@@ -967,17 +967,23 @@ end
 local function waitFor(pred, frames, tapA)
     for _ = 1, frames do
         if pred() then return true end
-        local state = tapA and controllerState()
-        if state == "dialogue_wait" then
-            if not INSPECT.advanceDialogue(60) then return false end
-        elseif state == "send_to_convoy" and INSPECT.onFullBag then
-            -- the bot's answer (botApi sets it); a scenario without one waits as before
-            if not INSPECT.onFullBag() then return false end
-        else
-            yield()
-        end
+        local pressed = nil
+        if tapA then pressed = INSPECT.answerWait(controllerState()) end
+        if pressed == false then return false end
+        if pressed == nil then yield() end
     end
     return false
+end
+
+-- Answer a wait the game puts to the player outside any menu the caller drives: a dialogue
+-- box, or the full-bag chooser when the bot set INSPECT.onFullBag (a scenario without one
+-- waits as before). FE8 raises the chooser in the ENEMY phase too, when a kill's drop lands on
+-- a full bag (vanilla Ch3 t7, Colm's counter). true = answered, false = the press failed,
+-- nil = nothing to answer here (the caller yields).
+function INSPECT.answerWait(state)
+    if state == "dialogue_wait" then return INSPECT.advanceDialogue(60) end
+    if state == "send_to_convoy" and INSPECT.onFullBag then return INSPECT.onFullBag() end
+    return nil
 end
 
 -- One guarded A on a dialogue box (#238: the only way a scenario presses through a box).
@@ -1412,11 +1418,9 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
         if faction() == 0 and not menuOpen() and state == "player_map_idle" then
             return "player"
         end
-        if state == "dialogue_wait" then
-            if not INSPECT.advanceDialogue(60) then return nil end
-        else
-            yield()
-        end
+        local pressed = INSPECT.answerWait(state)
+        if pressed == false then return nil end
+        if pressed == nil then yield() end
     end
     traceFailure("enemy_phase", "enemy phase reaches game over or returns player control",
         "fail:phase-timeout", nil, "controller-enemy-phase-timeout")
