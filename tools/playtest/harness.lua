@@ -3166,11 +3166,27 @@ INSPECT.botApi = function(game)
         if not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false, "the move failed" end
         if a.act == "attack" then
             -- The actor can die in its own attack: a dead unit is never greyed out, so its
-            -- death is an exit of the combat wait too.
-            if chooseAttack(u.addr, function()
-                return won() or lost() or (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0
-            end, a.targetId, a.obstacle) then return true end
-            return false, a.obstacle and "the strike on the wall did not play out" or "the attack did not play out"
+            -- death is an exit of the combat wait too. So is the event engine taking over: a
+            -- kill that ends the chapter (vanilla Ch2's DefeatAll, a Defeat Boss boss) plays
+            -- the ending from there, the actor never greyed out, and ~1,700 frames of it ran
+            -- the combat budget out. What follows is waited out on the enemy phase's
+            -- wedge-catcher budget, until the chapter advances or control comes back.
+            local dead = function() return (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0 end
+            local function settled()
+                return won() or lost() or dead() or (ru32(u.addr + 0x0C) & 0x2) ~= 0
+            end
+            if not chooseAttack(u.addr, function()
+                return won() or lost() or dead() or procActive(SYM.ProcScr_StdEventEngine)
+            end, a.targetId, a.obstacle) then
+                return false, a.obstacle and "the strike on the wall did not play out"
+                    or "the attack did not play out"
+            end
+            if not settled() and not waitFor(function()
+                return settled() or controllerState() == "player_map_idle"
+            end, TUNE.enemyPhaseFrames, true) then
+                return false, "an event began in the attack, and the game never came back"
+            end
+            return true
         elseif a.act == "talk" then
             if not chooseTalk(a.targetId) then return false end
             return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
