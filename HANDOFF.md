@@ -9,25 +9,55 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-28, late night (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at
-b9e99bd, PUSHED (no PR yet).** The fix list in #510 comment 6478205562 is DONE (974e921, e27ff56),
-and ours ch03 careful's stall turned out to be four bot faults, fixed (c742425, 8c9f6d1). Read
-today's two summaries: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6478944227>
-(items 1-5, with the Mogall's fights read as a pair) and
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6480158861> (the four planner
-faults, the vanilla regression, the Seth-benched experiment, and the weights ruling).
-- **Ch3 attempts 1-8 at 8c9f6d1:** vanilla 8/8 won all alive; ours careful 2/2 won t13 all alive,
-  even 3/3 won (Trex to a Grunt t7), bold 3/3 won (2 to the Mogall). Same-style attempts replay
-  identically (one saved start, RNG included): ~3 distinct games per side, not 8.
-- **Rulings, recorded on the branch (b9e99bd):** ADR 0374 (read every bot result beside vanilla;
-  prove the bot on vanilla first, then read ours' traces before calling a failure the level;
-  vanilla Ch3 attempts 1-8 after every planner change) and ADR 0375 (a style's risk tolerance is
-  not a declared value). No ch03 cell run now: the lord class and Baxby-as-Seth changes are coming.
+Refreshed 2026-10-29 (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at 592b058,
+PUSHED (no PR yet).**
+
+**NEXT SESSION, FIRST AND ONLY: a real brainstorm of the planner's LONG-TERM design** (Nicolas,
+2026-10-29: "these early chapters are way smaller and simpler than late game ... we need to be
+thinking about that not duct tape solutions"; "Don't guess what capabilities we have, do your
+homework and give me a real recommendation with no assumptions"). Use `superpowers:brainstorming`.
+The questions and the measurements they need are in ONE #510 comment:
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6482308936>. In brief: how a
+plan is scored (averaged expected damage vs the game's REAL enemy phase sampled in the sandbox),
+how far it looks (one turn vs a short rollout), search (beam + mend vs local search vs evolution,
+record 0021), and scale (all numbers so far are Ch1-Ch3; a late-game map is needed, and how to
+reach one is itself to be found out). **No more planner patches until that is decided**: the
+two-turn boss assault is NOT to be built.
+- Read before it: this session's three #510 summaries,
+  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6481175246> (the judged-phase
+  faults), <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6481532715> (the
+  vanilla Ch2 crash) and <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6481855102>
+  (CPU cost).
+- **Done 2026-10-29** (each proven in the ROM; the commit messages carry the numbers):
+  - 7b29653: the judged enemy phase branches where a counter may kill a striker; reds fight at
+    the HP the plan leaves; one order per act set in the beam; the **mend** (a unit the best plan
+    may lose tries its other acts).
+  - 79a5010: vanilla gets its own symbol tables (`PT_SYMDIR`). Running a vanilla and an ours run
+    at once used to hang vanilla in our addresses.
+  - 6c1d47c: an attack that starts an event (vanilla Ch2's DefeatAll ending) is waited out on the
+    enemy phase's budget. Vanilla Ch2 went from 2/8 to 8/8 won all alive.
+  - 434c351: one enemy decision runs its game calls as one list (a Thumb stub in the sandbox),
+    7-12% fewer frames for the same games, move for move.
+  - 592b058: `attempts` prints each run's frames, and lists a run that crashed before its bot
+    reported.
+- **Attempts 1-8, pool 4, at 592b058, ours beside vanilla:** Ch2: ours 7/8 won all alive (even
+  loses one), vanilla 8/8. Ch3: ours careful and even won all alive, bold won t20 with 2 deaths
+  to the Mogall; vanilla 8/8.
+- **CPU seconds are not a cost measure on this Mac** (M2: 4 performance + 4 efficiency cores;
+  other apps take ~2.5 cores). One identical game cost 17 to 29 CPU s. Compare costs in emulated
+  frames and game calls (now in every `attempts` line).
+- Rulings still standing: ADR 0374 (every bot result read beside vanilla) and ADR 0375 (a style's
+  risk tolerance is not declared).
 - Fixed but not proven in the ROM: `sight.legal` refusing an act (it refused none in ~40 runs; the
   refusal path is unit-tested only).
-Saved starts: vanilla
-Ch3 `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/3.ss`; ours ch03
-`references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/4.ss` (ch02 = `3.ss`).
+Saved starts: vanilla Ch2 and Ch3, `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/{2,3}.ss`;
+ours ch02 and ch03, `references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/{3,4}.ss`. Nothing later.
+**How to run one chapter:** ours needs a store of vanilla shops it does not have yet, so build the
+env with a dummy store (every `<n>.json` = `{"shops":[]}`): `campaign_env.py ours --store <dummy>
+--id e1-ours-ch07 --from 3`, then set `last: [3]` (ch02) or `from: 4, last: [4]` (ch03). Vanilla:
+`campaign_env.py vanilla --id e1-vanilla-ch3 --from 3` with `last: [3]` (`from: 2, last: [2]` for
+Ch2). Run with `montecarlo.py attempts [--vanilla] --env <file> --attempts 8 --jobs 4 --out
+<dir>/r.jsonl`; traces go beside the out file, `montecarlo.py story <trace>` reads one.
 #546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
 `lordfloor` +10 HP, not yet run in the emulator).
 **The parity model is being
@@ -167,10 +197,10 @@ G3 #537 78105ed; the summary is on #531).
             strike the grell alone and die.
         **Done 2026-10-28 (late):** the fix list of #510 comment 6478205562, and the boss
         assault's starvation, ally swaps, three holds, free-tile march (see the top of this file).
-        Still owed:
-        - Ours ch02 even/bold leave (1,12) unvisited (`left_open`, 3 of 8).
-        - Ours bold lone-strikes the Mogall and loses units: the planner has no "chip now, finish
-          next turn" plan (record 0021's whole-turn planning, NEXT item 6).
+        Still owed (all behind the design brainstorm at the top):
+        - Ours ch02 (1,12) is unreached in 7 of 8 (`left_open`); ours ch02 even loses one unit.
+        - Ours bold loses units to the Mogall: no plan chips the boss now and finishes it next
+          turn. Whether that becomes a look-ahead or a sampled rollout is the brainstorm's call.
         - Nicolas: **use convoy items before buying anything** (between chapters; drive the prep
           Supply screen). And: promote at level 10, between chapters, configured separately.
           Seals found in battle go to the convoy for now.
@@ -188,11 +218,10 @@ G3 #537 78105ed; the summary is on #531).
      3. **The planner barely reads claims:** two ch03 attempts differing only in claims
         (`avoid` vs `kits`) played identically. The plan says claims become goal and weight
         terms; build that.
-     4. Game-call cost: each sandbox call rounds up to a whole frame (~0.9 ms, `run_s`). Running
-        a call list in one frame is the next lever.
-     5. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
-        claims, then the PR and `/code-review <PR> medium` in a subagent.
-     6. If the beam keeps cornering units: evolve whole-turn plans (record 0021). Not adopted.
+     4. DONE 2026-10-29: game calls run as lists (434c351). What remains is Lua and emulation.
+     5. ch04 (fog), convert the other chapters' `unmodelled` claims, then the PR and
+        `/code-review <PR> medium` in a subagent. (Vanilla Ch2's crash is fixed, 6c1d47c.)
+     6. Whole-turn search (record 0021) is part of the design brainstorm at the top.
    - **How to run:** build PT_CAMPAIGN with `campaign_env.py`. Ours needs `--store` of a vanilla
      campaign through Ch8 for its shops; until one exists, pass `shops: {}` and `last: [host]`
      by hand. **PT_CAMPAIGN holds the JSON ITSELF, not a path:** `PT_CAMPAIGN="$(cat env.json)"
