@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` 5add902, no PR yet; planner, F1 pool and F2 verdict built; next: finish F2, then F3's plain-sentence report). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` c0382b3, no PR yet; planner, F1 pool and F2 (verdict + cell driver) built; next: F3, the trace first). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -98,8 +98,13 @@ G3 #537 78105ed; the summary is on #531).
      "no clear difference", each with both clean-clear rates and the gap's range. A summary line
      sits on top, flagged cells first, noting that about 1 flag in 24 is chance.
    - **NEXT, in order:**
-     1. Finish F2: `sample_style` (with its forced-units test), reading vanilla pairs from the
-        kept store, and the cell driver that runs a cell's pairs to its looks with the pool.
+     1. **F2 is DONE** (c0382b3): `montecarlo.py cell --ours <env> --vanilla <env> [--mode]
+        [--jobs]` plays a cell to its verdict. Pair s = each side's chapter start, the game seeded
+        with s (env `reseed`) and attempt 1's style. Each game's runs go in
+        `<run.sh --simdir>/runs.jsonl`, stamped with cell + Lua hash, and a kept run is never played
+        again. A crash's pair is left out and replaced by a new seed. `sample_style` IS
+        `Campaign.drawStyle` + `Bot.team` (no Python copy). The rulings are on #510 (comment
+        6457132394). `make sim` is not written yet (F4 needs it).
      2. F3: the report (plain sentences first), bot faults, feasibility, attempts buckets,
         `--post`. **Every run keeps a full playtest log (a TRACE, Nicolas: "I want to be able
         to understand everything about how it went")**: every player and enemy act with the
