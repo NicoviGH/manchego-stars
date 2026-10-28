@@ -1504,6 +1504,70 @@ do
     check(strikes(4), 2, "wall: a wall the first blow leaves standing is struck again")
 end
 
+-- test_the_assault_seats_every_striker: the boss E sits in the corner (0,0); (1,0) is the one
+-- tile beside it both A and C reach. R, the heavier, strikes from 1 or 2 away and also
+-- reaches (1,1); M strikes only from beside it. The assault seats R on (1,1) and M on (1,0):
+-- both strike. Offering each unit two tiles and seating the heaviest first on its first
+-- left M nothing (ours ch03: three of six strikers dropped).
+do
+    local R = blue(0x01, 0, 3, 0, { maxRange = 2 })
+    local M = blue(0x02, 1, 3, 1)
+    local E = red(0x81, 0, 0, { isBoss = true, hp = 30, minRange = false })
+    local hit = function(dmg) return fc { hit = 100, dmg = dmg, hits = 1 } end
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 3, 0 }, { 1, 0 }, { 1, 1 }), [0x02] = tiles({ 3, 1 }, { 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = hit(10), ["1,1"] = hit(10) } },
+               [0x02] = { [0x81] = { ["1,0"] = hit(5) } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(R, M, E), sightOf(o), style("careful"))
+    local seated
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "assault" then seated = table.concat(c.acts, " ") end
+    end
+    check(seated and seated:find("1>attack@1,1") ~= nil and seated:find("2>attack@1,0") ~= nil, true,
+          "assault: R strikes from 2 away, leaving M the tile beside the boss")
+end
+
+-- test_a_plan_moves_an_ally_off_the_tile_another_needs: B stands on (1,0), the one tile that
+-- brings A nearer the enemy; B can step on to (2,0). The plan moves B first, then A onto B's
+-- old tile -- never A first, which the game would refuse (ours ch03: Braulo queued behind the
+-- light hitters on the corner's safe tiles, and never reached the boss).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local F = blue(0x02, 1, 1, 0)
+    local E = red(0x81, 6, 0, { minRange = false })
+    local far = { ["0,0"] = 6, ["1,0"] = 5, ["2,0"] = 4, ["3,0"] = 3 }
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 1, 0 }, { 2, 0 }) },
+                field = fieldsOf { ["6,0"] = far } }
+    local _, plan = Planner.plan(B, boardOf(A, F, E), sightOf(o), style("careful"))
+    local order = {}
+    for _, a in ipairs(plan and plan.acts or {}) do order[#order + 1] = a.unitId .. "@" .. at(a) end
+    check(table.concat(order, " "), "2@2,0 1@1,0", "vacate: B steps on, then A takes its tile")
+end
+
+-- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
+-- (0,1) and (0,2) are safe, (0,1) the safest by board order. C marches onto (0,1). A must
+-- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (ours ch03: Braulo
+-- beside the Mogall at 81% to die while a safe tile stood free).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local C = blue(0x02, 1, 1, 1, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }),
+                  [0x81] = tiles({ 1, 0 }) },
+        field = function() return { [0] = { [0] = 5 }, [1] = { [0] = 5, [1] = 9 }, [2] = { [0] = 5 } } end,
+        danger = { ["0,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
+    local where = {}
+    for _, a in ipairs(plan and plan.acts or {}) do where[a.unitId] = at(a) end
+    check(where[0x02], "0,1", "holds: C takes the ground it marches for")
+    check(where[0x01], "0,2", "holds: A holds on its next safe tile, not the exposed one")
+end
+
 -- test_a_visited_tile_is_not_offered_again: a House (eventinfo House(0, ...), flag 0) keeps
 -- its Visit for good, so the game offers it every turn. Once we have visited it, it is no one's
 -- goal and no Visit is proposed there: vanilla Ch1's two houses held Seth and Eirika on them

@@ -294,7 +294,9 @@ function M.plan(Bot, board, sight, style, opts)
     local function extend(st, a, uid)
         local tile = a.move.x .. "," .. a.move.y
         if st.used[uid] or st.tiles[tile] or (a.targetId and st.gone[a.targetId])
-                or (a.act == "staff" and moved(st, a.targetId)) then
+                or (a.act == "staff" and moved(st, a.targetId))
+                -- an ally's tile, until the plan has moved that ally off it
+                or (a.vacate and not st.used[a.vacate]) then
             return nil
         end
         local v, fx = score(a, st, W, style, hitChance)
@@ -360,15 +362,13 @@ function M.plan(Bot, board, sight, style, opts)
         for i = 1, math.min(M.BEAM, #nxt) do beam[i] = nxt[i] end
     end
 
-    -- `st` with every unit it does not move holding (its hold act: the safest wait tile)
+    -- `st` with every unit it does not move holding: its safest hold tile still free
     local function complete(st)
         for _, c in ipairs(cands) do
             if not st.used[c.unit.id] then
                 for _, a in ipairs(c.acts) do
-                    if a.why == "hold" then
-                        st = extend(st, a, c.unit.id) or st
-                        break
-                    end
+                    local n = a.why == "hold" and extend(st, a, c.unit.id)
+                    if n then st = n break end
                 end
             end
         end
@@ -409,6 +409,32 @@ function M.plan(Bot, board, sight, style, opts)
             if x.opts[1].dealt ~= y.opts[1].dealt then return x.opts[1].dealt > y.opts[1].dealt end
             return x.uid < y.uid
         end)
+        -- each tile's takers; a striker takes, of its heaviest blows, the tile the fewest of
+        -- those after it could use -- a 1-2 range unit leaves the boss's side to the melee
+        local takers = {}
+        for i, sk in ipairs(strikers) do
+            for _, o in ipairs(sk.opts) do
+                local t = o.a.move.x .. "," .. o.a.move.y
+                takers[t] = takers[t] or {}
+                takers[t][i] = true
+            end
+        end
+        local function contention(t, after)
+            local n = 0
+            for j in pairs(takers[t]) do
+                if j > after then n = n + 1 end
+            end
+            return n
+        end
+        for i, sk in ipairs(strikers) do
+            local c = {}
+            for _, o in ipairs(sk.opts) do c[o] = contention(o.a.move.x .. "," .. o.a.move.y, i) end
+            table.sort(sk.opts, function(x, y)
+                if x.dealt ~= y.dealt then return x.dealt > y.dealt end
+                if c[x] ~= c[y] then return c[x] < c[y] end
+                return key(x.a) < key(y.a)
+            end)
+        end
         local st = start
         for _, sk in ipairs(strikers) do
             if st.gone[boss.id] then break end

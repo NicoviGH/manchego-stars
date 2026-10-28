@@ -381,6 +381,8 @@ end
 -- The axes a run's style is sampled on: aggression, a closed set, and the claims a run follows
 -- (the runner's list). The team is not an axis: Bot.team picks it from the map and the claims.
 -- The route is not one either: a campaign SETTING (#510 plan comment, "Lords").
+M.HOLDS = 3        -- hold tiles offered per unit (candidates), safest first
+
 M.STYLES = {
     aggression = { "careful", "even", "bold" },
     claims = {},   -- Strategy claim ids the run follows
@@ -499,13 +501,14 @@ local function strike(ctx, u, e, x, y)
         function() return ctx.sight.strike(u, e, x, y) end)
 end
 
--- sight.reach, with the unit's own tile always in it (attacking or waiting where it stands).
+-- sight.reach, with the unit's own tile always in it (attacking or waiting where it stands),
+-- and the tiles our own units stand on (FE8's movement map passes through them; endTiles).
 local function reachOf(ctx, u)
     local r = ctx.reaches[u.id]
     if r then return r end
     r = {}
     local own = false
-    for _, t in ipairs(ctx.sight.reach(u) or {}) do
+    for _, t in ipairs(ctx.sight.reach(u, true) or {}) do
         r[#r + 1] = t
         if t.x == u.x and t.y == u.y then own = true end
     end
@@ -548,6 +551,15 @@ end
 -- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
 -- seize tile for a unit that cannot Seize there -- unless it already stands on it: its own
 -- tile is always left, so a unit boxed in on the throne still has somewhere to wait.
+-- A tile an ally who has yet to act stands on is left in: the plan may move that ally first
+-- (vacated, below; the planner holds the act until it has). Ours ch03: the corner's safe
+-- tiles held our lightest hitters, and Braulo, the heaviest, never reached the boss.
+local function vacated(ctx, u, x, y)
+    local there = ctx.standing[tileKey(x, y)]
+    if there and there ~= u and there.faction == "blue" and not there.acted then return there end
+    return nil
+end
+
 local function endTiles(ctx, u)
     local s = ctx.seizeTile
     local barred = s and not canSeize(ctx, u)
@@ -555,7 +567,8 @@ local function endTiles(ctx, u)
     for _, t in ipairs(reachOf(ctx, u)) do
         local there = ctx.standing[tileKey(t.x, t.y)]
         local own = t.x == u.x and t.y == u.y
-        if (not there or there == u) and (own or not (barred and t.x == s.x and t.y == s.y)) then
+        if (not there or there == u or vacated(ctx, u, t.x, t.y))
+            and (own or not (barred and t.x == s.x and t.y == s.y)) then
             out[#out + 1] = t
         end
     end
@@ -652,15 +665,23 @@ end
 
 -- Of `tiles`, the one with the smallest worst case, the unit's own tile first on a tie (holding
 -- costs nothing).
-local function safest(ctx, u, tiles)
-    local best, bestSum = nil, nil
-    for _, t in ipairs(tiles) do
-        local sum = worstCase(ctx, u, t.x, t.y, nil).sum
-        local own = t.x == u.x and t.y == u.y
-        if not bestSum or sum < bestSum or (sum == bestSum and own) then best, bestSum = t, sum end
+-- `tiles`, safest first: the lowest worst case, its own tile first on a tie, then board order.
+local function bySafety(ctx, u, tiles)
+    local out = {}
+    for i, t in ipairs(tiles) do
+        out[i] = { t = t, i = i, sum = worstCase(ctx, u, t.x, t.y, nil).sum,
+                   own = t.x == u.x and t.y == u.y }
     end
-    return best
+    table.sort(out, function(a, b)
+        if a.sum ~= b.sum then return a.sum < b.sum end
+        if a.own ~= b.own then return a.own end
+        return a.i < b.i
+    end)
+    for i, o in ipairs(out) do out[i] = o.t end
+    return out
 end
+
+local function safest(ctx, u, tiles) return bySafety(ctx, u, tiles)[1] end
 
 -- What our own attack's counter can take before the enemy phase: its worst case, nothing when
 -- the target cannot answer this attack or the first blow is a sure kill (the target is dead
@@ -1408,15 +1429,21 @@ function M.candidates(board, sight, style, opts)
             c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
             if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
         end
+        local function offer(c)
+            local a = action(u, c.tile, "attack", c.target)
+            a.f, a.spent, a.first = c.f, c.spent, c.first
+            add(a, "attack")
+        end
         for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
             for _, list in ipairs({ best, safe }) do
-                local c = list[e]
-                if c then
-                    local a = action(u, c.tile, "attack", e)
-                    a.f, a.spent, a.first = c.f, c.spent, c.first
-                    add(a, "attack")
-                end
+                if list[e] then offer(list[e]) end
             end
+        end
+        -- the boss from every tile: the planner's assault seats several strikers around it,
+        -- and two tiles per unit gave them all the same one (ours ch03's corner Mogall: three
+        -- of six strikers dropped, the rest of its tiles empty)
+        for _, c in ipairs(attackOptions(ctx, u, open)) do
+            if c.target.isBoss then offer(c) end
         end
         add(breach(ctx, u, open, objective), "breach")
         for _, t in ipairs(ctx.onField) do
@@ -1462,7 +1489,8 @@ function M.candidates(board, sight, style, opts)
             end
         end
         add(action(u, march(ctx, u, open, objective), "wait"), "march")
-        add(action(u, safest(ctx, u, waitTiles(ctx, u)), "wait"), "hold")
+        local holds = bySafety(ctx, u, waitTiles(ctx, u))
+        add(holds[1] and action(u, holds[1], "wait"), "hold")
         -- progress: how much nearer its march goal (the game's field to it) each act ends it
         local goal = marchGoal(ctx, u, objective)
         local field = fieldFor(ctx, goal)
@@ -1486,8 +1514,14 @@ function M.candidates(board, sight, style, opts)
             end
         end
         if retreat then add(action(u, retreat, "wait"), "retreat") end
+        -- the next safest holds too: another unit the plan moves first may take the safest,
+        -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
+        -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
+        for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
         for _, a in ipairs(acts) do
             a.progress = gain(a.move.x, a.move.y)
+            local friend = vacated(ctx, u, a.move.x, a.move.y)
+            a.vacate = friend and friend.id
             -- what can strike it there next phase, each enemy's own strike (the planner's odds)
             a.exposure = {}
             for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y)) do

@@ -35,7 +35,7 @@
 --                            a unit for and nothing else reads -- so it walks `e` alone while
 --                            the others stay valid units: they block it on gBmMapUnit and a
 --                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
---   reach(unit)              tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
+--   reach(unit, friends)     tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
 --                            less those another unit stands on (gBmMapUnit). Either faction.
 --   range(unit)              { min, max } of the weapon FE8 has equipped (GetUnitEquippedWeapon,
 --                            the first CanUnitUseWeapon accepts, which BU_ISLOT_AUTO strikes
@@ -157,6 +157,7 @@ M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
+M.FACTION_MASK = 0xC0        -- include/bmunit.h: a unit index's faction bits (blue 0x00)
 M.EVFLAG_DEFEAT_BOSS = 2     -- include/constants/event-flags.h; DefeatTalkEnt +04 flag
 M.DEFEAT_TALK_FLAG = 0x04
 M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
@@ -631,15 +632,20 @@ function M.new(outer)
         return function(x, y) return g[y] and g[y][x] or 0 end
     end
 
-    function s.reach(u)
+    function s.reach(u, friends)
         return sandbox(function(call)
             call(S.GenerateUnitMovementMap, { u.addr })
             local out = {}
             for y = 0, h - 1 do
                 for x = 0, w - 1 do
-                    if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT
-                        and ((x == u.x and y == u.y) or grid(mem, S.gBmMapUnit, x, y) == 0) then
-                        out[#out + 1] = { x = x, y = y }
+                    local by = grid(mem, S.gBmMapUnit, x, y)
+                    local own = x == u.x and y == u.y
+                    if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT then
+                        if own or by == 0 then
+                            out[#out + 1] = { x = x, y = y }
+                        elseif friends and (by & M.FACTION_MASK) == (u.id & M.FACTION_MASK) then
+                            out[#out + 1] = { x = x, y = y, by = by }
+                        end
                     end
                 end
             end
