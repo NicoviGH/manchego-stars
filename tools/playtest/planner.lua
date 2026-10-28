@@ -29,7 +29,8 @@
 --
 -- api: Planner.plan(Bot, board, sight, style) -> the first act of the best plan (bot.lua's
 -- action shape) or nil when no unit can act, and the plan's record { score, acts, expect,
--- enemies, judged }. Planner.surprise(plan, k, before, after, visible) -> why the board after
+-- enemies, judged, predict, considered = every plan judged, best first: { judged, acts }
+-- }. Planner.surprise(plan, k, before, after, visible) -> why the board after
 -- its k-th act calls for a new plan, or nil to play act k + 1.
 
 local M = {}
@@ -302,6 +303,8 @@ function M.plan(Bot, board, sight, style)
     -- judge the best complete plans against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
     local best
+    -- every plan judged, for the run's trace: its acts and its score
+    local considered = {}
     for i = 1, math.min(M.FINAL, #beam) do
         local st = beam[i]
         local planned, at = {}, {}
@@ -341,9 +344,14 @@ function M.plan(Bot, board, sight, style)
         end
         st.judged = judged
         st.strikes = strikes
+        local keys = {}
+        for _, a in ipairs(st.acts) do keys[#keys + 1] = key(a) end
+        considered[#considered + 1] = { judged = judged, acts = keys }
         if not best or judged > best.judged then best = st end
     end
     if not best or #best.acts == 0 then return nil end
+    table.sort(considered, function(x, y) return x.judged > y.judged end)
+    best.considered = considered
     best.enemies = {}
     for _, e in ipairs(ctx.enemies) do best.enemies[e.id] = true end
     return best.acts[1], best

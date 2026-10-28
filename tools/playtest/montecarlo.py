@@ -25,6 +25,11 @@ record 0022; the #510 plan's Task 12, amended 2026-10-27).
     python3 tools/playtest/montecarlo.py cell --ours <env .json> --vanilla <env .json> \
         [--mode normal] [--jobs 4]
 
+    python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
+
+`story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
+forecast and every blow.
+
 `cell` plays one chapter-and-mode cell to its verdict. Pair s is run s of each side: the
 chapter's saved start loaded, the game seeded with s (env `reseed`, harness.lua) and attempt 1's
 style drawn from s, so pairs differ by seed and by style alike; one chapter start has only
@@ -36,14 +41,18 @@ seed played in its place, never the same one again.
 """
 import argparse
 import concurrent.futures
+import functools
 import glob
+import gzip
 import hashlib
 import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
+import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUN_SH = os.path.join(HERE, 'run.sh')
@@ -118,6 +127,26 @@ def records_of(task, text, where, log_path):
              'log': log_path, 'why': 'the worker left no BOTRUN record'}]
 
 
+def keep_trace(rec, out):
+    """File a run's trace (botrun.lua's TRACE, left in its run dir) beside the runs file,
+    gzipped, under a name no other run takes; the record then names it relative to the runs
+    file's directory. A record whose trace is missing keeps no `trace`."""
+    name = rec.get('trace')
+    if not name or not rec.get('run_dir'):
+        return
+    src = os.path.join(rec['run_dir'], name)
+    if not os.path.exists(src):
+        rec.pop('trace')
+        return
+    rel = os.path.join('traces', str(rec.get('campaign') or 'run'), '%s-s%s-a%s-%s.jsonl.gz' % (
+        rec.get('chapter'), rec.get('seed'), rec.get('attempt'), uuid.uuid4().hex[:8]))
+    dest = os.path.join(os.path.dirname(os.path.abspath(out)), rel)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(src, 'rb') as fin, gzip.open(dest, 'wb') as fout:
+        shutil.copyfileobj(fin, fout)
+    rec['trace'] = rel
+
+
 class Pool:
     """`jobs` workers at once. `launch(task, tag, log_path) -> (stdout text, run dir)` runs one
     task (the real one drives run.sh; tests pass a fake). A task's `stamp` is written into
@@ -147,6 +176,7 @@ class Pool:
                 recs = records_of(task, text, where, log_path)
             for r in recs:
                 r.update(task.get('stamp') or {})
+                keep_trace(r, self.out)
             return recs
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.jobs) as ex:
@@ -394,6 +424,172 @@ def cell_main(args):
     return 0
 
 
+# ---- one run, told (PR F3) ----
+
+@functools.lru_cache(maxsize=None)
+def _names(game):
+    """{character id: name}: ours' cast by its PCs' and guests' names, then every character
+    the decomp names (vanilla's cast and the generic enemies both games share)."""
+    sys.path.insert(0, os.path.dirname(HERE))
+    import inject.cast
+    import inject.decomp
+    from inject.scene_actors import character_pid
+    text = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
+    out = {v: k[len('CHARACTER_'):].replace('_', ' ').title()
+           for k, v in inject.decomp.enum_values(text, 'CHARACTER_').items()}
+    if game == 'ours':
+        for table in (inject.cast.PORTRAIT_MAP, inject.cast.GUEST_PORTRAIT_MAP):
+            for name, slot in table.items():
+                pid = character_pid(inject.cast.char_symbol(slot))
+                if pid is not None:
+                    out[pid] = name.replace('-', ' ').title()
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _items():
+    sys.path.insert(0, os.path.dirname(HERE))
+    import inject.decomp
+    text = inject.decomp.vanilla_decomp_text('include/constants/items.h')
+    return {v: k[len('ITEM_'):].replace('_', ' ').title()
+            for k, v in inject.decomp.enum_values(text, 'ITEM_').items()}
+
+
+@functools.lru_cache(maxsize=None)
+def _classes(game='vanilla'):
+    """{class id: name}: every vanilla class by FE8's name, and for ours each enemy reskin by
+    its own (campaign.yaml), on the slot it takes."""
+    sys.path.insert(0, os.path.dirname(HERE))
+    from inject import class_ids, reskins
+    import campaign_env
+    out = {v: class_ids.class_display_name(k[len('CLASS_'):])
+           for k, v in class_ids.vanilla_class_values().items()}
+    if game == 'ours':
+        for rk in reskins.enemy_class_reskins(campaign_env.campaign_chapters.CAMPAIGN):
+            out[campaign_env.reskin_class_id(rk)] = class_ids.class_display_name(rk['id'])
+    return out
+
+
+VERBS = {'attack': 'attacks', 'wait': 'waits', 'staff': 'uses a staff on', 'talk': 'talks to',
+         'door': 'opens a door', 'seize': 'seizes', 'item': 'uses an item', 'moves': 'moves',
+         'attacks': 'attacks'}
+
+
+def read_trace(path):
+    opener = gzip.open if path.endswith('.gz') else open
+    with opener(path, 'rt') as fh:
+        return [json.loads(line) for line in fh if line.strip()]
+
+
+def story(events, names=None, items=None, classes=None):
+    """One run's trace as plain lines. `names`/`items`/`classes`: {id: name}. A unit without a
+    name of its own is named by its class (from the phase snapshots and battles), then by id."""
+    names, items, classes = names or {}, items or {}, classes or {}
+    cls = {}   # character id -> class id, as the trace saw it
+
+    def who(cid):
+        if cid is None:
+            return 'someone'
+        if cid in names:
+            return names[cid]
+        c = cls.get(cid)
+        if c is not None:
+            return 'the %s' % classes.get(c, 'class 0x%02X' % c)
+        return 'unit 0x%02X' % cid
+
+    def item(iid):
+        return items.get(iid) or ('item 0x%02X' % iid)
+
+    def blows(b):
+        a, t = b['actor'], b['target']
+        side = {'actor': a, 'target': t}
+        other = {'actor': t, 'target': a}
+        back = ('%s hit %d%% crit %d%%' % (who(t['charId']), t['hit'], max(t['crit'], 0))
+                if t.get('canCounter', True) else '%s cannot strike back' % who(t['charId']))
+        head = '    forecast: %s hit %d%% crit %d%% with %s; %s' % (
+            who(a['charId']), a['hit'], max(a['crit'], 0), item(a['weapon']), back)
+        out = [head]
+        for h in b['hits']:
+            by, on = side[h['by']], other[h['by']]
+            if h['miss']:
+                out.append('    %s misses' % who(by['charId']))
+            else:
+                out.append('    %s hits %s for %d%s' % (who(by['charId']), who(on['charId']),
+                                                      h['dmg'], ', a critical' if h['crit'] else ''))
+        out.append('    after: %s %d -> %d HP, %s %d -> %d HP' % (
+            who(a['charId']), a['hpBefore'], a['hp'], who(t['charId']), t['hpBefore'], t['hp']))
+        for s in (a, t):
+            if s.get('levelUp'):
+                out.append('    %s gains a level' % who(s['charId']))
+            if s.get('broke'):
+                out.append("    %s's weapon breaks" % who(s['charId']))
+        return out
+
+    lines = []
+    for e in events:
+        t = e.get('t')
+        for u in e.get('units') or []:
+            if u.get('classId') is not None:
+                cls[u['charId']] = u['classId']
+        for b in e.get('battles') or []:
+            for side in (b or {}).get('actor'), (b or {}).get('target'):
+                if side and side.get('classId') is not None:
+                    cls.setdefault(side['charId'], side['classId'])
+        if t == 'start':
+            info, st = e.get('info') or {}, e.get('style') or {}
+            lines.append('%s, chapter %s, %s, seed %s, attempt %s: plays %s, following %d claims'
+                         % (info.get('game'), info.get('chapter'), info.get('mode'),
+                            info.get('seed'), info.get('attempt') or 1, st.get('aggression'),
+                            len(e.get('claims_played') or [])))
+        elif t == 'phase':
+            lines.append('Turn %s, %s phase.' % (e.get('turn'), e.get('phase')))
+        elif t == 'plan' and e.get('replan'):
+            lines.append('  (the board was not what the plan expected: %s; a new plan)'
+                         % e['replan'])
+        elif t == 'act':
+            act = e.get('act') or ('attacks' if e.get('battles') else 'moves')
+            act = VERBS.get(act, act)
+            fr, to = e.get('from') or {}, e.get('to') or {}
+            moved = ('from %s,%s to %s,%s' % (fr.get('x'), fr.get('y'), to.get('x'), to.get('y'))
+                     if fr != to else 'at %s,%s' % (to.get('x'), to.get('y')))
+            target = ''
+            if e.get('target') is not None:
+                target = ' %s' % who(e['target'])
+            elif e.get('battles') and e['battles'][0]:
+                target = ' %s' % who(e['battles'][0]['target']['charId'])
+            lines.append('  %s %s%s, %s.' % (who(e.get('unit')), act, target, moved))
+            for b in e.get('battles') or []:
+                if b:
+                    lines.extend(blows(b))
+            for f in e.get('fell') or []:
+                lines.append('  %s falls%s.' % (who(f.get('charId')), (' to %s' % who(f['killer']))
+                                                if f.get('killer') is not None else ''))
+        elif t == 'fell':
+            for f in e.get('fell') or []:
+                lines.append('  %s falls%s.' % (who(f.get('charId')), (' to %s' % who(f['killer']))
+                                                if f.get('killer') is not None else ''))
+        elif t == 'event':
+            k = e.get('kind')
+            if k == 'arrive':
+                lines.append('  %s arrives at %s,%s (%s).' % (who(e.get('charId')), e.get('x'),
+                                                             e.get('y'), e.get('faction')))
+            elif k == 'recruit':
+                lines.append('  %s joins (was %s).' % (who(e.get('charId')), e.get('from')))
+            elif k == 'items':
+                ch = ['gains %s' % item(i) for i in e.get('gained') or []] + \
+                     ['loses %s' % item(i) for i in e.get('lost') or []]
+                lines.append('  %s %s.' % (who(e.get('charId')), ', '.join(ch)))
+        elif t == 'end':
+            r = e.get('record') or {}
+            dead = ', '.join('%s (turn %s, to %s)' % (who(d.get('charId')), d.get('turn'),
+                                                      who(d.get('killer')))
+                             for d in r.get('deaths') or [])
+            lines.append('Result: %s on turn %s%s.' % (
+                r.get('outcome'), r.get('turns'),
+                ', everyone alive' if r.get('all_alive') else (', lost ' + dead if dead else '')))
+    return lines
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -404,6 +600,8 @@ def main(argv=None):
     a.add_argument('--out', default='runs.jsonl')
     a.add_argument('--seed', type=int, default=1)
     a.add_argument('--vanilla', action='store_true')
+    st = sub.add_parser('story', help="one run's trace as plain text")
+    st.add_argument('trace', help='a trace .jsonl or .jsonl.gz')
     c = sub.add_parser('cell', help='one chapter-and-mode cell, ours vs vanilla, to its verdict')
     c.add_argument('--ours', required=True, help="ours' campaign env .json with `from`")
     c.add_argument('--vanilla', required=True, help="the twin's campaign env .json with `from`")
@@ -412,6 +610,11 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.cmd == 'cell':
         return cell_main(args)
+    if args.cmd == 'story':
+        events = read_trace(args.trace)
+        game = ((events[0].get('info') or {}).get('game') if events else None) or 'vanilla'
+        print('\n'.join(story(events, _names(game), _items(), _classes(game))))
+        return 0
     with open(args.env) as fh:
         env = json.load(fh)
     pool = Pool(jobs=args.jobs, out=args.out)

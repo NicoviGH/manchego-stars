@@ -331,5 +331,51 @@ do
     check(Board.freeBeside(io, 16, 0, { { 1, 0 } }, 17, 16), nil, "a neighbour past the width is none")
 end
 
+-- Board.battle: the last real battle from the game's own records (bmbattle.h layouts).
+do
+    local m = fakeMem()
+    local S = { gBattleStats = 0x0203A4D4, gBattleActor = 0x0203A4EC, gBattleTarget = 0x0203A56C,
+                gBattleHitArray = 0x0203A5EC }
+    local CH_A, CH_T = 0x08803000, 0x08803100
+    m.w32(S.gBattleActor, CH_A); m.w8(CH_A + 4, 0x03)
+    m.w32(S.gBattleTarget, CH_T); m.w8(CH_T + 4, 0x51)
+    m.w8(S.gBattleActor + 0x0B, 0x02); m.w8(S.gBattleTarget + 0x0B, 0x83)
+    m.w8(S.gBattleActor + 0x72, 20); m.w8(S.gBattleActor + 0x13, 13)      -- HP 20 -> 13
+    m.w8(S.gBattleTarget + 0x72, 18); m.w8(S.gBattleTarget + 0x13, 0)     -- killed
+    m.w16(S.gBattleActor + 0x48, 0x2E01)                                  -- item 1, 46 uses
+    m.w16(S.gBattleActor + 0x64, 85); m.w16(S.gBattleActor + 0x6A, 0xFFFF) -- crit -1 (s16)
+    m.w8(S.gBattleActor + 0x6E, 30); m.w8(S.gBattleActor + 0x08, 6); m.w8(S.gBattleActor + 0x70, 5)
+    local function hit(attr, info, dmg) return attr | (info << 19) | ((dmg & 0xFF) << 24) end
+    m.w32(S.gBattleHitArray + 0, hit(Board.HIT_CRIT, 0, 12))                          -- actor crits
+    m.w32(S.gBattleHitArray + 4, hit(0, Board.HIT_RETALIATION, 7))                    -- counter
+    m.w32(S.gBattleHitArray + 8, hit(Board.HIT_MISS, 0, 0))
+    m.w32(S.gBattleHitArray + 12, hit(0, Board.HIT_FINISHES, 6))
+    m.w32(S.gBattleHitArray + 16, hit(0, Board.HIT_END, 0))
+    m.w32(S.gBattleHitArray + 20, hit(0, 0, 99))                                      -- past END
+    check(Board.battle(m, S), nil, "a simulation (config without REAL) is no battle")
+    check(Board.battleKey(m, S), nil, "nor has a key")
+    m.w16(S.gBattleStats, Board.BATTLE_REAL)
+    local b = Board.battle(m, S)
+    check(b.actor.charId .. ">" .. b.target.charId, "3>81", "who fought (CharacterData +04)")
+    check(b.actor.hpBefore .. ">" .. b.actor.hp, "20>13", "the actor's HP before and after")
+    check(b.target.hp, 0, "the target's HP after")
+    check(b.actor.weapon, 1, "the weapon's item id, uses masked off")
+    check(b.actor.hit .. "," .. b.actor.crit, "85,-1", "the forecast's effective hit and crit")
+    check(b.actor.levelUp, true, "a level gained")
+    check(b.actor.exp, 30, "exp gained")
+    check(#b.hits, 4, "blows stop at END")
+    check(b.hits[1].crit and b.hits[1].by == "actor" and b.hits[1].dmg == 12, true, "a crit by the actor")
+    check(b.hits[2].by .. b.hits[2].dmg, "target7", "RETALIATION is the target's blow")
+    check(b.hits[3].miss, true, "a miss")
+    check(b.hits[4].finishes, true, "the blow that finishes the fight")
+    check(b.target.levelUp, false, "no exp, no level (a wall's battle unit has none)")
+    local k1 = Board.battleKey(m, S)
+    m.w8(S.gBattleActor + 0x0B, 0x84)
+    check(Board.battleKey(m, S) ~= k1, true, "another fighter, another battle")
+    local k2 = Board.battleKey(m, S)
+    m.w32(S.gBattleHitArray, hit(0, 0, 5))
+    check(Board.battleKey(m, S) ~= k2, true, "another first blow, another battle")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

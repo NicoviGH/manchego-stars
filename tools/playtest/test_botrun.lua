@@ -350,5 +350,112 @@ do
     check(asked, 3, "turn 1: the plan and the played-out ask; turn 2: one ask, then stuck")
 end
 
+-- test_trace_tells_the_run: every act with the game's battle record, both phases, an arrival,
+-- and the BOTRUN record last.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                g.units[#g.units + 1] = unit(0x82, 1, "red", 9, 9, 10)   -- arrives in its phase
+            end
+            return {}
+        end,
+    }
+    local evs, battle = {}, { actor = { charId = 1 }, target = { charId = 0x81 },
+                              hits = { { by = "actor", dmg = 5 } } }
+    g.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    g.api.battle = function() return battle end
+    local endPhase = g.api.endPhase
+    g.api.endPhase = function()
+        local phase, deaths = endPhase()
+        return phase, deaths, { { id = 0x81, charId = 0x81, from = { x = 1, y = 0 },
+                                  to = { x = 1, y = 0 }, hp = 5, battles = {} } }
+    end
+    Botrun.run(g.api)
+    local kinds = {}
+    for _, e in ipairs(evs) do kinds[#kinds + 1] = e.t end
+    kinds = table.concat(kinds, ",")
+    check(evs[1].t, "start", "the trace opens with the run's info")
+    check(evs[1].info.seed, 7, "which names the seed")
+    check(evs[#evs].t, "end", "and closes with the record")
+    check(evs[#evs].record.outcome, "won", "the record, whole")
+    local acts, strikes, enemyActs, arrive, phases = 0, 0, 0, nil, 0
+    for _, e in ipairs(evs) do
+        if e.t == "act" and e.phase == "player" then
+            acts = acts + 1
+            if acts == 1 then
+                check(e.from.x .. "," .. e.from.y, "0,0", "an act names where it moved from")
+            end
+            if e.act == "attack" then
+                strikes = strikes + 1
+                check(e.battles[1] and e.battles[1].hits[1].dmg, 5, "a strike carries the game's battle")
+            else
+                check(#e.battles, 0, "a move carries none")
+            end
+        end
+        if e.t == "act" and e.phase == "enemy" then enemyActs = enemyActs + 1 end
+        if e.t == "event" and e.kind == "arrive" then arrive = e end
+        if e.t == "phase" then phases = phases + 1 end
+        check(e.turn ~= nil, true, "every event names its turn: " .. e.t)
+    end
+    check(strikes >= 2, true, "both strikes on the first enemy are traced")
+    check(enemyActs >= 1, true, "the enemy phase's acts are traced")
+    check(arrive and arrive.id, 0x82, "the arrival is an event")
+    check(phases >= 3, true, "each phase opens with a snapshot")
+    check(kinds:find("plan", 1, true) ~= nil, true, "decisions are traced")
+end
+
+-- Botrun.events: a recruit is a unit whose character was on another side; items are diffed.
+do
+    local b = { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 3, 3, 15) } }
+    b.units[1].items = { { id = 1 }, { id = 0x6C } }
+    local a = { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 3, 3, 15) } }
+    a.units[1].items = { { id = 1 }, { id = 5 } }
+    a.units[2].charId = 0x41
+    b.units[2].onField = true
+    local ev = Botrun.events(b, a)
+    local by = {}
+    for _, e in ipairs(ev) do by[e.kind] = e end
+    check(by.recruit and by.recruit.from, "green", "the green unit came over")
+    check(by.items and by.items.gained[1], 5, "an item gained")
+    check(by.items and by.items.lost[1], 0x6C, "an item gone")
+end
+
+-- test_a_talk_recruit_is_no_kill: the green unit Talked to leaves its slot for a blue one.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 1, 0, 15),
+                                   unit(0x81, 0, "red", 9, 9, 10) } }
+    g.units[2].charId = 0x30
+    -- the first act also recruits the green unit, as a Talk does: its slot empties, a blue one
+    -- fills with the same character
+    local act, talked = g.api.act, false
+    g.api.act = function(a)
+        if not talked then
+            talked = true
+            table.remove(g.units, 2)                  -- the game clears the green slot
+            local r = unit(0x02, 1, "blue", 1, 0, 15)
+            r.charId, r.acted = 0x30, true
+            g.units[#g.units + 1] = r
+        end
+        return act(a)
+    end
+    local evs = {}
+    g.api.trace = function(ev) evs[#evs + 1] = ev end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.kills["1"] == nil or r.kills["1"] == 1, true, "the recruit is not A's kill")
+    local joined
+    for _, e in ipairs(evs) do
+        if e.t == "event" and e.kind == "recruit" then joined = e end
+        if e.t == "act" then
+            for _, f in ipairs(e.fell or {}) do
+                check(f.charId ~= 0x30, true, "the recruit did not fall")
+            end
+        end
+    end
+    check(joined and joined.from, "green", "it joined from green")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

@@ -239,6 +239,10 @@ WANTED = [
                                 # terrainId +0x55, weapon +0x48. Names WHO is on screen when a
                                 # battle animation freezes.
     'gBattleTarget',            # struct BattleUnit: the defending side of that same combat.
+    'gBattleStats',             # struct BattleStats: +00 config, BATTLE_CONFIG_REAL on a real
+                                # battle (the AI's own simulations write the same arrays).
+    'gBattleHitArray',          # struct BattleHit[BATTLE_HIT_MAX]: each blow of the last battle,
+                                # as the game rolled it (board.lua Board.battle, the bot's trace).
     'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
                                 # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
                                 # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.

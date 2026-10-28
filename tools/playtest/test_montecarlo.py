@@ -273,6 +273,66 @@ class Cell(unittest.TestCase):
             fh.write('return 2')
         self.assertNotEqual(h1, mc.bot_hash(d))
 
+    def test_a_runs_trace_is_kept_gzipped_beside_the_runs(self):
+        import gzip
+        d = tempfile.mkdtemp()
+        out = os.path.join(d, 'store', 'runs.jsonl')
+        os.makedirs(os.path.dirname(out))
+        rd = tempfile.mkdtemp()
+        with open(os.path.join(rd, 'trace-ours-4-a1.jsonl'), 'w') as fh:
+            fh.write('{"t": "start"}\n{"t": "end"}\n')
+
+        def launch(task, tag, log_path):
+            return ('BOTRUN {"seed": %d, "chapter": 4, "attempt": 1, "campaign": "c", '
+                    '"trace": "trace-ours-4-a1.jsonl"}\n' % task['seed'], rd)
+        recs = list(mc.Pool(jobs=1, out=out, launch=launch).run(
+            mc.cell_tasks({'id': 'c', 'from': 4}, [3], 'normal', {})))
+        rel = recs[0]['trace']
+        self.assertTrue(rel.startswith('traces/c/4-s3-a1-'), rel)
+        with gzip.open(os.path.join(d, 'store', rel), 'rt') as fh:
+            self.assertEqual([json.loads(x)['t'] for x in fh], ['start', 'end'])
+
+
+class Story(unittest.TestCase):
+    def test_a_run_reads_as_plain_text(self):
+        battle = {'actor': {'charId': 0x10, 'hit': 40, 'crit': -1, 'weapon': 0x01, 'hpBefore': 18,
+                            'hp': 18, 'levelUp': False, 'broke': False},
+                  'target': {'charId': 0x01, 'hit': 90, 'crit': 5, 'weapon': 0x02,
+                             'hpBefore': 22, 'hp': 8, 'levelUp': False, 'broke': False},
+                  'hits': [{'by': 'actor', 'miss': False, 'crit': True, 'dmg': 14},
+                           {'by': 'target', 'miss': True, 'crit': False, 'dmg': 0}]}
+        events = [
+            {'t': 'start', 'turn': 0, 'info': {'game': 'ours', 'chapter': 4, 'mode': 'normal',
+                                               'seed': 3}, 'style': {'aggression': 'careful'},
+             'claims_played': ['a']},
+            {'t': 'phase', 'turn': 2, 'phase': 'enemy'},
+            {'t': 'act', 'turn': 2, 'phase': 'enemy', 'unit': 0x10, 'from': {'x': 1, 'y': 1},
+             'to': {'x': 2, 'y': 1}, 'battles': [battle]},
+            {'t': 'event', 'turn': 3, 'kind': 'arrive', 'charId': 0x11, 'x': 0, 'y': 9,
+             'faction': 'red'},
+            {'t': 'end', 'turn': 3, 'record': {'outcome': 'won', 'turns': 3, 'all_alive': True}}]
+        text = '\n'.join(mc.story(events, {0x10: 'The Ogre', 0x01: 'Braulo'}, {0x01: 'Iron Axe'}))
+        self.assertIn('Turn 2, enemy phase.', text)
+        self.assertIn('The Ogre attacks Braulo, from 1,1 to 2,1.', text)
+        self.assertIn('The Ogre hits Braulo for 14, a critical', text)
+        self.assertIn('Braulo misses', text)
+        self.assertIn('Braulo 22 -> 8 HP', text)
+        self.assertIn('hit 40% crit 0% with Iron Axe', text)
+        self.assertIn('unit 0x11 arrives at 0,9 (red).', text)
+        events[3]['units'] = [{'charId': 0x12, 'classId': 0x0E}]
+        events.insert(3, {'t': 'phase', 'turn': 3, 'phase': 'player',
+                          'units': [{'charId': 0x11, 'classId': 0x0E}]})
+        battle['target']['canCounter'] = False
+        text = '\n'.join(mc.story(events, {}, {}, {0x0E: 'Soldier'}))
+        self.assertIn('the Soldier arrives', text, 'a unit without a name is its class')
+        self.assertIn('cannot strike back', text)
+        self.assertIn('Result: won on turn 3, everyone alive.', text)
+
+    def test_names_come_from_the_decomp_and_our_cast(self):
+        self.assertEqual(mc._names('vanilla')[0x01], 'Eirika')
+        self.assertTrue(mc._items())
+        self.assertEqual(mc._classes()[0x01], 'Lord')
+
 
 if __name__ == '__main__':
     unittest.main()

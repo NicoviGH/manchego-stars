@@ -96,6 +96,13 @@ def _terrains():
         inject.decomp.vanilla_decomp_text('include/constants/terrains.h'), 'TERRAIN_')
 
 
+def reskin_class_id(rk):
+    """The class id a declared enemy reskin (campaign.yaml) takes on the board."""
+    if rk.get('slot_id') is not None:
+        return int(str(rk['slot_id']), 0)
+    return class_ids.vanilla_class_values()[rk['slot']]
+
+
 def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
     """A class token's ids on the board: the vanilla class, and for ours every reskin whose base
     it is. None when `token` is no vanilla class."""
@@ -107,8 +114,7 @@ def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
     if game == 'ours':
         for rk in reskins.enemy_class_reskins(campaign):
             if rk['base'] == enum:
-                out.add(int(str(rk['slot_id']), 0) if rk.get('slot_id') is not None
-                        else values[rk['slot']])
+                out.add(reskin_class_id(rk))
     return sorted(out)
 
 

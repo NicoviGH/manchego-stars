@@ -3027,6 +3027,38 @@ INSPECT.watchDeaths = function()
     return function() callbacks:remove(id); return deaths end
 end
 
+-- Each act of an enemy (or green) phase, in the order the AI plays them, for the run's trace:
+-- a frame callback following gActiveUnitId (CpDecide_Main sets it to each unit it decides and
+-- then performs for, one at a time) and catching each new REAL battle (Board.battleKey) while
+-- that unit is the one acting. A unit that neither moved nor fought is left out.
+INSPECT.watchEnemyActs = function()
+    local acts, cur, last = {}, nil, BOARD.battleKey()
+    local function close()
+        if not cur then return end
+        local x, y = rs8(cur.addr + 0x10), rs8(cur.addr + 0x11)
+        cur.to, cur.hp, cur.addr = { x = x, y = y }, ru8(cur.addr + 0x13), nil
+        if #cur.battles > 0 or x ~= cur.from.x or y ~= cur.from.y then acts[#acts + 1] = cur end
+        cur = nil
+    end
+    local id = callbacks:add("frame", function()
+        local uid = ru8(SYM.gActiveUnitId)
+        if (not cur or cur.id ~= uid) then
+            close()
+            local addr = uid >= 0x40 and ru32(SYM.gUnitLookup + uid * 4) or 0
+            if addr ~= 0 and ru32(addr) ~= 0 then
+                cur = { id = uid, charId = ru8(ru32(addr) + 4), addr = addr, battles = {},
+                        from = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) } }
+            end
+        end
+        local k = BOARD.battleKey()
+        if k and k ~= last then
+            last = k
+            if cur then cur.battles[#cur.battles + 1] = BOARD.battle() end
+        end
+    end)
+    return function() close(); callbacks:remove(id); return acts end
+end
+
 -- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
 INSPECT.botApi = function(game)
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
@@ -3069,7 +3101,20 @@ INSPECT.botApi = function(game)
         end,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
+        battle = BOARD.battle,
     }
+    -- The run's trace (botrun.lua): one JSON line per event in the run dir, a file per chapter
+    -- attempt, named in the record (montecarlo.py files it in the store).
+    local traceFile
+    api.trace = function(ev)
+        if not traceFile then
+            api.info.trace = string.format("trace-%s-%d-a%d.jsonl", game, api.info.chapter,
+                                           api.info.attempt or 1)
+            traceFile = assert(io.open(PLAYTEST_SHOTDIR .. "/" .. api.info.trace, "w"))
+        end
+        traceFile:write(Json.encode(ev), "\n")
+        if ev.t == "end" then traceFile:close(); traceFile = nil end
+    end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
     -- One action of Bot.decide's: move, then attack the chosen enemy, wait, or Seize.
@@ -3112,11 +3157,11 @@ INSPECT.botApi = function(game)
     end
     api.endPhase = function()
         local phaseTurn = turn()
-        local stop = INSPECT.watchDeaths()
+        local stop, stopActs = INSPECT.watchDeaths(), INSPECT.watchEnemyActs()
         local phase = runEnemyPhase(nil, won, phaseTurn)
-        local deaths = stop()
+        local deaths, acts = stop(), stopActs()
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
-        return phase, deaths
+        return phase, deaths, acts
     end
     return api
 end

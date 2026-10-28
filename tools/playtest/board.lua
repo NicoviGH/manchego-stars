@@ -339,6 +339,62 @@ function Board.freeBeside(io, ax, ay, order, w, h, ok)
     return nil
 end
 
+-- The last REAL battle, as the game rolled it (the bot's trace, #510 step 9 F3): who fought,
+-- the numbers the forecast shows, and every blow. include/bmbattle.h: struct BattleStats +00
+-- config (BATTLE_CONFIG_REAL 1 << 0; the AI's simulations set SIMULATE and write the same
+-- arrays). struct BattleUnit (0x80): +00 the Unit (its +13 curHP is the HP AFTER the battle,
+-- +08 its level after, +04 pClassData), +48 weapon, +52 canCounter, +5A attack, +5C defense, +64 effective hit, +6A effective
+-- crit, +6E exp gained, +70 level before, +72 HP before, +7D weapon broke. struct BattleHit
+-- (u32, 7 of them): bits 0-18 attributes (CRIT 1 << 0, MISS 1 << 1), 19-23 info (FINISHES 1 << 1,
+-- RETALIATION 1 << 3 = the target's blow, END 1 << 4), 24-31 the signed HP change it dealt.
+Board.BATTLE_REAL = 1 << 0
+Board.BATTLE_HIT_MAX = 7
+Board.HIT_CRIT, Board.HIT_MISS = 1 << 0, 1 << 1
+Board.HIT_FINISHES, Board.HIT_RETALIATION, Board.HIT_END = 1 << 1, 1 << 3, 1 << 4
+
+local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+
+-- A number that changes with each new real battle, or nil when the last battle generated was a
+-- simulation: four reads and no string, for a per-frame watch. It is the two fighters and the
+-- first blow, so two battles with both the same fighters and the same first blow share it: one
+-- enemy phase never has those (each AI unit acts once).
+function Board.battleKey(mem, SYM)
+    if (mem.u16(SYM.gBattleStats) & Board.BATTLE_REAL) == 0 then return nil end
+    return ((mem.u8(SYM.gBattleActor + 0x0B) << 8 | mem.u8(SYM.gBattleTarget + 0x0B)) << 32)
+        | mem.u32(SYM.gBattleHitArray)
+end
+
+local function battleSide(mem, b)
+    local exp = mem.s8(b + 0x6E)
+    return { id = mem.u8(b + 0x0B), charId = mem.u8(mem.u32(b) + 4),
+             classId = mem.u32(b + 0x04) ~= 0 and mem.u8(mem.u32(b + 0x04) + 4) or nil,
+             canCounter = mem.s8(b + 0x52) ~= 0,
+             hpBefore = mem.s8(b + 0x72), hp = mem.u8(b + 0x13), weapon = mem.u16(b + 0x48) & 0xFF,
+             attack = s16(mem.u16(b + 0x5A)), defense = s16(mem.u16(b + 0x5C)),
+             hit = s16(mem.u16(b + 0x64)), crit = s16(mem.u16(b + 0x6A)),
+             -- a level is gained only with exp: a wall's battle unit has no level to compare
+             exp = exp, levelUp = exp > 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
+             broke = mem.s8(b + 0x7D) ~= 0 }
+end
+
+-- { actor, target, hits = { { by = "actor"|"target", miss, crit, dmg, finishes } } } of the
+-- last real battle, or nil when the last battle generated was a simulation.
+function Board.battle(mem, SYM)
+    if (mem.u16(SYM.gBattleStats) & Board.BATTLE_REAL) == 0 then return nil end
+    local out = { actor = battleSide(mem, SYM.gBattleActor),
+                  target = battleSide(mem, SYM.gBattleTarget), hits = {} }
+    for i = 0, Board.BATTLE_HIT_MAX - 1 do
+        local w = mem.u32(SYM.gBattleHitArray + i * 4)
+        local attr, info, dmg = w & 0x7FFFF, (w >> 19) & 0x1F, (w >> 24) & 0xFF
+        if (info & Board.HIT_END) ~= 0 then break end
+        out.hits[#out.hits + 1] = {
+            by = (info & Board.HIT_RETALIATION) ~= 0 and "target" or "actor",
+            miss = (attr & Board.HIT_MISS) ~= 0, crit = (attr & Board.HIT_CRIT) ~= 0,
+            dmg = dmg >= 0x80 and dmg - 0x100 or dmg, finishes = (info & Board.HIT_FINISHES) ~= 0 }
+    end
+    return out
+end
+
 -- The reader with its memory and symbols bound, for harness.lua: one top-level local there
 -- instead of one per helper.
 function Board.bind(mem, SYM)
@@ -356,6 +412,8 @@ function Board.bind(mem, SYM)
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
+        battle = function() return Board.battle(mem, SYM) end,
+        battleKey = function() return Board.battleKey(mem, SYM) end,
         distance = Board.distance, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
