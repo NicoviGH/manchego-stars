@@ -302,6 +302,10 @@ WANTED = [
     'GetSelectTargetCount',     # the target list the last builder made (uiselecttarget.c)
     'GetTarget',                # one entry of it: struct SelectTarget { x, y, uid, extra }
     'CheckForCharacterEvents',  # whether a Talk event joins two characters (eventinfo.c)
+    # Villages and chests (#510 step 9): the unit menu's own checks, on the active unit.
+    'VisitCommandUsability',    # Visit: a village tile whose event is open, not a Phantom (bmmenu.c)
+    'ChestCommandUsability',    # Chest: a key or lockpick and CanUnitUseChestKeyItem (bmmenu.c)
+    'GetDefeatTalkEntry',       # a unit's death quote for this chapter; flag 2 = the Defeat Boss goal (eventinfo.c)
     # The planner's enemy phase (#510 step 9): the enemy turn order, as the game builds it.
     'BuildAiUnitList',          # gAiState.units: the faction's units able to act (cp_order.c)
     'SortAiUnitList',           # that list in the order the AI moves them (cp_order.c)

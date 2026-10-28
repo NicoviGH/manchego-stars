@@ -488,6 +488,24 @@ class TestUnitStateBits(unittest.TestCase):
             self.assertEqual(1 << int(shift), decomp.get(name), name)
 
 
+class TestFullBagItems(unittest.TestCase):
+    def test_bag_item_ids_are_the_decomps(self):
+        # INSPECT.BAG names each key and passive item it lists (Bot.fullBag's kinds); a wrong id
+        # would silently file a key as money and send it to the convoy. Each `[0xNN] = "ITEM_X"`
+        # is read against include/constants/items.h.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        items = enum_values(vanilla_decomp_text('include/constants/items.h'), 'ITEM_')
+        with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        block = text[text.index('INSPECT.BAG = {'):]
+        block = block[:block.index('\n}\n')]
+        pairs = re.findall(r'\[0x([0-9A-Fa-f]+)\] = "(ITEM_\w+)"', block)
+        self.assertEqual(len(pairs), 8, 'INSPECT.BAG lists four keys and four passive items')
+        for value, name in pairs:
+            self.assertEqual(int(value, 16), items.get(name), name)
+
+
 class TestNoBlanketEmulatorKill(unittest.TestCase):
     """Scenarios run FOUR AT A TIME by default since #310, so anything run.sh kills by name
     kills its siblings."""

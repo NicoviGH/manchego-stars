@@ -382,6 +382,13 @@ local function sightOf(o)
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
     if o.hidden then s.visible = function(x, y) return not o.hidden[x .. "," .. y] end end
+    -- villages and chests: the open tiles, and the unit menu's check per unit and tile
+    if o.explorable then
+        s.explorable = function() return o.explorable end
+        s.canExplore = function(u, x, y, kind)
+            return ((o.canExplore or {})[u.id] or {})[x .. "," .. y] == kind
+        end
+    end
     s.hitChance = Sight.hitChance
     if o.enemyPhase then s.enemyPhase = o.enemyPhase end
     s.attacks = function() return attacks end
@@ -1371,6 +1378,49 @@ local function test_route_follows_style()
 end
 test_route_follows_style()
 
+-- ── a full bag: which item goes to the convoy (Nicolas, 2026-10-28) ─────────────────────
+do
+    local function lance(rank, o)
+        o = o or {}
+        return { kind = "weapon", type = "lance", rank = rank, maxRange = o.maxRange or 1,
+                 effective = o.effective, usable = o.usable ~= false }
+    end
+    local function heal(uses) return { kind = "heal", uses = uses or 3 } end
+    local key, gem = { kind = "key" }, { kind = "money" }
+    local bow = { kind = "weapon", type = "bow", rank = 1, maxRange = 2, usable = false }
+    local F = B.fullBag
+    -- money, healing and an unusable weapon go first, the new item kept
+    check(F({ lance(1), heal(), key, gem, lance(2) }, lance(4)), 4, "bag: a gem leaves for a better lance")
+    check(F({ lance(1), heal(), key, bow, lance(2) }, heal()), 0, "bag: a second heal is not needed")
+    check(F({ lance(1), key, bow, lance(2), lance(3) }, heal()), 3, "bag: an unusable bow leaves for the first heal")
+    check(F({ lance(1), heal(1), heal(3), key, lance(2) }, key), 2, "bag: the emptier spare heal leaves for a key")
+    -- a weapon: a higher rank beats the lowest plain one of its type
+    check(F({ lance(1), heal(), key, lance(2), lance(3) }, lance(4)), 1, "bag: Silver beats Iron")
+    check(F({ lance(2), heal(), key, lance(2), lance(3) }, lance(2)), 0, "bag: an equal rank is a duplicate")
+    -- a Javelin's range is not beaten by rank, and a Javelin is wanted for its range
+    check(F({ lance(1, { maxRange = 2 }), heal(), key, lance(3), lance(3) }, lance(4)), 4,
+          "bag: Silver replaces a Steel, the Javelin stays")
+    check(F({ lance(1, { maxRange = 2 }), heal(), key, lance(3, { effective = "armour" }), heal() },
+            lance(4)), 0, "bag: the only ranged lance is never the one replaced")
+    check(F({ lance(1), heal(), key, gem, lance(3) }, lance(1, { maxRange = 2 })), 4,
+          "bag: a lance that adds range is wanted")
+    check(F({ lance(1), heal(), key, gem, lance(3) }, lance(2, { effective = "armour" })), 4,
+          "bag: a lance that adds bonus damage is wanted")
+    -- all five needed: the new item goes (Nicolas: three weapons, a Vulnerary and a key)
+    check(F({ lance(1), lance(2), lance(3, { maxRange = 2 }), heal(), key }, lance(1)), 0,
+          "bag: everything carried is needed")
+    -- a weapon the unit cannot use, money, a seal: not needed in hand
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "weapon", type = "bow", rank = 4,
+              usable = false }), 0, "bag: a bow for a lance user goes to the convoy")
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "money" }), 0, "bag: money goes")
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other" }), 0, "bag: a seal goes")
+    -- the convoy full: a discard takes duplicates and low tiers, never money
+    check(F({ lance(1), heal(), key, gem, lance(2) }, lance(4), true), 1, "bag: discard the beaten lance")
+    check(F({ heal(1), heal(), key, gem, lance(2) }, key, true), 1, "bag: discard a spare heal")
+    check(F({ lance(1), heal(), key, gem, lance(2, { maxRange = 2 }) }, heal(), true), 0,
+          "bag: no duplicate to discard, the new item goes")
+end
+
 -- ── PR E: breaching, doors, healing, Talk, keys, avoid, fog ────────────────────────────
 
 -- A field per goal tile: fields["x,y"] = { "x,y" = dist }.
@@ -1679,6 +1729,246 @@ do
         if a.unitId == 0x02 then moved = at(a) end
     end
     check(moved, "2,2", "planner: a killed enemy threatens no one")
+end
+
+-- test_planner_visits_a_safe_village: nothing reaches the village at (1,0), so careful takes
+-- it over a step of ground; the offer is in the plan's record, played, at no chance to die.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(a and a.act, "visit", "explore: a safe village is visited")
+    check(at(a), "1,0", "explore: from its own tile")
+    local e = plan and plan.explore and plan.explore[1]
+    check(e and e.die, 0, "explore: offered at no chance to die")
+    check(e and e.played, true, "explore: the offer was played")
+    -- a unit the game refuses (a Phantom, a Silenced unit) is offered nothing
+    o.canExplore = {}
+    local b = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(b and b.act ~= "visit", true, "explore: only where the game's menu allows it")
+end
+
+-- test_planner_skips_a_risky_village: X reaches the village and can kill A there, so the
+-- visit earns nothing -- under every style, bold included -- and the offer is recorded with
+-- its chance to die, unplayed.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+        explorable = { { x = 1, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["1,0"] = "chest" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    for _, aggression in ipairs({ "careful", "bold" }) do
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style(aggression))
+        check(a and a.act ~= "chest", true, "explore: no risky chest, " .. aggression)
+        local e = plan and plan.explore and plan.explore[1]
+        check(e and e.die > 0, true, "explore: the offer carries its chance to die, " .. aggression)
+        check(e and e.played, nil, "explore: unplayed, " .. aggression)
+    end
+end
+
+-- test_planner_beam_withholds_the_credit: X reaches the chest with a small chance to kill A,
+-- and only the beam's top plan is judged (FINAL = 1), against no enemy phase. Credited, the
+-- chest would top the beam; the beam's own check leaves it uncredited, so A holds.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 10, takenDmg = 25, takenHits = 1 } } } },
+        explorable = { { x = 1, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["1,0"] = "chest" } },
+    }
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.FINAL = final
+    check(at(a), "0,0", "explore: the beam credits no chest at a chance to die")
+end
+
+-- test_planner_judge_takes_the_credit_back: nothing the beam sees reaches the village, but the
+-- enemy phase the AI plays strikes A there with a small chance to kill. Credited, the visit
+-- would outweigh that chance; the judge takes the credit back, so careful stays put.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 10, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local die = Planner.odds(Planner.blows(10, 25, 1, 0, Sight.hitChance), 20)
+    check(die > 0 and Planner.WEIGHTS.careful.death * die < Planner.WEIGHTS.careful.recruit, true,
+          "explore: the strike's chance is small enough that a credit would buy it")
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(at(a), "0,0", "explore: the judged phase's chance withdraws the credit")
+end
+
+-- test_exploring_sends_the_nearest: the village at (8,0) is nearer B by the game's field, so
+-- B marches to it and A marches on the enemy.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local Bu = blue(0x02, 1, 5, 0, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local function manhattanField(goal)
+        local f = {}
+        for y = 0, 9 do
+            f[y] = {}
+            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+        end
+        return f
+    end
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }),
+                  [0x02] = tiles({ 5, 0 }, { 6, 0 }, { 5, 1 }) },
+        field = manhattanField,
+        explorable = { { x = 8, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["8,0"] = "visit" }, [0x02] = { ["8,0"] = "visit" } },
+    }
+    local marches = {}
+    for _, c in ipairs(B.candidates(boardOf(A, Bu, X), sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.why == "march" then marches[c.unit.id] = at(a) end
+        end
+    end
+    check(marches[0x02], "6,0", "exploring: the nearer unit marches to the village")
+    check(marches[0x01], "0,1", "exploring: the other marches on the enemy")
+end
+
+-- test_planner_assault: the boss X has 20 HP. A's and C's blows (12 each, sure) kill it
+-- together; either alone leaves it alive to strike that unit in its phase for its whole HP.
+-- The beam reads each strike tile as deadly (X reaches it) and keeps two plans a depth
+-- (BEAM = 2): holding outranks either blow alone, so it never holds both. Only the assault
+-- plan is the combination, and it is played.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 0, 2)
+    local X = red(0x81, 1, 1, { isBoss = true, hp = 20 })
+    local blow = fc { hit = 100, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                      counterDmg = 5, counterHits = 1, takenHit = 100, takenDmg = 30,
+                      takenHits = 1 }
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }), [0x02] = tiles({ 0, 2 }, { 1, 2 }),
+                  [0x81] = tiles({ 1, 1 }) },
+        danger = { ["1,0"] = 1, ["1,2"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = blow } }, [0x02] = { [0x81] = { ["1,2"] = blow } } },
+        enemyPhase = function(plan)
+            if plan.gone[0x81] then return {} end
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                if math.abs(b.x - 1) + math.abs(b.y - 1) == 1 then
+                    out[#out + 1] = { target = b.unit.id, takenHit = 100, takenDmg = 30,
+                                      takenHits = 1, takenCrit = 0 }
+                end
+            end
+            return out
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 2
+    local a, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(plan and plan.kind, "assault", "assault: the combination is the plan played")
+    check(a and a.act, "attack", "assault: it opens with a blow")
+    local blows = 0
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.act == "attack" then blows = blows + 1 end
+    end
+    check(blows, 2, "assault: both strike the boss")
+    -- a boss on a cloned generic row has no CA_BOSS: the objective names it (its death quote
+    -- raises the goal's flag), and the assault is the same
+    local plain = red(0x81, 1, 1, { hp = 20 })
+    o.objective = { kind = "boss", boss = 0x81 }
+    Planner.BEAM = 2
+    local _, named = Planner.plan(B, boardOf(blue(0x01, 0, 0, 0), blue(0x02, 1, 0, 2), plain),
+                                  sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(named and named.kind, "assault", "assault: the boss the objective names")
+    o.objective = { kind = "boss" }
+    -- one unit alone: no assault, and careful does not strike
+    local alone, aplan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(aplan and aplan.kind, "beam", "assault: none with one striker")
+    check(alone and alone.act ~= "attack", true, "assault: a lone strike is not made")
+end
+
+-- test_planner_chains_the_counter: A (30 HP) strikes the boss for 20; the boss's counter (66,
+-- 15) and its own strike next phase (sure, 15) kill A whenever the counter lands. Averaging
+-- the counter leaves A at 18, out of the phase's reach to kill: the chain does not.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 30 })
+    local X = red(0x81, 2, 0, { isBoss = true, hp = 40 })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
+                                                    counterHit = 66, counterDmg = 15,
+                                                    counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 15, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(a and a.act ~= "attack", true, "chain: no strike whose landed counter leaves A to die")
+end
+
+-- test_planner_unstalls: A holding at (0,0) is the best plan, but botrun has seen this board
+-- before (opts.stalled): the plan played must change it, and the least it can is the step to
+-- (1,0) that X reaches with a small chance to kill.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 10, takenDmg = 25, takenHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 10, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))), "0,0",
+          "unstall: careful holds")
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"), { stalled = true })
+    check(at(a), "1,0", "unstall: a stalled board is changed, by the least risky change")
 end
 
 -- test_planner_surprise: A attacks X from (1,0) expecting X at 10 HP and itself at 20; C

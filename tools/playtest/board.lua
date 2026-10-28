@@ -42,6 +42,7 @@ Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
 Board.US_DEAD = 1 << 2
 Board.US_NOT_DEPLOYED = 1 << 3
 Board.US_RESCUED = 1 << 5
+Board.US_HAS_MOVED = 1 << 6   -- Canto: Visit and Chest are not shown (bmmenu.c)
 Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
@@ -417,6 +418,7 @@ function Board.bind(mem, SYM)
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
+        US_HAS_MOVED = Board.US_HAS_MOVED,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
         BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
         ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,

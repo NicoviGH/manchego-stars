@@ -12,7 +12,9 @@
 --   won      the chapter advanced (api.won)
 --   lost     the game-over screen came up (api.lost), or the enemy phase reached it
 --   stuck    a player phase began on a board already seen this run, and nothing ahead can
---            change it: the hash holds every on-field unit's id, tile and HP, the objective's
+--            change it -- for the planner, a board that comes round again AFTER the planner was
+--            made to change it once (its first repeat is a stall: opts.stalled, counted in the
+--            record's `stalls`): the hash holds every on-field unit's id, tile and HP, the objective's
 --            turns left, and the turns until the next arrival a reinforcements claim cites --
 --            everything Bot.decide reads -- and the game's own turn-event check
 --            (sight.nextTurnEvent) finds no event still to fire. A repeat with an event ahead
@@ -34,7 +36,8 @@
 --   seed(s)            seed the game's RNG (Sight.seed)
 --   board()            Board.read
 --   sight()            Sight.new, called once
---   act(action)        perform Bot.decide's action: true; "noseize" when the menu offered no
+--   act(action)        perform Bot.decide's or the planner's action (a Visit or Chest
+--                      included): true; "noseize" when the menu offered no
 --                      Seize; false on a controller fault
 --   endPhase()         "player" | "gameover" | "ended" | nil, the deaths it saw:
 --                      { { id, charId, faction, killer } } (id = Board's unit index byte,
@@ -43,6 +46,10 @@
 --                      act (Board.ACTIONS' name), targetId, tile (a pillaged village or chest),
 --                      battles = { Board.battle... } } }
 --   battle()           OPTIONAL: Board.battle, the last real battle as the game rolled it
+--   bag()              OPTIONAL: each full-inventory answer since the last call: { charId,
+--                      item (the new one), sent (the item that went: to the convoy, or
+--                      discarded when `discard`), discard, why } (Bot.fullBag's); the record's
+--                      `bag` and a `bag` trace event each
 --   trace(event)       OPTIONAL: keep one event of the run's TRACE (below); an api that
 --                      keeps it in a file names the file in info.trace, and so in the record
 --   won(), lost()      the chapter advanced / the game-over screen is up
@@ -59,11 +66,13 @@
 --   phase   a phase's start (`phase` "player"|"enemy"): every on-field unit's id, charId,
 --           faction, tile, HP and item ids
 --   plan    a decision: the act chosen, and from the planner its judged score, the other plans
---           judged (`considered`), what it expects of the enemy phase (`predict`), and whether a
---           kept plan's act was played or a surprise (`replan`, why) forced a new one
+--           judged (`considered`), what it expects of the enemy phase (`predict`), every Visit
+--           and Chest offered (`explore`) and the tile each unit was sent to (`goals`), and whether a kept plan's act was played or a
+--           surprise (`replan`, why) forced a new one
 --   act     one act, either side: unit, from, to, the act and its target, the game's own
 --           battle records (Board.battle: the forecast's numbers, every blow) and who fell
 --   event   a change on the board no act names: a unit arriving, a recruit, items gained/lost
+--   bag     a full inventory answered: the new item, the one that went, why
 --   end     the BOTRUN record, last
 -- Every number in it is read from the game; nothing is re-derived.
 
@@ -172,6 +181,68 @@ local function fallen(before, after, action)
     return out
 end
 
+-- The no-risk rule's experiment (#510 step 9, Nicolas 2026-10-27: try it before it is
+-- locked): every village and chest the run saw open, and what became of it.
+--   open(list, turn)   one read of sight.explorable(); a tile gone from it that we did not
+--                      visit was closed by someone else (a pillage, an event)
+--   offered(list)      a plan's `explore`: each offer's standing chance to die
+--   visited(a, turn)   our Visit or Chest act was played
+--   failed(a, turn)    it was tried and the harness could not drive it (a full inventory's
+--                      send-or-discard menu): the run ends there as a crash
+--   summary()          per tile, in the order first seen: { x, y, kind, status = "visited" |
+--                      "failed" | "closed" | "skipped" (offered, never played) | "unreached"
+--                      (never offered), by, tried (the unit that failed), turn, offers, die =
+--                      the lowest chance it was offered at }
+function M.exploreLog()
+    local log, tiles, order = {}, {}, {}
+    local function key(x, y) return x .. "," .. y end
+    function log.open(list, turn)
+        local now = {}
+        for _, t in ipairs(list) do
+            local k = key(t.x, t.y)
+            now[k] = true
+            if not tiles[k] then
+                tiles[k] = { x = t.x, y = t.y, kind = t.kind, offers = 0 }
+                order[#order + 1] = k
+            end
+        end
+        for _, k in ipairs(order) do
+            local e = tiles[k]
+            if not now[k] and not e.by and not e.closed then e.closed = turn end
+        end
+    end
+    function log.offered(list)
+        for _, o in ipairs(list or {}) do
+            local e = tiles[key(o.x, o.y)]
+            if e then
+                e.offers = e.offers + 1
+                if not e.die or o.die < e.die then e.die = o.die end
+            end
+        end
+    end
+    function log.visited(a, turn)
+        local e = tiles[key(a.move.x, a.move.y)]
+        if e then e.by, e.turn = a.unit, turn end
+    end
+    function log.failed(a, turn)
+        local e = tiles[key(a.move.x, a.move.y)]
+        if e then e.failed, e.turn = a.unit, turn end
+    end
+    function log.summary()
+        local out = {}
+        for _, k in ipairs(order) do
+            local e = tiles[k]
+            local status = (e.by and "visited") or (e.failed and "failed") or (e.closed and "closed")
+                or (e.offers > 0 and "skipped") or "unreached"
+            out[#out + 1] = { x = e.x, y = e.y, kind = e.kind, status = status, by = e.by,
+                              turn = e.turn or e.closed, offers = e.offers, die = e.die,
+                              tried = e.failed }
+        end
+        return out
+    end
+    return log
+end
+
 function M.run(api)
     local Bot, Json = api.Bot, api.Json
     local style = Bot.applyClaims(api.claims or {}, api.style)
@@ -186,7 +257,8 @@ function M.run(api)
                   mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
                   attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
-                  deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 } }
+                  deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 }, bag = {} }
+    local explore = M.exploreLog()
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
@@ -194,6 +266,15 @@ function M.run(api)
         if api.trace then
             ev.turn = ev.turn or turn
             api.trace(ev)
+        end
+    end
+    -- each full-bag answer the harness gave since the last look (api.bag)
+    local function bagged()
+        for _, b in ipairs(api.bag and api.bag() or {}) do
+            b.turn = turn
+            rec.bag[#rec.bag + 1] = b
+            trace({ t = "bag", charId = b.charId, item = b.item, sent = b.sent,
+                    discard = b.discard, why = b.why })
         end
     end
     local lastBoard
@@ -235,6 +316,7 @@ function M.run(api)
                 end
             end
         end
+        rec.explore = explore.summary()
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
         trace({ t = "end", record = rec })
         api.emit(M.PREFIX .. Json.encode(rec))
@@ -266,18 +348,29 @@ function M.run(api)
                 end
             end
             local h = M.boardHash(Bot, board, sight.objective, style.arrivals)
+            local stalled = false
             if seen[h] and not (waitUntil and turn < waitUntil) then
                 waitUntil = sight.nextTurnEvent(turn)
                 if not waitUntil then
-                    for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
-                    return "stuck", "a player phase began on a board seen before, and no turn "
-                        .. "event is left to change it"
+                    -- the first repeat is a stall: the planner must change the board (its
+                    -- opts.stalled); a board that comes round again after that is stuck
+                    if seen[h] == "stalled" or not api.Planner or style.aggression == "greedy" then
+                        for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
+                        return "stuck", "a player phase began on a board seen before, and no turn "
+                            .. "event is left to change it"
+                    end
+                    stalled = true
+                    rec.stalls = (rec.stalls or 0) + 1
+                    api.log(string.format("botrun: board repeats on turn %d; the plan must change it",
+                        turn))
+                else
+                    api.log(string.format("botrun: board repeats on turn %d; a turn event is due on "
+                        .. "turn %d", turn, waitUntil))
                 end
-                api.log(string.format("botrun: board repeats on turn %d; a turn event is due on "
-                    .. "turn %d", turn, waitUntil))
             end
-            seen[h] = true
+            seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
+            if sight.explorable then explore.open(sight.explorable(), turn) end
             trace({ t = "phase", phase = "player", units = M.snapshot(board) })
             playing = nil
             while true do
@@ -301,12 +394,17 @@ function M.run(api)
                             api.log("plan: replan, " .. why)
                         end
                         local replan = playing and why
-                        local a, plan = api.Planner.plan(Bot, board, sight, style)
+                        local a, plan = api.Planner.plan(Bot, board, sight, style,
+                                                         { stalled = stalled })
+                        stalled = false   -- one changed act is the change; the rest plans freely
                         lastPlan = plan
                         rec.plans.made = rec.plans.made + 1
+                        explore.offered(plan and plan.explore)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
-                                judged = plan and plan.judged, considered = plan and plan.considered,
-                                predict = plan and plan.predict })
+                                judged = plan and plan.judged, kind = plan and plan.kind,
+                                considered = plan and plan.considered,
+                                predict = plan and plan.predict,
+                                explore = plan and plan.explore, goals = plan and plan.goals })
                         playing, nextAct = a and plan, 2
                         if plan and a then
                             local said = {}
@@ -327,8 +425,15 @@ function M.run(api)
                 if sight.batch then action = sight.batch(decide) else action = decide() end
                 if not action then break end
                 local done = api.act(action)
+                bagged()
+                if done == false and (action.act == "visit" or action.act == "chest") then
+                    explore.failed(action, turn)
+                end
                 if done == false then
                     return "crashed", "the harness could not perform " .. action.act
+                end
+                if action.act == "visit" or action.act == "chest" then
+                    explore.visited(action, turn)
                 end
                 local battle = action.act == "attack" and api.battle and api.battle() or nil
                 local after = api.board()
@@ -369,6 +474,7 @@ function M.run(api)
             changes(before)
             trace({ t = "phase", phase = "enemy", units = M.snapshot(before) })
             local phase, deaths, acts = api.endPhase()
+            bagged()
             for _, a in ipairs(acts or {}) do
                 trace({ t = "act", phase = "enemy", unit = a.charId, id = a.id, from = a.from,
                         to = a.to, hp = a.hp, act = a.act, targetId = a.targetId, tile = a.tile,

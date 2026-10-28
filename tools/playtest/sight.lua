@@ -66,7 +66,9 @@
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and takes its expected damage off the target before the
 --                            next decides. -> { { enemy, target, taken* as strike() } }.
---   objective                { kind, tile, turnsLeft } -- see objective().
+--   objective                { kind, tile, turnsLeft, boss } -- see objective(); boss = on a
+--                            Defeat Boss map, the charId whose death quote raises
+--                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start.
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
 --                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
 --                            unreached.
@@ -83,6 +85,16 @@
 --                            GetUnitKeyItemSlotForTerrain, a key or a thief's lockpick.
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
+--   explorable()             the villages and chests still open now: { x, y, kind =
+--                            "visit"|"chest" } per tile whose Visit or Chest command (read with
+--                            the Seize tile) GetAvailableTileEventCommand still returns -- a
+--                            visited, pillaged or opened tile's flag drops it. Read once per
+--                            board. A tile whose event only opens later in the chapter is not
+--                            in the start list, so it is never offered.
+--   canExplore(u, x, y, kind) the unit menu's own check with `u` standing on (x, y) as the
+--                            active unit: VisitCommandUsability (not a Phantom, not Silenced)
+--                            or ChestCommandUsability (a key or lockpick, CanUnitUseChestKeyItem)
+--                            returns MENU_ENABLED.
 --   doors()                  the door tiles still closed: a tile whose command is Door
 --                            (read with the Seize tile) and whose terrain is still a door.
 --   heals(u, x, y, hurt)     what `u` could heal standing on (x, y): per staff in staves(u)
@@ -128,6 +140,9 @@ M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
+M.MENU_ENABLED = 1           -- include/uimenu.h
+M.EVFLAG_DEFEAT_BOSS = 2     -- include/constants/event-flags.h; DefeatTalkEnt +04 flag
+M.DEFEAT_TALK_FLAG = 0x04
 M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
 -- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
@@ -463,6 +478,22 @@ function M.new(outer)
         return g
     end)
     s.objective = { kind = goal.kind, tile = goal.tile }
+    -- On a Defeat Boss map, the boss is the unit whose death quote raises the goal's flag --
+    -- how the game itself ends the chapter (GetDefeatTalkEntry, EVFLAG_DEFEAT_BOSS), not
+    -- CA_BOSS, which a boss on a cloned generic row (ours ch03's grell) does not carry.
+    if goal.kind == "boss" then
+        s.objective.boss = sandbox(function(call)
+            for _, u in ipairs(api.board().units) do
+                if u.faction == "red" and u.onField then
+                    local ent = call(S.GetDefeatTalkEntry, { u.charId })
+                    if ent ~= 0 and mem.u16(ent + M.DEFEAT_TALK_FLAG) == M.EVFLAG_DEFEAT_BOSS then
+                        return u.charId
+                    end
+                end
+            end
+            return nil
+        end)
+    end
 
     function s.demands()
         return M.demandsOf(api.board().units, commands, mem.u8(S.gPlaySt + PLAY_VISION))
@@ -761,6 +792,36 @@ function M.new(outer)
         return sandbox(function(call)
             return call(S.CheckForCharacterEvents, { u.charId, t.charId }) & 0xFF ~= 0
         end)
+    end
+
+    function s.explorable()
+        if not seen.explorable then
+            seen.explorable = sandbox(function(call)
+                local out = {}
+                for _, c in ipairs(commands) do
+                    local kind = (c.cmd == M.TILE_COMMAND_VISIT and "visit")
+                        or (c.cmd == M.TILE_COMMAND_CHEST and "chest")
+                    if kind and call(S.GetAvailableTileEventCommand, { c.x, c.y }) == c.cmd then
+                        out[#out + 1] = { x = c.x, y = c.y, kind = kind }
+                    end
+                end
+                return out
+            end)
+        end
+        return seen.explorable
+    end
+
+    -- Usability reads the unit and the tile it stands on, never where anyone else is, and is
+    -- only asked of a tile explorable() still offers: kept by the unit's facts and the tile.
+    function s.canExplore(u, x, y, kind)
+        return mine(kind .. "@" .. x .. "," .. y, u, function() return sandbox(function(call)
+            standOn(u, x, y)
+            api.write32(u.addr + UNIT_STATE, mem.u32(u.addr + UNIT_STATE) & ~Board.US_HAS_MOVED)
+            api.write32(S.gActiveUnit, u.addr)
+            api.write8(S.gActiveUnitId, u.id)
+            local check = kind == "visit" and S.VisitCommandUsability or S.ChestCommandUsability
+            return call(check, { 0, 0 }) == M.MENU_ENABLED
+        end) end) or false
     end
 
     function s.doors()

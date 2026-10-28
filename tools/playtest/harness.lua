@@ -967,8 +967,12 @@ end
 local function waitFor(pred, frames, tapA)
     for _ = 1, frames do
         if pred() then return true end
-        if tapA and controllerState() == "dialogue_wait" then
+        local state = tapA and controllerState()
+        if state == "dialogue_wait" then
             if not INSPECT.advanceDialogue(60) then return false end
+        elseif state == "send_to_convoy" and INSPECT.onFullBag then
+            -- the bot's answer (botApi sets it); a scenario without one waits as before
+            if not INSPECT.onFullBag() then return false end
         else
             yield()
         end
@@ -3125,7 +3129,15 @@ INSPECT.botApi = function(game)
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
         battle = BOARD.battle,
+        -- every full-bag answer since the last call (INSPECT.answerFullBag's log)
+        bag = function()
+            local out, n = {}, INSPECT.bagSeen or 0
+            for i = n + 1, #INSPECT.bagLog do out[#out + 1] = INSPECT.bagLog[i] end
+            INSPECT.bagSeen = #INSPECT.bagLog
+            return out
+        end,
     }
+    INSPECT.onFullBag = INSPECT.answerFullBag
     -- The run's trace (botrun.lua): one JSON line per event in the run dir, a file per chapter
     -- attempt, named in the record (montecarlo.py files it in the store).
     local traceFile
@@ -3140,7 +3152,8 @@ INSPECT.botApi = function(game)
     end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
-    -- One action of Bot.decide's: move, then attack the chosen enemy, wait, or Seize.
+    -- One action of Bot.decide's or the planner's: move, then attack the chosen enemy, wait,
+    -- Talk, open a door, heal, use an item, Visit, open a chest, or Seize.
     api.act = function(a)
         local u = BOARD.find("blue", a.unit)
         if not u or not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false end
@@ -3157,6 +3170,14 @@ INSPECT.botApi = function(game)
             if not selectSemantic("open_door", "the Door command opens the door", function(after)
                 return after.menu == nil
             end, 120) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+        elseif a.act == "visit" or a.act == "chest" then
+            -- the village's lines are pressed through until the unit is greyed out (awaitActed
+            -- taps each box, as VISIT.run's talkUntil does); a full inventory's send-or-discard
+            -- menu is not driven, so it ends the run as a crash that names the act
+            local cmd = a.act == "visit" and "visit" or "open_chest"
+            if not selectSemantic(cmd, "the " .. a.act .. " command starts the tile's event",
+                function(after) return after.menu == nil end, 120) then return false end
             return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
         elseif a.act == "staff" then
             return INSPECT.chooseStaff(u.addr, a.slot, a.targetId, function() return won() or lost() end)
@@ -3213,6 +3234,25 @@ INSPECT.CAMPAIGN = {
     shopSteps = 4000,                           -- frames one purchase may take, fades included
 }
 
+-- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +10 pEffectiveness, +19
+-- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
+-- types.h BmSt +2C um_tmp_item (the item that found no room); Unit +1E items[5] (bmunit.h);
+-- menu_def.c's
+-- convoy chooser rows. Keys: what GetUnitKeyItemSlotForTerrain looks for (bmunit.c). Passive:
+-- the items the engine tests by id or attribute while carried -- the Member Card (eventinfo.c),
+-- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
+INSPECT.BAG = {
+    ITEM_EFFECTIVE = 0x10, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C, ITEM_USE_EFFECT = 0x1E,
+    IA_STAFF = 4, BMST_TMP_ITEM = 0x2C, UNIT_ITEM_LIST = 0x1E, UNIT_ITEMS = 5,
+    CHAR_NUMBER = 0x04,                         -- CharacterData +04 number (bmunit.h)
+    MENU_DISCARD_FIRST = 0x24, MENU_SEND_FIRST = 0x2A,
+    KEYS = { [0x69] = "ITEM_CHESTKEY", [0x6A] = "ITEM_DOORKEY", [0x6B] = "ITEM_LOCKPICK",
+             [0x79] = "ITEM_CHESTKEY_BUNDLE" },
+    PASSIVE = { [0x71] = "ITEM_DELPHISHIELD", [0x72] = "ITEM_MEMBERCARD",
+                [0x73] = "ITEM_SILVERCARD", [0x7C] = "ITEM_HOPLON_SHIELD" },
+}
+INSPECT.bagLog = {}
+
 -- The world map's cursor and lord, for the observer: the open nodes, the node the cursor sits
 -- on (sub_80B961C, the L jump, puts ix/iy exactly on a node's x/y << 8), the lord's node.
 INSPECT.worldMap = function()
@@ -3246,6 +3286,85 @@ INSPECT.itemFacts = function(id)
     end
     if id == C.VULNERARY then facts.kind = "vulnerary" end
     return facts
+end
+
+-- What Bot.fullBag weighs about one item for one unit, every fact the game's (#510 step 9,
+-- Nicolas 2026-10-28). `call` is a sandbox's (INSPECT.gameCalls); `item` = { id, uses }.
+-- kind: a weapon or staff (IA_WEAPON | IA_STAFF; usable = CanUnitUseWeapon / CanUnitUseStaff;
+-- rank, the reach's max and the effectiveness list from its ItemData), a key (what
+-- GetUnitKeyItemSlotForTerrain looks for), a passive item (each one the engine tests by id),
+-- a heal (GetUnitItemHealAmount > 0), money (no use effect at all: gems, gold), else other
+-- (seals, boosters, Pure Water...).
+INSPECT.unitItemFacts = function(call, unitAddr, item)
+    local C, K = INSPECT.CAMPAIGN, INSPECT.BAG
+    local f = INSPECT.itemFacts(item.id)
+    local data = SYM.gItemData + item.id * BOARD.ITEMDATA_STRIDE
+    local attr, value = ru32(data + C.ITEM_ATTRIBUTES), item.id | (item.uses << 8)
+    f.uses = item.uses
+    if (attr & (C.IA_WEAPON | K.IA_STAFF)) ~= 0 then
+        f.kind = "weapon"
+        f.type = C.WEAPON_TYPES[ru8(data + C.ITEM_TYPE)]
+        f.rank = ru8(data + K.ITEM_RANK)
+        f.maxRange = ru8(data + K.ITEM_RANGE) & 0xF
+        local eff = ru32(data + K.ITEM_EFFECTIVE)
+        f.effective = eff ~= 0 and eff or nil
+        local check = (attr & K.IA_STAFF) ~= 0 and SYM.CanUnitUseStaff or SYM.CanUnitUseWeapon
+        f.usable = call(check, { unitAddr, value }) ~= 0
+    elseif K.KEYS[item.id] then
+        f.kind = "key"
+    elseif K.PASSIVE[item.id] then
+        f.kind = "passive"
+    elseif call(SYM.GetUnitItemHealAmount, { unitAddr, value }) > 0 then
+        f.kind = "heal"
+    elseif ru8(data + K.ITEM_USE_EFFECT) == 0 then
+        f.kind = "money"
+    else
+        f.kind = "other"
+    end
+    return f
+end
+
+-- A unit handed an item it has no room for (convoymenu.c HandleNewItemGetFromDrop): FE8's
+-- chooser, answered by Bot.fullBag. With room in the convoy the rows send (0x2A-0x2E the
+-- unit's items, 0x2F the new one); a full convoy's rows discard (0x24-0x29) and ask Yes/No
+-- first. Every answer is kept in INSPECT.bagLog for the run's record.
+INSPECT.answerFullBag = function()
+    local K = INSPECT.BAG
+    local o = observeController()
+    local base = o.menu.items[1].override_id
+    local discard = base < K.MENU_SEND_FIRST
+    if discard then base = K.MENU_DISCARD_FIRST else base = K.MENU_SEND_FIRST end
+    local unitAddr = ru32(SYM.gActiveUnit)
+    local newId = ru16(SYM.gBmSt + K.BMST_TMP_ITEM)
+    local held = {}
+    for k = 0, K.UNIT_ITEMS - 1 do
+        local raw = ru16(unitAddr + K.UNIT_ITEM_LIST + k * 2)
+        if (raw & 0xFF) ~= 0 then held[#held + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
+    end
+    local facts = INSPECT.gameCalls(function(call)
+        local out = { held = {} }
+        for _, it in ipairs(held) do out.held[#out.held + 1] = INSPECT.unitItemFacts(call, unitAddr, it) end
+        out.new = INSPECT.unitItemFacts(call, unitAddr, { id = newId & 0xFF, uses = newId >> 8 })
+        return out
+    end)
+    local slot, why = BOT.fullBag(facts.held, facts.new, discard)
+    local row = base + (slot == 0 and K.UNIT_ITEMS or slot - 1)
+    local entry = { charId = ru8(ru32(unitAddr) + K.CHAR_NUMBER), item = facts.new.id,
+                    sent = slot == 0 and facts.new.id or facts.held[slot].id, discard = discard,
+                    why = why }
+    INSPECT.bagLog[#INSPECT.bagLog + 1] = entry
+    log(string.format("bag: unit 0x%X gets item 0x%X; %s 0x%X (%s)", entry.charId, entry.item,
+        discard and "discards" or "sends", entry.sent, why))
+    if not INSPECT.menuTo("send_to_convoy", row) then return false end
+    if not guardedInput("send_item", "A", "the chooser takes the row", function(after)
+        return controllerState(after) ~= "send_to_convoy" or after.choice ~= nil
+    end, 120) then return false end
+    if controllerState() == "yes_no_choice" then
+        return selectSemantic("answer_yes", "the discard is confirmed", function(after)
+            return controllerState(after) ~= "yes_no_choice"
+        end, 120)
+    end
+    return true
 end
 
 -- The shops a set of world map nodes holds: { node, kind, list (the stock's address), items }.

@@ -147,6 +147,47 @@ local function recordOf(g)
     return Json.decode(line:sub(#Botrun.PREFIX + 1))
 end
 
+-- test_explore_log: what became of each village and chest the run saw open -- ours, someone
+-- else's (a pillage), offered and never played (with the lowest chance it was offered at),
+-- never offered.
+do
+    local log = Botrun.exploreLog()
+    log.open({ { x = 1, y = 1, kind = "visit" }, { x = 2, y = 2, kind = "visit" },
+               { x = 3, y = 3, kind = "chest" }, { x = 4, y = 4, kind = "chest" } }, 1)
+    log.offered({ { x = 1, y = 1, die = 0 }, { x = 3, y = 3, die = 0.4 } })
+    log.offered({ { x = 3, y = 3, die = 0.1 } })
+    log.visited({ unit = 0x01, move = { x = 1, y = 1 } }, 1)
+    log.open({ { x = 3, y = 3, kind = "chest" }, { x = 4, y = 4, kind = "chest" } }, 2)
+    local by = {}
+    for _, e in ipairs(log.summary()) do by[e.x] = e end
+    check(by[1].status, "visited", "explore log: ours")
+    check(by[1].by, 0x01, "explore log: by whom")
+    check(by[2].status, "closed", "explore log: gone, not by us")
+    check(by[2].turn, 2, "explore log: when it was seen gone")
+    check(by[3].status, "skipped", "explore log: offered, never played")
+    check(by[3].offers, 2, "explore log: how often")
+    check(by[3].die, 0.1, "explore log: the lowest chance it was offered at")
+    check(by[4].status, "unreached", "explore log: never offered")
+    log.failed({ unit = 0x1C, move = { x = 4, y = 4 } }, 3)
+    by = {}
+    for _, e in ipairs(log.summary()) do by[e.x] = e end
+    check(by[4].status, "failed", "explore log: tried, and the harness could not drive it")
+    check(by[4].tried, 0x1C, "explore log: by whom")
+end
+
+-- test_full_bag_answers_are_recorded: the harness's full-bag answers land in the record with
+-- the turn they came on.
+do
+    local g = fakeGame { units = rout() }
+    local given = { { charId = 1, item = 0x6C, sent = 0x6C, discard = false, why = "w" } }
+    g.api.bag = function() local b = given; given = {}; return b end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(#r.bag, 1, "bag: one answer recorded")
+    check(r.bag[1].sent, 0x6C, "bag: what went")
+    check(r.bag[1].turn, 1, "bag: on its turn")
+end
+
 -- test_two_turn_rout_ends_won: A strikes E for 5 a turn; E has 10 HP.
 do
     local g = fakeGame { units = rout() }
@@ -331,8 +372,9 @@ do
     local asked = 0
     g.api.Planner = {
         surprise = Planner.surprise,
-        plan = function(_, board)
+        plan = function(_, board, _, _, opts)
             asked = asked + 1
+            if opts and opts.stalled then g.stalledAsk = asked end
             for _, u in ipairs(board.units) do
                 if u.faction == "blue" and u.acted then return nil end
             end
@@ -347,7 +389,11 @@ do
     local r = recordOf(g)
     check(r.plans.kept, 1, "C's wait is played from A's plan")
     check(asked, r.plans.made, "every plan asked for is counted")
-    check(asked, 3, "turn 1: the plan and the played-out ask; turn 2: one ask, then stuck")
+    check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
+          .. "turn 2's board: one stalled ask; turn 4 repeats it again: stuck")
+    check(r.stalls, 1, "the first repeat is a stall, not stuck")
+    check(g.stalledAsk, 4, "the stalled ask is told it is stalled")
+    check(r.outcome, "stuck", "a board that comes round again after a stall is stuck")
 end
 
 -- test_trace_tells_the_run: every act with the game's battle record, both phases, an arrival,

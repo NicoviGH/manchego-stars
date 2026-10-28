@@ -29,7 +29,9 @@
 --            range(unit) -> { min, max }|nil, the reach of the weapon FE8 has equipped;
 --            canSeize(unit) -> bool, the game's CanUnitSeize;
 --            objective = { kind = "rout"|"boss"|"seize"|"survive"|"special",
---                          tile = {x,y}|nil, turnsLeft = n|nil } (a Defense map is "survive");
+--                          tile = {x,y}|nil, turnsLeft = n|nil, boss = charId|nil } (a
+--                          Defense map is "survive"; `boss` marks that red unit isBoss on the
+--                          board, beside CA_BOSS);
 --            field(goal) -> dist|nil, OPTIONAL: dist[y][x] = the distance from `goal` to
 --              (x, y), lower nearer (nil = unreached); FE8's own march map. A function of the
 --              goal because the bot chooses the goal (the boss, the nearest enemy). Without it
@@ -42,13 +44,17 @@
 --              because the AI's pick of weapon and tile can be changed by any unit anywhere.
 --              Reach and worst case are per call only.
 --            terrain(x, y) -> FE8 terrain id, OPTIONAL: only a terrain claim reads it; without
---              it that claim is a no-op. }
+--              it that claim is a no-op.
+--            explorable() -> {{x, y, kind = "visit"|"chest"}...}, canExplore(unit, x, y, kind)
+--              -> bool, OPTIONAL (sight.lua's): the open villages and chests, and the unit
+--              menu's own check; without them nothing is explored. }
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, weapon = nil }.
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
 --   `weapon` is nil = the weapon FE8 has equipped, the one sight.range describes.
---   "talk", "visit" and "staff" are acts the claim behaviours add; nothing here emits them.
+--   "talk" and "staff" are acts the claim behaviours add; "visit" and "chest" only the
+--   planner's proposals (Bot.candidates) make.
 --
 -- Worst case on an end tile = the sum, over every enemy that reaches it, of that enemy's
 -- strike: takenDmg x takenHits, x3 when takenCrit > 0 (FE8 triples a crit: bmbattle.c
@@ -143,6 +149,19 @@
 -- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
 --   caller spends seals in.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
+-- Bot.fullBag(held, new, convoyFull) -> slot, why: a unit given an item with no room (FE8's
+--   chooser, convoymenu.c) sends one item to the convoy -- or discards it when the convoy is
+--   full (convoyFull) -- and this is which (Nicolas, 2026-10-28): 0 = the new item, else the
+--   index into `held`. Each item is the game's facts about it for this unit: { id, kind =
+--   "weapon" (a staff included) | "heal" | "key" | "passive" | "money" | "other", type,
+--   rank, maxRange, effective (its effectiveness list, compared by identity), usable, uses }.
+--   The new item stays only when it is wanted: a healing item when the unit carries none, a
+--   key, or a weapon it can use that it lacks the type of, that adds range or bonus damage its
+--   others of the type lack, or that outranks one of them that does neither. Then what leaves
+--   is, in order, money, a seal or booster, a weapon the unit cannot use (the lowest rank), a
+--   spare healing item (the fewest uses), the weapon the new one beats; a discard takes only
+--   the beaten weapon, the spare heal or the unusable weapon. Nothing to leave, or a new item
+--   not wanted, and the new item goes.
 --
 -- ── The greedy core (the clear scenarios drive these directly) ─────────────────────────────
 -- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y} } | nil
@@ -420,6 +439,8 @@ local function context(board, sight)
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
+        -- the Defeat Boss map's boss as the game names it (sight.objective.boss), CA_BOSS or not
+        if o and o.boss and u.faction == "red" and u.charId == o.boss then u.isBoss = true end
         if u.onField then
             ctx.onField[#ctx.onField + 1] = u
             ctx.standing[tileKey(u.x, u.y)] = u
@@ -764,11 +785,14 @@ local function bestAttack(ctx, u, gate, only)
     return best
 end
 
--- Where the march heads: the objective's tile, the boss, or the nearest enemy; nil = hold.
+-- Where the march heads: the village or chest the unit is sent to (exploring, below), else the
+-- objective's tile, the boss, or the nearest enemy; nil = hold.
 -- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
 -- than the fog shows, so it pushes the fog back.
 local function goalFor(ctx, u, objective)
     local kind = objective and objective.kind
+    local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
+    if explore then return explore end
     if objective and objective.tile then return objective.tile end
     if kind == "survive" then return nil end
     if #ctx.enemies == 0 and ctx.sight.unseen then
@@ -1195,6 +1219,39 @@ end
 -- march goal, the obstacle that opens the way to it when it is cut off, and the field distance
 -- from the goal (where it stands, the best wait tile, the best allowed one), and per enemy it can strike, the tiles in range, how many the gate allows, and
 -- the best (largest-margin) exchange: our hit/damage and its counter against our HP.
+-- Exploring (#510 step 9; Nicolas: a new player does not know the rewards, so it visits
+-- every village and opens every chest it can): each village or chest still open
+-- (sight.explorable) sends one unit the game lets use it (sight.canExplore) marching to it, the
+-- nearest by the game's own field from the tile; each tile one unit, each unit one tile, the
+-- nearest pair first. ctx.exploreGoal[unit id] = the tile, which goalFor reads.
+local function exploring(ctx)
+    ctx.exploreGoal = {}
+    if not ctx.sight.explorable then return end
+    local pairs_ = {}
+    for _, t in ipairs(ctx.sight.explorable()) do
+        local field = fieldFor(ctx, t)
+        for _, u in ipairs(ctx.actors) do
+            local d = field and field[u.y] and field[u.y][u.x]
+            if d and ctx.sight.canExplore(u, t.x, t.y, t.kind) then
+                pairs_[#pairs_ + 1] = { t = t, u = u, d = d }
+            end
+        end
+    end
+    table.sort(pairs_, function(a, b)
+        if a.d ~= b.d then return a.d < b.d end
+        if a.u.slot ~= b.u.slot then return a.u.slot < b.u.slot end
+        if a.t.y ~= b.t.y then return a.t.y < b.t.y end
+        return a.t.x < b.t.x
+    end)
+    local taken = {}
+    for _, p in ipairs(pairs_) do
+        local k = tileKey(p.t.x, p.t.y)
+        if not taken[k] and not ctx.exploreGoal[p.u.id] then
+            taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
+        end
+    end
+end
+
 function M.explain(board, sight, style)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
@@ -1264,14 +1321,16 @@ end
 -- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
 -- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
 -- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
--- every Talk the game offers, its best heal, a Vulnerary, the march, the hold, the retreat and
--- a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
+-- every Talk the game offers, its best heal, a Vulnerary, a Visit or Chest on each open tile
+-- it reaches (sight.canExplore), the march (to its exploring tile when it was sent to one), the
+-- hold, the retreat and a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
 -- that can strike it there next phase); an attack its forecast (`f`) and counter worst case
 -- (`spent`).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view).
 function M.candidates(board, sight, style)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    exploring(ctx)
     local open = function() return true end
     local objective = sight.objective
     local out = {}
@@ -1341,6 +1400,17 @@ function M.candidates(board, sight, style)
             end
         end
         add(mend(ctx, u, open), "mend")
+        -- a village or chest the game lets `u` use, from the tile itself (whether it is worth
+        -- the trip is the planner's no-risk rule)
+        if ctx.sight.explorable then
+            local ends = {}
+            for _, t in ipairs(endTiles(ctx, u)) do ends[tileKey(t.x, t.y)] = true end
+            for _, t in ipairs(ctx.sight.explorable()) do
+                if ends[tileKey(t.x, t.y)] and ctx.sight.canExplore(u, t.x, t.y, t.kind) then
+                    add(action(u, t, t.kind), "explore")
+                end
+            end
+        end
         add(action(u, march(ctx, u, open, objective), "wait"), "march")
         add(action(u, safest(ctx, u, waitTiles(ctx, u)), "wait"), "hold")
         -- progress: how much nearer its march goal (the game's field to it) each act ends it
@@ -1653,6 +1723,94 @@ function M.promote(unit, items)
 end
 
 function M.promoteOrder(units) return byLevel(units) end
+
+-- A weapon's own reach and bonus damage, against the unit's other weapons of its type: what a
+-- higher rank cannot replace (a Javelin's range, an Armorslayer's effectiveness).
+local function special(w, others)
+    local reach, kinds = 0, {}
+    for _, o in ipairs(others) do
+        if o ~= w then
+            reach = math.max(reach, o.maxRange or 1)
+            if o.effective then kinds[o.effective] = true end
+        end
+    end
+    return (w.maxRange or 1) > reach or (w.effective ~= nil and not kinds[w.effective])
+end
+
+function M.fullBag(held, new, convoyFull)
+    local function usableOfType(t)
+        local out = {}
+        for _, it in ipairs(held) do
+            if it.kind == "weapon" and it.usable and it.type == t then out[#out + 1] = it end
+        end
+        return out
+    end
+    local heals = {}
+    for _, it in ipairs(held) do
+        if it.kind == "heal" then heals[#heals + 1] = it end
+    end
+    -- is the new item wanted, and which carried weapon it beats (nil: it beats none)
+    local wanted, beaten = false, nil
+    if new.kind == "heal" then
+        wanted = #heals == 0
+    elseif new.kind == "key" then
+        wanted = true
+    elseif new.kind == "weapon" and new.usable then
+        local same = usableOfType(new.type)
+        local with = { new }
+        for _, w in ipairs(same) do with[#with + 1] = w end
+        if #same == 0 or special(new, with) then
+            wanted = true
+        else
+            for _, w in ipairs(same) do
+                if not special(w, with) and (w.rank or 0) < (new.rank or 0)
+                        and (not beaten or (w.rank or 0) < (beaten.rank or 0)) then
+                    beaten = w
+                end
+            end
+            wanted = beaten ~= nil
+        end
+    end
+    if not wanted then return 0, "the new item is not needed in hand" end
+    -- what may leave, in order
+    local function first(test)
+        for i, it in ipairs(held) do
+            if test(it) then return i end
+        end
+        return nil
+    end
+    local spareHeal
+    if #heals > 1 then
+        for i, it in ipairs(held) do
+            if it.kind == "heal" and (not spareHeal or (it.uses or 0) < (held[spareHeal].uses or 0)) then
+                spareHeal = i
+            end
+        end
+    end
+    local unusable
+    for i, it in ipairs(held) do
+        if it.kind == "weapon" and not it.usable
+                and (not unusable or (it.rank or 0) < (held[unusable].rank or 0)) then
+            unusable = i
+        end
+    end
+    local beatenAt = beaten and first(function(it) return it == beaten end)
+    local order
+    if convoyFull then
+        -- a discard: duplicates and low tiers go; money, keys and the rest never do
+        order = { { beatenAt, "a weapon it beats" }, { spareHeal, "a spare healing item" },
+                  { unusable, "a weapon the unit cannot use" } }
+    else
+        order = { { first(function(it) return it.kind == "money" end), "money" },
+                  { first(function(it) return it.kind == "other" end), "a seal or booster" },
+                  { unusable, "a weapon the unit cannot use" },
+                  { spareHeal, "a spare healing item" }, { beatenAt, "a weapon it beats" } }
+    end
+    for _, o in ipairs(order) do
+        if o[1] then return o[1], o[2] end
+    end
+    return 0, "everything carried is needed"
+end
 
 function M.route(options, style)
     local r = style.route
