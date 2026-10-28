@@ -188,14 +188,14 @@ class ChapterBodies(unittest.TestCase):
         self.assertEqual(1, len(nerra))
         self.assertTrue(nerra[0].boss, 'nerra rides CHARACTER_NOVALA, who carries CA_BOSS')
 
-    def test_a_boss_on_a_RAW_pid_carries_none(self):
-        # Ravisin has no ENEMY_BASE_SLOT row, so her CharacterData is all zeros in the built
-        # ROM -- she pays 40 less kill exp than the vanilla boss she is measured against.
-        # This is a finding, not a bug in the reader, and the model must not paper over it.
+    def test_a_boss_on_a_RAW_pid_carries_CA_BOSS(self):
+        # Ravisin rides raw pid 0xb8, whose vanilla row has no attributes; the build stamps
+        # CA_BOSS on it (#545), so she pays the same +40 kill bonus as the boss she is
+        # measured against.
         bodies = ec.chapter_bodies(ec.load_chapter(self.campaign, 'ch05'))
         ravisin = [b for b in bodies if b.name == 'ravisin']
         self.assertEqual(1, len(ravisin))
-        self.assertFalse(ravisin[0].boss)
+        self.assertTrue(ravisin[0].boss)
 
     def test_the_prologue_boss_carries_CA_BOSS_though_his_stat_line_is_zeroed(self):
         # Sephek rides PROLOGUE_SEPHEK_SLOT (ONEILL) and DefeatBoss fires on his death

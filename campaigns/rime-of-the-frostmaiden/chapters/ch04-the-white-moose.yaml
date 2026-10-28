@@ -217,7 +217,7 @@ enemy_units:
     count: 4
     positions: [[11,6],[13,7],[12,8],[13,11]]
     class: mogall               # CLASS_MOGALL — floating eye; Evil Eye = ranged magic (hits RES)
-    level: 1                    # vanilla Ch4 Mogalls: L1×3 + L2×1 → L1 representative
+    levels: [1, 2, 1, 1]        # vanilla Ch4 Mogalls: L1×3 + L2×1, the L2 on (13,7) (ADR 0373)
     autolevel: true
     inventory:
       - id: evil-eye
@@ -245,7 +245,7 @@ enemy_units:
     count: 3
     positions: [[1,14],[5,13],[8,14]]
     class: bonewalker           # CLASS_BONEWALKER — MELEE skeleton (iron sword/lance), per the twin
-    level: 3                    # vanilla line Bonewalkers L2/3/3 → L3 representative
+    levels: [2, 3, 3]           # vanilla line Bonewalkers L2/3/3, by donor post (ADR 0373)
     autolevel: true
     inventory:
       - id: iron-sword
@@ -289,7 +289,10 @@ enemy_units:
     # caveat that the spatial/difficulty pass must take the new leader tile into account.
     positions: [[2,1],[2,0],[0,2],[0,0],[1,0],[0,1]]
     class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
-    level: 2
+    levels: [2, 2, 2, 1, 1, 1]  # the six vanilla Revenants the pack replaced: the line's L2 x3 and
+                                # L1 x3 (ADR 0373). The first is Lupin's tile, where
+                                # the ROM places Lupin at his own level; to revisit with #510's
+                                # model and the lord classes (Nicolas, 2026-10-28)
     autolevel: true
     arrives_turn: 2             # the reveal wave — monsters-only until the pack drops (turn 2)
     inventory:

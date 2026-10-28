@@ -656,14 +656,20 @@ def _vanilla_load_kwargs(d):
 def _our_load_kwargs(ed):
     """The same for one of OUR entries: the flag is the YAML's `autolevel:`, which is what the
     injector emits (inject/units.py), and the slot is the donor a hostile cast member or a
-    vanilla-slot boss rides; our raw pids carry no CA_BOSS."""
+    vanilla-slot boss rides. Every `is_boss` entry carries CA_BOSS, raw pid or not (#545)."""
+    import exp_curve                        # exp_curve imports this module
     # ENEMY_CHARACTER_SLOT, not ENEMY_BASE_SLOT: the question is the slot's ATTRIBUTES
     # (CA_BOSS), and Sephek keeps ONEILL's though his stat line is zeroed (inject/cast.py).
     donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
              or inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id')))
     flagged = bool(ed.get('autolevel'))
-    realistic = flagged and bool(donor) and _loads_realistically(
-        donor, _enemy_class_enum(ed['class'])) if 'class' in ed else False
+    # Two different slots: the boss bit is the row the unit DEPLOYS on (ENEMY_CHARACTER_SLOT, or
+    # its stamped boss row); `donor` may be a BASE_DONOR that lends only stats, and
+    # _loads_realistically also takes its pid < 0x40 and its class's CA_BOSS.
+    realistic = ('class' in ed and flagged
+                 and (exp_curve.entry_carries_ca_boss(ed)
+                      or (bool(donor)
+                          and _loads_realistically(donor, _enemy_class_enum(ed['class'])))))
     growths = inject.stats.donor_growths_and_ranks(_characters_text(), donor)[0] \
         if realistic and str(donor).startswith('CHARACTER_') else None
     return dict(autolevel=flagged, realistic=realistic, personal_growths=growths,

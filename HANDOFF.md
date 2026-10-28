@@ -9,7 +9,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR D #542 merged 70e01bb; next PR E). **The parity model is being
+Refreshed 2026-10-28, evening (Claude). **#545 is DONE: PR #546 merged (b3a9383).** Every
+chapter boss's row carries CA_BOSS (ADR 0372), and every line enemy in ch00-ch07 now sits at
+the level of the vanilla unit it mirrors (ADR 0373, "vanilla levels as the foundation"; ch04's
+wolf pack included). No parity verdict changed. Its pre-merge `SUITE=gate` run was DEFERRED by
+Nicolas to #510 step 10, which tracks it: ch01's goblins went L1 -> L2-3 and `lordfloor` now
+expects +10 HP, and neither has run in the emulator yet.
+**NOW, in a fresh session, step 1: push the step-9 WIP** so it stops living only on this machine:
+`git push -u origin feat/510-step9-e-campaigns` (b243941 has never been pushed; no PR yet).
+**Step 2: resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a
+LOCAL WIP commit (not pushed)**: villages/chests, the full-bag rule, the boss assault + stall rule
+(below, "NEXT"). **That branch predates #546: merge `origin/main` into it first** (it changes
+ch00/ch01/ch03/ch04/ch05 enemies, so the bot's ch03 and ch01 runs read differently from the notes
+below), then rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`; the
+checkout also touches the chapter YAMLs' mtimes). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -57,10 +70,140 @@ G3 #537 78105ed; the summary is on #531).
    - Run by hand: `tools/playtest/run.sh bot` / `sightprobe` (ours ch01), and with `PT_VANILLA=1`
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
-3. **Next: PR E, then F** (stack E->F only). PR E's caller hands bot.lua `promotes` and `canUse`
-   from the game's own checks (ADR 0369: no level or rank rule in the bot).
-   Ours has no world map yet: our campaign uses VANILLA's world map between chapters (the twin's
-   shops and stock at the same point, via the game's shop screen; Nicolas 2026-10-27, in the plan's E1).
+3. **NOW: PR E (campaigns) and PR F (the runner), one branch: `feat/510-step9-e-campaigns`**
+   (pushed, **5add902**, NO PR yet). Read in the plan comment (link at the top): "Party
+   selection, SETTLED", "Lords, SETTLED", "The planner", and Tasks 11-13 (F1-F3; F2 and F3
+   were amended 2026-10-27).
+   - **Built, E:** `Bot.team` picks the team by the map's DEMANDS, read at the prep screen
+     (`Sight.demands`/`Sight.answer`). The group caps come from `team_groups.py` (an explicit
+     class table). campaign.lua carries the cleared team and never repeats a style. Route
+     (vanilla) and lead (ours, `INSPECT.pickLead`) are campaign SETTINGS. The bot breaks walls,
+     heals, ends Canto, uses Talk and doors, and ignores enemies in fog. `campaign_env.py`
+     resolves claims to game ids and resumes with `--id X --from N`.
+   - **Lords (Nicolas):** each of our 8 leads becomes its own cell, but only on #543's lord
+     classes, after the runner. Until then ours runs the default lead.
+   - **Built, the planner** (`planner.lua`; `Bot.candidates` proposes, `sight.enemyPhase` runs
+     the game's own AI phase in one batch):
+     - Every act carries its end tile's exposure, every unit has a safe retreat, and the beam
+       pays each moved unit's death chance (020864d).
+     - A plan's next act is played unless `Planner.surprise` finds the board off the plan's
+       expectation (fb207ae). Heals are never planned on a unit the plan has moved (that was
+       a Staff crash).
+     - **Measured, ch03 alone:** careful won turn 13, all alive, 19.5 CPU s, 28 plans for 141
+       acts. Before these two changes it lost 1-3 units an attempt at ~38 CPU s.
+     - Speed: `Sight.batching` (one save/load per decision), cached unit facts, and `costs` in
+       every BOTRUN. Report timings on every change (Nicolas).
+   - **Built, F1, the pool** (9993947): `montecarlo.py attempts --env <env.json> --attempts N
+     --jobs J` plays attempts 1..N from the env's `from` start side by side and names the lowest
+     clean one. It is exactly what the sequential loop finds: every attempt loads one start
+     state, RNG included. Proven in the ROM: ch03 attempts 1-3 took 23 s wall vs ~60 s, and
+     attempt 1 matched the sequential run. run.sh `PT_RUN_TAG` isolates copies of a scenario
+     (run dir, kill, ROM copy and .sav). The campaign env's `attempt: k` plays only the k-th.
+   - **Built, F2's verdict** (5add902, `paired_verdict`): looks only at 50/100/200 pairs
+     (early stop at exact McNemar p < 0.001), Wilson rates, and Newcombe's paired interval for
+     the gap. Nicolas accepted this over the old "stop when the interval excludes 0" rule.
+     **Cross-checked** against statsmodels (~1e-16). In simulation the old rule falsely flagged
+     29-32% of no-difference cells and the new one 3-5%; a real 10-point gap is caught 71% of
+     the time. #510 comments 6455985418, 6456079024. Research records 0021 (planning a
+     multi-unit turn) and 0022 (Monte Carlo statistics).
+   - **F3's report format, settled (Nicolas, 2026-10-27: "I don't want to read a big table"):**
+     one plain sentence per cell, in the plan's Task 13. The only words are HARDER, EASIER or
+     "no clear difference", each with both clean-clear rates and the gap's range. A summary line
+     sits on top, flagged cells first, noting that about 1 flag in 24 is chance.
+   - **NEXT, in order:**
+     1. **F2 is DONE** (c0382b3): `montecarlo.py cell --ours <env> --vanilla <env> [--mode]
+        [--jobs]` plays a cell to its verdict. Pair s = each side's chapter start, the game seeded
+        with s (env `reseed`) and attempt 1's style. Each game's runs go in
+        `<run.sh --simdir>/runs.jsonl`, stamped with cell + Lua hash, and a kept run is never played
+        again. A crash's pair is left out and replaced by a new seed. `sample_style` IS
+        `Campaign.drawStyle` + `Bot.team` (no Python copy). The rulings are on #510 (comment
+        6457132394). `make sim` is not written yet (F4 needs it).
+     2. **F3's trace is DONE** (909e9ef; #510 comment 6457580533). Every run keeps a gzipped JSONL
+        trace in the store (`traces/<campaign>/...`, named in the record). It holds the start,
+        unit snapshots, plans (score, the others judged, predict, replan reasons), each act of
+        both sides with the game's battle record (`Board.battle`: forecast hit/crit, can-counter,
+        every blow), arrivals, recruits and items, and the record last. `montecarlo.py story
+        <trace>` tells one run in plain text. The trace costs no measurable CPU. A Talk recruit
+        no longer counts as a kill. Not traced: map-tile events (chests and villages show only
+        as items).
+        **Fixed after Nicolas's review (ba06c8e; #510 comment 6458549710):** each campaign keeps
+        its seed (pair s = campaign s from New Game, its FIRST attempt at the chapter; no
+        reseed). A run without a game result stops the cell and is reported in its own words.
+        Enemy acts follow `gActionData` as vanilla writes it. The stamp hashes the whole env.
+        `test_inject_unit_art`'s shared-temp-dir race is fixed.
+        **Built since, in b243941 (WIP, local; #510 comments 6459066722, 6473075402):**
+        - **Villages and chests, under Nicolas's NO-RISK RULE** (he rejected the made-up
+          `explore = 200`; the rule is ON TRIAL, not locked):
+          - `sight.explorable`/`canExplore` run the unit menu's own Visit/Chest checks.
+          - Each open tile sends its nearest able unit marching to it.
+          - The planner credits a visit only at zero chance to die, in both the beam and the
+            judged phase. The credit (the recruit's 200) only orders a SAFE visit.
+          - The record's `explore` says what became of each tile.
+          - Ours ch02: 2 of 4 villages taken at zero risk; careful never marched through the
+            bandits to the other two.
+        - **The full-bag rule (Nicolas, 2026-10-28), `Bot.fullBag`:** it answers FE8's own
+          send-to-convoy / discard chooser, and the record has `bag`. Ours ch03: all 4 chests
+          opened, and a duplicate Iron Sword went to the convoy.
+        - **Boss maps (Nicolas agreed: option 2, plus "go at the boss with multiple units"):**
+          - The ASSAULT plan: every unit that reaches the boss strikes it, judged beside the beam.
+          - A repeated board is first a STALL: the planner must play a plan that changes it, and
+            only a repeat after that is stuck. The record has `stalls`.
+          - The boss is read from the game's own Defeat Boss goal (`GetDefeatTalkEntry`, flag 2),
+            not CA_BOSS (before #545's fix the grell had none, so the bot saw no boss at all;
+            every boss carries it now, and the goal read stays).
+          - The judge CHAINS the counter with the enemy phase. Averaging it had let the lord
+            strike the grell alone and die.
+        - **Where it stands (ours ch03 attempt 1, `PT_CAMPAIGN` with `attempt: 1`):** the control
+          (exploring off) wins t13, all alive. The latest run had no stuck and no deaths, but it
+          CRASHED on turn 16: "the harness could not perform item" (a Vulnerary-type act).
+          Unexamined.
+        **The env, without a vanilla campaign:** point `campaign_env.py ours --store <dir>` at a
+        dir of `0.json..25.json`, each `{"shops": []}`, with `--id e1-ours-ch07 --from 4`. Then
+        set `last: [4]`, `shops: {}` and `attempt: 1` in the JSON. That plays ch03 alone, from
+        the saved start.
+        **NEXT, in order:**
+        1. The item crash: read the trace first; spend one instrumented run, never one per guess.
+        2. The stall rule can CYCLE: a unit steps into the boss's 2-range, is hit, retreats, and
+           the board comes back with other HP, so each repeat is "new" (one run: 6 stalls to turn
+           40). Watch for it once the assault fires.
+        3. The exploring trip itself: careful re-picks the sent unit at every decision, so no one
+           commits to a far village. Each open tile's unit is re-chosen per decision.
+        4. A kept plan's attack can find no Attack command (a target changed under it; the
+           surprise check missed it). Seen once in ch03 attempt 4; that trace was lost.
+        5. Nicolas: **use convoy items before buying anything** (between chapters; drive the prep
+           Supply screen). And: promote at level 10, between chapters, configured separately.
+           Seals found in battle go to the convoy for now.
+        **Then F3's rest:** the report (one plain sentence per cell first; Task 13), "what kills
+        us" as a query over traces, bot faults, feasibility, attempts buckets, `--post`.
+     2b. **Where runs live (plan Task 16, F5, SETTLED; Nicolas: give them "a good home in the
+        repo"):** ONE home each (Nicolas: no copies). The WRITE-UP is a committed record per
+        sweep, `sim/<id>-<slug>/RUN.md`: full YAML frontmatter of inputs and cost, plus the plain
+        verdicts. It is indexed by gen_decisions_index as a third collection (the index file is
+        to be built). The DATA is every run's trace, in one GitHub Release asset per sweep, sha256
+        in the frontmatter, fetched by `montecarlo.py fetch`. No run data is kept in git:
+        summaries are read from the traces. The local `references/sim` is only a cache (fetched
+        traces, save states). Runs are reused by cell key; `--fresh` re-runs. The repo is
+        PUBLIC, so releases are too.
+     3. **The planner barely reads claims:** two ch03 attempts differing only in claims
+        (`avoid` vs `kits`) played identically. The plan says claims become goal and weight
+        terms; build that.
+     4. Game-call cost: each sandbox call rounds up to a whole frame (~0.9 ms, `run_s`). Running
+        a call list in one frame is the next lever.
+     5. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
+        claims, then the PR and `/code-review <PR> medium` in a subagent.
+     6. If the beam keeps cornering units: evolve whole-turn plans (record 0021). Not adopted.
+   - **How to run:** build PT_CAMPAIGN with `campaign_env.py`. Ours needs `--store` of a vanilla
+     campaign through Ch8 for its shops; until one exists, pass `shops: {}` and `last: [host]`
+     by hand. **PT_CAMPAIGN holds the JSON ITSELF, not a path:** `PT_CAMPAIGN="$(cat env.json)"
+     tools/playtest/run.sh campaign`. A path is silently ignored, and a New Game runs. Retail:
+     add `PT_VANILLA=1`.
+   - **Fast loop:** an env with `id: e1-ours-ch07, from: 4, last: [4]` plays ch03 alone (~20 CPU
+     s per attempt). The saved starts are in `references/sim/ours/9405eea0cb9f/states/e1-ours-ch07/`
+     (4 = ch03, 5 = ch04).
+   - **Gotcha:** switching to main (for a HANDOFF commit) and back touches the chapter YAMLs'
+     mtimes, and run.sh then refuses the ROM as stale. Run
+     `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba` afterwards (the ROM hash is
+     unchanged).
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
@@ -94,6 +237,7 @@ Open thread on #531: a matrix run leaves the build tree non-canonical, so the pr
 ## In flight
 
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only, unchanged: ch07 moves to Distant Blade's map.
+  Parked: chapter work resumes after #510's difficulty and roster work is done (Nicolas, 2026-10-28).
 
 **Next, in order (#510's list is the plan):**
 
@@ -171,9 +315,12 @@ Open thread on #531: a matrix run leaves the build tree non-canonical, so the pr
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
    Nicolas the options. Read the twin BOTH with Seth fielded and with Seth benched (the Let's
    Play Archive's run benches him from Ch4); Baxby-as-Seth is back on the table as a lever and
-   Nicolas says it fits Baxby (both on #510, 2026-10-22). Baseline (2026-10-19, in #510): the force side is near parity, and the
-   clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
-   decision (ADR 0342 rejected it). Nicolas wants it TIGHTER (2026-10-21, on #510): clear-load
+   Nicolas says it fits Baxby (both on #510, 2026-10-22). Baseline (2026-10-19, in #510): the
+   force side is near parity, and the clear-load excess is the party, mostly vanilla's Seth.
+   **The party decisions are tracked in GitHub, not here:** #510 step 10's checklist, and the
+   tree under #459 (Roster parity): #547 (Cavaliers: Baxby as Seth, Lupin as Franz, joins
+   levelled to their chapter) and #526 (Lord system), whose #543 is built FIRST in step 10.
+   #459 is marked blocked by #510. Nicolas wants it TIGHTER (2026-10-21, on #510): clear-load
    above x1.0 means our game is harder than vanilla, so bring party levers toward x1.0 and a
    narrower band as options.
 4. **#493 -- the wiki's remaining findings** (navbox, #490's stat ranges, supports after #494), and

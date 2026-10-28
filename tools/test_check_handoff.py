@@ -131,6 +131,23 @@ class HandoffBranchGuard(unittest.TestCase):
         self.assertEqual(self._state(), 'ok')
         self.assertEqual(self._fails(), [])
 
+    def test_staging_mains_copy_passes_before_the_commit(self):
+        """The guard's own advised fix must get past pre-commit.
+
+        `git checkout main -- HANDOFF.md` stages main's copy, and so does a merge of main into
+        a drifted branch. The commit that syncs the branch runs this guard on the INDEX, so a
+        staged copy identical to main's is SYNCED, not drift (it blocked the #510 step-9
+        merge, 2026-10-28; the test above commits with hooks off and never saw it).
+        """
+        _run(self.tmp, 'checkout', '-q', '-b', 'feat/x')
+        _commit(self.tmp, 'HANDOFF.md', 'branch-local state\n', 'drifted')
+        _run(self.tmp, 'checkout', '-q', 'main')
+        _commit(self.tmp, 'HANDOFF.md', 'state v2\n', 'refresh on main')
+        _run(self.tmp, 'checkout', '-q', 'feat/x')
+        _run(self.tmp, 'checkout', 'main', '--', 'HANDOFF.md')
+        self.assertEqual(self._state(), 'ok')
+        self.assertEqual(self._fails(), [])
+
     def test_staged_edit_is_caught_before_it_becomes_a_commit(self):
         """Pre-commit runs `check.py`, so the guard has to see the index, not just history."""
         _run(self.tmp, 'checkout', '-q', '-b', 'feat/x')

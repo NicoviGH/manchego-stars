@@ -3,7 +3,7 @@
 import os
 import sys
 
-from inject.raw_pids import enemy_pid_for
+from inject.raw_pids import enemy_pid_for, entry_body_levels
 from inject.cast import _classed_cast, char_symbol, unit_items, PORTRAIT_MAP
 from inject.chapter_ids import (
     CH04_ENDING_MSG, CH04_ENDING_NO_LUPIN_MSG, CH04_GOAL_STATUS_MSG, CH04_GOAL_WINDOW_MSG,
@@ -289,11 +289,13 @@ def ch04_turn2_reveal_rows(campaign, chap, lupin):
         leader_pos[0], leader_pos[1], ', '.join(unit_items(campaign, _uid)),
         ai,
         ' /* lupin -- hostile pack leader (red; Marty parleys him blue) */')
+    # Body 0's level is the model's: the ROM puts Lupin, at his own level, on that tile.
+    generic_levels = entry_body_levels(wave)[1:]
     generics = [_enemy_unit_entry(
-        pid, cls, int(wave['level']), bool(wave.get('autolevel')), x, y, items, ai,
+        pid, cls, int(level), bool(wave.get('autolevel')), x, y, items, ai,
         ' /* %s %d/%d -- %s (generic pack; own pid so the parley can convert it) */'
         % (wave['id'], i + 1, len(generic_pos), wave['name']))
-        for i, (pid, (x, y)) in enumerate(zip(CH04_PACK_PIDS, generic_pos))]
+        for i, (pid, (x, y), level) in enumerate(zip(CH04_PACK_PIDS, generic_pos, generic_levels))]
     return [lupin_row] + generics
 
 
