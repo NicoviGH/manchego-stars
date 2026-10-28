@@ -1923,7 +1923,8 @@ class LordFloorSolver(unittest.TestCase):
         self.assertTrue(f.reached)
 
     def test_physical_threat_spends_def_to_cap_then_hp(self):
-        # A frail shaman vs the goblin fighter -> reproduces the locked +7 HP / +4 Def.
+        # A synthetic frail shaman vs a pow-5 goblin fighter buys +7 HP / +4 Def. (ch01's
+        # shipped floor is test_inject_ch01's; its goblins are vanilla's L2-3, ADR 0373.)
         mage = combatant('mage', hp=18, dfc=2, spd=6, con=7, weapon='flux')
         fighter = combatant('fighter', pow_=5, spd=4, con=11, weapon='iron-axe')
         f = df.lord_floor_delta(mage, [fighter], target=3.5, def_cap=4)

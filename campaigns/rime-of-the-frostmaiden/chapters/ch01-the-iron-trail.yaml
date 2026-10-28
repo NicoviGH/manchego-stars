@@ -239,7 +239,7 @@ enemy_units:
     inventory_by_class:
       fighter: [iron-axe]
       soldier: [iron-lance]
-    donor: [[13, 8], [13, 9], [12, 9]]
+    donor: [[13, 8], [12, 9], [13, 9]]   # one per body, in composition order: F, F, S
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
 
 # ── Events ────────────────────────────────────────────────────────────────────

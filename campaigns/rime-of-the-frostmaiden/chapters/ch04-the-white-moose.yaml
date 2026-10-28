@@ -289,7 +289,10 @@ enemy_units:
     # caveat that the spatial/difficulty pass must take the new leader tile into account.
     positions: [[2,1],[2,0],[0,2],[0,0],[1,0],[0,1]]
     class: mauthedoog           # CLASS_MAUTHEDOOG — the FE8 wolf/dog beast (Ravisin's awakened pack)
-    level: 2
+    levels: [2, 2, 2, 1, 1, 1]  # the six vanilla Revenants the pack replaced: 2 pack L2s and the
+                                # line's L2, L1, L1, L1 (ADR 0373). The first is Lupin's tile, where
+                                # the ROM places Lupin at his own level; to revisit with #510's
+                                # model and the lord classes (Nicolas, 2026-10-28)
     autolevel: true
     arrives_turn: 2             # the reveal wave — monsters-only until the pack drops (turn 2)
     inventory:
