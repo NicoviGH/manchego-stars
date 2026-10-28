@@ -881,7 +881,9 @@ local function breach(ctx, u, gate, objective)
         if inRange(t.x, t.y, b.x, b.y, r.min, r.max) and gate(ctx, u, t.x, t.y, nil) then
             if b.door then return action(u, t, "door", nil) end
             local a = action(u, t, "attack", nil)
-            a.obstacle = { x = b.x, y = b.y }
+            -- its HP and the strike's blow (the game's forecast): the planner tracks the wall
+            a.obstacle = { x = b.x, y = b.y, hp = b.hp,
+                           blow = ctx.sight.strikeWall and ctx.sight.strikeWall(u, b, t.x, t.y) }
             return a
         end
     end

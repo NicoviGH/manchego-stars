@@ -88,13 +88,28 @@
 --   explorable()             the villages and chests still open now: { x, y, kind =
 --                            "visit"|"chest" } per tile whose Visit or Chest command (read with
 --                            the Seize tile) GetAvailableTileEventCommand still returns -- a
---                            visited, pillaged or opened tile's flag drops it. Read once per
+--                            visited, pillaged or opened tile's flag drops it -- and, for a
+--                            village, whose Visit VisitCommandUsability still shows one of our
+--                            units standing there (a razed one keeps its command). Read once per
 --                            board. A tile whose event only opens later in the chapter is not
 --                            in the start list, so it is never offered.
 --   canExplore(u, x, y, kind) the unit menu's own check with `u` standing on (x, y) as the
 --                            active unit: VisitCommandUsability (not a Phantom, not Silenced)
 --                            or ChestCommandUsability (a key or lockpick, CanUnitUseChestKeyItem)
 --                            returns MENU_ENABLED.
+--   legal(a, u) -> why|nil   whether the game still offers act `a` (the bot's act table) to
+--                            `u`, the unit's live record, moving to a.move: its movement map
+--                            reaches the tile (reach), and the unit menu's own check passes with
+--                            it standing there as the active unit -- the Attack target list of
+--                            a weapon CanUnitUseWeaponNow allows (MakeTargetListForWeapon: the
+--                            unit or the wall still standing), heals() for a staff, CanUnitUseItem
+--                            for an item, and Talk/Door/Visit/Chest/Seize's *Usability with
+--                            Talk's target in its list. nil = legal, else why not. A kept plan
+--                            plays its next act on this word, not its own (Planner.surprise).
+--   strikeWall(u, o, x, y)   `u`'s strike from (x, y) on the wall o = { x, y, hp }, as the
+--                            Attack menu forecasts it (InitObstacleBattleUnit, then
+--                            BattleGenerateSimulation): { dmg, hits }. A wall is always hit
+--                            and never crit (ComputeBattleObstacleStats).
 --   doors()                  the door tiles still closed: a tile whose command is Door
 --                            (read with the Seize tile) and whose terrain is still a door.
 --   heals(u, x, y, hurt)     what `u` could heal standing on (x, y): per staff in staves(u)
@@ -141,6 +156,7 @@ M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
 M.MENU_ENABLED = 1           -- include/uimenu.h
+M.MENU_NOTSHOWN = 3
 M.EVFLAG_DEFEAT_BOSS = 2     -- include/constants/event-flags.h; DefeatTalkEnt +04 flag
 M.DEFEAT_TALK_FLAG = 0x04
 M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
@@ -174,6 +190,9 @@ local AI_WEIGHT_SHIFT, AI_WEIGHT_MASK = 3, 0x1F << 3
 -- ballista, AiAttemptBallistaCombat's -1). AI_ACTION_COMBAT = 1.
 local DEC_ACTION, DEC_X, DEC_Y, DEC_TARGET, DEC_SLOT = 0x00, 0x02, 0x03, 0x06, 0x07
 local AI_ACTION_COMBAT, BALLISTA_SLOT = 1, 0xFF
+-- struct ActionData (include/bmmind.h): +13 xOther, +14 yOther, +15 trapType (a wall's HP when
+-- the Attack menu forecasts a strike on it).
+local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 -- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script; 0x1C bytes.
 local EVENT_INFO_SIZE, EVENT_SCRIPT = 0x1C, 0x04
 -- struct PlaySt: +0D chapterVisionRange (0 = no fog), +0F faction, +10 u16 chapterTurnNumber.
@@ -650,6 +669,23 @@ function M.new(outer)
         return M.attackOf(ours, e.hp)
     end
 
+    -- `u`'s strike from (x, y) on the wall `o` ({ x, y, hp }), as the Attack menu forecasts
+    -- it (AttackMapSelect_SwitchIn: the wall's place and HP in gActionData, then
+    -- InitObstacleBattleUnit and BattleGenerateSimulation with no target unit). Kept by the
+    -- unit's facts and the wall: the blow reads the attacker's might against the wall's class.
+    function s.strikeWall(u, o, x, y)
+        return mine("wall@" .. o.x .. "," .. o.y, u, function() return sandbox(function(call, proc)
+            api.write8(S.gActionData + ACTION_X_OTHER, o.x)
+            api.write8(S.gActionData + ACTION_Y_OTHER, o.y)
+            api.write8(S.gActionData + ACTION_TRAP_TYPE, o.hp)
+            call(S.InitObstacleBattleUnit, {})
+            call(S.BattleGenerateSimulation, { u.addr, 0, x, y, M.ISLOT_AUTO })
+            call(S.InitBattleForecastBattleStats, { proc })
+            local a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
+            return { dmg = a.dmg, hits = a.hits }
+        end) end)
+    end
+
     -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
     local function standOn(u, x, y)
         if mem.u8(cell(mem, S.gBmMapUnit, u.x, u.y)) == u.id then
@@ -794,6 +830,28 @@ function M.new(outer)
         end)
     end
 
+    -- Inside a sandbox: `u` stands on (x, y) as the active unit, not yet acted, as the unit
+    -- menu finds it after a move.
+    local function asActive(u, x, y)
+        standOn(u, x, y)
+        api.write32(u.addr + UNIT_STATE, mem.u32(u.addr + UNIT_STATE) & ~Board.US_HAS_MOVED)
+        api.write32(S.gActiveUnit, u.addr)
+        api.write8(S.gActiveUnitId, u.id)
+    end
+
+    -- A razed village keeps its Visit command (GetAvailableTileEventCommand), but the Visit
+    -- menu is shown to no one there (VisitCommandUsability reads the tile): ch02's (12,3) on
+    -- turn 8. Silence greys it out and leaves it shown, so it stays open.
+    local function visitShown(x, y)
+        for _, u in ipairs(api.board().units) do
+            if u.faction == "blue" and u.onField and sandbox(function(call)
+                asActive(u, x, y)
+                return call(S.VisitCommandUsability, { 0, 0 }) ~= M.MENU_NOTSHOWN
+            end) then return true end
+        end
+        return false
+    end
+
     function s.explorable()
         if not seen.explorable then
             seen.explorable = sandbox(function(call)
@@ -801,7 +859,8 @@ function M.new(outer)
                 for _, c in ipairs(commands) do
                     local kind = (c.cmd == M.TILE_COMMAND_VISIT and "visit")
                         or (c.cmd == M.TILE_COMMAND_CHEST and "chest")
-                    if kind and call(S.GetAvailableTileEventCommand, { c.x, c.y }) == c.cmd then
+                    if kind and call(S.GetAvailableTileEventCommand, { c.x, c.y }) == c.cmd
+                        and (kind ~= "visit" or visitShown(c.x, c.y)) then
                         out[#out + 1] = { x = c.x, y = c.y, kind = kind }
                     end
                 end
@@ -815,13 +874,68 @@ function M.new(outer)
     -- only asked of a tile explorable() still offers: kept by the unit's facts and the tile.
     function s.canExplore(u, x, y, kind)
         return mine(kind .. "@" .. x .. "," .. y, u, function() return sandbox(function(call)
-            standOn(u, x, y)
-            api.write32(u.addr + UNIT_STATE, mem.u32(u.addr + UNIT_STATE) & ~Board.US_HAS_MOVED)
-            api.write32(S.gActiveUnit, u.addr)
-            api.write8(S.gActiveUnitId, u.id)
+            asActive(u, x, y)
             local check = kind == "visit" and S.VisitCommandUsability or S.ChestCommandUsability
             return call(check, { 0, 0 }) == M.MENU_ENABLED
         end) end) or false
+    end
+
+    -- the unit menu's own check for each act it has one for (bmmenu.c)
+    local MENU_CHECK = { talk = "TalkCommandUsability", door = "DoorCommandUsability",
+                         visit = "VisitCommandUsability", chest = "ChestCommandUsability",
+                         seize = "UnitActionMenu_CanSeize" }
+
+    -- whether the last target list built holds unit `id`, or the wall at `at` (uid 0)
+    local function listed(call, id, at)
+        for k = 0, call(S.GetSelectTargetCount, {}) - 1 do
+            local t = call(S.GetTarget, { k })
+            if at then
+                if mem.u8(t + 2) == 0 and mem.u8(t) == at.x and mem.u8(t + 1) == at.y then return true end
+            elseif mem.u8(t + 2) == id then
+                return true
+            end
+        end
+        return false
+    end
+
+    function s.legal(a, u)
+        local x, y = a.move.x, a.move.y
+        local reached = false
+        for _, t in ipairs(s.reach(u)) do
+            if t.x == x and t.y == y then reached = true end
+        end
+        if not reached then return "the next move is out of reach" end
+        if a.act == "staff" then
+            for _, st in ipairs(s.heals(u, x, y)) do
+                if st.slot == a.slot then
+                    for _, id in ipairs(st.targets) do
+                        if id == a.targetId then return nil end
+                    end
+                end
+            end
+            return "the game offers no such heal"
+        end
+        local ok = sandbox(function(call)
+            asActive(u, x, y)
+            if a.act == "attack" then
+                for _, it in ipairs(u.items) do
+                    if call(S.CanUnitUseWeaponNow, { u.addr, itemOf(it) }) ~= 0 then
+                        call(S.MakeTargetListForWeapon, { u.addr, itemOf(it) })
+                        if listed(call, a.targetId, a.obstacle) then return true end
+                    end
+                end
+                return false
+            elseif a.act == "item" then
+                local it = u.items[a.slot + 1]
+                return it ~= nil and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0
+            elseif MENU_CHECK[a.act] then
+                if call(S[MENU_CHECK[a.act]], { 0, 0 }) ~= M.MENU_ENABLED then return false end
+                return a.act ~= "talk" or listed(call, a.targetId)
+            end
+            return true
+        end)
+        if ok then return nil end
+        return "the game offers no " .. (a.obstacle and "strike on that wall" or a.act)
     end
 
     function s.doors()

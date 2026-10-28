@@ -38,9 +38,9 @@
 -- Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the village or chest
--- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, visible) -> why the board after
--- its k-th act calls for a new plan, or nil to play act k + 1. standing (optional) = the walls and
--- doors now, { obstacles, doors } (sight's): a broken wall or opened door ends the plan.
+-- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, visible, legal)
+-- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
+-- (optional) = sight.legal: the game no longer offering the next act ends the plan.
 
 local M = {}
 
@@ -187,6 +187,14 @@ local function score(act, st, W, style, hitChance)
         fx.blocked = gain <= 0
     elseif act.act == "staff" or act.act == "item" then
         v = v + W.heal * (act.gain or 0)
+    elseif act.obstacle and act.obstacle.blow then
+        -- a wall takes what the game's forecast of the strike deals (sight.strikeWall); one
+        -- the plan has already broken is no act -- a second strike planned on it was a crash
+        local at = act.obstacle.x .. "," .. act.obstacle.y
+        local hp = st.walls[at] or act.obstacle.hp
+        v = v + W.breach
+        fx.wall = { at = at, hp = hp - act.obstacle.blow.dmg * act.obstacle.blow.hits }
+        fx.blocked = hp <= 0
     elseif act.obstacle or act.act == "door" then
         v = v + W.breach
     elseif act.act == "seize" then
@@ -217,7 +225,7 @@ function M.plan(Bot, board, sight, style, opts)
     local objective = sight.objective and sight.objective.kind
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, explored = {}, counter = {}, healed = {},
-                    objective = objective }
+                    walls = {}, objective = objective }
 
     -- Whether `id` ends an earlier act of the plan off the tile it stands on now. The game
     -- was asked which heals reach whom with every unit where it stands (sight.heals), so a
@@ -294,7 +302,8 @@ function M.plan(Bot, board, sight, style, opts)
         local n = { base = st.base + v, acts = copy(st.acts), expect = copy(st.expect),
                     used = copy(st.used), tiles = copy(st.tiles), gone = copy(st.gone),
                     enemyHp = copy(st.enemyHp), hp = copy(st.hp), explored = copy(st.explored),
-                    counter = copy(st.counter), healed = copy(st.healed), objective = objective }
+                    counter = copy(st.counter), healed = copy(st.healed), walls = copy(st.walls),
+                    objective = objective }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk takes its target off the
         -- enemy side as a kill does
@@ -311,6 +320,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         if fx.counter then n.counter[uid] = fx.counter end
         if fx.explored then n.explored[uid] = true end
+        if fx.wall then n.walls[fx.wall.at] = fx.wall.hp end
         -- every moved unit's exposure, again: a later kill or heal in the plan changes an
         -- earlier unit's
         n.score = n.base
@@ -539,10 +549,11 @@ end
 
 -- Why the board `after` the plan's k-th act (played from `before`) is off what the plan
 -- expected, so the rest of it was planned for a board that is not there; nil when act k + 1
--- may be played as planned. `visible(x, y)` is the player's sight after the act (fog).
+-- may be played as planned. `visible(x, y)` is the player's sight after the act (fog);
+-- `legal(act, unit)` is sight.legal, the game's own word on whether the next act is offered.
 -- Taking LESS from a counter, or dealing more without a kill, is no surprise: the plan
 -- reckoned with worse.
-function M.surprise(plan, k, before, after, visible, standing)
+function M.surprise(plan, k, before, after, visible, legal)
     local a, x, nxt = plan.acts[k], plan.expect[k], plan.acts[k + 1]
     if not (a and x and nxt) then return "the plan is played out" end
     local now = {}
@@ -577,30 +588,12 @@ function M.surprise(plan, k, before, after, visible, standing)
     if t and x.targetHp and t.hp > x.targetHp + 0.5 then return "a blow missed" end
     local h = x.heals and now[x.heals.id]
     if h and h.hp < x.heals.hp then return "the heal fell short" end
-    -- the next act must still be there to play
+    -- the next act must still be there to play, and the game must still offer it: a kept act
+    -- is played on the game's word, never the plan's (a wall an earlier blow broke, a door
+    -- already opened, a heal whose counter missed: each crashed a run when it was not asked)
     local u = now[nxt.unitId]
     if not u or u.acted then return "the next unit cannot act" end
-    if nxt.targetId and not now[nxt.targetId] then return "the next target is gone" end
-    -- the game offers Staff only on someone hurt: a counter that missed leaves none
-    local t2 = nxt.act == "staff" and nxt.targetId and now[nxt.targetId]
-    if t2 and t2.hp >= (t2.maxhp or t2.hp) then return "the heal's target is not hurt" end
-    -- a wall an earlier blow broke, or a door already opened, leaves the act nothing to do
-    -- (vanilla Ch3: two units planned on one wall, the first broke it, the second crashed)
-    if standing and nxt.obstacle then
-        local stands = false
-        for _, o in ipairs(standing.obstacles or {}) do
-            if o.x == nxt.obstacle.x and o.y == nxt.obstacle.y then stands = true end
-        end
-        if not stands then return "the next wall is broken" end
-    end
-    if standing and nxt.act == "door" then
-        local shut = false
-        for _, d in ipairs(standing.doors or {}) do
-            if math.abs(d.x - nxt.move.x) + math.abs(d.y - nxt.move.y) == 1 then shut = true end
-        end
-        if not shut then return "the next door is open" end
-    end
-    return nil
+    return legal and legal(nxt, u) or nil
 end
 
 return M

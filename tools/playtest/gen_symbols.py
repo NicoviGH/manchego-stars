@@ -305,6 +305,13 @@ WANTED = [
     # Villages and chests (#510 step 9): the unit menu's own checks, on the active unit.
     'VisitCommandUsability',    # Visit: a village tile whose event is open, not a Phantom (bmmenu.c)
     'ChestCommandUsability',    # Chest: a key or lockpick and CanUnitUseChestKeyItem (bmmenu.c)
+    # A kept act is played on the game's word (sight.legal): the rest of the unit menu's checks.
+    'TalkCommandUsability',     # Talk: MakeTalkTargetList finds a partner, not Silenced (bmmenu.c)
+    'DoorCommandUsability',     # Door: a key and a door beside the unit (bmmenu.c)
+    'UnitActionMenu_CanSeize',  # Seize: CanUnitSeize on the Seize tile (bmmenu.c)
+    'CanUnitUseWeaponNow',      # the weapons the Attack command lists (bmitem.c)
+    'MakeTargetListForWeapon',  # that weapon's targets: units not allied, and walls (bmtarget.c)
+    'InitObstacleBattleUnit',   # a wall as gBattleTarget, for its strike's forecast (bmbattle.c)
     'GetDefeatTalkEntry',       # a unit's death quote for this chapter; flag 2 = the Defeat Boss goal (eventinfo.c)
     # The planner's enemy phase (#510 step 9): the enemy turn order, as the game builds it.
     'BuildAiUnitList',          # gAiState.units: the faction's units able to act (cp_order.c)

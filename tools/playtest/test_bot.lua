@@ -1474,6 +1474,36 @@ do
           "door: no key, the wall")
 end
 
+-- test_a_plan_strikes_a_wall_only_while_it_stands: A and C are both cut off by the wall at
+-- (2,0). A blow that breaks it leaves C nothing to strike, so the plan holds one strike, not
+-- two (vanilla Ch3 planned two, and the second crashed); a wall one blow leaves standing is
+-- struck by both. The blow is the game's forecast (sight.strikeWall).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 0, 1)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local function strikes(blowDmg)
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }, { 2, 1 }) },
+            field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                               ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                           ["4,0"] = 2, ["0,1"] = 3, ["1,1"] = 2, ["2,1"] = 1 } },
+            obstacles = { { x = 2, y = 0, hp = 10 } },
+        }
+        local sight = sightOf(o)
+        sight.strikeWall = function() return { dmg = blowDmg, hits = 1 } end
+        local _, plan = Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
+        local n = 0
+        for _, a in ipairs(plan and plan.acts or {}) do
+            if a.obstacle then n = n + 1 end
+        end
+        return n
+    end
+    check(strikes(10), 1, "wall: a blow that breaks it is the only strike planned")
+    check(strikes(4), 2, "wall: a wall the first blow leaves standing is struck again")
+end
+
 -- test_a_visited_tile_is_not_offered_again: a House (eventinfo House(0, ...), flag 0) keeps
 -- its Visit for good, so the game offers it every turn. Once we have visited it, it is no one's
 -- goal and no Visit is proposed there: vanilla Ch1's two houses held Seth and Eirika on them
@@ -2134,31 +2164,17 @@ do
     check(S(plan(), 1, before, after(A { acted = true }, C { acted = true }, red(0x81, 2, 0, { hp = 10 }))),
           "the next unit cannot act", "surprise: the next act is gone")
     check(S(plan(), 2, before, before), "the plan is played out", "surprise: nothing left to play")
-    -- C means to heal A, but the counter missed: A is whole and the game offers no Staff
-    local healing = plan()
-    healing.acts[2] = { unitId = 0x02, act = "staff", targetId = 0x01, move = { x = 0, y = 1 } }
-    check(S(healing, 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))),
-          "the heal's target is not hurt", "surprise: nothing to heal")
-    check(S(healing, 1, before, after(A { acted = true, hp = 25, maxhp = 30 }, C(),
-                                      red(0x81, 2, 0, { hp = 10 }))), nil,
-          "surprise: a hurt target is healed as planned")
-    -- C means to strike the wall at (0,2), but A's blow broke it: no Attack to play (vanilla
-    -- Ch3, every crash at turn 6). Likewise a door already opened.
-    local walling = plan()
-    walling.acts[2] = { unitId = 0x02, act = "attack", obstacle = { x = 0, y = 2 },
-                        move = { x = 0, y = 1 } }
+    -- C's act is played on the game's word: sight.legal is asked of it, with C's live record
+    -- (vanilla Ch3: a wall an earlier blow broke, a heal whose counter missed, each crashed)
     local played = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))
-    check(S(walling, 1, before, played, nil, { obstacles = {}, doors = {} }),
-          "the next wall is broken", "surprise: the wall is gone")
-    check(S(walling, 1, before, played, nil, { obstacles = { { x = 0, y = 2, hp = 10 } },
-                                               doors = {} }), nil,
-          "surprise: the wall stands, strike it")
-    local opening = plan()
-    opening.acts[2] = { unitId = 0x02, act = "door", move = { x = 0, y = 1 } }
-    check(S(opening, 1, before, played, nil, { obstacles = {}, doors = {} }),
-          "the next door is open", "surprise: no door left beside the opener")
-    check(S(opening, 1, before, played, nil, { obstacles = {}, doors = { { x = 0, y = 2 } } }),
-          nil, "surprise: the door is still shut")
+    local asked
+    local function refuses(act, u) asked = { act = act, u = u }; return "the game offers no attack" end
+    check(S(plan(), 1, before, played, nil, refuses), "the game offers no attack",
+          "surprise: the game no longer offers the next act")
+    check(asked.act.unitId == 0x02 and asked.u.id == 0x02, true,
+          "surprise: the game is asked about the next act, for its unit as it stands now")
+    check(S(plan(), 1, before, played, nil, function() return nil end), nil,
+          "surprise: the game still offers it, play on")
 end
 
 if fails > 0 then
