@@ -1098,6 +1098,7 @@ local function staffHeal(ctx, gate, only)
                         for _, id in ipairs(h.targets) do
                             local gain = math.min(missing[id] or 0, h.amount)
                             local c = { u = u, tile = t, slot = h.slot, id = id, gain = gain,
+                                        amount = h.amount,
                                         left = -(missing[id] or 0),
                                         worst = worstCase(ctx, u, t.x, t.y, nil).sum }
                             if gain > 0 and (not best or c.gain > best.gain
@@ -1114,7 +1115,8 @@ local function staffHeal(ctx, gate, only)
     end
     if not best then return nil end
     local a = action(best.u, best.tile, "staff", nil)
-    a.slot, a.targetId, a.gain = best.slot, best.id, best.gain
+    -- the amount too: the planner reads what the target is short by when the heal lands
+    a.slot, a.targetId, a.gain, a.amount = best.slot, best.id, best.gain, best.amount
     for _, b in ipairs(ctx.blues) do
         if b.id == best.id then a.target = b.charId end
     end
@@ -1134,7 +1136,7 @@ local function mend(ctx, u, gate)
     end
     local tile = safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u))
     local a = action(u, tile, "item", nil)
-    a.slot, a.gain = m.slot, math.min(u.maxhp - u.hp, m.amount)
+    a.slot, a.gain, a.amount = m.slot, math.min(u.maxhp - u.hp, m.amount), m.amount
     return a
 end
 
@@ -1224,17 +1226,34 @@ end
 -- (sight.explorable) sends one unit the game lets use it (sight.canExplore) marching to it, the
 -- nearest by the game's own field from the tile; each tile one unit, each unit one tile, the
 -- nearest pair first. ctx.exploreGoal[unit id] = the tile, which goalFor reads.
-local function exploring(ctx)
+-- `sent` (the last plan's goals, { {id, x, y} }) is kept first: a unit sent to a tile keeps it
+-- while the tile is open and the unit can still reach and use it, acted this turn or not.
+-- Re-picking each decision handed ch02's (12,3) between two units, and no one reached it.
+-- The game's check is a menu's, asked only of a unit that can act: an acted unit keeps its
+-- tile on the path alone (asked anyway, ch02's turn-7 "no" was cached into turn 8).
+local function exploring(ctx, sent)
     ctx.exploreGoal = {}
     if not ctx.sight.explorable then return end
-    local pairs_ = {}
-    for _, t in ipairs(ctx.sight.explorable()) do
+    local pairs_, taken = {}, {}
+    local function reaches(u, t)
         local field = fieldFor(ctx, t)
+        local d = field and field[u.y] and field[u.y][u.x]
+        return d and (u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)) and d
+    end
+    local open, blues = {}, {}
+    for _, t in ipairs(ctx.sight.explorable()) do open[tileKey(t.x, t.y)] = t end
+    for _, u in ipairs(ctx.blues) do blues[u.id] = u end
+    for _, g in ipairs(sent or {}) do
+        local t, u = open[tileKey(g.x, g.y)], blues[g.id]
+        if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
+            and reaches(u, t) then
+            taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
+        end
+    end
+    for _, t in ipairs(ctx.sight.explorable()) do
         for _, u in ipairs(ctx.actors) do
-            local d = field and field[u.y] and field[u.y][u.x]
-            if d and ctx.sight.canExplore(u, t.x, t.y, t.kind) then
-                pairs_[#pairs_ + 1] = { t = t, u = u, d = d }
-            end
+            local d = reaches(u, t)
+            if d then pairs_[#pairs_ + 1] = { t = t, u = u, d = d } end
         end
     end
     table.sort(pairs_, function(a, b)
@@ -1243,7 +1262,6 @@ local function exploring(ctx)
         if a.t.y ~= b.t.y then return a.t.y < b.t.y end
         return a.t.x < b.t.x
     end)
-    local taken = {}
     for _, p in ipairs(pairs_) do
         local k = tileKey(p.t.x, p.t.y)
         if not taken[k] and not ctx.exploreGoal[p.u.id] then
@@ -1326,11 +1344,12 @@ end
 -- hold, the retreat and a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
 -- that can strike it there next phase); an attack its forecast (`f`) and counter worst case
 -- (`spent`).
+-- `sent`: the last plan's goals, the tiles units were already sent to (exploring keeps them).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view).
-function M.candidates(board, sight, style)
+function M.candidates(board, sight, style, sent)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
-    exploring(ctx)
+    exploring(ctx, sent)
     local open = function() return true end
     local objective = sight.objective
     local out = {}

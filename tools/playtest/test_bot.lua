@@ -1688,6 +1688,35 @@ do
     check(heals, 0, "planner: no heal on a unit the plan has moved")
 end
 
+-- test_planner_no_vulnerary_after_a_full_heal: A is 15 down with a 10-HP Vulnerary; H's staff
+-- heals 20. Once H has healed A, A is full and FE8 refuses the Vulnerary (CanUnitUseHealItem:
+-- HP == max), so no plan uses it after the heal. ch02 turn 9 played exactly that and crashed:
+-- the Vulnerary act's gain was read off the start board.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 5, maxhp = 20, minRange = false })
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local X = red(0x81, 9, 9)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 1 }) },
+        mend = { [0x01] = { slot = 1, amount = 10 } },
+        staves = { [0x02] = { { slot = 0, amount = 20 } } },
+        heals = { [0x02] = { ["0,1"] = { { slot = 0, amount = 20, targets = { 0x01 } } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, H, X), sightOf(o), style("careful"))
+    local bad = 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local healed = false
+        for _, k in ipairs(c.acts) do
+            if k:match("^2>staff@.*>1$") then healed = true end
+            if healed and k:match("^1>item@") then bad = bad + 1 end
+        end
+    end
+    check(bad, 0, "planner: no Vulnerary on a unit the plan has healed full")
+    local acts = {}
+    for _, a in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = a.act end
+    check(table.concat(acts, ","):find("staff") ~= nil, true, "planner: the staff heal is played")
+end
+
 -- test_planner_prices_standing_exposure: the march to (1,0) gains 20 steps but X reaches it
 -- for 25 of A's 20; (0,1) gains 10 and nothing reaches it. Only the beam's top plan is
 -- judged (FINAL = 1), so the pick is the beam's own: its exposure term keeps the retreat
@@ -1860,6 +1889,51 @@ do
     end
     check(marches[0x02], "6,0", "exploring: the nearer unit marches to the village")
     check(marches[0x01], "0,1", "exploring: the other marches on the enemy")
+
+    -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A
+    -- keeps the village while it can still use it, and B marches on the enemy. (Re-picking
+    -- per decision left ch02's (12,3) handed between two units and never reached.)
+    local function sentMarches(sent, ...)
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), style("careful"), sent)) do
+            for _, a in ipairs(c.acts) do
+                if a.why == "march" then out[c.unit.id] = at(a) end
+            end
+        end
+        return out
+    end
+    local sentA = { { id = 0x01, x = 8, y = 0 } }
+    marches = sentMarches(sentA, A, Bu, X)
+    check(marches[0x01], "1,0", "exploring: the sent unit keeps its village")
+    check(marches[0x02], "5,1", "exploring: the nearer unit is not re-sent to it")
+    -- A has acted this turn: it still holds the village, so B is not sent there instead
+    local acted = blue(0x01, 0, 0, 0, { minRange = false, acted = true })
+    marches = sentMarches(sentA, acted, Bu, X)
+    check(marches[0x02], "5,1", "exploring: an acted sent unit still holds its village")
+    -- the game's check is never asked of a unit that has acted (it is a menu check, and its
+    -- answer is cached by the unit's facts: ch02's turn-7 "no" outlived the turn)
+    local asked = {}
+    local can = o.canExplore
+    local s = sightOf(o)
+    local inner = s.canExplore
+    s.canExplore = function(u, ...) asked[#asked + 1] = u.id; return inner(u, ...) end
+    B.candidates(boardOf(acted, Bu, X), s, style("careful"), sentA)
+    local askedA = 0
+    for _, id in ipairs(asked) do
+        if id == 0x01 then askedA = askedA + 1 end
+    end
+    check(#asked > 0, true, "exploring: the game's check is asked of the unit that can act")
+    check(askedA, 0, "exploring: the game's check is not asked of an acted unit")
+    o.canExplore = can
+    -- A can no longer use it (the game's check says no): it is released to the nearest
+    o.canExplore[0x01] = {}
+    marches = sentMarches(sentA, A, Bu, X)
+    check(marches[0x02], "6,0", "exploring: a sent unit that cannot use the tile releases it")
+    o.canExplore[0x01] = { ["8,0"] = "visit" }
+    -- the village is gone (visited, or pillaged): nobody is sent to it
+    o.explorable = {}
+    marches = sentMarches(sentA, A, Bu, X)
+    check(marches[0x01], "0,1", "exploring: a closed tile releases its unit")
 end
 
 -- test_planner_assault: the boss X has 20 HP. A's and C's blows (12 each, sure) kill it

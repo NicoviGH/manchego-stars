@@ -331,6 +331,9 @@ function M.run(api)
         local sight = api.sight()
         local seen, waitUntil = {}, nil
         local lastPlan
+        -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
+        -- unit left to act returns none), so the next turn keeps the same senders
+        local sent
         -- the plan being played this phase: its next act's index, and the board before the
         -- last act it played (Planner.surprise compares the two)
         local playing, nextAct, before
@@ -395,9 +398,11 @@ function M.run(api)
                         end
                         local replan = playing and why
                         local a, plan = api.Planner.plan(Bot, board, sight, style,
-                                                         { stalled = stalled })
+                                                         { stalled = stalled,
+                                                           sent = sent })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         lastPlan = plan
+                        if plan then sent = plan.goals end
                         rec.plans.made = rec.plans.made + 1
                         explore.offered(plan and plan.explore)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,

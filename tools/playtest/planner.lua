@@ -34,7 +34,8 @@
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts,
 -- expect, enemies, judged, predict, kind = "beam"|"assault"|"unstall", considered = every plan
--- judged, best first: { judged, acts, kind }, opts = { stalled = bool } | nil,
+-- judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent = the last plan's
+-- goals } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the village or chest
 -- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, visible) -> why the board after
@@ -174,6 +175,15 @@ local function score(act, st, W, style, hitChance)
         fx.heals = { id = t.id, hp = hp + gain }
         -- the game offers Staff only on someone hurt: a heal before the blow is no act
         fx.blocked = gain <= 0
+    elseif act.act == "item" and act.amount then
+        -- a Vulnerary on the unit itself: what it is short by now in the plan (a heal earlier
+        -- in it counts). FE8 refuses one at full HP (CanUnitUseHealItem), so then it is no act
+        local hp = st.hp[act.unitId] or act.unitHp
+        local gain = math.min(act.amount, act.unitMaxHp - hp)
+        v = v + W.heal * gain
+        fx.hp = hp + gain
+        fx.heals = { id = act.unitId, hp = hp + gain }
+        fx.blocked = gain <= 0
     elseif act.act == "staff" or act.act == "item" then
         v = v + W.heal * (act.gain or 0)
     elseif act.obstacle or act.act == "door" then
@@ -199,7 +209,7 @@ function M.plan(Bot, board, sight, style, opts)
     local W = M.WEIGHTS[style.aggression]
     if not W then error("planner.lua: no weights for style " .. tostring(style.aggression)) end
     local hitChance = sight.hitChance
-    local cands, ctx = Bot.candidates(board, sight, style)
+    local cands, ctx = Bot.candidates(board, sight, style, opts and opts.sent)
     if #cands == 0 then return nil end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
@@ -243,7 +253,7 @@ function M.plan(Bot, board, sight, style, opts)
     for _, c in ipairs(cands) do
         local scored = {}
         for _, a in ipairs(c.acts) do
-            a.unitHp = c.unit.hp
+            a.unitHp, a.unitMaxHp = c.unit.hp, c.unit.maxhp or c.unit.hp
             a.targetUnit = a.targetId and byId[a.targetId]
             if a.act == "visit" or a.act == "chest" then
                 offered[#offered + 1] = { id = a.unitId, charId = a.unit, x = a.move.x,
