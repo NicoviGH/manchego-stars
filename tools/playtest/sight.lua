@@ -225,6 +225,30 @@ local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 -- measured write: mGBA's pc write refills the pipeline, so it reads one instruction past what
 -- was written (measured 2026-10-27 at a frame boundary, the BIOS halt loop, ARM: +4).
 local THUMB_B_SELF = 0xE7FE
+-- A call LIST runs every call of it in one stretch of emulation: each call takes a whole frame
+-- however little of it the function uses (the rest spins in the loop), and one enemy's
+-- decision is six calls (#510 step 9: ~8,000 of ch02's 9,748 calls an attempt). The stub,
+-- Thumb, ARMv4T (no blx): r4 walks a list of { addr|1, r0, r1, r2, r3, [sp] } words ended by
+-- addr 0; it calls each through a `bx r5` veneer and branches to the return loop at the end.
+-- r4-r6 are callee-saved (AAPCS), so every called function keeps them.
+M.LIST_MAX = 4                -- calls in one list (the room above the stub)
+local LIST_STUB = {
+    0x6825,           -- +00 ldr r5, [r4, #0]
+    0x2D00,           -- +02 cmp r5, #0
+    0xD009,           -- +04 beq +1A            (the end)
+    0x6860,           -- +06 ldr r0, [r4, #4]
+    0x68A1,           -- +08 ldr r1, [r4, #8]
+    0x68E2,           -- +0A ldr r2, [r4, #12]
+    0x6923,           -- +0C ldr r3, [r4, #16]
+    0x6966,           -- +0E ldr r6, [r4, #20]
+    0x9600,           -- +10 str r6, [sp, #0]   (a fifth argument, where call() puts it)
+    0x3418,           -- +12 add r4, #24
+    0xF000, 0xF802,   -- +14 bl +1C             (lr = +18)
+    0xE7F2,           -- +18 b +00
+    0xE7EB,           -- +1A b loop             (loop = stub - 0x0C)
+    0x4728,           -- +1C bx r5
+}
+local LIST_STUB_AT, LIST_AT, LIST_ENTRY = 0x0C, 0x30, 24   -- past the loop's +8 window
 local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
 local GPRS = { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12",
                "sp", "lr" }
@@ -261,6 +285,31 @@ function M.machine(cpu, keep)
             return pc >= loop and pc <= loop + 8
         end
         local function call(addr, args)
+            if type(addr) == "table" then
+                -- a list: { { addr, args }... }, each args at most five -> the last call's r0
+                local list = addr
+                assert(#list >= 1 and #list <= M.LIST_MAX, "sight: a call list holds 1-4 calls")
+                local stub, at = loop + LIST_STUB_AT, loop + LIST_AT
+                for i, h in ipairs(LIST_STUB) do cpu.write16(stub + (i - 1) * 2, h) end
+                for k, c in ipairs(list) do
+                    M.calls[c[1]] = (M.calls[c[1]] or 0) + 1
+                    local e = at + (k - 1) * LIST_ENTRY
+                    assert(#c[2] <= 5, "sight: a listed call takes at most five arguments")
+                    cpu.write32(e, c[1] | 1)
+                    for i = 1, 5 do cpu.write32(e + i * 4, (c[2][i] or 0) & 0xFFFFFFFF) end
+                end
+                cpu.write32(at + #list * LIST_ENTRY, 0)
+                cpu.write16(loop, THUMB_B_SELF)
+                cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+                cpu.write("sp", top)
+                cpu.write("r4", at)
+                cpu.write("pc", stub)
+                if not cpu.frames(returned, M.FRAME_BUDGET) then
+                    error(string.format("sight: a call list (0x%08X first) did not return in %d "
+                        .. "frames (pc 0x%08X)", list[1][1], M.FRAME_BUDGET, cpu.read("pc")))
+                end
+                return cpu.read("r0")
+            end
             M.calls[addr] = (M.calls[addr] or 0) + 1
             for i, a in ipairs(args) do
                 if i <= 4 then cpu.write("r" .. (i - 1), a & 0xFFFFFFFF)
@@ -282,8 +331,10 @@ function M.machine(cpu, keep)
         local ok, a, b = pcall(function()
             cpsr = cpu.read("cpsr")
             cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
-            top = (cpu.read("sp") - 0x100) & ~7
-            scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
+            top = (cpu.read("sp") - 0x180) & ~7
+            -- SCRATCH_SIZE fits between scratch and the loop; a call list's stub and list
+            -- sit above the loop (LIST_STUB_AT, LIST_AT: LIST_MAX entries and the end)
+            scratch, loop = top + 0x10, top + 0x80
             return fn(call, scratch)
         end)
         if keep then writeRegisters(cpu, state) else cpu.load(state) end
@@ -731,25 +782,30 @@ function M.new(outer)
     local function aiDecide(call, proc, e, before)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
-        call(S.AiUpdateNoMoveFlag, { e.addr })
+        -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls
+        -- run as one list (cp_decide.c's order kept)
         api.write8(S.gAiState + AI_WEIGHT_TABLE,
             (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
         api.write8(S.gAiState + AI_DANGER_FILLED, 0)
-        call(S.AiInitDangerMap, {})
-        if before then before() end
-        call(S.AiClearDecision, {})
-        call(S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 })
+        local decide = { { S.AiClearDecision, {} },
+                         { S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 } } }
+        local setup = { { S.AiUpdateNoMoveFlag, { e.addr } }, { S.AiInitDangerMap, {} } }
+        if before then
+            call(setup)
+            before()
+            call(decide)
+        else
+            call({ setup[1], setup[2], decide[1], decide[2] })
+        end
         local D = S.gAiDecision
         if mem.u8(D + DEC_ACTION) ~= AI_ACTION_COMBAT then return nil end
         local target = mem.u8(D + DEC_TARGET)
         local addr = mem.u32(S.gUnitLookup + target * 4)
         local sx, sy, slot = mem.u8(D + DEC_X), mem.u8(D + DEC_Y), mem.u8(D + DEC_SLOT)
-        if slot == BALLISTA_SLOT then
-            call(S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy })
-        else
-            call(S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot })
-        end
-        call(S.InitBattleForecastBattleStats, { proc })
+        local sim = slot == BALLISTA_SLOT
+            and { S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy } }
+            or { S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot } }
+        call({ sim, { S.InitBattleForecastBattleStats, { proc } } })
         local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
         side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B, false)
         side.slot, side.tile = slot, { x = sx, y = sy }
