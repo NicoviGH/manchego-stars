@@ -78,10 +78,14 @@ class Workers(unittest.TestCase):
         self.assertTrue(kept[0]['run_dir'].startswith('/tmp/playtest-campaign@'))
 
     def test_a_k_past_every_style_is_no_style(self):
-        text = 'CAMPAIGN {"chapter": 4, "outcome": "no_style"}\n'
+        # campaign.lua's stop(): the campaign's last line, without a chapter
+        text = ('CAMPAIGN {"chapter": 4, "attempts": 2}\n'
+                'CAMPAIGN {"outcome": "no_style", "why": "chapter 4 has 2 styles, not 3"}\n')
         recs, kept = self.run_pool(lambda t, tag, lp: (text, '/tmp/x'),
                                    mc.attempt_tasks({'from': 4}, 1))
         self.assertEqual(kept[0]['outcome'], 'no_style')
+        self.assertEqual(kept[0]['kind'], 'campaign')
+        self.assertIn('2 styles', kept[0]['why'])
 
     def test_each_worker_gets_its_own_tag(self):
         tags = []
@@ -172,83 +176,123 @@ class Verdict(unittest.TestCase):
 
 
 class Cell(unittest.TestCase):
-    """run_cell over a fake `play`: `fate(name, seed) -> record fields` decides each run."""
+    """run_cell over a fake `play`: `fate(name, seed) -> records of that campaign` (each a
+    BOTRUN of the cell's chapter, attempt 1, unless the fate says otherwise)."""
 
-    def sides(self, store_dir=None, stamp=None):
+    def sides(self, store_dir=None):
         d = store_dir or tempfile.mkdtemp()
         out = {}
-        for n in ('ours', 'vanilla'):
-            env = {'id': 'c-' + n, 'from': 4}
-            out[n] = {'env': env, 'mode': 'normal', 'vanilla': n == 'vanilla',
+        for n, ch in (('ours', 4), ('vanilla', 3)):
+            env = {'last': [ch], 'claims': {}, 'game': n}
+            out[n] = {'env': env, 'chapter': ch, 'mode': 'normal', 'vanilla': n == 'vanilla',
                       'store': os.path.join(d, n + '.jsonl'),
-                      'stamp': stamp or mc.cell_stamp(env, 'normal', 'bot1')}
+                      'stamp': mc.cell_stamp(env, 'normal', 'bot1')}
         return out
 
     def play(self, fate, log):
         def play(side, tasks):
             name = 'vanilla' if side['vanilla'] else 'ours'
+            out = []
             for t in tasks:
                 log.append((name, t['seed']))
-            return [dict(fate(name, t['seed']), seed=t['seed']) for t in tasks]
+                for r in fate(name, t['seed'], side['chapter']):
+                    out.append(dict(r, seed=t['seed']))
+            return out
         return play
+
+    @staticmethod
+    def clean(yes, chapter):
+        return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'all_alive': yes},
+                {'kind': 'campaign', 'outcome': 'done'}]
 
     def test_vanilla_pairs_read_from_the_store_first(self):
         sides = self.sides()
         for s in range(1, 51):
-            mc.append_record(sides['vanilla']['store'],
-                             dict(sides['vanilla']['stamp'], seed=s, all_alive=True,
-                                  outcome='won'))
+            for r in self.clean(True, 3):
+                mc.append_record(sides['vanilla']['store'],
+                                 dict(r, seed=s, **sides['vanilla']['stamp']))
         log = []
-        v = mc.run_cell(sides, self.play(lambda n, s: {'outcome': 'lost', 'all_alive': False},
-                                         log))
+        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.clean(False, ch), log))
         self.assertTrue(v['settled'], 'ours 0/50 vs vanilla 50/50 settles at the first look')
         self.assertEqual(v['played'], {'ours': 50, 'vanilla': 0})
-        self.assertEqual(v['read'], {'ours': 0, 'vanilla': 50})
         self.assertNotIn('vanilla', {n for n, _ in log})
 
-    def test_a_kept_run_of_other_bot_code_is_played_again(self):
+    def test_a_kept_run_of_another_env_is_played_again(self):
         sides = self.sides()
-        old = mc.cell_stamp(sides['vanilla']['env'], 'normal', 'bot0')
+        other = mc.cell_stamp(dict(sides['vanilla']['env'], claims={'3': ['x']}), 'normal', 'bot1')
+        self.assertNotEqual(other, sides['vanilla']['stamp'], 'claims are in the stamp')
         for s in range(1, 51):
-            mc.append_record(sides['vanilla']['store'], dict(old, seed=s, all_alive=True))
-        v = mc.run_cell(sides, self.play(
-            lambda n, s: {'outcome': 'won', 'all_alive': n == 'vanilla'}, []))
+            for r in self.clean(True, 3):
+                mc.append_record(sides['vanilla']['store'], dict(r, seed=s, **other))
+        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.clean(n == 'vanilla', ch), []))
         self.assertEqual(v['played']['vanilla'], 50)
 
     def test_identical_cell_runs_to_the_last_look(self):
-        v = mc.run_cell(self.sides(), self.play(
-            lambda n, s: {'outcome': 'won', 'all_alive': s % 2 == 0}, []))
+        v = mc.run_cell(self.sides(), self.play(lambda n, s, ch: self.clean(s % 2 == 0, ch), []))
         self.assertEqual(v['look'], 200)
         self.assertTrue(v['settled'])
         self.assertFalse(v['differs'])
         self.assertEqual(v['played'], {'ours': 200, 'vanilla': 200})
 
-    def test_a_crashed_pair_is_left_out_and_a_new_seed_played(self):
+    def test_the_pair_is_the_first_attempt(self):
+        def fate(n, s, ch):
+            return [{'chapter': ch, 'attempt': 1, 'outcome': 'lost', 'all_alive': False},
+                    {'chapter': ch, 'attempt': 2, 'outcome': 'won', 'all_alive': True},
+                    {'kind': 'campaign', 'outcome': 'done'}]
+        v = mc.run_cell(self.sides(), self.play(fate, []))
+        self.assertEqual((v['ours'], v['vanilla']), (0.0, 0.0), 'a later clean retry is not it')
+
+    def test_a_crash_stops_the_cell_and_says_why(self):
+        def fate(n, s, ch):
+            if (n, s) == ('ours', 3):
+                return [{'chapter': ch, 'attempt': 1, 'outcome': 'crashed', 'run_dir': '/tmp/r3',
+                         'why': 'Lua error: boom', 'log_tail': ['RESULT: FAIL']},
+                        {'kind': 'campaign', 'outcome': 'crashed', 'why': 'chapter 4 attempt 1'}]
+            return self.clean(True, ch)
         log = []
-        v = mc.run_cell(self.sides(), self.play(
-            lambda n, s: {'outcome': 'crashed'} if (n, s) == ('ours', 3)
-            else {'outcome': 'won', 'all_alive': n == 'vanilla'}, log))
-        self.assertEqual(v['look'], 50)
-        self.assertEqual([x['seed'] for x in v['left_out']], [3])
-        self.assertEqual(v['left_out'][0]['sides'], ['ours'])
-        self.assertEqual(log.count(('ours', 3)), 1, 'a crash is never replayed')
-        self.assertIn(('ours', 51), log, 'seed 51 stands in for it')
-
-    def test_a_cell_whose_runs_all_crash_stops_unsettled(self):
-        v = mc.run_cell(self.sides(), self.play(lambda n, s: {'outcome': 'crashed'}, []))
+        v = mc.run_cell(self.sides(), self.play(fate, log))
         self.assertFalse(v['settled'])
-        self.assertIn('stopped', v['reason'])
-        self.assertEqual(len(v['left_out']), 50)
+        self.assertIn('stopped at 50 pairs', v['reason'])
+        p = v['problems']
+        self.assertEqual([(x['side'], x['seed']) for x in p], [('ours', 3)])
+        self.assertEqual(p[0]['why'], 'Lua error: boom')
+        self.assertEqual(p[0]['log_tail'], ['RESULT: FAIL'])
+        self.assertEqual(log.count(('ours', 3)), 1, 'never played again')
+        self.assertNotIn(('ours', 51), log, 'and no seed stands in for it')
 
-    def test_cell_tasks_seed_the_game_and_play_the_chapter_alone(self):
-        tasks = mc.cell_tasks({'id': 'c', 'from': 4, 'last': [7]}, [5, 6], 'difficult',
-                              {'cell': 1}, vanilla=True)
+    def test_a_campaign_that_never_reached_the_chapter_says_where_it_stopped(self):
+        def fate(n, s, ch):
+            if (n, s) == ('vanilla', 7):
+                return [{'chapter': 2, 'attempt': 1, 'outcome': 'lost', 'all_alive': False},
+                        {'kind': 'campaign', 'outcome': 'infeasible',
+                         'why': 'chapter 2: no clean clear in 300 attempts'}]
+            return self.clean(True, ch)
+        v = mc.run_cell(self.sides(), self.play(fate, []))
+        p = v['problems'][0]
+        self.assertEqual((p['side'], p['seed']), ('vanilla', 7))
+        self.assertIn('never played chapter 3', p['why'])
+        self.assertIn('300 attempts', p['why'])
+
+    def test_an_earlier_crash_is_reported_in_its_own_words(self):
+        def fate(n, s, ch):
+            if (n, s) == ('ours', 1):
+                return [{'chapter': 2, 'attempt': 1, 'outcome': 'crashed', 'why': 'Lua error: x'},
+                        {'kind': 'campaign', 'outcome': 'crashed', 'why': 'chapter 2 crashed'}]
+            return self.clean(True, ch)
+        p = mc.run_cell(self.sides(), self.play(fate, []))['problems'][0]
+        self.assertIn('crashed (chapter 2, attempt 1): Lua error: x', p['why'])
+
+    def test_campaign_tasks_keep_their_seed_from_new_game(self):
+        stamp = mc.cell_stamp({'last': [7]}, 'difficult', 'b')
+        tasks = mc.campaign_tasks({'last': [7]}, [5, 6], 'difficult', stamp, vanilla=True)
         self.assertEqual([t['seed'] for t in tasks], [5, 6])
         camp = tasks[0]['campaign']
-        self.assertEqual((camp['last'], camp['attempt'], camp['reseed']), ([4], 1, True))
+        self.assertNotIn('from', camp)
+        self.assertNotIn('attempt', camp)
+        self.assertNotEqual(camp['id'], tasks[1]['campaign']['id'], 'each seed its own campaign')
         self.assertEqual((tasks[0]['mode'], tasks[0]['vanilla']), ('difficult', True))
         with self.assertRaises(ValueError):
-            mc.cell_tasks({'id': 'c'}, [1], 'normal', {})
+            mc.campaign_tasks({'from': 4}, [1], 'normal', stamp)
 
     def test_a_tasks_stamp_reaches_every_record_crashed_too(self):
         d = tempfile.mkdtemp()
@@ -258,11 +302,13 @@ class Cell(unittest.TestCase):
             if task['seed'] == 2:
                 raise RuntimeError('died')
             return 'BOTRUN {"seed": %d, "outcome": "won"}\n' % task['seed'], '/tmp/x'
-        tasks = mc.cell_tasks({'id': 'c', 'from': 4}, [1, 2], 'normal', {'cell': {'bot': 'b'}})
-        list(mc.Pool(jobs=2, out=out, launch=launch).run(tasks))
-        kept = mc.kept_runs(out, {'cell': {'bot': 'b'}})
+        stamp = mc.cell_stamp({}, 'normal', 'b')
+        list(mc.Pool(jobs=2, out=out, launch=launch).run(
+            mc.campaign_tasks({}, [1, 2], 'normal', stamp)))
+        kept = mc.kept_runs(out, stamp)
         self.assertEqual(sorted(kept), [1, 2])
-        self.assertEqual(kept[2]['outcome'], 'crashed')
+        self.assertEqual(kept[2][0]['outcome'], 'crashed')
+        self.assertIn('died', kept[2][0]['why'])
 
     def test_bot_hash_follows_the_lua(self):
         d = tempfile.mkdtemp()
@@ -286,7 +332,7 @@ class Cell(unittest.TestCase):
             return ('BOTRUN {"seed": %d, "chapter": 4, "attempt": 1, "campaign": "c", '
                     '"trace": "trace-ours-4-a1.jsonl"}\n' % task['seed'], rd)
         recs = list(mc.Pool(jobs=1, out=out, launch=launch).run(
-            mc.cell_tasks({'id': 'c', 'from': 4}, [3], 'normal', {})))
+            mc.campaign_tasks({}, [3], 'normal', mc.cell_stamp({}, 'normal', 'b'))))
         rel = recs[0]['trace']
         self.assertTrue(rel.startswith('traces/c/4-s3-a1-'), rel)
         with gzip.open(os.path.join(d, 'store', rel), 'rt') as fh:
@@ -326,6 +372,15 @@ class Story(unittest.TestCase):
         text = '\n'.join(mc.story(events, {}, {}, {0x0E: 'Soldier'}))
         self.assertIn('the Soldier arrives', text, 'a unit without a name is its class')
         self.assertIn('cannot strike back', text)
+        events.insert(1, {'t': 'phase', 'turn': 2, 'phase': 'enemy',
+                          'units': [{'id': 0x02, 'charId': 0x01}, {'id': 0x85, 'charId': 0x13}]})
+        events.insert(4, {'t': 'act', 'turn': 2, 'phase': 'enemy', 'unit': 0x13, 'act': 'steal',
+                          'targetId': 0x02, 'from': {'x': 4, 'y': 4}, 'to': {'x': 5, 'y': 4}})
+        events.insert(5, {'t': 'act', 'turn': 2, 'phase': 'enemy', 'unit': 0x13, 'act': 'pick',
+                          'tile': {'x': 6, 'y': 2}, 'from': {'x': 5, 'y': 4}, 'to': {'x': 6, 'y': 2}})
+        text = '\n'.join(mc.story(events, {0x01: 'Braulo'}, {}, {}))
+        self.assertIn('steals from Braulo', text, 'a target by unit index, through the snapshot')
+        self.assertIn('pillages the tile at 6,2', text)
         self.assertIn('Result: won on turn 3, everyone alive.', text)
 
     def test_names_come_from_the_decomp_and_our_cast(self):

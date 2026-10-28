@@ -243,6 +243,10 @@ WANTED = [
                                 # battle (the AI's own simulations write the same arrays).
     'gBattleHitArray',          # struct BattleHit[BATTLE_HIT_MAX]: each blow of the last battle,
                                 # as the game rolled it (board.lua Board.battle, the bot's trace).
+    'gActionData',              # struct ActionData (include/bmunit.h): the action being played.
+                                # UnitBeginAction (bmunit.c) sets +0C subjectIndex and zeroes +11
+                                # unitActionType at each act's start; the act then sets the type.
+    'gActiveUnitMoveOrigin',    # struct Vec2: where that act's unit started (UnitBeginAction).
     'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
                                 # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
                                 # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.

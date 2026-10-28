@@ -40,6 +40,7 @@
 --                      { { id, charId, faction, killer } } (id = Board's unit index byte,
 --                      killer = the other fighter's charId), and OPTIONALLY each act of the
 --                      phase in order: { { id, charId, from = {x, y}, to = {x, y}, hp,
+--                      act (Board.ACTIONS' name), targetId, tile (a pillaged village or chest),
 --                      battles = { Board.battle... } } }
 --   battle()           OPTIONAL: Board.battle, the last real battle as the game rolled it
 --   trace(event)       OPTIONAL: keep one event of the run's TRACE (below); an api that
@@ -218,7 +219,7 @@ function M.run(api)
         end
     end
     local function finish(outcome, why)
-        rec.outcome, rec.turns = outcome, turn
+        rec.outcome, rec.turns, rec.why = outcome, turn, why
         rec.all_alive = outcome == "won" and #rec.deaths == 0
         rec.frames = api.frames() - startFrame
         if api.costs then
@@ -370,7 +371,8 @@ function M.run(api)
             local phase, deaths, acts = api.endPhase()
             for _, a in ipairs(acts or {}) do
                 trace({ t = "act", phase = "enemy", unit = a.charId, id = a.id, from = a.from,
-                        to = a.to, hp = a.hp, battles = a.battles })
+                        to = a.to, hp = a.hp, act = a.act, targetId = a.targetId, tile = a.tile,
+                        battles = a.battles })
             end
             trace({ t = "fell", phase = "enemy", fell = deaths or {} })
             for _, d in ipairs(deaths or {}) do

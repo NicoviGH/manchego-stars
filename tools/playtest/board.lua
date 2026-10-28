@@ -352,28 +352,27 @@ Board.BATTLE_HIT_MAX = 7
 Board.HIT_CRIT, Board.HIT_MISS = 1 << 0, 1 << 1
 Board.HIT_FINISHES, Board.HIT_RETALIATION, Board.HIT_END = 1 << 1, 1 << 3, 1 << 4
 
+-- include/types.h UNIT_ACTION_*: what gActionData +11 says an act was, named for the trace.
+Board.ACTION_COMBAT, Board.ACTION_STAFF, Board.ACTION_PICK = 0x02, 0x03, 0x15
+Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] = "dance",
+                  [0x06] = "steal", [0x07] = "summon", [0x08] = "summon", [0x09] = "rescue",
+                  [0x0A] = "drop", [0x0B] = "take", [0x0C] = "give", [0x0E] = "talk",
+                  [0x10] = "visit", [0x11] = "seize", [0x12] = "door", [0x14] = "chest",
+                  [0x15] = "pick", [0x1A] = "item", [0x1E] = "trapped", [0x1F] = "wait" }
+
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
--- A number that changes with each new real battle, or nil when the last battle generated was a
--- simulation: four reads and no string, for a per-frame watch. It is the two fighters and the
--- first blow, so two battles with both the same fighters and the same first blow share it: one
--- enemy phase never has those (each AI unit acts once).
-function Board.battleKey(mem, SYM)
-    if (mem.u16(SYM.gBattleStats) & Board.BATTLE_REAL) == 0 then return nil end
-    return ((mem.u8(SYM.gBattleActor + 0x0B) << 8 | mem.u8(SYM.gBattleTarget + 0x0B)) << 32)
-        | mem.u32(SYM.gBattleHitArray)
-end
-
 local function battleSide(mem, b)
-    local exp = mem.s8(b + 0x6E)
-    return { id = mem.u8(b + 0x0B), charId = mem.u8(mem.u32(b) + 4),
+    local exp, id = mem.s8(b + 0x6E), mem.u8(b + 0x0B)
+    return { id = id, charId = mem.u8(mem.u32(b) + 4),
              classId = mem.u32(b + 0x04) ~= 0 and mem.u8(mem.u32(b + 0x04) + 4) or nil,
              canCounter = mem.s8(b + 0x52) ~= 0,
              hpBefore = mem.s8(b + 0x72), hp = mem.u8(b + 0x13), weapon = mem.u16(b + 0x48) & 0xFF,
              attack = s16(mem.u16(b + 0x5A)), defense = s16(mem.u16(b + 0x5C)),
              hit = s16(mem.u16(b + 0x64)), crit = s16(mem.u16(b + 0x6A)),
-             -- a level is gained only with exp: a wall's battle unit has no level to compare
-             exp = exp, levelUp = exp > 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
+             -- InitObstacleBattleUnit builds a wall's (index 0) without InitBattleUnit, so its
+             -- levelPrevious is whatever the last battle left there
+             exp = exp, levelUp = id ~= 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
              broke = mem.s8(b + 0x7D) ~= 0 }
 end
 
@@ -413,13 +412,15 @@ function Board.bind(mem, SYM)
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
-        battleKey = function() return Board.battleKey(mem, SYM) end,
         distance = Board.distance, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
+        BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
+        ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
+        ACTION_PICK = Board.ACTION_PICK,
     }
 end
 

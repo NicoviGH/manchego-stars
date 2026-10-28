@@ -3027,33 +3027,56 @@ INSPECT.watchDeaths = function()
     return function() callbacks:remove(id); return deaths end
 end
 
--- Each act of an enemy (or green) phase, in the order the AI plays them, for the run's trace:
--- a frame callback following gActiveUnitId (CpDecide_Main sets it to each unit it decides and
--- then performs for, one at a time) and catching each new REAL battle (Board.battleKey) while
--- that unit is the one acting. A unit that neither moved nor fought is left out.
+-- Each act of an enemy (or green) phase, as the game records it, for the run's trace. Every
+-- act the AI performs starts with UnitBeginAction (bmunit.c): gActionData +0C subjectIndex = the
+-- unit, +11 unitActionType = 0, gActiveUnitMoveOrigin = its tile; CpPerform then sets the type
+-- (AiStartCombatAction: COMBAT and +0D targetIndex; AiStaffAction: STAFF and +0D; AiPickAction:
+-- PICK, the village or chest at
+-- +13/+14 xOther/yOther). A frame watch follows that record. The act's battle is read once the
+-- type is COMBAT and gBattleStats says REAL after the act began on a simulation: the AI simulates
+-- every attack it weighs (AiComputeCombatScore) before it performs one, so a REAL flag seen
+-- only after that is this act's own battle, never one left from an earlier phase.
 INSPECT.watchEnemyActs = function()
-    local acts, cur, last = {}, nil, BOARD.battleKey()
+    local acts, cur = {}, nil
+    local AD = SYM.gActionData
+    local prev = ru8(AD + 0x0C)
+    local function real() return (ru16(SYM.gBattleStats) & BOARD.BATTLE_REAL) ~= 0 end
     local function close()
         if not cur then return end
-        local x, y = rs8(cur.addr + 0x10), rs8(cur.addr + 0x11)
-        cur.to, cur.hp, cur.addr = { x = x, y = y }, ru8(cur.addr + 0x13), nil
-        if #cur.battles > 0 or x ~= cur.from.x or y ~= cur.from.y then acts[#acts + 1] = cur end
+        local addr = ru32(SYM.gUnitLookup + cur.id * 4)
+        if addr ~= 0 then cur.to, cur.hp = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) }, ru8(addr + 0x13) end
+        cur.sim = nil
+        acts[#acts + 1] = cur
         cur = nil
     end
     local id = callbacks:add("frame", function()
-        local uid = ru8(SYM.gActiveUnitId)
-        if (not cur or cur.id ~= uid) then
+        local uid = ru8(AD + 0x0C)
+        if uid ~= prev then
+            prev = uid
             close()
             local addr = uid >= 0x40 and ru32(SYM.gUnitLookup + uid * 4) or 0
             if addr ~= 0 and ru32(addr) ~= 0 then
-                cur = { id = uid, charId = ru8(ru32(addr) + 4), addr = addr, battles = {},
-                        from = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) } }
+                cur = { id = uid, charId = ru8(ru32(addr) + 4), battles = {},
+                        from = { x = rs16(SYM.gActiveUnitMoveOrigin), y = rs16(SYM.gActiveUnitMoveOrigin + 2) },
+                        sim = not real() }
             end
         end
-        local k = BOARD.battleKey()
-        if k and k ~= last then
-            last = k
-            if cur then cur.battles[#cur.battles + 1] = BOARD.battle() end
+        if not cur then return end
+        local kind = ru8(AD + 0x11)
+        if kind ~= 0 then
+            cur.act = BOARD.ACTIONS[kind] or string.format("0x%02X", kind)
+            -- only AiStartCombatAction and AiStaffAction set +0D: any other act leaves the
+            -- last one's target there
+            if kind == BOARD.ACTION_PICK then
+                cur.tile = { x = ru8(AD + 0x13), y = ru8(AD + 0x14) }
+            elseif kind == BOARD.ACTION_COMBAT or kind == BOARD.ACTION_STAFF then
+                cur.targetId = ru8(AD + 0x0D)
+            end
+        end
+        if not real() then
+            cur.sim = true
+        elseif cur.sim and kind == BOARD.ACTION_COMBAT and #cur.battles == 0 then
+            cur.battles[1] = BOARD.battle()
         end
     end)
     return function() close(); callbacks:remove(id); return acts end
@@ -3392,9 +3415,7 @@ INSPECT.campaignApi = function(game)
         shops = nil
         -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
         -- it, rather than replaying every chapter before it. The state holds the game's RNG, so
-        -- nothing is seeded, unless cfg.reseed: a Monte Carlo cell's run (montecarlo.py `cell`)
-        -- seeds the game with PT_SEED there, so its pairs differ by seed as well as by style (the
-        -- #510 plan's Task 12). No team is carried (a resumed pick has no last clear to keep).
+        -- nothing is seeded; no team is carried (a resumed pick has no last clear to keep).
         if played == nil and cfg.from then
             local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
             if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
@@ -3402,12 +3423,7 @@ INSPECT.campaignApi = function(game)
             f:close()
             wait(2)
             played = cfg.from
-            if cfg.reseed then
-                local sapi = INSPECT.sightApi()   -- loads INSPECT.Sight
-                INSPECT.Sight.seed(sapi, seed)
-            end
-            log(string.format("campaign: chapter %d resumes (%s)%s", played, controllerState(),
-                cfg.reseed and string.format(", seeded %d", seed) or ""))
+            log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
             return { chapter = played }
         end
         local stalled = INSPECT.watch("arrive")

@@ -353,7 +353,6 @@ do
     m.w32(S.gBattleHitArray + 16, hit(0, Board.HIT_END, 0))
     m.w32(S.gBattleHitArray + 20, hit(0, 0, 99))                                      -- past END
     check(Board.battle(m, S), nil, "a simulation (config without REAL) is no battle")
-    check(Board.battleKey(m, S), nil, "nor has a key")
     m.w16(S.gBattleStats, Board.BATTLE_REAL)
     local b = Board.battle(m, S)
     check(b.actor.charId .. ">" .. b.target.charId, "3>81", "who fought (CharacterData +04)")
@@ -368,13 +367,8 @@ do
     check(b.hits[2].by .. b.hits[2].dmg, "target7", "RETALIATION is the target's blow")
     check(b.hits[3].miss, true, "a miss")
     check(b.hits[4].finishes, true, "the blow that finishes the fight")
-    check(b.target.levelUp, false, "no exp, no level (a wall's battle unit has none)")
-    local k1 = Board.battleKey(m, S)
-    m.w8(S.gBattleActor + 0x0B, 0x84)
-    check(Board.battleKey(m, S) ~= k1, true, "another fighter, another battle")
-    local k2 = Board.battleKey(m, S)
-    m.w32(S.gBattleHitArray, hit(0, 0, 5))
-    check(Board.battleKey(m, S) ~= k2, true, "another first blow, another battle")
+    m.w8(S.gBattleTarget + 0x0B, 0); m.w8(S.gBattleTarget + 0x08, 0); m.w8(S.gBattleTarget + 0x70, 7)
+    check(Board.battle(m, S).target.levelUp, false, "a wall (index 0) never levels, whatever +70 holds")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
