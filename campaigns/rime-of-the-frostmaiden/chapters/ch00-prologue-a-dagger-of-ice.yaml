@@ -251,7 +251,8 @@ enemy_units:
     count: 2                     # trivial practice mooks (Torrga Icevein's hirelings)
     positions: [[14, 7], [13, 7]]  # O8 / N8 — screening the boss (vanilla bandits' spots)
     class: soldier               # spear-carrying hirelings: Hlin's axe beats a lance the way
-    level: 2                     #   Eirika's sword beats the Prologue's axes (#430, ADR 0322)
+    levels: [1, 2]               #   Eirika's sword beats the Prologue's axes (#430, ADR 0322);
+                                 # the levels are vanilla's two Fighters' (ADR 0373)
     inventory:
       - id: iron-lance
         damage_type: piercing

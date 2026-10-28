@@ -21,14 +21,15 @@ class LordFloorRows(unittest.TestCase):
     CAMPAIGN = 'rime-of-the-frostmaiden'
 
     def test_ch1_deltas_match_the_floor_solver(self):
-        # vs Ch1 enemies @target 3.5: the shamans are the glass picks (+7HP/+4Def); the armor
-        # tanks (braulo/wolfram) already clear the floor, so they take nothing.
+        # vs Ch1 enemies @target 3.5: the shamans are the glass picks (+10HP/+4Def); Wolfram
+        # already clears the floor, and Braulo needs one Def against vanilla's L2-3 line
+        # (ADR 0373: the goblins were L1 until then, and the floor was +7/+4 and 0/0).
         rows = {uid: (hp, df, res) for uid, hp, df, res in inject.chapters.ch01.lord_floor_rows(
             self.CAMPAIGN, ['marty', 'meesmickle', 'pinky', 'braulo', 'wolfram'])}
-        self.assertEqual(rows['marty'], (7, 4, 0))
-        self.assertEqual(rows['meesmickle'], (7, 4, 0))
-        self.assertEqual(rows['pinky'], (0, 4, 0))
-        self.assertEqual(rows['braulo'], (0, 0, 0))
+        self.assertEqual(rows['marty'], (10, 4, 0))
+        self.assertEqual(rows['meesmickle'], (10, 4, 0))
+        self.assertEqual(rows['pinky'], (1, 4, 0))
+        self.assertEqual(rows['braulo'], (0, 1, 0))
         self.assertEqual(rows['wolfram'], (0, 0, 0))
 
     def test_rows_preserve_candidate_order(self):

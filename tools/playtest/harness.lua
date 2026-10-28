@@ -3572,7 +3572,7 @@ scenarios.ckpt_lordpinky = function()
 end
 
 -- LORDFLOOR (#45 3c): pick MARTY (the frail shaman) as lord and verify the survivability
--- floor bakes in exactly ONCE -- +7 maxHP / +4 def at ch01 turn 1 -- and does NOT re-apply
+-- floor bakes in exactly ONCE -- +10 maxHP / +4 def at ch01 turn 1 -- and does NOT re-apply
 -- on later player phases. ch02 isn't a playable map yet, so the within-chapter multi-phase
 -- stability + the permanent applied-flag (0xFA) stand in for "carries into ch02 with no
 -- double-apply": both ride the identical BmMain_StartPhase -> LordFloor_ApplyOnce
@@ -3580,7 +3580,8 @@ end
 scenarios.lordfloor = function()
     local MARTY = 0x02                 -- marty rides CHARACTER_SETH
     local MARTY_ROW = 1                -- ...at row 1 of the lead menu (row 0 is Braulo)
-    local BASE_HP, FLOOR_HP = 18, 25   -- base maxHP 18, floor +7 (difficulty --lord-floor oracle)
+    local BASE_HP, FLOOR_HP = 18, 28   -- base maxHP 18, floor +10 (inject.chapters.ch01.lord_floor_rows;
+                                       -- +7 until ch01's goblins took vanilla's levels, ADR 0373)
     local BASE_DEF, FLOOR_DEF = 2, 6   -- base def 2, floor +4
     local APPLIED = 0xFA               -- LORDFLOOR_APPLIED_FLAG (permanent)
     local FOUNDING_EXP = 72            -- exp_curve.founding_grant()['marty'] (#430 step 4)
@@ -3615,7 +3616,8 @@ scenarios.lordfloor = function()
             .. "baked in by player-phase start (maxHP=%d, want %d)", APPLIED, hp1, FLOOR_HP)) end
     if hp1 ~= FLOOR_HP then
         return result("FAIL", string.format(
-            "marty maxHP=%d at ch01 t1, want %d (base %d +7 floor)", hp1, FLOOR_HP, BASE_HP)) end
+            "marty maxHP=%d at ch01 t1, want %d (base %d +%d floor)", hp1, FLOOR_HP, BASE_HP,
+            FLOOR_HP - BASE_HP)) end
     if df1 ~= FLOOR_DEF then
         return result("FAIL", string.format(
             "marty def=%d at ch01 t1, want %d (base %d +4 floor)", df1, FLOOR_DEF, BASE_DEF)) end
@@ -3644,8 +3646,9 @@ scenarios.lordfloor = function()
     end
 
     result("PASS", string.format(
-        "marty floored ONCE: maxHP %d->%d (+7), def %d->%d (+4), flag 0x%X set at t1, stable across 3 player phases",
-        BASE_HP, FLOOR_HP, BASE_DEF, FLOOR_DEF, APPLIED))
+        "marty floored ONCE: maxHP %d->%d (+%d), def %d->%d (+%d), flag 0x%X set at t1, stable "
+        .. "across 3 player phases", BASE_HP, FLOOR_HP, FLOOR_HP - BASE_HP, BASE_DEF, FLOOR_DEF,
+        FLOOR_DEF - BASE_DEF, APPLIED))
 end
 
 -- RECORDSUPPLY (#2/#3): with PINKY as lord, bench Braulo + deploy 3 non-Braulo in prep,

@@ -164,7 +164,7 @@ class GenericPidsCloneTheirDonor(unittest.TestCase):
         from inject.chapter_ids import BOSS_PID_ROW_DONORS
         vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
         text = inject.raw_pids.raw_pid_portrait_data(vanilla, 'rime-of-the-frostmaiden')
-        own = set(inject.stats.BASE_FIELDS) | {'number', 'baseLevel'}
+        own = set(inject.stats.BASE_FIELDS) | {'number', 'baseLevel', 'attributes'}
         for pid, donor in BOSS_PID_ROW_DONORS.items():
             got, want = self._fields(text, pid), self._fields(vanilla, donor)
             self.assertEqual(got['number'], pid)
@@ -172,6 +172,48 @@ class GenericPidsCloneTheirDonor(unittest.TestCase):
                              {k: v for k, v in want.items() if k not in own},
                              '%s is not a clone of %s' % (pid, donor))
         self.assertEqual(self._fields(text, '0xb7'), self._fields(vanilla, '0xb7'))
+
+    def test_every_boss_row_carries_CA_BOSS(self):
+        """#545: every `is_boss` unit of every HOSTED chapter rides a row that the build's own
+        pass leaves carrying CA_BOSS, raw pid or vanilla slot, so the engine pays its +40 kill
+        exp, marks it on the map and loads it as a boss -- and the model's
+        `exp_curve.entry_carries_ca_boss` says nothing the ROM does not."""
+        import exp_curve
+        from inject.hosts import hosted_chapters
+        text = inject.raw_pids.raw_pid_portrait_data(
+            inject.decomp.vanilla_decomp_text('src/data_characters.c'), 'rime-of-the-frostmaiden')
+        bosses = 0
+        for hosted in hosted_chapters():
+            chapter = 'ch%02d' % hosted.number
+            chap = exp_curve.load_chapter('rime-of-the-frostmaiden', chapter)
+            for ed in inject.raw_pids.chapter_roster_entries(chap):
+                if not ed.get('is_boss'):
+                    continue
+                pid = inject.raw_pids.enemy_pid(chapter, ed)
+                s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % pid, 'data_characters.c')
+                self.assertIn('CA_BOSS', inject.stats.attributes_in(text[s:e]),
+                              '%s %s rides %s' % (chapter, ed['id'], pid))
+                bosses += 1
+        self.assertGreaterEqual(bosses, 7)
+
+    def test_a_boss_rides_the_boss_row_even_on_a_by_class_chapter(self):
+        self.assertEqual(inject.raw_pids.CHAPTER_ENEMY_PIDS['ch03']['boss'],
+                         inject.raw_pids.enemy_pid('ch03', {'id': 'x', 'is_boss': True,
+                                                            'class': 'mogall'}))
+        with self.assertRaises(KeyError):      # ch04 has no boss row: a boss there cannot slip
+            inject.raw_pids.enemy_pid('ch04', {'id': 'x', 'is_boss': True, 'class': 'mogall'})
+
+    def test_stamping_CA_BOSS_keeps_a_rows_other_flags(self):
+        for written, want in (('CA_FEMALE', {'CA_BOSS', 'CA_FEMALE'}), ('0', {'CA_BOSS'})):
+            vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+            s, e = inject.decomp._find_brace_block(vanilla, '[0xbf - 1]', 'data_characters.c')
+            flagged = vanilla[:s] + vanilla[s:e].replace(
+                '.growthLck = 0,\n', '.growthLck = 0,\n        .attributes = %s,\n' % written) \
+                + vanilla[e:]
+            text = inject.raw_pids.stamp_boss_attributes(flagged)
+            s, e = inject.decomp._find_brace_block(text, '[0xbf - 1]', 'data_characters.c')
+            self.assertEqual(want, inject.stats.attributes_in(text[s:e]), written)
+            self.assertEqual(1, text[s:e].count('.attributes'), written)
 
     def test_every_row_the_pass_changes_is_a_declared_rewrite(self):
         """The exclusivity guard (assert_rewritten_raw_pids_are_exclusive) only sees the pids

@@ -121,9 +121,7 @@ class Fighter:
     """One body in the exp math: a class, a level, and whether the ROM marks it a boss.
 
     `boss` is the CA_BOSS bit as the BUILT ROM carries it, which is not the same question as
-    "is it the chapter's objective". Our bosses that ride a vanilla CHARACTER slot inherit
-    that slot's CA_BOSS; one on a raw pid has an all-zero CharacterData and carries none, so
-    it pays 40 less exp than the vanilla boss it is measured against."""
+    "is it the chapter's objective" (`entry_carries_ca_boss`)."""
     name: str
     class_enum: str
     level: int
@@ -229,14 +227,16 @@ def load_chapter(campaign, ch):
     return chapter_schema.load(d.chapter_path(campaign, ch))
 
 
-def _entry_boss(enemy_def):
+def entry_carries_ca_boss(enemy_def):
     """Does this entry's body carry CA_BOSS in the BUILT ROM?
 
     Not the same question as `is_boss:`, which is our authoring flag for "the objective
-    target". CA_BOSS lives on CharacterData, so a boss inherits it from the vanilla slot it
-    deploys on (`ENEMY_CHARACTER_SLOT`) and a boss on a RAW pid -- whose CharacterData gap is
-    all zeros -- carries none at all. The engine pays the +40 kill bonus off the ROM's
-    answer, not off ours."""
+    target", though every `is_boss` entry does carry it: the build stamps CA_BOSS onto each
+    chapter boss's row, raw pid or vanilla slot (inject.raw_pids.stamp_boss_attributes, #545).
+    Any other body carries it only if the vanilla slot it deploys on does
+    (`ENEMY_CHARACTER_SLOT`). The engine pays the +40 kill bonus off the ROM's answer."""
+    if enemy_def.get('is_boss'):
+        return True
     slot = inject.cast.ENEMY_CHARACTER_SLOT.get(enemy_def.get('id'))
     return 'CA_BOSS' in character_attributes(slot)
 
@@ -248,7 +248,7 @@ def chapter_bodies(chap):
     out = []
     for ed in inject.raw_pids.chapter_roster_entries(chap):
         name = ed.get('id', ed.get('name', 'enemy'))
-        boss = _entry_boss(ed)
+        boss = entry_carries_ca_boss(ed)
         levels = inject.raw_pids.entry_body_levels(ed)
         if 'composition' in ed and 'class' not in ed:
             classes = ed.get('composition') or []

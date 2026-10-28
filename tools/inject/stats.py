@@ -229,18 +229,33 @@ def cast_ranks(unit_id, vanilla_text=None):
     return donor_growths_and_ranks(vanilla, STAT_DONOR[unit_id])[1]
 
 
-def _set_gender(block, female):
-    """Set the CA_FEMALE attribute. Replaces .attributes if present; if absent,
-    inserts it only when female (absent already means 0 == male)."""
-    val = 'CA_FEMALE' if female else '0'
+def attributes_in(block):
+    """The flags on a decomp entry's `.attributes` line (a class, character or item block), as
+    a frozenset. Empty when the entry has none, or writes `0`: absent means zero, not
+    inherited. Reads one line, so a trailing comment or CRLF cannot pull in the next field."""
+    m = re.search(r'\.attributes\s*=\s*([^,\n]+)', block)
+    return frozenset(t.strip() for t in (m.group(1) if m else '').split('|')
+                     if t.strip() and t.strip() != '0')
+
+
+def _write_attributes(block, flags):
+    """Set a row's `.attributes` to exactly `flags`. Whether the field is THERE decides
+    replace-or-insert, never whether it carries flags: a `.attributes = 0,` row gains no second
+    initializer, which GCC would resolve to whichever comes last. An absent field already reads
+    0, so an empty set inserts nothing."""
+    val = ' | '.join(sorted(flags)) or '0'
     pat = re.compile(r'(\.attributes\s*=\s*)[^,\n]*(,)')
     new, n = pat.subn(lambda m: m.group(1) + val + m.group(2), block, count=1)
-    if n:
+    if n or not flags:
         return new
-    if not female:
-        return block  # no attributes field => already 0 => male; nothing to do
     idx = block.rfind('}')
-    return block[:idx] + '    .attributes = CA_FEMALE,\n    ' + block[idx:]
+    return block[:idx] + '    .attributes = %s,\n    ' % val + block[idx:]
+
+
+def _set_gender(block, female):
+    """Set the row's attributes to CA_FEMALE or nothing. It replaces every flag, which is why
+    the prologue keeps it off its boss's row (inject/chapters/prologue.py)."""
+    return _write_attributes(block, {'CA_FEMALE'} if female else set())
 
 
 def patch_character_data(campaign, verbose=True):
