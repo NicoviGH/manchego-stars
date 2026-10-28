@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` 909e9ef, no PR yet; planner, F1 pool, F2 and F3's trace built; next: F3's report). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` ba06c8e, no PR yet; planner, F1 pool, F2, F3's trace built; next: the bot visits villages and opens chests, then F3's report). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -113,9 +113,18 @@ G3 #537 78105ed; the summary is on #531).
         <trace>` tells one run in plain text. The trace costs no measurable CPU. A Talk recruit
         no longer counts as a kill. Not traced: map-tile events (chests and villages show only
         as items).
-        **NEXT, F3's rest:** the report (one plain sentence per cell first; Task 13), "what kills
-        us" as a query over traces (killer share by enemy and turn, death tiles, ours beside the
-        twin's), bot faults, feasibility, attempts buckets, `--post`.
+        **Fixed after Nicolas's review (ba06c8e; #510 comment 6458549710):** each campaign keeps
+        its seed (pair s = campaign s from New Game, its FIRST attempt at the chapter; no
+        reseed). A run without a game result stops the cell and is reported in its own words.
+        Enemy acts follow `gActionData` as vanilla writes it. The stamp hashes the whole env.
+        `test_inject_unit_art`'s shared-temp-dir race is fixed.
+        **NEXT, first: the bot visits every village and opens every chest it can** (Nicolas: a
+        new player explores them all). The design, from the decomp, is in that comment:
+        `GetAvailableTileEventCommand`, then `VisitCommandUsability`/`ChestCommandUsability` in
+        the sandbox, then the controller's `visit`/`open_chest` and `talkUntil`. The weight
+        `explore = 200` is PROPOSED and needs Nicolas's yes. Prove it on ours ch05.
+        **Then F3's rest:** the report (one plain sentence per cell first; Task 13), "what kills
+        us" as a query over traces, bot faults, feasibility, attempts buckets, `--post`.
      2b. **Where runs live (plan Task 16, F5, SETTLED; Nicolas: give them "a good home in the
         repo"):** ONE home each (Nicolas: no copies). The WRITE-UP is a committed record per
         sweep, `sim/<id>-<slug>/RUN.md`: full YAML frontmatter of inputs and cost, plus the plain
