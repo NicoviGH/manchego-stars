@@ -9,7 +9,14 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` ba06c8e, no PR yet; planner, F1 pool, F2, F3's trace built; next: the bot visits villages and opens chests, then F3's report). **The parity model is being
+Refreshed 2026-10-28 (Claude). **FIRST, in a fresh session: fix #545** (bosses on raw character
+slots lack CA_BOSS; Nicolas: fix it first, then resume step 9). Cut `feat/545-...` from `origin/main`.
+The issue body has the decomp evidence, the effects (+40 kill exp, map marker, status screen,
+Silencer, camera) and the fix with its test. Check Ravisin (ch05); run `make verdict-diff`.
+**Then resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a LOCAL WIP commit (not
+pushed)**: villages/chests, the full-bag rule, the boss assault + stall rule (below, "NEXT").
+After switching back to it, rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`):
+the checkout touches the chapter YAMLs' mtimes. **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -118,11 +125,47 @@ G3 #537 78105ed; the summary is on #531).
         reseed). A run without a game result stops the cell and is reported in its own words.
         Enemy acts follow `gActionData` as vanilla writes it. The stamp hashes the whole env.
         `test_inject_unit_art`'s shared-temp-dir race is fixed.
-        **NEXT, first: the bot visits every village and opens every chest it can** (Nicolas: a
-        new player explores them all). The design, from the decomp, is in that comment:
-        `GetAvailableTileEventCommand`, then `VisitCommandUsability`/`ChestCommandUsability` in
-        the sandbox, then the controller's `visit`/`open_chest` and `talkUntil`. The weight
-        `explore = 200` is PROPOSED and needs Nicolas's yes. Prove it on ours ch05.
+        **Built since, in b243941 (WIP, local; #510 comments 6459066722, 6473075402):**
+        - **Villages and chests, under Nicolas's NO-RISK RULE** (he rejected the made-up
+          `explore = 200`; the rule is ON TRIAL, not locked):
+          - `sight.explorable`/`canExplore` run the unit menu's own Visit/Chest checks.
+          - Each open tile sends its nearest able unit marching to it.
+          - The planner credits a visit only at zero chance to die, in both the beam and the
+            judged phase. The credit (the recruit's 200) only orders a SAFE visit.
+          - The record's `explore` says what became of each tile.
+          - Ours ch02: 2 of 4 villages taken at zero risk; careful never marched through the
+            bandits to the other two.
+        - **The full-bag rule (Nicolas, 2026-10-28), `Bot.fullBag`:** it answers FE8's own
+          send-to-convoy / discard chooser, and the record has `bag`. Ours ch03: all 4 chests
+          opened, and a duplicate Iron Sword went to the convoy.
+        - **Boss maps (Nicolas agreed: option 2, plus "go at the boss with multiple units"):**
+          - The ASSAULT plan: every unit that reaches the boss strikes it, judged beside the beam.
+          - A repeated board is first a STALL: the planner must play a plan that changes it, and
+            only a repeat after that is stuck. The record has `stalls`.
+          - The boss is read from the game's own Defeat Boss goal (`GetDefeatTalkEntry`, flag 2),
+            not CA_BOSS (#545: the grell has none, so the bot saw no boss at all).
+          - The judge CHAINS the counter with the enemy phase. Averaging it had let the lord
+            strike the grell alone and die.
+        - **Where it stands (ours ch03 attempt 1, `PT_CAMPAIGN` with `attempt: 1`):** the control
+          (exploring off) wins t13, all alive. The latest run had no stuck and no deaths, but it
+          CRASHED on turn 16: "the harness could not perform item" (a Vulnerary-type act).
+          Unexamined.
+        **The env, without a vanilla campaign:** point `campaign_env.py ours --store <dir>` at a
+        dir of `0.json..25.json`, each `{"shops": []}`, with `--id e1-ours-ch07 --from 4`. Then
+        set `last: [4]`, `shops: {}` and `attempt: 1` in the JSON. That plays ch03 alone, from
+        the saved start.
+        **NEXT, in order (after #545):**
+        1. The item crash: read the trace first; spend one instrumented run, never one per guess.
+        2. The stall rule can CYCLE: a unit steps into the boss's 2-range, is hit, retreats, and
+           the board comes back with other HP, so each repeat is "new" (one run: 6 stalls to turn
+           40). Watch for it once the assault fires.
+        3. The exploring trip itself: careful re-picks the sent unit at every decision, so no one
+           commits to a far village. Each open tile's unit is re-chosen per decision.
+        4. A kept plan's attack can find no Attack command (a target changed under it; the
+           surprise check missed it). Seen once in ch03 attempt 4; that trace was lost.
+        5. Nicolas: **use convoy items before buying anything** (between chapters; drive the prep
+           Supply screen). And: promote at level 10, between chapters, configured separately.
+           Seals found in battle go to the convoy for now.
         **Then F3's rest:** the report (one plain sentence per cell first; Task 13), "what kills
         us" as a query over traces, bot faults, feasibility, attempts buckets, `--post`.
      2b. **Where runs live (plan Task 16, F5, SETTLED; Nicolas: give them "a good home in the
