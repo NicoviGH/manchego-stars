@@ -3735,19 +3735,20 @@ INSPECT.campaignApi = function(game)
     end
 
     -- One purchase through the game's own shop screen: StartShopScreen(unit, the shop's stock,
-    -- its type, the player phase) as a kept call, then its list, prompts and exit by their keys.
+    -- its type) as a kept call, then its list, prompts and exit by their keys. ORPHANED (no
+    -- parent, PROC_TREE_3), as the game's own map shops start it (eventinfo.c,
+    -- StartArmoryScreenOrphaned): the shop's first act is LockGame, and a locked game stops
+    -- running tree 2, so a shop parented to the player phase froze itself (vanilla Ch5).
     api.buy = function(p)
         local s
         for _, e in ipairs(api.stock()) do if e.item == p.item then s = e end end
         local u = s and BOARD.find("blue", p.unit)
         if not u then return nil, string.format("no stock entry or unit for %d:%d", p.unit, p.item) end
-        local phase = PROCS.find(SYM.gProcScr_PlayerPhase)
-        if not phase then return nil, "no player phase to open the shop from" end
         local row
         for i, it in ipairs(s.shop.items) do if it == p.item then row = i - 1 end end
         local startGold = gold()
         INSPECT.gameCalls(function(call)
-            call(SYM.StartShopScreen, { u.addr, s.shop.list, C.SHOP_TYPE[s.shop.kind], phase })
+            call(SYM.StartShopScreen, { u.addr, s.shop.list, C.SHOP_TYPE[s.shop.kind], 0 })
         end, true)
         local stalled = INSPECT.watch("shop")
         for _ = 1, C.shopSteps do
