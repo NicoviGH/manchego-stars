@@ -266,6 +266,23 @@ end
 test_claims_followed_are_passed()
 
 local function test_draw_style_never_repeats_and_runs_out()
+
+-- A claim the bot has no behaviour for (Bot.unplayed) plays the same followed or not, so it is
+-- no part of a style: vanilla Ch5's four claims (arena, recruit, reinforcements, villages) made
+-- 3 x 2^4 = 48 styles that played as 3 games, and the campaign gave up after replaying them.
+local function test_unplayed_claims_are_no_part_of_a_style()
+    local claims = { { id = "u", kind = "unmodelled", topic = "arena" },
+                     { id = "k", kind = "kits", topic = "villages" },
+                     { id = "c", kind = "carry", unit = { 1 }, vs = "all" } }
+    local tried, n = {}, 0
+    math.randomseed(7)
+    while n <= 48 and Campaign.drawStyle(Bot, math.random, claims, 1, tried) do n = n + 1 end
+    check(n, 6, "three aggressions x the one playable claim followed or not")
+    for key in pairs(tried) do
+        check(key:match("|(.*)"):find("[uk]") == nil, true, "no unplayed claim in a style: " .. key)
+    end
+end
+test_unplayed_claims_are_no_part_of_a_style()
     local tried, keys = {}, {}
     for _ = 1, 3 do
         local style = Campaign.drawStyle(Bot, cycle({ 0.0, 0.0, 0.5, 0.99 }), {}, 1, tried)
