@@ -52,9 +52,9 @@ checked class by class against vanilla's whole force instead. Its reinforcement 
 vanilla's reinforcement arrays and already matched.
 
 **ch04's wolf pack takes the levels of the Revenants it replaced.** Vanilla Ch4 fields 12
-Revenants: L1×3, L2×7, L3×2. Ours keep 6 as Revenants (the line's two L3s, and four L2s from
-vanilla's pack), and the 6 Mauthe Doog of ADR 0049 replace the rest: two pack L2s and the line's
-L2, L1, L1, L1. The pack was all L2, so it now reads `levels: [2, 2, 2, 1, 1, 1]`. Its first tile
+Revenants: L1×3, L2×7, L3×2. Ours keep 6 as Revenants (the line's two L3s, and the four L2s of
+vanilla's reinforcement pack, 088B4C24), and the 6 Mauthe Doog of ADR 0049 replace the rest: the
+line's three L2s, on (7,9), (5,13) and (10,12), and its three L1s, on (5,8), (0,4) and (11,4). The pack was all L2, so it now reads `levels: [2, 2, 2, 1, 1, 1]`. Its first tile
 is Lupin's, and the ROM places him at his own level there, so the wolves the ROM fields are
 L2, L2, L1, L1, L1 (`ch04_turn2_reveal_rows` now reads per-body levels). The pack's levels are
 also its levels as parley allies, so Nicolas will revisit them with #510's model and the

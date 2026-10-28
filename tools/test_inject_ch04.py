@@ -124,6 +124,14 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertIn('.charIndex = CHARACTER_DUESSEL,', joined)
         self.assertRegex(joined, r'CHARACTER_DUESSEL,[^{]*?\.xPosition = %d,' % lx)
 
+    def test_each_generic_wolf_takes_its_own_level(self):
+        # The pack's `levels:` are the Revenants it replaced (ADR 0373). Body 0 is Lupin's tile,
+        # where the ROM places Lupin at his own level, so the five generics take levels[1:].
+        rows = [r for r in inject.chapters.ch04.ch04_turn2_reveal_rows(
+            self.CAMPAIGN, self._chap(), self._lupin()) if 'CHARACTER_DUESSEL' not in r]
+        self.assertEqual([int(re.search(r'\.level = (\d+),', r).group(1)) for r in rows],
+                         [2, 2, 1, 1, 1])
+
     def test_turn2_reveal_holds_the_difficulty_parity_count(self):
         # The YAML wave stays 6 for the difficulty read (make difficulty CH=ch04); the
         # 5-generics-plus-Lupin split is injector-side only, so parity is unchanged.
