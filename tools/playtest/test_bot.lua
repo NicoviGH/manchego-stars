@@ -1474,6 +1474,34 @@ do
           "door: no key, the wall")
 end
 
+-- test_exploring_opens_the_door_to_a_chest: the chest at (4,0) sits behind the door at (2,0),
+-- so no path reaches A. A can open both, so it is sent to the chest and its first act is the
+-- Door. Pairing only units the path reached left ch03's (6,12) chest, behind the door at
+-- (6,10), unopened in every attempt of every style, with Trex able to open both.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        doors = { { x = 2, y = 0 } }, obstacles = {}, openers = { [0x01] = true },
+        explorable = { { x = 4, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["4,0"] = "chest" } },
+    }
+    local function doorFor(cands)
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.acts) do
+                if a.act == "door" then return at(a) end
+            end
+        end
+    end
+    check(doorFor(B.candidates(boardOf(A, E), sightOf(o), style("careful"))), "1,0",
+          "exploring: a cut-off unit that can open the way is sent, and opens the door")
+    o.openers = {}
+    check(doorFor(B.candidates(boardOf(A, E), sightOf(o), style("careful"))), nil,
+          "exploring: nothing opens the way, nobody is sent")
+end
+
 -- test_healers_act_after_the_fighters: H heals A only once A has acted; until then A moves.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false })

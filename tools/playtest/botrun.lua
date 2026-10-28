@@ -183,8 +183,9 @@ end
 
 -- The no-risk rule's experiment (#510 step 9, Nicolas 2026-10-27: try it before it is
 -- locked): every village and chest the run saw open, and what became of it.
---   open(list, turn)   one read of sight.explorable(); a tile gone from it that we did not
---                      visit was closed by someone else (a pillage, an event)
+--   open(list, turn, usable)  one read of sight.explorable(); a tile gone from it that we did
+--                      not visit was closed by someone else (a pillage, an event). usable(t):
+--                      whether a unit could use it now (the game's own check)
 --   offered(list)      a plan's `explore`: each offer's standing chance to die
 --   visited(a, turn)   our Visit or Chest act was played
 --   failed(a, turn)    it was tried and the harness could not drive it (a full inventory's
@@ -193,10 +194,13 @@ end
 --                      "failed" | "closed" | "skipped" (offered, never played) | "unreached"
 --                      (never offered), by, tried (the unit that failed), turn, offers, die =
 --                      the lowest chance it was offered at }
+--   leftOpen()         bot faults: each tile never explored that a unit could still use at the
+--                      last read, { kind = "left_open", x, y, tile, offers }. ch03's chest behind
+--                      a door went unopened in every attempt, silently, as "unreached"
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
     local function key(x, y) return x .. "," .. y end
-    function log.open(list, turn)
+    function log.open(list, turn, usable)
         local now = {}
         for _, t in ipairs(list) do
             local k = key(t.x, t.y)
@@ -205,6 +209,7 @@ function M.exploreLog()
                 tiles[k] = { x = t.x, y = t.y, kind = t.kind, offers = 0 }
                 order[#order + 1] = k
             end
+            tiles[k].usable = usable ~= nil and usable(t) or false
         end
         for _, k in ipairs(order) do
             local e = tiles[k]
@@ -227,6 +232,17 @@ function M.exploreLog()
     function log.failed(a, turn)
         local e = tiles[key(a.move.x, a.move.y)]
         if e then e.failed, e.turn = a.unit, turn end
+    end
+    function log.leftOpen()
+        local out = {}
+        for _, k in ipairs(order) do
+            local e = tiles[k]
+            if e.usable and not (e.by or e.failed or e.closed) then
+                out[#out + 1] = { kind = "left_open", x = e.x, y = e.y, tile = e.kind,
+                                  offers = e.offers }
+            end
+        end
+        return out
     end
     function log.summary()
         local out = {}
@@ -317,6 +333,9 @@ function M.run(api)
             end
         end
         rec.explore = explore.summary()
+        if outcome == "won" then
+            for _, f in ipairs(explore.leftOpen()) do rec.bot_faults[#rec.bot_faults + 1] = f end
+        end
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
         trace({ t = "end", record = rec })
         api.emit(M.PREFIX .. Json.encode(rec))
@@ -373,7 +392,16 @@ function M.run(api)
             end
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
-            if sight.explorable then explore.open(sight.explorable(), turn) end
+            if sight.explorable then
+                -- whether any unit could use each tile now: every unit can act at phase start
+                explore.open(sight.explorable(), turn, function(t)
+                    for _, u in ipairs(board.units) do
+                        if u.faction == "blue" and u.onField
+                            and sight.canExplore(u, t.x, t.y, t.kind) then return true end
+                    end
+                    return false
+                end)
+            end
             trace({ t = "phase", phase = "player", units = M.snapshot(board) })
             playing = nil
             while true do

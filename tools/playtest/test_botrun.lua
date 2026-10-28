@@ -87,6 +87,10 @@ local function fakeGame(o)
                     return o.eventTurn and o.eventTurn > turn and o.eventTurn or nil
                 end,
             }
+            if o.explorable then
+                s.explorable = function() return o.explorable end
+                s.canExplore = function() return true end
+            end
             s.refresh = function()
                 g.refreshes = (g.refreshes or 0) + 1
                 s.objective.turnsLeft = g.turnsLeft
@@ -173,6 +177,37 @@ do
     for _, e in ipairs(log.summary()) do by[e.x] = e end
     check(by[4].status, "failed", "explore log: tried, and the harness could not drive it")
     check(by[4].tried, 0x1C, "explore log: by whom")
+end
+
+-- test_explore_left_open: a tile still open at the last player phase that a unit could use
+-- (the game's own check, read then) and that was never explored is a bot fault; one nobody
+-- could use any more (a chest with no opener left, a village destroyed) is not.
+do
+    local log = Botrun.exploreLog()
+    local tiles = { { x = 3, y = 3, kind = "chest" }, { x = 4, y = 4, kind = "chest" },
+                    { x = 5, y = 5, kind = "visit" } }
+    log.open(tiles, 1, function(t) return true end)
+    log.offered({ { x = 3, y = 3, die = 0.4 } })
+    log.visited({ unit = 0x01, move = { x = 5, y = 5 } }, 1)
+    log.open(tiles, 2, function(t) return t.x == 3 end)
+    local left = log.leftOpen()
+    check(#left, 1, "left open: only the tile a unit could still use")
+    check(left[1] and (left[1].x .. "," .. left[1].y), "3,3", "left open: which")
+    check(left[1] and left[1].kind, "left_open", "left open: the fault's kind")
+    check(left[1] and left[1].tile, "chest", "left open: the tile's kind")
+    check(left[1] and left[1].offers, 1, "left open: how often it was offered")
+end
+
+-- test_a_won_run_records_left_open_tiles: the rout is won in two blows while a village the
+-- unit could visit stands far off; the record's bot_faults names it.
+do
+    local g = fakeGame { units = rout(), explorable = { { x = 9, y = 9, kind = "visit" } } }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "won", "left open: the run is won")
+    local f = r.bot_faults and r.bot_faults[1]
+    check(f and f.kind, "left_open", "left open: a bot fault")
+    check(f and (f.x .. "," .. f.y), "9,9", "left open: the village")
 end
 
 -- test_full_bag_answers_are_recorded: the harness's full-bag answers land in the record with

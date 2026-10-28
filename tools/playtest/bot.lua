@@ -1231,6 +1231,9 @@ end
 -- Re-picking each decision handed ch02's (12,3) between two units, and no one reached it.
 -- The game's check is a menu's, asked only of a unit that can act: an acted unit keeps its
 -- tile on the path alone (asked anyway, ch02's turn-7 "no" was cached into turn 8).
+-- A unit cut off from the tile is sent when breachFor finds the door or wall that opens the
+-- way (the march then opens it, as for any goal): ch03's (6,12) chest sits behind a door,
+-- and pairing only the units a path reached left it unopened in every attempt.
 local function exploring(ctx, sent)
     ctx.exploreGoal = {}
     if not ctx.sight.explorable then return end
@@ -1238,6 +1241,18 @@ local function exploring(ctx, sent)
     local function reaches(u, t)
         local field = fieldFor(ctx, t)
         local d = field and field[u.y] and field[u.y][u.x]
+        if field and not d then
+            -- the way through the breach: the path to it, one step through, the path beyond
+            local b = breachFor(ctx, u, t)
+            local of = b and fieldFor(ctx, b)
+            local toB, beyond = of and of[u.y] and of[u.y][u.x], nil
+            for _, side in ipairs(b and SIDES or {}) do
+                local row = field[b.y + side[2]]
+                local v = row and row[b.x + side[1]]
+                if v and (not beyond or v < beyond) then beyond = v end
+            end
+            d = toB and beyond and toB + 1 + beyond
+        end
         return d and (u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)) and d
     end
     local open, blues = {}, {}
