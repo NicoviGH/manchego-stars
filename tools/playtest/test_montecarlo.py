@@ -106,6 +106,18 @@ class Attempts(unittest.TestCase):
         self.assertEqual({t['campaign']['from'] for t in tasks}, {4})
         self.assertEqual({t['seed'] for t in tasks}, {5})
 
+    def test_a_run_that_crashed_before_its_bot_reported_is_listed(self):
+        said = set()
+        ok = {'attempt': 1, 'outcome': 'won', 'turns': 8, 'frames': 30919, 'task_attempt': 1}
+        self.assertIn('30919 frames', mc.attempt_line(ok, said))
+        self.assertIsNone(mc.attempt_line({'kind': 'campaign', 'outcome': 'won',
+                                           'task_attempt': 1}, said))
+        self.assertIsNone(mc.attempt_line({'kind': 'campaign', 'outcome': 'crashed',
+                                           'task_attempt': 1}, said), 'attempt 1 was listed')
+        line = mc.attempt_line({'kind': 'campaign', 'outcome': 'crashed', 'task_attempt': 2,
+                                'why': 'Lua error'}, said)
+        self.assertEqual(line, 'attempt 2: crashed before the bot reported (Lua error)')
+
     def test_attempts_need_a_saved_start(self):
         with self.assertRaises(ValueError):
             mc.attempt_tasks({'id': 'c'}, 2)

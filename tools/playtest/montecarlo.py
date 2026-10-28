@@ -204,8 +204,29 @@ def attempt_tasks(env, n, seed=1, vanilla=False):
     """Attempts 1..n of the chapter at `env`'s `from` start, one task each."""
     if env.get('from') is None:
         raise ValueError('montecarlo: attempts need an env with `from` (a saved chapter start)')
-    return [{'campaign': dict(env, attempt=k), 'seed': seed, 'vanilla': vanilla}
-            for k in range(1, n + 1)]
+    return [{'campaign': dict(env, attempt=k), 'seed': seed, 'vanilla': vanilla,
+             'stamp': {'task_attempt': k}} for k in range(1, n + 1)]
+
+
+def attempt_line(r, said):
+    """The line `attempts` prints for record `r`, or None. `said` = the attempts already
+    printed. A worker's CAMPAIGN end is printed only when no BOTRUN of its attempt was: a run
+    that crashed before its bot reported (vanilla Ch3, 2026-10-29: a symbol table another run
+    rewrote) would otherwise vanish from the listing."""
+    if r.get('kind') == 'campaign':
+        k = r.get('task_attempt')
+        if k is None or k in said or r.get('outcome') != 'crashed':
+            return None
+        said.add(k)
+        return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
+    said.add(r.get('attempt'))
+    cost = (r.get('costs') or {}).get('cpu_s')
+    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s' % (
+        r.get('attempt'), r.get('outcome'), ' all alive' if r.get('all_alive') else '',
+        r.get('turns', '-'), len(r.get('deaths') or []),
+        '' if r.get('frames') is None else ', %d frames' % r['frames'],
+        '' if cost is None else ', %.1f CPU s' % cost,
+        ' (%s)' % r.get('why') if r.get('outcome') == 'crashed' else '')
 
 
 def first_clean(records):
@@ -662,16 +683,12 @@ def main(argv=None):
     with open(args.env) as fh:
         env = json.load(fh)
     pool = Pool(jobs=args.jobs, out=args.out)
-    records = []
+    records, said = [], set()
     for r in pool.run(attempt_tasks(env, args.attempts, args.seed, args.vanilla)):
         records.append(r)
-        if r.get('kind') == 'campaign':
-            continue
-        cost = (r.get('costs') or {}).get('cpu_s')
-        print('attempt %s: %s%s, turn %s, %d deaths%s' % (
-            r.get('attempt'), r.get('outcome'), ' all alive' if r.get('all_alive') else '',
-            r.get('turns', '-'), len(r.get('deaths') or []),
-            '' if cost is None else ', %.1f CPU s' % cost), flush=True)
+        line = attempt_line(r, said)
+        if line:
+            print(line, flush=True)
     k = first_clean(records)
     print('first clean attempt: %s' % (k if k is not None else 'none'))
     return 0
