@@ -216,7 +216,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0365` | [Kits: the happy path is graded, the guaranteed path printed beside it](decisions/0365-kits-the-happy-path-is-graded.md) | 2026-10-22 | #510 |
 | `0368` | [The step-9 bot is one pure policy, styled by what it refuses to end its move on](decisions/0368-the-bot-is-one-pure-policy-styled-by-what-it-refuses.md) | 2026-10-26 | #510 |
 | `0369` | [The bot reads the game's own danger zone and forecast, by running FE8's functions in a sandbox](decisions/0369-the-bot-reads-the-games-own-danger-zone-and-forecast.md) | 2026-10-26 | #510 |
-| `0372` | [Every chapter boss's row carries CA_BOSS, and its personal line is its whole line](decisions/0372-every-boss-row-carries-ca-boss.md) | 2026-10-28 | #545 |
+| `0372` | [Every chapter boss's row carries CA_BOSS, and its personal line holds every level it has](decisions/0372-every-boss-row-carries-ca-boss.md) | 2026-10-28 | #545 |
 
 ---
 

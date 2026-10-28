@@ -15,7 +15,7 @@ from inject.decomp import _find_brace_block
 from inject.hosting import _load_chapter_yaml, chapter_yaml_for
 from inject.hosts import hosted_chapters
 from inject.paths import CHARACTERS_C
-from inject.stats import _set_field, BASE_FIELDS
+from inject.stats import _set_field, _write_attributes, attributes_in, BASE_FIELDS
 from inject.text import raw_pid_name_text_id
 
 
@@ -80,7 +80,7 @@ def raw_pid_portrait_data(text, campaign):
         start, end = _find_brace_block(text, marker, CHARACTERS_C)
         block = _set_field(text[start:end], 'baseLevel', level, CHARACTERS_C, marker)
         text = text[:start] + block + text[end:]
-    return text
+    return stamp_boss_attributes(text)
 
 
 ENEMY_STUB_PLATE = 0x267   # "Enemy": vanilla's unused rows (0x92-0xa6, 0xbf, 0xc2-0xc4)
@@ -135,24 +135,11 @@ def stamp_boss_attributes(text):
     raw pid's row (a cloned generic, or a gap) does not, and without it the engine withholds
     everything it hangs on the bit: the +40 kill exp (bmbattle.c), the map's boss marker
     (bmudisp.c), the chapter status listing, the Silencer rate and the opening camera pan. It
-    also sends an autolevelled boss down LoadUnit's UnitAutolevelRealistic branch, so a boss's
-    `personal:` line is its whole line at its level, as vanilla's are."""
-    import unit_load
+    also sends an autolevelled boss down LoadUnit's UnitAutolevelRealistic branch, which grows
+    it from baseLevel (= its level), so its `personal:` line already holds every level it has."""
     for marker in boss_rows():
         s, e = _find_brace_block(text, marker, CHARACTERS_C)
-        block = text[s:e]
-        flags = unit_load.attributes_in(block)
-        if 'CA_BOSS' in flags:
-            continue
-        if flags:
-            block = _set_field(block, 'attributes', ' | '.join(sorted(flags | {'CA_BOSS'})),
-                               CHARACTERS_C, marker)
-        else:
-            block, n = re.subn(r'(?m)^(\s*)(\.growthLck\s*=\s*[^,\n]+,\s*\n)',
-                               r'\1\2\1.attributes = CA_BOSS,\n', block, count=1)
-            if n != 1:
-                sys.exit('ERROR: .growthLck insertion point not found in %s entry %s'
-                         % (CHARACTERS_C, marker))
+        block = _write_attributes(text[s:e], attributes_in(text[s:e]) | {'CA_BOSS'})
         text = text[:s] + block + text[e:]
     return text
 
@@ -192,7 +179,6 @@ def patch_raw_pid_portraits(campaign, verbose=True):
         text = f.read()
     text = raw_pid_portrait_data(text, campaign)
     text = slot_personal_data(text, campaign)
-    text = stamp_boss_attributes(text)
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(text)
     if verbose:
@@ -437,10 +423,10 @@ def enemy_pid(chapter, enemy, index=0):
     chapter with several generic pids (the prologue's guards) hands them out by the body's
     index WITHIN its entry, as the prologue's own guard slots always did."""
     pids = CHAPTER_ENEMY_PIDS[chapter]
+    if enemy.get('is_boss'):           # first: a boss rides the row stamp_boss_attributes stamps
+        return pids['boss']
     if 'by_class' in pids:
         return pids['by_class'][enemy['class']]
-    if enemy.get('is_boss'):
-        return pids['boss']
     if enemy.get('is_miniboss') and 'miniboss' in pids:
         return pids['miniboss']
     generic = pids['generic']

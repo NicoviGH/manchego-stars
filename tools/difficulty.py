@@ -663,8 +663,13 @@ def _our_load_kwargs(ed):
     donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
              or inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id')))
     flagged = bool(ed.get('autolevel'))
-    realistic = flagged and (exp_curve.entry_carries_ca_boss(ed) or bool(donor) and _loads_realistically(
-        donor, _enemy_class_enum(ed['class']))) if 'class' in ed else False
+    # Two different slots: the boss bit is the row the unit DEPLOYS on (ENEMY_CHARACTER_SLOT, or
+    # its stamped boss row); `donor` may be a BASE_DONOR that lends only stats, and
+    # _loads_realistically also takes its pid < 0x40 and its class's CA_BOSS.
+    realistic = ('class' in ed and flagged
+                 and (exp_curve.entry_carries_ca_boss(ed)
+                      or (bool(donor)
+                          and _loads_realistically(donor, _enemy_class_enum(ed['class'])))))
     growths = inject.stats.donor_growths_and_ranks(_characters_text(), donor)[0] \
         if realistic and str(donor).startswith('CHARACTER_') else None
     return dict(autolevel=flagged, realistic=realistic, personal_growths=growths,

@@ -1,12 +1,12 @@
 ---
 id: 372
-title: "Every chapter boss's row carries CA_BOSS, and its personal line is its whole line"
+title: "Every chapter boss's row carries CA_BOSS, and its personal line holds every level it has"
 date: "2026-10-28"
 section: "Combat System"
 issues: [545]
 ---
 
-# Every chapter boss's row carries CA_BOSS, and its personal line is its whole line
+# Every chapter boss's row carries CA_BOSS, and its personal line holds every level it has
 
 A boss on a raw character pid (ch03's grell on 0xBF, ch05's Ravisin on 0xB8) used to ride a row
 with no `CA_BOSS`, because neither a cloned generic row nor an unused gap carries it. The chapter
@@ -16,7 +16,9 @@ marker (`bmudisp.c`), the chapter status screen's listing (`uichapterstatus.c`),
 rate (`bmbattle.c`) and the opening camera's pan (`bmcamadjust.c`).
 
 **The build now stamps `CA_BOSS` onto every chapter boss's row**
-(`inject.raw_pids.stamp_boss_attributes`, over `CHAPTER_ENEMY_PIDS`), raw pid or vanilla slot.
+(`inject.raw_pids.stamp_boss_attributes`, the last step of `raw_pid_portrait_data`, over
+`CHAPTER_ENEMY_PIDS`), raw pid or vanilla slot. `enemy_pid` routes an `is_boss` entry to that
+row before anything else, so a hosted boss cannot ride an unstamped one.
 That is vanilla's own shape: every FE8 chapter boss is a character with `CA_BOSS`. A test fails
 when any `is_boss` unit's row lacks it. The parity model reads the same answer
 (`exp_curve.entry_carries_ca_boss`), so it no longer prices a raw-pid boss as a generic.
@@ -24,9 +26,10 @@ when any `is_boss` unit's row lacks it. The parity model reads the same answer
 **What follows from it.** With `CA_BOSS`, `LoadUnit` sends an autolevelled red unit down
 `UnitAutolevelRealistic`, which levels it from the row's `baseLevel`. Our bosses' `baseLevel` is
 their deploy level (`RAW_PID_LEVEL_SOURCES`), so they grow zero levels, as vanilla's do (Bazba:
-`baseLevel` 6, deployed at L6). **A boss's `personal:` line is therefore its WHOLE line at its
-level**, never a line that autolevel grows on top of. The grell was the one boss this changed: it
-had rolled 7 class-growth autolevels on top of its line. Those levels are folded into its
+`baseLevel` 6, deployed at L6). **A boss's `personal:` line therefore already holds every level
+it has.** It is still added to the class base, but no autolevel grows on top of it. The grell
+was the one boss this changed: it had rolled 7 class-growth autolevels on top of its line.
+Those levels are folded into its
 `personal:` at the model's rounded means (Nicolas chose this over accepting the drop, 2026-10-28),
 so its line is unchanged (36 HP / Pow 10 / Def 8 at L8). Only the ±12% autolevel noise is gone.
 

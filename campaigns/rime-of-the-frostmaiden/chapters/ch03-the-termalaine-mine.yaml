@@ -217,9 +217,9 @@ enemy_units:
     level: 8
     autolevel: true
     personal:                   # FE8's OWN boss mechanism: a named boss is class base PLUS a
-      baseHP: 21                # personal line that is its WHOLE line at its level. Its row
-      basePow: 8                # carries CA_BOSS and baseLevel 8, so LoadUnit's realistic branch
-      baseSkl: 2                # grows it zero levels, as it does vanilla's bosses (#545).
+      baseHP: 21                # personal line that already holds every level up to its own:
+      basePow: 8                # its row carries CA_BOSS and baseLevel 8, so LoadUnit's realistic
+      baseSkl: 2                # branch adds none, as with vanilla's bosses (#545).
       baseSpd: 2                # Modelled on the decomp's only defensive monster boss, Maelduin
       baseDef: 6                # (data_characters.c [CHARACTER_MAELDUIN_CHUnk - 1]: HP+15/Pow+6/
       baseRes: 2                # Def+4), and read against the party that meets it (ADR 0316):

@@ -512,6 +512,9 @@ class RavisinPortrait(unittest.TestCase):
         source += ''.join('\n    [%s - 1] = {\n        .nameTextId = 0x24d,\n'
                           '        .descTextId = 0x2a9,\n        .number = %s,\n    },' % (p, p)
                           for p in sorted(set(donors) | set(donors.values())))
+        # ...and the vanilla boss slots the boss stamp visits, which already carry CA_BOSS (#545)
+        source += ''.join('\n    %s = {\n        .attributes = CA_BOSS,\n    },' % m
+                          for m in inject.raw_pids.boss_rows() if 'CHARACTER_' in m)
         patched = inject.raw_pids.raw_pid_portrait_data(source, self.CAMPAIGN)
         for pid in donors:
             self.assertIn('.nameTextId = 0x%X,' % inject.cast.RAW_PID_PORTRAITS[pid][1], patched)

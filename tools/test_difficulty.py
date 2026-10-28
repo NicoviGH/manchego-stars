@@ -2293,15 +2293,20 @@ class BattlefieldDynamics(unittest.TestCase):
 
 
 # An is_boss unit carries CA_BOSS, so an autolevelled one loads "realistically" from its
-# baseLevel (= its level): zero levels, as vanilla's bosses do (#545). Its personal line is its
-# WHOLE line at its level. These are the class levels the role-check fixtures below used to
-# autolevel, at the model's rounded means, written as that line.
-ARMOR_KNIGHT_L8_LEVELS = {'baseHP': 6, 'basePow': 3, 'baseSkl': 2, 'baseSpd': 1, 'baseDef': 2,
-                          'baseRes': 1, 'baseLck': 2}
-DRUID_L7_LEVELS = {'baseHP': 7, 'basePow': 8, 'baseSkl': 5, 'baseSpd': 4, 'baseDef': 2,
-                   'baseRes': 5, 'baseLck': 3}
-DRUID_L9_LEVELS = {'baseHP': 8, 'basePow': 9, 'baseSkl': 5, 'baseSpd': 4, 'baseDef': 2,
-                   'baseRes': 6, 'baseLck': 4}
+# baseLevel (= its level), adding no levels, as vanilla's bosses do (#545): its personal line
+# already holds every level it has. The role-check fixtures below used to autolevel theirs, so
+# each carries those levels as its line, read off the model (a generic's load less a boss's).
+def _autolevelled_levels(class_token, level, weapon):
+    unit = {'id': 'boss', 'class': class_token, 'level': level, 'autolevel': True,
+            'inventory': [{'id': weapon, 'fe_base': weapon}]}
+    grown = df.enemy_combatants(unit)[0]
+    bare = df.enemy_combatants(dict(unit, is_boss=True))[0]
+    return {'base' + k: getattr(grown, f) - getattr(bare, f) for f, k in df._GROWN_FIELDS}
+
+
+ARMOR_KNIGHT_L8_LEVELS = _autolevelled_levels('armor-knight', 8, 'slim-lance')
+DRUID_L7_LEVELS = _autolevelled_levels('druid', 7, 'flux')
+DRUID_L9_LEVELS = _autolevelled_levels('druid', 9, 'flux')
 
 
 def _plus(line, **more):
