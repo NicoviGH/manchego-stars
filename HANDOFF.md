@@ -15,7 +15,9 @@ the level of the vanilla unit it mirrors (ADR 0373, "vanilla levels as the found
 wolf pack included). No parity verdict changed. Its pre-merge `SUITE=gate` run was DEFERRED by
 Nicolas to #510 step 10, which tracks it: ch01's goblins went L1 -> L2-3 and `lordfloor` now
 expects +10 HP, and neither has run in the emulator yet.
-**NOW, in a fresh session: resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a
+**NOW, in a fresh session, step 1: push the step-9 WIP** so it stops living only on this machine:
+`git push -u origin feat/510-step9-e-campaigns` (b243941 has never been pushed; no PR yet).
+**Step 2: resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a
 LOCAL WIP commit (not pushed)**: villages/chests, the full-bag rule, the boss assault + stall rule
 (below, "NEXT"). **That branch predates #546: merge `origin/main` into it first** (it changes
 ch00/ch01/ch03/ch04/ch05 enemies, so the bot's ch03 and ch01 runs read differently from the notes
@@ -235,6 +237,7 @@ Open thread on #531: a matrix run leaves the build tree non-canonical, so the pr
 ## In flight
 
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only, unchanged: ch07 moves to Distant Blade's map.
+  Parked: chapter work resumes after #510's difficulty and roster work is done (Nicolas, 2026-10-28).
 
 **Next, in order (#510's list is the plan):**
 
