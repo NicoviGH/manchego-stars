@@ -557,7 +557,10 @@ local function observePrep(observation)
     local addr = PROCS.find(SYM.ProcScr_PrepMenu)
     if not addr then return end
     local count = ru8(addr + 0x2B)
-    if count == 0 or count > 8 then
+    -- 0 rows is a menu being built, not a broken one: PrepMenu_OnInit zeroes max_index and the
+    -- rows follow a frame later (vanilla Ch6, after Pick Units: one frame at 0, then 5).
+    if count == 0 then return end
+    if count > 8 then
         observation.error = string.format("malformed ProcPrepMenu max_index=%d", count)
         return
     end
