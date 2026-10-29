@@ -141,6 +141,19 @@ local function fakeGame(o)
             return reds() == 0
         end,
         lost = function() return g.over == true end,
+        -- the game's kills: every unit the fake has marked dead since the last call (UnitKill
+        -- marks the unit; a unit only taken off the field was unloaded, not killed)
+        killed = function()
+            local out = {}
+            g.reported = g.reported or {}
+            for _, u in ipairs(g.units) do
+                if u.dead and not g.reported[u.id] then
+                    g.reported[u.id] = true
+                    out[#out + 1] = { id = u.id, charId = u.charId, faction = u.faction }
+                end
+            end
+            return out
+        end,
         frames = function() g.frame = g.frame + 100; return g.frame end,
         emit = function(line) g.emitted[#g.emitted + 1] = line end,
         log = function(l)
@@ -615,6 +628,23 @@ do
     check(r.outcome, "won", "green death: the chapter is still won")
     check(r.deaths[1] and r.deaths[1].faction, "green", "green death: recorded, with its side")
     check(r.clean, false, "green death: not clean")
+end
+
+-- test_a_green_unit_a_script_unloads_is_not_lost: the chapter's ending clears its green units
+-- (vanilla Ch6's villagers, Ch2's Garcia): gone from the field, but the game killed nobody.
+do
+    local units = rout()
+    units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
+    local r = judged { units = units, enemy = function(g)
+        -- ClearUnit empties the slot: the board read no longer has the unit at all
+        for i, u in ipairs(g.units) do
+            if u.id == 0x41 then table.remove(g.units, i) break end
+        end
+        return {}
+    end }
+    check(r.outcome, "won", "unloaded green: the chapter is won")
+    check(#r.deaths, 0, "unloaded green: no death recorded")
+    check(r.clean, true, "unloaded green: still clean")
 end
 
 -- test_a_recruit_never_seen_is_missing: owed X, X never comes on the field.

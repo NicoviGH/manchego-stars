@@ -3033,10 +3033,17 @@ INSPECT.attackRange = function(u)
 end
 INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(), u) end
 
--- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
--- for the phase's length that watches every faction's array (lean) -- a green unit lost spoils
--- the clear as a blue one does (ADR 0376) -- and, the frame one goes down, reads who is
--- fighting: gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
+-- Every unit the game kills while an act or an enemy phase plays, with the fighter it fell to:
+-- a frame callback that watches every faction's array (lean) -- a green unit lost spoils the
+-- clear as a blue one does (ADR 0376) -- and, the frame one goes down, reads who is fighting:
+-- gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
+-- A death is what UnitKill (bmunit.c) writes, the one function every death runs (a fight, a
+-- hazard, a trap, an event's kill): US_DEAD on a blue unit, and on any other only its character
+-- pointer cleared, the rest of the unit kept. A script that unloads units (a chapter ending's
+-- ClearUnit) zeroes the whole unit, its class pointer too, and kills nobody. Read here rather
+-- than caught at UnitKill's entry: a breakpoint held through every act and phase cost 56% more
+-- CPU (Manchego Stars ch01, 20.4 CPU s against 13.1), and arming it per caller would have to
+-- list every proc that can kill.
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
     for _, f in ipairs(BOARD.FACTIONS) do
@@ -3048,7 +3055,11 @@ INSPECT.watchDeaths = function()
     local id = callbacks:add("frame", function()
         for uid, who in pairs(alive) do
             local addr = ru32(SYM.gUnitLookup + uid * 4)
-            if addr == 0 or ru8(addr + 0x13) == 0 or (ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0 then
+            local killed = addr ~= 0 and ((ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0
+                or (ru32(addr) == 0 and ru32(addr + 0x04) ~= 0))
+            if addr == 0 or (ru32(addr) == 0 and ru32(addr + 0x04) == 0) then
+                alive[uid] = nil    -- unloaded (ClearUnit): gone, not killed
+            elseif killed then
                 local by
                 if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
                 elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
@@ -3208,7 +3219,7 @@ INSPECT.botApi = function(game)
         list.seen = #list
         return out
     end
-    local dropLog, theftLog = {}, {}
+    local dropLog, theftLog, killLog = {}, {}, {}
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
@@ -3270,6 +3281,9 @@ INSPECT.botApi = function(game)
         -- every drop the game gave one of ours since the last call (INSPECT.watchDrops, kept
         -- while an act or an enemy phase plays: the only times a battle resolves)
         drops = function() return unread(dropLog) end,
+        -- every unit the game killed since the last call (INSPECT.watchDeaths, through each
+        -- act and enemy phase)
+        killed = function() return unread(killLog) end,
         -- every theft an AI unit made since the last call (INSPECT.watchThefts), each with
         -- its item's rank and whether it spoils the clean clear (Sight.stealRanks, ADR 0379)
         thefts = function()
@@ -3370,23 +3384,27 @@ INSPECT.botApi = function(game)
         local stop, stopActs = INSPECT.watchDeaths(), INSPECT.watchEnemyActs()
         local phase = runEnemyPhase(nil, won, phaseTurn)
         local deaths, acts = stop(), stopActs()
+        for _, d in ipairs(deaths) do killLog[#killLog + 1] = d end
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
         return phase, deaths, acts
     end
     -- An act and an enemy phase play with the drop and theft watches on, their catches kept
-    -- in dropLog and theftLog.
-    local function watched(fn)
+    -- in dropLog and theftLog; an act also with the death watch (endPhase runs its own), its
+    -- catches in killLog.
+    local function watched(fn, deaths)
         return function(...)
             local stopDrops = INSPECT.watchDrops(sightApi.cpu)
             local stopThefts = INSPECT.watchThefts(sightApi.cpu)
+            local stopDeaths = deaths and INSPECT.watchDeaths()
             local out = table.pack(pcall(fn, ...))
             for _, d in ipairs(stopDrops()) do dropLog[#dropLog + 1] = d end
             for _, t in ipairs(stopThefts()) do theftLog[#theftLog + 1] = t end
+            for _, k in ipairs(stopDeaths and stopDeaths() or {}) do killLog[#killLog + 1] = k end
             if not out[1] then error(out[2], 0) end
             return table.unpack(out, 2, out.n)
         end
     end
-    api.act, api.endPhase = watched(api.act), watched(api.endPhase)
+    api.act, api.endPhase = watched(api.act, true), watched(api.endPhase)
     return api
 end
 
