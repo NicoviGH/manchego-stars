@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-375 decisions. Read this index, then open the two or three you need — the whole
+376 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -222,6 +222,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0373` | [Line units take vanilla's levels, so the exp is spread as vanilla spread it](decisions/0373-a-line-takes-vanilla-s-level-on-each-post.md) | 2026-10-28 | #545 #510 |
 | `0374` | [A bot result is read beside vanilla's, and the bot is proven on vanilla before ours is judged](decisions/0374-a-bot-result-is-read-beside-vanilla.md) | 2026-10-28 | #510 |
 | `0375` | [A style's risk tolerance is not a declared value: the styles are the variation](decisions/0375-a-styles-risk-tolerance-is-not-declared.md) | 2026-10-28 | #510 |
+| `0376` | [A clean clear has four parts, a vanilla chapter without one is a bot fault, and the bot clears all of vanilla's Eirika...](decisions/0376-a-clean-clear-has-four-parts-and-vanilla-is-the-bar.md) | 2026-10-29 | #510 |
 
 ---
 
