@@ -42,7 +42,7 @@ keep efficiency in mind." Every finding is checked against the decomp, with file
 - fbc4443: both envs carry `recruits` (still the regex; finding 7 replaces it).
 - 6837811: botrun judges `clear` / `clean`; campaign.lua clears on `clean == true`; a vanilla
   chapter with no clean clear stops as `bot_fault` (Manchego Stars keeps `infeasible`);
-  montecarlo reads `clean` and says what spoiled a clear; `all_alive` is a DEAD_CONCEPT.
+  montecarlo reads `clean` and says what spoiled a clear; the old all-alive flag is retired.
 - 6567cdc, 0f7c010, 08a906c: "joined" is now the game's party (`INSPECT.prepList()`); why
   (Ch5's ending leaves an unrecruited Joshua blue AND dead) is in ADR 0376. Unit tests only;
   the ROM proof is owed (the probe run above).
