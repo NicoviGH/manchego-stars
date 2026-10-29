@@ -624,6 +624,28 @@ do
     check(r.clean, true, "talked: clean")
 end
 
+-- test_a_recruit_the_ending_loads_joins: vanilla Ch5's ending loads Joshua blue
+-- (EventScr_StrictLoadUniqueAlly) with no Talk. Here the green unit turns blue in the phase
+-- that wins the chapter, so only a read after the win sees it.
+do
+    local units = rout()
+    units[2].hp = 30
+    local g = fakeGame { recruits = { 0x30 }, units = units, kind = "survive", turnsLeft = 2,
+        enemy = function(g, find)
+            if g.turnsLeft == 1 then
+                local j = unit(0x05, 4, "blue", -1, -1, 18)
+                j.charId, j.onMap, j.onField = 0x30, false, false
+                g.units[#g.units + 1] = j
+            end
+            return {}
+        end }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "won", "ending recruit: won")
+    check(r.recruits.joined[1], 0x30, "ending recruit: joined, read after the win")
+    check(r.clean, true, "ending recruit: clean")
+end
+
 -- test_a_razed_village_is_missing_at_once: a brigand's pick act names the village, and the
 -- game stops offering it.
 do

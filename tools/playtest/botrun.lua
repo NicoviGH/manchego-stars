@@ -319,7 +319,8 @@ function M.run(api)
                   deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 }, bag = {} }
     local explore = M.exploreLog()
     -- the clean clear's recruits part: owed = api.recruits less any already in the party
-    -- (blue, dead or not, deployed or not) at the first board; joined = seen blue later
+    -- (blue, dead or not, deployed or not) at the first board; joined = seen blue later,
+    -- the read after a win included
     local owed, blueSeen = nil, {}
     -- one step per act and per enemy phase: a thief's fall and the drop it gives share one
     local step = 0
@@ -399,6 +400,15 @@ function M.run(api)
         end
         rec.explore = explore.summary()
         local missing = "unchecked"
+        if owed and outcome == "won" then
+            -- a recruit an ending scene loads (vanilla Ch5's EventScr_StrictLoadUniqueAlly on
+            -- Joshua) joins after the last act; the party's blue array keeps it, so one read
+            -- after the win is the game's answer
+            local ok, board = pcall(api.board)
+            for _, u in ipairs(ok and board.units or {}) do
+                if u.faction == "blue" then blueSeen[u.charId] = true end
+            end
+        end
         if owed then
             rec.recruits = { owed = owed, joined = {} }
             missing = {}
