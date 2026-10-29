@@ -2375,17 +2375,18 @@ scenarios.goodberry = function()
     result("PASS", "Goodberry item menu captured (see screenshots)")
 end
 
--- The lead menu (ADR 0062, ch01): commit row `want` -- "default" (the highlighted lead), "last"
--- (the final candidate) or a NUMBER (that row of the LIVE menu, 0-based). Returns the row it
--- committed on, or nil, why. No row is guessed and no candidate count is assumed: the walk
--- counts the live item list, and the landing is asserted, because nothing downstream re-checks
--- which lead was taken (#241). reachCh01 and the campaign's arrive both answer the menu here.
-INSPECT.pickLead = function(want, observation)
+-- A choice menu: commit row `want` -- "default" (the highlighted row), "last" (the final row)
+-- or a NUMBER (that row of the LIVE menu, 0-based). `what` names the menu in the trace: our
+-- ch01 lead menu (ADR 0062) or vanilla's Ch8 route split (MenuDef_RouteSplit). Returns the row
+-- it committed on, or nil, why. No row is guessed and no row count is assumed: the walk counts
+-- the live item list, and the landing is asserted, because nothing downstream re-checks which
+-- row was taken (#241). reachCh01 and the campaign's arrive both answer their menus here.
+INSPECT.pickMenuRow = function(want, observation, what)
     local rows = observation.menu and #observation.menu.items or 0
     if want == "last" then want = rows - 1 end
     if type(want) == "number" then
         if want < 0 or want >= rows then
-            return nil, string.format("lead row %d is not in the live menu of %d candidates", want, rows)
+            return nil, string.format("%s row %d is not in the live menu of %d rows", what, want, rows)
         end
         -- Walk off the LIVE cursor and stop when it ARRIVES, rather than pressing a fixed
         -- count: a fixed count reaches the wanted row only if the menu opened on row 0, which
@@ -2394,29 +2395,29 @@ INSPECT.pickLead = function(want, observation)
         for _ = 1, rows do
             local at = observeController()
             if at.menu and at.menu.current == want then break end
-            if not guardedInput("menu_next", "DOWN", "the lead menu selection moves",
+            if not guardedInput("menu_next", "DOWN", what .. " menu selection moves",
                 function(after, before)
                     return after.menu ~= nil and before.menu ~= nil
                         and after.menu.current ~= before.menu.current
                 end, 60) then
-                return nil, "could not walk the lead menu to the chosen candidate"
+                return nil, "could not walk the " .. what .. " menu to the chosen row"
             end
         end
         local landed = observeController()
         if not (landed.menu and landed.menu.current == want) then
-            shot("ch01-lord-walk-lost")
-            return nil, string.format("lead menu walk landed on row %s of %d, not row %d",
-                tostring(landed.menu and landed.menu.current), rows, want)
+            shot(what .. "-menu-walk-lost")
+            return nil, string.format("%s menu walk landed on row %s of %d, not row %d",
+                what, tostring(landed.menu and landed.menu.current), rows, want)
         end
     end
     local committing = observeController().menu
     local picked = committing and committing.current or want
-    if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
+    if not guardedInput("select_current_menu_item", "A", what .. " menu selection closes", function(after)
         return after.menu == nil
     end, 300) then
-        return nil, "could not choose the highlighted lead"
+        return nil, "could not choose the highlighted " .. what
     end
-    log(string.format("lead committed on menu row %s of %d", tostring(picked), rows))
+    log(string.format("%s committed on menu row %s of %d", what, tostring(picked), rows))
     return picked
 end
 
@@ -2478,7 +2479,7 @@ local function reachCh01(opts)
             end
             yield()
         elseif state == "generic_menu" then
-            local picked, why = INSPECT.pickLead(opts.lord, observation)
+            local picked, why = INSPECT.pickMenuRow(opts.lord, observation, "lead")
             if picked == nil then result("FAIL", why); return false end
             opts.picked = picked
         elseif state == "yes_no_choice" then
@@ -3425,7 +3426,7 @@ INSPECT.campaignApi = function(game)
     local mode = TUNE.difficultyName[TUNE.difficultyWant]
     local id = cfg.id or string.format("%s-s%d", mode, seed)
     local dir = PLAYTEST_SIMDIR .. "/states/" .. id
-    local states, played, shops, leadPicked = {}, nil, nil, nil
+    local states, played, shops, menuPicked = {}, nil, nil, nil
     math.randomseed(seed)
     local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
 
@@ -3615,17 +3616,24 @@ INSPECT.campaignApi = function(game)
                 if not ok then return nil, "the world map refused its input (see the trace)" end
             elseif state == "generic_menu" and game == "ours" then
                 -- ch01's lead menu (ADR 0062): the campaign's `lord` row, else the highlighted lead.
-                local picked, pwhy = INSPECT.pickLead(cfg.lord or "default", obs)
+                local picked, pwhy = INSPECT.pickMenuRow(cfg.lord or "default", obs, "lead")
                 if picked == nil then return nil, "lead menu: " .. pwhy end
-                leadPicked = picked
-            elseif state == "yes_no_choice" and leadPicked ~= nil then
-                -- the pick's confirmation, "Will <lead> lead the party?"
-                if not selectSemantic("answer_yes", "the lead prompt takes Yes", function(after)
+                menuPicked = picked
+            elseif state == "generic_menu" and game == "vanilla" then
+                -- Ch8's route split (MenuDef_RouteSplit): row 0 Eirika, row 1 Ephraim -- route
+                -- 1 and 2, the campaign's setting (Bot.route).
+                local r = route(obs.menu.items)
+                local picked, pwhy = INSPECT.pickMenuRow(r - 1, obs, "route")
+                if picked == nil then return nil, "route menu: " .. pwhy end
+                menuPicked = picked
+            elseif state == "yes_no_choice" and menuPicked ~= nil then
+                -- the pick's confirmation: "Will <lead> lead the party?", or the route's
+                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", function(after)
                     return controllerState(after) ~= "yes_no_choice"
                 end, 120) then
-                    return nil, "the lead prompt refused Yes"
+                    return nil, "the pick's prompt refused Yes"
                 end
-                leadPicked = nil
+                menuPicked = nil
             elseif state ~= "player_map_idle" then
                 local advanced = advanceBootState(obs, state)
                 if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
