@@ -9,32 +9,39 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns` at
-9ad3d58, NOT PUSHED (10 commits past origin's 32d4d50).** The checkout is back on that branch;
-after switching, rebuild the ROM (see the gotcha below).
+Refreshed 2026-10-29 evening (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns`
+at 962346a, NOT PUSHED (11 commits past origin's 32d4d50).** The checkout is on main for this
+HANDOFF commit; switch back and rebuild the ROM (see the gotcha below).
 
-**NEXT SESSION: fix the re-derivation audit, all 21 findings, then finish part A.** The audit is
-ONE #510 comment, kept current in place:
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>. Nicolas
-(2026-10-29): "finish the audit and address them all. remember to eliminate duplicate code and
-keep efficiency in mind." Every finding is checked against the decomp, with file:line.
-- **Read first: ADR 0377** (a game fact is the game's own answer; the three reasons a
-  re-derivation may have; hit odds from the game's own rolls, Nicolas: "why wouldnt we?"; claims
-  tagged [code]/[ROM]) and **ADR 0232's 2026-10-29 amendment** (proof runs are owed, never
-  budgeted: do not ask). `setBreakpoint` is in our mGBA's Lua (dylib strings), not yet proven
-  in the headless runner.
-- **Suggested order:** the wrong ones first (1 damage, 2 the hit model in `bot.lua`'s
-  `killChance`, 3 the crit constant copied in `bot.lua` AND `planner.lua`, 4 `killsTarget`, 14
-  green deaths unwatched in `INSPECT.watchDeaths`, 13 `aiDecide`'s hand-built AI setup), then
-  part A's own (5 + 6 the chest won back via `BATTLE_HandleItemDrop`, 7 owed recruits via
-  `CheckForCharacterEvents` in-game instead of the regex in `campaign_env.py`), then 9 and 15-16
-  and the small ones. 17-18 are decided behaviour (fog knowledge is part C; averaged damage is
-  design decision 5), recorded so nobody mistakes them for the game.
-- **One probe run first** (instrumented, from `e1-vanilla-ch3/2`): does a breakpoint fire
-  headless; the cost of scanning `CheckForCharacterEvents` over character pairs and the pairs it
-  finds for Ch2; `api.party()` at the start and after the win (finding 8's ROM proof). Then
-  proof runs: vanilla Ch2 (`e1-vanilla-ch3/2`) and Ch5 (`e1-vanilla-ch3/6`), attempt 1.
+**NEXT SESSION: finish the re-derivation audit, then part A.** The audit is ONE #510 comment,
+kept current in place: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
+Nicolas (2026-10-29): "finish the audit and address them all. remember to eliminate duplicate
+code and keep efficiency in mind." Read **ADR 0377** first (and its "Built, 2026-10-29"
+amendment), and ADR 0232's 2026-10-29 amendment (proof runs are owed, never budgeted: do not ask).
+- **DONE this session (962346a): findings 1-4, 21, and 20's wall.** Each exchange is played by
+  the game every way its rolls can go (`sight.lua` `M.played`: `BattleGenerateSimulation` re-run,
+  each `BattleRoll1RN`/`2RN` caught by a breakpoint and its simResult r1 forced). Bot/planner
+  read `kill`, `die`, `sure`, `expected`, `counterWorst`, `dealt`/`counterDist`/`takenDist`
+  (distributions { [HP lost] = p }); `sight.odds`/`Sight.damage` compose several. Cached by
+  battle-unit state. Measured on the Manchego Stars ch01 bot run (won, nobody lost): 10.5 CPU s
+  before, 12.0 after (17.4 uncached).
+- **Breakpoints work headless only with the patched emulator.** `tools/mgba-headless-script-debugger.patch`
+  (applied by `tools/build_mgba_headless.sh`) attaches a debugger when a script runs; the built
+  binary in tools/emulator/ already has it. Unpatched, `setBreakpoint` returns -1 and
+  `cpu.breakpoint` raises. The headed mGBA-dev.app is untested with breakpoints.
+- **Next, in order:** 14 (green deaths unwatched in `INSPECT.watchDeaths`), 13 (`aiDecide`'s
+  hand-built AI setup: run the game's own per-unit routine), then part A's own: 5 + 6 (the chest
+  won back: catch `BATTLE_HandleItemDrop` with the same breakpoint API, `cpu.breakpoint`), 7 (owed
+  recruits via `CheckForCharacterEvents` in-game, replacing the regex in `campaign_env.py`), then
+  9, 15, 16, 10-12, 19, 20's heal. 17-18 are decided behaviour (recorded).
+- **One instrumented probe run** (from `e1-vanilla-ch3/2`): the cost of scanning
+  `CheckForCharacterEvents` over character pairs and the pairs it finds for Ch2; `api.party()`
+  at the start and after the win (finding 8's ROM proof). Then proof runs: vanilla Ch2
+  (`e1-vanilla-ch3/2`) and Ch5 (`e1-vanilla-ch3/6`), attempt 1. Report each run's CPU s against
+  the numbers above (Nicolas asked whether 12 s is a lot: it is a whole attempt at a chapter,
+  +14%; check it on a vanilla chapter with more enemies).
 - **Then** `/code-review <PR> medium` in a subagent, `review-to-clean`, and the PR.
+- **Prose:** say "Manchego Stars ch01", never "ours ch01" (Nicolas, again, 2026-10-29).
 
 **Part A (the four-part clean clear) as it stands.** Design: #510 comment 6485197805. Plan:
 #510 comment 6485521139 (its Task 4 text is out of date: update it with what follows). Record:
