@@ -35,13 +35,14 @@ end
 
 -- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"... },
 -- options = n (a route split before it), needs = Bot.team's demands/answers/strength } };
--- "dead" is a win with a death. o.route = the campaign's route setting.
+-- "dead" is a win with a death, "spoiled" a win with a recruit missed. o.route = the
+-- campaign's route setting, o.game the game (default "fake").
 local function fakeGame(o)
     local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, promoted = {},
                 plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0 }
     g.api = {
         Bot = Bot, Json = Json,
-        info = { game = "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1",
+        info = { game = o.game or "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1",
                  route = o.route },
         random = o.random or cycle({ 0.1, 0.6, 0.3, 0.9, 0.5 }),
         arrive = function(route)
@@ -80,8 +81,12 @@ local function fakeGame(o)
             if out == "dead" or out == "lost" then
                 deaths = { { charId = 0x02, turn = 3, killer = 0x40, phase = "enemy" } }
             end
-            return { outcome = out == "dead" and "won" or out, all_alive = out == "won",
-                     turns = 4, deaths = deaths }
+            local won = out == "won" or out == "dead" or out == "spoiled"
+            return { outcome = won and "won" or out, clean = out == "won", turns = 4,
+                     deaths = deaths, trace = "t" .. g.attempt,
+                     clear = { won = won, lost = deaths,
+                               recruits_missing = out == "spoiled" and { 0x30 } or {},
+                               rewards_missing = {} } }
         end,
         emit = function(line) g.emitted[#g.emitted + 1] = line end,
         log = function() end,
@@ -215,6 +220,47 @@ local function test_infeasible_after_max_attempts()
     check(ls[2].outcome, "infeasible", "and so does the campaign line")
 end
 test_infeasible_after_max_attempts()
+
+-- test_a_won_attempt_that_spoiled_a_part_is_retried: attempt 1 is won with a recruit missed,
+-- attempt 2 is clean; the failure keeps what spoiled it and the attempt's trace.
+local function test_a_won_attempt_that_spoiled_a_part_is_retried()
+    local g = fakeGame({ chapters = { { id = 3, outcomes = { "spoiled", "won" } } } })
+    Campaign.run(g.api)
+    local ls = lines(g)
+    check(ls[1].outcome, "cleared", "spoiled: cleared on the retry")
+    check(ls[1].attempts, 2, "spoiled: at attempt 2")
+    local f = ls[1].failures[1]
+    check(f and f.clear.recruits_missing[1], 0x30, "spoiled: the failure says what was missed")
+    check(f and f.trace, "t1", "spoiled: and names its trace")
+end
+test_a_won_attempt_that_spoiled_a_part_is_retried()
+
+-- vanilla is beaten clean by strong players, so no clean clear there is the bot's fault
+-- (#510 step 9 design, decision 2); ours keeps "infeasible"
+local function noCleanClear(game)
+    local saved = Campaign.MAX_ATTEMPTS
+    Campaign.MAX_ATTEMPTS = 2
+    local g = fakeGame({ game = game, chapters = { { id = 5, outcomes = { "spoiled", "dead" } },
+                                                   { id = 6 } } })
+    local ok, why = Campaign.run(g.api)
+    Campaign.MAX_ATTEMPTS = saved
+    return ok, why, lines(g)
+end
+
+local function test_vanilla_without_a_clean_clear_is_a_bot_fault()
+    local ok, why, ls = noCleanClear("vanilla")
+    check(ok, false, "bot fault: the campaign stops")
+    check(ls[1].outcome, "bot_fault", "bot fault: the chapter line")
+    check(ls[2].outcome, "bot_fault", "bot fault: the campaign line")
+    check(why:find("bot fault", 1, true) ~= nil, true, "bot fault: said in the why")
+end
+test_vanilla_without_a_clean_clear_is_a_bot_fault()
+
+local function test_ours_without_a_clean_clear_is_infeasible()
+    local _, _, ls = noCleanClear("ours")
+    check(ls[1].outcome, "infeasible", "ours: infeasible")
+end
+test_ours_without_a_clean_clear_is_infeasible()
 
 local function test_between_deploys_shops_promotes()
     local stock = { { item = 0x6C, price = 300, kind = "vulnerary" },

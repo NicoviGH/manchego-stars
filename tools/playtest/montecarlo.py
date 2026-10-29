@@ -208,6 +208,26 @@ def attempt_tasks(env, n, seed=1, vanilla=False):
              'stamp': {'task_attempt': k}} for k in range(1, n + 1)]
 
 
+def spoiled(r, who=lambda c: '0x%02X' % c):
+    """What kept record `r` from a clean clear (#510 step 9 design, part A), in words: each unit
+    lost, each owed recruit missed, each village or chest not taken; '' when nothing did."""
+    c = r.get('clear') or {}
+    out = ['lost %s (%s, turn %s, to %s)' % (who(d['charId']), d.get('faction'), d.get('turn'),
+                                             who(d['killer']) if d.get('killer') is not None
+                                             else 'nobody seen')
+           for d in c.get('lost') or []]
+    missing = c.get('recruits_missing')
+    if missing == 'unchecked':
+        out.append('recruits unchecked')
+    else:
+        out += ['missed %s' % who(m) for m in missing or []]
+    for t in c.get('rewards_missing') or []:
+        out.append('%s %s,%s %s%s' % ('village' if t['kind'] == 'visit' else 'chest', t['x'],
+                                       t['y'], t['why'], ' by %s' % who(t['closed_by'])
+                                       if t.get('closed_by') is not None else ''))
+    return '; '.join(out)
+
+
 def attempt_line(r, said):
     """The line `attempts` prints for record `r`, or None. `said` = the attempts already
     printed. A worker's CAMPAIGN end is printed only when no BOTRUN of its attempt was: a run
@@ -221,17 +241,19 @@ def attempt_line(r, said):
         return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
     said.add(r.get('attempt'))
     cost = (r.get('costs') or {}).get('cpu_s')
-    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s' % (
-        r.get('attempt'), r.get('outcome'), ' all alive' if r.get('all_alive') else '',
+    why = spoiled(r) if r.get('outcome') == 'won' and r.get('clean') is not True else ''
+    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s%s' % (
+        r.get('attempt'), r.get('outcome'), ' clean' if r.get('clean') is True else '',
         r.get('turns', '-'), len(r.get('deaths') or []),
         '' if r.get('frames') is None else ', %d frames' % r['frames'],
         '' if cost is None else ', %.1f CPU s' % cost,
-        ' (%s)' % r.get('why') if r.get('outcome') == 'crashed' else '')
+        ' (%s)' % r.get('why') if r.get('outcome') == 'crashed' else '',
+        ' (%s)' % why if why else '')
 
 
 def first_clean(records):
-    """The lowest attempt that cleared with everyone alive, or None."""
-    clean = [r['attempt'] for r in records if r.get('all_alive') and r.get('attempt')]
+    """The lowest attempt that cleared clean (the record's `clean`: all four parts), or None."""
+    clean = [r['attempt'] for r in records if r.get('clean') is True and r.get('attempt')]
     return min(clean) if clean else None
 
 
@@ -289,7 +311,7 @@ def newcombe_paired(a, b, c, d, z=Z95):
 
 
 def paired_verdict(pairs):
-    """Where a cell stands, from its pairs (ours_all_alive, vanilla_all_alive) in run order.
+    """Where a cell stands, from its pairs (ours_clean, vanilla_clean) in run order.
 
     It is judged at the largest planned look its pairs reach, on that many pairs only: a pair
     past the look waits for the next one. Settled at an early look when exact McNemar p <
@@ -388,7 +410,7 @@ def chapter_result(recs, chapter):
         if r.get('kind') != 'campaign' and r.get('chapter') == chapter and r.get('attempt') == 1:
             if r.get('outcome') in UNUSABLE:
                 return None, r
-            return bool(r.get('all_alive')), None
+            return r.get('clean') is True, None
     # an earlier attempt's crash, in its own words, before the campaign's summary of it
     crashed = [r for r in recs if r.get('kind') != 'campaign' and r.get('outcome') in UNUSABLE]
     ends = crashed or [r for r in recs if r.get('kind') == 'campaign']
@@ -644,12 +666,10 @@ def story(events, names=None, items=None, classes=None):
                 lines.append('  %s %s.' % (who(e.get('charId')), ', '.join(ch)))
         elif t == 'end':
             r = e.get('record') or {}
-            dead = ', '.join('%s (turn %s, to %s)' % (who(d.get('charId')), d.get('turn'),
-                                                      who(d.get('killer')))
-                             for d in r.get('deaths') or [])
+            why = spoiled(r, who)
             lines.append('Result: %s on turn %s%s.' % (
-                r.get('outcome'), r.get('turns'),
-                ', everyone alive' if r.get('all_alive') else (', lost ' + dead if dead else '')))
+                r.get('outcome'), r.get('turns'), ', clean' if r.get('clean') is True
+                else (', not clean: ' + why if why else '')))
     return lines
 
 

@@ -59,6 +59,7 @@ local function fakeGame(o)
         info = { game = "fake", rom_hash = "abc", chapter = 1, mode = "normal", seed = 7 },
         style = { aggression = o.aggression or "careful", deploy = {}, claims = {} },
         claims = o.claims,
+        recruits = o.recruits,
         seed = function(s) g.seeded = s end,
         board = copy,
         sight = function()
@@ -113,12 +114,14 @@ local function fakeGame(o)
             return true
         end,
         endPhase = function()
-            local deaths = o.enemy and o.enemy(g, find) or {}
+            local deaths, acts = {}, nil
+            if o.enemy then deaths, acts = o.enemy(g, find) end
+            deaths = deaths or {}
             for _, u in ipairs(g.units) do u.acted = false end
             g.turn = g.turn + 1
             if g.turnsLeft then g.turnsLeft = g.turnsLeft - 1 end
-            if g.over then return "gameover", deaths end
-            return "player", deaths
+            if g.over then return "gameover", deaths, acts end
+            return "player", deaths, acts
         end,
         won = function()
             if g.turnsLeft then return g.turnsLeft <= 0 end
@@ -234,7 +237,7 @@ do
     local r = recordOf(g)
     check(r.outcome, "won", "the rout is won")
     check(r.turns, 2, "on turn 2")
-    check(r.all_alive, true, "with everyone alive")
+    check(r.clean, nil, "with no owed list the clear is not judged")
     check(r.kills["1"], 1, "A's kill is counted")
     check(r.deployed[1], 1, "A was deployed")
     check(r.seed, 7, "the seed is recorded")
@@ -262,7 +265,7 @@ do
     check(r.deaths[1].killer, 0x81, "with its killer")
     check(r.deaths[1].phase, "enemy", "in the enemy phase")
     check(r.deaths[1].turn, 1, "on turn 1")
-    check(r.all_alive, false, "nobody calls that all alive")
+    check(r.clean, false, "nobody calls that clean")
 end
 
 -- test_repeated_board_is_stuck: the enemy is out of every reach and the bot cannot move
@@ -539,6 +542,169 @@ do
         end
     end
     check(joined and joined.from, "green", "it joined from green")
+end
+
+-- The four-part clean clear (#510 step 9 design, part A): won, no blue or green unit lost,
+-- every owed recruit joined, every village and chest taken, each read off the game.
+
+-- the rout, judged: nothing owed, nothing to explore
+local function judged(o)
+    o.units = o.units or rout()
+    o.recruits = o.recruits or {}
+    local g = fakeGame(o)
+    Botrun.run(g.api)
+    return recordOf(g), g
+end
+
+-- test_a_clean_rout_is_clean: the four parts hold.
+do
+    local r = judged {}
+    check(r.clean, true, "clean: a won rout with nothing owed")
+    check(r.clear.won, true, "clean: won")
+    check(#r.clear.lost, 0, "clean: nobody lost")
+    check(#r.clear.recruits_missing, 0, "clean: no recruit missing")
+    check(#r.clear.rewards_missing, 0, "clean: no reward missing")
+end
+
+-- test_a_green_death_spoils_the_clear: a green ally falls in the enemy phase (design 11).
+do
+    local units = rout()
+    units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
+    local r = judged { units = units, enemy = function(g, find)
+        local v = find(0x41)
+        if v.dead then return {} end
+        v.hp, v.dead, v.onField = 0, true, false
+        return { { id = 0x41, charId = 0x41, faction = "green", killer = 0x81 } }
+    end }
+    check(r.outcome, "won", "green death: the chapter is still won")
+    check(r.deaths[1] and r.deaths[1].faction, "green", "green death: recorded, with its side")
+    check(r.clean, false, "green death: not clean")
+end
+
+-- test_a_recruit_never_seen_is_missing: owed X, X never comes on the field.
+do
+    local r = judged { recruits = { 0x30 } }
+    check(r.recruits.owed[1], 0x30, "never seen: owed")
+    check(r.clear.recruits_missing[1], 0x30, "never seen: missing")
+    check(r.clean, false, "never seen: not clean")
+end
+
+-- test_a_recruit_already_blue_is_not_owed: X is in the party at the start, even undeployed
+-- (Amelia in Eirika's Ch13 when Ch9 recruited her).
+do
+    local units = rout()
+    local x = unit(0x05, 4, "blue", -1, -1, 18)
+    x.charId, x.onMap, x.onField = 0x30, false, false
+    units[#units + 1] = x
+    local r = judged { units = units, recruits = { 0x30 } }
+    check(#r.recruits.owed, 0, "already blue: not owed")
+    check(r.clean, true, "already blue: clean")
+end
+
+-- test_a_talked_recruit_joins: the green unit turns blue on the first act.
+do
+    local g = fakeGame { recruits = { 0x30 },
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 1, 0, 15),
+                  unit(0x81, 0, "red", 1, 1, 10) } }
+    g.units[2].charId = 0x30
+    local act, talked = g.api.act, false
+    g.api.act = function(a)
+        if not talked then
+            talked = true
+            table.remove(g.units, 2)
+            local r = unit(0x02, 1, "blue", 1, 0, 15)
+            r.charId, r.acted = 0x30, true
+            g.units[#g.units + 1] = r
+        end
+        return act(a)
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.recruits.joined[1], 0x30, "talked: joined")
+    check(r.clean, true, "talked: clean")
+end
+
+-- test_a_razed_village_is_missing_at_once: a brigand's pick act names the village, and the
+-- game stops offering it.
+do
+    local tiles = { { x = 9, y = 8, kind = "visit" } }
+    local r = judged { explorable = tiles, enemy = function(g, find)
+        if #tiles == 0 then return {} end
+        table.remove(tiles, 1)
+        return {}, { { id = 0x81, charId = 0x81, act = "pick", tile = { x = 9, y = 8 } } }
+    end }
+    local m = r.clear.rewards_missing[1]
+    check(m and m.why, "closed", "razed: missing, closed")
+    check(m and m.closed_by, 0x81, "razed: by the brigand")
+    check(r.clean, false, "razed: not clean")
+end
+
+-- test_a_skipped_village_is_missing: still open at the end, never visited.
+do
+    local r = judged { explorable = { { x = 9, y = 9, kind = "visit" } } }
+    local m = r.clear.rewards_missing[1]
+    check(m and m.kind, "visit", "skipped: the village is missing")
+    check(r.clean, false, "skipped: not clean")
+end
+
+-- A thief (0x82, far off) opens the chest at 9,8 in the first enemy phase and gains item 0x6C;
+-- A meanwhile fights the red at 1,0. `killer` kills the thief in the second enemy phase and,
+-- when blue, the drop reaches A through the full-bag menu (api.bag).
+local function thiefGame(killer)
+    local units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 30),
+                    unit(0x82, 1, "red", 9, 9, 10), unit(0x41, 0, "green", 8, 9, 10) }
+    for _, u in ipairs(units) do u.items = {} end
+    local tiles = { { x = 9, y = 8, kind = "chest" } }
+    local phase, dropped = 0, false
+    local g = fakeGame { units = units, recruits = {}, hit = 10, explorable = tiles,
+        enemy = function(g, find)
+            phase = phase + 1
+            local t = find(0x82)
+            if phase == 1 then
+                table.remove(tiles, 1)
+                t.items = { { id = 0x6C, uses = 1 } }
+                return {}, { { id = 0x82, charId = 0x82, act = "pick", tile = { x = 9, y = 8 } } }
+            elseif phase == 2 then
+                t.hp, t.dead, t.onField = 0, true, false
+                dropped = killer == 0x01
+                return { { id = 0x82, charId = 0x82, faction = "red", killer = killer } }
+            end
+            return {}
+        end }
+    g.api.bag = function()
+        if dropped then
+            dropped = false
+            return { { charId = 0x01, item = 0x6C, sent = 0x6C, discard = false, why = "full" } }
+        end
+        return {}
+    end
+    Botrun.run(g.api)
+    return recordOf(g)
+end
+
+-- test_a_chest_won_back_from_its_thief_is_taken
+do
+    local r = thiefGame(0x01)
+    check(#r.clear.rewards_missing, 0, "won back: the chest is taken")
+    check(r.explore[1] and r.explore[1].won_back, true, "won back: said so")
+    check(r.clean, true, "won back: clean")
+end
+
+-- test_a_chest_thief_killed_by_green_is_lost
+do
+    local r = thiefGame(0x41)
+    local m = r.clear.rewards_missing[1]
+    check(m and m.closed_by, 0x82, "green kill: the chest is missing, closed by the thief")
+    check(r.clean, false, "green kill: not clean")
+end
+
+-- test_no_recruit_list_leaves_clean_unjudged
+do
+    local g = fakeGame { units = rout() }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.clear.recruits_missing, "unchecked", "no list: unchecked")
+    check(r.clean, nil, "no list: not judged")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

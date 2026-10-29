@@ -10,7 +10,8 @@
 -- (Bot.team, over what the map asks: api.needs, read once per chapter start since every attempt
 -- starts from the same state), buys at the shops the world map has open (Bot.shop, through the
 -- game's own shop screen), spends seals (Bot.promote), and plays the chapter (botrun.lua). A
--- clear with everyone alive moves on and its team is CARRIED into the next chapter's pick;
+-- clean clear (the record's `clean`: won, no blue or green unit lost, every owed recruit
+-- joined, every village and chest taken) moves on and its team is CARRIED into the next chapter's pick;
 -- anything else loads the chapter-start state back and attempts again, at most MAX_ATTEMPTS
 -- times. The team follows from the claims a style follows (a carry claim's units), so two
 -- attempts differ by the style alone; when every style has been tried, the chapter stops. The RNG is never
@@ -27,8 +28,11 @@
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)
 --   no_style    api.only: this chapter start has fewer than k styles
---   infeasible  a chapter used MAX_ATTEMPTS, or every style, without a clean clear: no later
---               chapter is reached by a clean run, so none is played
+--   infeasible  ours: a chapter used MAX_ATTEMPTS, or every style, without a clean clear: no
+--               later chapter is reached by a clean run, so none is played
+--   bot_fault   the same on vanilla, which strong players clear clean: the bot is what failed,
+--               never the chapter (#510 step 9 design, decision 2). The chapter line's failures
+--               carry what spoiled each attempt and its trace
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -175,6 +179,15 @@ function M.run(api)
         return outcome == "done" or outcome == "played" or outcome == "no_style", why, chapters
     end
 
+    -- a chapter with no clean clear left to try: on vanilla the bot's fault, on ours infeasible
+    local function noClean(entry, tried)
+        local fault = info.game == "vanilla"
+        entry.outcome = fault and "bot_fault" or "infeasible"
+        line(entry)
+        return entry.outcome, string.format("chapter %d: no clean clear in " .. tried .. "%s",
+            entry.chapter, entry.attempts, fault and ", a bot fault" or "")
+    end
+
     local function play()
         local carried = {}
         while true do
@@ -207,12 +220,7 @@ function M.run(api)
                     return "no_style", string.format("chapter %d has %d styles, not %d", ch,
                         entry.attempts, api.only)
                 end
-                if not style then
-                    entry.outcome = "infeasible"
-                    line(entry)
-                    return "infeasible", string.format(
-                        "chapter %d: no clean clear in all %d styles", ch, entry.attempts)
-                end
+                if not style then return noClean(entry, "all %d styles") end
                 entry.attempts = entry.attempts + 1
                 local team, bwhy = between(api, style, followed, need, carried)
                 if not team then
@@ -228,7 +236,7 @@ function M.run(api)
                     return "played", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, tostring(rec.outcome))
                 end
-                if rec.outcome == "won" and rec.all_alive then
+                if rec.clean == true then
                     entry.outcome, entry.turns = "cleared", rec.turns
                     entry.team = { deploy = team.deploy, reasons = {} }
                     for _, charId in ipairs(team.deploy) do
@@ -241,19 +249,15 @@ function M.run(api)
                     break
                 end
                 entry.failures[#entry.failures + 1] = { attempt = entry.attempts, style = style,
-                    team = team.deploy, outcome = rec.outcome, deaths = rec.deaths }
+                    team = team.deploy, outcome = rec.outcome, deaths = rec.deaths,
+                    clear = rec.clear, trace = rec.trace }
                 if rec.outcome == "crashed" then
                     entry.outcome = "crashed"
                     line(entry)
                     return "crashed", string.format("chapter %d attempt %d crashed", ch,
                         entry.attempts)
                 end
-                if entry.attempts >= M.MAX_ATTEMPTS then
-                    entry.outcome = "infeasible"
-                    line(entry)
-                    return "infeasible", string.format("chapter %d: no clean clear in %d attempts",
-                        ch, entry.attempts)
-                end
+                if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
                 local lok, lwhy = api.load(ch)
                 if not lok then
                     entry.outcome = "crashed"

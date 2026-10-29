@@ -3863,6 +3863,9 @@ INSPECT.campaignApi = function(game)
         local b = INSPECT.botApi(game)
         b.style, b.claims = style, claims
         b.info.campaign, b.info.attempt = id, attempt
+        -- the recruits this chapter owes a clean clear (campaign_env.py): a campaign always
+        -- judges them, so a chapter with none owes an empty list, not an unchecked one
+        b.recruits = (cfg.recruits or {})[tostring(chapter())] or {}
         b.seed = function() end   -- seeded once, at the first chapter: FE8 never re-seeds
         pokeFastConfig()
         INSPECT.settle("phase", 6000, true)
@@ -3905,7 +3908,8 @@ end
 -- from its start state until it clears with everyone alive. PT_SEED seeds the game's RNG once;
 -- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
 -- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
--- record), claims = { [chapter] = resolved claims }, from = a chapter index to resume at, from
+-- record), claims = { [chapter] = resolved claims }, recruits = { [chapter] = {charIds} } (the
+-- recruits a clean clear owes), from = a chapter index to resume at, from
 -- the start state this id saved, attempt = k: only the k-th attempt from `from`'s start (the
 -- pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.

@@ -23,7 +23,7 @@ class Records(unittest.TestCase):
     def test_parse_botrun_line(self):
         text = '\n'.join([
             'engine noise',
-            'BOTRUN {"attempt": 2, "outcome": "won", "all_alive": true}',
+            'BOTRUN {"attempt": 2, "outcome": "won", "clean": true}',
             '[f085128] BOTRUN {"attempt": 3, "outcome": "lost"}',
             'CAMPAIGN {"outcome": "played"}',
         ])
@@ -62,7 +62,7 @@ class Workers(unittest.TestCase):
             if task['campaign']['attempt'] == 2:
                 raise RuntimeError('mgba-headless exited early')
             k = task['campaign']['attempt']
-            return 'BOTRUN {"attempt": %d, "outcome": "won", "all_alive": true}\n' % k, '/tmp/x'
+            return 'BOTRUN {"attempt": %d, "outcome": "won", "clean": true}\n' % k, '/tmp/x'
         recs, kept = self.run_pool(launch, mc.attempt_tasks({'from': 4}, 3))
         self.assertEqual(len(kept), 3, 'every worker leaves one record')
         dead = [r for r in kept if r['outcome'] == 'crashed']
@@ -123,10 +123,31 @@ class Attempts(unittest.TestCase):
             mc.attempt_tasks({'id': 'c'}, 2)
 
     def test_first_clean_is_the_lowest_clean_attempt(self):
-        recs = [{'attempt': 3, 'all_alive': True}, {'attempt': 1, 'all_alive': False},
-                {'attempt': 2, 'all_alive': True}, {'attempt': None, 'outcome': 'crashed'}]
+        recs = [{'attempt': 3, 'clean': True}, {'attempt': 1, 'clean': False},
+                {'attempt': 2, 'clean': True}, {'attempt': None, 'outcome': 'crashed'}]
         self.assertEqual(mc.first_clean(recs), 2)
-        self.assertIsNone(mc.first_clean([{'attempt': 1, 'all_alive': False}]))
+        self.assertIsNone(mc.first_clean([{'attempt': 1, 'clean': False}]))
+
+    def test_first_clean_needs_all_four_parts(self):
+        # a clear the run could not judge (no owed recruit list) is never a clean one
+        self.assertIsNone(mc.first_clean([{'attempt': 1, 'outcome': 'won', 'clean': None}]))
+        self.assertEqual(mc.first_clean([{'attempt': 1, 'outcome': 'won', 'clean': False},
+                                         {'attempt': 2, 'outcome': 'won', 'clean': True}]), 2)
+
+    def test_an_attempt_line_says_what_spoiled_it(self):
+        r = {'attempt': 1, 'outcome': 'won', 'turns': 9, 'clean': False,
+             'deaths': [{'charId': 0x42, 'faction': 'green', 'turn': 4, 'killer': 0x81}],
+             'clear': {'won': True, 'lost': [{'charId': 0x42, 'faction': 'green', 'turn': 4,
+                                              'killer': 0x81}],
+                       'recruits_missing': [0x30],
+                       'rewards_missing': [{'x': 3, 'y': 7, 'kind': 'visit', 'why': 'closed',
+                                            'closed_by': 0x81}]}}
+        line = mc.attempt_line(r, set())
+        self.assertIn('lost 0x42 (green, turn 4, to 0x81)', line)
+        self.assertIn('missed 0x30', line)
+        self.assertIn('village 3,7 closed by 0x81', line)
+        clean = mc.attempt_line({'attempt': 2, 'outcome': 'won', 'turns': 8, 'clean': True}, set())
+        self.assertIn('won clean', clean)
 
 
 class Verdict(unittest.TestCase):
@@ -214,7 +235,7 @@ class Cell(unittest.TestCase):
 
     @staticmethod
     def clean(yes, chapter):
-        return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'all_alive': yes},
+        return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'clean': yes},
                 {'kind': 'campaign', 'outcome': 'done'}]
 
     def test_vanilla_pairs_read_from_the_store_first(self):
@@ -248,8 +269,8 @@ class Cell(unittest.TestCase):
 
     def test_the_pair_is_the_first_attempt(self):
         def fate(n, s, ch):
-            return [{'chapter': ch, 'attempt': 1, 'outcome': 'lost', 'all_alive': False},
-                    {'chapter': ch, 'attempt': 2, 'outcome': 'won', 'all_alive': True},
+            return [{'chapter': ch, 'attempt': 1, 'outcome': 'lost', 'clean': False},
+                    {'chapter': ch, 'attempt': 2, 'outcome': 'won', 'clean': True},
                     {'kind': 'campaign', 'outcome': 'done'}]
         v = mc.run_cell(self.sides(), self.play(fate, []))
         self.assertEqual((v['ours'], v['vanilla']), (0.0, 0.0), 'a later clean retry is not it')
@@ -275,7 +296,7 @@ class Cell(unittest.TestCase):
     def test_a_campaign_that_never_reached_the_chapter_says_where_it_stopped(self):
         def fate(n, s, ch):
             if (n, s) == ('vanilla', 7):
-                return [{'chapter': 2, 'attempt': 1, 'outcome': 'lost', 'all_alive': False},
+                return [{'chapter': 2, 'attempt': 1, 'outcome': 'lost', 'clean': False},
                         {'kind': 'campaign', 'outcome': 'infeasible',
                          'why': 'chapter 2: no clean clear in 300 attempts'}]
             return self.clean(True, ch)
@@ -368,7 +389,7 @@ class Story(unittest.TestCase):
              'to': {'x': 2, 'y': 1}, 'battles': [battle]},
             {'t': 'event', 'turn': 3, 'kind': 'arrive', 'charId': 0x11, 'x': 0, 'y': 9,
              'faction': 'red'},
-            {'t': 'end', 'turn': 3, 'record': {'outcome': 'won', 'turns': 3, 'all_alive': True}}]
+            {'t': 'end', 'turn': 3, 'record': {'outcome': 'won', 'turns': 3, 'clean': True}}]
         text = '\n'.join(mc.story(events, {0x10: 'The Ogre', 0x01: 'Braulo'}, {0x01: 'Iron Axe'}))
         self.assertIn('Turn 2, enemy phase.', text)
         self.assertIn('The Ogre attacks Braulo, from 1,1 to 2,1.', text)
@@ -393,7 +414,12 @@ class Story(unittest.TestCase):
         text = '\n'.join(mc.story(events, {0x01: 'Braulo'}, {}, {}))
         self.assertIn('steals from Braulo', text, 'a target by unit index, through the snapshot')
         self.assertIn('pillages the tile at 6,2', text)
-        self.assertIn('Result: won on turn 3, everyone alive.', text)
+        self.assertIn('Result: won on turn 3, clean.', text)
+        events[-1]['record'] = {'outcome': 'won', 'turns': 3, 'clean': False,
+                                'clear': {'won': True, 'lost': [], 'recruits_missing': [0x01],
+                                          'rewards_missing': []}}
+        text = '\n'.join(mc.story(events, {0x01: 'Braulo'}, {}, {}))
+        self.assertIn('Result: won on turn 3, not clean: missed Braulo.', text)
 
     def test_names_come_from_the_decomp_and_our_cast(self):
         self.assertEqual(mc._names('vanilla')[0x01], 'Eirika')

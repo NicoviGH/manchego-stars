@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 design part A: a clear counts when the record's `clean` holds
+    # (won, no blue or green unit lost, every owed recruit joined, every reward taken)
+    r'\ball_alive\b',
     # retired by #510 step 9: one choice-menu picker answers ch01's lead menu and vanilla's
     # route split (INSPECT.pickMenuRow)
     r'INSPECT\.pickLead\b',

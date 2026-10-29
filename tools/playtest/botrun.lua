@@ -198,8 +198,18 @@ end
 --   leftOpen()         bot faults: each tile never explored that a unit could still use at the
 --                      last read, { kind = "left_open", x, y, tile, offers }. ch03's chest behind
 --                      a door went unopened in every attempt, silently, as "unreached"
+--   closedBy(x, y, charId, loot)  an act of another side's unit named the tile (a pick:
+--                      a pillage, or a thief's chest), and the item it gained doing so
+--   downed(charId, step)  that unit fell to one of ours, at the run's step `step`
+--   gained(item, step) one of ours gained `item` (an items event, or a full-bag answer)
+--   missing()          the clean clear's rewards part: each tile not taken, { x, y, kind,
+--                      why = its status, closed_by }. Taken = visited, or a chest whose
+--                      thief fell to one of ours and whose item then reached one of ours
+--                      (popup.c sets US_DROP_ITEM on the thief; bmmind.c gives the drop to
+--                      its killer)
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
+    local downedAt, gains = {}, {}
     local function key(x, y) return x .. "," .. y end
     function log.open(list, turn, usable)
         local now = {}
@@ -252,6 +262,30 @@ function M.exploreLog()
         end
         return out
     end
+    function log.closedBy(x, y, charId, loot)
+        local e = tiles[key(x, y)]
+        if e and not e.by then e.closedBy, e.loot = charId, loot end
+    end
+    function log.downed(charId, step) downedAt[charId] = downedAt[charId] or step end
+    function log.gained(item, step) gains[#gains + 1] = { item = item, step = step } end
+    local function wonBack(e)
+        local at = e.kind == "chest" and e.closedBy and e.loot and downedAt[e.closedBy]
+        if not at then return false end
+        for _, g in ipairs(gains) do
+            if g.item == e.loot and g.step >= at then return true end
+        end
+        return false
+    end
+    function log.missing()
+        local out = {}
+        for _, s in ipairs(log.summary()) do
+            if s.status ~= "visited" and not s.won_back then
+                out[#out + 1] = { x = s.x, y = s.y, kind = s.kind, why = s.status,
+                                  closed_by = s.closed_by }
+            end
+        end
+        return out
+    end
     function log.summary()
         local out = {}
         for _, k in ipairs(order) do
@@ -260,7 +294,8 @@ function M.exploreLog()
                 or (e.offers > 0 and "skipped") or "unreached"
             out[#out + 1] = { x = e.x, y = e.y, kind = e.kind, status = status, by = e.by,
                               turn = e.turn or e.closed, offers = e.offers, die = e.die,
-                              tried = e.failed }
+                              tried = e.failed, closed_by = e.closedBy,
+                              won_back = wonBack(e) or nil }
         end
         return out
     end
@@ -283,6 +318,11 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 }, bag = {} }
     local explore = M.exploreLog()
+    -- the clean clear's recruits part: owed = api.recruits less any already in the party
+    -- (blue, dead or not, deployed or not) at the first board; joined = seen blue later
+    local owed, blueSeen = nil, {}
+    -- one step per act and per enemy phase: a thief's fall and the drop it gives share one
+    local step = 0
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
@@ -297,35 +337,52 @@ function M.run(api)
         for _, b in ipairs(api.bag and api.bag() or {}) do
             b.turn = turn
             rec.bag[#rec.bag + 1] = b
+            explore.gained(b.item, step)
             trace({ t = "bag", charId = b.charId, item = b.item, sent = b.sent,
                     discard = b.discard, why = b.why })
         end
     end
     local lastBoard
     local function changes(after)
+        if api.recruits and not owed then
+            local party = {}
+            for _, u in ipairs(after.units) do
+                if u.faction == "blue" then party[u.charId] = true end
+            end
+            owed = {}
+            for _, c in ipairs(api.recruits) do
+                if not party[c] then owed[#owed + 1] = c end
+            end
+        end
+        for _, u in ipairs(after.units) do
+            if u.faction == "blue" then blueSeen[u.charId] = true end
+        end
         if lastBoard then
             for _, e in ipairs(M.events(lastBoard, after)) do
                 e.t = "event"
                 trace(e)
+                for _, item in ipairs(e.gained or {}) do explore.gained(item, step) end
             end
         end
         lastBoard = after
     end
 
+    -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
+    -- given only if its three green villagers live), so both are deaths; a red one is a kill.
     local function record(list, phase)
         for _, d in ipairs(list) do
-            if d.faction == "blue" then
-                rec.deaths[#rec.deaths + 1] = { charId = d.charId, turn = turn, killer = d.killer,
-                                                phase = phase }
+            if d.faction == "blue" or d.faction == "green" then
+                rec.deaths[#rec.deaths + 1] = { charId = d.charId, faction = d.faction, turn = turn,
+                                                killer = d.killer, phase = phase }
             elseif d.killer then
                 local k = tostring(d.killer)
                 rec.kills[k] = (rec.kills[k] or 0) + 1
+                if blueSeen[d.killer] then explore.downed(d.charId, step) end
             end
         end
     end
     local function finish(outcome, why)
         rec.outcome, rec.turns, rec.why = outcome, turn, why
-        rec.all_alive = outcome == "won" and #rec.deaths == 0
         rec.frames = api.frames() - startFrame
         if api.costs then
             -- what the run spent: each figure the difference since it started
@@ -341,6 +398,20 @@ function M.run(api)
             end
         end
         rec.explore = explore.summary()
+        local missing = "unchecked"
+        if owed then
+            rec.recruits = { owed = owed, joined = {} }
+            missing = {}
+            for _, c in ipairs(owed) do
+                local list = blueSeen[c] and rec.recruits.joined or missing
+                list[#list + 1] = c
+            end
+        end
+        rec.clear = { won = outcome == "won", lost = rec.deaths, recruits_missing = missing,
+                      rewards_missing = explore.missing() }
+        local held = rec.clear.won and #rec.deaths == 0 and #rec.clear.rewards_missing == 0
+        if not held or (owed and #missing > 0) then rec.clean = false
+        elseif owed then rec.clean = true end
         if outcome == "won" then
             for _, f in ipairs(explore.leftOpen()) do rec.bot_faults[#rec.bot_faults + 1] = f end
         end
@@ -465,6 +536,7 @@ function M.run(api)
                 local action
                 if sight.batch then action = sight.batch(decide) else action = decide() end
                 if not action then break end
+                step = step + 1
                 local done, why = api.act(action)
                 bagged()
                 if done == false and (action.act == "visit" or action.act == "chest") then
@@ -515,9 +587,22 @@ function M.run(api)
             end
             changes(before)
             trace({ t = "phase", phase = "enemy", units = M.snapshot(before) })
+            step = step + 1
             local phase, deaths, acts = api.endPhase()
             bagged()
+            local was, now = byId(before), byId(api.board())
             for _, a in ipairs(acts or {}) do
+                if a.tile then
+                    -- the item the unit gained by it: a thief's chest, which it drops if it falls
+                    local b, n, loot = was[a.id], now[a.id], nil
+                    if b and n then
+                        local had = itemCounts(b)
+                        for id, c in pairs(itemCounts(n)) do
+                            if c > (had[id] or 0) then loot = id end
+                        end
+                    end
+                    explore.closedBy(a.tile.x, a.tile.y, a.charId, loot)
+                end
                 trace({ t = "act", phase = "enemy", unit = a.charId, id = a.id, from = a.from,
                         to = a.to, hp = a.hp, act = a.act, targetId = a.targetId, tile = a.tile,
                         battles = a.battles })
