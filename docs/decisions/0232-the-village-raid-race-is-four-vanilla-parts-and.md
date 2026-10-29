@@ -68,6 +68,11 @@ Nicolas, 2026-08-10, after a session that ran scenarios fourteen times: *"I am w
 as you run scenarios again and again... I am tired of it."* Two rules, because there are two
 separate wastes and only one of them is about suite size.
 
+**Amended 2026-10-29: a run a change needs to be PROVEN is owed, never budgeted.** Nicolas:
+*"what run budget? I am not counting, we need to get it right."* These rules forbid pointless
+runs (re-watching a green scene, one run per guess, a run after a merge), not the proof a change
+needs; do not ask permission for that proof. One instrumented run per failure still holds.
+
 **1. Run the smallest set that covers what changed.**
 - Touched one chapter's constants → that chapter's suite (`SUITE=ch05`, ~11s cached).
 - Touched an arbitrary subset → `matrix.py run --scenarios a,b,c`.
