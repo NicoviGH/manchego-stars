@@ -15,10 +15,17 @@ Decisions 1-4 of the #510 step 9 long-term design (#510 comment 6485197805, acce
 bot's intentions:** the chapter is won; no unit is lost, blue or green (vanilla Ch6 gives
 Eirika an Orion's Bolt only if its three green villagers live, `EventScr_Ch6_EndingScene`); every
 recruit the chapter owes joins; every village and chest the map offers is taken.
-- **Owed recruits.** Vanilla: the chapter's Talk events whose script turns the target blue
-  (`CUSA` in it or in a script it CALLs; `difficulty._talk_recruits`). Manchego Stars: the
-  chapter's on-map Talk recruits (`inject.recruit.on_map_talk_recruits`). A character already in
-  the party at the chapter's start, dead or alive, deployed or not, is not owed.
+- **Owed recruits.** Both games alike, read from the game at the chapter's start (amended
+  2026-10-29, audit finding 7): the target of each talk the game would run now
+  (`sight.lua` `M.talks`: `SearchAvailableEvent` walks the chapter's `characterBasedEvents`, a
+  breakpoint on `EvCheck03_CHAR`/`EvCheck04_CHARASM` reads each talk entry it is handed, and
+  `CheckForCharacterEvents` keeps the available ones). A character already in the party at the
+  chapter's start, dead or alive, deployed or not, is not owed; so a talk between two party
+  members (ch15b's conversations) owes nothing, and a target who joins in the chapter's own
+  events is owed and joined. Before: a regex over the decomp's `CHAR`/`CUSA`/`CALL` for vanilla
+  (`difficulty._talk_recruits`, still the kit model's) and the YAML's on-map Talk recruits for
+  Manchego Stars. Proved equal [ROM]: vanilla Ch2 owes Ross and Garcia, Ch5 Joshua, Manchego
+  Stars ch03 Trex, ch01 no one (one walk and 73 checks for Ch2).
 - **Joined = seen blue and NOT dead.** Vanilla's endings mark an unrecruited Talk recruit blue
   AND dead: `EventScr_StrictLoadUniqueAlly` CUSAs it (or SPAWN_ALLYs it when it was killed, since
   `UnitKill` clears a red unit's character pointer), then `SET_HP` from slot 1 = 0, which sets

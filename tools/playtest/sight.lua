@@ -216,8 +216,12 @@ local AI_ACTION_COMBAT, BALLISTA_SLOT = 1, 0xFF
 -- struct ActionData (include/bmmind.h): +13 xOther, +14 yOther, +15 trapType (a wall's HP when
 -- the Attack menu forecasts a strike on it).
 local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
--- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script; 0x1C bytes.
-local EVENT_INFO_SIZE, EVENT_SCRIPT = 0x1C, 0x04
+-- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script, +1A pidA, +1B pidB;
+-- 0x1C bytes. A talk entry (EvtListTalk, struct EvCheck03/04) holds pidA +08, pidB +09.
+local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
+local TALK_PID_A, TALK_PID_B, NO_PID = 0x08, 0x09, 0xFF
+-- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
+local CHAPTER_TALKS = 0x04
 -- struct PlaySt: +0D chapterVisionRange (0 = no fog), +0F faction, +10 u16 chapterTurnNumber.
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
@@ -1189,12 +1193,15 @@ function M.new(outer)
                          visit = "VisitCommandUsability", chest = "ChestCommandUsability",
                          seize = "UnitActionMenu_CanSeize" }
 
-    -- whether the last target list built holds unit `id`, or the wall at `at` (uid 0)
-    local function listed(call, id, at)
+    -- whether the last target list built holds unit `id`, or the tile `at` with uid `uid` (a
+    -- wall's is 0, a door's TERRAIN_DOOR: TryAddClosedDoorToTargetList)
+    local function listed(call, id, at, uid)
         for k = 0, call(S.GetSelectTargetCount, {}) - 1 do
             local t = call(S.GetTarget, { k })
             if at then
-                if mem.u8(t + 2) == 0 and mem.u8(t) == at.x and mem.u8(t + 1) == at.y then return true end
+                if mem.u8(t + 2) == (uid or 0) and mem.u8(t) == at.x and mem.u8(t + 1) == at.y then
+                    return true
+                end
             elseif mem.u8(t + 2) == id then
                 return true
             end
@@ -1240,6 +1247,16 @@ function M.new(outer)
         end)
         if ok then return nil end
         return "the game offers no " .. (a.obstacle and "strike on that wall" or a.act)
+    end
+
+    -- Whether `u` on (x, y) can open the door `d` there: the Door command's own check
+    -- (DoorCommandUsability: a key, and the adjacent closed doors it lists) names `d`.
+    function s.doorFrom(u, x, y, d)
+        return sandbox(function(call)
+            asActive(u, x, y)
+            return call(S.DoorCommandUsability, { 0, 0 }) == M.MENU_ENABLED
+                and listed(call, nil, d, M.TERRAIN_DOOR)
+        end)
     end
 
     function s.doors()
@@ -1419,6 +1436,37 @@ end
 function M.canSeize(api, u, sandbox)
     return (sandbox or M.machine(api.cpu))(function(call)
         return call(api.SYM.CanUnitSeize, { u.addr }) ~= 0
+    end)
+end
+
+-- The chapter's talk events the game would run now, without a whole sight (the run's owed
+-- recruits): SearchAvailableEvent walks the chapter's characterBasedEvents asking for a pair no
+-- entry names, a breakpoint on each talk check (EvCheck03_CHAR, EvCheck04_CHARASM) reads the
+-- entry it is handed, and CheckForCharacterEvents(a, b) keeps the ones available (flag unset,
+-- condition met). -> { { a = pidA, b = pidB } }, a = 0 being anyone.
+function M.talks(api, sandbox)
+    local mem, S = api.mem, api.SYM
+    return (sandbox or M.machine(api.cpu))(function(call, info)
+        local events = call(S.GetChapterEventDataPointer, { api.chapter() })
+        for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
+        api.write32(info, mem.u32(events + CHAPTER_TALKS))
+        api.write8(info + EVENT_PID_A, NO_PID)
+        api.write8(info + EVENT_PID_B, NO_PID)
+        local seen = {}
+        local function entry()
+            local at = mem.u32(info)
+            seen[#seen + 1] = { a = mem.u8(at + TALK_PID_A), b = mem.u8(at + TALK_PID_B) }
+        end
+        local holds = { api.cpu.breakpoint(S.EvCheck03_CHAR, entry),
+                        api.cpu.breakpoint(S.EvCheck04_CHARASM, entry) }
+        local ok, err = pcall(call, S.SearchAvailableEvent, { info })
+        for _, hold in ipairs(holds) do api.cpu.unbreak(hold) end
+        if not ok then error(err, 0) end
+        local out = {}
+        for _, t in ipairs(seen) do
+            if call(S.CheckForCharacterEvents, { t.a, t.b }) ~= 0 then out[#out + 1] = t end
+        end
+        return out
     end)
 end
 

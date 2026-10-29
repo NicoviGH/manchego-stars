@@ -423,6 +423,12 @@ local function sightOf(o)
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
+    -- the Door command's check: an opener beside the door (as TryAddClosedDoorToTargetList)
+    if o.doors then
+        s.doorFrom = function(u, x, y, d)
+            return (o.openers or {})[u.id] == true and Board.distance(x, y, d.x, d.y) == 1
+        end
+    end
     if o.hidden then s.visible = function(x, y) return not o.hidden[x .. "," .. y] end end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then

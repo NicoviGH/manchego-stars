@@ -60,7 +60,7 @@ local function fakeGame(o)
         info = { game = "fake", rom_hash = "abc", chapter = 1, mode = "normal", seed = 7 },
         style = { aggression = o.aggression or "careful", deploy = {}, claims = {} },
         claims = o.claims,
-        recruits = o.recruits,
+        recruits = o.recruits and function() return o.recruits end,
         -- the game's party (IsUnitInCurrentRoster, through MakePrepUnitList): o.party(g) when
         -- a case decides it, else every blue unit not dead
         party = function()

@@ -501,7 +501,7 @@ class TestFullBagItems(unittest.TestCase):
         block = text[text.index('INSPECT.BAG = {'):]
         block = block[:block.index('\n}\n')]
         pairs = re.findall(r'\[0x([0-9A-Fa-f]+)\] = "(ITEM_\w+)"', block)
-        self.assertEqual(len(pairs), 8, 'INSPECT.BAG lists four keys and four passive items')
+        self.assertEqual(len(pairs), 4, 'INSPECT.BAG lists the four passive items')
         for value, name in pairs:
             self.assertEqual(int(value, 16), items.get(name), name)
 

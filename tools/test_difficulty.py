@@ -3359,5 +3359,16 @@ class BossBaseLevelMarginIsGuarded(unittest.TestCase):
                          'apply the malus while the model assumes immunity: %s' % bad)
 
 
+
+class TalkRecruits(unittest.TestCase):
+    """The kit model's talk recruits: talks whose script turns the target blue."""
+
+    def test_ch2_recruits_ross_and_garcia(self):
+        self.assertEqual(set(df._talk_recruits('ch2')), {'CHARACTER_ROSS', 'CHARACTER_GARCIA'})
+
+    def test_a_talk_without_cusa_recruits_no_one(self):
+        # ch15b's talks are conversations: none of their scripts turns a unit blue
+        self.assertEqual(df._talk_recruits('ch15b'), {})
+
 if __name__ == '__main__':
     unittest.main()

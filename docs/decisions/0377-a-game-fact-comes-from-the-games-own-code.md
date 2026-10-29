@@ -67,3 +67,22 @@ played chance to kill the striker).
   their map position) and `gBattleStats`' config and range (reason 2).
 - A petrifying blow ends the battle like a death [code `bmbattle.c:1201`]; the bot counts a
   petrified unit as every HP lost. That is our pricing, not the game's, and is written beside it.
+
+**Amended 2026-10-29 (audit findings 5-7, 13-16).** More facts the bot now takes from the game's
+code, each proved in the ROM:
+- **A drop** (5, 6): `NewPopup_GeneralItemGot`, whose only caller is `BATTLE_HandleItemDrop`,
+  caught at its entry (r0 the receiver, r1 the item), the breakpoint armed only while
+  `sProcScr_CombatAction` is live with a `US_DROP_ITEM` unit in the battle. A thief's chest is won
+  back when that drop names the thief and the chest's item. 7 drops caught on Manchego Stars ch01
+  with every red made a dropper (a probe, not committed): 14.1 CPU s, every battle armed.
+- **Owed recruits** (7): the chapter's talk table, walked by the game (ADR 0376).
+- **The enemy's decision** (13): `AiDecideMain` after the decide loop's whole per-unit step
+  (ADR 0369, amended).
+- **A key** (15): the item alone in the unit's bag, `GetUnitKeyItemSlotForTerrain` asked for a
+  door and a chest; a Lockpick is a key only to a thief [ROM]. The passive items stay a list: the
+  engine tests each by id in scattered places, with no one function (reason 1).
+- **A door's reach** (16): the Door command's own check, `DoorCommandUsability` and the closed
+  doors its target list names, from each wait tile; Manchego Stars ch03's chest behind the door
+  at 6,12 opened, clean, 173 checks, 20.7 CPU s.
+- **Green deaths** (14) are watched in the enemy phase like blue ones.
+

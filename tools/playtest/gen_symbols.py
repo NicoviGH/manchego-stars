@@ -290,6 +290,11 @@ WANTED = [
     'BattleRoll1RN',            # every one-number roll of a battle: crits, skill procs (bmbattle.c)
     'BattleRoll2RN',            # the two-number hit roll; both return simResult when simulating  # a ballista's strike (bmbattle.c)
     'gActiveUnit',              # struct Unit *: the AI decides for THIS unit
+    # The chapter's talks (eventinfo.c): the walk's two talk checks, caught to read each entry,
+    # and the Talk command's own availability check.
+    'EvCheck03_CHAR',           # an EvtListTalk entry's check
+    'EvCheck04_CHARASM',        # an EvtListConditionalTalk-with-asm entry's check
+    'CheckForCharacterEvents',  # whether the talk (pidA, pidB) would run now
     # A fallen unit's drop (bmmind.c BATTLE_HandleItemDrop, its popup's only caller).
     'NewPopup_GeneralItemGot',  # the item given to the blue unit that downed a dropper
     'sProcScr_CombatAction',    # the real battle's resolution, the drop included

@@ -860,11 +860,14 @@ end
 local function breach(ctx, u, gate, objective)
     local b = breachFor(ctx, u, goalFor(ctx, u, objective))
     if not b then return nil end
-    -- a door opens from beside it (the Door command's own adjacency); a wall is struck in range
-    local r = b.door and { min = 1, max = 1 } or ctx.sight.range(u)
-    if not r then return nil end
+    -- a door opens where the Door command offers it (sight.doorFrom); a wall is struck in range
+    local r = not b.door and ctx.sight.range(u)
+    if not (b.door or r) then return nil end
     for _, t in ipairs(waitTiles(ctx, u)) do
-        if inRange(t.x, t.y, b.x, b.y, r.min, r.max) and gate(ctx, u, t.x, t.y, nil) then
+        local can
+        if b.door then can = ctx.sight.doorFrom(u, t.x, t.y, b)
+        else can = inRange(t.x, t.y, b.x, b.y, r.min, r.max) end
+        if can and gate(ctx, u, t.x, t.y, nil) then
             if b.door then return action(u, t, "door", nil) end
             local a = action(u, t, "attack", nil)
             -- its HP and the strike's blow (the game's forecast): the planner tracks the wall

@@ -105,6 +105,49 @@ do
           "played: the breakpoints are cleared")
 end
 
+-- test_talks_reads_each_entry_the_walk_hands_its_checks: the game's walk hands two talk
+-- entries to its checks (one plain, one with an asm condition); CheckForCharacterEvents keeps
+-- the available one, the walk was asked for a pair no entry names, and the breakpoints go.
+do
+    local bytes, holds, at = {}, {}, {}
+    local function u8(a) return bytes[a] or 0 end
+    local function u32(a) return u8(a) | u8(a + 1) << 8 | u8(a + 2) << 16 | u8(a + 3) << 24 end
+    local function w8(a, v) bytes[a] = v & 0xFF end
+    local function w32(a, v) for i = 0, 3 do w8(a + i, v >> (8 * i)) end end
+    local INFO, LIST, GROUP = 0x03000000, 0x08100000, 0x08200000
+    w32(GROUP + 4, LIST)
+    w8(LIST + 0x08, 0x01); w8(LIST + 0x09, 0x0E)        -- Eirika -> Ross
+    w8(LIST + 0x18, 0x00); w8(LIST + 0x19, 0x0A)        -- anyone -> Garcia, asm-gated
+    local S = { GetChapterEventDataPointer = 1, SearchAvailableEvent = 2, EvCheck03_CHAR = 3,
+                EvCheck04_CHARASM = 4, CheckForCharacterEvents = 5 }
+    local asked
+    local api = {
+        SYM = S, mem = { u8 = u8, u32 = u32 }, write8 = w8, write32 = w32,
+        chapter = function() return 2 end,
+        cpu = { breakpoint = function(addr, fn) holds[#holds + 1] = addr; at[addr] = fn; return #holds end,
+                unbreak = function(id) at[holds[id]] = nil end },
+    }
+    local function sandbox(fn)
+        return fn(function(addr, args)
+            if addr == S.GetChapterEventDataPointer then return GROUP end
+            if addr == S.SearchAvailableEvent then
+                asked = { u8(INFO + 0x1A), u8(INFO + 0x1B) }
+                at[S.EvCheck03_CHAR]()
+                w32(INFO, LIST + 0x10); at[S.EvCheck04_CHARASM]()
+                return 0
+            end
+            if addr == S.CheckForCharacterEvents then return args[2] == 0x0E and 1 or 0 end
+        end, INFO)
+    end
+    local talks = Sight.talks(api, sandbox)
+    check(#talks, 1, "talks: only the available one is kept")
+    check(talks[1] and talks[1].a, 0x01, "talks: its pidA")
+    check(talks[1] and talks[1].b, 0x0E, "talks: its pidB")
+    check(asked and asked[1] == 0xFF and asked[2] == 0xFF, true, "talks: the walk matches no entry")
+    check(at[S.EvCheck03_CHAR] == nil and at[S.EvCheck04_CHARASM] == nil, true,
+          "talks: the breakpoints are cleared")
+end
+
 -- test_odds_compose_exchanges: two 50/50 exchanges of 6 on a 10 HP unit kill a quarter of the
 -- time; the damage is capped at the HP; worst and least read a distribution's ends.
 do

@@ -33,8 +33,10 @@
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
---   recruits           OPTIONAL: the charIds the chapter owes a clean clear (campaign_env.py);
---                      absent, the recruits part is "unchecked" and `clean` is never true
+--   recruits()         OPTIONAL: the charIds the chapter's talks would bring over, read from
+--                      the game at the first look (Sight talks: each talk the game would run,
+--                      its pidB); absent, the recruits part is "unchecked" and `clean` is
+--                      never true
 --   party()            with recruits: the charIds in the game's party now, the game's own
 --                      MakePrepUnitList (IsUnitInCurrentRoster), run in the sandbox
 --   seed(s)            seed the game's RNG (Sight.seed)
@@ -322,7 +324,7 @@ function M.run(api)
     local explore = M.exploreLog()
     -- the clean clear's recruits part, read from the game's party (api.party: the game's own
     -- MakePrepUnitList, i.e. IsUnitInCurrentRoster), never from the unit arrays: owed =
-    -- api.recruits less the party at the first read; joined = owed and in the party at the
+    -- api.recruits() less the party at the first read; joined = owed and in the party at the
     -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
     -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
     local owed = nil
@@ -355,7 +357,7 @@ function M.run(api)
             local party = {}
             for _, c in ipairs(api.party()) do party[c] = true end
             owed = {}
-            for _, c in ipairs(api.recruits) do
+            for _, c in ipairs(api.recruits()) do
                 if not party[c] then owed[#owed + 1] = c end
             end
         end

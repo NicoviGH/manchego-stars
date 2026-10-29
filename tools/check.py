@@ -98,6 +98,10 @@ DEAD_CONCEPTS = [
     # retired by #510 step 9 PR E: the team is Bot.team's pick over the map's demands, never a
     # level-ordered fill or a shuffled deploy, and the route is a campaign setting, never drawn
     r'Bot\.prep\b', r'STYLES\.route', r'\broute 50/50\b',
+    # retired by #510 step 9's re-derivation audit (ADR 0377, amended 2026-10-29): a key is the
+    # game's GetUnitKeyItemSlotForTerrain, a won-back chest its BATTLE_HandleItemDrop, owed
+    # recruits its talk table -- never a copied id list, a seen-blue set or a decomp regex
+    r'INSPECT\.BAG\.KEYS\b', r'\bblueSeen\b', r'explore\.downed\b', r'cfg\.recruits\b',
     # retired by #510 step 9 PR D (ADR 0369): who may Seize and a unit's reach are the game's
     # answers (CanUnitSeize, GetUnitEquippedWeapon) read through sight.lua, never board.lua's
     # copies; the enemy's strike is the AI's own decision (AiDecideMain since audit 13), not a

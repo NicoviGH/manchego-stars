@@ -3169,6 +3169,15 @@ INSPECT.botApi = function(game)
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
         board = BOARD.read,
+        -- the charIds the chapter's talks would bring over: each talk the game would run now
+        -- (Sight talks), its target, once
+        recruits = function()
+            local out, seen = {}, {}
+            for _, t in ipairs(Sight.talks(sightApi)) do
+                if not seen[t.b] then seen[t.b] = true; out[#out + 1] = t.b end
+            end
+            return out
+        end,
         -- the game's party, by charId (INSPECT.prepList)
         party = function()
             local out = {}
@@ -3343,8 +3352,8 @@ INSPECT.BAG = {
     IA_STAFF = 4, BMST_TMP_ITEM = 0x2C, UNIT_ITEM_LIST = 0x1E, UNIT_ITEMS = 5,
     CHAR_NUMBER = 0x04,                         -- CharacterData +04 number (bmunit.h)
     MENU_DISCARD_FIRST = 0x24, MENU_SEND_FIRST = 0x2A,
-    KEYS = { [0x69] = "ITEM_CHESTKEY", [0x6A] = "ITEM_DOORKEY", [0x6B] = "ITEM_LOCKPICK",
-             [0x79] = "ITEM_CHESTKEY_BUNDLE" },
+    -- The engine tests each passive item by id in scattered places (a shield's effect in the
+    -- battle code, the cards in the shop), with no one function to ask, so they are listed.
     PASSIVE = { [0x71] = "ITEM_DELPHISHIELD", [0x72] = "ITEM_MEMBERCARD",
                 [0x73] = "ITEM_SILVERCARD", [0x7C] = "ITEM_HOPLON_SHIELD" },
 }
@@ -3404,10 +3413,30 @@ end
 -- What Bot.fullBag weighs about one item for one unit, every fact the game's (#510 step 9,
 -- Nicolas 2026-10-28). `call` is a sandbox's (INSPECT.gameCalls); `item` = { id, uses }.
 -- kind: a weapon or staff (IA_WEAPON | IA_STAFF; usable = CanUnitUseWeapon / CanUnitUseStaff;
--- rank, the reach's max and the effectiveness list from its ItemData), a key (what
--- GetUnitKeyItemSlotForTerrain looks for), a passive item (each one the engine tests by id),
+-- rank, the reach's max and the effectiveness list from its ItemData), a key (the item alone
+-- in the unit's bag, GetUnitKeyItemSlotForTerrain finds it for a door or a chest: a Lockpick
+-- is a key only to a thief), a passive item (each one the engine tests by id),
 -- a heal (GetUnitItemHealAmount > 0), money (no use effect at all: gems, gold), else other
 -- (seals, boosters, Pure Water...).
+-- Whether the game takes `value` (id | uses << 8) for a key of the unit's: in the sandbox `call`
+-- runs in, the item is put alone in the unit's bag and GetUnitKeyItemSlotForTerrain asked for
+-- each key terrain; the bag is put back.
+INSPECT.isKey = function(call, unitAddr, value)
+    local K = INSPECT.BAG
+    local bag = {}
+    for k = 0, K.UNIT_ITEMS - 1 do
+        local at = unitAddr + K.UNIT_ITEM_LIST + k * 2
+        bag[k] = ru16(at)
+        emu:write16(at, k == 0 and value or 0)
+    end
+    local key = false
+    for _, terrain in ipairs({ INSPECT.Sight.TERRAIN_DOOR, INSPECT.Sight.TERRAIN_CHEST_FULL }) do
+        key = key or call(SYM.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
+    end
+    for k = 0, K.UNIT_ITEMS - 1 do emu:write16(unitAddr + K.UNIT_ITEM_LIST + k * 2, bag[k]) end
+    return key
+end
+
 INSPECT.unitItemFacts = function(call, unitAddr, item)
     local C, K = INSPECT.CAMPAIGN, INSPECT.BAG
     local f = INSPECT.itemFacts(item.id)
@@ -3423,7 +3452,7 @@ INSPECT.unitItemFacts = function(call, unitAddr, item)
         f.effective = eff ~= 0 and eff or nil
         local check = (attr & K.IA_STAFF) ~= 0 and SYM.CanUnitUseStaff or SYM.CanUnitUseWeapon
         f.usable = call(check, { unitAddr, value }) ~= 0
-    elseif K.KEYS[item.id] then
+    elseif INSPECT.isKey(call, unitAddr, value) then
         f.kind = "key"
     elseif K.PASSIVE[item.id] then
         f.kind = "passive"
@@ -3939,9 +3968,6 @@ INSPECT.campaignApi = function(game)
         local b = INSPECT.botApi(game)
         b.style, b.claims = style, claims
         b.info.campaign, b.info.attempt = id, attempt
-        -- the recruits this chapter owes a clean clear (campaign_env.py): a campaign always
-        -- judges them, so a chapter with none owes an empty list, not an unchecked one
-        b.recruits = (cfg.recruits or {})[tostring(chapter())] or {}
         b.seed = function() end   -- seeded once, at the first chapter: FE8 never re-seeds
         pokeFastConfig()
         INSPECT.settle("phase", 6000, true)
@@ -3984,8 +4010,7 @@ end
 -- from its start state until it clears with everyone alive. PT_SEED seeds the game's RNG once;
 -- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
 -- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
--- record), claims = { [chapter] = resolved claims }, recruits = { [chapter] = {charIds} } (the
--- recruits a clean clear owes), from = a chapter index to resume at, from
+-- record), claims = { [chapter] = resolved claims }, from = a chapter index to resume at, from
 -- the start state this id saved, attempt = k: only the k-th attempt from `from`'s start (the
 -- pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.

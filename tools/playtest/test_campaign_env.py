@@ -119,37 +119,6 @@ class Claims(unittest.TestCase):
                          'unresolved')
 
 
-class Recruits(unittest.TestCase):
-    """The recruits a chapter owes a clean clear (#510 step 9 design, part A): the talks that
-    turn a unit blue."""
-    pid = staticmethod(ce.character_pid)
-
-    def test_vanilla_ch2_owes_ross_and_garcia(self):
-        ch2 = str(ce.vanilla_index('FE8 Ch2'))
-        self.assertEqual(ce.vanilla_env()['recruits'][ch2],
-                         sorted([self.pid('CHARACTER_ROSS'), self.pid('CHARACTER_GARCIA')]))
-
-    def test_vanilla_ch5_owes_joshua(self):
-        ch5 = str(ce.vanilla_index('FE8 Ch5'))
-        self.assertEqual(ce.vanilla_env()['recruits'][ch5], [self.pid('CHARACTER_JOSHUA')])
-
-    def test_a_talk_without_cusa_recruits_no_one(self):
-        # ch15b's talks are conversations: none of their scripts turns a unit blue
-        self.assertEqual(difficulty._talk_recruits('ch15b'), {})
-
-    def test_ours_owes_its_talk_recruits(self):
-        hosts = {h.number: h.host_index for h in inject.hosts.hosted_chapters()}
-        with tempfile.TemporaryDirectory() as store:
-            for number in hosts:
-                twin = ce.vanilla_index(difficulty.VANILLA_CHAIN[number])
-                with open(os.path.join(store, '%d.json' % twin), 'w') as f:
-                    json.dump({'shops': []}, f)
-            recruits = ce.ours_env(store)['recruits']
-        trex = self.pid(ce.inject.cast.char_symbol('Rennac'))
-        self.assertEqual(recruits[str(hosts[3])], [trex])
-        self.assertNotIn(str(hosts[2]), recruits, 'ch02 has no talk recruit')
-
-
 class Resume(unittest.TestCase):
     def run_main(self, argv):
         import contextlib

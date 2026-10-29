@@ -49,7 +49,6 @@ import difficulty  # noqa: E402
 import inject.cast  # noqa: E402
 import inject.decomp  # noqa: E402
 import inject.hosts  # noqa: E402
-import inject.recruit  # noqa: E402
 import team_groups  # noqa: E402
 
 VANILLA_LAST = ('CHAPTER_E_21X', 'CHAPTER_I_21X')
@@ -177,29 +176,10 @@ def twin_claims_env(route):
     return out
 
 
-def vanilla_recruits():
-    """{chapter index (str): [charId]}: the recruits each vanilla chapter owes a clean clear
-    (#510 step 9 design, part A), its talks that turn a unit blue (difficulty._talk_recruits).
-    Every chapter with any, both routes': a campaign only reads the ones it reaches."""
-    return {k: list(v) for k, v in _vanilla_recruits().items()}
-
-
-@functools.lru_cache(maxsize=1)
-def _vanilla_recruits():
-    # read from the decomp at HEAD, which does not move inside a process
-    out = {}
-    for index in sorted(set(_chapter_enum().values())):
-        stem = difficulty.chapter_event_stem(index)
-        talk = difficulty._talk_recruits(stem) if stem else {}
-        if talk:
-            out[str(index)] = sorted(character_pid(t) for t in talk)
-    return out
-
-
 def vanilla_env(route=1):
     enum = _chapter_enum()
     return dict(team_groups.env(), last=[enum[n] for n in VANILLA_LAST], route=route,
-                claims=twin_claims_env(route), recruits=vanilla_recruits())
+                claims=twin_claims_env(route))
 
 
 def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
@@ -234,15 +214,7 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
             claims[str(hosts[number])] = [
                 resolve(c, '%s#%d' % (chap['id'], i), 'ours', chap, campaign)
                 for i, c in enumerate(strategy.our_claims(chap))]
-    # the recruits each chapter owes a clean clear: its on-map Talk recruits (inject.recruit)
-    recruits = {}
-    for number, host in hosts.items():
-        rows = inject.recruit.on_map_talk_recruits(campaign, number)
-        if rows:
-            recruits[str(host)] = sorted(character_pid(inject.cast.char_symbol(slot))
-                                         for _uid, slot, *_ in rows)
-    env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops, claims=claims,
-               recruits=recruits)
+    env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops, claims=claims)
     if lord is not None:
         env['lord'] = lead_row(lord, campaign)
     return env
