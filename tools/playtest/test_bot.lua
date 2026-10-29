@@ -1381,14 +1381,17 @@ local function test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
 end
 test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
 
+-- A stock price every buyer pays (the game prices per buyer: GetItemPurchasePrice).
+local function anyone(n) return setmetatable({}, { __index = function() return n end }) end
+
 local function test_shop_stops_at_gold()
     local stock = {
-        { item = 0x6C, price = 300, kind = "vulnerary" },
-        { item = 0x10, price = 500, type = "sword" },
-        { item = 0x11, price = 400, type = "sword" },
-        { item = 0x12, price = 900, type = "sword" },
-        { item = 0x20, price = 700, type = "lance" },
-        { item = 0x21, price = 100, type = "axe" },
+        { item = 0x6C, price = anyone(300), kind = "vulnerary" },
+        { item = 0x10, price = anyone(500), type = "sword" },
+        { item = 0x11, price = anyone(400), type = "sword" },
+        { item = 0x12, price = anyone(900), type = "sword" },
+        { item = 0x20, price = anyone(700), type = "lance" },
+        { item = 0x21, price = anyone(100), type = "axe" },
     }
     -- canUse is the game's CanUnitUseWeapon: A can wield the two cheaper swords, not 0x12.
     local A = unitOf(1, 0x01, 1, { canUse = { [0x10] = true, [0x11] = true } })
@@ -1424,6 +1427,18 @@ local function test_shop_stops_at_gold()
         "a weapon the game says the unit cannot use is never bought")
 end
 test_shop_stops_at_gold()
+
+-- test_shop_budgets_at_the_buyers_price: a Silver Card halves A's prices only, so 450 gold buys
+-- B's Vulnerary (300) and A's (150); priced at B's 300 for both, A's would not fit.
+local function test_shop_budgets_at_the_buyers_price()
+    local stock = { { item = 0x6C, price = { [0x01] = 150, [0x02] = 300 }, kind = "vulnerary" } }
+    local t = {}
+    for _, e in ipairs(B.shop(450, stock, { unitOf(2, 0x02, 1), unitOf(1, 0x01, 1) })) do
+        t[#t + 1] = e.unit .. ":" .. e.item
+    end
+    check(csv(t), "2:108,1:108", "each buyer pays its own price: 300 + 150 fit in 450")
+end
+test_shop_budgets_at_the_buyers_price()
 
 local function test_promote_reads_the_games_answer()
     -- `promotes` is the game's own check (class and level): the bot adds no rule of its own.

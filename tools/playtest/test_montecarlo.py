@@ -357,6 +357,21 @@ class Cell(unittest.TestCase):
             fh.write('return 2')
         self.assertNotEqual(h1, mc.bot_hash(d))
 
+    def test_bot_hash_ignores_generated_tables_and_tests(self):
+        # a ROM rebuild rewrites symbols.lua; a test edit runs no differently: neither may
+        # throw away every kept run
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, 'bot.lua'), 'w') as fh:
+            fh.write('return 1')
+        h1 = mc.bot_hash(d)
+        for name in ('symbols.lua', 'procscr.lua', 'test_bot.lua'):
+            with open(os.path.join(d, name), 'w') as fh:
+                fh.write('-- changed')
+        self.assertEqual(h1, mc.bot_hash(d))
+        with open(os.path.join(d, 'harness.lua'), 'w') as fh:
+            fh.write('-- the bot api')
+        self.assertNotEqual(h1, mc.bot_hash(d))
+
     def test_a_runs_trace_is_kept_gzipped_beside_the_runs(self):
         import gzip
         d = tempfile.mkdtemp()
@@ -430,6 +445,15 @@ class Story(unittest.TestCase):
         self.assertEqual(mc._names('vanilla')[0x01], 'Eirika')
         self.assertTrue(mc._items())
         self.assertEqual(mc._classes()[0x01], 'Lord')
+
+    def test_ours_names_and_claims_share_one_cast_lookup(self):
+        # a run's id names the cast member a claim with that name resolves to
+        import campaign_env as ce
+        from inject.scene_actors import cast_pids
+        names = mc._names('ours')
+        for name, pid in cast_pids().items():
+            self.assertEqual(ce._unit_id(name, 'ours', None), pid)
+            self.assertEqual(names[pid], name.replace('-', ' ').title())
 
 
 if __name__ == '__main__':

@@ -20,8 +20,9 @@
 -- that different play (the amendment, #510).
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
--- start state, the game's RNG in it, and the draws never read a result, so attempt k plays
--- exactly as it would after k - 1 failures: k workers side by side find what the loop finds,
+-- start state, the game's RNG in it; the draws restart at each chapter start (api.seed) and
+-- never read a result; and the start carries the team the campaign carried in (api.save,
+-- arrive). So attempt k plays exactly as it would after k - 1 failures: k workers side by side find what the loop finds,
 -- the lowest k that clears clean. It saves no state (the workers share the start's files) and
 -- moves on to no chapter.
 -- A campaign stops when:
@@ -43,11 +44,13 @@
 --                         split (vanilla's Ch8) the campaign takes, a SETTING, never drawn (#510
 --                         plan comment, "Lords"); a split with none set raises in Bot.route
 --   random()              a float in [0, 1): the campaign's own draws (styles)
+--   seed(chapter)         restart random()'s draws for this chapter start, from (seed, chapter)
 --   arrive(route)         ride the game to the next chapter's start; at a route split the
---                         harness calls route(options) -> index. Returns { chapter = n } |
+--                         harness calls route(options) -> index. Returns { chapter = n,
+--                         carried = {charIds}|nil (a resumed start: the team carried in) } |
 --                         "end" | nil, why
---   save(chapter)         write the chapter-start state and what the game gave (party, gold,
---                         items); true | nil, why
+--   save(chapter, carried) write the chapter-start state, what the game gave (party, gold,
+--                         items) and the carried team (charIds); true | nil, why
 --   load(chapter)         load that state back; true | nil, why
 --   roster()              bot.lua's roster entries: every unit the player could field this
 --                         chapter, in slot order, each with its classId
@@ -121,7 +124,9 @@ end
 -- not do a step.
 local function between(api, style, followed, need, carried)
     local Bot = api.Bot
-    local roster, cap = api.roster(), api.cap()
+    local roster = api.roster()
+    local cap, cwhy = api.cap()
+    if cwhy then return nil, "cap: " .. cwhy end
     local team = { deploy = {}, reasons = {} }
     local party = {}
     if cap then
@@ -197,14 +202,24 @@ function M.run(api)
             if at == "end" then return "done", "the game has no next chapter" end
             if not at then return "crashed", "arrive: " .. tostring(why) end
             local ch = at.chapter
+            api.seed(ch)
+            if at.carried then
+                carried = {}
+                for _, charId in ipairs(at.carried) do carried[charId] = true end
+            end
             if not api.only then
-                local ok, swhy = api.save(ch)
+                local list = {}
+                for charId in pairs(carried) do list[#list + 1] = charId end
+                table.sort(list)
+                local ok, swhy = api.save(ch, list)
                 if not ok then return "crashed", "save: " .. tostring(swhy) end
             end
             local claims = api.claims(ch) or {}
             local entry = { chapter = ch, attempts = 0, failures = {} }
             chapters[#chapters + 1] = entry
-            local need = api.cap() and api.needs(api.roster()) or nil
+            local cap, cwhy = api.cap()
+            if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end
+            local need = cap and api.needs(api.roster()) or nil
             entry.demands = need and need.demands or nil
             local tried = {}
             while true do

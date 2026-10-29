@@ -420,7 +420,7 @@ EOF
     if ! verdict_passed; then
         if grep -q '"event":"inspect"\|"event": "inspect"' "$log" 2>/dev/null; then
             echo "---------------- inspector ----------------"
-            python3 "$HERE/inspect_state.py" render "$log" || true
+            python3 "$HERE/inspect_state.py" render "$log" --symbols "${PT_SYMDIR:-$HERE}/symbols.json" || true
         fi
     fi
     echo "artifacts: $out"
@@ -441,6 +441,19 @@ fi
 # never notice. Existing single-hash stamps mismatch and re-mint once, which is correct.
 CHECKPOINT_STAMP="$ROMHASH:${PT_DIFFICULTY:-normal}"
 if [ -n "$BUILDER" ]; then
+    # One builder at a time per checkpoint: the builder's run dir, ROM and .sav are shared,
+    # never tagged, so tagged copies of a scenario (montecarlo.py's pool) that found it stale
+    # together would delete each other's logs and saves. The first takes the lock and builds;
+    # the rest wait, then find it valid below. mkdir is atomic; the lock names its owner, so a
+    # lock whose owner died without its trap (kill -9) is taken over rather than waited on.
+    BUILD_LOCK="$STATE_DIR/$CKPT.lock"
+    until mkdir "$BUILD_LOCK" 2>/dev/null; do
+        _owner=$(cat "$BUILD_LOCK/pid" 2>/dev/null || true)
+        if [ -n "$_owner" ] && ! kill -0 "$_owner" 2>/dev/null; then rm -rf "$BUILD_LOCK"; continue; fi
+        sleep 1
+    done
+    echo $$ > "$BUILD_LOCK/pid"
+    trap 'rm -rf "$BUILD_LOCK"' EXIT
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
         echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
         # Note what the state file looked like BEFORE the build. Most builder failures never
@@ -475,6 +488,8 @@ if [ -n "$BUILDER" ]; then
     else
         echo "== checkpoint '$CKPT' valid for $CHECKPOINT_STAMP -> loading =="
     fi
+    rm -rf "$BUILD_LOCK"
+    trap - EXIT
 fi
 
 # Rate + deadline also come from matrix.yaml (record* film at 60fps for faithful motion;

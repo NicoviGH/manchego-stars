@@ -42,7 +42,6 @@ at: the cell stops and reports what that run said.
 import argparse
 import concurrent.futures
 import functools
-import glob
 import gzip
 import hashlib
 import json
@@ -372,13 +371,17 @@ def simdir(vanilla):
 
 
 def bot_hash(root=HERE):
-    """The bot code a run ran: every Lua file of the playtest harness, hashed. A change to any
-    of them makes kept runs another cell's."""
+    """The bot code a run ran, hashed: the driver files the matrix keys on
+    (matrix.driver_source: no generated symbol table, no test) and harness.lua. A change to
+    any of them makes kept runs another cell's; rebuilding a ROM or editing a test does not."""
+    import matrix
+    files = matrix.driver_source(root)
+    harness = os.path.join(root, 'harness.lua')
+    if os.path.isfile(harness):
+        files['harness.lua'] = matrix._read(harness)
     h = hashlib.sha1()
-    for path in sorted(glob.glob(os.path.join(root, '*.lua'))):
-        h.update(os.path.basename(path).encode() + b'\0')
-        with open(path, 'rb') as fh:
-            h.update(fh.read())
+    for name in sorted(files):
+        h.update(name.encode() + b'\0' + files[name].encode())
     return h.hexdigest()[:12]
 
 
@@ -519,18 +522,14 @@ def _names(game):
     """{character id: name}: ours' cast by its PCs' and guests' names, then every character
     the decomp names (vanilla's cast and the generic enemies both games share)."""
     sys.path.insert(0, os.path.dirname(HERE))
-    import inject.cast
     import inject.decomp
-    from inject.scene_actors import character_pid
+    from inject.scene_actors import cast_pids
     text = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
     out = {v: k[len('CHARACTER_'):].replace('_', ' ').title()
            for k, v in inject.decomp.enum_values(text, 'CHARACTER_').items()}
     if game == 'ours':
-        for table in (inject.cast.PORTRAIT_MAP, inject.cast.GUEST_PORTRAIT_MAP):
-            for name, slot in table.items():
-                pid = character_pid(inject.cast.char_symbol(slot))
-                if pid is not None:
-                    out[pid] = name.replace('-', ' ').title()
+        for name, pid in cast_pids().items():
+            out[pid] = name.replace('-', ' ').title()
     return out
 
 

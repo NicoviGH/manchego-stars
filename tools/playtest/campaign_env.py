@@ -44,9 +44,10 @@ sys.path.insert(0, os.path.dirname(HERE))
 import campaign_chapters  # noqa: E402
 import strategy  # noqa: E402
 from inject import class_ids, reskins  # noqa: E402
-from inject.scene_actors import character_pid  # noqa: E402
+from inject.scene_actors import cast_pids, character_pid  # noqa: E402
 import difficulty  # noqa: E402
 import inject.cast  # noqa: E402
+import inject.chapter_settings  # noqa: E402
 import inject.decomp  # noqa: E402
 import inject.hosts  # noqa: E402
 import team_groups  # noqa: E402
@@ -59,19 +60,14 @@ def _chapter_enum():
         inject.decomp.vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_')
 
 
-def vanilla_index(ref):
-    """The vanilla chapter index of a VANILLA_CHAIN entry: 'FE8 Prologue' -> CHAPTER_L_PROLOGUE,
-    'FE8 ChK' -> CHAPTER_L_K (the routes share Prologue to Ch8)."""
-    tail = ref.split(' ', 1)[1]
-    name = 'CHAPTER_L_PROLOGUE' if tail == 'Prologue' else 'CHAPTER_L_' + tail[2:]
-    return _chapter_enum()[name]
-
-
 def twin_index(ref, route):
     """The vanilla chapter a twin_strategy key names on `route` (1 Eirika, 2 Ephraim), or None
     when that key belongs to the other route. Up to Ch8 the routes share chapters
-    (vanilla_index); a plain `FE8 ChN` with an `FE8 ChN Ephraim` twin is Eirika's own, one
-    without is shared; `Final` / `Final 2` are Ch21 / Ch21x."""
+    (inject.chapter_settings.twin_rows, the one owner); a plain `FE8 ChN` with an `FE8 ChN
+    Ephraim` twin is Eirika's own, one without is shared; `Final` / `Final 2` are Ch21 / Ch21x."""
+    shared = inject.chapter_settings.twin_rows()
+    if ref in shared:
+        return shared[ref]
     enum = _chapter_enum()
     tail = ref.split(' ', 1)[1]
     side = 'E' if route == 1 else 'I'
@@ -79,8 +75,6 @@ def twin_index(ref, route):
         return enum['CHAPTER_I_' + tail[2:-len(' Ephraim')]] if route == 2 else None
     if tail in ('Final', 'Final 2'):
         return enum['CHAPTER_%s_21%s' % (side, 'X' if tail == 'Final 2' else '')]
-    if tail == 'Prologue' or 'CHAPTER_L_' + tail[2:].upper() in enum:
-        return enum['CHAPTER_L_PROLOGUE' if tail == 'Prologue' else 'CHAPTER_L_' + tail[2:].upper()]
     if route == 2 and ref + ' Ephraim' in strategy._twin_file():
         return None
     return enum['CHAPTER_%s_%s' % (side, tail[2:])]
@@ -120,8 +114,7 @@ def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
 
 def _unit_id(name, game, campaign):
     if game == 'ours':
-        slot = (inject.cast.PORTRAIT_MAP.get(name) or inject.cast.GUEST_PORTRAIT_MAP.get(name))
-        pid = slot and character_pid(inject.cast.char_symbol(slot))
+        pid = cast_pids().get(name)
     else:
         pid = character_pid('CHARACTER_' + name.upper().replace('-', '_'))
     if pid is None:
@@ -200,7 +193,7 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
     hosts = {h.number: h.host_index for h in inject.hosts.hosted_chapters() if h.number in written}
     shops = {}
     for number, host in sorted(hosts.items()):
-        twin = vanilla_index(difficulty.VANILLA_CHAIN[number])
+        twin = inject.chapter_settings.twin_rows()[difficulty.VANILLA_CHAIN[number]]
         path = os.path.join(store, '%d.json' % twin)
         if not os.path.exists(path):
             raise FileNotFoundError('%s: no record of the twin (vanilla chapter %d) for our chapter '

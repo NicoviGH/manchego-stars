@@ -52,9 +52,15 @@ local function fakeGame(o)
             if ch.options then g.routeAsked = route({ "a", "b" }) end
             if ch.arriveFails then return nil, "the world map never handed over" end
             g.attempt = 0
-            return { chapter = ch.id }
+            return { chapter = ch.id, carried = ch.carried }
         end,
-        save = function(ch) g.saved[#g.saved + 1] = ch; return true end,
+        seed = function(ch) g.seeds[#g.seeds + 1] = ch; if o.seed then o.seed(ch) end end,
+        save = function(ch, carried)
+            g.saved[#g.saved + 1] = ch
+            g.carriedSaved = g.carriedSaved or {}
+            g.carriedSaved[ch] = carried
+            return true
+        end,
         load = function() g.loads = g.loads + 1; return true end,
         roster = roster,
         cap = function() return o.cap end,
@@ -263,8 +269,9 @@ end
 test_ours_without_a_clean_clear_is_infeasible()
 
 local function test_between_deploys_shops_promotes()
-    local stock = { { item = 0x6C, price = 300, kind = "vulnerary" },
-                    { item = 0x10, price = 500, type = "sword" } }
+    -- priced per buyer, as the harness does (every roster unit pays the same here)
+    local stock = { { item = 0x6C, price = { 300, 300, 300, 300 }, kind = "vulnerary" },
+                    { item = 0x10, price = { 500, 500, 500, 500 }, type = "sword" } }
     local needs = { demands = { { id = "sustain", need = 1 } },
                     answers = { [0x03] = { sustain = true } }, strength = {} }
     local g = fakeGame({ cap = 2, gold = 10000, stock = stock, random = cycle({ 0.1 }),
@@ -367,6 +374,48 @@ local function test_ungrouped_class_stops_the_campaign()
     check(why:find("no team group") ~= nil, true, "and says so")
 end
 test_ungrouped_class_stops_the_campaign()
+
+-- A prep screen whose Pick Units never opens is a crash, never a chapter without prep: the
+-- bot must not field the whole roster and shop on the prep screen.
+local function test_cap_failure_is_a_crash()
+    local g = fakeGame({ cap = 2, chapters = { { id = 1 } } })
+    g.api.cap = function() return nil, "Pick Units did not open" end
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "a cap failure stops the campaign")
+    check(why:find("Pick Units did not open") ~= nil, true, "and says why")
+    check(#g.plays, 0, "nothing is played on a prep screen it could not read")
+end
+test_cap_failure_is_a_crash()
+
+-- A run resumed at chapter 2 (the pool, or --from) plays it as the whole campaign did: the
+-- draws restart from (seed, chapter), and the start's record hands back the carried team.
+local function test_resume_plays_as_the_campaign()
+    local function seeded()
+        local at = 0
+        local values = { 0.1, 0.6, 0.3, 0.9, 0.5, 0.7 }
+        return function() at = at + 1; return values[(at - 1) % #values + 1] end,
+               function(ch) at = ch end
+    end
+    local ch1 = { demands = { { id = "d1", need = 1 } }, answers = { [0x04] = { d1 = true } },
+                  strength = {} }
+    local ch2 = { demands = { { id = "d2", need = 1 } },
+                  answers = { [0x02] = { d2 = true }, [0x04] = { d2 = true } }, strength = {} }
+    local r1, s1 = seeded()
+    local full = fakeGame({ cap = 2, random = r1, seed = s1, chapters = {
+        { id = 1, needs = ch1, outcomes = { "lost", "won" } }, { id = 2, needs = ch2 } } })
+    Campaign.run(full.api)
+    check(table.concat(full.seeds, ","), "1,2", "the draws restart at each chapter start")
+    check(table.concat(full.carriedSaved[2], ","), "1,4", "chapter 2's start saves the team carried in")
+    local r2, s2 = seeded()
+    local resumed = fakeGame({ cap = 2, random = r2, seed = s2, chapters = {
+        { id = 2, needs = ch2, carried = full.carriedSaved[2] } } })
+    Campaign.run(resumed.api)
+    check(Json.encode(resumed.plays[1].style), Json.encode(full.plays[3].style),
+          "the resumed chapter 2 draws the campaign's style")
+    check(table.concat(resumed.deployed[1], ","), table.concat(full.deployed[3], ","),
+          "and picks the campaign's team: the carried unit wins the tie")
+end
+test_resume_plays_as_the_campaign()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)

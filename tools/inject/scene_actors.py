@@ -10,7 +10,7 @@ import sys
 
 from inject import decomp as _decomp
 from inject import event_group
-from inject.cast import PORTRAIT_MAP
+from inject.cast import GUEST_PORTRAIT_MAP, PORTRAIT_MAP, char_symbol
 from inject.decomp import DECOMP, vanilla_decomp_text
 from inject.hosts import hosted_chapters
 from inject.paths import EVENTS_UDEFS_C
@@ -71,6 +71,18 @@ def character_pid(token):
         return int(token, 0)
     except ValueError:
         return None
+
+
+def cast_pids():
+    """{cast name: pid} for our PCs and guests, by the character slot each fills: the one
+    lookup both ways (a claim's unit to its id, a run's id back to its name)."""
+    out = {}
+    for table in (PORTRAIT_MAP, GUEST_PORTRAIT_MAP):
+        for name, slot in table.items():
+            pid = character_pid(char_symbol(slot))
+            if pid is not None:
+                out[name] = pid
+    return out
 
 
 def scene_staged_pids(body, severity=None):

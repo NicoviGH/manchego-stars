@@ -13,13 +13,15 @@ import campaign_env as ce  # noqa: E402
 import campaign_chapters  # noqa: E402
 import difficulty  # noqa: E402
 import inject.hosts  # noqa: E402
+from inject.chapter_settings import twin_rows  # noqa: E402
 
 
 class VanillaIndex(unittest.TestCase):
     def test_chain_reads_the_decomp_enum(self):
         # Ch5x is CHAPTER_L_5X = 5, so Ch5 onward sits one past its number.
-        got = [ce.vanilla_index(r) for r in difficulty.VANILLA_CHAIN]
+        got = [twin_rows()[r] for r in difficulty.VANILLA_CHAIN]
         self.assertEqual(got, [0, 1, 2, 3, 4, 6, 7, 8, 9])
+        self.assertEqual(twin_rows()['FE8 Ch5x'], 5, 'Ch5x is a shared-route twin too')
 
     def test_vanilla_ends_after_either_routes_last_chapter(self):
         env = ce.vanilla_env()
@@ -54,13 +56,13 @@ class Ours(unittest.TestCase):
         hosts = self.written()
         with tempfile.TemporaryDirectory() as store:
             for number in hosts:
-                twin = ce.vanilla_index(difficulty.VANILLA_CHAIN[number])
+                twin = twin_rows()[difficulty.VANILLA_CHAIN[number]]
                 with open(os.path.join(store, '%d.json' % twin), 'w') as f:
                     json.dump({'shops': [twin, 100 + twin]}, f)
             env = ce.ours_env(store)
         self.assertEqual(env['last'], [hosts[max(hosts)]])
         for number, host in hosts.items():
-            twin = ce.vanilla_index(difficulty.VANILLA_CHAIN[number])
+            twin = twin_rows()[difficulty.VANILLA_CHAIN[number]]
             self.assertEqual(env['shops'][str(host)], [twin, 100 + twin])
 
     def test_a_missing_twin_record_raises(self):
@@ -80,7 +82,7 @@ class Claims(unittest.TestCase):
                                         '%s: %r' % (chapter, c))
 
     def test_twin_ch3_is_played_not_parked(self):
-        ch3 = ce.vanilla_env(1)['claims'][str(ce.vanilla_index('FE8 Ch3'))]
+        ch3 = ce.vanilla_env(1)['claims'][str(twin_rows()['FE8 Ch3'])]
         recruit = [c for c in ch3 if c['kind'] == 'recruit'][0]
         enum = ce.character_pid
         self.assertEqual((recruit['unit'], recruit['by']),

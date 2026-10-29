@@ -121,8 +121,9 @@
 --   promotes = bool|nil }...} }. `canUse` is the game's CanUnitUseWeapon for this unit over the
 --   stock; `promotes` is the game's own promotion-item check for THIS unit (class and level),
 --   set on a seal it would accept.
--- stock entry: { item, price, type = weaponType|nil, kind = "vulnerary"|nil }; the caller
---   says which stock item is the Vulnerary, so no item id lives here.
+-- stock entry: { item, price = {[charId] = n}, type = weaponType|nil, kind = "vulnerary"|nil };
+--   price is the game's for each buyer (GetItemPurchasePrice reads the unit: a Silver Card
+--   halves it). The caller says which stock item is the Vulnerary, so no item id lives here.
 -- Bot.team(t) -> { deploy = {charIds}, reasons = {[charId] = reason}, give = {} }: whom the
 --   prep screen fields (#510 plan comment, "Party selection"). t = { roster, cap,
 --   maxima = {[group] = n}, demands = {{ id, need }...}, answers = {[charId] = {[demandId] =
@@ -1716,10 +1717,11 @@ function M.team(t)
     return { deploy = deploy, reasons = reasons, give = {} }
 end
 
-local function cheapest(stock, want)
+-- the cheapest stock entry `want` accepts, at `u`'s prices
+local function cheapest(stock, u, want)
     local best
     for _, s in ipairs(stock) do
-        if want(s) and (not best or s.price < best.price) then best = s end
+        if want(s) and (not best or s.price[u.charId] < best.price[u.charId]) then best = s end
     end
     return best
 end
@@ -1734,13 +1736,14 @@ end
 function M.shop(gold, stock, party)
     local out = {}
     local function buy(u, s)
-        if not s or s.price > gold then return end
-        gold = gold - s.price
+        if not s or s.price[u.charId] > gold then return end
+        gold = gold - s.price[u.charId]
         out[#out + 1] = { unit = u.charId, item = s.item }
     end
-    local vuln = cheapest(stock, function(s) return s.kind == "vulnerary" end)
     for _, u in ipairs(party) do
-        if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then buy(u, vuln) end
+        if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then
+            buy(u, cheapest(stock, u, function(s) return s.kind == "vulnerary" end))
+        end
     end
     for _, u in ipairs(party) do
         local usable = function(s) return s.type ~= nil and (u.canUse or {})[s.item] end
@@ -1754,7 +1757,7 @@ function M.shop(gold, stock, party)
         table.sort(types)
         for _, t in ipairs(types) do
             if not holdsAny(u, function(it) return it.type == t end) then
-                buy(u, cheapest(stock, function(s) return usable(s) and s.type == t end))
+                buy(u, cheapest(stock, u, function(s) return usable(s) and s.type == t end))
             end
         end
     end

@@ -3614,7 +3614,6 @@ INSPECT.campaignApi = function(game)
     local id = cfg.id or string.format("%s-s%d", mode, seed)
     local dir = PLAYTEST_SIMDIR .. "/states/" .. id
     local states, played, shops, menuPicked = {}, nil, nil, nil
-    math.randomseed(seed)
     local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
 
     -- The world map shops open now: vanilla's from its own world map; ours has none yet, so
@@ -3663,6 +3662,9 @@ INSPECT.campaignApi = function(game)
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
                  route = cfg.route },
         random = math.random,
+        -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
+        -- attempt draws what the whole campaign would have drawn there
+        seed = function(ch) math.randomseed(seed, ch) end,
         -- What the party may spend is the game's answer, not the PlaySt field: GetPartyGoldAmount
         -- is 0 in Ch5x (bmgold.c), where the shop refuses every purchase.
         gold = function()
@@ -3677,15 +3679,20 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
     end
     api.only = cfg.attempt
-    -- Priced by the game for the first fielded unit, on the map: GetItemPurchasePrice charges
-    -- half again while BM_FLAG_PREPSCREEN is set, and the bot buys on the map.
+    -- Priced by the game for each unit that could buy, on the map: GetItemPurchasePrice reads
+    -- the buyer (a Silver Card halves it) and charges half again while BM_FLAG_PREPSCREEN is
+    -- set, and the bot buys on the map.
     api.stock = function()
         if shops then return shops end
-        local lord = BOARD.read().units[1]
+        local buyers = units()
         local list = stockItems(chapter())
         INSPECT.gameCalls(function(call)
             for _, s in ipairs(list) do
-                s.price = call(SYM.GetItemPurchasePrice, { lord.addr, call(SYM.MakeNewItem, { s.item }) })
+                local item = call(SYM.MakeNewItem, { s.item })
+                s.price = {}
+                for _, u in ipairs(buyers) do
+                    s.price[u.charId] = call(SYM.GetItemPurchasePrice, { u.addr, item })
+                end
             end
         end)
         shops = list
@@ -3745,17 +3752,25 @@ INSPECT.campaignApi = function(game)
         end
         shops = nil
         -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
-        -- it, rather than replaying every chapter before it. The state holds the game's RNG, so
-        -- nothing is seeded; no team is carried (a resumed pick has no last clear to keep).
+        -- it, rather than replaying every chapter before it. The state holds the game's RNG,
+        -- and its record the team the campaign carried in, so the pick is the campaign's own.
         if played == nil and cfg.from then
             local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
             if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
             emu:loadStateBuffer(f:read("a"))
             f:close()
+            f = io.open(string.format("%s/%d.json", dir, cfg.from), "r")
+            if not f then return nil, string.format("no start record for chapter %d in %s", cfg.from, dir) end
+            local saved = Json.decode(f:read("a"))
+            f:close()
+            if saved.carried == nil then
+                return nil, string.format("chapter %d's start record predates the carried team; "
+                    .. "re-save it with a campaign run", cfg.from)
+            end
             wait(2)
             played = cfg.from
             log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
-            return { chapter = played }
+            return { chapter = played, carried = saved.carried }
         end
         local stalled = INSPECT.watch("arrive")
         for _ = 1, TUNE.bootSteps do
@@ -3827,8 +3842,9 @@ INSPECT.campaignApi = function(game)
     end
 
     -- The chapter-start state, kept in memory for the restarts and written beside what the game
-    -- gave (party, gold, items, the open shop nodes) under references/sim.
-    api.save = function(ch)
+    -- gave (party, gold, items, the open shop nodes) and the team the campaign carries into it
+    -- (a list of charIds), under references/sim.
+    api.save = function(ch, carried)
         local st = emu:saveStateBuffer()
         states[ch] = st
         os.execute(string.format('mkdir -p "%s"', dir))
@@ -3845,7 +3861,7 @@ INSPECT.campaignApi = function(game)
         f = io.open(string.format("%s/%d.json", dir, ch), "w")
         if not f then return nil, "cannot write " .. dir end
         f:write(Json.encode({ game = game, chapter = ch, gold = gold(), party = party,
-                              shops = openNodes(ch) }))
+                              shops = openNodes(ch), carried = carried }))
         f:close()
         return true
     end
@@ -3858,14 +3874,17 @@ INSPECT.campaignApi = function(game)
     end
 
     -- The prep screen's cap, read off Pick Units itself (ProcPrepUnit.max_counter): opening it
-    -- is the first half of the deploy, which follows at once. nil = no prep screen.
+    -- is the first half of the deploy, which follows at once. nil = no prep screen; nil, why =
+    -- the prep screen is there and Pick Units did not open (a harness fault, never "no prep").
     api.cap = function()
         local state = controllerState()
         if state == "prep_main" then
             if not guardedInput("pick_units", "A", "Pick Units opens", function(after)
                 return controllerState(after) ~= "prep_main"
-            end, 120) then return nil end
-            if not awaitControllerState("prep_pick_units", 900) then return nil end
+            end, 120) then return nil, "Pick Units did not open from prep_main" end
+            if not awaitControllerState("prep_pick_units", 900) then
+                return nil, "Pick Units opened but its screen never settled"
+            end
         elseif state ~= "prep_pick_units" then
             return nil
         end
@@ -4006,7 +4025,9 @@ INSPECT.campaignApi = function(game)
             if it.promotes then slot = i - 1; break end
         end
         local u = BOARD.find("blue", entry.charId)
-        if not (slot and u) then return nil, "no seal or no unit for 0x" .. entry.charId end
+        if not (slot and u) then
+            return nil, string.format("no seal or no unit for 0x%02X", entry.charId)
+        end
         local function classOf() return ru8(ru32(u.addr + 4) + 4) end
         local before = classOf()
         if not moveUnit(u.x, u.y, u.x, u.y) then return nil, "no command menu for the unit" end
