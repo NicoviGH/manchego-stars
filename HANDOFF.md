@@ -9,8 +9,8 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 night (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns`
-at a9d5869, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns`
+at 7cdb5bd, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
 rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`, the gotcha below).
 
 **NEXT SESSION: finish the re-derivation audit, then the review, the PR, and Nicolas's sweep.**
@@ -23,10 +23,12 @@ them all. remember to eliminate duplicate code and keep efficiency in mind."
   caught at `NewPopup_GeneralItemGot`, `api.drops`), 7+15+16 (a9d5869, owed recruits from the
   game's talk table via `Sight.talks`, so `campaign_env.py` carries no recruits; keys by
   `INSPECT.isKey`; doors by `sight.doorFrom`). Every one was proved in the ROM. The numbers are on
-  the audit comment.
-- **Left, in order:** 9 (`bot.lua` `inRange`/`attackTileFor`/`gridHostileInReach`: ask the game's
-  attack target list per usable weapon, as `sight.legal` already does; `talkFrom`'s
-  `manhattan == 1` is the same kind of copy), 10 (`s.visible`'s fog test), 11 (`turnsLeft`),
+  the audit comment. Then 9's attacks (7cdb5bd): every weapon Weapon Select lists
+  (`sight.weapons`), the act carries its slot, the harness picks that row; [ROM] ch01 clean,
+  11.71 CPU s.
+- **Left, in order:** 9's Talk half (`bot.lua` `talkFrom`'s `manhattan == 1`: ask
+  `TalkCommandUsability` + the target list from each wait tile, one helper shared with
+  `doorFrom` and `legal`; not started), 22-23 (thefts; the chest-from-a-thief guard), 10 (`s.visible`'s fog test), 11 (`turnsLeft`),
   12 (`SUPPORT_RANGE = 3`), 19 (`onFieldState`), 20's heal (`planner.lua` `score`). 17-18 are
   decided behaviour. Each fix states its measured cost (ADR 0377's reasons).
 - **Then:** `/code-review <PR> medium` in a subagent, `review-to-clean`, the PR (merge is
