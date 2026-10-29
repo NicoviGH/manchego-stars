@@ -10,7 +10,7 @@ live in GitHub issues. Before a context rollover, warn Nicolas, refresh this fil
 fresh instance — don't rely on auto-compaction.
 
 Refreshed 2026-10-29 (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns` at
-08a906c, NOT PUSHED (9 commits past origin's 32d4d50).** The checkout is back on that branch;
+9ad3d58, NOT PUSHED (10 commits past origin's 32d4d50).** The checkout is back on that branch;
 after switching, rebuild the ROM (see the gotcha below).
 
 **NEXT SESSION: fix the re-derivation audit, all 21 findings, then finish part A.** The audit is
@@ -18,20 +18,11 @@ ONE #510 comment, kept current in place:
 <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>. Nicolas
 (2026-10-29): "finish the audit and address them all. remember to eliminate duplicate code and
 keep efficiency in mind." Every finding is checked against the decomp, with file:line.
-- **The rule behind it (Nicolas: "what good reason would there be to ever rederive code when we
-  have the original game's source code?"):** a game fact comes from the game's own function.
-  A re-derivation needs a written reason beside it: the game has no function for the question
-  (then compose from the game's own answers), a MEASURED cost (then cache the game's answer), or
-  no emulator in the process (then read decomp DATA, never re-implement its logic).
-- **Settled by Nicolas, do not ask again:**
-  - Hit damage (finding 1) and the hit/crit odds: let the game run its OWN rolls in the sandbox
-    (`BattleGenerateHitAttributes`, with the thresholds caught at `BattleRoll1RN`/`BattleRoll2RN`)
-    -- "why wouldnt we?". Our mGBA exposes `setBreakpoint` to Lua (seen in the dylib's strings);
-    not yet proven in the headless runner. Measure the cost; cache by unit state.
-  - **No run budget** ("I am not counting, we need to get it right"): run what a change needs to
-    be proven; the run-cost rule only forbids pointless re-runs.
-  - Every claim about game behaviour is tagged with its source, [code] (file:line read in full)
-    or [ROM] (a value read from a run), never from a function's name.
+- **Read first: ADR 0377** (a game fact is the game's own answer; the three reasons a
+  re-derivation may have; hit odds from the game's own rolls, Nicolas: "why wouldnt we?"; claims
+  tagged [code]/[ROM]) and **ADR 0232's 2026-10-29 amendment** (proof runs are owed, never
+  budgeted: do not ask). `setBreakpoint` is in our mGBA's Lua (dylib strings), not yet proven
+  in the headless runner.
 - **Suggested order:** the wrong ones first (1 damage, 2 the hit model in `bot.lua`'s
   `killChance`, 3 the crit constant copied in `bot.lua` AND `planner.lua`, 4 `killsTarget`, 14
   green deaths unwatched in `INSPECT.watchDeaths`, 13 `aiDecide`'s hand-built AI setup), then
@@ -52,25 +43,17 @@ keep efficiency in mind." Every finding is checked against the decomp, with file
 - 6837811: botrun judges `clear` / `clean`; campaign.lua clears on `clean == true`; a vanilla
   chapter with no clean clear stops as `bot_fault` (Manchego Stars keeps `infeasible`);
   montecarlo reads `clean` and says what spoiled a clear; `all_alive` is a DEAD_CONCEPT.
-- 6567cdc then 0f7c010 then 08a906c: "joined". 6567cdc claimed Ch5's ending makes Joshua join;
-  it was WRONG. [code] `EventScr_StrictLoadUniqueAlly` makes an unrecruited one blue then
-  `SET_HP 0`, which sets US_DEAD; [ROM] the scout's Ch6 start holds Joshua blue, DEAD, hidden,
-  and the game's prep list leaves him out. Now joined/owed are the game's party
-  (`INSPECT.prepList()` = `MakePrepUnitList`, shared with the saved party). Unit tests only;
-  the ROM proof is owed (probe run above).
+- 6567cdc, 0f7c010, 08a906c: "joined" is now the game's party (`INSPECT.prepList()`); why
+  (Ch5's ending leaves an unrecruited Joshua blue AND dead) is in ADR 0376. Unit tests only;
+  the ROM proof is owed (the probe run above).
 - 0aedbee: ADR 0376 (decisions 1-4 of the design).
 - **Measured in the ROM:** vanilla Ch2 attempt 1 CLEAN (Eirika talks Ross t4, Ross talks Garcia
   t5; 28,445 frames, 12.2 CPU s). Vanilla Ch4 clean at attempt 1. Vanilla Ch5: 3 styles, none
   clean, stops as a BOT FAULT (Franz/Artur lost, the village at 5,1 unreached, Joshua killed).
-- **Ch5x comes AFTER Ch5** ([code] Ch4 ends `MNCH(0x6)`; Ch5's ending `MNC2(0x5)`). The clean
-  store `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/` has 0-4 and 6 and no 5
-  because no clean Ch5 clear exists yet. A campaign run re-saves the starts it passes: back the
-  store up first (this session restored 4 and 6 from a copy).
-- **Latent (ADR 0376):** vanilla's `StrictLoadUniqueAlly` calls remain in unhosted slots
-  (ch10a/ch12b `CHARACTER_MARISA`, ch14a/b `CHARACTER_RENNAC`), which Sahnar and Trex wear.
-- **A save state reads offline:** an mGBA `.ss` holds EWRAM at file offset 0x21000, so
-  `gUnitArrayBlue` (0x0202BE4C) is at 0x21000 + 0x2BE4C, 0x48 bytes a unit (+0x00 character
-  pointer, its +4 = charId from the ROM; +0x0C state; +0x12/+0x13 max/cur HP). No run needed.
+- The clean store `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/` has 0-4 and 6,
+  no 5: Ch5x follows Ch5 (ADR 0376) and no clean Ch5 clear exists yet. A campaign run re-saves
+  the starts it passes, so back the store up first (this session restored 4 and 6 from a copy).
+- Reading a chapter start's units with no run: ADR 0378.
 - After A: B (varied retries), C (retries that learn), D (capability gaps: Talk recruits as
   goals, the held Doorkey, Ch10's stalls), E (vanilla's Eirika route cleared chapter by chapter).
 
