@@ -99,6 +99,10 @@
 --                            CanUnitUseStaff, and GetUnitItemHealAmount > 0.
 --   canTalk(u, t)            the Talk command's own pair check, CheckForCharacterEvents (what
 --                            MakeTalkTargetList adds a neighbour by).
+--   offers(u, tiles, act, target)  of `tiles`, those where `u` standing there gets the unit
+--                            menu's own command for `act` (MENU_CHECK: TalkCommandUsability,
+--                            DoorCommandUsability, ...) enabled, its target list holding
+--                            `target` (a unit for Talk, a door's tile for Door), in one sandbox.
 --   opens(u, terrain)        `u` holds what opens that terrain (TERRAIN_DOOR, TERRAIN_CHEST_FULL):
 --                            GetUnitKeyItemSlotForTerrain, a key or a thief's lockpick.
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
@@ -961,8 +965,10 @@ function M.new(outer)
 
     -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
     local function standOn(u, x, y)
-        if mem.u8(cell(mem, S.gBmMapUnit, u.x, u.y)) == u.id then
-            api.write8(cell(mem, S.gBmMapUnit, u.x, u.y), 0)
+        -- where it stands now, not u.x/u.y: a sandbox may have moved it already
+        local cx, cy = mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)
+        if mem.u8(cell(mem, S.gBmMapUnit, cx, cy)) == u.id then
+            api.write8(cell(mem, S.gBmMapUnit, cx, cy), 0)
         end
         api.write8(cell(mem, S.gBmMapUnit, x, y), u.id)
         api.write8(u.addr + UNIT_X, x)
@@ -1220,6 +1226,26 @@ function M.new(outer)
         return false
     end
 
+    -- Inside a sandbox with the unit active: the unit menu's own check for `act` is enabled
+    -- and, given a target, the list it built holds it (a unit by its id, a door by its tile).
+    local function menuOffers(call, act, target)
+        if call(S[MENU_CHECK[act]], { 0, 0 }) ~= M.MENU_ENABLED then return false end
+        if not target then return true end
+        if act == "door" then return listed(call, nil, target, M.TERRAIN_DOOR) end
+        return listed(call, target.id)
+    end
+
+    function s.offers(u, tiles, act, target)
+        return sandbox(function(call)
+            local out = {}
+            for _, t in ipairs(tiles) do
+                asActive(u, t.x, t.y)
+                if menuOffers(call, act, target) then out[#out + 1] = t end
+            end
+            return out
+        end)
+    end
+
     function s.legal(a, u)
         local x, y = a.move.x, a.move.y
         local reached = false
@@ -1252,23 +1278,12 @@ function M.new(outer)
                 local it = u.items[a.slot + 1]
                 return it ~= nil and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0
             elseif MENU_CHECK[a.act] then
-                if call(S[MENU_CHECK[a.act]], { 0, 0 }) ~= M.MENU_ENABLED then return false end
-                return a.act ~= "talk" or listed(call, a.targetId)
+                return menuOffers(call, a.act, a.act == "talk" and { id = a.targetId } or nil)
             end
             return true
         end)
         if ok then return nil end
         return "the game offers no " .. (a.obstacle and "strike on that wall" or a.act)
-    end
-
-    -- Whether `u` on (x, y) can open the door `d` there: the Door command's own check
-    -- (DoorCommandUsability: a key, and the adjacent closed doors it lists) names `d`.
-    function s.doorFrom(u, x, y, d)
-        return sandbox(function(call)
-            asActive(u, x, y)
-            return call(S.DoorCommandUsability, { 0, 0 }) == M.MENU_ENABLED
-                and listed(call, nil, d, M.TERRAIN_DOOR)
-        end)
     end
 
     function s.doors()

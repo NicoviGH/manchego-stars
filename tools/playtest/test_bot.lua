@@ -393,11 +393,16 @@ local function sightOf(o)
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
-    -- the Door command's check: an opener beside the door (as TryAddClosedDoorToTargetList)
-    if o.doors then
-        s.doorFrom = function(u, x, y, d)
-            return (o.openers or {})[u.id] == true and Board.distance(x, y, d.x, d.y) == 1
+    -- the unit menu's check: Door lists a door beside an opener (TryAddClosedDoorToTargetList),
+    -- Talk a talkable unit beside the talker (MakeTalkTargetList)
+    s.offers = function(u, tiles, act, target)
+        local may = act == "door" and (o.openers or {})[u.id] == true
+            or act == "talk" and s.canTalk ~= nil and s.canTalk(u, target)
+        local out = {}
+        for _, t in ipairs(tiles) do
+            if may and Board.distance(t.x, t.y, target.x, target.y) == 1 then out[#out + 1] = t end
         end
+        return out
     end
     if o.hidden then s.visible = function(x, y) return not o.hidden[x .. "," .. y] end end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
@@ -1745,6 +1750,11 @@ do
     check(at(a), "2,0", "recruit: from beside it")
     -- no claim: the habit still takes the offered Talk
     check(B.decide(boardOf(A, T, E), sightOf(o), style("careful")).act, "talk", "talk habit")
+    -- beside it but the game's Talk command does not list it (silenced, say): no Talk
+    local mute = sightOf(o)
+    mute.offers = function() return {} end
+    check(B.decide(boardOf(A, T, E), mute, style("careful")).act ~= "talk", true,
+          "talk: only where the Talk command lists the target")
     -- out of reach: the claim marches the talker on the recruit
     o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
     a = B.decide(boardOf(A, T, E), sightOf(o), st)

@@ -377,7 +377,7 @@ local function context(board, sight)
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, breaches = {}, keyed = {}, talks = {},
-                  openers = {} }
+                  talkTiles = {}, openers = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
@@ -832,14 +832,14 @@ end
 local function breach(ctx, u, gate, objective)
     local b = breachFor(ctx, u, goalFor(ctx, u, objective))
     if not b then return nil end
-    -- a door opens where the Door command offers it (sight.doorFrom); a wall is struck by a
+    -- a door opens where the Door command offers it (sight.offers); a wall is struck by a
     -- weapon that reaches it
     local weapons = not b.door and ctx.sight.weapons(u)
     if not (b.door or #weapons > 0) then return nil end
-    for _, t in ipairs(waitTiles(ctx, u)) do
-        local can
-        if b.door then can = ctx.sight.doorFrom(u, t.x, t.y, b)
-        else can = Board.weaponFor(weapons, t.x, t.y, b.x, b.y) end
+    local tiles = waitTiles(ctx, u)
+    if b.door then tiles = ctx.sight.offers(u, tiles, "door", b) end
+    for _, t in ipairs(tiles) do
+        local can = b.door or Board.weaponFor(weapons, t.x, t.y, b.x, b.y)
         if can and gate(ctx, u, t.x, t.y, nil) then
             if b.door then return action(u, t, "door", nil) end
             local a = action(u, t, "attack", nil, can.slot)
@@ -861,14 +861,13 @@ local function talks(ctx, u, t)
     return ctx.talks[k]
 end
 
--- A Talk from a wait tile the gate allows beside `t`; nil when `u` cannot reach one.
+-- A Talk from a wait tile the gate allows where the Talk command offers `t` (sight.offers);
+-- nil when `u` cannot reach one. The tiles are asked once per pair per decide.
 local function talkFrom(ctx, u, t, gate)
-    local beside = {}
-    for _, tile in ipairs(waitTiles(ctx, u)) do
-        if manhattan(tile.x, tile.y, t.x, t.y) == 1 then beside[#beside + 1] = tile end
-    end
-    if #beside == 0 or not talks(ctx, u, t) then return nil end
-    for _, tile in ipairs(beside) do
+    if not talks(ctx, u, t) then return nil end
+    local k = u.id .. ">" .. t.id
+    ctx.talkTiles[k] = ctx.talkTiles[k] or ctx.sight.offers(u, waitTiles(ctx, u), "talk", t)
+    for _, tile in ipairs(ctx.talkTiles[k]) do
         if gate(ctx, u, tile.x, tile.y, nil) then return action(u, tile, "talk", t) end
     end
     return nil
