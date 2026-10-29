@@ -647,6 +647,33 @@ do
     check(r.clean, true, "unloaded green: still clean")
 end
 
+-- test_a_slot_the_death_watch_could_not_read_is_a_watch_fault: freed and reloaded within a
+-- frame, the slot no longer says whether its unit died: a watch fault, never a guess.
+do
+    local base
+    local r = judged { api = { killed = function()
+        local out = base or { { fault = "replaced", id = 0x41, charId = 0x41, faction = "green" } }
+        base = {}
+        return out
+    end } }
+    check(#r.deaths, 0, "unread slot: no death guessed")
+    check(r.watch_faults[1] and r.watch_faults[1].kind, "death_unread", "unread slot: a watch fault")
+end
+
+-- test_a_failed_act_still_records_its_deaths: the act killed one of ours, then the harness
+-- failed: the run crashes with the death recorded.
+do
+    local g = fakeGame { units = rout() }
+    g.api.act = function(a)
+        g.units[1].hp, g.units[1].dead, g.units[1].onField = 0, true, false
+        return false, "a menu never opened"
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "crashed", "failed act: crashed")
+    check(#r.deaths, 1, "failed act: the death it caused is recorded")
+end
+
 -- test_a_recruit_never_seen_is_missing: owed X, X never comes on the field.
 do
     local r = judged { recruits = { 0x30 } }

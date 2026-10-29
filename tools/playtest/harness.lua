@@ -3035,15 +3035,13 @@ INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(),
 
 -- Every unit the game kills while an act or an enemy phase plays, with the fighter it fell to:
 -- a frame callback that watches every faction's array (lean) -- a green unit lost spoils the
--- clear as a blue one does (ADR 0376) -- and, the frame one goes down, reads who is fighting:
--- gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
--- A death is what UnitKill (bmunit.c) writes, the one function every death runs (a fight, a
--- hazard, a trap, an event's kill): US_DEAD on a blue unit, and on any other only its character
--- pointer cleared, the rest of the unit kept. A script that unloads units (a chapter ending's
--- ClearUnit) zeroes the whole unit, its class pointer too, and kills nobody. Read here rather
--- than caught at UnitKill's entry: a breakpoint held through every act and phase cost 56% more
--- CPU (Manchego Stars ch01, 20.4 CPU s against 13.1), and arming it per caller would have to
--- list every proc that can kill.
+-- clear as a blue one does (ADR 0376) -- and, the frame one goes, reads what the game wrote to
+-- its slot (Board.fate) and who is fighting: gBattleActor/gBattleTarget +0x0B is the unit
+-- index, +0x00 the character. Read each frame rather than caught at UnitKill's entry: a
+-- breakpoint held through every act and phase cost 56% more CPU (Manchego Stars ch01, 20.4 CPU s
+-- against 13.1), and arming it per caller would have to list every proc that can kill.
+-- -> stop() -> { id, charId, faction, killer, ours } per kill, and per slot the watch could not
+-- read ({ fault = "replaced", id, charId, faction }: freed and reloaded within a frame).
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
     for _, f in ipairs(BOARD.FACTIONS) do
@@ -3054,12 +3052,8 @@ INSPECT.watchDeaths = function()
     local function charOf(bu) return ru8(ru32(bu) + 4) end
     local id = callbacks:add("frame", function()
         for uid, who in pairs(alive) do
-            local addr = ru32(SYM.gUnitLookup + uid * 4)
-            local killed = addr ~= 0 and ((ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0
-                or (ru32(addr) == 0 and ru32(addr + 0x04) ~= 0))
-            if addr == 0 or (ru32(addr) == 0 and ru32(addr + 0x04) == 0) then
-                alive[uid] = nil    -- unloaded (ClearUnit): gone, not killed
-            elseif killed then
+            local fate = BOARD.fate(ru32(SYM.gUnitLookup + uid * 4), who)
+            if fate == "killed" then
                 local by
                 if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
                 elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
@@ -3067,8 +3061,11 @@ INSPECT.watchDeaths = function()
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
                                         killer = by and charOf(by),
                                         ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0 }
-                alive[uid] = nil
+            elseif fate == "replaced" then
+                deaths[#deaths + 1] = { fault = fate, id = uid, charId = who.charId,
+                                        faction = who.faction }
             end
+            if fate then alive[uid] = nil end
         end
     end)
     return function() callbacks:remove(id); return deaths end
@@ -3383,10 +3380,15 @@ INSPECT.botApi = function(game)
         local phaseTurn = turn()
         local stop, stopActs = INSPECT.watchDeaths(), INSPECT.watchEnemyActs()
         local phase = runEnemyPhase(nil, won, phaseTurn)
-        local deaths, acts = stop(), stopActs()
-        for _, d in ipairs(deaths) do killLog[#killLog + 1] = d end
+        local acts = stopActs()
+        -- the next phase's start still kills (a poison tick, a turn event): watched through
+        -- its settle too
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
-        return phase, deaths, acts
+        local deaths = stop()
+        for _, d in ipairs(deaths) do killLog[#killLog + 1] = d end
+        local fell = {}
+        for _, d in ipairs(deaths) do if not d.fault then fell[#fell + 1] = d end end
+        return phase, fell, acts
     end
     -- An act and an enemy phase play with the drop and theft watches on, their catches kept
     -- in dropLog and theftLog; an act also with the death watch (endPhase runs its own), its

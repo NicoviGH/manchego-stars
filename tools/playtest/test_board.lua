@@ -21,6 +21,8 @@ local SYM = {
     gUnitArrayGreen = 0x0202BE4C + (62 + 50) * 0x48,
     gItemData = 0x08840B20,
     gBmMapSize = 0x0202E4D4,
+    gActiveUnit = 0x03004E50,
+    gAiDecision = 0x0203AA96,
 }
 
 local function fakeMem()
@@ -385,6 +387,33 @@ do
     check(b.hits[4].finishes, true, "the blow that finishes the fight")
     m.w8(S.gBattleTarget + 0x0B, 0); m.w8(S.gBattleTarget + 0x08, 0); m.w8(S.gBattleTarget + 0x70, 7)
     check(Board.battle(m, S).target.levelUp, false, "a wall (index 0) never levels, whatever +70 holds")
+end
+
+-- Board.fate: what the game wrote to a watched unit's slot. Each case is the decomp's own write:
+-- UnitKill (bmunit.c), AiEscapeAction (cp_perform.c), ClearUnit, a reload into a freed slot.
+do
+    local function at(slot) return SYM.gUnitArrayGreen + slot * 0x48 end
+    local m = fakeMem()
+    putUnit(m, SYM.gUnitArrayGreen, 0, { charId = 0x41 })
+    putUnit(m, SYM.gUnitArrayBlue, 0, { charId = 0x01 })
+    local green, blue = { charId = 0x41, faction = "green" }, { charId = 0x01, faction = "blue" }
+    check(Board.fate(m, SYM, at(0), green), nil, "fate: a unit still there")
+    m.w32(SYM.gUnitArrayBlue + 0x0C, Board.US_DEAD | Board.US_HIDDEN)
+    check(Board.fate(m, SYM, SYM.gUnitArrayBlue, blue), "killed", "fate: a blue UnitKill sets US_DEAD")
+    m.w32(SYM.gUnitArrayBlue + 0x0C, 0)
+    m.w32(SYM.gUnitArrayBlue, 0)
+    check(Board.fate(m, SYM, SYM.gUnitArrayBlue, blue), "phantom", "fate: a blue summon's UnitKill")
+    m.w32(at(0), 0)
+    check(Board.fate(m, SYM, at(0), green), "killed", "fate: UnitKill clears only the character")
+    m.w32(SYM.gActiveUnit, at(0))
+    m.w8(SYM.gAiDecision, Board.AI_ACTION_ESCAPE)
+    check(Board.fate(m, SYM, at(0), green), "escaped", "fate: AiEscapeAction is no death")
+    m.w8(SYM.gAiDecision, Board.AI_ACTION_COMBAT)
+    check(Board.fate(m, SYM, at(0), green), "killed", "fate: the active unit, not escaping, died")
+    m.w32(at(0) + 0x04, 0)
+    check(Board.fate(m, SYM, at(0), green), "unloaded", "fate: ClearUnit zeroes the class too")
+    putUnit(m, SYM.gUnitArrayGreen, 0, { charId = 0x42 })
+    check(Board.fate(m, SYM, at(0), green), "replaced", "fate: another unit in the slot")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
