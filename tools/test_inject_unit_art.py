@@ -3,7 +3,6 @@
 passes take their members from it, and every other reader asks it. These pin that it covers every
 path the passes used to decide on their own, in the order they claim SMS ids."""
 import os
-import glob
 import sys
 import tempfile
 import unittest
@@ -57,10 +56,11 @@ class Registry(unittest.TestCase):
 
     def test_drawing_a_remap_leaves_no_scratch_behind(self):
         trex = art.unit_sprite(CAMPAIGN, 'ch03', uid='trex')
-        pattern = os.path.join(tempfile.gettempdir(), 'manchego_art_*')
-        before = set(glob.glob(pattern))
-        art.idle_frame(CAMPAIGN, trex, 'green')
-        self.assertEqual(set(glob.glob(pattern)), before)
+        # A temp dir of the test's own: run_tests runs files in parallel, and another file
+        # drawing sprites makes and removes its own manchego_art_* in the shared one meanwhile.
+        with tempfile.TemporaryDirectory() as own, mock.patch.object(tempfile, 'tempdir', own):
+            art.idle_frame(CAMPAIGN, trex, 'green')
+            self.assertEqual(os.listdir(own), [])
 
     def test_a_reskin_reads_its_donor_from_vanilla_and_its_walk_only_if_it_exists(self):
         # No build tree needed: the donor is the base class's VANILLA wait sheet (#492 review).

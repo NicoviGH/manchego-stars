@@ -146,23 +146,23 @@ strategy_claims:
   - kind: threat
     vs: [brigand, mercenary, archer]
     cite: "The Grell is a Mogall with Evil Eye and does not move, so the danger is the kobolds on the way down."
-  - kind: unmodelled
-    topic: recruit
+  - kind: recruit
+    unit: trex
     cite: "Trex waits in the galleries as a green unit from turn 1 and can be recruited by talking to him with any party member."
-  - kind: unmodelled
-    topic: keys
+  - kind: keys
     cite: "two kobolds carry the keys: one drops a Door Key, the other a Chest Key."
-  - kind: unmodelled
-    topic: range
+  - kind: avoid
+    unit: pinky
+    vs: archer
     cite: "The kobold throwers carry Hand Axes and hit from two tiles, and a slinger with a bow covers the middle rooms, so keep Pinky back until it falls."
-  - kind: unmodelled
-    topic: steal
+  - kind: priority
+    vs: thief
     cite: "Keep watch of the enemy Thief, a svirfneblin."
   - kind: kits
     topic: drops
     cite: "The Antitoxin kobold and, more importantly, the Pure Water kobold can easily be lured out for Trex to claim their items before the rest of your units finish them off."
-  - kind: unmodelled
-    topic: healing
+  - kind: heal
+    vs: boss
     cite: "Evil Eye is magic, so send units with good Resistance into the Grell's reach and heal between attacks."
 
 # ── Deployment ──────────────────────────────────────────────────────────────────

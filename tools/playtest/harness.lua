@@ -1,7 +1,8 @@
 -- Automated FE8 playtest harness for mGBA 0.11+ (--script).
 --
 -- Launched by run.sh via a generated wrapper that sets:
---   PLAYTEST_DIR      -- this directory (for dofile of symbols.lua)
+--   PLAYTEST_DIR      -- this directory
+--   PLAYTEST_SYMDIR   -- where gen_symbols.py wrote symbols.lua and procscr.lua (PT_SYMDIR)
 --   PLAYTEST_SCENARIO -- which `scenarios.<name>` to run (the table below is the
 --                        authoritative list; run.sh's header groups the main ones)
 --   PLAYTEST_ENTRY    -- the function that runs it, when a chapter case's `lua:` binds a
@@ -17,11 +18,11 @@
 -- Asserts read the decomp's own structs; UI is driven only where the event
 -- engine demands real combat (deaths must go through battle, not HP pokes).
 
-dofile(PLAYTEST_DIR .. "/symbols.lua")
+dofile(PLAYTEST_SYMDIR .. "/symbols.lua")
 -- PROCSCR: proc-script address -> exact symbol. Proc identity must never come from the
 -- PROC_NAME string at proc+0x10 -- the decomp reuses those (E_FACE twice, bmenu three
 -- times), which is why freeze reports could not say which proc was waiting (#236).
-dofile(PLAYTEST_DIR .. "/procscr.lua")
+dofile(PLAYTEST_SYMDIR .. "/procscr.lua")
 -- It is generated (gitignored, written by gen_symbols.py from the ELF), so a stale or
 -- half-written table is a total outage with a confusing error much later. Say so here.
 assert(type(PROCSCR) == "table" and next(PROCSCR) ~= nil,
@@ -153,6 +154,7 @@ local INSPECT = {}
 -- the stamp holds at the frame it started from (INSPECT.sandboxAt). run.sh's progress and frame
 -- budget read these stamps. On INSPECT, declared here for it: log() is the first reader.
 INSPECT.sandboxFrames = 0
+INSPECT.costs = { calls = 0, save = 0, load = 0, run = 0 }   -- the sandbox's spend (botApi costs)
 INSPECT.framesRun = function()
     return (INSPECT.sandboxAt or emu:currentFrame()) + INSPECT.sandboxFrames
 end
@@ -498,6 +500,8 @@ local CALLBACK_NAMES = {
     [SYM.PrepItemSupply_Loop_GiveTakeKeyHandler] = "supply_input",
     [SYM.StatScreen_OnIdle] = "stat_screen_input",
     [SYM.HbMoveCtrl_OnIdle] = "help_box_input",
+    [SYM.Shop_Loop_BuyKeyHandler] = "shop_buy_input",
+    [SYM.WorldMap_Loop] = "world_map_input",
 }
 local PREP_CALLBACK_NAMES = {
     [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
@@ -553,7 +557,10 @@ local function observePrep(observation)
     local addr = PROCS.find(SYM.ProcScr_PrepMenu)
     if not addr then return end
     local count = ru8(addr + 0x2B)
-    if count == 0 or count > 8 then
+    -- 0 rows is a menu being built, not a broken one: PrepMenu_OnInit zeroes max_index and the
+    -- rows follow a frame later (vanilla Ch6, after Pick Units: one frame at 0, then 5).
+    if count == 0 then return end
+    if count > 8 then
         observation.error = string.format("malformed ProcPrepMenu max_index=%d", count)
         return
     end
@@ -595,6 +602,7 @@ local function observeTarget(observation)
     local kind
     if routines == SYM.gSelectInfo_Attack then kind = "attack"
     elseif routines == SYM.gSelectInfo_Talk then kind = "talk"
+    elseif routines == SYM.gSelectInfo_Heal then kind = "heal"
     else kind = string.format("0x%08X", routines) end
     observation.target = {
         kind = kind,
@@ -707,6 +715,20 @@ local function observeController()
         }
     end
     put("supply_screen", observedProc(SYM.ProcScr_BmSupplyScreen))
+    local shop = observedProc(SYM.gProcScr_Shop)
+    put("shop", shop)
+    if shop then
+        -- struct ShopState (bmshop.h): the list's hand is head_loc; IsShopPageScrolling is
+        -- bg2_off ~= hand_loc * px_per_line. ProcShop.shopItemCount is +0x5A.
+        local st = SYM.sShopState
+        observation.shop = {
+            cursor = ru16(st), count = ru8(shop.addr + 0x5A),
+            scrolling = ru16(st + 0x0C) ~= ru16(st + 0x06) * ru16(st + 0x08),
+        }
+    end
+    local worldMap = observedProc(SYM.ProcScr_WorldMapMain)
+    put("world_map", worldMap)
+    if worldMap then observation.world_map = INSPECT.worldMap() end
     put("stat_screen", observedProc(SYM.gProcScr_StatScreen))
     local helpBox = observedProc(SYM.gProcScr_HelpBoxMoveCtrl)
     put("help_box", helpBox)
@@ -949,13 +971,23 @@ end
 local function waitFor(pred, frames, tapA)
     for _ = 1, frames do
         if pred() then return true end
-        if tapA and controllerState() == "dialogue_wait" then
-            if not INSPECT.advanceDialogue(60) then return false end
-        else
-            yield()
-        end
+        local pressed = nil
+        if tapA then pressed = INSPECT.answerWait(controllerState()) end
+        if pressed == false then return false end
+        if pressed == nil then yield() end
     end
     return false
+end
+
+-- Answer a wait the game puts to the player outside any menu the caller drives: a dialogue
+-- box, or the full-bag chooser when the bot set INSPECT.onFullBag (a scenario without one
+-- waits as before). FE8 raises the chooser in the ENEMY phase too, when a kill's drop lands on
+-- a full bag (vanilla Ch3 t7, Colm's counter). true = answered, false = the press failed,
+-- nil = nothing to answer here (the caller yields).
+function INSPECT.answerWait(state)
+    if state == "dialogue_wait" then return INSPECT.advanceDialogue(60) end
+    if state == "send_to_convoy" and INSPECT.onFullBag then return INSPECT.onFullBag() end
+    return nil
 end
 
 -- One guarded A on a dialogue box (#238: the only way a scenario presses through a box).
@@ -1114,66 +1146,88 @@ local function chooseWait()
     end, 120)
 end
 
-local function chooseTalk()
+-- `targetId` (optional): the unit to talk to, the selector stepped to it (INSPECT.stepTarget).
+local function chooseTalk(targetId)
     if not selectSemantic("talk", "Talk opens its live target selector", function(after)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "talk"
     end, 300) then return false end
+    if not INSPECT.stepTarget(targetId, nil) then return false end
     return guardedInput("confirm_target", "A", "Talk reaches FE8's dialogue input wait", function(after)
         return controllerState(after) == "dialogue_wait"
     end, 600)
 end
 
--- Select Attack, an enabled weapon, and the current engine-selected target from live semantic
--- structures. `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the
--- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
--- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
--- `targetId` (optional) is the enemy's unit index byte: the selector is stepped to it first, so
--- a caller that chose its target strikes that one and not the selector's first.
-local function chooseAttack(actorAddr, stopWhen, targetId)
-    if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
-        return controllerState(after) == "weapon_menu"
-    end, 300) then return false end
-    if not selectSemantic("select_weapon", "weapon opens the live attack target selector", function(after)
-        return controllerState(after) == "target_selection"
-            and after.target and after.target.kind == "attack"
-    end, 300) then return false end
-    -- At most one step per target the selector can hold (bmunit.h: red[50]); a target it
-    -- never reaches is a fault.
+-- The open target selector stepped to the wanted target: `targetId` a unit's index byte, or
+-- `targetTile` an obstacle by its tile (bmtarget.c TryAddTrapsToTargetList lists it with uid 0);
+-- neither = the selector's first. At most one step per target the selector can hold (bmunit.h:
+-- red[50]); a target it never reaches is a fault.
+INSPECT.stepTarget = function(targetId, targetTile)
+    local function wanted(t)
+        if targetTile then return t ~= nil and t.x == targetTile.x and t.y == targetTile.y end
+        return not targetId or (t ~= nil and t.uid == targetId)
+    end
     for _ = 1, 50 do
-        local now = observeController().target
-        if not targetId or (now and now.uid == targetId) then break end
+        if wanted(observeController().target) then return true end
         if not guardedInput("next_target", "RIGHT", "the selector steps to its next target",
             function(after, before)
                 return after.target ~= nil and before.target ~= nil
-                    and after.target.uid ~= before.target.uid
+                    and (after.target.uid ~= before.target.uid or after.target.x ~= before.target.x
+                         or after.target.y ~= before.target.y)
             end, 30) then return false end
     end
-    if targetId and observeController().target.uid ~= targetId then
-        traceFailure("select_target", string.format("the selector reaches unit 0x%02X", targetId),
-            "fail:target-not-offered", nil, "controller-target-not-offered")
-        return false
-    end
-    -- Commit proof has to be mode-agnostic. procs.battle is gProc_ekrBattle, the battle
-    -- ANIMATION proc: a scenario that called pokeFastConfig() runs MAP combat, where it
-    -- never spawns, so requiring it alone fails an attack that in fact resolved (#232 --
-    -- it took out ch04packmath/ch04snag/clear_ch04 while the attacks all landed). The
-    -- target selector closing is the signal common to both modes; the combat wait below
-    -- is what proves the attack actually resolved, so this stays honest.
-    if not guardedInput("confirm_target", "A", "target selection commits the attack", function(after)
+    if wanted(observeController().target) then return true end
+    traceFailure("select_target", targetTile
+        and string.format("the selector reaches the obstacle at (%d,%d)", targetTile.x, targetTile.y)
+        or string.format("the selector reaches unit 0x%02X", targetId),
+        "fail:target-not-offered", nil, "controller-target-not-offered")
+    return false
+end
+
+-- Confirm the selector's target, then wait until the act resolved: the actor greyed out, or
+-- `stopWhen`. Commit proof has to be mode-agnostic. procs.battle is gProc_ekrBattle, the battle
+-- ANIMATION proc: a scenario that called pokeFastConfig() runs MAP combat, where it never
+-- spawns, so requiring it alone fails an attack that in fact resolved (#232 -- it took out
+-- ch04packmath/ch04snag/clear_ch04 while the attacks all landed). The target selector closing
+-- is the signal common to both modes; the wait below is what proves the act resolved.
+INSPECT.commitTarget = function(actorAddr, stopWhen, what)
+    if not guardedInput("confirm_target", "A", "target selection commits the " .. what, function(after)
         return after.procs.battle ~= nil or controllerState(after) ~= "target_selection"
     end, 300) then return false end
-    -- Combat (with battle anims) ends when the actor is greyed out. The budget has to fit
-    -- an animation NOBODY IS SKIPPING: the old 1200 was sized when waitFor still mashed A
-    -- on a 50-frame cadence, which advanced the in-battle quote text. #220 retired that
-    -- cadence on principle, and the ch00 boss animation then measured 1238 frames -- 38
-    -- over, so every ch00/ch01 combat scenario timed out on a fight it had already won
-    -- (#232). Vanilla's real worst cases are far longer than one clean round (crit, a
-    -- double, a level-up, a promotion), so size this for those, not for the measurement.
-    local done = waitFor(function()
+    return INSPECT.awaitActed(actorAddr, stopWhen)
+end
+
+-- An act (combat, a staff, an item) ends when the actor is greyed out. The budget has to fit
+-- an animation NOBODY IS SKIPPING: the old 1200 was sized when waitFor still mashed A on a
+-- 50-frame cadence, which advanced the in-battle quote text. #220 retired that cadence on
+-- principle, and the ch00 boss animation then measured 1238 frames -- 38 over, so every
+-- ch00/ch01 combat scenario timed out on a fight it had already won (#232). Vanilla's real
+-- worst cases are far longer than one clean round (crit, a double, a level-up, a promotion),
+-- so size this for those, not for the measurement.
+-- A unit with Canto gets its move back after any act but combat and a staff (playerphase.c
+-- PlayPhaseForceActiveUnitCanto): the game is back in move selection, and the act is only done
+-- once that move is spent. It is spent where the unit stands -- A on its own tile, then Wait
+-- if the command menu opens -- since nothing the bot decided asks it to move again.
+-- The last unit's act can end the player phase itself (the game auto-ends it): the act is over
+-- once the phase leaves blue, so the caller's enemy-phase watch sees that phase. Waiting on
+-- through it instead (Manchego Stars ch03, 2026-10-30) returned on the next player phase, and
+-- the bot then ended THAT turn unplayed.
+INSPECT.awaitActed = function(actorAddr, stopWhen)
+    local function acted()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
+            or faction() ~= 0
             or (stopWhen ~= nil and stopWhen())
+    end
+    local done = waitFor(function()
+        return acted() or controllerState() == "unit_selected"
     end, TUNE.combatFrames, true)
+    if done and not acted() then
+        if not guardedInput("confirm_move", "A", "Canto ends where the unit stands", function(after)
+            return controllerState(after) ~= "unit_selected"
+        end, 120) then return false end
+        if controllerState() == "unit_command_menu" and not chooseWait() then return false end
+        done = waitFor(acted, TUNE.combatFrames, true)
+    end
     if not done then
         traceFailure("await_combat", "actor becomes unavailable or scenario terminal fires",
             "fail:combat-timeout", nil, "controller-combat-timeout")
@@ -1181,6 +1235,73 @@ local function chooseAttack(actorAddr, stopWhen, targetId)
         return false
     end
     wait(30)
+    return true
+end
+
+-- Select Attack, an enabled weapon, and the current engine-selected target from live semantic
+-- structures. `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the
+-- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
+-- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
+-- `targetId` / `targetTile` (optional): INSPECT.stepTarget's, so a caller that chose its target
+-- strikes that one and not the selector's first. `slot` (optional): the weapon, the item in that
+-- slot (gWeaponSelectMenuItems, one row per item slot); else the menu's first.
+local function chooseAttack(actorAddr, stopWhen, targetId, targetTile, slot)
+    if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
+        return controllerState(after) == "weapon_menu"
+    end, 300) then return false end
+    if slot and not INSPECT.menuTo("weapon_menu", Controller.MENU_WEAPON_FIRST + slot) then
+        return false
+    end
+    if not selectSemantic("select_weapon", "weapon opens the live attack target selector", function(after)
+        return controllerState(after) == "target_selection"
+            and after.target and after.target.kind == "attack"
+    end, 300) then return false end
+    if not INSPECT.stepTarget(targetId, targetTile) then return false end
+    return INSPECT.commitTarget(actorAddr, stopWhen, "attack")
+end
+
+-- From the open menu `state`, the row whose override id is `id`: DOWN until it is current.
+INSPECT.menuTo = function(state, id)
+    for _ = 1, 8 do
+        local o = observeController()
+        if controllerState(o) ~= state then return false end
+        local cur = o.menu.current
+        for _, item in ipairs(o.menu.items) do
+            if item.slot == cur and item.override_id == id then return true end
+        end
+        if not guardedInput("menu_next", "DOWN", "the menu cursor moves", function(after)
+            return after.menu ~= nil and after.menu.current ~= cur
+        end, 30) then return false end
+    end
+    return false
+end
+
+-- Staff -> the staff in inventory `slot` (0-based; gStaffItemSelectMenuItems lists it as row
+-- 0x3E + slot) -> the heal selector, stepped to unit `targetId` -> commit, until it resolved.
+INSPECT.chooseStaff = function(actorAddr, slot, targetId, stopWhen)
+    if not selectSemantic("staff", "Staff opens the staff list", function(after)
+        return controllerState(after) == "staff_menu"
+    end, 120) then return false end
+    if not INSPECT.menuTo("staff_menu", INSPECT.MENU_STAFF_SLOT + slot) then return false end
+    if not selectSemantic("select_staff", "the staff opens its target selector", function(after)
+        return controllerState(after) == "target_selection"
+    end, 300) then return false end
+    if not INSPECT.stepTarget(targetId, nil) then return false end
+    return INSPECT.commitTarget(actorAddr, stopWhen, "staff")
+end
+INSPECT.MENU_STAFF_SLOT, INSPECT.MENU_ITEM_SLOT = 0x3E, 0x43   -- menu_def.c, slot 0's row
+
+-- Item -> inventory `slot` (0-based; gItemSelectMenuItems row 0x43 + slot) -> its submenu.
+INSPECT.itemSubmenu = function(slot)
+    if not selectSemantic("open_items", "the Item command opens the inventory", function(after)
+        return controllerState(after) == "item_list"
+    end, 120) then return nil, "no Item command" end
+    if not INSPECT.menuTo("item_list", INSPECT.MENU_ITEM_SLOT + slot) then
+        return nil, "the inventory never reached slot " .. slot
+    end
+    if not guardedInput("select_item", "A", "the item's submenu opens", function(after)
+        return controllerState(after) == "item_submenu"
+    end, 120) then return nil, "the item offered no submenu" end
     return true
 end
 
@@ -1310,11 +1431,9 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
         if faction() == 0 and not menuOpen() and state == "player_map_idle" then
             return "player"
         end
-        if state == "dialogue_wait" then
-            if not INSPECT.advanceDialogue(60) then return nil end
-        else
-            yield()
-        end
+        local pressed = INSPECT.answerWait(state)
+        if pressed == false then return nil end
+        if pressed == nil then yield() end
     end
     traceFailure("enemy_phase", "enemy phase reaches game over or returns player control",
         "fail:phase-timeout", nil, "controller-enemy-phase-timeout")
@@ -1854,6 +1973,7 @@ end
 -- (no hardcoded char ids) + bot.lua's pure greedy core (pickTarget/pickMove); the scenario owns
 -- the driving.
 local BOT = dofile(PLAYTEST_DIR .. "/bot.lua")
+INSPECT.Planner = dofile(PLAYTEST_DIR .. "/planner.lua")   -- the bot's planner (#510 step 9)
 local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
 local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
@@ -2264,6 +2384,52 @@ scenarios.goodberry = function()
     result("PASS", "Goodberry item menu captured (see screenshots)")
 end
 
+-- A choice menu: commit row `want` -- "default" (the highlighted row), "last" (the final row)
+-- or a NUMBER (that row of the LIVE menu, 0-based). `what` names the menu in the trace: our
+-- ch01 lead menu (ADR 0062) or vanilla's Ch8 route split (MenuDef_RouteSplit). Returns the row
+-- it committed on, or nil, why. No row is guessed and no row count is assumed: the walk counts
+-- the live item list, and the landing is asserted, because nothing downstream re-checks which
+-- row was taken (#241). reachCh01 and the campaign's arrive both answer their menus here.
+INSPECT.pickMenuRow = function(want, observation, what)
+    local rows = observation.menu and #observation.menu.items or 0
+    if want == "last" then want = rows - 1 end
+    if type(want) == "number" then
+        if want < 0 or want >= rows then
+            return nil, string.format("%s row %d is not in the live menu of %d rows", what, want, rows)
+        end
+        -- Walk off the LIVE cursor and stop when it ARRIVES, rather than pressing a fixed
+        -- count: a fixed count reaches the wanted row only if the menu opened on row 0, which
+        -- nothing guarantees, and FE8 menus WRAP -- so being wrong picks a different lead and
+        -- passes anyway.
+        for _ = 1, rows do
+            local at = observeController()
+            if at.menu and at.menu.current == want then break end
+            if not guardedInput("menu_next", "DOWN", what .. " menu selection moves",
+                function(after, before)
+                    return after.menu ~= nil and before.menu ~= nil
+                        and after.menu.current ~= before.menu.current
+                end, 60) then
+                return nil, "could not walk the " .. what .. " menu to the chosen row"
+            end
+        end
+        local landed = observeController()
+        if not (landed.menu and landed.menu.current == want) then
+            shot(what .. "-menu-walk-lost")
+            return nil, string.format("%s menu walk landed on row %s of %d, not row %d",
+                what, tostring(landed.menu and landed.menu.current), rows, want)
+        end
+    end
+    local committing = observeController().menu
+    local picked = committing and committing.current or want
+    if not guardedInput("select_current_menu_item", "A", what .. " menu selection closes", function(after)
+        return after.menu == nil
+    end, 300) then
+        return nil, "could not choose the highlighted " .. what
+    end
+    log(string.format("%s committed on menu row %s of %d", what, tostring(picked), rows))
+    return picked
+end
+
 -- Reach ch01: ride the ch00 win into chapter slot 2, drive the post-chapter save + Beat-1
 -- scene + lord select on OBSERVED state, then Fight! into the phase. Returns true at the
 -- destination; false with its own FAIL logged otherwise.
@@ -2322,53 +2488,9 @@ local function reachCh01(opts)
             end
             yield()
         elseif state == "generic_menu" then
-            -- Scenario policy: which lead to take. The controller owns the live menu
-            -- callback and the guarded input either way; no row is guessed and no
-            -- candidate count is assumed -- the walk counts the LIVE item list.
-            local rows = observation.menu and #observation.menu.items or 0
-            local want = opts.lord
-            if want == "last" then want = rows - 1 end
-            if type(want) == "number" then
-                if want < 0 or want >= rows then
-                    result("FAIL", string.format(
-                        "lead row %d is not in the live menu of %d candidates", want, rows))
-                    return false
-                end
-                -- Walk off the LIVE cursor and stop when it ARRIVES, rather than pressing a
-                -- fixed count: a fixed count reaches the wanted row only if the menu opened
-                -- on row 0, which nothing guarantees, and FE8 menus WRAP -- so being wrong
-                -- picks a different lead and passes anyway. The landing is asserted below
-                -- either way, because nothing downstream re-checks which lead was taken
-                -- (ckpt_lordpinky just saves the state) (#241).
-                for _ = 1, rows do
-                    local at = observeController()
-                    if at.menu and at.menu.current == want then break end
-                    if not guardedInput("menu_next", "DOWN", "the lead menu selection moves",
-                        function(after, before)
-                            return after.menu ~= nil and before.menu ~= nil
-                                and after.menu.current ~= before.menu.current
-                        end, 60) then
-                        result("FAIL", "could not walk the lead menu to the chosen candidate")
-                        return false
-                    end
-                end
-                local landed = observeController()
-                if not (landed.menu and landed.menu.current == want) then
-                    result("FAIL", string.format(
-                        "lead menu walk landed on row %s of %d, not row %d",
-                        tostring(landed.menu and landed.menu.current), rows, want))
-                    shot("ch01-lord-walk-lost")
-                    return false
-                end
-            end
-            local committing = observeController().menu
-            opts.picked = committing and committing.current or want
-            if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
-                return after.menu == nil
-            end, 300) then
-                result("FAIL", "could not choose the highlighted lead"); return false
-            end
-            log(string.format("lead committed on menu row %s of %d", tostring(opts.picked), rows))
+            local picked, why = INSPECT.pickMenuRow(opts.lord, observation, "lead")
+            if picked == nil then result("FAIL", why); return false end
+            opts.picked = picked
         elseif state == "yes_no_choice" then
             -- Lord select confirms the pick with "Will <lead> lead the party?". Same
             -- scenario policy as the menu above -- accept the default -- and Yes is the
@@ -2493,7 +2615,8 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy, stopWh
     if not reach then return nil, true end
     local mn, mx = unitAttackRange(u)
     enemies = enemies or liveEnemies()
-    local pick = mn and BOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
+    local pick = mn and BOT.pickTarget(reach, enemies,
+                                       { weapons = { { min = mn, max = mx } } }) or nil
     local tile = pick and pick.tile
     if not tile then
         -- no target in range: march (pure decision core -- field-first with a
@@ -2846,22 +2969,40 @@ INSPECT.sightApi = function()
             -- once the state is taken and the load clears it first, so a save or load that
             -- raises cannot leave the stamps frozen.
             save = function()
-                local at = emu:currentFrame()
+                local at, t0 = emu:currentFrame(), os.clock()
                 local st = emu:saveStateBuffer()
                 INSPECT.sandboxAt = at
+                INSPECT.costs.calls = INSPECT.costs.calls + 1
+                INSPECT.costs.save = INSPECT.costs.save + os.clock() - t0
                 return st
             end,
             load = function(st)
+                local t0 = os.clock()
                 INSPECT.sandboxAt = nil
                 emu:loadStateBuffer(st)
+                INSPECT.costs.load = INSPECT.costs.load + os.clock() - t0
             end,
             write16 = function(a, v) emu:write16(a, v) end,
             write32 = function(a, v) emu:write32(a, v) end,
+            -- `fn` runs each time the CPU reaches `addr`, before its first instruction (the
+            -- game's rolls, caught by sight.lua's `played`). mGBA steps the CPU one
+            -- instruction at a time while any is set, so they are cleared after the call.
+            breakpoint = function(addr, fn)
+                local id = emu:setBreakpoint(fn, addr & ~1)
+                if id < 0 then
+                    error("mGBA has no debugger for breakpoints: rebuild tools/emulator with "
+                        .. "tools/build_mgba_headless.sh (its patch attaches one)", 2)
+                end
+                return id
+            end,
+            unbreak = function(id) emu:clearBreakpoint(id) end,
             -- Each frame a call runs is real emulation, though the load rewinds the counter:
             -- INSPECT.sandboxFrames keeps it, and log() stamps lines with it added, so a run's
             -- cost, run.sh's frame budget and its stall watch all see what the sight spent. A
             -- heartbeat line every TUNE.sandboxHeartbeat frames keeps a long think visible.
             frames = function(done, max)
+                local t0 = os.clock()
+                local function spent() INSPECT.costs.run = INSPECT.costs.run + os.clock() - t0 end
                 for _ = 1, max do
                     yield()
                     INSPECT.sandboxFrames = INSPECT.sandboxFrames + 1
@@ -2869,8 +3010,9 @@ INSPECT.sightApi = function()
                         log(string.format("sight: %d frames of game code run so far",
                             INSPECT.sandboxFrames))
                     end
-                    if done() then return true end
+                    if done() then spent() return true end
                 end
+                spent()
                 return false
             end,
         },
@@ -2892,13 +3034,14 @@ end
 INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(), u) end
 
 -- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
--- for the phase's length that watches both arrays (lean) and, the frame one goes down, reads
--- who is fighting -- gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
+-- for the phase's length that watches every faction's array (lean) -- a green unit lost spoils
+-- the clear as a blue one does (ADR 0376) -- and, the frame one goes down, reads who is
+-- fighting: gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
-    for _, f in ipairs({ "blue", "red" }) do
-        for _, u in ipairs(BOARD.leanList(f)) do
-            if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f } end
+    for _, f in ipairs(BOARD.FACTIONS) do
+        for _, u in ipairs(BOARD.leanList(f.name)) do
+            if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f.name } end
         end
     end
     local function charOf(bu) return ru8(ru32(bu) + 4) end
@@ -2906,13 +3049,13 @@ INSPECT.watchDeaths = function()
         for uid, who in pairs(alive) do
             local addr = ru32(SYM.gUnitLookup + uid * 4)
             if addr == 0 or ru8(addr + 0x13) == 0 or (ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0 then
-                local killer
-                if ru8(SYM.gBattleActor + 0x0B) == uid then killer = charOf(SYM.gBattleTarget)
-                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then
-                    killer = charOf(SYM.gBattleActor)
-                end
+                local by
+                if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
+                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
+                -- ours: the killer's unit index is a blue one (FACTION_MASK bits 0)
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
-                                        killer = killer }
+                                        killer = by and charOf(by),
+                                        ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0 }
                 alive[uid] = nil
             end
         end
@@ -2920,8 +3063,152 @@ INSPECT.watchDeaths = function()
     return function() callbacks:remove(id); return deaths end
 end
 
+-- A breakpoint on `addr`, held only on the frames `want()` is true: mGBA steps the CPU one
+-- instruction at a time while any is set. `caught` runs each time the CPU reaches it. `cpu` is
+-- sightApi's. -> stop(), which clears both.
+INSPECT.breakWhile = function(cpu, addr, want, caught)
+    local hold
+    local id = callbacks:add("frame", function()
+        local on = want()
+        if on and not hold then hold = cpu.breakpoint(addr, caught)
+        elseif hold and not on then cpu.unbreak(hold); hold = nil end
+    end)
+    return function()
+        callbacks:remove(id)
+        if hold then cpu.unbreak(hold) end
+    end
+end
+
+-- Every item the game gives one of ours off a unit that fell (a thief's chest, an enemy's
+-- drop): NewPopup_GeneralItemGot, whose only caller is BATTLE_HandleItemDrop (bmmind.c), the
+-- game's own decision -- the fallen unit carries US_DROP_ITEM and an item, and a blue unit
+-- downed it -- caught at its entry: r0 the receiving unit, r1 the item. The fallen one is the
+-- battle's other unit (gBattleActor/gBattleTarget +0x0B). Held only while the battle's
+-- resolution (sProcScr_CombatAction) is live with a US_DROP_ITEM unit in it. -> stop() -> the
+-- drops since the watch began, { from = the fallen unit's charId, to = the receiver's, item }.
+INSPECT.watchDrops = function(cpu)
+    local drops = {}
+    local function unitAt(bu) return ru32(SYM.gUnitLookup + ru8(bu + 0x0B) * 4) end
+    local function dropper(addr) return addr ~= 0 and (ru32(addr + 0x0C) & BOARD.US_DROP_ITEM) ~= 0 end
+    local stop = INSPECT.breakWhile(cpu, SYM.NewPopup_GeneralItemGot, function()
+        return (dropper(unitAt(SYM.gBattleActor)) or dropper(unitAt(SYM.gBattleTarget)))
+            and PROCS.find(SYM.sProcScr_CombatAction) ~= nil
+    end, function()
+        local to = cpu.read("r0")
+        local from = unitAt(SYM.gBattleActor)
+        if from == to then from = unitAt(SYM.gBattleTarget) end
+        drops[#drops + 1] = { from = ru8(ru32(from) + 4), to = ru8(ru32(to) + 4),
+                              item = cpu.read("r1") & 0xFF }
+    end)
+    return function() stop(); return drops end
+end
+
+-- Every theft an AI unit makes: AiStartStealAction (cp_perform.c), the steal itself, caught at
+-- its entry, before it moves the item: gActiveUnit the thief, gAiDecision +06 the unit robbed,
+-- +07 the item's slot. Held only while gAiDecision is a steal (decided frames before it plays:
+-- gProcScr_CpPerform moves the thief and sleeps first). -> stop() -> the thefts since the watch
+-- began, { thief, from = charIds, item }.
+INSPECT.watchThefts = function(cpu)
+    local thefts = {}
+    local stop = INSPECT.breakWhile(cpu, SYM.AiStartStealAction, function()
+        return ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION) == BOARD.AI_ACTION_STEAL
+    end, function()
+        local robbed = ru32(SYM.gUnitLookup + ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET) * 4)
+        local slot = ru8(SYM.gAiDecision + BOARD.AI_DEC.SLOT)
+        thefts[#thefts + 1] = { thief = ru8(ru32(ru32(SYM.gActiveUnit)) + 4),
+                                from = ru8(ru32(robbed) + 4),
+                                item = ru16(robbed + 0x1E + slot * 2) & 0xFF }
+    end)
+    return function() stop(); return thefts end
+end
+
+-- Each act of an enemy (or green) phase, as the game records it, for the run's trace. Every
+-- act the AI performs starts with UnitBeginAction (bmunit.c): gActionData +0C subjectIndex = the
+-- unit, +11 unitActionType = 0, gActiveUnitMoveOrigin = its tile; CpPerform then sets the type
+-- (AiStartCombatAction: COMBAT and +0D targetIndex; AiStaffAction: STAFF and +0D; AiPickAction:
+-- PICK, the village or chest at +13/+14 xOther/yOther). A pillage and a steal are read off
+-- gAiDecision instead (AiPillageAction sets nothing for a village, AiStartStealAction nothing),
+-- and a chest by its tile: a thief opens one as USE_ITEM, by a pillage or by using its key. A frame watch follows that record. The act's battle is read once the
+-- type is COMBAT and gBattleStats says REAL after the act began on a simulation: the AI simulates
+-- every attack it weighs (AiComputeCombatScore) before it performs one, so a REAL flag seen
+-- only after that is this act's own battle, never one left from an earlier phase.
+INSPECT.watchEnemyActs = function()
+    local acts, cur = {}, nil
+    local AD = SYM.gActionData
+    local prev = ru8(AD + 0x0C)
+    local function real() return (ru16(SYM.gBattleStats) & BOARD.BATTLE_REAL) ~= 0 end
+    local function close()
+        if not cur then return end
+        -- a chest the act emptied, however the AI opened it (AiPillageAction, or its key used
+        -- as an item: green Colm in vanilla Ch3): full when the act began, not now
+        local d = cur.dest
+        if d and d.chest and terrainAt(d.x, d.y) ~= INSPECT.Sight.TERRAIN_CHEST_FULL then
+            cur.act, cur.tile = "chest", { x = d.x, y = d.y }
+        end
+        cur.dest = nil
+        local addr = ru32(SYM.gUnitLookup + cur.id * 4)
+        if addr ~= 0 then cur.to, cur.hp = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) }, ru8(addr + 0x13) end
+        cur.sim = nil
+        acts[#acts + 1] = cur
+        cur = nil
+    end
+    local id = callbacks:add("frame", function()
+        local uid = ru8(AD + 0x0C)
+        if uid ~= prev then
+            prev = uid
+            close()
+            local addr = uid >= 0x40 and ru32(SYM.gUnitLookup + uid * 4) or 0
+            if addr ~= 0 and ru32(addr) ~= 0 then
+                cur = { id = uid, charId = ru8(ru32(addr) + 4), battles = {},
+                        from = { x = rs16(SYM.gActiveUnitMoveOrigin), y = rs16(SYM.gActiveUnitMoveOrigin + 2) },
+                        sim = not real() }
+            end
+        end
+        if not cur then return end
+        local kind = ru8(AD + 0x11)
+        -- gAiDecision is this unit's while its act plays (CpDecide decides one unit, then
+        -- CpPerform plays it)
+        local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT) == cur.id
+            and ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
+        if decided and not cur.dest then
+            local x, y = ru8(SYM.gAiDecision + BOARD.AI_DEC.X), ru8(SYM.gAiDecision + BOARD.AI_DEC.Y)
+            cur.dest = { x = x, y = y, chest = terrainAt(x, y) == INSPECT.Sight.TERRAIN_CHEST_FULL }
+        end
+        if decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
+            -- AiPillageAction on a village: the tile event above it, no action type set
+            cur.act, cur.tile = "pillage", { x = cur.dest.x, y = cur.dest.y - 1 }
+        elseif kind ~= 0 then
+            cur.act = BOARD.ACTIONS[kind] or string.format("0x%02X", kind)
+            -- only AiStartCombatAction and AiStaffAction set +0D: any other act leaves the
+            -- last one's target there
+            if kind == BOARD.ACTION_PICK then
+                cur.tile = { x = ru8(AD + 0x13), y = ru8(AD + 0x14) }
+            elseif kind == BOARD.ACTION_COMBAT or kind == BOARD.ACTION_STAFF then
+                cur.targetId = ru8(AD + 0x0D)
+            end
+        elseif decided == BOARD.AI_ACTION_STEAL then
+            -- AiStartStealAction sets no action type
+            cur.act, cur.targetId = "steal", ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET)
+        end
+        if not real() then
+            cur.sim = true
+        elseif cur.sim and kind == BOARD.ACTION_COMBAT and #cur.battles == 0 then
+            cur.battles[1] = BOARD.battle()
+        end
+    end)
+    return function() close(); callbacks:remove(id); return acts end
+end
+
 -- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
 INSPECT.botApi = function(game)
+    -- the entries `list` gained since the last look at it
+    local function unread(list)
+        local out = {}
+        for i = (list.seen or 0) + 1, #list do out[#out + 1] = list[i] end
+        list.seen = #list
+        return out
+    end
+    local dropLog, theftLog = {}, {}
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
@@ -2934,32 +3221,139 @@ INSPECT.botApi = function(game)
     end
     local style = decode(PLAYTEST_STYLE, { aggression = "careful", deploy = {}, claims = {} })
     local api = {
-        Bot = BOT, Json = Json,
+        Bot = BOT, Json = Json, Planner = INSPECT.Planner,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, chapter = start,
                  mode = TUNE.difficultyName[TUNE.difficultyWant],
                  seed = tonumber(PLAYTEST_SEED) or 1 },
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
         board = BOARD.read,
+        -- the charIds the chapter's talks would bring over: each talk the game would run now
+        -- (Sight talks), its target, once
+        recruits = function()
+            local out, seen = {}, {}
+            for _, t in ipairs(Sight.talks(sightApi)) do
+                if not seen[t.b] then seen[t.b] = true; out[#out + 1] = t.b end
+            end
+            return out
+        end,
+        -- the game's party, by charId (INSPECT.prepList)
+        party = function()
+            local out = {}
+            for _, a in ipairs(INSPECT.prepList()) do out[#out + 1] = ru8(ru32(a) + 4) end
+            return out
+        end,
         won = won,
         lost = lost,
         -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
         frames = INSPECT.framesRun,
+        -- What the run spent, for the record: CPU seconds in all, and in the sandbox's saves,
+        -- loads and game frames, with its call count (os.clock: CPU time, the cost that
+        -- matters on a busy machine).
+        costs = function()
+            local c = INSPECT.costs
+            local names, by = {}, {}
+            for name, addr in pairs(SYM) do
+                if type(addr) == "number" then names[addr & ~1] = name end
+            end
+            for addr, n in pairs(INSPECT.Sight.calls) do
+                by[names[addr & ~1] or string.format("0x%08X", addr)] = n
+            end
+            return { cpu_s = os.clock(), sandbox_calls = c.calls, save_s = c.save,
+                     load_s = c.load, run_s = c.run, game_calls = by }
+        end,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
+        battle = BOARD.battle,
+        -- every full-bag answer since the last call (INSPECT.answerFullBag's log)
+        bag = function() return unread(INSPECT.bagLog) end,
+        -- every drop the game gave one of ours since the last call (INSPECT.watchDrops, kept
+        -- while an act or an enemy phase plays: the only times a battle resolves)
+        drops = function() return unread(dropLog) end,
+        -- every theft an AI unit made since the last call (INSPECT.watchThefts), each with
+        -- its item's rank and whether it spoils the clean clear (Sight.stealRanks, ADR 0379)
+        thefts = function()
+            local new, items = unread(theftLog), {}
+            for _, t in ipairs(new) do items[#items + 1] = t.item end
+            local ranks = #items > 0 and Sight.stealRanks(sightApi, items) or {}
+            for _, t in ipairs(new) do t.rank, t.spoils = ranks[t.item].rank, ranks[t.item].spoils end
+            return new
+        end,
     }
+    INSPECT.onFullBag = INSPECT.answerFullBag
+    -- The run's trace (botrun.lua): one JSON line per event in the run dir, a file per chapter
+    -- attempt, named in the record (montecarlo.py files it in the store).
+    local traceFile
+    api.trace = function(ev)
+        if not traceFile then
+            api.info.trace = string.format("trace-%s-%d-a%d.jsonl", game, api.info.chapter,
+                                           api.info.attempt or 1)
+            traceFile = assert(io.open(PLAYTEST_SHOTDIR .. "/" .. api.info.trace, "w"))
+        end
+        traceFile:write(Json.encode(ev), "\n")
+        if ev.t == "end" then traceFile:close(); traceFile = nil end
+    end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
-    -- One action of Bot.decide's: move, then attack the chosen enemy, wait, or Seize.
+    -- A failed act returns false and, where the driver knows it, why (the crash record says it).
+    -- One action of Bot.decide's or the planner's: move, then attack the chosen enemy, wait,
+    -- Talk, open a door, heal, use an item, Visit, open a chest, or Seize.
     api.act = function(a)
         local u = BOARD.find("blue", a.unit)
-        if not u or not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false end
+        if not u then return false, "the unit is not on the board" end
+        if not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false, "the move failed" end
         if a.act == "attack" then
             -- The actor can die in its own attack: a dead unit is never greyed out, so its
-            -- death is an exit of the combat wait too.
-            return chooseAttack(u.addr, function()
-                return won() or lost() or (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0
-            end, a.targetId)
+            -- death is an exit of the combat wait too. So is the event engine taking over: a
+            -- kill that ends the chapter (vanilla Ch2's DefeatAll, a Defeat Boss boss) plays
+            -- the ending from there, the actor never greyed out, and ~1,700 frames of it ran
+            -- the combat budget out. What follows is waited out on the enemy phase's
+            -- wedge-catcher budget, until the chapter advances or control comes back.
+            local dead = function() return (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0 end
+            -- the phase leaving blue ends it too (INSPECT.awaitActed): the enemy phase is
+            -- api.endPhase's to watch
+            local function settled()
+                return won() or lost() or dead() or (ru32(u.addr + 0x0C) & 0x2) ~= 0
+                    or faction() ~= 0
+            end
+            if not chooseAttack(u.addr, function()
+                return won() or lost() or dead() or procActive(SYM.ProcScr_StdEventEngine)
+            end, a.targetId, a.obstacle, a.slot) then
+                return false, a.obstacle and "the strike on the wall did not play out"
+                    or "the attack did not play out"
+            end
+            if not settled() and not waitFor(function()
+                return settled() or controllerState() == "player_map_idle"
+            end, TUNE.enemyPhaseFrames, true) then
+                return false, "an event began in the attack, and the game never came back"
+            end
+            return true
+        elseif a.act == "talk" then
+            if not chooseTalk(a.targetId) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+        elseif a.act == "door" then
+            if not selectSemantic("open_door", "the Door command opens the door", function(after)
+                return after.menu == nil
+            end, 120) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+        elseif a.act == "visit" or a.act == "chest" then
+            -- the village's lines are pressed through until the unit is greyed out (awaitActed
+            -- taps each box, as VISIT.run's talkUntil does); a full inventory's send-or-discard
+            -- menu is not driven, so it ends the run as a crash that names the act
+            local cmd = a.act == "visit" and "visit" or "open_chest"
+            if not selectSemantic(cmd, "the " .. a.act .. " command starts the tile's event",
+                function(after) return after.menu == nil end, 120) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+        elseif a.act == "staff" then
+            return INSPECT.chooseStaff(u.addr, a.slot, a.targetId, function() return won() or lost() end)
+        elseif a.act == "item" then
+            local opened, why = INSPECT.itemSubmenu(a.slot)
+            if not opened then return false, why end
+            if not selectSemantic("use_item", "Use starts the item's effect", function(after)
+                return controllerState(after) ~= "item_submenu"
+            end, 120) then return false, "the item's submenu offered no Use" end
+            if INSPECT.awaitActed(u.addr, function() return won() or lost() end) then return true end
+            return false, "the unit never finished using the item"
         elseif a.act == "seize" then
             if not Controller.findAction(Controller.legalActions(observeController()), "seize") then
                 return cancelUnitActionMenu() and "noseize"
@@ -2973,11 +3367,708 @@ INSPECT.botApi = function(game)
     end
     api.endPhase = function()
         local phaseTurn = turn()
-        local stop = INSPECT.watchDeaths()
+        local stop, stopActs = INSPECT.watchDeaths(), INSPECT.watchEnemyActs()
         local phase = runEnemyPhase(nil, won, phaseTurn)
-        local deaths = stop()
+        local deaths, acts = stop(), stopActs()
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
-        return phase, deaths
+        return phase, deaths, acts
+    end
+    -- An act and an enemy phase play with the drop and theft watches on, their catches kept
+    -- in dropLog and theftLog.
+    local function watched(fn)
+        return function(...)
+            local stopDrops = INSPECT.watchDrops(sightApi.cpu)
+            local stopThefts = INSPECT.watchThefts(sightApi.cpu)
+            local out = table.pack(pcall(fn, ...))
+            for _, d in ipairs(stopDrops()) do dropLog[#dropLog + 1] = d end
+            for _, t in ipairs(stopThefts()) do theftLog[#theftLog + 1] = t end
+            if not out[1] then error(out[2], 0) end
+            return table.unpack(out, 2, out.n)
+        end
+    end
+    api.act, api.endPhase = watched(api.act), watched(api.endPhase)
+    return api
+end
+
+-- ---- the bot plays chapter to chapter (#510 step 9 PR E). campaign.lua is its own chunk;
+-- this is its api over the drivers above (ADR 0370). Every rule is the game's: the Pick Units
+-- screen, the shop screen (StartShopScreen, a kept call), the world map's own cursor, and the
+-- game's checks run in sight.lua's sandbox -- CanUnitUseWeapon, CanUnitUsePromotionItem,
+-- IsCharacterForceDeployed, MakeNewItem + GetItemPurchasePrice, GetNextUnclearedNode.
+INSPECT.CAMPAIGN = {
+    VULNERARY = 0x6C,                           -- constants/items.h ITEM_VULNERARY
+    SHOP_TYPE = { armory = 0, vendor = 1 },     -- bmshop.h SHOP_TYPE_ARMORY / _VENDOR
+    -- worldmap.h: GMapData ix/iy +08/+0C (<<8), units[0].location +11, nodes[0x1C] +30 (bit 0
+    -- GM_NODE_STATE_VALID; a GMNode is padded to 4 bytes: the next field sits at +A0);
+    -- GMapNodeData stride 0x20, armory +0C, vendor +10, x +18, y +1A.
+    NODES = 0x1C, NODE_OPEN = 1, GM_IX = 0x08, GM_IY = 0x0C, GM_LORD = 0x11, GM_NODES = 0x30,
+    GM_NODE_STRIDE = 4,
+    NODE_STRIDE = 0x20, NODE_SHOP = { armory = 0x0C, vendor = 0x10 }, NODE_X = 0x18, NODE_Y = 0x1A,
+    SHOP_LIST_MAX = 20,                         -- bmshop.h SHOP_ITEMS_MAX_AMT + 1
+    -- bmitem.h ItemData +07 weaponType, +08 attributes; IA_WEAPON. The type is a name only so
+    -- bot.lua can group by it.
+    ITEM_TYPE = 0x07, ITEM_ATTRIBUTES = 0x08, IA_WEAPON = 1,
+    WEAPON_TYPES = { [0] = "sword", "lance", "axe", "bow", "staff", "anima", "light", "dark" },
+    PREP_COUNT = 0x100,                         -- PrepUnitList.max_num, after units[0x40]
+    PLAY_GOLD = 0x08,                           -- PlaySt +08 partyGoldAmount
+    shopSteps = 4000,                           -- frames one purchase may take, fades included
+}
+
+-- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +10 pEffectiveness, +19
+-- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
+-- types.h BmSt +2C um_tmp_item (the item that found no room); Unit +1E items[5] (bmunit.h);
+-- menu_def.c's
+-- convoy chooser rows. Keys: what GetUnitKeyItemSlotForTerrain looks for (bmunit.c). Passive:
+-- the items the engine tests by id or attribute while carried -- the Member Card (eventinfo.c),
+-- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
+INSPECT.BAG = {
+    ITEM_EFFECTIVE = 0x10, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C, ITEM_USE_EFFECT = 0x1E,
+    IA_STAFF = 4, BMST_TMP_ITEM = 0x2C, UNIT_ITEM_LIST = 0x1E, UNIT_ITEMS = 5,
+    CHAR_NUMBER = 0x04,                         -- CharacterData +04 number (bmunit.h)
+    MENU_DISCARD_FIRST = 0x24, MENU_SEND_FIRST = 0x2A,
+    -- The engine tests each passive item by id in scattered places (a shield's effect in the
+    -- battle code, the cards in the shop), with no one function to ask, so they are listed.
+    PASSIVE = { [0x71] = "ITEM_DELPHISHIELD", [0x72] = "ITEM_MEMBERCARD",
+                [0x73] = "ITEM_SILVERCARD", [0x7C] = "ITEM_HOPLON_SHIELD" },
+}
+INSPECT.bagLog = {}
+
+-- The world map's cursor and lord, for the observer: the open nodes, the node the cursor sits
+-- on (sub_80B961C, the L jump, puts ix/iy exactly on a node's x/y << 8), the lord's node.
+INSPECT.worldMap = function()
+    local C, gm = INSPECT.CAMPAIGN, SYM.gGMData
+    local cx, cy = ru32(gm + C.GM_IX) >> 8, ru32(gm + C.GM_IY) >> 8
+    local wm = { lord_node = ru8(gm + C.GM_LORD), open = {} }
+    for n = 0, C.NODES - 1 do
+        if (ru8(gm + C.GM_NODES + n * C.GM_NODE_STRIDE) & C.NODE_OPEN) ~= 0 then
+            wm.open[#wm.open + 1] = n
+            local node = SYM.gWMNodeData + n * C.NODE_STRIDE
+            if rs16(node + C.NODE_X) == cx and rs16(node + C.NODE_Y) == cy then wm.cursor_node = n end
+        end
+    end
+    return wm
+end
+
+-- Run game functions in sight.lua's sandbox (keep = false: everything is loaded back) or kept
+-- (keep = true: what they wrote stays, the registers are put back).
+INSPECT.gameCalls = function(fn, keep)
+    local api = INSPECT.sightApi()
+    return INSPECT.Sight.machine(api.cpu, keep)(fn)
+end
+
+-- The game's party: each unit address MakePrepUnitList lists (its test is prepscreen.c's
+-- IsUnitInCurrentRoster: not US_DEAD, not US_BIT16, not a class with attribute 0x200), built in
+-- the sandbox, since gPrepUnitList is an EWRAM overlay other prep screens reuse and the
+-- roster test writes a unit's state.
+INSPECT.prepList = function()
+    local C = INSPECT.CAMPAIGN
+    return INSPECT.gameCalls(function(call)
+        call(SYM.MakePrepUnitList, {})
+        local addrs = {}
+        for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
+            addrs[#addrs + 1] = ru32(SYM.gPrepUnitList + i * 4)
+        end
+        return addrs
+    end)
+end
+
+-- An item's facts for bot.lua: the weapon type of a weapon, and which item is the Vulnerary.
+INSPECT.itemFacts = function(id)
+    local C = INSPECT.CAMPAIGN
+    local data = SYM.gItemData + id * BOARD.ITEMDATA_STRIDE
+    local facts = { id = id }
+    if (ru32(data + C.ITEM_ATTRIBUTES) & C.IA_WEAPON) ~= 0 then
+        facts.type = C.WEAPON_TYPES[ru8(data + C.ITEM_TYPE)]
+    end
+    if id == C.VULNERARY then facts.kind = "vulnerary" end
+    return facts
+end
+
+-- What Bot.fullBag weighs about one item for one unit, every fact the game's (#510 step 9,
+-- Nicolas 2026-10-28). `call` is a sandbox's (INSPECT.gameCalls); `item` = { id, uses }.
+-- kind: a weapon or staff (IA_WEAPON | IA_STAFF; usable = CanUnitUseWeapon / CanUnitUseStaff;
+-- rank, the reach's max and the effectiveness list from its ItemData), a key (the item alone
+-- in the unit's bag, GetUnitKeyItemSlotForTerrain finds it for a door or a chest: a Lockpick
+-- is a key only to a thief), a passive item (each one the engine tests by id),
+-- a heal (GetUnitItemHealAmount > 0), money (no use effect at all: gems, gold), else other
+-- (seals, boosters, Pure Water...).
+-- Whether the game takes `value` (id | uses << 8) for a key of the unit's: in the sandbox `call`
+-- runs in, the item is put alone in the unit's bag and GetUnitKeyItemSlotForTerrain asked for
+-- each key terrain; the bag is put back.
+INSPECT.isKey = function(call, unitAddr, value)
+    local K = INSPECT.BAG
+    local bag = {}
+    for k = 0, K.UNIT_ITEMS - 1 do
+        local at = unitAddr + K.UNIT_ITEM_LIST + k * 2
+        bag[k] = ru16(at)
+        emu:write16(at, k == 0 and value or 0)
+    end
+    local key = false
+    for _, terrain in ipairs({ INSPECT.Sight.TERRAIN_DOOR, INSPECT.Sight.TERRAIN_CHEST_FULL }) do
+        key = key or call(SYM.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
+    end
+    for k = 0, K.UNIT_ITEMS - 1 do emu:write16(unitAddr + K.UNIT_ITEM_LIST + k * 2, bag[k]) end
+    return key
+end
+
+INSPECT.unitItemFacts = function(call, unitAddr, item)
+    local C, K = INSPECT.CAMPAIGN, INSPECT.BAG
+    local f = INSPECT.itemFacts(item.id)
+    local data = SYM.gItemData + item.id * BOARD.ITEMDATA_STRIDE
+    local attr, value = ru32(data + C.ITEM_ATTRIBUTES), item.id | (item.uses << 8)
+    f.uses = item.uses
+    if (attr & (C.IA_WEAPON | K.IA_STAFF)) ~= 0 then
+        f.kind = "weapon"
+        f.type = C.WEAPON_TYPES[ru8(data + C.ITEM_TYPE)]
+        f.rank = ru8(data + K.ITEM_RANK)
+        f.maxRange = ru8(data + K.ITEM_RANGE) & 0xF
+        local eff = ru32(data + K.ITEM_EFFECTIVE)
+        f.effective = eff ~= 0 and eff or nil
+        local check = (attr & K.IA_STAFF) ~= 0 and SYM.CanUnitUseStaff or SYM.CanUnitUseWeapon
+        f.usable = call(check, { unitAddr, value }) ~= 0
+    elseif INSPECT.isKey(call, unitAddr, value) then
+        f.kind = "key"
+    elseif K.PASSIVE[item.id] then
+        f.kind = "passive"
+    elseif call(SYM.GetUnitItemHealAmount, { unitAddr, value }) > 0 then
+        f.kind = "heal"
+    elseif ru8(data + K.ITEM_USE_EFFECT) == 0 then
+        f.kind = "money"
+    else
+        f.kind = "other"
+    end
+    return f
+end
+
+-- A unit handed an item it has no room for (convoymenu.c HandleNewItemGetFromDrop): FE8's
+-- chooser, answered by Bot.fullBag. With room in the convoy the rows send (0x2A-0x2E the
+-- unit's items, 0x2F the new one); a full convoy's rows discard (0x24-0x29) and ask Yes/No
+-- first. Every answer is kept in INSPECT.bagLog for the run's record.
+INSPECT.answerFullBag = function()
+    local K = INSPECT.BAG
+    local o = observeController()
+    local base = o.menu.items[1].override_id
+    local discard = base < K.MENU_SEND_FIRST
+    if discard then base = K.MENU_DISCARD_FIRST else base = K.MENU_SEND_FIRST end
+    local unitAddr = ru32(SYM.gActiveUnit)
+    local newId = ru16(SYM.gBmSt + K.BMST_TMP_ITEM)
+    local held = {}
+    for k = 0, K.UNIT_ITEMS - 1 do
+        local raw = ru16(unitAddr + K.UNIT_ITEM_LIST + k * 2)
+        if (raw & 0xFF) ~= 0 then held[#held + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
+    end
+    local facts = INSPECT.gameCalls(function(call)
+        local out = { held = {} }
+        for _, it in ipairs(held) do out.held[#out.held + 1] = INSPECT.unitItemFacts(call, unitAddr, it) end
+        out.new = INSPECT.unitItemFacts(call, unitAddr, { id = newId & 0xFF, uses = newId >> 8 })
+        return out
+    end)
+    local slot, why = BOT.fullBag(facts.held, facts.new, discard)
+    local row = base + (slot == 0 and K.UNIT_ITEMS or slot - 1)
+    local entry = { charId = ru8(ru32(unitAddr) + K.CHAR_NUMBER), item = facts.new.id,
+                    sent = slot == 0 and facts.new.id or facts.held[slot].id, discard = discard,
+                    why = why }
+    INSPECT.bagLog[#INSPECT.bagLog + 1] = entry
+    log(string.format("bag: unit 0x%X gets item 0x%X; %s 0x%X (%s)", entry.charId, entry.item,
+        discard and "discards" or "sends", entry.sent, why))
+    if not INSPECT.menuTo("send_to_convoy", row) then return false end
+    if not guardedInput("send_item", "A", "the chooser takes the row", function(after)
+        return controllerState(after) ~= "send_to_convoy" or after.choice ~= nil
+    end, 120) then return false end
+    if controllerState() == "yes_no_choice" then
+        return selectSemantic("answer_yes", "the discard is confirmed", function(after)
+            return controllerState(after) ~= "yes_no_choice"
+        end, 120)
+    end
+    return true
+end
+
+-- The shops a set of world map nodes holds: { node, kind, list (the stock's address), items }.
+INSPECT.nodeShops = function(nodes)
+    local C, out = INSPECT.CAMPAIGN, {}
+    for _, n in ipairs(nodes) do
+        local node = SYM.gWMNodeData + n * C.NODE_STRIDE
+        for _, kind in ipairs({ "armory", "vendor" }) do
+            local list = ru32(node + C.NODE_SHOP[kind])
+            local items = {}
+            for i = 0, C.SHOP_LIST_MAX - 1 do
+                local it = list ~= 0 and ru16(list + i * 2) or 0
+                if it == 0 then break end
+                items[#items + 1] = it
+            end
+            if #items > 0 then out[#out + 1] = { node = n, kind = kind, list = list, items = items } end
+        end
+    end
+    return out
+end
+
+-- Campaign.run's api (campaign.lua's contract). `game` is "ours" or "vanilla".
+INSPECT.campaignApi = function(game)
+    local C = INSPECT.CAMPAIGN
+    local Json = dofile(PLAYTEST_DIR .. "/json.lua")
+    local Botrun = dofile(PLAYTEST_DIR .. "/botrun.lua")
+    local cfg = (PLAYTEST_CAMPAIGN ~= nil and PLAYTEST_CAMPAIGN ~= "") and Json.decode(PLAYTEST_CAMPAIGN)
+        or {}
+    local seed = tonumber(PLAYTEST_SEED) or 1
+    local mode = TUNE.difficultyName[TUNE.difficultyWant]
+    local id = cfg.id or string.format("%s-s%d", mode, seed)
+    local dir = PLAYTEST_SIMDIR .. "/states/" .. id
+    local states, played, shops, menuPicked = {}, nil, nil, nil
+    local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
+
+    -- The world map shops open now: vanilla's from its own world map; ours has none yet, so
+    -- the twin's at the same point, as the vanilla campaign recorded them (cfg.shops).
+    local function openNodes(ch)
+        if game == "vanilla" then return INSPECT.worldMap().open end
+        return (cfg.shops or {})[tostring(ch)] or {}
+    end
+    -- The stock of every open shop; an item two shops sell is bought at the first. Unpriced:
+    -- api.stock prices it.
+    local function stockItems(ch)
+        local list, seen = {}, {}
+        for _, shop in ipairs(INSPECT.nodeShops(openNodes(ch))) do
+            for _, it in ipairs(shop.items) do
+                if not seen[it] then
+                    seen[it] = true
+                    local e = INSPECT.itemFacts(it)
+                    list[#list + 1] = { item = it, type = e.type, kind = e.kind, shop = shop }
+                end
+            end
+        end
+        return list
+    end
+    -- The units the player could field: the Pick Units list while Preparations is up (its
+    -- owner, ProcScr_AtMenu, which stays alive under Pick Units; the command list's proc does
+    -- not), else the blue units on the field. gPrepUnitList is an EWRAM overlay other prep
+    -- screens reuse, so it is built here, in the sandbox, by the game's own MakePrepUnitList
+    -- (what Pick Units runs when it opens).
+    local function units()
+        local all, out = BOARD.read().units, {}
+        if PROCS.find(SYM.ProcScr_AtMenu) then
+            local byAddr = {}
+            for _, u in ipairs(all) do byAddr[u.addr] = u end
+            for _, a in ipairs(INSPECT.prepList()) do
+                if byAddr[a] then out[#out + 1] = byAddr[a] end
+            end
+            return out
+        end
+        for _, u in ipairs(all) do
+            if u.faction == "blue" and u.onField then out[#out + 1] = u end
+        end
+        return out
+    end
+
+    local api = { Bot = BOT, Json = Json,
+        info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
+                 route = cfg.route },
+        random = math.random,
+        -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
+        -- attempt draws what the whole campaign would have drawn there
+        seed = function(ch) math.randomseed(seed, ch) end,
+        -- What the party may spend is the game's answer, not the PlaySt field: GetPartyGoldAmount
+        -- is 0 in Ch5x (bmgold.c), where the shop refuses every purchase.
+        gold = function()
+            return INSPECT.gameCalls(function(call) return call(SYM.GetPartyGoldAmount, {}) end)
+        end,
+        emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
+        log = log,
+    }
+    api.claims = function(ch) return (cfg.claims or {})[tostring(ch)] or {} end
+    -- cfg.attempt: play that one attempt from cfg.from's start and stop (campaign.lua; the pool)
+    if cfg.attempt ~= nil and not (cfg.from and math.type(cfg.attempt) == "integer" and cfg.attempt >= 1) then
+        error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
+    end
+    api.only = cfg.attempt
+    -- Priced by the game for each unit that could buy, on the map: GetItemPurchasePrice reads
+    -- the buyer (a Silver Card halves it) and charges half again while BM_FLAG_PREPSCREEN is
+    -- set, and the bot buys on the map.
+    api.stock = function()
+        if shops then return shops end
+        local buyers = units()
+        local list = stockItems(chapter())
+        INSPECT.gameCalls(function(call)
+            for _, s in ipairs(list) do
+                local item = call(SYM.MakeNewItem, { s.item })
+                s.price = {}
+                for _, u in ipairs(buyers) do
+                    s.price[u.charId] = call(SYM.GetItemPurchasePrice, { u.addr, item })
+                end
+            end
+        end)
+        shops = list
+        return shops
+    end
+    api.roster = function()
+        local us, stock = units(), stockItems(chapter())
+        return INSPECT.gameCalls(function(call)
+            local out = {}
+            for _, u in ipairs(us) do
+                local e = { id = u.id, charId = u.charId, classId = u.classId, level = u.level,
+                            canUse = {}, items = {},
+                            forced = call(SYM.IsCharacterForceDeployed, { u.charId }) ~= 0 }
+                for _, s in ipairs(stock) do
+                    if call(SYM.CanUnitUseWeapon, { u.addr, call(SYM.MakeNewItem, { s.item }) }) ~= 0 then
+                        e.canUse[s.item] = true
+                    end
+                end
+                for _, held in ipairs(u.items) do
+                    local f = INSPECT.itemFacts(held.id)
+                    f.promotes = call(SYM.CanUnitUsePromotionItem,
+                        { u.addr, held.id | (held.uses << 8) }) ~= 0 or nil
+                    e.items[#e.items + 1] = f
+                end
+                out[#out + 1] = e
+            end
+            return out
+        end)
+    end
+
+    -- What the map asks of a team and how each roster unit answers it, read at the prep screen
+    -- by sight.lua (the game's own checks). A demand's `rep` (a board unit) is dropped before it
+    -- is returned: the record keeps the demand's id.
+    api.needs = function(roster)
+        local sight = INSPECT.Sight.new(INSPECT.sightApi())
+        local demands, byChar = sight.demands(), {}
+        for _, u in ipairs(units()) do byChar[u.charId] = u end
+        local answers, strength = {}, {}
+        for _, e in ipairs(roster) do
+            answers[e.charId], strength[e.charId] = {}, {}
+            for _, d in ipairs(demands) do
+                answers[e.charId][d.id], strength[e.charId][d.id] = sight.answer(byChar[e.charId], d)
+            end
+        end
+        for _, d in ipairs(demands) do d.rep = nil end
+        return { demands = demands, answers = answers, strength = strength }
+    end
+    -- The team caps (team_groups.py, carried in PT_CAMPAIGN): class id -> group, and maxima.
+    api.teamGroups = function() return cfg.groups or {}, cfg.maxima or {} end
+
+    -- Ride the game to the next chapter's start: its prep screen, else its first player phase.
+    -- The world map walks the lord to the game's next story node (GetNextUnclearedNode) by its
+    -- own L and A; it never enters any other node.
+    api.arrive = function(route)
+        for _, last in ipairs(cfg.last or {}) do
+            if played == last then return "end" end
+        end
+        shops = nil
+        -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
+        -- it, rather than replaying every chapter before it. The state holds the game's RNG,
+        -- and its record the team the campaign carried in, so the pick is the campaign's own.
+        if played == nil and cfg.from then
+            local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
+            if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
+            emu:loadStateBuffer(f:read("a"))
+            f:close()
+            f = io.open(string.format("%s/%d.json", dir, cfg.from), "r")
+            if not f then return nil, string.format("no start record for chapter %d in %s", cfg.from, dir) end
+            local saved = Json.decode(f:read("a"))
+            f:close()
+            if saved.carried == nil then
+                return nil, string.format("chapter %d's start record predates the carried team; "
+                    .. "re-save it with a campaign run", cfg.from)
+            end
+            wait(2)
+            played = cfg.from
+            log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
+            return { chapter = played, carried = saved.carried }
+        end
+        local stalled = INSPECT.watch("arrive")
+        for _ = 1, TUNE.bootSteps do
+            if TUNE.bootHook then TUNE.bootHook() end
+            local obs = observeController()
+            local state, why = controllerState(obs)
+            if stalled(obs, state) then
+                return nil, "parked on an unclassified wait (see the inspect snapshot)"
+            end
+            local ch = chapter()
+            if ch ~= played and (state == "prep_main"
+                    or (state == "player_map_idle" and inChapter(ch))) then
+                if played == nil then
+                    local sapi = INSPECT.sightApi()
+                    INSPECT.Sight.seed(sapi, seed)
+                end
+                played = ch
+                log(string.format("campaign: chapter %d starts (%s)", ch, state))
+                return { chapter = ch }
+            end
+            if state == "world_map_idle" then
+                local target = INSPECT.gameCalls(function(call)
+                    return call(SYM.GetNextUnclearedNode, { SYM.gGMData })
+                end)
+                if target >= 0x80 then return nil, "the world map has no next story node" end
+                local wm = obs.world_map
+                local ok
+                if wm.cursor_node ~= target then
+                    ok = guardedInput("wm_next_node", "L", "the cursor moves to another open node",
+                        function(after)
+                            return after.world_map == nil or after.world_map.cursor_node ~= wm.cursor_node
+                        end, 120)
+                else
+                    ok = guardedInput("wm_select", "A", "A on the story node walks or enters",
+                        function(after) return controllerState(after) ~= "world_map_idle" end, 120)
+                end
+                if not ok then return nil, "the world map refused its input (see the trace)" end
+            elseif state == "generic_menu" and game == "ours" then
+                -- ch01's lead menu (ADR 0062): the campaign's `lord` row, else the highlighted lead.
+                local picked, pwhy = INSPECT.pickMenuRow(cfg.lord or "default", obs, "lead")
+                if picked == nil then return nil, "lead menu: " .. pwhy end
+                menuPicked = picked
+            elseif state == "generic_menu" and game == "vanilla" then
+                -- Ch8's route split (MenuDef_RouteSplit): row 0 Eirika, row 1 Ephraim -- route
+                -- 1 and 2, the campaign's setting (Bot.route).
+                local r = route(obs.menu.items)
+                local picked, pwhy = INSPECT.pickMenuRow(r - 1, obs, "route")
+                if picked == nil then return nil, "route menu: " .. pwhy end
+                menuPicked = picked
+            elseif state == "yes_no_choice" and menuPicked ~= nil then
+                -- the pick's confirmation: "Will <lead> lead the party?", or the route's
+                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", function(after)
+                    return controllerState(after) ~= "yes_no_choice"
+                end, 120) then
+                    return nil, "the pick's prompt refused Yes"
+                end
+                menuPicked = nil
+            elseif state ~= "player_map_idle" then
+                local advanced = advanceBootState(obs, state)
+                if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
+                if advanced == nil then
+                    return nil, "unsupported state between chapters: " .. tostring(state or why)
+                end
+            else
+                yield()
+            end
+        end
+        return nil, "no chapter start within the boot allowance"
+    end
+
+    -- The chapter-start state, kept in memory for the restarts and written beside what the game
+    -- gave (party, gold, items, the open shop nodes) and the team the campaign carries into it
+    -- (a list of charIds), under references/sim.
+    api.save = function(ch, carried)
+        local st = emu:saveStateBuffer()
+        states[ch] = st
+        os.execute(string.format('mkdir -p "%s"', dir))
+        local f = io.open(string.format("%s/%d.ss", dir, ch), "wb")
+        if not f then return nil, "cannot write " .. dir end
+        f:write(st)
+        f:close()
+        local party = {}
+        for _, u in ipairs(units()) do
+            local items = {}
+            for _, it in ipairs(u.items) do items[#items + 1] = it.id end
+            party[#party + 1] = { charId = u.charId, classId = u.classId, level = u.level, items = items }
+        end
+        f = io.open(string.format("%s/%d.json", dir, ch), "w")
+        if not f then return nil, "cannot write " .. dir end
+        f:write(Json.encode({ game = game, chapter = ch, gold = gold(), party = party,
+                              shops = openNodes(ch), carried = carried }))
+        f:close()
+        return true
+    end
+    api.load = function(ch)
+        if not states[ch] then return nil, "no state for chapter " .. ch end
+        emu:loadStateBuffer(states[ch])
+        shops = nil
+        wait(2)
+        return true
+    end
+
+    -- The prep screen's cap, read off Pick Units itself (ProcPrepUnit.max_counter): opening it
+    -- is the first half of the deploy, which follows at once. nil = no prep screen; nil, why =
+    -- the prep screen is there and Pick Units did not open (a harness fault, never "no prep").
+    api.cap = function()
+        local state = controllerState()
+        if state == "prep_main" then
+            if not guardedInput("pick_units", "A", "Pick Units opens", function(after)
+                return controllerState(after) ~= "prep_main"
+            end, 120) then return nil, "Pick Units did not open from prep_main" end
+            if not awaitControllerState("prep_pick_units", 900) then
+                return nil, "Pick Units opened but its screen never settled"
+            end
+        elseif state ~= "prep_pick_units" then
+            return nil
+        end
+        return observeController().prep_units.cap
+    end
+
+    -- Pick exactly `ids` on Pick Units (bench the others first, so the cap is never in the way),
+    -- then Fight!, then the first player phase.
+    api.deploy = function(ids)
+        local want = {}
+        for _, c in ipairs(ids) do want[c] = true end
+        local function moveTo(i)
+            for _ = 1, 80 do
+                local o = observeController()
+                if controllerState(o) == "prep_pick_units" then
+                    local c, cr, tr = o.prep_units.cursor, o.prep_units.cursor // 2, i // 2
+                    if c == i then return true end
+                    local intention, key
+                    if c % 2 == 1 and i % 2 == 0 then intention, key = "pick_left", "LEFT"
+                    elseif cr < tr then intention, key = "pick_next", "DOWN"
+                    elseif cr > tr then intention, key = "pick_previous", "UP"
+                    else intention, key = "pick_right", "RIGHT" end
+                    if not guardedInput(intention, key, "the deploy cursor moves", function(after)
+                        return after.prep_units ~= nil and after.prep_units.cursor ~= c
+                    end, 60) then return false end
+                else
+                    yield()
+                end
+            end
+            return false
+        end
+        local function fielded(addr) return (ru32(addr + 0x0C) & BOARD.US_NOT_DEPLOYED) == 0 end
+        for pass = 1, 2 do
+            for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
+                local addr = ru32(SYM.gPrepUnitList + i * 4)
+                local should = want[ru8(ru32(addr) + 4)] == true
+                if (pass == 1 and fielded(addr) and not should)
+                    or (pass == 2 and not fielded(addr) and should) then
+                    if not moveTo(i) then return nil, "the deploy cursor never reached row " .. i end
+                    local was = fielded(addr)
+                    if not guardedInput("toggle_deploy", "A", "the unit's deploy flips", function()
+                        return fielded(addr) ~= was
+                    end, 60) then
+                        local pid = ru8(ru32(addr) + 4)
+                        return nil, string.format("row %d (char 0x%02X, game says forced=%s) would not toggle",
+                            i, pid, tostring(INSPECT.gameCalls(function(call)
+                                return call(SYM.IsCharacterForceDeployed, { pid }) ~= 0
+                            end)))
+                    end
+                end
+            end
+        end
+        if not guardedInput("cancel_pick", "B", "Pick Units closes", function(after)
+            return controllerState(after) ~= "prep_pick_units"
+        end, 120) or not awaitControllerState("prep_main", 900) then
+            return nil, "Pick Units never handed back the prep menu"
+        end
+        if not driveThroughPrep() then return nil, "Fight! did not leave the prep screen" end
+        if not INSPECT.settle("idle", 9000, true) then return nil, "no player phase after Fight!" end
+        return true
+    end
+
+    -- One purchase through the game's own shop screen: StartShopScreen(unit, the shop's stock,
+    -- its type) as a kept call, then its list, prompts and exit by their keys. ORPHANED (no
+    -- parent, PROC_TREE_3), as the game's own map shops start it (eventinfo.c,
+    -- StartArmoryScreenOrphaned): the shop's first act is LockGame, and a locked game stops
+    -- running tree 2, so a shop parented to the player phase froze itself (vanilla Ch5).
+    api.buy = function(p)
+        local s
+        for _, e in ipairs(api.stock()) do if e.item == p.item then s = e end end
+        local u = s and BOARD.find("blue", p.unit)
+        if not u then return nil, string.format("no stock entry or unit for %d:%d", p.unit, p.item) end
+        local row
+        for i, it in ipairs(s.shop.items) do if it == p.item then row = i - 1 end end
+        local startGold = gold()
+        INSPECT.gameCalls(function(call)
+            call(SYM.StartShopScreen, { u.addr, s.shop.list, C.SHOP_TYPE[s.shop.kind], 0 })
+        end, true)
+        local stalled = INSPECT.watch("shop")
+        for _ = 1, C.shopSteps do
+            local obs = observeController()
+            local state = controllerState(obs)
+            if stalled(obs, state) then return nil, "the shop stalled (see the inspect snapshot)" end
+            local bought = gold() < startGold
+            local ok = true
+            if state == "player_map_idle" and not PROCS.find(SYM.gProcScr_Shop) then
+                if bought then return true end
+                return nil, "the shop closed before the purchase"
+            elseif state == "dialogue_wait" then
+                ok = INSPECT.advanceDialogue(120)
+            elseif state == "yes_no_choice" then
+                -- Before the purchase every prompt is a yes: Buy, the price, send to storage.
+                -- After it, the greeting's B leaves.
+                if bought then
+                    ok = guardedInput("cancel_choice", "B", "the shop's prompt closes", function(after)
+                        return controllerState(after) ~= "yes_no_choice"
+                    end, 120)
+                elseif obs.choice.current ~= "yes" then
+                    ok = guardedInput("select_yes", "LEFT", "Yes is highlighted", function(after)
+                        return after.choice ~= nil and after.choice.current == "yes"
+                    end, 60)
+                else
+                    ok = guardedInput("answer_yes", "A", "the prompt takes Yes", function(after)
+                        return controllerState(after) ~= "yes_no_choice"
+                    end, 120)
+                end
+            elseif state == "shop_buy" then
+                local c = obs.shop.cursor
+                if bought then
+                    ok = guardedInput("shop_leave", "B", "the list closes", function(after)
+                        return controllerState(after) ~= "shop_buy"
+                    end, 120)
+                elseif c ~= row then
+                    local down = c < row
+                    ok = guardedInput(down and "shop_next" or "shop_previous", down and "DOWN" or "UP",
+                        "the hand moves", function(after)
+                            return after.shop ~= nil and after.shop.cursor ~= c
+                        end, 60)
+                else
+                    ok = guardedInput("shop_buy", "A", "the price is asked", function(after)
+                        return controllerState(after) ~= "shop_buy"
+                    end, 120)
+                end
+            else
+                yield()
+            end
+            if not ok then return nil, "the shop refused an input in " .. tostring(state) end
+        end
+        return nil, "the purchase did not finish within its allowance"
+    end
+
+    -- Spend a seal as the player does: the unit's Item command, the seal's row, Use. A branched
+    -- promotion takes the first class the game's menu offers, and every prompt after it a yes;
+    -- done when the unit's class has changed and the map is back.
+    api.promote = function(entry)
+        local slot
+        for i, it in ipairs(entry.items) do
+            if it.promotes then slot = i - 1; break end
+        end
+        local u = BOARD.find("blue", entry.charId)
+        if not (slot and u) then
+            return nil, string.format("no seal or no unit for 0x%02X", entry.charId)
+        end
+        local function classOf() return ru8(ru32(u.addr + 4) + 4) end
+        local before = classOf()
+        if not moveUnit(u.x, u.y, u.x, u.y) then return nil, "no command menu for the unit" end
+        local opened, why = INSPECT.itemSubmenu(slot)
+        if not opened then return nil, why end
+        if not selectSemantic("use_item", "Use starts the promotion", function(after)
+            return controllerState(after) ~= "item_submenu"
+        end, 120) then return nil, "the seal could not be used" end
+        local stalled = INSPECT.watch("promote")
+        for _ = 1, TUNE.bootSteps do
+            local obs = observeController()
+            local state = controllerState(obs)
+            if stalled(obs, state) then return nil, "the promotion stalled (see the inspect snapshot)" end
+            local ok = true
+            if state == "player_map_idle" and classOf() ~= before then return true
+            elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
+            elseif state == "yes_no_choice" then
+                ok = selectSemantic("answer_yes", "the promotion's prompt takes Yes", function(after)
+                    return controllerState(after) ~= "yes_no_choice"
+                end, 120)
+            elseif state == "generic_menu" then
+                ok = guardedInput("select_current_menu_item", "A", "the first class is chosen",
+                    function(after) return controllerState(after) ~= "generic_menu" end, 120)
+            else
+                yield()
+            end
+            if not ok then return nil, "the promotion refused an input in " .. tostring(state) end
+        end
+        return nil, "the promotion did not finish within its allowance"
+    end
+
+    api.play = function(style, claims, attempt)
+        local b = INSPECT.botApi(game)
+        b.style, b.claims = style, claims
+        b.info.campaign, b.info.attempt = id, attempt
+        b.seed = function() end   -- seeded once, at the first chapter: FE8 never re-seeds
+        pokeFastConfig()
+        INSPECT.settle("phase", 6000, true)
+        wait(60)
+        local _, _, rec = Botrun.run(b)
+        return rec
     end
     return api
 end
@@ -3008,6 +4099,21 @@ scenarios.bot = function()
     if not reachCh01Map() then return end
     local ok, why, rec = play("ours")
     return result(ok and "PASS" or "FAIL", string.format("ch01 %s: %s", rec.outcome, why))
+end
+
+-- campaign: the bot plays chapter to chapter (campaign.lua), from New Game, restarting a chapter
+-- from its start state until it clears with everyone alive. PT_SEED seeds the game's RNG once;
+-- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
+-- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
+-- record), claims = { [chapter] = resolved claims }, from = a chapter index to resume at, from
+-- the start state this id saved, attempt = k: only the k-th attempt from `from`'s start (the
+-- pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
+scenarios.campaign = function()
+    local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")
+    if PLAYTEST_VANILLA == "1" then INSPECT.retailFastText() end
+    local ok, why = Campaign.run(INSPECT.campaignApi(PLAYTEST_VANILLA == "1" and "vanilla" or "ours"))
+    return result(ok and "PASS" or "FAIL", why)
 end
 
 -- sightprobe: what the sight reads at the chapter's start, printed for a check by eye against
@@ -3075,16 +4181,17 @@ scenarios.sightprobe = function()
         end
     end
     if not foe then return result("FAIL", "no enemy on the field") end
-    -- One attack of ours where it is in range, with the enemy's counter to it.
-    local r = sight.range(lead)
+    -- One attack of ours where a weapon reaches, with the enemy's counter to it.
+    local weapons = sight.weapons(lead)
     for _, t in ipairs(reach) do
-        local d = BOARD.distance(t.x, t.y, foe.x, foe.y)
-        if r and d >= r.min and d <= r.max then
+        if BOARD.weaponFor(weapons, t.x, t.y, foe.x, foe.y) then
             local g = sight.attack(lead, foe, t.x, t.y, nil)
             log(string.format("attack 0x%02X from (%d,%d) on 0x%02X: hit=%d dmg=%d crit=%d hits=%d "
-                .. "kills=%s | counter hit=%d dmg=%d crit=%d hits=%d (counters=%s)", lead.charId,
+                .. "kills=%s | counter hit=%d dmg=%d crit=%d hits=%d (counters=%s) | played: "
+                .. "kill %.4f die %.4f expected %.2f counterWorst %d", lead.charId,
                 t.x, t.y, foe.charId, g.hit, g.dmg, g.crit, g.hits, tostring(g.killsTarget),
-                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters)))
+                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters),
+                g.kill, g.die, g.expected, g.counterWorst))
             break
         end
     end
@@ -4030,24 +5137,24 @@ INSPECT.firstAttacks = function()
     look(1)
     local holding = callbacks:add("frame", hold)
     for phase = 1, phases do
-        emu:write8(SYM.gAiDecision + 0x00, 0)
+        emu:write8(SYM.gAiDecision + BOARD.AI_DEC.ACTION, 0)
         local decided = {}
         local watch = callbacks:add("frame", function()
-            local who, act = ru8(SYM.gAiDecision + 0x01), ru8(SYM.gAiDecision + 0x00)
-            -- struct AiDecision (cp_common.h): +00 actionId, +01 unitId, +02/+03 the tile it
-            -- moves to, +06 targetId. Every unit's decision once a phase, so a late striker
-            -- can be traced to where it stood and whom it went for.
+            local who = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT)
+            local act = ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
+            -- Every unit's decision once a phase (Board.AI_DEC), so a late striker can be
+            -- traced to where it stood and whom it went for.
             if who ~= 0 and decided[who] ~= act then
                 decided[who] = act
                 log(string.format('{"event":"ai_decision","phase":%d,"unit":"0x%02x","action":%d,'
                     .. '"x":%d,"y":%d,"target":"0x%02x"}', phase, who, act,
-                    ru8(SYM.gAiDecision + 0x02), ru8(SYM.gAiDecision + 0x03),
-                    ru8(SYM.gAiDecision + 0x06)))
+                    ru8(SYM.gAiDecision + BOARD.AI_DEC.X), ru8(SYM.gAiDecision + BOARD.AI_DEC.Y),
+                    ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET)))
             end
-            if act == 1 and not attacked[who] then
+            if act == BOARD.AI_ACTION_COMBAT and not attacked[who] then
                 attacked[who] = phase
                 log(string.format('{"event":"first_attack","phase":%d,"unit":"0x%02x",'
-                    .. '"target":"0x%02x"}', phase, who, ru8(SYM.gAiDecision + 0x06)))
+                    .. '"target":"0x%02x"}', phase, who, ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET)))
             end
         end)
         -- A reinforcement loads during the turn change, before the enemy acts: look again
@@ -4261,15 +5368,12 @@ local function teleportToFiringTile(u, mn, mx)
     return false
 end
 
--- True when the ENGINE would offer this unit an Attack command from its current tile: a hostile
--- sits within [mn,mx] of it in gBmMapUnit. The clear-bot asks first so its policy chooses Wait
--- when Attack will not appear; chooseAttack independently resolves the live semantic command.
-local function canAttackFromHere(u, mn, mx)
-    local w, h = mapSize()
-    return BOT.gridHostileInReach(function(x, y)
-        if x < 0 or x >= w or y < 0 or y >= h then return nil end
-        return mapUnitAt(x, y)
-    end, u.x, u.y, mn, mx)
+-- True when the game offers this unit the Attack command from its current tile
+-- (AttackCommandUsability, sight.lua canAttack). The clear-bot asks first so its policy chooses
+-- Wait when Attack will not appear; chooseAttack independently resolves the live semantic
+-- command. A red in fog is no target: it is not on gBmMapUnit (#204).
+local function canAttackFromHere(u)
+    return INSPECT.Sight.canAttack(INSPECT.sightApi(), u)
 end
 
 -- Turn fog OFF for a clear-bot run -- GRID AND ALL (#204). Zeroing gPlaySt.chapterVisionRange
@@ -5086,12 +6190,11 @@ scenarios.ch03tourmaline = function()
     for s = 3, 4 do emu:write16(u.addr + 0x1E + s * 2, 0) end
     -- Relocate to an ISOLATED floor tile (no orthogonally-adjacent ally) so the command menu is just
     -- [Item, Wait] -- otherwise a nearby deployed unit adds Rescue at row 0 and A opens the wrong submenu.
-    local function terr(x, y) return ru8(ru32(ru32(SYM.gBmMapTerrain) + y * 4) + x) end
     local FLOOR = { [0x01] = true, [0x02] = true, [0x17] = true, [0x2a] = true, [0x2d] = true }
     local moved = false
     for y = 1, 14 do
         for x = 1, 15 do
-            if FLOOR[terr(x, y)] and mapUnitAt(x, y) == 0
+            if FLOOR[terrainAt(x, y)] and mapUnitAt(x, y) == 0
                 and mapUnitAt(x - 1, y) == 0 and mapUnitAt(x + 1, y) == 0
                 and mapUnitAt(x, y - 1) == 0 and mapUnitAt(x, y + 1) == 0 then
                 if not INSPECT.place(u, x, y) then
@@ -5830,7 +6933,7 @@ scenarios.ch04packmath = function()
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and teleportAdjacentTo(u, { wolf }) then
                     u = unitAt(SYM.gUnitArrayBlue, i)
-                    if u and canAttackFromHere(u, mn, mx) and moveUnit(u.x, u.y, u.x, u.y) then
+                    if u and canAttackFromHere(u) and moveUnit(u.x, u.y, u.x, u.y) then
                         local was = packAlive()
                         chooseAttack(u.addr)
                         INSPECT.settle("fight", 600)
@@ -6745,7 +7848,7 @@ scenarios.ch05crest = function()
         -- The engine's GRID, not our arithmetic, decides whether row 0 of the command menu is
         -- Attack (#204). Pressing it anyway opens Item and Uses a vulnerary at full HP, which
         -- is both an illegal input and a wasted turn.
-        if not canAttackFromHere(hero, hmin, hmax) then
+        if not canAttackFromHere(hero) then
             log(string.format("ch05crest: attempt %d -- Ravisin parked at (%d,%d) is not in "
                 .. "[%d,%d] of the striker on (%d,%d) per gBmMapUnit; not pressing Attack",
                 t, red(RAVISIN) and red(RAVISIN).x or -1, red(RAVISIN) and red(RAVISIN).y or -1,
@@ -6958,7 +8061,7 @@ local function clearCh04(parley)
                 elseif not teleportToFiringTile(u, mn, mx) then
                     log(string.format("  blue[%d] pid=0x%02X (%d,%d): no firing tile [%d,%d]",
                         i, u.charId, u.x, u.y, mn, mx))
-                elseif not canAttackFromHere(unitAt(SYM.gUnitArrayBlue, i), mn, mx) then
+                elseif not canAttackFromHere(unitAt(SYM.gUnitArrayBlue, i)) then
                     -- The engine's grid, not the unit array, decides whether row 0 is Attack.
                     -- Pressing anyway opens Item and Uses a vulnerary at full HP (#204).
                     u = unitAt(SYM.gUnitArrayBlue, i)
@@ -7361,11 +8464,12 @@ scenarios.ch06halberd = function()
             emu:write8(a + 0x16, 4); emu:write8(a + 0x19, 4)
             emu:write8(dropper().addr + 0x13, dropper().maxhp)
             local swung
-            emu:write8(SYM.gAiDecision + 0x00, 0)   -- last phase's decision must not match
+            emu:write8(SYM.gAiDecision + BOARD.AI_DEC.ACTION, 0)   -- last phase's decision must not match
             local watch = callbacks:add("frame", function()
-                if ru8(SYM.gAiDecision + 0x01) == mine and ru8(SYM.gAiDecision + 0x00) == 1 then
-                    swung = { target = ru8(SYM.gAiDecision + 0x06),
-                              slot = ru8(SYM.gAiDecision + 0x07) }
+                if ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT) == mine
+                    and ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION) == BOARD.AI_ACTION_COMBAT then
+                    swung = { target = ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET),
+                              slot = ru8(SYM.gAiDecision + BOARD.AI_DEC.SLOT) }
                 end
             end)
             local phase = runEnemyPhase()

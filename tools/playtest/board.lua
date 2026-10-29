@@ -42,7 +42,18 @@ Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
 Board.US_DEAD = 1 << 2
 Board.US_NOT_DEPLOYED = 1 << 3
 Board.US_RESCUED = 1 << 5
+Board.US_HAS_MOVED = 1 << 6   -- Canto: Visit and Chest are not shown (bmmenu.c)
 Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
+-- "hidden by fog?": RefreshUnitsOnBmMap sets it on a red or purple unit on a fogged tile, in
+-- the same refresh that rebuilds gBmMapFog (bmmap.c), so it is the game's own word on which
+-- enemies the player sees. Never set without fog.
+Board.US_BIT9 = 1 << 9
+Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that downs it (bmmind.c)
+-- "On the field" has no one test in FE8, so this is the union of the two the game uses.
+-- RefreshUnitsOnBmMap places every unit without US_HIDDEN (bmmap.c), and the phase's can-act
+-- test skips US_DEAD, US_NOT_DEPLOYED and US_RESCUED (bmphase.c). Neither covers the other:
+-- the prep screen un-deploys a unit with US_NOT_DEPLOYED alone (prep_unitselect.c), and an
+-- event kills one with US_DEAD alone (eventscr.c).
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
@@ -84,6 +95,22 @@ function Board.distance(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
 
+-- Of `weapons` (sight.weapons: { slot, min, max } in item order), the first that strikes (bx, by)
+-- from (ax, ay) -- only item `slot`'s when one is given -- or nil. It is MakeTargetListForWeapon's
+-- range test: MapAddInBoundedRange marks the tiles min..max away by RECT_DISTANCE, and a unit
+-- not allied standing on one is a target. Asked here, not of the game, for its cost: the bot
+-- asks it for every (weapon, wait tile, enemy) of every unit at each decide, and a target list
+-- is a game call per (weapon, tile). The act it plays is confirmed by the game's own list
+-- (sight.legal), and the other half of that test, that the target stands on gBmMapUnit (not
+-- hidden in fog), is the bot's enemy list itself.
+function Board.weaponFor(weapons, ax, ay, bx, by, slot)
+    local d = Board.distance(ax, ay, bx, by)
+    for _, w in ipairs(weapons or {}) do
+        if (slot == nil or w.slot == slot) and d >= w.min and d <= w.max then return w end
+    end
+    return nil
+end
+
 -- The unit's CHARACTER carries CA_BOSS (named bosses). The class attribute is not read:
 -- the clear-bot has always meant "this chapter's named boss", not "a boss-class unit".
 function Board.isBoss(mem, addr)
@@ -120,6 +147,7 @@ function Board.leanAt(mem, SYM, base, slot)
         state = state,
         dead = (state & Board.US_DEAD) ~= 0,
         acted = (state & Board.US_UNSELECTABLE) ~= 0,
+        fogged = (state & Board.US_BIT9) ~= 0,
     }
 end
 
@@ -339,6 +367,67 @@ function Board.freeBeside(io, ax, ay, order, w, h, ok)
     return nil
 end
 
+-- The last REAL battle, as the game rolled it (the bot's trace, #510 step 9 F3): who fought,
+-- the numbers the forecast shows, and every blow. include/bmbattle.h: struct BattleStats +00
+-- config (BATTLE_CONFIG_REAL 1 << 0; the AI's simulations set SIMULATE and write the same
+-- arrays). struct BattleUnit (0x80): +00 the Unit (its +13 curHP is the HP AFTER the battle,
+-- +08 its level after, +04 pClassData), +48 weapon, +52 canCounter, +5A attack, +5C defense, +64 effective hit, +6A effective
+-- crit, +6E exp gained, +70 level before, +72 HP before, +7D weapon broke. struct BattleHit
+-- (u32, 7 of them): bits 0-18 attributes (CRIT 1 << 0, MISS 1 << 1), 19-23 info (FINISHES 1 << 1,
+-- RETALIATION 1 << 3 = the target's blow, END 1 << 4), 24-31 the signed HP change it dealt.
+Board.BATTLE_REAL = 1 << 0
+Board.BATTLE_HIT_MAX = 7
+Board.HIT_CRIT, Board.HIT_MISS = 1 << 0, 1 << 1
+Board.HIT_FINISHES, Board.HIT_RETALIATION, Board.HIT_END = 1 << 1, 1 << 3, 1 << 4
+
+-- include/types.h UNIT_ACTION_*: what gActionData +11 says an act was, named for the trace.
+Board.ACTION_COMBAT, Board.ACTION_STAFF, Board.ACTION_PICK = 0x02, 0x03, 0x15
+Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] = "dance",
+                  [0x06] = "steal", [0x07] = "summon", [0x08] = "summon", [0x09] = "rescue",
+                  [0x0A] = "drop", [0x0B] = "take", [0x0C] = "give", [0x0E] = "talk",
+                  [0x10] = "visit", [0x11] = "seize", [0x12] = "door", [0x14] = "chest",
+                  [0x15] = "pick", [0x1A] = "item", [0x1E] = "trapped", [0x1F] = "wait" }
+-- include/cp_common.h struct AiDecision (gAiDecision): +00 actionId, +01 unitId, +02/+03
+-- xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the ballista, AiAttemptBallistaCombat's -1).
+Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, SLOT = 0x07 }
+-- AI_ACTION_*: what the AI chose. A theft (AiStartStealAction) and a village pillage
+-- (AiPillageAction) set no action type of their own.
+Board.AI_ACTION_COMBAT, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE = 1, 3, 4
+
+local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+
+local function battleSide(mem, b)
+    local exp, id = mem.s8(b + 0x6E), mem.u8(b + 0x0B)
+    return { id = id, charId = mem.u8(mem.u32(b) + 4),
+             classId = mem.u32(b + 0x04) ~= 0 and mem.u8(mem.u32(b + 0x04) + 4) or nil,
+             canCounter = mem.s8(b + 0x52) ~= 0,
+             hpBefore = mem.s8(b + 0x72), hp = mem.u8(b + 0x13), weapon = mem.u16(b + 0x48) & 0xFF,
+             attack = s16(mem.u16(b + 0x5A)), defense = s16(mem.u16(b + 0x5C)),
+             hit = s16(mem.u16(b + 0x64)), crit = s16(mem.u16(b + 0x6A)),
+             -- InitObstacleBattleUnit builds a wall's (index 0) without InitBattleUnit, so its
+             -- levelPrevious is whatever the last battle left there
+             exp = exp, levelUp = id ~= 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
+             broke = mem.s8(b + 0x7D) ~= 0 }
+end
+
+-- { actor, target, hits = { { by = "actor"|"target", miss, crit, dmg, finishes } } } of the
+-- last real battle, or nil when the last battle generated was a simulation.
+function Board.battle(mem, SYM)
+    if (mem.u16(SYM.gBattleStats) & Board.BATTLE_REAL) == 0 then return nil end
+    local out = { actor = battleSide(mem, SYM.gBattleActor),
+                  target = battleSide(mem, SYM.gBattleTarget), hits = {} }
+    for i = 0, Board.BATTLE_HIT_MAX - 1 do
+        local w = mem.u32(SYM.gBattleHitArray + i * 4)
+        local attr, info, dmg = w & 0x7FFFF, (w >> 19) & 0x1F, (w >> 24) & 0xFF
+        if (info & Board.HIT_END) ~= 0 then break end
+        out.hits[#out.hits + 1] = {
+            by = (info & Board.HIT_RETALIATION) ~= 0 and "target" or "actor",
+            miss = (attr & Board.HIT_MISS) ~= 0, crit = (attr & Board.HIT_CRIT) ~= 0,
+            dmg = dmg >= 0x80 and dmg - 0x100 or dmg, finishes = (info & Board.HIT_FINISHES) ~= 0 }
+    end
+    return out
+end
+
 -- The reader with its memory and symbols bound, for harness.lua: one top-level local there
 -- instead of one per helper.
 function Board.bind(mem, SYM)
@@ -356,12 +445,19 @@ function Board.bind(mem, SYM)
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
-        distance = Board.distance, inMap = Board.inMap, place = Board.place,
+        battle = function() return Board.battle(mem, SYM) end,
+        distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
-        UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
-        US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF,
+        FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
+        US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
+        US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
+        BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
+        ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
+        ACTION_PICK = Board.ACTION_PICK,
+        AI_DEC = Board.AI_DEC, AI_ACTION_COMBAT = Board.AI_ACTION_COMBAT,
+        AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
     }
 end
 

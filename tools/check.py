@@ -86,9 +86,29 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 (ADR 0377): an exchange's odds are the game's own play of it,
+    # every roll caught (sight.lua `played`), never a blow model of displayed hit and x3 crits
+    r'\bhitChance\b', r'\bCRIT_MULTIPLIER\b', r'Planner\.blows\b', r'plan\.branch\b',
+    # retired by #510 step 9 design part A: a clear counts when the record's `clean` holds
+    # (won, no blue or green unit lost, every owed recruit joined, every reward taken)
+    r'\ball_alive\b',
+    # retired by #510 step 9: one choice-menu picker answers ch01's lead menu and vanilla's
+    # route split (INSPECT.pickMenuRow)
+    r'INSPECT\.pickLead\b',
+    # retired by #510 step 9 PR E: the team is Bot.team's pick over the map's demands, never a
+    # level-ordered fill or a shuffled deploy, and the route is a campaign setting, never drawn
+    r'Bot\.prep\b', r'STYLES\.route', r'\broute 50/50\b',
+    # retired by #510 step 9's re-derivation audit (ADR 0377, amended 2026-10-29): a key is the
+    # game's GetUnitKeyItemSlotForTerrain, a won-back chest its BATTLE_HandleItemDrop, owed
+    # recruits its talk table -- never a copied id list, a seen-blue set or a decomp regex
+    r'INSPECT\.BAG\.KEYS\b', r'\bblueSeen\b', r'explore\.downed\b', r'cfg\.recruits\b',
+    # (audit 10): an enemy in fog is the game's own US_BIT9 (board.lua `fogged`), never a copy
+    # of bmtarget.c's fog test
+    r'sight\.visible\b', r'\bs\.visible\b',
     # retired by #510 step 9 PR D (ADR 0369): who may Seize and a unit's reach are the game's
     # answers (CanUnitSeize, GetUnitEquippedWeapon) read through sight.lua, never board.lua's
-    # copies; the enemy's strike is AiAttemptOffensiveAction itself, not a copy of its slot loop
+    # copies; the enemy's strike is the AI's own decision (AiDecideMain since audit 13), not a
+    # copy of its slot loop
     r'Board\.canSeize', r'Board\.lordPid', r'Board\.attackRange', r'LORDSEL_FLAG_BASE \+ i\) to know',
     r'\bruledOut memo\b', r'\baiPick\b', r'\btakenCandidates\b', r'\bdiesWorst\b',
     r'sight\.forecast\b',
@@ -2585,15 +2605,18 @@ def check_generated_indexes_fresh(fail):
     import gen_chapter_index
     import gen_class_index
     import gen_decisions_index
-    for mod, rel in ((gen_chapter_index, 'docs/CHAPTERS.md'),
-                     (gen_class_index, 'docs/CLASSES.md'),
-                     (gen_decisions_index, 'docs/decisions.md')):
+    research = functools.partial(gen_decisions_index.generate, gen_decisions_index.RESEARCH)
+    for gen, rel, tool in ((gen_chapter_index.generate, 'docs/CHAPTERS.md', 'gen_chapter_index'),
+                           (gen_class_index.generate, 'docs/CLASSES.md', 'gen_class_index'),
+                           (gen_decisions_index.generate, 'docs/decisions.md',
+                            'gen_decisions_index'),
+                           (research, 'docs/research.md', 'gen_decisions_index')):
         path = os.path.join(REPO, rel)
-        want = mod.generate()[0]
+        want = gen()[0]
         have = _read_text(path) if os.path.isfile(path) else None
         if have != want:
-            fail.append('%s is stale vs the YAML -- regenerate: python3 tools/%s.py'
-                        % (rel, mod.__name__))
+            fail.append('%s is stale vs its sources -- regenerate: python3 tools/%s.py'
+                        % (rel, tool))
 
 
 # ── Engine campaign-agnosticism (the Engine/Content Boundary Rule, mechanized) ─────
@@ -2897,7 +2920,9 @@ def _handoff_branch_state():
               or HANDOFF_FILE in _diff_names(base))
     if not edited:
         return 'ok', ''                                  # UNTOUCHED
-    if not _git(['diff', '--name-only', main_ref, 'HEAD', '--', HANDOFF_FILE]) and not staged:
+    # The INDEX, not HEAD: the commit that syncs a drifted branch (`git checkout main --
+    # HANDOFF.md`, or a merge of main) is checked here before it exists.
+    if not _git(['diff', '--cached', '--name-only', main_ref, '--', HANDOFF_FILE]):
         return 'ok', ''                                  # SYNCED to main's tip
     if HANDOFF_FILE in staged:
         return 'diverged', 'staged for commit on `%s`' % branch
@@ -3399,7 +3424,8 @@ def check_build_workflow_filters_agree(fail):
 
 
 def check_decision_records_wellformed(fail):
-    """Every docs/decisions/ file parses, and its id is unique and matches its filename.
+    """Every docs/decisions/ and docs/research/ file parses, and its id is unique and matches
+    its filename.
 
     The corpus is the source of truth now, so a malformed ADR is a decision that silently
     stops being indexed -- the same failure as a check that is defined but never registered.
@@ -3409,11 +3435,17 @@ def check_decision_records_wellformed(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     import gen_decisions_index as gen
 
+    for coll in (gen.DECISIONS, gen.RESEARCH):
+        _records_wellformed(fail, gen, coll)
+
+
+def _records_wellformed(fail, gen, coll):
+    """check_decision_records_wellformed for one indexed folder (docs/decisions/, docs/research/)."""
     seen = {}
     try:
-        records = gen.adrs()
+        records = gen.adrs(coll)
     except Exception as exc:
-        fail.append('docs/decisions/: an ADR could not be parsed -- %s' % exc)
+        fail.append('docs/%s/: a record could not be parsed -- %s' % (coll.name, exc))
         return
     for rec in records:
         name = rec['path'].split('/')[-1]
@@ -3432,12 +3464,12 @@ def check_decision_records_wellformed(fail):
             fail.append('id %d is used by both %s and %s' % (ident, seen[ident], name))
         seen[ident] = name
 
-    notes = gen.section_notes()
-    known = set(gen.SECTION_ORDER) | {r.get('section') for r in records}
+    notes = gen.section_notes(coll)
+    known = set(coll.sections) | {r.get('section') for r in records}
     for section in notes:
         if section not in known:
-            fail.append('a section note claims section %r, which no decision uses and '
-                        'SECTION_ORDER does not name' % section)
+            fail.append('a section note claims section %r, which no %s uses and its '
+                        'section list does not name' % (section, coll.column))
 
 
 def check_decision_citations_resolve(fail):

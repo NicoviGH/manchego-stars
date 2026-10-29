@@ -131,9 +131,11 @@ scenarios:
   vanillagold: {rom: any, manual: true, kind: diagnostic, deadline: 900}
   # #510 step 9 PR D: the bot plays one chapter (ours ch01; PT_VANILLA=1 retail Ch1 after the
   # Prologue) and emits a BOTRUN record; sightprobe prints what sight.lua reads, for a check
-  # by eye. Both headless (memory only), both run by hand -- never in a suite.
+  # by eye. Both headless (memory only), both run by hand -- never in a suite. campaign (PR E)
+  # plays chapter to chapter; a whole game is hours, hence its deadline.
   bot: {rom: any, manual: true, deadline: 1800}
   sightprobe: {rom: any, manual: true, deadline: 900}
+  campaign: {rom: any, manual: true, deadline: 86400}
   goodberry: {}
   ch01: {}
   smoke_ch01: {}

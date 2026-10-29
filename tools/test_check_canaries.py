@@ -443,7 +443,9 @@ def c_handoff_only_on_main():
     answers = {('rev-parse', '--abbrev-ref', 'HEAD'): 'feat/canary',
                ('rev-parse', '--verify', '--quiet', 'origin/main'): 'abc123',
                ('merge-base', 'HEAD', 'origin/main'): 'abc123',
-               ('diff', '--cached', '--name-only'): check.HANDOFF_FILE}
+               ('diff', '--cached', '--name-only'): check.HANDOFF_FILE,
+               ('diff', '--cached', '--name-only', 'origin/main', '--', check.HANDOFF_FILE):
+                   check.HANDOFF_FILE}
     with mock.patch.dict(os.environ, {'GITHUB_HEAD_REF': '', 'GITHUB_BASE_REF': ''}), \
             mock.patch.object(check, '_git', lambda args: answers.get(tuple(args), '')):
         return run(check.check_handoff_only_on_main)

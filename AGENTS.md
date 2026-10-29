@@ -19,6 +19,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | What a playtest scenario needs (ROM flag, host chapter, checkpoint, timing) | A hosted chapter's scenarios are DECLARED in its own YAML under `playtest:` and their rows + chapter suite are derived (`tools/playtest/declared.py`, #314). Everything a chapter does not own — the spine, chapter-generic probes, checkpoint builders, ROM configs, timing classes, `gate` — stays in **`tools/playtest/matrix.yaml`**. A name in both RAISES. |
 | Prep screen / deploy cap / force-deployment | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol — the CAP is the parity, Pick Units only chooses which PCs fill it. Never re-derive this from the decomp, and never from `hasPrepScreen` (dead FE7 leftover, false everywhere).** |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
+| How players play vanilla (party, prep, resets, shops) and what playtesting research says about bots | **`docs/research.md`** (generated index; one record per topic under `docs/research/`, searchable by its frontmatter title and tags). Evidence the decisions cite, never a decision itself |
 | The back half's plan (ch09–ch20) | `status: planned` chapter YAMLs, read through the wiki (`python3 tools/gen_wiki.py` → `build/wiki/index.html`); `docs/roadmap.md` holds the arc and the recruit cadence |
 | Vision / architecture / phased roadmap | `docs/PRD.md` |
 | Work backlog | **GitHub issues** (milestones M0–M4) |

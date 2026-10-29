@@ -149,19 +149,23 @@ def apply_chapter_difficulty(campaign, verbose=False):
 # vanilla puts Ch5x (Unbroken Heart) at row 5, so from Ch5 on chapter N is row N+1. Only the
 # shared-route `CHAPTER_L_*` rows are named here; past the split the routes interleave, and a
 # twin there has to say which route it means.
-_SHARED_ROW = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)$')
+_SHARED_ROW = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)(X?)$')
 
 
 def shared_route_twin(chapter_enum):
-    """'CHAPTER_L_5' -> 'FE8 Ch5' (by name: its value is 6), 'CHAPTER_L_PROLOGUE' ->
-    'FE8 Prologue'; None for any chapter off the shared route."""
+    """'CHAPTER_L_5' -> 'FE8 Ch5' (by name: its value is 6), 'CHAPTER_L_5X' -> 'FE8 Ch5x',
+    'CHAPTER_L_PROLOGUE' -> 'FE8 Prologue'; None for any chapter off the shared route."""
     m = _SHARED_ROW.match(chapter_enum)
     if not m:
         return None
-    return 'FE8 Prologue' if m.group(1) == 'PROLOGUE' else 'FE8 Ch%d' % int(m.group(1))
+    if m.group(1) == 'PROLOGUE':
+        return 'FE8 Prologue'
+    return 'FE8 Ch%d%s' % (int(m.group(1)), m.group(2).lower())
 
 
-def _twin_rows():
+def twin_rows():
+    """{'FE8 Prologue': 0, ..., 'FE8 Ch5x': 5, 'FE8 Ch5': 6, ...}: each shared-route twin's
+    chapter index, which is also its chapter_settings row. The one owner of that mapping."""
     rows = enum_values(vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_L_')
     return {shared_route_twin(n): v for n, v in rows.items() if shared_route_twin(n)}
 
@@ -169,7 +173,7 @@ def _twin_rows():
 def twin_settings_index(chap):
     """The vanilla chapter_settings row of a chapter's `parity_reference` twin."""
     ref = chap.get('parity_reference', '')
-    rows = _twin_rows()
+    rows = twin_rows()
     if ref not in rows:
         sys.exit('ERROR: %s: parity_reference %r names no shared-route vanilla chapter, so its '
                  'music has no twin row to follow -- name the route\'s row explicitly'

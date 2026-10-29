@@ -36,9 +36,13 @@ from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
 from inject.decomp import DECOMP, enum_values, vanilla_decomp_text  # noqa: E402  DECOMP is the build tree (#408); the reads are HEAD
 ELF = os.environ.get('PT_ELF') or os.path.join(DECOMP, 'fireemblem8.elf')   # PT_VANILLA (run.sh)
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, 'symbols.lua')
-OUT_PROCSCR = os.path.join(HERE, 'procscr.lua')
-OUT_JSON = os.path.join(HERE, 'symbols.json')
+# PT_SYMDIR: where the tables go. run.sh gives retail FE8 its own (PT_VANILLA): one shared
+# set let an ours run started beside a vanilla one overwrite vanilla's addresses before its
+# emulator loaded them, and the vanilla run hung in our IsCharacterForceDeployed (2026-10-29).
+OUT_DIR = os.environ.get('PT_SYMDIR') or HERE
+OUT = os.path.join(OUT_DIR, 'symbols.lua')
+OUT_PROCSCR = os.path.join(OUT_DIR, 'procscr.lua')
+OUT_JSON = os.path.join(OUT_DIR, 'symbols.json')
 
 ROM_START = 0x08000000
 ROM_END = 0x0A000000
@@ -175,6 +179,7 @@ WANTED = [
     'TargetSelection_Loop',     # exact target-selector input callback
     'gSelectInfo_Attack',       # distinguishes attack targets from other selectors
     'gSelectInfo_Talk',         # distinguishes Talk targets from other selectors
+    'gSelectInfo_Heal',         # distinguishes a healing staff's targets (bmitemuse.c)
     'gProcScr_BKSEL',           # passive battle-forecast panel owner; SelectTargetProc, not
                                 # this display proc, owns the target-confirmation input
     'BattleForecast_LoopDisplay', # exact stable forecast display callback (still no legal input)
@@ -238,6 +243,14 @@ WANTED = [
                                 # terrainId +0x55, weapon +0x48. Names WHO is on screen when a
                                 # battle animation freezes.
     'gBattleTarget',            # struct BattleUnit: the defending side of that same combat.
+    'gBattleStats',             # struct BattleStats: +00 config, BATTLE_CONFIG_REAL on a real
+                                # battle (the AI's own simulations write the same arrays).
+    'gBattleHitArray',          # struct BattleHit[BATTLE_HIT_MAX]: each blow of the last battle,
+                                # as the game rolled it (board.lua Board.battle, the bot's trace).
+    'gActionData',              # struct ActionData (include/bmunit.h): the action being played.
+                                # UnitBeginAction (bmunit.c) sets +0C subjectIndex and zeroes +11
+                                # unitActionType at each act's start; the act then sets the type.
+    'gActiveUnitMoveOrigin',    # struct Vec2: where that act's unit started (UnitBeginAction).
     'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
                                 # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
                                 # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.
@@ -265,16 +278,30 @@ WANTED = [
     'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
     'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D
     'InitRN',                   # the game's own RNG seeding (rng.c)
-    # An enemy's strike on one target: the enemy phase's per-unit setup (cp_decide.c) and its
-    # offensive routine itself (cp_battle.c AiAttemptOffensiveAction).
-    'AiAttemptOffensiveAction', # the AI's whole attack decision for the active unit
-    'AiIsUnitEnemy',            # the "is enemy" test the AI script passes it (cp_script.c)
+    # An enemy's decision: the enemy phase's per-unit setup and its decision itself (cp_decide.c
+    # CpDecide_Main's loop body, AiDecideMain).
+    'RefreshEntityBmMaps',      # the unit, fog and hidden maps, rebuilt from the unit structs
+    'AiDecideMain',             # the AI's whole decision for the active unit: scripts A and B
     'AiUpdateNoMoveFlag',       # sets AI_FLAG_STAY from the unit's ai_config
     'AiInitDangerMap',          # the AI's danger map, which its tile choice reads
     'AiClearDecision',          # empties gAiDecision before a decision
-    'gAiState',                 # struct AiState: dangerMapFilled +7A, combatWeightTableId +7D
-    'BattleGenerateBallistaSimulation',  # a ballista's strike (bmbattle.c)
+    'gAiState',                 # struct AiState: decideState +79, dangerMapFilled +7A, unk7C, +7D
+    'BattleGenerateBallistaSimulation',
+    'BattleRoll1RN',            # every one-number roll of a battle: crits, skill procs (bmbattle.c)
+    'BattleRoll2RN',            # the two-number hit roll; both return simResult when simulating  # a ballista's strike (bmbattle.c)
     'gActiveUnit',              # struct Unit *: the AI decides for THIS unit
+    # The chapter's talks (eventinfo.c): the walk's two talk checks, caught to read each entry,
+    # and the Talk command's own availability check.
+    'EvCheck03_CHAR',           # an EvtListTalk entry's check
+    'EvCheck04_CHARASM',        # an EvtListConditionalTalk-with-asm entry's check
+    'CheckForCharacterEvents',  # whether the talk (pidA, pidB) would run now
+    # A fallen unit's drop (bmmind.c BATTLE_HandleItemDrop, its popup's only caller).
+    'NewPopup_GeneralItemGot',  # the item given to the blue unit that downed a dropper
+    'sProcScr_CombatAction',    # the real battle's resolution, the drop included
+    # An AI theft (cp_perform.c AiStartStealAction) and the rank its list gives the item.
+    'AiStartStealAction',       # the steal itself: gAiDecision's target and item slot
+    'AiGetItemStealRank',       # the item's place in gAiStealPriorityItemList (ADR 0379)
+    'EquipUnitItemSlot',        # Weapon Select equips the weapon struck with: what it counters with
     'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
     # Turn events still to come (eventinfo.c): botrun's "nothing can change this board".
     'GetChapterEventDataPointer',   # the chapter's event lists; turnBasedEvents at +00
@@ -283,6 +310,51 @@ WANTED = [
     'GenerateExtendedMovementMap',  # the AI's march distance to a far goal (bmidoten.c)
     'CanUnitSeize',             # who may Seize: the Seize command's own check (bmdifficulty.c)
     'GetUnitEquippedWeapon',    # the weapon BU_ISLOT_AUTO strikes with: first usable (bmitem.c)
+    # Bot.team's demands (#510 step 9 PR E): what each unit answers, by the game's own checks.
+    'GetUnitKeyItemSlotForTerrain',  # a key or lockpick for a chest/door (Chest/DoorCommandUsability)
+    'GetUnitFogViewRange',      # how far a unit sees in fog: a thief's +5, a torch (bmunit.c)
+    'CanUnitUseStaff',          # whether a unit can use a staff it holds (bmitem.c)
+    # The bot's heals (#510 step 9 PR E): what a staff or a Vulnerary would do, by the game.
+    'CanUnitUseItem',           # usable now; for a staff it builds the targets (bmitemuse.c)
+    'GetUnitItemHealAmount',    # the HP an item restores for this unit (bmitem.c)
+    'GetUnitMaxHp',             # maxHP + the equipped weapon's HP bonus, AddUnitHp's cap (bmunit.c)
+    'GetSelectTargetCount',     # the target list the last builder made (uiselecttarget.c)
+    'GetTarget',                # one entry of it: struct SelectTarget { x, y, uid, extra }
+    'CheckForCharacterEvents',  # whether a Talk event joins two characters (eventinfo.c)
+    # Villages and chests (#510 step 9): the unit menu's own checks, on the active unit.
+    'VisitCommandUsability',    # Visit: a village tile whose event is open, not a Phantom (bmmenu.c)
+    'ChestCommandUsability',    # Chest: a key or lockpick and CanUnitUseChestKeyItem (bmmenu.c)
+    # A kept act is played on the game's word (sight.legal): the rest of the unit menu's checks.
+    'TalkCommandUsability',     # Talk: MakeTalkTargetList finds a partner, not Silenced (bmmenu.c)
+    'DoorCommandUsability',     # Door: a key and a door beside the unit (bmmenu.c)
+    'UnitActionMenu_CanSeize',  # Seize: CanUnitSeize on the Seize tile (bmmenu.c)
+    'CanUnitUseWeaponNow',      # the weapons the Attack command lists (bmitem.c)
+    'MakeTargetListForWeapon',  # that weapon's targets: units not allied, and walls (bmtarget.c)
+    'AttackCommandUsability',   # Attack: a weapon above with a target (bmmenu.c; the clear loop)
+    'InitObstacleBattleUnit',   # a wall as gBattleTarget, for its strike's forecast (bmbattle.c)
+    'GetDefeatTalkEntry',       # a unit's death quote for this chapter; flag 2 = the Defeat Boss goal (eventinfo.c)
+    # The planner's enemy phase (#510 step 9): the enemy turn order, as the game builds it.
+    'BuildAiUnitList',          # gAiState.units: the faction's units able to act (cp_order.c)
+    'SortAiUnitList',           # that list in the order the AI moves them (cp_order.c)
+    'MakePrepUnitList',         # the Pick Units roster, rebuilt into its EWRAM overlay (prepscreen.c)
+    # campaign.lua (#510 step 9 PR E): between chapters, the game's own shop, rules and world map.
+    'StartShopScreen',          # opens the Armory/Vendor screen for a unit over a stock list
+    'Shop_Loop_BuyKeyHandler',  # the shop's item list key handler (bmshop.c)
+    'sShopState',               # struct ShopState: head_loc +00, hand_loc +06, px_per_line +08,
+                                # bg2_off +0C (IsShopPageScrolling compares the last two)
+    'GetItemPurchasePrice',     # what the shop charges this unit for an item (Silver Card included)
+    'GetPartyGoldAmount',       # what the party may spend: 0 in Ch5x (bmgold.c)
+    'CanUnitUseWeapon',         # whether a unit can wield an item (bmitem.c)
+    'CanUnitUsePromotionItem',  # whether a seal promotes this unit now: class and level (bmitemuse.c)
+    'ProcScr_WorldMapMain',     # the world map's main proc (worldmap_main.c)
+    'WorldMap_Loop',            # its free-cursor loop: L, A and the D-pad
+    'gGMData',                  # struct GMapData: cursor ix/iy +08/+0C (<<8), units[0].location
+                                # +11 (the lord), nodes[] state +30 (bit 0 open, 4 bytes each)
+    'gWMNodeData',              # struct GMapNodeData[] (stride 0x20): armory +0C, vendor +10,
+                                # secretShop +14, x +18, y +1A
+    'GetNextUnclearedNode',     # the node of the next story chapter (worldmap_path.c)
+    'MakeNewItem',              # an item at full uses, as the shop makes its stock (bmitem.c)
+    'IsCharacterForceDeployed', # the prep screen's forced-unit check (prep_unitselect.c)
 ]
 
 
@@ -532,6 +604,7 @@ def write_atomic(path, text):
 def main():
     if not os.path.exists(ELF):
         sys.exit('ERROR: %s not built (run make first)' % ELF)
+    os.makedirs(OUT_DIR, exist_ok=True)
     nm = subprocess.run(['arm-none-eabi-nm', ELF], capture_output=True, text=True, check=True)
     symbols = parse_nm(nm.stdout)
     try:

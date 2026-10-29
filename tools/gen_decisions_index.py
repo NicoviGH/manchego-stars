@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Generate docs/decisions.md -- the INDEX over docs/decisions/*.md.
+"""Generate docs/decisions.md -- the INDEX over docs/decisions/*.md -- and docs/research.md,
+the same kind of index over docs/research/*.md (reference research the decisions cite:
+one record per topic, the same front matter, so a session searches titles and sections
+instead of grepping long documents; #510, 2026-10-27).
 
 The ADR files are the single source of truth; this index is DERIVED. Do not hand-edit
 docs/decisions.md -- add or edit a file under docs/decisions/ and regenerate:
@@ -18,6 +21,7 @@ two or three ADRs its task actually needs.
 
 Stdlib + pyyaml only, so the lightweight CI `checks` job can import it.
 """
+import collections
 import glob
 import os
 import re
@@ -27,8 +31,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from yaml_loader import yaml_load                                     # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ADR_DIR = os.path.join(REPO, 'docs', 'decisions')
-OUT = os.path.join(REPO, 'docs', 'decisions.md')
 
 # The section order of the original document, preserved so the index reads the way the file
 # always did. A section with no ADRs simply does not appear.
@@ -49,9 +51,40 @@ SECTION_ORDER = [
 
 FRONT_MATTER = re.compile(r'\A---\n(.*?)\n---\n', re.S)
 
+# One indexed folder of records: its files, the index it generates, the index's opening.
+Collection = collections.namedtuple('Collection', 'name dir out sections intro column tags')
+DECISIONS = Collection(
+    'decisions', os.path.join(REPO, 'docs', 'decisions'), os.path.join(REPO, 'docs', 'decisions.md'),
+    SECTION_ORDER, [
+        '# Design Decisions — Manchego Stars',
+        '',
+        '> These decisions are **settled**. Do not re-open them without a strong reason.',
+        '>',
+        '> **This file is GENERATED.** Each decision is one file under `docs/decisions/`;',
+        '> this is the index. Add or edit the ADR, then regenerate:',
+        '> `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.',
+        '',
+        '%d decisions. Read this index, then open the two or three you need — the whole',
+        'set is ~197,000 tokens and no session has ever needed all of it at once.',
+    ], 'decision', False)
+RESEARCH = Collection(
+    'research', os.path.join(REPO, 'docs', 'research'), os.path.join(REPO, 'docs', 'research.md'),
+    ['Playtesting bots', 'FE8: between battles', 'FE8: building the party',
+     'FE8: whom guides field, by chapter'], [
+        '# Research — Manchego Stars',
+        '',
+        '> Reference research: what sources say, each claim cited. **Evidence, not decisions:**',
+        '> what we do is in `docs/decisions.md`. Vanilla facts only; ours live in the YAML.',
+        '>',
+        '> **This file is GENERATED.** Each record is one file under `docs/research/`; add or',
+        '> edit one, then regenerate: `python3 tools/gen_decisions_index.py`.',
+        '',
+        '%d records. Search the titles and tags here, then open the ones you need.',
+    ], 'record', True)
 
-def parse(path):
-    """One ADR file -> its front matter plus the first prose line, for the index blurb."""
+
+def parse(path, coll=DECISIONS):
+    """One record file -> its front matter plus the first prose line, for the index blurb."""
     with open(path, encoding='utf-8') as fh:
         text = fh.read()
     m = FRONT_MATTER.match(text)
@@ -67,16 +100,16 @@ def parse(path):
         if line and not line.startswith(('|', '#', '```', '---', '>')):
             blurb = line
             break
-    meta['path'] = 'decisions/' + os.path.basename(path)
+    meta['path'] = coll.name + '/' + os.path.basename(path)
     meta['blurb'] = blurb
     return meta
 
 
-def adrs():
-    return [parse(p) for p in sorted(glob.glob(os.path.join(ADR_DIR, '[0-9]*.md')))]
+def adrs(coll=DECISIONS):
+    return [parse(p, coll) for p in sorted(glob.glob(os.path.join(coll.dir, '[0-9]*.md')))]
 
 
-def section_notes():
+def section_notes(coll=DECISIONS):
     """`_<slug>.md` files: prose that belongs to a SECTION rather than to any one decision.
 
     These carried the section's framing in the original document -- including the whole of
@@ -84,7 +117,7 @@ def section_notes():
     decisions-only index. Underscore-prefixed so the ADR glob above skips them.
     """
     notes = {}
-    for path in sorted(glob.glob(os.path.join(ADR_DIR, '_*.md'))):
+    for path in sorted(glob.glob(os.path.join(coll.dir, '_*.md'))):
         with open(path, encoding='utf-8') as fh:
             text = fh.read()
         m = FRONT_MATTER.match(text)
@@ -112,7 +145,7 @@ def citation_corpus():
     # Section names live in the index, not in any record, and pointers name them
     # ("decisions.md -> Working Conventions"), so they are part of the corpus.
     parts = list(SECTION_ORDER)
-    for path in sorted(glob.glob(os.path.join(ADR_DIR, '*.md'))):
+    for path in sorted(glob.glob(os.path.join(DECISIONS.dir, '*.md'))):
         with open(path, encoding='utf-8') as fh:
             parts.append(fh.read())
     return re.sub(r'[^a-z0-9]+', ' ', ' '.join(parts).lower())
@@ -131,31 +164,22 @@ def squish(text, limit=150):
     return text[:limit].rsplit(' ', 1)[0] + '...'
 
 
-def generate():
-    """Return (index_text, adr_list). check.py diffs [0] against the committed file."""
-    found = adrs()
-    notes = section_notes()
+def generate(coll=DECISIONS):
+    """Return (index_text, record_list). check.py diffs [0] against the committed file."""
+    found = adrs(coll)
+    notes = section_notes(coll)
     by_section = {}
     for a in found:
         by_section.setdefault(a.get('section') or 'Uncategorised', []).append(a)
     for section in notes:                    # a prose-only section still gets a heading
         by_section.setdefault(section, [])
 
-    order = [s for s in SECTION_ORDER if s in by_section]
-    order += sorted(s for s in by_section if s not in SECTION_ORDER)
+    order = [s for s in coll.sections if s in by_section]
+    order += sorted(s for s in by_section if s not in coll.sections)
 
     out = []
-    out.append('# Design Decisions — Manchego Stars')
-    out.append('')
-    out.append('> These decisions are **settled**. Do not re-open them without a strong reason.')
-    out.append('>')
-    out.append('> **This file is GENERATED.** Each decision is one file under `docs/decisions/`;')
-    out.append('> this is the index. Add or edit the ADR, then regenerate:')
-    out.append('> `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.')
-    out.append('')
-    out.append('%d decisions. Read this index, then open the two or three you need — the whole'
-               % len(found))
-    out.append('set is ~197,000 tokens and no session has ever needed all of it at once.')
+    for line in coll.intro:
+        out.append(line % len(found) if '%d' in line else line)
     out.append('')
     out.append('**Contents:** ' + ' · '.join(
         '[%s](#%s)' % (s, anchor(s)) for s in order))
@@ -175,13 +199,14 @@ def generate():
         # Title only. These titles are full sentences that state the decision -- "A read that
         # never changes is read ONCE" -- so a separate blurb column doubled the index's size
         # to say the same thing twice.
-        out.append('| | decision | date | issues |')
-        out.append('|---|---|---|---|')
+        out.append('| | %s | date | issues |%s' % (coll.column, ' tags |' if coll.tags else ''))
+        out.append('|---|---|---|---|%s' % ('---|' if coll.tags else ''))
         for a in rows:
             issues = ' '.join('#%s' % i for i in (a.get('issues') or [])) or '—'
-            out.append('| `%04d` | [%s](%s) | %s | %s |' % (
+            tags = (' %s |' % ', '.join(a.get('tags') or ()) or ' — |') if coll.tags else ''
+            out.append('| `%04d` | [%s](%s) | %s | %s |%s' % (
                 a.get('id') or 0, squish(a.get('title'), 120), a['path'],
-                a.get('date') or '—', issues))
+                a.get('date') or '—', issues, tags))
         out.append('')
 
     text = '\n'.join(out)
@@ -196,10 +221,12 @@ def anchor(heading):
 
 
 def main():
-    text, found = generate()
-    with open(OUT, 'w', encoding='utf-8') as fh:
-        fh.write(text)
-    print('docs/decisions.md: %d decisions indexed (%.0f KB)' % (len(found), len(text) / 1024))
+    for coll in (DECISIONS, RESEARCH):
+        text, found = generate(coll)
+        with open(coll.out, 'w', encoding='utf-8') as fh:
+            fh.write(text)
+        print('%s: %d records indexed (%.0f KB)' % (os.path.relpath(coll.out, REPO), len(found),
+                                                    len(text) / 1024))
     return 0
 
 

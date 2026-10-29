@@ -42,6 +42,18 @@ class TheRealCorpusIsClean(unittest.TestCase):
         self.assertEqual(want, have,
                          'docs/decisions.md is stale -- python3 tools/gen_decisions_index.py')
 
+    def test_research_index_is_fresh(self):
+        want = gen.generate(gen.RESEARCH)[0]
+        with open(gen.RESEARCH.out, encoding='utf-8') as fh:
+            have = fh.read()
+        self.assertEqual(want, have,
+                         'docs/research.md is stale -- python3 tools/gen_decisions_index.py')
+
+    def test_every_research_record_has_a_known_section_and_tags(self):
+        for rec in gen.adrs(gen.RESEARCH):
+            self.assertIn(rec['section'], gen.RESEARCH.sections, rec['path'])
+            self.assertTrue(rec.get('tags'), rec['path'] + ' has no tags to be searched by')
+
     def test_every_decision_has_a_known_section(self):
         for rec in gen.adrs():
             self.assertIn(rec['section'], gen.SECTION_ORDER, rec['path'])
@@ -73,14 +85,18 @@ class ItCatchesWhatItIsFor(unittest.TestCase):
             for name, body in files.items():
                 with open(os.path.join(d, name), 'w', encoding='utf-8') as fh:
                     fh.write(body)
-            real_repo, real_dir = check.REPO, gen.ADR_DIR
-            check.REPO, gen.ADR_DIR = tmp, d
+            empty = os.path.join(tmp, 'docs', 'research')
+            os.makedirs(empty)
+            real = check.REPO, gen.DECISIONS, gen.RESEARCH
+            check.REPO = tmp
+            gen.DECISIONS = gen.DECISIONS._replace(dir=d)
+            gen.RESEARCH = gen.RESEARCH._replace(dir=empty)
             try:
                 fail = []
                 check.check_decision_records_wellformed(fail)
                 return fail
             finally:
-                check.REPO, gen.ADR_DIR = real_repo, real_dir
+                check.REPO, gen.DECISIONS, gen.RESEARCH = real
 
     def test_duplicate_ids_fail(self):
         fail = self._run({'0001-a.md': GOOD % 1, '0001-b.md': GOOD % 1})

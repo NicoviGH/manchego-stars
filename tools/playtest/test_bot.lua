@@ -3,6 +3,8 @@
 -- Run: lua tools/playtest/test_bot.lua
 local here = (arg[0]:match("(.*/)")) or "./"
 local B = dofile(here .. "bot.lua")
+local Planner = dofile(here .. "planner.lua")
+local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
 
 local tests, fails = 0, 0
@@ -27,14 +29,14 @@ end
 do
     local reach = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 })
     local enemies = { { x = 8, y = 8, hp = 20, is_boss = false } }
-    check(B.pickTarget(reach, enemies, { range = 1 }), nil, "no enemy in range -> nil")
+    check(B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } }), nil, "no enemy in range -> nil")
 end
 
 -- One enemy orthogonally adjacent to a reachable tile -> that enemy, from that tile.
 do
     local reach = tiles({ 5, 5 }, { 5, 6 })
     local enemies = { { x = 5, y = 7, hp = 20, is_boss = false } }  -- adjacent to (5,6)
-    local pick = B.pickTarget(reach, enemies, { range = 1 })
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
     check(pick ~= nil, true, "adjacent enemy is attackable")
     check(pick and pick.target.x, 5, "picks the enemy")
     check(pick and pick.tile.x, 5, "attack tile x")
@@ -48,7 +50,7 @@ do
         { x = 3, y = 5, hp = 10, is_boss = false },  -- adjacent to (3,4)
         { x = 6, y = 7, hp = 40, is_boss = true },   -- adjacent to (6,6)
     }
-    local pick = B.pickTarget(reach, enemies, { range = 1 })
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
     check(pick and pick.target.is_boss, true, "boss preferred over non-boss")
 end
 
@@ -59,7 +61,7 @@ do
         { x = 0, y = 2, hp = 18, is_boss = false },  -- adjacent to (0,1)
         { x = 2, y = 2, hp = 5, is_boss = false },   -- adjacent to (2,1)
     }
-    local pick = B.pickTarget(reach, enemies, { range = 1 })
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
     check(pick and pick.target.hp, 5, "lowest-hp non-boss preferred")
 end
 
@@ -67,21 +69,21 @@ end
 do
     local reach = tiles({ 4, 4 })
     local enemies = { { x = 4, y = 6, hp = 20, is_boss = false } }  -- distance 2 from (4,4)
-    check(B.pickTarget(reach, enemies, { range = 1 }), nil, "range 1 can't reach distance 2")
-    local pick = B.pickTarget(reach, enemies, { range = 2 })
+    check(B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } }), nil, "range 1 can't reach distance 2")
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 2 } } })
     check(pick ~= nil, true, "range 2 reaches distance 2")
 end
 
--- A BOW (min_range 2): an ADJACENT enemy is NOT attackable -- striking from range 1 leaves
+-- A BOW (min 2): an ADJACENT enemy is NOT attackable -- striking from range 1 leaves
 -- no Attack command, so pickTarget must skip the adjacent tile (#65 recordrbgtest bug).
 do
     local adjacent = tiles({ 4, 5 })  -- distance 1 from the foe at (4,6)
     local enemies = { { x = 4, y = 6, hp = 20, is_boss = false } }
-    check(B.pickTarget(adjacent, enemies, { range = 2, min_range = 2 }), nil,
-          "bow (min_range 2) won't pick an adjacent tile it can't fire from")
+    check(B.pickTarget(adjacent, enemies, { weapons = { { slot = 0, min = 2, max = 2 } } }), nil,
+          "bow (min 2) won't pick an adjacent tile it can't fire from")
     -- but a true range-2 tile IS picked, and an adjacent one is left out of a mixed reach.
     local mixed = tiles({ 4, 5 }, { 4, 4 })  -- (4,5)=dist 1, (4,4)=dist 2
-    local pick = B.pickTarget(mixed, enemies, { range = 2, min_range = 2 })
+    local pick = B.pickTarget(mixed, enemies, { weapons = { { slot = 0, min = 2, max = 2 } } })
     check(pick ~= nil and pick.tile.x == 4 and pick.tile.y == 4, true,
           "bow strikes from the range-2 tile (4,4), not the adjacent (4,5)")
 end
@@ -187,7 +189,7 @@ do
                 if o ~= u then blocked[B.tileKey(o.x, o.y)] = true end
             end
             local reach = reachFor(u, blocked)
-            local atk = B.pickTarget(reach, enemies, { range = 1 })
+            local atk = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
             if atk then engaged = true break end
             local mv = B.pickMove(reach, { field = field, cur = u,
                                            goal = boss, blocked = blocked,
@@ -199,44 +201,6 @@ do
     end
     check(engaged, true, "walled-camp march: a unit reaches attack range within 6 turns")
 end
--- gridHostileInReach (#204): the clear-bot must decide from the ENGINE'S tile->unit grid, not
--- from the unit array. A red the grid does not know about is not attackable, and pressing the
--- command menu's row 0 anyway lands on Item.
-do
-    -- gridAt over a sparse {["x,y"] = byte} table; nil off-map.
-    local function gridOf(t)
-        return function(x, y)
-            if x < 0 or x > 14 or y < 0 or y > 14 then return nil end
-            return t[x .. "," .. y] or 0
-        end
-    end
-
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x81 }), 5, 5, 1, 1), true,
-        "hostile adjacent ON THE GRID -> attackable")
-
-    -- The #204 regression: the unit array says an enemy is at (6,5), but it stands in fog so
-    -- RefreshUnitsOnBmMap never wrote it to gBmMapUnit. There is no Attack row.
-    check(B.gridHostileInReach(gridOf({}), 5, 5, 1, 1), false,
-        "enemy absent from the grid (fogged) -> NOT attackable")
-
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x01 }), 5, 5, 1, 1), false,
-        "a BLUE id on the grid is not a hostile")
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x41 }), 5, 5, 1, 1), false,
-        "a GREEN id on the grid is not a hostile")
-
-    -- A bow cannot fire at an adjacent foe: min range 2.
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x81 }), 5, 5, 2, 2), false,
-        "bow: hostile at range 1 is out of [2,2]")
-    check(B.gridHostileInReach(gridOf({ ["7,5"] = 0x81 }), 5, 5, 2, 2), true,
-        "bow: hostile at range 2 is attackable")
-
-    -- Diagonals count as range 2 (Manhattan), and the map edge must not throw.
-    check(B.gridHostileInReach(gridOf({ ["1,1"] = 0x81 }), 0, 0, 1, 2), true,
-        "diagonal hostile is at Manhattan 2")
-    check(B.gridHostileInReach(gridOf({}), 0, 0, 1, 2), false,
-        "off-map probes at the corner are safe")
-end
-
 -- Stall progress (#510 step 9). Distance is measured from the units that can still be the
 -- one to finish: once the boss is dead the field points at the seize tile, and a unit that
 -- the game says cannot Seize is excluded, so the lord's march is what counts.
@@ -303,9 +267,10 @@ local function unit(o)
         id = o.id, slot = o.slot or 0, faction = o.faction or "blue", charId = o.charId or o.id,
         x = o.x, y = o.y, hp = o.hp or 20, maxhp = o.maxhp or o.hp or 20,
         onMap = true, onField = o.onField ~= false, dead = false, acted = o.acted or false,
+        fogged = o.fogged or false,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
-        isBoss = o.isBoss or false, classId = o.classId,
+        isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
     }
 end
 local function blue(id, slot, x, y, o)
@@ -325,20 +290,68 @@ end
 local QUIET = { hit = 0, dmg = 0, crit = 0, hits = 0, counters = false, counterHit = 0,
                 counterDmg = 0, counterCrit = 0, counterHits = 0, takenHit = 0, takenDmg = 0,
                 takenCrit = 0, takenHits = 0, killsTarget = false }
+-- The fake game's play of a strike's blows, for the fixtures' window numbers (the ROM's own
+-- play is sight.lua's `played`, proven in the ROM): each lands at its hit through FE8's two
+-- rolls and crits at its crit, tripled. `live` = the chance the striker is still standing
+-- for them (a counter's blows, after our attack may have killed).
+local function blowsOf(hit, dmg, hits, crit, live)
+    local p = Sight.rollChance(2, hit or 0) * (live or 1)
+    local c = math.max(0, math.min(100, crit or 0)) / 100
+    local out = {}
+    for _ = 1, hits or 0 do
+        local one = { [0] = 1 - p }
+        one[dmg or 0] = (one[dmg or 0] or 0) + p * (1 - c)
+        one[(dmg or 0) * 3] = (one[(dmg or 0) * 3] or 0) + p * c
+        out[#out + 1] = one
+    end
+    return out
+end
+-- A fixture's attack, as sight.attack returns it once the fake game has played it.
+local function attackPlayed(f, uHp, tHp)
+    local dealt = Sight.damage(blowsOf(f.hit, f.dmg, f.hits, f.crit), tHp)
+    local kill = Sight.odds({ dealt }, tHp)
+    local back = f.counters and Sight.damage(blowsOf(f.counterHit, f.counterDmg, f.counterHits,
+                                                     f.counterCrit, 1 - kill), uHp)
+        or { [0] = 1 }
+    return Sight.attackOf({ hit = f.hit, dmg = f.dmg, crit = f.crit, hits = f.hits,
+                            counter = { armed = f.counters, hit = f.counterHit,
+                                        dmg = f.counterDmg, crit = f.counterCrit,
+                                        hits = f.counterHits },
+                            killsTarget = f.killsTarget, dealt = dealt, back = back }, tHp, uHp)
+end
+-- A fixture's enemy strike (sight.strike's, or one of sight.enemyPhase's), played on a unit
+-- at `hp`; one already carrying takenDist is left as it is.
+local function strikePlayed(t, hp)
+    if t.takenDist then return t end
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    out.takenDist = Sight.damage(blowsOf(t.takenHit, t.takenDmg, t.takenHits, t.takenCrit),
+                                 hp or math.huge)
+    out.takenWorst = Sight.worst(out.takenDist)
+    out.counterDist = Sight.damage(blowsOf(t.counterHit, t.counterDmg, t.counterHits,
+                                           t.counterCrit), t.strikerHp or math.huge)
+    return out
+end
 local function sightOf(o)
     local attacks, strikes = 0, 0
-    local function entry(u, t, x, y)
+    -- a forecast per tile, or per tile and weapon ("x,y/slot") where a test tells them apart
+    local function entry(u, t, x, y, slot)
         local byT = (o.fc or {})[u.id]
         local byTile = byT and byT[t.id]
-        return (byTile and byTile[x .. "," .. y]) or QUIET
+        return (byTile and (byTile[x .. "," .. y .. "/" .. tostring(slot)]
+                            or byTile[x .. "," .. y])) or QUIET
+    end
+    -- The game's Weapon Select list, modelled by the unit's `weapons` or its one range.
+    local function weapons(u)
+        return u.weapons or (u.minRange and { { slot = 0, min = u.minRange, max = u.maxRange } })
+            or {}
     end
     local s = {
         objective = o.objective or { kind = "rout" },
         field = o.field,
         cache = o.cache,
         terrain = o.terrain,
-        -- The game's equipped-weapon reach, modelled by the board unit's own range.
-        range = function(u) return u.minRange and { min = u.minRange, max = u.maxRange } or nil end,
+        weapons = weapons,
         -- The game's CanUnitSeize, modelled by the objective's lord (anyone, when none is named).
         canSeize = function(u)
             local lord = (o.objective or {}).lord
@@ -359,15 +372,70 @@ local function sightOf(o)
                 return n
             end
         end,
-        attack = function(u, t, x, y)
+        attack = function(u, t, x, y, slot)
+            local w = Board.weaponFor(weapons(u), x, y, t.x, t.y, slot)
+            if not w then return nil end
             attacks = attacks + 1
-            return entry(u, t, x, y)
+            return attackPlayed(entry(u, t, x, y, w.slot), u.hp, t.hp)
         end,
-        strike = function(u, t, x, y)
+        strike = function(u, t, x, y, slot)
             strikes = strikes + 1
-            return entry(u, t, x, y)
+            return strikePlayed(entry(u, t, x, y, slot), u.hp)
         end,
     }
+    -- The game reads PR E added (each optional, as in sight.lua's callers): obstacles, doors,
+    -- staves/heals/mend, the Talk check, key holders, and fog.
+    for _, k in ipairs({ "obstacles", "doors", "unseen" }) do
+        if o[k] then s[k] = function() return o[k] end end
+    end
+    if o.staves then s.staves = function(u) return o.staves[u.id] or {} end end
+    if o.heals then s.heals = function(u, x, y) return (o.heals[u.id] or {})[x .. "," .. y] or {} end end
+    if o.mend then s.mend = function(u) return o.mend[u.id] end end
+    if o.maxHp then
+        s.maxHps = function(units)
+            for _, u in ipairs(units) do u.maxhp = o.maxHp[u.id] or u.maxhp end
+        end
+    end
+    if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
+    if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
+    if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
+    -- the unit menu's check: Door lists a door beside an opener (TryAddClosedDoorToTargetList),
+    -- Talk a talkable unit beside the talker (MakeTalkTargetList)
+    s.offers = function(u, tiles, act, target)
+        local may = act == "door" and (o.openers or {})[u.id] == true
+            or act == "talk" and s.canTalk ~= nil and s.canTalk(u, target)
+        local out = {}
+        for _, t in ipairs(tiles) do
+            if may and Board.distance(t.x, t.y, target.x, target.y) == 1 then out[#out + 1] = t end
+        end
+        return out
+    end
+    -- villages and chests: the open tiles, and the unit menu's check per unit and tile
+    if o.explorable then
+        s.explorable = function() return o.explorable end
+        s.canExplore = function(u, x, y, kind)
+            return ((o.canExplore or {})[u.id] or {})[x .. "," .. y] == kind
+        end
+    end
+    s.odds = Sight.odds
+    if o.enemyPhase then
+        -- each strike played on its target at the HP the plan gives it
+        s.enemyPhase = function(plan)
+            local hp = {}
+            for _, b in ipairs(plan.blues) do hp[b.unit.id] = b.hp end
+            local out = o.enemyPhase(plan)
+            local played = {}
+            local function play(t)
+                played[t] = played[t] or strikePlayed(t, t.targetHp or hp[t.target])
+                return played[t]
+            end
+            for i, t in ipairs(out) do out[i] = play(t) end
+            for _, oc in ipairs(out.outcomes or {}) do
+                for i, t in ipairs(oc.strikes) do oc.strikes[i] = play(t) end
+            end
+            return out
+        end
+    end
     s.attacks = function() return attacks end
     s.strikes = function() return strikes end
     s.calls = function() return attacks + strikes end
@@ -458,6 +526,7 @@ do
             local g = {}
             for k, v in pairs(f) do g[k] = v end
             g.counters, g.counterHit, g.counterDmg, g.counterHits = false, 0, 0, 0
+            g.counterDist, g.counterWorst, g.die = { [0] = 1 }, 0, 0
             return g
         end
         return f
@@ -513,15 +582,16 @@ do
     }
     check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
         "60% in one blow beats 70% needed twice")
-    -- 4% once and 20% twice are the SAME chance: the tie goes on to expected damage (E2's)
+    -- the same 50% kill on both: the tie goes on to expected damage, E2's 12 HP against E1's 10
+    local E2b = red(0x82, 0, 1, { hp = 12 })
     s = sightOf {
         fc = { [0x01] = {
-            [0x81] = { ["0,0"] = fc { hit = 20, dmg = 5, hits = 2, killsTarget = true } },
-            [0x82] = { ["0,0"] = fc { hit = 4, dmg = 60, hits = 1, killsTarget = true } },
+            [0x81] = { ["0,0"] = fc { hit = 50, dmg = 10, hits = 1, killsTarget = true } },
+            [0x82] = { ["0,0"] = fc { hit = 50, dmg = 12, hits = 1, killsTarget = true } },
         } },
     }
-    check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
-        "equal kill chances tie exactly; expected damage (60 x 4 > 5 x 2 x 20) decides")
+    check(B.decide(boardOf(A, E1, E2b), s, style("careful")).target, 0x82,
+        "equal kill chances tie exactly; expected damage (12 x 50% > 10 x 50%) decides")
     -- a kill only a crit lands (10 HP at 2 a blow, 2 blows) ranks as no kill chance at all
     s = sightOf {
         fc = { [0x01] = {
@@ -669,6 +739,30 @@ do
     local g = B.decide(board, fresh, style("greedy"))
     check(g.act, "attack", "greedy attacks whatever the forecast says")
     check(fresh.calls(), 0, "greedy reads no forecast")
+end
+
+-- Every weapon the Weapon Select menu lists is asked (sight.weapons), not the equipped one
+-- alone (audit 9): a sword (1) and a javelin (1-2) in the bag, the javelin strikes an enemy two
+-- tiles off; where both reach, the act's slot is the weapon whose forecast wins.
+do
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 2 } } })
+    local kills = fc { hit = 100, dmg = 10, hits = 1, killsTarget = true }
+    local far = red(0x81, 0, 2, { hp = 10 })
+    local sight = sightOf { reach = { [0x01] = tiles({ 0, 0 }) },
+                            fc = { [0x01] = { [0x81] = { ["0,0"] = kills } } } }
+    local a = B.decide(boardOf(A, far), sight, style("careful"))
+    check(a.act .. "/" .. tostring(a.slot), "attack/1", "the javelin strikes from two tiles")
+    local near = red(0x81, 0, 1, { hp = 10 })
+    local both = sightOf { reach = { [0x01] = tiles({ 0, 0 }) },
+                           fc = { [0x01] = { [0x81] = {
+                               ["0,0/0"] = kills,
+                               ["0,0/1"] = fc { hit = 100, dmg = 3, hits = 1 } } } } }
+    a = B.decide(boardOf(A, near), both, style("careful"))
+    check(a.act .. "/" .. tostring(a.slot), "attack/0", "where both reach, the weapon that kills")
+    local swordOnly = blue(0x01, 0, 0, 0)
+    check(B.decide(boardOf(swordOnly, far), sight, style("careful")).act, "wait",
+          "a sword alone does not reach two tiles")
 end
 
 -- test_objective_seize: the lord with the seize tile in reach and danger 0 there seizes,
@@ -1170,62 +1264,160 @@ local function test_carry_survives_a_full_deploy()
     local st = B.CLAIM_BEHAVIOURS.carry({ id = "c3", kind = "carry", unit = { 0x02 },
                                           vs = "all" }, sampled)
     check(csv(st.deploy), "2,1,3", "carry: carried first, then the sampled list")
-    check(csv(B.prep(roster, 2, st).deploy), "2,1", "prep: a full sampled list keeps the carry")
+    for _, u in ipairs(roster) do u.group = "magic" end
+    check(csv(B.team({ roster = roster, cap = 2, maxima = {}, demands = {}, answers = {},
+                       carried = {}, style = st }).deploy), "2,1",
+        "team: a full claim list keeps the carry")
 end
 test_carry_survives_a_full_deploy()
 
-local function test_prep_forced_first()
-    local roster = { unitOf(1, 0x01, 3), unitOf(2, 0x02, 9), unitOf(3, 0x03, 5, { forced = true }),
-                     unitOf(4, 0x04, 7), unitOf(5, 0x05, 7), unitOf(6, 0x06, 1, { forced = true }) }
-    local p = B.prep(roster, 4, { deploy = {} })
-    check(csv(p.deploy), "3,6,2,4", "forced (slot order), then highest level, ties by slot")
-    check(#p.give, 0, "no transfer rule decided: give is empty")
-    p = B.prep(roster, 4, { deploy = { 0x01, 0x99, 0x01, 0x03 } })
-    check(csv(p.deploy), "3,6,1,2",
-        "style.deploy next; unknown charId skipped, duplicate not doubled")
-    p = B.prep(roster, 5, { deploy = { 0x04 } })
-    check(csv(p.deploy), "3,6,4,2,5", "cap 5: forced, style, then level")
-    p = B.prep(roster, 1, { deploy = { 0x04 } })
-    check(csv(p.deploy), "3,6", "forced alone exceed the cap: all forced still go, nothing else")
-    p = B.prep(roster, 10, { deploy = {} })
-    check(#p.deploy, 6, "cap above the roster: everyone")
+-- Bot.team: forced, then a followed claim's units, then the demands, then fill. g = the group.
+local function teamUnit(id, charId, group, extra)
+    return unitOf(id, charId, 1, (function()
+        local e = { group = group }
+        for k, v in pairs(extra or {}) do e[k] = v end
+        return e
+    end)())
 end
-test_prep_forced_first()
+local function team(t)
+    t.maxima = t.maxima or {}
+    t.demands = t.demands or {}
+    t.answers = t.answers or {}
+    t.carried = t.carried or {}
+    t.style = t.style or { deploy = {} }
+    return B.team(t)
+end
+
+local function test_team_forced_past_the_ceiling_claims_under_it()
+    local roster = { teamUnit(1, 0x01, "armour", { forced = true }), teamUnit(2, 0x02, "armour"),
+                     teamUnit(3, 0x03, "armour", { forced = true }), teamUnit(4, 0x04, "magic") }
+    local p = team({ roster = roster, cap = 4, maxima = { armour = 1 },
+                     style = { deploy = { 0x02, 0x04 } } })
+    check(csv(p.deploy), "1,3,4", "forced both (past armour 1); claim's armour 2 capped; magic in")
+    check(p.reasons[0x01].why, "forced", "reason: forced")
+    check(p.reasons[0x04].why, "claim", "reason: a followed claim")
+    check(#p.give, 0, "no transfer rule decided: give is empty")
+end
+test_team_forced_past_the_ceiling_claims_under_it()
+
+local function test_team_covers_the_most_demand_first()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "thief"),
+                     teamUnit(3, 0x03, "healer") }
+    local demands = { { id = "chests", need = 1 }, { id = "fog", need = 1 },
+                      { id = "sustain", need = 1 } }
+    local answers = { [0x01] = { fog = true }, [0x02] = { chests = true, fog = true },
+                      [0x03] = { sustain = true } }
+    local p = team({ roster = roster, cap = 2, demands = demands, answers = answers })
+    check(csv(p.deploy), "2,3", "thief covers two, then the healer covers what is left")
+    check(table.concat(p.reasons[0x02].demands, ","), "chests,fog", "reason names the demands")
+end
+test_team_covers_the_most_demand_first()
+
+local function test_team_ties_carried_then_earlier_joiner()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "magic"),
+                     teamUnit(3, 0x03, "magic") }
+    local demands = { { id = "sustain", need = 1 } }
+    local answers = { [0x01] = { sustain = true }, [0x02] = { sustain = true }, [0x03] = { sustain = true } }
+    local p = team({ roster = roster, cap = 1, demands = demands, answers = answers,
+                     carried = { [0x03] = true } })
+    check(csv(p.deploy), "3", "equal cover: the carried unit")
+    check(p.reasons[0x03].carried, true, "reason says it won as carried")
+    p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
+    check(csv(p.deploy), "1", "equal cover, none carried: the earlier joiner (slot order)")
+end
+test_team_ties_carried_then_earlier_joiner()
+
+local function test_team_carried_never_beats_an_uncovered_demand()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "thief") }
+    local p = team({ roster = roster, cap = 1, demands = { { id = "chests", need = 1 } },
+                     answers = { [0x02] = { chests = true } }, carried = { [0x01] = true } })
+    check(csv(p.deploy), "2", "a carried unit covering nothing loses to the chest opener")
+end
+test_team_carried_never_beats_an_uncovered_demand()
+
+local function test_team_a_full_group_benches_the_later_joiner()
+    local roster = { teamUnit(1, 0x01, "flier"), teamUnit(2, 0x02, "flier"),
+                     teamUnit(3, 0x03, "flier") }
+    local demands = { { id = "villages", need = 3 } }
+    local answers = { [0x01] = { villages = true }, [0x02] = { villages = true },
+                      [0x03] = { villages = true } }
+    local p = team({ roster = roster, cap = 3, maxima = { flier = 2 }, demands = demands,
+                     answers = answers })
+    check(csv(p.deploy), "1,2", "flier 2: the third flier stays benched, its slot stays empty")
+end
+test_team_a_full_group_benches_the_later_joiner()
+
+local function test_team_an_enemy_class_needs_an_answer_each()
+    local roster = { teamUnit(1, 0x01, "axe"), teamUnit(2, 0x02, "axe"),
+                     teamUnit(3, 0x03, "magic"), teamUnit(4, 0x04, "sword") }
+    local demands = { { id = "enemy:9", need = 2 }, { id = "sustain", need = 1 } }
+    local answers = { [0x01] = { ["enemy:9"] = true }, [0x02] = { ["enemy:9"] = true },
+                      [0x04] = { ["enemy:9"] = true } }
+    local p = team({ roster = roster, cap = 2, demands = demands, answers = answers })
+    check(csv(p.deploy), "1,2", "two enemies of the class: two answerers")
+end
+test_team_an_enemy_class_needs_an_answer_each()
+
+local function test_team_fill_is_the_best_answer_to_the_biggest_class()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "axe"),
+                     teamUnit(3, 0x03, "sword"), teamUnit(4, 0x04, "sword") }
+    local demands = { { id = "enemy:9", need = 1 }, { id = "enemy:7", need = 1 } }
+    local answers = { [0x01] = { ["enemy:9"] = true }, [0x02] = { ["enemy:7"] = true },
+                      [0x03] = { ["enemy:9"] = true }, [0x04] = { ["enemy:9"] = true } }
+    local strength = { [0x03] = { ["enemy:9"] = 2 }, [0x04] = { ["enemy:9"] = 5 } }
+    local p = team({ roster = roster, cap = 4, demands = demands, answers = answers,
+                     strength = strength })
+    check(csv(p.deploy), "1,2,4,3", "covered by the first answerers, then fill: highest strength first")
+    check(p.reasons[0x04].why, "fill", "reason: fill")
+end
+test_team_fill_is_the_best_answer_to_the_biggest_class()
+
+local function test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
+    local ok = pcall(team, { roster = { unitOf(1, 0x01, 1) }, cap = 1 })
+    check(ok, false, "a unit with no group raises: there is no default group")
+    local p = team({ roster = { teamUnit(1, 0x01, "magic") }, cap = 3,
+                     carried = { [0x09] = true } })
+    check(csv(p.deploy), "1", "a carried unit no longer on the roster (dead, departed) drops out")
+end
+test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
+
+-- A stock price every buyer pays (the game prices per buyer: GetItemPurchasePrice).
+local function anyone(n) return setmetatable({}, { __index = function() return n end }) end
 
 local function test_shop_stops_at_gold()
     local stock = {
-        { item = 0x6C, price = 300, kind = "vulnerary" },
-        { item = 0x10, price = 500, type = "sword" },
-        { item = 0x11, price = 400, type = "sword" },
-        { item = 0x12, price = 900, type = "sword" },
-        { item = 0x20, price = 700, type = "lance" },
-        { item = 0x21, price = 100, type = "axe" },
+        { item = 0x6C, price = anyone(300), kind = "vulnerary" },
+        { item = 0x10, price = anyone(500), type = "sword" },
+        { item = 0x11, price = anyone(400), type = "sword" },
+        { item = 0x12, price = anyone(900), type = "sword" },
+        { item = 0x20, price = anyone(700), type = "lance" },
+        { item = 0x21, price = anyone(100), type = "axe" },
     }
     -- canUse is the game's CanUnitUseWeapon: A can wield the two cheaper swords, not 0x12.
     local A = unitOf(1, 0x01, 1, { canUse = { [0x10] = true, [0x11] = true } })
     local Bu = unitOf(2, 0x02, 1, { canUse = { [0x20] = true } })
     local function flat(r)
         local t = {}
-        for _, e in ipairs(r) do t[#t + 1] = e.item .. "x" .. e.qty end
+        for _, e in ipairs(r) do t[#t + 1] = e.unit .. ":" .. e.item end
         return csv(t)
     end
-    check(flat(B.shop(10000, stock, { A, Bu })), "108x2,17x1,32x1",
-        "vulneraries per unit first, then the cheapest usable weapon each lacks")
-    check(flat(B.shop(700, stock, { A, Bu })), "108x2",
+    check(flat(B.shop(10000, stock, { A, Bu })), "1:108,2:108,1:17,2:32",
+        "vulneraries per unit first, then the cheapest usable weapon each lacks, each for its unit")
+    check(flat(B.shop(700, stock, { A, Bu })), "1:108,2:108",
         "gold runs out after the vulneraries: 100 left buys no 400+ sword")
     local Cu0 = unitOf(3, 0x03, 1, { canUse = { [0x21] = true, [0x10] = true, [0x11] = true } })
-    check(flat(B.shop(1000, stock, { Bu, Cu0 })), "108x2,33x1",
+    check(flat(B.shop(1000, stock, { Bu, Cu0 })), "2:108,3:108,3:33",
         "skip then continue: the lance (700) is skipped at 400 gold, "
             .. "the axe (100) after it is bought")
     A.items = { { id = 0x10, type = "sword", rank = 1 } }
-    check(flat(B.shop(10000, stock, { A, Bu })), "108x2,32x1", "a unit holding its type buys none")
+    check(flat(B.shop(10000, stock, { A, Bu })), "1:108,2:108,2:32", "a unit holding its type buys none")
     local Cu = unitOf(3, 0x03, 1, { canUse = { [0x21] = true, [0x10] = true, [0x11] = true } })
-    check(flat(B.shop(800, stock, { Cu })), "108x1,33x1,17x1",
+    check(flat(B.shop(800, stock, { Cu })), "3:108,3:33,3:17",
         "skip-and-continue: exact fit, gold 800 buys vuln 300, axe 100, sword 400 in order")
-    check(flat(B.shop(450, stock, { Cu })), "108x1,33x1",
+    check(flat(B.shop(450, stock, { Cu })), "3:108,3:33",
         "the sword (400) is skipped at 50 gold, the buying stops there")
     A.items = { { id = 0x10, type = "sword", rank = 1 }, { id = 0x6C, kind = "vulnerary" } }
-    check(flat(B.shop(10000, stock, { A, Bu })), "108x1,32x1",
+    check(flat(B.shop(10000, stock, { A, Bu })), "2:108,2:32",
         "a unit already holding a Vulnerary buys none")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
     check(flat(B.shop(10000, { stock[2] }, { A })), "",
@@ -1235,6 +1427,18 @@ local function test_shop_stops_at_gold()
         "a weapon the game says the unit cannot use is never bought")
 end
 test_shop_stops_at_gold()
+
+-- test_shop_budgets_at_the_buyers_price: a Silver Card halves A's prices only, so 450 gold buys
+-- B's Vulnerary (300) and A's (150); priced at B's 300 for both, A's would not fit.
+local function test_shop_budgets_at_the_buyers_price()
+    local stock = { { item = 0x6C, price = { [0x01] = 150, [0x02] = 300 }, kind = "vulnerary" } }
+    local t = {}
+    for _, e in ipairs(B.shop(450, stock, { unitOf(2, 0x02, 1), unitOf(1, 0x01, 1) })) do
+        t[#t + 1] = e.unit .. ":" .. e.item
+    end
+    check(csv(t), "2:108,1:108", "each buyer pays its own price: 300 + 150 fit in 450")
+end
+test_shop_budgets_at_the_buyers_price()
 
 local function test_promote_reads_the_games_answer()
     -- `promotes` is the game's own check (class and level): the bot adds no rule of its own.
@@ -1257,9 +1461,1016 @@ local function test_route_follows_style()
     check(B.route(opts, { route = 2 }), 2, "route 2")
     check(pcall(B.route, opts, { route = 4 }), false, "out-of-range route raises")
     check(pcall(B.route, opts, {}), false, "missing route raises")
-    check(#B.STYLES.route, 2, "route is a sampled axis, two options")
 end
 test_route_follows_style()
+
+-- ── a full bag: which item goes to the convoy (Nicolas, 2026-10-28) ─────────────────────
+do
+    local function lance(rank, o)
+        o = o or {}
+        return { kind = "weapon", type = "lance", rank = rank, maxRange = o.maxRange or 1,
+                 effective = o.effective, usable = o.usable ~= false }
+    end
+    local function heal(uses) return { kind = "heal", uses = uses or 3 } end
+    local key, gem = { kind = "key" }, { kind = "money" }
+    local bow = { kind = "weapon", type = "bow", rank = 1, maxRange = 2, usable = false }
+    local F = B.fullBag
+    -- money, healing and an unusable weapon go first, the new item kept
+    check(F({ lance(1), heal(), key, gem, lance(2) }, lance(4)), 4, "bag: a gem leaves for a better lance")
+    check(F({ lance(1), heal(), key, bow, lance(2) }, heal()), 0, "bag: a second heal is not needed")
+    check(F({ lance(1), key, bow, lance(2), lance(3) }, heal()), 3, "bag: an unusable bow leaves for the first heal")
+    check(F({ lance(1), heal(1), heal(3), key, lance(2) }, key), 2, "bag: the emptier spare heal leaves for a key")
+    -- a weapon: a higher rank beats the lowest plain one of its type
+    check(F({ lance(1), heal(), key, lance(2), lance(3) }, lance(4)), 1, "bag: Silver beats Iron")
+    check(F({ lance(2), heal(), key, lance(2), lance(3) }, lance(2)), 0, "bag: an equal rank is a duplicate")
+    -- a Javelin's range is not beaten by rank, and a Javelin is wanted for its range
+    check(F({ lance(1, { maxRange = 2 }), heal(), key, lance(3), lance(3) }, lance(4)), 4,
+          "bag: Silver replaces a Steel, the Javelin stays")
+    check(F({ lance(1, { maxRange = 2 }), heal(), key, lance(3, { effective = "armour" }), heal() },
+            lance(4)), 0, "bag: the only ranged lance is never the one replaced")
+    check(F({ lance(1), heal(), key, gem, lance(3) }, lance(1, { maxRange = 2 })), 4,
+          "bag: a lance that adds range is wanted")
+    check(F({ lance(1), heal(), key, gem, lance(3) }, lance(2, { effective = "armour" })), 4,
+          "bag: a lance that adds bonus damage is wanted")
+    -- all five needed: the new item goes (Nicolas: three weapons, a Vulnerary and a key)
+    check(F({ lance(1), lance(2), lance(3, { maxRange = 2 }), heal(), key }, lance(1)), 0,
+          "bag: everything carried is needed")
+    -- a weapon the unit cannot use, money, a seal: not needed in hand
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "weapon", type = "bow", rank = 4,
+              usable = false }), 0, "bag: a bow for a lance user goes to the convoy")
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "money" }), 0, "bag: money goes")
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other" }), 0, "bag: a seal goes")
+    -- the convoy full: a discard takes duplicates and low tiers, never money
+    check(F({ lance(1), heal(), key, gem, lance(2) }, lance(4), true), 1, "bag: discard the beaten lance")
+    check(F({ heal(1), heal(), key, gem, lance(2) }, key, true), 1, "bag: discard a spare heal")
+    check(F({ lance(1), heal(), key, gem, lance(2, { maxRange = 2 }) }, heal(), true), 0,
+          "bag: no duplicate to discard, the new item goes")
+end
+
+-- ── PR E: breaching, doors, healing, Talk, keys, avoid, fog ────────────────────────────
+
+-- A field per goal tile: fields["x,y"] = { "x,y" = dist }.
+local function fieldsOf(fields)
+    return function(g)
+        local f = fields[g.x .. "," .. g.y]
+        if not f then return nil end
+        local out = {}
+        for k, d in pairs(f) do
+            local x, y = k:match("(%d+),(%d+)")
+            x, y = tonumber(x), tonumber(y)
+            out[y] = out[y] or {}
+            out[y][x] = d
+        end
+        return out
+    end
+end
+local BOSS_SIDE = { ["3,0"] = 1, ["4,0"] = 0 }
+local FROM_WALL = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1, ["4,0"] = 2 }
+
+-- test_breach_strikes_the_wall_that_cuts_off_the_goal: the boss's field never reaches A, the
+-- wall at (2,0) sits beside it, so A strikes the wall from (1,0); without the wall it marches.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local sight = sightOf {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = { { x = 2, y = 0, hp = 20 } },
+    }
+    local a = B.decide(boardOf(A, E), sight, style("careful"))
+    check(a and a.act, "attack", "breach: the cut-off unit attacks")
+    check(a and a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y), "2,0", "breach: the wall")
+    check(at(a), "1,0", "breach: from beside it")
+end
+
+-- test_a_key_holder_opens_the_door_before_a_wall: the same cut, a door at (2,0) as well as a
+-- wall: the opener uses Door; a unit with no key still strikes the wall.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = { { x = 2, y = 0, hp = 20 } }, doors = { { x = 2, y = 0 } },
+        openers = { [0x01] = true },
+    }
+    check(B.decide(boardOf(A, E), sightOf(o), style("careful")).act, "door", "door: opener")
+    o.openers = {}
+    check(B.decide(boardOf(A, E), sightOf(o), style("careful")).act, "attack",
+          "door: no key, the wall")
+end
+
+-- test_a_plan_strikes_a_wall_only_while_it_stands: A and C are both cut off by the wall at
+-- (2,0). A blow that breaks it leaves C nothing to strike, so the plan holds one strike, not
+-- two (vanilla Ch3 planned two, and the second crashed); a wall one blow leaves standing is
+-- struck by both. The blow is the game's forecast (sight.strikeWall).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 0, 1)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local function strikes(blowDmg)
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }, { 2, 1 }) },
+            field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                               ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                           ["4,0"] = 2, ["0,1"] = 3, ["1,1"] = 2, ["2,1"] = 1 } },
+            obstacles = { { x = 2, y = 0, hp = 10 } },
+        }
+        local sight = sightOf(o)
+        sight.strikeWall = function() return { dealt = blowDmg } end
+        local _, plan = Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
+        local n = 0
+        for _, a in ipairs(plan and plan.acts or {}) do
+            if a.obstacle then n = n + 1 end
+        end
+        return n
+    end
+    check(strikes(10), 1, "wall: a blow that breaks it is the only strike planned")
+    check(strikes(4), 2, "wall: a wall the first blow leaves standing is struck again")
+end
+
+-- test_the_assault_seats_every_striker: the boss E sits in the corner (0,0); (1,0) is the one
+-- tile beside it both A and C reach. R, the heavier, strikes from 1 or 2 away and also
+-- reaches (1,1); M strikes only from beside it. The assault seats R on (1,1) and M on (1,0):
+-- both strike. Offering each unit two tiles and seating the heaviest first on its first
+-- left M nothing (ours ch03: three of six strikers dropped).
+do
+    local R = blue(0x01, 0, 3, 0, { maxRange = 2 })
+    local M = blue(0x02, 1, 3, 1)
+    local E = red(0x81, 0, 0, { isBoss = true, hp = 30, minRange = false })
+    local hit = function(dmg) return fc { hit = 100, dmg = dmg, hits = 1 } end
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 3, 0 }, { 1, 0 }, { 1, 1 }), [0x02] = tiles({ 3, 1 }, { 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = hit(10), ["1,1"] = hit(10) } },
+               [0x02] = { [0x81] = { ["1,0"] = hit(5) } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(R, M, E), sightOf(o), style("careful"))
+    local seated
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "assault" then seated = table.concat(c.acts, " ") end
+    end
+    check(seated and seated:find("1>attack@1,1") ~= nil and seated:find("2>attack@1,0") ~= nil, true,
+          "assault: R strikes from 2 away, leaving M the tile beside the boss")
+end
+
+-- test_a_plan_moves_an_ally_off_the_tile_another_needs: B stands on (1,0), the one tile that
+-- brings A nearer the enemy; B can step on to (2,0). The plan moves B first, then A onto B's
+-- old tile -- never A first, which the game would refuse (ours ch03: Braulo queued behind the
+-- light hitters on the corner's safe tiles, and never reached the boss).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local F = blue(0x02, 1, 1, 0)
+    local E = red(0x81, 6, 0, { minRange = false })
+    local far = { ["0,0"] = 6, ["1,0"] = 5, ["2,0"] = 4, ["3,0"] = 3 }
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 1, 0 }, { 2, 0 }) },
+                field = fieldsOf { ["6,0"] = far } }
+    local _, plan = Planner.plan(B, boardOf(A, F, E), sightOf(o), style("careful"))
+    local order = {}
+    for _, a in ipairs(plan and plan.acts or {}) do order[#order + 1] = a.unitId .. "@" .. at(a) end
+    check(table.concat(order, " "), "2@2,0 1@1,0", "vacate: B steps on, then A takes its tile")
+end
+
+-- test_a_unit_still_advances_when_the_ally_ahead_stays: F holds (2,0), A's nearest tile to
+-- the goal, and has nowhere else to go; A's safest holds are its own tile and two behind it.
+-- A still advances to the free (1,0): a tile an ally
+-- may vacate is an extra way forward, never the only one (vanilla Ch3: Eirika held at (13,8)
+-- behind the army for five turns, the throne open).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local F = blue(0x02, 1, 2, 0)
+    local E = red(0x81, 6, 0, { minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 1, 0 }, { 2, 0 }),
+                          [0x02] = tiles({ 2, 0 }) },
+                field = fieldsOf { ["6,0"] = { ["0,0"] = 6, ["0,1"] = 7, ["0,2"] = 8, ["1,0"] = 5,
+                                               ["2,0"] = 4 } } }
+    local _, plan = Planner.plan(B, boardOf(A, F, E), sightOf(o), style("careful"))
+    local where = {}
+    for _, a in ipairs(plan and plan.acts or {}) do where[a.unitId] = at(a) end
+    check(where[0x01], "1,0", "vacate: with the ally ahead staying, A takes the free tile")
+end
+
+-- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
+-- (0,1) and (0,2) are safe, (0,1) the safest by board order. C marches onto (0,1). A must
+-- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (ours ch03: Braulo
+-- beside the Mogall at 81% to die while a safe tile stood free).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local C = blue(0x02, 1, 1, 1, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }),
+                  [0x81] = tiles({ 1, 0 }) },
+        field = function() return { [0] = { [0] = 5 }, [1] = { [0] = 5, [1] = 9 }, [2] = { [0] = 5 } } end,
+        danger = { ["0,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
+    local where = {}
+    for _, a in ipairs(plan and plan.acts or {}) do where[a.unitId] = at(a) end
+    check(where[0x02], "0,1", "holds: C takes the ground it marches for")
+    check(where[0x01], "0,2", "holds: A holds on its next safe tile, not the exposed one")
+end
+
+-- test_a_visited_tile_is_not_offered_again: a House (eventinfo House(0, ...), flag 0) keeps
+-- its Visit for good, so the game offers it every turn. Once we have visited it, it is no one's
+-- goal and no Visit is proposed there: vanilla Ch1's two houses held Seth and Eirika on them
+-- for nine turns, every style stuck.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+    }
+    local function visits(opts)
+        local n = 0
+        for _, c in ipairs(B.candidates(boardOf(A, E), sightOf(o), style("careful"), opts)) do
+            for _, a in ipairs(c.acts) do
+                if a.act == "visit" then n = n + 1 end
+            end
+        end
+        return n
+    end
+    check(visits(nil), 1, "visited: an unvisited house is offered")
+    check(visits({ explored = { ["1,0"] = true } }), 0, "visited: not offered again")
+end
+
+-- test_exploring_opens_the_door_to_a_chest: the chest at (4,0) sits behind the door at (2,0),
+-- so no path reaches A. A can open both, so it is sent to the chest and its first act is the
+-- Door. Pairing only units the path reached left ch03's (6,12) chest, behind the door at
+-- (6,10), unopened in every attempt of every style, with Trex able to open both.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        doors = { { x = 2, y = 0 } }, obstacles = {}, openers = { [0x01] = true },
+        explorable = { { x = 4, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["4,0"] = "chest" } },
+    }
+    local function doorFor(cands)
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.acts) do
+                if a.act == "door" then return at(a) end
+            end
+        end
+    end
+    check(doorFor(B.candidates(boardOf(A, E), sightOf(o), style("careful"))), "1,0",
+          "exploring: a cut-off unit that can open the way is sent, and opens the door")
+    o.openers = {}
+    check(doorFor(B.candidates(boardOf(A, E), sightOf(o), style("careful"))), nil,
+          "exploring: nothing opens the way, nobody is sent")
+end
+
+-- test_healers_act_after_the_fighters: H heals A only once A has acted; until then A moves.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false })
+    local H = blue(0x02, 1, 1, 0, { minRange = false })
+    local o = {
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        reach = { [0x02] = tiles({ 1, 0 }) },
+    }
+    local a = B.decide(boardOf(A, H), sightOf(o), style("careful"))
+    check(a and a.unit, 0x01, "heal: the fighter acts first")
+    A.acted = true
+    a = B.decide(boardOf(A, H), sightOf(o), style("careful"))
+    check(a and a.act, "staff", "heal: then the healer heals")
+    check(a and a.targetId, 0x01, "heal: the wounded ally")
+    check(a and a.slot, 0, "heal: with its staff's slot")
+end
+
+-- test_mend_uses_a_vulnerary_when_down_its_whole_amount: no attack, 15 HP down, a 10-HP
+-- Vulnerary in slot 1: used. Only 5 down: kept.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 5, maxhp = 20 })
+    local o = { mend = { [0x01] = { slot = 1, amount = 10 } } }
+    local a = B.decide(boardOf(A), sightOf(o), style("careful"))
+    check(a and a.act, "item", "mend: a wounded unit with nothing to strike uses it")
+    check(a and a.slot, 1, "mend: that slot")
+    A.hp = 15
+    check(B.decide(boardOf(A), sightOf(o), style("careful")).act, "wait", "mend: not for 5 HP")
+end
+
+-- test_mend_reads_the_games_max_hp: A's maxHP stat is 20 and it has 12 (8 down), but its
+-- weapon adds 5 HP, so GetUnitMaxHp (sight.maxHps) is 25: 13 down, and the 10-HP Vulnerary
+-- is used.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 20 })
+    local o = { mend = { [0x01] = { slot = 1, amount = 10 } }, maxHp = { [0x01] = 25 } }
+    local a = B.decide(boardOf(A), sightOf(o), style("careful"))
+    check(a and a.act, "item", "mend: the cap is the game's max HP, not the raw stat")
+end
+
+-- test_recruit_claim_talks_first_and_marches_when_out_of_reach: green T talkable by A.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local T = blue(0x30, 5, 3, 0, { faction = "green" })
+    local E = red(0x81, 9, 9, { hp = 1 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+                talk = { [0x01] = { [0x30] = true } } }
+    local st = claimed("careful", { id = "r1", kind = "recruit", unit = { 0x30 } })
+    local a = B.decide(boardOf(A, T, E), sightOf(o), st)
+    check(a and a.act, "talk", "recruit: talks")
+    check(a and a.targetId, 0x30, "recruit: to the recruit")
+    check(at(a), "2,0", "recruit: from beside it")
+    -- no claim: the habit still takes the offered Talk
+    check(B.decide(boardOf(A, T, E), sightOf(o), style("careful")).act, "talk", "talk habit")
+    -- beside it but the game's Talk command does not list it (silenced, say): no Talk
+    local mute = sightOf(o)
+    mute.offers = function() return {} end
+    check(B.decide(boardOf(A, T, E), mute, style("careful")).act ~= "talk", true,
+          "talk: only where the Talk command lists the target")
+    -- out of reach: the claim marches the talker on the recruit
+    o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
+    a = B.decide(boardOf(A, T, E), sightOf(o), st)
+    check(a and a.act, "wait", "recruit: marches when it cannot reach")
+    check(at(a), "1,0", "recruit: toward the recruit")
+end
+
+-- test_keys_and_priority_rank_their_target_first: A deals more to E1, but E2 holds a key
+-- (keys claim) or is a priority claim's class.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 30, classId = CLS_A })
+    local E2 = red(0x82, 0, 1, { hp = 30, classId = CLS_B })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) }, keys = { [0x82] = true },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 90, dmg = 9, hits = 1 } },
+                          [0x82] = { ["0,0"] = fc { hit = 90, dmg = 3, hits = 1 } } } },
+    }
+    local board = boardOf(A, E1, E2)
+    check(B.decide(board, sightOf(o), style("careful")).targetId, 0x81, "no claim: the bigger hit")
+    check(B.decide(board, sightOf(o), claimed("careful", { id = "k", kind = "keys" })).targetId,
+          0x82, "keys: the key holder first")
+    check(B.decide(board, sightOf(o), claimed("careful", { id = "p", kind = "priority",
+                                                         vs = { CLS_B } })).targetId,
+          0x82, "priority: the named class first")
+end
+
+-- test_avoid_keeps_the_unit_out_of_reach: P marches right; (2,0) is in the archer's reach.
+do
+    local P = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 4, 0, { classId = CLS_A, minRange = 2, maxRange = 2 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) } }
+    check(at(B.decide(boardOf(P, X), sightOf(o), style("bold"))), "2,0", "no claim: as far as it goes")
+    local st = claimed("bold", { id = "v", kind = "avoid", unit = { 0x01 }, vs = { CLS_A } })
+    check(at(B.decide(boardOf(P, X), sightOf(o), st)), "1,0", "avoid: short of the reach")
+end
+
+-- test_heal_claim_counts_the_heal_before_the_enemy_phase: careful A (20 HP) on the boss:
+-- counter 12 + the boss's strike 10 kills; a healer beside the attack tile gives 10 back.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 2, 0, { isBoss = true, hp = 40 })
+    local o = {
+        objective = { kind = "boss" }, danger = { ["1,0"] = 1 },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 80, dmg = 5, hits = 1, counters = true,
+                                                    counterHit = 80, counterDmg = 12,
+                                                    counterHits = 1, takenHit = 80,
+                                                    takenDmg = 10, takenHits = 1 } } } },
+    }
+    local a = B.decide(boardOf(A, H, E), sightOf(o), style("careful"))
+    check(a and a.act ~= "attack", true, "no claim: careful refuses the boss")
+    a = B.decide(boardOf(A, H, E), sightOf(o),
+                 claimed("careful", { id = "h", kind = "heal", vs = "boss" }))
+    check(a and a.act, "attack", "heal claim: the heal is counted")
+end
+
+-- test_fog_hides_targets_and_marches_on_the_unseen: E stands in fog: no attack on it, and
+-- the march heads for the nearest unseen tile, not for E.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 1, 0, { hp = 1, fogged = true })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
+        unseen = { { x = 0, y = 3 } },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true } } } },
+    }
+    local a = B.decide(boardOf(A, E), sightOf(o), style("bold"))
+    check(a and a.act, "wait", "fog: no target it cannot see")
+    check(at(a), "0,1", "fog: toward the unseen, not the hidden enemy")
+end
+
+-- ── The planner ─────────────────────────────────────────────────────────────────────────
+
+-- test_planner_takes_the_sure_kill: E1 dies to A's blow, E2 only takes a chip.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 5 })
+    local E2 = red(0x82, 0, 1, { hp = 30 })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } },
+                          [0x82] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1 } } } },
+    }
+    local a = Planner.plan(B, boardOf(A, E1, E2), sight, style("careful"))
+    check(a and a.targetId, 0x81, "planner: the kill")
+end
+
+-- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field, but the
+-- AI would strike A there for its whole HP. careful holds; bold takes the ground.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))), "0,0",
+          "planner: careful holds out of the strike")
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))), "1,0",
+          "planner: bold takes the ground")
+end
+
+-- test_a_struck_weapon_is_held_next_phase: the game equips the weapon a unit struck with
+-- (EquipUnitItemSlot), so it counters with it: A's javelin (slot 1) strikes E from two tiles,
+-- and the act's exposure and the plan's enemy phase are judged with A holding it.
+do
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 2 } } })
+    local E = red(0x81, 0, 2, { hp = 30, minRange = 1, maxRange = 1 })
+    local judged = {}
+    local o = { reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 0, 2 }, { 0, 1 }) },
+                danger = { ["0,0"] = 1 },
+                fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 3, hits = 1 } } } },
+                enemyPhase = function(plan)
+                    for _, b in ipairs(plan.blues) do judged[#judged + 1] = tostring(b.slot) end
+                    return {}
+                end }
+    local sight = sightOf(o)
+    local asked, strike = {}, sight.strike
+    sight.strike = function(u, e, x, y, slot)
+        asked[tostring(slot)] = true
+        return strike(u, e, x, y, slot)
+    end
+    local att
+    for _, c in ipairs(B.candidates(boardOf(A, E), sight, style("careful"))) do
+        for _, a in ipairs(c.acts) do if a.act == "attack" then att = a end end
+    end
+    check(att and att.slot, 1, "held: the javelin strikes")
+    check(asked["1"], true, "held: the act's exposure holds the javelin")
+    local a = Planner.plan(B, boardOf(A, E), sight, style("bold"))
+    check(a and a.act, "attack", "held: the plan strikes")
+    check(table.concat(judged, ","):find("1") ~= nil, true,
+          "held: the plan's enemy phase holds the javelin")
+end
+
+-- test_planner_mends_a_plan_that_loses_a_unit: A's Vulnerary at (1,0) is its best act by its
+-- own score, and the beam (BEAM = 1) keeps only that; the enemy phase kills A there. The
+-- mend tries A's other acts and finds the hold at (0,0), where nothing strikes it.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 10, maxhp = 20 })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 99, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(at(a) .. " " .. tostring(plan and plan.kind), "0,0 mend",
+          "planner: the mend keeps A out of the strike")
+end
+
+-- test_planner_beam_keeps_one_order: two units, two tiles each, nothing to fight. The beam
+-- reaches each pair of tiles in both orders; the plans judged are each a different board.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local C = blue(0x02, 1, 0, 2, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 2 }, { 1, 2 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 }, [2] = { [0] = 40, [1] = 20 } } end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
+    local seen, twice = {}, false
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local set = {}
+        for _, k in ipairs(c.acts) do set[#set + 1] = k end
+        table.sort(set)
+        set = table.concat(set, "|")
+        if seen[set] then twice = true end
+        seen[set] = true
+    end
+    check(plan ~= nil and #plan.considered > 1 and not twice, true,
+          "planner: no plan judged twice in another order")
+end
+
+-- test_planner_judges_every_way_the_phase_goes: at (1,0) X strikes A for nothing, and A's
+-- counter may kill X (sight.enemyPhase plays the phase both ways, as likely as the counter's
+-- played chance). If it does, Y takes X's tile and kills A. The judge pays A's death in that
+-- outcome only: die = that outcome's chance, not 0 and not 1.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local q = Sight.rollChance(2, 50)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    local x = { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
+                                takenHits = 1, takenCrit = 0, counterHit = 50, counterDmg = 20,
+                                counterHits = 1, counterCrit = 0, strikerHp = 10,
+                                targetHp = b.hp }
+                    local y = { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                                takenHits = 1, takenCrit = 0 }
+                    local out = { x }
+                    out.outcomes = { { p = 1 - q, strikes = { x } }, { p = q, strikes = { x, y } } }
+                    return out
+                end
+            end
+            return {}
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    local die
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x01 and p.x == 1 then die = p.die end
+    end
+    check(die ~= nil and math.abs(die - q) < 1e-9, true,
+          "planner: A dies only in the outcome where X falls")
+end
+
+-- test_planner_heals_between_attacks: the grell pattern. A's attack draws a 12 counter and the
+-- enemy phase strikes 10 more: 22 of A's 20. H's heal after the attack (+10) keeps A alive,
+-- so careful attacks and heals; without H it does not attack. A strikes from where it
+-- stands: the heals the game lists were read with it there.
+do
+    local A = blue(0x01, 0, 1, 0)
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 2, 0, { isBoss = true, hp = 40 })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["1,1"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 5, hits = 1, counters = true,
+                                                    counterHit = 100, counterDmg = 12,
+                                                    counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.x == 1 then
+                    return { { target = 0x01, takenHit = 100, takenDmg = 10, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local st = style("careful")
+    local first, plan = Planner.plan(B, boardOf(A, H, E), sightOf(o), st)
+    local acts = {}
+    for _, a in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = a.act end
+    check(table.concat(acts, ","), "attack,staff", "planner: attack, then heal the attacker")
+    check(first and first.act, "attack", "planner: the attack first")
+    -- no healer: the counter and the strike together kill A, so careful does not attack
+    local alone = Planner.plan(B, boardOf(A, E), sightOf(o), st)
+    check(alone and alone.act ~= "attack", true, "planner: no heal, no attack")
+    -- A starting at (0,0) must move to strike: the heal was read with A at (0,0), so it is
+    -- no heal for A at (1,0), and careful does not attack
+    local _, moved = Planner.plan(B, boardOf(blue(0x01, 0, 0, 0), H, E), sightOf(o), st)
+    local heals = 0
+    for _, a in ipairs(moved and moved.acts or {}) do
+        if a.act == "staff" then heals = heals + 1 end
+    end
+    check(heals, 0, "planner: no heal on a unit the plan has moved")
+end
+
+-- test_planner_no_vulnerary_after_a_full_heal: A is 15 down with a 10-HP Vulnerary; H's staff
+-- heals 20. Once H has healed A, A is full and FE8 refuses the Vulnerary (CanUnitUseHealItem:
+-- HP == max), so no plan uses it after the heal. ch02 turn 9 played exactly that and crashed:
+-- the Vulnerary act's gain was read off the start board.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 5, maxhp = 20, minRange = false })
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local X = red(0x81, 9, 9)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 1 }) },
+        mend = { [0x01] = { slot = 1, amount = 10 } },
+        staves = { [0x02] = { { slot = 0, amount = 20 } } },
+        heals = { [0x02] = { ["0,1"] = { { slot = 0, amount = 20, targets = { 0x01 } } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, H, X), sightOf(o), style("careful"))
+    local bad = 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local healed = false
+        for _, k in ipairs(c.acts) do
+            if k:match("^2>staff@.*>1$") then healed = true end
+            if healed and k:match("^1>item@") then bad = bad + 1 end
+        end
+    end
+    check(bad, 0, "planner: no Vulnerary on a unit the plan has healed full")
+    local acts = {}
+    for _, a in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = a.act end
+    check(table.concat(acts, ","):find("staff") ~= nil, true, "planner: the staff heal is played")
+end
+
+-- test_planner_prices_standing_exposure: the march to (1,0) gains 20 steps but X reaches it
+-- for 25 of A's 20; (0,1) gains 10 and nothing reaches it. Only the beam's top plan is
+-- judged (FINAL = 1), so the pick is the beam's own: its exposure term keeps the retreat
+-- first, where before it ranked the march first and the judge had nothing safe to choose.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }), [0x81] = tiles({ 2, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 }, [1] = { [0] = 30 } } end,
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.FINAL = final
+    check(at(a), "0,1", "planner: careful takes the safe ground")
+    check(a and a.why, "retreat", "planner: it is the retreat")
+end
+
+-- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that
+-- reaches (2,2), so B's march there costs nothing -- whichever unit the beam moves first.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local Bu = blue(0x02, 1, 0, 2, { minRange = false })
+    local X = red(0x81, 1, 0, { hp = 5 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 2 }, { 2, 2 }),
+                  [0x81] = tiles({ 1, 0 }, { 2, 1 }) },
+        field = function() return { [0] = { [0] = 50 }, [2] = { [0] = 40, [2] = 20 } } end,
+        danger = { ["2,2"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } },
+               [0x02] = { [0x81] = { ["2,2"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, Bu, X), sightOf(o), style("careful"))
+    local moved
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x02 then moved = at(a) end
+    end
+    check(moved, "2,2", "planner: a killed enemy threatens no one")
+end
+
+-- test_planner_visits_a_safe_village: nothing reaches the village at (1,0), so careful takes
+-- it over a step of ground; the offer is in the plan's record, played, at no chance to die.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(a and a.act, "visit", "explore: a safe village is visited")
+    check(at(a), "1,0", "explore: from its own tile")
+    local e = plan and plan.explore and plan.explore[1]
+    check(e and e.die, 0, "explore: offered at no chance to die")
+    check(e and e.played, true, "explore: the offer was played")
+    -- a unit the game refuses (a Phantom, a Silenced unit) is offered nothing
+    o.canExplore = {}
+    local b = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(b and b.act ~= "visit", true, "explore: only where the game's menu allows it")
+end
+
+-- test_planner_skips_a_risky_village: X reaches the village and can kill A there, so the
+-- visit earns nothing -- under every style, bold included -- and the offer is recorded with
+-- its chance to die, unplayed.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+        explorable = { { x = 1, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["1,0"] = "chest" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    for _, aggression in ipairs({ "careful", "bold" }) do
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style(aggression))
+        check(a and a.act ~= "chest", true, "explore: no risky chest, " .. aggression)
+        local e = plan and plan.explore and plan.explore[1]
+        check(e and e.die > 0, true, "explore: the offer carries its chance to die, " .. aggression)
+        check(e and e.played, nil, "explore: unplayed, " .. aggression)
+    end
+end
+
+-- test_planner_beam_withholds_the_credit: X reaches the chest with a small chance to kill A,
+-- and only the beam's top plan is judged (FINAL = 1), against no enemy phase. Credited, the
+-- chest would top the beam; the beam's own check leaves it uncredited, so A holds.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 10, takenDmg = 25, takenHits = 1 } } } },
+        explorable = { { x = 1, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["1,0"] = "chest" } },
+    }
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.FINAL = final
+    check(at(a), "0,0", "explore: the beam credits no chest at a chance to die")
+end
+
+-- test_planner_judge_takes_the_credit_back: nothing the beam sees reaches the village, but the
+-- enemy phase the AI plays strikes A there with a small chance to kill. Credited, the visit
+-- would outweigh that chance; the judge takes the credit back, so careful stays put.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 10, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local die = Sight.rollChance(2, 10)
+    check(die > 0 and Planner.WEIGHTS.careful.death * die < Planner.WEIGHTS.careful.recruit, true,
+          "explore: the strike's chance is small enough that a credit would buy it")
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(at(a), "0,0", "explore: the judged phase's chance withdraws the credit")
+end
+
+-- test_exploring_sends_the_nearest: the village at (8,0) is nearer B by the game's field, so
+-- B marches to it and A marches on the enemy.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local Bu = blue(0x02, 1, 5, 0, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local function manhattanField(goal)
+        local f = {}
+        for y = 0, 9 do
+            f[y] = {}
+            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+        end
+        return f
+    end
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }),
+                  [0x02] = tiles({ 5, 0 }, { 6, 0 }, { 5, 1 }) },
+        field = manhattanField,
+        explorable = { { x = 8, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["8,0"] = "visit" }, [0x02] = { ["8,0"] = "visit" } },
+    }
+    local marches = {}
+    for _, c in ipairs(B.candidates(boardOf(A, Bu, X), sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.why == "march" then marches[c.unit.id] = at(a) end
+        end
+    end
+    check(marches[0x02], "6,0", "exploring: the nearer unit marches to the village")
+    check(marches[0x01], "0,1", "exploring: the other marches on the enemy")
+
+    -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A
+    -- keeps the village while it can still use it, and B marches on the enemy. (Re-picking
+    -- per decision left ch02's (12,3) handed between two units and never reached.)
+    local function sentMarches(sent, ...)
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), style("careful"), { sent = sent })) do
+            for _, a in ipairs(c.acts) do
+                if a.why == "march" then out[c.unit.id] = at(a) end
+            end
+        end
+        return out
+    end
+    local sentA = { { id = 0x01, x = 8, y = 0 } }
+    marches = sentMarches(sentA, A, Bu, X)
+    check(marches[0x01], "1,0", "exploring: the sent unit keeps its village")
+    check(marches[0x02], "5,1", "exploring: the nearer unit is not re-sent to it")
+    -- A has acted this turn: it still holds the village, so B is not sent there instead
+    local acted = blue(0x01, 0, 0, 0, { minRange = false, acted = true })
+    marches = sentMarches(sentA, acted, Bu, X)
+    check(marches[0x02], "5,1", "exploring: an acted sent unit still holds its village")
+    -- the game's check is never asked of a unit that has acted (it is a menu check, and its
+    -- answer is cached by the unit's facts: ch02's turn-7 "no" outlived the turn)
+    local asked = {}
+    local can = o.canExplore
+    local s = sightOf(o)
+    local inner = s.canExplore
+    s.canExplore = function(u, ...) asked[#asked + 1] = u.id; return inner(u, ...) end
+    B.candidates(boardOf(acted, Bu, X), s, style("careful"), { sent = sentA })
+    local askedA = 0
+    for _, id in ipairs(asked) do
+        if id == 0x01 then askedA = askedA + 1 end
+    end
+    check(#asked > 0, true, "exploring: the game's check is asked of the unit that can act")
+    check(askedA, 0, "exploring: the game's check is not asked of an acted unit")
+    o.canExplore = can
+    -- A can no longer use it (the game's check says no): it is released to the nearest
+    o.canExplore[0x01] = {}
+    marches = sentMarches(sentA, A, Bu, X)
+    check(marches[0x02], "6,0", "exploring: a sent unit that cannot use the tile releases it")
+    o.canExplore[0x01] = { ["8,0"] = "visit" }
+    -- the village is gone (visited, or pillaged): nobody is sent to it
+    o.explorable = {}
+    marches = sentMarches(sentA, A, Bu, X)
+    check(marches[0x01], "0,1", "exploring: a closed tile releases its unit")
+end
+
+-- test_planner_assault: the boss X has 20 HP. A's and C's blows (12 each, sure) kill it
+-- together; either alone leaves it alive to strike that unit in its phase for its whole HP.
+-- The beam reads each strike tile as deadly (X reaches it) and keeps two plans a depth
+-- (BEAM = 2): holding outranks either blow alone, so it never holds both. Only the assault
+-- plan is the combination, and it is played.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 0, 2)
+    local X = red(0x81, 1, 1, { isBoss = true, hp = 20 })
+    local blow = fc { hit = 100, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                      counterDmg = 5, counterHits = 1, takenHit = 100, takenDmg = 30,
+                      takenHits = 1 }
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }), [0x02] = tiles({ 0, 2 }, { 1, 2 }),
+                  [0x81] = tiles({ 1, 1 }) },
+        danger = { ["1,0"] = 1, ["1,2"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = blow } }, [0x02] = { [0x81] = { ["1,2"] = blow } } },
+        enemyPhase = function(plan)
+            if plan.gone[0x81] then return {} end
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                if math.abs(b.x - 1) + math.abs(b.y - 1) == 1 then
+                    out[#out + 1] = { target = b.unit.id, takenHit = 100, takenDmg = 30,
+                                      takenHits = 1, takenCrit = 0 }
+                end
+            end
+            return out
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 2
+    local a, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(plan and plan.kind, "assault", "assault: the combination is the plan played")
+    check(a and a.act, "attack", "assault: it opens with a blow")
+    local blows = 0
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.act == "attack" then blows = blows + 1 end
+    end
+    check(blows, 2, "assault: both strike the boss")
+    -- a boss on a cloned generic row has no CA_BOSS: the objective names it (its death quote
+    -- raises the goal's flag), and the assault is the same
+    local plain = red(0x81, 1, 1, { hp = 20 })
+    o.objective = { kind = "boss", boss = 0x81 }
+    Planner.BEAM = 2
+    local _, named = Planner.plan(B, boardOf(blue(0x01, 0, 0, 0), blue(0x02, 1, 0, 2), plain),
+                                  sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(named and named.kind, "assault", "assault: the boss the objective names")
+    o.objective = { kind = "boss" }
+    -- one unit alone: no assault, and careful does not strike
+    local alone, aplan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(aplan and aplan.kind, "beam", "assault: none with one striker")
+    check(alone and alone.act ~= "attack", true, "assault: a lone strike is not made")
+end
+
+-- test_planner_chains_the_counter: A (30 HP) strikes the boss for 20; the boss's counter (66,
+-- 15) and its own strike next phase (sure, 15) kill A whenever the counter lands. Averaging
+-- the counter leaves A at 18, out of the phase's reach to kill: the chain does not.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 30 })
+    local X = red(0x81, 2, 0, { isBoss = true, hp = 40 })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
+                                                    counterHit = 66, counterDmg = 15,
+                                                    counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 15, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(a and a.act ~= "attack", true, "chain: no strike whose landed counter leaves A to die")
+end
+
+-- test_planner_unstalls: A holding at (0,0) is the best plan, but botrun has seen this board
+-- before (opts.stalled): the plan played must change it, and the least it can is the step to
+-- (1,0) that X reaches with a small chance to kill.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 10, takenDmg = 25, takenHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 10, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))), "0,0",
+          "unstall: careful holds")
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"), { stalled = true })
+    check(at(a), "1,0", "unstall: a stalled board is changed, by the least risky change")
+end
+
+-- test_planner_surprise: A attacks X from (1,0) expecting X at 10 HP and itself at 20; C
+-- moves next. The plan plays on only while the board is what it expected.
+do
+    local function plan(o)
+        o = o or {}
+        return { acts = { { unitId = 0x01, act = "attack", targetId = 0x81, move = { x = 1, y = 0 } },
+                          { unitId = 0x02, act = "wait", move = { x = 0, y = 2 } } },
+                 expect = { { hp = 20, gone = o.gone, targetHp = 10 } },
+                 enemies = { [0x81] = true } }
+    end
+    local function A(o) return blue(0x01, 0, 1, 0, o) end
+    local function C(o) return blue(0x02, 1, 0, 1, o) end
+    local before = boardOf(blue(0x01, 0, 0, 0), C(), red(0x81, 2, 0, { hp = 20 }))
+    local function after(...) return boardOf(...) end
+    local S = Planner.surprise
+    check(S(plan(), 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))), nil,
+          "surprise: as expected, play on")
+    check(S(plan(), 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 4 }))), nil,
+          "surprise: more dealt than expected is no surprise")
+    check(S(plan(), 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 20 }))),
+          "a blow missed", "surprise: a miss")
+    check(S(plan(), 1, before, after(A { acted = true, hp = 12 }, C(), red(0x81, 2, 0, { hp = 10 }))),
+          "the counter took more than expected", "surprise: a heavier counter")
+    check(S(plan(), 1, before, after(C(), red(0x81, 2, 0, { hp = 10 }))), "a unit of ours fell",
+          "surprise: a death")
+    check(S(plan(), 1, before, after(A { acted = true }, C())), "an unexpected kill",
+          "surprise: a kill the plan did not count on")
+    check(S(plan { gone = 0x81 }, 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 3 }))),
+          "the kill missed", "surprise: an expected kill that did not land")
+    local seen = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }), red(0x82, 5, 5))
+    check(S(plan(), 1, before, seen), "an enemy came into sight", "surprise: a new enemy")
+    local fogged = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }), red(0x82, 5, 5, { fogged = true }))
+    check(S(plan(), 1, before, fogged), nil, "surprise: an enemy still in fog is no news")
+    check(S(plan(), 1, before, after(A { acted = true }, C { acted = true }, red(0x81, 2, 0, { hp = 10 }))),
+          "the next unit cannot act", "surprise: the next act is gone")
+    check(S(plan(), 2, before, before), "the plan is played out", "surprise: nothing left to play")
+    -- C's act is played on the game's word: sight.legal is asked of it, with C's live record
+    -- (vanilla Ch3: a wall an earlier blow broke, a heal whose counter missed, each crashed)
+    local played = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))
+    local asked
+    local function refuses(act, u) asked = { act = act, u = u }; return "the game offers no attack" end
+    check(S(plan(), 1, before, played, refuses), "the game offers no attack",
+          "surprise: the game no longer offers the next act")
+    check(asked.act.unitId == 0x02 and asked.u.id == 0x02, true,
+          "surprise: the game is asked about the next act, for its unit as it stands now")
+    check(S(plan(), 1, before, played, nil, function() return nil end), nil,
+          "surprise: the game still offers it, play on")
+end
 
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)

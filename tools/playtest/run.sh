@@ -58,6 +58,10 @@
 #   bot                  -- #510 step 9: the bot plays our ch01 (botrun.lua, sight.lua) and
 #                           prints one `BOTRUN <json>` record. PT_SEED=N seeds the game's RNG,
 #                           PT_STYLE / PT_CLAIMS are JSON (bot.lua's style, resolved claims).
+#   campaign             -- #510 step 9 PR E: the bot plays chapter to chapter from New Game
+#                           (campaign.lua), restarting a chapter until a clean clear; PT_CAMPAIGN
+#                           is JSON (id, last, shops, claims; harness.lua's scenario says), and
+#                           states land in PT_SIMDIR (references/sim/<game>/<rom-hash>).
 #                           PT_VANILLA=1: retail Ch1, after the bot plays the Prologue
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
@@ -116,9 +120,30 @@ ROM="$REPO/build/fireemblem8u/fireemblem8.gba"   # the build tree (#408)
 if [ "${PT_VANILLA:-0}" = "1" ]; then
     ROM="$REPO/build/vanilla-fe8/fireemblem8.gba"
     export PT_ELF="$REPO/build/vanilla-fe8/fireemblem8.elf" MX_SKIP_ROM_CHECK=1
+    # its own symbol tables: a run of ours at the same time rewrites tools/playtest's (#510)
+    export PT_SYMDIR="$HERE/vanilla-symbols"
+fi
+# Where this game's runs and chapter-start states live for a ROM hash: references/sim/<game>/
+# <hash>, or PT_SIMDIR. `run.sh --simdir` prints it for the current ROM and exits (montecarlo.py
+# reads its kept runs there before it plays any).
+simdir() { echo "${PT_SIMDIR:-$REPO/references/sim/$([ "${PT_VANILLA:-0}" = 1 ] && echo vanilla || echo ours)/$1}"; }
+if [ "${1:-}" = "--simdir" ]; then
+    simdir "$(shasum "$ROM" | cut -c1-12)"
+    exit 0
 fi
 SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordscene|...)}"
 KEEP_OPEN="${2:-}"
+# PT_RUN_TAG=<tag>: one of several copies of THIS scenario running at once (montecarlo.py's
+# pool, #510 step 9 PR F). Its run dir is /tmp/playtest-<scenario>@<tag>, the leftover kill
+# below reaches only that dir, and it boots its own copy of the ROM there, so the save mGBA
+# keeps beside the ROM is its own: untagged, every run deletes and shares one .sav.
+RUN_TAG=""
+if [ -n "${PT_RUN_TAG:-}" ]; then
+    case "$PT_RUN_TAG" in
+        *[!A-Za-z0-9_-]*) echo "run.sh: PT_RUN_TAG must be letters, digits, _ or -" >&2; exit 2 ;;
+    esac
+    RUN_TAG="@$PT_RUN_TAG"
+fi
 STATE_DIR="$HERE/states"
 mkdir -p "$STATE_DIR"
 
@@ -217,7 +242,7 @@ python3 "$HERE/gen_symbols.py"
 # that way in one gate (ch01, ch04moose, ch04packmath), each at the exact second the pool
 # started the next scenario, and each reported `mGBA exited early` as though the ROM were
 # broken.
-pkill -9 -f "/tmp/playtest-(ckpt_)?$SCENARIO/" 2>/dev/null || true
+pkill -9 -f "/tmp/playtest-(ckpt_)?$SCENARIO$RUN_TAG/" 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
 
 # Did the last run_mgba PASS? Classify in ONE place. This was four copies of a glob, and
@@ -239,9 +264,12 @@ run_mgba() {
     # checkpoint builder silently inheriting the headless engine is exactly the bug this
     # line makes impossible to miss (#308).
     echo "engine: $mode ($(basename "$app"))"
-    local out="/tmp/playtest-$scen" log
+    local out="/tmp/playtest-$scen" log rom="$ROM"
+    # the tag names copies of the scenario asked for, never a checkpoint builder it needs
+    if [ "$scen" = "$SCENARIO" ]; then out="$out$RUN_TAG"; fi
     log="$out/playtest.log"
     rm -rf "$out" && mkdir -p "$out"
+    if [ "$out" != "/tmp/playtest-$scen" ]; then rom="$out/$(basename "$ROM")"; cp "$ROM" "$rom"; fi
     # A DECLARED case (#314) has no function in harness.lua: its chapter YAML declares what
     # it proves and declared.py emits it here, fresh, for every run. Generated into the run
     # directory rather than committed -- a generated file in the tree is a second copy of the
@@ -255,9 +283,10 @@ run_mgba() {
     fi
     local wrapper="$out/wrapper.lua"
     cat > "$wrapper" <<EOF
--- PT_STYLE / PT_CLAIMS are JSON: read from the environment, never spliced into this source,
+-- PT_STYLE / PT_CLAIMS / PT_CAMPAIGN are JSON: read from the environment, never spliced in,
 -- where a nested array's "]]" would close a Lua long string early.
 PLAYTEST_DIR = "$HERE"
+PLAYTEST_SYMDIR = "${PT_SYMDIR:-$HERE}"
 PLAYTEST_SCENARIO = "$scen"
 PLAYTEST_ENTRY = "$([ "$scen" = "$SCENARIO" ] && echo "${MX_ENTRY:-}")"
 PLAYTEST_LOG = "$log"
@@ -266,6 +295,8 @@ PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_STYLE = os.getenv("PT_STYLE") or ""
 PLAYTEST_CLAIMS = os.getenv("PT_CLAIMS") or ""
+PLAYTEST_CAMPAIGN = os.getenv("PT_CAMPAIGN") or ""
+PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}
@@ -283,7 +314,7 @@ PLAYTEST_HEADLESS = "$hl"
 PLAYTEST_CASE = "$case"
 dofile("$HERE/harness.lua")
 EOF
-    rm -f "$REPO/build/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
+    rm -f "${rom%.gba}.sav"   # fresh save: New Game is the default path
     # Muted by DEFAULT and deliberately: a scenario is watched, often many times, and at
     # 240fps the audio is a screech. `PT_SOUND=1` unmutes for the runs where the SOUND is the
     # thing under review (ch05's moose bellow was the first, 2026-08-15) -- and it pins
@@ -299,7 +330,7 @@ EOF
     # ~1GB over a 600s scenario, all of it captured into mgba-stdout.log and none of it read.
     "$app" --script "$wrapper" -l 0 \
         -C mute=$mute -C fpsTarget="$fps" -C audioSync=$async -C videoSync="$vsync" \
-        "$ROM" >"$out/mgba-stdout.log" 2>&1 &
+        "$rom" >"$out/mgba-stdout.log" 2>&1 &
     local pid=$!
     echo "running '$scen' (pid $pid, ${fps}fps); polling $log"
     # The work is FRAME-bound; the deadline used to be WALL-clock, and that mismatch is what
@@ -377,7 +408,11 @@ EOF
     [ "$final" -gt "$last_frame" ] && last_frame=$final
     local elapsed=$((SECONDS - started)); [ "$elapsed" -gt 0 ] || elapsed=1
     echo "throughput: ${last_frame} frames in ${elapsed}s = $((last_frame / elapsed))fps (target ${fps}fps)"
-    if [ "$KEEP_OPEN" != "--keep-open" ]; then kill "$pid" 2>/dev/null || true; fi
+    # --keep-open leaves the asked-for scenario's window up, never a checkpoint builder's: that
+    # one holds the checkpoint lock (fd 9) for as long as it lives
+    if [ "$KEEP_OPEN" != "--keep-open" ] || [ "$scen" != "$SCENARIO" ]; then
+        kill "$pid" 2>/dev/null || true
+    fi
     echo "----------------------------------------"
     cat "$log" 2>/dev/null || echo "(no log produced)"
     echo "----------------------------------------"
@@ -389,7 +424,7 @@ EOF
     if ! verdict_passed; then
         if grep -q '"event":"inspect"\|"event": "inspect"' "$log" 2>/dev/null; then
             echo "---------------- inspector ----------------"
-            python3 "$HERE/inspect_state.py" render "$log" || true
+            python3 "$HERE/inspect_state.py" render "$log" --symbols "${PT_SYMDIR:-$HERE}/symbols.json" || true
         fi
     fi
     echo "artifacts: $out"
@@ -410,6 +445,18 @@ fi
 # never notice. Existing single-hash stamps mismatch and re-mint once, which is correct.
 CHECKPOINT_STAMP="$ROMHASH:${PT_DIFFICULTY:-normal}"
 if [ -n "$BUILDER" ]; then
+    # One builder at a time per checkpoint: the builder's run dir, ROM and .sav are shared,
+    # never tagged, so tagged copies of a scenario (montecarlo.py's pool) that found it stale
+    # together would delete each other's logs and saves. The first takes the lock and builds;
+    # the rest wait, then find it valid below. A kernel flock on fd 9: it is taken atomically,
+    # and it belongs to the open file, so it is freed when the last process holding fd 9 dies
+    # (kill -9 included; the builder's mGBA inherits it, so a live build keeps it). macOS has no
+    # flock(1), and lockf(1) only wraps a whole command.
+    exec 9>"$STATE_DIR/$CKPT.lock"
+    if ! python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null; then
+        echo "== waiting for the '$CKPT' checkpoint lock (another run is building it) =="
+        python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'
+    fi
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
         echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
         # Note what the state file looked like BEFORE the build. Most builder failures never
@@ -444,6 +491,7 @@ if [ -n "$BUILDER" ]; then
     else
         echo "== checkpoint '$CKPT' valid for $CHECKPOINT_STAMP -> loading =="
     fi
+    exec 9>&-   # the scenario's own run must not hold the lock
 fi
 
 # Rate + deadline also come from matrix.yaml (record* film at 60fps for faithful motion;

@@ -999,11 +999,13 @@ def scenario_driver_text(entry, files=None, source=None):
 # SAME run, so they must hash the same or the cache pays for it twice (#358 review).
 RUN_SH_DEFAULTS = {'PT_DIFFICULTY': 'normal', 'PT_STALL_S': '1800', 'PT_MAX_WALL_S': '7200'}
 
-PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
+PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
                      'PT_DIFFICULTY',
                      # The bot's play style and the Strategy claims it follows (#510 step 9).
                      'PT_STYLE', 'PT_CLAIMS',
+                     # The campaign's config and where it writes its states (PR E).
+                     'PT_CAMPAIGN', 'PT_SIMDIR',
                      # The #345 watchdog knobs. Neither should change a verdict -- they bound
                      # how patient run.sh is, not what the scenario proves -- but the guard
                      # that keeps this list honest cannot tell, and a run killed early by a
@@ -1021,7 +1023,11 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'P
                      # harness.lua skips under mgba-headless. Serving a headed PASS for a
                      # headless run -- or the reverse -- would cache across two different
                      # execution paths, which is precisely what this key exists to prevent.
-                     'PT_HEADED')
+                     'PT_HEADED',
+                     # PT_RUN_TAG (montecarlo.py's pool) moves the run to its own dir and ROM
+                     # copy. It proves nothing different, and the matrix never sets it; it is
+                     # keyed for the reason PT_SOUND is.
+                     'PT_RUN_TAG')
 
 
 # -- what a scenario can possibly depend on (#255 phase 2) ------------------

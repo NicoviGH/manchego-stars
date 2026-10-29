@@ -26,6 +26,18 @@ Kinds (each side's claims are read against that side's OWN party and force):
   reinforcements  no fields: the strategy warns of the waves. REPORTED: how many bodies
               arrive after turn 1, and how many of them are in the side's heaviest
               engagement (#510 step 7), the one its threat is read from.
+  recruit     `unit`, optional `by` (one or a list): talk that unit over, by `by` when the
+              strategy names who (Neimi talks to Colm), else by anyone the game lets. PLAYED by
+              the step-9 bot, first, before the rest of the map; not a parity read.
+  keys        no fields: the strategy points at the enemies carrying keys. PLAYED: the bot
+              strikes the enemies the game says hold a key first, and a unit holding one opens
+              the door that cuts it off from its goal.
+  heal        `vs`: heal between attacks on that enemy. PLAYED: the bot's style gates count the
+              heal a healer can still give this phase before the enemy phase.
+  avoid       `unit` and `vs`: keep that unit out of those enemies' reach (the flier off the
+              archer). PLAYED: the unit never ends a move where one of them can strike it.
+  priority    `vs`: an enemy to kill before the rest (the enemy thief). PLAYED: the bot ranks
+              it above every other target.
   kits        `topic` (one of KIT_TOPICS): what the party picks up. REPORTED: modelled since
               #510 step 8 (ADR 0365): the verdict reads the happy path, every pickup taken,
               and `make difficulty CH=` prints the guaranteed path beside it.
@@ -67,7 +79,14 @@ KINDS = {
     'reinforcements': set(),
     'kits': {'topic'},
     'unmodelled': {'topic'},
+    'recruit': {'unit'},
+    'keys': set(),
+    'heal': {'vs'},
+    'avoid': {'unit', 'vs'},
+    'priority': {'vs'},
 }
+# The kinds only the step-9 bot reads (#510): the parity model prints nothing for them.
+PLAYED_ONLY = {'recruit', 'keys', 'heal', 'avoid', 'priority'}
 # topic -> (the #510 step that reads it, what the play is). Step 7 = reach and time; 'out' =
 # left out by decision (ADR 0365).
 TOPICS = {
@@ -287,7 +306,7 @@ def _check(claim, bodies, per_enemy, labels, lines, tiles, side=None, arrivals=N
     `party_matchup` read and `arrivals` the turn each body arrives (None without a board)."""
     import fe_combat as fc
     kind, vs = claim['kind'], claim.get('vs')
-    if kind == 'unmodelled':
+    if kind == 'unmodelled' or kind in PLAYED_ONLY:
         return None
     if kind == 'kits':
         return ('note kits %s: modelled (#510 step 8) -- the verdict reads the happy path, '

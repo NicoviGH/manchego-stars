@@ -48,18 +48,25 @@ class WantedSymbols(unittest.TestCase):
 SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNSeeds',
          'BattleGenerateSimulation', 'InitBattleForecastBattleStats', 'GenerateDangerZoneRange',
          'GenerateUnitMovementMap', 'GetUnitMovementCost', 'GetAvailableTileEventCommand',
-         'GetROMChapterStruct', 'InitRN', 'AiAttemptOffensiveAction', 'AiIsUnitEnemy',
+         'GetROMChapterStruct', 'InitRN', 'RefreshEntityBmMaps', 'AiDecideMain',
          'AiUpdateNoMoveFlag', 'AiInitDangerMap', 'AiClearDecision', 'gAiState', 'gAiDecision',
          'BattleGenerateBallistaSimulation', 'gActiveUnit', 'gActiveUnitId',
+         'NewPopup_GeneralItemGot', 'sProcScr_CombatAction', 'EvCheck03_CHAR',
+         'EvCheck04_CHARASM', 'CheckForCharacterEvents', 'GetUnitKeyItemSlotForTerrain',
          'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
          'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon']
+# campaign.lua's between-chapter reads and calls (#510 step 9 PR E).
+CAMPAIGN = ['StartShopScreen', 'Shop_Loop_BuyKeyHandler', 'sShopState', 'GetItemPurchasePrice',
+            'CanUnitUseWeapon', 'CanUnitUsePromotionItem', 'ProcScr_WorldMapMain',
+            'WorldMap_Loop', 'gGMData', 'gWMNodeData', 'GetNextUnclearedNode', 'MakeNewItem',
+            'IsCharacterForceDeployed']
 ELFS = {'ours': os.path.join(gs.DECOMP, 'fireemblem8.elf'),
         'vanilla': os.path.join(gs.REPO, 'build', 'vanilla-fe8', 'fireemblem8.elf')}
 
 
 class SightSymbols(unittest.TestCase):
     def test_every_sight_symbol_is_required(self):
-        for name in SIGHT:
+        for name in SIGHT + CAMPAIGN:
             self.assertIn(name, gs.WANTED, name)
 
     def test_both_elfs_carry_every_sight_symbol(self):
@@ -71,8 +78,8 @@ class SightSymbols(unittest.TestCase):
                 self.skipTest('%s ELF not built: %s' % (game, elf))
             nm = subprocess.run(['arm-none-eabi-nm', elf], capture_output=True, text=True,
                                 check=True).stdout
-            got = gs.wanted_symbols(gs.parse_nm(nm), SIGHT)
-            self.assertEqual(sorted(got), sorted(SIGHT), game)
+            got = gs.wanted_symbols(gs.parse_nm(nm), SIGHT + CAMPAIGN)
+            self.assertEqual(sorted(got), sorted(SIGHT + CAMPAIGN), game)
 
 
 class ProcScripts(unittest.TestCase):

@@ -21,6 +21,7 @@ local MENU_ARMORY = 0x5F   -- the shop commands on an Armory / Vendor tile (menu
 local MENU_VENDOR = 0x60
 local MENU_ARENA = 0x62
 local MENU_ITEM = 0x67
+local MENU_STAFF = 0x51
 local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
 -- The two arms of ConvoyMenuProc_StarMenu (convoymenu.c), which is raised whenever a unit is
@@ -29,6 +30,13 @@ local MENU_WAIT = 0x6B
 -- block the chapter identically, so they are one state.
 local MENU_CONVOY_SEND_FIRST = 0x24
 local MENU_CONVOY_SEND_LAST = 0x2F
+-- gItemSubMenuItems: what a chosen inventory item offers -- Use, Equip, Trade, Discard
+-- (menu_def.c).
+local MENU_ITEM_USE = 0x34
+local MENU_ITEM_SUB_LAST = 0x37
+-- gStaffItemSelectMenuItems: the Staff command's list, one row per staff slot (menu_def.c).
+local MENU_STAFF_SLOT_FIRST = 0x3E
+local MENU_STAFF_SLOT_LAST = 0x42
 -- gItemSelectMenuItems: one row per inventory slot (menu_def.c).
 local MENU_ITEM_SLOT_FIRST = 0x43
 local MENU_ITEM_SLOT_LAST = 0x47
@@ -64,7 +72,7 @@ local function menuKinds(observation)
             or item.override_id == MENU_BALLISTA_ATTACK
             or item.override_id == MENU_TALK or item.override_id == MENU_CHEST
             or item.override_id == MENU_DOOR or item.override_id == MENU_ARENA
-            or item.override_id == MENU_ITEM
+            or item.override_id == MENU_ITEM or item.override_id == MENU_STAFF
             or item.override_id == MENU_SUPPLY or item.override_id == MENU_WAIT then unit = true end
         if item.override_id == MENU_END_PHASE then map = true end
     end
@@ -201,7 +209,8 @@ local RULES = {
             if observation.target.frozen then
                 return matched("transition", "target_selection is frozen")
             end
-            if observation.target.kind ~= "attack" and observation.target.kind ~= "talk" then
+            local kind = observation.target.kind
+            if kind ~= "attack" and kind ~= "talk" and kind ~= "heal" then
                 return unsupported("unsupported target selection kind")
             end
             return matched("target_selection", "target_selection in its input loop")
@@ -248,6 +257,17 @@ local RULES = {
                 if item.override_id >= MENU_ITEM_SLOT_FIRST
                     and item.override_id <= MENU_ITEM_SLOT_LAST then
                     return matched("item_list", "menu rows are inventory slots")
+                end
+            end
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_STAFF_SLOT_FIRST
+                    and item.override_id <= MENU_STAFF_SLOT_LAST then
+                    return matched("staff_menu", "menu rows are the Staff command's staves")
+                end
+            end
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_ITEM_USE and item.override_id <= MENU_ITEM_SUB_LAST then
+                    return matched("item_submenu", "menu rows are an item's Use/Equip/Trade/Discard")
                 end
             end
             if weapon then return matched("weapon_menu", "menu offers weapon items") end
@@ -399,6 +419,50 @@ local RULES = {
                 return matched("transition", "map_fade is animating")
             end
             return rejected("map_fade proc absent")
+        end,
+    },
+    {
+        -- The shop's item list (gProcScr_Shop in Shop_Loop_BuyKeyHandler, bmshop.c). Its
+        -- greeting, price and convoy prompts are talk choices and dialogue, named above; this is
+        -- the list between them. Below the prompts (a save or intro screen outranks a proc blocked under it), above
+        -- player_phase: a map shop blocks the player phase under it.
+        name = "shop_buy",
+        check = function(observation)
+            if not proc(observation, "shop") then return rejected("shop proc absent") end
+            -- Outside the list the shop is fading, opening or closing: its prompts are talk
+            -- choices and dialogue, which the rules above already took.
+            if not idleIs(observation, "shop", "shop_buy_input") then
+                return matched("transition", string.format("shop idle=%s, not its list",
+                    tostring(idleOf(observation, "shop"))), true)
+            end
+            if not observation.shop then
+                return matched("transition", "shop live with no observed list structure")
+            end
+            -- The key handler returns before reading A or B while a page scrolls
+            -- (IsShopPageScrolling), so a press then is lost.
+            if observation.shop.scrolling then
+                return matched("transition", "the shop list is scrolling")
+            end
+            return matched("shop_buy", "shop in Shop_Loop_BuyKeyHandler")
+        end,
+    },
+    {
+        -- The world map's free cursor (ProcScr_WorldMapMain in WorldMap_Loop, worldmap_main.c):
+        -- L moves the cursor to the next open node, A on a node walks the lord there or, on the
+        -- lord's own node, enters what is there.
+        name = "world_map",
+        check = function(observation)
+            if not proc(observation, "world_map") then return rejected("world_map proc absent") end
+            -- Outside WorldMap_Loop it is scrolling, walking the lord or fading; its scenes are
+            -- dialogue, taken above.
+            if not idleIs(observation, "world_map", "world_map_input") then
+                return matched("transition", string.format("world_map idle=%s, not its cursor",
+                    tostring(idleOf(observation, "world_map"))), true)
+            end
+            if not observation.world_map then
+                return matched("transition", "world map live with no observed cursor")
+            end
+            return matched("world_map_idle", "world_map in WorldMap_Loop")
         end,
     },
     {
@@ -642,6 +706,21 @@ function M.legalActions(observation)
         -- START only launches with someone deployed; on an empty field FE8 just buzzes.
         if pick.deployed > 0 then add(actions, "fight", "START", "prep_units.deployed") end
         add(actions, "cancel_pick", "B", "prep_units.on_b")
+    elseif state == "shop_buy" then
+        -- Shop_Loop_BuyKeyHandler: the hand walks the list (head_loc), A asks the price of the
+        -- row under it, B leaves the list for the "anything else?" prompt.
+        local shop = observation.shop
+        if shop.cursor > 0 then add(actions, "shop_previous", "UP", "shop.head_loc") end
+        if shop.cursor < shop.count - 1 then add(actions, "shop_next", "DOWN", "shop.head_loc") end
+        add(actions, "shop_buy", "A", "shop.head_loc", shop.cursor)
+        add(actions, "shop_leave", "B", "shop.on_b")
+    elseif state == "world_map_idle" then
+        -- WorldMap_LoopExt: L on a node moves the cursor to the next open one (and off a node,
+        -- to the nearest); A on a node is that node's action.
+        add(actions, "wm_next_node", "L", "world_map.on_l")
+        if observation.world_map.cursor_node then
+            add(actions, "wm_select", "A", "world_map.cursor_node", observation.world_map.cursor_node)
+        end
     elseif state == "supply_screen" then
         add(actions, "close_supply", "B", "supply_screen.on_b")
     elseif state == "stat_screen" then
@@ -689,6 +768,7 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_ARMORY, "armory")
         addMenuCommand(actions, observation, MENU_VENDOR, "vendor")
         addMenuCommand(actions, observation, MENU_ITEM, "open_items")
+        addMenuCommand(actions, observation, MENU_STAFF, "staff")
         addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
     elseif state == "map_command_menu" then
@@ -701,6 +781,14 @@ function M.legalActions(observation)
         for _, item in ipairs(enabledMenuItems(observation)) do
             if item.override_id >= MENU_WEAPON_FIRST and item.override_id <= MENU_WEAPON_LAST then
                 add(actions, "select_weapon", observation.menu.current == item.slot and "A" or nil,
+                    string.format("menu.override_id=0x%02X", item.override_id), item.slot)
+            end
+        end
+    elseif state == "staff_menu" then
+        addMenuNavigation(actions, observation)
+        for _, item in ipairs(enabledMenuItems(observation)) do
+            if observation.menu.current == item.slot then
+                add(actions, "select_staff", "A",
                     string.format("menu.override_id=0x%02X", item.override_id), item.slot)
             end
         end
@@ -718,6 +806,9 @@ function M.legalActions(observation)
                 add(actions, "select_item", "A", "menu.item_slot", item.slot)
             end
         end
+    elseif state == "item_submenu" then
+        addMenuNavigation(actions, observation)
+        addMenuCommand(actions, observation, MENU_ITEM_USE, "use_item")
     elseif state == "generic_menu" then
         addMenuNavigation(actions, observation)
         for _, item in ipairs(enabledMenuItems(observation)) do
@@ -763,11 +854,18 @@ function M.legalActions(observation)
     return actions
 end
 
+-- The action for `intention`: the one pressable now (it has a key) when several are listed --
+-- Weapon Select lists a select_weapon per enabled row, and only the current row's is keyed, so
+-- the first would walk the cursor off the row a caller chose (INSPECT.menuTo) -- else the first.
 function M.findAction(actions, intention)
+    local first
     for _, candidate in ipairs(actions or {}) do
-        if candidate.intention == intention then return candidate end
+        if candidate.intention == intention then
+            if candidate.key then return candidate end
+            first = first or candidate
+        end
     end
-    return nil
+    return first
 end
 
 local function jsonString(value)
@@ -849,6 +947,7 @@ function M.formatTrace(record)
 end
 
 M.MENU_ATTACK = MENU_ATTACK
+M.MENU_WEAPON_FIRST = MENU_WEAPON_FIRST
 M.MENU_SEIZE = MENU_SEIZE
 M.MENU_BALLISTA_ATTACK = MENU_BALLISTA_ATTACK
 M.MENU_TALK = MENU_TALK

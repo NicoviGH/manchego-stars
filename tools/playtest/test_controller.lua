@@ -169,6 +169,50 @@ a = action(supply, "close_supply")
 check(a and a.key, "B", "B leaves the convoy (PrepItemSupply_Loop_GiveTakeKeyHandler)")
 check(action(supply, "cursor_down"), nil, "and the map cursor is not offered while it is up")
 
+-- The shop's item list (#510 step 9 PR E): above the map it blocks, and its bounds are the list's.
+local shop = {
+    procs = { shop = { idle = "shop_buy_input" }, player_phase = { idle = "player_main_idle" } },
+    shop = { cursor = 0, count = 3, scrolling = false },
+}
+classify(shop, "shop_buy", "the shop list outranks the map underneath it")
+check(action(shop, "shop_previous"), nil, "no UP from the first row")
+check((action(shop, "shop_next") or {}).key, "DOWN", "DOWN walks the list")
+check((action(shop, "shop_buy") or {}).key, "A", "A asks the price of the row under the hand")
+check((action(shop, "shop_leave") or {}).key, "B", "B leaves the list")
+check(action(shop, "cursor_down"), nil, "and the map cursor is not offered while it is up")
+shop.shop.cursor = 2
+check(action(shop, "shop_next"), nil, "no DOWN from the last row")
+check((action(shop, "shop_previous") or {}).key, "UP", "UP walks back")
+shop.shop.scrolling = true
+classify(shop, "transition", "a scrolling shop page takes no input")
+classify({ procs = { shop = { idle = "0x08000000" } } }, "transition",
+    "a shop outside its list is fading or between prompts")
+
+-- An inventory item's submenu: Use is named by its id, not its row (#510 step 9 PR E: seals).
+local itemSub = {
+    procs = proc("menu", "menu_input"),
+    menu = { current = 0, items = {
+        { slot = 0, override_id = 0x34, availability = 1, on_selected = "0x0801" },
+        { slot = 1, override_id = 0x36, availability = 1, on_selected = "0x0802" },
+        { slot = 2, override_id = 0x37, availability = 1, on_selected = "0x0803" } } },
+}
+classify(itemSub, "item_submenu", "Use/Trade/Discard rows are an item's submenu")
+check((action(itemSub, "use_item") or {}).key, "A", "A on Use when it is highlighted")
+itemSub.menu.current = 2
+local nav = action(itemSub, "use_item")
+check(nav and nav.key, nil, "Use is legal but needs the cursor first")
+
+-- The world map's free cursor.
+local wm = { procs = { world_map = { idle = "world_map_input" } },
+             world_map = { cursor_node = 3, lord_node = 2 } }
+classify(wm, "world_map_idle", "the world map's free cursor")
+check((action(wm, "wm_next_node") or {}).key, "L", "L moves to the next open node")
+check((action(wm, "wm_select") or {}).key, "A", "A on a node")
+wm.world_map.cursor_node = nil
+check(action(wm, "wm_select"), nil, "A is not offered off a node")
+classify({ procs = { world_map = { idle = "0x08000000" } } }, "transition",
+    "the world map mid-scroll or mid-walk is not its free cursor")
+
 -- The status screen and its help box (ADR 0346's `casthelp`). The help box is a blocking child,
 -- so it outranks the status screen, which outranks the map underneath both.
 local statScreen = {
@@ -477,6 +521,34 @@ classify(weaponMenu, "weapon_menu", "weapon menu is identified by its semantic s
 a = action(weaponMenu, "select_weapon")
 check(a and a.key, "A", "selected enabled weapon is confirmable")
 check(a and a.target, 1, "weapon selection records the live item slot")
+-- both rows enabled, the cursor on row 1 (where INSPECT.menuTo put it): row 1 is confirmed, not
+-- walked back to row 0 (vanilla Ch3, 2026-10-30: Garcia's Hand Axe became his Iron Axe)
+weaponMenu.menu.items[1].availability = 1
+a = action(weaponMenu, "select_weapon")
+check(a and a.key, "A", "the current enabled weapon is confirmed in place")
+check(a and a.target, 1, "the current row, not the first listed")
+
+-- The Staff command: its list of staves (menu_def.c gStaffItemSelectMenuItems, 0x3E-0x42),
+-- then the heal selector.
+local staffCommand = {
+    procs = proc("menu", "menu_input"),
+    menu = { current = 1, items = { { slot = 0, override_id = 0x51, availability = 1 },
+                                    { slot = 1, override_id = 0x6B, availability = 1 } } },
+}
+classify(staffCommand, "unit_command_menu", "a menu offering Staff is the unit's command menu")
+check(action(staffCommand, "staff") ~= nil, true, "Staff resolves from semantic id 0x51")
+local staffMenu = {
+    procs = proc("menu", "menu_input"),
+    menu = { current = 0, items = { { slot = 0, override_id = 0x3E, availability = 1 } } },
+}
+classify(staffMenu, "staff_menu", "the staff list is identified by its semantic slot ids")
+a = action(staffMenu, "select_staff")
+check(a and a.key, "A", "the highlighted staff is confirmable")
+local healTarget = {
+    procs = proc("target_selection", "target_selection_input"),
+    target = { kind = "heal", x = 3, y = 4, uid = 0x02, frozen = false },
+}
+classify(healTarget, "target_selection", "live heal target selector")
 
 local attackTarget = {
     procs = proc("target_selection", "target_selection_input"),

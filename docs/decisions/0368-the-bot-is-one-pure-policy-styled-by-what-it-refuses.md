@@ -82,15 +82,20 @@ in the Lua (the caller marks the Vulnerary with `kind = "vulnerary"` and a seal 
 unit with `promotes = true`; the bot never knows which seal fits which class). ADR 0369 removed
 the game rules this record first put here (a level-10 check, a rank comparison): `promotes` and
 `canUse` are the game's own checks, read by the caller. The input shapes are in bot.lua's header.
-- `Bot.prep(roster, cap, style)`: forced units in slot order, then `style.deploy` in listed order
-  (a charId not in the roster is skipped, a repeat counts once), then the highest level, ties by
-  slot order, up to the cap. The cap is never exceeded except by forced units: when they alone
-  exceed it, all of them still go and nothing else does. `give` is always `{}`: no transfer rule
-  is decided yet.
+- `Bot.team(t)` (amended 2026-10-27, #510 PR E; it replaced the earlier "highest level fills
+  the cap"): forced units in slot order (past every ceiling), then `style.deploy` (a followed
+  claim's units), then greedily the unit answering the most of the map's still-needed demands,
+  then fill by strength on the biggest demand; ties go to a carried unit, then the earlier joiner.
+  The demands and answers are the game's, read by sight.lua at the prep screen; each unit's team
+  group is the caller's read of `team_groups.py`, and a group's maximum benches the later joiner.
+  The design is the #510 plan comment's "Party selection" block. `give` is always `{}`: no
+  transfer rule is decided yet.
 - `Bot.shop(gold, stock, party)`: one cheapest Vulnerary per deployed unit, then, per unit in
   deploy order and per weapon type among the stock it can use (`canUse`, the game's
   `CanUnitUseWeapon`), the cheapest one it can use when it holds none of the type. A purchase gold cannot cover is skipped and later
-  ones are still tried; the result is aggregated `{{item, qty}}`.
+  ones are still tried; the result is one `{unit, item}` per purchase, in the order made (PR E:
+  FE8's shop screen buys into the inventory of the unit that opened it, so each purchase names
+  its unit; it was an aggregated `{{item, qty}}` until then).
 - `Bot.promote(unit, items)`: a seal the game accepts for this unit is held. The order is
   `Bot.promoteOrder(units)` (highest level first, ties by slot order); the caller spends a seal
   per true.
@@ -104,8 +109,8 @@ each kind with the fields it uses. The bot maps no name and reads no YAML. Each 
 `Bot.CLAIM_BEHAVIOURS[kind](claim, style)`, returns a NEW style with its entry added (the given
 style is never edited, because the runner samples one style and may apply claims to it more than
 once), and `Bot.decide` reads those entries:
-- `carry`: the units go AHEAD of the sampled `style.deploy` (deduped). `Bot.prep` fills its cap in
-  list order, so appended they were cut whenever the sampled list already filled it. After the sure kills and
+- `carry`: the units go AHEAD of any other claim's `style.deploy` (deduped). `Bot.team` takes that
+  list in order, so appended they were cut whenever an earlier list already filled the cap. After the sure kills and
   before the most-threatened rule they attack an enemy `vs` names when one can.
 - `answer`: those units rank an enemy `vs` names above every other target, a sure kill elsewhere
   included.
@@ -130,7 +135,7 @@ A claim without a string `id` and `kind` raises before dispatch, in `applyClaims
 `Bot.applyClaims(claims, style)` folds them in order, and `Bot.unplayed(claims)` returns the id of
 every claim whose kind has no behaviour (`threat`, `kits`, `unmodelled`, any unknown kind), so a
 run reports what it did not play. Greedy ignores every claim field in `decide` (only `deploy`
-reaches `Bot.prep`): the clear scenarios' picks are unchanged.
+reaches `Bot.team`): the clear scenarios' picks are unchanged.
 
 **The twin's claims run to the end, and topics are one taxonomy (2026-10-26, C4; Nicolas: semantic
 judgement over keyword matching, a shared tagging taxonomy).** `tools/wiki/twin_strategy.yaml`
@@ -152,9 +157,9 @@ do). A test checks every twin `unit`/`vs`/`tile` against the decomp's CHARACTER_
 names, so the runner's resolver cannot meet an unknown name mid-run.
 
 **PR C review fixes (2026-10-26).** A unit always keeps its own tile, so one that cannot Seize and
-is boxed in on the throne waits there instead of having no tile. The kill chance is the hit rate
-once per blow the kill needs (a doubling 70% that needs both blows is 49%), kept as an exact
-integer so equal chances tie exactly. The shop buys a
+is boxed in on the throne waits there instead of having no tile. The kill chance was the hit rate
+once per blow the kill needs; superseded 2026-10-29 by the game's own play of the exchange
+(ADR 0377), rounded to billionths so equal chances tie exactly. The shop buys a
 Vulnerary only for a unit holding none (a held item can carry `kind = "vulnerary"`); the plan's
 order, Vulneraries before weapons, stands. Claim tags that were folded too far by keyword went
 back to what their lines mean: "keep Ross and Garcia safe if you want to recruit them" is

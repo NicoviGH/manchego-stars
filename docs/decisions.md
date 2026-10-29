@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-371 decisions. Read this index, then open the two or three you need — the whole
+379 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -37,6 +37,7 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0328` | [Our battle anims link past the 16MB image, in their own object](decisions/0328-our-battle-anims-link-past-the-16mb-image.md) | 2026-10-04 | #26 |
 | `0344` | [A unit's art and its items each have one resolver](decisions/0344-a-unit-s-art-and-its-items-each-have-one-resolver.md) | 2026-10-14 | #491 #487 |
 | `0349` | [Every retile is held to its donor's terrain on every run, flips included](decisions/0349-every-retile-is-held-to-its-donor-s-terrain.md) | 2026-10-15 | #495 |
+| `0377` | [A game fact comes from the game's own code; re-deriving one needs a written reason](decisions/0377-a-game-fact-comes-from-the-games-own-code.md) | 2026-10-29 | #510 |
 
 ---
 
@@ -51,6 +52,7 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0289` | [campaign.yaml declares what the BUILD reads, and it is scanned like any other doc](decisions/0289-campaign-yaml-declares-what-the-build-reads.md) | 2026-09-17 | #30 |
 | `0347` | [The wiki is a GitHub Pages site CI deploys from main](decisions/0347-the-wiki-is-a-github-pages-site-ci-deploys-from-main.md) | 2026-10-15 | #486 #493 |
 | `0348` | [A chapter is complete when Nicolas signs it off](decisions/0348-a-chapter-is-complete-when-nicolas-signs-it-off.md) | 2026-10-15 | #493 |
+| `0371` | [Research is kept as records under docs/research/, indexed like the decisions](decisions/0371-research-is-records-indexed-like-decisions.md) | 2026-10-27 | #510 |
 
 ---
 
@@ -216,8 +218,13 @@ fresh. Don't leave it in chat or agent memory only.
 | `0365` | [Kits: the happy path is graded, the guaranteed path printed beside it](decisions/0365-kits-the-happy-path-is-graded.md) | 2026-10-22 | #510 |
 | `0368` | [The step-9 bot is one pure policy, styled by what it refuses to end its move on](decisions/0368-the-bot-is-one-pure-policy-styled-by-what-it-refuses.md) | 2026-10-26 | #510 |
 | `0369` | [The bot reads the game's own danger zone and forecast, by running FE8's functions in a sandbox](decisions/0369-the-bot-reads-the-games-own-danger-zone-and-forecast.md) | 2026-10-26 | #510 |
+| `0370` | [The bot plays chapter to chapter through the game's own screens, and shops at the world map's open stock](decisions/0370-the-bot-plays-campaigns-through-the-games-own-screens.md) | 2026-10-27 | #510 |
 | `0372` | [Every chapter boss's row carries CA_BOSS, and its personal line holds every level it has](decisions/0372-every-boss-row-carries-ca-boss.md) | 2026-10-28 | #545 |
 | `0373` | [Line units take vanilla's levels, so the exp is spread as vanilla spread it](decisions/0373-a-line-takes-vanilla-s-level-on-each-post.md) | 2026-10-28 | #545 #510 |
+| `0374` | [A bot result is read beside vanilla's, and the bot is proven on vanilla before ours is judged](decisions/0374-a-bot-result-is-read-beside-vanilla.md) | 2026-10-28 | #510 |
+| `0375` | [A style's risk tolerance is not a declared value: the styles are the variation](decisions/0375-a-styles-risk-tolerance-is-not-declared.md) | 2026-10-28 | #510 |
+| `0376` | [A clean clear has four parts, a vanilla chapter without one is a bot fault, and the bot clears all of vanilla's Eirika...](decisions/0376-a-clean-clear-has-four-parts-and-vanilla-is-the-bar.md) | 2026-10-29 | #510 |
+| `0379` | [A theft spoils a clean clear only when the thief took something it ranks above the stat boosters](decisions/0379-a-theft-spoils-a-clean-clear-only-above-the-boosters.md) | 2026-10-29 | #510 |
 
 ---
 
@@ -511,6 +518,7 @@ session state. `HANDOFF.md` points here._
 | `0340` | [A chapter injector writes no copy of a shared job](decisions/0340-a-chapter-injector-writes-no-copy-of-a-shared-job.md) | 2026-10-10 | #479 #302 #27 |
 | `0366` | [The harness's emu is a write-counting guard, so a per-frame read memo cannot go stale](decisions/0366-the-harness-emu-is-a-write-counting-guard.md) | 2026-10-23 | #531 |
 | `0367` | [Record and diagnostic scenarios are archived, not owed: a scene is filmed when it changes](decisions/0367-headed-scenarios-are-archived-not-owed.md) | 2026-10-24 | #538 #531 |
+| `0378` | [A save state's units read offline, with no emulator run](decisions/0378-a-save-states-units-read-offline.md) | 2026-10-29 | #510 |
 
 ---
 

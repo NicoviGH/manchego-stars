@@ -130,19 +130,24 @@ do
     check(items[2].id, 3, "second item id")
 end
 
--- A dead unit (US_DEAD) is on the board but excluded by Board.live; acted reads state bit 1.
+-- A dead unit (US_DEAD) is on the board but excluded by Board.live; acted reads state bit 1,
+-- fogged bit 9 (US_BIT9, the game's "hidden by fog").
 do
     local b = board(function(m)
         putUnit(m, SYM.gUnitArrayRed, 0, { charId = 0x80, state = 0x4, hp = 0 })
         putUnit(m, SYM.gUnitArrayRed, 1, { charId = 0x81, x = 2, y = 2 })
+        putUnit(m, SYM.gUnitArrayRed, 2, { charId = 0x82, x = 3, y = 2, state = 0x200 })
         putUnit(m, SYM.gUnitArrayBlue, 0, { charId = 1, state = 0x2 })
     end)
     check(Board.unit(b, "red", 0x80).dead, true, "US_DEAD reads dead")
     local live = Board.live(b, "red")
-    check(#live, 1, "Board.live drops the dead unit")
+    check(#live, 2, "Board.live drops the dead unit")
     check(live[1].charId, 0x81, "Board.live keeps the living one")
     check(Board.unit(b, "blue", 1).acted, true, "US_UNSELECTABLE reads acted")
     check(Board.unit(b, "red", 0x81).acted, false, "fresh unit has not acted")
+    check(Board.unit(b, "red", 0x82).fogged, true, "US_BIT9 reads fogged")
+    check(Board.unit(b, "red", 0x81).fogged, false, "a unit in sight is not fogged")
+    check(Board.unit(b, "red", 0x82).onField, true, "a unit in fog is still on the field")
 end
 
 -- Bounds are the decomp's: blue slot 61 is blue; what sits past it is red slot 0, read once,
@@ -269,6 +274,17 @@ end
 check(Board.distance(1, 2, 4, 0), 5, "|dx| + |dy|")
 check(Board.distance(3, 3, 3, 3), 0, "a tile is 0 from itself")
 
+-- Board.weaponFor: the first weapon (item order) whose min..max covers the distance, or the
+-- named slot's alone.
+do
+    local bag = { { slot = 0, min = 1, max = 1 }, { slot = 2, min = 2, max = 2 } }
+    check(Board.weaponFor(bag, 0, 0, 0, 1).slot, 0, "adjacent: the sword, first in the bag")
+    check(Board.weaponFor(bag, 0, 0, 1, 1).slot, 2, "two tiles: the bow")
+    check(Board.weaponFor(bag, 0, 0, 0, 3), nil, "three tiles: nothing reaches")
+    check(Board.weaponFor(bag, 0, 0, 0, 1, 2), nil, "the bow alone cannot strike adjacent")
+    check(Board.weaponFor({}, 0, 0, 0, 1), nil, "no weapon, no strike")
+end
+
 -- Header: turn, phase, map size.
 do
     local b = board(function() end)
@@ -329,6 +345,46 @@ do
     local fx, fy = Board.freeBeside(io, 0, 0, { { -1, 0 }, { 1, 0 }, { 0, 1 } }, 17, 16)
     check(fx .. "," .. fy, "0,1", "off-map and occupied neighbours are skipped")
     check(Board.freeBeside(io, 16, 0, { { 1, 0 } }, 17, 16), nil, "a neighbour past the width is none")
+end
+
+-- Board.battle: the last real battle from the game's own records (bmbattle.h layouts).
+do
+    local m = fakeMem()
+    local S = { gBattleStats = 0x0203A4D4, gBattleActor = 0x0203A4EC, gBattleTarget = 0x0203A56C,
+                gBattleHitArray = 0x0203A5EC }
+    local CH_A, CH_T = 0x08803000, 0x08803100
+    m.w32(S.gBattleActor, CH_A); m.w8(CH_A + 4, 0x03)
+    m.w32(S.gBattleTarget, CH_T); m.w8(CH_T + 4, 0x51)
+    m.w8(S.gBattleActor + 0x0B, 0x02); m.w8(S.gBattleTarget + 0x0B, 0x83)
+    m.w8(S.gBattleActor + 0x72, 20); m.w8(S.gBattleActor + 0x13, 13)      -- HP 20 -> 13
+    m.w8(S.gBattleTarget + 0x72, 18); m.w8(S.gBattleTarget + 0x13, 0)     -- killed
+    m.w16(S.gBattleActor + 0x48, 0x2E01)                                  -- item 1, 46 uses
+    m.w16(S.gBattleActor + 0x64, 85); m.w16(S.gBattleActor + 0x6A, 0xFFFF) -- crit -1 (s16)
+    m.w8(S.gBattleActor + 0x6E, 30); m.w8(S.gBattleActor + 0x08, 6); m.w8(S.gBattleActor + 0x70, 5)
+    local function hit(attr, info, dmg) return attr | (info << 19) | ((dmg & 0xFF) << 24) end
+    m.w32(S.gBattleHitArray + 0, hit(Board.HIT_CRIT, 0, 12))                          -- actor crits
+    m.w32(S.gBattleHitArray + 4, hit(0, Board.HIT_RETALIATION, 7))                    -- counter
+    m.w32(S.gBattleHitArray + 8, hit(Board.HIT_MISS, 0, 0))
+    m.w32(S.gBattleHitArray + 12, hit(0, Board.HIT_FINISHES, 6))
+    m.w32(S.gBattleHitArray + 16, hit(0, Board.HIT_END, 0))
+    m.w32(S.gBattleHitArray + 20, hit(0, 0, 99))                                      -- past END
+    check(Board.battle(m, S), nil, "a simulation (config without REAL) is no battle")
+    m.w16(S.gBattleStats, Board.BATTLE_REAL)
+    local b = Board.battle(m, S)
+    check(b.actor.charId .. ">" .. b.target.charId, "3>81", "who fought (CharacterData +04)")
+    check(b.actor.hpBefore .. ">" .. b.actor.hp, "20>13", "the actor's HP before and after")
+    check(b.target.hp, 0, "the target's HP after")
+    check(b.actor.weapon, 1, "the weapon's item id, uses masked off")
+    check(b.actor.hit .. "," .. b.actor.crit, "85,-1", "the forecast's effective hit and crit")
+    check(b.actor.levelUp, true, "a level gained")
+    check(b.actor.exp, 30, "exp gained")
+    check(#b.hits, 4, "blows stop at END")
+    check(b.hits[1].crit and b.hits[1].by == "actor" and b.hits[1].dmg == 12, true, "a crit by the actor")
+    check(b.hits[2].by .. b.hits[2].dmg, "target7", "RETALIATION is the target's blow")
+    check(b.hits[3].miss, true, "a miss")
+    check(b.hits[4].finishes, true, "the blow that finishes the fight")
+    m.w8(S.gBattleTarget + 0x0B, 0); m.w8(S.gBattleTarget + 0x08, 0); m.w8(S.gBattleTarget + 0x70, 7)
+    check(Board.battle(m, S).target.levelUp, false, "a wall (index 0) never levels, whatever +70 holds")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

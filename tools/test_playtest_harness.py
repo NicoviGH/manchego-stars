@@ -48,8 +48,11 @@ class TestChooseAttackContract(unittest.TestCase):
         # scenario that called pokeFastConfig() runs map combat, where it never spawns
         # -- so a postcondition of `after.procs.battle ~= nil` alone can never hold and
         # the attack fails despite having resolved (ch04packmath/ch04snag/clear_ch04).
-        body = _block(_read_harness(), 'local function chooseAttack(',
-                      '-- March a unit toward')
+        # The commit is INSPECT.commitTarget's, shared by the Attack and Staff paths.
+        harness = _read_harness()
+        self.assertIn('return INSPECT.commitTarget(actorAddr, stopWhen, "attack")',
+                      _block(harness, 'local function chooseAttack(', '-- March a unit toward'))
+        body = _block(harness, 'INSPECT.commitTarget = function(', 'INSPECT.awaitActed = ')
         self.assertIn('confirm_target', body)
         commit = body[body.index('"confirm_target"'):]
         commit = commit[:commit.index('end,')]
@@ -483,6 +486,24 @@ class TestUnitStateBits(unittest.TestCase):
                          'a Board.US_* bit not written as `1 << N` goes unchecked')
         for name, shift in bits.items():
             self.assertEqual(1 << int(shift), decomp.get(name), name)
+
+
+class TestFullBagItems(unittest.TestCase):
+    def test_bag_item_ids_are_the_decomps(self):
+        # INSPECT.BAG names each key and passive item it lists (Bot.fullBag's kinds); a wrong id
+        # would silently file a key as money and send it to the convoy. Each `[0xNN] = "ITEM_X"`
+        # is read against include/constants/items.h.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        items = enum_values(vanilla_decomp_text('include/constants/items.h'), 'ITEM_')
+        with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        block = text[text.index('INSPECT.BAG = {'):]
+        block = block[:block.index('\n}\n')]
+        pairs = re.findall(r'\[0x([0-9A-Fa-f]+)\] = "(ITEM_\w+)"', block)
+        self.assertEqual(len(pairs), 4, 'INSPECT.BAG lists the four passive items')
+        for value, name in pairs:
+            self.assertEqual(int(value, 16), items.get(name), name)
 
 
 class TestNoBlanketEmulatorKill(unittest.TestCase):
