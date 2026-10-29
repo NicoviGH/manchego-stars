@@ -130,19 +130,24 @@ do
     check(items[2].id, 3, "second item id")
 end
 
--- A dead unit (US_DEAD) is on the board but excluded by Board.live; acted reads state bit 1.
+-- A dead unit (US_DEAD) is on the board but excluded by Board.live; acted reads state bit 1,
+-- fogged bit 9 (US_BIT9, the game's "hidden by fog").
 do
     local b = board(function(m)
         putUnit(m, SYM.gUnitArrayRed, 0, { charId = 0x80, state = 0x4, hp = 0 })
         putUnit(m, SYM.gUnitArrayRed, 1, { charId = 0x81, x = 2, y = 2 })
+        putUnit(m, SYM.gUnitArrayRed, 2, { charId = 0x82, x = 3, y = 2, state = 0x200 })
         putUnit(m, SYM.gUnitArrayBlue, 0, { charId = 1, state = 0x2 })
     end)
     check(Board.unit(b, "red", 0x80).dead, true, "US_DEAD reads dead")
     local live = Board.live(b, "red")
-    check(#live, 1, "Board.live drops the dead unit")
+    check(#live, 2, "Board.live drops the dead unit")
     check(live[1].charId, 0x81, "Board.live keeps the living one")
     check(Board.unit(b, "blue", 1).acted, true, "US_UNSELECTABLE reads acted")
     check(Board.unit(b, "red", 0x81).acted, false, "fresh unit has not acted")
+    check(Board.unit(b, "red", 0x82).fogged, true, "US_BIT9 reads fogged")
+    check(Board.unit(b, "red", 0x81).fogged, false, "a unit in sight is not fogged")
+    check(Board.unit(b, "red", 0x82).onField, true, "a unit in fog is still on the field")
 end
 
 -- Bounds are the decomp's: blue slot 61 is blue; what sits past it is red slot 0, read once,

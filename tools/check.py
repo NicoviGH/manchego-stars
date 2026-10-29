@@ -102,6 +102,9 @@ DEAD_CONCEPTS = [
     # game's GetUnitKeyItemSlotForTerrain, a won-back chest its BATTLE_HandleItemDrop, owed
     # recruits its talk table -- never a copied id list, a seen-blue set or a decomp regex
     r'INSPECT\.BAG\.KEYS\b', r'\bblueSeen\b', r'explore\.downed\b', r'cfg\.recruits\b',
+    # (audit 10): an enemy in fog is the game's own US_BIT9 (board.lua `fogged`), never a copy
+    # of bmtarget.c's fog test
+    r'sight\.visible\b', r'\bs\.visible\b',
     # retired by #510 step 9 PR D (ADR 0369): who may Seize and a unit's reach are the game's
     # answers (CanUnitSeize, GetUnitEquippedWeapon) read through sight.lua, never board.lua's
     # copies; the enemy's strike is the AI's own decision (AiDecideMain since audit 13), not a

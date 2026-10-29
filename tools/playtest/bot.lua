@@ -353,7 +353,11 @@ M.STYLES = {
     claims = {},   -- Strategy claim ids the run follows
 }
 
-local SUPPORT_RANGE = 3     -- bmreliance.h SUPPORT_BONUSES_MAX_DISTANCE, RECT_DISTANCE
+-- bmreliance.h SUPPORT_BONUSES_MAX_DISTANCE, by RECT_DISTANCE. Copied because it is compiled
+-- in as an immediate, with no symbol to read. It only bounds attackKey, a memo key: a unit
+-- further away cannot move the simulation's support bonus (bmreliance.c). The link arena's
+-- unlimited range (BM_FLAG_LINKARENA) never applies in a campaign.
+local SUPPORT_RANGE = 3
 
 
 -- The chance the attack kills, as a whole number of billionths: equal chances must compare
@@ -388,13 +392,15 @@ local function context(board, sight)
             ctx.standing[tileKey(u.x, u.y)] = u
             if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
             if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
-            -- the enemies a player knows of: none it cannot see in fog (sight.visible)
-            if u.faction == "red" and (not sight.visible or sight.visible(u.x, u.y)) then
+            -- the enemies a player knows of: none the game hides in fog (US_BIT9, board.lua)
+            if u.faction == "red" and not u.fogged then
                 ctx.enemies[#ctx.enemies + 1] = u
             end
         end
     end
     table.sort(ctx.actors, function(a, b) return a.slot < b.slot end)
+    -- the max HP a heal fills to, as the game reads it (the board's maxhp is the raw stat)
+    if sight.maxHps then sight.maxHps(ctx.blues) end
     return ctx
 end
 

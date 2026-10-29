@@ -41,7 +41,7 @@
 -- explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the village or chest
--- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, visible, legal)
+-- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
 
@@ -120,7 +120,9 @@ local function score(act, st, W, style, odds)
             fx.explored = true
         end
     elseif act.act == "staff" and act.amount then
-        -- a planned heal: what the target is short by now in the plan, up to the staff's amount
+        -- a planned heal: what the target is short by now in the plan, up to the staff's amount.
+        -- This is AddUnitHp's clamp to GetUnitMaxHp (sight.maxHps), applied here because the HP
+        -- is the plan's, which no game state holds
         local t = act.targetUnit
         local hp = st.hp[t.id] or t.hp
         local gain = math.min(act.amount, (t.maxhp or hp) - hp)
@@ -584,11 +586,11 @@ end
 
 -- Why the board `after` the plan's k-th act (played from `before`) is off what the plan
 -- expected, so the rest of it was planned for a board that is not there; nil when act k + 1
--- may be played as planned. `visible(x, y)` is the player's sight after the act (fog);
+-- may be played as planned. An enemy the game hides in fog (`fogged`, US_BIT9) is not in sight;
 -- `legal(act, unit)` is sight.legal, the game's own word on whether the next act is offered.
 -- Taking LESS from a counter, or dealing more without a kill, is no surprise: the plan
 -- reckoned with worse.
-function M.surprise(plan, k, before, after, visible, legal)
+function M.surprise(plan, k, before, after, legal)
     local a, x, nxt = plan.acts[k], plan.expect[k], plan.acts[k + 1]
     if not (a and x and nxt) then return "the plan is played out" end
     local now = {}
@@ -609,7 +611,7 @@ function M.surprise(plan, k, before, after, visible, legal)
         if plan.expect[i].gone then gone[plan.expect[i].gone] = true end
     end
     for _, u in pairs(now) do
-        if u.faction == "red" and not plan.enemies[u.id] and (not visible or visible(u.x, u.y)) then
+        if u.faction == "red" and not plan.enemies[u.id] and not u.fogged then
             return "an enemy came into sight"
         end
     end

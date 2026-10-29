@@ -51,8 +51,9 @@ not the level. Especially playing vanilla"). `campaign.lua` stops with `bot_faul
 line carrying every failed attempt's `clear` and trace. Manchego Stars keeps `infeasible`.
 
 **3. A retry knows what earlier attempts saw, and only that.** Attempt k at a chapter start reads
-the play logs of attempts 1 to k-1 at the same start, each fact filtered by the game's vision
-test (`sight.visible`) at the moment it was logged ("A player trying again would have seen the
+the play logs of attempts 1 to k-1 at the same start, each fact filtered by what the game showed
+the player at the moment it was logged (a unit's `US_BIT9`, `board.lua` `fogged`; a tile's
+`gBmMapFog`, `sight.unseen`) ("A player trying again would have seen the
 map and stuff"). Built in part C.
 
 **4. No Manchego Stars verdict counts until the bot clears ALL of vanilla's Eirika route clean**,

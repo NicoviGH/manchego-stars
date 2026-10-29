@@ -539,7 +539,7 @@ function M.run(api)
                         local why
                         if playing then
                             why = api.Planner.surprise(playing, nextAct - 1, before, board,
-                                sight.visible, sight.legal)
+                                sight.legal)
                             if not why then
                                 local a = playing.acts[nextAct]
                                 nextAct = nextAct + 1

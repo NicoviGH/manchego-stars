@@ -267,6 +267,7 @@ local function unit(o)
         id = o.id, slot = o.slot or 0, faction = o.faction or "blue", charId = o.charId or o.id,
         x = o.x, y = o.y, hp = o.hp or 20, maxhp = o.maxhp or o.hp or 20,
         onMap = true, onField = o.onField ~= false, dead = false, acted = o.acted or false,
+        fogged = o.fogged or false,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
@@ -390,6 +391,11 @@ local function sightOf(o)
     if o.staves then s.staves = function(u) return o.staves[u.id] or {} end end
     if o.heals then s.heals = function(u, x, y) return (o.heals[u.id] or {})[x .. "," .. y] or {} end end
     if o.mend then s.mend = function(u) return o.mend[u.id] end end
+    if o.maxHp then
+        s.maxHps = function(units)
+            for _, u in ipairs(units) do u.maxhp = o.maxHp[u.id] or u.maxhp end
+        end
+    end
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
@@ -404,7 +410,6 @@ local function sightOf(o)
         end
         return out
     end
-    if o.hidden then s.visible = function(x, y) return not o.hidden[x .. "," .. y] end end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then
         s.explorable = function() return o.explorable end
@@ -1736,6 +1741,16 @@ do
     check(B.decide(boardOf(A), sightOf(o), style("careful")).act, "wait", "mend: not for 5 HP")
 end
 
+-- test_mend_reads_the_games_max_hp: A's maxHP stat is 20 and it has 12 (8 down), but its
+-- weapon adds 5 HP, so GetUnitMaxHp (sight.maxHps) is 25: 13 down, and the 10-HP Vulnerary
+-- is used.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 20 })
+    local o = { mend = { [0x01] = { slot = 1, amount = 10 } }, maxHp = { [0x01] = 25 } }
+    local a = B.decide(boardOf(A), sightOf(o), style("careful"))
+    check(a and a.act, "item", "mend: the cap is the game's max HP, not the raw stat")
+end
+
 -- test_recruit_claim_talks_first_and_marches_when_out_of_reach: green T talkable by A.
 do
     local A = blue(0x01, 0, 0, 0)
@@ -1818,9 +1833,9 @@ end
 -- the march heads for the nearest unseen tile, not for E.
 do
     local A = blue(0x01, 0, 0, 0)
-    local E = red(0x81, 1, 0, { hp = 1 })
+    local E = red(0x81, 1, 0, { hp = 1, fogged = true })
     local o = {
-        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) }, hidden = { ["1,0"] = true },
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
         unseen = { { x = 0, y = 3 } },
         fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1,
                                                     killsTarget = true } } } },
@@ -2424,8 +2439,8 @@ do
           "the kill missed", "surprise: an expected kill that did not land")
     local seen = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }), red(0x82, 5, 5))
     check(S(plan(), 1, before, seen), "an enemy came into sight", "surprise: a new enemy")
-    check(S(plan(), 1, before, seen, function(x, y) return not (x == 5 and y == 5) end), nil,
-          "surprise: an enemy still in fog is no news")
+    local fogged = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }), red(0x82, 5, 5, { fogged = true }))
+    check(S(plan(), 1, before, fogged), nil, "surprise: an enemy still in fog is no news")
     check(S(plan(), 1, before, after(A { acted = true }, C { acted = true }, red(0x81, 2, 0, { hp = 10 }))),
           "the next unit cannot act", "surprise: the next act is gone")
     check(S(plan(), 2, before, before), "the plan is played out", "surprise: nothing left to play")
@@ -2434,7 +2449,7 @@ do
     local played = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))
     local asked
     local function refuses(act, u) asked = { act = act, u = u }; return "the game offers no attack" end
-    check(S(plan(), 1, before, played, nil, refuses), "the game offers no attack",
+    check(S(plan(), 1, before, played, refuses), "the game offers no attack",
           "surprise: the game no longer offers the next act")
     check(asked.act.unitId == 0x02 and asked.u.id == 0x02, true,
           "surprise: the game is asked about the next act, for its unit as it stands now")

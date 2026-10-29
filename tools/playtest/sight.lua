@@ -92,9 +92,9 @@
 --                            unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
---   visible(x, y)            the player sees (x, y): no fog (chapterVisionRange 0) or gBmMapFog
---                            set there -- bmtarget.c's own test; a red unit in fog is no target.
---   unseen()                 every tile the fog hides now ({} without fog).
+--   unseen()                 every tile the fog hides now: gBmMapFog 0 there, which
+--                            RefreshEntityBmMaps never leaves without fog (bmmap.c). An enemy
+--                            in fog is the game's US_BIT9 (board.lua), no target.
 --   staves(u)                the staves `u` can heal with, { slot (0-based), amount }:
 --                            CanUnitUseStaff, and GetUnitItemHealAmount > 0.
 --   canTalk(u, t)            the Talk command's own pair check, CheckForCharacterEvents (what
@@ -139,6 +139,8 @@
 --                            target list -- { slot, amount = GetUnitItemHealAmount, targets =
 --                            { unit index bytes } }. `hurt` (optional, units): allies read as
 --                            one HP short, for a heal the planner means to follow a blow.
+--   maxHps(units)            sets each unit's `maxhp` to GetUnitMaxHp (maxHP + the equipped
+--                            weapon's HP bonus), the cap AddUnitHp holds a heal to.
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff,
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
@@ -208,8 +210,7 @@ local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
 M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
 -- +40 u16 ai_config. Its state bits are board.lua's (Board.US_*).
-local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_MAXHP, UNIT_HP, UNIT_AI_CONFIG =
-    0x0C, 0x10, 0x11, 0x12, 0x13, 0x40
+local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_HP, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x13, 0x40
 -- struct AiState (include/cp_common.h): +79 decideState, +7A dangerMapFilled, +7C unk7C (the
 -- staff AI's HP threshold), +7D combatWeightTableId; the weight table comes from ai_config
 -- bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*). cp_decide.c's per-unit loop writes these as field
@@ -595,8 +596,9 @@ function M.demandsOf(units, commands, fog)
     return out
 end
 
--- Turns left on a Defense map on turn `turn`: End - turn (the goal window's last turn is
--- End - 1). Pure.
+-- Turns left on a Defense map on turn `turn`: End - turn. FE8 has no function for it: the goal
+-- window does the same sum inline, drawing "turn / goalWindowEndTurnNumber - 1" and "Last Turn"
+-- from End - 1 on (player_interface.c). Pure.
 function M.turnsLeft(endTurn, turn) return endTurn - turn end
 
 -- Of a turn-event scan, the first later turn whose available scripts include one not available
@@ -688,7 +690,7 @@ end
 function M.new(outer)
     local sandbox, api = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
-    local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
+    local US_HIDDEN, US_UNDER_A_ROOF, US_BIT9 = Board.US_HIDDEN, Board.US_UNDER_A_ROOF, Board.US_BIT9
     local w, h = api.map()
     local s = { cache = {}, odds = M.odds }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
@@ -805,10 +807,14 @@ function M.new(outer)
     -- unit alone -- class, level, HP, status, items -- never on where anyone stands, so they
     -- outlive refresh(): keyed by those facts, a changed unit is simply a new key.
     local own = {}
-    local function mine(kind, u, ask)
-        local parts = { kind, u.id, u.classId or "-", u.level or "-", u.hp, u.status or "-" }
+    -- `hp` is "-" for an answer HP never moves (max HP)
+    local function ownKey(kind, u, hp)
+        local parts = { kind, u.id, u.classId or "-", u.level or "-", hp, u.status or "-" }
         for _, it in ipairs(u.items or {}) do parts[#parts + 1] = it.id .. "x" .. it.uses end
-        local k = table.concat(parts, ":")
+        return table.concat(parts, ":")
+    end
+    local function mine(kind, u, ask)
+        local k = ownKey(kind, u, u.hp)
         local v = own[k]
         if v == nil then
             v = ask()
@@ -1083,7 +1089,8 @@ function M.new(outer)
                 for k = i, #order do
                     local id = order[k]
                     local e = byId[id]
-                    if e and not (plan.gone or {})[id] and s.visible(e.x, e.y) then
+                    if e and not (plan.gone or {})[id]
+                            and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
                         local target, side = aiDecide(call, proc, e)
                         if target then
                             local t = M.strikeOf(side)
@@ -1133,12 +1140,8 @@ function M.new(outer)
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
-    function s.visible(x, y)
-        return mem.u8(S.gPlaySt + PLAY_VISION) == 0 or grid(mem, S.gBmMapFog, x, y) ~= 0
-    end
     function s.unseen()
         local out = {}
-        if mem.u8(S.gPlaySt + PLAY_VISION) == 0 then return out end
         for y = 0, h - 1 do
             for x = 0, w - 1 do
                 if grid(mem, S.gBmMapFog, x, y) == 0 then out[#out + 1] = { x = x, y = y } end
@@ -1324,13 +1327,12 @@ function M.new(outer)
     function s.heals(u, x, y, hurt)
         local staves = s.staves(u)
         if #staves == 0 then return {} end
+        if hurt then s.maxHps(hurt) end
         return sandbox(function(call)
             standOn(u, x, y)
             -- a planned heal: these allies read as wounded, so the game's list offers them
             for _, o in ipairs(hurt or {}) do
-                if mem.u8(o.addr + UNIT_HP) >= mem.u8(o.addr + UNIT_MAXHP) then
-                    api.write8(o.addr + UNIT_HP, mem.u8(o.addr + UNIT_MAXHP) - 1)
-                end
+                if mem.u8(o.addr + UNIT_HP) >= o.maxhp then api.write8(o.addr + UNIT_HP, o.maxhp - 1) end
             end
             local out = {}
             for _, st in ipairs(staves) do
@@ -1347,6 +1349,22 @@ function M.new(outer)
             end
             return out
         end)
+    end
+
+    -- Each unit's max HP as the game reads it, GetUnitMaxHp: maxHP plus the equipped weapon's
+    -- HP bonus, the cap AddUnitHp holds every heal to (bmunit.c). Set on each unit as `maxhp`,
+    -- the misses asked in one sandbox.
+    function s.maxHps(units)
+        local miss = {}
+        for _, u in ipairs(units) do
+            if own[ownKey("maxhp", u, "-")] == nil then miss[#miss + 1] = u end
+        end
+        if #miss > 0 then
+            sandbox(function(call)
+                for _, u in ipairs(miss) do own[ownKey("maxhp", u, "-")] = call(S.GetUnitMaxHp, { u.addr }) end
+            end)
+        end
+        for _, u in ipairs(units) do u.maxhp = own[ownKey("maxhp", u, "-")] end
     end
 
     function s.mend(u)
