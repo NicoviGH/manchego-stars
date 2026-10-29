@@ -51,6 +51,7 @@ SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNS
          'GetROMChapterStruct', 'InitRN', 'RefreshEntityBmMaps', 'AiDecideMain',
          'AiUpdateNoMoveFlag', 'AiInitDangerMap', 'AiClearDecision', 'gAiState', 'gAiDecision',
          'BattleGenerateBallistaSimulation', 'gActiveUnit', 'gActiveUnitId',
+         'NewPopup_GeneralItemGot', 'sProcScr_CombatAction',
          'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
          'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon']
 # campaign.lua's between-chapter reads and calls (#510 step 9 PR E).

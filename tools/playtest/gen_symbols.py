@@ -290,6 +290,9 @@ WANTED = [
     'BattleRoll1RN',            # every one-number roll of a battle: crits, skill procs (bmbattle.c)
     'BattleRoll2RN',            # the two-number hit roll; both return simResult when simulating  # a ballista's strike (bmbattle.c)
     'gActiveUnit',              # struct Unit *: the AI decides for THIS unit
+    # A fallen unit's drop (bmmind.c BATTLE_HandleItemDrop, its popup's only caller).
+    'NewPopup_GeneralItemGot',  # the item given to the blue unit that downed a dropper
+    'sProcScr_CombatAction',    # the real battle's resolution, the drop included
     'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
     # Turn events still to come (eventinfo.c): botrun's "nothing can change this board".
     'GetChapterEventDataPointer',   # the chapter's event lists; turnBasedEvents at +00

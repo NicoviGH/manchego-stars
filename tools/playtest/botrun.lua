@@ -77,6 +77,7 @@
 --           battle records (Board.battle: the forecast's numbers, every blow) and who fell
 --   event   a change on the board no act names: a unit arriving, a recruit, items gained/lost
 --   bag     a full inventory answered: the new item, the one that went, why
+--   drop    the game gave one of ours a fallen unit's item: from, to (charIds), item
 --   end     the BOTRUN record, last
 -- Every number in it is read from the game; nothing is re-derived.
 
@@ -204,16 +205,15 @@ end
 --                      a door went unopened in every attempt, silently, as "unreached"
 --   closedBy(x, y, charId, loot)  an act of another side's unit named the tile (a pick:
 --                      a pillage, or a thief's chest), and the item it gained doing so
---   downed(charId, step)  that unit fell to one of ours, at the run's step `step`
---   gained(item, step) one of ours gained `item` (an items event, or a full-bag answer)
+--   dropped(d)         the game gave one of ours a fallen unit's item (api.drops: its own
+--                      BATTLE_HandleItemDrop), d = { from, to, item }
 --   missing()          the clean clear's rewards part: each tile not taken, { x, y, kind,
 --                      why = its status, closed_by }. Taken = visited, or a chest whose
---                      thief fell to one of ours and whose item then reached one of ours
---                      (popup.c sets US_DROP_ITEM on the thief; bmmind.c gives the drop to
---                      its killer)
+--                      thief the game then made drop that chest's item to one of ours
+--                      (popup.c sets US_DROP_ITEM on the thief)
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
-    local downedAt, gains = {}, {}
+    local drops = {}
     local function key(x, y) return x .. "," .. y end
     function log.open(list, turn, usable)
         local now = {}
@@ -270,13 +270,11 @@ function M.exploreLog()
         local e = tiles[key(x, y)]
         if e and not e.by then e.closedBy, e.loot = charId, loot end
     end
-    function log.downed(charId, step) downedAt[charId] = downedAt[charId] or step end
-    function log.gained(item, step) gains[#gains + 1] = { item = item, step = step } end
+    function log.dropped(d) drops[#drops + 1] = d end
     local function wonBack(e)
-        local at = e.kind == "chest" and e.closedBy and e.loot and downedAt[e.closedBy]
-        if not at then return false end
-        for _, g in ipairs(gains) do
-            if g.item == e.loot and g.step >= at then return true end
+        if e.kind ~= "chest" or not e.closedBy or not e.loot then return false end
+        for _, d in ipairs(drops) do
+            if d.from == e.closedBy and d.item == e.loot then return true end
         end
         return false
     end
@@ -327,9 +325,7 @@ function M.run(api)
     -- api.recruits less the party at the first read; joined = owed and in the party at the
     -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
     -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
-    local owed, blueSeen = nil, {}
-    -- one step per act and per enemy phase: a thief's fall and the drop it gives share one
-    local step = 0
+    local owed = nil
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
@@ -339,14 +335,18 @@ function M.run(api)
             api.trace(ev)
         end
     end
-    -- each full-bag answer the harness gave since the last look (api.bag)
+    -- each full-bag answer the harness gave, and each drop the game gave one of ours, since
+    -- the last look (api.bag, api.drops)
     local function bagged()
         for _, b in ipairs(api.bag and api.bag() or {}) do
             b.turn = turn
             rec.bag[#rec.bag + 1] = b
-            explore.gained(b.item, step)
             trace({ t = "bag", charId = b.charId, item = b.item, sent = b.sent,
                     discard = b.discard, why = b.why })
+        end
+        for _, d in ipairs(api.drops and api.drops() or {}) do
+            explore.dropped(d)
+            trace({ t = "drop", from = d.from, to = d.to, item = d.item })
         end
     end
     local lastBoard
@@ -359,14 +359,10 @@ function M.run(api)
                 if not party[c] then owed[#owed + 1] = c end
             end
         end
-        for _, u in ipairs(after.units) do
-            if u.faction == "blue" then blueSeen[u.charId] = true end
-        end
         if lastBoard then
             for _, e in ipairs(M.events(lastBoard, after)) do
                 e.t = "event"
                 trace(e)
-                for _, item in ipairs(e.gained or {}) do explore.gained(item, step) end
             end
         end
         lastBoard = after
@@ -382,7 +378,6 @@ function M.run(api)
             elseif d.killer then
                 local k = tostring(d.killer)
                 rec.kills[k] = (rec.kills[k] or 0) + 1
-                if blueSeen[d.killer] then explore.downed(d.charId, step) end
             end
         end
     end
@@ -544,7 +539,6 @@ function M.run(api)
                 local action
                 if sight.batch then action = sight.batch(decide) else action = decide() end
                 if not action then break end
-                step = step + 1
                 local done, why = api.act(action)
                 bagged()
                 if done == false and (action.act == "visit" or action.act == "chest") then
@@ -595,7 +589,6 @@ function M.run(api)
             end
             changes(before)
             trace({ t = "phase", phase = "enemy", units = M.snapshot(before) })
-            step = step + 1
             local phase, deaths, acts = api.endPhase()
             bagged()
             local was, now = byId(before), byId(api.board())

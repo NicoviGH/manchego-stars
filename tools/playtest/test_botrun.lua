@@ -701,7 +701,7 @@ end
 
 -- A thief (0x82, far off) opens the chest at 9,8 in the first enemy phase and gains item 0x6C;
 -- A meanwhile fights the red at 1,0. `killer` kills the thief in the second enemy phase and,
--- when blue, the drop reaches A through the full-bag menu (api.bag).
+-- when blue, the game drops the chest's item to A (api.drops: its BATTLE_HandleItemDrop).
 local function thiefGame(killer)
     local units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 30),
                     unit(0x82, 1, "red", 9, 9, 10), unit(0x41, 0, "green", 8, 9, 10) }
@@ -723,10 +723,10 @@ local function thiefGame(killer)
             end
             return {}
         end }
-    g.api.bag = function()
+    g.api.drops = function()
         if dropped then
             dropped = false
-            return { { charId = 0x01, item = 0x6C, sent = 0x6C, discard = false, why = "full" } }
+            return { { from = 0x82, to = 0x01, item = 0x6C } }
         end
         return {}
     end

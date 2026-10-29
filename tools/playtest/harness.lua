@@ -3053,6 +3053,38 @@ INSPECT.watchDeaths = function()
     return function() callbacks:remove(id); return deaths end
 end
 
+-- Every item the game gives one of ours off a unit that fell (a thief's chest, an enemy's
+-- drop): NewPopup_GeneralItemGot, whose only caller is BATTLE_HandleItemDrop (bmmind.c), the
+-- game's own decision -- the fallen unit carries US_DROP_ITEM and an item, and a blue unit
+-- downed it -- caught at its entry: r0 the receiving unit, r1 the item. The fallen one is the
+-- battle's other unit (gBattleActor/gBattleTarget +0x0B). mGBA single-steps while a breakpoint
+-- is set, so it is set only for the frames the battle's resolution (sProcScr_CombatAction) is
+-- live with a US_DROP_ITEM unit in it. `cpu` is sightApi's. -> stop() -> the drops since the
+-- watch began, { from = the fallen unit's charId, to = the receiver's, item = its id }.
+INSPECT.watchDrops = function(cpu)
+    local drops, hold = {}, nil
+    local function unitAt(bu) return ru32(SYM.gUnitLookup + ru8(bu + 0x0B) * 4) end
+    local function dropper(addr) return addr ~= 0 and (ru32(addr + 0x0C) & BOARD.US_DROP_ITEM) ~= 0 end
+    local function caught()
+        local to = cpu.read("r0")
+        local from = unitAt(SYM.gBattleActor)
+        if from == to then from = unitAt(SYM.gBattleTarget) end
+        drops[#drops + 1] = { from = ru8(ru32(from) + 4), to = ru8(ru32(to) + 4),
+                              item = cpu.read("r1") & 0xFF }
+    end
+    local id = callbacks:add("frame", function()
+        local want = (dropper(unitAt(SYM.gBattleActor)) or dropper(unitAt(SYM.gBattleTarget)))
+            and PROCS.find(SYM.sProcScr_CombatAction) ~= nil
+        if want and not hold then hold = cpu.breakpoint(SYM.NewPopup_GeneralItemGot, caught)
+        elseif hold and not want then cpu.unbreak(hold); hold = nil end
+    end)
+    return function()
+        callbacks:remove(id)
+        if hold then cpu.unbreak(hold) end
+        return drops
+    end
+end
+
 -- Each act of an enemy (or green) phase, as the game records it, for the run's trace. Every
 -- act the AI performs starts with UnitBeginAction (bmunit.c): gActionData +0C subjectIndex = the
 -- unit, +11 unitActionType = 0, gActiveUnitMoveOrigin = its tile; CpPerform then sets the type
@@ -3110,6 +3142,14 @@ end
 
 -- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
 INSPECT.botApi = function(game)
+    -- the entries `list` gained since the last look at it
+    local function unread(list)
+        local out = {}
+        for i = (list.seen or 0) + 1, #list do out[#out + 1] = list[i] end
+        list.seen = #list
+        return out
+    end
+    local dropLog = {}
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
@@ -3158,12 +3198,10 @@ INSPECT.botApi = function(game)
         log = log,
         battle = BOARD.battle,
         -- every full-bag answer since the last call (INSPECT.answerFullBag's log)
-        bag = function()
-            local out, n = {}, INSPECT.bagSeen or 0
-            for i = n + 1, #INSPECT.bagLog do out[#out + 1] = INSPECT.bagLog[i] end
-            INSPECT.bagSeen = #INSPECT.bagLog
-            return out
-        end,
+        bag = function() return unread(INSPECT.bagLog) end,
+        -- every drop the game gave one of ours since the last call (INSPECT.watchDrops, kept
+        -- while an act or an enemy phase plays: the only times a battle resolves)
+        drops = function() return unread(dropLog) end,
     }
     INSPECT.onFullBag = INSPECT.answerFullBag
     -- The run's trace (botrun.lua): one JSON line per event in the run dir, a file per chapter
@@ -3255,6 +3293,17 @@ INSPECT.botApi = function(game)
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
         return phase, deaths, acts
     end
+    -- An act and an enemy phase play with the drop watch on, its catches kept in dropLog.
+    local function dropsWatched(fn)
+        return function(...)
+            local stop = INSPECT.watchDrops(sightApi.cpu)
+            local out = table.pack(pcall(fn, ...))
+            for _, d in ipairs(stop()) do dropLog[#dropLog + 1] = d end
+            if not out[1] then error(out[2], 0) end
+            return table.unpack(out, 2, out.n)
+        end
+    end
+    api.act, api.endPhase = dropsWatched(api.act), dropsWatched(api.endPhase)
     return api
 end
 
