@@ -3772,6 +3772,8 @@ INSPECT.campaignApi = function(game)
         -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
         -- it, rather than replaying every chapter before it. The state holds the game's RNG,
         -- and its record the team the campaign carried in, so the pick is the campaign's own.
+        -- A record saved before it kept that team resumes with none, said in the chapter's
+        -- line (carried_unknown): its pick may not be the campaign's.
         if played == nil and cfg.from then
             local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
             if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
@@ -3781,14 +3783,15 @@ INSPECT.campaignApi = function(game)
             if not f then return nil, string.format("no start record for chapter %d in %s", cfg.from, dir) end
             local saved = Json.decode(f:read("a"))
             f:close()
-            if saved.carried == nil then
-                return nil, string.format("chapter %d's start record predates the carried team; "
-                    .. "re-save it with a campaign run", cfg.from)
-            end
             wait(2)
             played = cfg.from
             log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
-            return { chapter = played, carried = saved.carried }
+            if saved.carried == nil then
+                log(string.format("campaign: WARNING chapter %d's start record predates the "
+                    .. "carried team; it resumes with none", played))
+            end
+            return { chapter = played, carried = saved.carried or {},
+                     carriedUnknown = saved.carried == nil }
         end
         local stalled = INSPECT.watch("arrive")
         for _ = 1, TUNE.bootSteps do

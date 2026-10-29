@@ -47,7 +47,8 @@
 --   seed(chapter)         restart random()'s draws for this chapter start, from (seed, chapter)
 --   arrive(route)         ride the game to the next chapter's start; at a route split the
 --                         harness calls route(options) -> index. Returns { chapter = n,
---                         carried = {charIds}|nil (a resumed start: the team carried in) } |
+--                         carried = {charIds}|nil (a resumed start: the team carried in),
+--                         carriedUnknown = true|nil (a start saved before records kept it) } |
 --                         "end" | nil, why
 --   save(chapter, carried) write the chapter-start state, what the game gave (party, gold,
 --                         items) and the carried team (charIds); true | nil, why
@@ -215,7 +216,8 @@ function M.run(api)
                 if not ok then return "crashed", "save: " .. tostring(swhy) end
             end
             local claims = api.claims(ch) or {}
-            local entry = { chapter = ch, attempts = 0, failures = {} }
+            local entry = { chapter = ch, attempts = 0, failures = {},
+                            carried_unknown = at.carriedUnknown or nil }
             chapters[#chapters + 1] = entry
             local cap, cwhy = api.cap()
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end
