@@ -9,57 +9,55 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at 592b058,
-PUSHED (no PR yet).**
+Refreshed 2026-10-29 (Claude, later). **#510 step 9 is on `feat/510-step9-e-campaigns`: 41668e4,
+then one commit syncing this HANDOFF and retiring the old lead picker's name. PUSHED (no PR yet).**
 
-**NEXT SESSION, FIRST AND ONLY: a real brainstorm of the planner's LONG-TERM design** (Nicolas,
-2026-10-29: "these early chapters are way smaller and simpler than late game ... we need to be
-thinking about that not duct tape solutions"; "Don't guess what capabilities we have, do your
-homework and give me a real recommendation with no assumptions"). Use `superpowers:brainstorming`.
-The questions and the measurements they need are in ONE #510 comment:
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6482308936>. In brief: how a
-plan is scored (averaged expected damage vs the game's REAL enemy phase sampled in the sandbox),
-how far it looks (one turn vs a short rollout), search (beam + mend vs local search vs evolution,
-record 0021), and scale (all numbers so far are Ch1-Ch3; a late-game map is needed, and how to
-reach one is itself to be found out). **No more planner patches until that is decided**: the
-two-turn boss assault is NOT to be built.
-- Read before it: this session's three #510 summaries,
-  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6481175246> (the judged-phase
-  faults), <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6481532715> (the
-  vanilla Ch2 crash) and <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6481855102>
-  (CPU cost).
-- **Done 2026-10-29** (each proven in the ROM; the commit messages carry the numbers):
-  - 7b29653: the judged enemy phase branches where a counter may kill a striker; reds fight at
-    the HP the plan leaves; one order per act set in the beam; the **mend** (a unit the best plan
-    may lose tries its other acts).
-  - 79a5010: vanilla gets its own symbol tables (`PT_SYMDIR`). Running a vanilla and an ours run
-    at once used to hang vanilla in our addresses.
-  - 6c1d47c: an attack that starts an event (vanilla Ch2's DefeatAll ending) is waited out on the
-    enemy phase's budget. Vanilla Ch2 went from 2/8 to 8/8 won all alive.
-  - 434c351: one enemy decision runs its game calls as one list (a Thumb stub in the sandbox),
-    7-12% fewer frames for the same games, move for move.
-  - 592b058: `attempts` prints each run's frames, and lists a run that crashed before its bot
-    reported.
-- **Attempts 1-8, pool 4, at 592b058, ours beside vanilla:** Ch2: ours 7/8 won all alive (even
-  loses one), vanilla 8/8. Ch3: ours careful and even won all alive, bold won t20 with 2 deaths
-  to the Mogall; vanilla 8/8.
-- **CPU seconds are not a cost measure on this Mac** (M2: 4 performance + 4 efficiency cores;
-  other apps take ~2.5 cores). One identical game cost 17 to 29 CPU s. Compare costs in emulated
-  frames and game calls (now in every `attempts` line).
-- Rulings still standing: ADR 0374 (every bot result read beside vanilla) and ADR 0375 (a style's
-  risk tolerance is not declared).
-- Fixed but not proven in the ROM: `sight.legal` refusing an act (it refused none in ~40 runs; the
-  refusal path is unit-tested only).
-Saved starts: vanilla Ch2 and Ch3, `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/{2,3}.ss`;
-ours ch02 and ch03, `references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/{3,4}.ss`. Nothing later.
-**How to run one chapter:** ours needs a store of vanilla shops it does not have yet, so build the
-env with a dummy store (every `<n>.json` = `{"shops":[]}`): `campaign_env.py ours --store <dummy>
---id e1-ours-ch07 --from 3`, then set `last: [3]` (ch02) or `from: 4, last: [4]` (ch03). Vanilla:
-`campaign_env.py vanilla --id e1-vanilla-ch3 --from 3` with `last: [3]` (`from: 2, last: [2]` for
-Ch2). Run with `montecarlo.py attempts [--vanilla] --env <file> --attempts 8 --jobs 4 --out
-<dir>/r.jsonl`; traces go beside the out file, `montecarlo.py story <trace>` reads one.
-#546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
-`lordfloor` +10 HP, not yet run in the emulator).
+**NEXT SESSION: plan and build the ACCEPTED long-term design** (Nicolas, 2026-10-29: "Accepted").
+It is ONE #510 comment, edited in place:
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6485197805>. The evidence
+behind it (the vanilla scout, Ch3-Ch14) is
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6484135808>. Start with
+`superpowers:writing-plans` on the design's **part A**. Per the standing rule the plan is ONE issue
+comment, never a docs file, and the code is written inline (no SDD).
+- **The design in brief** (read the comment itself; this is only a pointer):
+  - A clean clear has four parts: the chapter is won, no unit is lost, every recruit joins, every
+    reward is taken. Any green ally's death also spoils it (vanilla Ch6's Orion's Bolt).
+  - On vanilla, a chapter the bot cannot clear clean is a BOT FAULT, never "infeasible".
+  - A retry reads the earlier attempts' play logs, filtered to what was on screen.
+  - The judged phase and the beam + mend stay as built. Retries vary much more (a death-weight
+    range, amending ADR 0375).
+  - **No ours verdict counts until the bot clears all of vanilla's Eirika route clean.**
+  - Order of work: A (the four-part clean clear), B (varied retries), C (retries that learn),
+    D (the scout's capability gaps: Talk recruits as goals, a held Doorkey opening Ch14's door,
+    Ch10's stalls), E (vanilla's Eirika route cleared chapter by chapter).
+  - Records owed when built: ADR 0375 amended, plus one new ADR for decisions 1-4.
+- **Done 2026-10-29 (later), each proven in the ROM; the commit messages carry the numbers:**
+  - 578b086: a bought item's shop starts orphaned, as vanilla's map shops do. The shop's
+    LockGame stopped the player phase's proc tree, so the shop froze itself.
+  - 42d65a1: a claim the bot cannot play is no part of a style (vanilla Ch5's 48 styles were 3
+    games).
+  - 7811b35: the campaign spends `GetPartyGoldAmount`, which is 0 in Ch5x.
+  - 7b866ca: a prep menu with 0 rows is being built, not broken (one frame after Pick Units).
+  - 41668e4: vanilla's Ch8 route split is answered. The ch01 lead-menu picker became
+    `INSPECT.pickMenuRow`, the one choice-menu picker.
+- **Saved starts:** vanilla's clean campaign `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/`
+  (0-4, 6 = Prologue to Ch5's start, all clean). The SCOUT
+  `states/scout-vanilla/` (5 = Ch5x, 6 = Ch5, 7 = Ch6, 8 = Ch7, 9 = Ch8) came from a throwaway
+  switch that took a won chapter WITH deaths as cleared. That switch is not committed. Those
+  starts carry the scout's losses, so they are for study, never for a verdict. Ours: as before,
+  `references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/{3,4}.ss`.
+- **How to run vanilla from a saved start:** `campaign_env.py vanilla --route 1 --id <id> --from N
+  > env.json`, then `PT_VANILLA=1 PT_RUN_TAG=<tag> PT_CAMPAIGN="$(cat env.json)"
+  tools/playtest/run.sh campaign`; leave out `last` to play to the end. A pool of attempts:
+  `montecarlo.py attempts --vanilla --env <file> --attempts 8 --jobs 4 --out <dir>/r.jsonl`.
+  `montecarlo.py story <trace>` reads one trace. Vanilla chapter indices: 5 = Ch5x, 6 = Ch5,
+  7 = Ch6 ... 61 (0x3D) = Ch11 (constants/chapters.h).
+- **Scout costs** (one attempt): Ch3 32k frames / 15 CPU s; Ch13 142k frames / 80 CPU s. Compare
+  costs in frames and game calls, never CPU s (this Mac's cores are uneven).
+- Rulings still standing: ADR 0374 (every bot result read beside vanilla), ADR 0375 (risk
+  tolerance not declared; to be amended by the design's call 6).
+- #546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
+  `lordfloor` +10 HP, not yet run in the emulator).
 **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
@@ -115,7 +113,7 @@ G3 #537 78105ed; the summary is on #531).
    - **Built, E:** `Bot.team` picks the team by the map's DEMANDS, read at the prep screen
      (`Sight.demands`/`Sight.answer`). The group caps come from `team_groups.py` (an explicit
      class table). campaign.lua carries the cleared team and never repeats a style. Route
-     (vanilla) and lead (ours, `INSPECT.pickLead`) are campaign SETTINGS. The bot breaks walls,
+     (vanilla) and lead (ours, `INSPECT.pickMenuRow`) are campaign SETTINGS. The bot breaks walls,
      heals, ends Canto, uses Talk and doors, and ignores enemies in fog. `campaign_env.py`
      resolves claims to game ids and resumes with `--id X --from N`.
    - **Lords (Nicolas):** each of our 8 leads becomes its own cell, but only on #543's lord
@@ -197,7 +195,7 @@ G3 #537 78105ed; the summary is on #531).
             strike the grell alone and die.
         **Done 2026-10-28 (late):** the fix list of #510 comment 6478205562, and the boss
         assault's starvation, ally swaps, three holds, free-tile march (see the top of this file).
-        Still owed (all behind the design brainstorm at the top):
+        Still owed (the accepted design at the top orders all of this now):
         - Ours ch02 (1,12) is unreached in 7 of 8 (`left_open`); ours ch02 even loses one unit.
         - Ours bold loses units to the Mogall: no plan chips the boss now and finishes it next
           turn. Whether that becomes a look-ahead or a sampled rollout is the brainstorm's call.
