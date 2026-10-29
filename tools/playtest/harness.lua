@@ -1208,9 +1208,14 @@ end
 -- PlayPhaseForceActiveUnitCanto): the game is back in move selection, and the act is only done
 -- once that move is spent. It is spent where the unit stands -- A on its own tile, then Wait
 -- if the command menu opens -- since nothing the bot decided asks it to move again.
+-- The last unit's act can end the player phase itself (the game auto-ends it): the act is over
+-- once the phase leaves blue, so the caller's enemy-phase watch sees that phase. Waiting on
+-- through it instead (Manchego Stars ch03, 2026-10-30) returned on the next player phase, and
+-- the bot then ended THAT turn unplayed.
 INSPECT.awaitActed = function(actorAddr, stopWhen)
     local function acted()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
+            or faction() ~= 0
             or (stopWhen ~= nil and stopWhen())
     end
     local done = waitFor(function()
@@ -3044,13 +3049,13 @@ INSPECT.watchDeaths = function()
         for uid, who in pairs(alive) do
             local addr = ru32(SYM.gUnitLookup + uid * 4)
             if addr == 0 or ru8(addr + 0x13) == 0 or (ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0 then
-                local killer
-                if ru8(SYM.gBattleActor + 0x0B) == uid then killer = charOf(SYM.gBattleTarget)
-                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then
-                    killer = charOf(SYM.gBattleActor)
-                end
+                local by
+                if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
+                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
+                -- ours: the killer's unit index is a blue one (FACTION_MASK bits 0)
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
-                                        killer = killer }
+                                        killer = by and charOf(by),
+                                        ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0 }
                 alive[uid] = nil
             end
         end
@@ -3058,44 +3063,72 @@ INSPECT.watchDeaths = function()
     return function() callbacks:remove(id); return deaths end
 end
 
+-- A breakpoint on `addr`, held only on the frames `want()` is true: mGBA steps the CPU one
+-- instruction at a time while any is set. `caught` runs each time the CPU reaches it. `cpu` is
+-- sightApi's. -> stop(), which clears both.
+INSPECT.breakWhile = function(cpu, addr, want, caught)
+    local hold
+    local id = callbacks:add("frame", function()
+        local on = want()
+        if on and not hold then hold = cpu.breakpoint(addr, caught)
+        elseif hold and not on then cpu.unbreak(hold); hold = nil end
+    end)
+    return function()
+        callbacks:remove(id)
+        if hold then cpu.unbreak(hold) end
+    end
+end
+
 -- Every item the game gives one of ours off a unit that fell (a thief's chest, an enemy's
 -- drop): NewPopup_GeneralItemGot, whose only caller is BATTLE_HandleItemDrop (bmmind.c), the
 -- game's own decision -- the fallen unit carries US_DROP_ITEM and an item, and a blue unit
 -- downed it -- caught at its entry: r0 the receiving unit, r1 the item. The fallen one is the
--- battle's other unit (gBattleActor/gBattleTarget +0x0B). mGBA single-steps while a breakpoint
--- is set, so it is set only for the frames the battle's resolution (sProcScr_CombatAction) is
--- live with a US_DROP_ITEM unit in it. `cpu` is sightApi's. -> stop() -> the drops since the
--- watch began, { from = the fallen unit's charId, to = the receiver's, item = its id }.
+-- battle's other unit (gBattleActor/gBattleTarget +0x0B). Held only while the battle's
+-- resolution (sProcScr_CombatAction) is live with a US_DROP_ITEM unit in it. -> stop() -> the
+-- drops since the watch began, { from = the fallen unit's charId, to = the receiver's, item }.
 INSPECT.watchDrops = function(cpu)
-    local drops, hold = {}, nil
+    local drops = {}
     local function unitAt(bu) return ru32(SYM.gUnitLookup + ru8(bu + 0x0B) * 4) end
     local function dropper(addr) return addr ~= 0 and (ru32(addr + 0x0C) & BOARD.US_DROP_ITEM) ~= 0 end
-    local function caught()
+    local stop = INSPECT.breakWhile(cpu, SYM.NewPopup_GeneralItemGot, function()
+        return (dropper(unitAt(SYM.gBattleActor)) or dropper(unitAt(SYM.gBattleTarget)))
+            and PROCS.find(SYM.sProcScr_CombatAction) ~= nil
+    end, function()
         local to = cpu.read("r0")
         local from = unitAt(SYM.gBattleActor)
         if from == to then from = unitAt(SYM.gBattleTarget) end
         drops[#drops + 1] = { from = ru8(ru32(from) + 4), to = ru8(ru32(to) + 4),
                               item = cpu.read("r1") & 0xFF }
-    end
-    local id = callbacks:add("frame", function()
-        local want = (dropper(unitAt(SYM.gBattleActor)) or dropper(unitAt(SYM.gBattleTarget)))
-            and PROCS.find(SYM.sProcScr_CombatAction) ~= nil
-        if want and not hold then hold = cpu.breakpoint(SYM.NewPopup_GeneralItemGot, caught)
-        elseif hold and not want then cpu.unbreak(hold); hold = nil end
     end)
-    return function()
-        callbacks:remove(id)
-        if hold then cpu.unbreak(hold) end
-        return drops
-    end
+    return function() stop(); return drops end
+end
+
+-- Every theft an AI unit makes: AiStartStealAction (cp_perform.c), the steal itself, caught at
+-- its entry, before it moves the item: gActiveUnit the thief, gAiDecision +06 the unit robbed,
+-- +07 the item's slot. Held only while gAiDecision is a steal (decided frames before it plays:
+-- gProcScr_CpPerform moves the thief and sleeps first). -> stop() -> the thefts since the watch
+-- began, { thief, from = charIds, item }.
+INSPECT.watchThefts = function(cpu)
+    local thefts = {}
+    local stop = INSPECT.breakWhile(cpu, SYM.AiStartStealAction, function()
+        return ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION) == BOARD.AI_ACTION_STEAL
+    end, function()
+        local robbed = ru32(SYM.gUnitLookup + ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET) * 4)
+        local slot = ru8(SYM.gAiDecision + BOARD.AI_DEC.SLOT)
+        thefts[#thefts + 1] = { thief = ru8(ru32(ru32(SYM.gActiveUnit)) + 4),
+                                from = ru8(ru32(robbed) + 4),
+                                item = ru16(robbed + 0x1E + slot * 2) & 0xFF }
+    end)
+    return function() stop(); return thefts end
 end
 
 -- Each act of an enemy (or green) phase, as the game records it, for the run's trace. Every
 -- act the AI performs starts with UnitBeginAction (bmunit.c): gActionData +0C subjectIndex = the
 -- unit, +11 unitActionType = 0, gActiveUnitMoveOrigin = its tile; CpPerform then sets the type
 -- (AiStartCombatAction: COMBAT and +0D targetIndex; AiStaffAction: STAFF and +0D; AiPickAction:
--- PICK, the village or chest at
--- +13/+14 xOther/yOther). A frame watch follows that record. The act's battle is read once the
+-- PICK, the village or chest at +13/+14 xOther/yOther). A pillage and a steal are read off
+-- gAiDecision instead (AiPillageAction sets nothing for a village, AiStartStealAction nothing),
+-- and a chest by its tile: a thief opens one as USE_ITEM, by a pillage or by using its key. A frame watch follows that record. The act's battle is read once the
 -- type is COMBAT and gBattleStats says REAL after the act began on a simulation: the AI simulates
 -- every attack it weighs (AiComputeCombatScore) before it performs one, so a REAL flag seen
 -- only after that is this act's own battle, never one left from an earlier phase.
@@ -3106,6 +3139,13 @@ INSPECT.watchEnemyActs = function()
     local function real() return (ru16(SYM.gBattleStats) & BOARD.BATTLE_REAL) ~= 0 end
     local function close()
         if not cur then return end
+        -- a chest the act emptied, however the AI opened it (AiPillageAction, or its key used
+        -- as an item: green Colm in vanilla Ch3): full when the act began, not now
+        local d = cur.dest
+        if d and d.chest and terrainAt(d.x, d.y) ~= INSPECT.Sight.TERRAIN_CHEST_FULL then
+            cur.act, cur.tile = "chest", { x = d.x, y = d.y }
+        end
+        cur.dest = nil
         local addr = ru32(SYM.gUnitLookup + cur.id * 4)
         if addr ~= 0 then cur.to, cur.hp = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) }, ru8(addr + 0x13) end
         cur.sim = nil
@@ -3126,7 +3166,18 @@ INSPECT.watchEnemyActs = function()
         end
         if not cur then return end
         local kind = ru8(AD + 0x11)
-        if kind ~= 0 then
+        -- gAiDecision is this unit's while its act plays (CpDecide decides one unit, then
+        -- CpPerform plays it)
+        local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT) == cur.id
+            and ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
+        if decided and not cur.dest then
+            local x, y = ru8(SYM.gAiDecision + BOARD.AI_DEC.X), ru8(SYM.gAiDecision + BOARD.AI_DEC.Y)
+            cur.dest = { x = x, y = y, chest = terrainAt(x, y) == INSPECT.Sight.TERRAIN_CHEST_FULL }
+        end
+        if decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
+            -- AiPillageAction on a village: the tile event above it, no action type set
+            cur.act, cur.tile = "pillage", { x = cur.dest.x, y = cur.dest.y - 1 }
+        elseif kind ~= 0 then
             cur.act = BOARD.ACTIONS[kind] or string.format("0x%02X", kind)
             -- only AiStartCombatAction and AiStaffAction set +0D: any other act leaves the
             -- last one's target there
@@ -3135,6 +3186,9 @@ INSPECT.watchEnemyActs = function()
             elseif kind == BOARD.ACTION_COMBAT or kind == BOARD.ACTION_STAFF then
                 cur.targetId = ru8(AD + 0x0D)
             end
+        elseif decided == BOARD.AI_ACTION_STEAL then
+            -- AiStartStealAction sets no action type
+            cur.act, cur.targetId = "steal", ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET)
         end
         if not real() then
             cur.sim = true
@@ -3154,7 +3208,7 @@ INSPECT.botApi = function(game)
         list.seen = #list
         return out
     end
-    local dropLog = {}
+    local dropLog, theftLog = {}, {}
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
@@ -3216,6 +3270,15 @@ INSPECT.botApi = function(game)
         -- every drop the game gave one of ours since the last call (INSPECT.watchDrops, kept
         -- while an act or an enemy phase plays: the only times a battle resolves)
         drops = function() return unread(dropLog) end,
+        -- every theft an AI unit made since the last call (INSPECT.watchThefts), each with
+        -- its item's rank and whether it spoils the clean clear (Sight.stealRanks, ADR 0379)
+        thefts = function()
+            local new, items = unread(theftLog), {}
+            for _, t in ipairs(new) do items[#items + 1] = t.item end
+            local ranks = #items > 0 and Sight.stealRanks(sightApi, items) or {}
+            for _, t in ipairs(new) do t.rank, t.spoils = ranks[t.item].rank, ranks[t.item].spoils end
+            return new
+        end,
     }
     INSPECT.onFullBag = INSPECT.answerFullBag
     -- The run's trace (botrun.lua): one JSON line per event in the run dir, a file per chapter
@@ -3247,8 +3310,11 @@ INSPECT.botApi = function(game)
             -- the combat budget out. What follows is waited out on the enemy phase's
             -- wedge-catcher budget, until the chapter advances or control comes back.
             local dead = function() return (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0 end
+            -- the phase leaving blue ends it too (INSPECT.awaitActed): the enemy phase is
+            -- api.endPhase's to watch
             local function settled()
                 return won() or lost() or dead() or (ru32(u.addr + 0x0C) & 0x2) ~= 0
+                    or faction() ~= 0
             end
             if not chooseAttack(u.addr, function()
                 return won() or lost() or dead() or procActive(SYM.ProcScr_StdEventEngine)
@@ -3307,17 +3373,20 @@ INSPECT.botApi = function(game)
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
         return phase, deaths, acts
     end
-    -- An act and an enemy phase play with the drop watch on, its catches kept in dropLog.
-    local function dropsWatched(fn)
+    -- An act and an enemy phase play with the drop and theft watches on, their catches kept
+    -- in dropLog and theftLog.
+    local function watched(fn)
         return function(...)
-            local stop = INSPECT.watchDrops(sightApi.cpu)
+            local stopDrops = INSPECT.watchDrops(sightApi.cpu)
+            local stopThefts = INSPECT.watchThefts(sightApi.cpu)
             local out = table.pack(pcall(fn, ...))
-            for _, d in ipairs(stop()) do dropLog[#dropLog + 1] = d end
+            for _, d in ipairs(stopDrops()) do dropLog[#dropLog + 1] = d end
+            for _, t in ipairs(stopThefts()) do theftLog[#theftLog + 1] = t end
             if not out[1] then error(out[2], 0) end
             return table.unpack(out, 2, out.n)
         end
     end
-    api.act, api.endPhase = dropsWatched(api.act), dropsWatched(api.endPhase)
+    api.act, api.endPhase = watched(api.act), watched(api.endPhase)
     return api
 end
 
@@ -5047,24 +5116,24 @@ INSPECT.firstAttacks = function()
     look(1)
     local holding = callbacks:add("frame", hold)
     for phase = 1, phases do
-        emu:write8(SYM.gAiDecision + 0x00, 0)
+        emu:write8(SYM.gAiDecision + BOARD.AI_DEC.ACTION, 0)
         local decided = {}
         local watch = callbacks:add("frame", function()
-            local who, act = ru8(SYM.gAiDecision + 0x01), ru8(SYM.gAiDecision + 0x00)
-            -- struct AiDecision (cp_common.h): +00 actionId, +01 unitId, +02/+03 the tile it
-            -- moves to, +06 targetId. Every unit's decision once a phase, so a late striker
-            -- can be traced to where it stood and whom it went for.
+            local who = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT)
+            local act = ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
+            -- Every unit's decision once a phase (Board.AI_DEC), so a late striker can be
+            -- traced to where it stood and whom it went for.
             if who ~= 0 and decided[who] ~= act then
                 decided[who] = act
                 log(string.format('{"event":"ai_decision","phase":%d,"unit":"0x%02x","action":%d,'
                     .. '"x":%d,"y":%d,"target":"0x%02x"}', phase, who, act,
-                    ru8(SYM.gAiDecision + 0x02), ru8(SYM.gAiDecision + 0x03),
-                    ru8(SYM.gAiDecision + 0x06)))
+                    ru8(SYM.gAiDecision + BOARD.AI_DEC.X), ru8(SYM.gAiDecision + BOARD.AI_DEC.Y),
+                    ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET)))
             end
-            if act == 1 and not attacked[who] then
+            if act == BOARD.AI_ACTION_COMBAT and not attacked[who] then
                 attacked[who] = phase
                 log(string.format('{"event":"first_attack","phase":%d,"unit":"0x%02x",'
-                    .. '"target":"0x%02x"}', phase, who, ru8(SYM.gAiDecision + 0x06)))
+                    .. '"target":"0x%02x"}', phase, who, ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET)))
             end
         end)
         -- A reinforcement loads during the turn change, before the enemy acts: look again
@@ -6100,12 +6169,11 @@ scenarios.ch03tourmaline = function()
     for s = 3, 4 do emu:write16(u.addr + 0x1E + s * 2, 0) end
     -- Relocate to an ISOLATED floor tile (no orthogonally-adjacent ally) so the command menu is just
     -- [Item, Wait] -- otherwise a nearby deployed unit adds Rescue at row 0 and A opens the wrong submenu.
-    local function terr(x, y) return ru8(ru32(ru32(SYM.gBmMapTerrain) + y * 4) + x) end
     local FLOOR = { [0x01] = true, [0x02] = true, [0x17] = true, [0x2a] = true, [0x2d] = true }
     local moved = false
     for y = 1, 14 do
         for x = 1, 15 do
-            if FLOOR[terr(x, y)] and mapUnitAt(x, y) == 0
+            if FLOOR[terrainAt(x, y)] and mapUnitAt(x, y) == 0
                 and mapUnitAt(x - 1, y) == 0 and mapUnitAt(x + 1, y) == 0
                 and mapUnitAt(x, y - 1) == 0 and mapUnitAt(x, y + 1) == 0 then
                 if not INSPECT.place(u, x, y) then
@@ -8375,11 +8443,12 @@ scenarios.ch06halberd = function()
             emu:write8(a + 0x16, 4); emu:write8(a + 0x19, 4)
             emu:write8(dropper().addr + 0x13, dropper().maxhp)
             local swung
-            emu:write8(SYM.gAiDecision + 0x00, 0)   -- last phase's decision must not match
+            emu:write8(SYM.gAiDecision + BOARD.AI_DEC.ACTION, 0)   -- last phase's decision must not match
             local watch = callbacks:add("frame", function()
-                if ru8(SYM.gAiDecision + 0x01) == mine and ru8(SYM.gAiDecision + 0x00) == 1 then
-                    swung = { target = ru8(SYM.gAiDecision + 0x06),
-                              slot = ru8(SYM.gAiDecision + 0x07) }
+                if ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT) == mine
+                    and ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION) == BOARD.AI_ACTION_COMBAT then
+                    swung = { target = ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET),
+                              slot = ru8(SYM.gAiDecision + BOARD.AI_DEC.SLOT) }
                 end
             end)
             local phase = runEnemyPhase()

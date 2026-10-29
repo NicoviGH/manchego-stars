@@ -177,6 +177,7 @@ M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
+M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the first booster
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
 M.FACTION_MASK = 0xC0        -- include/bmunit.h: a unit index's faction bits (blue 0x00)
@@ -215,10 +216,9 @@ local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_MAXHP, UNIT_HP, UNIT_AI_CONFIG =
 -- assignments, which are copied here as they stand.
 local AI_DECIDE_STATE, AI_DANGER_FILLED, AI_STAFF_HP, AI_WEIGHT_TABLE = 0x79, 0x7A, 0x7C, 0x7D
 local AI_WEIGHT_SHIFT, AI_WEIGHT_MASK = 3, 0x1F << 3
--- struct AiDecision: +00 actionId, +02/+03 xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the
--- ballista, AiAttemptBallistaCombat's -1). AI_ACTION_COMBAT = 1.
-local DEC_ACTION, DEC_X, DEC_Y, DEC_TARGET, DEC_SLOT = 0x00, 0x02, 0x03, 0x06, 0x07
-local AI_ACTION_COMBAT, BALLISTA_SLOT = 1, 0xFF
+-- gAiDecision's itemSlot for the ballista (AiAttemptBallistaCombat's -1); its layout is
+-- board.lua's (Board.AI_DEC).
+local BALLISTA_SLOT = 0xFF
 -- struct ActionData (include/bmmind.h): +13 xOther, +14 yOther, +15 trapType (a wall's HP when
 -- the Attack menu forecasts a strike on it).
 local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
@@ -1016,10 +1016,11 @@ function M.new(outer)
             call({ setup[1], setup[2], setup[3], decide[1], decide[2] })
         end
         local D = S.gAiDecision
-        if mem.u8(D + DEC_ACTION) ~= AI_ACTION_COMBAT then return nil end
-        local target = mem.u8(D + DEC_TARGET)
+        local DEC = Board.AI_DEC
+        if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then return nil end
+        local target = mem.u8(D + DEC.TARGET)
         local addr = mem.u32(S.gUnitLookup + target * 4)
-        local sx, sy, slot = mem.u8(D + DEC_X), mem.u8(D + DEC_Y), mem.u8(D + DEC_SLOT)
+        local sx, sy, slot = mem.u8(D + DEC.X), mem.u8(D + DEC.Y), mem.u8(D + DEC.SLOT)
         local sim = slot == BALLISTA_SLOT
             and { S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy } }
             or { S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot } }
@@ -1028,9 +1029,16 @@ function M.new(outer)
         return target, side
     end
 
-    function s.strike(u, e, x, y)
+    -- Inside a sandbox: `u` holds the weapon in item `slot` as it does after striking with it
+    -- (WeaponSelectMenu_Selected: EquipUnitItemSlot), the one it counters with next phase.
+    local function equip(call, u, slot)
+        if slot and slot > 0 then call(S.EquipUnitItemSlot, { u.addr, slot }) end
+    end
+
+    function s.strike(u, e, x, y, slot)
         local t = sandbox(function(call, proc)
             standOn(u, x, y)
+            equip(call, u, slot)
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
             local target, side = aiDecide(call, proc, e, function() onlyTarget(u) end)
@@ -1047,6 +1055,7 @@ function M.new(outer)
             for _, b in ipairs(plan.blues) do
                 standOn(b.unit, b.x, b.y)
                 api.write8(b.unit.addr + UNIT_HP, b.hp)
+                equip(call, b.unit, b.slot)
             end
             for id, hp in pairs(plan.reds or {}) do
                 if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
@@ -1518,6 +1527,21 @@ function M.talks(api, sandbox)
         local out = {}
         for _, t in ipairs(seen) do
             if call(S.CheckForCharacterEvents, { t.a, t.b }) ~= 0 then out[#out + 1] = t end
+        end
+        return out
+    end)
+end
+
+-- What each stolen item costs a clean clear (ADR 0379): its AiGetItemStealRank, and whether
+-- that ranks it above ITEM_BOOSTER_SKL in the game's own list. -> { [item] = { rank, spoils } }
+function M.stealRanks(api, items)
+    local S = api.SYM
+    return M.machine(api.cpu)(function(call)
+        local line = call(S.AiGetItemStealRank, { M.ITEM_BOOSTER_SKL })
+        local out = {}
+        for _, item in ipairs(items) do
+            local rank = call(S.AiGetItemStealRank, { item })
+            out[item] = { rank = rank, spoils = rank < line }
         end
         return out
     end)

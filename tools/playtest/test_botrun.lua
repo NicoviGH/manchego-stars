@@ -565,8 +565,31 @@ local function judged(o)
     o.units = o.units or rout()
     o.recruits = o.recruits or {}
     local g = fakeGame(o)
+    for k, v in pairs(o.api or {}) do g.api[k] = v end
     Botrun.run(g.api)
     return recordOf(g), g
+end
+
+-- test_a_theft_above_the_boosters_spoils_the_clear (ADR 0379): every theft is recorded; one
+-- the game ranks above ITEM_BOOSTER_SKL (api.thefts: spoils) spoils it, one below does not.
+do
+    local function robbed(spoils)
+        local told = false
+        return judged { api = { thefts = function()
+            if told then return {} end
+            told = true
+            return { { thief = 0x85, from = 0x01, item = spoils and 0x89 or 0x6C,
+                       rank = spoils and 9 or 40, spoils = spoils } }
+        end } }
+    end
+    local r = robbed(true)
+    check(#r.thefts, 1, "theft: recorded")
+    check(r.clear.stolen[1] and r.clear.stolen[1].item, 0x89, "theft: a Master Seal is stolen")
+    check(r.clean, false, "theft: above the boosters, not clean")
+    r = robbed(false)
+    check(#r.thefts, 1, "theft: a Vulnerary recorded")
+    check(#r.clear.stolen, 0, "theft: a Vulnerary spoils nothing")
+    check(r.clean, true, "theft: below the boosters, still clean")
 end
 
 -- test_a_clean_rout_is_clean: the four parts hold.
@@ -701,8 +724,9 @@ end
 
 -- A thief (0x82, far off) opens the chest at 9,8 in the first enemy phase and gains item 0x6C;
 -- A meanwhile fights the red at 1,0. `killer` kills the thief in the second enemy phase and,
--- when blue, the game drops the chest's item to A (api.drops: its BATTLE_HandleItemDrop).
-local function thiefGame(killer)
+-- when blue, the game drops the chest's item to A (api.drops: its BATTLE_HandleItemDrop),
+-- unless `missed` (the drop watch failing to catch it).
+local function thiefGame(killer, missed, stays)
     local units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 30),
                     unit(0x82, 1, "red", 9, 9, 10), unit(0x41, 0, "green", 8, 9, 10) }
     for _, u in ipairs(units) do u.items = {} end
@@ -713,13 +737,14 @@ local function thiefGame(killer)
             phase = phase + 1
             local t = find(0x82)
             if phase == 1 then
-                table.remove(tiles, 1)
+                if not stays then table.remove(tiles, 1) end
                 t.items = { { id = 0x6C, uses = 1 } }
                 return {}, { { id = 0x82, charId = 0x82, act = "pick", tile = { x = 9, y = 8 } } }
             elseif phase == 2 then
                 t.hp, t.dead, t.onField = 0, true, false
-                dropped = killer == 0x01
-                return { { id = 0x82, charId = 0x82, faction = "red", killer = killer } }
+                dropped = killer == 0x01 and not missed
+                return { { id = 0x82, charId = 0x82, faction = "red", killer = killer,
+                           ours = killer == 0x01 } }
             end
             return {}
         end }
@@ -740,6 +765,25 @@ do
     check(#r.clear.rewards_missing, 0, "won back: the chest is taken")
     check(r.explore[1] and r.explore[1].won_back, true, "won back: said so")
     check(r.clean, true, "won back: clean")
+    check(#r.watch_faults, 0, "won back: the drop was caught")
+end
+
+-- test_a_thief_opened_chest_still_listed_is_closed: AiPillageAction empties the chest's terrain
+-- and leaves its event flag, so the game's list still names it (vanilla Ch3, Colm, 2026-10-30)
+do
+    local r = thiefGame(0x41, false, true)
+    check(r.explore[1] and r.explore[1].status, "closed", "still listed: closed by the thief")
+    check(r.explore[1] and r.explore[1].closed_by, 0x82, "still listed: by the thief")
+end
+
+-- test_a_thief_felled_by_ours_with_no_drop_caught_is_a_watch_fault: the game gave the drop
+-- (popup.c marks the thief US_DROP_ITEM), so a miss is the watch's
+do
+    local r = thiefGame(0x01, true)
+    local f = r.watch_faults[1]
+    check(f and f.kind, "drop_missed", "missed drop: a watch fault")
+    check(f and f.thief, 0x82, "missed drop: the thief")
+    check(f and f.item, 0x6C, "missed drop: the chest's item")
 end
 
 -- test_a_chest_thief_killed_by_green_is_lost
@@ -748,6 +792,7 @@ do
     local m = r.clear.rewards_missing[1]
     check(m and m.closed_by, 0x82, "green kill: the chest is missing, closed by the thief")
     check(r.clean, false, "green kill: not clean")
+    check(#r.watch_faults, 0, "green kill: no drop was owed to us")
 end
 
 -- test_no_recruit_list_leaves_clean_unjudged

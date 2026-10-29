@@ -428,7 +428,8 @@ function M.plan(Bot, board, sight, style, opts)
         for _, u in ipairs(ctx.blues) do
             local a = at[u.id]
             planned[#planned + 1] = { unit = u, x = a and a.move.x or u.x, y = a and a.move.y or u.y,
-                                      hp = st.hp[u.id] or u.hp }
+                                      hp = st.hp[u.id] or u.hp,
+                                      slot = a and a.act == "attack" and a.slot or nil }
         end
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end

@@ -298,6 +298,10 @@ WANTED = [
     # A fallen unit's drop (bmmind.c BATTLE_HandleItemDrop, its popup's only caller).
     'NewPopup_GeneralItemGot',  # the item given to the blue unit that downed a dropper
     'sProcScr_CombatAction',    # the real battle's resolution, the drop included
+    # An AI theft (cp_perform.c AiStartStealAction) and the rank its list gives the item.
+    'AiStartStealAction',       # the steal itself: gAiDecision's target and item slot
+    'AiGetItemStealRank',       # the item's place in gAiStealPriorityItemList (ADR 0379)
+    'EquipUnitItemSlot',        # Weapon Select equips the weapon struck with: what it counters with
     'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
     # Turn events still to come (eventinfo.c): botrun's "nothing can change this board".
     'GetChapterEventDataPointer',   # the chapter's event lists; turnBasedEvents at +00

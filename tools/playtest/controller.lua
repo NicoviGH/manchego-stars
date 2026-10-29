@@ -854,11 +854,18 @@ function M.legalActions(observation)
     return actions
 end
 
+-- The action for `intention`: the one pressable now (it has a key) when several are listed --
+-- Weapon Select lists a select_weapon per enabled row, and only the current row's is keyed, so
+-- the first would walk the cursor off the row a caller chose (INSPECT.menuTo) -- else the first.
 function M.findAction(actions, intention)
+    local first
     for _, candidate in ipairs(actions or {}) do
-        if candidate.intention == intention then return candidate end
+        if candidate.intention == intention then
+            if candidate.key then return candidate end
+            first = first or candidate
+        end
     end
-    return nil
+    return first
 end
 
 local function jsonString(value)

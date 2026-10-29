@@ -141,8 +141,10 @@ class Attempts(unittest.TestCase):
                                               'killer': 0x81}],
                        'recruits_missing': [0x30],
                        'rewards_missing': [{'x': 3, 'y': 7, 'kind': 'visit', 'why': 'closed',
-                                            'closed_by': 0x81}]}}
+                                            'closed_by': 0x81}],
+                       'stolen': [{'thief': 0x85, 'from': 0x01, 'item': 0x89, 'turn': 6}]}}
         line = mc.attempt_line(r, set())
+        self.assertIn('0x85 stole item 0x89 from 0x01 (turn 6)', line)
         self.assertIn('lost 0x42 (green, turn 4, to 0x81)', line)
         self.assertIn('missed 0x30', line)
         self.assertIn('village 3,7 closed by 0x81', line)

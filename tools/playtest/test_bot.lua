@@ -377,9 +377,9 @@ local function sightOf(o)
             attacks = attacks + 1
             return attackPlayed(entry(u, t, x, y, w.slot), u.hp, t.hp)
         end,
-        strike = function(u, t, x, y)
+        strike = function(u, t, x, y, slot)
             strikes = strikes + 1
-            return strikePlayed(entry(u, t, x, y), u.hp)
+            return strikePlayed(entry(u, t, x, y, slot), u.hp)
         end,
     }
     -- The game reads PR E added (each optional, as in sight.lua's callers): obstacles, doors,
@@ -1868,6 +1868,39 @@ do
           "planner: careful holds out of the strike")
     check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))), "1,0",
           "planner: bold takes the ground")
+end
+
+-- test_a_struck_weapon_is_held_next_phase: the game equips the weapon a unit struck with
+-- (EquipUnitItemSlot), so it counters with it: A's javelin (slot 1) strikes E from two tiles,
+-- and the act's exposure and the plan's enemy phase are judged with A holding it.
+do
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 2 } } })
+    local E = red(0x81, 0, 2, { hp = 30, minRange = 1, maxRange = 1 })
+    local judged = {}
+    local o = { reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 0, 2 }, { 0, 1 }) },
+                danger = { ["0,0"] = 1 },
+                fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 3, hits = 1 } } } },
+                enemyPhase = function(plan)
+                    for _, b in ipairs(plan.blues) do judged[#judged + 1] = tostring(b.slot) end
+                    return {}
+                end }
+    local sight = sightOf(o)
+    local asked, strike = {}, sight.strike
+    sight.strike = function(u, e, x, y, slot)
+        asked[tostring(slot)] = true
+        return strike(u, e, x, y, slot)
+    end
+    local att
+    for _, c in ipairs(B.candidates(boardOf(A, E), sight, style("careful"))) do
+        for _, a in ipairs(c.acts) do if a.act == "attack" then att = a end end
+    end
+    check(att and att.slot, 1, "held: the javelin strikes")
+    check(asked["1"], true, "held: the act's exposure holds the javelin")
+    local a = Planner.plan(B, boardOf(A, E), sight, style("bold"))
+    check(a and a.act, "attack", "held: the plan strikes")
+    check(table.concat(judged, ","):find("1") ~= nil, true,
+          "held: the plan's enemy phase holds the javelin")
 end
 
 -- test_planner_mends_a_plan_that_loses_a_unit: A's Vulnerary at (1,0) is its best act by its

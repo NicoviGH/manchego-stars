@@ -414,8 +414,8 @@ end
 
 -- A strike's key: the exchange and the WHOLE board. The strike is the enemy AI's own pick of
 -- weapon and tile (sight.lua), and any unit anywhere can block or open its path.
-local function strikeKey(ctx, u, e, x, y)
-    local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "board" }
+local function strikeKey(ctx, u, e, x, y, slot)
+    local parts = { unitKey(u), x, y, slot or "-", unitKey(e), e.x, e.y, "board" }
     for _, o in ipairs(ctx.onField) do
         parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
     end
@@ -432,14 +432,15 @@ local function remembered(memo, k, ask)
 end
 
 -- Our attack from (x, y) on `e` with the weapon in item `slot` (nil when it does not reach),
--- and `e`'s own strike on `u` there.
+-- and `e`'s own strike on `u` there, `u` holding the weapon in `slot` (nil: as it is) after
+-- striking with it.
 local function attack(ctx, u, e, x, y, slot)
     return remembered(ctx.attacks, attackKey(ctx, u, e, x, y, slot),
         function() return ctx.sight.attack(u, e, x, y, slot) end)
 end
-local function strike(ctx, u, e, x, y)
-    return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y),
-        function() return ctx.sight.strike(u, e, x, y) end)
+local function strike(ctx, u, e, x, y, slot)
+    return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y, slot),
+        function() return ctx.sight.strike(u, e, x, y, slot) end)
 end
 
 -- sight.reach, with the unit's own tile always in it (attacking or waiting where it stands),
@@ -573,15 +574,18 @@ local function claimsOn(ctx, field, u)
 end
 
 -- What can strike `u` next enemy phase if it ends on (x, y): per visible enemy that reaches
--- the tile, that enemy (`by`) and its own strike there (sight.strike: the AI's weapon).
-local function exposure(ctx, u, x, y)
-    local k = u.id .. "@" .. tileKey(x, y)
+-- the tile, that enemy (`by`) and its own strike there (sight.strike: the AI's weapon), `u`
+-- holding the weapon in `slot` when it struck with that one.
+local function exposure(ctx, u, x, y, slot)
+    local k = u.id .. "@" .. tileKey(x, y) .. "/" .. (slot or "-")
     local list = ctx.exposures[k]
     if list then return list end
     list = {}
     if ctx.sight.danger(x, y) > 0 then
         for _, e in ipairs(ctx.enemies) do
-            if reaches(ctx, e, x, y) then list[#list + 1] = { by = e, f = strike(ctx, u, e, x, y) } end
+            if reaches(ctx, e, x, y) then
+                list[#list + 1] = { by = e, f = strike(ctx, u, e, x, y, slot) }
+            end
         end
     end
     ctx.exposures[k] = list
@@ -1476,7 +1480,8 @@ function M.candidates(board, sight, style, opts)
             a.vacate = friend and friend.id
             -- what can strike it there next phase, each enemy's own strike (the planner's odds)
             a.exposure = {}
-            for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y)) do
+            local held = a.act == "attack" and a.slot or nil
+            for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
                 a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
             end
         end

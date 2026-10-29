@@ -521,6 +521,12 @@ classify(weaponMenu, "weapon_menu", "weapon menu is identified by its semantic s
 a = action(weaponMenu, "select_weapon")
 check(a and a.key, "A", "selected enabled weapon is confirmable")
 check(a and a.target, 1, "weapon selection records the live item slot")
+-- both rows enabled, the cursor on row 1 (where INSPECT.menuTo put it): row 1 is confirmed, not
+-- walked back to row 0 (vanilla Ch3, 2026-10-30: Garcia's Hand Axe became his Iron Axe)
+weaponMenu.menu.items[1].availability = 1
+a = action(weaponMenu, "select_weapon")
+check(a and a.key, "A", "the current enabled weapon is confirmed in place")
+check(a and a.target, 1, "the current row, not the first listed")
 
 -- The Staff command: its list of staves (menu_def.c gStaffItemSelectMenuItems, 0x3E-0x42),
 -- then the heal selector.

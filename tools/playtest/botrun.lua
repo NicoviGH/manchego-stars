@@ -182,7 +182,8 @@ local function fallen(before, after, action)
             local killer
             if action and u.id == action.unitId then killer = action.target end
             if action and u.id == action.targetId then killer = action.unit end
-            out[#out + 1] = { id = u.id, charId = u.charId, faction = u.faction, killer = killer }
+            out[#out + 1] = { id = u.id, charId = u.charId, faction = u.faction, killer = killer,
+                              ours = action ~= nil and u.id == action.targetId }
         end
     end
     return out
@@ -209,13 +210,18 @@ end
 --                      a pillage, or a thief's chest), and the item it gained doing so
 --   dropped(d)         the game gave one of ours a fallen unit's item (api.drops: its own
 --                      BATTLE_HandleItemDrop), d = { from, to, item }
+--   fell(charId)       a unit of another side fell to one of ours
+--   dropMissed()       the drop watch's faults: each chest a thief emptied whose thief then
+--                      fell to one of ours with no drop of that item caught. popup.c marks the
+--                      thief US_DROP_ITEM, so the game gave it: the watch missed it.
+--                      { kind = "drop_missed", x, y, thief, item }
 --   missing()          the clean clear's rewards part: each tile not taken, { x, y, kind,
 --                      why = its status, closed_by }. Taken = visited, or a chest whose
 --                      thief the game then made drop that chest's item to one of ours
 --                      (popup.c sets US_DROP_ITEM on the thief)
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
-    local drops = {}
+    local drops, felled = {}, {}
     local function key(x, y) return x .. "," .. y end
     function log.open(list, turn, usable)
         local now = {}
@@ -273,12 +279,24 @@ function M.exploreLog()
         if e and not e.by then e.closedBy, e.loot = charId, loot end
     end
     function log.dropped(d) drops[#drops + 1] = d end
+    function log.fell(charId) felled[charId] = true end
     local function wonBack(e)
         if e.kind ~= "chest" or not e.closedBy or not e.loot then return false end
         for _, d in ipairs(drops) do
             if d.from == e.closedBy and d.item == e.loot then return true end
         end
         return false
+    end
+    function log.dropMissed()
+        local out = {}
+        for _, k in ipairs(order) do
+            local e = tiles[k]
+            if e.kind == "chest" and e.loot and felled[e.closedBy] and not wonBack(e) then
+                out[#out + 1] = { kind = "drop_missed", x = e.x, y = e.y, thief = e.closedBy,
+                                  item = e.loot }
+            end
+        end
+        return out
     end
     function log.missing()
         local out = {}
@@ -294,7 +312,10 @@ function M.exploreLog()
         local out = {}
         for _, k in ipairs(order) do
             local e = tiles[k]
-            local status = (e.by and "visited") or (e.failed and "failed") or (e.closed and "closed")
+            -- a chest a thief opened can stay in GetAvailableTileEventCommand's list (its
+            -- terrain is emptied, its flag left): the act names it closed
+            local status = (e.by and "visited") or (e.failed and "failed")
+                or ((e.closed or e.closedBy) and "closed")
                 or (e.offers > 0 and "skipped") or "unreached"
             out[#out + 1] = { x = e.x, y = e.y, kind = e.kind, status = status, by = e.by,
                               turn = e.turn or e.closed, offers = e.offers, die = e.die,
@@ -320,7 +341,8 @@ function M.run(api)
                   mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
                   attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
-                  deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 }, bag = {} }
+                  deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
+                  plans = { made = 0, kept = 0 }, bag = {} }
     local explore = M.exploreLog()
     -- the clean clear's recruits part, read from the game's party (api.party: the game's own
     -- MakePrepUnitList, i.e. IsUnitInCurrentRoster), never from the unit arrays: owed =
@@ -349,6 +371,12 @@ function M.run(api)
         for _, d in ipairs(api.drops and api.drops() or {}) do
             explore.dropped(d)
             trace({ t = "drop", from = d.from, to = d.to, item = d.item })
+        end
+        for _, t in ipairs(api.thefts and api.thefts() or {}) do
+            t.turn = turn
+            rec.thefts[#rec.thefts + 1] = t
+            trace({ t = "theft", thief = t.thief, from = t.from, item = t.item, rank = t.rank,
+                    spoils = t.spoils })
         end
     end
     local lastBoard
@@ -380,6 +408,7 @@ function M.run(api)
             elseif d.killer then
                 local k = tostring(d.killer)
                 rec.kills[k] = (rec.kills[k] or 0) + 1
+                if d.ours then explore.fell(d.charId) end
             end
         end
     end
@@ -412,14 +441,22 @@ function M.run(api)
                 list[#list + 1] = c
             end
         end
+        -- a theft spoils the clear only above the stat boosters (ADR 0379); the rest are kept
+        -- in rec.thefts
+        local stolen = {}
+        for _, t in ipairs(rec.thefts) do
+            if t.spoils then stolen[#stolen + 1] = t end
+        end
         rec.clear = { won = outcome == "won", lost = rec.deaths, recruits_missing = missing,
-                      rewards_missing = explore.missing() }
+                      rewards_missing = explore.missing(), stolen = stolen }
         local held = rec.clear.won and #rec.deaths == 0 and #rec.clear.rewards_missing == 0
+            and #stolen == 0
         if not held or (owed and #missing > 0) then rec.clean = false
         elseif owed then rec.clean = true end
         if outcome == "won" then
             for _, f in ipairs(explore.leftOpen()) do rec.bot_faults[#rec.bot_faults + 1] = f end
         end
+        rec.watch_faults = explore.dropMissed()
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
         trace({ t = "end", record = rec })
         api.emit(M.PREFIX .. Json.encode(rec))

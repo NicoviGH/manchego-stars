@@ -210,7 +210,8 @@ def attempt_tasks(env, n, seed=1, vanilla=False):
 
 def spoiled(r, who=lambda c: '0x%02X' % c):
     """What kept record `r` from a clean clear (#510 step 9 design, part A), in words: each unit
-    lost, each owed recruit missed, each village or chest not taken; '' when nothing did."""
+    lost, each owed recruit missed, each village or chest not taken, each theft ranked above the
+    stat boosters (ADR 0379); '' when nothing did."""
     c = r.get('clear') or {}
     out = ['lost %s (%s, turn %s, to %s)' % (who(d['charId']), d.get('faction'), d.get('turn'),
                                              who(d['killer']) if d.get('killer') is not None
@@ -225,6 +226,9 @@ def spoiled(r, who=lambda c: '0x%02X' % c):
         out.append('%s %s,%s %s%s' % ('village' if t['kind'] == 'visit' else 'chest', t['x'],
                                        t['y'], t['why'], ' by %s' % who(t['closed_by'])
                                        if t.get('closed_by') is not None else ''))
+    out += ['%s stole item 0x%02X from %s (turn %s)' % (who(t['thief']), t['item'], who(t['from']),
+                                                        t.get('turn'))
+            for t in c.get('stolen') or []]
     return '; '.join(out)
 
 

@@ -377,6 +377,12 @@ Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] =
                   [0x0A] = "drop", [0x0B] = "take", [0x0C] = "give", [0x0E] = "talk",
                   [0x10] = "visit", [0x11] = "seize", [0x12] = "door", [0x14] = "chest",
                   [0x15] = "pick", [0x1A] = "item", [0x1E] = "trapped", [0x1F] = "wait" }
+-- include/cp_common.h struct AiDecision (gAiDecision): +00 actionId, +01 unitId, +02/+03
+-- xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the ballista, AiAttemptBallistaCombat's -1).
+Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, SLOT = 0x07 }
+-- AI_ACTION_*: what the AI chose. A theft (AiStartStealAction) and a village pillage
+-- (AiPillageAction) set no action type of their own.
+Board.AI_ACTION_COMBAT, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE = 1, 3, 4
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
@@ -440,6 +446,8 @@ function Board.bind(mem, SYM)
         BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
         ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
         ACTION_PICK = Board.ACTION_PICK,
+        AI_DEC = Board.AI_DEC, AI_ACTION_COMBAT = Board.AI_ACTION_COMBAT,
+        AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
     }
 end
 
