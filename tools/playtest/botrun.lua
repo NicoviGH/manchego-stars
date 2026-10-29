@@ -33,6 +33,10 @@
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
+--   recruits           OPTIONAL: the charIds the chapter owes a clean clear (campaign_env.py);
+--                      absent, the recruits part is "unchecked" and `clean` is never true
+--   party()            with recruits: the charIds in the game's party now, the game's own
+--                      MakePrepUnitList (IsUnitInCurrentRoster), run in the sandbox
 --   seed(s)            seed the game's RNG (Sight.seed)
 --   board()            Board.read
 --   sight()            Sight.new, called once
@@ -318,11 +322,12 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 }, bag = {} }
     local explore = M.exploreLog()
-    -- the clean clear's recruits part: owed = api.recruits less any already in the party
-    -- (blue, dead or not, deployed or not) at the first board; joined = seen blue and not
-    -- dead later. Vanilla's endings mark an unrecruited one blue AND dead
-    -- (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD), and the prep list drops it
-    local owed, joinedSeen, blueSeen = nil, {}, {}
+    -- the clean clear's recruits part, read from the game's party (api.party: the game's own
+    -- MakePrepUnitList, i.e. IsUnitInCurrentRoster), never from the unit arrays: owed =
+    -- api.recruits less the party at the first read; joined = owed and in the party at the
+    -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
+    -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
+    local owed, blueSeen = nil, {}
     -- one step per act and per enemy phase: a thief's fall and the drop it gives share one
     local step = 0
     local startFrame = api.frames()
@@ -348,19 +353,14 @@ function M.run(api)
     local function changes(after)
         if api.recruits and not owed then
             local party = {}
-            for _, u in ipairs(after.units) do
-                if u.faction == "blue" then party[u.charId] = true end
-            end
+            for _, c in ipairs(api.party()) do party[c] = true end
             owed = {}
             for _, c in ipairs(api.recruits) do
                 if not party[c] then owed[#owed + 1] = c end
             end
         end
         for _, u in ipairs(after.units) do
-            if u.faction == "blue" then
-                blueSeen[u.charId] = true
-                if not u.dead then joinedSeen[u.charId] = true end
-            end
+            if u.faction == "blue" then blueSeen[u.charId] = true end
         end
         if lastBoard then
             for _, e in ipairs(M.events(lastBoard, after)) do
@@ -407,8 +407,11 @@ function M.run(api)
         if owed then
             rec.recruits = { owed = owed, joined = {} }
             missing = {}
+            local party = {}
+            local ok, list = pcall(api.party)
+            for _, c in ipairs(ok and list or {}) do party[c] = true end
             for _, c in ipairs(owed) do
-                local list = joinedSeen[c] and rec.recruits.joined or missing
+                local list = party[c] and rec.recruits.joined or missing
                 list[#list + 1] = c
             end
         end

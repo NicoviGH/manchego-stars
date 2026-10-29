@@ -60,6 +60,16 @@ local function fakeGame(o)
         style = { aggression = o.aggression or "careful", deploy = {}, claims = {} },
         claims = o.claims,
         recruits = o.recruits,
+        -- the game's party (IsUnitInCurrentRoster, through MakePrepUnitList): o.party(g) when
+        -- a case decides it, else every blue unit not dead
+        party = function()
+            if o.party then return o.party(g) end
+            local out = {}
+            for _, u in ipairs(g.units) do
+                if u.faction == "blue" and not u.dead then out[#out + 1] = u.charId end
+            end
+            return out
+        end,
         seed = function(s) g.seeded = s end,
         board = copy,
         sight = function()
@@ -624,28 +634,43 @@ do
     check(r.clean, true, "talked: clean")
 end
 
--- test_a_recruit_the_ending_marks_dead_has_not_joined: vanilla Ch5's ending runs
--- EventScr_StrictLoadUniqueAlly on an unrecruited Joshua: CUSA (or SPAWN_ALLY when he was
--- killed), then SET_HP 0, which sets US_DEAD (eventscr.c). The scout's Ch6 start holds him
--- blue, DEAD and hidden, and the game's prep list leaves him out. A dead blue entry is no join.
+-- test_joined_is_the_games_party_not_the_unit_array: vanilla Ch5's ending runs
+-- EventScr_StrictLoadUniqueAlly on an unrecruited Joshua, leaving a blue entry the game's own
+-- roster test (IsUnitInCurrentRoster: US_DEAD, US_BIT16, a class attribute) keeps out of the
+-- party. Here the entry is blue and not flagged dead, and the game's party still leaves it
+-- out: the party decides, never the array.
 do
     local g = fakeGame { recruits = { 0x30 },
-        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) },
+        party = function(g) return { 0x01 } end }
     local act = g.api.act
     g.api.act = function(a)
         local ok = act(a)
         if a.act == "attack" then
-            local j = unit(0x05, 4, "blue", -1, -1, 0)
-            j.charId, j.onMap, j.onField, j.dead = 0x30, false, false, true
+            local j = unit(0x05, 4, "blue", -1, -1, 24)
+            j.charId, j.onMap, j.onField = 0x30, false, false
             g.units[#g.units + 1] = j
         end
         return ok
     end
     Botrun.run(g.api)
     local r = recordOf(g)
-    check(#r.recruits.joined, 0, "marked dead: not joined")
-    check(r.clear.recruits_missing[1], 0x30, "marked dead: missing")
-    check(r.clean, false, "marked dead: not clean")
+    check(#r.recruits.joined, 0, "out of the party: not joined")
+    check(r.clear.recruits_missing[1], 0x30, "out of the party: missing")
+    check(r.clean, false, "out of the party: not clean")
+end
+
+-- test_owed_is_read_from_the_games_party_at_the_start: a blue entry for X exists at the start
+-- but the game's party leaves it out (a unit the game marked dead in an earlier chapter): X is
+-- owed, and never joins.
+do
+    local units = rout()
+    local x = unit(0x05, 4, "blue", -1, -1, 18)
+    x.charId, x.onMap, x.onField = 0x30, false, false
+    units[#units + 1] = x
+    local r = judged { units = units, recruits = { 0x30 }, party = function() return { 0x01 } end }
+    check(r.recruits.owed[1], 0x30, "not in the party at the start: owed")
+    check(r.clean, false, "not in the party at the start: not clean")
 end
 
 -- test_a_razed_village_is_missing_at_once: a brigand's pick act names the village, and the

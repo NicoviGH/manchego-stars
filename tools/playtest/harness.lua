@@ -3116,6 +3116,12 @@ INSPECT.botApi = function(game)
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
         board = BOARD.read,
+        -- the game's party, by charId (INSPECT.prepList)
+        party = function()
+            local out = {}
+            for _, a in ipairs(INSPECT.prepList()) do out[#out + 1] = ru8(ru32(a) + 4) end
+            return out
+        end,
         won = won,
         lost = lost,
         -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
@@ -3305,6 +3311,22 @@ INSPECT.gameCalls = function(fn, keep)
     return INSPECT.Sight.machine(api.cpu, keep)(fn)
 end
 
+-- The game's party: each unit address MakePrepUnitList lists (its test is prepscreen.c's
+-- IsUnitInCurrentRoster: not US_DEAD, not US_BIT16, not a class with attribute 0x200), built in
+-- the sandbox, since gPrepUnitList is an EWRAM overlay other prep screens reuse and the
+-- roster test writes a unit's state.
+INSPECT.prepList = function()
+    local C = INSPECT.CAMPAIGN
+    return INSPECT.gameCalls(function(call)
+        call(SYM.MakePrepUnitList, {})
+        local addrs = {}
+        for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
+            addrs[#addrs + 1] = ru32(SYM.gPrepUnitList + i * 4)
+        end
+        return addrs
+    end)
+end
+
 -- An item's facts for bot.lua: the weapon type of a weapon, and which item is the Vulnerary.
 INSPECT.itemFacts = function(id)
     local C = INSPECT.CAMPAIGN
@@ -3461,15 +3483,7 @@ INSPECT.campaignApi = function(game)
         if PROCS.find(SYM.ProcScr_AtMenu) then
             local byAddr = {}
             for _, u in ipairs(all) do byAddr[u.addr] = u end
-            local listed = INSPECT.gameCalls(function(call)
-                call(SYM.MakePrepUnitList, {})
-                local addrs = {}
-                for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
-                    addrs[#addrs + 1] = ru32(SYM.gPrepUnitList + i * 4)
-                end
-                return addrs
-            end)
-            for _, a in ipairs(listed) do
+            for _, a in ipairs(INSPECT.prepList()) do
                 if byAddr[a] then out[#out + 1] = byAddr[a] end
             end
             return out
