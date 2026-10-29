@@ -9,32 +9,42 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns` at
-9ad3d58, NOT PUSHED (10 commits past origin's 32d4d50).** The checkout is back on that branch;
-after switching, rebuild the ROM (see the gotcha below).
+Refreshed 2026-10-29 night (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns`
+at a9d5869, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
+rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`, the gotcha below).
 
-**NEXT SESSION: fix the re-derivation audit, all 21 findings, then finish part A.** The audit is
-ONE #510 comment, kept current in place:
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>. Nicolas
-(2026-10-29): "finish the audit and address them all. remember to eliminate duplicate code and
-keep efficiency in mind." Every finding is checked against the decomp, with file:line.
-- **Read first: ADR 0377** (a game fact is the game's own answer; the three reasons a
-  re-derivation may have; hit odds from the game's own rolls, Nicolas: "why wouldnt we?"; claims
-  tagged [code]/[ROM]) and **ADR 0232's 2026-10-29 amendment** (proof runs are owed, never
-  budgeted: do not ask). `setBreakpoint` is in our mGBA's Lua (dylib strings), not yet proven
-  in the headless runner.
-- **Suggested order:** the wrong ones first (1 damage, 2 the hit model in `bot.lua`'s
-  `killChance`, 3 the crit constant copied in `bot.lua` AND `planner.lua`, 4 `killsTarget`, 14
-  green deaths unwatched in `INSPECT.watchDeaths`, 13 `aiDecide`'s hand-built AI setup), then
-  part A's own (5 + 6 the chest won back via `BATTLE_HandleItemDrop`, 7 owed recruits via
-  `CheckForCharacterEvents` in-game instead of the regex in `campaign_env.py`), then 9 and 15-16
-  and the small ones. 17-18 are decided behaviour (fog knowledge is part C; averaged damage is
-  design decision 5), recorded so nobody mistakes them for the game.
-- **One probe run first** (instrumented, from `e1-vanilla-ch3/2`): does a breakpoint fire
-  headless; the cost of scanning `CheckForCharacterEvents` over character pairs and the pairs it
-  finds for Ch2; `api.party()` at the start and after the win (finding 8's ROM proof). Then
-  proof runs: vanilla Ch2 (`e1-vanilla-ch3/2`) and Ch5 (`e1-vanilla-ch3/6`), attempt 1.
-- **Then** `/code-review <PR> medium` in a subagent, `review-to-clean`, and the PR.
+**NEXT SESSION: finish the re-derivation audit, then the review, the PR, and Nicolas's sweep.**
+The audit is ONE #510 comment, kept current in place (its "Fixed" sections say what each commit did
+and what it measured): <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
+Read **ADR 0377** and its two amendments first. Nicolas (2026-10-29): "finish the audit and address
+them all. remember to eliminate duplicate code and keep efficiency in mind."
+- **DONE this session:** 14 (b47558f, green deaths watched), 13 (50f8651, `AiDecideMain` after
+  `CpDecide_Main`'s whole per-unit step; a sight call list now holds 5), 5+6 (69546af, the drop
+  caught at `NewPopup_GeneralItemGot`, `api.drops`), 7+15+16 (a9d5869, owed recruits from the
+  game's talk table via `Sight.talks`, so `campaign_env.py` carries no recruits; keys by
+  `INSPECT.isKey`; doors by `sight.doorFrom`). Every one was proved in the ROM. The numbers are on
+  the audit comment.
+- **Left, in order:** 9 (`bot.lua` `inRange`/`attackTileFor`/`gridHostileInReach`: ask the game's
+  attack target list per usable weapon, as `sight.legal` already does; `talkFrom`'s
+  `manhattan == 1` is the same kind of copy), 10 (`s.visible`'s fog test), 11 (`turnsLeft`),
+  12 (`SUPPORT_RANGE = 3`), 19 (`onFieldState`), 20's heal (`planner.lua` `score`). 17-18 are
+  decided behaviour. Each fix states its measured cost (ADR 0377's reasons).
+- **Then:** `/code-review <PR> medium` in a subagent, `review-to-clean`, the PR (merge is
+  pre-approved for step 9 once the review is clean and CI is green on HEAD).
+- **Then Nicolas's ask (2026-10-29): "at the end of all this do a sweep for optimization and
+  consolidation opportunities so our bot is nice and lean and efficient and follows best practices
+  for this type of thing."** Scope: `bot.lua`, `planner.lua`, `sight.lua`, `board.lua`,
+  `botrun.lua`, `campaign.lua` and the harness's bot api. Look for copies to fold (e.g. the
+  breakpoint arm/clear pattern now in `M.played`, `M.talks` and `INSPECT.watchDrops`), sandbox
+  calls to batch, and per-frame work. Report CPU s before and after on the runs below.
+- **Baselines (CPU s, attempt 1) [ROM]:** Manchego Stars ch01 bot 11.7-12.1 (won, clean); ch03
+  (`e1-ours-ch07/4`, ROM fd3cb9d8dca6) 20.7, clean turn 17; vanilla Ch2 (`e1-vanilla-ch3/2`) 13.8,
+  clean turn 8; Ch3 (`/3`) 15.3, clean turn 12; Ch5 (`/6`) 17.2, not clean (bot fault: Franz lost
+  t2, the village at 5,1 unreached).
+- **Running Manchego Stars ch03** needs an ours env, and `ours_env` wants every written chapter's
+  twin shop record. Build a scratch store from `e1-vanilla-ch3/*.json` plus `scout-vanilla/*.json`
+  and pass it as `--store`.
+- **Prose:** say "Manchego Stars ch01", never "ours ch01".
 
 **Part A (the four-part clean clear) as it stands.** Design: #510 comment 6485197805. Plan:
 #510 comment 6485521139 (its Task 4 text is out of date: update it with what follows). Record:
