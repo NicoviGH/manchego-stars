@@ -148,8 +148,11 @@ class Attempts(unittest.TestCase):
         self.assertIn('lost 0x42 (green, turn 4, to 0x81)', line)
         self.assertIn('missed 0x30', line)
         self.assertIn('village 3,7 closed by 0x81', line)
-        clean = mc.attempt_line({'attempt': 2, 'outcome': 'won', 'turns': 8, 'clean': True}, set())
+        clean = mc.attempt_line({'attempt': 2, 'outcome': 'won', 'turns': 8, 'clean': True,
+                                 'thefts': [{'thief': 0x8E, 'from': 0x05, 'item': 0x6A,
+                                             'turn': 7, 'spoils': False}]}, set())
         self.assertIn('won clean', clean)
+        self.assertIn('[noted: 0x8E stole item 0x6A from 0x05 (turn 7)]', clean)
 
 
 class Verdict(unittest.TestCase):
