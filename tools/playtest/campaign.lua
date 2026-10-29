@@ -11,20 +11,20 @@
 -- starts from the same state), buys at the shops the world map has open (Bot.shop, through the
 -- game's own shop screen), spends seals (Bot.promote), and plays the chapter (botrun.lua). A
 -- clean clear (the record's `clean`: won, no blue or green unit lost, every owed recruit
--- joined, every village and chest taken) moves on and its team is CARRIED into the next chapter's pick;
--- anything else loads the chapter-start state back and attempts again, at most MAX_ATTEMPTS
--- times. The team follows from the claims a style follows (a carry claim's units), so two
--- attempts differ by the style alone; when every style has been tried, the chapter stops. The RNG is never
--- re-seeded on a restart: FE8 seeds it once at power-on and a suspend save stores it, so a
--- restart differs from the last only by the bot's new style and the game's RNG follows from
--- that different play (the amendment, #510).
+-- joined, every village and chest taken) moves on and its team is CARRIED into the next
+-- chapter's pick; anything else loads the chapter-start state back and attempts again, at most
+-- MAX_ATTEMPTS times. The team follows from the claims a style follows (a carry claim's units),
+-- so two attempts differ by the style alone; when every style has been tried, the chapter
+-- stops. The game's RNG is never re-seeded on a restart: FE8 seeds it once at power-on and a
+-- suspend save stores it, so a restart differs from the last only by the bot's new style and
+-- the game's RNG follows from that different play (the amendment, #510).
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
 -- start state, the game's RNG in it; the draws restart at each chapter start (api.seed) and
 -- never read a result; and the start carries the team the campaign carried in (api.save,
--- arrive). So attempt k plays exactly as it would after k - 1 failures: k workers side by side find what the loop finds,
--- the lowest k that clears clean. It saves no state (the workers share the start's files) and
--- moves on to no chapter.
+-- arrive). So attempt k plays exactly as it would after k - 1 failures: k workers side by
+-- side find what the loop finds, the lowest k that clears clean. It saves no state (the
+-- workers share the start's files) and moves on to no chapter.
 -- A campaign stops when:
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)

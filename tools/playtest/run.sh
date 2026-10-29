@@ -444,16 +444,12 @@ if [ -n "$BUILDER" ]; then
     # One builder at a time per checkpoint: the builder's run dir, ROM and .sav are shared,
     # never tagged, so tagged copies of a scenario (montecarlo.py's pool) that found it stale
     # together would delete each other's logs and saves. The first takes the lock and builds;
-    # the rest wait, then find it valid below. mkdir is atomic; the lock names its owner, so a
-    # lock whose owner died without its trap (kill -9) is taken over rather than waited on.
-    BUILD_LOCK="$STATE_DIR/$CKPT.lock"
-    until mkdir "$BUILD_LOCK" 2>/dev/null; do
-        _owner=$(cat "$BUILD_LOCK/pid" 2>/dev/null || true)
-        if [ -n "$_owner" ] && ! kill -0 "$_owner" 2>/dev/null; then rm -rf "$BUILD_LOCK"; continue; fi
-        sleep 1
-    done
-    echo $$ > "$BUILD_LOCK/pid"
-    trap 'rm -rf "$BUILD_LOCK"' EXIT
+    # the rest wait, then find it valid below. A kernel flock on fd 9: it is taken atomically,
+    # and it belongs to the open file, so it is freed when the last process holding fd 9 dies
+    # (kill -9 included; the builder's mGBA inherits it, so a live build keeps it). macOS has no
+    # flock(1), and lockf(1) only wraps a whole command.
+    exec 9>"$STATE_DIR/$CKPT.lock"
+    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
         echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
         # Note what the state file looked like BEFORE the build. Most builder failures never
@@ -488,8 +484,7 @@ if [ -n "$BUILDER" ]; then
     else
         echo "== checkpoint '$CKPT' valid for $CHECKPOINT_STAMP -> loading =="
     fi
-    rm -rf "$BUILD_LOCK"
-    trap - EXIT
+    exec 9>&-   # the scenario's own run must not hold the lock
 fi
 
 # Rate + deadline also come from matrix.yaml (record* film at 60fps for faithful motion;
