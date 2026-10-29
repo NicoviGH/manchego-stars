@@ -43,3 +43,27 @@ decomp file:line read in full, not a function's name or a partial read) or **[RO
 read from a run); anything else is labelled an inference. (2026-10-29: "Ch5's ending makes Joshua
 join" was claimed from `EventScr_StrictLoadUniqueAlly`'s name and first half; the routine's end
 sets him dead.)
+
+**Built, 2026-10-29 (audit findings 1-4, 20's wall, 21).** Each exchange is played by the game
+every way its rolls can go (`sight.lua` `M.played`): `BattleGenerateSimulation` is run again and
+again, every `BattleRoll1RN`/`BattleRoll2RN` caught at its entry with a breakpoint and its
+`simResult` (r1, which a simulation returns in place of rolling) forced, depth first [code
+`bmbattle.c:253-265`]. A roll's odds count every 16-bit `NextRN` through `NextRN_100` [code
+`rng.c`] (the game has no function for them: reason 1). What the bot and the planner read is the
+outcome distribution: kill, death, the worst counter, the expected damage; the window's hit,
+damage and crit are kept for the logs only. Retired with it: the displayed-hit kill chance, both
+copies of the x3 crit, `killsTarget = dmg x hits >= HP`, the "first-blow sure kill takes no
+counter" rule (the game's play already stops the counter), a wall's `dmg x hits` (now the
+simulation's own HP lost), and the planner's `plan.branch` (the judged phase reads the counter's
+played chance to kill the striker).
+- **Headless mGBA needs a patch for this.** Its frontend attaches a debugger only for `-d`/`-g`,
+  and without one `emu:setBreakpoint` returns -1 [ROM]. `tools/mgba-headless-script-debugger.patch`
+  (applied by `tools/build_mgba_headless.sh`) attaches one whenever a script runs, never entered:
+  mGBA runs at full speed and single-steps only while a breakpoint is set, which `played` does
+  only for its own calls.
+- **Cost, measured on the Manchego Stars ch01 bot run (won, nobody lost, each time) [ROM]:** 827
+  simulations and 10.5 CPU s before; 7,266 and 17.4 played uncached; 2,116 and 12.0 with the
+  played outcomes cached by the two battle units as the simulation set them up (every byte but
+  their map position) and `gBattleStats`' config and range (reason 2).
+- A petrifying blow ends the battle like a death [code `bmbattle.c:1201`]; the bot counts a
+  petrified unit as every HP lost. That is our pricing, not the game's, and is written beside it.

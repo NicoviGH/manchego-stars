@@ -286,7 +286,9 @@ WANTED = [
     'AiInitDangerMap',          # the AI's danger map, which its tile choice reads
     'AiClearDecision',          # empties gAiDecision before a decision
     'gAiState',                 # struct AiState: dangerMapFilled +7A, combatWeightTableId +7D
-    'BattleGenerateBallistaSimulation',  # a ballista's strike (bmbattle.c)
+    'BattleGenerateBallistaSimulation',
+    'BattleRoll1RN',            # every one-number roll of a battle: crits, skill procs (bmbattle.c)
+    'BattleRoll2RN',            # the two-number hit roll; both return simResult when simulating  # a ballista's strike (bmbattle.c)
     'gActiveUnit',              # struct Unit *: the AI decides for THIS unit
     'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
     # Turn events still to come (eventinfo.c): botrun's "nothing can change this board".

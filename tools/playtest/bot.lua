@@ -18,13 +18,12 @@
 --              else gBmMapRange's coverage (1 per tile an enemy could strike it from);
 --            threat(enemy) -> function(x, y) -> n, the game's danger zone of that ONE enemy:
 --              0 = it cannot strike (x, y) this turn;
---            attack(unit, target, x, y, slot) -> { hit, dmg, crit, hits, counters, counterHit,
---              counterDmg, counterCrit, counterHits, killsTarget } | nil (out of range): our
---              attack from (x, y) and `target`'s counter to it (counters = false, counter* 0,
---              when it has none);
---            strike(unit, enemy, x, y) -> { takenHit, takenDmg, takenCrit, takenHits }: the
---              enemy's own strike on `unit` standing on (x, y), on its phase, as its AI makes it;
---              0 when it does not strike there;
+--            attack(unit, target, x, y, slot) -> sight.lua's (Sight.attackOf): the window's
+--              numbers, and as the game plays it: kill, die, sure, expected, counterWorst,
+--              dealt, counterDist | nil (out of range);
+--            strike(unit, enemy, x, y) -> sight.lua's (Sight.strikeOf): the enemy's own strike
+--              on `unit` standing on (x, y), on its phase, as its AI makes it and the game
+--              plays it: takenDist, takenWorst; nothing taken when it does not strike there;
 --            reach(unit) -> {{x,y}...}, the tiles the unit can move to this phase;
 --            range(unit) -> { min, max }|nil, the reach of the weapon FE8 has equipped;
 --            canSeize(unit) -> bool, the game's CanUnitSeize;
@@ -56,13 +55,12 @@
 --   "talk" and "staff" are acts the claim behaviours add; "visit" and "chest" only the
 --   planner's proposals (Bot.candidates) make.
 --
--- Worst case on an end tile = the sum, over every enemy that reaches it, of that enemy's
--- strike: takenDmg x takenHits, x3 when takenCrit > 0 (FE8 triples a crit: bmbattle.c
--- BattleGenerateHitAttributes); a strike with takenHit 0 adds nothing. An enemy "reaches" the
+-- Worst case on an end tile = the sum, over every enemy that reaches it, of the most that
+-- enemy's strike can take as the game plays it (takenWorst). An enemy "reaches" the
 -- tile when sight.threat(enemy) covers it; danger(x, y) = 0 skips the walk. The target of a
--- SURE kill (killsTarget at hit >= 100) is left out: it is dead before the enemy phase.
--- An attack's own counter is its worst case too, nothing when the enemy cannot answer or the
--- first blow is a sure kill (the attacker strikes first: bmbattle.c BattleUnwind). An attack
+-- SURE kill (every way the attack goes kills it) is left out: it is dead before the enemy
+-- phase. An attack's own counter is its worst case too (counterWorst: nothing when the enemy
+-- cannot answer or is dead before it can, as the game plays the exchange). An attack
 -- whose counter alone can kill the unit is refused by every style but greedy; then:
 --   careful: the worst case < the unit's HP after that counter
 --   even:    no SINGLE enemy's worst case >= that same HP
@@ -388,37 +386,12 @@ M.STYLES = {
     claims = {},   -- Strategy claim ids the run follows
 }
 
-local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
-local SURE_HIT = 100
 local SUPPORT_RANGE = 3     -- bmreliance.h SUPPORT_BONUSES_MAX_DISTANCE, RECT_DISTANCE
 
 
-local function isSureKill(f) return f.killsTarget and f.hit >= SURE_HIT end
-
--- A strike's worst case for our unit: its damage x hits, x3 on a crit; nothing when it cannot
--- hit. `taken` is the enemy's own strike on its phase, `counter` its answer to our attack.
-local function strikeWorst(hit, dmg, hits, crit)
-    if (hit or 0) <= 0 then return 0 end
-    return dmg * hits * ((crit or 0) > 0 and CRIT_MULTIPLIER or 1)
-end
-local function takenWorst(f)
-    return strikeWorst(f.takenHit, f.takenDmg, f.takenHits, f.takenCrit)
-end
-
--- The chance that the attack kills: the hit rate once per blow the kill needs, crits not
--- counted. A doubling attack that needs both blows is hit^2, not hit. Kept as an exact integer
--- over a fixed 100^MAX_BLOWS (hit^n x 100^(MAX_BLOWS-n)), so equal chances compare equal: as a
--- float, 4% once and 20% twice differed in the last bit and the tie went to whichever rounded up.
-local MAX_BLOWS = 4     -- a brave weapon doubling: 2 rounds x 2 strikes
-local function killChance(f, e)
-    if not f.killsTarget or f.dmg <= 0 then return 0 end
-    local need = (e.hp + f.dmg - 1) // f.dmg
-    -- more blows than any exchange lands: the forecast's kill needs a crit, which is not counted
-    if need > MAX_BLOWS then return 0 end
-    local chance = 1
-    for i = 1, MAX_BLOWS do chance = chance * (i <= need and f.hit or 100) end
-    return chance
-end
+-- The chance the attack kills, as a whole number of billionths: equal chances must compare
+-- equal, and a sum of float products differs in its last bit with the order it was added in.
+local function killChance(f) return math.floor(f.kill * 1e9 + 0.5) end
 
 -- A unit as an attack or strike reads it within a phase: id, HP, level (a level-up mid-phase
 -- changes its stats) and every item with its uses (which one is equipped is the game's call:
@@ -656,7 +629,7 @@ local function worstCase(ctx, u, x, y, spared)
     w = { sum = 0, max = 0 }
     for _, s in ipairs(exposure(ctx, u, x, y)) do
         if s.by ~= spared then
-            local dmg = takenWorst(s.f)
+            local dmg = s.f.takenWorst
             w.sum, w.max = w.sum + dmg, math.max(w.max, dmg)
         end
     end
@@ -684,17 +657,8 @@ end
 
 local function safest(ctx, u, tiles) return bySafety(ctx, u, tiles)[1] end
 
--- What our own attack's counter can take before the enemy phase: its worst case, nothing when
--- the target cannot answer this attack or the first blow is a sure kill (the target is dead
--- before it can answer).
-local function counterWorst(f, e)
-    if not f.counters then return 0 end
-    if f.hit >= SURE_HIT and f.dmg >= e.hp then return 0 end
-    return strikeWorst(f.counterHit, f.counterDmg, f.counterHits, f.counterCrit)
-end
-
 -- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
--- `spent` (the attack's own counter, counterWorst) already off its HP. An attack whose
+-- `spent` (the attack's own counter, f.counterWorst) already off its HP. An attack whose
 -- counter alone can kill is refused before any gate is asked (every style but greedy).
 -- bold's gate never weighs the enemy phase, so it asks for no strike to do so.
 local GATES = {
@@ -778,16 +742,16 @@ local function attackOptions(ctx, u, gate)
         for _, t in ipairs(strikeTiles(ctx, u, e)) do
             if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
                 local f = attack(ctx, u, e, t.x, t.y)
-                local sure = f and isSureKill(f)
-                local spent = f and counterWorst(f, e)
+                local sure = f and f.sure
+                local spent = f and f.counterWorst
                 -- what the counter leaves before the enemy phase, a heal claim's heal counted
                 local left = f and math.max(u.hp - (u.maxhp or u.hp),
                                             spent - healCredit(ctx, u, e, t))
                 if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
                     opts[#opts + 1] = { tile = t, target = e, sure = sure, answered = answered,
                                         first = first, f = f, spent = spent,
-                                        killChance = killChance(f, e),
-                                        expected = f.dmg * f.hits * f.hit }
+                                        killChance = killChance(f),
+                                        expected = f.expected }
                 end
             end
         end
@@ -1363,8 +1327,8 @@ function M.explain(board, sight, style)
                     local f = attack(ctx, u, e, t.x, t.y)
                     if f then
                         n = n + 1
-                        local spent = counterWorst(f, e)
-                        if spent < u.hp and gate(ctx, u, t.x, t.y, isSureKill(f) and e or nil,
+                        local spent = f.counterWorst
+                        if spent < u.hp and gate(ctx, u, t.x, t.y, f.sure and e or nil,
                                                  spent) then
                             pass = pass + 1
                         end
@@ -1540,8 +1504,7 @@ function M.candidates(board, sight, style, opts)
             -- what can strike it there next phase, each enemy's own strike (the planner's odds)
             a.exposure = {}
             for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y)) do
-                a.exposure[#a.exposure + 1] = { id = s.by.id, hit = s.f.takenHit, dmg = s.f.takenDmg,
-                                                hits = s.f.takenHits, crit = s.f.takenCrit }
+                a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
             end
         end
         out[#out + 1] = { unit = u, acts = acts }

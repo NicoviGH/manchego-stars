@@ -327,6 +327,48 @@ end
 local QUIET = { hit = 0, dmg = 0, crit = 0, hits = 0, counters = false, counterHit = 0,
                 counterDmg = 0, counterCrit = 0, counterHits = 0, takenHit = 0, takenDmg = 0,
                 takenCrit = 0, takenHits = 0, killsTarget = false }
+-- The fake game's play of a strike's blows, for the fixtures' window numbers (the ROM's own
+-- play is sight.lua's `played`, proven in the ROM): each lands at its hit through FE8's two
+-- rolls and crits at its crit, tripled. `live` = the chance the striker is still standing
+-- for them (a counter's blows, after our attack may have killed).
+local function blowsOf(hit, dmg, hits, crit, live)
+    local p = Sight.rollChance(2, hit or 0) * (live or 1)
+    local c = math.max(0, math.min(100, crit or 0)) / 100
+    local out = {}
+    for _ = 1, hits or 0 do
+        local one = { [0] = 1 - p }
+        one[dmg or 0] = (one[dmg or 0] or 0) + p * (1 - c)
+        one[(dmg or 0) * 3] = (one[(dmg or 0) * 3] or 0) + p * c
+        out[#out + 1] = one
+    end
+    return out
+end
+-- A fixture's attack, as sight.attack returns it once the fake game has played it.
+local function attackPlayed(f, uHp, tHp)
+    local dealt = Sight.damage(blowsOf(f.hit, f.dmg, f.hits, f.crit), tHp)
+    local kill = Sight.odds({ dealt }, tHp)
+    local back = f.counters and Sight.damage(blowsOf(f.counterHit, f.counterDmg, f.counterHits,
+                                                     f.counterCrit, 1 - kill), uHp)
+        or { [0] = 1 }
+    return Sight.attackOf({ hit = f.hit, dmg = f.dmg, crit = f.crit, hits = f.hits,
+                            counter = { armed = f.counters, hit = f.counterHit,
+                                        dmg = f.counterDmg, crit = f.counterCrit,
+                                        hits = f.counterHits },
+                            killsTarget = f.killsTarget, dealt = dealt, back = back }, tHp, uHp)
+end
+-- A fixture's enemy strike (sight.strike's, or one of sight.enemyPhase's), played on a unit
+-- at `hp`; one already carrying takenDist is left as it is.
+local function strikePlayed(t, hp)
+    if t.takenDist then return t end
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    out.takenDist = Sight.damage(blowsOf(t.takenHit, t.takenDmg, t.takenHits, t.takenCrit),
+                                 hp or math.huge)
+    out.takenWorst = Sight.worst(out.takenDist)
+    out.counterDist = Sight.damage(blowsOf(t.counterHit, t.counterDmg, t.counterHits,
+                                           t.counterCrit), t.strikerHp or math.huge)
+    return out
+end
 local function sightOf(o)
     local attacks, strikes = 0, 0
     local function entry(u, t, x, y)
@@ -363,11 +405,11 @@ local function sightOf(o)
         end,
         attack = function(u, t, x, y)
             attacks = attacks + 1
-            return entry(u, t, x, y)
+            return attackPlayed(entry(u, t, x, y), u.hp, t.hp)
         end,
         strike = function(u, t, x, y)
             strikes = strikes + 1
-            return entry(u, t, x, y)
+            return strikePlayed(entry(u, t, x, y), u.hp)
         end,
     }
     -- The game reads PR E added (each optional, as in sight.lua's callers): obstacles, doors,
@@ -389,8 +431,25 @@ local function sightOf(o)
             return ((o.canExplore or {})[u.id] or {})[x .. "," .. y] == kind
         end
     end
-    s.hitChance = Sight.hitChance
-    if o.enemyPhase then s.enemyPhase = o.enemyPhase end
+    s.odds = Sight.odds
+    if o.enemyPhase then
+        -- each strike played on its target at the HP the plan gives it
+        s.enemyPhase = function(plan)
+            local hp = {}
+            for _, b in ipairs(plan.blues) do hp[b.unit.id] = b.hp end
+            local out = o.enemyPhase(plan)
+            local played = {}
+            local function play(t)
+                played[t] = played[t] or strikePlayed(t, t.targetHp or hp[t.target])
+                return played[t]
+            end
+            for i, t in ipairs(out) do out[i] = play(t) end
+            for _, oc in ipairs(out.outcomes or {}) do
+                for i, t in ipairs(oc.strikes) do oc.strikes[i] = play(t) end
+            end
+            return out
+        end
+    end
     s.attacks = function() return attacks end
     s.strikes = function() return strikes end
     s.calls = function() return attacks + strikes end
@@ -481,6 +540,7 @@ do
             local g = {}
             for k, v in pairs(f) do g[k] = v end
             g.counters, g.counterHit, g.counterDmg, g.counterHits = false, 0, 0, 0
+            g.counterDist, g.counterWorst, g.die = { [0] = 1 }, 0, 0
             return g
         end
         return f
@@ -536,15 +596,16 @@ do
     }
     check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
         "60% in one blow beats 70% needed twice")
-    -- 4% once and 20% twice are the SAME chance: the tie goes on to expected damage (E2's)
+    -- the same 50% kill on both: the tie goes on to expected damage, E2's 12 HP against E1's 10
+    local E2b = red(0x82, 0, 1, { hp = 12 })
     s = sightOf {
         fc = { [0x01] = {
-            [0x81] = { ["0,0"] = fc { hit = 20, dmg = 5, hits = 2, killsTarget = true } },
-            [0x82] = { ["0,0"] = fc { hit = 4, dmg = 60, hits = 1, killsTarget = true } },
+            [0x81] = { ["0,0"] = fc { hit = 50, dmg = 10, hits = 1, killsTarget = true } },
+            [0x82] = { ["0,0"] = fc { hit = 50, dmg = 12, hits = 1, killsTarget = true } },
         } },
     }
-    check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
-        "equal kill chances tie exactly; expected damage (60 x 4 > 5 x 2 x 20) decides")
+    check(B.decide(boardOf(A, E1, E2b), s, style("careful")).target, 0x82,
+        "equal kill chances tie exactly; expected damage (12 x 50% > 10 x 50%) decides")
     -- a kill only a crit lands (10 HP at 2 a blow, 2 blows) ranks as no kill chance at all
     s = sightOf {
         fc = { [0x01] = {
@@ -1492,7 +1553,7 @@ do
             obstacles = { { x = 2, y = 0, hp = 10 } },
         }
         local sight = sightOf(o)
-        sight.strikeWall = function() return { dmg = blowDmg, hits = 1 } end
+        sight.strikeWall = function() return { dealt = blowDmg } end
         local _, plan = Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
         local n = 0
         for _, a in ipairs(plan and plan.acts or {}) do
@@ -1761,16 +1822,6 @@ end
 
 -- ── The planner ─────────────────────────────────────────────────────────────────────────
 
--- test_planner_odds: one sure blow of 10 kills 10 HP; two coin-flip blows of 6 kill 10 HP a
--- quarter of the time; a crit triples.
-do
-    local sure = { { p = 1, c = 0, dmg = 10 } }
-    check(Planner.odds(sure, 10), 1, "odds: a sure blow kills")
-    local flip = { { p = 0.5, c = 0, dmg = 6 }, { p = 0.5, c = 0, dmg = 6 } }
-    check(Planner.odds(flip, 10), 0.25, "odds: both must land")
-    check(Planner.odds({ { p = 1, c = 1, dmg = 4 } }, 10), 1, "odds: a crit triples")
-end
-
 -- test_planner_takes_the_sure_kill: E1 dies to A's blow, E2 only takes a chip.
 do
     local A = blue(0x01, 0, 0, 0)
@@ -1861,13 +1912,13 @@ do
 end
 
 -- test_planner_judges_every_way_the_phase_goes: at (1,0) X strikes A for nothing, and A's
--- counter (a 50 to hit, 20 against X's 10 HP) may kill X. If it does, Y takes X's tile and
--- kills A. The judge asks the planner's own chance of that kill (plan.branch) and pays A's
--- death in that outcome only: die = the chance the counter kills X, not 0 and not 1.
+-- counter may kill X (sight.enemyPhase plays the phase both ways, as likely as the counter's
+-- played chance). If it does, Y takes X's tile and kills A. The judge pays A's death in that
+-- outcome only: die = that outcome's chance, not 0 and not 1.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
-    local asked
+    local q = Sight.rollChance(2, 50)
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
         field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
@@ -1880,8 +1931,6 @@ do
                                 targetHp = b.hp }
                     local y = { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
                                 takenHits = 1, takenCrit = 0 }
-                    local q = plan.branch(x)
-                    asked = q
                     local out = { x }
                     out.outcomes = { { p = 1 - q, strikes = { x } }, { p = q, strikes = { x, y } } }
                     return out
@@ -1891,13 +1940,11 @@ do
         end,
     }
     local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
-    check(asked ~= nil and math.abs(asked - Sight.hitChance(50)) < 1e-9, true,
-          "planner: the branch is the counter's chance to kill the striker")
     local die
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.id == 0x01 and p.x == 1 then die = p.die end
     end
-    check(die ~= nil and math.abs(die - Sight.hitChance(50)) < 1e-9, true,
+    check(die ~= nil and math.abs(die - q) < 1e-9, true,
           "planner: A dies only in the outcome where X falls")
 end
 
@@ -2111,7 +2158,7 @@ do
             return {}
         end,
     }
-    local die = Planner.odds(Planner.blows(10, 25, 1, 0, Sight.hitChance), 20)
+    local die = Sight.rollChance(2, 10)
     check(die > 0 and Planner.WEIGHTS.careful.death * die < Planner.WEIGHTS.careful.recruit, true,
           "explore: the strike's chance is small enough that a credit would buy it")
     local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))

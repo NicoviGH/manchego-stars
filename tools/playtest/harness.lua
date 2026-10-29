@@ -2974,6 +2974,18 @@ INSPECT.sightApi = function()
             end,
             write16 = function(a, v) emu:write16(a, v) end,
             write32 = function(a, v) emu:write32(a, v) end,
+            -- `fn` runs each time the CPU reaches `addr`, before its first instruction (the
+            -- game's rolls, caught by sight.lua's `played`). mGBA steps the CPU one
+            -- instruction at a time while any is set, so they are cleared after the call.
+            breakpoint = function(addr, fn)
+                local id = emu:setBreakpoint(fn, addr & ~1)
+                if id < 0 then
+                    error("mGBA has no debugger for breakpoints: rebuild tools/emulator with "
+                        .. "tools/build_mgba_headless.sh (its patch attaches one)", 2)
+                end
+                return id
+            end,
+            unbreak = function(id) emu:clearBreakpoint(id) end,
             -- Each frame a call runs is real emulation, though the load rewinds the counter:
             -- INSPECT.sandboxFrames keeps it, and log() stamps lines with it added, so a run's
             -- cost, run.sh's frame budget and its stall watch all see what the sight spent. A
@@ -4006,9 +4018,11 @@ scenarios.sightprobe = function()
         if r and d >= r.min and d <= r.max then
             local g = sight.attack(lead, foe, t.x, t.y, nil)
             log(string.format("attack 0x%02X from (%d,%d) on 0x%02X: hit=%d dmg=%d crit=%d hits=%d "
-                .. "kills=%s | counter hit=%d dmg=%d crit=%d hits=%d (counters=%s)", lead.charId,
+                .. "kills=%s | counter hit=%d dmg=%d crit=%d hits=%d (counters=%s) | played: "
+                .. "kill %.4f die %.4f expected %.2f counterWorst %d", lead.charId,
                 t.x, t.y, foe.charId, g.hit, g.dmg, g.crit, g.hits, tostring(g.killsTarget),
-                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters)))
+                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters),
+                g.kill, g.die, g.expected, g.counterWorst))
             break
         end
     end

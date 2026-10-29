@@ -588,9 +588,9 @@ function M.run(api)
             local before = api.board()
             -- what the last plan expected of this enemy phase, beside what it did
             for _, p in ipairs(lastPlan and lastPlan.predict or {}) do
-                if p.blows > 0 then
-                    api.log(string.format("plan: 0x%02X @%d,%d hp %d: %d blows, die %.2f, taken %.1f",
-                        p.charId, p.x, p.y, p.hp, p.blows, p.die, p.taken))
+                if p.strikes > 0 then
+                    api.log(string.format("plan: 0x%02X @%d,%d hp %d: %d strikes, die %.2f, taken %.1f",
+                        p.charId, p.x, p.y, p.hp, p.strikes, p.die, p.taken))
                 end
             end
             changes(before)

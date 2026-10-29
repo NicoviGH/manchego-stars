@@ -42,19 +42,26 @@
 --                            with), read as GetItemMinRange/GetItemMaxRange read it; nil = none.
 --   canSeize(unit)           the game's CanUnitSeize (bmdifficulty.c), the Seize command's check.
 --   attack(u, e, x, y, slot) our unit from (x, y) on enemy `e` where it stands, as the forecast
---                            window computes it (BattleGenerateSimulation +
+--                            window shows it (BattleGenerateSimulation +
 --                            InitBattleForecastBattleStats): hit, dmg, crit, hits; `e`'s
 --                            counter* (counterHit, counterDmg, counterCrit, counterHits) and
---                            `counters` (false, counter* 0, when it cannot answer); killsTarget
---                            = dmg x hits >= e's HP. nil when (x, y) is out of our range.
+--                            `counters` (false, counter* 0, when it cannot answer) -- all for
+--                            the logs. What it does is played (ADR 0377): the simulation run
+--                            once per way its rolls can go, each BattleRoll1RN/2RN caught and
+--                            forced (cpu.breakpoint): dealt / counterDist = { [HP lost] = p }
+--                            for `e` / our unit, kill / die = the chance it kills `e` / ours,
+--                            killsTarget = the plain simulation (every hit lands, nothing
+--                            procs) leaves `e` at 0. nil when (x, y) is out of our range.
 --   strike(u, e, x, y)       `e`'s own strike on `u` standing on (x, y), on its phase: the
 --                            enemy phase's per-unit setup (cp_decide.c: AiUpdateNoMoveFlag, the
 --                            combat weight table, AiInitDangerMap, AiClearDecision), then
 --                            AiAttemptOffensiveAction(AiIsUnitEnemy) itself -- STAY, ballista
 --                            and thief branches included -- with every other target hidden for
---                            the call, so it can only choose `u`. Its decision is simulated:
---                            takenHit, takenDmg, takenCrit, takenHits, takenSlot, takenTile.
---                            All 0 (slot/tile nil) when the AI does not strike `u` there.
+--                            the call, so it can only choose `u`. Its decision is simulated and
+--                            played as attack()'s: takenHit, takenDmg, takenCrit, takenHits
+--                            (the window's), takenSlot, takenTile, takenDist (what it takes off
+--                            `u`), counterDist (what `u`'s counter takes off `e`). All 0 (slot/
+--                            tile nil, takenDist nothing) when the AI does not strike `u` there.
 --   batch(fn)                fn's reads in one save/load: one decision's worth of questions
 --                            cost one state round trip, not one each.
 --   enemyPhase(plan)         the enemy phase the AI would play against a planned board, in
@@ -66,12 +73,12 @@
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and takes its expected damage off the target before the
 --                            next decides. plan.reds = { [enemy id] = hp } (optional): the HP
---                            the plan leaves an enemy. plan.branch(strike) (optional) -> the
---                            chance the target's counter kills the striker; above 0 the rest
---                            of the phase is played both ways, the striker's tile freed in
---                            the second (ch02: a Brigand Marty killed let the next one in).
---                            -> { { enemy, target, taken* as strike(), counter* (absent when
---                            the target cannot answer), strikerHp, targetHp } }: the likeliest
+--                            the plan leaves an enemy. Where the target's counter may kill
+--                            the striker (its played chance, `felled`), the rest of the phase
+--                            is played both ways, the striker's tile freed in the second
+--                            (ch02: a Brigand Marty killed let the next one in).
+--                            -> { { enemy, target, taken* as strike(), counterDist, felled,
+--                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went.
 --   objective                { kind, tile, turnsLeft, boss } -- see objective(); boss = on a
@@ -172,7 +179,6 @@ M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
 -- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
 M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
-M.ITEM_MONSTER_STONE = 0xB5  -- constants/items.h
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
 -- (player_interface.c), so the turns left on turn T are End - T.
@@ -183,7 +189,13 @@ M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
 
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
 local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
-             weaponBroke = 0x7D }
+             statusOut = 0x6F, hpInitial = 0x72, weaponBroke = 0x7D }
+-- include/bmunit.h UNIT_STATUS_PETRIFY and UNIT_STATUS_13: the two statuses a blow sets that
+-- end the battle like a death (BattleGenerateHit)
+local STATUS_PETRIFY, STATUS_13 = 11, 13
+-- struct BattleUnit is 0x80 bytes; its word at +0x10 holds xPos, yPos (the low half), maxHP
+-- and curHP. struct BattleStats: +00 config and +02 range share its first word.
+local BU_SIZE, BU_POSITION, POSITION_BITS = 0x80, 0x10, 0xFFFF
 local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
 M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
@@ -346,62 +358,189 @@ end
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 local function s32(v) return v >= 0x80000000 and v - 0x100000000 or v end
 
--- One side of a simulated exchange, as the forecast window reads it (bksel.c): hit, crit,
--- damage against the other side's defence, how many blows (the proc's hit count for that side),
--- and whether it is armed (a weapon, or one that broke). `actor` is gBattleActor's side: the
--- window marks an ACTOR's Monster Stone with 0xFF for damage and crit ("--", its damage is not
--- shown), and so does this -- a worst case then reads it as lethal, never as harmless.
-function M.side(mem, me, other, proc, hitsAt, actor)
+-- One side of a simulated exchange, as the forecast window shows it (bksel.c): hit, crit,
+-- damage (the window's own sum: battleAttack less the other side's battleDefense, bksel.c
+-- :233), how many blows (the proc's hit count for that side), and whether it is armed (a
+-- weapon, or one that broke). Display only, for the logs: what an exchange DOES is `played`.
+function M.side(mem, me, other, proc, hitsAt)
     local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
-    local crit = s16(mem.u16(me + BU.crit))
-    if actor and (mem.u16(me + BU.weapon) & 0xFF) == M.ITEM_MONSTER_STONE then
-        dmg, crit = 0xFF, 0xFF
-    end
-    return { hit = s16(mem.u16(me + BU.hit)), crit = crit,
+    return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
              armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0 }
 end
 
--- Our attack read off its simulation: `ours` is our side with `ours.counter` the enemy's.
--- Pure, so test_sight.lua builds every case.
-function M.attackOf(ours, eHp)
+-- The chance one of the game's rolls passes (rng.c): Roll1RN draws one NextRN_100, Roll2RN
+-- the floor of two draws' mean, and passes below the threshold; NextRN_100 is NextRN() * 100
+-- / 0x10000. The game has no function for a roll's odds (ADR 0377, reason 1): this counts
+-- them over every 16-bit NextRN, each taken as equally likely. `threshold` is the u16 the
+-- BattleRoll functions take.
+local DRAW, ROLLS = nil, { {}, {} }
+function M.rollChance(numbers, threshold)
+    if threshold >= 100 then return 1 end
+    if threshold <= 0 then return 0 end
+    local known = ROLLS[numbers][threshold]
+    if known then return known end
+    if not DRAW then
+        DRAW = {}
+        for k = 0, 99 do DRAW[k] = 0 end
+        for v = 0, 0xFFFF do
+            local k = v * 100 // 0x10000
+            DRAW[k] = DRAW[k] + 1
+        end
+    end
+    local n = 0
+    if numbers == 1 then
+        for a = 0, threshold - 1 do n = n + DRAW[a] end
+        known = n / 0x10000
+    else
+        for a = 0, 99 do
+            for b = 0, 99 do
+                if (a + b) // 2 < threshold then n = n + DRAW[a] * DRAW[b] end
+            end
+        end
+        known = n / 0x100000000
+    end
+    ROLLS[numbers][threshold] = known
+    return known
+end
+
+-- An exchange's played outcomes (`leaves`: { p, dealt, back }, each the HP one side lost) as
+-- two distributions { [hp lost] = probability }: the target's (dealt) and the actor's (back).
+function M.exchangeOf(leaves)
+    local dealt, back = {}, {}
+    for _, l in ipairs(leaves) do
+        dealt[l.dealt] = (dealt[l.dealt] or 0) + l.p
+        back[l.back] = (back[l.back] or 0) + l.p
+    end
+    return dealt, back
+end
+
+-- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
+-- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes
+-- caught at S.BattleRoll1RN/S.BattleRoll2RN's entry and its simResult (r1, which a simulation
+-- returns in place of rolling) forced, depth first: pass where it can, then fail. A roll that
+-- cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
+-- target and the actor lost in the run just made. -> { { p, dealt, back } }. Inside a
+-- sandbox; the breakpoints are set only for these calls (mGBA steps while one is set).
+function M.played(cpu, call, sim, S, lost)
+    local path, odds, at = {}, {}, 0
+    local function catch(numbers)
+        return function()
+            at = at + 1
+            if path[at] == nil then
+                odds[at] = M.rollChance(numbers, cpu.read("r0") & 0xFFFF)
+                path[at] = odds[at] > 0
+            end
+            cpu.write("r1", path[at] and 1 or 0)
+        end
+    end
+    local holds = { cpu.breakpoint(S.BattleRoll1RN, catch(1)),
+                    cpu.breakpoint(S.BattleRoll2RN, catch(2)) }
+    local leaves = {}
+    local ok, err = pcall(function()
+        local split
+        repeat
+            at = 0
+            call(sim[1], sim[2])
+            local p = 1
+            for i = 1, at do p = p * (path[i] and odds[i] or 1 - odds[i]) end
+            local dealt, back = lost()
+            leaves[#leaves + 1] = { p = p, dealt = dealt, back = back }
+            -- the next outcome: the deepest roll forced to pass that can also fail
+            split = at
+            while split > 0 and not (path[split] and odds[split] < 1) do split = split - 1 end
+            for i = split + 1, #path do path[i], odds[i] = nil, nil end
+            if split > 0 then path[split] = false end
+        until split == 0
+    end)
+    for _, hold in ipairs(holds) do cpu.unbreak(hold) end
+    if not ok then error(err, 0) end
+    return leaves
+end
+
+-- The HP several independent exchanges take off one unit, as a distribution { [damage] =
+-- probability }, capped at `cap` (the unit's HP: past it, it is dead and the rest does not
+-- matter). Each of `dists` is one exchange's { [damage] = probability }.
+function M.damage(dists, cap)
+    local dist = { [0] = 1 }
+    for _, one in ipairs(dists) do
+        local nxt = {}
+        for d, p in pairs(dist) do
+            for x, q in pairs(one) do
+                local to = math.min(d + x, cap)
+                if p * q > 0 then nxt[to] = (nxt[to] or 0) + p * q end
+            end
+        end
+        dist = nxt
+    end
+    return dist
+end
+
+-- P(`dists` together take at least `hp`), and the expected damage (capped at `hp`).
+function M.odds(dists, hp)
+    local dead, mean = 0, 0
+    for d, p in pairs(M.damage(dists, hp)) do
+        if d >= hp then dead = dead + p end
+        mean = mean + d * p
+    end
+    return dead, mean
+end
+
+-- The most and the least a distribution can take: its largest and smallest damage with any
+-- chance.
+function M.worst(dist)
+    local w = 0
+    for d, p in pairs(dist) do
+        if p > 0 and d > w then w = d end
+    end
+    return w
+end
+function M.least(dist)
+    local l = math.huge
+    for d, p in pairs(dist) do
+        if p > 0 and d < l then l = d end
+    end
+    return l
+end
+
+-- Our attack read off its simulation: `ours` is our side, with `ours.counter` the enemy's,
+-- `ours.killsTarget` the game's own simulation (every hit lands, nothing procs) and
+-- `ours.dealt`/`ours.back` its played distributions. kill / die: the chance the exchange
+-- kills `e` (at eHp) / our unit (at uHp); sure: every way it goes kills `e`; expected: the
+-- damage it is expected to deal; counterWorst: the most the counter can take off ours
+-- (nothing when `e` cannot answer, or dies before it can). Pure, so test_sight.lua builds
+-- every case.
+function M.attackOf(ours, eHp, uHp)
     local c = ours.counter
-    local counters = c ~= nil and c.armed
+    local counters = c.armed and c.hits > 0
+    local kill, expected = M.odds({ ours.dealt }, eHp)
     return { hit = ours.hit, dmg = ours.dmg, crit = ours.crit, hits = ours.hits,
              counters = counters,
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
-             killsTarget = ours.hits > 0 and ours.dmg * ours.hits >= eHp }
+             killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
+             kill = kill, die = (M.odds({ ours.back }, uHp)), sure = M.least(ours.dealt) >= eHp,
+             expected = expected, counterWorst = M.worst(ours.back) }
 end
 
--- The enemy's strike read off its simulation, or none (nil) when its AI does not strike.
--- The chance a displayed hit rate lands. FE8 rolls a hit with Roll2RN (rng.c): the average
--- of two 0-99 draws, rounded down, below the rate. Crits roll once (Roll1RN): rate / 100.
-local HIT_CHANCE = {}
-function M.hitChance(rate)
-    rate = math.max(0, math.min(100, rate or 0))
-    if HIT_CHANCE[rate] == nil then
-        local n = 0
-        for a = 0, 99 do
-            for b = 0, 99 do
-                if (a + b) // 2 < rate then n = n + 1 end
-            end
-        end
-        HIT_CHANCE[rate] = n / 10000
-    end
-    return HIT_CHANCE[rate]
-end
-
+-- The enemy's strike read off its simulation, or none (nil) when its AI does not strike:
+-- taken* as the window shows it, takenDist what it takes off our unit (takenWorst: the most),
+-- counterDist what our counter takes off it.
 function M.strikeOf(t)
+    local dealt = t and t.dealt or { [0] = 1 }
     return { takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
              takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
-             takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil }
+             takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil,
+             takenDist = dealt, takenWorst = M.worst(dealt),
+             counterDist = t and t.back or { [0] = 1 } }
 end
 
--- Whether our attack ANSWERS its target, and how hard: it kills in one round and outlives
--- the counter at its worst (every blow lands); strength = the round's expected damage. Pure.
+-- Whether our attack ANSWERS its target, and how hard: the game's own simulation kills it
+-- and no way the exchange can go kills our unit; strength = the damage it is expected to deal
+-- (capped at the target's HP).
+-- Pure.
 function M.answerOf(a, hp)
-    return a.killsTarget and a.counterDmg * a.counterHits < hp, a.dmg * a.hits * a.hit / 100
+    return a.killsTarget and a.counterWorst < hp, a.expected
 end
 
 -- What the map asks of a team, for Bot.team (#510 plan comment, "Party selection"). Pure, so
@@ -532,7 +671,7 @@ function M.new(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
-    local s = { cache = {}, hitChance = M.hitChance }
+    local s = { cache = {}, odds = M.odds }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
@@ -720,24 +859,72 @@ function M.new(outer)
         return mine("seize", u, function() return M.canSeize(api, u, sandbox) end) or false
     end
 
+    -- The HP a battle unit lost in the simulation just run. A blow that petrifies ends the
+    -- battle as a death does (BattleGenerateHit), and a petrified unit is out of the fight, so
+    -- the bot counts it as every HP lost: our pricing, not the game's.
+    local function lost(bu)
+        local initial = mem.s8(bu + BU.hpInitial)
+        local status = mem.s8(bu + BU.statusOut)
+        if status == STATUS_PETRIFY or status == STATUS_13 then return initial end
+        return initial - mem.u8(bu + UNIT_HP)
+    end
+
+    -- One exchange as the forecast window reads it (`sim`, then InitBattleForecastBattleStats)
+    -- and as it plays: the actor's side (M.side) with .counter the target's, .killsTarget the
+    -- game's own simulation (every hit lands, nothing procs), and .dealt / .back its played
+    -- distributions (M.exchangeOf). Inside a sandbox.
+    -- The played outcomes, kept by what the game played them from (ADR 0377, reason 2: a
+    -- MEASURED cost -- the Manchego Stars ch01 bot run took 7,266 simulations and 17.4 CPU s
+    -- without it, 2,116 and 12.0 with it, against 827 and 10.5 before any were played): both
+    -- battle units as the simulation set them up, every byte but where they
+    -- stand, and gBattleStats' config and range. The chapter (BattleCheckSilencer reads it) is
+    -- this sight's own.
+    local playedBy = {}
+    local function battleKey()
+        local parts = { mem.u32(S.gBattleStats) }
+        for _, bu in ipairs({ S.gBattleActor, S.gBattleTarget }) do
+            for at = 0, BU_SIZE - 4, 4 do
+                local word = mem.u32(bu + at)
+                if at == BU_POSITION then word = word & ~POSITION_BITS end
+                parts[#parts + 1] = word
+            end
+        end
+        return table.concat(parts, ":")
+    end
+
+    local function exchange(call, proc, sim)
+        call({ sim, { S.InitBattleForecastBattleStats, { proc } } })
+        local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
+        side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
+        side.killsTarget = mem.u8(S.gBattleTarget + UNIT_HP) == 0
+        local key = battleKey()
+        local known = playedBy[key]
+        if not known then
+            known = { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
+                return lost(S.gBattleTarget), lost(S.gBattleActor)
+            end)) }
+            playedBy[key] = known
+        end
+        side.dealt, side.back = known[1], known[2]
+        return side
+    end
+
     function s.attack(u, e, x, y, slot)
         local r = s.range(u)
         local d = Board.distance(x, y, e.x, e.y)
         if not (r and d >= r.min and d <= r.max) then return nil end
         local ours = sandbox(function(call, proc)
-            call(S.BattleGenerateSimulation, { u.addr, e.addr, x, y, slot or M.ISLOT_AUTO })
-            call(S.InitBattleForecastBattleStats, { proc })
-            local a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
-            a.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B, false)
-            return a
+            return exchange(call, proc,
+                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, slot or M.ISLOT_AUTO } })
         end)
-        return M.attackOf(ours, e.hp)
+        return M.attackOf(ours, e.hp, u.hp)
     end
 
     -- `u`'s strike from (x, y) on the wall `o` ({ x, y, hp }), as the Attack menu forecasts
     -- it (AttackMapSelect_SwitchIn: the wall's place and HP in gActionData, then
-    -- InitObstacleBattleUnit and BattleGenerateSimulation with no target unit). Kept by the
-    -- unit's facts and the wall: the blow reads the attacker's might against the wall's class.
+    -- InitObstacleBattleUnit and BattleGenerateSimulation with no target unit) -> what the
+    -- strike takes off the wall in the game's own simulation. Kept by the unit's facts and the
+    -- wall: the blow reads the attacker's might against the wall's class.
     function s.strikeWall(u, o, x, y)
         return mine("wall@" .. o.x .. "," .. o.y, u, function() return sandbox(function(call, proc)
             api.write8(S.gActionData + ACTION_X_OTHER, o.x)
@@ -745,9 +932,7 @@ function M.new(outer)
             api.write8(S.gActionData + ACTION_TRAP_TYPE, o.hp)
             call(S.InitObstacleBattleUnit, {})
             call(S.BattleGenerateSimulation, { u.addr, 0, x, y, M.ISLOT_AUTO })
-            call(S.InitBattleForecastBattleStats, { proc })
-            local a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
-            return { dmg = a.dmg, hits = a.hits }
+            return { dealt = lost(S.gBattleTarget) }
         end) end)
     end
 
@@ -805,9 +990,7 @@ function M.new(outer)
         local sim = slot == BALLISTA_SLOT
             and { S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy } }
             or { S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot } }
-        call({ sim, { S.InitBattleForecastBattleStats, { proc } } })
-        local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
-        side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B, false)
+        local side = exchange(call, proc, sim)
         side.slot, side.tile = slot, { x = sx, y = sy }
         return target, side
     end
@@ -853,7 +1036,7 @@ function M.new(outer)
             -- the phase from order[i] on, after `done`'s strikes -> its outcomes. A striker
             -- the counter may kill splits it: the enemies after it decide once with it
             -- standing and once with its tile free (each in a nested sandbox, so neither
-            -- sees the other's board), the second as likely as plan.branch says.
+            -- sees the other's board), the second as likely as its played counter kills it.
             local function play(i, done)
                 for k = i, #order do
                     local id = order[k]
@@ -864,21 +1047,16 @@ function M.new(outer)
                             local t = M.strikeOf(side)
                             t.enemy, t.target = id, target
                             local addr = mem.u32(S.gUnitLookup + target * 4)
-                            local c = side.counter
-                            if c.armed then
-                                t.counterHit, t.counterDmg = c.hit, c.dmg
-                                t.counterHits, t.counterCrit = c.hits, c.crit
-                            end
                             t.strikerHp, t.targetHp = mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP)
+                            t.felled = (M.odds({ t.counterDist }, t.strikerHp))
                             local now = {}
                             for x = 1, #done do now[x] = done[x] end
                             now[#now + 1] = t
                             done = now
                             standOn(e, side.tile.x, side.tile.y)
-                            local hit = M.hitChance(t.takenHit)
-                            api.write8(addr + UNIT_HP, math.max(0,
-                                t.targetHp - math.floor(hit * t.takenDmg * t.takenHits + 0.5)))
-                            local q = plan.branch and plan.branch(t) or 0
+                            local _, mean = M.odds({ t.takenDist }, t.targetHp)
+                            api.write8(addr + UNIT_HP, t.targetHp - math.floor(mean + 0.5))
+                            local q = t.felled
                             if q > 0 then
                                 local out = {}
                                 local stood = sandbox(function() return play(k + 1, done) end)

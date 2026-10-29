@@ -6,6 +6,7 @@ local Botrun = dofile(here .. "botrun.lua")
 local Json = dofile(here .. "json.lua")
 local Bot = dofile(here .. "bot.lua")
 local Board = dofile(here .. "board.lua")
+local Sight = dofile(here .. "sight.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -84,15 +85,17 @@ local function fakeGame(o)
                 reach = function(u)
                     return within(u, u.faction == "blue" and (o.move or 3) or 0)
                 end,
+                -- one sure blow of o.hit and no counter, as the game would play it
                 attack = function(u, e)
                     local dmg = o.hit or 5
-                    return { hit = 100, dmg = dmg, crit = 0, hits = 1, counters = false,
-                             counterHit = 0, counterDmg = 0, counterCrit = 0, counterHits = 0,
-                             killsTarget = dmg >= e.hp }
+                    return Sight.attackOf({ hit = 100, dmg = dmg, crit = 0, hits = 1,
+                                            counter = { armed = false, hits = 0 },
+                                            killsTarget = dmg >= e.hp,
+                                            dealt = { [math.min(dmg, e.hp)] = 1 },
+                                            back = { [0] = 1 } }, e.hp, u.hp)
                 end,
-                strike = function()
-                    return { takenHit = 0, takenDmg = 0, takenCrit = 0, takenHits = 0 }
-                end,
+                strike = function() return Sight.strikeOf(nil) end,
+                odds = Sight.odds,
                 nextTurnEvent = function(turn)
                     g.eventAsks = (g.eventAsks or 0) + 1
                     return o.eventTurn and o.eventTurn > turn and o.eventTurn or nil

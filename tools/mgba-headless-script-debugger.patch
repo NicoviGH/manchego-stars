@@ -1,0 +1,26 @@
+diff --git a/src/platform/headless-main.c b/src/platform/headless-main.c
+index 61110b1..2bea423 100644
+--- a/src/platform/headless-main.c
++++ b/src/platform/headless-main.c
+@@ -169,10 +169,20 @@ int main(int argc, char * argv[]) {
+ 	struct mDebugger debugger;
+ 	mDebuggerInit(&debugger);
+ 	bool hasDebugger = mArgumentsApplyDebugger(&args, core, &debugger);
++	bool enterDebugger = hasDebugger;
++#ifdef ENABLE_SCRIPTING
++	/* A script's emu:setBreakpoint needs a debugger on the core. Attached but never entered,
++	 * it runs at full speed and steps only while a breakpoint is set. */
++	if (StringListSize(&headlessOpts.scripts)) {
++		hasDebugger = true;
++	}
++#endif
+ 
+ 	if (hasDebugger) {
+ 		mDebuggerAttach(&debugger, core);
+-		mDebuggerEnter(&debugger, DEBUGGER_ENTER_MANUAL, NULL);
++		if (enterDebugger) {
++			mDebuggerEnter(&debugger, DEBUGGER_ENTER_MANUAL, NULL);
++		}
+ 	} else {
+ 		mDebuggerDeinit(&debugger);
+ 	}

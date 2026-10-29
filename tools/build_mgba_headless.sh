@@ -39,6 +39,18 @@ if [ ! -d "$SRC" ]; then
     git clone --depth 1 https://github.com/mgba-emu/mgba.git "$SRC"
 fi
 
+# The headless frontend attaches a debugger only for -d/-g, and without one a script's
+# emu:setBreakpoint returns -1. sight.lua catches the game's own rolls with breakpoints
+# (ADR 0377), so the patch attaches one whenever a script runs, never entered: the CPU runs
+# at full speed and steps one instruction at a time only while a breakpoint is set.
+PATCH="$REPO/tools/mgba-headless-script-debugger.patch"
+if git -C "$SRC" apply --reverse --check "$PATCH" 2>/dev/null; then
+    echo "==> debugger patch already applied"
+else
+    echo "==> applying the debugger patch"
+    git -C "$SRC" apply "$PATCH"
+fi
+
 echo "==> configuring"
 # Qt and SDL off: we want no GUI frontend at all, and skipping them drops the Qt dependency
 # entirely. Confirm the summary reads `Headless: ON` and `Lua: <version>` -- if Lua is

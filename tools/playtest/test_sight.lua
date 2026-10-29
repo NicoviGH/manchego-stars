@@ -44,14 +44,78 @@ local function fakeCpu(cost)
     return cpu, function() return loads, ram end
 end
 
--- test_hit_chance_is_the_two_roll_rule: Roll2RN's true odds (rng.c), the published 2RN table:
--- the ends pull outward (a displayed 70 lands 82.3% of the time, a 30 only 18.3%).
+-- test_roll_chance_counts_every_draw: Roll1RN and Roll2RN's odds over every 16-bit NextRN
+-- (rng.c). NextRN_100 = NextRN() * 100 / 0x10000 gives 0 to 656 of the 65536 values, so a 1%
+-- roll passes 656/65536 of the time; Roll2RN lands on the published 2RN table to 0.1% (a
+-- displayed 70 lands 82.3% of the time, a 30 only 18.3%).
 do
-    check(Sight.hitChance(0), 0, "2RN: 0 never")
-    check(Sight.hitChance(100), 1, "2RN: 100 always")
-    check(Sight.hitChance(50), 0.505, "2RN: 50 lands 50.5%")
-    check(Sight.hitChance(70), 0.823, "2RN: 70 lands 82.3%")
-    check(Sight.hitChance(30), 0.183, "2RN: 30 lands 18.3%")
+    local function near(got, want) return math.abs(got - want) < 0.0005 end
+    check(Sight.rollChance(2, 0), 0, "2RN: 0 never")
+    check(Sight.rollChance(2, 100), 1, "2RN: 100 always")
+    check(Sight.rollChance(2, 0xFFFF), 1, "2RN: a u16 past 100 always")
+    check(near(Sight.rollChance(2, 50), 0.505), true, "2RN: 50 lands 50.5%")
+    check(near(Sight.rollChance(2, 70), 0.823), true, "2RN: 70 lands 82.3%")
+    check(near(Sight.rollChance(2, 30), 0.183), true, "2RN: 30 lands 18.3%")
+    check(Sight.rollChance(1, 1), 656 / 0x10000, "1RN: a 1% roll is the 656 draws that give 0")
+    check(Sight.rollChance(1, 0), 0, "1RN: 0 never")
+end
+
+-- test_played_splits_every_roll_that_can_go_both_ways: a fake battle -- our blow (2RN 50),
+-- its crit (1RN 10) only when it lands, a crit-free counter (1RN 0) that cannot pass, and the
+-- counter's own blow (2RN 100) that cannot miss -- is run once per outcome, each roll forced
+-- through r1, and the breakpoints are cleared after.
+do
+    local regs, holds, at = { r0 = 0, r1 = 0 }, {}, {}
+    local cpu = {
+        read = function(r) return regs[r] end,
+        write = function(r, v) regs[r] = v end,
+        breakpoint = function(addr, fn) holds[#holds + 1] = addr; at[addr] = fn; return #holds end,
+        unbreak = function(id) at[holds[id]] = nil end,
+    }
+    local S = { BattleRoll1RN = 0x0802B000, BattleRoll2RN = 0x0802B100 }
+    local function roll(addr, threshold)
+        regs.r0, regs.r1 = threshold, 0
+        at[addr]()
+        return regs.r1 == 1
+    end
+    local dealt, back, runs = 0, 0, 0
+    local function battle()
+        runs = runs + 1
+        dealt, back = 0, 0
+        if roll(S.BattleRoll2RN, 50) then
+            dealt = roll(S.BattleRoll1RN, 10) and 15 or 5
+        end
+        roll(S.BattleRoll1RN, 0)
+        if roll(S.BattleRoll2RN, 100) then back = 3 end
+    end
+    local called = {}
+    local leaves = Sight.played(cpu, function(addr, args)
+        called[#called + 1] = string.format("%X:%s", addr, table.concat(args, ","))
+        battle()
+    end, { 0x0802C001, { 1, 2 } }, S, function() return dealt, back end)
+    check(called[1], "802C001:1,2", "played: the simulation is called with its own arguments")
+    check(runs, 3, "played: one run per outcome (crit, hit, miss)")
+    local d, b = Sight.exchangeOf(leaves)
+    local hit, crit = Sight.rollChance(2, 50), Sight.rollChance(1, 10)
+    check(math.abs(d[15] - hit * crit) < 1e-12, true, "played: the crit's chance")
+    check(math.abs(d[5] - hit * (1 - crit)) < 1e-12, true, "played: the plain hit's")
+    check(math.abs(d[0] - (1 - hit)) < 1e-12, true, "played: the miss's")
+    check(math.abs(b[3] - 1) < 1e-12, true, "played: the sure counter in every outcome")
+    check(at[S.BattleRoll1RN] == nil and at[S.BattleRoll2RN] == nil, true,
+          "played: the breakpoints are cleared")
+end
+
+-- test_odds_compose_exchanges: two 50/50 exchanges of 6 on a 10 HP unit kill a quarter of the
+-- time; the damage is capped at the HP; worst and least read a distribution's ends.
+do
+    local half = { [0] = 0.5, [6] = 0.5 }
+    local dead, mean = Sight.odds({ half, half }, 10)
+    check(dead, 0.25, "odds: both must land")
+    check(mean, 0.5 * 6 + 0.25 * 10, "odds: the mean, 12 capped at the 10 HP")
+    check(Sight.odds({ { [4] = 1 } }, 10), 0, "odds: one sure 4 does not kill 10")
+    check(Sight.worst(half), 6, "worst: the largest damage with a chance")
+    check(Sight.worst({ [0] = 1, [9] = 0 }), 0, "worst: a damage with no chance is not counted")
+    check(Sight.least(half), 0, "least: the smallest")
 end
 
 -- test_batch_is_one_round_trip_and_reads_do_not_leak: three reads inside one batch load the
@@ -157,35 +221,55 @@ do
 end
 
 -- attackOf / strikeOf: our attack (with the enemy's counter) and the enemy's own strike are
--- separate reads.
+-- separate reads; what each does is its played distributions.
 local hitter = { hit = 80, crit = 5, dmg = 6, hits = 2, armed = true }
 do
+    -- 70%: the target (5 HP) dies, or lives to counter for 6 or a critical 18
     local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
-                               counter = hitter }, 5)
+                               counter = hitter, killsTarget = true,
+                               dealt = { [5] = 0.7, [0] = 0.3 },
+                               back = { [0] = 0.75, [6] = 0.2, [18] = 0.05 } }, 5, 20)
     check(f.counters, true, "armed: the enemy counters")
-    check(f.counterDmg, 6, "the counter's damage")
+    check(f.counterDmg, 6, "the counter's damage, as the window shows it")
     check(f.counterHits, 2, "with its blows")
     check(f.counterCrit, 5, "and its crit")
-    check(f.killsTarget, true, "5 x 1 kills a 5 HP enemy")
+    check(f.killsTarget, true, "the game's own simulation kills it")
+    check(f.kill, 0.7, "kill: the outcomes that take its 5 HP")
+    check(f.sure, false, "not sure: it can miss")
+    check(f.expected, 3.5, "expected: the mean damage dealt")
+    check(f.counterWorst, 18, "counterWorst: a critical counter")
+    check(f.die, 0, "die: nothing takes our 20")
 end
 
 do
     local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
                                counter = { hit = 0, crit = 0, dmg = 0, hits = 0,
-                                           armed = false } }, 9)
+                                           armed = false }, killsTarget = false,
+                               dealt = { [5] = 1 }, back = { [0] = 1 } }, 9, 20)
     check(f.counters, false, "an unarmed answer is no counter")
     check(f.counterDmg, 0, "so no counter damage")
-    check(f.killsTarget, false, "5 x 1 does not kill 9")
+    check(f.killsTarget, false, "5 does not kill 9")
+    check(f.counterWorst, 0, "and nothing comes back")
+    check(f.sure, false, "a sure 5 on 9 is no sure kill")
+    local a = Sight.attackOf({ hit = 100, crit = 0, dmg = 9, hits = 1, armed = true,
+                               counter = hitter, killsTarget = true, dealt = { [9] = 1 },
+                               back = { [0] = 1 } }, 9, 20)
+    check(a.sure, true, "every outcome takes 9 of 9: a sure kill")
+    check(Sight.answerOf(a, 20), true, "a sure kill that takes nothing back answers")
 end
 
 do
     local t = Sight.strikeOf({ hit = 60, crit = 0, dmg = 9, hits = 1, armed = true, slot = 1,
-                               tile = { x = 4, y = 4 } })
+                               tile = { x = 4, y = 4 }, dealt = { [0] = 0.4, [9] = 0.6 },
+                               back = { [0] = 1 } })
     check(t.takenDmg, 9, "the AI's strike")
+    check(t.takenWorst, 9, "the most it takes")
+    check(t.takenDist[9], 0.6, "as the game plays it")
     check(t.takenSlot, 1, "with the slot it chose")
     check(t.takenTile.x .. "," .. t.takenTile.y, "4,4", "and the tile")
     local none = Sight.strikeOf(nil)
     check(none.takenHit, 0, "an enemy whose AI does not strike us strikes nothing")
+    check(none.takenWorst, 0, "and takes nothing")
     check(none.takenSlot, nil, "and chose no slot")
 end
 
@@ -203,8 +287,7 @@ do
         "only the repeating event ahead: no change")
 end
 
--- side: the forecast window marks only the ACTOR's Monster Stone 0xFF (damage and crit); a
--- target's is read as it is.
+-- side: the forecast window's numbers, read off the battle units and the proc.
 do
     local bytes = {}
     local mem = {
@@ -212,15 +295,13 @@ do
         s8 = function(a) local v = bytes[a] or 0; return v >= 0x80 and v - 0x100 or v end,
     }
     local A, T, P = 0x100, 0x200, 0x300
-    bytes[A + 0x48] = 0xB5        -- weapon: the Monster Stone (uses 0)
+    bytes[A + 0x48] = 0x01
     bytes[A + 0x5A], bytes[T + 0x5C] = 12, 4
-    bytes[A + 0x64], bytes[A + 0x6A] = 70, 0
-    bytes[P + 0x50] = 1
-    local actor = Sight.side(mem, A, T, P, 0x50, true)
-    check(actor.dmg .. "/" .. actor.crit, "255/255",
-        "the actor's Monster Stone: 0xFF damage and crit")
-    local target = Sight.side(mem, A, T, P, 0x50, false)
-    check(target.dmg .. "/" .. target.crit, "8/0", "the same stone on the target's side: as it is")
+    bytes[A + 0x64], bytes[A + 0x6A] = 70, 3
+    bytes[P + 0x50] = 2
+    local side = Sight.side(mem, A, T, P, 0x50)
+    check(string.format("%d/%d/%d/%d/%s", side.hit, side.dmg, side.crit, side.hits,
+        tostring(side.armed)), "70/8/3/2/true", "side: the window's hit, damage, crit, blows")
 end
 
 -- eventOrder: the check runs at a player phase's start, so this turn's green and red phases are
@@ -252,12 +333,12 @@ end
 -- The scratch the forecast proc and EventInfo share fits below the return loop.
 check(Sight.SCRATCH_SIZE <= 0x70, true, "scratch ends before the loop at +0x80 (scratch at +0x10)")
 
--- answerOf: kills in one round AND outlives the counter at its worst; strength = expected damage.
+-- answerOf: the game's simulation kills AND no outcome's counter kills us; strength = expected.
 do
-    local a = { hit = 80, dmg = 6, hits = 2, killsTarget = true, counterDmg = 5, counterHits = 2 }
+    local a = { killsTarget = true, counterWorst = 10, expected = 9.6 }
     local ok, strength = Sight.answerOf(a, 11)
-    check(ok, true, "answerOf: kills, and 10 counter damage < 11 HP")
-    check(strength, 9.6, "answerOf: strength = 6 x 2 x 80%")
+    check(ok, true, "answerOf: kills, and the worst counter (10) < 11 HP")
+    check(strength, 9.6, "answerOf: strength = the expected damage")
     check((Sight.answerOf(a, 10)), false, "answerOf: a counter that can kill is no answer")
     a.killsTarget = false
     check((Sight.answerOf(a, 99)), false, "answerOf: no kill this round is no answer")

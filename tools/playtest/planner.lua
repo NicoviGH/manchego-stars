@@ -29,8 +29,8 @@
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
 --      most of a plan's cost, and an act that went as expected leaves the plan as good as it
 --      was.
--- Honesty: outcomes are odds (Sight.hitChance: FE8's two-roll hit; crits one roll), never the
--- game's next random numbers; an enemy the player cannot see is in no plan (Bot.candidates and
+-- Honesty: outcomes are odds (each exchange played by the game every way its rolls can go,
+-- sight.lua's `played`; several composed by sight.odds), never the game's next random numbers; an enemy the player cannot see is in no plan (Bot.candidates and
 -- sight.enemyPhase skip it); the enemy's choices are the game's own AI.
 -- Styles are weights (M.WEIGHTS): how much a unit's death costs against progress.
 --
@@ -67,94 +67,43 @@ M.WEIGHTS = {
              recruit = 200, breach = 25, win = 100000, fog = 0 },
 }
 
-local CRIT = 3     -- bmbattle.c: damage x3 on a critical hit
-
--- One strike's blows: { hit chance, crit chance, damage } each, `hits` of them.
-function M.blows(hitRate, dmg, hits, critRate, hitChance)
-    local out = {}
-    local p, c = hitChance(hitRate or 0), math.max(0, math.min(100, critRate or 0)) / 100
-    for _ = 1, hits or 0 do out[#out + 1] = { p = p, c = c, dmg = dmg or 0 } end
-    return out
-end
-
--- The damage a list of blows deals, as a distribution { [damage] = probability }, capped at
--- `cap` (the target's HP: past it, it is dead and the rest does not matter).
-function M.damage(blows, cap)
-    local dist = { [0] = 1 }
-    for _, b in ipairs(blows) do
-        local nxt = {}
-        local function add(d, p)
-            if p > 0 then
-                d = math.min(d, cap)
-                nxt[d] = (nxt[d] or 0) + p
-            end
-        end
-        for d, p in pairs(dist) do
-            if d >= cap then
-                add(d, p)
-            else
-                add(d, p * (1 - b.p))
-                add(d + b.dmg, p * b.p * (1 - b.c))
-                add(d + b.dmg * CRIT, p * b.p * b.c)
-            end
-        end
-        dist = nxt
-    end
-    return dist
-end
-
--- P(the blows deal at least `hp`), and the expected damage (capped at `hp`).
-function M.odds(blows, hp)
-    local dead, mean = 0, 0
-    for d, p in pairs(M.damage(blows, hp)) do
-        if d >= hp then dead = dead + p end
-        mean = mean + d * p
-    end
-    return dead, mean
-end
-
 -- `act`'s standing exposure for a unit at `hp`, the enemies in `gone` left out: the chance
 -- it dies and the HP it loses if each enemy that reaches its tile strikes it.
-local function exposed(act, hp, gone, hitChance)
-    local blows = {}
+local function exposed(act, hp, gone, odds)
+    local strikes = {}
     for _, s in ipairs(act.exposure or {}) do
-        if not gone[s.id] then
-            for _, b in ipairs(M.blows(s.hit, s.dmg, s.hits, s.crit, hitChance)) do
-                blows[#blows + 1] = b
-            end
-        end
+        if not gone[s.id] then strikes[#strikes + 1] = s.dist end
     end
-    if #blows == 0 then return 0, 0 end
-    return M.odds(blows, hp)
+    if #strikes == 0 then return 0, 0 end
+    return odds(strikes, hp)
 end
 
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
-local function score(act, st, W, style, hitChance)
+local function score(act, st, W, style, odds)
     local fx = { hp = act.unitHp, gone = nil, enemyHp = nil }
     local v = W.progress * (act.progress or 0)
     if act.act == "attack" and act.f then
         local f, e = act.f, act.targetUnit
+        -- the game played the exchange at the target's own HP; at the lower HP an earlier act
+        -- of the plan leaves it, its damage is read capped there (the plan's HP is an average:
+        -- design decision 5)
         local hp = st.enemyHp[e.id] or e.hp
-        local ours = M.blows(f.hit, f.dmg, f.hits, f.crit, hitChance)
-        local kill, dealt = M.odds(ours, hp)
+        local kill, dealt = odds({ f.dealt }, hp)
         -- the objective's boss: every point of its HP is a step to the win
         local target = (e.isBoss and st.objective == "boss") and M.BOSS_WORTH or 1
         local worth = (e.isBoss and 5 or 1) + (act.first and 1 or 0)
         v = v + W.dealt * dealt * target + W.kill * kill * worth
         if f.counters then
-            -- the counter's risk is its chance to kill; the HP it takes is paid once, at the
+            -- the counter's risk is its chance to kill (a target dead before it answers takes
+            -- nothing: the game's play of the exchange); the HP it takes is paid once, at the
             -- end, after any heal the plan gives back (the judge's deficit)
-            local back = M.blows(f.counterHit, f.counterDmg, f.counterHits, f.counterCrit, hitChance)
-            local die, taken = M.odds(back, act.unitHp)
-            v = v - (1 - kill) * W.death * die
-            fx.hp = math.max(1, act.unitHp - math.floor((1 - kill) * taken + 0.5))
-            -- the counter's blows, each as likely as the target living to make it: the judge
-            -- chains them with the enemy phase's, so a counter that lands is not averaged away
-            fx.counter = {}
-            for _, b in ipairs(back) do
-                fx.counter[#fx.counter + 1] = { p = b.p * (1 - kill), c = b.c, dmg = b.dmg }
-            end
+            local die, taken = odds({ f.counterDist }, act.unitHp)
+            v = v - W.death * die
+            fx.hp = math.max(1, act.unitHp - math.floor(taken + 0.5))
+            -- the judge chains it with the enemy phase's strikes, so a counter that lands is
+            -- not averaged away
+            fx.counter = { f.counterDist }
         end
         fx.enemyHp = { id = e.id, hp = hp - dealt }
         if kill >= 0.5 then fx.gone = e.id end
@@ -166,7 +115,7 @@ local function score(act, st, W, style, hitChance)
         -- unit stands no chance of dying next phase. The credit is the recruit's (a village
         -- may be one); it orders a safe visit against the unit's other acts and never buys
         -- risk. The judge takes it back when the enemy phase it plays finds a chance there.
-        if exposed(act, act.unitHp, st.gone, hitChance) == 0 then
+        if exposed(act, act.unitHp, st.gone, odds) == 0 then
             v = v + W.recruit
             fx.explored = true
         end
@@ -196,7 +145,7 @@ local function score(act, st, W, style, hitChance)
         local at = act.obstacle.x .. "," .. act.obstacle.y
         local hp = st.walls[at] or act.obstacle.hp
         v = v + W.breach
-        fx.wall = { at = at, hp = hp - act.obstacle.blow.dmg * act.obstacle.blow.hits }
+        fx.wall = { at = at, hp = hp - act.obstacle.blow.dealt }
         fx.blocked = hp <= 0
     elseif act.obstacle or act.act == "door" then
         v = v + W.breach
@@ -220,7 +169,7 @@ end
 function M.plan(Bot, board, sight, style, opts)
     local W = M.WEIGHTS[style.aggression]
     if not W then error("planner.lua: no weights for style " .. tostring(style.aggression)) end
-    local hitChance = sight.hitChance
+    local odds = sight.odds
     local cands, ctx = Bot.candidates(board, sight, style, opts)
     if #cands == 0 then return nil end
     local byId = {}
@@ -252,7 +201,7 @@ function M.plan(Bot, board, sight, style, opts)
         local k = key(a) .. "#" .. hp .. "#" .. table.concat(ids, ",")
         local r = risks[k]
         if not r then
-            local die, taken = exposed(a, hp, gone, hitChance)
+            local die, taken = exposed(a, hp, gone, odds)
             r = W.death * die + W.taken * taken
             risks[k] = r
         end
@@ -270,9 +219,9 @@ function M.plan(Bot, board, sight, style, opts)
             if a.act == "visit" or a.act == "chest" then
                 offered[#offered + 1] = { id = a.unitId, charId = a.unit, x = a.move.x,
                                           y = a.move.y, kind = a.act,
-                                          die = (exposed(a, a.unitHp, {}, hitChance)) }
+                                          die = (exposed(a, a.unitHp, {}, odds)) }
             end
-            local v, fx = score(a, start, W, style, hitChance)
+            local v, fx = score(a, start, W, style, odds)
             scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, fx.gone and { [fx.gone] = true } or {}) }
         end
         table.sort(scored, function(x, y)
@@ -302,7 +251,7 @@ function M.plan(Bot, board, sight, style, opts)
                 or (a.vacate and not st.used[a.vacate]) then
             return nil
         end
-        local v, fx = score(a, st, W, style, hitChance)
+        local v, fx = score(a, st, W, style, odds)
         if fx.blocked then return nil end
         local n = { base = st.base + v, acts = copy(st.acts), expect = copy(st.expect),
                     used = copy(st.used), tiles = copy(st.tiles), gone = copy(st.gone),
@@ -410,8 +359,7 @@ function M.plan(Bot, board, sight, style, opts)
             local opts = {}
             for _, a in ipairs(c.acts) do
                 if a.act == "attack" and a.targetId == boss.id and a.f then
-                    local _, dealt = M.odds(M.blows(a.f.hit, a.f.dmg, a.f.hits, a.f.crit,
-                                                     hitChance), boss.hp)
+                    local _, dealt = odds({ a.f.dealt }, boss.hp)
                     opts[#opts + 1] = { a = a, dealt = dealt }
                 end
             end
@@ -474,16 +422,6 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
-    -- the chance a striker falls to its target's counter, priced as score() prices ours: the
-    -- counter's chance to kill it, as likely as the target living through the strike
-    local function felled(t)
-        if not t.counterHits or t.counterHits == 0 then return 0 end
-        local kill = M.odds(M.blows(t.counterHit, t.counterDmg, t.counterHits, t.counterCrit,
-                                    hitChance), t.strikerHp)
-        local first = M.odds(M.blows(t.takenHit, t.takenDmg, t.takenHits, t.takenCrit,
-                                     hitChance), t.targetHp)
-        return kill * (1 - first)
-    end
     local function judge(st)
         local planned, at = {}, {}
         for _, a in ipairs(st.acts) do at[a.unitId] = a end
@@ -495,24 +433,21 @@ function M.plan(Bot, board, sight, style, opts)
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
         local strikes = sight.enemyPhase and sight.enemyPhase({ blues = planned, gone = st.gone,
-                                                                reds = reds, branch = felled })
+                                                                reds = reds })
             or {}
-        -- each unit's chance to die, HP lost and blows, over every way the phase went
+        -- each unit's chance to die, HP lost and the strikes on it, over every way the phase went
         local judged = st.base
-        local die, taken, short, blows = {}, {}, {}, {}
+        local die, taken, short, struck = {}, {}, {}, {}
         for _, o in ipairs(strikes.outcomes or { { p = 1, strikes = strikes } }) do
             local onUnit = {}
             for _, s in ipairs(o.strikes) do
                 onUnit[s.target] = onUnit[s.target] or {}
-                for _, b in ipairs(M.blows(s.takenHit, s.takenDmg, s.takenHits, s.takenCrit,
-                                           hitChance)) do
-                    table.insert(onUnit[s.target], b)
-                end
+                table.insert(onUnit[s.target], s.takenDist)
             end
             for _, p in ipairs(planned) do
                 local id = p.unit.id
                 local phase = onUnit[id] or {}
-                local d, t = M.odds(phase, p.hp)
+                local d, t = odds(phase, p.hp)
                 local back = st.counter[id]
                 local sh = ((p.unit.maxhp or p.hp) - p.hp) + t
                 if back then
@@ -520,17 +455,17 @@ function M.plan(Bot, board, sight, style, opts)
                     -- heal the plan gives it): the phase's share of the death is the chain's
                     -- less the counter's own, which score() already paid
                     local chain = {}
-                    for _, b in ipairs(back) do chain[#chain + 1] = b end
-                    for _, b in ipairs(phase) do chain[#chain + 1] = b end
+                    for _, x in ipairs(back) do chain[#chain + 1] = x end
+                    for _, x in ipairs(phase) do chain[#chain + 1] = x end
                     local hp0 = p.unit.hp + (st.healed[id] or 0)
-                    local all, lost = M.odds(chain, hp0)
-                    d = math.max(0, all - (M.odds(back, hp0)))
+                    local all, lost = odds(chain, hp0)
+                    d = math.max(0, all - (odds(back, hp0)))
                     sh = ((p.unit.maxhp or p.hp) - hp0) + lost
                 end
                 die[id] = (die[id] or 0) + o.p * d
                 taken[id] = (taken[id] or 0) + o.p * t
                 short[id] = (short[id] or 0) + o.p * sh
-                blows[id] = math.max(blows[id] or 0, #phase)
+                struck[id] = math.max(struck[id] or 0, #phase)
             end
         end
         st.predict = {}
@@ -538,7 +473,7 @@ function M.plan(Bot, board, sight, style, opts)
             local id = p.unit.id
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
                                             y = p.y, hp = p.hp, die = die[id], taken = taken[id],
-                                            blows = blows[id] }
+                                            strikes = struck[id] }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
             judged = judged - W.death * die[id] - W.taken * short[id]
             -- the no-risk rule, against the phase as the AI plays it
