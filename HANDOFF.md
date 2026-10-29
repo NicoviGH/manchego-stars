@@ -10,10 +10,10 @@ live in GitHub issues. Before a context rollover, warn Nicolas, refresh this fil
 fresh instance — don't rely on auto-compaction.
 
 Refreshed 2026-10-30 (Claude, latest, evening). **#510 step 9 is on `feat/510-step9-e-campaigns`
-at efdae5a, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
+at 06b17f8, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
 rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`, the gotcha below).
 
-**NEXT SESSION: answer Nicolas's open question if he has, finish the audit's small items, then
+**NEXT SESSION: finish the audit's small items, then
 the review, the PR, and Nicolas's sweep.** The audit is ONE #510 comment, kept current in place
 (its "Fixed" sections say what each commit did and measured):
 <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
@@ -33,9 +33,8 @@ Read **ADR 0377** (+ amendments) and **ADR 0379** first.
     exposures ignored that striking equips the weapon (`EquipUnitItemSlot`). `Board.AI_DEC`
     is now the one owner of `gAiDecision`'s layout.
   - efdae5a: montecarlo notes non-spoiling thefts (ADR 0379).
-- **Open question to Nicolas (on the audit comment):** a chest whose thief JOINS us holding
-  the loot (Colm, vanilla Ch3): taken or not? ADR 0376 as written says not, so vanilla Ch3 is
-  not clean today. Do not decide it for him.
+- **Answered (Nicolas):** a chest whose thief joins us is taken (06b17f8, ADR 0376 amended);
+  vanilla Ch3 is now clean t11, 17.6 CPU s.
 - **Left, in order:** 10 (`s.visible`'s fog test), 11 (`turnsLeft`), 12 (`SUPPORT_RANGE = 3`),
   19 (`onFieldState`), 20's heal (`planner.lua` `score`). 17-18 are decided behaviour. Each fix
   states its measured cost (ADR 0377).
@@ -50,7 +49,7 @@ Read **ADR 0377** (+ amendments) and **ADR 0379** first.
   to the boss on plans judging 0.88-0.89 death with nothing better. Earlier "clean" ch03 runs
   had skipped turns and wrong weapons. Raise it with Nicolas (part B/C territory), don't patch.
 - **Baselines (CPU s, attempt 1, efdae5a) [ROM]:** Manchego Stars ch01 clean t9 13.3; vanilla
-  Ch2 (`e1-vanilla-ch3/2`) clean t8 14.6; vanilla Ch3 (`/3`) won t11 17.8 (only Colm's chests);
+  Ch2 (`e1-vanilla-ch3/2`) clean t8 14.6; vanilla Ch3 (`/3`) clean t11 17.6;
   Manchego Stars ch03 (`e1-ours-ch07/4`) won t12 25.5, not clean. Vanilla Ch5 not re-run.
 - **Running a chapter alone:** `campaign_env.py vanilla --id e1-vanilla-ch3 --from N`, then set
   `last: [N]`, `attempt: 1` in the JSON; `PT_VANILLA=1 PT_RUN_TAG=x PT_CAMPAIGN="$(cat env)"
