@@ -35,9 +35,9 @@ Read **ADR 0377** (+ amendments) and **ADR 0379** first.
   - efdae5a: montecarlo notes non-spoiling thefts (ADR 0379).
 - **Answered (Nicolas):** a chest whose thief joins us is taken (06b17f8, ADR 0376 amended);
   vanilla Ch3 is now clean t11, 17.6 CPU s.
-- **Left, in order:** 10 (`s.visible`'s fog test), 11 (`turnsLeft`), 12 (`SUPPORT_RANGE = 3`),
-  19 (`onFieldState`), 20's heal (`planner.lua` `score`). 17-18 are decided behaviour. Each fix
-  states its measured cost (ADR 0377).
+- **Audit 10-12, 19, 20: being committed on the branch (2026-10-30)**: an enemy in fog is the
+  game's `US_BIT9`; a heal's cap is `GetUnitMaxHp`; 11, 12 and 19 keep their copies, each with
+  a stated reason. Numbers on the audit comment. 17-18 are decided behaviour.
 - **Then:** `/code-review <PR> medium` in a subagent, `review-to-clean`, the PR (merge is
   pre-approved for step 9 once the review is clean and CI is green on HEAD).
 - **Then Nicolas's ask (2026-10-29): a sweep for optimization and consolidation** ("nice and
