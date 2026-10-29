@@ -624,26 +624,28 @@ do
     check(r.clean, true, "talked: clean")
 end
 
--- test_a_recruit_the_ending_loads_joins: vanilla Ch5's ending loads Joshua blue
--- (EventScr_StrictLoadUniqueAlly) with no Talk. Here the green unit turns blue in the phase
--- that wins the chapter, so only a read after the win sees it.
+-- test_a_recruit_the_ending_marks_dead_has_not_joined: vanilla Ch5's ending runs
+-- EventScr_StrictLoadUniqueAlly on an unrecruited Joshua: CUSA (or SPAWN_ALLY when he was
+-- killed), then SET_HP 0, which sets US_DEAD (eventscr.c). The scout's Ch6 start holds him
+-- blue, DEAD and hidden, and the game's prep list leaves him out. A dead blue entry is no join.
 do
-    local units = rout()
-    units[2].hp = 30
-    local g = fakeGame { recruits = { 0x30 }, units = units, kind = "survive", turnsLeft = 2,
-        enemy = function(g, find)
-            if g.turnsLeft == 1 then
-                local j = unit(0x05, 4, "blue", -1, -1, 18)
-                j.charId, j.onMap, j.onField = 0x30, false, false
-                g.units[#g.units + 1] = j
-            end
-            return {}
-        end }
+    local g = fakeGame { recruits = { 0x30 },
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local act = g.api.act
+    g.api.act = function(a)
+        local ok = act(a)
+        if a.act == "attack" then
+            local j = unit(0x05, 4, "blue", -1, -1, 0)
+            j.charId, j.onMap, j.onField, j.dead = 0x30, false, false, true
+            g.units[#g.units + 1] = j
+        end
+        return ok
+    end
     Botrun.run(g.api)
     local r = recordOf(g)
-    check(r.outcome, "won", "ending recruit: won")
-    check(r.recruits.joined[1], 0x30, "ending recruit: joined, read after the win")
-    check(r.clean, true, "ending recruit: clean")
+    check(#r.recruits.joined, 0, "marked dead: not joined")
+    check(r.clear.recruits_missing[1], 0x30, "marked dead: missing")
+    check(r.clean, false, "marked dead: not clean")
 end
 
 -- test_a_razed_village_is_missing_at_once: a brigand's pick act names the village, and the

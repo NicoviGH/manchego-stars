@@ -319,9 +319,10 @@ function M.run(api)
                   deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 }, bag = {} }
     local explore = M.exploreLog()
     -- the clean clear's recruits part: owed = api.recruits less any already in the party
-    -- (blue, dead or not, deployed or not) at the first board; joined = seen blue later,
-    -- the read after a win included
-    local owed, blueSeen = nil, {}
+    -- (blue, dead or not, deployed or not) at the first board; joined = seen blue and not
+    -- dead later. Vanilla's endings mark an unrecruited one blue AND dead
+    -- (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD), and the prep list drops it
+    local owed, joinedSeen, blueSeen = nil, {}, {}
     -- one step per act and per enemy phase: a thief's fall and the drop it gives share one
     local step = 0
     local startFrame = api.frames()
@@ -356,7 +357,10 @@ function M.run(api)
             end
         end
         for _, u in ipairs(after.units) do
-            if u.faction == "blue" then blueSeen[u.charId] = true end
+            if u.faction == "blue" then
+                blueSeen[u.charId] = true
+                if not u.dead then joinedSeen[u.charId] = true end
+            end
         end
         if lastBoard then
             for _, e in ipairs(M.events(lastBoard, after)) do
@@ -400,20 +404,11 @@ function M.run(api)
         end
         rec.explore = explore.summary()
         local missing = "unchecked"
-        if owed and outcome == "won" then
-            -- a recruit an ending scene loads (vanilla Ch5's EventScr_StrictLoadUniqueAlly on
-            -- Joshua) joins after the last act; the party's blue array keeps it, so one read
-            -- after the win is the game's answer
-            local ok, board = pcall(api.board)
-            for _, u in ipairs(ok and board.units or {}) do
-                if u.faction == "blue" then blueSeen[u.charId] = true end
-            end
-        end
         if owed then
             rec.recruits = { owed = owed, joined = {} }
             missing = {}
             for _, c in ipairs(owed) do
-                local list = blueSeen[c] and rec.recruits.joined or missing
+                local list = joinedSeen[c] and rec.recruits.joined or missing
                 list[#list + 1] = c
             end
         end
