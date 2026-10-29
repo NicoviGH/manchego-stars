@@ -3024,13 +3024,14 @@ end
 INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(), u) end
 
 -- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
--- for the phase's length that watches both arrays (lean) and, the frame one goes down, reads
--- who is fighting -- gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
+-- for the phase's length that watches every faction's array (lean) -- a green unit lost spoils
+-- the clear as a blue one does (ADR 0376) -- and, the frame one goes down, reads who is
+-- fighting: gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
-    for _, f in ipairs({ "blue", "red" }) do
-        for _, u in ipairs(BOARD.leanList(f)) do
-            if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f } end
+    for _, f in ipairs(BOARD.FACTIONS) do
+        for _, u in ipairs(BOARD.leanList(f.name)) do
+            if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f.name } end
         end
     end
     local function charOf(bu) return ru8(ru32(bu) + 4) end
