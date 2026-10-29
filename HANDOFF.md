@@ -9,41 +9,53 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 night (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns`
-at a9d5869, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
+Refreshed 2026-10-30 (Claude, latest, evening). **#510 step 9 is on `feat/510-step9-e-campaigns`
+at 06b17f8, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
 rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`, the gotcha below).
 
-**NEXT SESSION: finish the re-derivation audit, then the review, the PR, and Nicolas's sweep.**
-The audit is ONE #510 comment, kept current in place (its "Fixed" sections say what each commit did
-and what it measured): <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
-Read **ADR 0377** and its two amendments first. Nicolas (2026-10-29): "finish the audit and address
-them all. remember to eliminate duplicate code and keep efficiency in mind."
-- **DONE this session:** 14 (b47558f, green deaths watched), 13 (50f8651, `AiDecideMain` after
-  `CpDecide_Main`'s whole per-unit step; a sight call list now holds 5), 5+6 (69546af, the drop
-  caught at `NewPopup_GeneralItemGot`, `api.drops`), 7+15+16 (a9d5869, owed recruits from the
-  game's talk table via `Sight.talks`, so `campaign_env.py` carries no recruits; keys by
-  `INSPECT.isKey`; doors by `sight.doorFrom`). Every one was proved in the ROM. The numbers are on
-  the audit comment.
-- **Left, in order:** 9 (`bot.lua` `inRange`/`attackTileFor`/`gridHostileInReach`: ask the game's
-  attack target list per usable weapon, as `sight.legal` already does; `talkFrom`'s
-  `manhattan == 1` is the same kind of copy), 10 (`s.visible`'s fog test), 11 (`turnsLeft`),
-  12 (`SUPPORT_RANGE = 3`), 19 (`onFieldState`), 20's heal (`planner.lua` `score`). 17-18 are
-  decided behaviour. Each fix states its measured cost (ADR 0377's reasons).
+**NEXT SESSION: finish the audit's small items, then
+the review, the PR, and Nicolas's sweep.** The audit is ONE #510 comment, kept current in place
+(its "Fixed" sections say what each commit did and measured):
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
+Read **ADR 0377** (+ amendments) and **ADR 0379** first.
+- **DONE this session (all [ROM]-proved, numbers on the audit comment):**
+  - 2b8faf3, audit 9's Talk half: `sight.offers(u, tiles, act, target)` runs the menu's own
+    check (`TalkCommandUsability`/`DoorCommandUsability`) from each wait tile in one sandbox;
+    `menuOffers` is shared by `offers` and `legal`; `doorFrom` is gone.
+  - 56851ff, audit 22-23: thefts (`INSPECT.watchThefts`, `Sight.stealRanks`, `clear.stolen`,
+    `rec.thefts`); `INSPECT.breakWhile` folds the drop and theft breakpoints. A thief's chest
+    is now named by the act (it is opened as USE_ITEM, which the watch never saw: the path was
+    BROKEN, Colm in vanilla Ch3); `rec.watch_faults` (`drop_missed`) guards the drop.
+  - **Three harness bugs found on the way (56851ff):** `Controller.findAction` walked Weapon
+    Select back to row 0 (since 7cdb5bd the chosen weapon was often not played); **an act that
+    auto-ended the player phase made the bot end the NEXT turn unplayed** (ch01 at HEAD skipped
+    turns 3 and 5; every earlier baseline had skipped turns); the judged enemy phase and
+    exposures ignored that striking equips the weapon (`EquipUnitItemSlot`). `Board.AI_DEC`
+    is now the one owner of `gAiDecision`'s layout.
+  - efdae5a: montecarlo notes non-spoiling thefts (ADR 0379).
+- **Answered (Nicolas):** a chest whose thief joins us is taken (06b17f8, ADR 0376 amended);
+  vanilla Ch3 is now clean t11, 17.6 CPU s.
+- **Audit 10-12, 19, 20: being committed on the branch (2026-10-30)**: an enemy in fog is the
+  game's `US_BIT9`; a heal's cap is `GetUnitMaxHp`; 11, 12 and 19 keep their copies, each with
+  a stated reason. Numbers on the audit comment. 17-18 are decided behaviour.
 - **Then:** `/code-review <PR> medium` in a subagent, `review-to-clean`, the PR (merge is
   pre-approved for step 9 once the review is clean and CI is green on HEAD).
-- **Then Nicolas's ask (2026-10-29): "at the end of all this do a sweep for optimization and
-  consolidation opportunities so our bot is nice and lean and efficient and follows best practices
-  for this type of thing."** Scope: `bot.lua`, `planner.lua`, `sight.lua`, `board.lua`,
-  `botrun.lua`, `campaign.lua` and the harness's bot api. Look for copies to fold (e.g. the
-  breakpoint arm/clear pattern now in `M.played`, `M.talks` and `INSPECT.watchDrops`), sandbox
-  calls to batch, and per-frame work. Report CPU s before and after on the runs below.
-- **Baselines (CPU s, attempt 1) [ROM]:** Manchego Stars ch01 bot 11.7-12.1 (won, clean); ch03
-  (`e1-ours-ch07/4`, ROM fd3cb9d8dca6) 20.7, clean turn 17; vanilla Ch2 (`e1-vanilla-ch3/2`) 13.8,
-  clean turn 8; Ch3 (`/3`) 15.3, clean turn 12; Ch5 (`/6`) 17.2, not clean (bot fault: Franz lost
-  t2, the village at 5,1 unreached).
-- **Running Manchego Stars ch03** needs an ours env, and `ours_env` wants every written chapter's
-  twin shop record. Build a scratch store from `e1-vanilla-ch3/*.json` plus `scout-vanilla/*.json`
-  and pass it as `--store`.
+- **Then Nicolas's ask (2026-10-29): a sweep for optimization and consolidation** ("nice and
+  lean and efficient and follows best practices"). Scope: `bot.lua`, `planner.lua`,
+  `sight.lua`, `board.lua`, `botrun.lua`, `campaign.lua` and the harness's bot api. Still to
+  fold: the breakpoint pattern in `M.played` and `M.talks` (drops/thefts already use
+  `INSPECT.breakWhile`). Report CPU s before and after.
+- **Planner quality, now visible:** Manchego Stars ch03 is won t12 but NOT clean: two units lost
+  to the boss on plans judging 0.88-0.89 death with nothing better. Earlier "clean" ch03 runs
+  had skipped turns and wrong weapons. Raise it with Nicolas (part B/C territory), don't patch.
+- **Baselines (CPU s, attempt 1, efdae5a) [ROM]:** Manchego Stars ch01 clean t9 13.3; vanilla
+  Ch2 (`e1-vanilla-ch3/2`) clean t8 14.6; vanilla Ch3 (`/3`) clean t11 17.6;
+  Manchego Stars ch03 (`e1-ours-ch07/4`) won t12 25.5, not clean. Vanilla Ch5 not re-run.
+- **Running a chapter alone:** `campaign_env.py vanilla --id e1-vanilla-ch3 --from N`, then set
+  `last: [N]`, `attempt: 1` in the JSON; `PT_VANILLA=1 PT_RUN_TAG=x PT_CAMPAIGN="$(cat env)"
+  tools/playtest/run.sh campaign`. Manchego Stars ch03 needs an ours env with `--store` of a
+  scratch dir holding `e1-vanilla-ch3/*.json` plus `scout-vanilla/*.json`, `--id e1-ours-ch07
+  --from 4`. Back up the state store first (this session's runs left it unchanged).
 - **Prose:** say "Manchego Stars ch01", never "ours ch01".
 
 **Part A (the four-part clean clear) as it stands.** Design: #510 comment 6485197805. Plan:
