@@ -246,6 +246,37 @@ def vanilla_decomp_text(relpath):
                                    encoding='utf-8', env=env)
 
 
+@functools.lru_cache(maxsize=1)
+def vanilla_event_files():
+    """{relpath: text} of every file under src/events/ at HEAD, read in ONE `git cat-file
+    --batch`: ~140 files through vanilla_decomp_text would cost a process each and evict its
+    working set."""
+    env = git_env()
+    tree = subprocess.check_output(
+        ['git', '-C', SUBMODULE, 'ls-tree', '-r', 'HEAD', 'src/events/'],
+        encoding='utf-8', env=env)
+    blobs = [line.split(None, 3)[2:] for line in tree.splitlines()]
+    raw = subprocess.run(['git', '-C', SUBMODULE, 'cat-file', '--batch'], check=True,
+                         input=''.join(sha + '\n' for sha, _ in blobs).encode(),
+                         stdout=subprocess.PIPE, env=env).stdout
+    out, at = {}, 0
+    for sha, path in blobs:
+        eol = raw.index(b'\n', at)
+        size = int(raw[at:eol].split()[2])
+        out[path] = raw[eol + 1:eol + 1 + size].decode('utf-8')
+        at = eol + 1 + size + 1
+    return out
+
+
+@functools.lru_cache(maxsize=1)
+def vanilla_event_scripts():
+    """{label: body} for every `EventListScr <label>[] = { body };` under src/events/ at HEAD.
+    A chapter's talk can CALL a script another stem's file defines (ch14b's Rennac talk calls
+    ch14a's), so a script is looked up across the directory."""
+    return dict(re.findall(r'\bEventListScr\s+(\w+)\[\]\s*=\s*\{(.*?)\};',
+                           '\n'.join(vanilla_event_files().values()), re.S))
+
+
 def _table_close_line(lines, decl):
     """(decl line index, closing `};` line index) for a C array `decl`."""
     di = next((i for i, ln in enumerate(lines) if decl in ln), None)

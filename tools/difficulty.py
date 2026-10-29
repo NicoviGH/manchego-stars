@@ -1307,13 +1307,23 @@ def _opening_udefs(stem):
 def _talk_recruits(stem):
     """Characters a chapter's talk events recruit, {target: actor}, from each `CHAR(flag,
     script, actor, target)` in its eventinfo (Eirika->Ross, Ross->Garcia, Neimi->Colm,
-    Natasha->Joshua)."""
-    relpath = 'src/events/%s-eventinfo.h' % stem
-    if not os.path.exists(os.path.join(inject.decomp.SUBMODULE, relpath)):
+    Natasha->Joshua) whose script turns the target blue: `CUSA(target)` in it or in a script
+    it CALLs. A talk that is only a conversation (ch15b's) recruits no one."""
+    info = inject.decomp.vanilla_event_files().get('src/events/%s-eventinfo.h' % stem)
+    if info is None:
         return {}
-    info = inject.decomp.vanilla_decomp_text(relpath)
-    return {target: actor for actor, target in re.findall(
-        r'\bCHAR\([^,]+,[^,]+,\s*(\w+)\s*,\s*(CHARACTER_\w+)\s*\)', info)}
+    scripts = inject.decomp.vanilla_event_scripts()
+
+    def turns_blue(label, target, seen):
+        body = scripts.get(label)
+        if body is None or label in seen:
+            return False
+        seen.add(label)
+        return (re.search(r'\bCUSA\(\s*%s\s*\)' % target, body) is not None
+                or any(turns_blue(c, target, seen) for c in re.findall(r'\bCALL\(\s*(\w+)\s*\)', body)))
+    return {target: actor for label, actor, target in re.findall(
+        r'\bCHAR\([^,]+,\s*(\w+)\s*,\s*(\w+)\s*,\s*(CHARACTER_\w+)\s*\)', info)
+        if turns_blue(label, target, set())}
 
 
 def _udef_sources(stem):
