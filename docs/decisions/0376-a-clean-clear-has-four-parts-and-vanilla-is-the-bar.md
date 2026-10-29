@@ -37,8 +37,10 @@ recruit the chapter owes joins; every village and chest the map offers is taken.
 - **Rewards.** The game's own list (`sight.explorable()`: each village and chest whose command
   the game offers; a tile only an event opens later is not on it). Taken = visited or opened by
   us, or a chest whose thief fell to one of ours and whose item then reached one of ours (the
-  thief carries `US_DROP_ITEM`, `popup.c`; the drop goes to its killer, `bmmind.c`). A razed
-  village is lost at once.
+  thief carries `US_DROP_ITEM`, `popup.c`; the drop goes to its killer, `bmmind.c`), or a chest
+  whose thief is in the game's party at the end (amended 2026-10-30, Nicolas: vanilla Ch3's
+  Colm opens two chests and is recruited holding them -- "Colm is one of ours so I guess it's
+  fine"). A razed village is lost at once.
 - The BOTRUN record carries `clear` (each part, with what spoiled it) and `clean`; a run with
   no owed list (a single-chapter `bot` run) leaves `clean` null, never true. `all_alive` is
   retired.

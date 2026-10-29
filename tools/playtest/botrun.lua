@@ -211,6 +211,8 @@ end
 --   dropped(d)         the game gave one of ours a fallen unit's item (api.drops: its own
 --                      BATTLE_HandleItemDrop), d = { from, to, item }
 --   fell(charId)       a unit of another side fell to one of ours
+--   joined(party)      the game's party at the end, by charId: a chest whose thief is in it
+--                      came to us with the thief (vanilla Ch3's Colm; Nicolas, 2026-10-30)
 --   dropMissed()       the drop watch's faults: each chest a thief emptied whose thief then
 --                      fell to one of ours with no drop of that item caught. popup.c marks the
 --                      thief US_DROP_ITEM, so the game gave it: the watch missed it.
@@ -218,7 +220,7 @@ end
 --   missing()          the clean clear's rewards part: each tile not taken, { x, y, kind,
 --                      why = its status, closed_by }. Taken = visited, or a chest whose
 --                      thief the game then made drop that chest's item to one of ours
---                      (popup.c sets US_DROP_ITEM on the thief)
+--                      (popup.c sets US_DROP_ITEM on the thief), or whose thief joined us
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
     local drops, felled = {}, {}
@@ -280,8 +282,11 @@ function M.exploreLog()
     end
     function log.dropped(d) drops[#drops + 1] = d end
     function log.fell(charId) felled[charId] = true end
+    local party = {}
+    function log.joined(p) party = p end
     local function wonBack(e)
         if e.kind ~= "chest" or not e.closedBy or not e.loot then return false end
+        if party[e.closedBy] then return true end
         for _, d in ipairs(drops) do
             if d.from == e.closedBy and d.item == e.loot then return true end
         end
@@ -428,14 +433,15 @@ function M.run(api)
                 end
             end
         end
+        local party = {}
+        local ok, list = pcall(api.party or function() return {} end)
+        for _, c in ipairs(ok and list or {}) do party[c] = true end
+        explore.joined(party)
         rec.explore = explore.summary()
         local missing = "unchecked"
         if owed then
             rec.recruits = { owed = owed, joined = {} }
             missing = {}
-            local party = {}
-            local ok, list = pcall(api.party)
-            for _, c in ipairs(ok and list or {}) do party[c] = true end
             for _, c in ipairs(owed) do
                 local list = party[c] and rec.recruits.joined or missing
                 list[#list + 1] = c

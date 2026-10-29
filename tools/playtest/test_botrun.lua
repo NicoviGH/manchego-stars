@@ -726,7 +726,7 @@ end
 -- A meanwhile fights the red at 1,0. `killer` kills the thief in the second enemy phase and,
 -- when blue, the game drops the chest's item to A (api.drops: its BATTLE_HandleItemDrop),
 -- unless `missed` (the drop watch failing to catch it).
-local function thiefGame(killer, missed, stays)
+local function thiefGame(killer, missed, stays, joins)
     local units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 30),
                     unit(0x82, 1, "red", 9, 9, 10), unit(0x41, 0, "green", 8, 9, 10) }
     for _, u in ipairs(units) do u.items = {} end
@@ -740,6 +740,9 @@ local function thiefGame(killer, missed, stays)
                 if not stays then table.remove(tiles, 1) end
                 t.items = { { id = 0x6C, uses = 1 } }
                 return {}, { { id = 0x82, charId = 0x82, act = "pick", tile = { x = 9, y = 8 } } }
+            elseif phase == 2 and joins then
+                t.faction = "blue"   -- recruited, the chest's item in its bag
+                return {}
             elseif phase == 2 then
                 t.hp, t.dead, t.onField = 0, true, false
                 dropped = killer == 0x01 and not missed
@@ -793,6 +796,15 @@ do
     check(m and m.closed_by, 0x82, "green kill: the chest is missing, closed by the thief")
     check(r.clean, false, "green kill: not clean")
     check(#r.watch_faults, 0, "green kill: no drop was owed to us")
+end
+
+-- test_a_chest_whose_thief_joins_us_is_taken (ADR 0376 amended, Nicolas 2026-10-30: vanilla
+-- Ch3's Colm opens two chests and is recruited holding them)
+do
+    local r = thiefGame(nil, false, false, true)
+    check(#r.clear.rewards_missing, 0, "joined: the chest is taken")
+    check(r.explore[1] and r.explore[1].won_back, true, "joined: said so")
+    check(r.clean, true, "joined: clean")
 end
 
 -- test_no_recruit_list_leaves_clean_unjudged
