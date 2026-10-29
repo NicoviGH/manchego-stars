@@ -49,9 +49,10 @@
 --              menu's own check; without them nothing is explored. }
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
---   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, weapon = nil }.
+--   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, slot = n|nil }.
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
---   `weapon` is nil = the weapon FE8 has equipped, the one sight.range describes.
+--   `slot` is the item an attack strikes with (one of sight.weapons), a heal's staff or a used
+--   item; nil = the first the Weapon Select menu lists.
 --   "talk" and "staff" are acts the claim behaviours add; "visit" and "chest" only the
 --   planner's proposals (Bot.candidates) make.
 --
@@ -162,18 +163,17 @@
 --   not wanted, and the new item goes.
 --
 -- ── The greedy core (the clear scenarios drive these directly) ─────────────────────────────
--- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y} } | nil
+-- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y}, slot } | nil
 --   reachable: list of {x,y} tiles the unit can move to this turn (its own tile included)
 --   enemies:   list of {x,y,hp,is_boss}
---   prefs.range:     weapon MAX reach in tiles (1 = melee adjacency; 2 = e.g. a hand axe)
---   prefs.min_range: weapon MIN reach (default 1); 2 for a bow, which CANNOT hit an adjacent
---                    foe -- striking from range 1 leaves no Attack command, so the strike
---                    tile must sit at min_range..range, not 1..range.
+--   prefs.weapons:   the unit's weapons, { slot, min, max } (sight.weapons; Board.weaponFor
+--                    says which strikes a tile). A bow's min is 2: it CANNOT hit an adjacent
+--                    foe, so its strike tile sits min..max away, not 1..max.
 --   prefs.tilesFor:  optional function(enemy) -> tiles, the strike tiles for THAT enemy in
 --                    place of `reachable` (decide's throne rule); absent = `reachable`.
---   Returns the best attackable enemy + the reachable tile to strike from, or nil if no
---   enemy sits within [min_range, range] of any reachable tile. Preference: the boss first,
---   then the lowest-HP enemy (likeliest kill).
+--   Returns the best attackable enemy, the reachable tile to strike from and the weapon's
+--   slot, or nil if no weapon strikes an enemy from any reachable tile. Preference: the boss
+--   first, then the lowest-HP enemy (likeliest kill).
 
 local M = {}
 
@@ -184,16 +184,12 @@ local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
 
 local manhattan = Board.distance   -- FE8's RECT_DISTANCE
 
-local function inRange(ax, ay, bx, by, minRange, maxRange)
-    local d = manhattan(ax, ay, bx, by)
-    return d >= minRange and d <= maxRange
-end
-
--- A reachable tile from which `e` is within [minRange, range] (so a bow, minRange 2, won't
--- pick an adjacent tile it can't fire from), or nil.
-local function attackTileFor(reachable, e, range, minRange)
+-- A reachable tile from which one of `weapons` strikes `e` (so a bow, min 2, won't pick an
+-- adjacent tile it can't fire from), and that weapon; nil when none does.
+local function attackTileFor(reachable, e, weapons)
     for _, t in ipairs(reachable) do
-        if inRange(t.x, t.y, e.x, e.y, minRange, range) then return t end
+        local w = Board.weaponFor(weapons, t.x, t.y, e.x, e.y)
+        if w then return t, w end
     end
     return nil
 end
@@ -205,45 +201,16 @@ local function preferred(c, b)
 end
 
 function M.pickTarget(reachable, enemies, prefs)
-    local range = (prefs and prefs.range) or 1
-    local minRange = (prefs and prefs.min_range) or 1
-    local best, bestTile
+    local best, bestTile, bestWeapon
     for _, e in ipairs(enemies) do
-        local from = prefs and prefs.tilesFor and prefs.tilesFor(e) or reachable
-        local tile = attackTileFor(from, e, range, minRange)
+        local from = prefs.tilesFor and prefs.tilesFor(e) or reachable
+        local tile, w = attackTileFor(from, e, prefs.weapons)
         if tile and (not best or preferred(e, best)) then
-            best, bestTile = e, tile
+            best, bestTile, bestWeapon = e, tile, w
         end
     end
-    if best then return { target = best, tile = bestTile } end
+    if best then return { target = best, tile = bestTile, slot = bestWeapon.slot } end
     return nil
-end
-
--- FE8 writes the UNIT INDEX into gBmMapUnit (bmmap.c RefreshUnitsOnBmMap): 1..0x7F for blue and
--- green, FACTION_RED + 1 (0x81) and up for red/purple. So a grid byte above FACTION_RED is a
--- hostile standing on that tile.
-local FACTION_RED = 0x80
-
--- True when the engine's tile->unit GRID holds a hostile within [minRange, maxRange] of (x,y) --
--- i.e. when the engine would offer an Attack row to a unit standing there. `gridAt(x, y)` returns
--- the grid byte, or nil off-map.
---
--- Deliberately the grid and NOT the unit array (#204): RefreshUnitsOnBmMap SKIPS a red standing in
--- fog, writing it to gBmMapHidden instead, so the unit array can report ten live enemies while
--- gBmMapUnit holds none of them. A clear-bot that trusts the array then teleports "adjacent" to a
--- foe the engine cannot see, gets a command menu with no Attack row, and its blind row-0 press
--- opens ITEM -- Using a vulnerary at full HP, forever, with the enemy count never moving.
-function M.gridHostileInReach(gridAt, x, y, minRange, maxRange)
-    for dx = -maxRange, maxRange do
-        local slack = maxRange - math.abs(dx)
-        for dy = -slack, slack do
-            if manhattan(0, 0, dx, dy) >= minRange then
-                local id = gridAt(x + dx, y + dy)
-                if id and id > FACTION_RED then return true end
-            end
-        end
-    end
-    return false
 end
 
 local function tileKey(x, y) return x .. "," .. y end
@@ -434,8 +401,8 @@ end
 -- An attack's key: what FE8's simulation reads for it -- both fighters (unitKey), our tile, the
 -- enemy's tile, and every other unit within support range of either fighter (support bonuses
 -- move with them). An action elsewhere leaves it standing.
-local function attackKey(ctx, u, e, x, y)
-    local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "near" }
+local function attackKey(ctx, u, e, x, y, slot)
+    local parts = { unitKey(u), slot or "-", x, y, unitKey(e), e.x, e.y, "near" }
     for _, o in ipairs(ctx.onField) do
         if o ~= u and o ~= e and (manhattan(o.x, o.y, x, y) <= SUPPORT_RANGE
                 or manhattan(o.x, o.y, e.x, e.y) <= SUPPORT_RANGE) then
@@ -464,10 +431,11 @@ local function remembered(memo, k, ask)
     return v or nil
 end
 
--- Our attack from (x, y) on `e` (nil when out of range) and `e`'s own strike on `u` there.
-local function attack(ctx, u, e, x, y)
-    return remembered(ctx.attacks, attackKey(ctx, u, e, x, y),
-        function() return ctx.sight.attack(u, e, x, y, nil) end)
+-- Our attack from (x, y) on `e` with the weapon in item `slot` (nil when it does not reach),
+-- and `e`'s own strike on `u` there.
+local function attack(ctx, u, e, x, y, slot)
+    return remembered(ctx.attacks, attackKey(ctx, u, e, x, y, slot),
+        function() return ctx.sight.attack(u, e, x, y, slot) end)
 end
 local function strike(ctx, u, e, x, y)
     return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y),
@@ -671,10 +639,13 @@ local GATES = {
     bold = function() return true end,
 }
 
-local function action(u, tile, act, target)
+local function action(u, tile, act, target, slot)
     return { unit = u.charId, unitId = u.id, move = { x = tile.x, y = tile.y }, act = act,
-             target = target and target.charId, targetId = target and target.id, weapon = nil }
+             target = target and target.charId, targetId = target and target.id, slot = slot }
 end
+
+-- An attack option's act: its tile, target and weapon.
+local function strikeAct(u, c) return action(u, c.tile, "attack", c.target, c.slot) end
 
 -- True if attack candidate c beats b: a priority target, an answered class, sure kill, kill
 -- chance, expected damage, boss, low HP.
@@ -732,25 +703,26 @@ local function attackOptions(ctx, u, gate)
     if opts then return opts end
     opts = {}
     local answers = claimsOn(ctx, "answers", u)
-    local r = ctx.sight.range(u)
-    for _, e in ipairs(r and ctx.enemies or {}) do
+    local weapons = ctx.sight.weapons(u)
+    for _, e in ipairs(ctx.enemies) do
         local answered = false
         for _, c in ipairs(answers) do
             if matchesVs(c.vs, e) then answered = true end
         end
         local first = isPriority(ctx, e)
         for _, t in ipairs(strikeTiles(ctx, u, e)) do
-            if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
-                local f = attack(ctx, u, e, t.x, t.y)
+            for _, w in ipairs(weapons) do
+                local f = Board.weaponFor(weapons, t.x, t.y, e.x, e.y, w.slot)
+                    and attack(ctx, u, e, t.x, t.y, w.slot)
                 local sure = f and f.sure
                 local spent = f and f.counterWorst
                 -- what the counter leaves before the enemy phase, a heal claim's heal counted
                 local left = f and math.max(u.hp - (u.maxhp or u.hp),
                                             spent - healCredit(ctx, u, e, t))
                 if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
-                    opts[#opts + 1] = { tile = t, target = e, sure = sure, answered = answered,
-                                        first = first, f = f, spent = spent,
-                                        killChance = killChance(f),
+                    opts[#opts + 1] = { tile = t, target = e, slot = w.slot, sure = sure,
+                                        answered = answered, first = first, f = f,
+                                        spent = spent, killChance = killChance(f),
                                         expected = f.expected }
                 end
             end
@@ -860,19 +832,20 @@ end
 local function breach(ctx, u, gate, objective)
     local b = breachFor(ctx, u, goalFor(ctx, u, objective))
     if not b then return nil end
-    -- a door opens where the Door command offers it (sight.doorFrom); a wall is struck in range
-    local r = not b.door and ctx.sight.range(u)
-    if not (b.door or r) then return nil end
+    -- a door opens where the Door command offers it (sight.doorFrom); a wall is struck by a
+    -- weapon that reaches it
+    local weapons = not b.door and ctx.sight.weapons(u)
+    if not (b.door or #weapons > 0) then return nil end
     for _, t in ipairs(waitTiles(ctx, u)) do
         local can
         if b.door then can = ctx.sight.doorFrom(u, t.x, t.y, b)
-        else can = inRange(t.x, t.y, b.x, b.y, r.min, r.max) end
+        else can = Board.weaponFor(weapons, t.x, t.y, b.x, b.y) end
         if can and gate(ctx, u, t.x, t.y, nil) then
             if b.door then return action(u, t, "door", nil) end
-            local a = action(u, t, "attack", nil)
+            local a = action(u, t, "attack", nil, can.slot)
             -- its HP and the strike's blow (the game's forecast): the planner tracks the wall
-            a.obstacle = { x = b.x, y = b.y, hp = b.hp,
-                           blow = ctx.sight.strikeWall and ctx.sight.strikeWall(u, b, t.x, t.y) }
+            a.obstacle = { x = b.x, y = b.y, hp = b.hp, blow = ctx.sight.strikeWall
+                           and ctx.sight.strikeWall(u, b, t.x, t.y, can.slot) }
             return a
         end
     end
@@ -1047,7 +1020,7 @@ local function claimedMove(ctx, gate)
             for _, u in ipairs(ctx.actors) do
                 if listed(c.units, u.charId) then
                     local a = bestAttack(ctx, u, gate, c.vs)
-                    if a then return action(u, a.tile, "attack", a.target) end
+                    if a then return strikeAct(u, a) end
                     local t = field == "walls" and approach(ctx, u, gate, c.vs)
                     if t then return action(u, t, "wait") end
                 end
@@ -1141,11 +1114,9 @@ local function greedy(ctx, objective)
         targets[#targets + 1] = { x = e.x, y = e.y, hp = e.hp, is_boss = e.isBoss, unit = e }
     end
     -- tilesFor gives the strike tiles per target, so no shared reach is passed
-    local r = ctx.sight.range(u)
-    local pick = r and M.pickTarget(nil, targets,
-        { range = r.max, min_range = r.min,
-          tilesFor = function(t) return strikeTiles(ctx, u, t.unit) end })
-    if pick then return action(u, pick.tile, "attack", pick.target.unit) end
+    local pick = M.pickTarget(nil, targets, { weapons = ctx.sight.weapons(u),
+        tilesFor = function(t) return strikeTiles(ctx, u, t.unit) end })
+    if pick then return action(u, pick.tile, "attack", pick.target.unit, pick.slot) end
     local b = breach(ctx, u, function() return true end, objective)
     if b then return b end
     local goal = marchGoal(ctx, u, objective)
@@ -1178,7 +1149,7 @@ function M.decide(board, sight, style)
     for _, u in ipairs(ctx.actors) do
         local a = bestAttack(ctx, u, gate)
         attacks[u] = a
-        if a and a.sure then return action(u, a.tile, "attack", a.target) end
+        if a and a.sure then return strikeAct(u, a) end
     end
     local talk = talkHabit(ctx, gate)
     if talk then return talk end
@@ -1202,7 +1173,7 @@ function M.decide(board, sight, style)
         if w > most or (w == most and d > count) then u, most, count = c, w, d end
     end
     local a = attacks[u]
-    if a then return action(u, a.tile, "attack", a.target) end
+    if a then return strikeAct(u, a) end
     return mend(ctx, u, gate) or breach(ctx, u, gate, objective)
         or action(u, march(ctx, u, gate, objective), "wait")
 end
@@ -1322,12 +1293,12 @@ function M.explain(board, sight, style)
             tostring(fd(u)),
             tostring(nearest(tiles)), tostring(nearest(allowed)),
             worstCase(ctx, u, u.x, u.y, nil).sum)
-        local r = ctx.sight.range(u)
-        for _, e in ipairs(r and ctx.enemies or {}) do
+        local weapons = ctx.sight.weapons(u)
+        for _, e in ipairs(ctx.enemies) do
             local n, pass, best = 0, 0, nil
             for _, t in ipairs(strikeTiles(ctx, u, e)) do
-                if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
-                    local f = attack(ctx, u, e, t.x, t.y)
+                for _, w in ipairs(weapons) do
+                    local f = attack(ctx, u, e, t.x, t.y, w.slot)
                     if f then
                         n = n + 1
                         local spent = f.counterWorst
@@ -1398,7 +1369,7 @@ function M.candidates(board, sight, style, opts)
             if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
         end
         local function offer(c)
-            local a = action(u, c.tile, "attack", c.target)
+            local a = strikeAct(u, c)
             a.f, a.spent, a.first = c.f, c.spent, c.first
             add(a, "attack")
         end

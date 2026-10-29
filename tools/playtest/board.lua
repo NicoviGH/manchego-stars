@@ -86,6 +86,22 @@ function Board.distance(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
 
+-- Of `weapons` (sight.weapons: { slot, min, max } in item order), the first that strikes (bx, by)
+-- from (ax, ay) -- only item `slot`'s when one is given -- or nil. It is MakeTargetListForWeapon's
+-- range test: MapAddInBoundedRange marks the tiles min..max away by RECT_DISTANCE, and a unit
+-- not allied standing on one is a target. Asked here, not of the game, for its cost: the bot
+-- asks it for every (weapon, wait tile, enemy) of every unit at each decide, and a target list
+-- is a game call per (weapon, tile). The act it plays is confirmed by the game's own list
+-- (sight.legal), and the other half of that test, that the target stands on gBmMapUnit (not
+-- hidden in fog), is the bot's enemy list itself.
+function Board.weaponFor(weapons, ax, ay, bx, by, slot)
+    local d = Board.distance(ax, ay, bx, by)
+    for _, w in ipairs(weapons or {}) do
+        if (slot == nil or w.slot == slot) and d >= w.min and d <= w.max then return w end
+    end
+    return nil
+end
+
 -- The unit's CHARACTER carries CA_BOSS (named bosses). The class attribute is not read:
 -- the clear-bot has always meant "this chapter's named boss", not "a boss-class unit".
 function Board.isBoss(mem, addr)
@@ -414,7 +430,7 @@ function Board.bind(mem, SYM)
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
-        distance = Board.distance, inMap = Board.inMap, place = Board.place,
+        distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,

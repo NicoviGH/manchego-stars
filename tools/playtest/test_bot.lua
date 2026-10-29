@@ -29,14 +29,14 @@ end
 do
     local reach = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 })
     local enemies = { { x = 8, y = 8, hp = 20, is_boss = false } }
-    check(B.pickTarget(reach, enemies, { range = 1 }), nil, "no enemy in range -> nil")
+    check(B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } }), nil, "no enemy in range -> nil")
 end
 
 -- One enemy orthogonally adjacent to a reachable tile -> that enemy, from that tile.
 do
     local reach = tiles({ 5, 5 }, { 5, 6 })
     local enemies = { { x = 5, y = 7, hp = 20, is_boss = false } }  -- adjacent to (5,6)
-    local pick = B.pickTarget(reach, enemies, { range = 1 })
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
     check(pick ~= nil, true, "adjacent enemy is attackable")
     check(pick and pick.target.x, 5, "picks the enemy")
     check(pick and pick.tile.x, 5, "attack tile x")
@@ -50,7 +50,7 @@ do
         { x = 3, y = 5, hp = 10, is_boss = false },  -- adjacent to (3,4)
         { x = 6, y = 7, hp = 40, is_boss = true },   -- adjacent to (6,6)
     }
-    local pick = B.pickTarget(reach, enemies, { range = 1 })
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
     check(pick and pick.target.is_boss, true, "boss preferred over non-boss")
 end
 
@@ -61,7 +61,7 @@ do
         { x = 0, y = 2, hp = 18, is_boss = false },  -- adjacent to (0,1)
         { x = 2, y = 2, hp = 5, is_boss = false },   -- adjacent to (2,1)
     }
-    local pick = B.pickTarget(reach, enemies, { range = 1 })
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
     check(pick and pick.target.hp, 5, "lowest-hp non-boss preferred")
 end
 
@@ -69,21 +69,21 @@ end
 do
     local reach = tiles({ 4, 4 })
     local enemies = { { x = 4, y = 6, hp = 20, is_boss = false } }  -- distance 2 from (4,4)
-    check(B.pickTarget(reach, enemies, { range = 1 }), nil, "range 1 can't reach distance 2")
-    local pick = B.pickTarget(reach, enemies, { range = 2 })
+    check(B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } }), nil, "range 1 can't reach distance 2")
+    local pick = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 2 } } })
     check(pick ~= nil, true, "range 2 reaches distance 2")
 end
 
--- A BOW (min_range 2): an ADJACENT enemy is NOT attackable -- striking from range 1 leaves
+-- A BOW (min 2): an ADJACENT enemy is NOT attackable -- striking from range 1 leaves
 -- no Attack command, so pickTarget must skip the adjacent tile (#65 recordrbgtest bug).
 do
     local adjacent = tiles({ 4, 5 })  -- distance 1 from the foe at (4,6)
     local enemies = { { x = 4, y = 6, hp = 20, is_boss = false } }
-    check(B.pickTarget(adjacent, enemies, { range = 2, min_range = 2 }), nil,
-          "bow (min_range 2) won't pick an adjacent tile it can't fire from")
+    check(B.pickTarget(adjacent, enemies, { weapons = { { slot = 0, min = 2, max = 2 } } }), nil,
+          "bow (min 2) won't pick an adjacent tile it can't fire from")
     -- but a true range-2 tile IS picked, and an adjacent one is left out of a mixed reach.
     local mixed = tiles({ 4, 5 }, { 4, 4 })  -- (4,5)=dist 1, (4,4)=dist 2
-    local pick = B.pickTarget(mixed, enemies, { range = 2, min_range = 2 })
+    local pick = B.pickTarget(mixed, enemies, { weapons = { { slot = 0, min = 2, max = 2 } } })
     check(pick ~= nil and pick.tile.x == 4 and pick.tile.y == 4, true,
           "bow strikes from the range-2 tile (4,4), not the adjacent (4,5)")
 end
@@ -189,7 +189,7 @@ do
                 if o ~= u then blocked[B.tileKey(o.x, o.y)] = true end
             end
             local reach = reachFor(u, blocked)
-            local atk = B.pickTarget(reach, enemies, { range = 1 })
+            local atk = B.pickTarget(reach, enemies, { weapons = { { slot = 0, min = 1, max = 1 } } })
             if atk then engaged = true break end
             local mv = B.pickMove(reach, { field = field, cur = u,
                                            goal = boss, blocked = blocked,
@@ -201,44 +201,6 @@ do
     end
     check(engaged, true, "walled-camp march: a unit reaches attack range within 6 turns")
 end
--- gridHostileInReach (#204): the clear-bot must decide from the ENGINE'S tile->unit grid, not
--- from the unit array. A red the grid does not know about is not attackable, and pressing the
--- command menu's row 0 anyway lands on Item.
-do
-    -- gridAt over a sparse {["x,y"] = byte} table; nil off-map.
-    local function gridOf(t)
-        return function(x, y)
-            if x < 0 or x > 14 or y < 0 or y > 14 then return nil end
-            return t[x .. "," .. y] or 0
-        end
-    end
-
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x81 }), 5, 5, 1, 1), true,
-        "hostile adjacent ON THE GRID -> attackable")
-
-    -- The #204 regression: the unit array says an enemy is at (6,5), but it stands in fog so
-    -- RefreshUnitsOnBmMap never wrote it to gBmMapUnit. There is no Attack row.
-    check(B.gridHostileInReach(gridOf({}), 5, 5, 1, 1), false,
-        "enemy absent from the grid (fogged) -> NOT attackable")
-
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x01 }), 5, 5, 1, 1), false,
-        "a BLUE id on the grid is not a hostile")
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x41 }), 5, 5, 1, 1), false,
-        "a GREEN id on the grid is not a hostile")
-
-    -- A bow cannot fire at an adjacent foe: min range 2.
-    check(B.gridHostileInReach(gridOf({ ["6,5"] = 0x81 }), 5, 5, 2, 2), false,
-        "bow: hostile at range 1 is out of [2,2]")
-    check(B.gridHostileInReach(gridOf({ ["7,5"] = 0x81 }), 5, 5, 2, 2), true,
-        "bow: hostile at range 2 is attackable")
-
-    -- Diagonals count as range 2 (Manhattan), and the map edge must not throw.
-    check(B.gridHostileInReach(gridOf({ ["1,1"] = 0x81 }), 0, 0, 1, 2), true,
-        "diagonal hostile is at Manhattan 2")
-    check(B.gridHostileInReach(gridOf({}), 0, 0, 1, 2), false,
-        "off-map probes at the corner are safe")
-end
-
 -- Stall progress (#510 step 9). Distance is measured from the units that can still be the
 -- one to finish: once the boss is dead the field points at the seize tile, and a unit that
 -- the game says cannot Seize is excluded, so the lord's march is what counts.
@@ -307,7 +269,7 @@ local function unit(o)
         onMap = true, onField = o.onField ~= false, dead = false, acted = o.acted or false,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
-        isBoss = o.isBoss or false, classId = o.classId,
+        isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
     }
 end
 local function blue(id, slot, x, y, o)
@@ -371,18 +333,24 @@ local function strikePlayed(t, hp)
 end
 local function sightOf(o)
     local attacks, strikes = 0, 0
-    local function entry(u, t, x, y)
+    -- a forecast per tile, or per tile and weapon ("x,y/slot") where a test tells them apart
+    local function entry(u, t, x, y, slot)
         local byT = (o.fc or {})[u.id]
         local byTile = byT and byT[t.id]
-        return (byTile and byTile[x .. "," .. y]) or QUIET
+        return (byTile and (byTile[x .. "," .. y .. "/" .. tostring(slot)]
+                            or byTile[x .. "," .. y])) or QUIET
+    end
+    -- The game's Weapon Select list, modelled by the unit's `weapons` or its one range.
+    local function weapons(u)
+        return u.weapons or (u.minRange and { { slot = 0, min = u.minRange, max = u.maxRange } })
+            or {}
     end
     local s = {
         objective = o.objective or { kind = "rout" },
         field = o.field,
         cache = o.cache,
         terrain = o.terrain,
-        -- The game's equipped-weapon reach, modelled by the board unit's own range.
-        range = function(u) return u.minRange and { min = u.minRange, max = u.maxRange } or nil end,
+        weapons = weapons,
         -- The game's CanUnitSeize, modelled by the objective's lord (anyone, when none is named).
         canSeize = function(u)
             local lord = (o.objective or {}).lord
@@ -403,9 +371,11 @@ local function sightOf(o)
                 return n
             end
         end,
-        attack = function(u, t, x, y)
+        attack = function(u, t, x, y, slot)
+            local w = Board.weaponFor(weapons(u), x, y, t.x, t.y, slot)
+            if not w then return nil end
             attacks = attacks + 1
-            return attackPlayed(entry(u, t, x, y), u.hp, t.hp)
+            return attackPlayed(entry(u, t, x, y, w.slot), u.hp, t.hp)
         end,
         strike = function(u, t, x, y)
             strikes = strikes + 1
@@ -759,6 +729,30 @@ do
     local g = B.decide(board, fresh, style("greedy"))
     check(g.act, "attack", "greedy attacks whatever the forecast says")
     check(fresh.calls(), 0, "greedy reads no forecast")
+end
+
+-- Every weapon the Weapon Select menu lists is asked (sight.weapons), not the equipped one
+-- alone (audit 9): a sword (1) and a javelin (1-2) in the bag, the javelin strikes an enemy two
+-- tiles off; where both reach, the act's slot is the weapon whose forecast wins.
+do
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 2 } } })
+    local kills = fc { hit = 100, dmg = 10, hits = 1, killsTarget = true }
+    local far = red(0x81, 0, 2, { hp = 10 })
+    local sight = sightOf { reach = { [0x01] = tiles({ 0, 0 }) },
+                            fc = { [0x01] = { [0x81] = { ["0,0"] = kills } } } }
+    local a = B.decide(boardOf(A, far), sight, style("careful"))
+    check(a.act .. "/" .. tostring(a.slot), "attack/1", "the javelin strikes from two tiles")
+    local near = red(0x81, 0, 1, { hp = 10 })
+    local both = sightOf { reach = { [0x01] = tiles({ 0, 0 }) },
+                           fc = { [0x01] = { [0x81] = {
+                               ["0,0/0"] = kills,
+                               ["0,0/1"] = fc { hit = 100, dmg = 3, hits = 1 } } } } }
+    a = B.decide(boardOf(A, near), both, style("careful"))
+    check(a.act .. "/" .. tostring(a.slot), "attack/0", "where both reach, the weapon that kills")
+    local swordOnly = blue(0x01, 0, 0, 0)
+    check(B.decide(boardOf(swordOnly, far), sight, style("careful")).act, "wait",
+          "a sword alone does not reach two tiles")
 end
 
 -- test_objective_seize: the lord with the seize tile in reach and danger 0 there seizes,

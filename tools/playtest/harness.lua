@@ -1238,11 +1238,15 @@ end
 -- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
 -- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
 -- `targetId` / `targetTile` (optional): INSPECT.stepTarget's, so a caller that chose its target
--- strikes that one and not the selector's first.
-local function chooseAttack(actorAddr, stopWhen, targetId, targetTile)
+-- strikes that one and not the selector's first. `slot` (optional): the weapon, the item in that
+-- slot (gWeaponSelectMenuItems, one row per item slot); else the menu's first.
+local function chooseAttack(actorAddr, stopWhen, targetId, targetTile, slot)
     if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
         return controllerState(after) == "weapon_menu"
     end, 300) then return false end
+    if slot and not INSPECT.menuTo("weapon_menu", Controller.MENU_WEAPON_FIRST + slot) then
+        return false
+    end
     if not selectSemantic("select_weapon", "weapon opens the live attack target selector", function(after)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "attack"
@@ -2606,7 +2610,8 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy, stopWh
     if not reach then return nil, true end
     local mn, mx = unitAttackRange(u)
     enemies = enemies or liveEnemies()
-    local pick = mn and BOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
+    local pick = mn and BOT.pickTarget(reach, enemies,
+                                       { weapons = { { min = mn, max = mx } } }) or nil
     local tile = pick and pick.tile
     if not tile then
         -- no target in range: march (pure decision core -- field-first with a
@@ -3247,7 +3252,7 @@ INSPECT.botApi = function(game)
             end
             if not chooseAttack(u.addr, function()
                 return won() or lost() or dead() or procActive(SYM.ProcScr_StdEventEngine)
-            end, a.targetId, a.obstacle) then
+            end, a.targetId, a.obstacle, a.slot) then
                 return false, a.obstacle and "the strike on the wall did not play out"
                     or "the attack did not play out"
             end
@@ -4086,11 +4091,10 @@ scenarios.sightprobe = function()
         end
     end
     if not foe then return result("FAIL", "no enemy on the field") end
-    -- One attack of ours where it is in range, with the enemy's counter to it.
-    local r = sight.range(lead)
+    -- One attack of ours where a weapon reaches, with the enemy's counter to it.
+    local weapons = sight.weapons(lead)
     for _, t in ipairs(reach) do
-        local d = BOARD.distance(t.x, t.y, foe.x, foe.y)
-        if r and d >= r.min and d <= r.max then
+        if BOARD.weaponFor(weapons, t.x, t.y, foe.x, foe.y) then
             local g = sight.attack(lead, foe, t.x, t.y, nil)
             log(string.format("attack 0x%02X from (%d,%d) on 0x%02X: hit=%d dmg=%d crit=%d hits=%d "
                 .. "kills=%s | counter hit=%d dmg=%d crit=%d hits=%d (counters=%s) | played: "
@@ -5274,15 +5278,12 @@ local function teleportToFiringTile(u, mn, mx)
     return false
 end
 
--- True when the ENGINE would offer this unit an Attack command from its current tile: a hostile
--- sits within [mn,mx] of it in gBmMapUnit. The clear-bot asks first so its policy chooses Wait
--- when Attack will not appear; chooseAttack independently resolves the live semantic command.
-local function canAttackFromHere(u, mn, mx)
-    local w, h = mapSize()
-    return BOT.gridHostileInReach(function(x, y)
-        if x < 0 or x >= w or y < 0 or y >= h then return nil end
-        return mapUnitAt(x, y)
-    end, u.x, u.y, mn, mx)
+-- True when the game offers this unit the Attack command from its current tile
+-- (AttackCommandUsability, sight.lua canAttack). The clear-bot asks first so its policy chooses
+-- Wait when Attack will not appear; chooseAttack independently resolves the live semantic
+-- command. A red in fog is no target: it is not on gBmMapUnit (#204).
+local function canAttackFromHere(u)
+    return INSPECT.Sight.canAttack(INSPECT.sightApi(), u)
 end
 
 -- Turn fog OFF for a clear-bot run -- GRID AND ALL (#204). Zeroing gPlaySt.chapterVisionRange
@@ -6843,7 +6844,7 @@ scenarios.ch04packmath = function()
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and teleportAdjacentTo(u, { wolf }) then
                     u = unitAt(SYM.gUnitArrayBlue, i)
-                    if u and canAttackFromHere(u, mn, mx) and moveUnit(u.x, u.y, u.x, u.y) then
+                    if u and canAttackFromHere(u) and moveUnit(u.x, u.y, u.x, u.y) then
                         local was = packAlive()
                         chooseAttack(u.addr)
                         INSPECT.settle("fight", 600)
@@ -7758,7 +7759,7 @@ scenarios.ch05crest = function()
         -- The engine's GRID, not our arithmetic, decides whether row 0 of the command menu is
         -- Attack (#204). Pressing it anyway opens Item and Uses a vulnerary at full HP, which
         -- is both an illegal input and a wasted turn.
-        if not canAttackFromHere(hero, hmin, hmax) then
+        if not canAttackFromHere(hero) then
             log(string.format("ch05crest: attempt %d -- Ravisin parked at (%d,%d) is not in "
                 .. "[%d,%d] of the striker on (%d,%d) per gBmMapUnit; not pressing Attack",
                 t, red(RAVISIN) and red(RAVISIN).x or -1, red(RAVISIN) and red(RAVISIN).y or -1,
@@ -7971,7 +7972,7 @@ local function clearCh04(parley)
                 elseif not teleportToFiringTile(u, mn, mx) then
                     log(string.format("  blue[%d] pid=0x%02X (%d,%d): no firing tile [%d,%d]",
                         i, u.charId, u.x, u.y, mn, mx))
-                elseif not canAttackFromHere(unitAt(SYM.gUnitArrayBlue, i), mn, mx) then
+                elseif not canAttackFromHere(unitAt(SYM.gUnitArrayBlue, i)) then
                     -- The engine's grid, not the unit array, decides whether row 0 is Attack.
                     -- Pressing anyway opens Item and Uses a vulnerary at full HP (#204).
                     u = unitAt(SYM.gUnitArrayBlue, i)

@@ -269,6 +269,17 @@ end
 check(Board.distance(1, 2, 4, 0), 5, "|dx| + |dy|")
 check(Board.distance(3, 3, 3, 3), 0, "a tile is 0 from itself")
 
+-- Board.weaponFor: the first weapon (item order) whose min..max covers the distance, or the
+-- named slot's alone.
+do
+    local bag = { { slot = 0, min = 1, max = 1 }, { slot = 2, min = 2, max = 2 } }
+    check(Board.weaponFor(bag, 0, 0, 0, 1).slot, 0, "adjacent: the sword, first in the bag")
+    check(Board.weaponFor(bag, 0, 0, 1, 1).slot, 2, "two tiles: the bow")
+    check(Board.weaponFor(bag, 0, 0, 0, 3), nil, "three tiles: nothing reaches")
+    check(Board.weaponFor(bag, 0, 0, 0, 1, 2), nil, "the bow alone cannot strike adjacent")
+    check(Board.weaponFor({}, 0, 0, 0, 1), nil, "no weapon, no strike")
+end
+
 -- Header: turn, phase, map size.
 do
     local b = board(function() end)

@@ -37,11 +37,13 @@
 --                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
 --   reach(unit, friends)     tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
 --                            less those another unit stands on (gBmMapUnit). Either faction.
---   range(unit)              { min, max } of the weapon FE8 has equipped (GetUnitEquippedWeapon,
---                            the first CanUnitUseWeapon accepts, which BU_ISLOT_AUTO strikes
---                            with), read as GetItemMinRange/GetItemMaxRange read it; nil = none.
+--   weapons(unit)            the weapons the Attack command's Weapon Select lists, in item
+--                            order: per item CanUnitUseWeaponNow allows (AttackCommandUsability's
+--                            loop), { slot, min, max } with GetItemMinRange/GetItemMaxRange's
+--                            reach. Board.weaponFor says which of them strikes a tile.
 --   canSeize(unit)           the game's CanUnitSeize (bmdifficulty.c), the Seize command's check.
---   attack(u, e, x, y, slot) our unit from (x, y) on enemy `e` where it stands, as the forecast
+--   attack(u, e, x, y, slot) our unit from (x, y) on enemy `e` where it stands, with the weapon in
+--                            item `slot` (nil = the first of weapons(u) that reaches), as the forecast
 --                            window shows it (BattleGenerateSimulation +
 --                            InitBattleForecastBattleStats): hit, dmg, crit, hits; `e`'s
 --                            counter* (counterHit, counterDmg, counterCrit, counterHits) and
@@ -364,6 +366,9 @@ function M.machine(cpu, keep)
         return a, b
     end
 end
+
+-- An inventory entry as the unit struct holds it: the item id, its uses in the high byte.
+local function itemOf(it) return it.id | (it.uses << 8) end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 local function s32(v) return v >= 0x80000000 and v - 0x100000000 or v end
@@ -743,16 +748,24 @@ function M.new(outer)
 
     function s.answer(u, d)
         if d.kind == "enemy" then
-            local e, r = d.rep, s.range(u)
-            if not r then return false, 0 end
-            for _, o in ipairs(SIDES) do
-                local x, y = e.x + o[1] * r.max, e.y + o[2] * r.max
-                if x >= 0 and y >= 0 and x < w and y < h then
-                    local a = s.attack(u, e, x, y)
-                    if a then return M.answerOf(a, u.hp) end
+            -- per weapon, its strike from the first side tile at its longest reach; the best
+            -- (an answer first, then the strength)
+            local e, best, strength = d.rep, nil, 0
+            for _, wp in ipairs(s.weapons(u)) do
+                for _, o in ipairs(SIDES) do
+                    local x, y = e.x + o[1] * wp.max, e.y + o[2] * wp.max
+                    local a = x >= 0 and y >= 0 and x < w and y < h
+                        and s.attack(u, e, x, y, wp.slot)
+                    if a then
+                        local ok, str = M.answerOf(a, u.hp)
+                        if best == nil or (ok and not best) or (ok == best and str > strength) then
+                            best, strength = ok, str
+                        end
+                        break
+                    end
                 end
             end
-            return false, 0
+            return best or false, strength
         elseif d.kind == "chests" or d.kind == "doors" then
             return s.opens(u, d.kind == "chests" and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR), 0
         elseif d.kind == "fog" then
@@ -861,8 +874,8 @@ function M.new(outer)
         end)
     end
 
-    function s.range(u)
-        return mine("range", u, function() return M.range(api, u, sandbox) end)
+    function s.weapons(u)
+        return mine("weapons", u, function() return M.weapons(api, u, sandbox) end)
     end
 
     function s.canSeize(u)
@@ -920,12 +933,11 @@ function M.new(outer)
     end
 
     function s.attack(u, e, x, y, slot)
-        local r = s.range(u)
-        local d = Board.distance(x, y, e.x, e.y)
-        if not (r and d >= r.min and d <= r.max) then return nil end
+        local w = Board.weaponFor(s.weapons(u), x, y, e.x, e.y, slot)
+        if not w then return nil end
         local ours = sandbox(function(call, proc)
             return exchange(call, proc,
-                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, slot or M.ISLOT_AUTO } })
+                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, w.slot } })
         end)
         return M.attackOf(ours, e.hp, u.hp)
     end
@@ -935,13 +947,14 @@ function M.new(outer)
     -- InitObstacleBattleUnit and BattleGenerateSimulation with no target unit) -> what the
     -- strike takes off the wall in the game's own simulation. Kept by the unit's facts and the
     -- wall: the blow reads the attacker's might against the wall's class.
-    function s.strikeWall(u, o, x, y)
-        return mine("wall@" .. o.x .. "," .. o.y, u, function() return sandbox(function(call, proc)
+    function s.strikeWall(u, o, x, y, slot)
+        return mine("wall@" .. o.x .. "," .. o.y .. "/" .. tostring(slot), u,
+                    function() return sandbox(function(call, proc)
             api.write8(S.gActionData + ACTION_X_OTHER, o.x)
             api.write8(S.gActionData + ACTION_Y_OTHER, o.y)
             api.write8(S.gActionData + ACTION_TRAP_TYPE, o.hp)
             call(S.InitObstacleBattleUnit, {})
-            call(S.BattleGenerateSimulation, { u.addr, 0, x, y, M.ISLOT_AUTO })
+            call(S.BattleGenerateSimulation, { u.addr, 0, x, y, slot or M.ISLOT_AUTO })
             return { dealt = lost(S.gBattleTarget) }
         end) end)
     end
@@ -1119,8 +1132,6 @@ function M.new(outer)
         return out
     end
 
-    local function itemOf(it) return it.id | (it.uses << 8) end
-
     function s.opens(u, terrain)
         return mine("opens" .. terrain, u, function() return sandbox(function(call)
             return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
@@ -1226,12 +1237,13 @@ function M.new(outer)
             end
             return "the game offers no such heal"
         end
+        local weapons = a.act == "attack" and s.weapons(u)
         local ok = sandbox(function(call)
             asActive(u, x, y)
             if a.act == "attack" then
-                for _, it in ipairs(u.items) do
-                    if call(S.CanUnitUseWeaponNow, { u.addr, itemOf(it) }) ~= 0 then
-                        call(S.MakeTargetListForWeapon, { u.addr, itemOf(it) })
+                for _, w in ipairs(weapons) do
+                    if a.slot == nil or a.slot == w.slot then
+                        call(S.MakeTargetListForWeapon, { u.addr, itemOf(u.items[w.slot + 1]) })
                         if listed(call, a.targetId, a.obstacle) then return true end
                     end
                 end
@@ -1430,6 +1442,32 @@ function M.range(api, u, sandbox)
     end)
     local mn, mx = api.Board.itemRange(item)
     return mn and { min = mn, max = mx } or nil
+end
+
+-- `u`'s weapons as Weapon Select lists them (sight.weapons), without a whole sight.
+function M.weapons(api, u, sandbox)
+    local S = api.SYM
+    return (sandbox or M.machine(api.cpu))(function(call)
+        local out = {}
+        for i, it in ipairs(u.items) do
+            local item = itemOf(it)
+            if call(S.CanUnitUseWeaponNow, { u.addr, item }) ~= 0 then
+                local mn, mx = api.Board.itemRange(item)
+                out[#out + 1] = { slot = i - 1, min = mn, max = mx }
+            end
+        end
+        return out
+    end)
+end
+
+-- Whether the game shows `u` the Attack command where it stands (AttackCommandUsability, `u`
+-- the active unit), without a whole sight (harness.lua's clear loop).
+function M.canAttack(api, u, sandbox)
+    local S = api.SYM
+    return (sandbox or M.machine(api.cpu))(function(call)
+        api.write32(S.gActiveUnit, u.addr)
+        return call(S.AttackCommandUsability, { 0, 0 }) == M.MENU_ENABLED
+    end)
 end
 
 -- The game's CanUnitSeize for `u` without a whole sight (harness.lua's clear loop).

@@ -325,6 +325,7 @@ WANTED = [
     'UnitActionMenu_CanSeize',  # Seize: CanUnitSeize on the Seize tile (bmmenu.c)
     'CanUnitUseWeaponNow',      # the weapons the Attack command lists (bmitem.c)
     'MakeTargetListForWeapon',  # that weapon's targets: units not allied, and walls (bmtarget.c)
+    'AttackCommandUsability',   # Attack: a weapon above with a target (bmmenu.c; the clear loop)
     'InitObstacleBattleUnit',   # a wall as gBattleTarget, for its strike's forecast (bmbattle.c)
     'GetDefeatTalkEntry',       # a unit's death quote for this chapter; flag 2 = the Defeat Boss goal (eventinfo.c)
     # The planner's enemy phase (#510 step 9): the enemy turn order, as the game builds it.
