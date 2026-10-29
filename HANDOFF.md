@@ -9,55 +9,72 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 (Claude, later). **#510 step 9 is on `feat/510-step9-e-campaigns`: 41668e4,
-then one commit syncing this HANDOFF and retiring the old lead picker's name. PUSHED (no PR yet).**
+Refreshed 2026-10-29 (Claude, latest). **#510 step 9 is on `feat/510-step9-e-campaigns` at
+08a906c, NOT PUSHED (9 commits past origin's 32d4d50).** The checkout is back on that branch;
+after switching, rebuild the ROM (see the gotcha below).
 
-**NEXT SESSION: plan and build the ACCEPTED long-term design** (Nicolas, 2026-10-29: "Accepted").
-It is ONE #510 comment, edited in place:
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6485197805>. The evidence
-behind it (the vanilla scout, Ch3-Ch14) is
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6484135808>. Start with
-`superpowers:writing-plans` on the design's **part A**. Per the standing rule the plan is ONE issue
-comment, never a docs file, and the code is written inline (no SDD).
-- **The design in brief** (read the comment itself; this is only a pointer):
-  - A clean clear has four parts: the chapter is won, no unit is lost, every recruit joins, every
-    reward is taken. Any green ally's death also spoils it (vanilla Ch6's Orion's Bolt).
-  - On vanilla, a chapter the bot cannot clear clean is a BOT FAULT, never "infeasible".
-  - A retry reads the earlier attempts' play logs, filtered to what was on screen.
-  - The judged phase and the beam + mend stay as built. Retries vary much more (a death-weight
-    range, amending ADR 0375).
-  - **No ours verdict counts until the bot clears all of vanilla's Eirika route clean.**
-  - Order of work: A (the four-part clean clear), B (varied retries), C (retries that learn),
-    D (the scout's capability gaps: Talk recruits as goals, a held Doorkey opening Ch14's door,
-    Ch10's stalls), E (vanilla's Eirika route cleared chapter by chapter).
-  - Records owed when built: ADR 0375 amended, plus one new ADR for decisions 1-4.
-- **Done 2026-10-29 (later), each proven in the ROM; the commit messages carry the numbers:**
-  - 578b086: a bought item's shop starts orphaned, as vanilla's map shops do. The shop's
-    LockGame stopped the player phase's proc tree, so the shop froze itself.
-  - 42d65a1: a claim the bot cannot play is no part of a style (vanilla Ch5's 48 styles were 3
-    games).
-  - 7811b35: the campaign spends `GetPartyGoldAmount`, which is 0 in Ch5x.
-  - 7b866ca: a prep menu with 0 rows is being built, not broken (one frame after Pick Units).
-  - 41668e4: vanilla's Ch8 route split is answered. The ch01 lead-menu picker became
-    `INSPECT.pickMenuRow`, the one choice-menu picker.
-- **Saved starts:** vanilla's clean campaign `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/`
-  (0-4, 6 = Prologue to Ch5's start, all clean). The SCOUT
-  `states/scout-vanilla/` (5 = Ch5x, 6 = Ch5, 7 = Ch6, 8 = Ch7, 9 = Ch8) came from a throwaway
-  switch that took a won chapter WITH deaths as cleared. That switch is not committed. Those
-  starts carry the scout's losses, so they are for study, never for a verdict. Ours: as before,
-  `references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/{3,4}.ss`.
-- **How to run vanilla from a saved start:** `campaign_env.py vanilla --route 1 --id <id> --from N
-  > env.json`, then `PT_VANILLA=1 PT_RUN_TAG=<tag> PT_CAMPAIGN="$(cat env.json)"
-  tools/playtest/run.sh campaign`; leave out `last` to play to the end. A pool of attempts:
-  `montecarlo.py attempts --vanilla --env <file> --attempts 8 --jobs 4 --out <dir>/r.jsonl`.
-  `montecarlo.py story <trace>` reads one trace. Vanilla chapter indices: 5 = Ch5x, 6 = Ch5,
-  7 = Ch6 ... 61 (0x3D) = Ch11 (constants/chapters.h).
-- **Scout costs** (one attempt): Ch3 32k frames / 15 CPU s; Ch13 142k frames / 80 CPU s. Compare
-  costs in frames and game calls, never CPU s (this Mac's cores are uneven).
-- Rulings still standing: ADR 0374 (every bot result read beside vanilla), ADR 0375 (risk
-  tolerance not declared; to be amended by the design's call 6).
-- #546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
-  `lordfloor` +10 HP, not yet run in the emulator).
+**NEXT SESSION: fix the re-derivation audit, all 21 findings, then finish part A.** The audit is
+ONE #510 comment, kept current in place:
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>. Nicolas
+(2026-10-29): "finish the audit and address them all. remember to eliminate duplicate code and
+keep efficiency in mind." Every finding is checked against the decomp, with file:line.
+- **The rule behind it (Nicolas: "what good reason would there be to ever rederive code when we
+  have the original game's source code?"):** a game fact comes from the game's own function.
+  A re-derivation needs a written reason beside it: the game has no function for the question
+  (then compose from the game's own answers), a MEASURED cost (then cache the game's answer), or
+  no emulator in the process (then read decomp DATA, never re-implement its logic).
+- **Settled by Nicolas, do not ask again:**
+  - Hit damage (finding 1) and the hit/crit odds: let the game run its OWN rolls in the sandbox
+    (`BattleGenerateHitAttributes`, with the thresholds caught at `BattleRoll1RN`/`BattleRoll2RN`)
+    -- "why wouldnt we?". Our mGBA exposes `setBreakpoint` to Lua (seen in the dylib's strings);
+    not yet proven in the headless runner. Measure the cost; cache by unit state.
+  - **No run budget** ("I am not counting, we need to get it right"): run what a change needs to
+    be proven; the run-cost rule only forbids pointless re-runs.
+  - Every claim about game behaviour is tagged with its source, [code] (file:line read in full)
+    or [ROM] (a value read from a run), never from a function's name.
+- **Suggested order:** the wrong ones first (1 damage, 2 the hit model in `bot.lua`'s
+  `killChance`, 3 the crit constant copied in `bot.lua` AND `planner.lua`, 4 `killsTarget`, 14
+  green deaths unwatched in `INSPECT.watchDeaths`, 13 `aiDecide`'s hand-built AI setup), then
+  part A's own (5 + 6 the chest won back via `BATTLE_HandleItemDrop`, 7 owed recruits via
+  `CheckForCharacterEvents` in-game instead of the regex in `campaign_env.py`), then 9 and 15-16
+  and the small ones. 17-18 are decided behaviour (fog knowledge is part C; averaged damage is
+  design decision 5), recorded so nobody mistakes them for the game.
+- **One probe run first** (instrumented, from `e1-vanilla-ch3/2`): does a breakpoint fire
+  headless; the cost of scanning `CheckForCharacterEvents` over character pairs and the pairs it
+  finds for Ch2; `api.party()` at the start and after the win (finding 8's ROM proof). Then
+  proof runs: vanilla Ch2 (`e1-vanilla-ch3/2`) and Ch5 (`e1-vanilla-ch3/6`), attempt 1.
+- **Then** `/code-review <PR> medium` in a subagent, `review-to-clean`, and the PR.
+
+**Part A (the four-part clean clear) as it stands.** Design: #510 comment 6485197805. Plan:
+#510 comment 6485521139 (its Task 4 text is out of date: update it with what follows). Record:
+**ADR 0376**.
+- fbc4443: both envs carry `recruits` (still the regex; finding 7 replaces it).
+- 6837811: botrun judges `clear` / `clean`; campaign.lua clears on `clean == true`; a vanilla
+  chapter with no clean clear stops as `bot_fault` (Manchego Stars keeps `infeasible`);
+  montecarlo reads `clean` and says what spoiled a clear; `all_alive` is a DEAD_CONCEPT.
+- 6567cdc then 0f7c010 then 08a906c: "joined". 6567cdc claimed Ch5's ending makes Joshua join;
+  it was WRONG. [code] `EventScr_StrictLoadUniqueAlly` makes an unrecruited one blue then
+  `SET_HP 0`, which sets US_DEAD; [ROM] the scout's Ch6 start holds Joshua blue, DEAD, hidden,
+  and the game's prep list leaves him out. Now joined/owed are the game's party
+  (`INSPECT.prepList()` = `MakePrepUnitList`, shared with the saved party). Unit tests only;
+  the ROM proof is owed (probe run above).
+- 0aedbee: ADR 0376 (decisions 1-4 of the design).
+- **Measured in the ROM:** vanilla Ch2 attempt 1 CLEAN (Eirika talks Ross t4, Ross talks Garcia
+  t5; 28,445 frames, 12.2 CPU s). Vanilla Ch4 clean at attempt 1. Vanilla Ch5: 3 styles, none
+  clean, stops as a BOT FAULT (Franz/Artur lost, the village at 5,1 unreached, Joshua killed).
+- **Ch5x comes AFTER Ch5** ([code] Ch4 ends `MNCH(0x6)`; Ch5's ending `MNC2(0x5)`). The clean
+  store `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/` has 0-4 and 6 and no 5
+  because no clean Ch5 clear exists yet. A campaign run re-saves the starts it passes: back the
+  store up first (this session restored 4 and 6 from a copy).
+- **Latent (ADR 0376):** vanilla's `StrictLoadUniqueAlly` calls remain in unhosted slots
+  (ch10a/ch12b `CHARACTER_MARISA`, ch14a/b `CHARACTER_RENNAC`), which Sahnar and Trex wear.
+- **A save state reads offline:** an mGBA `.ss` holds EWRAM at file offset 0x21000, so
+  `gUnitArrayBlue` (0x0202BE4C) is at 0x21000 + 0x2BE4C, 0x48 bytes a unit (+0x00 character
+  pointer, its +4 = charId from the ROM; +0x0C state; +0x12/+0x13 max/cur HP). No run needed.
+- After A: B (varied retries), C (retries that learn), D (capability gaps: Talk recruits as
+  goals, the held Doorkey, Ch10's stalls), E (vanilla's Eirika route cleared chapter by chapter).
+
+
 **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
