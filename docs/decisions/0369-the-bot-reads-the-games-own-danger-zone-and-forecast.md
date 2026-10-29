@@ -22,7 +22,7 @@ divergence from vanilla is a gap to close, not a ruling to record.
 | `range(unit)` | `GetUnitEquippedWeapon` (the first weapon `CanUnitUseWeapon` accepts, which `BU_ISLOT_AUTO` strikes with), then that item's range byte as `GetItemMinRange`/`GetItemMaxRange` read it (both inline: no symbol to call) | `gItemData` |
 | `canSeize(unit)` | `CanUnitSeize` (bmdifficulty.c), the Seize command's own usability check; patch 0005 makes it the chosen lead in our build | its return |
 | `attack(u, e, x, y)`: our attack and `e`'s counter | `BattleGenerateSimulation` + `InitBattleForecastBattleStats` (the forecast window's two calls) | `gBattleActor`/`gBattleTarget`, the forecast proc's hit counts; a broken weapon still armed, and the ACTOR's Monster Stone marked 0xFF damage and crit, as bksel.c marks it (a worst case reads it as lethal) |
-| `strike(u, e, x, y)`: `e`'s own strike on its phase | the enemy phase's per-unit setup (cp_decide.c: `AiUpdateNoMoveFlag`, the combat weight table from `ai_config`, `AiInitDangerMap`, `AiClearDecision`), then `AiAttemptOffensiveAction(AiIsUnitEnemy)` itself, then the decision simulated (`BattleGenerateSimulation`, or `BattleGenerateBallistaSimulation` for slot 0xFF) | `gAiDecision`, then `gBattleActor` |
+| `strike(u, e, x, y)`: `e`'s own strike on its phase | the enemy phase's per-unit step (cp_decide.c `CpDecide_Main`: `RefreshEntityBmMaps`, `AiUpdateNoMoveFlag`, the combat weight table from `ai_config`, `AiInitDangerMap`, `AiClearDecision`), then `AiDecideMain` itself (amended 2026-10-29, below), then the decision simulated (`BattleGenerateSimulation`, or `BattleGenerateBallistaSimulation` for slot 0xFF) | `gAiDecision`, then `gBattleActor` |
 | `objective` | `GetROMChapterStruct` (goal window type +0x8C, its end turn +0x8D, whose last turn the goal window shows as End − 1, so turns left = End − turn); `GetAvailableTileEventCommand` per tile for the Seize tile (as bmcommanddbg.c finds it) | the chapter data |
 | `field(goal)` | `GenerateExtendedMovementMap` from the goal, out to `MAP_MOVEMENT_EXTENDED`, with the movement costs (`GetUnitMovementCost`) of the first deployed unit that can Seize, else the first deployed: the map FE8's AI heads for a far target over (cp_0803E2F4.c) | `gBmMapMovement` |
 | `nextTurnEvent(turn)` | `SearchAvailableEvent`/`SearchNextAvailableEvent` over `GetChapterEventDataPointer(ch)->turnBasedEvents` (the phase change's own turn-event check, eventinfo.c), the turn and phase set to each later one: this turn's green and red phases first (the check runs at a player phase's start, when only this turn's blue phase has fired), then every phase to turn 255 | the first turn offering a script not already available now; a full scan costs ~765 frames, paid only when a board repeats |
@@ -130,3 +130,14 @@ selector to the enemy the bot chose (a new legal action, `next_target`, RIGHT, u
 `PT_STYLE`/`PT_CLAIMS` are JSON read from the environment, never spliced into Lua source.
 
 `bot` and `sightprobe` are `manual: true` rows in matrix.yaml, headless, never in a suite.
+
+**Amended 2026-10-29 (#510 step 9, re-derivation audit finding 13).** The enemy's decision is now
+the decide loop's whole per-unit step and `AiDecideMain`, not `AiAttemptOffensiveAction(AiIsUnitEnemy)`
+alone: the unit's own AI scripts decide (a script that waits for a turn, attacks only listed
+targets or heals first now does so in the judged phase too), and `RefreshEntityBmMaps`,
+`decideState = 0` and `unk7C = 0` run as the game runs them. The step is `CpDecide_Main`'s loop
+body, which is not a function: `CpDecide_Main` itself starts `gProcScr_CpPerform`, which would play
+the act on the sandbox's next frame, so its field assignments are written and its calls made, in
+its order. Still left out: `RenderBmMap`/`RefreshUnitSprites` (draws) and the `US_HAS_MOVED_AI` it
+sets after (read only by cp_order.c's list building). The paragraph above that calls
+`RefreshEntityBmMaps` and `unk7C` left out is superseded by this.

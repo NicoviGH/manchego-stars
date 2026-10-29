@@ -278,14 +278,14 @@ WANTED = [
     'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
     'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D
     'InitRN',                   # the game's own RNG seeding (rng.c)
-    # An enemy's strike on one target: the enemy phase's per-unit setup (cp_decide.c) and its
-    # offensive routine itself (cp_battle.c AiAttemptOffensiveAction).
-    'AiAttemptOffensiveAction', # the AI's whole attack decision for the active unit
-    'AiIsUnitEnemy',            # the "is enemy" test the AI script passes it (cp_script.c)
+    # An enemy's decision: the enemy phase's per-unit setup and its decision itself (cp_decide.c
+    # CpDecide_Main's loop body, AiDecideMain).
+    'RefreshEntityBmMaps',      # the unit, fog and hidden maps, rebuilt from the unit structs
+    'AiDecideMain',             # the AI's whole decision for the active unit: scripts A and B
     'AiUpdateNoMoveFlag',       # sets AI_FLAG_STAY from the unit's ai_config
     'AiInitDangerMap',          # the AI's danger map, which its tile choice reads
     'AiClearDecision',          # empties gAiDecision before a decision
-    'gAiState',                 # struct AiState: dangerMapFilled +7A, combatWeightTableId +7D
+    'gAiState',                 # struct AiState: decideState +79, dangerMapFilled +7A, unk7C, +7D
     'BattleGenerateBallistaSimulation',
     'BattleRoll1RN',            # every one-number roll of a battle: crits, skill procs (bmbattle.c)
     'BattleRoll2RN',            # the two-number hit roll; both return simResult when simulating  # a ballista's strike (bmbattle.c)

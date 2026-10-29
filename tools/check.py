@@ -100,7 +100,8 @@ DEAD_CONCEPTS = [
     r'Bot\.prep\b', r'STYLES\.route', r'\broute 50/50\b',
     # retired by #510 step 9 PR D (ADR 0369): who may Seize and a unit's reach are the game's
     # answers (CanUnitSeize, GetUnitEquippedWeapon) read through sight.lua, never board.lua's
-    # copies; the enemy's strike is AiAttemptOffensiveAction itself, not a copy of its slot loop
+    # copies; the enemy's strike is the AI's own decision (AiDecideMain since audit 13), not a
+    # copy of its slot loop
     r'Board\.canSeize', r'Board\.lordPid', r'Board\.attackRange', r'LORDSEL_FLAG_BASE \+ i\) to know',
     r'\bruledOut memo\b', r'\baiPick\b', r'\btakenCandidates\b', r'\bdiesWorst\b',
     r'sight\.forecast\b',

@@ -53,11 +53,12 @@
 --                            killsTarget = the plain simulation (every hit lands, nothing
 --                            procs) leaves `e` at 0. nil when (x, y) is out of our range.
 --   strike(u, e, x, y)       `e`'s own strike on `u` standing on (x, y), on its phase: the
---                            enemy phase's per-unit setup (cp_decide.c: AiUpdateNoMoveFlag, the
---                            combat weight table, AiInitDangerMap, AiClearDecision), then
---                            AiAttemptOffensiveAction(AiIsUnitEnemy) itself -- STAY, ballista
---                            and thief branches included -- with every other target hidden for
---                            the call, so it can only choose `u`. Its decision is simulated and
+--                            enemy phase's per-unit step (cp_decide.c CpDecide_Main: the maps
+--                            rebuilt, AiUpdateNoMoveFlag, the combat weight table,
+--                            AiInitDangerMap, AiClearDecision), then AiDecideMain itself -- the
+--                            unit's own AI scripts, STAY, ballista and thief branches included
+--                            -- with every other target hidden for the decision, so it can only
+--                            choose `u`. Its decision is simulated and
 --                            played as attack()'s: takenHit, takenDmg, takenCrit, takenHits
 --                            (the window's), takenSlot, takenTile, takenDist (what it takes off
 --                            `u`), counterDist (what `u`'s counter takes off `e`). All 0 (slot/
@@ -202,10 +203,11 @@ M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the s
 -- +40 u16 ai_config. Its state bits are board.lua's (Board.US_*).
 local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_MAXHP, UNIT_HP, UNIT_AI_CONFIG =
     0x0C, 0x10, 0x11, 0x12, 0x13, 0x40
--- struct AiState (include/cp_common.h): +7A dangerMapFilled, +7D combatWeightTableId; the
--- weight table comes from ai_config bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*), written by
--- cp_decide.c's per-unit loop as one field assignment, which is copied here as it stands.
-local AI_DANGER_FILLED, AI_WEIGHT_TABLE = 0x7A, 0x7D
+-- struct AiState (include/cp_common.h): +79 decideState, +7A dangerMapFilled, +7C unk7C (the
+-- staff AI's HP threshold), +7D combatWeightTableId; the weight table comes from ai_config
+-- bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*). cp_decide.c's per-unit loop writes these as field
+-- assignments, which are copied here as they stand.
+local AI_DECIDE_STATE, AI_DANGER_FILLED, AI_STAFF_HP, AI_WEIGHT_TABLE = 0x79, 0x7A, 0x7C, 0x7D
 local AI_WEIGHT_SHIFT, AI_WEIGHT_MASK = 3, 0x1F << 3
 -- struct AiDecision: +00 actionId, +02/+03 xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the
 -- ballista, AiAttemptBallistaCombat's -1). AI_ACTION_COMBAT = 1.
@@ -239,11 +241,14 @@ local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 local THUMB_B_SELF = 0xE7FE
 -- A call LIST runs every call of it in one stretch of emulation: each call takes a whole frame
 -- however little of it the function uses (the rest spins in the loop), and one enemy's
--- decision is six calls (#510 step 9: ~8,000 of ch02's 9,748 calls an attempt). The stub,
+-- decision is five calls (#510 step 9: ~8,000 of ch02's 9,748 calls an attempt). The stub,
 -- Thumb, ARMv4T (no blx): r4 walks a list of { addr|1, r0, r1, r2, r3, [sp] } words ended by
 -- addr 0; it calls each through a `bx r5` veneer and branches to the return loop at the end.
 -- r4-r6 are callee-saved (AAPCS), so every called function keeps them.
-M.LIST_MAX = 4                -- calls in one list (the room above the stub)
+-- Calls in one list. The list sits at loop + LIST_AT = top + 0xB0 and the caller's stack starts
+-- at top + 0x180 or above, so 0xD0 bytes hold up to eight entries and the end word; an enemy's
+-- decision (aiDecide) is five.
+M.LIST_MAX = 5
 local LIST_STUB = {
     0x6825,           -- +00 ldr r5, [r4, #0]
     0x2D00,           -- +02 cmp r5, #0
@@ -300,7 +305,8 @@ function M.machine(cpu, keep)
             if type(addr) == "table" then
                 -- a list: { { addr, args }... }, each args at most five -> the last call's r0
                 local list = addr
-                assert(#list >= 1 and #list <= M.LIST_MAX, "sight: a call list holds 1-4 calls")
+                assert(#list >= 1 and #list <= M.LIST_MAX,
+                    "sight: a call list holds 1-" .. M.LIST_MAX .. " calls")
                 local stub, at = loop + LIST_STUB_AT, loop + LIST_AT
                 for i, h in ipairs(LIST_STUB) do cpu.write16(stub + (i - 1) * 2, h) end
                 for k, c in ipairs(list) do
@@ -956,31 +962,35 @@ function M.new(outer)
         end
     end
 
-    -- Enemy `e`'s own offensive decision on the board as it stands, inside a sandbox:
-    -- cp_decide.c's per-unit setup, in its order, with every player unit still visible: the
-    -- AI's danger map (AiFillDangerMap) is their threat, and its tile choice reads it. Left
-    -- out: RefreshEntityBmMaps/RenderBmMap/RefreshUnitSprites (they would rebuild gBmMapUnit
-    -- from the structs, which is already what it holds, and draw) and gAiState.unk7C = 0 (read
-    -- only by cp_staff.c, the staff AI). `before` runs just ahead of the decision (strike()
-    -- narrows the targets there). -> the struck unit's id and the strike as the forecast
-    -- reads it (M.side, with slot and tile), or nil when the AI does not attack.
+    -- Enemy `e`'s own decision on the board as it stands, inside a sandbox: cp_decide.c
+    -- CpDecide_Main's per-unit step, in its order, with every player unit still visible: the
+    -- AI's danger map (AiFillDangerMap) is their threat, and its tile choice reads it. The step
+    -- is CpDecide_Main's loop body, not a function: CpDecide_Main itself would start
+    -- gProcScr_CpPerform, which plays the act on the sandbox's next frame. So its field
+    -- assignments are written here and its calls made. Left out: RenderBmMap and
+    -- RefreshUnitSprites (they draw) and the US_HAS_MOVED_AI it sets after (read only by
+    -- cp_order.c's list building, done before any decision). `before` runs just ahead of the
+    -- decision (strike() narrows the targets there). -> the struck unit's id and the strike as
+    -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
     local function aiDecide(call, proc, e, before)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
         -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls
         -- run as one list (cp_decide.c's order kept)
+        api.write8(S.gAiState + AI_DECIDE_STATE, 0)
+        api.write8(S.gAiState + AI_STAFF_HP, 0)
         api.write8(S.gAiState + AI_WEIGHT_TABLE,
             (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
         api.write8(S.gAiState + AI_DANGER_FILLED, 0)
-        local decide = { { S.AiClearDecision, {} },
-                         { S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 } } }
-        local setup = { { S.AiUpdateNoMoveFlag, { e.addr } }, { S.AiInitDangerMap, {} } }
+        local decide = { { S.AiClearDecision, {} }, { S.AiDecideMain, {} } }
+        local setup = { { S.RefreshEntityBmMaps, {} }, { S.AiUpdateNoMoveFlag, { e.addr } },
+                        { S.AiInitDangerMap, {} } }
         if before then
             call(setup)
             before()
             call(decide)
         else
-            call({ setup[1], setup[2], decide[1], decide[2] })
+            call({ setup[1], setup[2], setup[3], decide[1], decide[2] })
         end
         local D = S.gAiDecision
         if mem.u8(D + DEC_ACTION) ~= AI_ACTION_COMBAT then return nil end
@@ -998,7 +1008,7 @@ function M.new(outer)
     function s.strike(u, e, x, y)
         local t = sandbox(function(call, proc)
             standOn(u, x, y)
-            -- `u` is made the one target only after the danger map: AiAttemptOffensiveAction
+            -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
             local target, side = aiDecide(call, proc, e, function() onlyTarget(u) end)
             if target ~= u.id then return nil end

@@ -48,7 +48,7 @@ class WantedSymbols(unittest.TestCase):
 SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNSeeds',
          'BattleGenerateSimulation', 'InitBattleForecastBattleStats', 'GenerateDangerZoneRange',
          'GenerateUnitMovementMap', 'GetUnitMovementCost', 'GetAvailableTileEventCommand',
-         'GetROMChapterStruct', 'InitRN', 'AiAttemptOffensiveAction', 'AiIsUnitEnemy',
+         'GetROMChapterStruct', 'InitRN', 'RefreshEntityBmMaps', 'AiDecideMain',
          'AiUpdateNoMoveFlag', 'AiInitDangerMap', 'AiClearDecision', 'gAiState', 'gAiDecision',
          'BattleGenerateBallistaSimulation', 'gActiveUnit', 'gActiveUnitId',
          'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
