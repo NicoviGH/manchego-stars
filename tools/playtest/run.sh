@@ -408,7 +408,11 @@ EOF
     [ "$final" -gt "$last_frame" ] && last_frame=$final
     local elapsed=$((SECONDS - started)); [ "$elapsed" -gt 0 ] || elapsed=1
     echo "throughput: ${last_frame} frames in ${elapsed}s = $((last_frame / elapsed))fps (target ${fps}fps)"
-    if [ "$KEEP_OPEN" != "--keep-open" ]; then kill "$pid" 2>/dev/null || true; fi
+    # --keep-open leaves the asked-for scenario's window up, never a checkpoint builder's: that
+    # one holds the checkpoint lock (fd 9) for as long as it lives
+    if [ "$KEEP_OPEN" != "--keep-open" ] || [ "$scen" != "$SCENARIO" ]; then
+        kill "$pid" 2>/dev/null || true
+    fi
     echo "----------------------------------------"
     cat "$log" 2>/dev/null || echo "(no log produced)"
     echo "----------------------------------------"
@@ -449,7 +453,10 @@ if [ -n "$BUILDER" ]; then
     # (kill -9 included; the builder's mGBA inherits it, so a live build keeps it). macOS has no
     # flock(1), and lockf(1) only wraps a whole command.
     exec 9>"$STATE_DIR/$CKPT.lock"
-    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'
+    if ! python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null; then
+        echo "== waiting for the '$CKPT' checkpoint lock (another run is building it) =="
+        python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'
+    fi
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
         echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
         # Note what the state file looked like BEFORE the build. Most builder failures never
