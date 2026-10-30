@@ -175,6 +175,26 @@ do
     check(f3 ~= f1, true, "stamp: a new frame moves it")
 end
 
+-- harness.lua writes nothing through PROCS.raw: the write counter sees only calls through the
+-- guard, and both the proc memo and controllerState's per-frame state are kept under
+-- PROCS.stamp(). Whether a call is a read is isRead's answer, the guard's own (ADR 0366).
+do
+    local f = assert(io.open(here .. "harness.lua"))
+    local harness = f:read("a")
+    f:close()
+    local calls, writes = 0, {}
+    for name in harness:gmatch("PROCS%.raw:(%w+)%(") do
+        calls = calls + 1
+        if not ProcMemo.isRead(name) then writes[#writes + 1] = name end
+    end
+    for name in harness:gmatch("[^%w_.]raw:(%w+)%(") do
+        calls = calls + 1
+        if not ProcMemo.isRead(name) then writes[#writes + 1] = name end
+    end
+    check(calls > 0, true, "harness: the hot reads bind to PROCS.raw")
+    check(table.concat(writes, ","), "", "harness: no non-read call through the raw emulator")
+end
+
 -- If anything replaces the guard (mGBA re-binding the global, or a script), writes would
 -- bypass it and the memo could go stale silently. It must fail loudly instead.
 do

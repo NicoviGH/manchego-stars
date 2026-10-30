@@ -38,20 +38,6 @@ class TestHarnessLoads(unittest.TestCase):
                          'harness.lua does not load: %s' % done.stderr.decode())
 
 
-class TestRawEmulatorOnlyReads(unittest.TestCase):
-    def test_nothing_writes_through_the_raw_emulator(self):
-        # procmemo's write counter only sees calls through the `emu` guard, and both the proc
-        # memo and controllerState's per-frame memo are kept under PROCS.stamp(). A write
-        # through PROCS.raw would leave either answering from before it (ADR 0366).
-        harness = _read_harness()
-        calls = re.findall(r'\b(?:PROCS\.raw|raw):(\w+)\(', harness)
-        self.assertTrue(calls, 'expected the hot reads to bind to PROCS.raw')
-        writes = sorted({c for c in calls
-                         if not (c.startswith('read') or c.startswith('get')
-                                 or c == 'currentFrame')})
-        self.assertEqual(writes, [], 'non-read calls through the raw emulator: %s' % writes)
-
-
 class TestChooseAttackContract(unittest.TestCase):
     """#232. chooseAttack is the shared attack path -- every combat scenario in the
     campaign routes through it -- so both of its waits have to hold in every mode the

@@ -273,8 +273,10 @@ local THUMB_B_SELF = 0xE7FE
 -- the game's IRQ area and a call never returned). A KEPT call keeps `b .`: its SWI would
 -- overwrite the game's own SVC lr and spsr, which a frame ending inside VBlankIntrWait still
 -- needs, and no load puts them back.
-local HALT_LOOP = { 0x4903, 0x6009, 0x4903, 0x2200, 0x800A, 0xDF02, 0xE7FD, 0x46C0 }
-local HALT_MARKER, HALT_IE = 0x10, 0x14       -- the loop's two literal words
+M.HALT_LOOP = { 0x4903, 0x6009, 0x4903, 0x2200, 0x800A, 0xDF02, 0xE7FD, 0x46C0 }
+local HALT_LOOP = M.HALT_LOOP
+M.HALT_MARKER = 0x10                          -- the loop's two literal words: the marker's
+local HALT_MARKER, HALT_IE = M.HALT_MARKER, 0x14   -- address, then REG_IE
 local MARKER_AT = 0x7C                        -- the marker word, at top + 7C (under the loop)
 local REG_IE = 0x04000200
 local SVC_NOIRQ = 0x13 | 0x80                 -- CPSR mode Supervisor, I
@@ -288,7 +290,7 @@ local SVC_NOIRQ = 0x13 | 0x80                 -- CPSR mode Supervisor, I
 -- at top + 0x180 or above, so 0xC0 bytes hold up to seven entries and the end word; an enemy's
 -- decision (aiDecide) is five.
 M.LIST_MAX = 5
-local LIST_STUB = {
+M.LIST_STUB = {
     0x6825,           -- +00 ldr r5, [r4, #0]
     0x2D00,           -- +02 cmp r5, #0
     0xD009,           -- +04 beq +1A            (the end)
@@ -304,7 +306,9 @@ local LIST_STUB = {
     0xE7E1,           -- +1A b loop             (loop = stub - 0x20)
     0x4728,           -- +1C bx r5
 }
-local LIST_STUB_AT, LIST_AT, LIST_ENTRY = 0x20, 0x40, 24   -- past the halt loop's 0x18 bytes
+local LIST_STUB = M.LIST_STUB
+M.LIST_STUB_AT = 0x20                                  -- past the halt loop's 0x18 bytes
+local LIST_STUB_AT, LIST_AT, LIST_ENTRY = M.LIST_STUB_AT, 0x40, 24
 local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
 local GPRS = { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12",
                "sp", "lr" }
@@ -330,6 +334,10 @@ local function writeRegisters(cpu, regs)
             cpu.read("pc"), regs.pc))
     end
 end
+-- Where a sandbox's frame starts below the game's sp (the call's stack top), and where its return
+-- loop sits above that.
+function M.top(sp) return (sp - 0x180) & ~7 end
+M.LOOP_AT = 0x80
 function M.machine(cpu, keep)
     return function(fn)
         -- The load puts every register back; only cpsr is kept here. A kept call loads
@@ -397,10 +405,10 @@ function M.machine(cpu, keep)
         local ok, a, b = pcall(function()
             cpsr = cpu.read("cpsr")
             cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
-            top = (cpu.read("sp") - 0x180) & ~7
+            top = M.top(cpu.read("sp"))
             -- SCRATCH_SIZE fits between scratch and the loop; a call list's stub and list
             -- sit above the loop (LIST_STUB_AT, LIST_AT: LIST_MAX entries and the end)
-            scratch, loop = top + 0x10, top + 0x80
+            scratch, loop = top + 0x10, top + M.LOOP_AT
             if not keep then
                 marker, ie = top + MARKER_AT, cpu.read32(REG_IE) & 0xFFFF
                 cpu.write("cpsr", (cpsr & ~0xFF) | SVC_NOIRQ)
@@ -413,6 +421,15 @@ function M.machine(cpu, keep)
         if not ok then error(a, 0) end
         return a, b
     end
+end
+
+-- `cache[key]`, else read(), kept there only when no sandbox is `open()`: a read made inside one
+-- may see its writes (journaled, or a game call's own), so it is returned and dropped.
+function M.keptRead(cache, key, read, open)
+    if cache[key] ~= nil then return cache[key] end
+    local now = read()
+    if not open() then cache[key] = now end
+    return now
 end
 
 -- `body()` run with a breakpoint on each of `holds` ({ { addr, fn }... }: fn runs each time the
@@ -760,10 +777,7 @@ function M.new(outer)
     -- it there). One read inside a sandbox may see its writes -- a unit stood elsewhere, its HP
     -- set, a bag a game call reordered -- so it is read fresh and dropped.
     local function units()
-        if seen.units then return seen.units end
-        local now = api.board().units
-        if not open() then seen.units = now end
-        return now
+        return M.keptRead(seen, "units", function() return api.board().units end, open)
     end
 
     -- The chapter's goal and tile commands, read once: its kind, the Defense map's end turn,

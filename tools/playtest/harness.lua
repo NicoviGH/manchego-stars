@@ -2960,8 +2960,8 @@ end
 -- The sandbox's CPU. A call runs as ordinary emulation: `frames` yields this coroutine a frame
 -- at a time until the call is back in its loop. Every write, save and load goes through the
 -- memo guard (`emu`, procmemo.lua, ADR 0366): a load rewinds the frame counter, and a write may
--- land anywhere, so the proc-pool memo is dropped with each. Register reads/writes are the
--- CPU's, never memory, and go to the real emulator.
+-- land anywhere, so the proc-pool memo is dropped with each. Register reads go to the real
+-- emulator; register writes go through the guard too (they move PROCS.stamp()).
 INSPECT.sightApi = function()
     local raw = PROCS.raw
     INSPECT.Sight = INSPECT.Sight or dofile(PLAYTEST_DIR .. "/sight.lua")
@@ -2975,8 +2975,6 @@ INSPECT.sightApi = function()
         cpu = {
             read = function(r) return raw:readRegister(r) end,
             read32 = function(a) return raw:read32(a) end,
-            -- through the guard: every write moves PROCS.stamp(), which controllerState keeps
-            -- a classification under
             write = function(r, v) emu:writeRegister(r, v) end,
             -- The frame a sandbox starts from holds log()'s stamps still while it runs (the
             -- calls' frames are counted into INSPECT.sandboxFrames instead). The save sets it only

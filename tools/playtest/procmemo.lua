@@ -21,9 +21,10 @@
 local ProcMemo = {}
 
 -- Calls that only READ the emulator. Everything else counts as a write.
-local function isRead(name)
+function ProcMemo.isRead(name)
     return name == "currentFrame" or name:sub(1, 4) == "read" or name:sub(1, 3) == "get"
 end
+local isRead = ProcMemo.isRead
 
 -- A proxy for `obj` that forwards every method call to it, counting each non-read call as a
 -- write via bump(). A member that is itself an object -- `emu.memory` and its domains, whose

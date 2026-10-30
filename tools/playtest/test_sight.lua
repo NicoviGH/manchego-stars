@@ -39,8 +39,8 @@ local function fakeCpu(cost)
                 local loop = regs.lr & ~1
                 regs.pc = loop + 4   -- bx lr, then the pipeline reads ahead
                 -- the halt loop's str: the marker (its literal at +10) set to its own address
-                local marker = ram[loop + 0x10]
-                if ram[loop] == 0x4903 and marker then ram[marker] = marker end
+                local marker = ram[loop + Sight.HALT_MARKER]
+                if ram[loop] == Sight.HALT_LOOP[1] and marker then ram[marker] = marker end
             end
             if done() then return true end
         end
@@ -226,16 +226,48 @@ do
     local cpu, seen = fakeCpu(1)
     pcall(Sight.machine(cpu), function(call) return call({ { 0x08001000, { 1, 2 } } }) end)
     local _, ram = seen()
-    local loop = ((0x03007D00 - 0x180) & ~7) + 0x80
-    local stub
-    for a = loop, loop + 0x40, 2 do if ram[a] == 0x6825 then stub = a; break end end
-    check(stub ~= nil, true, "list: the stub was written above the loop")
-    local at = stub + 0x1A
+    local loop = Sight.top(0x03007D00) + Sight.LOOP_AT
+    local stub = loop + Sight.LIST_STUB_AT
+    check(ram[stub], Sight.LIST_STUB[1], "list: the stub was written at LIST_STUB_AT")
+    local at = stub + (#Sight.LIST_STUB - 2) * 2   -- the `b loop`, before the `bx r5` veneer
     local h = ram[at]
     check(h & 0xF800, 0xE000, "list: the stub's last word is a Thumb B")
     local imm = h & 0x7FF
     if imm >= 0x400 then imm = imm - 0x800 end
     check(at + 4 + imm * 2, loop, "list: the stub branches back to the loop")
+end
+
+-- keptRead: a read made with no sandbox open is kept and answers every later ask; one made
+-- inside a sandbox is returned but never kept (it may see the sandbox's own writes).
+do
+    local reads, isOpen = 0, false
+    local function read() reads = reads + 1; return "board" .. reads end
+    local function open() return isOpen end
+    local cache = {}
+    isOpen = true
+    check(Sight.keptRead(cache, "units", read, open), "board1", "keptRead: inside a sandbox, read")
+    check(cache.units, nil, "keptRead: and not kept")
+    isOpen = false
+    check(Sight.keptRead(cache, "units", read, open), "board2", "keptRead: outside, a fresh read")
+    isOpen = true
+    check(Sight.keptRead(cache, "units", read, open), "board2", "keptRead: kept, even inside one")
+    check(reads, 2, "keptRead: no third read")
+end
+
+-- withBreaks: a breakpoint that cannot be set still clears the ones set before it, and raises.
+do
+    local set, cleared = {}, {}
+    local cpu = {
+        breakpoint = function(addr)
+            if #set == 1 then error("no debugger") end
+            set[#set + 1] = addr
+            return #set
+        end,
+        unbreak = function(id) cleared[#cleared + 1] = id end,
+    }
+    local ok = pcall(Sight.withBreaks, cpu, { { 0x10, print }, { 0x20, print } }, function() end)
+    check(ok, false, "withBreaks: a breakpoint that fails raises")
+    check(#cleared == 1 and cleared[1] == 1, true, "withBreaks: and the one set first is cleared")
 end
 
 -- A KEPT call (PR E): what it wrote stays, the registers come back as they were, pc through a
@@ -273,10 +305,13 @@ do
     end)
     check(got, 42, "a sandboxed call returns the function's r0")
     local loads, ram = seen()
-    local top = (0x03007D00 - 0x180) & ~7
-    check(ram[loop], 0x4903, "lr names the halt loop written into scratch RAM")
+    local top = Sight.top(0x03007D00)
+    check(loop, top + Sight.LOOP_AT, "lr names the loop's place above the call's stack")
+    for i, h in ipairs(Sight.HALT_LOOP) do
+        check(ram[loop + (i - 1) * 2], h, "the halt loop's word " .. i .. " is written")
+    end
     check(ram[loop + 0x0A], 0xDF02, "which halts through the BIOS (swi 2)")
-    check(ram[loop + 0x10], top + 0x7C, "its first literal is the marker's address")
+    check(ram[loop + Sight.HALT_MARKER], top + 0x7C, "its first literal is the marker's address")
     check(ram[loop + 0x14], 0x04000200, "its second is REG_IE, which the loop clears")
     check(ram[0x04000200], 0x2001, "the call starts with the game's IE written back")
     check(loop > cpu.read("sp"), false, "the loop sits above the call's stack, under the caller's")
@@ -296,7 +331,7 @@ do
             local pc = cpu.read("pc")
             if pc ~= 0x08001000 and pc < 0x08000000 and pc > 0x03000000 then
                 loop = pc - 4
-                local marker = cpu.read32(loop + 0x10)
+                local marker = cpu.read32(loop + Sight.HALT_MARKER)
                 cpu.write32(marker, marker)
                 cpu.write("pc", 0x0000016C)
             end
@@ -331,7 +366,7 @@ do
     local wrote, write32 = {}, cpu.write32
     cpu.write32 = function(a, v) wrote[#wrote + 1] = { a, v }; write32(a, v) end
     Sight.machine(cpu)(function(call) return call(0x08001000, { 1, 2, 3, 4, -1 }) end)
-    local top, stack = (0x03007D00 - 0x180) & ~7, {}
+    local top, stack = Sight.top(0x03007D00), {}
     for _, w in ipairs(wrote) do
         if w[1] >= top and w[1] < top + 0x10 then stack[#stack + 1] = w end
     end
