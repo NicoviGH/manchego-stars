@@ -9,54 +9,44 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest, evening). **#510 step 9 is on `feat/510-step9-e-campaigns`
-at 06b17f8, PUSHED, no PR yet.** The checkout is on main for this HANDOFF commit; switch back and
-rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`, the gotcha below).
+Refreshed 2026-10-29 (Claude, latest). **#510 step 9 PR E+F is MERGED (#548, dc5ed4b), and so is
+the unit-loss fix (#549, 96cf9d1).** main is clean; no branch is in flight. This session's results,
+numbers and open items are ONE #510 comment:
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6513563594>. The audit
+(complete) is <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
+Read **ADR 0376** (its "Lost" amendment), **0377** and **0379** first.
 
-**NEXT SESSION: finish the audit's small items, then
-the review, the PR, and Nicolas's sweep.** The audit is ONE #510 comment, kept current in place
-(its "Fixed" sections say what each commit did and measured):
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
-Read **ADR 0377** (+ amendments) and **ADR 0379** first.
-- **DONE this session (all [ROM]-proved, numbers on the audit comment):**
-  - 2b8faf3, audit 9's Talk half: `sight.offers(u, tiles, act, target)` runs the menu's own
-    check (`TalkCommandUsability`/`DoorCommandUsability`) from each wait tile in one sandbox;
-    `menuOffers` is shared by `offers` and `legal`; `doorFrom` is gone.
-  - 56851ff, audit 22-23: thefts (`INSPECT.watchThefts`, `Sight.stealRanks`, `clear.stolen`,
-    `rec.thefts`); `INSPECT.breakWhile` folds the drop and theft breakpoints. A thief's chest
-    is now named by the act (it is opened as USE_ITEM, which the watch never saw: the path was
-    BROKEN, Colm in vanilla Ch3); `rec.watch_faults` (`drop_missed`) guards the drop.
-  - **Three harness bugs found on the way (56851ff):** `Controller.findAction` walked Weapon
-    Select back to row 0 (since 7cdb5bd the chosen weapon was often not played); **an act that
-    auto-ended the player phase made the bot end the NEXT turn unplayed** (ch01 at HEAD skipped
-    turns 3 and 5; every earlier baseline had skipped turns); the judged enemy phase and
-    exposures ignored that striking equips the weapon (`EquipUnitItemSlot`). `Board.AI_DEC`
-    is now the one owner of `gAiDecision`'s layout.
-  - efdae5a: montecarlo notes non-spoiling thefts (ADR 0379).
-- **Answered (Nicolas):** a chest whose thief joins us is taken (06b17f8, ADR 0376 amended);
-  vanilla Ch3 is now clean t11, 17.6 CPU s.
-- **Audit 10-12, 19, 20: being committed on the branch (2026-10-30)**: an enemy in fog is the
-  game's `US_BIT9`; a heal's cap is `GetUnitMaxHp`; 11, 12 and 19 keep their copies, each with
-  a stated reason. Numbers on the audit comment. 17-18 are decided behaviour.
-- **Then:** `/code-review <PR> medium` in a subagent, `review-to-clean`, the PR (merge is
-  pre-approved for step 9 once the review is clean and CI is green on HEAD).
-- **Then Nicolas's ask (2026-10-29): a sweep for optimization and consolidation** ("nice and
-  lean and efficient and follows best practices"). Scope: `bot.lua`, `planner.lua`,
-  `sight.lua`, `board.lua`, `botrun.lua`, `campaign.lua` and the harness's bot api. Still to
-  fold: the breakpoint pattern in `M.played` and `M.talks` (drops/thefts already use
-  `INSPECT.breakWhile`). Report CPU s before and after.
-- **Planner quality, now visible:** Manchego Stars ch03 is won t12 but NOT clean: two units lost
-  to the boss on plans judging 0.88-0.89 death with nothing better. Earlier "clean" ch03 runs
-  had skipped turns and wrong weapons. Raise it with Nicolas (part B/C territory), don't patch.
-- **Baselines (CPU s, attempt 1, efdae5a) [ROM]:** Manchego Stars ch01 clean t9 13.3; vanilla
-  Ch2 (`e1-vanilla-ch3/2`) clean t8 14.6; vanilla Ch3 (`/3`) clean t11 17.6;
-  Manchego Stars ch03 (`e1-ours-ch07/4`) won t12 25.5, not clean. Vanilla Ch5 not re-run.
-- **Running a chapter alone:** `campaign_env.py vanilla --id e1-vanilla-ch3 --from N`, then set
-  `last: [N]`, `attempt: 1` in the JSON; `PT_VANILLA=1 PT_RUN_TAG=x PT_CAMPAIGN="$(cat env)"
-  tools/playtest/run.sh campaign`. Manchego Stars ch03 needs an ours env with `--store` of a
-  scratch dir holding `e1-vanilla-ch3/*.json` plus `scout-vanilla/*.json`, `--id e1-ours-ch07
-  --from 4`. Back up the state store first (this session's runs left it unchanged).
-- **Prose:** say "Manchego Stars ch01", never "ours ch01".
+**NEXT SESSION: Nicolas's sweep (2026-10-29), "nice and lean and efficient and follows best
+practices".**
+- Scope: `bot.lua`, `planner.lua`, `sight.lua`, `board.lua`, `botrun.lua`, `campaign.lua` and
+  the harness's bot api.
+- Still to fold: the breakpoint pattern in `M.played` and `M.talks` (drops and thefts already
+  use `INSPECT.breakWhile`).
+- Report CPU s before and after. Baselines at 96cf9d1 [ROM]: Manchego Stars ch01 clean t9,
+  13.47; vanilla Ch4 clean t5, 28.6; vanilla Ch6 clean t7, 39.8.
+- Branch off main, then `/code-review <PR> medium` in a subagent and `review-to-clean`. Merge is
+  pre-approved for #510 step 9 PRs once the review is clean and CI is green on HEAD.
+
+**Open (detail on the comment above; raise with Nicolas, don't patch):**
+- From New Game (seed 1), vanilla Ch2 has no clean clear in any style: Ross dies on turn 2-3.
+  This is part D (Talk recruits as goals). Until it is fixed, the vanilla store can't be
+  re-saved past Ch2.
+- Vanilla Ch5 is never clean. Ch6 was reached only through an uncommitted probe.
+- Manchego Stars ch03 is won but not clean: two units lost to the boss on plans judging 0.88-0.89
+  death.
+- Forced fog stalls on the last hidden red unit. This is part C.
+
+**Running a chapter alone:**
+1. `campaign_env.py vanilla --id e1-vanilla-ch3 --from N` (the store has 0-4 and 6; 6 is Ch5,
+   index 7 is Ch6).
+2. Set `last: [N]` and `attempt: k` in the JSON.
+3. Run `PT_VANILLA=1 PT_RUN_TAG=x PT_CAMPAIGN="$(cat env)" tools/playtest/run.sh campaign`.
+
+The old start records have no carried team: they resume with a WARNING and `carried_unknown`.
+`attempt` k picks the k-th style drawn from (seed, chapter), so the old clean Ch2 style (bold, no
+claims) is attempt 5. A full (non-attempt) run re-saves the starts it passes, so back the store up
+first. Reaching Ch6 needs a scratch copy of the store and a won-carries-on patch (uncommitted).
+
 
 **Part A (the four-part clean clear) as it stands.** Design: #510 comment 6485197805. Plan:
 #510 comment 6485521139 (its Task 4 text is out of date: update it with what follows). Record:
@@ -128,8 +118,8 @@ G3 #537 78105ed; the summary is on #531).
    - Run by hand: `tools/playtest/run.sh bot` / `sightprobe` (ours ch01), and with `PT_VANILLA=1`
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
-3. **NOW: PR E (campaigns) and PR F (the runner), one branch: `feat/510-step9-e-campaigns`**
-   (pushed, **b9e99bd**, NO PR yet). Read in the plan comment (link at the top): "Party
+3. **DONE: PR E (campaigns) and PR F (the runner)**, merged as #548 (dc5ed4b); then #549 (a
+   unit is lost only when the game killed it, 96cf9d1). What they built, for reference. Read in the plan comment (link at the top): "Party
    selection, SETTLED", "Lords, SETTLED", "The planner", and Tasks 11-13 (F1-F3; F2 and F3
    were amended 2026-10-27).
    - **Built, E:** `Bot.team` picks the team by the map's DEMANDS, read at the prep screen
