@@ -1821,6 +1821,23 @@ do
     check(at(a) ~= "3,0", true, "recruit: no march on one it has no way to")
 end
 
+-- test_recruit_claim_talks_where_the_game_offers_it: the claim names C. The field (one
+-- class's costs) has no way from C to T, but the game offers C's Talk from (1,0) this turn. The
+-- Talk is the game's own check, so C talks -- not A, whom the plain talk habit (slot order)
+-- would pick; only the march, when no Talk is offered, needs a way.
+do
+    local A = blue(0x01, 0, 0, 1)
+    local C = blue(0x02, 1, 2, 0)
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local st = claimed("careful", { id = "r1", kind = "recruit", unit = { 0x30 } })
+    st.recruits[1].by = { 0x02 }
+    local a = B.decide(boardOf(A, C, T), sightOf({
+        reach = { [0x01] = tiles({ 0, 1 }), [0x02] = tiles({ 2, 0 }, { 1, 0 }) },
+        field = function() return { [0] = {}, [1] = { [0] = 1 } } end,
+        talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }), st)
+    check(a and a.act .. ">" .. a.unitId, "talk>2", "recruit: the claim's talker talks, way or not")
+end
+
 -- test_keys_and_priority_rank_their_target_first: A deals more to E1, but E2 holds a key
 -- (keys claim) or is a priority claim's class.
 do

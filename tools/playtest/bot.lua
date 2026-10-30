@@ -927,10 +927,16 @@ local function recruitFirst(ctx, gate)
     for _, c in ipairs(ctx.style.recruits or {}) do
         for _, t in ipairs(ctx.onField) do
             if t.faction ~= "blue" and listed(c.units, t.charId) then
-                local talkers, near, nearD = talkersOf(ctx, t, c.by), nil, nil
-                for _, p in ipairs(talkers) do
-                    local a = talkFrom(ctx, p.u, t, gate)
-                    if a then return a end
+                -- the Talk is the game's own check (talkFrom), the field's way or not: the field
+                -- is one class's costs, not the talker's; only the march needs a way
+                for _, u in ipairs(ctx.actors) do
+                    if not c.by or listed(c.by, u.charId) then
+                        local a = talkFrom(ctx, u, t, gate)
+                        if a then return a end
+                    end
+                end
+                local near, nearD
+                for _, p in ipairs(talkersOf(ctx, t, c.by)) do
                     if not nearD or p.d < nearD then near, nearD = p.u, p.d end
                 end
                 if near then
@@ -1279,11 +1285,8 @@ local function exploring(ctx, sent)
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
     for _, t in ipairs(ctx.onField) do
-        local by
-        for _, c in ipairs(ctx.style.recruits or {}) do
-            if listed(c.units, t.charId) then by = c.by end
-        end
-        for _, p in ipairs(talkersOf(ctx, t, by)) do
+        local claim = claimsOn(ctx, "recruits", t)[1]   -- the one recruitFirst acts on
+        for _, p in ipairs(talkersOf(ctx, t, claim and claim.by)) do
             talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
         end
     end
