@@ -530,8 +530,11 @@ end
 -- seize tile (needsToStepOff) while any other is left -- it aims at the throne, it does not
 -- stand in the lord's way to it.
 -- An avoid claim on `u` keeps it off every tile an enemy its `vs` names reaches, while any
--- other is left.
+-- other is left -- and not on a stalled board (ctx.stalled), where a careful player that has
+-- stopped making progress takes the least it must (vanilla Ch5: Natasha dead, every unit
+-- kept out of Joshua's reach between them and the boss, the same board for ten turns).
 local function outOfReach(ctx, u, tiles)
+    if ctx.stalled then return tiles end
     local vs = {}
     for _, c in ipairs(ctx.style.avoids or {}) do
         if listed(c.units, u.charId) then vs[#vs + 1] = c.vs end
@@ -905,16 +908,33 @@ local function marchLength(ctx, u, t)
     return d
 end
 
--- The units able to act that could go and Talk `t` over: ones the game lets Talk to it (and
--- `by` names, when given) with a way to it, in slot order: { { u, d = the march } }. None for
--- a unit the fog hides: a player knows no more than the fog shows.
+-- Whether `u` may Talk `t` over: the game's own check (talks), for a unit not on our side
+-- and not hidden by the fog (a player knows no more than the fog shows).
+local function mayTalkOver(ctx, u, t)
+    return t.faction ~= "blue" and not t.fogged and talks(ctx, u, t)
+end
+
+-- The units able to act that could go and Talk `t` over (mayTalkOver, and `by` names them,
+-- when given) with a way to it, in slot order: { { u, d = the march } }.
 local function talkersOf(ctx, t, by)
     local out = {}
-    if t.faction == "blue" or t.fogged then return out end
     for _, u in ipairs(ctx.actors) do
-        if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
+        if (not by or listed(by, u.charId)) and mayTalkOver(ctx, u, t) then
             local d = marchLength(ctx, u, t)
             if d then out[#out + 1] = { u = u, d = d } end
+        end
+    end
+    return out
+end
+
+-- The units one of ours may Talk over (mayTalkOver), by id: a recruit lost to any blow spoils
+-- the clear (botrun's recruits_missing), as a green unit's death does. Every blue counts, one
+-- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
+local function recruitsOf(ctx)
+    local out = {}
+    for _, t in ipairs(ctx.onField) do
+        for _, u in ipairs(ctx.blues) do
+            if mayTalkOver(ctx, u, t) then out[t.id] = true break end
         end
     end
     return out
@@ -1258,7 +1278,7 @@ local function openTiles(ctx)
 end
 
 local function exploring(ctx, sent)
-    ctx.exploreGoal = {}
+    ctx.exploreGoal, ctx.talkDuty = {}, {}
     local taken = {}
     local function reaches(u, t)
         local d = marchLength(ctx, u, t)
@@ -1294,10 +1314,16 @@ local function exploring(ctx, sent)
             if #talkers > 0 then break end
         end
         for _, p in ipairs(talkers) do
-            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
+            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, claimed = #claims > 0 }
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end)
+    -- a talker sent to a recruit the style claims is on duty (Bot.candidates): the claim is
+    -- played first
+    for _, p in ipairs(talkPairs) do
+        local g = ctx.exploreGoal[p.u.id]
+        if p.claimed and g and g.x == p.t.x and g.y == p.t.y then ctx.talkDuty[p.u.id] = p.t end
+    end
     if not ctx.sight.explorable then return end
     local pairs_ = {}
     local open, blues = {}, {}
@@ -1395,13 +1421,17 @@ end
 -- (`spent`).
 -- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
--- has visited or opened (never offered again).
--- -> { { unit, acts } }, ctx (the planner scores with the same view).
+-- has visited or opened (never offered again); `stalled`, the board repeats (an avoid claim
+-- gives way).
+-- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
+-- ids, are the units whose death the planner pays as one of ours).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     ctx.explored = opts and opts.explored or {}
+    ctx.stalled = opts and opts.stalled
     exploring(ctx, opts and opts.sent)
+    ctx.recruits = recruitsOf(ctx)
     local open = function() return true end
     local objective = sight.objective
     local out = {}
@@ -1532,6 +1562,19 @@ function M.candidates(board, sight, style, opts)
         -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
         -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
         for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
+        -- a recruit claim is played first: the talker exploring sent to its recruit Talks
+        -- (that recruit, or any other the game offers it), or goes toward it (the march, or
+        -- the retreat that still gains ground), and does nothing else (vanilla Ch5: Natasha
+        -- healed and held for five turns, Joshua never reached)
+        if ctx.talkDuty[u.id] then
+            local kept = {}
+            for _, a in ipairs(acts) do
+                if a.act == "talk" or a.why == "march" or a.why == "retreat" then
+                    kept[#kept + 1] = a
+                end
+            end
+            acts = kept
+        end
         for _, a in ipairs(acts) do
             a.progress = gain(a.move.x, a.move.y)
             local friend = vacated(ctx, u, a.move.x, a.move.y)

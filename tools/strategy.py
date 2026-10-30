@@ -28,14 +28,16 @@ Kinds (each side's claims are read against that side's OWN party and force):
               engagement (#510 step 7), the one its threat is read from.
   recruit     `unit`, optional `by` (one or a list): talk that unit over, by `by` when the
               strategy names who (Neimi talks to Colm), else by anyone the game lets. PLAYED by
-              the step-9 bot, first, before the rest of the map; not a parity read.
+              the step-9 bot, first, before the rest of the map: while the recruit is on the
+              field, its `by` only Talks it over or goes toward it (ADR 0382); not a parity read.
   keys        no fields: the strategy points at the enemies carrying keys. PLAYED: the bot
               strikes the enemies the game says hold a key first, and a unit holding one opens
               the door that cuts it off from its goal.
   heal        `vs`: heal between attacks on that enemy. PLAYED: the bot's style gates count the
               heal a healer can still give this phase before the enemy phase.
   avoid       `unit` and `vs`: keep that unit out of those enemies' reach (the flier off the
-              archer). PLAYED: the unit never ends a move where one of them can strike it.
+              archer). PLAYED: the unit never ends a move where one of them can strike it,
+              except on a stalled board (ADR 0382).
   priority    `vs`: an enemy to kill before the rest (the enemy thief). PLAYED: the bot ranks
               it above every other target.
   kits        `topic` (one of KIT_TOPICS): what the party picks up. REPORTED: modelled since

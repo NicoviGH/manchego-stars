@@ -498,9 +498,11 @@ function M.run(api)
 
     local function play()
         api.seed(api.info.seed)
-        trace({ t = "start", info = api.info, style = api.style, claims_played = played,
-                claims_unplayed = unplayed })
         local sight = api.sight()
+        -- the units whose death ends the game, as the game says (sight.objective.gameOver)
+        trace({ t = "start", info = api.info, style = api.style, claims_played = played,
+                claims_unplayed = unplayed,
+                game_over = sight.objective and sight.objective.gameOver })
         local seen, waitUntil = {}, nil
         local lastPlan
         -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
