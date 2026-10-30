@@ -425,6 +425,20 @@ function Board.fate(mem, SYM, addr, was)
     return nil
 end
 
+-- Who killed unit index `uid`: the other fighter of the fight it fell in, read off
+-- gBattleActor/gBattleTarget (+0x0B the unit index, +0x00 the character) -> its charId and
+-- whether it is one of ours (a blue index), or nil. Only while a fight resolves (`fighting`):
+-- the battle structs keep the last fight's units, so a phase start's poison tick or an event's
+-- kill would otherwise be credited to it.
+function Board.killer(mem, SYM, uid, fighting)
+    if not fighting then return nil end
+    local by
+    if mem.u8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
+    elseif mem.u8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
+    if not by then return nil end
+    return mem.u8(mem.u32(by) + 4), (mem.u8(by + 0x0B) & 0xC0) == 0
+end
+
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
 local function battleSide(mem, b)
@@ -489,6 +503,7 @@ function Board.bind(mem, SYM)
         ACTION_PICK = Board.ACTION_PICK,
         AI_DEC = Board.AI_DEC, AI_ACTION_COMBAT = Board.AI_ACTION_COMBAT,
         fate = function(addr, was) return Board.fate(mem, SYM, addr, was) end,
+        killer = function(uid, fighting) return Board.killer(mem, SYM, uid, fighting) end,
         AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
     }
 end

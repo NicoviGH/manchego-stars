@@ -3036,8 +3036,7 @@ INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(),
 -- Every unit the game kills while an act or an enemy phase plays, with the fighter it fell to:
 -- a frame callback that watches every faction's array (lean) -- a green unit lost spoils the
 -- clear as a blue one does (ADR 0376) -- and, the frame one goes, reads what the game wrote to
--- its slot (Board.fate) and who is fighting: gBattleActor/gBattleTarget +0x0B is the unit
--- index, +0x00 the character. Read each frame rather than caught at UnitKill's entry: a
+-- its slot (Board.fate) and, in a fight, who killed it (Board.killer). Read each frame rather than caught at UnitKill's entry: a
 -- breakpoint held through every act and phase cost 56% more CPU (Manchego Stars ch01, 20.4 CPU s
 -- against 13.1), and arming it per caller would have to list every proc that can kill.
 -- -> stop() -> { id, charId, faction, killer, ours } per kill, and per slot the watch could not
@@ -3049,24 +3048,15 @@ INSPECT.watchDeaths = function()
             if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f.name } end
         end
     end
-    local function charOf(bu) return ru8(ru32(bu) + 4) end
     local id = callbacks:add("frame", function()
         for uid, who in pairs(alive) do
             local fate = BOARD.fate(ru32(SYM.gUnitLookup + uid * 4), who)
             if fate == "killed" then
-                -- a killer only in a fight: the battle structs keep the last fight's units, so a
-                -- poison tick or an event's kill would otherwise be credited to it
-                local by
-                if procActive(SYM.sProcScr_CombatAction) then
-                    if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
-                    elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
-                end
-                -- ours: the killer's unit index is a blue one (FACTION_MASK bits 0); turn and
-                -- phase when it fell (a phase start's poison tick is the next phase's)
+                -- turn and phase when it fell (a phase start's poison tick is the next phase's)
+                local killer, ours = BOARD.killer(uid, procActive(SYM.sProcScr_CombatAction))
                 local now = BOARD.header()
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
-                                        killer = by and charOf(by),
-                                        ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0,
+                                        killer = killer, ours = ours == true,
                                         turn = now.turn,
                                         phase = now.phase == "blue" and "player" or "enemy" }
             elseif fate == "replaced" then

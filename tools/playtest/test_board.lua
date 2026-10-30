@@ -22,6 +22,8 @@ local SYM = {
     gItemData = 0x08840B20,
     gBmMapSize = 0x0202E4D4,
     gActiveUnit = 0x03004E50,
+    gBattleActor = 0x0203A4EC,
+    gBattleTarget = 0x0203A56C,
     gAiDecision = 0x0203AA96,
 }
 
@@ -414,6 +416,22 @@ do
     check(Board.fate(m, SYM, at(0), green), "unloaded", "fate: ClearUnit zeroes the class too")
     putUnit(m, SYM.gUnitArrayGreen, 0, { charId = 0x42 })
     check(Board.fate(m, SYM, at(0), green), "replaced", "fate: another unit in the slot")
+end
+
+-- Board.killer: the other fighter, only while a fight resolves. The battle structs keep the
+-- last fight's units after it, so outside one (a poison tick, an event's kill) nobody is credited.
+do
+    local m = fakeMem()
+    local ch = CHAR_BASE + 0x8E * 0x34
+    m.w8(ch + 0x04, 0x8E)
+    m.w8(SYM.gBattleActor + 0x0B, 0x81)       -- the enemy 0x8E attacked
+    m.w32(SYM.gBattleActor, ch)
+    m.w8(SYM.gBattleTarget + 0x0B, 0x45)      -- the green unit it fought
+    local killer, ours = Board.killer(m, SYM, 0x45, true)
+    check(killer, 0x8E, "killer: in a fight, the other fighter")
+    check(ours, false, "killer: an enemy index is not ours")
+    check(Board.killer(m, SYM, 0x45, false), nil, "killer: no fight, no killer (stale structs)")
+    check(Board.killer(m, SYM, 0x46, true), nil, "killer: a unit not in the fight")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
