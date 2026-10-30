@@ -85,9 +85,11 @@
 --                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went.
---   objective                { kind, tile, turnsLeft, boss } -- see objective(); boss = on a
+--   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective(); boss = on a
 --                            Defeat Boss map, the charId whose death quote raises
---                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start.
+--                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
+--                            gameOver = the charIds of ours whose death sets
+--                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
 --                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
 --                            unreached.
@@ -185,6 +187,7 @@ M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
 M.FACTION_MASK = 0xC0        -- include/bmunit.h: a unit index's faction bits (blue 0x00)
 M.EVFLAG_DEFEAT_BOSS = 2     -- include/constants/event-flags.h; DefeatTalkEnt +04 flag
+M.EVFLAG_GAMEOVER = 101      -- the same; RunWaitEvents ends the game when it is set
 M.DEFEAT_TALK_FLAG = 0x04
 M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
@@ -817,6 +820,22 @@ function M.new(outer)
             end
             return nil
         end)
+    end
+    -- The units of ours whose death ends the game: the game's own death step, run in the
+    -- sandbox. A dying unit's entry (GetDefeatTalkEntry, quote text or none) names the flag
+    -- its death sets, and SetPidDefeatedFlag sets it -- but never EVFLAG_GAMEOVER for the
+    -- chapter's protected unit on a non-story map -- and that flag is what RunWaitEvents ends
+    -- the game on. Read at the start: the entries are the chapter's, not the board's.
+    s.objective.gameOver = {}
+    for _, u in ipairs(api.board().units) do
+        if u.faction == "blue" and u.onField and sandbox(function(call)
+            local ent = call(S.GetDefeatTalkEntry, { u.charId })
+            if ent == 0 then return false end
+            call(S.SetPidDefeatedFlag, { u.charId, mem.u16(ent + M.DEFEAT_TALK_FLAG) })
+            return call(S.CheckFlag, { M.EVFLAG_GAMEOVER }) & 0xFF ~= 0
+        end) then
+            table.insert(s.objective.gameOver, u.charId)
+        end
     end
 
     function s.demands()

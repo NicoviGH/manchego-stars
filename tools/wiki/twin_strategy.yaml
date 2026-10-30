@@ -100,9 +100,16 @@ FE8 Ch5:
     - kind: unmodelled
       topic: arena
       cite: "This chapter features the first arena in the game."
-    - kind: unmodelled
-      topic: recruit
-      cite: "Recruiting Joshua is less intimidating than it initially appears."
+    - kind: recruit
+      unit: joshua
+      by: natasha
+      cite: "then simply have Natasha walk up to him"
+    # Joshua is the map's one Myrmidon, so the class names him; Natasha is left out, she
+    # walks up to him (the wiki: he does not strike her on the USA ROM the bot plays)
+    - kind: avoid
+      unit: [eirika, seth, franz, gilliam, vanessa, moulder, ross, garcia, neimi, colm, artur, lute]
+      vs: myrmidon
+      cite: "simply kill any nearby mobile enemies while staying away from Joshua"
     - kind: reinforcements
       cite: "Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended."
     - kind: kits

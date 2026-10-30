@@ -1866,6 +1866,18 @@ do
     check(at(B.decide(boardOf(P, X), sightOf(o), style("bold"))), "2,0", "no claim: as far as it goes")
     local st = claimed("bold", { id = "v", kind = "avoid", unit = { 0x01 }, vs = { CLS_A } })
     check(at(B.decide(boardOf(P, X), sightOf(o), st)), "1,0", "avoid: short of the reach")
+    -- on a stalled board the claim gives way: a careful player that has stopped making
+    -- progress takes the least it must (vanilla Ch5: Natasha dead, every unit kept out of
+    -- Joshua's reach between them and the boss, the same board for ten turns)
+    local function tilesOf(opts)
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(P, X), sightOf(o), st, opts)) do
+            for _, a in ipairs(c.acts) do out[at(a)] = true end
+        end
+        return out
+    end
+    check(tostring(tilesOf(nil)["2,0"]) .. " " .. tostring(tilesOf({ stalled = true })["2,0"]),
+          "nil true", "avoid: lifted on a stalled board")
 end
 
 -- test_heal_claim_counts_the_heal_before_the_enemy_phase: careful A (20 HP) on the boss:
@@ -2630,6 +2642,164 @@ do
     check(pcall(Json.encode, plan and plan.predict), true, "planner: the predictions encode")
 end
 
+-- test_planner_pays_a_recruit_our_counter_kills: R (red) is a recruit, since the game lets A
+-- Talk to it, but stands out of A's reach this turn. It strikes A at (0,0) and A's counter
+-- kills it; at (1,0) A is out of its reach, which costs ground. A recruit killed spoils the
+-- clear as one of ours does (botrun's recruits_missing; vanilla Ch5's Joshua, killed by
+-- Seth's counter), so careful gives up the ground, and bold, which prices a death low, keeps
+-- it and records R's chance to fall.
+local function counterKillsRecruit()
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local R = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        field = function() return { [0] = { [0] = 20, [1] = 40 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x01, takenHit = 0, takenDmg = 0, takenHits = 1,
+                       takenCrit = 0, targetHp = 20, felled = 1 } }
+        end,
+    }
+    return boardOf(A, R), o
+end
+do
+    local board, o = counterKillsRecruit()
+    local a = Planner.plan(B, board, sightOf(o), style("careful"))
+    check(at(a), "1,0", "planner: careful keeps out of a recruit's reach when its counter kills it")
+    board, o = counterKillsRecruit()
+    local b, plan = Planner.plan(B, board, sightOf(o), style("bold"))
+    local r
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.recruit then r = p end
+    end
+    check(at(b) .. " " .. tostring(r and r.id) .. " " .. tostring(r and r.die) .. " "
+          .. tostring(r and table.concat(r.struck, ",")), "0,0 129 1 1",
+          "planner: bold keeps the ground, and records the recruit's chance to fall to A")
+    check(pcall(Json.encode, plan and plan.predict), true, "planner: a recruit's record encodes")
+end
+
+-- test_planner_mends_a_plan_that_kills_a_recruit: as above with BEAM = 1, so the beam keeps only
+-- A's march to (0,0). R strikes A there and dies; R has no menu of ours, so the mend tries the
+-- acts of the unit it strikes, A, and finds (1,0).
+do
+    local board, o = counterKillsRecruit()
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(at(a) .. " " .. tostring(plan and plan.kind), "1,0 mend",
+          "planner: the mend keeps A out of the recruit's reach")
+end
+
+-- test_planner_never_credits_killing_a_recruit: A can kill R from (1,0); C, far off, is the one
+-- the game lets Talk to R, so R is a recruit. Its kill is paid as a death, not credited, so
+-- careful does not attack it.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 0, 5, { minRange = false })
+    local R = red(0x81, 2, 0, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 5 }) },
+        talk = { [0x02] = { [0x81] = true } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 99, hits = 1,
+                                                     killsTarget = true } } } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, R), sightOf(o), style("careful"))
+    local attacks = false
+    for _, x in ipairs(plan and plan.acts or {}) do
+        attacks = attacks or (x.act == "attack" and x.targetId == 0x81)
+    end
+    check(attacks, false, "planner: no plan kills a recruit")
+end
+
+-- test_planner_judges_a_talk_with_the_recruit_off_the_enemy_side: A Talks R over from (1,0). R
+-- joins us, so the judged phase has no strike from it: the phase is played with R gone, and A's
+-- predicted chance to die there is nothing.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local R = red(0x81, 2, 0, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        enemyPhase = function(plan)
+            if (plan.gone or {})[0x81] then return {} end
+            return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 20 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, R), sightOf(o), style("careful"))
+    local die
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x01 then die = p.die end
+    end
+    check(tostring(a and a.act) .. " " .. tostring(die), "talk 0",
+          "planner: a talked-over recruit does not strike in the judged phase")
+end
+
+-- test_planner_prices_a_game_over_units_death_as_the_chapter: L's death quote ends the game
+-- (sight.objective.gameOver). Where L stands, X strikes it at even odds; at (1,0) L takes X's
+-- strike off C, who then dies for sure. One unit's sure death costs less than an even chance
+-- of a game over (vanilla Ch5: Eirika left to Joshua at 0.76 for a recruit's 0.97), so L moves.
+do
+    local L = blue(0x01, 0, 0, 0, { minRange = false })
+    local C = blue(0x02, 1, 0, 5, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout", gameOver = { 0x01 } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 5 }) },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.x == 1 then
+                    return { { enemy = 0x81, target = 0x02, takenHit = 100, takenDmg = 99,
+                               takenHits = 1, takenCrit = 0, targetHp = 20 } }
+                end
+            end
+            return { { enemy = 0x81, target = 0x01, takenHit = 50, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 20 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(L, C, X), sightOf(o), style("careful"))
+    local moved
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.unitId == 0x01 then moved = at(x) end
+    end
+    check(moved, "1,0", "planner: a game-over unit's death costs the chapter, not one unit")
+end
+
+-- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%
+-- of the time. Standing, E holds J off; dead, it frees J to strike L there for sure, and L's
+-- death ends the game. The average keeps E standing (kill < 0.5), so only the branch where the
+-- kill lands shows the risk (vanilla Ch5 turn 5: Eirika's kill turned Joshua on her). L waits.
+do
+    local L = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 2, 0, { minRange = false, hp = 10 })
+    local J = red(0x82, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout", gameOver = { 0x01 } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 40, dmg = 10, hits = 1 } } } },
+        enemyPhase = function(plan)
+            local atOne = false
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.x == 1 then atOne = true end
+            end
+            if atOne and (plan.gone or {})[0x81] then
+                return { { enemy = 0x82, target = 0x01, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 20 } }
+            end
+            return {}
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(L, E, J), sightOf(o), style("careful"))
+    local attacks = false
+    for _, x in ipairs(plan and plan.acts or {}) do attacks = attacks or x.act == "attack" end
+    check(attacks, false, "planner: a kill that may free a striker on the lord is played both ways")
+end
+
 -- test_a_talker_is_sent_to_its_recruit: T (green) is far off and A is the only unit the game
 -- lets Talk to it. A is sent to T's tile, not to the nearest enemy, and marches on it.
 do
@@ -2660,6 +2830,47 @@ do
     end
     check(sent, "0,0", "talker: sent to its recruit")
     check(moved, "3,0", "talker: marches on it")
+end
+
+-- test_a_claimed_talker_only_goes_to_its_recruit: the style claims R (red, far off) for N, a
+-- healer with a hurt ally beside it and an enemy to hold off. A claim is played first: while R
+-- is on the field, N's menu is the march on R and the retreat toward it, never the heal or a
+-- hold (vanilla Ch5: Natasha healed for five turns and never reached Joshua).
+do
+    local N = blue(0x0D, 0, 4, 0, { minRange = false })
+    local C = blue(0x02, 1, 4, 1, { minRange = false, hp = 5, maxhp = 20 })
+    local R = red(0x81, 0, 0, { minRange = false })
+    local o = {
+        reach = { [0x0D] = tiles({ 4, 0 }, { 3, 0 }, { 5, 0 }), [0x02] = tiles({ 4, 1 }) },
+        talk = { [0x0D] = { [0x81] = true } },
+        staves = { [0x0D] = { { slot = 0 } } },
+        heals = { [0x0D] = { ["4,0"] = { { slot = 0, amount = 10, targets = { 0x02 } } },
+                             ["5,0"] = { { slot = 0, amount = 10, targets = { 0x02 } } } } },
+        field = function(goal)
+            local f = {}
+            for y = 0, 9 do
+                f[y] = {}
+                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+            end
+            return f
+        end,
+    }
+    local function whys(st)
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(N, C, R), sightOf(o), st)) do
+            if c.unit.id == 0x0D then
+                for _, a in ipairs(c.acts) do out[a.why] = true end
+            end
+        end
+        return out
+    end
+    local free = whys(style("careful"))
+    check(free.heal and free.hold and true or false, true, "talker: unclaimed, it may heal or hold")
+    local st = B.applyClaims({ { id = "c", kind = "recruit", unit = { 0x81 }, by = { 0x0D } } },
+                             style("careful"))
+    local claimed = whys(st)
+    check(tostring(claimed.heal) .. " " .. tostring(claimed.hold) .. " " .. tostring(claimed.march),
+          "nil nil true", "talker: claimed, it only marches on its recruit")
 end
 
 -- The goals a careful plan sends units to, "x,y" by unit id. `o.field` defaults to open ground

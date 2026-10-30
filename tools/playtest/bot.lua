@@ -530,8 +530,11 @@ end
 -- seize tile (needsToStepOff) while any other is left -- it aims at the throne, it does not
 -- stand in the lord's way to it.
 -- An avoid claim on `u` keeps it off every tile an enemy its `vs` names reaches, while any
--- other is left.
+-- other is left -- and not on a stalled board (ctx.stalled), where a careful player that has
+-- stopped making progress takes the least it must (vanilla Ch5: Natasha dead, every unit
+-- kept out of Joshua's reach between them and the boss, the same board for ten turns).
 local function outOfReach(ctx, u, tiles)
+    if ctx.stalled then return tiles end
     local vs = {}
     for _, c in ipairs(ctx.style.avoids or {}) do
         if listed(c.units, u.charId) then vs[#vs + 1] = c.vs end
@@ -920,6 +923,21 @@ local function talkersOf(ctx, t, by)
     return out
 end
 
+-- The units not on our side that one of ours able to act could Talk over (the game's own
+-- check, talks), by id: a recruit lost to any blow spoils the clear (botrun's
+-- recruits_missing), as a green unit's death does. None the fog hides, as for talkersOf.
+local function recruitsOf(ctx)
+    local out = {}
+    for _, t in ipairs(ctx.onField) do
+        if t.faction ~= "blue" and not t.fogged then
+            for _, u in ipairs(ctx.actors) do
+                if talks(ctx, u, t) then out[t.id] = true break end
+            end
+        end
+    end
+    return out
+end
+
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
 -- none) talks the recruit over when it can reach it, else the nearest such talker (by the
 -- field from the recruit) marches on it.
@@ -948,6 +966,21 @@ local function recruitFirst(ctx, gate)
                     local tile = #allowed > 0 and M.pickMove(allowed, { cur = near, goal = t,
                                                                         field = field })
                     return action(near, tile or { x = near.x, y = near.y }, "wait")
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- The recruit a claim sends `u` to Talk over (its `by` names `u`), still to be talked over
+-- and not hidden by the fog; nil for none.
+local function claimedRecruit(ctx, u)
+    for _, c in ipairs(ctx.style.recruits or {}) do
+        if c.by and listed(c.by, u.charId) then
+            for _, t in ipairs(ctx.onField) do
+                if t.faction ~= "blue" and not t.fogged and listed(c.units, t.charId) then
+                    return t
                 end
             end
         end
@@ -1395,13 +1428,17 @@ end
 -- (`spent`).
 -- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
--- has visited or opened (never offered again).
--- -> { { unit, acts } }, ctx (the planner scores with the same view).
+-- has visited or opened (never offered again); `stalled`, the board repeats (an avoid claim
+-- gives way).
+-- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
+-- ids, are the units whose death the planner pays as one of ours).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     ctx.explored = opts and opts.explored or {}
+    ctx.stalled = opts and opts.stalled
     exploring(ctx, opts and opts.sent)
+    ctx.recruits = recruitsOf(ctx)
     local open = function() return true end
     local objective = sight.objective
     local out = {}
@@ -1532,6 +1569,20 @@ function M.candidates(board, sight, style, opts)
         -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
         -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
         for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
+        -- a recruit claim is played first: its talker Talks the recruit over, or goes toward
+        -- it (the march, or the retreat that still gains ground), and does nothing else
+        -- (vanilla Ch5: Natasha healed and held for five turns, Joshua never reached)
+        local duty = claimedRecruit(ctx, u)
+        if duty then
+            local kept = {}
+            for _, a in ipairs(acts) do
+                if (a.act == "talk" and a.targetId == duty.id) or a.why == "march"
+                        or a.why == "retreat" then
+                    kept[#kept + 1] = a
+                end
+            end
+            acts = kept
+        end
         for _, a in ipairs(acts) do
             a.progress = gain(a.move.x, a.move.y)
             local friend = vacated(ctx, u, a.move.x, a.move.y)
