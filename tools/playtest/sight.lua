@@ -9,9 +9,9 @@
 -- points the CPU at a game function (args in r0-r3 and on the stack, IRQs masked, lr at a
 -- return loop it writes into scratch RAM, which halts in the BIOS: ADR 0380), lets the emulator
 -- run frames until the call is back in that loop, reads what the caller asks for, and loads the
--- state back -- registers, RAM and RNG exactly as they were. It never single-steps: a call long enough to cross the end of a
--- frame (ch01's danger zone) deadlocks mGBA's emu:step() inside its frame callback, so the
--- call runs as ordinary emulation, between frames. The forecast WINDOW cannot answer the enemy
+-- state back -- registers, RAM and RNG exactly as they were. It never single-steps: a call
+-- long enough to cross the end of a frame (ch01's danger zone) deadlocks mGBA's emu:step()
+-- inside its frame callback, so the call runs as ordinary emulation, between frames. The forecast WINDOW cannot answer the enemy
 -- phase: FE8 zeroes the weapon of a target outside its range (SetBattleUnitWeapon,
 -- BattleInitTargetCanCounter), so it never shows an enemy's strike on a tile it is not beside.
 --
