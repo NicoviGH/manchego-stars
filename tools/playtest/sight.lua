@@ -11,9 +11,10 @@
 -- run frames until the call is back in that loop, reads what the caller asks for, and loads the
 -- state back -- registers, RAM and RNG exactly as they were. It never single-steps: a call
 -- long enough to cross the end of a frame (ch01's danger zone) deadlocks mGBA's emu:step()
--- inside its frame callback, so the call runs as ordinary emulation, between frames. The forecast WINDOW cannot answer the enemy
--- phase: FE8 zeroes the weapon of a target outside its range (SetBattleUnitWeapon,
--- BattleInitTargetCanCounter), so it never shows an enemy's strike on a tile it is not beside.
+-- inside its frame callback, so the call runs as ordinary emulation, between frames. The
+-- forecast WINDOW cannot answer the enemy phase: FE8 zeroes the weapon of a target outside its
+-- range (SetBattleUnitWeapon, BattleInitTargetCanCounter), so it never shows an enemy's strike
+-- on a tile it is not beside.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -235,13 +236,13 @@ local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
--- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool (run emulated frames
--- until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch) between a save and a
--- load and returns what fn returns; call(addr, args) runs one game function and returns its r0.
--- `scratch` is SCRATCH_SIZE free bytes for the caller. The CPU is put in System mode FIRST:
--- sp and lr are banked, so they are read and written in the mode the call runs in -- a frame
--- that ends inside an IRQ or SWI would otherwise hand out that mode's registers. Above the
--- call's stack sit `scratch` and the return loop; the load puts back whatever was there.
+-- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
+-- (run emulated frames until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch)
+-- between a save and a load and returns what fn returns; call(addr, args) runs one game function
+-- and returns its r0. `scratch` is SCRATCH_SIZE free bytes for the caller. The CPU is put in
+-- System mode FIRST: sp and lr are banked, so they are read and written in the mode the call runs
+-- in -- a frame that ends inside an IRQ or SWI would otherwise hand out that mode's registers.
+-- Above the call's stack sit `scratch` and the return loop; the load puts back whatever was there.
 --
 -- Sight.machine(cpu, true) is the same call KEPT (#510 step 9 PR E): what the game function
 -- wrote stays -- a shop proc it started runs on the next frame -- and only the registers are put
@@ -336,8 +337,8 @@ function M.machine(cpu, keep)
         local state = keep and readRegisters(cpu) or cpu.save()
         local cpsr, top, scratch, loop, marker, ie, svcSp
         local function returned()
+            if marker then return cpu.read32(marker) == marker end
             local pc = cpu.read("pc")
-            if marker then return cpu.read32(marker) == marker or (pc >= loop and pc <= loop + 0x10) end
             return pc >= loop and pc <= loop + 8
         end
         -- the CPU sent to `pc` (lr = the loop, unless the stub sets its own) with the return
@@ -420,8 +421,10 @@ end
 -- -> what body returns. (INSPECT.breakWhile is the live game's: held frame by frame.)
 function M.withBreaks(cpu, holds, body)
     local ids = {}
-    for i, h in ipairs(holds) do ids[i] = cpu.breakpoint(h[1], h[2]) end
-    local out = table.pack(pcall(body))
+    local out = table.pack(pcall(function()
+        for _, h in ipairs(holds) do ids[#ids + 1] = cpu.breakpoint(h[1], h[2]) end
+        return body()
+    end))
     for _, id in ipairs(ids) do cpu.unbreak(id) end
     if not out[1] then error(out[2], 0) end
     return table.unpack(out, 2, out.n)
@@ -492,12 +495,12 @@ function M.exchangeOf(leaves)
 end
 
 -- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
--- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes
--- caught at S.BattleRoll1RN/S.BattleRoll2RN's entry (M.withBreaks) and its simResult (r1, which a simulation
--- returns in place of rolling) forced, depth first: pass where it can, then fail. A roll that
--- cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
--- target and the actor lost in the run just made. -> { { p, dealt, back } }. Inside a
--- sandbox; the breakpoints are set only for these calls (mGBA steps while one is set).
+-- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes caught
+-- at S.BattleRoll1RN/S.BattleRoll2RN's entry (M.withBreaks) and its simResult (r1, which a
+-- simulation returns in place of rolling) forced, depth first: pass where it can, then fail. A roll
+-- that cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
+-- target and the actor lost in the run just made. -> { { p, dealt, back } }. Inside a sandbox; the
+-- breakpoints are set only for these calls (mGBA steps while one is set).
 function M.played(cpu, call, sim, S, lost)
     local path, odds, at = {}, {}, 0
     local function catch(numbers)
@@ -736,13 +739,14 @@ function M.batching(outer)
         if not ok then error(a, 0) end
         return a, b
     end
-    -- whether memory holds a write of the sandbox's own, not yet put back
-    local function dirty() return journal ~= nil and #journal > 0 end
-    return sandbox, api, dirty
+    -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
+    -- (a call's EquipUnitItemSlot reorders a bag, and nothing journals that)
+    local function open() return depth > 0 end
+    return sandbox, api, open
 end
 
 function M.new(outer)
-    local sandbox, api, dirty = M.batching(outer)
+    local sandbox, api, open = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF, US_BIT9 = Board.US_HIDDEN, Board.US_UNDER_A_ROOF, Board.US_BIT9
     local w, h = api.map()
@@ -751,13 +755,15 @@ function M.new(outer)
     function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
 
-    -- The board's units, read once per board like every other answer. Never kept from a read
-    -- made over a sandbox's own writes (a unit stood elsewhere, its HP set): that one is read
-    -- fresh and dropped.
+    -- The board's units, read once per board like every other answer: kept only from a read
+    -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
+    -- it there). One read inside a sandbox may see its writes -- a unit stood elsewhere, its HP
+    -- set, a bag a game call reordered -- so it is read fresh and dropped.
     local function units()
-        if dirty() then return api.board().units end
-        seen.units = seen.units or api.board().units
-        return seen.units
+        if seen.units then return seen.units end
+        local now = api.board().units
+        if not open() then seen.units = now end
+        return now
     end
 
     -- The chapter's goal and tile commands, read once: its kind, the Defense map's end turn,
@@ -889,6 +895,7 @@ function M.new(outer)
 
     function s.refresh()
         seen = { threats = {}, fields = {} }
+        units()
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
     end

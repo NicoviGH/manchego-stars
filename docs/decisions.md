@@ -225,7 +225,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0375` | [A style's risk tolerance is not a declared value: the styles are the variation](decisions/0375-a-styles-risk-tolerance-is-not-declared.md) | 2026-10-28 | #510 |
 | `0376` | [A clean clear has four parts, a vanilla chapter without one is a bot fault, and the bot clears all of vanilla's Eirika...](decisions/0376-a-clean-clear-has-four-parts-and-vanilla-is-the-bar.md) | 2026-10-29 | #510 |
 | `0379` | [A theft spoils a clean clear only when the thief took something it ranks above the stat boosters](decisions/0379-a-theft-spoils-a-clean-clear-only-above-the-boosters.md) | 2026-10-29 | #510 |
-| `0380` | [A sandbox call returns into the BIOS's Halt, not a spinning b .](decisions/0380-the-sandbox-call-halts-in-the-bios-instead-of-spinning.md) | 2026-10-30 | #510 |
+| `0380` | [A sandbox call returns into the BIOS's Halt, not a spinning branch-to-self loop](decisions/0380-the-sandbox-call-halts-in-the-bios-instead-of-spinning.md) | 2026-10-30 | #510 |
 
 ---
 

@@ -36,7 +36,11 @@ local function fakeCpu(cost)
             ran = ran + 1
             if regs.pc == 0x08001000 and ran >= cost then
                 regs.r0 = regs.r0 + regs.r1
-                regs.pc = (regs.lr & ~1) + 4   -- bx lr, then the pipeline reads ahead
+                local loop = regs.lr & ~1
+                regs.pc = loop + 4   -- bx lr, then the pipeline reads ahead
+                -- the halt loop's str: the marker (its literal at +10) set to its own address
+                local marker = ram[loop + 0x10]
+                if ram[loop] == 0x4903 and marker then ram[marker] = marker end
             end
             if done() then return true end
         end
@@ -176,6 +180,7 @@ do
                     write32 = function(a, v) bytes[a] = v end }
     local sandbox, api = Sight.batching(outer)
     local before = { bytes[0x100] }
+
     local sums = sandbox(function()
         local out = {}
         for i = 1, 3 do
@@ -194,6 +199,43 @@ do
     -- an unbatched read is its own round trip, as before
     sandbox(function(call) return call(0x08001000, { 1, 1 }) end)
     check(select(1, seen()), 2, "unbatched: its own load")
+end
+
+-- open(): whether a sandbox is open, nested ones included, journal or no journal -- a game
+-- call's own writes are never journaled, so Sight.new keeps no units() read made while it is.
+do
+    local cpu = fakeCpu(1)
+    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
+                  u32 = function() return 0 end }
+    local nop = function() end
+    local sandbox, _, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
+                                              write16 = nop, write32 = nop })
+    check(open(), false, "open: no sandbox yet")
+    sandbox(function(call)
+        check(open(), true, "open: inside a sandbox")
+        sandbox(function() call(0x08001000, { 1, 1 }) end)
+        check(open(), true, "open: still, after a nested call returns with nothing journaled")
+    end)
+    check(open(), false, "open: closed after the outermost returns")
+end
+
+-- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
+-- return loop, wherever LIST_STUB_AT puts the stub (the fake CPU never runs the stub, so the
+-- call is let fail and the words it wrote are read).
+do
+    local cpu, seen = fakeCpu(1)
+    pcall(Sight.machine(cpu), function(call) return call({ { 0x08001000, { 1, 2 } } }) end)
+    local _, ram = seen()
+    local loop = ((0x03007D00 - 0x180) & ~7) + 0x80
+    local stub
+    for a = loop, loop + 0x40, 2 do if ram[a] == 0x6825 then stub = a; break end end
+    check(stub ~= nil, true, "list: the stub was written above the loop")
+    local at = stub + 0x1A
+    local h = ram[at]
+    check(h & 0xF800, 0xE000, "list: the stub's last word is a Thumb B")
+    local imm = h & 0x7FF
+    if imm >= 0x400 then imm = imm - 0x800 end
+    check(at + 4 + imm * 2, loop, "list: the stub branches back to the loop")
 end
 
 -- A KEPT call (PR E): what it wrote stays, the registers come back as they were, pc through a
@@ -286,11 +328,13 @@ end
 do
     -- The fifth argument rides the stack, as the ARM calling convention puts it.
     local cpu = fakeCpu(1)
-    local wrote = {}
-    cpu.write32 = function(a, v) wrote[#wrote + 1] = { a, v } end
+    local wrote, write32 = {}, cpu.write32
+    cpu.write32 = function(a, v) wrote[#wrote + 1] = { a, v }; write32(a, v) end
     Sight.machine(cpu)(function(call) return call(0x08001000, { 1, 2, 3, 4, -1 }) end)
     local top, stack = (0x03007D00 - 0x180) & ~7, {}
-    for _, w in ipairs(wrote) do if w[1] >= top and w[1] < top + 0x10 then stack[#stack + 1] = w end end
+    for _, w in ipairs(wrote) do
+        if w[1] >= top and w[1] < top + 0x10 then stack[#stack + 1] = w end
+    end
     check(#stack, 1, "one stack argument written")
     check(stack[1][1], top, "at the call's sp")
     check(stack[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")

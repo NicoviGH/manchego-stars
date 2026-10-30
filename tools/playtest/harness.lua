@@ -2975,7 +2975,9 @@ INSPECT.sightApi = function()
         cpu = {
             read = function(r) return raw:readRegister(r) end,
             read32 = function(a) return raw:read32(a) end,
-            write = function(r, v) raw:writeRegister(r, v) end,
+            -- through the guard: every write moves PROCS.stamp(), which controllerState keeps
+            -- a classification under
+            write = function(r, v) emu:writeRegister(r, v) end,
             -- The frame a sandbox starts from holds log()'s stamps still while it runs (the
             -- calls' frames are counted into INSPECT.sandboxFrames instead). The save sets it only
             -- once the state is taken and the load clears it first, so a save or load that
