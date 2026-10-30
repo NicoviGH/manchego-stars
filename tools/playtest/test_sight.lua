@@ -23,6 +23,7 @@ local function fakeCpu(cost)
     local cpu = {}
     function cpu.read(r) return regs[r] end
     function cpu.write(r, v) regs[r] = v end
+    function cpu.read32(a) return ram[a] or 0 end
     function cpu.write16(a, v) ram[a] = v end
     function cpu.write32(a, v) ram[a] = v end
     function cpu.save() return { pc = regs.pc, sp = regs.sp, marker = ram.marker } end
@@ -35,7 +36,11 @@ local function fakeCpu(cost)
             ran = ran + 1
             if regs.pc == 0x08001000 and ran >= cost then
                 regs.r0 = regs.r0 + regs.r1
-                regs.pc = (regs.lr & ~1) + 4   -- bx lr, then the pipeline reads ahead
+                local loop = regs.lr & ~1
+                regs.pc = loop + 4   -- bx lr, then the pipeline reads ahead
+                -- the halt loop's str: the marker (its literal at +10) set to its own address
+                local marker = ram[loop + Sight.HALT_MARKER]
+                if ram[loop] == Sight.HALT_LOOP[1] and marker then ram[marker] = marker end
             end
             if done() then return true end
         end
@@ -175,6 +180,7 @@ do
                     write32 = function(a, v) bytes[a] = v end }
     local sandbox, api = Sight.batching(outer)
     local before = { bytes[0x100] }
+
     local sums = sandbox(function()
         local out = {}
         for i = 1, 3 do
@@ -193,6 +199,75 @@ do
     -- an unbatched read is its own round trip, as before
     sandbox(function(call) return call(0x08001000, { 1, 1 }) end)
     check(select(1, seen()), 2, "unbatched: its own load")
+end
+
+-- open(): whether a sandbox is open, nested ones included, journal or no journal -- a game
+-- call's own writes are never journaled, so Sight.new keeps no units() read made while it is.
+do
+    local cpu = fakeCpu(1)
+    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
+                  u32 = function() return 0 end }
+    local nop = function() end
+    local sandbox, _, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
+                                              write16 = nop, write32 = nop })
+    check(open(), false, "open: no sandbox yet")
+    sandbox(function(call)
+        check(open(), true, "open: inside a sandbox")
+        sandbox(function() call(0x08001000, { 1, 1 }) end)
+        check(open(), true, "open: still, after a nested call returns with nothing journaled")
+    end)
+    check(open(), false, "open: closed after the outermost returns")
+end
+
+-- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
+-- return loop, wherever LIST_STUB_AT puts the stub (the fake CPU never runs the stub, so the
+-- call is let fail and the words it wrote are read).
+do
+    local cpu, seen = fakeCpu(1)
+    pcall(Sight.machine(cpu), function(call) return call({ { 0x08001000, { 1, 2 } } }) end)
+    local _, ram = seen()
+    local loop = Sight.top(0x03007D00) + Sight.LOOP_AT
+    local stub = loop + Sight.LIST_STUB_AT
+    check(ram[stub], Sight.LIST_STUB[1], "list: the stub was written at LIST_STUB_AT")
+    local at = stub + (#Sight.LIST_STUB - 2) * 2   -- the `b loop`, before the `bx r5` veneer
+    local h = ram[at]
+    check(h & 0xF800, 0xE000, "list: the stub's last word is a Thumb B")
+    local imm = h & 0x7FF
+    if imm >= 0x400 then imm = imm - 0x800 end
+    check(at + 4 + imm * 2, loop, "list: the stub branches back to the loop")
+end
+
+-- keptRead: a read made with no sandbox open is kept and answers every later ask; one made
+-- inside a sandbox is returned but never kept (it may see the sandbox's own writes).
+do
+    local reads, isOpen = 0, false
+    local function read() reads = reads + 1; return "board" .. reads end
+    local function open() return isOpen end
+    local cache = {}
+    isOpen = true
+    check(Sight.keptRead(cache, "units", read, open), "board1", "keptRead: inside a sandbox, read")
+    check(cache.units, nil, "keptRead: and not kept")
+    isOpen = false
+    check(Sight.keptRead(cache, "units", read, open), "board2", "keptRead: outside, a fresh read")
+    isOpen = true
+    check(Sight.keptRead(cache, "units", read, open), "board2", "keptRead: kept, even inside one")
+    check(reads, 2, "keptRead: no third read")
+end
+
+-- withBreaks: a breakpoint that cannot be set still clears the ones set before it, and raises.
+do
+    local set, cleared = {}, {}
+    local cpu = {
+        breakpoint = function(addr)
+            if #set == 1 then error("no debugger") end
+            set[#set + 1] = addr
+            return #set
+        end,
+        unbreak = function(id) cleared[#cleared + 1] = id end,
+    }
+    local ok = pcall(Sight.withBreaks, cpu, { { 0x10, print }, { 0x20, print } }, function() end)
+    check(ok, false, "withBreaks: a breakpoint that fails raises")
+    check(#cleared == 1 and cleared[1] == 1, true, "withBreaks: and the one set first is cleared")
 end
 
 -- A KEPT call (PR E): what it wrote stays, the registers come back as they were, pc through a
@@ -214,12 +289,14 @@ do
     local loads, ram = seen()
     check(loads, 0, "a kept call loads no state")
     check(ram.marker, "kept", "and what it wrote stays")
+    check(ram[Sight.REG_IE], nil, "a kept call leaves REG_IE alone")
     for r, v in pairs(before) do check(cpu.read(r), v, "register " .. r .. " is put back") end
 end
 
 do
     local cpu, seen = fakeCpu(3)
     local loop
+    select(2, seen())[Sight.REG_IE] = 0x2001
     local got = Sight.machine(cpu)(function(call)
         local _, ram = seen(); ram.marker = "dirty"
         local r = call(0x08001001, { 2, 40 })
@@ -228,11 +305,41 @@ do
     end)
     check(got, 42, "a sandboxed call returns the function's r0")
     local loads, ram = seen()
-    check(ram[loop], 0xE7FE, "lr names a Thumb `b .` written into scratch RAM")
+    local top = Sight.top(0x03007D00)
+    check(loop, top + Sight.LOOP_AT, "lr names the loop's place above the call's stack")
+    for i, h in ipairs(Sight.HALT_LOOP) do
+        check(ram[loop + (i - 1) * 2], h, "the halt loop's word " .. i .. " is written")
+    end
+    check(ram[loop + Sight.HALT_MARKER], top + Sight.MARKER_AT,
+          "its first literal is the marker's address")
+    check(ram[loop + Sight.HALT_IE], Sight.REG_IE, "its second is REG_IE, which the loop clears")
+    check(ram[Sight.REG_IE], 0x2001, "the call starts with the game's IE written back")
     check(loop > cpu.read("sp"), false, "the loop sits above the call's stack, under the caller's")
     check(loads, 1, "the state is loaded back once")
     check(ram.marker, nil, "what the call wrote is gone after the sandbox")
     check(cpu.read("pc"), 0x1F8, "the CPU is back where the frame left it")
+end
+
+do
+    -- Returned into the halt: the CPU sits in the BIOS's Halt, outside the loop, and the loop's
+    -- str has set the marker. The call is seen as returned through the marker alone.
+    local cpu = fakeCpu(2)
+    local frames = cpu.frames
+    function cpu.frames(done, max)
+        local loop
+        return frames(function()
+            local pc = cpu.read("pc")
+            if pc ~= 0x08001000 and pc < 0x08000000 and pc > 0x03000000 then
+                loop = pc - 4
+                local marker = cpu.read32(loop + Sight.HALT_MARKER)
+                cpu.write32(marker, marker)
+                cpu.write("pc", 0x0000016C)
+            end
+            return done()
+        end, max)
+    end
+    local got = Sight.machine(cpu)(function(call) return call(0x08001001, { 2, 40 }) end)
+    check(got, 42, "a call halted in the BIOS is seen as returned through its marker")
 end
 
 do
@@ -256,11 +363,16 @@ end
 do
     -- The fifth argument rides the stack, as the ARM calling convention puts it.
     local cpu = fakeCpu(1)
-    local wrote = {}
-    cpu.write32 = function(a, v) wrote[#wrote + 1] = { a, v } end
+    local wrote, write32 = {}, cpu.write32
+    cpu.write32 = function(a, v) wrote[#wrote + 1] = { a, v }; write32(a, v) end
     Sight.machine(cpu)(function(call) return call(0x08001000, { 1, 2, 3, 4, -1 }) end)
-    check(#wrote, 1, "one stack argument written")
-    check(wrote[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")
+    local top, stack = Sight.top(0x03007D00), {}
+    for _, w in ipairs(wrote) do
+        if w[1] >= top and w[1] < top + Sight.SCRATCH_AT then stack[#stack + 1] = w end
+    end
+    check(#stack, 1, "one stack argument written")
+    check(stack[1][1], top, "at the call's sp")
+    check(stack[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")
 end
 
 -- attackOf / strikeOf: our attack (with the enemy's counter) and the enemy's own strike are

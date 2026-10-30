@@ -31,7 +31,7 @@ divergence from vanilla is a gap to close, not a ruling to record.
 **How the game's code is run.** `Sight.machine` saves the emulator state and puts the CPU in System
 mode, Thumb, IRQs masked, FIRST: `sp` and `lr` are banked, so they are read and written in the mode
 the call runs in. It sets r0-r3 (and the stack for a fifth argument), points `lr` at a two-byte
-Thumb `b .` written into scratch RAM above the call's stack, and jumps to the function. The harness
+Thumb `b .` written into scratch RAM above the call's stack, and jumps to the function. (Amended by ADR 0380, 2026-10-30: a call that is loaded back now returns into the BIOS's Halt rather than a spinning `b .`.) The harness
 then yields frames until the CPU sits in that loop, the caller reads what it needs, and the state is
 loaded back: RAM, registers and RNG exactly as they were. It never single-steps. `emu:step()` from
 inside mGBA's frame callback deadlocks when a call crosses the end of a frame. ch01's danger zone

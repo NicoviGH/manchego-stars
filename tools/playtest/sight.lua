@@ -7,13 +7,14 @@
 --
 -- HOW THE GAME'S CODE IS RUN. Sight.machine(cpu) is a sandbox: it saves the emulator's state,
 -- points the CPU at a game function (args in r0-r3 and on the stack, IRQs masked, lr at a
--- two-byte `b .` it writes into scratch RAM), lets the emulator run frames until the CPU sits
--- in that loop, reads what the caller asks for, and loads the state back -- registers, RAM and
--- RNG exactly as they were. It never single-steps: a call long enough to cross the end of a
--- frame (ch01's danger zone) deadlocks mGBA's emu:step() inside its frame callback, so the
--- call runs as ordinary emulation, between frames. The forecast WINDOW cannot answer the enemy
--- phase: FE8 zeroes the weapon of a target outside its range (SetBattleUnitWeapon,
--- BattleInitTargetCanCounter), so it never shows an enemy's strike on a tile it is not beside.
+-- return loop it writes into scratch RAM, which halts in the BIOS: ADR 0380), lets the emulator
+-- run frames until the call is back in that loop, reads what the caller asks for, and loads the
+-- state back -- registers, RAM and RNG exactly as they were. It never single-steps: a call
+-- long enough to cross the end of a frame (ch01's danger zone) deadlocks mGBA's emu:step()
+-- inside its frame callback, so the call runs as ordinary emulation, between frames. The
+-- forecast WINDOW cannot answer the enemy phase: FE8 zeroes the weapon of a target outside its
+-- range (SetBattleUnitWeapon, BattleInitTargetCanCounter), so it never shows an enemy's strike
+-- on a tile it is not beside.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -234,14 +235,14 @@ local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 
--- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), write16(addr, v),
--- write32(addr, v), save() -> state, load(state), frames(done, max) -> bool (run emulated frames
--- until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch) between a save and a
--- load and returns what fn returns; call(addr, args) runs one game function and returns its r0.
--- `scratch` is SCRATCH_SIZE free bytes for the caller. The CPU is put in System mode FIRST:
--- sp and lr are banked, so they are read and written in the mode the call runs in -- a frame
--- that ends inside an IRQ or SWI would otherwise hand out that mode's registers. Above the
--- call's stack sit `scratch` and the return loop; the load puts back whatever was there.
+-- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
+-- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
+-- (run emulated frames until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch)
+-- between a save and a load and returns what fn returns; call(addr, args) runs one game function
+-- and returns its r0. `scratch` is SCRATCH_SIZE free bytes for the caller. The CPU is put in
+-- System mode FIRST: sp and lr are banked, so they are read and written in the mode the call runs
+-- in -- a frame that ends inside an IRQ or SWI would otherwise hand out that mode's registers.
+-- Above the call's stack sit `scratch` and the return loop; the load puts back whatever was there.
 --
 -- Sight.machine(cpu, true) is the same call KEPT (#510 step 9 PR E): what the game function
 -- wrote stays -- a shop proc it started runs on the next frame -- and only the registers are put
@@ -250,17 +251,48 @@ local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 -- measured write: mGBA's pc write refills the pipeline, so it reads one instruction past what
 -- was written (measured 2026-10-27 at a frame boundary, the BIOS halt loop, ARM: +4).
 local THUMB_B_SELF = 0xE7FE
+-- The return loop of a call that is loaded back HALTS rather than spins: a CPU spinning in
+-- `b .` is emulated instruction by instruction to the frame's end (measured, Manchego Stars
+-- ch01: 0.47 ms a sandbox frame against ~0.13 for a live one, which sits in the BIOS's
+-- VBlankIntrWait; 1.05 ms with breakpoints held), and mGBA skips a halted CPU from event to
+-- event. A RAM write to HALTCNT is ignored outside the BIOS (mGBA io.c, as on hardware), so
+-- the loop calls the BIOS's Halt (swi 2), REG_IE cleared first so nothing wakes it. The halted
+-- CPU's pc sits in the BIOS, outside the loop, so the loop first marks a word that the call
+-- has returned. Each call writes the game's IE back before it starts: the frame ends with the
+-- CPU halted (the game's VBlankIntrWait, or this loop), and only an enabled, pending interrupt
+-- (VBlank's IF, never acknowledged: IRQs stay masked) wakes it. The load puts IE back.
+--   +00 ldr r1, [pc, #12]   (the marker's address, the word at +10)
+--   +02 str r1, [r1, #0]    (marker = its own address)
+--   +04 ldr r1, [pc, #12]   (REG_IE, the word at +14)
+--   +06 movs r2, #0
+--   +08 strh r2, [r1, #0]   (IE = 0)
+--   +0A swi 2
+--   +0C b +0A
+-- The next call leaves the BIOS's SWI frame unreturned, so each call also puts the SVC
+-- stack pointer back where the sandbox found it (without, ~46 calls crept the SVC stack into
+-- the game's IRQ area and a call never returned). A KEPT call keeps `b .`: its SWI would
+-- overwrite the game's own SVC lr and spsr, which a frame ending inside VBlankIntrWait still
+-- needs, and no load puts them back.
+M.HALT_LOOP = { 0x4903, 0x6009, 0x4903, 0x2200, 0x800A, 0xDF02, 0xE7FD, 0x46C0 }
+local HALT_LOOP = M.HALT_LOOP
+M.HALT_MARKER, M.HALT_IE = 0x10, 0x14         -- the loop's two literal words: the marker's
+local HALT_MARKER, HALT_IE = M.HALT_MARKER, M.HALT_IE   -- address, then REG_IE
+M.MARKER_AT = 0x7C                            -- the marker word, at top + 7C (under the loop)
+local MARKER_AT = M.MARKER_AT
+M.REG_IE = 0x04000200
+local REG_IE = M.REG_IE
+local SVC_NOIRQ = 0x13 | 0x80                 -- CPSR mode Supervisor, I
 -- A call LIST runs every call of it in one stretch of emulation: each call takes a whole frame
 -- however little of it the function uses (the rest spins in the loop), and one enemy's
 -- decision is five calls (#510 step 9: ~8,000 of ch02's 9,748 calls an attempt). The stub,
 -- Thumb, ARMv4T (no blx): r4 walks a list of { addr|1, r0, r1, r2, r3, [sp] } words ended by
 -- addr 0; it calls each through a `bx r5` veneer and branches to the return loop at the end.
 -- r4-r6 are callee-saved (AAPCS), so every called function keeps them.
--- Calls in one list. The list sits at loop + LIST_AT = top + 0xB0 and the caller's stack starts
--- at top + 0x180 or above, so 0xD0 bytes hold up to eight entries and the end word; an enemy's
+-- Calls in one list. The list sits at loop + LIST_AT = top + 0xC0 and the caller's stack starts
+-- at top + 0x180 or above, so 0xC0 bytes hold up to seven entries and the end word; an enemy's
 -- decision (aiDecide) is five.
 M.LIST_MAX = 5
-local LIST_STUB = {
+M.LIST_STUB = {
     0x6825,           -- +00 ldr r5, [r4, #0]
     0x2D00,           -- +02 cmp r5, #0
     0xD009,           -- +04 beq +1A            (the end)
@@ -273,10 +305,12 @@ local LIST_STUB = {
     0x3418,           -- +12 add r4, #24
     0xF000, 0xF802,   -- +14 bl +1C             (lr = +18)
     0xE7F2,           -- +18 b +00
-    0xE7EB,           -- +1A b loop             (loop = stub - 0x0C)
+    0xE7E1,           -- +1A b loop             (loop = stub - 0x20)
     0x4728,           -- +1C bx r5
 }
-local LIST_STUB_AT, LIST_AT, LIST_ENTRY = 0x0C, 0x30, 24   -- past the loop's +8 window
+local LIST_STUB = M.LIST_STUB
+M.LIST_STUB_AT = 0x20                                  -- past the halt loop's 0x18 bytes
+local LIST_STUB_AT, LIST_AT, LIST_ENTRY = M.LIST_STUB_AT, 0x40, 24
 local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
 local GPRS = { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12",
                "sp", "lr" }
@@ -302,15 +336,45 @@ local function writeRegisters(cpu, regs)
             cpu.read("pc"), regs.pc))
     end
 end
+-- Where a sandbox's frame starts below the game's sp (the call's stack top), and where its return
+-- loop sits above that.
+function M.top(sp) return (sp - 0x180) & ~7 end
+M.SCRATCH_AT, M.LOOP_AT = 0x10, 0x80   -- below SCRATCH_AT: a fifth argument, at the stack top
 function M.machine(cpu, keep)
     return function(fn)
         -- The load puts every register back; only cpsr is kept here. A kept call loads
         -- nothing, so it reads every register first.
         local state = keep and readRegisters(cpu) or cpu.save()
-        local cpsr, top, scratch, loop
+        local cpsr, top, scratch, loop, marker, ie, svcSp
         local function returned()
+            if marker then return cpu.read32(marker) == marker end
             local pc = cpu.read("pc")
             return pc >= loop and pc <= loop + 8
+        end
+        -- the CPU sent to `pc` (lr = the loop, unless the stub sets its own) with the return
+        -- loop armed, run until it is back in it -> r0. sp and lr are banked: written after the
+        -- switch.
+        local function run(pc, what, lr)
+            if keep then
+                cpu.write16(loop, THUMB_B_SELF)
+            else
+                for i, h in ipairs(HALT_LOOP) do cpu.write16(loop + (i - 1) * 2, h) end
+                cpu.write32(loop + HALT_MARKER, marker)
+                cpu.write32(loop + HALT_IE, REG_IE)
+                cpu.write32(marker, 0)
+                cpu.write16(REG_IE, ie)
+                cpu.write("cpsr", (cpsr & ~0xFF) | SVC_NOIRQ)
+                cpu.write("sp", svcSp)
+            end
+            cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+            cpu.write("sp", top)
+            if lr then cpu.write("lr", lr) end
+            cpu.write("pc", pc)
+            if not cpu.frames(returned, M.FRAME_BUDGET) then
+                error(string.format("sight: %s did not return in %d frames (pc 0x%08X)",
+                    what, M.FRAME_BUDGET, cpu.read("pc")))
+            end
+            return cpu.read("r0")
         end
         local function call(addr, args)
             if type(addr) == "table" then
@@ -328,48 +392,61 @@ function M.machine(cpu, keep)
                     for i = 1, 5 do cpu.write32(e + i * 4, (c[2][i] or 0) & 0xFFFFFFFF) end
                 end
                 cpu.write32(at + #list * LIST_ENTRY, 0)
-                cpu.write16(loop, THUMB_B_SELF)
-                cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
-                cpu.write("sp", top)
                 cpu.write("r4", at)
-                cpu.write("pc", stub)
-                if not cpu.frames(returned, M.FRAME_BUDGET) then
-                    error(string.format("sight: a call list (0x%08X first) did not return in %d "
-                        .. "frames (pc 0x%08X)", list[1][1], M.FRAME_BUDGET, cpu.read("pc")))
-                end
-                return cpu.read("r0")
+                return run(stub, string.format("a call list (0x%08X first)", list[1][1]))
             end
             M.calls[addr] = (M.calls[addr] or 0) + 1
             for i, a in ipairs(args) do
                 if i <= 4 then cpu.write("r" .. (i - 1), a & 0xFFFFFFFF)
                 else cpu.write32(top + (i - 5) * 4, a & 0xFFFFFFFF) end
             end
-            cpu.write16(loop, THUMB_B_SELF)
-            cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
-            cpu.write("sp", top)
-            cpu.write("lr", loop | 1)
-            cpu.write("pc", addr & ~1)
-            if not cpu.frames(returned, M.FRAME_BUDGET) then
-                error(string.format("sight: call 0x%08X did not return in %d frames (pc 0x%08X)",
-                    addr, M.FRAME_BUDGET, cpu.read("pc")))
-            end
-            return cpu.read("r0")
+            return run(addr & ~1, string.format("call 0x%08X", addr), loop | 1)
         end
         -- Everything after the save is inside the pcall, the mode switch included: whatever
         -- raises, the state is loaded back.
         local ok, a, b = pcall(function()
             cpsr = cpu.read("cpsr")
             cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
-            top = (cpu.read("sp") - 0x180) & ~7
+            top = M.top(cpu.read("sp"))
             -- SCRATCH_SIZE fits between scratch and the loop; a call list's stub and list
             -- sit above the loop (LIST_STUB_AT, LIST_AT: LIST_MAX entries and the end)
-            scratch, loop = top + 0x10, top + 0x80
+            scratch, loop = top + M.SCRATCH_AT, top + M.LOOP_AT
+            if not keep then
+                marker, ie = top + MARKER_AT, cpu.read32(REG_IE) & 0xFFFF
+                cpu.write("cpsr", (cpsr & ~0xFF) | SVC_NOIRQ)
+                svcSp = cpu.read("sp")
+                cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+            end
             return fn(call, scratch)
         end)
         if keep then writeRegisters(cpu, state) else cpu.load(state) end
         if not ok then error(a, 0) end
         return a, b
     end
+end
+
+-- `cache[key]`, else read(), kept there only when no sandbox is `open()`: a read made inside one
+-- may see its writes (journaled, or a game call's own), so it is returned and dropped.
+function M.keptRead(cache, key, read, open)
+    if cache[key] ~= nil then return cache[key] end
+    local now = read()
+    if not open() then cache[key] = now end
+    return now
+end
+
+-- `body()` run with a breakpoint on each of `holds` ({ { addr, fn }... }: fn runs each time the
+-- CPU reaches addr), every one cleared after it returns or raises: mGBA steps the CPU one
+-- instruction at a time while any is set, so they are held only for the calls that need them.
+-- -> what body returns. (INSPECT.breakWhile is the live game's: held frame by frame.)
+function M.withBreaks(cpu, holds, body)
+    local ids = {}
+    local out = table.pack(pcall(function()
+        for _, h in ipairs(holds) do ids[#ids + 1] = cpu.breakpoint(h[1], h[2]) end
+        return body()
+    end))
+    for _, id in ipairs(ids) do cpu.unbreak(id) end
+    if not out[1] then error(out[2], 0) end
+    return table.unpack(out, 2, out.n)
 end
 
 -- An inventory entry as the unit struct holds it: the item id, its uses in the high byte.
@@ -394,34 +471,35 @@ end
 -- / 0x10000. The game has no function for a roll's odds (ADR 0377, reason 1): this counts
 -- them over every 16-bit NextRN, each taken as equally likely. `threshold` is the u16 the
 -- BattleRoll functions take.
-local DRAW, ROLLS = nil, { {}, {} }
+-- ODDS[n][t]: a roll of `n` draws passing at threshold t (0..100), built once: draw[k] counts
+-- the NextRN values whose NextRN_100 is k, and Roll2RN's floor((a + b) / 2) < t is a + b < 2t,
+-- so its odds are a prefix sum over the pair sums' counts.
+local ODDS
+local function buildOdds()
+    local draw, pairs2 = {}, {}
+    for k = 0, 99 do draw[k] = 0 end
+    for v = 0, 0xFFFF do
+        local k = v * 100 // 0x10000
+        draw[k] = draw[k] + 1
+    end
+    for sum = 0, 199 do pairs2[sum] = 0 end
+    for a = 0, 99 do
+        for b = 0, 99 do pairs2[a + b] = pairs2[a + b] + draw[a] * draw[b] end
+    end
+    local one, two = { [0] = 0 }, { [0] = 0 }
+    local n1, n2 = 0, 0
+    for t = 1, 100 do
+        n1 = n1 + draw[t - 1]
+        n2 = n2 + pairs2[2 * t - 2] + pairs2[2 * t - 1]
+        one[t], two[t] = n1 / 0x10000, n2 / 0x100000000
+    end
+    return { one, two }
+end
 function M.rollChance(numbers, threshold)
     if threshold >= 100 then return 1 end
     if threshold <= 0 then return 0 end
-    local known = ROLLS[numbers][threshold]
-    if known then return known end
-    if not DRAW then
-        DRAW = {}
-        for k = 0, 99 do DRAW[k] = 0 end
-        for v = 0, 0xFFFF do
-            local k = v * 100 // 0x10000
-            DRAW[k] = DRAW[k] + 1
-        end
-    end
-    local n = 0
-    if numbers == 1 then
-        for a = 0, threshold - 1 do n = n + DRAW[a] end
-        known = n / 0x10000
-    else
-        for a = 0, 99 do
-            for b = 0, 99 do
-                if (a + b) // 2 < threshold then n = n + DRAW[a] * DRAW[b] end
-            end
-        end
-        known = n / 0x100000000
-    end
-    ROLLS[numbers][threshold] = known
-    return known
+    ODDS = ODDS or buildOdds()
+    return ODDS[numbers][threshold]
 end
 
 -- An exchange's played outcomes (`leaves`: { p, dealt, back }, each the HP one side lost) as
@@ -436,12 +514,12 @@ function M.exchangeOf(leaves)
 end
 
 -- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
--- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes
--- caught at S.BattleRoll1RN/S.BattleRoll2RN's entry and its simResult (r1, which a simulation
--- returns in place of rolling) forced, depth first: pass where it can, then fail. A roll that
--- cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
--- target and the actor lost in the run just made. -> { { p, dealt, back } }. Inside a
--- sandbox; the breakpoints are set only for these calls (mGBA steps while one is set).
+-- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes caught
+-- at S.BattleRoll1RN/S.BattleRoll2RN's entry (M.withBreaks) and its simResult (r1, which a
+-- simulation returns in place of rolling) forced, depth first: pass where it can, then fail. A roll
+-- that cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
+-- target and the actor lost in the run just made. -> { { p, dealt, back } }. Inside a sandbox; the
+-- breakpoints are set only for these calls (mGBA steps while one is set).
 function M.played(cpu, call, sim, S, lost)
     local path, odds, at = {}, {}, 0
     local function catch(numbers)
@@ -454,10 +532,8 @@ function M.played(cpu, call, sim, S, lost)
             cpu.write("r1", path[at] and 1 or 0)
         end
     end
-    local holds = { cpu.breakpoint(S.BattleRoll1RN, catch(1)),
-                    cpu.breakpoint(S.BattleRoll2RN, catch(2)) }
     local leaves = {}
-    local ok, err = pcall(function()
+    M.withBreaks(cpu, { { S.BattleRoll1RN, catch(1) }, { S.BattleRoll2RN, catch(2) } }, function()
         local split
         repeat
             at = 0
@@ -473,8 +549,6 @@ function M.played(cpu, call, sim, S, lost)
             if split > 0 then path[split] = false end
         until split == 0
     end)
-    for _, hold in ipairs(holds) do cpu.unbreak(hold) end
-    if not ok then error(err, 0) end
     return leaves
 end
 
@@ -684,11 +758,14 @@ function M.batching(outer)
         if not ok then error(a, 0) end
         return a, b
     end
-    return sandbox, api
+    -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
+    -- (a call's EquipUnitItemSlot reorders a bag, and nothing journals that)
+    local function open() return depth > 0 end
+    return sandbox, api, open
 end
 
 function M.new(outer)
-    local sandbox, api = M.batching(outer)
+    local sandbox, api, open = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF, US_BIT9 = Board.US_HIDDEN, Board.US_UNDER_A_ROOF, Board.US_BIT9
     local w, h = api.map()
@@ -696,6 +773,14 @@ function M.new(outer)
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
+
+    -- The board's units, read once per board like every other answer: kept only from a read
+    -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
+    -- it there). One read inside a sandbox may see its writes -- a unit stood elsewhere, its HP
+    -- set, a bag a game call reordered -- so it is read fresh and dropped.
+    local function units()
+        return M.keptRead(seen, "units", function() return api.board().units end, open)
+    end
 
     -- The chapter's goal and tile commands, read once: its kind, the Defense map's end turn,
     -- every tile's location event, and the Seize tile (the one whose command is Seize, as
@@ -735,7 +820,7 @@ function M.new(outer)
     end
 
     function s.demands()
-        return M.demandsOf(api.board().units, commands, mem.u8(S.gPlaySt + PLAY_VISION))
+        return M.demandsOf(units(), commands, mem.u8(S.gPlaySt + PLAY_VISION))
     end
 
     -- Turns `unit` needs from `at` to `tile` on its own movement costs, nil = never.
@@ -788,7 +873,7 @@ function M.new(outer)
         elseif d.kind == "village" then
             if raced[d.id] == nil then
                 local best = false
-                for _, e in ipairs(api.board().units) do
+                for _, e in ipairs(units()) do
                     if e.faction == "red" and e.onField then
                         local n = turnsTo(e, d.tile, e)
                         if n and (not best or n < best) then best = n end
@@ -826,6 +911,7 @@ function M.new(outer)
 
     function s.refresh()
         seen = { threats = {}, fields = {} }
+        units()
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
     end
@@ -849,7 +935,7 @@ function M.new(outer)
     function s.threat(e)
         if not seen.threats[e.id] then
             seen.threats[e.id] = sandbox(function(call)
-                for _, o in ipairs(api.board().units) do
+                for _, o in ipairs(units()) do
                     if o.faction == "red" and o.id ~= e.id then
                         local st = mem.u32(o.addr + UNIT_STATE)
                         api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
@@ -983,8 +1069,9 @@ function M.new(outer)
 
     -- Hides every other unit the AI could choose, so its own routine can only pick `u`. Hidden
     -- units keep their gBmMapUnit entries: they still block as they do.
-    local function onlyTarget(u)
-        for _, o in ipairs(api.board().units) do
+    -- `all` is units(), read before the sandbox stood `u` elsewhere.
+    local function onlyTarget(u, all)
+        for _, o in ipairs(all) do
             if o.faction ~= "red" and o.id ~= u.id and o.onField then
                 api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
             end
@@ -1042,12 +1129,13 @@ function M.new(outer)
     end
 
     function s.strike(u, e, x, y, slot)
+        local all = units()
         local t = sandbox(function(call, proc)
             standOn(u, x, y)
             equip(call, u, slot)
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
-            local target, side = aiDecide(call, proc, e, function() onlyTarget(u) end)
+            local target, side = aiDecide(call, proc, e, function() onlyTarget(u, all) end)
             if target ~= u.id then return nil end
             return side
         end)
@@ -1057,7 +1145,7 @@ function M.new(outer)
     function s.enemyPhase(plan)
         return sandbox(function(call, proc)
             local byId = {}
-            for _, o in ipairs(api.board().units) do byId[o.id] = o end
+            for _, o in ipairs(units()) do byId[o.id] = o end
             for _, b in ipairs(plan.blues) do
                 standOn(b.unit, b.x, b.y)
                 api.write8(b.unit.addr + UNIT_HP, b.hp)
@@ -1180,7 +1268,7 @@ function M.new(outer)
     -- menu is shown to no one there (VisitCommandUsability reads the tile): ch02's (12,3) on
     -- turn 8. Silence greys it out and leaves it shown, so it stays open.
     local function visitShown(x, y)
-        for _, u in ipairs(api.board().units) do
+        for _, u in ipairs(units()) do
             if u.faction == "blue" and u.onField and sandbox(function(call)
                 asActive(u, x, y)
                 return call(S.VisitCommandUsability, { 0, 0 }) ~= M.MENU_NOTSHOWN
@@ -1405,7 +1493,7 @@ function M.new(outer)
 
     function s.fieldUnit()
         local first
-        for _, u in ipairs(api.board().units) do
+        for _, u in ipairs(units()) do
             if u.faction == "blue" and u.onField then
                 if s.canSeize(u) then return u end
                 first = first or u
@@ -1537,11 +1625,8 @@ function M.talks(api, sandbox)
             local at = mem.u32(info)
             seen[#seen + 1] = { a = mem.u8(at + TALK_PID_A), b = mem.u8(at + TALK_PID_B) }
         end
-        local holds = { api.cpu.breakpoint(S.EvCheck03_CHAR, entry),
-                        api.cpu.breakpoint(S.EvCheck04_CHARASM, entry) }
-        local ok, err = pcall(call, S.SearchAvailableEvent, { info })
-        for _, hold in ipairs(holds) do api.cpu.unbreak(hold) end
-        if not ok then error(err, 0) end
+        M.withBreaks(api.cpu, { { S.EvCheck03_CHAR, entry }, { S.EvCheck04_CHARASM, entry } },
+            function() call(S.SearchAvailableEvent, { info }) end)
         local out = {}
         for _, t in ipairs(seen) do
             if call(S.CheckForCharacterEvents, { t.a, t.b }) ~= 0 then out[#out + 1] = t end

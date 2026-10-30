@@ -21,9 +21,10 @@
 local ProcMemo = {}
 
 -- Calls that only READ the emulator. Everything else counts as a write.
-local function isRead(name)
+function ProcMemo.isRead(name)
     return name == "currentFrame" or name:sub(1, 4) == "read" or name:sub(1, 3) == "get"
 end
+local isRead = ProcMemo.isRead
 
 -- A proxy for `obj` that forwards every method call to it, counting each non-read call as a
 -- write via bump(). A member that is itself an object -- `emu.memory` and its domains, whose
@@ -61,6 +62,8 @@ end
 --   procs.live()      a NEW list of { slot, addr, script } for every non-empty slot, in slot
 --                     order, on every call: the caller owns it, so mutating it cannot corrupt
 --                     what the next caller in the same frame is told
+--   procs.stamp()     (frame, writes): the memo's own key. Anything read from emulator
+--                     memory alone may be kept while both are unchanged (controllerState)
 -- `pool` is { base, stride, count }: SYM.sProcArray, sizeof(struct Proc), the pool size.
 function ProcMemo.install(env, pool)
     local real = env.emu
@@ -93,6 +96,7 @@ function ProcMemo.install(env, pool)
     return {
         raw = real,
         pool = pool,
+        stamp = function() return real:currentFrame(), writes end,
         find = function(script)
             -- A symbol gen_symbols.py does not export reads as nil, and looking for nil finds
             -- nothing, which looks exactly like "the proc never started" (ch02armory, #493).

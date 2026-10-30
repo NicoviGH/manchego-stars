@@ -158,6 +158,42 @@ do
     check(env.emu:currentFrame(), real.frame, "currentFrame forwards")
 end
 
+-- stamp() is the memo's key: it moves with the frame and with every non-read call, and with
+-- nothing else (controllerState keeps a classification under it).
+do
+    local procs, env, real = setup()
+    local f0, w0 = procs.stamp()
+    env.emu:read32(slot(1))
+    procs.find(A)
+    local f1, w1 = procs.stamp()
+    check(f1 == f0 and w1 == w0, true, "stamp: reads leave it unchanged")
+    env.emu:write32(slot(1), A)
+    local _, w2 = procs.stamp()
+    check(w2 ~= w1, true, "stamp: a write moves it")
+    real.frame = real.frame + 1
+    local f3 = procs.stamp()
+    check(f3 ~= f1, true, "stamp: a new frame moves it")
+end
+
+-- harness.lua writes nothing through PROCS.raw: the write counter sees only calls through the
+-- guard, and both the proc memo and controllerState's per-frame state are kept under
+-- PROCS.stamp(). Whether a call is a read is isRead's answer, the guard's own (ADR 0366).
+do
+    local f = assert(io.open(here .. "harness.lua"))
+    local harness = f:read("a")
+    f:close()
+    -- every `raw:name(` whose `raw` is a whole name (PROCS.raw, a local, any other alias)
+    local calls, writes = 0, {}
+    for before, name in harness:gmatch("(.)raw:([%w_]+)%(") do
+        if not before:match("[%w_]") then
+            calls = calls + 1
+            if not ProcMemo.isRead(name) then writes[#writes + 1] = name end
+        end
+    end
+    check(calls > 0, true, "harness: the hot reads bind to PROCS.raw")
+    check(table.concat(writes, ","), "", "harness: no non-read call through the raw emulator")
+end
+
 -- If anything replaces the guard (mGBA re-binding the global, or a script), writes would
 -- bypass it and the memo could go stale silently. It must fail loudly instead.
 do
