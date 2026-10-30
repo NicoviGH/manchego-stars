@@ -285,6 +285,7 @@ function M.pickMove(reachable, opts)
 end
 
 M.tileKey = tileKey
+M.distance = manhattan   -- the planner's too (which of ours could save a green unit)
 
 -- The stall watchdog's distance (#510 step 9): the nearest field distance to the target among
 -- the units that could still be the one to finish -- on the field, and not excluded.
@@ -885,11 +886,13 @@ local function talkFrom(ctx, u, t, gate)
 end
 
 -- Of the units able to act that the game lets Talk to `t` (and `by` names, when given), the
--- nearest it by the field from `t`; nil when none. -> talker, the field
+-- nearest it by the field from `t`; nil when none. -> talker, the field (built only once a
+-- unit can Talk to `t`: most units on a map are no one's recruit)
 local function nearestTalker(ctx, t, by)
-    local field, near, nearD = fieldFor(ctx, t), nil, nil
+    local field, near, nearD
     for _, u in ipairs(ctx.actors) do
         if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
+            field = field or fieldFor(ctx, t)
             local d = field and field[u.y] and field[u.y][u.x]
                       or manhattan(u.x, u.y, t.x, t.y) + OFFFIELD
             if not nearD or d < nearD then near, nearD = u, d end
@@ -1208,7 +1211,7 @@ end
 -- every village and opens every chest it can): each village or chest still open
 -- (sight.explorable) sends one unit the game lets use it (sight.canExplore) marching to it, the
 -- nearest by the game's own field from the tile; each tile one unit, each unit one tile, the
--- nearest pair first. A Talk recruit comes before them all (its nearest talker is sent to it).
+-- nearest pair first. A Talk recruit comes before them all, paired with its talkers the same way.
 -- ctx.exploreGoal[unit id] = the tile, which goalFor reads.
 -- `sent` (the last plan's goals, { {id, x, y} }) is kept first: a unit sent to a tile keeps it
 -- while the tile is open and the unit can still reach and use it, acted this turn or not.
@@ -1231,20 +1234,9 @@ end
 
 local function exploring(ctx, sent)
     ctx.exploreGoal = {}
-    -- a Talk recruit before any village: its nearest talker marches on it, or the planner only
-    -- credits the Talk once a talker happens into reach (vanilla Ch2: Ross, killed on turn 2
-    -- while Eirika marched on the brigands)
-    for _, t in ipairs(ctx.onField) do
-        if t.faction ~= "blue" then
-            local near = nearestTalker(ctx, t)
-            if near and not ctx.exploreGoal[near.id] then
-                ctx.exploreGoal[near.id] = { x = t.x, y = t.y }
-            end
-        end
-    end
-    if not ctx.sight.explorable then return end
-    local pairs_, taken = {}, {}
-    local function reaches(u, t)
+    local taken = {}
+    -- the march from `u` to `t` by the field from `t`, through the breach where it has no way
+    local function length(u, t)
         local field = fieldFor(ctx, t)
         local d = field and field[u.y] and field[u.y][u.x]
         if field and not d then
@@ -1259,8 +1251,50 @@ local function exploring(ctx, sent)
             end
             d = toB and beyond and toB + 1 + beyond
         end
+        return d
+    end
+    local function reaches(u, t)
+        local d = length(u, t)
         return d and (u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)) and d
     end
+    -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
+    local function assign(pairs_, key)
+        table.sort(pairs_, function(a, b)
+            if a.d ~= b.d then return a.d < b.d end
+            if a.u.slot ~= b.u.slot then return a.u.slot < b.u.slot end
+            if a.t.y ~= b.t.y then return a.t.y < b.t.y end
+            return a.t.x < b.t.x
+        end)
+        for _, p in ipairs(pairs_) do
+            local k = key(p.t)
+            if not taken[k] and not ctx.exploreGoal[p.u.id] then
+                taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
+            end
+        end
+    end
+    -- A Talk recruit before any village: a unit the game lets Talk to it marches on it, or the
+    -- planner credits the Talk only once a talker happens into reach (vanilla Ch2: Ross, killed
+    -- on turn 2 while Eirika marched on the brigands). Never one the fog hides (a player knows no
+    -- more than it shows), and a recruit the style claims goes to the claim's talker only
+    -- (recruitFirst marches that one).
+    local talkPairs = {}
+    for _, t in ipairs(ctx.onField) do
+        if t.faction ~= "blue" and not t.fogged then
+            local by
+            for _, c in ipairs(ctx.style and ctx.style.recruits or {}) do
+                if listed(c.units, t.charId) then by = c.by end
+            end
+            for _, u in ipairs(ctx.actors) do
+                if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
+                    local d = length(u, t)
+                    if d then talkPairs[#talkPairs + 1] = { t = t, u = u, d = d } end
+                end
+            end
+        end
+    end
+    assign(talkPairs, function(t) return "talk>" .. t.id end)
+    if not ctx.sight.explorable then return end
+    local pairs_ = {}
     local open, blues = {}, {}
     for _, t in ipairs(openTiles(ctx)) do open[tileKey(t.x, t.y)] = t end
     for _, u in ipairs(ctx.blues) do blues[u.id] = u end
@@ -1277,18 +1311,7 @@ local function exploring(ctx, sent)
             if d then pairs_[#pairs_ + 1] = { t = t, u = u, d = d } end
         end
     end
-    table.sort(pairs_, function(a, b)
-        if a.d ~= b.d then return a.d < b.d end
-        if a.u.slot ~= b.u.slot then return a.u.slot < b.u.slot end
-        if a.t.y ~= b.t.y then return a.t.y < b.t.y end
-        return a.t.x < b.t.x
-    end)
-    for _, p in ipairs(pairs_) do
-        local k = tileKey(p.t.x, p.t.y)
-        if not taken[k] and not ctx.exploreGoal[p.u.id] then
-            taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
-        end
-    end
+    assign(pairs_, function(t) return tileKey(t.x, t.y) end)
 end
 
 function M.explain(board, sight, style)

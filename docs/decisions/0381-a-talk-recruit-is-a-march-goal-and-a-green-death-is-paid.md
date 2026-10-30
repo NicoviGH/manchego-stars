@@ -38,6 +38,16 @@ So the goal is what clears this start. The judge did not change this run's outco
 It is kept because it is the verdict's own definition of a loss, and its effect is proven by a
 unit test (`test_planner_pays_a_green_units_death`), not by this run.
 
+**Amended at review (#551, 2026-10-30).** A recruit's talker is paired the way a village's
+visitor is: by the march length from the recruit's field, through a breach where the field has
+no way, each recruit one talker and each talker one recruit, the nearest pair first. A recruit
+the fog hides gets no talker (a player knows no more than the fog shows). A recruit the style
+claims goes only to the claim's `by`. And since a green unit has no menu, the mend tries for one
+at risk the acts of ours that could save it: any act ending beside it, and any attack on an enemy
+that strikes it in the judged phase (`predict.strikers`). Reruns after the amendment: vanilla
+Ch2 clean at attempt 2 (7 turns), Ch3 and Ch4 clean at attempt 1, Manchego Stars ch01 clean at
+attempt 1.
+
 **Not decided here:** whether a careful style should spend more to save a green unit than its
 own unit's death (a recruit forfeited is worth more than one loss). The weight is `W.death`
 until a run shows a chapter that needs more.

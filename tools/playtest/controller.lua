@@ -211,8 +211,8 @@ local RULES = {
             end
             -- TargetSelection_Loop starts its camera scroll BLOCKING on itself
             -- (EnsureCameraOntoPosition, bm.c): until it ends the loop does not run and an A
-            -- pressed then is dropped (vanilla Ch3, 2026-10-30: a Talk confirm lost for 600 frames).
-            if observation.target.locked then
+            -- pressed then is dropped (vanilla Ch3, 2026-10-30: a Talk confirm lost 600 frames).
+            if proc(observation, "target_selection").locked then
                 return matched("transition", "target_selection is blocked on its camera scroll")
             end
             local kind = observation.target.kind

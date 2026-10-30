@@ -515,10 +515,13 @@ local function callbackName(a, names)
     a = codeAddr(a)
     return (names or CALLBACK_NAMES)[a] or string.format("0x%08X", a)
 end
-local function observedProc(script, idleName)
-    local addr = PROCS.find(script)
+-- `at` (optional): the proc's address, for one found otherwise than by its script. `locked` is
+-- proc_lockCnt: a proc blocked on a child (Proc_StartBlocking) runs no loop and reads no keys.
+local function observedProc(script, idleName, at)
+    local addr = at or PROCS.find(script)
     if not addr then return nil end
-    return { addr = addr, idle = idleName or callbackName(ru32(addr + 0x0C)) }
+    return { addr = addr, idle = idleName or callbackName(ru32(addr + 0x0C)),
+             locked = ru8(addr + 0x28) ~= 0 }
 end
 local function observeMenu(observation)
     local addr = activeMenuProc()
@@ -608,7 +611,6 @@ local function observeTarget(observation)
         kind = kind,
         x = rs8(current), y = rs8(current + 1), uid = ru8(current + 2),
         extra = ru8(current + 3), frozen = (ru8(addr + 0x34) & 0x40) ~= 0,
-        locked = ru8(addr + 0x28) ~= 0,   -- proc_lockCnt: a blocking child (its camera scroll)
     }
 end
 local function observedUnit(unitId)
@@ -694,10 +696,13 @@ local function observeController()
         end
     end
     local rawMenu = anyMenuProc()
-    put("menu", rawMenu and { addr = rawMenu, idle = callbackName(ru32(rawMenu + 0x0C)),
-        locked = ru8(rawMenu + 0x28) ~= 0, frozen = (ru8(rawMenu + 0x63) & 0x40) ~= 0,
-        ending = (ru8(rawMenu + 0x63) & 0x04) ~= 0,
-        doomed = (ru8(rawMenu + 0x63) & 0x80) ~= 0 })
+    local menuProc = rawMenu and observedProc(nil, nil, rawMenu)
+    if menuProc then
+        local flags = ru8(rawMenu + 0x63)
+        menuProc.frozen, menuProc.ending = (flags & 0x40) ~= 0, (flags & 0x04) ~= 0
+        menuProc.doomed = (flags & 0x80) ~= 0
+    end
+    put("menu", menuProc)
     put("at_menu", observedProc(SYM.ProcScr_AtMenu, "at_menu_idle"))
     put("prep_menu", observedProc(SYM.ProcScr_PrepMenu))
     put("sally", observedProc(SYM.gProcScr_SALLYCURSOR, "sally_idle"))
@@ -1181,14 +1186,14 @@ INSPECT.stepTarget = function(targetId, targetTile)
     end
     for _ = 1, 50 do
         if wanted(observeController().target) then return true end
-        -- A step re-centres the camera, blocking the selector: done once it takes input again.
         if not guardedInput("next_target", "RIGHT", "the selector steps to its next target",
             function(after, before)
                 return after.target ~= nil and before.target ~= nil
                     and (after.target.uid ~= before.target.uid or after.target.x ~= before.target.x
                          or after.target.y ~= before.target.y)
-                    and controllerState(after) == "target_selection"
-            end, 120) then return false end
+            end, 30) then return false end
+        -- the step re-centres the camera, blocking the selector until the scroll ends
+        if not awaitControllerState("target_selection", 120) then return false end
     end
     if wanted(observeController().target) then return true end
     traceFailure("select_target", targetTile

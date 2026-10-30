@@ -6,6 +6,7 @@ local B = dofile(here .. "bot.lua")
 local Planner = dofile(here .. "planner.lua")
 local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
+local Json = dofile(here .. "json.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -2499,6 +2500,57 @@ do
     check(g and g.green and g.die, 0, "planner: the green unit's phase is predicted")
 end
 
+-- test_planner_mends_a_plan_that_loses_a_green_unit: A's march to (0,1) is its best act by its
+-- own score, and the beam (BEAM = 1) keeps only that; X then kills green G. G has no menu of
+-- its own, so the mend tries the acts of ours that could save it -- one ending beside it, or
+-- striking one that strikes it -- and finds A's block at (1,0).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 2, 0, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+        field = function()
+            return { [0] = { [0] = 40, [1] = 40, [2] = 40 }, [1] = { [0] = 10 } }
+        end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(at(a) .. " " .. tostring(plan and plan.kind), "1,0 mend",
+          "planner: the mend blocks for a green unit")
+end
+
+-- test_planner_records_a_green_units_strikers: nothing saves G from X. The prediction names X
+-- as its striker, and encodes: botrun logs the plan's record as JSON (string keys only).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 2, 0, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        enemyPhase = function()
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    local g
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x30 then g = p end
+    end
+    check(g and table.concat(g.strikers, ","), tostring(0x81), "planner: the green's striker")
+    check(pcall(Json.encode, plan and plan.predict), true, "planner: the predictions encode")
+end
+
 -- test_a_talker_is_sent_to_its_recruit: T (green) is far off and A is the only unit the game
 -- lets Talk to it. A is sent to T's tile, not to the nearest enemy, and marches on it.
 do
@@ -2529,6 +2581,78 @@ do
     end
     check(sent, "0,0", "talker: sent to its recruit")
     check(moved, "3,0", "talker: marches on it")
+end
+
+-- The goals a careful plan sends units to, "x,y" by unit id. `o.field` defaults to open ground
+-- (the manhattan distance from the goal); `blocked[id]` cuts that unit off from every goal.
+local function talkGoals(board, o, st, blocked)
+    o.field = o.field or function(goal)
+        local f = {}
+        for y = 0, 9 do
+            f[y] = {}
+            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+        end
+        for _, u in ipairs(board.units) do
+            if blocked and blocked[u.id] then f[u.y][u.x] = nil end
+        end
+        return f
+    end
+    local _, plan = Planner.plan(B, board, sightOf(o), st or style("careful"))
+    local out = {}
+    for _, g in ipairs(plan and plan.goals or {}) do out[g.id] = g.x .. "," .. g.y end
+    return out
+end
+
+-- test_no_talker_is_sent_into_the_fog: a red the game lets A Talk to, hidden in fog. A player
+-- knows no more than the fog shows (goalFor), so A is not sent to its tile.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local R = red(0x81, 0, 0, { fogged = true })
+    local g = talkGoals(boardOf(A, R), { reach = { [0x01] = tiles({ 4, 0 }) },
+                                         talk = { [0x01] = { [0x81] = true } } })
+    check(g[0x01] ~= "0,0", true, "talker: not sent to a recruit in fog")
+end
+
+-- test_no_talker_is_sent_where_it_has_no_way: A may Talk to T, but the field from T has no way
+-- to A (and no wall or door to breach). A is not sent to stand idle facing it.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local g = talkGoals(boardOf(A, T), { reach = { [0x01] = tiles({ 4, 0 }) },
+                                         talk = { [0x01] = { [0x30] = true } } }, nil,
+                        { [0x01] = true })
+    check(g[0x01], nil, "talker: not sent to a recruit it has no way to")
+end
+
+-- test_each_recruit_gets_its_own_talker: A and C may each Talk to T1 and T2, and A is the
+-- nearer to both. Each recruit gets one talker and each talker one recruit, nearest pair first:
+-- A takes T1 (distance 1), C is left T2.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local C = blue(0x02, 1, 8, 0, { minRange = false })
+    local T1 = blue(0x30, 5, 3, 0, { faction = "green" })
+    local T2 = blue(0x31, 6, 4, 4, { faction = "green" })
+    local g = talkGoals(boardOf(A, C, T1, T2), {
+        reach = { [0x01] = tiles({ 4, 0 }), [0x02] = tiles({ 8, 0 }) },
+        talk = { [0x01] = { [0x30] = true, [0x31] = true },
+                 [0x02] = { [0x30] = true, [0x31] = true } } })
+    check(g[0x01], "3,0", "talker: the nearest pair is sent first")
+    check(g[0x02], "4,4", "talker: the second recruit gets the free talker")
+end
+
+-- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
+-- the nearer unit able to Talk to it. Only C is sent; A is left to its own goal.
+do
+    local A = blue(0x01, 0, 1, 0, { minRange = false })
+    local C = blue(0x02, 1, 8, 0, { minRange = false })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local st = style("careful")
+    st.recruits = { { units = { 0x30 }, by = { 0x02 } } }
+    local g = talkGoals(boardOf(A, C, T), {
+        reach = { [0x01] = tiles({ 1, 0 }), [0x02] = tiles({ 8, 0 }) },
+        talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }, st)
+    check(g[0x02], "0,0", "talker: the claim's talker is sent")
+    check(g[0x01] ~= "0,0", true, "talker: a nearer unit the claim does not name is not")
 end
 
 if fails > 0 then
