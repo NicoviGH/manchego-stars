@@ -9,42 +9,46 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **#510 step 9 part D (Talk recruits as goals) is MERGED:
-PR #551, 87e7b98 on main** (reviewed clean in 4 rounds: `/code-review 551 medium` + 3 scoped
-re-reviews, every finding fixed; CI green on its head). Record: **ADR 0381** (amended at review).
-Summary: #510 comment 6526158857. The tree is clean on main; no branch is in flight.
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9, vanilla Ch5's recruit (Joshua), is MERGED:
+PR #552, 1997471 on main** (`/code-review 552 medium` + 2 scoped re-reviews, every finding
+resolved; CI green on its head). Record: **ADR 0382**. Summary:
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6533432309>. The tree is clean on
+main; no branch is in flight.
 
-**The vanilla Ch3 Talk crash was a dropped key press, not a Talk stall.** The selector opened while
-FE8 was still scrolling the camera, and `TargetSelection_Loop` blocks on that scroll
-(`EnsureCameraOntoPosition`), so it dropped the A. A locked selector (`proc_lockCnt` +0x28, read in
-`observedProc`) is now a transition. One per-frame probe run found it: the retry press, not the
-first, started the Talk.
-
-**What the PR does:**
-- A Talk recruit is a march goal, paired the way villages are (`marchLength` + `talkersOf` in
-  bot.lua, the one owner: a way through the field or a breach, no fog, a claim's `by`).
-- The judge pays a green unit's death, and the mend can save one (`predict.strikers`).
-- The controller fix above.
+**What #552 does:**
+- The planner pays a recruit's death, and a unit whose death ends the game costs `W.win`. sight runs
+  the game's `SetPidDefeatedFlag` in the sandbox (`sight.objective.gameOver`; Ch5: Eirika).
+- The judge plays the 2 most uncertain kills both ways.
+- Ch5's wiki line is two claims: recruit Joshua by Natasha, and avoid the Myrmidon.
 
 **Measured (CPU s):**
 | Run | Result |
 |---|---|
-| Vanilla Ch2 (New Game start) | clean at attempt 2 (11.1 s) |
-| Vanilla Ch3 | clean at attempt 1, Colm recruited (15.0 s) |
-| Vanilla Ch4 | clean at attempt 1 (19.0 s) |
-| Ours ch01 (New Game) | clean at attempt 1 (8.2 s) |
+| Vanilla Ch5 | clean at attempt 9 (none before); Joshua joined in 6 of 9 |
+| Vanilla Ch2 | clean at attempt 1 (9.7-11.2) |
+| Vanilla Ch3 | clean at attempt 1 (16.1-18.3), Colm recruited |
+| Vanilla Ch4 | clean at attempt 1 (21.2-28.2; 19.0 before: the kill branch costs about 30% a turn) |
+| Ours ch01 (New Game) | clean at attempt 1 (9.0-10.2) |
 
-**NEXT: the rest of the planner's open items, in the agreed order.** Start a branch off main.
-1. Vanilla Ch5's recruit 0x20: the march goal does NOT fix it. Read why before changing anything
-   (the Ch5 start is index 6 in the `e1-vanilla-ch3` store: `campaign_env.py vanilla --id
-   e1-vanilla-ch3 --from 6`, `last: [6]`; back the store up first, since a run re-saves starts).
-   Use `superpowers:systematic-debugging`: one instrumented run, not one run per guess.
+**NEXT: the planner's open items, in order.** Start a branch off main.
+1. **Ch5's village at (5,1).** The near-misses (attempts 5 and 8: none lost, Joshua recruited) lose
+   it: the planner takes the win while a reward is open ("unreached"), passes it up ("skipped"), or
+   brigands pillage it ("closed"). Read why first: one instrumented run of attempt 8 (`attempt: 8`).
 2. Ours ch03's boss losses: Nicolas's design call, look-ahead vs a sampled rollout.
 3. The forced-fog stall (part C).
+4. **Curate the other chapters' guide lines as claims, as Ch5's was** (Nicolas: the guides and the
+   research are there to drive the strategy). Ch5 went from `unmodelled` to a clean clear this way.
+
 
 The older "Still owed" list below is still open too.
 
 **Lessons from this session (tooling):**
+- A rule the game enforces (a lord's death is a game over) is modelled from the game's own read,
+  never asked. Only true tuning (a recruit vs one of ours) goes to Nicolas.
+- Compare two runs' traces at their first diverging plan record, not by outcome: a review-round
+  regression (enemy HP dropped from the plan) first looked like RNG luck.
+- When a fix round rewrites a block, diff the round for deleted lines that are not part of the
+  finding: that is where the dropped `enemyHp` line hid.
 - A probe in `chooseTalk` is the cheapest way in: 13 s a run. Edit harness.lua with a script that
   asserts its anchor matched, keep a copy of the original, and restore it after every run.
 - An ablation (one half of a change switched off) costs one run and says which half did the work.
