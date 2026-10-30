@@ -57,23 +57,20 @@ ADR 0381's march goal did not recruit Joshua. One instrumented run each found wh
    Joshua's reach between them and the boss, the board repeating until `stuck`).
 
 **Measured in the ROM** (vanilla, seed 1, the `e1-vanilla-ch3` starts; CPU s), after the
-review fixes (#552):
+review fixes (#552; the last set five runs at once):
 
 | Run | Before | After |
 |---|---|---|
-| Ch5, all 12 styles | Joshua killed or never reached; no clean clear | **Joshua recruited in 8 of 12**; no clean clear: attempts 5, 8 and 10 lose no one and recruit him but miss the village at (5,1) |
+| Ch5, attempts until clean | Joshua killed or never reached; no clean clear | **clean at attempt 9** (even, `avoid`): Joshua recruited, none lost, every village. Joshua joined in 6 of 9 attempts |
 | Ch5 attempt 7 | `stuck` t22 | won t21 (Natasha, Vanessa, Lute lost) |
-| Ch2 | clean at attempt 2 (11.1) | clean at attempt 1 (9.7) |
-| Ch3 | clean at attempt 1 (15.0) | clean at attempt 1 (16.1), Colm recruited |
-| Ch4 | clean at attempt 1 (19.0) | clean at attempt 1 (21.2) |
-| Manchego Stars ch01 (New Game) | clean at attempt 1 (8.2) | clean at attempt 1 (9.0) |
+| Ch2 | clean at attempt 2 (11.1) | clean at attempt 1 (9.7-11.2) |
+| Ch3 | clean at attempt 1 (15.0) | clean at attempt 1 (16.1-18.3), Colm recruited |
+| Ch4 | clean at attempt 1 (19.0) | clean at attempt 1 (21.2-28.2) |
+| Manchego Stars ch01 (New Game) | clean at attempt 1 (8.2) | clean at attempt 1 (9.0-10.2) |
 
-Before the review, attempt 9 (even, `avoid`) was clean; composing a target's blows (4) chose a
-different turn 3 opening there (Artur's blow before Seth's, judged 107.4 against 101.9), and
-the run went another way (Vanessa lost). One clean draw of twelve was luck, not a fix.
-
-**Still open: the village at (5,1).** It is won past ("unreached": attempts 8, 10), passed up
-("skipped": 9), or pillaged first ("closed": 5). The planner takes the win while a reward is
-still open; part A recorded the same village on its Ch5 runs. A clean Ch5 waits on it.
+**Still open: the village at (5,1).** Attempts 5 and 8 lose no one and recruit Joshua but
+miss it: won past ("unreached", 8) or pillaged first ("closed", 5); attempts 3 and 6 pass it
+up ("skipped"). The planner takes the win while a reward is still open; part A recorded the
+same village on its Ch5 runs. One clean style of nine is the measure until that is closed.
 
 The kill branch costs about 30% a turn (Ch5 attempt 1: 2.35 s a turn before, 3.0 s after).

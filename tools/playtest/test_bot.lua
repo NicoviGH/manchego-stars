@@ -2864,6 +2864,28 @@ do
           "planner: a green whose death ends the game costs the chapter")
 end
 
+-- test_planner_reads_a_second_blow_at_the_hp_the_first_leaves: A and C each hit E (20 HP)
+-- for 12, sure. The plan reads C's blow at the 8 HP A's leaves, so it kills, and the plan
+-- expects E gone after it. Read at E's full HP, neither blow kills.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 2, 1)
+    local E = red(0x81, 1, 1, { minRange = false, hp = 20 })
+    local blow = fc { hit = 100, dmg = 12, hits = 1 }
+    local o = {
+        reach = { [0x01] = tiles({ 1, 0 }), [0x02] = tiles({ 1, 2 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = blow } }, [0x02] = { [0x81] = { ["1,2"] = blow } } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, E), sightOf(o), style("bold"))
+    local blows, last = 0, nil
+    for k, x in ipairs(plan and plan.acts or {}) do
+        if x.act == "attack" then blows, last = blows + 1, plan.expect[k] end
+    end
+    check(blows .. " " .. tostring(last and last.gone), "2 " .. 0x81,
+          "planner: the second blow is read at the HP the first leaves")
+end
+
 -- test_a_talker_is_sent_to_its_recruit: T (green) is far off and A is the only unit the game
 -- lets Talk to it. A is sent to T's tile, not to the nearest enemy, and marches on it.
 do

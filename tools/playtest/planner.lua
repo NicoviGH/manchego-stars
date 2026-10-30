@@ -301,6 +301,7 @@ function M.plan(Bot, board, sight, style, opts)
         n.used[uid], n.tiles[tile] = true, true
         n.hp[uid] = fx.hp
         if fx.gone then n.gone[fx.gone] = true end
+        if fx.enemyHp then n.enemyHp[fx.enemyHp.id] = fx.enemyHp.hp end
         if fx.kill then
             local blows = copy(n.kill[fx.kill.id] or {})
             blows[#blows + 1] = fx.kill.dist
