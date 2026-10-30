@@ -425,6 +425,10 @@ function Board.fate(mem, SYM, addr, was)
     return nil
 end
 
+-- A battle unit's (gBattleActor/gBattleTarget) unit index (+0x0B) and character (+0x00 ->
+-- +0x04): who fought, for Board.killer and battleSide.
+local function fighterOf(mem, b) return mem.u8(b + 0x0B), mem.u8(mem.u32(b) + 4) end
+
 -- Who killed unit index `uid`: the other fighter of the fight it fell in, read off
 -- gBattleActor/gBattleTarget (+0x0B the unit index, +0x00 the character) -> its charId and
 -- whether it is one of ours (a blue index), or nil. Only while a fight resolves (`fighting`):
@@ -433,17 +437,19 @@ end
 function Board.killer(mem, SYM, uid, fighting)
     if not fighting then return nil end
     local by
-    if mem.u8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
-    elseif mem.u8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
+    if fighterOf(mem, SYM.gBattleActor) == uid then by = SYM.gBattleTarget
+    elseif fighterOf(mem, SYM.gBattleTarget) == uid then by = SYM.gBattleActor end
     if not by then return nil end
-    return mem.u8(mem.u32(by) + 4), (mem.u8(by + 0x0B) & 0xC0) == 0
+    local id, charId = fighterOf(mem, by)
+    return charId, (id & 0xC0) == 0
 end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
 local function battleSide(mem, b)
-    local exp, id = mem.s8(b + 0x6E), mem.u8(b + 0x0B)
-    return { id = id, charId = mem.u8(mem.u32(b) + 4),
+    local exp = mem.s8(b + 0x6E)
+    local id, charId = fighterOf(mem, b)
+    return { id = id, charId = charId,
              classId = mem.u32(b + 0x04) ~= 0 and mem.u8(mem.u32(b + 0x04) + 4) or nil,
              canCounter = mem.s8(b + 0x52) ~= 0,
              hpBefore = mem.s8(b + 0x72), hp = mem.u8(b + 0x13), weapon = mem.u16(b + 0x48) & 0xFF,

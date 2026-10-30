@@ -432,6 +432,14 @@ do
     check(ours, false, "killer: an enemy index is not ours")
     check(Board.killer(m, SYM, 0x45, false), nil, "killer: no fight, no killer (stale structs)")
     check(Board.killer(m, SYM, 0x46, true), nil, "killer: a unit not in the fight")
+    -- the other side: the enemy that attacked dies to the blue unit it fought
+    local blueCh = CHAR_BASE + 0x01 * 0x34
+    m.w8(blueCh + 0x04, 0x01)
+    m.w8(SYM.gBattleTarget + 0x0B, 0x01)
+    m.w32(SYM.gBattleTarget, blueCh)
+    killer, ours = Board.killer(m, SYM, 0x81, true)
+    check(killer, 0x01, "killer: the actor fell, the target killed it")
+    check(ours, true, "killer: a blue index is ours")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

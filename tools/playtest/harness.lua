@@ -3036,9 +3036,10 @@ INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(),
 -- Every unit the game kills while an act or an enemy phase plays, with the fighter it fell to:
 -- a frame callback that watches every faction's array (lean) -- a green unit lost spoils the
 -- clear as a blue one does (ADR 0376) -- and, the frame one goes, reads what the game wrote to
--- its slot (Board.fate) and, in a fight, who killed it (Board.killer). Read each frame rather than caught at UnitKill's entry: a
--- breakpoint held through every act and phase cost 56% more CPU (Manchego Stars ch01, 20.4 CPU s
--- against 13.1), and arming it per caller would have to list every proc that can kill.
+-- its slot (Board.fate) and, in a fight, who killed it (Board.killer). Read each frame rather
+-- than caught at UnitKill's entry: a breakpoint held through every act and phase cost 56% more
+-- CPU (Manchego Stars ch01, 20.4 CPU s against 13.1), and arming it per caller would have to
+-- list every proc that can kill.
 -- -> stop() -> { id, charId, faction, killer, ours } per kill, and per slot the watch could not
 -- read ({ fault = "replaced", id, charId, faction }: freed and reloaded within a frame).
 INSPECT.watchDeaths = function()
