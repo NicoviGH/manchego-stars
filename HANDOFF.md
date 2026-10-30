@@ -9,11 +9,10 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **#510 step 9 part D (Talk recruits as goals) is DONE and
-reviewed clean: PR #551 (`feat/510-talk-recruit-goals`, head 89bf729). It merges once CI is green
-for that head commit** (a step 9 PR may merge after `/code-review` and CI; check
-`gh run list --branch feat/510-talk-recruit-goals --json headSha,status`, then `--squash`).
-Record: **ADR 0381** (amended at review). Summary: #510 comment 6526158857.
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9 part D (Talk recruits as goals) is MERGED:
+PR #551, 87e7b98 on main** (reviewed clean in 4 rounds: `/code-review 551 medium` + 3 scoped
+re-reviews, every finding fixed; CI green on its head). Record: **ADR 0381** (amended at review).
+Summary: #510 comment 6526158857. The tree is clean on main; no branch is in flight.
 
 **The vanilla Ch3 Talk crash was a dropped key press, not a Talk stall.** The selector opened while
 FE8 was still scrolling the camera, and `TargetSelection_Loop` blocks on that scroll
@@ -35,8 +34,11 @@ first, started the Talk.
 | Vanilla Ch4 | clean at attempt 1 (19.0 s) |
 | Ours ch01 (New Game) | clean at attempt 1 (8.2 s) |
 
-**NEXT: the rest of the planner's open items, in the agreed order.**
-1. Vanilla Ch5's recruit 0x20: the march goal does NOT fix it. Read why first.
+**NEXT: the rest of the planner's open items, in the agreed order.** Start a branch off main.
+1. Vanilla Ch5's recruit 0x20: the march goal does NOT fix it. Read why before changing anything
+   (the Ch5 start is index 6 in the `e1-vanilla-ch3` store: `campaign_env.py vanilla --id
+   e1-vanilla-ch3 --from 6`, `last: [6]`; back the store up first, since a run re-saves starts).
+   Use `superpowers:systematic-debugging`: one instrumented run, not one run per guess.
 2. Ours ch03's boss losses: Nicolas's design call, look-ahead vs a sampled rollout.
 3. The forced-fog stall (part C).
 
