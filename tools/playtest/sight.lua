@@ -275,10 +275,12 @@ local THUMB_B_SELF = 0xE7FE
 -- needs, and no load puts them back.
 M.HALT_LOOP = { 0x4903, 0x6009, 0x4903, 0x2200, 0x800A, 0xDF02, 0xE7FD, 0x46C0 }
 local HALT_LOOP = M.HALT_LOOP
-M.HALT_MARKER = 0x10                          -- the loop's two literal words: the marker's
-local HALT_MARKER, HALT_IE = M.HALT_MARKER, 0x14   -- address, then REG_IE
-local MARKER_AT = 0x7C                        -- the marker word, at top + 7C (under the loop)
-local REG_IE = 0x04000200
+M.HALT_MARKER, M.HALT_IE = 0x10, 0x14         -- the loop's two literal words: the marker's
+local HALT_MARKER, HALT_IE = M.HALT_MARKER, M.HALT_IE   -- address, then REG_IE
+M.MARKER_AT = 0x7C                            -- the marker word, at top + 7C (under the loop)
+local MARKER_AT = M.MARKER_AT
+M.REG_IE = 0x04000200
+local REG_IE = M.REG_IE
 local SVC_NOIRQ = 0x13 | 0x80                 -- CPSR mode Supervisor, I
 -- A call LIST runs every call of it in one stretch of emulation: each call takes a whole frame
 -- however little of it the function uses (the rest spins in the loop), and one enemy's
@@ -337,7 +339,7 @@ end
 -- Where a sandbox's frame starts below the game's sp (the call's stack top), and where its return
 -- loop sits above that.
 function M.top(sp) return (sp - 0x180) & ~7 end
-M.LOOP_AT = 0x80
+M.SCRATCH_AT, M.LOOP_AT = 0x10, 0x80   -- below SCRATCH_AT: a fifth argument, at the stack top
 function M.machine(cpu, keep)
     return function(fn)
         -- The load puts every register back; only cpsr is kept here. A kept call loads
@@ -408,7 +410,7 @@ function M.machine(cpu, keep)
             top = M.top(cpu.read("sp"))
             -- SCRATCH_SIZE fits between scratch and the loop; a call list's stub and list
             -- sit above the loop (LIST_STUB_AT, LIST_AT: LIST_MAX entries and the end)
-            scratch, loop = top + 0x10, top + M.LOOP_AT
+            scratch, loop = top + M.SCRATCH_AT, top + M.LOOP_AT
             if not keep then
                 marker, ie = top + MARKER_AT, cpu.read32(REG_IE) & 0xFFFF
                 cpu.write("cpsr", (cpsr & ~0xFF) | SVC_NOIRQ)

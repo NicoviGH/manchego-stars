@@ -182,14 +182,13 @@ do
     local f = assert(io.open(here .. "harness.lua"))
     local harness = f:read("a")
     f:close()
+    -- every `raw:name(` whose `raw` is a whole name (PROCS.raw, a local, any other alias)
     local calls, writes = 0, {}
-    for name in harness:gmatch("PROCS%.raw:(%w+)%(") do
-        calls = calls + 1
-        if not ProcMemo.isRead(name) then writes[#writes + 1] = name end
-    end
-    for name in harness:gmatch("[^%w_.]raw:(%w+)%(") do
-        calls = calls + 1
-        if not ProcMemo.isRead(name) then writes[#writes + 1] = name end
+    for before, name in harness:gmatch("(.)raw:([%w_]+)%(") do
+        if not before:match("[%w_]") then
+            calls = calls + 1
+            if not ProcMemo.isRead(name) then writes[#writes + 1] = name end
+        end
     end
     check(calls > 0, true, "harness: the hot reads bind to PROCS.raw")
     check(table.concat(writes, ","), "", "harness: no non-read call through the raw emulator")

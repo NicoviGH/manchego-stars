@@ -289,14 +289,14 @@ do
     local loads, ram = seen()
     check(loads, 0, "a kept call loads no state")
     check(ram.marker, "kept", "and what it wrote stays")
-    check(ram[0x04000200], nil, "a kept call leaves REG_IE alone")
+    check(ram[Sight.REG_IE], nil, "a kept call leaves REG_IE alone")
     for r, v in pairs(before) do check(cpu.read(r), v, "register " .. r .. " is put back") end
 end
 
 do
     local cpu, seen = fakeCpu(3)
     local loop
-    select(2, seen())[0x04000200] = 0x2001
+    select(2, seen())[Sight.REG_IE] = 0x2001
     local got = Sight.machine(cpu)(function(call)
         local _, ram = seen(); ram.marker = "dirty"
         local r = call(0x08001001, { 2, 40 })
@@ -310,10 +310,10 @@ do
     for i, h in ipairs(Sight.HALT_LOOP) do
         check(ram[loop + (i - 1) * 2], h, "the halt loop's word " .. i .. " is written")
     end
-    check(ram[loop + 0x0A], 0xDF02, "which halts through the BIOS (swi 2)")
-    check(ram[loop + Sight.HALT_MARKER], top + 0x7C, "its first literal is the marker's address")
-    check(ram[loop + 0x14], 0x04000200, "its second is REG_IE, which the loop clears")
-    check(ram[0x04000200], 0x2001, "the call starts with the game's IE written back")
+    check(ram[loop + Sight.HALT_MARKER], top + Sight.MARKER_AT,
+          "its first literal is the marker's address")
+    check(ram[loop + Sight.HALT_IE], Sight.REG_IE, "its second is REG_IE, which the loop clears")
+    check(ram[Sight.REG_IE], 0x2001, "the call starts with the game's IE written back")
     check(loop > cpu.read("sp"), false, "the loop sits above the call's stack, under the caller's")
     check(loads, 1, "the state is loaded back once")
     check(ram.marker, nil, "what the call wrote is gone after the sandbox")
@@ -368,7 +368,7 @@ do
     Sight.machine(cpu)(function(call) return call(0x08001000, { 1, 2, 3, 4, -1 }) end)
     local top, stack = Sight.top(0x03007D00), {}
     for _, w in ipairs(wrote) do
-        if w[1] >= top and w[1] < top + 0x10 then stack[#stack + 1] = w end
+        if w[1] >= top and w[1] < top + Sight.SCRATCH_AT then stack[#stack + 1] = w end
     end
     check(#stack, 1, "one stack argument written")
     check(stack[1][1], top, "at the call's sp")
