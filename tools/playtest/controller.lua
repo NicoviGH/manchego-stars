@@ -209,6 +209,12 @@ local RULES = {
             if observation.target.frozen then
                 return matched("transition", "target_selection is frozen")
             end
+            -- TargetSelection_Loop starts its camera scroll BLOCKING on itself
+            -- (EnsureCameraOntoPosition, bm.c): until it ends the loop does not run and an A
+            -- pressed then is dropped (vanilla Ch3, 2026-10-30: a Talk confirm lost for 600 frames).
+            if observation.target.locked then
+                return matched("transition", "target_selection is blocked on its camera scroll")
+            end
             local kind = observation.target.kind
             if kind ~= "attack" and kind ~= "talk" and kind ~= "heal" then
                 return unsupported("unsupported target selection kind")

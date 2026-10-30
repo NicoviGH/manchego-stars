@@ -41,3 +41,15 @@ unit test (`test_planner_pays_a_green_units_death`), not by this run.
 **Not decided here:** whether a careful style should spend more to save a green unit than its
 own unit's death (a recruit forfeited is worth more than one loss). The weight is `W.death`
 until a run shows a chapter that needs more.
+
+**The Talk it exposed in vanilla Ch3 was a lost key press, not a Talk stall (2026-10-30).** With
+the goal, attempt 1 crashed on turn 8 ("the harness could not perform talk"): Neimi's Talk to Colm
+opened its selector right after an attack at (13,1), so FE8 was still scrolling the camera to Colm
+at (6,9). `TargetSelection_Loop` starts that scroll BLOCKING on itself (`EnsureCameraOntoPosition`,
+bm.c), so its loop does not run and the A pressed that frame is dropped. The controller classified
+the blocked selector as `target_selection` and pressed anyway. guardedInput's retry confirmed it 600
+frames later, and its short settle then ran out three frames before the text printed. A
+selector whose proc is locked (`proc_lockCnt`, +0x28, as the menu already reads it) is now a
+transition, and a step to the next target waits for the selector to take input again. Measured
+after the fix: vanilla Ch3 clean at attempt 1 (13 turns, Colm recruited), Ch2 clean at attempt 2,
+Ch4 clean at attempt 1 (5 turns), Manchego Stars ch01 clean at attempt 1 (8 turns, from New Game).

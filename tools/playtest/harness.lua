@@ -608,6 +608,7 @@ local function observeTarget(observation)
         kind = kind,
         x = rs8(current), y = rs8(current + 1), uid = ru8(current + 2),
         extra = ru8(current + 3), frozen = (ru8(addr + 0x34) & 0x40) ~= 0,
+        locked = ru8(addr + 0x28) ~= 0,   -- proc_lockCnt: a blocking child (its camera scroll)
     }
 end
 local function observedUnit(unitId)
@@ -1180,12 +1181,14 @@ INSPECT.stepTarget = function(targetId, targetTile)
     end
     for _ = 1, 50 do
         if wanted(observeController().target) then return true end
+        -- A step re-centres the camera, blocking the selector: done once it takes input again.
         if not guardedInput("next_target", "RIGHT", "the selector steps to its next target",
             function(after, before)
                 return after.target ~= nil and before.target ~= nil
                     and (after.target.uid ~= before.target.uid or after.target.x ~= before.target.x
                          or after.target.y ~= before.target.y)
-            end, 30) then return false end
+                    and controllerState(after) == "target_selection"
+            end, 120) then return false end
     end
     if wanted(observeController().target) then return true end
     traceFailure("select_target", targetTile
