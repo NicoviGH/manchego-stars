@@ -1285,8 +1285,15 @@ local function exploring(ctx, sent)
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
     for _, t in ipairs(ctx.onField) do
-        local claim = claimsOn(ctx, "recruits", t)[1]   -- the one recruitFirst acts on
-        for _, p in ipairs(talkersOf(ctx, t, claim and claim.by)) do
+        -- unclaimed: any talker; claimed: the first claim with a talker that can go, as
+        -- recruitFirst falls through its claims in order
+        local claims, talkers = claimsOn(ctx, "recruits", t), nil
+        if #claims == 0 then talkers = talkersOf(ctx, t, nil) end
+        for _, c in ipairs(claims) do
+            talkers = talkersOf(ctx, t, c.by)
+            if #talkers > 0 then break end
+        end
+        for _, p in ipairs(talkers) do
             talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
         end
     end

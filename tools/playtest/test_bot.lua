@@ -2734,6 +2734,20 @@ do
     check(g[0x01] ~= "0,0", true, "talker: a nearer unit the claim does not name is not")
 end
 
+-- test_a_recruit_falls_through_its_claims: two claims name T; the first's talker C has acted,
+-- so, as recruitFirst falls through to the second, A (the second's) is sent.
+do
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local C = blue(0x02, 1, 1, 0, { minRange = false, acted = true })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local st = style("careful")
+    st.recruits = { { units = { 0x30 }, by = { 0x02 } }, { units = { 0x30 }, by = { 0x01 } } }
+    local g = talkGoals(boardOf(A, C, T), {
+        reach = { [0x01] = tiles({ 8, 0 }) },
+        talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }, st)
+    check(g[0x01], "0,0", "talker: the next claim's talker when the first's cannot go")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
