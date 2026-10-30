@@ -804,9 +804,20 @@ local function observeController()
     end
     return observation
 end
+-- With no observation, the state is kept for the frame: an observation reads emulator memory
+-- alone, so it stands until the frame moves or the harness writes (PROCS.stamp). A combat wait
+-- asks twice a frame (its predicate and the dialogue check).
+INSPECT.stateAt = {}
 controllerState = function(observation)
-    local state, why = Controller.classify(observation or observeController())
-    return state, why
+    if observation then return Controller.classify(observation) end
+    local frame, writes = PROCS.stamp()
+    local at = INSPECT.stateAt
+    if at.frame ~= frame or at.writes ~= writes then
+        local state, why = Controller.classify(observeController())
+        at = { frame = frame, writes = writes, state = state, why = why }
+        INSPECT.stateAt = at
+    end
+    return at.state, at.why
 end
 local function legalNames(actions)
     local names = {}
@@ -2963,6 +2974,7 @@ INSPECT.sightApi = function()
         Board = BOARD,
         cpu = {
             read = function(r) return raw:readRegister(r) end,
+            read32 = function(a) return raw:read32(a) end,
             write = function(r, v) raw:writeRegister(r, v) end,
             -- The frame a sandbox starts from holds log()'s stamps still while it runs (the
             -- calls' frames are counted into INSPECT.sandboxFrames instead). The save sets it only

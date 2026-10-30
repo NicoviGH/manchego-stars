@@ -158,6 +158,23 @@ do
     check(env.emu:currentFrame(), real.frame, "currentFrame forwards")
 end
 
+-- stamp() is the memo's key: it moves with the frame and with every non-read call, and with
+-- nothing else (controllerState keeps a classification under it).
+do
+    local procs, env, real = setup()
+    local f0, w0 = procs.stamp()
+    env.emu:read32(slot(1))
+    procs.find(A)
+    local f1, w1 = procs.stamp()
+    check(f1 == f0 and w1 == w0, true, "stamp: reads leave it unchanged")
+    env.emu:write32(slot(1), A)
+    local _, w2 = procs.stamp()
+    check(w2 ~= w1, true, "stamp: a write moves it")
+    real.frame = real.frame + 1
+    local f3 = procs.stamp()
+    check(f3 ~= f1, true, "stamp: a new frame moves it")
+end
+
 -- If anything replaces the guard (mGBA re-binding the global, or a script), writes would
 -- bypass it and the memo could go stale silently. It must fail loudly instead.
 do

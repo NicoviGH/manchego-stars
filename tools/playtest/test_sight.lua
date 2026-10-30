@@ -23,6 +23,7 @@ local function fakeCpu(cost)
     local cpu = {}
     function cpu.read(r) return regs[r] end
     function cpu.write(r, v) regs[r] = v end
+    function cpu.read32(a) return ram[a] or 0 end
     function cpu.write16(a, v) ram[a] = v end
     function cpu.write32(a, v) ram[a] = v end
     function cpu.save() return { pc = regs.pc, sp = regs.sp, marker = ram.marker } end
@@ -214,12 +215,14 @@ do
     local loads, ram = seen()
     check(loads, 0, "a kept call loads no state")
     check(ram.marker, "kept", "and what it wrote stays")
+    check(ram[0x04000200], nil, "a kept call leaves REG_IE alone")
     for r, v in pairs(before) do check(cpu.read(r), v, "register " .. r .. " is put back") end
 end
 
 do
     local cpu, seen = fakeCpu(3)
     local loop
+    select(2, seen())[0x04000200] = 0x2001
     local got = Sight.machine(cpu)(function(call)
         local _, ram = seen(); ram.marker = "dirty"
         local r = call(0x08001001, { 2, 40 })
@@ -228,11 +231,38 @@ do
     end)
     check(got, 42, "a sandboxed call returns the function's r0")
     local loads, ram = seen()
-    check(ram[loop], 0xE7FE, "lr names a Thumb `b .` written into scratch RAM")
+    local top = (0x03007D00 - 0x180) & ~7
+    check(ram[loop], 0x4903, "lr names the halt loop written into scratch RAM")
+    check(ram[loop + 0x0A], 0xDF02, "which halts through the BIOS (swi 2)")
+    check(ram[loop + 0x10], top + 0x7C, "its first literal is the marker's address")
+    check(ram[loop + 0x14], 0x04000200, "its second is REG_IE, which the loop clears")
+    check(ram[0x04000200], 0x2001, "the call starts with the game's IE written back")
     check(loop > cpu.read("sp"), false, "the loop sits above the call's stack, under the caller's")
     check(loads, 1, "the state is loaded back once")
     check(ram.marker, nil, "what the call wrote is gone after the sandbox")
     check(cpu.read("pc"), 0x1F8, "the CPU is back where the frame left it")
+end
+
+do
+    -- Returned into the halt: the CPU sits in the BIOS's Halt, outside the loop, and the loop's
+    -- str has set the marker. The call is seen as returned through the marker alone.
+    local cpu = fakeCpu(2)
+    local frames = cpu.frames
+    function cpu.frames(done, max)
+        local loop
+        return frames(function()
+            local pc = cpu.read("pc")
+            if pc ~= 0x08001000 and pc < 0x08000000 and pc > 0x03000000 then
+                loop = pc - 4
+                local marker = cpu.read32(loop + 0x10)
+                cpu.write32(marker, marker)
+                cpu.write("pc", 0x0000016C)
+            end
+            return done()
+        end, max)
+    end
+    local got = Sight.machine(cpu)(function(call) return call(0x08001001, { 2, 40 }) end)
+    check(got, 42, "a call halted in the BIOS is seen as returned through its marker")
 end
 
 do
@@ -259,8 +289,11 @@ do
     local wrote = {}
     cpu.write32 = function(a, v) wrote[#wrote + 1] = { a, v } end
     Sight.machine(cpu)(function(call) return call(0x08001000, { 1, 2, 3, 4, -1 }) end)
-    check(#wrote, 1, "one stack argument written")
-    check(wrote[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")
+    local top, stack = (0x03007D00 - 0x180) & ~7, {}
+    for _, w in ipairs(wrote) do if w[1] >= top and w[1] < top + 0x10 then stack[#stack + 1] = w end end
+    check(#stack, 1, "one stack argument written")
+    check(stack[1][1], top, "at the call's sp")
+    check(stack[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")
 end
 
 -- attackOf / strikeOf: our attack (with the enemy's counter) and the enemy's own strike are

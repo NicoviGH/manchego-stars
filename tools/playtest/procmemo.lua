@@ -61,6 +61,8 @@ end
 --   procs.live()      a NEW list of { slot, addr, script } for every non-empty slot, in slot
 --                     order, on every call: the caller owns it, so mutating it cannot corrupt
 --                     what the next caller in the same frame is told
+--   procs.stamp()     (frame, writes): the memo's own key. Anything read from emulator
+--                     memory alone may be kept while both are unchanged (controllerState)
 -- `pool` is { base, stride, count }: SYM.sProcArray, sizeof(struct Proc), the pool size.
 function ProcMemo.install(env, pool)
     local real = env.emu
@@ -93,6 +95,7 @@ function ProcMemo.install(env, pool)
     return {
         raw = real,
         pool = pool,
+        stamp = function() return real:currentFrame(), writes end,
         find = function(script)
             -- A symbol gen_symbols.py does not export reads as nil, and looking for nil finds
             -- nothing, which looks exactly like "the proc never started" (ch02armory, #493).
