@@ -6,6 +6,7 @@ local B = dofile(here .. "bot.lua")
 local Planner = dofile(here .. "planner.lua")
 local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
+local Json = dofile(here .. "json.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -1792,6 +1793,51 @@ do
     check(at(a), "1,0", "recruit: toward the recruit")
 end
 
+-- test_recruit_claim_marches_only_where_a_player_could: the claim's talker A is out of reach of
+-- its recruit. It is not marched on one the fog hides, nor on one it has no way to; it goes on
+-- toward the enemy (east) instead of west to the recruit.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local E = red(0x81, 9, 0, { hp = 1 })
+    local function open(goal, cut)
+        local f = {}
+        for y = 0, 9 do
+            f[y] = {}
+            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+        end
+        if cut then f[0][4] = nil end
+        return f
+    end
+    local reach = { [0x01] = tiles({ 4, 0 }, { 3, 0 }, { 5, 0 }) }
+    local st = claimed("careful", { id = "r1", kind = "recruit", unit = { 0x31 } })
+    local R = red(0x82, 0, 0, { charId = 0x31, fogged = true })
+    local a = B.decide(boardOf(A, R, E), sightOf({ reach = reach, field = open,
+                                                   talk = { [0x01] = { [0x82] = true } } }), st)
+    check(at(a) ~= "3,0", true, "recruit: no march on one the fog hides")
+    local T = blue(0x30, 5, 0, 0, { faction = "green", charId = 0x31 })
+    a = B.decide(boardOf(A, T, E), sightOf({ reach = reach,
+        field = function(goal) return open(goal, goal.x == 0) end,
+        talk = { [0x01] = { [0x30] = true } } }), st)
+    check(at(a) ~= "3,0", true, "recruit: no march on one it has no way to")
+end
+
+-- test_recruit_claim_talks_where_the_game_offers_it: the claim names C. The field (one
+-- class's costs) has no way from C to T, but the game offers C's Talk from (1,0) this turn. The
+-- Talk is the game's own check, so C talks -- not A, whom the plain talk habit (slot order)
+-- would pick; only the march, when no Talk is offered, needs a way.
+do
+    local A = blue(0x01, 0, 0, 1)
+    local C = blue(0x02, 1, 2, 0)
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local st = claimed("careful", { id = "r1", kind = "recruit", unit = { 0x30 } })
+    st.recruits[1].by = { 0x02 }
+    local a = B.decide(boardOf(A, C, T), sightOf({
+        reach = { [0x01] = tiles({ 0, 1 }), [0x02] = tiles({ 2, 0 }, { 1, 0 }) },
+        field = function() return { [0] = {}, [1] = { [0] = 1 } } end,
+        talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }), st)
+    check(a and a.act .. ">" .. a.unitId, "talk>2", "recruit: the claim's talker talks, way or not")
+end
+
 -- test_keys_and_priority_rank_their_target_first: A deals more to E1, but E2 holds a key
 -- (keys claim) or is a priority claim's class.
 do
@@ -2470,6 +2516,236 @@ do
           "surprise: the game is asked about the next act, for its unit as it stands now")
     check(S(plan(), 1, before, played, nil, function() return nil end), nil,
           "surprise: the game still offers it, play on")
+end
+
+-- test_planner_pays_a_green_units_death: X kills green G next phase unless A stands on (1,0),
+-- which costs A ground toward its goal. A green unit lost spoils the clear (botrun), so careful
+-- gives up the ground: A blocks, and the plan predicts G's phase with it there.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 20, [1] = 40 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    check(at(a), "1,0", "planner: careful blocks for a green unit")
+    local g
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x30 then g = p end
+    end
+    check(g and g.green and g.die, 0, "planner: the green unit's phase is predicted")
+end
+
+-- test_planner_mends_a_plan_that_loses_a_green_unit: A's march to (0,1) is its best act by its
+-- own score, and the beam (BEAM = 1) keeps only that; X then kills green G. G has no menu of
+-- its own, so the mend tries the acts of ours that could save it -- one ending beside it, or
+-- striking one that strikes it -- and finds A's block at (1,0).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 2, 0, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+        field = function()
+            return { [0] = { [0] = 40, [1] = 40, [2] = 40 }, [1] = { [0] = 10 } }
+        end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(at(a) .. " " .. tostring(plan and plan.kind), "1,0 mend",
+          "planner: the mend blocks for a green unit")
+end
+
+-- test_planner_mend_tries_each_act_once: greens G1 and G2 both stand beside (1,0), and only
+-- A's block there saves them. Both are at risk and both offer it; it is judged once.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G1 = blue(0x30, 5, 2, 0, { faction = "green", hp = 10, minRange = false })
+    local G2 = blue(0x31, 6, 1, 1, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 2 }) },
+        field = function()
+            return { [0] = { [0] = 40, [1] = 40 }, [2] = { [0] = 10 } }
+        end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 10 },
+                     { enemy = 0x81, target = 0x31, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, G1, G2, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    local blocks = 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "mend" and table.concat(c.acts, " "):find("@1,0") then blocks = blocks + 1 end
+    end
+    check(at(a), "1,0", "planner: the mend blocks for both")
+    check(blocks, 1, "planner: the block is judged once")
+end
+
+-- test_planner_records_a_green_units_strikers: nothing saves G from X. The prediction names X
+-- as its striker, and encodes: botrun logs the plan's record as JSON (string keys only).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 2, 0, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        enemyPhase = function()
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    local g
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x30 then g = p end
+    end
+    check(g and table.concat(g.strikers, ","), tostring(0x81), "planner: the green's striker")
+    check(pcall(Json.encode, plan and plan.predict), true, "planner: the predictions encode")
+end
+
+-- test_a_talker_is_sent_to_its_recruit: T (green) is far off and A is the only unit the game
+-- lets Talk to it. A is sent to T's tile, not to the nearest enemy, and marches on it.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local C = blue(0x02, 1, 4, 1, { minRange = false })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local E = red(0x81, 9, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 4, 0 }, { 3, 0 }, { 5, 0 }),
+                  [0x02] = tiles({ 4, 1 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        field = function(goal)
+            local f = {}
+            for y = 0, 9 do
+                f[y] = {}
+                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+            end
+            return f
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, T, E), sightOf(o), style("careful"))
+    local sent, moved
+    for _, g in ipairs(plan and plan.goals or {}) do
+        if g.id == 0x01 then sent = g.x .. "," .. g.y end
+    end
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x01 then moved = at(a) end
+    end
+    check(sent, "0,0", "talker: sent to its recruit")
+    check(moved, "3,0", "talker: marches on it")
+end
+
+-- The goals a careful plan sends units to, "x,y" by unit id. `o.field` defaults to open ground
+-- (the manhattan distance from the goal); `blocked[id]` cuts that unit off from every goal.
+local function talkGoals(board, o, st, blocked)
+    o.field = o.field or function(goal)
+        local f = {}
+        for y = 0, 9 do
+            f[y] = {}
+            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+        end
+        for _, u in ipairs(board.units) do
+            if blocked and blocked[u.id] then f[u.y][u.x] = nil end
+        end
+        return f
+    end
+    local _, plan = Planner.plan(B, board, sightOf(o), st or style("careful"))
+    local out = {}
+    for _, g in ipairs(plan and plan.goals or {}) do out[g.id] = g.x .. "," .. g.y end
+    return out
+end
+
+-- test_no_talker_is_sent_into_the_fog: a red the game lets A Talk to, hidden in fog. A player
+-- knows no more than the fog shows (goalFor), so A is not sent to its tile.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local R = red(0x81, 0, 0, { fogged = true })
+    local g = talkGoals(boardOf(A, R), { reach = { [0x01] = tiles({ 4, 0 }) },
+                                         talk = { [0x01] = { [0x81] = true } } })
+    check(g[0x01] ~= "0,0", true, "talker: not sent to a recruit in fog")
+end
+
+-- test_no_talker_is_sent_where_it_has_no_way: A may Talk to T, but the field from T has no way
+-- to A (and no wall or door to breach). A is not sent to stand idle facing it.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local g = talkGoals(boardOf(A, T), { reach = { [0x01] = tiles({ 4, 0 }) },
+                                         talk = { [0x01] = { [0x30] = true } } }, nil,
+                        { [0x01] = true })
+    check(g[0x01], nil, "talker: not sent to a recruit it has no way to")
+end
+
+-- test_each_recruit_gets_its_own_talker: A and C may each Talk to T1 and T2, and A is the
+-- nearer to both. Each recruit gets one talker and each talker one recruit, nearest pair first:
+-- A takes T1 (distance 1), C is left T2.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local C = blue(0x02, 1, 8, 0, { minRange = false })
+    local T1 = blue(0x30, 5, 3, 0, { faction = "green" })
+    local T2 = blue(0x31, 6, 4, 4, { faction = "green" })
+    local g = talkGoals(boardOf(A, C, T1, T2), {
+        reach = { [0x01] = tiles({ 4, 0 }), [0x02] = tiles({ 8, 0 }) },
+        talk = { [0x01] = { [0x30] = true, [0x31] = true },
+                 [0x02] = { [0x30] = true, [0x31] = true } } })
+    check(g[0x01], "3,0", "talker: the nearest pair is sent first")
+    check(g[0x02], "4,4", "talker: the second recruit gets the free talker")
+end
+
+-- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
+-- the nearer unit able to Talk to it. Only C is sent; A is left to its own goal.
+do
+    local A = blue(0x01, 0, 1, 0, { minRange = false })
+    local C = blue(0x02, 1, 8, 0, { minRange = false })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local st = style("careful")
+    st.recruits = { { units = { 0x30 }, by = { 0x02 } } }
+    local g = talkGoals(boardOf(A, C, T), {
+        reach = { [0x01] = tiles({ 1, 0 }), [0x02] = tiles({ 8, 0 }) },
+        talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }, st)
+    check(g[0x02], "0,0", "talker: the claim's talker is sent")
+    check(g[0x01] ~= "0,0", true, "talker: a nearer unit the claim does not name is not")
+end
+
+-- test_a_recruit_falls_through_its_claims: two claims name T; the first's talker C has acted,
+-- so, as recruitFirst falls through to the second, A (the second's) is sent.
+do
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local C = blue(0x02, 1, 1, 0, { minRange = false, acted = true })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local st = style("careful")
+    st.recruits = { { units = { 0x30 }, by = { 0x02 } }, { units = { 0x30 }, by = { 0x01 } } }
+    local g = talkGoals(boardOf(A, C, T), {
+        reach = { [0x01] = tiles({ 8, 0 }) },
+        talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }, st)
+    check(g[0x01], "0,0", "talker: the next claim's talker when the first's cannot go")
 end
 
 if fails > 0 then

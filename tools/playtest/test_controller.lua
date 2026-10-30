@@ -575,6 +575,18 @@ check(action(frozenTarget, "confirm_target"), nil, "frozen target exposes no inp
 check(action(frozenTarget, "cancel_target"), nil, "a frozen selector exposes no escape either")
 check(action(frozenTarget, "next_target"), nil, "nor a step to its next target")
 
+-- A selector whose camera is still scrolling to its target: TargetSelection_Loop starts
+-- ProcScr_CamMove BLOCKING on itself (EnsureCameraOntoPosition), so its loop does not run and
+-- an A pressed then is dropped (vanilla Ch3, Neimi's Talk opened with the camera at 13,1).
+local lockedTarget = {
+    procs = { target_selection = { idle = "target_selection_input", locked = true } },
+    target = { kind = "talk", x = 6, y = 9, uid = 0x41, frozen = false },
+}
+classify(lockedTarget, "transition", "a selector blocked on its camera is passive")
+check(action(lockedTarget, "confirm_target"), nil, "a blocked selector takes no confirm")
+check(action(lockedTarget, "cancel_target"), nil, "nor a B, which it would drop as well")
+check(action(lockedTarget, "next_target"), nil, "nor a step to its next target")
+
 -- The battle forecast is display-only. TargetSelection_Loop owns confirmation; the
 -- forecast's callbacks must be observed as passive transitions and never expose a
 -- guessed second A press.

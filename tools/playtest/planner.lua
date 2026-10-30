@@ -15,15 +15,17 @@
 --      exposed one: the judge then had nothing safe to pick (ch03, 2026-10-27).
 --   3. Judge: the best FINAL complete plans each meet the enemy phase the game's own AI would
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
---      for each unit's chance to die there, its expected damage, and a fog risk for a fragile
---      unit left beside ground it cannot see. Two more are judged beside them: on a Defeat
---      Boss map the assault (every unit that reaches the boss strikes it, heaviest first --
---      a combination the beam's per-unit cut never tries), and on a stalled board
---      (opts.stalled) each unit's best act that changes the board, of which the best is
---      played: a careful player that has stopped making progress takes the least it must.
+--      for each unit's chance to die there (a green one's too: it spoils the clear), its
+--      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
+--      Two more are judged beside them: on a Defeat Boss map the assault (every unit that
+--      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
+--      never tries), and on a stalled board (opts.stalled) each unit's best act that
+--      changes the board, of which the best is played: a careful player that has stopped
+--      making progress takes the least it must.
 --      The enemy phase is played every way it can go where a counter may kill a striker
 --      (its tile freed for the next). Last, the best plan is mended: each unit it may lose
---      tries its other acts, the rest of the plan kept, and those are judged too.
+--      tries its other acts (a green one, the acts of ours that could save it), the rest of
+--      the plan kept, and those are judged too.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
@@ -36,12 +38,13 @@
 --
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts,
--- expect, enemies, judged, predict, kind = "beam"|"assault"|"unstall"|"mend", considered =
--- every plan judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent,
--- explored (both Bot.candidates') } | nil,
+-- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
+-- `strikers` the ids of the enemies that strike it in the judged phase, sorted), kind =
+-- "beam"|"assault"|"unstall"|"mend", considered = every plan judged, best first: { judged,
+-- acts, kind }, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
--- to die), played, judgedDie (the judged phase's, when played) }, goals = the village or chest
--- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, legal)
+-- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
+-- or chest each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
 
@@ -424,6 +427,14 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
+    -- a green unit lost spoils the clear as one of ours does (botrun's clean clear: vanilla
+    -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
+    -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
+    -- meets the phase where it stands
+    local greens = {}
+    for _, u in ipairs(ctx.onField) do
+        if u.faction == "green" and not u.dead then greens[#greens + 1] = u end
+    end
     local function judge(st)
         local planned, at = {}, {}
         for _, a in ipairs(st.acts) do at[a.unitId] = a end
@@ -441,6 +452,8 @@ function M.plan(Bot, board, sight, style, opts)
         -- each unit's chance to die, HP lost and the strikes on it, over every way the phase went
         local judged = st.base
         local die, taken, short, struck = {}, {}, {}, {}
+        local strikers = {}   -- per green unit, the enemies that strike it in any outcome
+        for _, g in ipairs(greens) do strikers[g.id] = {} end
         for _, o in ipairs(strikes.outcomes or { { p = 1, strikes = strikes } }) do
             local onUnit = {}
             for _, s in ipairs(o.strikes) do
@@ -470,8 +483,28 @@ function M.plan(Bot, board, sight, style, opts)
                 short[id] = (short[id] or 0) + o.p * sh
                 struck[id] = math.max(struck[id] or 0, #phase)
             end
+            for _, g in ipairs(greens) do
+                local phase = onUnit[g.id] or {}
+                local d, t = odds(phase, g.hp)
+                die[g.id] = (die[g.id] or 0) + o.p * d
+                taken[g.id] = (taken[g.id] or 0) + o.p * t
+                struck[g.id] = math.max(struck[g.id] or 0, #phase)
+            end
+            for _, s in ipairs(o.strikes) do
+                if strikers[s.target] then strikers[s.target][s.enemy] = true end
+            end
         end
         st.predict = {}
+        for _, g in ipairs(greens) do
+            judged = judged - W.death * die[g.id]
+            local by = {}   -- a list: the record is logged as JSON, whose keys are strings
+            for id in pairs(strikers[g.id]) do by[#by + 1] = id end
+            table.sort(by)
+            st.predict[#st.predict + 1] = { id = g.id, charId = g.charId, x = g.x, y = g.y,
+                                            hp = g.hp, die = die[g.id], taken = taken[g.id],
+                                            strikes = struck[g.id], strikers = by,
+                                            green = true }
+        end
         for _, p in ipairs(planned) do
             local id = p.unit.id
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
@@ -530,10 +563,30 @@ function M.plan(Bot, board, sight, style, opts)
     -- the likeliest to die first, tries every other act of its menu, the rest of the plan kept
     -- where it still fits. The beam ranks acts by their own score, so a plan where one unit
     -- steps elsewhere for its own sake can lose to that unit's best act in every slot (ch02
-    -- turn 5: the four plans judged all left Marty to two Brigands).
+    -- turn 5: the four plans judged all left Marty to two Brigands). A green unit has no menu:
+    -- it tries instead the acts of ours that could save it, one ending beside it (a block) or
+    -- striking an enemy that strikes it.
     if best then
         local base, menuOf, risky = best, {}, {}
-        for _, m in ipairs(menus) do menuOf[m.unit.id] = m.acts end
+        for _, m in ipairs(menus) do
+            local mine = {}
+            for _, a in ipairs(m.acts) do mine[#mine + 1] = { uid = m.unit.id, a = a } end
+            menuOf[m.unit.id] = mine
+        end
+        local function tries(p)
+            if not p.green then return menuOf[p.id] or {} end
+            local striker, out = {}, {}
+            for _, id in ipairs(p.strikers) do striker[id] = true end
+            for _, m in ipairs(menus) do
+                for _, a in ipairs(m.acts) do
+                    if Bot.distance(a.move.x, a.move.y, p.x, p.y) == 1
+                        or (a.act == "attack" and a.targetId and striker[a.targetId]) then
+                        out[#out + 1] = { uid = m.unit.id, a = a }
+                    end
+                end
+            end
+            return out
+        end
         for _, p in ipairs(base.predict) do
             if p.die > 0 then risky[#risky + 1] = p end
         end
@@ -541,16 +594,18 @@ function M.plan(Bot, board, sight, style, opts)
             if x.die ~= y.die then return x.die > y.die end
             return x.id < y.id
         end)
+        -- each act tried once: two greens side by side, or a blue at risk beside a green, offer
+        -- the same one again, and each try plays a whole enemy phase
+        local mine, tried = {}, {}
+        for _, a in ipairs(base.acts) do mine[a.unitId] = key(a) end
         for _, p in ipairs(risky) do
-            local mine
-            for _, a in ipairs(base.acts) do
-                if a.unitId == p.id then mine = key(a) end
-            end
-            for _, a in ipairs(menuOf[p.id] or {}) do
-                local st = key(a) ~= mine and extend(start, a, p.id)
+            for _, t in ipairs(tries(p)) do
+                local k = key(t.a)
+                local st = k ~= mine[t.uid] and not tried[k] and extend(start, t.a, t.uid)
+                tried[k] = true
                 if st then
                     for _, x in ipairs(base.acts) do
-                        if x.unitId ~= p.id then st = extend(st, x, x.unitId) or st end
+                        if x.unitId ~= t.uid then st = extend(st, x, x.unitId) or st end
                     end
                     consider(complete(st), "mend")
                 end
@@ -573,7 +628,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
     end
     best.explore = offered
-    -- the village or chest each unit was sent to (Bot.candidates' exploring), by unit id
+    -- the recruit, village or chest each unit was sent to (Bot.candidates' exploring), by unit id
     best.goals = {}
     for id, t in pairs(ctx.exploreGoal or {}) do
         best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }

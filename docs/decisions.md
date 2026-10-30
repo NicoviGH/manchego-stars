@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-380 decisions. Read this index, then open the two or three you need — the whole
+381 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -226,6 +226,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0376` | [A clean clear has four parts, a vanilla chapter without one is a bot fault, and the bot clears all of vanilla's Eirika...](decisions/0376-a-clean-clear-has-four-parts-and-vanilla-is-the-bar.md) | 2026-10-29 | #510 |
 | `0379` | [A theft spoils a clean clear only when the thief took something it ranks above the stat boosters](decisions/0379-a-theft-spoils-a-clean-clear-only-above-the-boosters.md) | 2026-10-29 | #510 |
 | `0380` | [A sandbox call returns into the BIOS's Halt, not a spinning branch-to-self loop](decisions/0380-the-sandbox-call-halts-in-the-bios-instead-of-spinning.md) | 2026-10-30 | #510 |
+| `0381` | [A Talk recruit is its nearest talker's march goal, and the planner pays a green unit's death as one of ours](decisions/0381-a-talk-recruit-is-a-march-goal-and-a-green-death-is-paid.md) | 2026-10-30 | #510 |
 
 ---
 
