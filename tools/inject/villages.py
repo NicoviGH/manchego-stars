@@ -227,6 +227,23 @@ def assert_village_tiles_visitable(chap, maps_dir, stem):
                      'unobtainable. Paint a village tile there (#205).'
                      % (village['id'], x, y, terrain[y][x]))
 
+def village_rewards(eventinfo, scripts):
+    """[(x, y, 'item' | 'gold', value)] for every `Village(flag, script, x, y)` in a vanilla
+    eventinfo: the RAW value its script puts in `SVAL(EVT_SLOT_3, <v>)`, given by the next
+    GIVEITEMTO (an item id) or GIVEITEMTOMAIN (gold). `scripts` = {label: body}; a script it
+    cannot find, or one that gives nothing, is left out."""
+    out = []
+    for script, x, y in re.findall(
+            r'Village\(\s*[^,]+,\s*(\w+),\s*(\d+),\s*(\d+)\s*\)', eventinfo):
+        body = scripts.get(script)
+        m = body and re.search(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9A-Fa-f]+|\d+)\)\s*'
+                               r'(GIVEITEMTOMAIN|GIVEITEMTO)\b', body)
+        if m:
+            out.append((int(x), int(y), 'gold' if m.group(2) == 'GIVEITEMTOMAIN' else 'item',
+                        int(m.group(1), 0)))
+    return out
+
+
 def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     """{(x, y): ITEM_ enum} -- what vanilla hands out at each village on `layout`'s chapter.
 
@@ -242,16 +259,9 @@ def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     by_id = {int(v, 16): n for n, v in re.findall(
         r'(ITEM_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
         vanilla_decomp_text('include/constants/items.h'))}
-    gifts = {}
-    for script, x, y in re.findall(
-            r'Village\(\s*[^,]+,\s*(\w+),\s*(\d+),\s*(\d+)\s*\)', eventinfo):
-        body = eventscript.split('EventListScr %s[] = {' % script, 1)
-        if len(body) < 2:
-            continue                                    # script lives elsewhere; nothing to read
-        match = re.search(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9A-Fa-f]+|\d+)\)', body[1].split('};', 1)[0])
-        if match:
-            gifts[(int(x), int(y))] = by_id.get(int(match.group(1), 0))
-    return gifts
+    scripts = dict(re.findall(r'\bEventListScr\s+(\w+)\[\]\s*=\s*\{(.*?)\};', eventscript, re.S))
+    return {(x, y): by_id.get(v) if kind == 'item' else None
+            for x, y, kind, v in village_rewards(eventinfo, scripts)}
 
 
 def assert_village_gifts_match_vanilla(chap, gifts=None):

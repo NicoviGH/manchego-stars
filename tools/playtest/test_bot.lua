@@ -1187,6 +1187,24 @@ do
     check(B.CLAIM_BEHAVIOURS.threat, nil, "threat has no behaviour")
 end
 
+-- A reward claim lands in style.rewards and is played; a reinforcements claim's waves land
+-- in style.waves beside its turns in style.arrivals.
+do
+    local wave = { turn = 8, units = { { class = 9, x = 13, y = 0, ai1 = 0, ai2 = 4, items = {} } } }
+    local st = claimed("careful", { id = "r1", kind = "reward", item = 0x68, needs = "villages" },
+        { id = "w1", kind = "reinforcements", turns = { 2, 8 }, waves = { wave } })
+    check(#st.rewards, 1, "reward: style.rewards holds it")
+    check(st.rewards[1].item, 0x68, "reward: its item")
+    check(st.rewards[1].needs, "villages", "reward: its needs")
+    check(#B.unplayed({ { id = "r1", kind = "reward", item = 0x68, needs = "villages" } }), 0,
+        "reward: played")
+    check(st.waves[1].turn, 8, "reinforcements: style.waves holds its waves")
+    check(st.arrivals[1][2], 8, "reinforcements: style.arrivals keeps its turns")
+    local ok = pcall(B.CLAIM_BEHAVIOURS.reward, { id = "r2", kind = "reward", needs = "villages" },
+        style("careful"))
+    check(ok, false, "reward without an item raises")
+end
+
 -- A claim missing what its behaviour needs raises, naming the claim; it is never skipped.
 do
     local bad = {

@@ -104,6 +104,11 @@
 --   reinforcements {turns}: on the turn before any of `turns` the march holds (the no-goal
 --                       rule above); attacks are still made. Reads board.turn (Board.read's),
 --                       and decide raises when it is missing.
+--                       Its `waves` (who arrives where: campaign_env) go to style.waves, which
+--                       the goals read for when a looter reaches a village (sight.closings).
+--   reward {item, needs}: an end-of-chapter reward the game gives when every goal `needs`
+--                       names is taken (villages, chests or tiles): style.rewards, which the
+--                       goals share out over those goals.
 -- Bot.applyClaims(claims, style) folds them in order. Bot.unplayed(claims) -> the ids of every
 -- claim whose kind has no behaviour (threat, kits, unmodelled, an unknown kind), so a run
 -- reports what it did not play instead of dropping it.
@@ -1669,7 +1674,19 @@ M.CLAIM_BEHAVIOURS = {
         return withEntry(style, "terrains", { tile = claim.tile, vs = needVs(claim) })
     end,
     reinforcements = function(claim, style)
-        return withEntry(style, "arrivals", needIds(claim, "turns", "{arrival turns}"))
+        local out = withEntry(style, "arrivals", needIds(claim, "turns", "{arrival turns}"))
+        -- the waves themselves (campaign_env: who arrives where), for the goals' closings
+        out.waves = copyList(style.waves)
+        for _, w in ipairs(claim.waves or {}) do out.waves[#out.waves + 1] = w end
+        return out
+    end,
+    -- an end-of-chapter reward (the game gives `item` when every goal `needs` names is taken)
+    reward = function(claim, style)
+        if not isInteger(claim.item) then malformed(claim, "needs item = an item id") end
+        if claim.needs ~= "villages" and claim.needs ~= "chests" and type(claim.needs) ~= "table" then
+            malformed(claim, "needs needs = villages | chests | { {x, y} }")
+        end
+        return withEntry(style, "rewards", { item = claim.item, needs = claim.needs })
     end,
     recruit = function(claim, style)
         local by = claim.by ~= nil and needIds(claim, "by", "{charIds}") or nil

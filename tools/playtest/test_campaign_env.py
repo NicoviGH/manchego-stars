@@ -116,9 +116,44 @@ class Claims(unittest.TestCase):
         with self.assertRaises(ValueError):
             ce.resolve({'kind': 'recruit', 'unit': 'nobody'}, 'x#0', 'ours')
 
-    def test_reinforcements_go_unresolved_not_dropped(self):
-        self.assertEqual(ce.resolve({'kind': 'reinforcements'}, 'x#0', 'vanilla')['kind'],
-                         'unresolved')
+    def test_ch5_reinforcements_resolve_to_waves(self):
+        # vanilla Ch5's three Brigand pairs, on turns 2, 6 and 8, from their spawn tiles
+        # (the decomp's UnitDef_088B5860/589C/58D8), each looting by its AI2 (0x04)
+        c = ce.resolve({'kind': 'reinforcements'}, 'FE8 Ch5#3', 'vanilla', ref='FE8 Ch5')
+        brigand = ce.class_ids.vanilla_class_values()['CLASS_BRIGAND']
+        self.assertEqual(c['kind'], 'reinforcements')
+        self.assertEqual(c['turns'], [2, 6, 8])
+        self.assertEqual([[(u['x'], u['y']) for u in w['units']] for w in c['waves']],
+                         [[(14, 16), (14, 15)], [(14, 8), (14, 6)], [(13, 0), (14, 1)]])
+        self.assertEqual({(u['class'], u['ai2']) for w in c['waves'] for u in w['units']},
+                         {(brigand, 4)})
+
+    def test_our_reinforcements_resolve_from_the_chapter(self):
+        # ours ch05: the eruption's waves on turns 2, 6 and 8, on vanilla's spawn tiles
+        chap = next(ch for ch in campaign_chapters.load_all() if ch['id'] == 'ch05-the-elven-tomb')
+        c = ce.resolve({'kind': 'reinforcements'}, 'ch05#3', 'ours', chap)
+        self.assertEqual(c['turns'], [2, 6, 8])
+        self.assertEqual(sorted((u['x'], u['y']) for u in c['waves'][2]['units']),
+                         [(13, 0), (14, 1)])
+
+    def test_reward_resolves_item_id(self):
+        c = ce.resolve({'kind': 'reward', 'item': 'guiding-ring', 'needs': 'villages'},
+                       'FE8 Ch5#4', 'vanilla')
+        self.assertEqual((c['item'], c['needs']), (0x68, 'villages'))
+        tiles = ce.resolve({'kind': 'reward', 'item': 'guiding-ring', 'needs': [[5, 1]]},
+                           'x#0', 'vanilla')
+        self.assertEqual(tiles['needs'], [[5, 1]])
+        with self.assertRaises(ValueError):
+            ce.resolve({'kind': 'reward', 'item': 'no-such-item', 'needs': 'villages'},
+                       'x#0', 'vanilla')
+
+    def test_village_gifts_are_every_vanilla_village(self):
+        # every Village(...) under src/events/ (17 at HEAD), Ch5's (5,1) Torch (0x0E) among
+        # them; no vanilla village gives gold (GIVEITEMTOMAIN is used only off villages)
+        g = ce.village_gifts()
+        self.assertEqual(len(g['items']), 17)
+        self.assertIn(0x0E, g['items'])
+        self.assertEqual(g['gold'], [])
 
 
 class Resume(unittest.TestCase):

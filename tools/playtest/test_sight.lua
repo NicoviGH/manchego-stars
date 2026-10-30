@@ -525,7 +525,7 @@ do
     check(table.concat(ids, " "), "doors fog sustain", "demandsOf: doors, fog when the range is set")
 end
 
--- loots: an AI1 script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
+-- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
 -- (cp_script.h; the scripts loop back with a GOTO, so a scan past it reads the next script).
 do
     local ram = {}

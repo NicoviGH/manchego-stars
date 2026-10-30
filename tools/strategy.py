@@ -86,9 +86,12 @@ KINDS = {
     'heal': {'vs'},
     'avoid': {'unit', 'vs'},
     'priority': {'vs'},
+    'reward': {'item', 'needs'},
 }
 # The kinds only the step-9 bot reads (#510): the parity model prints nothing for them.
-PLAYED_ONLY = {'recruit', 'keys', 'heal', 'avoid', 'priority'}
+PLAYED_ONLY = {'recruit', 'keys', 'heal', 'avoid', 'priority', 'reward'}
+# A reward's `needs`: every village, every chest, or a list of [x, y] tiles.
+REWARD_NEEDS = ('villages', 'chests')
 # topic -> (the #510 step that reads it, what the play is). Step 7 = reach and time; 'out' =
 # left out by decision (ADR 0365).
 TOPICS = {
@@ -163,6 +166,10 @@ def validate(claims, section, where):
         if kind == 'kits' and c['topic'] not in KIT_TOPICS:
             raise ValueError('%s: kits topic %r is not one of %s'
                              % (where, c['topic'], sorted(KIT_TOPICS)))
+        if kind == 'reward' and not (c['needs'] in REWARD_NEEDS or (
+                isinstance(c['needs'], list) and all(len(t) == 2 for t in c['needs']))):
+            raise ValueError('%s: reward needs %r is not one of %s or a list of [x, y]'
+                             % (where, c['needs'], REWARD_NEEDS))
         cite = plain(c.get('cite'))
         if not cite or cite not in body:
             raise ValueError('%s: %s claim cites a line its Strategy section does not have: %r'

@@ -112,8 +112,10 @@ FE8 Ch5:
       cite: "simply kill any nearby mobile enemies while staying away from Joshua"
     - kind: reinforcements
       cite: "Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended."
-    - kind: kits
-      topic: villages
+    # the ending scene gives it (EventScr_Ch5_EndingScene: flags 8-11, every village)
+    - kind: reward
+      item: guiding-ring
+      needs: villages
       cite: "There is a free Guiding Ring if you visit all the villages."
 
 FE8 Ch6:

@@ -3791,6 +3791,47 @@ def _vanilla_reinforcement_turns(stem):
     return out
 
 
+def arrival_waves(where, game):
+    """The enemy waves a chapter loads after turn 1, as the bot's planner reads them (#510
+    step 9): [{turn, units: [{class, x, y, ai1, ai2, items}]}] by turn, with the game's ids.
+    `where` is the twin's parity reference (vanilla: `_vanilla_reinforcement_turns` joined with
+    `_vanilla_red_defs`, the spawn tile its UnitDefinition loads on) or our chapter (its
+    entries' `arrives_turn`, positions and the donor AI they emit, `enemy_ai_bytes`). A
+    reskin plays as its base (ADR 0362), so ours carry the base class. None for a twin whose
+    force is not curated (Ch5x, Ch9 on)."""
+    classes = inject.class_ids.vanilla_class_values()
+    items = {e: i for i, e in _item_id_to_enum().items()}
+    waves = {}
+    if game == 'vanilla':
+        reds = _vanilla_red_defs(where)
+        if where not in PARITY_REFERENCE_STEM or reds is None:
+            return None                    # an uncurated twin: its force is not read yet
+        turns = _vanilla_reinforcement_turns(PARITY_REFERENCE_STEM[where])
+        for array, _i, d in reds:
+            if array in turns:
+                waves.setdefault(turns[array], []).append({
+                    'class': classes[d['classIndex']], 'x': d['xPosition'], 'y': d['yPosition'],
+                    'ai1': d['ai'][0], 'ai2': d['ai'][1],
+                    'items': [items[n] for n in d['items'] if n in items]})
+    else:
+        for enemy in where.get('enemy_units') or []:
+            turn = inject.raw_pids.entry_arrival_turn(enemy)
+            if turn <= 1:
+                continue
+            for index, (x, y) in enumerate(enemy['positions']):
+                pack = enemy.get('composition') if 'class' not in enemy else None
+                token = pack[index] if pack else enemy['class']
+                carried = (enemy['inventory_by_class'][token] if pack else
+                           [it.get('fe_base') or it['id'] for it in enemy.get('inventory', [])
+                            if not it.get('is_key_item')])
+                ai = enemy_ai_bytes(where, enemy, index)
+                waves.setdefault(turn, []).append({
+                    'class': classes[inject.class_ids.vanilla_class_enum(token)], 'x': x, 'y': y,
+                    'ai1': ai[0], 'ai2': ai[1],
+                    'items': [items[inject.decomp.ITEM_ENUM[n]] for n in carried]})
+    return [{'turn': t, 'units': us} for t, us in sorted(waves.items())]
+
+
 def chapter_enemy_groups(chap):
     """Our force split by battlefield role (#171): line (turn-1 must-kill), reinforcements
     (arriving after turn 1, `inject.raw_pids.entry_arrival_turn`), convertibles

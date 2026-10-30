@@ -332,7 +332,8 @@ WANTED = [
     'GetItemCost',              # price per use x uses: the party's worth sums it (bmitem.c)
     'GetItemMaxUses',           # an item's full uses (bmitem.c)
     'GetClassData',             # a class's struct: costs, MOV, attributes (bmunit.c)
-    'gpAi1Table',               # AI1 scripts by ai1 index: a looter's holds AI_CMD_PILLAGE
+    'gpAi1Table',               # AI scripts by index (cp_data.c): a looter's holds
+    'gpAi2Table',               # AI_CMD_PILLAGE (vanilla's are AI2 0x04/0x05)
     'CanUnitUseWeaponNow',      # the weapons the Attack command lists (bmitem.c)
     'MakeTargetListForWeapon',  # that weapon's targets: units not allied, and walls (bmtarget.c)
     'AttackCommandUsability',   # Attack: a weapon above with a target (bmmenu.c; the clear loop)

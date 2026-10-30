@@ -702,10 +702,11 @@ function M.eventOrder(turn)
     end
     return out
 end
--- Whether AI1 script `ai1` loots (AiScriptCmd_10_DoLooting): gpAi1Table[0][ai1] holds
--- AI_CMD_PILLAGE before the GOTO that loops it. `scripts` = gpAi1Table's address.
-function M.loots(mem, scripts, ai1)
-    local at = mem.u32(mem.u32(scripts) + ai1 * 4)
+-- Whether AI script `index` loots (AiScriptCmd_10_DoLooting): table[0][index] holds
+-- AI_CMD_PILLAGE before the GOTO that loops it. `scripts` = gpAi1Table's or gpAi2Table's
+-- address (cp_data.c: vanilla's looters are AI2 0x04 and 0x05, PillageThen*).
+function M.loots(mem, scripts, index)
+    local at = mem.u32(mem.u32(scripts) + index * 4)
     for i = 0, M.AI_SCR_MAX - 1 do
         local cmd = mem.u8(at + i * M.AI_SCR_SIZE)
         if cmd == M.AI_CMD_PILLAGE then return true end
@@ -1337,8 +1338,8 @@ function M.new(outer)
     -- The field's red units play k enemy phases forward with the game's own AI (aiDecide, as
     -- enemyPhase plays one), our units held where they stand: a looter's decision is
     -- AI_ACTION_PILLAGE on the tile, and each unit is stood where it decided to go. A wave not
-    -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, items = {ids} } } } }, the
-    -- guide's reinforcements resolved) loots when its AI1 script does (M.loots), chests too
+    -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, ai2, items = {ids} } } } },
+    -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
     -- as its moves reach the tile (M.waveCloses). Read once per board.
     function s.closings(k, waves)
@@ -1385,6 +1386,7 @@ function M.new(outer)
                         local items = {}
                         for _, id in ipairs(wu.items or {}) do items[#items + 1] = { id = id } end
                         local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
+                            or M.loots(mem, S.gpAi2Table, wu.ai2)
                         local chests = villages
                             and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES))
                         for _, t in pairs(open) do
