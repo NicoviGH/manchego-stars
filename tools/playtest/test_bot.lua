@@ -2472,6 +2472,65 @@ do
           "surprise: the game still offers it, play on")
 end
 
+-- test_planner_pays_a_green_units_death: X kills green G next phase unless A stands on (1,0),
+-- which costs A ground toward its goal. A green unit lost spoils the clear (botrun), so careful
+-- gives up the ground: A blocks, and the plan predicts G's phase with it there.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 20, [1] = 40 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    check(at(a), "1,0", "planner: careful blocks for a green unit")
+    local g
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x30 then g = p end
+    end
+    check(g and g.green and g.die, 0, "planner: the green unit's phase is predicted")
+end
+
+-- test_a_talker_is_sent_to_its_recruit: T (green) is far off and A is the only unit the game
+-- lets Talk to it. A is sent to T's tile, not to the nearest enemy, and marches on it.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local C = blue(0x02, 1, 4, 1, { minRange = false })
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local E = red(0x81, 9, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 4, 0 }, { 3, 0 }, { 5, 0 }),
+                  [0x02] = tiles({ 4, 1 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        field = function(goal)
+            local f = {}
+            for y = 0, 9 do
+                f[y] = {}
+                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+            end
+            return f
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, T, E), sightOf(o), style("careful"))
+    local sent, moved
+    for _, g in ipairs(plan and plan.goals or {}) do
+        if g.id == 0x01 then sent = g.x .. "," .. g.y end
+    end
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x01 then moved = at(a) end
+    end
+    check(sent, "0,0", "talker: sent to its recruit")
+    check(moved, "3,0", "talker: marches on it")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

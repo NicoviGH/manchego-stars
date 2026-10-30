@@ -754,8 +754,8 @@ local function bestAttack(ctx, u, gate, only)
     return best
 end
 
--- Where the march heads: the village or chest the unit is sent to (exploring, below), else the
--- objective's tile, the boss, or the nearest enemy; nil = hold.
+-- Where the march heads: the recruit, village or chest the unit is sent to (exploring, below),
+-- else the objective's tile, the boss, or the nearest enemy; nil = hold.
 -- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
 -- than the fog shows, so it pushes the fog back.
 local function goalFor(ctx, u, objective)
@@ -884,6 +884,20 @@ local function talkFrom(ctx, u, t, gate)
     return nil
 end
 
+-- Of the units able to act that the game lets Talk to `t` (and `by` names, when given), the
+-- nearest it by the field from `t`; nil when none. -> talker, the field
+local function nearestTalker(ctx, t, by)
+    local field, near, nearD = fieldFor(ctx, t), nil, nil
+    for _, u in ipairs(ctx.actors) do
+        if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
+            local d = field and field[u.y] and field[u.y][u.x]
+                      or manhattan(u.x, u.y, t.x, t.y) + OFFFIELD
+            if not nearD or d < nearD then near, nearD = u, d end
+        end
+    end
+    return near, field
+end
+
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
 -- none) talks the recruit over when it can reach it, else the nearest such talker (by the
 -- field from the recruit) marches on it.
@@ -891,16 +905,13 @@ local function recruitFirst(ctx, gate)
     for _, c in ipairs(ctx.style.recruits or {}) do
         for _, t in ipairs(ctx.onField) do
             if t.faction ~= "blue" and listed(c.units, t.charId) then
-                local field, near, nearD = fieldFor(ctx, t), nil, nil
                 for _, u in ipairs(ctx.actors) do
-                    if (not c.by or listed(c.by, u.charId)) and talks(ctx, u, t) then
+                    if not c.by or listed(c.by, u.charId) then
                         local a = talkFrom(ctx, u, t, gate)
                         if a then return a end
-                        local d = field and field[u.y] and field[u.y][u.x]
-                                  or manhattan(u.x, u.y, t.x, t.y) + OFFFIELD
-                        if not nearD or d < nearD then near, nearD = u, d end
                     end
                 end
+                local near, field = nearestTalker(ctx, t, c.by)
                 if near then
                     local allowed = {}
                     for _, tile in ipairs(waitTiles(ctx, near)) do
@@ -1197,7 +1208,8 @@ end
 -- every village and opens every chest it can): each village or chest still open
 -- (sight.explorable) sends one unit the game lets use it (sight.canExplore) marching to it, the
 -- nearest by the game's own field from the tile; each tile one unit, each unit one tile, the
--- nearest pair first. ctx.exploreGoal[unit id] = the tile, which goalFor reads.
+-- nearest pair first. A Talk recruit comes before them all (its nearest talker is sent to it).
+-- ctx.exploreGoal[unit id] = the tile, which goalFor reads.
 -- `sent` (the last plan's goals, { {id, x, y} }) is kept first: a unit sent to a tile keeps it
 -- while the tile is open and the unit can still reach and use it, acted this turn or not.
 -- Re-picking each decision handed ch02's (12,3) between two units, and no one reached it.
@@ -1219,6 +1231,17 @@ end
 
 local function exploring(ctx, sent)
     ctx.exploreGoal = {}
+    -- a Talk recruit before any village: its nearest talker marches on it, or the planner only
+    -- credits the Talk once a talker happens into reach (vanilla Ch2: Ross, killed on turn 2
+    -- while Eirika marched on the brigands)
+    for _, t in ipairs(ctx.onField) do
+        if t.faction ~= "blue" then
+            local near = nearestTalker(ctx, t)
+            if near and not ctx.exploreGoal[near.id] then
+                ctx.exploreGoal[near.id] = { x = t.x, y = t.y }
+            end
+        end
+    end
     if not ctx.sight.explorable then return end
     local pairs_, taken = {}, {}
     local function reaches(u, t)
