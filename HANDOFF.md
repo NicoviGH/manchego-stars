@@ -9,25 +9,22 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-29 (Claude, latest). **#510 step 9 PR E+F is MERGED (#548, dc5ed4b), and so is
-the unit-loss fix (#549, 96cf9d1).** main is clean; no branch is in flight. This session's results,
-numbers and open items are ONE #510 comment:
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6513563594>. The audit
-(complete) is <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
-Read **ADR 0376** (its "Lost" amendment), **0377** and **0379** first.
+Refreshed 2026-10-30 (Claude, latest). **Nicolas's sweep of the bot code is MERGED (#550,
+ef1dc4a).** main is clean, and no branch is in flight. The results, numbers and the next lever are
+one #510 comment: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6524301360>.
+Read **ADR 0380** (the sandbox halts in the BIOS instead of spinning) and ADR 0376 (its "Lost"
+amendment), 0377 and 0379.
+- Cost now, in CPU s: Manchego Stars ch01 clean t9 9.61 (was 13.56); vanilla Ch4 attempt 1
+  clean t5 19.83 (was 36.49). Both play the same games as before.
+- **NEXT: ask Nicolas** whether the next lever is in scope. Lua is now about half of a ch01 run,
+  and about half of that is the harness's per-frame UI observation (`observeController`) during
+  act waits and boot. That is harness controller code, outside the sweep's scope. Otherwise,
+  pick up the planner's open items below (parts B-D).
+- The previous session's results are on #510 too:
+  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6513563594>. The audit is
+  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
 
-**NEXT SESSION: Nicolas's sweep (2026-10-29), "nice and lean and efficient and follows best
-practices".**
-- Scope: `bot.lua`, `planner.lua`, `sight.lua`, `board.lua`, `botrun.lua`, `campaign.lua` and
-  the harness's bot api.
-- Still to fold: the breakpoint pattern in `M.played` and `M.talks` (drops and thefts already
-  use `INSPECT.breakWhile`).
-- Report CPU s before and after. Baselines at 96cf9d1 [ROM]: Manchego Stars ch01 clean t9,
-  13.47; vanilla Ch4 clean t5, 28.6; vanilla Ch6 clean t7, 39.8.
-- Branch off main, then `/code-review <PR> medium` in a subagent and `review-to-clean`. Merge is
-  pre-approved for #510 step 9 PRs once the review is clean and CI is green on HEAD.
-
-**Open (detail on the comment above; raise with Nicolas, don't patch):**
+**Open (detail on the 2026-10-29 comment above; raise with Nicolas, don't patch):**
 - From New Game (seed 1), vanilla Ch2 has no clean clear in any style: Ross dies on turn 2-3.
   This is part D (Talk recruits as goals). Until it is fixed, the vanilla store can't be
   re-saved past Ch2.
