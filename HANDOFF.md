@@ -10,28 +10,43 @@ live in GitHub issues. Before a context rollover, warn Nicolas, refresh this fil
 fresh instance — don't rely on auto-compaction.
 
 Refreshed 2026-10-30 (Claude, latest). **Nicolas's sweep of the bot code is MERGED (#550,
-ef1dc4a).** main is clean, and no branch is in flight. The results, numbers and the next lever are
-one #510 comment: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6524301360>.
-Read **ADR 0380** (the sandbox halts in the BIOS instead of spinning) and ADR 0376 (its "Lost"
+ef1dc4a). Speed is settled for now** (Nicolas, 2026-10-30: "we're fine with speed for now; if it's
+an issue later we'll dig further"). main is clean and no branch is in flight. Results and numbers
+are on #510: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6524301360>.
+Read **ADR 0380** (the sandbox halts in the BIOS instead of spinning), plus 0376 (its "Lost"
 amendment), 0377 and 0379.
-- Cost now, in CPU s: Manchego Stars ch01 clean t9 9.61 (was 13.56); vanilla Ch4 attempt 1
+- **Cost now, in CPU s:** Manchego Stars ch01 clean t9 9.61 (was 13.56); vanilla Ch4 attempt 1
   clean t5 19.83 (was 36.49). Both play the same games as before.
-- **NEXT: ask Nicolas** whether the next lever is in scope. Lua is now about half of a ch01 run,
-  and about half of that is the harness's per-frame UI observation (`observeController`) during
-  act waits and boot. That is harness controller code, outside the sweep's scope. Otherwise,
-  pick up the planner's open items below (parts B-D).
-- The previous session's results are on #510 too:
-  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6513563594>. The audit is
+- **If speed comes back:** the next lever is the harness's per-frame UI observation
+  (`observeController`, about a quarter of a ch01 run's CPU), during `awaitActed` waits and boot.
+  Not started on purpose.
+- **The previous sessions' results are on #510 too:** step 9 E+F,
+  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6513563594>, and the audit,
   <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
 
-**Open (detail on the 2026-10-29 comment above; raise with Nicolas, don't patch):**
-- From New Game (seed 1), vanilla Ch2 has no clean clear in any style: Ross dies on turn 2-3.
-  This is part D (Talk recruits as goals). Until it is fixed, the vanilla store can't be
-  re-saved past Ch2.
-- Vanilla Ch5 is never clean. Ch6 was reached only through an uncommitted probe.
-- Manchego Stars ch03 is won but not clean: two units lost to the boss on plans judging 0.88-0.89
-  death.
-- Forced fog stalls on the last hidden red unit. This is part C.
+**NEXT SESSION: the planner's open items (#510 step 9 parts B-D).** These were left as "raise with
+Nicolas, don't patch", so open with them and agree an order before building. Recommended order:
+1. **Vanilla Ch2: Talk recruits as goals, which protect the recruit (part D).** From New Game
+   (seed 1), Ch2 has no clean clear in any of its 6 styles, because Ross is killed on turn 2-3.
+   It goes first because it BLOCKS the vanilla store: no start past Ch2 can be re-saved until a
+   clean Ch2 exists. The old Ch2 start is still clean (bold, no claims: attempt 5), so compare
+   the two starts.
+2. **Vanilla Ch5 is never clean:** the recruit 0x20 is missed. This is probably the same Talk
+   goal. Ch6 was reached only through an uncommitted probe, and Ch5x follows Ch5 (ADR 0376).
+3. **Manchego Stars ch03 is won t12 but not clean:** two units are lost to the boss on plans
+   judging 0.88-0.89 death. This is a design question for Nicolas (look-ahead vs a sampled
+   rollout; see "Ours bold loses units to the Mogall" below), not a patch.
+4. **Forced fog stalls on the last hidden red unit** (part C, decided behaviour 17). Real Ch6
+   does not hit it.
+- The older "Still owed" list further down (ours ch02 (1,12) `left_open`, convoy before buying,
+  promote at 10, claims as goal/weight terms) is still open. Fold it into the same conversation.
+
+**Lessons from this session (tooling):**
+- `print()` from a scenario goes nowhere headless: write a file under /tmp instead.
+- A Lua `debug.sethook` covers only the thread it is set on: hook `coroutine.create` too, or the
+  bot's own code (it runs in the scenario coroutine) is never sampled.
+- An overnight background run can take hours of wall time for seconds of CPU (the Mac throttles
+  it). Read `cpu_s`, not wall time, and don't mistake that for a hang.
 
 **Running a chapter alone:**
 1. `campaign_env.py vanilla --id e1-vanilla-ch3 --from N` (the store has 0-4 and 6; 6 is Ch5,
