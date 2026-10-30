@@ -9,44 +9,74 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **Nicolas's sweep of the bot code is MERGED (#550,
-ef1dc4a). Speed is settled for now** (Nicolas, 2026-10-30: "we're fine with speed for now; if it's
-an issue later we'll dig further"). main is clean and no branch is in flight. Results and numbers
-are on #510: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6524301360>.
-Read **ADR 0380** (the sandbox halts in the BIOS instead of spinning), plus 0376 (its "Lost"
-amendment), 0377 and 0379.
-- **Cost now, in CPU s:** Manchego Stars ch01 clean t9 9.61 (was 13.56); vanilla Ch4 attempt 1
-  clean t5 19.83 (was 36.49). Both play the same games as before.
-- **If speed comes back:** the next lever is the harness's per-frame UI observation
-  (`observeController`, about a quarter of a ch01 run's CPU), during `awaitActed` waits and boot.
-  Not started on purpose.
-- **The previous sessions' results are on #510 too:** step 9 E+F,
-  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6513563594>, and the audit,
-  <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6504714008>.
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9 part D (Talk recruits as goals) is built on
+the local branch `feat/510-talk-recruit-goals` (f470a8f, NOT pushed, no PR), and it is blocked by a
+vanilla Ch3 crash it exposes.** Nicolas picked part D first of the planner's open items. Speed is
+settled for now (#550 merged; Nicolas: "we're fine with speed for now"). Read **ADR 0381** (on the
+branch) and 0376/0380.
 
-**NEXT SESSION: the planner's open items (#510 step 9 parts B-D).** These were left as "raise with
-Nicolas, don't patch", so open with them and agree an order before building. Recommended order:
-1. **Vanilla Ch2: Talk recruits as goals, which protect the recruit (part D).** From New Game
-   (seed 1), Ch2 has no clean clear in any of its 6 styles, because Ross is killed on turn 2-3.
-   It goes first because it BLOCKS the vanilla store: no start past Ch2 can be re-saved until a
-   clean Ch2 exists. The old Ch2 start is still clean (bold, no claims: attempt 5), so compare
-   the two starts.
-2. **Vanilla Ch5 is never clean:** the recruit 0x20 is missed. This is probably the same Talk
-   goal. Ch6 was reached only through an uncommitted probe, and Ch5x follows Ch5 (ADR 0376).
-3. **Manchego Stars ch03 is won t12 but not clean:** two units are lost to the boss on plans
-   judging 0.88-0.89 death. This is a design question for Nicolas (look-ahead vs a sampled
-   rollout; see "Ours bold loses units to the Mogall" below), not a patch.
-4. **Forced fog stalls on the last hidden red unit** (part C, decided behaviour 17). Real Ch6
-   does not hit it.
-- The older "Still owed" list further down (ours ch02 (1,12) `left_open`, convoy before buying,
-  promote at 10, claims as goal/weight terms) is still open. Fold it into the same conversation.
+**What the branch does (ADR 0381):**
+- A Talk recruit is its nearest talker's march goal, before any village or chest (`exploring` in
+  bot.lua; `nearestTalker` is shared with the recruit claim's rule).
+- The planner's judge pays each green unit's chance to die at `W.death` (planner.lua `greens`);
+  botrun's clean clear already counted a green death as a loss.
+- Two unit tests in test_bot.lua, each proven to fail without its half.
+
+**Measured (CPU s are user time):**
+| Run | Result |
+|---|---|
+| Vanilla Ch2 from New Game, main | no clean clear in 6 styles (Ross killed t2-3) |
+| Vanilla Ch2, branch | clean at attempt 2 (Eirika talks Ross t5, Ross talks Garcia t6), 22 s |
+| Goal only / judge only | goal only clears (same frames); judge only fails all 6 |
+| Vanilla Ch4, ours ch01 | unchanged: clean t5 / clean t9 |
+| Vanilla Ch5 | still never clean (recruit 0x20 missed): the goal does NOT fix it |
+| **Vanilla Ch3, branch** | **attempt 1 (bold) CRASHES t8: "the harness could not perform talk"**; main clears clean at attempt 2 |
+
+**NEXT SESSION: debug the Ch3 Talk crash (use superpowers:systematic-debugging), then review and
+PR the branch.** `git switch feat/510-talk-recruit-goals` first.
+- **Reproduce (13 CPU s, deterministic):** back up `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3`
+  (a run re-saves starts); `campaign_env.py vanilla --id e1-vanilla-ch3 --from 3`, set `last: [3]`,
+  `PT_VANILLA=1 PT_RUN_TAG=v3 PT_CAMPAIGN=... tools/playtest/run.sh campaign`. Restore the store after.
+- **What happens:** the plan KEEPS `0x08 (Neimi) talk @6,8` (target Colm, uid 0x41 at 6,9) after
+  `0x02 attack @13,1`. Menu, Talk and target select all pass; `confirm_target` (harness.lua
+  `chooseTalk`, 600-frame budget) fails its postcondition (`dialogue_wait`). The event is
+  `EventScr_Ch3_Talk_NeimiColm` (MUSS, STAL 33, TEXTSHOW 0x99a). On main the same Talk passes in
+  78 frames (turn 9, freshly planned, not kept).
+- **Established by probe runs (all reverted):**
+  - Not slow: with a 5000-frame budget it still fails.
+  - The game is not frozen: OnMain and OnVBlank run every frame, the clock ticks, the CPU waits in
+    the BIOS normally.
+  - At the failure: tree 3 is intact (TalkSkipListener > Talk > EventEngine > GameControl), no
+    lock, no `gProcScr_TalkFaceMove` anywhere in the pool. Faces are loaded (gFaces 0 = 0x0A
+    Neimi, 1 = 0x0C Colm; talk slots 1 and 4), the bubble is correct, `str` sits on "C-Colm"
+    with `putLines` 0, print delay 0. Before the Talk, `sTalkState->faces[1]` held a stale pointer
+    from an earlier talk.
+  - **The moment guardedInput's wait loop gave up, the text printed and reached
+    `gProcScr_TalkWaitForInput` within 3 frames.** So something in the harness's handling holds
+    the Talk while the driver waits.
+  - Two probes replacing the guardedInput call (press A then 150 blind frames; press A then
+    observe every frame) did not even register the A press (still `target_selection`). Unexplained:
+    those probes differ from guardedInput only in how they press and observe, which should not matter.
+- **Leads, untested:** (1) the kept act: botrun asks `sight.legal` (a sandbox call, loaded back)
+  before playing a kept act; on main the Talk was freshly planned. Compare the sandbox calls made
+  right before the two Talks. (2) The `PROCS.stamp()` memo of `controllerState` (#550) or the
+  write guard. (3) What exactly differs between guardedInput's press/observe and the probes'.
+- Probe addresses (vanilla): `sTalkState` ptr at 0x0859133C, `gFaces` 0x03004980, `sProcArray`
+  0x02024E68 (64 x 0x6C), `gProcTreeRootArray` 0x02026A70, `GetGameClock` 0x08000D28.
+- **After the fix:** rerun vanilla Ch2 (`--id d1-ross --from 2`, the New Game Ch2 start), Ch3,
+  Ch4 and ours ch01; then `/code-review <PR> medium` in a subagent; Nicolas merges.
+- **Then the rest of the open items, in the agreed order:** vanilla Ch5's recruit 0x20 (not the
+  march goal; read why), ours ch03's boss losses (Nicolas's design call: look-ahead vs a sampled
+  rollout), the forced-fog stall (part C). The older "Still owed" list below is still open.
+- Not posted on #510 yet: the findings above go on the issue once the crash is understood.
 
 **Lessons from this session (tooling):**
-- `print()` from a scenario goes nowhere headless: write a file under /tmp instead.
-- A Lua `debug.sethook` covers only the thread it is set on: hook `coroutine.create` too, or the
-  bot's own code (it runs in the scenario coroutine) is never sampled.
+- A probe in `chooseTalk` is the cheapest way in: 13 s a run. Edit harness.lua with a script that
+  asserts its anchor matched, keep a copy of the original, and restore it after every run.
+- An ablation (one half of a change switched off) costs one run and says which half did the work.
+- `print()` from a scenario goes nowhere headless: write to the log (`log(...)`) or a file under /tmp.
 - An overnight background run can take hours of wall time for seconds of CPU (the Mac throttles
-  it). Read `cpu_s`, not wall time, and don't mistake that for a hang.
+  it). Read `cpu_s`, not wall time.
 
 **Running a chapter alone:**
 1. `campaign_env.py vanilla --id e1-vanilla-ch3 --from N` (the store has 0-4 and 6; 6 is Ch5,
