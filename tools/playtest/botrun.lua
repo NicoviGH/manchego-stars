@@ -51,6 +51,13 @@
 --                      phase in order: { { id, charId, from = {x, y}, to = {x, y}, hp,
 --                      act (Board.ACTIONS' name), targetId, tile (a pillaged village or chest),
 --                      battles = { Board.battle... } } }
+--   killed()           each unit the game killed since the last call (Board.fate, what
+--                      UnitKill writes): { { id, charId, faction, killer|nil, turn|nil,
+--                      phase|nil (when it fell: "player" | "enemy") } }, and each
+--                      unit the watch could not read as { fault, id, charId, faction }. The
+--                      only word on a blue or green loss: a unit gone from the field without
+--                      one was unloaded by a script (a chapter's ending), or escaped, never
+--                      killed
 --   battle()           OPTIONAL: Board.battle, the last real battle as the game rolled it
 --   bag()              OPTIONAL: each full-inventory answer since the last call: { charId,
 --                      item (the new one), sent (the item that went: to the convoy, or
@@ -216,7 +223,9 @@ end
 --   dropMissed()       the drop watch's faults: each chest a thief emptied whose thief then
 --                      fell to one of ours with no drop of that item caught. popup.c marks the
 --                      thief US_DROP_ITEM, so the game gave it: the watch missed it.
---                      { kind = "drop_missed", x, y, thief, item }
+--                      { kind = "drop_missed", x, y, thief, item }; the record's
+--                      `watch_faults` adds the death watch's, { kind = "death_unread", why,
+--                      charId, faction, turn, phase }
 --   missing()          the clean clear's rewards part: each tile not taken, { x, y, kind,
 --                      why = its status, closed_by }. Taken = visited, or a chest whose
 --                      thief the game then made drop that chest's item to one of ours
@@ -405,12 +414,28 @@ function M.run(api)
 
     -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
     -- given only if its three green villagers live), so both are deaths; a red one is a kill.
+    -- A blue or green death is one the game ran UnitKill on (api.killed); `list`, the board's
+    -- falls, gives the red kills and a killer where the watch saw no fight. A slot the watch
+    -- could not read is a watch fault, never a guess.
+    local deathFaults = {}
     local function record(list, phase)
+        local seen = {}
+        for _, d in ipairs(list) do seen[d.id] = d end
+        for _, k in ipairs(api.killed()) do
+            if k.fault then
+                deathFaults[#deathFaults + 1] = { kind = "death_unread", why = k.fault,
+                                                  charId = k.charId, faction = k.faction,
+                                                  turn = turn, phase = phase }
+            elseif k.faction == "blue" or k.faction == "green" then
+                local d = seen[k.id] or {}
+                rec.deaths[#rec.deaths + 1] = { charId = k.charId, faction = k.faction,
+                                                turn = k.turn or turn, killer = k.killer or d.killer,
+                                                phase = k.phase or phase }
+            end
+        end
+        -- a red one gone with the fighter that downed it: that fighter's kill
         for _, d in ipairs(list) do
-            if d.faction == "blue" or d.faction == "green" then
-                rec.deaths[#rec.deaths + 1] = { charId = d.charId, faction = d.faction, turn = turn,
-                                                killer = d.killer, phase = phase }
-            elseif d.killer then
+            if d.faction == "red" and d.killer then
                 local k = tostring(d.killer)
                 rec.kills[k] = (rec.kills[k] or 0) + 1
                 if d.ours then explore.fell(d.charId) end
@@ -463,6 +488,7 @@ function M.run(api)
             for _, f in ipairs(explore.leftOpen()) do rec.bot_faults[#rec.bot_faults + 1] = f end
         end
         rec.watch_faults = explore.dropMissed()
+        for _, f in ipairs(deathFaults) do rec.watch_faults[#rec.watch_faults + 1] = f end
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
         trace({ t = "end", record = rec })
         api.emit(M.PREFIX .. Json.encode(rec))
@@ -590,6 +616,7 @@ function M.run(api)
                     explore.failed(action, turn)
                 end
                 if done == false then
+                    record({}, "player")   -- the deaths the act caused before it failed
                     return "crashed", "the harness could not perform " .. action.act
                         .. (why and (": " .. why) or "")
                 end
@@ -657,14 +684,14 @@ function M.run(api)
             for _, d in ipairs(deaths or {}) do
                 api.log(string.format("plan: died 0x%02X to 0x%02X", d.charId or 0, d.killer or 0))
             end
-            record(deaths or {}, "enemy")
-            -- A unit seen on the field before the phase and dead after it, that the watcher
-            -- missed -- read before any return, so a lost run carries every death.
-            local counted = {}
-            for _, d in ipairs(deaths or {}) do counted[d.id] = true end
+            -- the watcher's falls and any it missed, read before any return so a lost run
+            -- carries every death; record keeps the blue and green ones the game killed
+            local all, counted = {}, {}
+            for _, d in ipairs(deaths or {}) do all[#all + 1] = d; counted[d.id] = true end
             for _, d in ipairs(fallen(before, api.board(), nil)) do
-                if not counted[d.id] then record({ d }, "enemy") end
+                if not counted[d.id] then all[#all + 1] = d end
             end
+            record(all, "enemy")
             if phase == "gameover" then return "lost", "game over in the enemy phase" end
             if phase == "ended" then
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end

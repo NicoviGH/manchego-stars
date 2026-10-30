@@ -3033,10 +3033,15 @@ INSPECT.attackRange = function(u)
 end
 INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(), u) end
 
--- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
--- for the phase's length that watches every faction's array (lean) -- a green unit lost spoils
--- the clear as a blue one does (ADR 0376) -- and, the frame one goes down, reads who is
--- fighting: gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
+-- Every unit the game kills while an act or an enemy phase plays, with the fighter it fell to:
+-- a frame callback that watches every faction's array (lean) -- a green unit lost spoils the
+-- clear as a blue one does (ADR 0376) -- and, the frame one goes, reads what the game wrote to
+-- its slot (Board.fate) and, in a fight, who killed it (Board.killer). Read each frame rather
+-- than caught at UnitKill's entry: a breakpoint held through every act and phase cost 56% more
+-- CPU (Manchego Stars ch01, 20.4 CPU s against 13.1), and arming it per caller would have to
+-- list every proc that can kill.
+-- -> stop() -> { id, charId, faction, killer, ours } per kill, and per slot the watch could not
+-- read ({ fault = "replaced", id, charId, faction }: freed and reloaded within a frame).
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
     for _, f in ipairs(BOARD.FACTIONS) do
@@ -3044,20 +3049,22 @@ INSPECT.watchDeaths = function()
             if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f.name } end
         end
     end
-    local function charOf(bu) return ru8(ru32(bu) + 4) end
     local id = callbacks:add("frame", function()
         for uid, who in pairs(alive) do
-            local addr = ru32(SYM.gUnitLookup + uid * 4)
-            if addr == 0 or ru8(addr + 0x13) == 0 or (ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0 then
-                local by
-                if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
-                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
-                -- ours: the killer's unit index is a blue one (FACTION_MASK bits 0)
+            local fate = BOARD.fate(ru32(SYM.gUnitLookup + uid * 4), who)
+            if fate == "killed" then
+                -- turn and phase when it fell (a phase start's poison tick is the next phase's)
+                local killer, ours = BOARD.killer(uid, procActive(SYM.sProcScr_CombatAction))
+                local now = BOARD.header()
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
-                                        killer = by and charOf(by),
-                                        ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0 }
-                alive[uid] = nil
+                                        killer = killer, ours = ours == true,
+                                        turn = now.turn,
+                                        phase = now.phase == "blue" and "player" or "enemy" }
+            elseif fate == "replaced" then
+                deaths[#deaths + 1] = { fault = fate, id = uid, charId = who.charId,
+                                        faction = who.faction }
             end
+            if fate then alive[uid] = nil end
         end
     end)
     return function() callbacks:remove(id); return deaths end
@@ -3208,7 +3215,7 @@ INSPECT.botApi = function(game)
         list.seen = #list
         return out
     end
-    local dropLog, theftLog = {}, {}
+    local dropLog, theftLog, killLog = {}, {}, {}
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
@@ -3270,6 +3277,9 @@ INSPECT.botApi = function(game)
         -- every drop the game gave one of ours since the last call (INSPECT.watchDrops, kept
         -- while an act or an enemy phase plays: the only times a battle resolves)
         drops = function() return unread(dropLog) end,
+        -- every unit the game killed since the last call (INSPECT.watchDeaths, through each
+        -- act and enemy phase)
+        killed = function() return unread(killLog) end,
         -- every theft an AI unit made since the last call (INSPECT.watchThefts), each with
         -- its item's rank and whether it spoils the clean clear (Sight.stealRanks, ADR 0379)
         thefts = function()
@@ -3369,24 +3379,33 @@ INSPECT.botApi = function(game)
         local phaseTurn = turn()
         local stop, stopActs = INSPECT.watchDeaths(), INSPECT.watchEnemyActs()
         local phase = runEnemyPhase(nil, won, phaseTurn)
-        local deaths, acts = stop(), stopActs()
+        local acts = stopActs()
+        -- the next phase's start still kills (a poison tick, a turn event): watched through
+        -- its settle too
         if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
-        return phase, deaths, acts
+        local deaths = stop()
+        for _, d in ipairs(deaths) do killLog[#killLog + 1] = d end
+        local fell = {}
+        for _, d in ipairs(deaths) do if not d.fault then fell[#fell + 1] = d end end
+        return phase, fell, acts
     end
     -- An act and an enemy phase play with the drop and theft watches on, their catches kept
-    -- in dropLog and theftLog.
-    local function watched(fn)
+    -- in dropLog and theftLog; an act also with the death watch (endPhase runs its own), its
+    -- catches in killLog.
+    local function watched(fn, deaths)
         return function(...)
             local stopDrops = INSPECT.watchDrops(sightApi.cpu)
             local stopThefts = INSPECT.watchThefts(sightApi.cpu)
+            local stopDeaths = deaths and INSPECT.watchDeaths()
             local out = table.pack(pcall(fn, ...))
             for _, d in ipairs(stopDrops()) do dropLog[#dropLog + 1] = d end
             for _, t in ipairs(stopThefts()) do theftLog[#theftLog + 1] = t end
+            for _, k in ipairs(stopDeaths and stopDeaths() or {}) do killLog[#killLog + 1] = k end
             if not out[1] then error(out[2], 0) end
             return table.unpack(out, 2, out.n)
         end
     end
-    api.act, api.endPhase = watched(api.act), watched(api.endPhase)
+    api.act, api.endPhase = watched(api.act, true), watched(api.endPhase)
     return api
 end
 
@@ -3754,6 +3773,8 @@ INSPECT.campaignApi = function(game)
         -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
         -- it, rather than replaying every chapter before it. The state holds the game's RNG,
         -- and its record the team the campaign carried in, so the pick is the campaign's own.
+        -- A record saved before it kept that team resumes with none, said in the chapter's
+        -- line (carried_unknown): its pick may not be the campaign's.
         if played == nil and cfg.from then
             local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
             if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
@@ -3763,14 +3784,15 @@ INSPECT.campaignApi = function(game)
             if not f then return nil, string.format("no start record for chapter %d in %s", cfg.from, dir) end
             local saved = Json.decode(f:read("a"))
             f:close()
-            if saved.carried == nil then
-                return nil, string.format("chapter %d's start record predates the carried team; "
-                    .. "re-save it with a campaign run", cfg.from)
-            end
             wait(2)
             played = cfg.from
             log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
-            return { chapter = played, carried = saved.carried }
+            if saved.carried == nil then
+                log(string.format("campaign: WARNING chapter %d's start record predates the "
+                    .. "carried team; it resumes with none", played))
+            end
+            return { chapter = played, carried = saved.carried or {},
+                     carriedUnknown = saved.carried == nil }
         end
         local stalled = INSPECT.watch("arrive")
         for _ = 1, TUNE.bootSteps do

@@ -47,10 +47,12 @@
 --   seed(chapter)         restart random()'s draws for this chapter start, from (seed, chapter)
 --   arrive(route)         ride the game to the next chapter's start; at a route split the
 --                         harness calls route(options) -> index. Returns { chapter = n,
---                         carried = {charIds}|nil (a resumed start: the team carried in) } |
+--                         carried = {charIds}|nil (a resumed start: the team carried in),
+--                         carriedUnknown = true|nil (a start saved before records kept it) } |
 --                         "end" | nil, why
 --   save(chapter, carried) write the chapter-start state, what the game gave (party, gold,
---                         items) and the carried team (charIds); true | nil, why
+--                         items) and the carried team (charIds; nil = unknown, left out of the
+--                         record); true | nil, why
 --   load(chapter)         load that state back; true | nil, why
 --   roster()              bot.lua's roster entries: every unit the player could field this
 --                         chapter, in slot order, each with its classId
@@ -208,14 +210,19 @@ function M.run(api)
                 for _, charId in ipairs(at.carried) do carried[charId] = true end
             end
             if not api.only then
-                local list = {}
-                for charId in pairs(carried) do list[#list + 1] = charId end
-                table.sort(list)
+                -- a team the start's record never kept stays unknown when it is saved again
+                local list
+                if not at.carriedUnknown then
+                    list = {}
+                    for charId in pairs(carried) do list[#list + 1] = charId end
+                    table.sort(list)
+                end
                 local ok, swhy = api.save(ch, list)
                 if not ok then return "crashed", "save: " .. tostring(swhy) end
             end
             local claims = api.claims(ch) or {}
-            local entry = { chapter = ch, attempts = 0, failures = {} }
+            local entry = { chapter = ch, attempts = 0, failures = {},
+                            carried_unknown = at.carriedUnknown or nil }
             chapters[#chapters + 1] = entry
             local cap, cwhy = api.cap()
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end

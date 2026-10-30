@@ -15,6 +15,15 @@ Decisions 1-4 of the #510 step 9 long-term design (#510 comment 6485197805, acce
 bot's intentions:** the chapter is won; no unit is lost, blue or green (vanilla Ch6 gives
 Eirika an Orion's Bolt only if its three green villagers live, `EventScr_Ch6_EndingScene`); every
 recruit the chapter owes joins; every village and chest the map offers is taken.
+- **Lost.** A unit the game killed: what `UnitKill` writes (`US_DEAD` on a blue unit; on any
+  other only the character pointer cleared, the class pointer kept), never a unit gone from the
+  board (amended 2026-10-29, Nicolas). `Board.fate` reads it. Not lost: a slot `ClearUnit`
+  zeroed (a chapter's ending unloads units this way: vanilla Ch6's three villagers and Ch5x's
+  0x42 vanished on the winning turn and were counted lost, so Ch6 could never clear clean), a
+  blue summon's death (`UNIT_IS_PHANTOM`), and an AI escape (`AiEscapeAction` clears the same
+  pointer without `UnitKill`). A slot freed and reloaded within one frame no longer says which
+  happened: a watch fault (`death_unread`), never a guess. [ROM] vanilla Ch6 clean t7; Ross,
+  killed in Ch2, is still lost.
 - **Owed recruits.** Both games alike, read from the game at the chapter's start (amended
   2026-10-29, audit finding 7): the target of each talk the game would run now
   (`sight.lua` `M.talks`: `SearchAvailableEvent` walks the chapter's `characterBasedEvents`, a

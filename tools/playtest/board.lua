@@ -392,13 +392,64 @@ Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] =
 Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, SLOT = 0x07 }
 -- AI_ACTION_*: what the AI chose. A theft (AiStartStealAction) and a village pillage
 -- (AiPillageAction) set no action type of their own.
-Board.AI_ACTION_COMBAT, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE = 1, 3, 4
+Board.AI_ACTION_COMBAT, Board.AI_ACTION_ESCAPE, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE =
+    1, 2, 3, 4
+
+-- What became of a unit the death watch saw on the field (`was` = { charId, faction }), read off
+-- what the game wrote to its slot at `addr` this frame; nil = it is still there.
+--   killed    UnitKill ran on it (bmunit.c), the one function every death runs (a fight, a
+--             hazard, a trap, an event's kill): US_DEAD on a blue unit; on any other only its
+--             character pointer cleared, the rest of the unit kept
+--   phantom   a blue summon's UnitKill (UNIT_IS_PHANTOM: only the pointer cleared), never a
+--             unit of ours
+--   escaped   AiEscapeAction (cp_perform.c) clears the same pointer without UnitKill: the unit
+--             is gActiveUnit with gAiDecision an escape
+--   unloaded  ClearUnit zeroed it, its class pointer too: a script removed it (a chapter
+--             ending's), nobody killed it
+--   replaced  another unit holds the slot: the slot was freed and reloaded within the frame,
+--             and what freed it can no longer be read
+function Board.fate(mem, SYM, addr, was)
+    if addr == 0 then return "unloaded" end
+    local chptr, clptr = mem.u32(addr), mem.u32(addr + 0x04)
+    if chptr == 0 and clptr == 0 then return "unloaded" end
+    if was.faction == "blue" and (mem.u32(addr + 0x0C) & Board.US_DEAD) ~= 0 then return "killed" end
+    if chptr == 0 then
+        if was.faction == "blue" then return "phantom" end
+        if mem.u32(SYM.gActiveUnit) == addr
+                and mem.u8(SYM.gAiDecision + Board.AI_DEC.ACTION) == Board.AI_ACTION_ESCAPE then
+            return "escaped"
+        end
+        return "killed"
+    end
+    if mem.u8(chptr + 0x04) ~= was.charId then return "replaced" end
+    return nil
+end
+
+-- A battle unit's (gBattleActor/gBattleTarget) unit index (+0x0B) and character (+0x00 ->
+-- +0x04): who fought, for Board.killer and battleSide.
+local function fighterOf(mem, b) return mem.u8(b + 0x0B), mem.u8(mem.u32(b) + 4) end
+
+-- Who killed unit index `uid`: the other fighter of the fight it fell in, read off
+-- gBattleActor/gBattleTarget (+0x0B the unit index, +0x00 the character) -> its charId and
+-- whether it is one of ours (a blue index), or nil. Only while a fight resolves (`fighting`):
+-- the battle structs keep the last fight's units, so a phase start's poison tick or an event's
+-- kill would otherwise be credited to it.
+function Board.killer(mem, SYM, uid, fighting)
+    if not fighting then return nil end
+    local by
+    if fighterOf(mem, SYM.gBattleActor) == uid then by = SYM.gBattleTarget
+    elseif fighterOf(mem, SYM.gBattleTarget) == uid then by = SYM.gBattleActor end
+    if not by then return nil end
+    local id, charId = fighterOf(mem, by)
+    return charId, (id & 0xC0) == 0
+end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
 local function battleSide(mem, b)
-    local exp, id = mem.s8(b + 0x6E), mem.u8(b + 0x0B)
-    return { id = id, charId = mem.u8(mem.u32(b) + 4),
+    local exp = mem.s8(b + 0x6E)
+    local id, charId = fighterOf(mem, b)
+    return { id = id, charId = charId,
              classId = mem.u32(b + 0x04) ~= 0 and mem.u8(mem.u32(b + 0x04) + 4) or nil,
              canCounter = mem.s8(b + 0x52) ~= 0,
              hpBefore = mem.s8(b + 0x72), hp = mem.u8(b + 0x13), weapon = mem.u16(b + 0x48) & 0xFF,
@@ -457,6 +508,8 @@ function Board.bind(mem, SYM)
         ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
         ACTION_PICK = Board.ACTION_PICK,
         AI_DEC = Board.AI_DEC, AI_ACTION_COMBAT = Board.AI_ACTION_COMBAT,
+        fate = function(addr, was) return Board.fate(mem, SYM, addr, was) end,
+        killer = function(uid, fighting) return Board.killer(mem, SYM, uid, fighting) end,
         AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
     }
 end

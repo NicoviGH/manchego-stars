@@ -52,7 +52,7 @@ local function fakeGame(o)
             if ch.options then g.routeAsked = route({ "a", "b" }) end
             if ch.arriveFails then return nil, "the world map never handed over" end
             g.attempt = 0
-            return { chapter = ch.id, carried = ch.carried }
+            return { chapter = ch.id, carried = ch.carried, carriedUnknown = ch.carriedUnknown }
         end,
         seed = function(ch) g.seeds[#g.seeds + 1] = ch; if o.seed then o.seed(ch) end end,
         save = function(ch, carried)
@@ -416,6 +416,18 @@ local function test_resume_plays_as_the_campaign()
           "and picks the campaign's team: the carried unit wins the tie")
 end
 test_resume_plays_as_the_campaign()
+
+-- A start saved before records kept the carried team resumes with none, and its chapter line
+-- says so: that pick may not be the campaign's.
+local function test_resume_without_a_carried_team_says_so()
+    local g = fakeGame({ cap = 2, chapters = { { id = 3, carried = {}, carriedUnknown = true } } })
+    Campaign.run(g.api)
+    check(lines(g)[1].carried_unknown, true, "the chapter line marks the team unknown")
+    check(#g.plays, 1, "and the chapter is played")
+    check(g.saved[1], 3, "the start is saved again")
+    check(g.carriedSaved[3], nil, "with its team still unknown, so the next resume says so too")
+end
+test_resume_without_a_carried_team_says_so()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)

@@ -488,6 +488,24 @@ class TestUnitStateBits(unittest.TestCase):
             self.assertEqual(1 << int(shift), decomp.get(name), name)
 
 
+class TestAiActionIds(unittest.TestCase):
+    def test_board_lua_ai_actions_are_the_decomps(self):
+        # board.lua names the AI's action ids it reads off gAiDecision (Board.fate tells an
+        # escape from a death by AI_ACTION_ESCAPE); a wrong id would read an escape as a kill.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        decomp = enum_values(vanilla_decomp_text('include/cp_common.h'), 'AI_ACTION_')
+        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        m = re.search(r'^(Board\.AI_ACTION_\w+(?:, Board\.AI_ACTION_\w+)*) =\s*([\d, ]+)$', text, re.M)
+        self.assertIsNotNone(m, 'board.lua names its AI_ACTION_* ids in one assignment')
+        names = [n.strip()[len('Board.'):] for n in m.group(1).split(',')]
+        values = [int(v) for v in m.group(2).split(',')]
+        self.assertEqual(len(names), len(values))
+        for name, value in zip(names, values):
+            self.assertEqual(value, decomp.get(name), name)
+
+
 class TestFullBagItems(unittest.TestCase):
     def test_bag_item_ids_are_the_decomps(self):
         # INSPECT.BAG names each key and passive item it lists (Bot.fullBag's kinds); a wrong id

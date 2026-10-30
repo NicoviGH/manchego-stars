@@ -21,6 +21,10 @@ local SYM = {
     gUnitArrayGreen = 0x0202BE4C + (62 + 50) * 0x48,
     gItemData = 0x08840B20,
     gBmMapSize = 0x0202E4D4,
+    gActiveUnit = 0x03004E50,
+    gBattleActor = 0x0203A4EC,
+    gBattleTarget = 0x0203A56C,
+    gAiDecision = 0x0203AA96,
 }
 
 local function fakeMem()
@@ -385,6 +389,57 @@ do
     check(b.hits[4].finishes, true, "the blow that finishes the fight")
     m.w8(S.gBattleTarget + 0x0B, 0); m.w8(S.gBattleTarget + 0x08, 0); m.w8(S.gBattleTarget + 0x70, 7)
     check(Board.battle(m, S).target.levelUp, false, "a wall (index 0) never levels, whatever +70 holds")
+end
+
+-- Board.fate: what the game wrote to a watched unit's slot. Each case is the decomp's own write:
+-- UnitKill (bmunit.c), AiEscapeAction (cp_perform.c), ClearUnit, a reload into a freed slot.
+do
+    local function at(slot) return SYM.gUnitArrayGreen + slot * 0x48 end
+    local m = fakeMem()
+    putUnit(m, SYM.gUnitArrayGreen, 0, { charId = 0x41 })
+    putUnit(m, SYM.gUnitArrayBlue, 0, { charId = 0x01 })
+    local green, blue = { charId = 0x41, faction = "green" }, { charId = 0x01, faction = "blue" }
+    check(Board.fate(m, SYM, at(0), green), nil, "fate: a unit still there")
+    m.w32(SYM.gUnitArrayBlue + 0x0C, Board.US_DEAD | Board.US_HIDDEN)
+    check(Board.fate(m, SYM, SYM.gUnitArrayBlue, blue), "killed", "fate: a blue UnitKill sets US_DEAD")
+    m.w32(SYM.gUnitArrayBlue + 0x0C, 0)
+    m.w32(SYM.gUnitArrayBlue, 0)
+    check(Board.fate(m, SYM, SYM.gUnitArrayBlue, blue), "phantom", "fate: a blue summon's UnitKill")
+    m.w32(at(0), 0)
+    check(Board.fate(m, SYM, at(0), green), "killed", "fate: UnitKill clears only the character")
+    m.w32(SYM.gActiveUnit, at(0))
+    m.w8(SYM.gAiDecision, Board.AI_ACTION_ESCAPE)
+    check(Board.fate(m, SYM, at(0), green), "escaped", "fate: AiEscapeAction is no death")
+    m.w8(SYM.gAiDecision, Board.AI_ACTION_COMBAT)
+    check(Board.fate(m, SYM, at(0), green), "killed", "fate: the active unit, not escaping, died")
+    m.w32(at(0) + 0x04, 0)
+    check(Board.fate(m, SYM, at(0), green), "unloaded", "fate: ClearUnit zeroes the class too")
+    putUnit(m, SYM.gUnitArrayGreen, 0, { charId = 0x42 })
+    check(Board.fate(m, SYM, at(0), green), "replaced", "fate: another unit in the slot")
+end
+
+-- Board.killer: the other fighter, only while a fight resolves. The battle structs keep the
+-- last fight's units after it, so outside one (a poison tick, an event's kill) nobody is credited.
+do
+    local m = fakeMem()
+    local ch = CHAR_BASE + 0x8E * 0x34
+    m.w8(ch + 0x04, 0x8E)
+    m.w8(SYM.gBattleActor + 0x0B, 0x81)       -- the enemy 0x8E attacked
+    m.w32(SYM.gBattleActor, ch)
+    m.w8(SYM.gBattleTarget + 0x0B, 0x45)      -- the green unit it fought
+    local killer, ours = Board.killer(m, SYM, 0x45, true)
+    check(killer, 0x8E, "killer: in a fight, the other fighter")
+    check(ours, false, "killer: an enemy index is not ours")
+    check(Board.killer(m, SYM, 0x45, false), nil, "killer: no fight, no killer (stale structs)")
+    check(Board.killer(m, SYM, 0x46, true), nil, "killer: a unit not in the fight")
+    -- the other side: the enemy that attacked dies to the blue unit it fought
+    local blueCh = CHAR_BASE + 0x01 * 0x34
+    m.w8(blueCh + 0x04, 0x01)
+    m.w8(SYM.gBattleTarget + 0x0B, 0x01)
+    m.w32(SYM.gBattleTarget, blueCh)
+    killer, ours = Board.killer(m, SYM, 0x81, true)
+    check(killer, 0x01, "killer: the actor fell, the target killed it")
+    check(ours, true, "killer: a blue index is ours")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
