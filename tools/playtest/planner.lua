@@ -9,15 +9,16 @@
 --   2. Search: a beam over which unit acts next and how. A partial plan is scored by expected
 --      values from the game's forecasts: damage dealt, the chance to kill, the counter's chance
 --      to kill our unit, HP healed, a recruit (an attack on one pays its death), ground gained
---      toward the goal -- less each moved
---      unit's standing exposure: its chance to die and the HP it loses if every enemy that
---      reaches its tile strikes it (an enemy the plan kills does not; the HP is the plan's).
+--      toward the goal -- less each moved unit's standing exposure: its chance to die and the
+--      HP it loses if every enemy that reaches its tile strikes it (an enemy the plan kills
+--      does not; the HP is the plan's).
 --      Without it the beam ranked only what a unit does, and every plan it kept was the
 --      exposed one: the judge then had nothing safe to pick (ch03, 2026-10-27).
 --   3. Judge: the best FINAL complete plans each meet the enemy phase the game's own AI would
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
 --      for each unit's chance to die there (a green one's too: it spoils the clear; and a
---      recruit's, to our counter), its expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
+--      recruit's, to our counter; a unit whose death ends the game costs the chapter), its
+--      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
 --      Two more are judged beside them: on a Defeat Boss map the assault (every unit that
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
 --      never tries), and on a stalled board (opts.stalled) each unit's best act that
@@ -25,9 +26,10 @@
 --      making progress takes the least it must.
 --      The enemy phase is played every way it can go where a counter may kill a striker
 --      (its tile freed for the next), and once per way the plan's BRANCH most uncertain kills
---      can go (an enemy the average keeps may die, one it removes may live). Last, the best plan is mended: each unit it may lose
---      tries its other acts (a green one, the acts of ours that could save it; a recruit, the
---      acts of the units it strikes), the rest of the plan kept, and those are judged too.
+--      can go (an enemy the average keeps may die, one it removes may live). Last, the best
+--      plan is mended: each unit it may lose tries its other acts (a green one, the acts of
+--      ours that could save it; a recruit, the acts of the units it strikes), the rest of the
+--      plan kept, and those are judged too.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
@@ -108,7 +110,7 @@ local function score(act, st, W, style, odds)
         if st.recruits[e.id] then
             -- a recruit is talked over, not worn down: its death spoils the clear as one of
             -- ours does (Bot.candidates' ctx.recruits), and its damage earns nothing
-            v = v - W.death * kill
+            v = v - loss(W, st, e.charId) * kill
         else
             -- the objective's boss: every point of its HP is a step to the win
             local target = (e.isBoss and st.objective == "boss") and M.BOSS_WORTH or 1
@@ -127,10 +129,9 @@ local function score(act, st, W, style, odds)
             fx.counter = { f.counterDist }
         end
         fx.enemyHp = { id = e.id, hp = hp - dealt }
-        -- the kill as a chance, for the judge to play both ways: `left` is the HP the target
-        -- keeps when it lives (the damage is capped at its HP, so the dead share is hp * kill)
-        fx.kill = { id = e.id, p = kill,
-                    left = kill < 1 and hp - (dealt - hp * kill) / (1 - kill) or 0 }
+        -- what the blow does, for the judge to play the kill both ways (its odds composed with
+        -- the plan's other blows on the target, at the target's own HP)
+        fx.kill = { id = e.id, dist = f.dealt }
         if kill >= 0.5 then fx.gone = e.id end
         if e.isBoss and kill >= 0.5 and st.objective == "boss" then v = v + W.win * kill end
     elseif act.act == "talk" then
@@ -301,13 +302,10 @@ function M.plan(Bot, board, sight, style, opts)
         n.hp[uid] = fx.hp
         if fx.gone then n.gone[fx.gone] = true end
         if fx.kill then
-            -- each attack's chance read at the HP the plan leaves the target, taken as
-            -- independent: the target lives through them all or it does not
-            local k = n.kill[fx.kill.id]
-            n.kill[fx.kill.id] = { p = 1 - (1 - (k and k.p or 0)) * (1 - fx.kill.p),
-                                   left = fx.kill.left }
+            local blows = copy(n.kill[fx.kill.id] or {})
+            blows[#blows + 1] = fx.kill.dist
+            n.kill[fx.kill.id] = blows
         end
-        if fx.enemyHp then n.enemyHp[fx.enemyHp.id] = fx.enemyHp.hp end
         if fx.heals then
             n.healed[fx.heals.id] = (n.healed[fx.heals.id] or 0)
                 + fx.heals.hp - (st.hp[fx.heals.id] or (byId[fx.heals.id] or {}).hp or fx.heals.hp)
@@ -486,16 +484,25 @@ function M.plan(Bot, board, sight, style, opts)
         -- gone at a kill >= 0.5, else standing at its mean HP) hides the way the rolls go
         -- otherwise (vanilla Ch5 turn 5: Eirika's attack killed an enemy the plan kept
         -- standing, and Joshua's AI turned on her). The rest keep the average.
-        local open = {}
-        for id, k in pairs(st.kill) do
-            if k.p > 0 and k.p < 1 then open[#open + 1] = { id = id, p = k.p, left = k.left } end
+        local open, gone = {}, copy(st.gone)
+        for id, blows in pairs(st.kill) do
+            -- the plan's blows on it together, at its own HP: each blow alone was scored at the
+            -- HP the earlier ones leave on average, which can call a sure kill short. Gone or
+            -- standing by that composed chance; `left`, the HP it keeps when it lives (the
+            -- damage is capped at its HP, so the dead share is hp * p)
+            local hp = byId[id].hp
+            local p, mean = odds(blows, hp)
+            gone[id] = p >= 0.5 or nil
+            if p > 0 and p < 1 then
+                open[#open + 1] = { id = id, p = p, left = hp - (mean - hp * p) / (1 - p) }
+            end
         end
         table.sort(open, function(x, y)
             local dx, dy = math.abs(x.p - 0.5), math.abs(y.p - 0.5)
             if dx ~= dy then return dx < dy end
             return x.id < y.id
         end)
-        local ways = { { p = 1, gone = st.gone, reds = reds } }
+        local ways = { { p = 1, gone = gone, reds = reds } }
         for i = 1, math.min(M.BRANCH, #open) do
             local k, nxt = open[i], {}
             for _, w in ipairs(ways) do
@@ -573,7 +580,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         st.predict = {}
         for _, g in ipairs(greens) do
-            judged = judged - W.death * die[g.id]
+            judged = judged - loss(W, st, g.charId) * die[g.id]
             local by = {}   -- a list: the record is logged as JSON, whose keys are strings
             for id in pairs(strikers[g.id]) do by[#by + 1] = id end
             table.sort(by)
@@ -588,9 +595,8 @@ function M.plan(Bot, board, sight, style, opts)
         end
         table.sort(fallen)
         for _, id in ipairs(fallen) do
-            local d = felled[id]
-            judged = judged - W.death * d
-            local r, hit = byId[id], {}
+            local d, r, hit = felled[id], byId[id], {}
+            judged = judged - loss(W, st, r.charId) * d
             for t in pairs(struckBy[id]) do hit[#hit + 1] = t end
             table.sort(hit)
             st.predict[#st.predict + 1] = { id = id, charId = r.charId, x = r.x, y = r.y,

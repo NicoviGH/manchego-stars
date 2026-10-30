@@ -908,14 +908,18 @@ local function marchLength(ctx, u, t)
     return d
 end
 
--- The units able to act that could go and Talk `t` over: ones the game lets Talk to it (and
--- `by` names, when given) with a way to it, in slot order: { { u, d = the march } }. None for
--- a unit the fog hides: a player knows no more than the fog shows.
+-- Whether `u` may Talk `t` over: the game's own check (talks), for a unit not on our side
+-- and not hidden by the fog (a player knows no more than the fog shows).
+local function mayTalkOver(ctx, u, t)
+    return t.faction ~= "blue" and not t.fogged and talks(ctx, u, t)
+end
+
+-- The units able to act that could go and Talk `t` over (mayTalkOver, and `by` names them,
+-- when given) with a way to it, in slot order: { { u, d = the march } }.
 local function talkersOf(ctx, t, by)
     local out = {}
-    if t.faction == "blue" or t.fogged then return out end
     for _, u in ipairs(ctx.actors) do
-        if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
+        if (not by or listed(by, u.charId)) and mayTalkOver(ctx, u, t) then
             local d = marchLength(ctx, u, t)
             if d then out[#out + 1] = { u = u, d = d } end
         end
@@ -923,16 +927,14 @@ local function talkersOf(ctx, t, by)
     return out
 end
 
--- The units not on our side that one of ours able to act could Talk over (the game's own
--- check, talks), by id: a recruit lost to any blow spoils the clear (botrun's
--- recruits_missing), as a green unit's death does. None the fog hides, as for talkersOf.
+-- The units one of ours may Talk over (mayTalkOver), by id: a recruit lost to any blow spoils
+-- the clear (botrun's recruits_missing), as a green unit's death does. Every blue counts, one
+-- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
 local function recruitsOf(ctx)
     local out = {}
     for _, t in ipairs(ctx.onField) do
-        if t.faction ~= "blue" and not t.fogged then
-            for _, u in ipairs(ctx.actors) do
-                if talks(ctx, u, t) then out[t.id] = true break end
-            end
+        for _, u in ipairs(ctx.blues) do
+            if mayTalkOver(ctx, u, t) then out[t.id] = true break end
         end
     end
     return out
@@ -966,21 +968,6 @@ local function recruitFirst(ctx, gate)
                     local tile = #allowed > 0 and M.pickMove(allowed, { cur = near, goal = t,
                                                                         field = field })
                     return action(near, tile or { x = near.x, y = near.y }, "wait")
-                end
-            end
-        end
-    end
-    return nil
-end
-
--- The recruit a claim sends `u` to Talk over (its `by` names `u`), still to be talked over
--- and not hidden by the fog; nil for none.
-local function claimedRecruit(ctx, u)
-    for _, c in ipairs(ctx.style.recruits or {}) do
-        if c.by and listed(c.by, u.charId) then
-            for _, t in ipairs(ctx.onField) do
-                if t.faction ~= "blue" and not t.fogged and listed(c.units, t.charId) then
-                    return t
                 end
             end
         end
@@ -1291,7 +1278,7 @@ local function openTiles(ctx)
 end
 
 local function exploring(ctx, sent)
-    ctx.exploreGoal = {}
+    ctx.exploreGoal, ctx.talkDuty = {}, {}
     local taken = {}
     local function reaches(u, t)
         local d = marchLength(ctx, u, t)
@@ -1327,10 +1314,16 @@ local function exploring(ctx, sent)
             if #talkers > 0 then break end
         end
         for _, p in ipairs(talkers) do
-            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
+            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, claimed = #claims > 0 }
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end)
+    -- a talker sent to a recruit the style claims is on duty (Bot.candidates): the claim is
+    -- played first
+    for _, p in ipairs(talkPairs) do
+        local g = ctx.exploreGoal[p.u.id]
+        if p.claimed and g and g.x == p.t.x and g.y == p.t.y then ctx.talkDuty[p.u.id] = p.t end
+    end
     if not ctx.sight.explorable then return end
     local pairs_ = {}
     local open, blues = {}, {}
@@ -1569,15 +1562,14 @@ function M.candidates(board, sight, style, opts)
         -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
         -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
         for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
-        -- a recruit claim is played first: its talker Talks the recruit over, or goes toward
-        -- it (the march, or the retreat that still gains ground), and does nothing else
-        -- (vanilla Ch5: Natasha healed and held for five turns, Joshua never reached)
-        local duty = claimedRecruit(ctx, u)
-        if duty then
+        -- a recruit claim is played first: the talker exploring sent to its recruit Talks
+        -- (that recruit, or any other the game offers it), or goes toward it (the march, or
+        -- the retreat that still gains ground), and does nothing else (vanilla Ch5: Natasha
+        -- healed and held for five turns, Joshua never reached)
+        if ctx.talkDuty[u.id] then
             local kept = {}
             for _, a in ipairs(acts) do
-                if (a.act == "talk" and a.targetId == duty.id) or a.why == "march"
-                        or a.why == "retreat" then
+                if a.act == "talk" or a.why == "march" or a.why == "retreat" then
                     kept[#kept + 1] = a
                 end
             end

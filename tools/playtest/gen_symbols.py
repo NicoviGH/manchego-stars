@@ -335,6 +335,7 @@ WANTED = [
     'GetDefeatTalkEntry',       # a unit's death quote for this chapter; flag 2 = the Defeat Boss goal (eventinfo.c)
     'SetPidDefeatedFlag',       # sets the flag a unit's death raises (its entry's; 0x65 = game over) (eventinfo.c)
     'CheckFlag',                # whether an event flag is set (eventinfo.c)
+    'ClearFlag',                # clears an event flag (eventinfo.c)
     # The planner's enemy phase (#510 step 9): the enemy turn order, as the game builds it.
     'BuildAiUnitList',          # gAiState.units: the faction's units able to act (cp_order.c)
     'SortAiUnitList',           # that list in the order the AI moves them (cp_order.c)

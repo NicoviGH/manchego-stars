@@ -19,7 +19,8 @@ ADR 0381's march goal did not recruit Joshua. One instrumented run each found wh
    it (and its damage earns nothing), and our counter's `felled` on its strikes. The mend tries
    the struck units' other acts. Its price against one of ours is Nicolas's: "early recruits
    are key members, later ones are replacements for losses. But that's subjective" -- so it
-   stays `W.death`, ADR 0381's price for a green unit.
+   stays `W.death`, ADR 0381's price for a green unit. Every blue counts as a talker, one that
+   has acted this turn too (it Talks next turn), so a replan after its move keeps the recruit.
 2. **A Talk left the recruit striking in the judged phase.** `score` set no `gone` for a
    Talk, so the sandbox's enemy phase still had the recruit red. A Talk now takes it off the
    enemy side, as a kill does.
@@ -28,35 +29,51 @@ ADR 0381's march goal did not recruit Joshua. One instrumented run each found wh
    a dying unit's defeat-talk entry (`GetDefeatTalkEntry`, quote text or none) names the flag
    its death sets, `SetPidDefeatedFlag` sets it (never 0x65 for the chapter's protected unit on
    a non-story map), and `RunWaitEvents` starts the game over when it is set [code]. sight runs
-   that step in the sandbox per unit at the start and reads the flag back
-   (`sight.objective.gameOver`; vanilla Ch5: Eirika alone [ROM]); the planner pays such a
-   death at `W.win`. Nicolas: a game rule, not a design question.
+   that step for every unit on the field, any side (an escort's death can end the game too),
+   in one sandbox at the start: it reads the flag back, then clears the unit's flag with the
+   game's `ClearFlag` before the next (`sight.objective.gameOver`; vanilla Ch5: Eirika alone
+   [ROM]). The planner pays such a death at `W.win`, every death through one `loss()`.
+   Nicolas: a game rule, not a design question.
 4. **An uncertain kill was played one way.** Eirika's attack then killed an enemy the plan's
    average kept standing (kill < 0.5), and Joshua's AI turned on her. The judge now plays the
    enemy phase both ways for the plan's `M.BRANCH` = 2 most uncertain kills (nearest 0.5),
-   each way weighted by its chance, a survivor at its HP given that it lives. `BRANCH` is a
-   cost cap (2^BRANCH enemy phases per judged plan), not a weight.
+   each way weighted by its chance, a survivor at its HP given that it lives. A target's
+   chance is all the plan's blows on it composed at its own HP: read one blow at a time, each
+   at the HP the earlier ones leave on average, two 50% blows of 10 on 20 HP were no kill at
+   all; composed, a quarter. `BRANCH` is a cost cap (2^BRANCH enemy phases per judged plan),
+   not a weight, and it has no floor: at `W.win`, a 3% chance of a lord's death costs three
+   units' deaths.
 5. **The guide's strategy, as claims.** The wiki's line ("kill any nearby mobile enemies while
    staying away from Joshua, then simply have Natasha walk up to him") was curated as
    `unmodelled`. It is now two claims: `recruit` Joshua `by` Natasha, and `avoid` the
    Myrmidon (the map's only one) for everyone else. The ROM is USA (`BE8E`, the decomp's
    SHA-1), where the wiki says Joshua does not strike Natasha (not checked in the ROM: the
-   enemy phase is the game's own AI either way). A claimed recruit is played first: while it is on the field, its `by`'s menu is the
-   Talk, the march on it and the retreat toward it (Natasha healed and held for five turns
-   before). An `avoid` claim gives way on a stalled board, where the planner already takes the
-   least it must (attempt 7: Natasha dead, every unit kept out of Joshua's reach between them
-   and the boss, the board repeating until `stuck`).
+   enemy phase is the game's own AI either way). A claimed recruit is played first: the
+   talker `exploring` sends to it (one with a way to it) has only Talks, the march on it and
+   the retreat toward it on its menu (Natasha healed and held for five turns before). An
+   `avoid` claim gives way on a stalled board, for the one plan that must change it (botrun
+   clears `stalled` after its first act), where the planner already takes the least it must
+   and still pays any death the move risks (attempt 7: Natasha dead, every unit kept out of
+   Joshua's reach between them and the boss, the board repeating until `stuck`).
 
-**Measured in the ROM** (vanilla, seed 1, the `e1-vanilla-ch3` starts; CPU s):
+**Measured in the ROM** (vanilla, seed 1, the `e1-vanilla-ch3` starts; CPU s), after the
+review fixes (#552):
 
 | Run | Before | After |
 |---|---|---|
-| Ch5, attempts until clean | attempt 1 won t6 unclean (Joshua killed); no clean clear known | **clean at attempt 9** (even, `avoid`): Joshua recruited, none lost, every village. Joshua joined in 6 of 9 attempts; attempts 5 and 8 lost no one but left a village |
+| Ch5, all 12 styles | Joshua killed or never reached; no clean clear | **Joshua recruited in 8 of 12**; no clean clear: attempts 5, 8 and 10 lose no one and recruit him but miss the village at (5,1) |
 | Ch5 attempt 7 | `stuck` t22 | won t21 (Natasha, Vanessa, Lute lost) |
-| Ch2 | clean at attempt 2 (11.1) | clean at attempt 1 (9.8) |
-| Ch3 | clean at attempt 1 (15.0) | clean at attempt 1 (16.6), Colm recruited |
-| Ch4 | clean at attempt 1 (19.0) | clean at attempt 1 (25.9) |
+| Ch2 | clean at attempt 2 (11.1) | clean at attempt 1 (9.7) |
+| Ch3 | clean at attempt 1 (15.0) | clean at attempt 1 (16.1), Colm recruited |
+| Ch4 | clean at attempt 1 (19.0) | clean at attempt 1 (21.2) |
 | Manchego Stars ch01 (New Game) | clean at attempt 1 (8.2) | clean at attempt 1 (9.0) |
 
-The kill branch costs about 30% a turn (Ch5 attempt 1: 2.35 s a turn before, 3.0 s after;
-Ch4 +36%).
+Before the review, attempt 9 (even, `avoid`) was clean; composing a target's blows (4) chose a
+different turn 3 opening there (Artur's blow before Seth's, judged 107.4 against 101.9), and
+the run went another way (Vanessa lost). One clean draw of twelve was luck, not a fix.
+
+**Still open: the village at (5,1).** It is won past ("unreached": attempts 8, 10), passed up
+("skipped": 9), or pillaged first ("closed": 5). The planner takes the win while a reward is
+still open; part A recorded the same village on its Ch5 runs. A clean Ch5 waits on it.
+
+The kill branch costs about 30% a turn (Ch5 attempt 1: 2.35 s a turn before, 3.0 s after).

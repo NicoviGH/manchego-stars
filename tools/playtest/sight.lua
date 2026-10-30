@@ -85,10 +85,10 @@
 --                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went.
---   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective(); boss = on a
---                            Defeat Boss map, the charId whose death quote raises
+--   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
+--                            boss = on a Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
---                            gameOver = the charIds of ours whose death sets
+--                            gameOver = the charIds, on any side, whose death sets
 --                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
 --                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
@@ -805,38 +805,45 @@ function M.new(outer)
         return g
     end)
     s.objective = { kind = goal.kind, tile = goal.tile }
-    -- On a Defeat Boss map, the boss is the unit whose death quote raises the goal's flag --
-    -- how the game itself ends the chapter (GetDefeatTalkEntry, EVFLAG_DEFEAT_BOSS), not
-    -- CA_BOSS, which a boss on a cloned generic row (ours ch03's grell) does not carry.
+    -- Inside a sandbox: the flag unit `charId`'s death sets, its GetDefeatTalkEntry row's (quote
+    -- text or none); nil when it has no row. Read at the start: the rows are the chapter's.
+    local function defeatFlag(call, charId)
+        local ent = call(S.GetDefeatTalkEntry, { charId })
+        return ent ~= 0 and mem.u16(ent + M.DEFEAT_TALK_FLAG) or nil
+    end
+    -- On a Defeat Boss map, the boss is the unit whose death raises the goal's flag -- how the
+    -- game itself ends the chapter (EVFLAG_DEFEAT_BOSS), not CA_BOSS, which a boss on a cloned
+    -- generic row (ours ch03's grell) does not carry.
     if goal.kind == "boss" then
         s.objective.boss = sandbox(function(call)
             for _, u in ipairs(api.board().units) do
-                if u.faction == "red" and u.onField then
-                    local ent = call(S.GetDefeatTalkEntry, { u.charId })
-                    if ent ~= 0 and mem.u16(ent + M.DEFEAT_TALK_FLAG) == M.EVFLAG_DEFEAT_BOSS then
-                        return u.charId
-                    end
+                if u.faction == "red" and u.onField
+                        and defeatFlag(call, u.charId) == M.EVFLAG_DEFEAT_BOSS then
+                    return u.charId
                 end
             end
             return nil
         end)
     end
-    -- The units of ours whose death ends the game: the game's own death step, run in the
-    -- sandbox. A dying unit's entry (GetDefeatTalkEntry, quote text or none) names the flag
-    -- its death sets, and SetPidDefeatedFlag sets it -- but never EVFLAG_GAMEOVER for the
-    -- chapter's protected unit on a non-story map -- and that flag is what RunWaitEvents ends
-    -- the game on. Read at the start: the entries are the chapter's, not the board's.
-    s.objective.gameOver = {}
-    for _, u in ipairs(api.board().units) do
-        if u.faction == "blue" and u.onField and sandbox(function(call)
-            local ent = call(S.GetDefeatTalkEntry, { u.charId })
-            if ent == 0 then return false end
-            call(S.SetPidDefeatedFlag, { u.charId, mem.u16(ent + M.DEFEAT_TALK_FLAG) })
-            return call(S.CheckFlag, { M.EVFLAG_GAMEOVER }) & 0xFF ~= 0
-        end) then
-            table.insert(s.objective.gameOver, u.charId)
+    -- The units whose death ends the game, on any side (an escort's too): the game's own death
+    -- step, run in one sandbox. SetPidDefeatedFlag sets the unit's flag -- but never
+    -- EVFLAG_GAMEOVER for the chapter's protected unit on a non-story map -- and that flag is
+    -- what RunWaitEvents ends the game on. Each unit's flag is cleared after (ClearFlag) before
+    -- the next is read: GetDefeatTalkEntry skips a row whose flag is set.
+    s.objective.gameOver = sandbox(function(call)
+        local out = {}
+        for _, u in ipairs(api.board().units) do
+            local flag = u.onField and defeatFlag(call, u.charId)
+            if flag then
+                call(S.SetPidDefeatedFlag, { u.charId, flag })
+                if call(S.CheckFlag, { M.EVFLAG_GAMEOVER }) & 0xFF ~= 0 then
+                    out[#out + 1] = u.charId
+                end
+                call(S.ClearFlag, { flag })
+            end
         end
-    end
+        return out
+    end)
 
     function s.demands()
         return M.demandsOf(units(), commands, mem.u8(S.gPlaySt + PLAY_VISION))

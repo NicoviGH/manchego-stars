@@ -2714,6 +2714,14 @@ do
         attacks = attacks or (x.act == "attack" and x.targetId == 0x81)
     end
     check(attacks, false, "planner: no plan kills a recruit")
+    -- C has acted (a replan after its move): R is still its recruit next turn
+    C.acted = true
+    _, plan = Planner.plan(B, boardOf(A, C, R), sightOf(o), style("careful"))
+    attacks = false
+    for _, x in ipairs(plan and plan.acts or {}) do
+        attacks = attacks or (x.act == "attack" and x.targetId == 0x81)
+    end
+    check(attacks, false, "planner: a recruit whose talker has acted is still one")
 end
 
 -- test_planner_judges_a_talk_with_the_recruit_off_the_enemy_side: A Talks R over from (1,0). R
@@ -2800,6 +2808,62 @@ do
     check(attacks, false, "planner: a kill that may free a striker on the lord is played both ways")
 end
 
+-- test_planner_composes_a_targets_blows_before_branching: A and C each hit E (20 HP) for 10 at
+-- 50%. Together they kill it a quarter of the time (both land), and when it lives it keeps
+-- 13 HP on average ((0 x 1/4 + 10 x 1/2) / (3/4) taken). Read one blow at a time, at the HP
+-- the first leaves on average (15), neither kills and the judge never plays E dead.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 2, 1)
+    local E = red(0x81, 1, 1, { minRange = false, hp = 20 })
+    local blow = fc { hit = 50, dmg = 10, hits = 1 }
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 1, 0 }), [0x02] = tiles({ 1, 2 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = blow } }, [0x02] = { [0x81] = { ["1,2"] = blow } } },
+        enemyPhase = function(plan)
+            local both = 0
+            for _, b in ipairs(plan.blues) do
+                if b.slot then both = both + 1 end
+            end
+            if both == 2 then
+                seen[(plan.gone or {})[0x81] and "dead" or tostring((plan.reds or {})[0x81])] = true
+            end
+            return {}
+        end,
+    }
+    Planner.plan(B, boardOf(A, C, E), sightOf(o), style("bold"))
+    check(tostring(seen.dead) .. " " .. tostring(seen["13"]), "true true",
+          "planner: two blows on one target are played dead and alive at 13 HP")
+end
+
+-- test_planner_prices_a_game_over_greens_death_as_the_chapter: as the green test above, in
+-- bold, which pays one death (60) less than the ground the block costs. When G's death ends
+-- the game (an escort: sight.objective.gameOver names it), its death is the chapter, and A
+-- blocks.
+do
+    local function play(gameOver)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
+        local X = red(0x81, 9, 9, { minRange = false })
+        local o = {
+            objective = { kind = "rout", gameOver = gameOver },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            field = function() return { [0] = { [0] = 20, [1] = 40 } } end,
+            enemyPhase = function(plan)
+                for _, b in ipairs(plan.blues) do
+                    if b.x == 1 then return {} end
+                end
+                return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 10 } }
+            end,
+        }
+        return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), style("bold"))))
+    end
+    check(play({}) .. " " .. play({ 0x30 }), "0,0 1,0",
+          "planner: a green whose death ends the game costs the chapter")
+end
+
 -- test_a_talker_is_sent_to_its_recruit: T (green) is far off and A is the only unit the game
 -- lets Talk to it. A is sent to T's tile, not to the nearest enemy, and marches on it.
 do
@@ -2871,6 +2935,11 @@ do
     local claimed = whys(st)
     check(tostring(claimed.heal) .. " " .. tostring(claimed.hold) .. " " .. tostring(claimed.march),
           "nil nil true", "talker: claimed, it only marches on its recruit")
+    -- no way to R (the field never reaches N): exploring sends N nowhere, so it is on no duty
+    -- and keeps its own menu
+    o.field = function() return {} end
+    local cut = whys(st)
+    check(cut.heal and cut.hold and true or false, true, "talker: no way to its recruit, no duty")
 end
 
 -- The goals a careful plan sends units to, "x,y" by unit id. `o.field` defaults to open ground
