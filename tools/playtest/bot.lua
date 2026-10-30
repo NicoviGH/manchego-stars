@@ -885,20 +885,39 @@ local function talkFrom(ctx, u, t, gate)
     return nil
 end
 
--- Of the units able to act that the game lets Talk to `t` (and `by` names, when given), the
--- nearest it by the field from `t`; nil when none. -> talker, the field (built only once a
--- unit can Talk to `t`: most units on a map are no one's recruit)
-local function nearestTalker(ctx, t, by)
-    local field, near, nearD
+-- The march from `u` to `t` by the game's field from `t`, through the breach where the field
+-- has no way (breachFor); nil = no way at all.
+local function marchLength(ctx, u, t)
+    local field = fieldFor(ctx, t)
+    local d = field and field[u.y] and field[u.y][u.x]
+    if field and not d then
+        -- the way through the breach: the path to it, one step through, the path beyond
+        local b = breachFor(ctx, u, t)
+        local of = b and fieldFor(ctx, b)
+        local toB, beyond = of and of[u.y] and of[u.y][u.x], nil
+        for _, side in ipairs(b and SIDES or {}) do
+            local row = field[b.y + side[2]]
+            local v = row and row[b.x + side[1]]
+            if v and (not beyond or v < beyond) then beyond = v end
+        end
+        d = toB and beyond and toB + 1 + beyond
+    end
+    return d
+end
+
+-- The units able to act that could go and Talk `t` over: ones the game lets Talk to it (and
+-- `by` names, when given) with a way to it, in slot order: { { u, d = the march } }. None for
+-- a unit the fog hides: a player knows no more than the fog shows.
+local function talkersOf(ctx, t, by)
+    local out = {}
+    if t.faction == "blue" or t.fogged then return out end
     for _, u in ipairs(ctx.actors) do
         if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
-            field = field or fieldFor(ctx, t)
-            local d = field and field[u.y] and field[u.y][u.x]
-                      or manhattan(u.x, u.y, t.x, t.y) + OFFFIELD
-            if not nearD or d < nearD then near, nearD = u, d end
+            local d = marchLength(ctx, u, t)
+            if d then out[#out + 1] = { u = u, d = d } end
         end
     end
-    return near, field
+    return out
 end
 
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
@@ -908,14 +927,14 @@ local function recruitFirst(ctx, gate)
     for _, c in ipairs(ctx.style.recruits or {}) do
         for _, t in ipairs(ctx.onField) do
             if t.faction ~= "blue" and listed(c.units, t.charId) then
-                for _, u in ipairs(ctx.actors) do
-                    if not c.by or listed(c.by, u.charId) then
-                        local a = talkFrom(ctx, u, t, gate)
-                        if a then return a end
-                    end
+                local talkers, near, nearD = talkersOf(ctx, t, c.by), nil, nil
+                for _, p in ipairs(talkers) do
+                    local a = talkFrom(ctx, p.u, t, gate)
+                    if a then return a end
+                    if not nearD or p.d < nearD then near, nearD = p.u, p.d end
                 end
-                local near, field = nearestTalker(ctx, t, c.by)
                 if near then
+                    local field = fieldFor(ctx, t)
                     local allowed = {}
                     for _, tile in ipairs(waitTiles(ctx, near)) do
                         if gate(ctx, near, tile.x, tile.y, nil) then allowed[#allowed + 1] = tile end
@@ -1235,26 +1254,8 @@ end
 local function exploring(ctx, sent)
     ctx.exploreGoal = {}
     local taken = {}
-    -- the march from `u` to `t` by the field from `t`, through the breach where it has no way
-    local function length(u, t)
-        local field = fieldFor(ctx, t)
-        local d = field and field[u.y] and field[u.y][u.x]
-        if field and not d then
-            -- the way through the breach: the path to it, one step through, the path beyond
-            local b = breachFor(ctx, u, t)
-            local of = b and fieldFor(ctx, b)
-            local toB, beyond = of and of[u.y] and of[u.y][u.x], nil
-            for _, side in ipairs(b and SIDES or {}) do
-                local row = field[b.y + side[2]]
-                local v = row and row[b.x + side[1]]
-                if v and (not beyond or v < beyond) then beyond = v end
-            end
-            d = toB and beyond and toB + 1 + beyond
-        end
-        return d
-    end
     local function reaches(u, t)
-        local d = length(u, t)
+        local d = marchLength(ctx, u, t)
         return d and (u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)) and d
     end
     -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
@@ -1272,24 +1273,18 @@ local function exploring(ctx, sent)
             end
         end
     end
-    -- A Talk recruit before any village: a unit the game lets Talk to it marches on it, or the
-    -- planner credits the Talk only once a talker happens into reach (vanilla Ch2: Ross, killed
-    -- on turn 2 while Eirika marched on the brigands). Never one the fog hides (a player knows no
-    -- more than it shows), and a recruit the style claims goes to the claim's talker only
-    -- (recruitFirst marches that one).
+    -- A Talk recruit before any village: a unit that could Talk it over (talkersOf) marches on
+    -- it, or the planner credits the Talk only once a talker happens into reach (vanilla Ch2:
+    -- Ross, killed on turn 2 while Eirika marched on the brigands). A recruit the style claims
+    -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
     for _, t in ipairs(ctx.onField) do
-        if t.faction ~= "blue" and not t.fogged then
-            local by
-            for _, c in ipairs(ctx.style and ctx.style.recruits or {}) do
-                if listed(c.units, t.charId) then by = c.by end
-            end
-            for _, u in ipairs(ctx.actors) do
-                if (not by or listed(by, u.charId)) and talks(ctx, u, t) then
-                    local d = length(u, t)
-                    if d then talkPairs[#talkPairs + 1] = { t = t, u = u, d = d } end
-                end
-            end
+        local by
+        for _, c in ipairs(ctx.style.recruits or {}) do
+            if listed(c.units, t.charId) then by = c.by end
+        end
+        for _, p in ipairs(talkersOf(ctx, t, by)) do
+            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end)

@@ -39,9 +39,9 @@
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts,
 -- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
--- `strikers` its enemies), kind = "beam"|"assault"|"unstall"|"mend", considered = every plan
--- judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent, explored (both
--- Bot.candidates') } | nil,
+-- `strikers` the ids of the enemies that strike it in the judged phase, sorted), kind =
+-- "beam"|"assault"|"unstall"|"mend", considered = every plan judged, best first: { judged,
+-- acts, kind }, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
 -- or chest each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, legal)
@@ -569,10 +569,9 @@ function M.plan(Bot, board, sight, style, opts)
     if best then
         local base, menuOf, risky = best, {}, {}
         for _, m in ipairs(menus) do
-            for _, a in ipairs(m.acts) do
-                menuOf[m.unit.id] = menuOf[m.unit.id] or {}
-                table.insert(menuOf[m.unit.id], { uid = m.unit.id, a = a })
-            end
+            local mine = {}
+            for _, a in ipairs(m.acts) do mine[#mine + 1] = { uid = m.unit.id, a = a } end
+            menuOf[m.unit.id] = mine
         end
         local function tries(p)
             if not p.green then return menuOf[p.id] or {} end
@@ -595,11 +594,15 @@ function M.plan(Bot, board, sight, style, opts)
             if x.die ~= y.die then return x.die > y.die end
             return x.id < y.id
         end)
+        -- each act tried once: two greens side by side, or a blue at risk beside a green, offer
+        -- the same one again, and each try plays a whole enemy phase
+        local mine, tried = {}, {}
+        for _, a in ipairs(base.acts) do mine[a.unitId] = key(a) end
         for _, p in ipairs(risky) do
-            local mine = {}
-            for _, a in ipairs(base.acts) do mine[a.unitId] = key(a) end
             for _, t in ipairs(tries(p)) do
-                local st = key(t.a) ~= mine[t.uid] and extend(start, t.a, t.uid)
+                local k = key(t.a)
+                local st = k ~= mine[t.uid] and not tried[k] and extend(start, t.a, t.uid)
+                tried[k] = true
                 if st then
                     for _, x in ipairs(base.acts) do
                         if x.unitId ~= t.uid then st = extend(st, x, x.unitId) or st end

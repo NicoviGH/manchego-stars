@@ -1793,6 +1793,34 @@ do
     check(at(a), "1,0", "recruit: toward the recruit")
 end
 
+-- test_recruit_claim_marches_only_where_a_player_could: the claim's talker A is out of reach of
+-- its recruit. It is not marched on one the fog hides, nor on one it has no way to; it goes on
+-- toward the enemy (east) instead of west to the recruit.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local E = red(0x81, 9, 0, { hp = 1 })
+    local function open(goal, cut)
+        local f = {}
+        for y = 0, 9 do
+            f[y] = {}
+            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+        end
+        if cut then f[0][4] = nil end
+        return f
+    end
+    local reach = { [0x01] = tiles({ 4, 0 }, { 3, 0 }, { 5, 0 }) }
+    local st = claimed("careful", { id = "r1", kind = "recruit", unit = { 0x31 } })
+    local R = red(0x82, 0, 0, { charId = 0x31, fogged = true })
+    local a = B.decide(boardOf(A, R, E), sightOf({ reach = reach, field = open,
+                                                   talk = { [0x01] = { [0x82] = true } } }), st)
+    check(at(a) ~= "3,0", true, "recruit: no march on one the fog hides")
+    local T = blue(0x30, 5, 0, 0, { faction = "green", charId = 0x31 })
+    a = B.decide(boardOf(A, T, E), sightOf({ reach = reach,
+        field = function(goal) return open(goal, goal.x == 0) end,
+        talk = { [0x01] = { [0x30] = true } } }), st)
+    check(at(a) ~= "3,0", true, "recruit: no march on one it has no way to")
+end
+
 -- test_keys_and_priority_rank_their_target_first: A deals more to E1, but E2 holds a key
 -- (keys claim) or is a priority claim's class.
 do
@@ -2527,6 +2555,40 @@ do
     Planner.BEAM = beam
     check(at(a) .. " " .. tostring(plan and plan.kind), "1,0 mend",
           "planner: the mend blocks for a green unit")
+end
+
+-- test_planner_mend_tries_each_act_once: greens G1 and G2 both stand beside (1,0), and only
+-- A's block there saves them. Both are at risk and both offer it; it is judged once.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G1 = blue(0x30, 5, 2, 0, { faction = "green", hp = 10, minRange = false })
+    local G2 = blue(0x31, 6, 1, 1, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 2 }) },
+        field = function()
+            return { [0] = { [0] = 40, [1] = 40 }, [2] = { [0] = 10 } }
+        end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 10 },
+                     { enemy = 0x81, target = 0x31, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, G1, G2, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    local blocks = 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "mend" and table.concat(c.acts, " "):find("@1,0") then blocks = blocks + 1 end
+    end
+    check(at(a), "1,0", "planner: the mend blocks for both")
+    check(blocks, 1, "planner: the block is judged once")
 end
 
 -- test_planner_records_a_green_units_strikers: nothing saves G from X. The prediction names X
