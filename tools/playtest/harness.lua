@@ -3054,13 +3054,21 @@ INSPECT.watchDeaths = function()
         for uid, who in pairs(alive) do
             local fate = BOARD.fate(ru32(SYM.gUnitLookup + uid * 4), who)
             if fate == "killed" then
+                -- a killer only in a fight: the battle structs keep the last fight's units, so a
+                -- poison tick or an event's kill would otherwise be credited to it
                 local by
-                if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
-                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
-                -- ours: the killer's unit index is a blue one (FACTION_MASK bits 0)
+                if procActive(SYM.sProcScr_CombatAction) then
+                    if ru8(SYM.gBattleActor + 0x0B) == uid then by = SYM.gBattleTarget
+                    elseif ru8(SYM.gBattleTarget + 0x0B) == uid then by = SYM.gBattleActor end
+                end
+                -- ours: the killer's unit index is a blue one (FACTION_MASK bits 0); turn and
+                -- phase when it fell (a phase start's poison tick is the next phase's)
+                local now = BOARD.header()
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
                                         killer = by and charOf(by),
-                                        ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0 }
+                                        ours = by ~= nil and (ru8(by + 0x0B) & 0xC0) == 0,
+                                        turn = now.turn,
+                                        phase = now.phase == "blue" and "player" or "enemy" }
             elseif fate == "replaced" then
                 deaths[#deaths + 1] = { fault = fate, id = uid, charId = who.charId,
                                         faction = who.faction }

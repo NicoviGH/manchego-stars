@@ -424,6 +424,8 @@ local function test_resume_without_a_carried_team_says_so()
     Campaign.run(g.api)
     check(lines(g)[1].carried_unknown, true, "the chapter line marks the team unknown")
     check(#g.plays, 1, "and the chapter is played")
+    check(g.saved[1], 3, "the start is saved again")
+    check(g.carriedSaved[3], nil, "with its team still unknown, so the next resume says so too")
 end
 test_resume_without_a_carried_team_says_so()
 

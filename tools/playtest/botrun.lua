@@ -52,7 +52,8 @@
 --                      act (Board.ACTIONS' name), targetId, tile (a pillaged village or chest),
 --                      battles = { Board.battle... } } }
 --   killed()           each unit the game killed since the last call (Board.fate, what
---                      UnitKill writes): { { id, charId, faction, killer|nil } }, and each
+--                      UnitKill writes): { { id, charId, faction, killer|nil, turn|nil,
+--                      phase|nil (when it fell: "player" | "enemy") } }, and each
 --                      unit the watch could not read as { fault, id, charId, faction }. The
 --                      only word on a blue or green loss: a unit gone from the field without
 --                      one was unloaded by a script (a chapter's ending), or escaped, never
@@ -427,8 +428,9 @@ function M.run(api)
                                                   turn = turn, phase = phase }
             elseif k.faction == "blue" or k.faction == "green" then
                 local d = seen[k.id] or {}
-                rec.deaths[#rec.deaths + 1] = { charId = k.charId, faction = k.faction, turn = turn,
-                                                killer = k.killer or d.killer, phase = phase }
+                rec.deaths[#rec.deaths + 1] = { charId = k.charId, faction = k.faction,
+                                                turn = k.turn or turn, killer = k.killer or d.killer,
+                                                phase = k.phase or phase }
             end
         end
         -- a red one gone with the fighter that downed it: that fighter's kill
