@@ -4223,6 +4223,14 @@ scenarios.sightprobe = function()
         end
     end
     if not foe then return result("FAIL", "no enemy on the field") end
+    -- The planner's goal reads: the lead's turns to the nearest enemy's tile, the Iron Sword's
+    -- price (0x01: 46 uses x 10 = 460, data_items.c) and what the enemy phases ahead loot.
+    log(string.format("turnsTo lead->(%d,%d) = %s; itemCost(0x01) = %d", foe.x, foe.y,
+        tostring(sight.turnsTo(lead, foe)), sight.itemCost(0x01)))
+    local closed = {}
+    for k, p in pairs(sight.closings(INSPECT.Sight.CLOSE_HORIZON)) do closed[#closed + 1] = k .. "@" .. p end
+    table.sort(closed)
+    log("closings " .. table.concat(closed, " "))
     -- One attack of ours where a weapon reaches, with the enemy's counter to it.
     local weapons = sight.weapons(lead)
     for _, t in ipairs(reach) do

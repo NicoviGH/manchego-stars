@@ -193,6 +193,12 @@ M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
 -- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
 M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
+-- include/cp_script.h: struct AiScr is 0x10 bytes, `cmd` at +00; AI_CMD_PILLAGE runs
+-- AiScriptCmd_10_DoLooting, and a script loops back with AI_CMD_GOTO.
+M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
+-- include/constants/items.h; include/bmunit.h CA_STEAL, UNIT_ITEM_COUNT
+M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL, M.UNIT_ITEM_COUNT = 0x69, 0x6B, 0x04, 5
+M.CLOSE_HORIZON = 8   -- enemy phases closings() plays forward
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
 -- (player_interface.c), so the turns left on turn T are End - T.
@@ -237,6 +243,8 @@ local CHAPTER_TALKS = 0x04
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
+-- struct ClassData +28 attributes (CA_*)
+local CLASS_ATTRIBUTES = 0x28
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
 -- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
@@ -694,6 +702,37 @@ function M.eventOrder(turn)
     end
     return out
 end
+-- Whether AI1 script `ai1` loots (AiScriptCmd_10_DoLooting): gpAi1Table[0][ai1] holds
+-- AI_CMD_PILLAGE before the GOTO that loops it. `scripts` = gpAi1Table's address.
+function M.loots(mem, scripts, ai1)
+    local at = mem.u32(mem.u32(scripts) + ai1 * 4)
+    for i = 0, M.AI_SCR_MAX - 1 do
+        local cmd = mem.u8(at + i * M.AI_SCR_SIZE)
+        if cmd == M.AI_CMD_PILLAGE then return true end
+        if cmd == M.AI_CMD_GOTO then return false end
+    end
+    return false
+end
+
+-- Whether a looter with `items` (ids) and class `attributes` takes chests as well as villages:
+-- AiGetChestUnlockItemSlot (cp_utility.c) -- a Chest Key, or a Lockpick on a CA_STEAL class;
+-- a full bag takes nothing (it flags the unit to escape instead).
+function M.opensChests(items, attributes)
+    if #items >= M.UNIT_ITEM_COUNT then return false end
+    for _, it in ipairs(items) do
+        if it.id == M.ITEM_CHESTKEY then return true end
+        if it.id == M.ITEM_LOCKPICK and (attributes & M.CA_STEAL) ~= 0 then return true end
+    end
+    return false
+end
+
+-- The enemy phase, numbered from turn `now`'s as 1, at which a wave loaded on turn `turn`
+-- reaches a tile `turns` of its moves away: it first moves on its own turn's phase.
+function M.waveCloses(turn, now, turns)
+    if not turns then return nil end
+    return (turn - now) + turns
+end
+
 function M.firstNewEvent(now, later)
     for _, at in ipairs(later) do
         for script in pairs(at.scripts) do
@@ -849,17 +888,57 @@ function M.new(outer)
         return M.demandsOf(units(), commands, mem.u8(S.gPlaySt + PLAY_VISION))
     end
 
-    -- Turns `unit` needs from `at` to `tile` on its own movement costs, nil = never.
+    -- FE8's own march distance to `tile`: GenerateExtendedMovementMap from it, out to
+    -- MAP_MOVEMENT_EXTENDED -- the map its AI heads for a far target over (cp_0803E2F4.c) --
+    -- on `unit`'s movement costs (GetUnitMovementCost: its class's table for the weather).
+    -- dist[y][x], nil = unreached. Units do not block it, as they do not block the AI's. One
+    -- per class and tile for the board (a broken wall or an opened door changes the map).
+    -- `classData` (optional) puts that class's costs on `unit` first, for a unit not loaded yet.
+    local function costGrid(unit, tile, classData)
+        local costGrids = seen.grids
+        local cls = classData or mem.u32(unit.addr + UNIT_CLASS)
+        local k = cls .. "@" .. tile.x .. "," .. tile.y
+        if costGrids[k] == nil then
+            costGrids[k] = sandbox(function(call)
+                if classData then api.write32(unit.addr + UNIT_CLASS, classData) end
+                local costs = call(S.GetUnitMovementCost, { unit.addr })
+                call(S.GenerateExtendedMovementMap, { tile.x, tile.y, costs })
+                local dist = {}
+                for y = 0, h - 1 do
+                    dist[y] = {}
+                    for x = 0, w - 1 do
+                        local v = grid(mem, S.gBmMapMovement, x, y)
+                        if v ~= M.UNREACHED then dist[y][x] = v end
+                    end
+                end
+                return dist
+            end)
+        end
+        return costGrids[k]
+    end
+    -- Turns `unit` needs from `at` to `tile` on its own movement costs (UNIT_MOV), nil = never.
     local function turnsTo(unit, tile, at)
-        local cost = sandbox(function(call)
-            local costs = call(S.GetUnitMovementCost, { unit.addr })
-            call(S.GenerateExtendedMovementMap, { tile.x, tile.y, costs })
-            return grid(mem, S.gBmMapMovement, at.x, at.y)
-        end)
-        if cost == M.UNREACHED then return nil end
+        local cost = costGrid(unit, tile)[at.y][at.x]
+        if not cost then return nil end
         local mov = mem.s8(unit.addr + UNIT_MOV_BONUS) + mem.s8(mem.u32(unit.addr + UNIT_CLASS) + CLASS_MOV)
         return math.ceil(cost / mov)
     end
+    -- the api's: from `from` (default: where u stands)
+    function s.turnsTo(u, tile, from) return turnsTo(u, tile, from or u) end
+
+    -- What an item is worth: FE8's own GetItemCost (price per use x uses, bmitem.c) on the
+    -- item at its full uses (GetItemMaxUses), the number the game sums for the party's worth.
+    local prices = {}
+    function s.itemCost(id)
+        if prices[id] == nil then
+            prices[id] = sandbox(function(call)
+                local uses = call(S.GetItemMaxUses, { id })
+                return call(S.GetItemCost, { id | (uses << 8) })
+            end)
+        end
+        return prices[id]
+    end
+
     local raced = {}   -- village id -> the fastest red unit's turns (false: none reaches)
     local SIDES = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } }
 
@@ -936,7 +1015,7 @@ function M.new(outer)
     end
 
     function s.refresh()
-        seen = { threats = {}, fields = {} }
+        seen = { threats = {}, grids = {} }
         units()
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
@@ -1253,6 +1332,77 @@ function M.new(outer)
         end)
     end
 
+    -- When each village or chest still open (explorable()) closes: the first enemy phase,
+    -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`.
+    -- The field's red units play k enemy phases forward with the game's own AI (aiDecide, as
+    -- enemyPhase plays one), our units held where they stand: a looter's decision is
+    -- AI_ACTION_PILLAGE on the tile, and each unit is stood where it decided to go. A wave not
+    -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, items = {ids} } } } }, the
+    -- guide's reinforcements resolved) loots when its AI1 script does (M.loots), chests too
+    -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
+    -- as its moves reach the tile (M.waveCloses). Read once per board.
+    function s.closings(k, waves)
+        if seen.closings then return seen.closings end
+        local open, all = {}, units()
+        for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
+        local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
+        local out = {}
+        local function close(x, y, phase)
+            local key = x .. "," .. y
+            if open[key] and (not out[key] or phase < out[key]) then out[key] = phase end
+        end
+        sandbox(function(call, proc)
+            local byId = {}
+            for _, o in ipairs(all) do byId[o.id] = o end
+            local D, DEC = S.gAiDecision, Board.AI_DEC
+            for phase = 1, k do
+                api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
+                api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
+                local n = call(S.BuildAiUnitList, {})
+                if n > 0 then call(S.SortAiUnitList, { n }) end
+                local order = {}
+                for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
+                for _, id in ipairs(order) do
+                    local e = byId[id]
+                    if e and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
+                        aiDecide(call, proc, e)
+                        if mem.u8(D + DEC.PERFORMED) ~= 0 then
+                            local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+                            if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
+                                close(x, y, phase)
+                            end
+                            standOn(e, x, y)
+                        end
+                    end
+                end
+            end
+            -- a wave: its class's costs, on a stand-in unit struct (any on the board)
+            local stand = all[1]
+            for _, wv in ipairs(waves or {}) do
+                if wv.turn > turn0 and stand then
+                    for _, wu in ipairs(wv.units) do
+                        local cls = call(S.GetClassData, { wu.class })
+                        local items = {}
+                        for _, id in ipairs(wu.items or {}) do items[#items + 1] = { id = id } end
+                        local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
+                        local chests = villages
+                            and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES))
+                        for _, t in pairs(open) do
+                            if (t.kind == "visit" and villages) or (t.kind == "chest" and chests) then
+                                local cost = costGrid(stand, t, cls)[wu.y][wu.x]
+                                local turns = cost and math.ceil(cost / mem.s8(cls + CLASS_MOV))
+                                local at = M.waveCloses(wv.turn, turn0, turns)
+                                if at then close(t.x, t.y, at) end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        seen.closings = out
+        return out
+    end
+
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
     function s.unseen()
         local out = {}
@@ -1528,29 +1678,11 @@ function M.new(outer)
         return first
     end
 
-    -- FE8's own march distance: GenerateExtendedMovementMap from the goal, out to
-    -- MAP_MOVEMENT_EXTENDED -- the map its AI heads for a far target over (cp_0803E2F4.c).
-    -- Units do not block it, as they do not block the AI's. A field is a march heading; each
-    -- unit's real reach is reach()'s.
+    -- The march heading to a goal: costGrid on fieldUnit()'s costs. Each unit's real reach is
+    -- reach()'s.
     function s.field(goalTile)
-        local k = goalTile.x .. "," .. goalTile.y
-        if seen.fields[k] == nil then
-            local unit = s.fieldUnit()
-            seen.fields[k] = unit and sandbox(function(call)
-                local costs = call(S.GetUnitMovementCost, { unit.addr })
-                call(S.GenerateExtendedMovementMap, { goalTile.x, goalTile.y, costs })
-                local dist = {}
-                for y = 0, h - 1 do
-                    dist[y] = {}
-                    for x = 0, w - 1 do
-                        local v = grid(mem, S.gBmMapMovement, x, y)
-                        if v ~= M.UNREACHED then dist[y][x] = v end
-                    end
-                end
-                return dist
-            end) or false
-        end
-        return seen.fields[k] or nil
+        local unit = s.fieldUnit()
+        return unit and costGrid(unit, goalTile) or nil
     end
 
     -- The game's turn-event check (eventinfo.c: the phase-change hook searches turnBasedEvents

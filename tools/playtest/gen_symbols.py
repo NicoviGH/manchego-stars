@@ -328,6 +328,11 @@ WANTED = [
     'TalkCommandUsability',     # Talk: MakeTalkTargetList finds a partner, not Silenced (bmmenu.c)
     'DoorCommandUsability',     # Door: a key and a door beside the unit (bmmenu.c)
     'UnitActionMenu_CanSeize',  # Seize: CanUnitSeize on the Seize tile (bmmenu.c)
+    # The planner's goals (#510 step 9): what an item is worth, a class's costs and AI scripts.
+    'GetItemCost',              # price per use x uses: the party's worth sums it (bmitem.c)
+    'GetItemMaxUses',           # an item's full uses (bmitem.c)
+    'GetClassData',             # a class's struct: costs, MOV, attributes (bmunit.c)
+    'gpAi1Table',               # AI1 scripts by ai1 index: a looter's holds AI_CMD_PILLAGE
     'CanUnitUseWeaponNow',      # the weapons the Attack command lists (bmitem.c)
     'MakeTargetListForWeapon',  # that weapon's targets: units not allied, and walls (bmtarget.c)
     'AttackCommandUsability',   # Attack: a weapon above with a target (bmmenu.c; the clear loop)

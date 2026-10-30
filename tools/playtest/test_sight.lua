@@ -525,5 +525,35 @@ do
     check(table.concat(ids, " "), "doors fog sustain", "demandsOf: doors, fog when the range is set")
 end
 
+-- loots: an AI1 script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
+-- (cp_script.h; the scripts loop back with a GOTO, so a scan past it reads the next script).
+do
+    local ram = {}
+    local mem = { u32 = function(a) return ram[a] or 0 end, u8 = function(a) return ram[a] or 0 end }
+    -- gpAi1Table at 0x100 holds the table's address 0x200; ai1 0 -> script 0x300, ai1 1 -> 0x400
+    ram[0x100], ram[0x200], ram[0x204] = 0x200, 0x300, 0x400
+    ram[0x300], ram[0x310], ram[0x320] = 0x05, 0x10, 0x03           -- action, PILLAGE, GOTO
+    ram[0x400], ram[0x410], ram[0x420] = 0x05, 0x03, 0x10           -- action, GOTO, (another's)
+    check(Sight.loots(mem, 0x100, 0), true, "loots: PILLAGE before the GOTO")
+    check(Sight.loots(mem, 0x100, 1), false, "loots: nothing past the script's GOTO counts")
+end
+
+-- opensChests: AiGetChestUnlockItemSlot's rule -- a Chest Key, or a Lockpick on a CA_STEAL
+-- class, and never with a full bag.
+do
+    check(Sight.opensChests({ { id = 0x69 } }, 0), true, "opensChests: a Chest Key")
+    check(Sight.opensChests({ { id = 0x6B } }, 0), false, "opensChests: a Lockpick, no CA_STEAL")
+    check(Sight.opensChests({ { id = 0x6B } }, 4), true, "opensChests: a Lockpick on a thief")
+    check(Sight.opensChests({ { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 0x69 } }, 0),
+        false, "opensChests: a full bag takes no loot")
+end
+
+-- waveCloses: a wave loaded on turn T first moves that turn's enemy phase; from turn `now` the
+-- enemy phases are numbered 1, 2, ... so it closes at (T - now) + its turns.
+do
+    check(Sight.waveCloses(8, 4, 2), 6, "waveCloses: turn 8, two moves, seen from turn 4")
+    check(Sight.waveCloses(8, 4, nil), nil, "waveCloses: a tile it never reaches")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
