@@ -1334,7 +1334,8 @@ function M.new(outer)
     end
 
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
-    -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`.
+    -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`
+    -- (default M.CLOSE_HORIZON).
     -- The field's red units play k enemy phases forward with the game's own AI (aiDecide, as
     -- enemyPhase plays one), our units held where they stand: a looter's decision is
     -- AI_ACTION_PILLAGE on the tile, and each unit is stood where it decided to go. A wave not
@@ -1344,6 +1345,7 @@ function M.new(outer)
     -- as its moves reach the tile (M.waveCloses). Read once per board.
     function s.closings(k, waves)
         if seen.closings then return seen.closings end
+        k = k or M.CLOSE_HORIZON
         local open, all = {}, units()
         for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
         local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
