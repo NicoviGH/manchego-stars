@@ -463,6 +463,12 @@ local function fc(o)
 end
 local function style(aggression) return { aggression = aggression, deploy = {}, claims = {} } end
 -- a style whose villages and chests are worth `gold` each (goals.lua's prior: the mean gift)
+-- the chance a plan leaves goal `id` (its record's goalWorth `after`), nil when it has none
+local function goalAfter(plan, id)
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == id then return g.after end
+    end
+end
 local function gifted(aggression, gold)
     local st = style(aggression)
     st.villageGifts = { items = {}, gold = { gold } }
@@ -3008,10 +3014,7 @@ do
     check(sent, "0,0", "talker: sent to its recruit")
     -- the plan leaves T's Talk for next turn, sure (GAMMA^1): within one move of T every tile
     -- gives that, and nothing in the model makes a nearer one surer (goals.lua)
-    local after
-    for _, g in ipairs(plan and plan.goalWorth or {}) do
-        if g.id == "recruit:" .. 0x30 then after = g.after end
-    end
+    local after = goalAfter(plan, "recruit:" .. 0x30)
     check(after, 0.85, "talker: its recruit is Talked over next turn")
 end
 
@@ -3178,10 +3181,7 @@ do
     check(a and a.act ~= "attack", true, "goals: the boss kill waits for a village in reach")
     board, sight = bossAndVillage()
     local _, vplan = Planner.plan(B, board, sight, gifted("careful", 100000))
-    local after
-    for _, g in ipairs(vplan and vplan.goalWorth or {}) do
-        if g.id == "visit:1,6" then after = g.after end
-    end
+    local after = goalAfter(vplan, "visit:1,6")
     check(after, 0.85, "goals: A ends where it Visits the rich village next turn")
 end
 
@@ -3449,10 +3449,7 @@ do
         enemyPhase = function() return {} end,
     }
     local _, plan = Planner.plan(B, boardOf(A, E, F), sightOf(o), gifted("careful", 1000))
-    local win
-    for _, g in ipairs(plan and plan.goalWorth or {}) do
-        if g.id == "win" then win = g.after end
-    end
+    local win = goalAfter(plan, "win")
     check(win, 0.85, "goals: a kill with an enemy in the fog is no win (the win stays a turn off)")
 end
 
@@ -3472,10 +3469,7 @@ do
     local sight = sightOf(o)
     sight.redCount = function() return 2 end   -- E, and a red E carries
     local _, plan = Planner.plan(B, boardOf(A, E), sight, gifted("careful", 1000))
-    local win
-    for _, g in ipairs(plan and plan.goalWorth or {}) do
-        if g.id == "win" then win = g.after end
-    end
+    local win = goalAfter(plan, "win")
     check(win, 0.85, "goals: the game's red count, not the board's, decides a Rout's win")
 end
 
@@ -3521,19 +3515,13 @@ do
         enemyPhase = function() return {} end,
     }
     local _, plan = Planner.plan(B, boardOf(A, T, E), sightOf(o), style("careful"))
-    local win
-    for _, g in ipairs(plan and plan.goalWorth or {}) do
-        if g.id == "win" then win = g.after end
-    end
+    local win = goalAfter(plan, "win")
     check(win, 0.85, "rout: a Talk on a green is no win while a red stands")
     local H = red(0x82, 9, 8, { minRange = false, onField = false })
     local x = { objective = { kind = "rout" }, reach = { [0x01] = tiles({ 1, 0 }) },
                 enemyPhase = function() return {} end }
     _, plan = Planner.plan(B, boardOf(A, H), sightOf(x), style("careful"))
-    win = nil
-    for _, g in ipairs(plan and plan.goalWorth or {}) do
-        if g.id == "win" then win = g.after end
-    end
+    win = goalAfter(plan, "win")
     check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
 end
 
