@@ -53,7 +53,8 @@
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
 -- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
--- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase) },
+-- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase),
+-- closes },
 -- winFell = the judged phase's chance our counter ends the chapter }.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
@@ -244,7 +245,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- full speed keeps a goal's chance, holding back loses a turn of it, a Visit or a Talk
     -- takes it; the win closes every other goal still open, so it costs what they were worth.
     local goals = Goals.list(board, sight, style, ctx)
-    local turnsTo = sight.turnsTo or function() return nil end
+    -- the goals' turns: the game's own, through the breach when a door or wall cuts a unit off
+    local turnsTo = ctx.turnsTo
     local function positions(st, alive)
         local pos = {}
         for _, u in ipairs(ctx.blues) do
@@ -300,12 +302,14 @@ function M.plan(Bot, board, sight, style, opts)
                 if g.kind == "recruit" then
                     c = c * (1 - (st.recruitHit[g.unitId] or 0))
                         * (1 - (felled and felled[g.unitId] or 0))
+                        * (alive and alive[g.unitId] or 1)
                 end
             end
             v = v + Goals.worth(g, W) * (c - before[g.id])
             if rows then
                 rows[#rows + 1] = { id = g.id, kind = g.kind, gold = g.gold,
-                                    worth = Goals.worth(g, W), before = before[g.id], after = c }
+                                    worth = Goals.worth(g, W), before = before[g.id], after = c,
+                                    closes = g.closes }
             end
         end
         -- the win now rather than a turn later: one death's worth x (1 - GAMMA). With nothing
@@ -739,6 +743,9 @@ function M.plan(Bot, board, sight, style, opts)
         -- counter may have felled (its goal lost)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
+        -- a green recruit the enemy may kill loses its goal as well (vanilla Ch2: Ross, at 0.37
+        -- to die, was a 22-point risk to bold, and with him went Garcia, whom only he talks over)
+        for _, g in ipairs(greens) do alive[g.id] = 1 - (die[g.id] or 0) end
         st.goalWorth = {}
         judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
         st.winFell, st.winStruck = fell, winStruck

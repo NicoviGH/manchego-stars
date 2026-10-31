@@ -1348,7 +1348,8 @@ function M.new(outer)
     -- (default M.CLOSE_HORIZON).
     -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2)
     -- play k enemy phases forward with the game's own AI (aiDecide, as enemyPhase plays one),
-    -- in the game's turn order, every other unit held where it stands: a looter's decision is
+    -- in the game's turn order, every other unit held where it stands and ours hidden from the
+    -- AI (when it falls undefended): a looter's decision is
     -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
     -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
     -- calls (3,787 -> 11,086). Read once per turn: our acts move no looter. A wave not
@@ -1378,6 +1379,15 @@ function M.new(outer)
         sandbox(function(call, proc)
             local byId = {}
             for _, o in ipairs(all) do byId[o.id] = o end
+            -- the question is when a tile falls if no one of ours defends it: our units are
+            -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
+            -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
+            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell)
+            for _, o in ipairs(all) do
+                if o.faction ~= "red" and o.onField then
+                    api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
+                end
+            end
             local D, DEC = S.gAiDecision, Board.AI_DEC
             for phase = 1, next(looter) and k or 0 do
                 api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)

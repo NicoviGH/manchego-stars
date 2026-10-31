@@ -1764,6 +1764,27 @@ do
           "exploring: nothing opens the way, nobody is sent")
 end
 
+-- test_goal_turns_go_through_the_breach: the same chest, behind the door. The game's own turns
+-- (sight.turnsTo) find no way; the goals' read goes through the door A can open, so the chest
+-- has a chance and the walk to it is worth something (vanilla Ch3: the throne behind walls was
+-- unreachable for every unit, and the army sat for 22 turns).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        doors = { { x = 2, y = 0 } }, obstacles = {}, openers = { [0x01] = true },
+        explorable = { { x = 4, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["4,0"] = "chest" } },
+    }
+    local sight = sightOf(o)
+    check(sight.turnsTo(A, { x = 4, y = 0 }), nil, "breach: the game's turns find no way")
+    local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
+    local t = ctx.turnsTo(A, { x = 4, y = 0 })
+    check(t ~= nil and t > 0, true, "breach: the goals' turns go through the door")
+end
+
 -- test_healers_act_after_the_fighters: H heals A only once A has acted; until then A moves.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false })
@@ -3298,6 +3319,37 @@ do
     check((play(true) or {}).act ~= "attack", true, "goals: no chip on the boss while a goal is open")
     check((play(false) or {}).act, "attack", "goals: with nothing left, the chip")
 end
+
+
+-- test_a_green_recruits_death_loses_its_goal: as the game-over green test, in bold, but G is a
+-- recruit A may Talk over. Its death in the enemy phase spoils the clear (one death) AND loses
+-- the unit it would have been (its goal): A blocks for a village whose ground beats one death
+-- alone (vanilla Ch2: Ross, and Garcia with him).
+local function greenRecruitPlay(gold, talk)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = talk and { [0x01] = { [0x30] = true } } or nil,
+        field = function(t)
+            return t.x == 5 and t.y == 0 and { [0] = { [0] = 20, [1] = 40 } } or nil
+        end,
+        explorable = { { x = 5, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["5,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), gifted("bold", gold))))
+end
+check(greenRecruitPlay(2500, false) .. " " .. greenRecruitPlay(2500, true), "0,0 1,0",
+      "goals: a green recruit's death costs its goal too, and A blocks")
 
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)

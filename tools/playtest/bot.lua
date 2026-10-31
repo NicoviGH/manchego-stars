@@ -849,6 +849,28 @@ local function breachFor(ctx, u, goal)
     return b or nil
 end
 
+-- The turns `u` needs from `from` (default: where it stands) to `tile`, the goals' read
+-- (goals.lua's turnsTo): sight.turnsTo on its own costs, else, cut off by a door or a wall,
+-- through the obstacle that opens the way (breachFor) as the march goes -- its moves to the
+-- obstacle, one step through, the field beyond. Without the breach, vanilla Ch3's throne (behind
+-- walls) was unreachable for every unit, so nothing pulled the army and a run took 22 turns.
+local function turnsFor(ctx, u, tile, from)
+    from = from or u
+    local s = ctx.sight
+    local n = s.turnsTo and s.turnsTo(u, tile, from)
+    if n or not s.turnsTo then return n end
+    local b = breachFor(ctx, u, tile)
+    local toB = b and s.turnsTo(u, b, from)
+    local field = toB and fieldFor(ctx, tile)
+    local beyond
+    for _, side in ipairs(field and SIDES or {}) do
+        local row = field[b.y + side[2]]
+        local v = row and row[b.x + side[1]]
+        if v and (not beyond or v < beyond) then beyond = v end
+    end
+    return beyond and toB + (1 + beyond) / s.mov(u) or nil
+end
+
 -- Where `u` marches: its goal, or the obstacle that opens the way to it.
 local function marchGoal(ctx, u, objective)
     local goal = goalFor(ctx, u, objective)
@@ -1292,17 +1314,11 @@ local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) 
 
 -- What sending `u` to open tile `t` is worth: its gold x the chance `u` gets there (Goals.chance:
 -- its own turns, none once a looter closes it first), and that chance. A unit cut off from it
--- goes through the breach (marchLength) at its own MOV.
+-- goes through the breach (turnsFor).
 local function sendWorth(ctx, u, t)
-    local function turns(v, tile, from)
-        local n = ctx.sight.turnsTo and ctx.sight.turnsTo(v, tile, from)
-        if n then return n end
-        local d = marchLength(ctx, v, tile)
-        return d and ctx.sight.mov and d / ctx.sight.mov(v) or d
-    end
     local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
     local pos = { [u.id] = { x = u.x, y = u.y, acted = u.acted, alive = 1 } }
-    local c = Goals.chance(goal, pos, Goals.GAMMA, turns)
+    local c = Goals.chance(goal, pos, Goals.GAMMA, ctx.turnsTo)
     return t.gold * c, c
 end
 
@@ -1467,6 +1483,7 @@ function M.candidates(board, sight, style, opts)
     ctx.explored = opts and opts.explored or {}
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
+    ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
     exploring(ctx, opts and opts.sent)
     ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
