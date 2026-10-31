@@ -9,37 +9,33 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **#510 step 9: the sandbox equip leak is fixed and MERGED,
-PR #554, 5ef00b7 on main.** `/code-review 554 medium` + a scoped re-review, every finding fixed, none
-dropped; CI green on its head. Write-up: #510 comment 6537709042. The tree is clean on main; no
-branch in flight. The goal-worth planner before it (#553, ADR 0383) is described in that ADR.
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9: two fixes MERGED today.** #554 (5ef00b7):
+the sandbox equip leak. #555 (fb779c6): the talk duty retired (Nicolas's call, ADR 0382 amended).
+Each went through `/code-review <PR> medium` plus scoped re-reviews, every finding fixed, CI green
+on the head. Write-ups: #510 comments 6537709042 and 6538190941. The tree is clean on main; no
+branch in flight.
 
-**What #554 fixed:** vanilla Ch5's "Joshua lost to our counter on turn 2" was a SANDBOX LEAK, not a
-planner judgement. `EquipUnitItemSlot` reorders the bag, a game write the journal never saw, so one
-judged plan's equip (Seth's Iron Sword) stayed in front for the plans judged after it in the same
-batch: Seth's counter was judged unable to kill Joshua. Now `Sight.equip` keeps the bag through
-`api.keep16` (batching's named "a game call will write these" op) and is the ONLY caller of
-EquipUnitItemSlot (test_sight checks the source). The bag layout has one owner: `Board.items`,
-`Board.UNIT_ITEMS`, `Board.ITEM_COUNT` (harness's INSPECT.BAG copy folded).
+- **#554:** vanilla Ch5's "Joshua lost to our counter on turn 2" was a sandbox leak, not a
+  judgement. `EquipUnitItemSlot` reorders the bag, a game write no journal saw, so one judged
+  plan's equip (Seth's Iron Sword) stayed in front for the next plans. `Sight.equip` now keeps the
+  bag via `api.keep16`, and it is the only caller (test_sight checks the source). The bag layout's
+  owner is `Board.items` / `UNIT_ITEMS` / `ITEM_COUNT`.
+- **#555:** a talker sent to a claimed recruit keeps its whole menu (heal, holds). The cut menu
+  had left the planner no safe plan to judge for Natasha.
 
-**Measured, fix vs main, same envs** (first clean attempt):
-| Chapter | Fix | Main |
-|---|---|---|
-| Vanilla Ch2 | 1 | 1 |
-| Vanilla Ch3 | 1 | 1 |
-| Vanilla Ch4 | none in 3 (village 1,11 skipped) | none in 3, the same |
-| Vanilla Ch5 | **1** | none in 9 |
-| Ours ch01 (from its store, `from: 2`) | none in 3 (attempts 1 and 3 `stuck`) | none in 3, frame-identical |
-The Ch4 and ours ch01 "1"s in #553's table were stale: main does not clear them clean on today's envs.
+**Measured, vanilla Ch5 attempts 1-9, same env, seed 1** (main before #554 / after #554 / after #555):
+clean clears 0 / 1 / **2**; Joshua recruited 5 / 8 (after #555); Natasha killed 5 / 0 (after #555).
+Vanilla Ch2 and Ch3 are unchanged (clean at attempt 1). Vanilla Ch4 and ours ch01 are not clean on
+today's envs, on main before either fix as well: the old table's "1"s were stale.
 
 **NEXT: the planner's open items, in order.** Start a branch off main.
-1. **Vanilla Ch5: Natasha dies on enemy phase 3** (attempts 2, 4, 5, 8), so Joshua is never talked
-   to. Not a prediction miss: each turn-3 plan sends her toward Joshua knowing a 0.32-0.69 death
-   chance and judges the rest worse. The recruit goal's worth vs her death: pricing/tuning.
-2. **The win-procrastination stall** (vanilla Ch5 attempt 5, `stuck` turn 43): a goal two moves away
-   (village 12,10) that nothing moves toward keeps its chance each turn, so waiting (its one-turn
-   decay) always beats the win (which closes it). Likely the same shape as ours ch01's `stuck`
-   attempts and Ch4's skipped village 1,11 -- check those traces first.
+1. **The win-procrastination stall.** A goal two moves away that nothing moves toward keeps its
+   chance every turn, so waiting (one turn's decay) always beats the win (which closes the goal).
+   Seen as vanilla Ch5 attempt 5 `stuck` on turn 43 after #554 (village 12,10); #555's path avoids
+   it there. Check ours ch01's `stuck` attempts 1 and 3 and Ch4's skipped village 1,11 first: they
+   may share the cause. Ours ch01 from its store: see "Running a chapter alone" below.
+2. **Vanilla Ch5 after #555:** Joshua kills an unrecruited unit before the Talk (attempts 1, 4, 8),
+   and Gilliam (0x04) dies on turn 2 (attempts 1, 3, 4, 9).
 3. **Ours ch02's two greens** (201, 202) die on turns 2-3 in every attempt, on main too.
 4. Ours ch03's boss losses: Nicolas's design call (look-ahead vs a sampled rollout).
 5. The forced-fog stall (part C).
