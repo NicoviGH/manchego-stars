@@ -89,6 +89,9 @@ DEAD_CONCEPTS = [
     # retired by #510 step 9's goal worth (ADR 0383): the planner weighs what is still left to
     # get (goals.lua), never a flat step of ground or a recruit's fixed credit
     r'\bW\.progress\b', r'\bW\.recruit\b', r'\ba\.progress\b',
+    # retired by ADR 0382's 2026-10-30 amendment: a claimed recruit's talker keeps its whole
+    # menu (the recruit's goal worth pulls it), never a duty cut to the march on it
+    r'\btalkDuty\b', r'\b(?:recruit )?claim is played first\b',
     # retired by #510 step 9 (ADR 0377): an exchange's odds are the game's own play of it,
     # every roll caught (sight.lua `played`), never a blow model of displayed hit and x3 crits
     r'\bhitChance\b', r'\bCRIT_MULTIPLIER\b', r'Planner\.blows\b', r'plan\.branch\b',

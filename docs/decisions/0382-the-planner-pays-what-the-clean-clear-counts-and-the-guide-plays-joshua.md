@@ -74,3 +74,14 @@ up ("skipped"). The planner takes the win while a reward is still open; part A r
 same village on its Ch5 runs. One clean style of nine is the measure until that is closed.
 
 The kill branch costs about 30% a turn (Ch5 attempt 1: 2.35 s a turn before, 3.0 s after).
+
+**Amended 2026-10-30 (#510; Nicolas: retire it).** The talker's duty in (5) is retired. A
+claimed recruit still sends its talker to it (`exploring`: the march on it), but the talker
+keeps its whole menu, heal and hold tiles included. The duty was set before anything priced
+the recruit; since ADR 0383, the recruit's goal worth pulls the talker there, and the planner
+prices the turn a hold costs against the death a march risks. The cut menu left that trade
+unjudged: in vanilla Ch5 attempt 2, all ten judged plans walked Natasha into a 0.56 chance to
+die on turn 3, because no plan holding her back existed to judge. Measured on the same envs,
+seed 1 (vanilla Ch5 attempts 1-9, with the duty against without): clean clears 1 against 2,
+Joshua recruited 5 against 8, deaths 12 against 9, Natasha killed 5 against 0, stuck 1
+against 0, CPU 280 s against 290 s. Vanilla Ch2's Talk recruits are frame-identical.

@@ -1323,7 +1323,7 @@ local function sendWorth(ctx, u, t)
 end
 
 local function exploring(ctx, sent)
-    ctx.exploreGoal, ctx.talkDuty = {}, {}
+    ctx.exploreGoal = {}
     local taken = {}
     local function reaches(u, t)
         local d = marchLength(ctx, u, t)
@@ -1360,16 +1360,10 @@ local function exploring(ctx, sent)
             if #talkers > 0 then break end
         end
         for _, p in ipairs(talkers) do
-            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, claimed = #claims > 0 }
+            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end)
-    -- a talker sent to a recruit the style claims is on duty (Bot.candidates): the claim is
-    -- played first
-    for _, p in ipairs(talkPairs) do
-        local g = ctx.exploreGoal[p.u.id]
-        if p.claimed and g and g.x == p.t.x and g.y == p.t.y then ctx.talkDuty[p.u.id] = p.t end
-    end
     if not ctx.sight.explorable then return end
     local pairs_ = {}
     local open, blues = {}, {}
@@ -1630,19 +1624,6 @@ function M.candidates(board, sight, style, opts)
         -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
         -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
         for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
-        -- a recruit claim is played first: the talker exploring sent to its recruit Talks
-        -- (that recruit, or any other the game offers it), or goes toward it (the march, or
-        -- the retreat that still gains ground), and does nothing else (vanilla Ch5: Natasha
-        -- healed and held for five turns, Joshua never reached)
-        if ctx.talkDuty[u.id] then
-            local kept = {}
-            for _, a in ipairs(acts) do
-                if a.act == "talk" or a.why == "march" or a.why == "retreat" then
-                    kept[#kept + 1] = a
-                end
-            end
-            acts = kept
-        end
         for _, a in ipairs(acts) do
             local friend = vacated(ctx, u, a.move.x, a.move.y)
             a.vacate = friend and friend.id

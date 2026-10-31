@@ -3018,10 +3018,11 @@ do
     check(after, 0.85, "talker: its recruit is Talked over next turn")
 end
 
--- test_a_claimed_talker_only_goes_to_its_recruit: the style claims R (red, far off) for N, a
--- healer with a hurt ally beside it and an enemy to hold off. A claim is played first: while R
--- is on the field, N's menu is the march on R and the retreat toward it, never the heal or a
--- hold (vanilla Ch5: Natasha healed for five turns and never reached Joshua).
+-- test_a_claimed_talker_keeps_its_menu: the style claims R (red, far off) for N, a healer with
+-- a hurt ally beside it. The claim sends N to R (the march on it), and N keeps the heal and its
+-- hold tiles: the recruit's goal worth (goals.lua) pulls it there, and the planner prices the
+-- turn a hold costs against the death a march risks. A menu cut to the march alone left no safe
+-- plan to judge (vanilla Ch5: Natasha sent into a 0.56 chance to die on turn 3, Joshua lost).
 do
     local N = blue(0x0D, 0, 4, 0, { minRange = false })
     local C = blue(0x02, 1, 4, 1, { minRange = false, hp = 5, maxhp = 20 })
@@ -3056,12 +3057,7 @@ do
                              style("careful"))
     local claimed = whys(st)
     check(tostring(claimed.heal) .. " " .. tostring(claimed.hold) .. " " .. tostring(claimed.march),
-          "nil nil true", "talker: claimed, it only marches on its recruit")
-    -- no way to R (the field never reaches N): exploring sends N nowhere, so it is on no duty
-    -- and keeps its own menu
-    o.field = function() return {} end
-    local cut = whys(st)
-    check(cut.heal and cut.hold and true or false, true, "talker: no way to its recruit, no duty")
+          "true true true", "talker: claimed, it marches on its recruit and keeps heal and hold")
 end
 
 -- The goals a careful plan sends units to, "x,y" by unit id. `o.field` defaults to open ground
