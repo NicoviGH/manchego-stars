@@ -1372,18 +1372,20 @@ local function exploring(ctx, sent)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
+            and reaches(u, t) and sendWorth(ctx, u, t) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
     end
     -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
-    -- slow one would lose), the nearer on a tie
+    -- slow one would lose), the nearer on a tie. A trip worth nothing is none: the sent unit's
+    -- march goes there instead of to the objective (ours ch01: the lord sent to a House with
+    -- no gift known never marched on the gate, and the chapter stalled)
     for _, t in ipairs(openTiles(ctx)) do
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
             if d then
-                local v, c = sendWorth(ctx, u, t)
-                if c > 0 then pairs_[#pairs_ + 1] = { t = t, u = u, d = d, v = v } end
+                local v = sendWorth(ctx, u, t)
+                if v > 0 then pairs_[#pairs_ + 1] = { t = t, u = u, d = d, v = v } end
             end
         end
     end

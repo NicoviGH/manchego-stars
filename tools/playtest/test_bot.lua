@@ -1763,7 +1763,7 @@ do
             end
         end
     end
-    check(doorFor(B.candidates(boardOf(A, E), sightOf(o), style("careful"))), "1,0",
+    check(doorFor(B.candidates(boardOf(A, E), sightOf(o), gifted("careful", 500))), "1,0",
           "exploring: a cut-off unit that can open the way is sent, and opens the door")
     o.openers = {}
     check(doorFor(B.candidates(boardOf(A, E), sightOf(o), style("careful"))), nil,
@@ -2389,13 +2389,24 @@ do
         canExplore = { [0x01] = { ["8,0"] = "visit" }, [0x02] = { ["8,0"] = "visit" } },
     }
     local marches = {}
-    for _, c in ipairs(B.candidates(boardOf(A, Bu, X), sightOf(o), style("careful"))) do
+    for _, c in ipairs(B.candidates(boardOf(A, Bu, X), sightOf(o), gifted("careful", 500))) do
         for _, a in ipairs(c.acts) do
             if a.why == "march" then marches[c.unit.id] = at(a) end
         end
     end
     check(marches[0x02], "6,0", "exploring: the nearer unit marches to the village")
     check(marches[0x01], "0,1", "exploring: the other marches on the enemy")
+    -- test_a_worthless_tile_sends_no_one: the same village with no gift known (an env with no
+    -- prior for it: ours ch01's Houses) is worth nothing, so no unit is sent and B keeps its
+    -- march on the enemy. Sent anyway, it took the lord's march on the gate for good: the
+    -- chapter stalled until `stuck`.
+    local free = {}
+    for _, c in ipairs(B.candidates(boardOf(A, Bu, X), sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.why == "march" then free[c.unit.id] = at(a) end
+        end
+    end
+    check(free[0x02], "5,1", "exploring: a tile worth nothing sends no one")
 
     -- test_exploring_sends_the_faster_in_a_race: a looter closes (8,0) after enemy phase 2. A
     -- (MOV 4, 2 turns: phase 2 unacted) and a slow B (MOV 1, 3 tiles: 3 turns, too late) can
@@ -2406,7 +2417,7 @@ do
         local race = {}
         for k, v in pairs(o) do race[k] = v end
         race.closings = { ["8,0"] = 2 }
-        local _, ctx = B.candidates(boardOf(A2, B2, X), sightOf(race), style("careful"))
+        local _, ctx = B.candidates(boardOf(A2, B2, X), sightOf(race), gifted("careful", 500))
         check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 8,
               "exploring: the unit that gets there in time is sent")
         check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
@@ -2417,7 +2428,7 @@ do
     -- per decision left ch02's (12,3) handed between two units and never reached.)
     local function sentMarches(sent, ...)
         local out = {}
-        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), style("careful"), { sent = sent })) do
+        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), gifted("careful", 500), { sent = sent })) do
             for _, a in ipairs(c.acts) do
                 if a.why == "march" then out[c.unit.id] = at(a) end
             end
@@ -2439,7 +2450,7 @@ do
     local s = sightOf(o)
     local inner = s.canExplore
     s.canExplore = function(u, ...) asked[#asked + 1] = u.id; return inner(u, ...) end
-    B.candidates(boardOf(acted, Bu, X), s, style("careful"), { sent = sentA })
+    B.candidates(boardOf(acted, Bu, X), s, gifted("careful", 500), { sent = sentA })
     local askedA = 0
     for _, id in ipairs(asked) do
         if id == 0x01 then askedA = askedA + 1 end
