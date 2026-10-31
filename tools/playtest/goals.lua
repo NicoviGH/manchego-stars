@@ -12,9 +12,9 @@
 --                  takers = our units the game lets use it (sight.canExplore).
 --   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the units of ours that
 --                  may Talk it over); its takers are those talkers.
---   objective      the way to the objective: the Seize tile (takers: who sight.canSeize), or
---                  the boss's tile on a Defeat Boss map (every unit). None on Rout or Survive:
---                  Rout's way there is its kills, Survive's is holding.
+--   objective      each unit's own way to the objective (ctx.objectiveTile: the Seize tile,
+--                  the boss, or on Rout the nearest enemy -- where its march heads), the unit
+--                  its one taker. None on Survive, whose way there is holding.
 -- goal = { id, kind, tile = {x, y}, gold, takerUnits = { unit }, closes = enemy phase | nil }.
 -- `gold` (Goals.worth makes it points):
 --   a village or chest: the mean gift over every vanilla village (style.villageGifts: items
@@ -25,16 +25,19 @@
 --     goals its `needs` names, none of it once one of them is lost (ctx.lost).
 -- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it.
 --
--- Goals.worth(goal, W) -> points: gold x W.gold, plus W.death for a recruit (a unit) and the
--- objective's way there (so no style walks into a death for it; the win itself is the
--- planner's W.win).
+-- Goals.worth(goal, W) -> points: gold x W.gold, plus W.death for a recruit (a unit), and for
+-- the objective's way there one W.death shared over the army (`share`): no style walks into a
+-- death for it, and each unit is pulled forward as the old flat ground term pulled it (careful:
+-- ~111 a unit of nine, a turn closer ~9 against the old 8). The win itself is the planner's W.win.
 --
 -- Goals.chance(goal, pos, gamma, turnsTo) -> 0..1: pos[unit id] = { x, y, acted, alive (0..1) },
--- the board a plan leaves. A taker that has not acted arrives on player phase max(t, 1) (this
--- one is 1), one that has acted on 1 + max(t, 1), t = turnsTo(u, tile, pos) its moves there;
--- each phase later is a factor gamma (another enemy phase where something can go wrong), and a
--- goal closed before the taker's phase (closes < it) is 0 for it. Over the takers, the
--- expected best as each lives (alive), the best first.
+-- the board a plan leaves. t = turnsTo(u, tile, pos), its turns there (sight's: cost / MOV, not
+-- rounded); one that has acted starts a turn later. The chance is gamma ^ (t + late - 1), at
+-- most 1: each turn further is another enemy phase where something can go wrong, and every
+-- step counts, the last one into reach too (a talker one step from its recruit's side was
+-- indifferent between that tile and one farther off but still in reach). A goal closed before
+-- the phase the taker really arrives on (closes < ceil(t) + late, at least phase 1) is 0 for
+-- it. Over the takers, the expected best as each lives (alive), the best first.
 
 local M = {}
 
@@ -48,10 +51,10 @@ local function mean(xs)
 end
 
 -- the worth of a village or chest whose gift is unknown: the mean vanilla gift
-local function prior(sight, gifts)
+local function prior(cost, gifts)
     if not gifts then return 0 end
     local xs = {}
-    for _, id in ipairs(gifts.items or {}) do xs[#xs + 1] = sight.itemCost(id) end
+    for _, id in ipairs(gifts.items or {}) do xs[#xs + 1] = cost(id) end
     for _, g in ipairs(gifts.gold or {}) do xs[#xs + 1] = g end
     return mean(xs)
 end
@@ -78,6 +81,8 @@ end
 
 function M.list(board, sight, style, ctx)
     local goals, blues, byId = {}, {}, {}
+    -- a sight without a read (test_bot's fakes) has no goal that needs it
+    local cost = sight.itemCost or function() return 0 end
     for _, u in ipairs(board.units) do
         byId[u.id] = u
         if u.faction == "blue" and u.onField and not u.dead then blues[#blues + 1] = u end
@@ -91,14 +96,16 @@ function M.list(board, sight, style, ctx)
     end
     local explored, closings = ctx.explored or {}, sight.closings and
         sight.closings(nil, style.waves) or {}
-    local worth = prior(sight, style.villageGifts)
+    local worth = prior(cost, style.villageGifts)
     for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
         local k = key(t.x, t.y)
         if not explored[k] then
             goals[#goals + 1] = {
                 id = t.kind .. ":" .. k, kind = t.kind, tile = { x = t.x, y = t.y }, gold = worth,
                 closes = closings[k],
-                takerUnits = takers(function(u) return sight.canExplore(u, t.x, t.y, t.kind) end),
+                takerUnits = takers(function(u)
+                    return sight.canExplore and sight.canExplore(u, t.x, t.y, t.kind)
+                end),
             }
         end
     end
@@ -109,14 +116,14 @@ function M.list(board, sight, style, ctx)
             for _, g in ipairs(goals) do
                 if needs(r, g) then share[#share + 1] = g end
             end
-            for _, g in ipairs(share) do g.gold = g.gold + sight.itemCost(r.item) / #share end
+            for _, g in ipairs(share) do g.gold = g.gold + cost(r.item) / #share end
         end
     end
     for id, talkers in pairs(ctx.recruitTalkers or {}) do
         local t = byId[id]
         if t then
             local gold = 0
-            for _, it in ipairs(t.items or {}) do gold = gold + sight.itemCost(it.id) end
+            for _, it in ipairs(t.items or {}) do gold = gold + cost(it.id) end
             local us = {}
             for _, uid in ipairs(talkers) do
                 if byId[uid] then us[#us + 1] = byId[uid] end
@@ -125,17 +132,12 @@ function M.list(board, sight, style, ctx)
                                   tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us }
         end
     end
-    local o = sight.objective or {}
-    if o.kind == "seize" and o.tile then
-        goals[#goals + 1] = { id = "objective", kind = "objective", tile = o.tile, gold = 0,
-                              takerUnits = takers(function(u) return sight.canSeize(u) end) }
-    elseif o.kind == "boss" then
-        for _, u in ipairs(board.units) do
-            if u.isBoss and u.faction == "red" and u.onField and not u.dead then
-                goals[#goals + 1] = { id = "objective", kind = "objective",
-                                      tile = { x = u.x, y = u.y }, gold = 0,
-                                      takerUnits = takers(function() return true end) }
-            end
+    for _, u in ipairs(ctx.objectiveTile and blues or {}) do
+        local t = ctx.objectiveTile(u)
+        if t then
+            goals[#goals + 1] = { id = "objective:" .. u.id, kind = "objective",
+                                  tile = { x = t.x, y = t.y }, gold = 0, share = 1 / #blues,
+                                  takerUnits = { u } }
         end
     end
     table.sort(goals, function(a, b) return a.id < b.id end)
@@ -144,7 +146,8 @@ end
 
 function M.worth(goal, W)
     local v = goal.gold * W.gold
-    if goal.kind == "recruit" or goal.kind == "objective" then v = v + W.death end
+    if goal.kind == "recruit" then v = v + W.death end
+    if goal.kind == "objective" then v = v + W.death * goal.share end
     return v
 end
 
@@ -155,9 +158,10 @@ function M.chance(goal, pos, gamma, turnsTo)
         if p and (p.alive or 1) > 0 then
             local t = turnsTo(u, goal.tile, p)
             if t then
-                local phase = math.max(t, 1) + (p.acted and 1 or 0)
-                if not goal.closes or goal.closes >= phase then
-                    options[#options + 1] = { c = gamma ^ (phase - 1), alive = p.alive or 1 }
+                local late = p.acted and 1 or 0
+                if not goal.closes or goal.closes >= math.max(math.ceil(t), 1) + late then
+                    options[#options + 1] = { c = gamma ^ math.max(t + late - 1, 0),
+                                              alive = p.alive or 1 }
                 end
             end
         end

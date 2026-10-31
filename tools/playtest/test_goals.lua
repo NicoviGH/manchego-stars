@@ -17,7 +17,8 @@ end
 
 local G = 0.85
 
--- A fake sight: turns = Manhattan distance / mov, rounded up (mov 4); prices by id.
+-- A fake sight: turns = Manhattan distance / mov (mov 4), not rounded, as sight.turnsTo;
+-- prices by id.
 local function fakeSight(o)
     o = o or {}
     local s = {}
@@ -25,7 +26,7 @@ local function fakeSight(o)
         from = from or u
         local d = math.abs(from.x - tile.x) + math.abs(from.y - tile.y)
         if o.cutOff and o.cutOff[u.id] then return nil end
-        return math.ceil(d / 4)
+        return d / 4
     end
     function s.itemCost(id) return (o.prices or {})[id] or 0 end
     function s.explorable() return o.open or {} end
@@ -55,8 +56,8 @@ local function before(goals)
     return pos
 end
 
--- TestChanceDiscountsByTurns: one taker 2 turns away (8 tiles, mov 4), unacted -> it arrives on
--- this turn's player phase 2 -> 0.85^1. After it has acted from the same tile, phase 3: 0.85^2.
+-- TestChanceDiscountsByTurns: one taker 2 turns away (8 tiles, mov 4), unacted -> 0.85^1. After
+-- it has acted from the same tile, a turn later: 0.85^2.
 do
     local sight = fakeSight({ open = { { x = 8, y = 0, kind = "visit" } },
                               prices = { [0x0E] = 500 } })
@@ -69,7 +70,7 @@ do
     check(Goals.chance(g, { [1] = { x = 0, y = 0, acted = true, alive = 1 } }, G, sight.turnsTo),
         G ^ 2, "chance: two turns away, acted")
     check(Goals.chance(g, { [1] = { x = 7, y = 0, acted = true, alive = 1 } }, G, sight.turnsTo),
-        G ^ 1, "chance: beside it, acted: next phase")
+        G ^ 0.25, "chance: a step off, acted: a quarter turn")
 end
 
 -- TestChanceZeroWhenClosedFirst: the taker arrives on player phase 3; a looter closes it after
@@ -163,24 +164,29 @@ do
         { gold = 0.04, death = 1000 }), 40, "worth: gold at the style's rate")
 end
 
--- TestObjectiveGoals: a Seize map's way there is a goal its Seizers take; a Defeat Boss map's
--- is the boss's tile, every unit a taker; Survive and Rout have none.
+-- TestObjectiveGoals: each unit's way to the objective (ctx.objectiveTile) is its own goal,
+-- worth one death shared over the army; none where it has no tile (Survive).
 do
-    local board = { units = { blue(1, 0, 0), blue(2, 1, 0),
-                              { id = 0x81, charId = 0x40, x = 9, y = 9, faction = "red",
-                                onField = true, isBoss = true, items = {} } }, turn = 1 }
-    local seize = Goals.list(board, fakeSight({ objective = { kind = "seize", tile = { x = 6, y = 6 } } }), {}, {})
-    local g = find(seize, "objective")
-    check(g ~= nil and #g.takerUnits, 1, "objective: Seize, taken by who can Seize")
-    check(Goals.worth(g, { gold = 0.04, death = 1000 }), 1000, "objective: worth one death")
-    local boss = Goals.list(board, fakeSight({ objective = { kind = "boss" } }), {}, {})
-    g = find(boss, "objective")
-    check(g.tile.x .. "," .. g.tile.y, "9,9", "objective: the boss's tile")
-    check(#g.takerUnits, 2, "objective: every unit goes at the boss")
-    check(find(Goals.list(board, fakeSight({ objective = { kind = "survive" } }), {}, {}),
-        "objective"), nil, "objective: Survive has no way there")
-    check(find(Goals.list(board, fakeSight({ objective = { kind = "rout" } }), {}, {}),
-        "objective"), nil, "objective: Rout has none")
+    local board = { units = { blue(1, 0, 0), blue(2, 1, 0) }, turn = 1 }
+    local tiles = { [1] = { x = 6, y = 6 }, [2] = { x = 9, y = 9 } }
+    local goals = Goals.list(board, fakeSight(), {}, { objectiveTile = function(u) return tiles[u.id] end })
+    local g = find(goals, "objective:1")
+    check(g.tile.x .. "," .. g.tile.y, "6,6", "objective: the unit's own way there")
+    check(#g.takerUnits == 1 and g.takerUnits[1].id, 1, "objective: the unit is its one taker")
+    check(Goals.worth(g, { gold = 0.04, death = 1000 }), 500, "objective: one death over the army")
+    check(find(Goals.list(board, fakeSight(), {}, { objectiveTile = function() return nil end }),
+        "objective:1"), nil, "objective: none without a tile (Survive)")
+end
+
+-- TestEveryStepCounts: a step that leaves the whole turns the same still raises the chance.
+do
+    local board = { units = { blue(1, 0, 0) }, turn = 1 }
+    local g = find(Goals.list(board, fakeSight(), {}, { objectiveTile = function() return { x = 20, y = 0 } end }),
+        "objective:1")
+    local t = fakeSight().turnsTo
+    local far = Goals.chance(g, { [1] = { x = 0, y = 0, acted = true, alive = 1 } }, G, t)
+    local near = Goals.chance(g, { [1] = { x = 1, y = 0, acted = true, alive = 1 } }, G, t)
+    check(near > far, true, "chance: one step nearer is worth something")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

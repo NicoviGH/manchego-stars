@@ -917,15 +917,24 @@ function M.new(outer)
         end
         return costGrids[k]
     end
-    -- Turns `unit` needs from `at` to `tile` on its own movement costs (UNIT_MOV), nil = never.
+    -- UNIT_MOV: the class's MOV plus the unit's bonus
+    local function movOf(unit)
+        return mem.s8(unit.addr + UNIT_MOV_BONUS) + mem.s8(mem.u32(unit.addr + UNIT_CLASS) + CLASS_MOV)
+    end
+    -- Turns `unit` needs from `at` to `tile` on its own movement costs, nil = never.
     local function turnsTo(unit, tile, at)
         local cost = costGrid(unit, tile)[at.y][at.x]
         if not cost then return nil end
-        local mov = mem.s8(unit.addr + UNIT_MOV_BONUS) + mem.s8(mem.u32(unit.addr + UNIT_CLASS) + CLASS_MOV)
-        return math.ceil(cost / mov)
+        return math.ceil(cost / movOf(unit))
     end
-    -- the api's: from `from` (default: where u stands)
-    function s.turnsTo(u, tile, from) return turnsTo(u, tile, from or u) end
+    -- the api's, for the goals: cost / UNIT_MOV NOT rounded (every step toward a goal counts;
+    -- goals.lua rounds up where the real arrival matters), from `from` (default: where u stands)
+    function s.turnsTo(u, tile, from)
+        from = from or u
+        local cost = costGrid(u, tile)[from.y][from.x]
+        if not cost then return nil end
+        return cost / movOf(u)
+    end
 
     -- What an item is worth: FE8's own GetItemCost (price per use x uses, bmitem.c) on the
     -- item at its full uses (GetItemMaxUses), the number the game sums for the party's worth.

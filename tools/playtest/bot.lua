@@ -764,13 +764,18 @@ local function bestAttack(ctx, u, gate, only)
 end
 
 -- Where the march heads: the recruit, village or chest the unit is sent to (exploring, below),
--- else the objective's tile, the boss, or the nearest enemy; nil = hold.
+-- else its way to the objective (objectiveTile); nil = hold.
+-- objectiveTile: the objective's tile, the boss, or the nearest enemy; nil on a Survive map.
 -- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
 -- than the fog shows, so it pushes the fog back.
+local objectiveTile
 local function goalFor(ctx, u, objective)
-    local kind = objective and objective.kind
     local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
     if explore then return explore end
+    return objectiveTile(ctx, u, objective)
+end
+objectiveTile = function(ctx, u, objective)
+    local kind = objective and objective.kind
     if objective and objective.tile then return objective.tile end
     if kind == "survive" then return nil end
     if #ctx.enemies == 0 and ctx.sight.unseen then
@@ -935,14 +940,19 @@ end
 -- The units one of ours may Talk over (mayTalkOver), by id: a recruit lost to any blow spoils
 -- the clear (botrun's recruits_missing), as a green unit's death does. Every blue counts, one
 -- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
+-- -> out[id] = true, and talkers[id] = the ids of ours that may Talk it over (goals.lua's takers).
 local function recruitsOf(ctx)
-    local out = {}
+    local out, talkers = {}, {}
     for _, t in ipairs(ctx.onField) do
         for _, u in ipairs(ctx.blues) do
-            if mayTalkOver(ctx, u, t) then out[t.id] = true break end
+            if mayTalkOver(ctx, u, t) then
+                out[t.id] = true
+                talkers[t.id] = talkers[t.id] or {}
+                table.insert(talkers[t.id], u.id)
+            end
         end
     end
-    return out
+    return out, talkers
 end
 
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
@@ -1426,17 +1436,21 @@ end
 -- (`spent`).
 -- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
--- has visited or opened (never offered again); `stalled`, the board repeats (an avoid claim
--- gives way).
+-- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
+-- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
+-- claim gives way).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
--- ids, are the units whose death the planner pays as one of ours).
+-- ids, are the units a blow of ours must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     ctx.explored = opts and opts.explored or {}
+    ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
     exploring(ctx, opts and opts.sent)
-    ctx.recruits = recruitsOf(ctx)
+    ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
+    -- each unit's way to the objective, for the goals (goals.lua)
+    ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     local open = function() return true end
     local objective = sight.objective
     local out = {}
@@ -1513,7 +1527,7 @@ function M.candidates(board, sight, style, opts)
         end
         add(mend(ctx, u, open), "mend")
         -- a village or chest the game lets `u` use, from the tile itself (whether it is worth
-        -- the trip is the planner's no-risk rule)
+        -- the trip is the planner's: its worth against the unit's risk there, goals.lua)
         if ctx.sight.explorable then
             local ends = {}
             for _, t in ipairs(endTiles(ctx, u)) do ends[tileKey(t.x, t.y)] = true end
@@ -1581,7 +1595,6 @@ function M.candidates(board, sight, style, opts)
             acts = kept
         end
         for _, a in ipairs(acts) do
-            a.progress = gain(a.move.x, a.move.y)
             local friend = vacated(ctx, u, a.move.x, a.move.y)
             a.vacate = friend and friend.id
             -- what can strike it there next phase, each enemy's own strike (the planner's odds)

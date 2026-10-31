@@ -196,8 +196,8 @@ local function fallen(before, after, action)
     return out
 end
 
--- The no-risk rule's experiment (#510 step 9, Nicolas 2026-10-27: try it before it is
--- locked): every village and chest the run saw open, and what became of it.
+-- Every village and chest the run saw open, and what became of it (#510 step 9): the record of
+-- how the planner's goals (goals.lua) played out.
 --   open(list, turn, usable)  one read of sight.explorable(); a tile gone from it that we did
 --                      not visit was closed by someone else (a pillage, an event). usable(t):
 --                      whether a unit could use it now (the game's own check)
@@ -271,6 +271,15 @@ function M.exploreLog()
         local out = {}
         for k, e in pairs(tiles) do
             if e.by then out[k] = true end
+        end
+        return out
+    end
+    -- the "x,y" tiles closed before we took them (a pillage, an event), each to its kind: a
+    -- reward that needs one is lost (goals.lua)
+    function log.lost()
+        local out = {}
+        for k, e in pairs(tiles) do
+            if not e.by and (e.closed or e.closedBy) then out[k] = e.kind end
         end
         return out
     end
@@ -582,7 +591,8 @@ function M.run(api)
                         local replan = playing and why
                         local a, plan = api.Planner.plan(Bot, board, sight, style,
                                                          { stalled = stalled, sent = sent,
-                                                           explored = explore.explored() })
+                                                           explored = explore.explored(),
+                                                           lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         lastPlan = plan
                         if plan then sent = plan.goals end
