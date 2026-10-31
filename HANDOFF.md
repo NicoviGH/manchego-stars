@@ -29,11 +29,13 @@ Vanilla Ch2 and Ch3 are unchanged (clean at attempt 1). Vanilla Ch4 and ours ch0
 today's envs, on main before either fix as well: the old table's "1"s were stale.
 
 **NEXT: the planner's open items, in order.** Start a branch off main.
-1. **The win-procrastination stall.** A goal two moves away that nothing moves toward keeps its
-   chance every turn, so waiting (one turn's decay) always beats the win (which closes the goal).
-   Seen as vanilla Ch5 attempt 5 `stuck` on turn 43 after #554 (village 12,10); #555's path avoids
-   it there. Check ours ch01's `stuck` attempts 1 and 3 and Ch4's skipped village 1,11 first: they
-   may share the cause. Ours ch01 from its store: see "Running a chapter alone" below.
+1. **The win-procrastination stall: ours ch01.** With every enemy dead, the lord (the only unit
+   that can seize) is sent to the House at (13,2), and his march to it picks his own tile (12,7)
+   every turn (not `holding`). Next: one look at the field from (13,2) and at `pickMove` on that
+   board. Repro: the ch01 store env (`from: 2`) plus `house_gifts`; attempts 1 and 3 `stuck`, 2
+   clean. #510 comments 6538768445 and its correction. **Tried and rejected:** a "worth > 0" send
+   (#556, closed: it only bites on a stale env and reverses Nicolas's visit-everything intent), and
+   offering every sent unit the objective march (it costs vanilla Ch2 two clean clears).
 2. **Vanilla Ch5 after #555:** Joshua kills an unrecruited unit before the Talk (attempts 1, 4, 8),
    and Gilliam (0x04) dies on turn 2 (attempts 1, 3, 4, 9).
 3. **Ours ch02's two greens** (201, 202) die on turns 2-3 in every attempt, on main too.
