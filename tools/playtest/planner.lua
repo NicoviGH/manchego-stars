@@ -52,7 +52,9 @@
 -- acts, kind }, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
--- or chest each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, legal)
+-- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
+-- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase) } }.
+-- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
 
@@ -265,8 +267,9 @@ function M.plan(Bot, board, sight, style, opts)
         return 1
     end
     -- `alive` (the judge's): each unit's chance to live the phase; `felled`: each recruit's
-    -- chance our counter killed it
-    local function goalTerm(st, alive, felled)
+    -- chance our counter killed it; `rows` (optional) gets each goal's { id, kind, gold, worth,
+    -- before, after }, the plan record's goalWorth
+    local function goalTerm(st, alive, felled, rows)
         local pos, pWin, v = positions(st, alive), winChance(st), 0
         for _, g in ipairs(goals) do
             local c
@@ -282,6 +285,10 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
             v = v + Goals.worth(g, W) * (c - before[g.id])
+            if rows then
+                rows[#rows + 1] = { id = g.id, kind = g.kind, gold = g.gold,
+                                    worth = Goals.worth(g, W), before = before[g.id], after = c }
+            end
         end
         return v
     end
@@ -690,7 +697,8 @@ function M.plan(Bot, board, sight, style, opts)
         -- counter may have felled (its goal lost)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
-        judged = judged + goalTerm(st, alive, felled)
+        st.goalWorth = {}
+        judged = judged + goalTerm(st, alive, felled, st.goalWorth)
         st.judged = judged
         st.strikes = strikes
     end

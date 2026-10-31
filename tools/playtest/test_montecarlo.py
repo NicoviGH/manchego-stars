@@ -441,6 +441,20 @@ class Story(unittest.TestCase):
         text = '\n'.join(mc.story(events, {0x01: 'Braulo'}, {}, {}))
         self.assertIn('Result: won on turn 3, not clean: missed Braulo.', text)
 
+    def test_story_prints_goal_moves(self):
+        # a new plan's goals (planner.lua's goalWorth): each one whose chance it moves, with
+        # its worth; one it leaves as it was is not printed
+        events = [
+            {'t': 'start', 'turn': 0, 'info': {'game': 'vanilla', 'chapter': 6}, 'style': {}},
+            {'t': 'plan', 'turn': 4, 'worth': [
+                {'id': 'visit:5,1', 'kind': 'visit', 'gold': 3000, 'worth': 120,
+                 'before': 0.61, 'after': 0.52},
+                {'id': 'objective:7', 'kind': 'objective', 'gold': 0, 'worth': 111,
+                 'before': 0.4, 'after': 0.4}]}]
+        text = '\n'.join(mc.story(events, {}, {}, {}))
+        self.assertIn('goal visit:5,1 (worth 120): chance 0.61 -> 0.52', text)
+        self.assertNotIn('objective:7', text)
+
     def test_names_come_from_the_decomp_and_our_cast(self):
         self.assertEqual(mc._names('vanilla')[0x01], 'Eirika')
         self.assertTrue(mc._items())

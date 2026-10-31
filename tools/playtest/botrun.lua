@@ -82,7 +82,8 @@
 --           faction, tile, HP and item ids
 --   plan    a decision: the act chosen, and from the planner its judged score, the other plans
 --           judged (`considered`), what it expects of the enemy phase (`predict`), every Visit
---           and Chest offered (`explore`) and the tile each unit was sent to (`goals`), and whether a kept plan's act was played or a
+--           and Chest offered (`explore`), the tile each unit was sent to (`goals`), what the
+--           plan does to each open goal (`worth`: id, kind, gold, worth, before, after), and whether a kept plan's act was played or a
 --           surprise (`replan`, why) forced a new one
 --   act     one act, either side: unit, from, to, the act and its target, the game's own
 --           battle records (Board.battle: the forecast's numbers, every blow) and who fell
@@ -605,7 +606,8 @@ function M.run(api)
                                 judged = plan and plan.judged, kind = plan and plan.kind,
                                 considered = plan and plan.considered,
                                 predict = plan and plan.predict,
-                                explore = plan and plan.explore, goals = plan and plan.goals })
+                                explore = plan and plan.explore, goals = plan and plan.goals,
+                                worth = plan and plan.goalWorth })
                         playing, nextAct = a and plan, 2
                         if plan and a then
                             local said = {}

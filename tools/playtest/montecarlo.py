@@ -634,9 +634,15 @@ def story(events, names=None, items=None, classes=None):
                             len(e.get('claims_played') or [])))
         elif t == 'phase':
             lines.append('Turn %s, %s phase.' % (e.get('turn'), e.get('phase')))
-        elif t == 'plan' and e.get('replan'):
-            lines.append('  (the board was not what the plan expected: %s; a new plan)'
-                         % e['replan'])
+        elif t == 'plan' and (e.get('replan') or e.get('worth')):
+            if e.get('replan'):
+                lines.append('  (the board was not what the plan expected: %s; a new plan)'
+                             % e['replan'])
+            # what the plan does to each goal it moves (planner.lua's goalWorth)
+            for g in e.get('worth') or []:
+                if abs(g['after'] - g['before']) >= 0.005:
+                    lines.append('  goal %s (worth %.0f): chance %.2f -> %.2f'
+                                 % (g['id'], g['worth'], g['before'], g['after']))
         elif t == 'act':
             act = e.get('act') or ('attacks' if e.get('battles') else 'moves')
             act = VERBS.get(act, act)
