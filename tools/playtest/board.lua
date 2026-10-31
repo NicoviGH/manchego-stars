@@ -58,7 +58,8 @@ local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | B
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
 local IA_WEAPON = 1 << 0
-local ITEM_COUNT = 5
+-- include/bmunit.h: struct Unit +0x1E u16 items[UNIT_ITEM_COUNT] (id | uses << 8)
+Board.UNIT_ITEMS, Board.ITEM_COUNT = 0x1E, 5
 
 -- Array bounds are the DECOMP's (bmunit.h: blue[62] / red[50] / green[20]), never the
 -- roster of the day: `blue` once searched 8 for as long as the cast WAS 8, and missed a
@@ -158,8 +159,8 @@ function Board.unitAt(mem, SYM, base, slot)
     local a = u.addr
     local clptr = mem.u32(a + 0x04)
     local items = {}
-    for k = 0, ITEM_COUNT - 1 do
-        local raw = mem.u16(a + 0x1E + k * 2)
+    for k = 0, Board.ITEM_COUNT - 1 do
+        local raw = mem.u16(a + Board.UNIT_ITEMS + k * 2)
         if (raw & 0xFF) ~= 0 then items[#items + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
     end
     u.id = mem.u8(a + 0x0B)

@@ -219,6 +219,50 @@ do
     check(open(), false, "open: closed after the outermost returns")
 end
 
+-- test_equip_does_not_leak_into_the_next_read: EquipUnitItemSlot (bmitem.c) moves the item to
+-- the front of the bag, a write the game makes and no journal sees. Two judged plans in one
+-- batch: the first equips slot 2, and the second must find the bag as it was, its slot 0 still
+-- the first item (vanilla Ch5: Seth's Iron Sword left in front, Joshua's death to his Silver
+-- Lance judged impossible).
+do
+    local Board = dofile(here .. "board.lua")
+    local cpu = fakeCpu(1)
+    local bytes = {}
+    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                       u16 = function(a) return bytes[a] or 0 end,
+                                       u32 = function(a) return bytes[a] or 0 end },
+                    write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end }
+    local sandbox, api = Sight.batching(outer)
+    local S, u = { EquipUnitItemSlot = 0x08016C34 }, { addr = 0x200 }
+    local function bag()
+        local out = {}
+        for k = 0, Board.ITEM_COUNT - 1 do out[#out + 1] = bytes[u.addr + Board.UNIT_ITEMS + k * 2] or 0 end
+        return table.concat(out, ",")
+    end
+    for k, item in ipairs({ 23, 108, 1 }) do bytes[u.addr + Board.UNIT_ITEMS + (k - 1) * 2] = item end
+    -- the game's own EquipUnitItemSlot, written straight to memory as the game writes it
+    local function call(fn, args)
+        check(fn, S.EquipUnitItemSlot, "equip: calls EquipUnitItemSlot")
+        local base = args[1] + Board.UNIT_ITEMS
+        local item = bytes[base + args[2] * 2]
+        for i = args[2], 1, -1 do bytes[base + i * 2] = bytes[base + (i - 1) * 2] end
+        bytes[base] = item
+    end
+    local seen = {}
+    sandbox(function()
+        sandbox(function()
+            Sight.equip(api, call, S, u, 2)
+            seen[1] = bag()
+        end)
+        sandbox(function() seen[2] = bag() end)
+    end)
+    check(seen[1], "1,23,108,0,0", "equip: slot 2 is moved to the front")
+    check(seen[2], "23,108,1,0,0", "equip: the next read finds the bag as it was")
+    Sight.equip(api, function() error("equip: slot 0 is already in hand") end, S, u, 0)
+end
+
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
 -- return loop, wherever LIST_STUB_AT puts the stub (the fake CPU never runs the stub, so the
 -- call is let fail and the words it wrote are read).
