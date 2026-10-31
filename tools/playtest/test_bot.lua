@@ -3130,8 +3130,10 @@ end
 -- village; a later win is the same win, so careful does not kill. A village worth more than A's
 -- way to the boss (a whole death's worth, A being the army) is walked on.
 do
+    -- 30000 gold (careful: 1200 points) outweighs the kill's own credit and the win now
+    -- (~205 + 150); a 10000-gold village is about level with them under careful
     local board, sight = bossAndVillage()
-    local a = Planner.plan(B, board, sight, gifted("careful", 10000))
+    local a = Planner.plan(B, board, sight, gifted("careful", 30000))
     check(a and a.act ~= "attack", true, "goals: the boss kill waits for a village in reach")
     board, sight = bossAndVillage()
     check(at(Planner.plan(B, board, sight, gifted("careful", 100000))), "1,4",
@@ -3238,6 +3240,38 @@ do
     }
     local a = Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 10000))
     check(at(a) ~= "1,0", true, "goals: no stand where our counter would end the chapter")
+end
+
+
+-- test_mend_moves_a_unit_whose_counter_ends_the_chapter: A's chip on the boss (no kill) tops
+-- the beam (the boss's damage counts five times), and in the enemy phase the boss strikes A
+-- and A's counter kills it, closing a rich village. The beam cannot see that counter; the
+-- mend tries A's other acts, and A does not stay beside the boss.
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 30, isBoss = true })
+    local Z = red(0x82, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }, { 1, 4 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1 } } } },
+        explorable = { { x = 1, y = 6, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,6"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then
+                    return { { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
+                               takenHits = 1, takenCrit = 0, targetHp = b.hp, felled = 1 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    local a = Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 30000))
+    Planner.FINAL = final
+    check(at(a) ~= "1,0", true, "goals: the mend keeps A from the counter that ends the chapter")
 end
 
 if fails > 0 then

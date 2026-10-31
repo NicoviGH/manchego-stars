@@ -607,7 +607,8 @@ function M.run(api)
                                 considered = plan and plan.considered,
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,
-                                worth = plan and plan.goalWorth })
+                                worth = plan and plan.goalWorth,
+                                win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then
                             local said = {}

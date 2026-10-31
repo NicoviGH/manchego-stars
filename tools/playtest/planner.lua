@@ -53,7 +53,8 @@
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
 -- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
--- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase) } }.
+-- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase) },
+-- winFell = the judged phase's chance our counter ends the chapter }.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -292,6 +293,14 @@ function M.plan(Bot, board, sight, style, opts)
                 rows[#rows + 1] = { id = g.id, kind = g.kind, gold = g.gold,
                                     worth = Goals.worth(g, W), before = before[g.id], after = c }
             end
+        end
+        -- the win now rather than a turn later: one death's worth x (1 - GAMMA). With nothing
+        -- left to get, a unit beside the boss whose way there is already sure would otherwise
+        -- gain nothing by the kill and could idle there; it is less than any open goal's worth
+        v = v + W.death * pWin * (1 - Goals.GAMMA)
+        if rows then
+            rows[#rows + 1] = { id = "win", kind = "win", gold = 0, worth = W.death,
+                                before = Goals.GAMMA, after = pWin + (1 - pWin) * Goals.GAMMA }
         end
         return v
     end
@@ -610,7 +619,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- per recruit, its chance our counter kills it (the phase's own `felled`) and the units
         -- of ours it strikes, whose other acts may save it (vanilla Ch5: Joshua, killed by
         -- Seth's counter on turn 3, the planner paying nothing for it)
-        local felled, struckBy, fell = {}, {}, 0
+        local felled, struckBy, fell, winStruck = {}, {}, 0, {}
         for _, o in ipairs(outcomes) do
             local onUnit = {}
             for _, s in ipairs(o.strikes) do
@@ -659,6 +668,7 @@ function M.plan(Bot, board, sight, style, opts)
                 local e = byId[s.enemy]
                 if e and ((objective == "boss" and e.isBoss) or (objective == "rout" and left == 1)) then
                     lives = lives * (1 - (s.felled or 0))
+                    if (s.felled or 0) > 0 then winStruck[s.target] = true end
                 end
             end
             fell = fell + o.p * (1 - lives)
@@ -717,6 +727,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.goalWorth = {}
         judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
+        st.winFell, st.winStruck = fell, winStruck
         st.judged = judged
         st.strikes = strikes
     end
@@ -793,6 +804,15 @@ function M.plan(Bot, board, sight, style, opts)
         end
         for _, p in ipairs(base.predict) do
             if p.die > 0 then risky[#risky + 1] = p end
+        end
+        -- a unit of ours whose counter may end the chapter (the boss striking it and dying)
+        -- tries its other acts too: the beam cannot see that counter, so every plan it kept
+        -- had Seth strike the boss and stand beside it (vanilla Ch5 attempt 8, turn 5)
+        local struckIds = {}
+        for id in pairs(base.winStruck or {}) do struckIds[#struckIds + 1] = id end
+        table.sort(struckIds)
+        for _, id in ipairs(struckIds) do
+            if menuOf[id] then risky[#risky + 1] = { id = id, die = base.winFell } end
         end
         table.sort(risky, function(x, y)
             if x.die ~= y.die then return x.die > y.die end

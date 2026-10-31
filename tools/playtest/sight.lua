@@ -1033,11 +1033,9 @@ function M.new(outer)
     end
     s.refresh()
 
-    local phaseSeen = {}   -- this player phase's answers (closings), dropped by newPhase()
     function s.newPhase()
         s.refresh()
         s.cache = {}
-        phaseSeen = {}
     end
 
     function s.danger(x, y)
@@ -1353,13 +1351,15 @@ function M.new(outer)
     -- in the game's turn order, every other unit held where it stands: a looter's decision is
     -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
     -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
-    -- calls (3,787 -> 11,086). Read once per player phase: our acts move no looter. A wave not
+    -- calls (3,787 -> 11,086). Read once per turn: our acts move no looter. A wave not
     -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, ai2, items = {ids} } } } },
     -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
     -- as its moves reach the tile (M.waveCloses). Read once per board.
+    local closingsAt = {}   -- turn -> closings(): newPhase() runs before every decision
     function s.closings(k, waves)
-        if phaseSeen.closings then return phaseSeen.closings end
+        local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
+        if closingsAt[turn0] then return closingsAt[turn0] end
         k = k or M.CLOSE_HORIZON
         local open, all = {}, units()
         for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
@@ -1370,7 +1370,6 @@ function M.new(outer)
                 looter[o.id] = true
             end
         end
-        local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
         local out = {}
         local function close(x, y, phase)
             local key = x .. "," .. y
@@ -1425,7 +1424,7 @@ function M.new(outer)
                 end
             end
         end)
-        phaseSeen.closings = out
+        closingsAt[turn0] = out
         return out
     end
 
