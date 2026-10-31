@@ -38,6 +38,7 @@ import inject.hosts  # noqa: E402
 import inject.paths  # noqa: E402
 import inject.raw_pids  # noqa: E402
 import inject.stats  # noqa: E402
+import inject.units  # noqa: E402
 import inject.villages  # noqa: E402
 import argparse
 import sys
@@ -3795,8 +3796,8 @@ def arrival_waves(where, game):
     """The enemy waves a chapter loads after turn 1, as the bot's planner reads them (#510
     step 9): [{turn, units: [{class, x, y, ai1, ai2, items}]}] by turn, with the game's ids.
     `where` is the twin's parity reference (vanilla: `_vanilla_reinforcement_turns` joined with
-    `_vanilla_red_defs`, the spawn tile its UnitDefinition loads on) or our chapter (its
-    entries' `arrives_turn`, positions and the donor AI they emit, `enemy_ai_bytes`). A
+    `_vanilla_red_defs`, the spawn tile its UnitDefinition loads on) or our chapter (each body
+    the injector emits, `inject.units.enemy_bodies`, with the donor AI, `enemy_ai_bytes`). A
     reskin plays as its base (ADR 0362), so ours carry the base class. None for a twin whose
     force is not curated (Ch5x, Ch9 on)."""
     classes = inject.class_ids.vanilla_class_values()
@@ -3814,21 +3815,16 @@ def arrival_waves(where, game):
                     'ai1': d['ai'][0], 'ai2': d['ai'][1],
                     'items': [items[n] for n in d['items'] if n in items]})
     else:
-        for enemy in where.get('enemy_units') or []:
-            turn = inject.raw_pids.entry_arrival_turn(enemy)
-            if turn <= 1:
-                continue
-            for index, (x, y) in enumerate(enemy['positions']):
-                pack = enemy.get('composition') if 'class' not in enemy else None
-                token = pack[index] if pack else enemy['class']
-                carried = (enemy['inventory_by_class'][token] if pack else
-                           [it.get('fe_base') or it['id'] for it in enemy.get('inventory', [])
-                            if not it.get('is_key_item')])
-                ai = enemy_ai_bytes(where, enemy, index)
+        class_ids = inject.class_ids.ChapterClassIds(where['id'].split('-')[0])
+        turns = {inject.raw_pids.entry_arrival_turn(e) for e in where.get('enemy_units') or []}
+        for turn in sorted(t for t in turns if t > 1):
+            for b in inject.units.enemy_bodies(where, class_ids, arrives_turn=turn):
+                # a reskin plays as its base (ADR 0362): the base class's costs and MOV
+                cls = classes.get(b['cls']) or classes[inject.class_ids.vanilla_class_enum(b['token'])]
+                ai = enemy_ai_bytes(where, b['enemy'], b['index'])
                 waves.setdefault(turn, []).append({
-                    'class': classes[inject.class_ids.vanilla_class_enum(token)], 'x': x, 'y': y,
-                    'ai1': ai[0], 'ai2': ai[1],
-                    'items': [items[inject.decomp.ITEM_ENUM[n]] for n in carried]})
+                    'class': cls, 'x': b['x'], 'y': b['y'], 'ai1': ai[0], 'ai2': ai[1],
+                    'items': [items[e] for e in b['carried']]})
     return [{'turn': t, 'units': us} for t, us in sorted(waves.items())]
 
 

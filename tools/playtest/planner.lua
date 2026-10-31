@@ -124,6 +124,8 @@ local function score(act, st, W, style, odds)
             -- a recruit is talked over, not worn down: its damage earns nothing, and its death
             -- is its goal lost (the goals' term reads fx.recruitHit)
             fx.recruitHit = { id = e.id, p = kill }
+            -- its goal is one unit; a recruit whose death ends the game costs the chapter
+            if st.gameOver[e.charId] then v = v - W.win * kill end
         else
             -- the objective's boss: every point of its HP is a step to the win, as far as the
             -- win is wanted now (st.bossWant: 1 with nothing else left to get, near 0 with a
@@ -273,15 +275,22 @@ function M.plan(Bot, board, sight, style, opts)
         local now = W.death * (1 - Goals.GAMMA)
         start.bossWant = now / (now + open)
     end
+    -- the red units on the field the plan leaves standing, the ones the fog hides too: a Rout
+    -- is won only when none is left, not when the last one in sight dies
+    local function redsLeft(st)
+        local n = 0
+        for _, u in ipairs(board.units) do
+            if u.faction == "red" and u.onField and not u.dead and not st.gone[u.id] then
+                n = n + 1
+            end
+        end
+        return n
+    end
     -- the chance a plan ends the chapter: a Seize or the boss's death (score's fx.win), or on
-    -- a Rout map every enemy in sight gone
+    -- a Rout map every red unit gone
     local function winChance(st)
         if objective ~= "rout" then return st.win end
-        if #ctx.enemies == 0 then return 0 end
-        for _, e in ipairs(ctx.enemies) do
-            if not st.gone[e.id] then return 0 end
-        end
-        return 1
+        return redsLeft(st) == 0 and 1 or 0
     end
     -- `alive` (the judge's): each unit's chance to live the phase; `felled`: each recruit's
     -- chance our counter killed it; `fell`: the chance a counter of ours ended the chapter in
@@ -302,7 +311,6 @@ function M.plan(Bot, board, sight, style, opts)
                 if g.kind == "recruit" then
                     c = c * (1 - (st.recruitHit[g.unitId] or 0))
                         * (1 - (felled and felled[g.unitId] or 0))
-                        * (alive and alive[g.unitId] or 1)
                 end
             end
             v = v + Goals.worth(g, W) * (c - before[g.id])
@@ -683,12 +691,7 @@ function M.plan(Bot, board, sight, style, opts)
                 struck[g.id] = math.max(struck[g.id] or 0, #phase)
             end
             -- the strikers our counters fell (felled): the boss, or a Rout's last enemy, is the win
-            local left = 0
-            if objective == "rout" then
-                for _, e in ipairs(ctx.enemies) do
-                    if not st.gone[e.id] then left = left + 1 end
-                end
-            end
+            local left = objective == "rout" and redsLeft(st) or 0
             local lives = 1
             for _, s in ipairs(o.strikes) do
                 local e = byId[s.enemy]
@@ -751,9 +754,6 @@ function M.plan(Bot, board, sight, style, opts)
         -- counter may have felled (its goal lost)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
-        -- a green recruit the enemy may kill loses its goal as well (vanilla Ch2: Ross, at 0.37
-        -- to die, was a 22-point risk to bold, and with him went Garcia, whom only he talks over)
-        for _, g in ipairs(greens) do alive[g.id] = 1 - (die[g.id] or 0) end
         st.goalWorth = {}
         judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
         st.winFell, st.winStruck = fell, winStruck

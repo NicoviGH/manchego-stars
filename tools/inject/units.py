@@ -124,50 +124,61 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
                        items, ai))
 
 
-def enemy_rows(chap, class_ids, pid_for, arrives_turn=None, exclude=(), spawns=None,
-               reda_symbol=None):
-    """One enemy UnitDefinition row per authored BODY of a deployment wave (#479).
-
-    `arrives_turn=None` selects the turn-1 line; a number selects that reinforcement wave.
-    `pid_for(entry, index)` is the chapter's fact: the CHARACTER a body rides (a boss's own slot
-    so its flagged quote keys to it alone, a shared autolevelled generic for the rest, ch04's
-    per-class monster pids, the prologue's per-body guard slots). `exclude` drops entries by id
-    (ch05's Sahnar LOADs from her own table). `spawns` {(id, index): (x, y)} LOADs that body on
-    another tile and walks it to its post through the REDA `reda_symbol(id, index)` names
-    (ch06's merfolk surfacing).
+def enemy_bodies(chap, class_ids, arrives_turn=None, exclude=()):
+    """Each authored BODY of a deployment wave (#479), in emit order: the one walk over a
+    chapter's enemy entries. Yields {enemy, index, token (its class token), cls (the class
+    enum it deploys as), carried (ITEM_ enums, a dropper's drop last), dropper, x, y (its
+    post)}. `arrives_turn=None` selects the turn-1 line; a number selects that wave.
 
     An entry is one `class:` with one `inventory:`, or a mixed pack: `composition:` names each
-    body's class and `inventory_by_class:` its weapons (ch01's goblin raiders). Levels are per
-    body (`entry_body_levels`, so `levels:` is honoured everywhere). A group-level `item_drop`
-    goes to the FIRST body only, carried last (`_items_with_drop_last`). An `is_key_item` is
-    story, not an FE8 item, and is never emitted. The `.ai` bytes are the donor's, through
-    `enemy_ai_initialiser`.
-    """
-    rows = []
+    body's class and `inventory_by_class:` its weapons (ch01's goblin raiders). A group-level
+    `item_drop` goes to the FIRST body only, carried last (`_items_with_drop_last`). An
+    `is_key_item` is story, not an FE8 item, and is never carried."""
     for enemy in chap['enemy_units']:
         if enemy.get('arrives_turn') != arrives_turn or enemy['id'] in exclude:
             continue
         drop = enemy.get('item_drop')
-        levels = entry_body_levels(enemy)
         pack = enemy.get('composition') if 'class' not in enemy else None
         for index, (x, y) in enumerate(enemy['positions']):
             if pack:
-                cls = class_ids[pack[index]]
-                carried = [ITEM_ENUM[i] for i in enemy['inventory_by_class'][pack[index]]]
+                token = pack[index]
+                cls = class_ids[token]
+                carried = [ITEM_ENUM[i] for i in enemy['inventory_by_class'][token]]
             else:
+                token = enemy['class']
                 cls = class_ids.for_entry(enemy)
                 carried = [ITEM_ENUM[item.get('fe_base') or item['id']]
                            for item in enemy.get('inventory', []) if not item.get('is_key_item')]
             dropper = bool(drop) and index == 0
             if dropper:
                 carried = _items_with_drop_last(carried, ITEM_ENUM[drop])
-            spawn = (spawns or {}).get((enemy['id'], index))
-            sx, sy = spawn if spawn else (x, y)
-            rows.append(_enemy_unit_entry(
-                pid_for(enemy, index), cls, levels[index], bool(enemy.get('autolevel')), sx, sy,
-                ', '.join(carried) or '0', enemy_ai_initialiser(chap, enemy, index),
-                ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=dropper,
-                reda=reda_symbol(enemy['id'], index) if spawn else None))
+            yield {'enemy': enemy, 'index': index, 'token': token, 'cls': cls,
+                   'carried': carried, 'dropper': dropper, 'x': x, 'y': y}
+
+
+def enemy_rows(chap, class_ids, pid_for, arrives_turn=None, exclude=(), spawns=None,
+               reda_symbol=None):
+    """One enemy UnitDefinition row per authored BODY of a deployment wave (enemy_bodies).
+
+    `pid_for(entry, index)` is the chapter's fact: the CHARACTER a body rides (a boss's own slot
+    so its flagged quote keys to it alone, a shared autolevelled generic for the rest, ch04's
+    per-class monster pids, the prologue's per-body guard slots). `exclude` drops entries by id
+    (ch05's Sahnar LOADs from her own table). `spawns` {(id, index): (x, y)} LOADs that body on
+    another tile and walks it to its post through the REDA `reda_symbol(id, index)` names
+    (ch06's merfolk surfacing). Levels are per body (`entry_body_levels`, so `levels:` is
+    honoured everywhere). The `.ai` bytes are the donor's, through `enemy_ai_initialiser`.
+    """
+    rows = []
+    for b in enemy_bodies(chap, class_ids, arrives_turn, exclude):
+        enemy, index = b['enemy'], b['index']
+        levels = entry_body_levels(enemy)
+        spawn = (spawns or {}).get((enemy['id'], index))
+        sx, sy = spawn if spawn else (b['x'], b['y'])
+        rows.append(_enemy_unit_entry(
+            pid_for(enemy, index), b['cls'], levels[index], bool(enemy.get('autolevel')), sx, sy,
+            ', '.join(b['carried']) or '0', enemy_ai_initialiser(chap, enemy, index),
+            ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=b['dropper'],
+            reda=reda_symbol(enemy['id'], index) if spawn else None))
     return rows
 
 

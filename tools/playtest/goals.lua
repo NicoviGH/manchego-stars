@@ -19,7 +19,8 @@
 -- `gold` (Goals.worth makes it points):
 --   a village or chest: the mean gift over every vanilla village (style.villageGifts: items
 --     at sight.itemCost, the game's own GetItemCost; gold at face value) -- a new player does
---     not know what one holds;
+--     not know what one holds; a House (sight.explorable's `house`) the mean over every vanilla
+--     House (style.houseGifts: most only talk, worth 0), and no 'villages' reward needs one;
 --   a recruit: its items' sight.itemCost;
 --   a reward (style.rewards, a guide's claim): its item's itemCost shared evenly over the open
 --     goals its `needs` names, none of it once one of them is lost (ctx.lost).
@@ -32,12 +33,13 @@
 --
 -- Goals.chance(goal, pos, gamma, turnsTo) -> 0..1: pos[unit id] = { x, y, acted, alive (0..1) },
 -- the board a plan leaves. t = turnsTo(u, tile, pos), its turns there (sight's: cost / MOV, not
--- rounded); one that has acted starts a turn later. The chance is gamma ^ (t + late - 1), at
--- most 1: each turn further is another enemy phase where something can go wrong, and every
--- step counts, the last one into reach too (a talker one step from its recruit's side was
--- indifferent between that tile and one farther off but still in reach). A goal closed before
--- the phase the taker really arrives on (closes < ceil(t) + late, at least phase 1) is 0 for
--- it. Over the takers, the expected best as each lives (alive), the best first.
+-- rounded); one that has acted takes it a turn later. The chance is gamma ^ (max(t, 1) - 1 +
+-- late): each turn further is another enemy phase where something can go wrong, and every
+-- step beyond reach counts. Within reach it is 1 for a unit that has not acted and gamma for
+-- one that has, standing on the goal too: taking it now is worth a turn over waiting there.
+-- A goal closed before the phase the taker really arrives on (closes < ceil(t) + late, at
+-- least phase 1) is 0 for it. Over the takers, the expected best as each lives (alive), the
+-- best first.
 
 local M = {}
 
@@ -64,7 +66,7 @@ local function prior(cost, gifts)
 end
 
 local function needs(reward, g)
-    if reward.needs == "villages" then return g.kind == "visit" end
+    if reward.needs == "villages" then return g.kind == "visit" and not g.house end
     if reward.needs == "chests" then return g.kind == "chest" end
     for _, t in ipairs(reward.needs) do
         if t[1] == g.tile.x and t[2] == g.tile.y then return true end
@@ -90,12 +92,13 @@ function M.openTiles(sight, style, ctx)
     local cost = sight.itemCost or function() return 0 end
     local explored = ctx.explored or {}
     local closings = sight.closings and sight.closings(nil, style.waves) or {}
-    local worth, out = prior(cost, style.villageGifts), {}
+    local worth, house, out = prior(cost, style.villageGifts), prior(cost, style.houseGifts), {}
     for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
         local k = key(t.x, t.y)
         if not explored[k] then
             out[#out + 1] = { id = t.kind .. ":" .. k, kind = t.kind, x = t.x, y = t.y,
-                              tile = { x = t.x, y = t.y }, gold = worth, closes = closings[k] }
+                              tile = { x = t.x, y = t.y }, house = t.house,
+                              gold = t.house and house or worth, closes = closings[k] }
         end
     end
     -- a reward's item, shared over the open goals it needs
@@ -173,7 +176,7 @@ function M.chance(goal, pos, gamma, turnsTo)
             if t then
                 local late = p.acted and 1 or 0
                 if not goal.closes or goal.closes >= math.max(math.ceil(t), 1) + late then
-                    options[#options + 1] = { c = gamma ^ math.max(t + late - 1, 0),
+                    options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
                                               alive = p.alive or 1 }
                 end
             end

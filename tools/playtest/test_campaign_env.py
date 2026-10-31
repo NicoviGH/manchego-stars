@@ -136,6 +136,20 @@ class Claims(unittest.TestCase):
         self.assertEqual(sorted((u['x'], u['y']) for u in c['waves'][2]['units']),
                          [(13, 0), (14, 1)])
 
+    def test_our_waves_carry_what_the_rom_carries(self):
+        # the wave's bodies are the injector's (inject.units.enemy_bodies): the drop rides last
+        # on the first body only, as the ROM's UnitDefinition carries it
+        chap = {'id': 'ch05-x', 'enemy_units': [{
+            'id': 'w', 'name': 'W', 'arrives_turn': 3, 'class': 'brigand',
+            'positions': [[1, 2], [3, 4]], 'inventory': [{'id': 'iron-axe'}],
+            'item_drop': 'chest-key', 'ai_override': {'ai': '{0x0, 0x4, 0x9}', 'why': 'test'}}]}
+        waves = difficulty.arrival_waves(chap, 'ours')
+        items = {e: i for i, e in difficulty._item_id_to_enum().items()}
+        self.assertEqual([w['turn'] for w in waves], [3])
+        self.assertEqual([u['items'] for u in waves[0]['units']],
+                         [[items['ITEM_AXE_IRON'], items['ITEM_CHESTKEY']], [items['ITEM_AXE_IRON']]])
+        self.assertEqual({(u['ai1'], u['ai2']) for u in waves[0]['units']}, {(0, 4)})
+
     def test_reward_resolves_item_id(self):
         c = ce.resolve({'kind': 'reward', 'item': 'guiding-ring', 'needs': 'villages'},
                        'FE8 Ch5#4', 'vanilla')
@@ -154,6 +168,12 @@ class Claims(unittest.TestCase):
         self.assertEqual(len(g['items']), 17)
         self.assertIn(0x0E, g['items'])
         self.assertEqual(g['gold'], [])
+
+    def test_house_gifts_count_a_talk_as_nothing(self):
+        # every House(...) at HEAD (19): one gives an item, the rest only talk (gold 0)
+        h = ce.village_gifts('House')
+        self.assertEqual((len(h['items']), len(h['gold'])), (1, 18))
+        self.assertEqual(set(h['gold']), {0})
 
 
 class Resume(unittest.TestCase):

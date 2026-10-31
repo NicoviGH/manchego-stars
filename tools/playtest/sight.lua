@@ -111,7 +111,7 @@
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
 --   explorable()             the villages and chests still open now: { x, y, kind =
---                            "visit"|"chest" } per tile whose Visit or Chest command (read with
+--                            "visit"|"chest", house (a Visit whose entry has flag 0) } per tile whose Visit or Chest command (read with
 --                            the Seize tile) GetAvailableTileEventCommand still returns -- a
 --                            visited, pillaged or opened tile's flag drops it -- and, for a
 --                            village, whose Visit VisitCommandUsability still shows one of our
@@ -182,6 +182,7 @@ M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
+M.TERRAIN_VILLAGE_CLOSED, M.TERRAIN_CHEST_EMPTY = 0x04, 0x20
 M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the first booster
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
@@ -236,6 +237,8 @@ local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 -- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script, +1A pidA, +1B pidB;
 -- 0x1C bytes. A talk entry (EvtListTalk, struct EvCheck03/04) holds pidA +08, pidB +09.
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
+-- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
+local EVENT_FLAG, EVENT_X, EVENT_Y, CHAPTER_LOCATIONS = 0x08, 0x18, 0x19, 0x08
 local TALK_PID_A, TALK_PID_B, NO_PID = 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
 local CHAPTER_TALKS = 0x04
@@ -725,6 +728,24 @@ function M.opensChests(items, attributes)
         if it.id == M.ITEM_LOCKPICK and (attributes & M.CA_STEAL) ~= 0 then return true end
     end
     return false
+end
+
+-- closings()' cache key: what its read depends on -- the turn, the horizon, the waves, each
+-- looter as it stands (id, tile, HP) and the open tiles. A looter killed or moved, a tile
+-- taken, is a new key.
+function M.closingsKey(turn, k, waves, looters, open)
+    local parts = {}
+    for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
+    for key in pairs(open) do parts[#parts + 1] = key end
+    table.sort(parts)
+    return turn .. "|" .. k .. "|" .. #(waves or {}) .. "|" .. table.concat(parts, ";")
+end
+
+-- The terrain closings() leaves on a tile a looter took, `t` its explorable() entry: an emptied
+-- chest, else a closed village -- off the AI's loot lists (cp_utility.c
+-- gTerrainList_LootableVillages(AndChests)), so the looter goes on to its next target.
+function M.sackedTerrain(t)
+    return t and t.kind == "chest" and M.TERRAIN_CHEST_EMPTY or M.TERRAIN_VILLAGE_CLOSED
 end
 
 -- The enemy phase, numbered from turn `now`'s as 1, at which a wave loaded on turn `turn`
@@ -1352,25 +1373,29 @@ function M.new(outer)
     -- AI (when it falls undefended): a looter's decision is
     -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
     -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
-    -- calls (3,787 -> 11,086). Read once per turn: our acts move no looter. A wave not
+    -- calls (3,787 -> 11,086). Read again only when a looter or an open tile changed. A wave not
     -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, ai2, items = {ids} } } } },
     -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
     -- as its moves reach the tile (M.waveCloses). Read once per board.
-    local closingsAt = {}   -- turn -> closings(): newPhase() runs before every decision
+    -- closings() by what it reads: the turn, k, the waves, and each looter as it stands (a
+    -- looter our act kills or moves is a new read). newPhase() runs before every decision.
+    local closingsAt = {}
     function s.closings(k, waves)
-        local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
-        if closingsAt[turn0] then return closingsAt[turn0] end
         k = k or M.CLOSE_HORIZON
+        local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
         local open, all = {}, units()
         for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
-        local looter = {}
+        local looter, looters = {}, {}
         for _, o in ipairs(all) do
             if o.faction == "red" and o.onField and (M.loots(mem, S.gpAi1Table, mem.u8(o.addr + UNIT_AI1))
                     or M.loots(mem, S.gpAi2Table, mem.u8(o.addr + UNIT_AI2))) then
                 looter[o.id] = true
+                looters[#looters + 1] = o
             end
         end
+        local ck = M.closingsKey(turn0, k, waves, looters, open)
+        if closingsAt[ck] then return closingsAt[ck] end
         local out = {}
         local function close(x, y, phase)
             local key = x .. "," .. y
@@ -1404,6 +1429,13 @@ function M.new(outer)
                             local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
                             if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                 close(x, y, phase)
+                                -- the tile is taken: AiPillageAction opens a chest (it empties)
+                                -- or runs the village's tile change, which the replay does not
+                                -- play; a terrain off the AI's loot lists (cp_utility.c
+                                -- gTerrainList_Lootable*) keeps it from being chosen again,
+                                -- so the looter goes on to its next target
+                                api.write8(cell(mem, S.gBmMapTerrain, x, y),
+                                    M.sackedTerrain(open[x .. "," .. y]))
                             end
                             standOn(e, x, y)
                         end
@@ -1434,7 +1466,7 @@ function M.new(outer)
                 end
             end
         end)
-        closingsAt[turn0] = out
+        closingsAt[ck] = out
         return out
     end
 
@@ -1488,16 +1520,31 @@ function M.new(outer)
         return false
     end
 
+    -- Whether the Visit at (x, y) is a House: its location entry (SearchAvailableEvent over the
+    -- chapter's locationBasedEvents, as GetAvailableTileEventCommand finds it) has flag 0, so
+    -- its Visit never closes and it marks nothing taken (eventinfo House(0, ...)); a village's
+    -- entry sets a flag. `info` is a sandbox's scratch.
+    local function isHouse(call, info, x, y)
+        local events = call(S.GetChapterEventDataPointer, { api.chapter() })
+        for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
+        api.write32(info, mem.u32(events + CHAPTER_LOCATIONS))
+        api.write8(info + EVENT_X, x)
+        api.write8(info + EVENT_Y, y)
+        return call(S.SearchAvailableEvent, { info }) ~= 0 and mem.u32(info + EVENT_FLAG) == 0
+    end
+
     function s.explorable()
         if not seen.explorable then
-            seen.explorable = sandbox(function(call)
+            seen.explorable = sandbox(function(call, info)
                 local out = {}
                 for _, c in ipairs(commands) do
                     local kind = (c.cmd == M.TILE_COMMAND_VISIT and "visit")
                         or (c.cmd == M.TILE_COMMAND_CHEST and "chest")
                     if kind and call(S.GetAvailableTileEventCommand, { c.x, c.y }) == c.cmd
                         and (kind ~= "visit" or visitShown(c.x, c.y)) then
-                        out[#out + 1] = { x = c.x, y = c.y, kind = kind }
+                        out[#out + 1] = { x = c.x, y = c.y, kind = kind,
+                                          house = kind == "visit" and isHouse(call, info, c.x, c.y)
+                                              or nil }
                     end
                 end
                 return out

@@ -3,7 +3,7 @@
 import re
 import sys
 
-from inject.decomp import ITEM_ENUM, vanilla_decomp_text
+from inject.decomp import ITEM_ENUM, event_scripts, vanilla_decomp_text, vanilla_event_scripts
 from inject.maps import terrain_ids
 from inject.terrain import _map_terrain_grid
 
@@ -227,20 +227,23 @@ def assert_village_tiles_visitable(chap, maps_dir, stem):
                      'unobtainable. Paint a village tile there (#205).'
                      % (village['id'], x, y, terrain[y][x]))
 
-def village_rewards(eventinfo, scripts):
-    """[(x, y, 'item' | 'gold', value)] for every `Village(flag, script, x, y)` in a vanilla
-    eventinfo: the RAW value its script puts in `SVAL(EVT_SLOT_3, <v>)`, given by the next
-    GIVEITEMTO (an item id) or GIVEITEMTOMAIN (gold). `scripts` = {label: body}; a script it
-    cannot find, or one that gives nothing, is left out."""
+def village_rewards(eventinfo, scripts, macro='Village', nothing=False):
+    """[(x, y, 'item' | 'gold', value)] for every `<macro>(flag, script, x, y)` in a vanilla
+    eventinfo (`Village`, or `House`): the RAW value its script puts in
+    `SVAL(EVT_SLOT_3, <v>)`, given by the next GIVEITEMTO (an item id) or GIVEITEMTOMAIN (gold).
+    `scripts` = {label: body}. A script that gives nothing is left out, or with `nothing` kept
+    as (x, y, None, 0) (most Houses only talk); one it cannot find is left out."""
     out = []
     for script, x, y in re.findall(
-            r'Village\(\s*[^,]+,\s*(\w+),\s*(\d+),\s*(\d+)\s*\)', eventinfo):
+            r'\b%s\(\s*[^,]+,\s*(\w+),\s*(\d+),\s*(\d+)\s*\)' % macro, eventinfo):
         body = scripts.get(script)
         m = body and re.search(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9A-Fa-f]+|\d+)\)\s*'
                                r'(GIVEITEMTOMAIN|GIVEITEMTO)\b', body)
         if m:
             out.append((int(x), int(y), 'gold' if m.group(2) == 'GIVEITEMTOMAIN' else 'item',
                         int(m.group(1), 0)))
+        elif body is not None and nothing:
+            out.append((int(x), int(y), None, 0))
     return out
 
 
@@ -254,12 +257,12 @@ def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     stem = vanilla_eventinfo_stem(layout)
     if eventinfo is None:
         eventinfo = vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-    if eventscript is None:
-        eventscript = vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     by_id = {int(v, 16): n for n, v in re.findall(
         r'(ITEM_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
         vanilla_decomp_text('include/constants/items.h'))}
-    scripts = dict(re.findall(r'\bEventListScr\s+(\w+)\[\]\s*=\s*\{(.*?)\};', eventscript, re.S))
+    # a village script may live in another stem's file: HEAD's are looked up across the
+    # directory (vanilla_event_scripts), as campaign_env's gifts are
+    scripts = event_scripts(eventscript) if eventscript is not None else vanilla_event_scripts()
     return {(x, y): by_id.get(v) if kind == 'item' else None
             for x, y, kind, v in village_rewards(eventinfo, scripts)}
 

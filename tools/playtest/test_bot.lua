@@ -1785,6 +1785,20 @@ do
     check(t ~= nil and t > 0, true, "breach: the goals' turns go through the door")
 end
 
+-- test_goal_turns_are_read_once_per_decision: the planner asks the same unit, tile and start
+-- again and again (every goal, every partial plan); the game's read runs once (PR #553 review).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local sight = sightOf({ reach = { [0x01] = tiles({ 0, 0 }) } })
+    local calls, read = 0, sight.turnsTo
+    sight.turnsTo = function(...) calls = calls + 1 return read(...) end
+    local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
+    calls = 0
+    for _ = 1, 3 do ctx.turnsTo(A, { x = 4, y = 0 }, { x = 1, y = 0 }) end
+    check(calls, 1, "turns: one game read for the same unit, tile and start")
+end
+
 -- test_healers_act_after_the_fighters: H heals A only once A has acted; until then A moves.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false })
@@ -2992,7 +3006,10 @@ do
         if a.unitId == 0x01 then moved = at(a) end
     end
     check(sent, "0,0", "talker: sent to its recruit")
-    check(moved, "3,0", "talker: marches on it")
+    -- within one move of T every tile reads the same: Talk next turn (goals.lua)
+    local mx, my = (moved or "99,99"):match("(%d+),(%d+)")
+    check(math.abs(tonumber(mx)) + math.abs(tonumber(my)) <= 6, true,
+          "talker: ends within a move of its recruit")
 end
 
 -- test_a_claimed_talker_only_goes_to_its_recruit: the style claims R (red, far off) for N, a
@@ -3157,8 +3174,10 @@ do
     local a = Planner.plan(B, board, sight, gifted("careful", 30000))
     check(a and a.act ~= "attack", true, "goals: the boss kill waits for a village in reach")
     board, sight = bossAndVillage()
-    check(at(Planner.plan(B, board, sight, gifted("careful", 100000))), "1,4",
-          "goals: A walks on a rich village")
+    local w = at(Planner.plan(B, board, sight, gifted("careful", 100000)))
+    local wx, wy = (w or "99,99"):match("(%d+),(%d+)")
+    check(math.abs(tonumber(wx) - 1) + math.abs(tonumber(wy) - 6) <= 5, true,
+          "goals: A ends within a move of a rich village (Visit next turn)")
 end
 
 -- test_boss_kill_taken_when_the_village_cannot_be_had: a looter closes it after this phase,
@@ -3321,10 +3340,10 @@ do
 end
 
 
--- test_a_green_recruits_death_loses_its_goal: as the game-over green test, in bold, but G is a
--- recruit A may Talk over. Its death in the enemy phase spoils the clear (one death) AND loses
--- the unit it would have been (its goal): A blocks for a village whose ground beats one death
--- alone (vanilla Ch2: Ross, and Garcia with him).
+-- test_a_green_recruits_death_is_one_death: as the game-over green test, in bold, but G is a
+-- recruit A may Talk over. Its death in the enemy phase costs one death, as any unit's does
+-- (the clear spoiled and the unit lost are one price, PR #553's review): a recruit or not, A
+-- makes the same call at every village worth.
 local function greenRecruitPlay(gold, talk)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
@@ -3348,8 +3367,10 @@ local function greenRecruitPlay(gold, talk)
     }
     return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), gifted("bold", gold))))
 end
-check(greenRecruitPlay(2500, false) .. " " .. greenRecruitPlay(2500, true), "0,0 1,0",
-      "goals: a green recruit's death costs its goal too, and A blocks")
+for _, gold in ipairs({ 1500, 2000, 2500, 3000 }) do
+    check(greenRecruitPlay(gold, true), greenRecruitPlay(gold, false),
+          "goals: a green recruit's death costs one death, as any green's, at " .. gold)
+end
 
 
 -- test_a_march_toward_a_goal_survives_the_menu_cut: A has four small attacks (each worth a
@@ -3382,6 +3403,79 @@ do
         if a.unitId == 0x01 then moved = at(a) end
     end
     check(moved, "2,0", "goals: the march toward a recruit survives the menu cut")
+end
+
+
+-- test_a_visit_now_beats_waiting_on_the_village: A stands one step from a village worth 1000
+-- gold and nothing threatens it. Visiting now takes it; standing on it without the Visit leaves
+-- it for next turn, one turn of GAMMA (6 points under careful). Before PR #553's review both
+-- read chance 1 and judged the same: the visit won on the tie-break alone.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "survive" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
+    local judged = {}
+    for _, x in ipairs(plan and plan.considered or {}) do judged[x.acts[1]] = x.judged end
+    check(a and a.act, "visit", "goals: a village in reach is visited, not waited on")
+    check((judged["1>visit@1,0>nil"] or -1e9) > (judged["1>wait@1,0>nil"] or 1e9), true,
+          "goals: the visit judges above waiting on the village")
+end
+
+-- test_rout_under_fog_is_not_won_by_the_last_seen_kill: A can kill E, the only enemy in sight;
+-- F stands in the fog. Killing E wins nothing, so a village A could take now is not closed by
+-- it: careful visits rather than strike (PR #553 review).
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 5 })
+    local F = red(0x82, 14, 14, { minRange = false, fogged = true })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        explorable = { { x = 1, y = 1, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,1"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, E, F), sightOf(o), gifted("careful", 1000))
+    local win
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == "win" then win = g.after end
+    end
+    check(win, 0.85, "goals: a kill with an enemy in the fog is no win (the win stays a turn off)")
+end
+
+-- test_hitting_a_game_over_recruit_costs_the_chapter: R (red) is a recruit A may Talk over,
+-- and its death ends the game (sight.objective.gameOver names it). A's attack on it may kill
+-- it: even bold, which prices a death at 60, judges that strike as the chapter (PR #553 review).
+do
+    local A = blue(0x01, 0, 1, 0)
+    local R = red(0x81, 2, 0, { hp = 10, charId = 0x50 })
+    local Z = red(0x82, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "rout", gameOver = { 0x50 } },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 60, dmg = 10, hits = 1, killsTarget = true } } } },
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, R, Z), sightOf(o), style("bold"))
+    check(a and a.act ~= "attack", true, "goals: bold does not strike a game-over recruit")
+    -- the strike as the judge priced it: the chapter at its 60% kill, not one death's 60
+    local judged
+    for _, x in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(x.acts) do
+            if k:find(">attack@1,0>129", 1, true) then judged = x.judged end
+        end
+    end
+    check(judged ~= nil and judged < -10000, true,
+          "goals: a strike that may kill a game-over recruit is judged as the chapter")
 end
 
 if fails > 0 then

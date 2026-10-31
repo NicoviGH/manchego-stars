@@ -1483,7 +1483,19 @@ function M.candidates(board, sight, style, opts)
     ctx.explored = opts and opts.explored or {}
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
-    ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
+    -- memoised for the decision: the planner asks it per goal, taker and partial plan, and a
+    -- unit cut off goes through breachFor and the field again each time
+    local turnsMemo = {}
+    ctx.turnsTo = function(u, tile, from)
+        from = from or u
+        local k = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y
+        local v = turnsMemo[k]
+        if v == nil then
+            v = turnsFor(ctx, u, tile, from) or false
+            turnsMemo[k] = v
+        end
+        return v or nil
+    end
     exploring(ctx, opts and opts.sent)
     ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)

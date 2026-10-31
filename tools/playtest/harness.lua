@@ -4104,7 +4104,8 @@ INSPECT.campaignApi = function(game)
     api.play = function(style, claims, attempt)
         local b = INSPECT.botApi(game)
         b.style, b.claims = style, claims
-        b.villageGifts = cfg.village_gifts   -- what every vanilla village gives (goals.lua's prior)
+        -- what every vanilla village and House gives (goals.lua's priors)
+        b.villageGifts, b.houseGifts = cfg.village_gifts, cfg.house_gifts
         b.info.campaign, b.info.attempt = id, attempt
         b.seed = function() end   -- seeded once, at the first chapter: FE8 never re-seeds
         pokeFastConfig()

@@ -70,7 +70,9 @@ do
     check(Goals.chance(g, { [1] = { x = 0, y = 0, acted = true, alive = 1 } }, G, sight.turnsTo),
         G ^ 2, "chance: two turns away, acted")
     check(Goals.chance(g, { [1] = { x = 7, y = 0, acted = true, alive = 1 } }, G, sight.turnsTo),
-        G ^ 0.25, "chance: a step off, acted: a quarter turn")
+        G ^ 1, "chance: in reach but acted: next turn")
+    check(Goals.chance(g, { [1] = { x = 8, y = 0, acted = true, alive = 1 } }, G, sight.turnsTo),
+        G ^ 1, "chance: standing on it, acted: next turn too (taking it now is worth a turn)")
 end
 
 -- TestChanceZeroWhenClosedFirst: the taker arrives on player phase 3; a looter closes it after
@@ -187,6 +189,19 @@ do
     local far = Goals.chance(g, { [1] = { x = 0, y = 0, acted = true, alive = 1 } }, G, t)
     local near = Goals.chance(g, { [1] = { x = 1, y = 0, acted = true, alive = 1 } }, G, t)
     check(near > far, true, "chance: one step nearer is worth something")
+end
+
+-- TestHouseIsNotAVillage: a House (flag 0) is worth the House prior and no 'villages' reward
+-- is shared onto it (vanilla Ch1's two Houses held Seth and Eirika for nine turns).
+do
+    local open = { { x = 1, y = 0, kind = "visit" }, { x = 2, y = 0, kind = "visit", house = true } }
+    local sight = fakeSight({ open = open, prices = { [0x68] = 10000 } })
+    local style = { rewards = { { item = 0x68, needs = "villages" } },
+                    villageGifts = { items = {}, gold = { 1000 } },
+                    houseGifts = { items = {}, gold = { 0, 0, 100 } } }
+    local goals = Goals.list({ units = { blue(1, 0, 0) }, turn = 1 }, sight, style, {})
+    check(find(goals, "visit:1,0").gold, 1000 + 10000, "house: the village takes the whole reward")
+    check(find(goals, "visit:2,0").gold, 100 / 3, "house: the House prior, no reward share")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

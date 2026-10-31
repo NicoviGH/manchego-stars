@@ -33,8 +33,8 @@
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
---   villageGifts       OPTIONAL: { items, gold }, what every vanilla village gives (campaign_env):
---                      the worth of a village or chest whose gift is unknown (goals.lua)
+--   villageGifts, houseGifts  OPTIONAL: { items, gold }, what every vanilla village and House
+--                      gives (campaign_env): the worth of one whose gift is unknown (goals.lua)
 --   recruits()         OPTIONAL: the charIds the chapter's talks would bring over, read from
 --                      the game at the first look (Sight talks: each talk the game would run,
 --                      its pidB); absent, the recruits part is "unchecked" and `clean` is
@@ -356,7 +356,7 @@ end
 function M.run(api)
     local Bot, Json = api.Bot, api.Json
     local style = Bot.applyClaims(api.claims or {}, api.style)
-    style.villageGifts = api.villageGifts
+    style.villageGifts, style.houseGifts = api.villageGifts, api.houseGifts
     local unplayed = Bot.unplayed(api.claims or {})
     local skipped = {}
     for _, id in ipairs(unplayed) do skipped[id] = true end

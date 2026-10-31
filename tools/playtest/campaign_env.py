@@ -185,15 +185,19 @@ def twin_claims_env(route):
     return out
 
 
-def village_gifts():
-    """What every vanilla village gives (inject.villages.village_rewards over src/events/ at
-    HEAD): {items: [item ids], gold: [amounts]}. The planner's worth of a village whose gift a
-    new player cannot know is their mean, each item at the game's own GetItemCost (#510)."""
+def village_gifts(macro='Village'):
+    """What every vanilla village (or House) gives (inject.villages.village_rewards over
+    src/events/ at HEAD): {items: [item ids], gold: [amounts]}, a House that only talks as gold
+    0. The planner's worth of a village or House whose gift a new player cannot know is their
+    mean, each item at the game's own GetItemCost (#510)."""
     scripts = inject.decomp.vanilla_event_scripts()
     out = {'items': [], 'gold': []}
     for path, text in sorted(inject.decomp.vanilla_event_files().items()):
         if path.endswith('-eventinfo.h'):
-            for _x, _y, kind, v in inject.villages.village_rewards(text, scripts):
+            # a House that only talks gives nothing (0); a village's gift the parse cannot
+            # read is unknown, not nothing, and stays out of the mean
+            for _x, _y, kind, v in inject.villages.village_rewards(
+                    text, scripts, macro, nothing=macro == 'House'):
                 out['items' if kind == 'item' else 'gold'].append(v)
     return out
 
@@ -201,7 +205,8 @@ def village_gifts():
 def vanilla_env(route=1):
     enum = _chapter_enum()
     return dict(team_groups.env(), last=[enum[n] for n in VANILLA_LAST], route=route,
-                claims=twin_claims_env(route), village_gifts=village_gifts())
+                claims=twin_claims_env(route), village_gifts=village_gifts(),
+                house_gifts=village_gifts('House'))
 
 
 def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
@@ -237,7 +242,7 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
                 resolve(c, '%s#%d' % (chap['id'], i), 'ours', chap, campaign)
                 for i, c in enumerate(strategy.our_claims(chap))]
     env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops, claims=claims,
-               village_gifts=village_gifts())
+               village_gifts=village_gifts(), house_gifts=village_gifts('House'))
     if lord is not None:
         env['lord'] = lead_row(lord, campaign)
     return env

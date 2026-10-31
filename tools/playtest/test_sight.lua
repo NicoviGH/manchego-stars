@@ -555,5 +555,28 @@ do
     check(Sight.waveCloses(8, 4, nil), nil, "waveCloses: a tile it never reaches")
 end
 
+-- closingsKey: a looter killed, moved or hurt, a tile taken, or other waves is a new read; the
+-- same board is the same key whatever order the units come in.
+do
+    local open = { ["1,2"] = {}, ["5,6"] = {} }
+    local a, b = { id = 0x81, x = 3, y = 3, hp = 20 }, { id = 0x82, x = 9, y = 9, hp = 20 }
+    local key = Sight.closingsKey(3, 8, nil, { a, b }, open)
+    check(Sight.closingsKey(3, 8, nil, { b, a }, open), key, "closingsKey: order-free")
+    check(Sight.closingsKey(3, 8, nil, { a }, open) ~= key, true, "closingsKey: a looter gone")
+    check(Sight.closingsKey(3, 8, nil, { a, { id = 0x82, x = 8, y = 9, hp = 20 } }, open) ~= key,
+        true, "closingsKey: a looter moved")
+    check(Sight.closingsKey(3, 8, nil, { a, b }, { ["1,2"] = {} }) ~= key, true,
+        "closingsKey: a tile taken")
+    check(Sight.closingsKey(3, 8, { { turn = 8 } }, { a, b }, open) ~= key, true,
+        "closingsKey: the waves")
+end
+
+-- sackedTerrain: a taken chest is emptied, a taken village closed; neither is on the AI's loot
+-- lists (cp_utility.c: VILLAGE_REGULAR 0x03, CHURCH, RUINS_VILLAGE 0x37, CHEST_FULL 0x21).
+do
+    check(Sight.sackedTerrain({ kind = "chest" }), 0x20, "sackedTerrain: an emptied chest")
+    check(Sight.sackedTerrain({ kind = "visit" }), 0x04, "sackedTerrain: a closed village")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
