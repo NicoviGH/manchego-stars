@@ -104,7 +104,6 @@ def _set_move_row(class_value, sheet_sym, motion_sym):
 def reskin_class_id(rk):
     """The class id a declared enemy reskin (campaign.yaml) takes on the board: its appended
     `slot_id`, else the vanilla slot it fills."""
-    from inject.class_ids import vanilla_class_values
     if rk.get('slot_id') is not None:
         return int(str(rk['slot_id']), 0)
     return vanilla_class_values()[rk['slot']]

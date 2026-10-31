@@ -279,7 +279,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- the red units the plan leaves standing, as the game counts them for a Rout
     -- (sight.redCount: CountRedUnits -- the fogged, carried and hidden ones too), less the ones
     -- the plan removes: a Rout is won only when none is left, not when the last one in sight
-    -- dies. A sight without the read (test_bot's fakes) counts the board's reds.
+    -- dies. A sight without the read (test_bot's fakes) counts as CountRedUnits does: every
+    -- red not dead, on the field or not.
     local function redsLeft(st)
         local n = sight.redCount and sight.redCount()
         if not n then
@@ -288,7 +289,10 @@ function M.plan(Bot, board, sight, style, opts)
                 if u.faction == "red" and not u.dead then n = n + 1 end
             end
         end
-        for _ in pairs(st.gone) do n = n - 1 end
+        -- a Talk takes a green recruit off too (fx.gone); the game's count holds only reds
+        for id in pairs(st.gone) do
+            if byId[id] and byId[id].faction == "red" then n = n - 1 end
+        end
         return n
     end
     -- the chance a plan ends the chapter: a Seize or the boss's death (score's fx.win), or on

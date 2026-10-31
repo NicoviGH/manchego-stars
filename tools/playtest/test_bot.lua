@@ -3506,6 +3506,37 @@ do
           "goals: a strike that may kill a game-over recruit is judged as the chapter")
 end
 
+
+-- test_rout_counts_reds_only: on a Rout map, a Talk takes a green recruit off the board too
+-- (gone), but only reds count: talking T over while E stands is no win. And the count, as
+-- the game's, takes a red off the field (carried) as standing (PR #553 re-review).
+do
+    local A = blue(0x01, 0, 1, 0)
+    local T = blue(0x30, 5, 0, 0, { faction = "green", minRange = false })
+    local E = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, T, E), sightOf(o), style("careful"))
+    local win
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == "win" then win = g.after end
+    end
+    check(win, 0.85, "rout: a Talk on a green is no win while a red stands")
+    local H = red(0x82, 9, 8, { minRange = false, onField = false })
+    local x = { objective = { kind = "rout" }, reach = { [0x01] = tiles({ 1, 0 }) },
+                enemyPhase = function() return {} end }
+    _, plan = Planner.plan(B, boardOf(A, H), sightOf(x), style("careful"))
+    win = nil
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == "win" then win = g.after end
+    end
+    check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

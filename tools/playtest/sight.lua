@@ -787,13 +787,10 @@ end
 -- Inside a sandbox: `info` (scratch) made a fresh struct EventInfo over the chapter's event
 -- list at `offset` in its ChapterEventGroup (GetChapterEventDataPointer), ready for the game's
 -- SearchAvailableEvent -- the turn events (+00), the talks (+04), the location events (+08).
--- -> the list's address.
 local function eventSearch(api, call, info, offset)
     local events = call(api.SYM.GetChapterEventDataPointer, { api.chapter() })
     for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
-    local list = api.mem.u32(events + offset)
-    api.write32(info, list)
-    return list
+    api.write32(info, api.mem.u32(events + offset))
 end
 
 -- Sight.batching(outer) -> sandbox, api: Sight.machine made re-entrant (the planner's cost,
