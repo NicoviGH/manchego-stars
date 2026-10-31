@@ -3455,8 +3455,8 @@ INSPECT.CAMPAIGN = {
 
 -- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +10 pEffectiveness, +19
 -- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
--- types.h BmSt +2C um_tmp_item (the item that found no room); Unit +1E items[5] (bmunit.h);
--- menu_def.c's
+-- types.h BmSt +2C um_tmp_item (the item that found no room); the bag itself is board.lua's
+-- (Board.UNIT_ITEMS, ITEM_COUNT); menu_def.c's
 -- convoy chooser rows. Keys: what GetUnitKeyItemSlotForTerrain looks for (bmunit.c). Passive:
 -- the items the engine tests by id or attribute while carried -- the Member Card (eventinfo.c),
 -- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
@@ -3535,7 +3535,6 @@ end
 -- runs in, the item is put alone in the unit's bag and GetUnitKeyItemSlotForTerrain asked for
 -- each key terrain; the bag is put back.
 INSPECT.isKey = function(call, unitAddr, value)
-    local K = INSPECT.BAG
     local bag = {}
     for k = 0, BOARD.ITEM_COUNT - 1 do
         local at = unitAddr + BOARD.UNIT_ITEMS + k * 2
