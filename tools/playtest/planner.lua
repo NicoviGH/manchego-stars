@@ -124,9 +124,13 @@ local function score(act, st, W, style, odds)
             -- is its goal lost (the goals' term reads fx.recruitHit)
             fx.recruitHit = { id = e.id, p = kill }
         else
-            -- the objective's boss: every point of its HP is a step to the win
-            local target = (e.isBoss and st.objective == "boss") and M.BOSS_WORTH or 1
-            local worth = (e.isBoss and 5 or 1) + (act.first and 1 or 0)
+            -- the objective's boss: every point of its HP is a step to the win, as far as the
+            -- win is wanted now (st.bossWant: 1 with nothing else left to get, near 0 with a
+            -- rich goal open -- vanilla Ch5 attempt 8: a chip on the boss, credited five times,
+            -- crit it dead with three villages open)
+            local want = st.bossWant or 1
+            local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
+            local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             v = v + W.dealt * dealt * target + W.kill * kill * worth
         end
         if f.counters then
@@ -257,6 +261,16 @@ function M.plan(Bot, board, sight, style, opts)
         local pos = positions(start)
         for _, g in ipairs(goals) do before[g.id] = Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
     end
+    -- how much the win is wanted now: its worth now (one death x (1 - GAMMA), goalTerm's)
+    -- against that and everything else still open, worth x chance (score's boss credit)
+    do
+        local open = 0
+        for _, g in ipairs(goals) do
+            if g.kind ~= "objective" then open = open + Goals.worth(g, W) * before[g.id] end
+        end
+        local now = W.death * (1 - Goals.GAMMA)
+        start.bossWant = now / (now + open)
+    end
     -- the chance a plan ends the chapter: a Seize or the boss's death (score's fx.win), or on
     -- a Rout map every enemy in sight gone
     local function winChance(st)
@@ -370,7 +384,7 @@ function M.plan(Bot, board, sight, style, opts)
         local n = { base = st.base + v, acts = copy(st.acts), expect = copy(st.expect),
                     used = copy(st.used), tiles = copy(st.tiles), gone = copy(st.gone),
                     enemyHp = copy(st.enemyHp), hp = copy(st.hp), took = copy(st.took),
-                    recruitHit = copy(st.recruitHit), win = st.win,
+                    recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     counter = copy(st.counter), healed = copy(st.healed), walls = copy(st.walls),
                     objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill) }

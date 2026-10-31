@@ -3274,6 +3274,31 @@ do
     check(at(a) ~= "1,0", true, "goals: the mend keeps A from the counter that ends the chapter")
 end
 
+
+-- test_no_boss_chip_while_a_goal_is_open: A can chip the boss (9 of its 25 HP; a 5% crit
+-- kills it) or not, a village worth 25000 gold open (careful: 1000 points). The chip is a step
+-- to a win not wanted yet (st.bossWant ~0.13): credited ~25 with the win's own share, against
+-- the crit's 5% of the village (~41), it is left; credited five times over (~61), it was
+-- taken. With no village, the chip.
+do
+    local function play(village)
+        local A = blue(0x01, 0, 1, 0)
+        local E = red(0x81, 2, 0, { hp = 25, isBoss = true, minRange = false })
+        local Z = red(0x82, 14, 14, { minRange = false })
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }, { 1, 4 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, crit = 5 } } } },
+            explorable = village and { { x = 1, y = 6, kind = "visit" } } or {},
+            canExplore = { [0x01] = village and { ["1,6"] = "visit" } or {} },
+            enemyPhase = function() return {} end,
+        }
+        return Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 25000))
+    end
+    check((play(true) or {}).act ~= "attack", true, "goals: no chip on the boss while a goal is open")
+    check((play(false) or {}).act, "attack", "goals: with nothing left, the chip")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
