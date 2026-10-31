@@ -3006,10 +3006,13 @@ do
         if a.unitId == 0x01 then moved = at(a) end
     end
     check(sent, "0,0", "talker: sent to its recruit")
-    -- within one move of T every tile reads the same: Talk next turn (goals.lua)
-    local mx, my = (moved or "99,99"):match("(%d+),(%d+)")
-    check(math.abs(tonumber(mx)) + math.abs(tonumber(my)) <= 6, true,
-          "talker: ends within a move of its recruit")
+    -- the plan leaves T's Talk for next turn, sure (GAMMA^1): within one move of T every tile
+    -- gives that, and nothing in the model makes a nearer one surer (goals.lua)
+    local after
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == "recruit:" .. 0x30 then after = g.after end
+    end
+    check(after, 0.85, "talker: its recruit is Talked over next turn")
 end
 
 -- test_a_claimed_talker_only_goes_to_its_recruit: the style claims R (red, far off) for N, a
@@ -3174,10 +3177,12 @@ do
     local a = Planner.plan(B, board, sight, gifted("careful", 30000))
     check(a and a.act ~= "attack", true, "goals: the boss kill waits for a village in reach")
     board, sight = bossAndVillage()
-    local w = at(Planner.plan(B, board, sight, gifted("careful", 100000)))
-    local wx, wy = (w or "99,99"):match("(%d+),(%d+)")
-    check(math.abs(tonumber(wx) - 1) + math.abs(tonumber(wy) - 6) <= 5, true,
-          "goals: A ends within a move of a rich village (Visit next turn)")
+    local _, vplan = Planner.plan(B, board, sight, gifted("careful", 100000))
+    local after
+    for _, g in ipairs(vplan and vplan.goalWorth or {}) do
+        if g.id == "visit:1,6" then after = g.after end
+    end
+    check(after, 0.85, "goals: A ends where it Visits the rich village next turn")
 end
 
 -- test_boss_kill_taken_when_the_village_cannot_be_had: a looter closes it after this phase,
@@ -3449,6 +3454,29 @@ do
         if g.id == "win" then win = g.after end
     end
     check(win, 0.85, "goals: a kill with an enemy in the fog is no win (the win stays a turn off)")
+end
+
+-- The game's own count (CountRedUnits) decides: a red carried by another is in no board read,
+-- yet the Rout goes on while it lives.
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 5 })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        explorable = { { x = 1, y = 1, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,1"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local sight = sightOf(o)
+    sight.redCount = function() return 2 end   -- E, and a red E carries
+    local _, plan = Planner.plan(B, boardOf(A, E), sight, gifted("careful", 1000))
+    local win
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == "win" then win = g.after end
+    end
+    check(win, 0.85, "goals: the game's red count, not the board's, decides a Rout's win")
 end
 
 -- test_hitting_a_game_over_recruit_costs_the_chapter: R (red) is a recruit A may Talk over,

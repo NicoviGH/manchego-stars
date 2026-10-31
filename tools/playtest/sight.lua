@@ -95,6 +95,7 @@
 --                            unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
+--   redCount()               CountRedUnits: every red not dead (a Rout's count).
 --   unseen()                 every tile the fog hides now: gBmMapFog 0 there, which
 --                            RefreshEntityBmMaps never leaves without fog (bmmap.c). An enemy
 --                            in fog is the game's US_BIT9 (board.lua), no target.
@@ -238,7 +239,8 @@ local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 -- 0x1C bytes. A talk entry (EvtListTalk, struct EvCheck03/04) holds pidA +08, pidB +09.
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
 -- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
-local EVENT_FLAG, EVENT_X, EVENT_Y, CHAPTER_LOCATIONS = 0x08, 0x18, 0x19, 0x08
+local EVENT_FLAG, EVENT_X, EVENT_Y = 0x08, 0x18, 0x19
+local CHAPTER_TURNS, CHAPTER_LOCATIONS = 0x00, 0x08
 local TALK_PID_A, TALK_PID_B, NO_PID = 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
 local CHAPTER_TALKS = 0x04
@@ -730,15 +732,22 @@ function M.opensChests(items, attributes)
     return false
 end
 
--- closings()' cache key: what its read depends on -- the turn, the horizon, the waves, each
--- looter as it stands (id, tile, HP) and the open tiles. A looter killed or moved, a tile
--- taken, is a new key.
-function M.closingsKey(turn, k, waves, looters, open)
+-- closings()' cache key: what its read depends on -- the turn, the horizon, each looter as it
+-- stands (id, tile, HP), the tiles our units block, the open tiles and each wave's units. A
+-- looter killed or moved, one of ours moved, a tile taken, is a new key.
+function M.closingsKey(turn, k, waves, looters, open, blockers)
     local parts = {}
     for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
+    -- our units are hidden from the AI but still block its walk
+    for _, o in ipairs(blockers or {}) do parts[#parts + 1] = "b" .. o.x .. "," .. o.y end
     for key in pairs(open) do parts[#parts + 1] = key end
+    for _, w in ipairs(waves or {}) do
+        for _, u in ipairs(w.units) do
+            parts[#parts + 1] = "w" .. w.turn .. ":" .. u.class .. "@" .. u.x .. "," .. u.y
+        end
+    end
     table.sort(parts)
-    return turn .. "|" .. k .. "|" .. #(waves or {}) .. "|" .. table.concat(parts, ";")
+    return turn .. "|" .. k .. "|" .. table.concat(parts, ";")
 end
 
 -- The terrain closings() leaves on a tile a looter took, `t` its explorable() entry: an emptied
@@ -773,6 +782,18 @@ local function readGrid(mem, base, w, h)
         for x = 0, w - 1 do g[y][x] = grid(mem, base, x, y) end
     end
     return g
+end
+
+-- Inside a sandbox: `info` (scratch) made a fresh struct EventInfo over the chapter's event
+-- list at `offset` in its ChapterEventGroup (GetChapterEventDataPointer), ready for the game's
+-- SearchAvailableEvent -- the turn events (+00), the talks (+04), the location events (+08).
+-- -> the list's address.
+local function eventSearch(api, call, info, offset)
+    local events = call(api.SYM.GetChapterEventDataPointer, { api.chapter() })
+    for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
+    local list = api.mem.u32(events + offset)
+    api.write32(info, list)
+    return list
 end
 
 -- Sight.batching(outer) -> sandbox, api: Sight.machine made re-entrant (the planner's cost,
@@ -1386,15 +1407,17 @@ function M.new(outer)
         local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
         local open, all = {}, units()
         for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
-        local looter, looters = {}, {}
+        local looter, looters, blockers = {}, {}, {}
         for _, o in ipairs(all) do
             if o.faction == "red" and o.onField and (M.loots(mem, S.gpAi1Table, mem.u8(o.addr + UNIT_AI1))
                     or M.loots(mem, S.gpAi2Table, mem.u8(o.addr + UNIT_AI2))) then
                 looter[o.id] = true
                 looters[#looters + 1] = o
+            elseif o.faction ~= "red" and o.onField then
+                blockers[#blockers + 1] = o
             end
         end
-        local ck = M.closingsKey(turn0, k, waves, looters, open)
+        local ck = M.closingsKey(turn0, k, waves, looters, open, blockers)
         if closingsAt[ck] then return closingsAt[ck] end
         local out = {}
         local function close(x, y, phase)
@@ -1455,7 +1478,9 @@ function M.new(outer)
                         local chests = villages
                             and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES))
                         for _, t in pairs(open) do
-                            if (t.kind == "visit" and villages) or (t.kind == "chest" and chests) then
+                            -- a House is never looted (AiLocationIsPillageTarget: no House)
+                            if (t.kind == "visit" and villages and not t.house)
+                                    or (t.kind == "chest" and chests) then
                                 local cost = costGrid(stand, t, cls)[wu.y][wu.x]
                                 local turns = cost and math.ceil(cost / mem.s8(cls + CLASS_MOV))
                                 local at = M.waveCloses(wv.turn, turn0, turns)
@@ -1471,6 +1496,14 @@ function M.new(outer)
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
+    -- The red units the game counts for a Rout (CountRedUnits, bmunit.c): every valid red not
+    -- dead -- carried, hidden and fogged ones too. Read once per board.
+    function s.redCount()
+        if seen.redCount == nil then
+            seen.redCount = sandbox(function(call) return call(S.CountRedUnits, {}) end)
+        end
+        return seen.redCount
+    end
     function s.unseen()
         local out = {}
         for y = 0, h - 1 do
@@ -1525,9 +1558,7 @@ function M.new(outer)
     -- its Visit never closes and it marks nothing taken (eventinfo House(0, ...)); a village's
     -- entry sets a flag. `info` is a sandbox's scratch.
     local function isHouse(call, info, x, y)
-        local events = call(S.GetChapterEventDataPointer, { api.chapter() })
-        for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
-        api.write32(info, mem.u32(events + CHAPTER_LOCATIONS))
+        eventSearch(api, call, info, CHAPTER_LOCATIONS)
         api.write8(info + EVENT_X, x)
         api.write8(info + EVENT_Y, y)
         return call(S.SearchAvailableEvent, { info }) ~= 0 and mem.u32(info + EVENT_FLAG) == 0
@@ -1774,14 +1805,11 @@ function M.new(outer)
     -- board repeats, against a chapter's tens of thousands.
     function s.nextTurnEvent(turn)
         return sandbox(function(call, info)
-            local events = call(S.GetChapterEventDataPointer, { api.chapter() })
-            local list = mem.u32(events)
             local function scriptsAt(t, phase)
                 local out = {}
                 api.write16(S.gPlaySt + PLAY_TURN, t)
                 api.write8(S.gPlaySt + PLAY_FACTION, phase)
-                for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
-                api.write32(info, list)
+                eventSearch(api, call, info, CHAPTER_TURNS)
                 local found = call(S.SearchAvailableEvent, { info })
                 while found ~= 0 do
                     out[mem.u32(info + EVENT_SCRIPT)] = true
@@ -1855,9 +1883,7 @@ end
 function M.talks(api, sandbox)
     local mem, S = api.mem, api.SYM
     return (sandbox or M.machine(api.cpu))(function(call, info)
-        local events = call(S.GetChapterEventDataPointer, { api.chapter() })
-        for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
-        api.write32(info, mem.u32(events + CHAPTER_TALKS))
+        eventSearch(api, call, info, CHAPTER_TALKS)
         api.write8(info + EVENT_PID_A, NO_PID)
         api.write8(info + EVENT_PID_B, NO_PID)
         local seen = {}

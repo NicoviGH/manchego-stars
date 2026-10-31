@@ -567,8 +567,13 @@ do
         true, "closingsKey: a looter moved")
     check(Sight.closingsKey(3, 8, nil, { a, b }, { ["1,2"] = {} }) ~= key, true,
         "closingsKey: a tile taken")
-    check(Sight.closingsKey(3, 8, { { turn = 8 } }, { a, b }, open) ~= key, true,
-        "closingsKey: the waves")
+    local wave = { { turn = 8, units = { { class = 9, x = 13, y = 0 } } } }
+    check(Sight.closingsKey(3, 8, wave, { a, b }, open) ~= key, true, "closingsKey: the waves")
+    check(Sight.closingsKey(3, 8, { { turn = 8, units = { { class = 9, x = 14, y = 1 } } } },
+        { a, b }, open) ~= Sight.closingsKey(3, 8, wave, { a, b }, open), true,
+        "closingsKey: a wave's units, not only how many waves")
+    check(Sight.closingsKey(3, 8, nil, { a, b }, open, { { x = 4, y = 4 } }) ~= key, true,
+        "closingsKey: one of ours blocking")
 end
 
 -- sackedTerrain: a taken chest is emptied, a taken village closed; neither is on the AI's loot

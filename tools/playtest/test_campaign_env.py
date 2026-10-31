@@ -150,6 +150,20 @@ class Claims(unittest.TestCase):
                          [[items['ITEM_AXE_IRON'], items['ITEM_CHESTKEY']], [items['ITEM_AXE_IRON']]])
         self.assertEqual({(u['ai1'], u['ai2']) for u in waves[0]['units']}, {(0, 4)})
 
+    def test_a_reskinned_wave_is_the_class_the_rom_loads(self):
+        # a reskinned body carries its slot's class id, the class the ROM loads it as (the
+        # slot holds its base's clone, ADR 0362), never the entry's `class` token's
+        import inject.reskins
+        rk = inject.reskins.enemy_class_reskins(campaign_chapters.CAMPAIGN)[0]
+        dressed = next(iter(rk['dresses']))   # a chapter id that reskin dresses
+        token = rk['dresses'][dressed][0]
+        chap = {'id': dressed + '-x', 'enemy_units': [{
+            'id': 'w', 'name': 'W', 'arrives_turn': 2, 'class': token,
+            'positions': [[1, 2]], 'inventory': [],
+            'ai_override': {'ai': '{0x0, 0x4, 0x9}', 'why': 'test'}}]}
+        waves = difficulty.arrival_waves(chap, 'ours')
+        self.assertEqual(waves[0]['units'][0]['class'], inject.reskins.reskin_class_id(rk))
+
     def test_reward_resolves_item_id(self):
         c = ce.resolve({'kind': 'reward', 'item': 'guiding-ring', 'needs': 'villages'},
                        'FE8 Ch5#4', 'vanilla')

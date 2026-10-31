@@ -553,7 +553,7 @@ def _classes(game='vanilla'):
            for k, v in class_ids.vanilla_class_values().items()}
     if game == 'ours':
         for rk in reskins.enemy_class_reskins(campaign_env.campaign_chapters.CAMPAIGN):
-            out[campaign_env.reskin_class_id(rk)] = class_ids.class_display_name(rk['id'])
+            out[reskins.reskin_class_id(rk)] = class_ids.class_display_name(rk['id'])
     return out
 
 

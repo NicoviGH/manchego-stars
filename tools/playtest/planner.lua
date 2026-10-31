@@ -124,8 +124,9 @@ local function score(act, st, W, style, odds)
             -- a recruit is talked over, not worn down: its damage earns nothing, and its death
             -- is its goal lost (the goals' term reads fx.recruitHit)
             fx.recruitHit = { id = e.id, p = kill }
-            -- its goal is one unit; a recruit whose death ends the game costs the chapter
-            if st.gameOver[e.charId] then v = v - W.win * kill end
+            -- its goal is one unit (W.death); what its death costs beyond that (the chapter,
+            -- when it ends the game: loss())
+            v = v - (loss(W, st, e.charId) - W.death) * kill
         else
             -- the objective's boss: every point of its HP is a step to the win, as far as the
             -- win is wanted now (st.bossWant: 1 with nothing else left to get, near 0 with a
@@ -275,15 +276,19 @@ function M.plan(Bot, board, sight, style, opts)
         local now = W.death * (1 - Goals.GAMMA)
         start.bossWant = now / (now + open)
     end
-    -- the red units on the field the plan leaves standing, the ones the fog hides too: a Rout
-    -- is won only when none is left, not when the last one in sight dies
+    -- the red units the plan leaves standing, as the game counts them for a Rout
+    -- (sight.redCount: CountRedUnits -- the fogged, carried and hidden ones too), less the ones
+    -- the plan removes: a Rout is won only when none is left, not when the last one in sight
+    -- dies. A sight without the read (test_bot's fakes) counts the board's reds.
     local function redsLeft(st)
-        local n = 0
-        for _, u in ipairs(board.units) do
-            if u.faction == "red" and u.onField and not u.dead and not st.gone[u.id] then
-                n = n + 1
+        local n = sight.redCount and sight.redCount()
+        if not n then
+            n = 0
+            for _, u in ipairs(board.units) do
+                if u.faction == "red" and not u.dead then n = n + 1 end
             end
         end
+        for _ in pairs(st.gone) do n = n - 1 end
         return n
     end
     -- the chance a plan ends the chapter: a Seize or the boss's death (score's fx.win), or on

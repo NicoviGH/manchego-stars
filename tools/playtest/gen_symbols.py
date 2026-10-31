@@ -334,6 +334,7 @@ WANTED = [
     'GetClassData',             # a class's struct: costs, MOV, attributes (bmunit.c)
     'gpAi1Table',               # AI scripts by index (cp_data.c): a looter's holds
     'gpAi2Table',               # AI_CMD_PILLAGE (vanilla's are AI2 0x04/0x05)
+    'CountRedUnits',            # every red not dead, rescued and hidden ones too: a Rout's count
     'CanUnitUseWeaponNow',      # the weapons the Attack command lists (bmitem.c)
     'MakeTargetListForWeapon',  # that weapon's targets: units not allied, and walls (bmtarget.c)
     'AttackCommandUsability',   # Attack: a weapon above with a target (bmmenu.c; the clear loop)
