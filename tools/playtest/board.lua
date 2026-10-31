@@ -152,17 +152,23 @@ function Board.leanAt(mem, SYM, base, slot)
     }
 end
 
+-- The bag of the unit at `addr`: { { id, uses }... }, empty slots left out.
+function Board.items(mem, addr)
+    local items = {}
+    for k = 0, Board.ITEM_COUNT - 1 do
+        local raw = mem.u16(addr + Board.UNIT_ITEMS + k * 2)
+        if (raw & 0xFF) ~= 0 then items[#items + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
+    end
+    return items
+end
+
 -- FULL: the lean read plus index, class, items and boss attribute.
 function Board.unitAt(mem, SYM, base, slot)
     local u = Board.leanAt(mem, SYM, base, slot)
     if not u then return nil end
     local a = u.addr
     local clptr = mem.u32(a + 0x04)
-    local items = {}
-    for k = 0, Board.ITEM_COUNT - 1 do
-        local raw = mem.u16(a + Board.UNIT_ITEMS + k * 2)
-        if (raw & 0xFF) ~= 0 then items[#items + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
-    end
+    local items = Board.items(mem, a)
     u.id = mem.u8(a + 0x0B)
     u.classId = clptr ~= 0 and mem.u8(clptr + 0x04) or nil
     u.items = items
@@ -498,6 +504,7 @@ function Board.bind(mem, SYM)
         find = function(faction, charId) return Board.find(mem, SYM, faction, charId) end,
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
+        items = function(addr) return Board.items(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
@@ -506,7 +513,8 @@ function Board.bind(mem, SYM)
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
         US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
-        ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
+        ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE, UNIT_ITEMS = Board.UNIT_ITEMS,
+        ITEM_COUNT = Board.ITEM_COUNT,
         BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
         ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
         ACTION_PICK = Board.ACTION_PICK,
