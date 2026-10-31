@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9's goal worth (ADR 0383): the planner weighs what is still left to
+    # get (goals.lua), never a flat step of ground or a recruit's fixed credit
+    r'\bW\.progress\b', r'\bW\.recruit\b', r'\ba\.progress\b',
     # retired by #510 step 9 (ADR 0377): an exchange's odds are the game's own play of it,
     # every roll caught (sight.lua `played`), never a blow model of displayed hit and x3 crits
     r'\bhitChance\b', r'\bCRIT_MULTIPLIER\b', r'Planner\.blows\b', r'plan\.branch\b',

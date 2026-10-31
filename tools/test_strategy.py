@@ -227,5 +227,20 @@ class Findings(unittest.TestCase):
         self.assertTrue(any(l.startswith('OK   answer eirika vs fighter') for l in lines), lines)
 
 
+
+class RewardKind(unittest.TestCase):
+    def test_reward_needs_item_and_needs(self):
+        section = 'There is a free Guiding Ring if you visit all the villages.'
+        good = {'kind': 'reward', 'item': 'guiding-ring', 'needs': 'villages',
+                'cite': 'There is a free Guiding Ring if you visit all the villages.'}
+        strategy.validate([good], section, 'x')
+        for drop in ('item', 'needs'):
+            bad = dict(good)
+            bad.pop(drop)
+            with self.assertRaises(ValueError):
+                strategy.validate([bad], section, 'x')
+        with self.assertRaises(ValueError):
+            strategy.validate([dict(good, needs='houses')], section, 'x')
+
 if __name__ == '__main__':
     unittest.main()

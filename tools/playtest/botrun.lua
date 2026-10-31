@@ -33,6 +33,8 @@
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
+--   villageGifts, houseGifts  OPTIONAL: { items, gold }, what every vanilla village and House
+--                      gives (campaign_env): the worth of one whose gift is unknown (goals.lua)
 --   recruits()         OPTIONAL: the charIds the chapter's talks would bring over, read from
 --                      the game at the first look (Sight talks: each talk the game would run,
 --                      its pidB); absent, the recruits part is "unchecked" and `clean` is
@@ -80,7 +82,8 @@
 --           faction, tile, HP and item ids
 --   plan    a decision: the act chosen, and from the planner its judged score, the other plans
 --           judged (`considered`), what it expects of the enemy phase (`predict`), every Visit
---           and Chest offered (`explore`) and the tile each unit was sent to (`goals`), and whether a kept plan's act was played or a
+--           and Chest offered (`explore`), the tile each unit was sent to (`goals`), what the
+--           plan does to each open goal (`worth`: id, kind, gold, worth, before, after), and whether a kept plan's act was played or a
 --           surprise (`replan`, why) forced a new one
 --   act     one act, either side: unit, from, to, the act and its target, the game's own
 --           battle records (Board.battle: the forecast's numbers, every blow) and who fell
@@ -196,8 +199,8 @@ local function fallen(before, after, action)
     return out
 end
 
--- The no-risk rule's experiment (#510 step 9, Nicolas 2026-10-27: try it before it is
--- locked): every village and chest the run saw open, and what became of it.
+-- Every village and chest the run saw open, and what became of it (#510 step 9): the record of
+-- how the planner's goals (goals.lua) played out.
 --   open(list, turn, usable)  one read of sight.explorable(); a tile gone from it that we did
 --                      not visit was closed by someone else (a pillage, an event). usable(t):
 --                      whether a unit could use it now (the game's own check)
@@ -274,6 +277,15 @@ function M.exploreLog()
         end
         return out
     end
+    -- the "x,y" tiles closed before we took them (a pillage, an event), each to its kind: a
+    -- reward that needs one is lost (goals.lua)
+    function log.lost()
+        local out = {}
+        for k, e in pairs(tiles) do
+            if not e.by and (e.closed or e.closedBy) then out[k] = e.kind end
+        end
+        return out
+    end
     function log.leftOpen()
         local out = {}
         for _, k in ipairs(order) do
@@ -344,6 +356,7 @@ end
 function M.run(api)
     local Bot, Json = api.Bot, api.Json
     local style = Bot.applyClaims(api.claims or {}, api.style)
+    style.villageGifts, style.houseGifts = api.villageGifts, api.houseGifts
     local unplayed = Bot.unplayed(api.claims or {})
     local skipped = {}
     for _, id in ipairs(unplayed) do skipped[id] = true end
@@ -582,7 +595,8 @@ function M.run(api)
                         local replan = playing and why
                         local a, plan = api.Planner.plan(Bot, board, sight, style,
                                                          { stalled = stalled, sent = sent,
-                                                           explored = explore.explored() })
+                                                           explored = explore.explored(),
+                                                           lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         lastPlan = plan
                         if plan then sent = plan.goals end
@@ -592,7 +606,9 @@ function M.run(api)
                                 judged = plan and plan.judged, kind = plan and plan.kind,
                                 considered = plan and plan.considered,
                                 predict = plan and plan.predict,
-                                explore = plan and plan.explore, goals = plan and plan.goals })
+                                explore = plan and plan.explore, goals = plan and plan.goals,
+                                worth = plan and plan.goalWorth,
+                                win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then
                             local said = {}

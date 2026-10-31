@@ -388,8 +388,10 @@ Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] =
                   [0x10] = "visit", [0x11] = "seize", [0x12] = "door", [0x14] = "chest",
                   [0x15] = "pick", [0x1A] = "item", [0x1E] = "trapped", [0x1F] = "wait" }
 -- include/cp_common.h struct AiDecision (gAiDecision): +00 actionId, +01 unitId, +02/+03
--- xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the ballista, AiAttemptBallistaCombat's -1).
-Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, SLOT = 0x07 }
+-- xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the ballista, AiAttemptBallistaCombat's -1),
+-- +0A actionPerformed (AiSetDecision sets it: the unit decided to move or act at all).
+Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, SLOT = 0x07,
+                 PERFORMED = 0x0A }
 -- AI_ACTION_*: what the AI chose. A theft (AiStartStealAction) and a village pillage
 -- (AiPillageAction) set no action type of their own.
 Board.AI_ACTION_COMBAT, Board.AI_ACTION_ESCAPE, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE =

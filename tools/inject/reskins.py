@@ -101,6 +101,14 @@ def _set_move_row(class_value, sheet_sym, motion_sym):
         f.write(new)
 
 
+def reskin_class_id(rk):
+    """The class id a declared enemy reskin (campaign.yaml) takes on the board: its appended
+    `slot_id`, else the vanilla slot it fills."""
+    if rk.get('slot_id') is not None:
+        return int(str(rk['slot_id']), 0)
+    return vanilla_class_values()[rk['slot']]
+
+
 def enemy_class_reskins(campaign):
     """The campaign's declared enemy class reskins (campaign.yaml `enemy_class_reskins`),
     as a list of dicts {id, base, slot, sprite}. Empty if none declared."""

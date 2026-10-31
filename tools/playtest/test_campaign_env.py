@@ -116,9 +116,78 @@ class Claims(unittest.TestCase):
         with self.assertRaises(ValueError):
             ce.resolve({'kind': 'recruit', 'unit': 'nobody'}, 'x#0', 'ours')
 
-    def test_reinforcements_go_unresolved_not_dropped(self):
-        self.assertEqual(ce.resolve({'kind': 'reinforcements'}, 'x#0', 'vanilla')['kind'],
-                         'unresolved')
+    def test_ch5_reinforcements_resolve_to_waves(self):
+        # vanilla Ch5's three Brigand pairs, on turns 2, 6 and 8, from their spawn tiles
+        # (the decomp's UnitDef_088B5860/589C/58D8), each looting by its AI2 (0x04)
+        c = ce.resolve({'kind': 'reinforcements'}, 'FE8 Ch5#3', 'vanilla', ref='FE8 Ch5')
+        brigand = ce.class_ids.vanilla_class_values()['CLASS_BRIGAND']
+        self.assertEqual(c['kind'], 'reinforcements')
+        self.assertEqual(c['turns'], [2, 6, 8])
+        self.assertEqual([[(u['x'], u['y']) for u in w['units']] for w in c['waves']],
+                         [[(14, 16), (14, 15)], [(14, 8), (14, 6)], [(13, 0), (14, 1)]])
+        self.assertEqual({(u['class'], u['ai2']) for w in c['waves'] for u in w['units']},
+                         {(brigand, 4)})
+
+    def test_our_reinforcements_resolve_from_the_chapter(self):
+        # ours ch05: the eruption's waves on turns 2, 6 and 8, on vanilla's spawn tiles
+        chap = next(ch for ch in campaign_chapters.load_all() if ch['id'] == 'ch05-the-elven-tomb')
+        c = ce.resolve({'kind': 'reinforcements'}, 'ch05#3', 'ours', chap)
+        self.assertEqual(c['turns'], [2, 6, 8])
+        self.assertEqual(sorted((u['x'], u['y']) for u in c['waves'][2]['units']),
+                         [(13, 0), (14, 1)])
+
+    def test_our_waves_carry_what_the_rom_carries(self):
+        # the wave's bodies are the injector's (inject.units.enemy_bodies): the drop rides last
+        # on the first body only, as the ROM's UnitDefinition carries it
+        chap = {'id': 'ch05-x', 'enemy_units': [{
+            'id': 'w', 'name': 'W', 'arrives_turn': 3, 'class': 'brigand',
+            'positions': [[1, 2], [3, 4]], 'inventory': [{'id': 'iron-axe'}],
+            'item_drop': 'chest-key', 'ai_override': {'ai': '{0x0, 0x4, 0x9}', 'why': 'test'}}]}
+        waves = difficulty.arrival_waves(chap, 'ours')
+        items = {e: i for i, e in difficulty._item_id_to_enum().items()}
+        self.assertEqual([w['turn'] for w in waves], [3])
+        self.assertEqual([u['items'] for u in waves[0]['units']],
+                         [[items['ITEM_AXE_IRON'], items['ITEM_CHESTKEY']], [items['ITEM_AXE_IRON']]])
+        self.assertEqual({(u['ai1'], u['ai2']) for u in waves[0]['units']}, {(0, 4)})
+
+    def test_a_reskinned_wave_is_the_class_the_rom_loads(self):
+        # a reskinned body carries its slot's class id, the class the ROM loads it as (the
+        # slot holds its base's clone, ADR 0362), never the entry's `class` token's
+        import inject.reskins
+        rk = inject.reskins.enemy_class_reskins(campaign_chapters.CAMPAIGN)[0]
+        dressed = next(iter(rk['dresses']))   # a chapter id that reskin dresses
+        token = rk['dresses'][dressed][0]
+        chap = {'id': dressed + '-x', 'enemy_units': [{
+            'id': 'w', 'name': 'W', 'arrives_turn': 2, 'class': token,
+            'positions': [[1, 2]], 'inventory': [],
+            'ai_override': {'ai': '{0x0, 0x4, 0x9}', 'why': 'test'}}]}
+        waves = difficulty.arrival_waves(chap, 'ours')
+        self.assertEqual(waves[0]['units'][0]['class'], inject.reskins.reskin_class_id(rk))
+
+    def test_reward_resolves_item_id(self):
+        c = ce.resolve({'kind': 'reward', 'item': 'guiding-ring', 'needs': 'villages'},
+                       'FE8 Ch5#4', 'vanilla')
+        self.assertEqual((c['item'], c['needs']), (0x68, 'villages'))
+        tiles = ce.resolve({'kind': 'reward', 'item': 'guiding-ring', 'needs': [[5, 1]]},
+                           'x#0', 'vanilla')
+        self.assertEqual(tiles['needs'], [[5, 1]])
+        with self.assertRaises(ValueError):
+            ce.resolve({'kind': 'reward', 'item': 'no-such-item', 'needs': 'villages'},
+                       'x#0', 'vanilla')
+
+    def test_village_gifts_are_every_vanilla_village(self):
+        # every Village(...) under src/events/ (17 at HEAD), Ch5's (5,1) Torch (0x0E) among
+        # them; no vanilla village gives gold (GIVEITEMTOMAIN is used only off villages)
+        g = ce.village_gifts()
+        self.assertEqual(len(g['items']), 17)
+        self.assertIn(0x0E, g['items'])
+        self.assertEqual(g['gold'], [])
+
+    def test_house_gifts_count_a_talk_as_nothing(self):
+        # every House(...) at HEAD (19): one gives an item, the rest only talk (gold 0)
+        h = ce.village_gifts('House')
+        self.assertEqual((len(h['items']), len(h['gold'])), (1, 18))
+        self.assertEqual(set(h['gold']), {0})
 
 
 class Resume(unittest.TestCase):

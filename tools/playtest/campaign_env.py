@@ -50,6 +50,7 @@ import inject.cast  # noqa: E402
 import inject.chapter_settings  # noqa: E402
 import inject.decomp  # noqa: E402
 import inject.hosts  # noqa: E402
+import inject.villages  # noqa: E402
 import team_groups  # noqa: E402
 
 VANILLA_LAST = ('CHAPTER_E_21X', 'CHAPTER_I_21X')
@@ -90,13 +91,6 @@ def _terrains():
         inject.decomp.vanilla_decomp_text('include/constants/terrains.h'), 'TERRAIN_')
 
 
-def reskin_class_id(rk):
-    """The class id a declared enemy reskin (campaign.yaml) takes on the board."""
-    if rk.get('slot_id') is not None:
-        return int(str(rk['slot_id']), 0)
-    return class_ids.vanilla_class_values()[rk['slot']]
-
-
 def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
     """A class token's ids on the board: the vanilla class, and for ours every reskin whose base
     it is. None when `token` is no vanilla class."""
@@ -108,7 +102,7 @@ def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
     if game == 'ours':
         for rk in reskins.enemy_class_reskins(campaign):
             if rk['base'] == enum:
-                out.add(reskin_class_id(rk))
+                out.add(reskins.reskin_class_id(rk))
     return sorted(out)
 
 
@@ -140,12 +134,27 @@ def _vs(v, game, chap, campaign):
     return sorted(out)
 
 
-def resolve(claim, key, game, chap=None, campaign=campaign_chapters.CAMPAIGN):
-    """One claim as bot.lua takes it (its Claims section): id `key`, game ids for every name."""
+def resolve(claim, key, game, chap=None, campaign=campaign_chapters.CAMPAIGN, ref=None):
+    """One claim as bot.lua takes it (its Claims section): id `key`, game ids for every name.
+    `chap` is our chapter (ours), `ref` the twin's parity reference (vanilla): a reinforcements
+    claim resolves to the waves that chapter loads (difficulty.arrival_waves), and goes
+    `unresolved` where they are not read (no chapter, or an uncurated twin)."""
     kind = claim['kind']
     out = {'id': key, 'kind': kind}
     if kind == 'reinforcements':
-        return {'id': key, 'kind': 'unresolved', 'was': kind}
+        where = chap if game == 'ours' else ref
+        if where is None:
+            return {'id': key, 'kind': 'unresolved', 'was': kind}
+        waves = difficulty.arrival_waves(where, game)
+        if waves is None:
+            return {'id': key, 'kind': 'unresolved', 'was': kind}
+        return dict(out, turns=[w['turn'] for w in waves], waves=waves)
+    if kind == 'reward':
+        enum = inject.decomp.ITEM_ENUM.get(claim['item'])
+        ids = {e: i for i, e in difficulty._item_id_to_enum().items()}
+        if enum not in ids:
+            raise ValueError('claim reward item %r names no item' % claim['item'])
+        return dict(out, item=ids[enum], needs=claim['needs'])
     for field in ('unit', 'by'):
         if field in claim:
             out[field] = [_unit_id(n, game, campaign) for n in _names(claim[field])]
@@ -164,15 +173,33 @@ def twin_claims_env(route):
     for ref in strategy._twin_file():
         index = twin_index(ref, route)
         if index is not None:
-            out[str(index)] = [resolve(c, '%s#%d' % (ref, i), 'vanilla')
+            out[str(index)] = [resolve(c, '%s#%d' % (ref, i), 'vanilla', ref=ref)
                                for i, c in enumerate(strategy.twin_claims(ref))]
+    return out
+
+
+def village_gifts(macro='Village'):
+    """What every vanilla village (or House) gives (inject.villages.village_rewards over
+    src/events/ at HEAD): {items: [item ids], gold: [amounts]}, a House that only talks as gold
+    0. The planner's worth of a village or House whose gift a new player cannot know is their
+    mean, each item at the game's own GetItemCost (#510)."""
+    scripts = inject.decomp.vanilla_event_scripts()
+    out = {'items': [], 'gold': []}
+    for path, text in sorted(inject.decomp.vanilla_event_files().items()):
+        if path.endswith('-eventinfo.h'):
+            # a House that only talks gives nothing (0); a village's gift the parse cannot
+            # read is unknown, not nothing, and stays out of the mean
+            for _x, _y, kind, v in inject.villages.village_rewards(
+                    text, scripts, macro, nothing=macro == 'House'):
+                out['items' if kind == 'item' else 'gold'].append(v)
     return out
 
 
 def vanilla_env(route=1):
     enum = _chapter_enum()
     return dict(team_groups.env(), last=[enum[n] for n in VANILLA_LAST], route=route,
-                claims=twin_claims_env(route))
+                claims=twin_claims_env(route), village_gifts=village_gifts(),
+                house_gifts=village_gifts('House'))
 
 
 def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
@@ -207,7 +234,8 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
             claims[str(hosts[number])] = [
                 resolve(c, '%s#%d' % (chap['id'], i), 'ours', chap, campaign)
                 for i, c in enumerate(strategy.our_claims(chap))]
-    env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops, claims=claims)
+    env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops, claims=claims,
+               village_gifts=village_gifts(), house_gifts=village_gifts('House'))
     if lord is not None:
         env['lord'] = lead_row(lord, campaign)
     return env

@@ -272,6 +272,7 @@ local function unit(o)
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
+        mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
     }
 end
 local function blue(id, slot, x, y, o)
@@ -350,6 +351,16 @@ local function sightOf(o)
     local s = {
         objective = o.objective or { kind = "rout" },
         field = o.field,
+        -- The game's march cost to a goal over MOV (sight.turnsTo, not rounded): the test's
+        -- field when it gives one, else Manhattan; MOV 5 unless the unit says.
+        turnsTo = function(u, tile, from)
+            from = from or u
+            local f = o.field and o.field(tile)
+            local d = f and f[from.y] and f[from.y][from.x]
+            if f and not d then return nil end
+            return (d or Board.distance(from.x, from.y, tile.x, tile.y)) / (u.mov or 5)
+        end,
+        mov = function(u) return u.mov or 5 end,
         cache = o.cache,
         terrain = o.terrain,
         weapons = weapons,
@@ -411,6 +422,8 @@ local function sightOf(o)
         end
         return out
     end
+    -- when a looter takes each open tile (sight.closings: "x,y" -> the enemy phase)
+    if o.closings then s.closings = function() return o.closings end end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then
         s.explorable = function() return o.explorable end
@@ -449,6 +462,18 @@ local function fc(o)
     return f
 end
 local function style(aggression) return { aggression = aggression, deploy = {}, claims = {} } end
+-- a style whose villages and chests are worth `gold` each (goals.lua's prior: the mean gift)
+-- the chance a plan leaves goal `id` (its record's goalWorth `after`), nil when it has none
+local function goalAfter(plan, id)
+    for _, g in ipairs(plan and plan.goalWorth or {}) do
+        if g.id == id then return g.after end
+    end
+end
+local function gifted(aggression, gold)
+    local st = style(aggression)
+    st.villageGifts = { items = {}, gold = { gold } }
+    return st
+end
 local function at(a) return a and a.move and (a.move.x .. "," .. a.move.y) end
 
 -- test_careful_never_ends_on_a_tile_where_worst_case_kills: A (hp 20) can kill E1 only from
@@ -1187,6 +1212,24 @@ do
     check(B.CLAIM_BEHAVIOURS.threat, nil, "threat has no behaviour")
 end
 
+-- A reward claim lands in style.rewards and is played; a reinforcements claim's waves land
+-- in style.waves beside its turns in style.arrivals.
+do
+    local wave = { turn = 8, units = { { class = 9, x = 13, y = 0, ai1 = 0, ai2 = 4, items = {} } } }
+    local st = claimed("careful", { id = "r1", kind = "reward", item = 0x68, needs = "villages" },
+        { id = "w1", kind = "reinforcements", turns = { 2, 8 }, waves = { wave } })
+    check(#st.rewards, 1, "reward: style.rewards holds it")
+    check(st.rewards[1].item, 0x68, "reward: its item")
+    check(st.rewards[1].needs, "villages", "reward: its needs")
+    check(#B.unplayed({ { id = "r1", kind = "reward", item = 0x68, needs = "villages" } }), 0,
+        "reward: played")
+    check(st.waves[1].turn, 8, "reinforcements: style.waves holds its waves")
+    check(st.arrivals[1][2], 8, "reinforcements: style.arrivals keeps its turns")
+    local ok = pcall(B.CLAIM_BEHAVIOURS.reward, { id = "r2", kind = "reward", needs = "villages" },
+        style("careful"))
+    check(ok, false, "reward without an item raises")
+end
+
 -- A claim missing what its behaviour needs raises, naming the claim; it is never skipped.
 do
     local bad = {
@@ -1727,6 +1770,41 @@ do
           "exploring: nothing opens the way, nobody is sent")
 end
 
+-- test_goal_turns_go_through_the_breach: the same chest, behind the door. The game's own turns
+-- (sight.turnsTo) find no way; the goals' read goes through the door A can open, so the chest
+-- has a chance and the walk to it is worth something (vanilla Ch3: the throne behind walls was
+-- unreachable for every unit, and the army sat for 22 turns).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        doors = { { x = 2, y = 0 } }, obstacles = {}, openers = { [0x01] = true },
+        explorable = { { x = 4, y = 0, kind = "chest" } },
+        canExplore = { [0x01] = { ["4,0"] = "chest" } },
+    }
+    local sight = sightOf(o)
+    check(sight.turnsTo(A, { x = 4, y = 0 }), nil, "breach: the game's turns find no way")
+    local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
+    local t = ctx.turnsTo(A, { x = 4, y = 0 })
+    check(t ~= nil and t > 0, true, "breach: the goals' turns go through the door")
+end
+
+-- test_goal_turns_are_read_once_per_decision: the planner asks the same unit, tile and start
+-- again and again (every goal, every partial plan); the game's read runs once (PR #553 review).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local sight = sightOf({ reach = { [0x01] = tiles({ 0, 0 }) } })
+    local calls, read = 0, sight.turnsTo
+    sight.turnsTo = function(...) calls = calls + 1 return read(...) end
+    local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
+    calls = 0
+    for _ = 1, 3 do ctx.turnsTo(A, { x = 4, y = 0 }, { x = 1, y = 0 }) end
+    check(calls, 1, "turns: one game read for the same unit, tile and start")
+end
+
 -- test_healers_act_after_the_fighters: H heals A only once A has acted; until then A moves.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false })
@@ -1934,27 +2012,34 @@ do
     check(a and a.targetId, 0x81, "planner: the kill")
 end
 
--- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field, but the
--- AI would strike A there for its whole HP. careful holds; bold takes the ground.
+-- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field toward a
+-- village worth 1000 gold, but the AI would strike A there for 10 of its 20 HP. careful holds
+-- (40 points of village x the chance gained, against 2 a HP lost); bold takes the ground
+-- (150 against 0.5 a HP). A sure death there would lose the village with A: no style buys it.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
-    local X = red(0x81, 9, 9, { minRange = false })
+    -- X stands where (1,0) is no nearer: the objective's way there pulls neither way
+    local X = red(0x81, 0, 9, { minRange = false })
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
-        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        field = function(t)
+            return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
+        end,
+        explorable = { { x = 9, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["9,0"] = "visit" } },
         enemyPhase = function(plan)
             for _, b in ipairs(plan.blues) do
                 if b.x == 1 then
-                    return { { target = b.unit.id, takenHit = 100, takenDmg = 25, takenHits = 1,
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 10, takenHits = 1,
                                takenCrit = 0 } }
                 end
             end
             return {}
         end,
     }
-    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))), "0,0",
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))), "0,0",
           "planner: careful holds out of the strike")
-    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))), "1,0",
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("bold", 1000))), "1,0",
           "planner: bold takes the ground")
 end
 
@@ -2052,7 +2137,10 @@ do
     local q = Sight.rollChance(2, 50)
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
-        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        field = function() return { [0] = { [0] = 40, [1] = 5 } } end,
+        -- a village beside (1,0), worth bold's stand there
+        explorable = { { x = 9, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["9,0"] = "visit" } },
         enemyPhase = function(plan)
             for _, b in ipairs(plan.blues) do
                 if b.x == 1 then
@@ -2070,7 +2158,7 @@ do
             return {}
         end,
     }
-    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("bold", 10000))
     local die
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.id == 0x01 and p.x == 1 then die = p.die end
@@ -2180,6 +2268,8 @@ do
     local A = blue(0x01, 0, 0, 0)
     local Bu = blue(0x02, 1, 0, 2, { minRange = false })
     local X = red(0x81, 1, 0, { hp = 5 })
+    -- Y, far off, keeps the map from being won by X's death (the win makes every move moot)
+    local Y = red(0x82, 9, 9, { minRange = false })
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 2 }, { 2, 2 }),
                   [0x81] = tiles({ 1, 0 }, { 2, 1 }) },
@@ -2188,7 +2278,7 @@ do
         fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } },
                [0x02] = { [0x81] = { ["2,2"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
     }
-    local _, plan = Planner.plan(B, boardOf(A, Bu, X), sightOf(o), style("careful"))
+    local _, plan = Planner.plan(B, boardOf(A, Bu, X, Y), sightOf(o), style("careful"))
     local moved
     for _, a in ipairs(plan and plan.acts or {}) do
         if a.unitId == 0x02 then moved = at(a) end
@@ -2196,8 +2286,8 @@ do
     check(moved, "2,2", "planner: a killed enemy threatens no one")
 end
 
--- test_planner_visits_a_safe_village: nothing reaches the village at (1,0), so careful takes
--- it over a step of ground; the offer is in the plan's record, played, at no chance to die.
+-- test_planner_visits_a_safe_village: nothing reaches the village at (1,0), worth 500 gold, so
+-- careful takes it; the offer is in the plan's record, played, at no chance to die.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -2206,7 +2296,7 @@ do
         explorable = { { x = 1, y = 0, kind = "visit" } },
         canExplore = { [0x01] = { ["1,0"] = "visit" } },
     }
-    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))
     check(a and a.act, "visit", "explore: a safe village is visited")
     check(at(a), "1,0", "explore: from its own tile")
     local e = plan and plan.explore and plan.explore[1]
@@ -2214,13 +2304,13 @@ do
     check(e and e.played, true, "explore: the offer was played")
     -- a unit the game refuses (a Phantom, a Silenced unit) is offered nothing
     o.canExplore = {}
-    local b = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    local b = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))
     check(b and b.act ~= "visit", true, "explore: only where the game's menu allows it")
 end
 
--- test_planner_skips_a_risky_village: X reaches the village and can kill A there, so the
--- visit earns nothing -- under every style, bold included -- and the offer is recorded with
--- its chance to die, unplayed.
+-- test_planner_weighs_a_risky_chest: X reaches the chest and kills A there for sure. A chest of
+-- 500 gold is left under every style (bold's 75 points against its 60 a death, and the chest
+-- lost with A); the offer is recorded with its chance to die, unplayed.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 3, 0)
@@ -2241,37 +2331,17 @@ do
         end,
     }
     for _, aggression in ipairs({ "careful", "bold" }) do
-        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style(aggression))
-        check(a and a.act ~= "chest", true, "explore: no risky chest, " .. aggression)
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted(aggression, 500))
+        check(a and a.act ~= "chest", true, "explore: no deadly chest, " .. aggression)
         local e = plan and plan.explore and plan.explore[1]
         check(e and e.die > 0, true, "explore: the offer carries its chance to die, " .. aggression)
         check(e and e.played, nil, "explore: unplayed, " .. aggression)
     end
 end
 
--- test_planner_beam_withholds_the_credit: X reaches the chest with a small chance to kill A,
--- and only the beam's top plan is judged (FINAL = 1), against no enemy phase. Credited, the
--- chest would top the beam; the beam's own check leaves it uncredited, so A holds.
-do
-    local A = blue(0x01, 0, 0, 0, { minRange = false })
-    local X = red(0x81, 3, 0)
-    local o = {
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 2, 0 }) },
-        danger = { ["1,0"] = 1 },
-        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 10, takenDmg = 25, takenHits = 1 } } } },
-        explorable = { { x = 1, y = 0, kind = "chest" } },
-        canExplore = { [0x01] = { ["1,0"] = "chest" } },
-    }
-    local final = Planner.FINAL
-    Planner.FINAL = 1
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
-    Planner.FINAL = final
-    check(at(a), "0,0", "explore: the beam credits no chest at a chance to die")
-end
-
--- test_planner_judge_takes_the_credit_back: nothing the beam sees reaches the village, but the
--- enemy phase the AI plays strikes A there with a small chance to kill. Credited, the visit
--- would outweigh that chance; the judge takes the credit back, so careful stays put.
+-- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with
+-- a small chance to kill. Careful leaves a village worth 500 gold (20 points against that
+-- chance of a 1000-point death) and takes one worth 100000 (4000 points).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -2290,10 +2360,11 @@ do
         end,
     }
     local die = Sight.rollChance(2, 10)
-    check(die > 0 and Planner.WEIGHTS.careful.death * die < Planner.WEIGHTS.careful.recruit, true,
-          "explore: the strike's chance is small enough that a credit would buy it")
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
-    check(at(a), "0,0", "explore: the judged phase's chance withdraws the credit")
+    check(die > 0 and die < 0.1, true, "explore: the strike's chance to kill is small")
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))), "0,0",
+          "explore: careful leaves a small village to a small risk")
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 100000))), "1,0",
+          "explore: careful takes a rich one through it")
 end
 
 -- test_exploring_sends_the_nearest: the village at (8,0) is nearer B by the game's field, so
@@ -2325,6 +2396,21 @@ do
     end
     check(marches[0x02], "6,0", "exploring: the nearer unit marches to the village")
     check(marches[0x01], "0,1", "exploring: the other marches on the enemy")
+
+    -- test_exploring_sends_the_faster_in_a_race: a looter closes (8,0) after enemy phase 2. A
+    -- (MOV 4, 2 turns: phase 2 unacted) and a slow B (MOV 1, 3 tiles: 3 turns, too late) can
+    -- both use it; nearer by the field, B was the old pick. A is sent: B would get nothing.
+    do
+        local A2 = blue(0x01, 0, 0, 0, { minRange = false, mov = 4 })
+        local B2 = blue(0x02, 1, 5, 0, { minRange = false, mov = 1 })
+        local race = {}
+        for k, v in pairs(o) do race[k] = v end
+        race.closings = { ["8,0"] = 2 }
+        local _, ctx = B.candidates(boardOf(A2, B2, X), sightOf(race), style("careful"))
+        check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 8,
+              "exploring: the unit that gets there in time is sent")
+        check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
+    end
 
     -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A
     -- keeps the village while it can still use it, and B marches on the enemy. (Re-picking
@@ -2644,17 +2730,24 @@ end
 
 -- test_planner_pays_a_recruit_our_counter_kills: R (red) is a recruit, since the game lets A
 -- Talk to it, but stands out of A's reach this turn. It strikes A at (0,0) and A's counter
--- kills it; at (1,0) A is out of its reach, which costs ground. A recruit killed spoils the
--- clear as one of ours does (botrun's recruits_missing; vanilla Ch5's Joshua, killed by
--- Seth's counter), so careful gives up the ground, and bold, which prices a death low, keeps
--- it and records R's chance to fall.
+-- kills it; at (1,0) A is out of its reach, which costs ground toward a village worth 10000
+-- gold. A recruit killed is its goal lost (one death and its items; vanilla Ch5's Joshua,
+-- killed by Seth's counter), so careful gives up the ground, and bold, which prices a death
+-- low and the village high, keeps it and records R's chance to fall.
 local function counterKillsRecruit()
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local R = red(0x81, 9, 9, { minRange = false })
+    -- Y is the objective's nearest enemy, where (0,0) and (1,0) are about as near: the
+    -- objective pulls neither way
+    local Y = red(0x82, 0, 9, { minRange = false })
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
         talk = { [0x01] = { [0x81] = true } },
-        field = function() return { [0] = { [0] = 20, [1] = 40 } } end,
+        field = function(t)
+            return (t.x ~= 0 or t.y ~= 9) and { [0] = { [0] = 20, [1] = 40 } } or nil
+        end,
+        explorable = { { x = 5, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["5,0"] = "visit" } },
         enemyPhase = function(plan)
             for _, b in ipairs(plan.blues) do
                 if b.x == 1 then return {} end
@@ -2663,14 +2756,14 @@ local function counterKillsRecruit()
                        takenCrit = 0, targetHp = 20, felled = 1 } }
         end,
     }
-    return boardOf(A, R), o
+    return boardOf(A, R, Y), o
 end
 do
     local board, o = counterKillsRecruit()
-    local a = Planner.plan(B, board, sightOf(o), style("careful"))
+    local a = Planner.plan(B, board, sightOf(o), gifted("careful", 10000))
     check(at(a), "1,0", "planner: careful keeps out of a recruit's reach when its counter kills it")
     board, o = counterKillsRecruit()
-    local b, plan = Planner.plan(B, board, sightOf(o), style("bold"))
+    local b, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000))
     local r
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.recruit then r = p end
@@ -2838,18 +2931,22 @@ do
 end
 
 -- test_planner_prices_a_game_over_greens_death_as_the_chapter: as the green test above, in
--- bold, which pays one death (60) less than the ground the block costs. When G's death ends
--- the game (an escort: sight.objective.gameOver names it), its death is the chapter, and A
--- blocks.
+-- bold, which pays one death (60) less than the ground toward a village of 10000 gold the
+-- block costs. When G's death ends the game (an escort: sight.objective.gameOver names it),
+-- its death is the chapter, and A blocks.
 do
     local function play(gameOver)
         local A = blue(0x01, 0, 0, 0, { minRange = false })
         local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
-        local X = red(0x81, 9, 9, { minRange = false })
+        local X = red(0x81, 0, 9, { minRange = false })
         local o = {
             objective = { kind = "rout", gameOver = gameOver },
             reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
-            field = function() return { [0] = { [0] = 20, [1] = 40 } } end,
+            field = function(t)
+                return t.x == 5 and t.y == 0 and { [0] = { [0] = 20, [1] = 40 } } or nil
+            end,
+            explorable = { { x = 5, y = 0, kind = "visit" } },
+            canExplore = { [0x01] = { ["5,0"] = "visit" } },
             enemyPhase = function(plan)
                 for _, b in ipairs(plan.blues) do
                     if b.x == 1 then return {} end
@@ -2858,7 +2955,7 @@ do
                            takenHits = 1, takenCrit = 0, targetHp = 10 } }
             end,
         }
-        return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), style("bold"))))
+        return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), gifted("bold", 10000))))
     end
     check(play({}) .. " " .. play({ 0x30 }), "0,0 1,0",
           "planner: a green whose death ends the game costs the chapter")
@@ -2915,7 +3012,10 @@ do
         if a.unitId == 0x01 then moved = at(a) end
     end
     check(sent, "0,0", "talker: sent to its recruit")
-    check(moved, "3,0", "talker: marches on it")
+    -- the plan leaves T's Talk for next turn, sure (GAMMA^1): within one move of T every tile
+    -- gives that, and nothing in the model makes a nearer one surer (goals.lua)
+    local after = goalAfter(plan, "recruit:" .. 0x30)
+    check(after, 0.85, "talker: its recruit is Talked over next turn")
 end
 
 -- test_a_claimed_talker_only_goes_to_its_recruit: the style claims R (red, far off) for N, a
@@ -3048,6 +3148,381 @@ do
         reach = { [0x01] = tiles({ 8, 0 }) },
         talk = { [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } } }, st)
     check(g[0x01], "0,0", "talker: the next claim's talker when the first's cannot go")
+end
+
+
+-- ── The goals (#510 step 9: what is still left to get) ──────────────────────────────────────
+
+-- A beside the boss with a sure kill; a village 6 tiles off (1.2 turns at MOV 5) that only A
+-- can take, worth 10000 gold (careful: 400 points). `o` changes per case.
+local function bossAndVillage(o)
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 5, isBoss = true })
+    local x = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }, { 1, 4 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        explorable = { { x = 1, y = 6, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,6"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    for k, v in pairs(o or {}) do x[k] = v end
+    return boardOf(A, E), sightOf(x)
+end
+
+-- test_boss_kill_waits_for_a_reachable_village: the kill would end the chapter and close the
+-- village; a later win is the same win, so careful does not kill. A village worth more than A's
+-- way to the boss (a whole death's worth, A being the army) is walked on.
+do
+    -- 30000 gold (careful: 1200 points) outweighs the kill's own credit and the win now
+    -- (~205 + 150); a 10000-gold village is about level with them under careful
+    local board, sight = bossAndVillage()
+    local a = Planner.plan(B, board, sight, gifted("careful", 30000))
+    check(a and a.act ~= "attack", true, "goals: the boss kill waits for a village in reach")
+    board, sight = bossAndVillage()
+    local _, vplan = Planner.plan(B, board, sight, gifted("careful", 100000))
+    local after = goalAfter(vplan, "visit:1,6")
+    check(after, 0.85, "goals: A ends where it Visits the rich village next turn")
+end
+
+-- test_boss_kill_taken_when_the_village_cannot_be_had: a looter closes it after this phase,
+-- before A could get there; or the game lets no one of ours Visit it. Then the win costs
+-- nothing it could still get, and is taken.
+do
+    local board, sight = bossAndVillage({ closings = { ["1,6"] = 1 } })
+    check((Planner.plan(B, board, sight, gifted("careful", 10000)) or {}).act, "attack",
+          "goals: the boss dies when the village closes first")
+    board, sight = bossAndVillage({ canExplore = {} })
+    check((Planner.plan(B, board, sight, gifted("careful", 10000)) or {}).act, "attack",
+          "goals: a village no one may take holds nothing back")
+end
+
+-- test_rout_last_kill_and_seize_are_the_win: on a Rout map the last enemy's death is the win
+-- and waits for the village as the boss's does; with another enemy left it is only a kill.
+-- A Seize waits the same way, and is taken with no village open.
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 5 })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }, { 1, 4 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        explorable = { { x = 1, y = 6, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,6"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local a = Planner.plan(B, boardOf(A, E), sightOf(o), gifted("careful", 10000))
+    check(a and a.act ~= "attack", true, "goals: a Rout's last kill waits for the village")
+    local F = red(0x82, 14, 14, { minRange = false })
+    a = Planner.plan(B, boardOf(A, E, F), sightOf(o), gifted("careful", 10000))
+    check(a and a.act, "attack", "goals: a kill that leaves an enemy is no win, and is taken")
+    local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    local seize = {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }) },
+        explorable = { { x = 4, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["4,0"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    a = Planner.plan(B, boardOf(L, Z), sightOf(seize), gifted("careful", 10000))
+    check(a and a.act ~= "seize", true, "goals: the Seize waits for the village")
+    seize.explorable, seize.canExplore = {}, {}
+    a = Planner.plan(B, boardOf(L, Z), sightOf(seize), gifted("careful", 10000))
+    check(a and a.act, "seize", "goals: with nothing left, the Seize")
+end
+
+-- test_survive_holds_as_before: a Survive map has no way there: with nothing to get, the
+-- safest hold, its own tile on a tie.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = { objective = { kind = "survive" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+                enemyPhase = function() return {} end }
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))), "0,0",
+          "goals: Survive holds where it stands")
+end
+
+-- test_a_goal_closing_now_is_taken_first: two villages A can each Visit now; a looter takes
+-- (2,0) after this phase and (0,1) never. A takes (2,0): the other keeps its chance.
+do
+    local A = blue(0x01, 0, 1, 0, { minRange = false })
+    local X = red(0x81, 14, 14, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 1, 0 }, { 2, 0 }, { 0, 1 }) },
+        explorable = { { x = 2, y = 0, kind = "visit" }, { x = 0, y = 1, kind = "visit" } },
+        canExplore = { [0x01] = { ["2,0"] = "visit", ["0,1"] = "visit" } },
+        closings = { ["2,0"] = 1 },
+        enemyPhase = function() return {} end,
+    }
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
+    check(a and a.act .. "@" .. at(a), "visit@2,0", "goals: the closing village first")
+end
+
+
+-- test_a_counter_that_kills_the_boss_is_the_win: at (1,0) the boss strikes A and A's counter
+-- kills it in the enemy phase -- the chapter ends there, closing the village. Careful keeps A
+-- at (1,1), out of the boss's reach, while the village is open (vanilla Ch5 attempt 8: the
+-- boss fell so on turn 5, (5,1) unvisited).
+do
+    local A = blue(0x01, 0, 1, 2, { minRange = false })
+    local E = red(0x81, 2, 0, { hp = 5, isBoss = true, minRange = false })
+    local Z = red(0x82, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 2 }, { 1, 0 }, { 1, 1 }) },
+        explorable = { { x = 1, y = 6, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,6"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then
+                    return { { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
+                               takenHits = 1, takenCrit = 0, targetHp = b.hp, felled = 1 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local a = Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 10000))
+    check(at(a) ~= "1,0", true, "goals: no stand where our counter would end the chapter")
+end
+
+
+-- test_mend_moves_a_unit_whose_counter_ends_the_chapter: A's chip on the boss (no kill) tops
+-- the beam (the boss's damage counts five times), and in the enemy phase the boss strikes A
+-- and A's counter kills it, closing a rich village. The beam cannot see that counter; the
+-- mend tries A's other acts, and A does not stay beside the boss.
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 30, isBoss = true })
+    local Z = red(0x82, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }, { 1, 4 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1 } } } },
+        explorable = { { x = 1, y = 6, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,6"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then
+                    return { { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
+                               takenHits = 1, takenCrit = 0, targetHp = b.hp, felled = 1 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    local a = Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 30000))
+    Planner.FINAL = final
+    check(at(a) ~= "1,0", true, "goals: the mend keeps A from the counter that ends the chapter")
+end
+
+
+-- test_no_boss_chip_while_a_goal_is_open: A can chip the boss (9 of its 25 HP; a 5% crit
+-- kills it) or not, a village worth 25000 gold open (careful: 1000 points). The chip is a step
+-- to a win not wanted yet (st.bossWant ~0.13): credited ~25 with the win's own share, against
+-- the crit's 5% of the village (~41), it is left; credited five times over (~61), it was
+-- taken. With no village, the chip.
+do
+    local function play(village)
+        local A = blue(0x01, 0, 1, 0)
+        local E = red(0x81, 2, 0, { hp = 25, isBoss = true, minRange = false })
+        local Z = red(0x82, 14, 14, { minRange = false })
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }, { 1, 4 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, crit = 5 } } } },
+            explorable = village and { { x = 1, y = 6, kind = "visit" } } or {},
+            canExplore = { [0x01] = village and { ["1,6"] = "visit" } or {} },
+            enemyPhase = function() return {} end,
+        }
+        return Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 25000))
+    end
+    check((play(true) or {}).act ~= "attack", true, "goals: no chip on the boss while a goal is open")
+    check((play(false) or {}).act, "attack", "goals: with nothing left, the chip")
+end
+
+
+-- test_a_green_recruits_death_is_one_death: as the game-over green test, in bold, but G is a
+-- recruit A may Talk over. Its death in the enemy phase costs one death, as any unit's does
+-- (the clear spoiled and the unit lost are one price, PR #553's review): a recruit or not, A
+-- makes the same call at every village worth.
+local function greenRecruitPlay(gold, talk)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = talk and { [0x01] = { [0x30] = true } } or nil,
+        field = function(t)
+            return t.x == 5 and t.y == 0 and { [0] = { [0] = 20, [1] = 40 } } or nil
+        end,
+        explorable = { { x = 5, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["5,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then return {} end
+            end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), gifted("bold", gold))))
+end
+for _, gold in ipairs({ 1500, 2000, 2500, 3000 }) do
+    check(greenRecruitPlay(gold, true), greenRecruitPlay(gold, false),
+          "goals: a green recruit's death costs one death, as any green's, at " .. gold)
+end
+
+
+-- test_a_march_toward_a_goal_survives_the_menu_cut: A has four small attacks (each worth a
+-- point of damage) and a march to (2,0) toward T, a recruit only A can Talk over, worth one
+-- death, east like the throne; (2,0) costs 2 HP of exposure to X. Ranked by its own score the march (-4) fell under
+-- the attacks and was cut before the beam; ranked with what it does to T's goal, it is played.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local T = blue(0x30, 5, 9, 0, { faction = "green", minRange = false })
+    local E = {}
+    for i, t in ipairs({ { 0, 1 }, { 1, 1 }, { 3, 1 }, { 4, 1 } }) do
+        E[i] = red(0x80 + i, t[1], t[2], { hp = 30, minRange = false })
+    end
+    local X = red(0x85, 3, 0)
+    local hit = fc { hit = 100, dmg = 1, hits = 1 }
+    local o = {
+        -- a Seize map whose throne lies east too, and A no lord: the way there pulls with T
+        objective = { kind = "seize", tile = { x = 9, y = 1 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }), [0x85] = tiles({ 3, 0 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        danger = { ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = hit }, [0x82] = { ["1,0"] = hit },
+                          [0x85] = { ["2,0"] = fc { takenHit = 100, takenDmg = 2, takenHits = 1 } } } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, T, E[1], E[2], E[3], E[4], X), sightOf(o),
+                                 style("careful"))
+    local moved
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x01 then moved = at(a) end
+    end
+    check(moved, "2,0", "goals: the march toward a recruit survives the menu cut")
+end
+
+
+-- test_a_visit_now_beats_waiting_on_the_village: A stands one step from a village worth 1000
+-- gold and nothing threatens it. Visiting now takes it; standing on it without the Visit leaves
+-- it for next turn, one turn of GAMMA (6 points under careful). Before PR #553's review both
+-- read chance 1 and judged the same: the visit won on the tie-break alone.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "survive" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
+    local judged = {}
+    for _, x in ipairs(plan and plan.considered or {}) do judged[x.acts[1]] = x.judged end
+    check(a and a.act, "visit", "goals: a village in reach is visited, not waited on")
+    check((judged["1>visit@1,0>nil"] or -1e9) > (judged["1>wait@1,0>nil"] or 1e9), true,
+          "goals: the visit judges above waiting on the village")
+end
+
+-- test_rout_under_fog_is_not_won_by_the_last_seen_kill: A can kill E, the only enemy in sight;
+-- F stands in the fog. Killing E wins nothing, so a village A could take now is not closed by
+-- it: careful visits rather than strike (PR #553 review).
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 5 })
+    local F = red(0x82, 14, 14, { minRange = false, fogged = true })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        explorable = { { x = 1, y = 1, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,1"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, E, F), sightOf(o), gifted("careful", 1000))
+    local win = goalAfter(plan, "win")
+    check(win, 0.85, "goals: a kill with an enemy in the fog is no win (the win stays a turn off)")
+end
+
+-- The game's own count (CountRedUnits) decides: a red carried by another is in no board read,
+-- yet the Rout goes on while it lives.
+do
+    local A = blue(0x01, 0, 1, 0)
+    local E = red(0x81, 2, 0, { hp = 5 })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        explorable = { { x = 1, y = 1, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,1"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local sight = sightOf(o)
+    sight.redCount = function() return 2 end   -- E, and a red E carries
+    local _, plan = Planner.plan(B, boardOf(A, E), sight, gifted("careful", 1000))
+    local win = goalAfter(plan, "win")
+    check(win, 0.85, "goals: the game's red count, not the board's, decides a Rout's win")
+end
+
+-- test_hitting_a_game_over_recruit_costs_the_chapter: R (red) is a recruit A may Talk over,
+-- and its death ends the game (sight.objective.gameOver names it). A's attack on it may kill
+-- it: even bold, which prices a death at 60, judges that strike as the chapter (PR #553 review).
+do
+    local A = blue(0x01, 0, 1, 0)
+    local R = red(0x81, 2, 0, { hp = 10, charId = 0x50 })
+    local Z = red(0x82, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "rout", gameOver = { 0x50 } },
+        reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 60, dmg = 10, hits = 1, killsTarget = true } } } },
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, R, Z), sightOf(o), style("bold"))
+    check(a and a.act ~= "attack", true, "goals: bold does not strike a game-over recruit")
+    -- the strike as the judge priced it: the chapter at its 60% kill, not one death's 60
+    local judged
+    for _, x in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(x.acts) do
+            if k:find(">attack@1,0>129", 1, true) then judged = x.judged end
+        end
+    end
+    check(judged ~= nil and judged < -10000, true,
+          "goals: a strike that may kill a game-over recruit is judged as the chapter")
+end
+
+
+-- test_rout_counts_reds_only: on a Rout map, a Talk takes a green recruit off the board too
+-- (gone), but only reds count: talking T over while E stands is no win. And the count, as
+-- the game's, takes a red off the field (carried) as standing (PR #553 re-review).
+do
+    local A = blue(0x01, 0, 1, 0)
+    local T = blue(0x30, 5, 0, 0, { faction = "green", minRange = false })
+    local E = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 1, 0 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, T, E), sightOf(o), style("careful"))
+    local win = goalAfter(plan, "win")
+    check(win, 0.85, "rout: a Talk on a green is no win while a red stands")
+    local H = red(0x82, 9, 8, { minRange = false, onField = false })
+    local x = { objective = { kind = "rout" }, reach = { [0x01] = tiles({ 1, 0 }) },
+                enemyPhase = function() return {} end }
+    _, plan = Planner.plan(B, boardOf(A, H), sightOf(x), style("careful"))
+    win = goalAfter(plan, "win")
+    check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
 end
 
 if fails > 0 then

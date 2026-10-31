@@ -268,13 +268,17 @@ def vanilla_event_files():
     return out
 
 
+def event_scripts(text):
+    """{label: body} for every `EventListScr <label>[] = { body };` in `text`."""
+    return dict(re.findall(r'\bEventListScr\s+(\w+)\[\]\s*=\s*\{(.*?)\};', text, re.S))
+
+
 @functools.lru_cache(maxsize=1)
 def vanilla_event_scripts():
-    """{label: body} for every `EventListScr <label>[] = { body };` under src/events/ at HEAD.
-    A chapter's talk can CALL a script another stem's file defines (ch14b's Rennac talk calls
-    ch14a's), so a script is looked up across the directory."""
-    return dict(re.findall(r'\bEventListScr\s+(\w+)\[\]\s*=\s*\{(.*?)\};',
-                           '\n'.join(vanilla_event_files().values()), re.S))
+    """event_scripts over every file under src/events/ at HEAD. A chapter's talk can CALL a
+    script another stem's file defines (ch14b's Rennac talk calls ch14a's), so a script is
+    looked up across the directory."""
+    return event_scripts('\n'.join(vanilla_event_files().values()))
 
 
 def _table_close_line(lines, decl):

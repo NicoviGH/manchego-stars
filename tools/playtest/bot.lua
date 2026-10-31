@@ -104,6 +104,11 @@
 --   reinforcements {turns}: on the turn before any of `turns` the march holds (the no-goal
 --                       rule above); attacks are still made. Reads board.turn (Board.read's),
 --                       and decide raises when it is missing.
+--                       Its `waves` (who arrives where: campaign_env) go to style.waves, which
+--                       the goals read for when a looter reaches a village (sight.closings).
+--   reward {item, needs}: an end-of-chapter reward the game gives when every goal `needs`
+--                       names is taken (villages, chests or tiles): style.rewards, which the
+--                       goals share out over those goals.
 -- Bot.applyClaims(claims, style) folds them in order. Bot.unplayed(claims) -> the ids of every
 -- claim whose kind has no behaviour (threat, kits, unmodelled, an unknown kind), so a run
 -- reports what it did not play instead of dropping it.
@@ -177,6 +182,9 @@
 --   first, then the lowest-HP enemy (likeliest kill).
 
 local M = {}
+
+-- goals.lua, beside this file: what each open village or chest is worth, and its chance
+local Goals = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "goals.lua")
 
 -- board.lua is pure too. In a run the wrapper's PLAYTEST_DIR names this directory (run.sh);
 -- under plain `lua` (test_bot.lua) it is read off this chunk's own path.
@@ -759,13 +767,18 @@ local function bestAttack(ctx, u, gate, only)
 end
 
 -- Where the march heads: the recruit, village or chest the unit is sent to (exploring, below),
--- else the objective's tile, the boss, or the nearest enemy; nil = hold.
+-- else its way to the objective (objectiveTile); nil = hold.
+-- objectiveTile: the objective's tile, the boss, or the nearest enemy; nil on a Survive map.
 -- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
 -- than the fog shows, so it pushes the fog back.
+local objectiveTile
 local function goalFor(ctx, u, objective)
-    local kind = objective and objective.kind
     local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
     if explore then return explore end
+    return objectiveTile(ctx, u, objective)
+end
+objectiveTile = function(ctx, u, objective)
+    local kind = objective and objective.kind
     if objective and objective.tile then return objective.tile end
     if kind == "survive" then return nil end
     if #ctx.enemies == 0 and ctx.sight.unseen then
@@ -834,6 +847,28 @@ local function breachFor(ctx, u, goal)
     end
     ctx.breaches[k] = b
     return b or nil
+end
+
+-- The turns `u` needs from `from` (default: where it stands) to `tile`, the goals' read
+-- (goals.lua's turnsTo): sight.turnsTo on its own costs, else, cut off by a door or a wall,
+-- through the obstacle that opens the way (breachFor) as the march goes -- its moves to the
+-- obstacle, one step through, the field beyond. Without the breach, vanilla Ch3's throne (behind
+-- walls) was unreachable for every unit, so nothing pulled the army and a run took 22 turns.
+local function turnsFor(ctx, u, tile, from)
+    from = from or u
+    local s = ctx.sight
+    local n = s.turnsTo and s.turnsTo(u, tile, from)
+    if n or not s.turnsTo then return n end
+    local b = breachFor(ctx, u, tile)
+    local toB = b and s.turnsTo(u, b, from)
+    local field = toB and fieldFor(ctx, tile)
+    local beyond
+    for _, side in ipairs(field and SIDES or {}) do
+        local row = field[b.y + side[2]]
+        local v = row and row[b.x + side[1]]
+        if v and (not beyond or v < beyond) then beyond = v end
+    end
+    return beyond and toB + (1 + beyond) / s.mov(u) or nil
 end
 
 -- Where `u` marches: its goal, or the obstacle that opens the way to it.
@@ -930,14 +965,19 @@ end
 -- The units one of ours may Talk over (mayTalkOver), by id: a recruit lost to any blow spoils
 -- the clear (botrun's recruits_missing), as a green unit's death does. Every blue counts, one
 -- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
+-- -> out[id] = true, and talkers[id] = the ids of ours that may Talk it over (goals.lua's takers).
 local function recruitsOf(ctx)
-    local out = {}
+    local out, talkers = {}, {}
     for _, t in ipairs(ctx.onField) do
         for _, u in ipairs(ctx.blues) do
-            if mayTalkOver(ctx, u, t) then out[t.id] = true break end
+            if mayTalkOver(ctx, u, t) then
+                out[t.id] = true
+                talkers[t.id] = talkers[t.id] or {}
+                table.insert(talkers[t.id], u.id)
+            end
         end
     end
-    return out
+    return out, talkers
 end
 
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
@@ -1267,14 +1307,19 @@ end
 -- way (the march then opens it, as for any goal): ch03's (6,12) chest sits behind a door,
 -- and pairing only the units a path reached left it unopened in every attempt.
 -- The villages and chests still worth a trip: what the game offers (sight.explorable) less
--- the tiles this run has already explored (ctx.explored). A House keeps its Visit for good
--- (eventinfo House(0, ...)): vanilla Ch1's two held Seth and Eirika for nine turns.
-local function openTiles(ctx)
-    local out = {}
-    for _, t in ipairs(ctx.sight.explorable()) do
-        if not ctx.explored[tileKey(t.x, t.y)] then out[#out + 1] = t end
-    end
-    return out
+-- the tiles this run has already explored (ctx.explored), each with its worth and when it
+-- closes (Goals.openTiles). A House keeps its Visit for good (eventinfo House(0, ...)):
+-- vanilla Ch1's two held Seth and Eirika for nine turns.
+local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) end
+
+-- What sending `u` to open tile `t` is worth: its gold x the chance `u` gets there (Goals.chance:
+-- its own turns, none once a looter closes it first), and that chance. A unit cut off from it
+-- goes through the breach (turnsFor).
+local function sendWorth(ctx, u, t)
+    local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
+    local pos = { [u.id] = { x = u.x, y = u.y, acted = u.acted, alive = 1 } }
+    local c = Goals.chance(goal, pos, Goals.GAMMA, ctx.turnsTo)
+    return t.gold * c, c
 end
 
 local function exploring(ctx, sent)
@@ -1287,6 +1332,7 @@ local function exploring(ctx, sent)
     -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
     local function assign(pairs_, key)
         table.sort(pairs_, function(a, b)
+            if (a.v or 0) ~= (b.v or 0) then return (a.v or 0) > (b.v or 0) end
             if a.d ~= b.d then return a.d < b.d end
             if a.u.slot ~= b.u.slot then return a.u.slot < b.u.slot end
             if a.t.y ~= b.t.y then return a.t.y < b.t.y end
@@ -1332,14 +1378,19 @@ local function exploring(ctx, sent)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and reaches(u, t) then
+            and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
     end
+    -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
+    -- slow one would lose), the nearer on a tie
     for _, t in ipairs(openTiles(ctx)) do
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
-            if d then pairs_[#pairs_ + 1] = { t = t, u = u, d = d } end
+            if d then
+                local v, c = sendWorth(ctx, u, t)
+                if c > 0 then pairs_[#pairs_ + 1] = { t = t, u = u, d = d, v = v } end
+            end
         end
     end
     assign(pairs_, function(t) return tileKey(t.x, t.y) end)
@@ -1421,17 +1472,34 @@ end
 -- (`spent`).
 -- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
--- has visited or opened (never offered again); `stalled`, the board repeats (an avoid claim
--- gives way).
+-- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
+-- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
+-- claim gives way).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
--- ids, are the units whose death the planner pays as one of ours).
+-- ids, are the units a blow of ours must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     ctx.explored = opts and opts.explored or {}
+    ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
+    -- memoised for the decision: the planner asks it per goal, taker and partial plan, and a
+    -- unit cut off goes through breachFor and the field again each time
+    local turnsMemo = {}
+    ctx.turnsTo = function(u, tile, from)
+        from = from or u
+        local k = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y
+        local v = turnsMemo[k]
+        if v == nil then
+            v = turnsFor(ctx, u, tile, from) or false
+            turnsMemo[k] = v
+        end
+        return v or nil
+    end
     exploring(ctx, opts and opts.sent)
-    ctx.recruits = recruitsOf(ctx)
+    ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
+    -- each unit's way to the objective, for the goals (goals.lua)
+    ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     local open = function() return true end
     local objective = sight.objective
     local out = {}
@@ -1508,7 +1576,7 @@ function M.candidates(board, sight, style, opts)
         end
         add(mend(ctx, u, open), "mend")
         -- a village or chest the game lets `u` use, from the tile itself (whether it is worth
-        -- the trip is the planner's no-risk rule)
+        -- the trip is the planner's: its worth against the unit's risk there, goals.lua)
         if ctx.sight.explorable then
             local ends = {}
             for _, t in ipairs(endTiles(ctx, u)) do ends[tileKey(t.x, t.y)] = true end
@@ -1576,7 +1644,6 @@ function M.candidates(board, sight, style, opts)
             acts = kept
         end
         for _, a in ipairs(acts) do
-            a.progress = gain(a.move.x, a.move.y)
             local friend = vacated(ctx, u, a.move.x, a.move.y)
             a.vacate = friend and friend.id
             -- what can strike it there next phase, each enemy's own strike (the planner's odds)
@@ -1669,7 +1736,19 @@ M.CLAIM_BEHAVIOURS = {
         return withEntry(style, "terrains", { tile = claim.tile, vs = needVs(claim) })
     end,
     reinforcements = function(claim, style)
-        return withEntry(style, "arrivals", needIds(claim, "turns", "{arrival turns}"))
+        local out = withEntry(style, "arrivals", needIds(claim, "turns", "{arrival turns}"))
+        -- the waves themselves (campaign_env: who arrives where), for the goals' closings
+        out.waves = copyList(style.waves)
+        for _, w in ipairs(claim.waves or {}) do out.waves[#out.waves + 1] = w end
+        return out
+    end,
+    -- an end-of-chapter reward (the game gives `item` when every goal `needs` names is taken)
+    reward = function(claim, style)
+        if not isInteger(claim.item) then malformed(claim, "needs item = an item id") end
+        if claim.needs ~= "villages" and claim.needs ~= "chests" and type(claim.needs) ~= "table" then
+            malformed(claim, "needs needs = villages | chests | { {x, y} }")
+        end
+        return withEntry(style, "rewards", { item = claim.item, needs = claim.needs })
     end,
     recruit = function(claim, style)
         local by = claim.by ~= nil and needIds(claim, "by", "{charIds}") or nil

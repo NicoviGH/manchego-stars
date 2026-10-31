@@ -8,16 +8,18 @@
 --      hold, retreat, Seize, each read from the game, each with its end tile's exposure.
 --   2. Search: a beam over which unit acts next and how. A partial plan is scored by expected
 --      values from the game's forecasts: damage dealt, the chance to kill, the counter's chance
---      to kill our unit, HP healed, a recruit (an attack on one pays its death), ground gained
---      toward the goal -- less each moved unit's standing exposure: its chance to die and the
+--      to kill our unit, HP healed, and what the plan does to every goal still open (goals.lua:
+--      each one's worth x chance, the ground toward it, a Visit or Talk taking it, an attack
+--      on a recruit losing it, the win closing the rest) -- less each moved unit's standing
+--      exposure: its chance to die and the
 --      HP it loses if every enemy that reaches its tile strikes it (an enemy the plan kills
 --      does not; the HP is the plan's).
 --      Without it the beam ranked only what a unit does, and every plan it kept was the
 --      exposed one: the judge then had nothing safe to pick (ch03, 2026-10-27).
 --   3. Judge: the best FINAL complete plans each meet the enemy phase the game's own AI would
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
---      for each unit's chance to die there (a green one's too: it spoils the clear; and a
---      recruit's, to our counter; a unit whose death ends the game costs the chapter), its
+--      for each unit's chance to die there (a green one's too: it spoils the clear; a recruit
+--      our counter fells loses its goal; a unit whose death ends the game costs the chapter), its
 --      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
 --      Two more are judged beside them: on a Defeat Boss map the assault (every unit that
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
@@ -50,11 +52,18 @@
 -- acts, kind }, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
--- or chest each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, legal)
+-- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
+-- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase),
+-- closes },
+-- winFell = the judged phase's chance our counter ends the chapter }.
+-- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
 
 local M = {}
+
+-- goals.lua, beside this file: the goals still open and their chance from a board
+local Goals = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "goals.lua")
 
 M.BEAM = 6         -- partial plans kept at each depth
 M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam tries (and its
@@ -64,18 +73,22 @@ M.BRANCH = 2       -- a plan's uncertain kills the judge plays both ways (2^BRAN
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
 
--- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per enemy removed; progress: per step
--- of the march field; heal: per HP restored; recruit: a unit talked over, and a safe Visit or
--- Chest (the no-risk rule, in score()); breach: a way
--- opened; win: a Seize (and the game lost, for a unit whose death ends it); fog: a fragile unit
--- beside the unseen.
+-- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
+-- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
+-- whose death ends it (a lord's); fog: a fragile unit beside the unseen; gold: points per gold
+-- a goal is worth (goals.lua: under careful no item outweighs a life, under bold a good one
+-- does). What each further turn to a goal leaves of its chance is goals.lua's GAMMA.
+-- Ground toward a goal, a Visit, a Talk recruit and the win itself: the goals' term (goalTerm
+-- below), the change a plan makes to each open goal's worth x chance. The win completes every
+-- unit's way to the objective (one death's worth in all) and closes every other goal: a later
+-- win is the same win, so it waits while what it would close is worth more than the waiting.
 M.WEIGHTS = {
-    careful = { death = 1000, taken = 2, dealt = 1, kill = 30, progress = 2, heal = 1.5,
-                recruit = 200, breach = 25, win = 100000, fog = 40 },
-    even = { death = 300, taken = 1, dealt = 1, kill = 30, progress = 3, heal = 1,
-             recruit = 200, breach = 25, win = 100000, fog = 15 },
-    bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, progress = 4, heal = 0.5,
-             recruit = 200, breach = 25, win = 100000, fog = 0 },
+    careful = { death = 1000, taken = 2, dealt = 1, kill = 30, heal = 1.5, breach = 25,
+                win = 100000, fog = 40, gold = 0.04 },
+    even = { death = 300, taken = 1, dealt = 1, kill = 30, heal = 1, breach = 25,
+             win = 100000, fog = 15, gold = 0.08 },
+    bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, heal = 0.5, breach = 25,
+             win = 100000, fog = 0, gold = 0.15 },
 }
 
 -- `act`'s standing exposure for a unit at `hp`, the enemies in `gone` left out: the chance
@@ -99,7 +112,7 @@ end
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
     local fx = { hp = act.unitHp, gone = nil, enemyHp = nil }
-    local v = W.progress * (act.progress or 0)
+    local v = 0
     if act.act == "attack" and act.f then
         local f, e = act.f, act.targetUnit
         -- the game played the exchange at the target's own HP; at the lower HP an earlier act
@@ -108,13 +121,20 @@ local function score(act, st, W, style, odds)
         local hp = st.enemyHp[e.id] or e.hp
         local kill, dealt = odds({ f.dealt }, hp)
         if st.recruits[e.id] then
-            -- a recruit is talked over, not worn down: its death spoils the clear as one of
-            -- ours does (Bot.candidates' ctx.recruits), and its damage earns nothing
-            v = v - loss(W, st, e.charId) * kill
+            -- a recruit is talked over, not worn down: its damage earns nothing, and its death
+            -- is its goal lost (the goals' term reads fx.recruitHit)
+            fx.recruitHit = { id = e.id, p = kill }
+            -- its goal is one unit (W.death); what its death costs beyond that (the chapter,
+            -- when it ends the game: loss())
+            v = v - (loss(W, st, e.charId) - W.death) * kill
         else
-            -- the objective's boss: every point of its HP is a step to the win
-            local target = (e.isBoss and st.objective == "boss") and M.BOSS_WORTH or 1
-            local worth = (e.isBoss and 5 or 1) + (act.first and 1 or 0)
+            -- the objective's boss: every point of its HP is a step to the win, as far as the
+            -- win is wanted now (st.bossWant: 1 with nothing else left to get, near 0 with a
+            -- rich goal open -- vanilla Ch5 attempt 8: a chip on the boss, credited five times,
+            -- crit it dead with three villages open)
+            local want = st.bossWant or 1
+            local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
+            local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             v = v + W.dealt * dealt * target + W.kill * kill * worth
         end
         if f.counters then
@@ -133,21 +153,18 @@ local function score(act, st, W, style, odds)
         -- the plan's other blows on the target, at the target's own HP)
         fx.kill = { id = e.id, dist = f.dealt }
         if kill >= 0.5 then fx.gone = e.id end
-        if e.isBoss and kill >= 0.5 and st.objective == "boss" then v = v + W.win * kill end
+        -- the boss's death is the win: its worth is the goals' (goalTerm), what it completes
+        -- less what it closes, never a sum of its own, or no goal could ever wait for it
+        if e.isBoss and st.objective == "boss" then fx.win = kill end
     elseif act.act == "talk" then
         -- the recruit joins us: it is off the enemy side, for the plan's later acts and for the
-        -- judged phase, as a kill is
-        v = v + W.recruit
+        -- judged phase, as a kill is; its goal is taken (the goals' term)
         fx.gone = act.targetId
+        fx.took = "recruit:" .. act.targetId
     elseif act.act == "visit" or act.act == "chest" then
-        -- the no-risk rule (Nicolas, 2026-10-27, on trial): a visit is credited only where the
-        -- unit stands no chance of dying next phase. The credit is the recruit's (a village
-        -- may be one); it orders a safe visit against the unit's other acts and never buys
-        -- risk. The judge takes it back when the enemy phase it plays finds a chance there.
-        if exposed(act, act.unitHp, st.gone, odds) == 0 then
-            v = v + W.recruit
-            fx.explored = true
-        end
+        -- the goal is taken; what it is worth against the risk there is the goals' term
+        -- against the unit's exposure, by style
+        fx.took = act.act .. ":" .. act.move.x .. "," .. act.move.y
     elseif act.act == "staff" and act.amount then
         -- a planned heal: what the target is short by now in the plan, up to the staff's amount.
         -- This is AddUnitHp's clamp to GetUnitMaxHp (sight.maxHps), applied here because the HP
@@ -181,7 +198,7 @@ local function score(act, st, W, style, odds)
     elseif act.obstacle or act.act == "door" then
         v = v + W.breach
     elseif act.act == "seize" then
-        v = v + W.win
+        fx.win = 1   -- the win, scored as the boss's death is (goalTerm)
     end
     return v, fx
 end
@@ -209,7 +226,8 @@ function M.plan(Bot, board, sight, style, opts)
     local gameOver = {}
     for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do gameOver[c] = true end
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
-                    gone = {}, enemyHp = {}, hp = {}, explored = {}, counter = {}, healed = {},
+                    gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
+                    counter = {}, healed = {},
                     walls = {}, objective = objective, recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {} }
 
@@ -223,6 +241,103 @@ function M.plan(Bot, board, sight, style, opts)
             if x.unitId == id then return not u or x.move.x ~= u.x or x.move.y ~= u.y end
         end
         return false
+    end
+
+    -- The goals still open (goals.lua), and each one's chance on the board as it stands, every
+    -- unit yet to act where it is: a plan earns what it changes of worth x chance. A march at
+    -- full speed keeps a goal's chance, holding back loses a turn of it, a Visit or a Talk
+    -- takes it; the win closes every other goal still open, so it costs what they were worth.
+    local goals = Goals.list(board, sight, style, ctx)
+    -- the goals' turns: the game's own, through the breach when a door or wall cuts a unit off
+    local turnsTo = ctx.turnsTo
+    local function positions(st, alive)
+        local pos = {}
+        for _, u in ipairs(ctx.blues) do
+            pos[u.id] = { x = u.x, y = u.y, acted = u.acted, alive = alive and alive[u.id] or 1 }
+        end
+        for _, a in ipairs(st.acts) do
+            local p = pos[a.unitId]
+            if p then p.x, p.y, p.acted = a.move.x, a.move.y, true end
+        end
+        return pos
+    end
+    local before = {}
+    do
+        local pos = positions(start)
+        for _, g in ipairs(goals) do before[g.id] = Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
+    end
+    -- how much the win is wanted now: its worth now (one death x (1 - GAMMA), goalTerm's)
+    -- against that and everything else still open, worth x chance (score's boss credit)
+    do
+        local open = 0
+        for _, g in ipairs(goals) do
+            if g.kind ~= "objective" then open = open + Goals.worth(g, W) * before[g.id] end
+        end
+        local now = W.death * (1 - Goals.GAMMA)
+        start.bossWant = now / (now + open)
+    end
+    -- the red units the plan leaves standing, as the game counts them for a Rout
+    -- (sight.redCount: CountRedUnits -- the fogged, carried and hidden ones too), less the ones
+    -- the plan removes: a Rout is won only when none is left, not when the last one in sight
+    -- dies. A sight without the read (test_bot's fakes) counts as CountRedUnits does: every
+    -- red not dead, on the field or not.
+    local function redsLeft(st)
+        local n = sight.redCount and sight.redCount()
+        if not n then
+            n = 0
+            for _, u in ipairs(board.units) do
+                if u.faction == "red" and not u.dead then n = n + 1 end
+            end
+        end
+        -- a Talk takes a green recruit off too (fx.gone); the game's count holds only reds
+        for id in pairs(st.gone) do
+            if byId[id] and byId[id].faction == "red" then n = n - 1 end
+        end
+        return n
+    end
+    -- the chance a plan ends the chapter: a Seize or the boss's death (score's fx.win), or on
+    -- a Rout map every red unit gone
+    local function winChance(st)
+        if objective ~= "rout" then return st.win end
+        return redsLeft(st) == 0 and 1 or 0
+    end
+    -- `alive` (the judge's): each unit's chance to live the phase; `felled`: each recruit's
+    -- chance our counter killed it; `fell`: the chance a counter of ours ended the chapter in
+    -- the phase (the boss, or a Rout's last enemy, striking and dying: vanilla Ch5 attempt 8's
+    -- boss died so on turn 5 with (5,1) still open); `rows` (optional) gets each goal's { id,
+    -- kind, gold, worth, before, after }, the plan record's goalWorth
+    local function goalTerm(st, alive, felled, rows, fell)
+        local pos, v = positions(st, alive), 0
+        local pWin = 1 - (1 - winChance(st)) * (1 - (fell or 0))
+        for _, g in ipairs(goals) do
+            local c
+            if st.took[g.id] then
+                c = 1
+            elseif g.kind == "objective" then
+                c = pWin + (1 - pWin) * Goals.chance(g, pos, Goals.GAMMA, turnsTo)
+            else
+                c = Goals.chance(g, pos, Goals.GAMMA, turnsTo) * (1 - pWin)
+                if g.kind == "recruit" then
+                    c = c * (1 - (st.recruitHit[g.unitId] or 0))
+                        * (1 - (felled and felled[g.unitId] or 0))
+                end
+            end
+            v = v + Goals.worth(g, W) * (c - before[g.id])
+            if rows then
+                rows[#rows + 1] = { id = g.id, kind = g.kind, gold = g.gold,
+                                    worth = Goals.worth(g, W), before = before[g.id], after = c,
+                                    closes = g.closes }
+            end
+        end
+        -- the win now rather than a turn later: one death's worth x (1 - GAMMA). With nothing
+        -- left to get, a unit beside the boss whose way there is already sure would otherwise
+        -- gain nothing by the kill and could idle there; it is less than any open goal's worth
+        v = v + W.death * pWin * (1 - Goals.GAMMA)
+        if rows then
+            rows[#rows + 1] = { id = "win", kind = "win", gold = 0, worth = W.death,
+                                before = Goals.GAMMA, after = pWin + (1 - pWin) * Goals.GAMMA }
+        end
+        return v
     end
 
     -- the beam's exposure term, memoised: the same act, HP and kills recur across the beam
@@ -242,7 +357,8 @@ function M.plan(Bot, board, sight, style, opts)
         return r
     end
 
-    -- each unit's acts, its own best first, PER_UNIT of them; every Visit and Chest offered,
+    -- each unit's acts, its own best first (its score with what it does to the goals),
+    -- PER_UNIT of them; every Visit and Chest offered,
     -- with its standing chance to die, for the run's trace (the rule's experiment)
     local menus, offered = {}, {}
     for _, c in ipairs(cands) do
@@ -256,7 +372,14 @@ function M.plan(Bot, board, sight, style, opts)
                                           die = (exposed(a, a.unitHp, {}, odds)) }
             end
             local v, fx = score(a, start, W, style, odds)
-            scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, fx.gone and { [fx.gone] = true } or {}) }
+            local gone = fx.gone and { [fx.gone] = true } or {}
+            -- what the act alone does to the goals: a march toward one earns nothing of its own,
+            -- and ranked without this it was cut from the menu (vanilla Ch2: Eirika's walk to
+            -- Ross never reached the beam, and Ross died on turn 4)
+            local alone = { acts = { a }, took = fx.took and { [fx.took] = true } or {},
+                            recruitHit = fx.recruitHit and { [fx.recruitHit.id] = fx.recruitHit.p } or {},
+                            win = fx.win or 0, gone = gone }
+            scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, gone) + goalTerm(alone) }
         end
         table.sort(scored, function(x, y)
             if x.v ~= y.v then return x.v > y.v end
@@ -289,7 +412,8 @@ function M.plan(Bot, board, sight, style, opts)
         if fx.blocked then return nil end
         local n = { base = st.base + v, acts = copy(st.acts), expect = copy(st.expect),
                     used = copy(st.used), tiles = copy(st.tiles), gone = copy(st.gone),
-                    enemyHp = copy(st.enemyHp), hp = copy(st.hp), explored = copy(st.explored),
+                    enemyHp = copy(st.enemyHp), hp = copy(st.hp), took = copy(st.took),
+                    recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     counter = copy(st.counter), healed = copy(st.healed), walls = copy(st.walls),
                     objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill) }
@@ -313,11 +437,16 @@ function M.plan(Bot, board, sight, style, opts)
             n.hp[fx.heals.id] = fx.heals.hp
         end
         if fx.counter then n.counter[uid] = fx.counter end
-        if fx.explored then n.explored[uid] = true end
+        if fx.took then n.took[fx.took] = true end
+        if fx.recruitHit then
+            n.recruitHit[fx.recruitHit.id] = math.max(n.recruitHit[fx.recruitHit.id] or 0,
+                                                     fx.recruitHit.p)
+        end
+        if fx.win then n.win = math.max(n.win, fx.win) end
         if fx.wall then n.walls[fx.wall.at] = fx.wall.hp end
         -- every moved unit's exposure, again: a later kill or heal in the plan changes an
         -- earlier unit's
-        n.score = n.base
+        n.score = n.base + goalTerm(n)
         for _, x in ipairs(n.acts) do
             n.score = n.score - risk(x, n.hp[x.unitId] or x.unitHp, n.gone)
         end
@@ -533,7 +662,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- per recruit, its chance our counter kills it (the phase's own `felled`) and the units
         -- of ours it strikes, whose other acts may save it (vanilla Ch5: Joshua, killed by
         -- Seth's counter on turn 3, the planner paying nothing for it)
-        local felled, struckBy = {}, {}
+        local felled, struckBy, fell, winStruck = {}, {}, 0, {}
         for _, o in ipairs(outcomes) do
             local onUnit = {}
             for _, s in ipairs(o.strikes) do
@@ -570,6 +699,17 @@ function M.plan(Bot, board, sight, style, opts)
                 taken[g.id] = (taken[g.id] or 0) + o.p * t
                 struck[g.id] = math.max(struck[g.id] or 0, #phase)
             end
+            -- the strikers our counters fell (felled): the boss, or a Rout's last enemy, is the win
+            local left = objective == "rout" and redsLeft(st) or 0
+            local lives = 1
+            for _, s in ipairs(o.strikes) do
+                local e = byId[s.enemy]
+                if e and ((objective == "boss" and e.isBoss) or (objective == "rout" and left == 1)) then
+                    lives = lives * (1 - (s.felled or 0))
+                    if (s.felled or 0) > 0 then winStruck[s.target] = true end
+                end
+            end
+            fell = fell + o.p * (1 - lives)
             for _, s in ipairs(o.strikes) do
                 if strikers[s.target] then strikers[s.target][s.enemy] = true end
                 if st.recruits[s.enemy] then
@@ -597,7 +737,6 @@ function M.plan(Bot, board, sight, style, opts)
         table.sort(fallen)
         for _, id in ipairs(fallen) do
             local d, r, hit = felled[id], byId[id], {}
-            judged = judged - loss(W, st, r.charId) * d
             for t in pairs(struckBy[id]) do hit[#hit + 1] = t end
             table.sort(hit)
             st.predict[#st.predict + 1] = { id = id, charId = r.charId, x = r.x, y = r.y,
@@ -611,8 +750,6 @@ function M.plan(Bot, board, sight, style, opts)
                                             strikes = struck[id] }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
             judged = judged - loss(W, st, p.unit.charId) * die[id] - W.taken * short[id]
-            -- the no-risk rule, against the phase as the AI plays it
-            if st.explored[id] and die[id] > 0 then judged = judged - W.recruit end
             if W.fog > 0 then
                 for _, t in ipairs(unseen) do
                     if math.abs(t.x - p.x) + math.abs(t.y - p.y) <= M.FOG_REACH then
@@ -622,6 +759,13 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
         end
+        -- the goals, as the phase leaves them: who lives to take each, and each recruit our
+        -- counter may have felled (its goal lost)
+        local alive = {}
+        for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
+        st.goalWorth = {}
+        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
+        st.winFell, st.winStruck = fell, winStruck
         st.judged = judged
         st.strikes = strikes
     end
@@ -698,6 +842,15 @@ function M.plan(Bot, board, sight, style, opts)
         end
         for _, p in ipairs(base.predict) do
             if p.die > 0 then risky[#risky + 1] = p end
+        end
+        -- a unit of ours whose counter may end the chapter (the boss striking it and dying)
+        -- tries its other acts too: the beam cannot see that counter, so every plan it kept
+        -- had Seth strike the boss and stand beside it (vanilla Ch5 attempt 8, turn 5)
+        local struckIds = {}
+        for id in pairs(base.winStruck or {}) do struckIds[#struckIds + 1] = id end
+        table.sort(struckIds)
+        for _, id in ipairs(struckIds) do
+            if menuOf[id] then risky[#risky + 1] = { id = id, die = base.winFell } end
         end
         table.sort(risky, function(x, y)
             if x.die ~= y.die then return x.die > y.die end

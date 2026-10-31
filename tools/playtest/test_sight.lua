@@ -525,5 +525,63 @@ do
     check(table.concat(ids, " "), "doors fog sustain", "demandsOf: doors, fog when the range is set")
 end
 
+-- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
+-- (cp_script.h; the scripts loop back with a GOTO, so a scan past it reads the next script).
+do
+    local ram = {}
+    local mem = { u32 = function(a) return ram[a] or 0 end, u8 = function(a) return ram[a] or 0 end }
+    -- gpAi1Table at 0x100 holds the table's address 0x200; ai1 0 -> script 0x300, ai1 1 -> 0x400
+    ram[0x100], ram[0x200], ram[0x204] = 0x200, 0x300, 0x400
+    ram[0x300], ram[0x310], ram[0x320] = 0x05, 0x10, 0x03           -- action, PILLAGE, GOTO
+    ram[0x400], ram[0x410], ram[0x420] = 0x05, 0x03, 0x10           -- action, GOTO, (another's)
+    check(Sight.loots(mem, 0x100, 0), true, "loots: PILLAGE before the GOTO")
+    check(Sight.loots(mem, 0x100, 1), false, "loots: nothing past the script's GOTO counts")
+end
+
+-- opensChests: AiGetChestUnlockItemSlot's rule -- a Chest Key, or a Lockpick on a CA_STEAL
+-- class, and never with a full bag.
+do
+    check(Sight.opensChests({ { id = 0x69 } }, 0), true, "opensChests: a Chest Key")
+    check(Sight.opensChests({ { id = 0x6B } }, 0), false, "opensChests: a Lockpick, no CA_STEAL")
+    check(Sight.opensChests({ { id = 0x6B } }, 4), true, "opensChests: a Lockpick on a thief")
+    check(Sight.opensChests({ { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 0x69 } }, 0),
+        false, "opensChests: a full bag takes no loot")
+end
+
+-- waveCloses: a wave loaded on turn T first moves that turn's enemy phase; from turn `now` the
+-- enemy phases are numbered 1, 2, ... so it closes at (T - now) + its turns.
+do
+    check(Sight.waveCloses(8, 4, 2), 6, "waveCloses: turn 8, two moves, seen from turn 4")
+    check(Sight.waveCloses(8, 4, nil), nil, "waveCloses: a tile it never reaches")
+end
+
+-- closingsKey: a looter killed, moved or hurt, a tile taken, or other waves is a new read; the
+-- same board is the same key whatever order the units come in.
+do
+    local open = { ["1,2"] = {}, ["5,6"] = {} }
+    local a, b = { id = 0x81, x = 3, y = 3, hp = 20 }, { id = 0x82, x = 9, y = 9, hp = 20 }
+    local key = Sight.closingsKey(3, 8, nil, { a, b }, open)
+    check(Sight.closingsKey(3, 8, nil, { b, a }, open), key, "closingsKey: order-free")
+    check(Sight.closingsKey(3, 8, nil, { a }, open) ~= key, true, "closingsKey: a looter gone")
+    check(Sight.closingsKey(3, 8, nil, { a, { id = 0x82, x = 8, y = 9, hp = 20 } }, open) ~= key,
+        true, "closingsKey: a looter moved")
+    check(Sight.closingsKey(3, 8, nil, { a, b }, { ["1,2"] = {} }) ~= key, true,
+        "closingsKey: a tile taken")
+    local wave = { { turn = 8, units = { { class = 9, x = 13, y = 0 } } } }
+    check(Sight.closingsKey(3, 8, wave, { a, b }, open) ~= key, true, "closingsKey: the waves")
+    check(Sight.closingsKey(3, 8, { { turn = 8, units = { { class = 9, x = 14, y = 1 } } } },
+        { a, b }, open) ~= Sight.closingsKey(3, 8, wave, { a, b }, open), true,
+        "closingsKey: a wave's units, not only how many waves")
+    check(Sight.closingsKey(3, 8, nil, { a, b }, open, { { x = 4, y = 4 } }) ~= key, true,
+        "closingsKey: one of ours blocking")
+end
+
+-- sackedTerrain: a taken chest is emptied, a taken village closed; neither is on the AI's loot
+-- lists (cp_utility.c: VILLAGE_REGULAR 0x03, CHURCH, RUINS_VILLAGE 0x37, CHEST_FULL 0x21).
+do
+    check(Sight.sackedTerrain({ kind = "chest" }), 0x20, "sackedTerrain: an emptied chest")
+    check(Sight.sackedTerrain({ kind = "visit" }), 0x04, "sackedTerrain: a closed village")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
