@@ -88,5 +88,5 @@ Joshua recruited 5 against 8, deaths 12 against 9, Natasha killed 5 against 0 (t
 attempts 2, 4, 5 and 8, turn 5 in 6), stuck 1 against 0. CPU is higher in all, 280 s against
 297 s (235 s against 264 s without attempt 5), because the runs play more turns: 64 against 75
 in the other eight. A turn and a plan cost less: 3.67 s a turn against 3.52, 1.61 s a plan
-against 1.47 (attempt 5 left out, whose 43 near-free stalled turns would make the duty look
-cheaper per turn). Vanilla Ch2's Talk recruits are frame-identical.
+against 1.47 (attempt 5 left out, whose 43 cheap stalled turns, 1.06 s each, would make the
+duty look cheaper per turn). Vanilla Ch2's Talk recruits are frame-identical.
