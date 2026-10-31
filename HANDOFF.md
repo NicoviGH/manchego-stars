@@ -9,53 +9,41 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **#510 step 9, the goal-worth planner, is MERGED: PR #553,
-8b9aac4 on main.** `/code-review 553 medium` plus 3 scoped re-reviews, every finding fixed, none
-dropped; CI green on its head. Record: **ADR 0383**. Design: #510 comment 6534885686. Plan:
-6535169947. Tuning: 6536976812. Open item: 6537387169. The tree is clean on main; no branch in
-flight.
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9: the sandbox equip leak is fixed and MERGED,
+PR #554, 5ef00b7 on main.** `/code-review 554 medium` + a scoped re-review, every finding fixed, none
+dropped; CI green on its head. Write-up: #510 comment 6537709042. The tree is clean on main; no
+branch in flight. The goal-worth planner before it (#553, ADR 0383) is described in that ADR.
 
-**What #553 does (Nicolas: "the bot figures out how to get everything done, helped by the guide
-and the goals" -- no per-chapter rules):**
-- `tools/playtest/goals.lua` (new, pure) lists the open goals: villages, chests, Houses, Talk
-  recruits, guide-claimed end-of-chapter rewards, and each unit's way to the objective. Each has
-  a worth in gold (FE8's `GetItemCost`; for an unknown village or House, the mean vanilla gift)
-  and a chance from a board: GAMMA^(max(t,1)-1+late), 0 once a looter closes it first.
-- The planner scores sum of worth x (chance after - chance before) in the beam, each unit's menu
-  and the judge. The win completes the way there and closes the rest, plus one death x (1-GAMMA)
-  for coming now. Retired: the flat ground term, the fixed recruit credit, the no-risk visit rule, the win's own credit
-  (`W.win` prices only a game-over death).
-- Starting values, untuned: GAMMA 0.85 (goals.lua); points per gold careful 0.04 / even 0.08 /
-  bold 0.15.
-- sight: `turnsTo`, `itemCost`, `redCount` (CountRedUnits), and `closings`, which replays the
-  field's looters with the game's AI (our units hidden, a sacked tile marked) and times
-  guide-known waves.
-- Claims: reinforcements resolve to waves (`difficulty.arrival_waves` over the injector's own
-  `inject.units.enemy_bodies`). New `reward` kind; vanilla Ch5's Guiding Ring line uses it.
-- Env: `village_gifts` and `house_gifts`.
+**What #554 fixed:** vanilla Ch5's "Joshua lost to our counter on turn 2" was a SANDBOX LEAK, not a
+planner judgement. `EquipUnitItemSlot` reorders the bag, a game write the journal never saw, so one
+judged plan's equip (Seth's Iron Sword) stayed in front for the plans judged after it in the same
+batch: Seth's counter was judged unable to kill Joshua. Now `Sight.equip` keeps the bag through
+`api.keep16` (batching's named "a game call will write these" op) and is the ONLY caller of
+EquipUnitItemSlot (test_sight checks the source). The bag layout has one owner: `Board.items`,
+`Board.UNIT_ITEMS`, `Board.ITEM_COUNT` (harness's INSPECT.BAG copy folded).
 
-**Measured, against main's bot on the same envs** (the new claims change the style draw):
-| Chapter | First clean attempt (this) | Main |
+**Measured, fix vs main, same envs** (first clean attempt):
+| Chapter | Fix | Main |
 |---|---|---|
 | Vanilla Ch2 | 1 | 1 |
 | Vanilla Ch3 | 1 | 1 |
-| Vanilla Ch4 | 1 | 1 |
-| Vanilla Ch5 | **none in 9** (attempt 5 before the review fixes) | attempt 9 (older env) |
-| Ours ch01 | 1 | 1 |
-| Ours ch02 | never clean (two greens die on turns 2-3) | never clean, the same |
-
-CPU per turn on ours ch02: +9.6% (from the mend's extra judged plans).
+| Vanilla Ch4 | none in 3 (village 1,11 skipped) | none in 3, the same |
+| Vanilla Ch5 | **1** | none in 9 |
+| Ours ch01 (from its store, `from: 2`) | none in 3 (attempts 1 and 3 `stuck`) | none in 3, frame-identical |
+The Ch4 and ours ch01 "1"s in #553's table were stale: main does not clear them clean on today's envs.
 
 **NEXT: the planner's open items, in order.** Start a branch off main.
-1. **Vanilla Ch5 loses Joshua to our counter on turn 2** (attempts 2, 4, 5 and 8). An early act
-   leaves a unit he strikes and dies to, and the replan comes after that unit has acted.
-   Details and where to look: #510 comment 6537387169. One instrumented run of attempt 5 first.
-2. **Ours ch02's two greens** (201, 202) die on turns 2-3 in every attempt, on main too.
-3. Ours ch03's boss losses: Nicolas's design call (look-ahead vs a sampled rollout). Re-check
-   after #553: the boss credit is now scaled by `bossWant`.
-4. The forced-fog stall (part C).
-5. **Curate the other chapters' guide lines as claims** (new kinds available: `reward`;
-   reinforcements now resolve to waves).
+1. **Vanilla Ch5: Natasha dies on enemy phase 3** (attempts 2, 4, 5, 8), so Joshua is never talked
+   to. Not a prediction miss: each turn-3 plan sends her toward Joshua knowing a 0.32-0.69 death
+   chance and judges the rest worse. The recruit goal's worth vs her death: pricing/tuning.
+2. **The win-procrastination stall** (vanilla Ch5 attempt 5, `stuck` turn 43): a goal two moves away
+   (village 12,10) that nothing moves toward keeps its chance each turn, so waiting (its one-turn
+   decay) always beats the win (which closes it). Likely the same shape as ours ch01's `stuck`
+   attempts and Ch4's skipped village 1,11 -- check those traces first.
+3. **Ours ch02's two greens** (201, 202) die on turns 2-3 in every attempt, on main too.
+4. Ours ch03's boss losses: Nicolas's design call (look-ahead vs a sampled rollout).
+5. The forced-fog stall (part C).
+6. **Curate the other chapters' guide lines as claims** (`reward`; reinforcements resolve to waves).
 
 The older "Still owed" list below is still open too.
 
@@ -74,6 +62,13 @@ The older "Still owed" list below is still open too.
   they read.
 - A pure helper (`closingsKey`, `sackedTerrain`, `loots`, `opensChests`, `waveCloses`) is how a
   game-backed read gets a unit test.
+- **When a judged phase disagrees with the board one act later, suspect the sandbox before the
+  planner.** One instrumented run (an uncommitted `PT_PHASELOG` write in `enemyPhase`: every
+  enemy's decision, felled, and the target's bag) found #554 in one go. Nested sandboxes undo only
+  `api.write*`; a game call that writes a unit struct needs `api.keep16` first.
+- Ours from a store: `campaign_env` JSON plus `from: 2`, `PT_SIMDIR=<scratch copy>`, then
+  `montecarlo.py attempts` (without `--from`, a campaign run retries the chapter until clean and
+  never stops on ours ch01).
 
 **Running a chapter alone:**
 1. `campaign_env.py vanilla --id e1-vanilla-ch3 --from N` (the store has 0-4 and 6; 6 is Ch5,
