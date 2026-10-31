@@ -48,9 +48,10 @@ ADR 0381's march goal did not recruit Joshua. One instrumented run each found wh
    `unmodelled`. It is now two claims: `recruit` Joshua `by` Natasha, and `avoid` the
    Myrmidon (the map's only one) for everyone else. The ROM is USA (`BE8E`, the decomp's
    SHA-1), where the wiki says Joshua does not strike Natasha (not checked in the ROM: the
-   enemy phase is the game's own AI either way). A claimed recruit is played first: the
-   talker `exploring` sends to it (one with a way to it) has only Talks, the march on it and
-   the retreat toward it on its menu (Natasha healed and held for five turns before). An
+   enemy phase is the game's own AI either way). [Retired 2026-10-30, see the amendment
+   below: A claimed recruit is played first: the talker `exploring` sends to it (one with a
+   way to it) has only Talks, the march on it and the retreat toward it on its menu (Natasha
+   healed and held for five turns before).] An
    `avoid` claim gives way on a stalled board, for the one plan that must change it (botrun
    clears `stalled` after its first act), where the planner already takes the least it must
    and still pays any death the move risks (attempt 7: Natasha dead, every unit kept out of
@@ -74,3 +75,18 @@ up ("skipped"). The planner takes the win while a reward is still open; part A r
 same village on its Ch5 runs. One clean style of nine is the measure until that is closed.
 
 The kill branch costs about 30% a turn (Ch5 attempt 1: 2.35 s a turn before, 3.0 s after).
+
+**Amended 2026-10-30 (#510; Nicolas: retire it).** The talker's duty in (5) is retired. A
+claimed recruit still sends its talker to it (`exploring`: the march on it), but the talker
+keeps its whole menu, heal and hold tiles included. The duty was set before anything priced
+the recruit; since ADR 0383, the recruit's goal worth pulls the talker there, and the planner
+prices the turn a hold costs against the death a march risks. The cut menu left that trade
+unjudged: in vanilla Ch5 attempt 2, all ten judged plans walked Natasha into a 0.56 chance to
+die on turn 3, because no plan holding her back existed to judge. Measured on the same envs,
+seed 1 (vanilla Ch5 attempts 1-9, with the duty against without): clean clears 1 against 2,
+Joshua recruited 5 against 8, deaths 12 against 9, Natasha killed 5 against 0 (turn 3 in
+attempts 2, 4, 5 and 8, turn 5 in 6), stuck 1 against 0. CPU is higher in all, 280 s against
+297 s (235 s against 264 s without attempt 5), because the runs play more turns: 64 against 75
+in the other eight. A turn and a plan cost less: 3.67 s a turn against 3.52, 1.61 s a plan
+against 1.47 (attempt 5 left out, whose 43 cheap stalled turns, 1.06 s each, would make the
+duty look cheaper per turn). Vanilla Ch2's Talk recruits are frame-identical.
