@@ -340,7 +340,8 @@ function M.plan(Bot, board, sight, style, opts)
         return r
     end
 
-    -- each unit's acts, its own best first, PER_UNIT of them; every Visit and Chest offered,
+    -- each unit's acts, its own best first (its score with what it does to the goals),
+    -- PER_UNIT of them; every Visit and Chest offered,
     -- with its standing chance to die, for the run's trace (the rule's experiment)
     local menus, offered = {}, {}
     for _, c in ipairs(cands) do
@@ -354,7 +355,14 @@ function M.plan(Bot, board, sight, style, opts)
                                           die = (exposed(a, a.unitHp, {}, odds)) }
             end
             local v, fx = score(a, start, W, style, odds)
-            scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, fx.gone and { [fx.gone] = true } or {}) }
+            local gone = fx.gone and { [fx.gone] = true } or {}
+            -- what the act alone does to the goals: a march toward one earns nothing of its own,
+            -- and ranked without this it was cut from the menu (vanilla Ch2: Eirika's walk to
+            -- Ross never reached the beam, and Ross died on turn 4)
+            local alone = { acts = { a }, took = fx.took and { [fx.took] = true } or {},
+                            recruitHit = fx.recruitHit and { [fx.recruitHit.id] = fx.recruitHit.p } or {},
+                            win = fx.win or 0, gone = gone }
+            scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, gone) + goalTerm(alone) }
         end
         table.sort(scored, function(x, y)
             if x.v ~= y.v then return x.v > y.v end

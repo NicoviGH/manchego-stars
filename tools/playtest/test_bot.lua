@@ -3351,6 +3351,39 @@ end
 check(greenRecruitPlay(2500, false) .. " " .. greenRecruitPlay(2500, true), "0,0 1,0",
       "goals: a green recruit's death costs its goal too, and A blocks")
 
+
+-- test_a_march_toward_a_goal_survives_the_menu_cut: A has four small attacks (each worth a
+-- point of damage) and a march to (2,0) toward T, a recruit only A can Talk over, worth one
+-- death, east like the throne; (2,0) costs 2 HP of exposure to X. Ranked by its own score the march (-4) fell under
+-- the attacks and was cut before the beam; ranked with what it does to T's goal, it is played.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local T = blue(0x30, 5, 9, 0, { faction = "green", minRange = false })
+    local E = {}
+    for i, t in ipairs({ { 0, 1 }, { 1, 1 }, { 3, 1 }, { 4, 1 } }) do
+        E[i] = red(0x80 + i, t[1], t[2], { hp = 30, minRange = false })
+    end
+    local X = red(0x85, 3, 0)
+    local hit = fc { hit = 100, dmg = 1, hits = 1 }
+    local o = {
+        -- a Seize map whose throne lies east too, and A no lord: the way there pulls with T
+        objective = { kind = "seize", tile = { x = 9, y = 1 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }), [0x85] = tiles({ 3, 0 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        danger = { ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = hit }, [0x82] = { ["1,0"] = hit },
+                          [0x85] = { ["2,0"] = fc { takenHit = 100, takenDmg = 2, takenHits = 1 } } } },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, T, E[1], E[2], E[3], E[4], X), sightOf(o),
+                                 style("careful"))
+    local moved
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x01 then moved = at(a) end
+    end
+    check(moved, "2,0", "goals: the march toward a recruit survives the menu cut")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
