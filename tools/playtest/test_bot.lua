@@ -3212,6 +3212,34 @@ do
     check(a and a.act .. "@" .. at(a), "visit@2,0", "goals: the closing village first")
 end
 
+
+-- test_a_counter_that_kills_the_boss_is_the_win: at (1,0) the boss strikes A and A's counter
+-- kills it in the enemy phase -- the chapter ends there, closing the village. Careful keeps A
+-- at (1,1), out of the boss's reach, while the village is open (vanilla Ch5 attempt 8: the
+-- boss fell so on turn 5, (5,1) unvisited).
+do
+    local A = blue(0x01, 0, 1, 2, { minRange = false })
+    local E = red(0x81, 2, 0, { hp = 5, isBoss = true, minRange = false })
+    local Z = red(0x82, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 2 }, { 1, 0 }, { 1, 1 }) },
+        explorable = { { x = 1, y = 6, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,6"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 and b.y == 0 then
+                    return { { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
+                               takenHits = 1, takenCrit = 0, targetHp = b.hp, felled = 1 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local a = Planner.plan(B, boardOf(A, E, Z), sightOf(o), gifted("careful", 10000))
+    check(at(a) ~= "1,0", true, "goals: no stand where our counter would end the chapter")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

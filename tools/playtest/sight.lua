@@ -243,8 +243,8 @@ local CHAPTER_TALKS = 0x04
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
--- struct ClassData +28 attributes (CA_*)
-local CLASS_ATTRIBUTES = 0x28
+-- struct ClassData +28 attributes (CA_*); struct Unit +42 ai1, +44 ai2 (the AI script indices)
+local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
 -- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
@@ -1033,9 +1033,11 @@ function M.new(outer)
     end
     s.refresh()
 
+    local phaseSeen = {}   -- this player phase's answers (closings), dropped by newPhase()
     function s.newPhase()
         s.refresh()
         s.cache = {}
+        phaseSeen = {}
     end
 
     function s.danger(x, y)
@@ -1346,18 +1348,28 @@ function M.new(outer)
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
     -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`
     -- (default M.CLOSE_HORIZON).
-    -- The field's red units play k enemy phases forward with the game's own AI (aiDecide, as
-    -- enemyPhase plays one), our units held where they stand: a looter's decision is
-    -- AI_ACTION_PILLAGE on the tile, and each unit is stood where it decided to go. A wave not
+    -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2)
+    -- play k enemy phases forward with the game's own AI (aiDecide, as enemyPhase plays one),
+    -- in the game's turn order, every other unit held where it stands: a looter's decision is
+    -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
+    -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
+    -- calls (3,787 -> 11,086). Read once per player phase: our acts move no looter. A wave not
     -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, ai2, items = {ids} } } } },
     -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
     -- as its moves reach the tile (M.waveCloses). Read once per board.
     function s.closings(k, waves)
-        if seen.closings then return seen.closings end
+        if phaseSeen.closings then return phaseSeen.closings end
         k = k or M.CLOSE_HORIZON
         local open, all = {}, units()
         for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
+        local looter = {}
+        for _, o in ipairs(all) do
+            if o.faction == "red" and o.onField and (M.loots(mem, S.gpAi1Table, mem.u8(o.addr + UNIT_AI1))
+                    or M.loots(mem, S.gpAi2Table, mem.u8(o.addr + UNIT_AI2))) then
+                looter[o.id] = true
+            end
+        end
         local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
         local out = {}
         local function close(x, y, phase)
@@ -1368,7 +1380,7 @@ function M.new(outer)
             local byId = {}
             for _, o in ipairs(all) do byId[o.id] = o end
             local D, DEC = S.gAiDecision, Board.AI_DEC
-            for phase = 1, k do
+            for phase = 1, next(looter) and k or 0 do
                 api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
                 api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
                 local n = call(S.BuildAiUnitList, {})
@@ -1376,7 +1388,7 @@ function M.new(outer)
                 local order = {}
                 for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
                 for _, id in ipairs(order) do
-                    local e = byId[id]
+                    local e = looter[id] and byId[id]
                     if e and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
                         aiDecide(call, proc, e)
                         if mem.u8(D + DEC.PERFORMED) ~= 0 then
@@ -1413,7 +1425,7 @@ function M.new(outer)
                 end
             end
         end)
-        seen.closings = out
+        phaseSeen.closings = out
         return out
     end
 

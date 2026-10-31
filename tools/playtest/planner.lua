@@ -267,10 +267,13 @@ function M.plan(Bot, board, sight, style, opts)
         return 1
     end
     -- `alive` (the judge's): each unit's chance to live the phase; `felled`: each recruit's
-    -- chance our counter killed it; `rows` (optional) gets each goal's { id, kind, gold, worth,
-    -- before, after }, the plan record's goalWorth
-    local function goalTerm(st, alive, felled, rows)
-        local pos, pWin, v = positions(st, alive), winChance(st), 0
+    -- chance our counter killed it; `fell`: the chance a counter of ours ended the chapter in
+    -- the phase (the boss, or a Rout's last enemy, striking and dying: vanilla Ch5 attempt 8's
+    -- boss died so on turn 5 with (5,1) still open); `rows` (optional) gets each goal's { id,
+    -- kind, gold, worth, before, after }, the plan record's goalWorth
+    local function goalTerm(st, alive, felled, rows, fell)
+        local pos, v = positions(st, alive), 0
+        local pWin = 1 - (1 - winChance(st)) * (1 - (fell or 0))
         for _, g in ipairs(goals) do
             local c
             if st.took[g.id] then
@@ -607,7 +610,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- per recruit, its chance our counter kills it (the phase's own `felled`) and the units
         -- of ours it strikes, whose other acts may save it (vanilla Ch5: Joshua, killed by
         -- Seth's counter on turn 3, the planner paying nothing for it)
-        local felled, struckBy = {}, {}
+        local felled, struckBy, fell = {}, {}, 0
         for _, o in ipairs(outcomes) do
             local onUnit = {}
             for _, s in ipairs(o.strikes) do
@@ -644,6 +647,21 @@ function M.plan(Bot, board, sight, style, opts)
                 taken[g.id] = (taken[g.id] or 0) + o.p * t
                 struck[g.id] = math.max(struck[g.id] or 0, #phase)
             end
+            -- the strikers our counters fell (felled): the boss, or a Rout's last enemy, is the win
+            local left = 0
+            if objective == "rout" then
+                for _, e in ipairs(ctx.enemies) do
+                    if not st.gone[e.id] then left = left + 1 end
+                end
+            end
+            local lives = 1
+            for _, s in ipairs(o.strikes) do
+                local e = byId[s.enemy]
+                if e and ((objective == "boss" and e.isBoss) or (objective == "rout" and left == 1)) then
+                    lives = lives * (1 - (s.felled or 0))
+                end
+            end
+            fell = fell + o.p * (1 - lives)
             for _, s in ipairs(o.strikes) do
                 if strikers[s.target] then strikers[s.target][s.enemy] = true end
                 if st.recruits[s.enemy] then
@@ -698,7 +716,7 @@ function M.plan(Bot, board, sight, style, opts)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.goalWorth = {}
-        judged = judged + goalTerm(st, alive, felled, st.goalWorth)
+        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
         st.judged = judged
         st.strikes = strikes
     end
