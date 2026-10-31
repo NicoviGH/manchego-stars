@@ -272,6 +272,7 @@ local function unit(o)
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
+        mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
     }
 end
 local function blue(id, slot, x, y, o)
@@ -359,6 +360,7 @@ local function sightOf(o)
             if f and not d then return nil end
             return (d or Board.distance(from.x, from.y, tile.x, tile.y)) / (u.mov or 5)
         end,
+        mov = function(u) return u.mov or 5 end,
         cache = o.cache,
         terrain = o.terrain,
         weapons = weapons,
@@ -2353,6 +2355,21 @@ do
     end
     check(marches[0x02], "6,0", "exploring: the nearer unit marches to the village")
     check(marches[0x01], "0,1", "exploring: the other marches on the enemy")
+
+    -- test_exploring_sends_the_faster_in_a_race: a looter closes (8,0) after enemy phase 2. A
+    -- (MOV 4, 2 turns: phase 2 unacted) and a slow B (MOV 1, 3 tiles: 3 turns, too late) can
+    -- both use it; nearer by the field, B was the old pick. A is sent: B would get nothing.
+    do
+        local A2 = blue(0x01, 0, 0, 0, { minRange = false, mov = 4 })
+        local B2 = blue(0x02, 1, 5, 0, { minRange = false, mov = 1 })
+        local race = {}
+        for k, v in pairs(o) do race[k] = v end
+        race.closings = { ["8,0"] = 2 }
+        local _, ctx = B.candidates(boardOf(A2, B2, X), sightOf(race), style("careful"))
+        check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 8,
+              "exploring: the unit that gets there in time is sent")
+        check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
+    end
 
     -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A
     -- keeps the village while it can still use it, and B marches on the enemy. (Re-picking

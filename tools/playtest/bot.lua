@@ -183,6 +183,9 @@
 
 local M = {}
 
+-- goals.lua, beside this file: what each open village or chest is worth, and its chance
+local Goals = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "goals.lua")
+
 -- board.lua is pure too. In a run the wrapper's PLAYTEST_DIR names this directory (run.sh);
 -- under plain `lua` (test_bot.lua) it is read off this chunk's own path.
 local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
@@ -1282,14 +1285,25 @@ end
 -- way (the march then opens it, as for any goal): ch03's (6,12) chest sits behind a door,
 -- and pairing only the units a path reached left it unopened in every attempt.
 -- The villages and chests still worth a trip: what the game offers (sight.explorable) less
--- the tiles this run has already explored (ctx.explored). A House keeps its Visit for good
--- (eventinfo House(0, ...)): vanilla Ch1's two held Seth and Eirika for nine turns.
-local function openTiles(ctx)
-    local out = {}
-    for _, t in ipairs(ctx.sight.explorable()) do
-        if not ctx.explored[tileKey(t.x, t.y)] then out[#out + 1] = t end
+-- the tiles this run has already explored (ctx.explored), each with its worth and when it
+-- closes (Goals.openTiles). A House keeps its Visit for good (eventinfo House(0, ...)):
+-- vanilla Ch1's two held Seth and Eirika for nine turns.
+local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) end
+
+-- What sending `u` to open tile `t` is worth: its gold x the chance `u` gets there (Goals.chance:
+-- its own turns, none once a looter closes it first), and that chance. A unit cut off from it
+-- goes through the breach (marchLength) at its own MOV.
+local function sendWorth(ctx, u, t)
+    local function turns(v, tile, from)
+        local n = ctx.sight.turnsTo and ctx.sight.turnsTo(v, tile, from)
+        if n then return n end
+        local d = marchLength(ctx, v, tile)
+        return d and ctx.sight.mov and d / ctx.sight.mov(v) or d
     end
-    return out
+    local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
+    local pos = { [u.id] = { x = u.x, y = u.y, acted = u.acted, alive = 1 } }
+    local c = Goals.chance(goal, pos, Goals.GAMMA, turns)
+    return t.gold * c, c
 end
 
 local function exploring(ctx, sent)
@@ -1302,6 +1316,7 @@ local function exploring(ctx, sent)
     -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
     local function assign(pairs_, key)
         table.sort(pairs_, function(a, b)
+            if (a.v or 0) ~= (b.v or 0) then return (a.v or 0) > (b.v or 0) end
             if a.d ~= b.d then return a.d < b.d end
             if a.u.slot ~= b.u.slot then return a.u.slot < b.u.slot end
             if a.t.y ~= b.t.y then return a.t.y < b.t.y end
@@ -1347,14 +1362,19 @@ local function exploring(ctx, sent)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and reaches(u, t) then
+            and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
     end
+    -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
+    -- slow one would lose), the nearer on a tie
     for _, t in ipairs(openTiles(ctx)) do
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
-            if d then pairs_[#pairs_ + 1] = { t = t, u = u, d = d } end
+            if d then
+                local v, c = sendWorth(ctx, u, t)
+                if c > 0 then pairs_[#pairs_ + 1] = { t = t, u = u, d = d, v = v } end
+            end
         end
     end
     assign(pairs_, function(t) return tileKey(t.x, t.y) end)

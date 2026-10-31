@@ -927,6 +927,7 @@ function M.new(outer)
         if not cost then return nil end
         return math.ceil(cost / movOf(unit))
     end
+    function s.mov(u) return movOf(u) end
     -- the api's, for the goals: cost / UNIT_MOV NOT rounded (every step toward a goal counts;
     -- goals.lua rounds up where the real arrival matters), from `from` (default: where u stands)
     function s.turnsTo(u, tile, from)

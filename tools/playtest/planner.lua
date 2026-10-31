@@ -73,18 +73,18 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
 -- whose death ends it (a lord's); fog: a fragile unit beside the unseen; gold: points per gold
 -- a goal is worth (goals.lua: under careful no item outweighs a life, under bold a good one
--- does); gamma: what each further turn to a goal leaves of its chance.
+-- does). What each further turn to a goal leaves of its chance is goals.lua's GAMMA.
 -- Ground toward a goal, a Visit, a Talk recruit and the win itself: the goals' term (goalTerm
 -- below), the change a plan makes to each open goal's worth x chance. The win completes every
 -- unit's way to the objective (one death's worth in all) and closes every other goal: a later
 -- win is the same win, so it waits while what it would close is worth more than the waiting.
 M.WEIGHTS = {
     careful = { death = 1000, taken = 2, dealt = 1, kill = 30, heal = 1.5, breach = 25,
-                win = 100000, fog = 40, gold = 0.04, gamma = 0.85 },
+                win = 100000, fog = 40, gold = 0.04 },
     even = { death = 300, taken = 1, dealt = 1, kill = 30, heal = 1, breach = 25,
-             win = 100000, fog = 15, gold = 0.08, gamma = 0.85 },
+             win = 100000, fog = 15, gold = 0.08 },
     bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, heal = 0.5, breach = 25,
-             win = 100000, fog = 0, gold = 0.15, gamma = 0.85 },
+             win = 100000, fog = 0, gold = 0.15 },
 }
 
 -- `act`'s standing exposure for a unit at `hp`, the enemies in `gone` left out: the chance
@@ -252,7 +252,7 @@ function M.plan(Bot, board, sight, style, opts)
     local before = {}
     do
         local pos = positions(start)
-        for _, g in ipairs(goals) do before[g.id] = Goals.chance(g, pos, W.gamma, turnsTo) end
+        for _, g in ipairs(goals) do before[g.id] = Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
     end
     -- the chance a plan ends the chapter: a Seize or the boss's death (score's fx.win), or on
     -- a Rout map every enemy in sight gone
@@ -273,9 +273,9 @@ function M.plan(Bot, board, sight, style, opts)
             if st.took[g.id] then
                 c = 1
             elseif g.kind == "objective" then
-                c = pWin + (1 - pWin) * Goals.chance(g, pos, W.gamma, turnsTo)
+                c = pWin + (1 - pWin) * Goals.chance(g, pos, Goals.GAMMA, turnsTo)
             else
-                c = Goals.chance(g, pos, W.gamma, turnsTo) * (1 - pWin)
+                c = Goals.chance(g, pos, Goals.GAMMA, turnsTo) * (1 - pWin)
                 if g.kind == "recruit" then
                     c = c * (1 - (st.recruitHit[g.unitId] or 0))
                         * (1 - (felled and felled[g.unitId] or 0))

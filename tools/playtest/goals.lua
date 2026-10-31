@@ -41,6 +41,10 @@
 
 local M = {}
 
+-- What each turn further from a goal leaves of its chance: another enemy phase where something
+-- can go wrong (Claude's starting value, #510 comment 6534885686; tuned on the runs).
+M.GAMMA = 0.85
+
 local function key(x, y) return x .. "," .. y end
 
 local function mean(xs)
@@ -79,6 +83,34 @@ local function voided(reward, lost)
     return false
 end
 
+-- The villages and chests still open, each with its worth in gold and when it closes:
+-- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
+-- is sent where by it.
+function M.openTiles(sight, style, ctx)
+    local cost = sight.itemCost or function() return 0 end
+    local explored = ctx.explored or {}
+    local closings = sight.closings and sight.closings(nil, style.waves) or {}
+    local worth, out = prior(cost, style.villageGifts), {}
+    for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
+        local k = key(t.x, t.y)
+        if not explored[k] then
+            out[#out + 1] = { id = t.kind .. ":" .. k, kind = t.kind, x = t.x, y = t.y,
+                              tile = { x = t.x, y = t.y }, gold = worth, closes = closings[k] }
+        end
+    end
+    -- a reward's item, shared over the open goals it needs
+    for _, r in ipairs(style.rewards or {}) do
+        if not voided(r, ctx.lost) then
+            local share = {}
+            for _, g in ipairs(out) do
+                if needs(r, g) then share[#share + 1] = g end
+            end
+            for _, g in ipairs(share) do g.gold = g.gold + cost(r.item) / #share end
+        end
+    end
+    return out
+end
+
 function M.list(board, sight, style, ctx)
     local goals, blues, byId = {}, {}, {}
     -- a sight without a read (test_bot's fakes) has no goal that needs it
@@ -94,30 +126,11 @@ function M.list(board, sight, style, ctx)
         end
         return out
     end
-    local explored, closings = ctx.explored or {}, sight.closings and
-        sight.closings(nil, style.waves) or {}
-    local worth = prior(cost, style.villageGifts)
-    for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
-        local k = key(t.x, t.y)
-        if not explored[k] then
-            goals[#goals + 1] = {
-                id = t.kind .. ":" .. k, kind = t.kind, tile = { x = t.x, y = t.y }, gold = worth,
-                closes = closings[k],
-                takerUnits = takers(function(u)
-                    return sight.canExplore and sight.canExplore(u, t.x, t.y, t.kind)
-                end),
-            }
-        end
-    end
-    -- a reward's item, shared over the open goals it needs
-    for _, r in ipairs(style.rewards or {}) do
-        if not voided(r, ctx.lost) then
-            local share = {}
-            for _, g in ipairs(goals) do
-                if needs(r, g) then share[#share + 1] = g end
-            end
-            for _, g in ipairs(share) do g.gold = g.gold + cost(r.item) / #share end
-        end
+    for _, g in ipairs(M.openTiles(sight, style, ctx)) do
+        g.takerUnits = takers(function(u)
+            return sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind)
+        end)
+        goals[#goals + 1] = g
     end
     for id, talkers in pairs(ctx.recruitTalkers or {}) do
         local t = byId[id]
