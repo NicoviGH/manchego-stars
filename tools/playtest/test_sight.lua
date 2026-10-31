@@ -4,6 +4,7 @@
 -- Run: lua tools/playtest/test_sight.lua
 local here = (arg[0]:match("(.*/)")) or "./"
 local Sight = dofile(here .. "sight.lua")
+local Board = dofile(here .. "board.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -217,6 +218,80 @@ do
         check(open(), true, "open: still, after a nested call returns with nothing journaled")
     end)
     check(open(), false, "open: closed after the outermost returns")
+end
+
+-- test_equip_does_not_leak_into_the_next_read: EquipUnitItemSlot (bmitem.c) moves the item to
+-- the front of the bag, a write the game makes and no journal sees. Two judged plans in one
+-- batch: the first equips slot 2, and the second must find the bag as it was, its slot 0 still
+-- the first item (vanilla Ch5: Seth's Iron Sword left in front, Joshua's death to his Silver
+-- Lance judged impossible).
+do
+    local cpu = fakeCpu(1)
+    local bytes = {}
+    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                       u16 = function(a) return bytes[a] or 0 end,
+                                       u32 = function(a) return bytes[a] or 0 end },
+                    write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end, Board = Board }
+    local sandbox, api = Sight.batching(outer)
+    local S, u = { EquipUnitItemSlot = 0x08016C34 }, { addr = 0x200 }
+    local function bag()
+        local out = {}
+        for k = 0, Board.ITEM_COUNT - 1 do out[#out + 1] = bytes[u.addr + Board.UNIT_ITEMS + k * 2] or 0 end
+        return table.concat(out, ",")
+    end
+    for k, item in ipairs({ 23, 108, 1 }) do bytes[u.addr + Board.UNIT_ITEMS + (k - 1) * 2] = item end
+    -- the game's own EquipUnitItemSlot, written straight to memory as the game writes it
+    local function call(fn, args)
+        check(fn, S.EquipUnitItemSlot, "equip: calls EquipUnitItemSlot")
+        local base = args[1] + Board.UNIT_ITEMS
+        local item = bytes[base + args[2] * 2]
+        for i = args[2], 1, -1 do bytes[base + i * 2] = bytes[base + (i - 1) * 2] end
+        bytes[base] = item
+    end
+    local seen = {}
+    sandbox(function()
+        sandbox(function()
+            Sight.equip(api, call, S, u, 2)
+            seen[1] = bag()
+        end)
+        sandbox(function() seen[2] = bag() end)
+    end)
+    check(seen[1], "1,23,108,0,0", "equip: slot 2 is moved to the front")
+    check(seen[2], "23,108,1,0,0", "equip: the next read finds the bag as it was")
+    Sight.equip(api, function() error("equip: slot 0 is already in hand") end, S, u, 0)
+    -- keep16 makes no write itself (a real one drops harness memos); the sandbox still puts
+    -- the halfword back
+    local writes, real = 0, outer.write16
+    outer.write16 = function(a, v) writes = writes + 1; real(a, v) end
+    local at = u.addr + Board.UNIT_ITEMS
+    sandbox(function()
+        sandbox(function()
+            api.keep16(at, 1)
+            check(writes, 0, "keep16: no write made")
+            bytes[at] = 99
+        end)
+    end)
+    check(bytes[at], 23, "keep16: put back when the sandbox returns")
+end
+
+-- Every equip in sight.lua goes through Sight.equip: a sandbox read that called
+-- EquipUnitItemSlot itself would leak the reordered bag into the next judged plan again
+-- (the test above proves only the helper). Read off the source: the strike and the enemy
+-- phase each equip through it, and the game call appears in Sight.equip alone.
+do
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    local _, direct = src:gsub("S%.EquipUnitItemSlot", "")
+    check(direct, 1, "equip: EquipUnitItemSlot is called from Sight.equip alone")
+    for _, name in ipairs({ "s.strike", "s.enemyPhase" }) do
+        local at = src:find("function " .. name .. "(", 1, true)
+        local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
+        check(body ~= nil and body:find("M.equip(api, call, S, ", 1, true) ~= nil, true,
+              "equip: " .. name .. " equips through Sight.equip")
+    end
 end
 
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
@@ -541,10 +616,10 @@ end
 -- opensChests: AiGetChestUnlockItemSlot's rule -- a Chest Key, or a Lockpick on a CA_STEAL
 -- class, and never with a full bag.
 do
-    check(Sight.opensChests({ { id = 0x69 } }, 0), true, "opensChests: a Chest Key")
-    check(Sight.opensChests({ { id = 0x6B } }, 0), false, "opensChests: a Lockpick, no CA_STEAL")
-    check(Sight.opensChests({ { id = 0x6B } }, 4), true, "opensChests: a Lockpick on a thief")
-    check(Sight.opensChests({ { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 0x69 } }, 0),
+    check(Sight.opensChests({ { id = 0x69 } }, 0, Board.ITEM_COUNT), true, "opensChests: a Chest Key")
+    check(Sight.opensChests({ { id = 0x6B } }, 0, Board.ITEM_COUNT), false, "opensChests: a Lockpick, no CA_STEAL")
+    check(Sight.opensChests({ { id = 0x6B } }, 4, Board.ITEM_COUNT), true, "opensChests: a Lockpick on a thief")
+    check(Sight.opensChests({ { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 0x69 } }, 0, Board.ITEM_COUNT),
         false, "opensChests: a full bag takes no loot")
 end
 

@@ -198,8 +198,8 @@ M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 -- include/cp_script.h: struct AiScr is 0x10 bytes, `cmd` at +00; AI_CMD_PILLAGE runs
 -- AiScriptCmd_10_DoLooting, and a script loops back with AI_CMD_GOTO.
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
--- include/constants/items.h; include/bmunit.h CA_STEAL, UNIT_ITEM_COUNT
-M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL, M.UNIT_ITEM_COUNT = 0x69, 0x6B, 0x04, 5
+-- include/constants/items.h; include/bmunit.h CA_STEAL
+M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL = 0x69, 0x6B, 0x04
 M.CLOSE_HORIZON = 8   -- enemy phases closings() plays forward
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
@@ -722,9 +722,10 @@ end
 
 -- Whether a looter with `items` (ids) and class `attributes` takes chests as well as villages:
 -- AiGetChestUnlockItemSlot (cp_utility.c) -- a Chest Key, or a Lockpick on a CA_STEAL class;
--- a full bag takes nothing (it flags the unit to escape instead).
-function M.opensChests(items, attributes)
-    if #items >= M.UNIT_ITEM_COUNT then return false end
+-- a full bag (`capacity` items: Board.ITEM_COUNT) takes nothing (it flags the unit to escape
+-- instead).
+function M.opensChests(items, attributes, capacity)
+    if #items >= capacity then return false end
     for _, it in ipairs(items) do
         if it.id == M.ITEM_CHESTKEY then return true end
         if it.id == M.ITEM_LOCKPICK and (attributes & M.CA_STEAL) ~= 0 then return true end
@@ -814,6 +815,15 @@ function M.batching(outer)
         write8 = journaled(mem0.u8, outer.write8),
         write16 = journaled(mem0.u16, outer.write16),
         write32 = journaled(mem0.u32, outer.write32),
+        -- keep16(addr, n): the n halfwords from addr are put back when the sandbox returns,
+        -- for a game call about to write them itself (M.equip), with no write made now
+        keep16 = function(addr, n)
+            if not journal then return end
+            for k = 0, n - 1 do
+                local at = addr + k * 2
+                journal[#journal + 1] = { at, mem0.u16(at), outer.write16 }
+            end
+        end,
     }, { __index = outer })
     local machine = M.machine(api.cpu)
     local depth, outerCall, outerScratch = 0, nil, nil
@@ -841,9 +851,23 @@ function M.batching(outer)
         return a, b
     end
     -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
-    -- (a call's EquipUnitItemSlot reorders a bag, and nothing journals that)
+    -- (a call's EquipUnitItemSlot reorders a bag; only M.equip keeps it, so call that)
     local function open() return depth > 0 end
     return sandbox, api, open
+end
+
+-- Inside a sandbox: `u` holds the weapon in item `slot` as it does after striking with it
+-- (WeaponSelectMenu_Selected: EquipUnitItemSlot), the one it counters with next phase.
+-- EquipUnitItemSlot reorders the bag in place, a game write no journal sees, so the bag is
+-- journaled first and a nested sandbox puts it back: otherwise one judged plan's equip leaks
+-- into the next one's, whose slot then names another item (vanilla Ch5: Seth's Iron Sword
+-- left in front, his counter judged unable to kill Joshua, who then died to it).
+-- It moves items 0..slot only (bmitem.c), so those are kept. api = M.batching's (its
+-- Board bound: api.Board), call = the sandbox's. Every equip goes through here.
+function M.equip(api, call, S, u, slot)
+    if not slot or slot <= 0 then return end
+    api.keep16(u.addr + api.Board.UNIT_ITEMS, slot + 1)
+    call(S.EquipUnitItemSlot, { u.addr, slot })
 end
 
 function M.new(outer)
@@ -1277,17 +1301,11 @@ function M.new(outer)
         return target, side
     end
 
-    -- Inside a sandbox: `u` holds the weapon in item `slot` as it does after striking with it
-    -- (WeaponSelectMenu_Selected: EquipUnitItemSlot), the one it counters with next phase.
-    local function equip(call, u, slot)
-        if slot and slot > 0 then call(S.EquipUnitItemSlot, { u.addr, slot }) end
-    end
-
     function s.strike(u, e, x, y, slot)
         local all = units()
         local t = sandbox(function(call, proc)
             standOn(u, x, y)
-            equip(call, u, slot)
+            M.equip(api, call, S, u, slot)
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
             local target, side = aiDecide(call, proc, e, function() onlyTarget(u, all) end)
@@ -1304,7 +1322,7 @@ function M.new(outer)
             for _, b in ipairs(plan.blues) do
                 standOn(b.unit, b.x, b.y)
                 api.write8(b.unit.addr + UNIT_HP, b.hp)
-                equip(call, b.unit, b.slot)
+                M.equip(api, call, S, b.unit, b.slot)
             end
             for id, hp in pairs(plan.reds or {}) do
                 if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
@@ -1473,7 +1491,7 @@ function M.new(outer)
                         local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
                             or M.loots(mem, S.gpAi2Table, wu.ai2)
                         local chests = villages
-                            and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES))
+                            and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES), Board.ITEM_COUNT)
                         for _, t in pairs(open) do
                             -- a House is never looted (AiLocationIsPillageTarget: no House)
                             if (t.kind == "visit" and villages and not t.house)

@@ -3455,14 +3455,14 @@ INSPECT.CAMPAIGN = {
 
 -- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +10 pEffectiveness, +19
 -- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
--- types.h BmSt +2C um_tmp_item (the item that found no room); Unit +1E items[5] (bmunit.h);
--- menu_def.c's
+-- types.h BmSt +2C um_tmp_item (the item that found no room); the bag itself is board.lua's
+-- (Board.UNIT_ITEMS, ITEM_COUNT); menu_def.c's
 -- convoy chooser rows. Keys: what GetUnitKeyItemSlotForTerrain looks for (bmunit.c). Passive:
 -- the items the engine tests by id or attribute while carried -- the Member Card (eventinfo.c),
 -- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
 INSPECT.BAG = {
     ITEM_EFFECTIVE = 0x10, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C, ITEM_USE_EFFECT = 0x1E,
-    IA_STAFF = 4, BMST_TMP_ITEM = 0x2C, UNIT_ITEM_LIST = 0x1E, UNIT_ITEMS = 5,
+    IA_STAFF = 4, BMST_TMP_ITEM = 0x2C,
     CHAR_NUMBER = 0x04,                         -- CharacterData +04 number (bmunit.h)
     MENU_DISCARD_FIRST = 0x24, MENU_SEND_FIRST = 0x2A,
     -- The engine tests each passive item by id in scattered places (a shield's effect in the
@@ -3535,10 +3535,9 @@ end
 -- runs in, the item is put alone in the unit's bag and GetUnitKeyItemSlotForTerrain asked for
 -- each key terrain; the bag is put back.
 INSPECT.isKey = function(call, unitAddr, value)
-    local K = INSPECT.BAG
     local bag = {}
-    for k = 0, K.UNIT_ITEMS - 1 do
-        local at = unitAddr + K.UNIT_ITEM_LIST + k * 2
+    for k = 0, BOARD.ITEM_COUNT - 1 do
+        local at = unitAddr + BOARD.UNIT_ITEMS + k * 2
         bag[k] = ru16(at)
         emu:write16(at, k == 0 and value or 0)
     end
@@ -3546,7 +3545,7 @@ INSPECT.isKey = function(call, unitAddr, value)
     for _, terrain in ipairs({ INSPECT.Sight.TERRAIN_DOOR, INSPECT.Sight.TERRAIN_CHEST_FULL }) do
         key = key or call(SYM.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
     end
-    for k = 0, K.UNIT_ITEMS - 1 do emu:write16(unitAddr + K.UNIT_ITEM_LIST + k * 2, bag[k]) end
+    for k = 0, BOARD.ITEM_COUNT - 1 do emu:write16(unitAddr + BOARD.UNIT_ITEMS + k * 2, bag[k]) end
     return key
 end
 
@@ -3591,11 +3590,7 @@ INSPECT.answerFullBag = function()
     if discard then base = K.MENU_DISCARD_FIRST else base = K.MENU_SEND_FIRST end
     local unitAddr = ru32(SYM.gActiveUnit)
     local newId = ru16(SYM.gBmSt + K.BMST_TMP_ITEM)
-    local held = {}
-    for k = 0, K.UNIT_ITEMS - 1 do
-        local raw = ru16(unitAddr + K.UNIT_ITEM_LIST + k * 2)
-        if (raw & 0xFF) ~= 0 then held[#held + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
-    end
+    local held = BOARD.items(unitAddr)
     local facts = INSPECT.gameCalls(function(call)
         local out = { held = {} }
         for _, it in ipairs(held) do out.held[#out.held + 1] = INSPECT.unitItemFacts(call, unitAddr, it) end
@@ -3603,7 +3598,7 @@ INSPECT.answerFullBag = function()
         return out
     end)
     local slot, why = BOT.fullBag(facts.held, facts.new, discard)
-    local row = base + (slot == 0 and K.UNIT_ITEMS or slot - 1)
+    local row = base + (slot == 0 and BOARD.ITEM_COUNT or slot - 1)
     local entry = { charId = ru8(ru32(unitAddr) + K.CHAR_NUMBER), item = facts.new.id,
                     sent = slot == 0 and facts.new.id or facts.held[slot].id, discard = discard,
                     why = why }
