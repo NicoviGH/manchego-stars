@@ -9,64 +9,82 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **#510 step 9, vanilla Ch5's recruit (Joshua), is MERGED:
-PR #552, 1997471 on main** (`/code-review 552 medium` + 2 scoped re-reviews, every finding
-resolved; CI green on its head). Record: **ADR 0382**. Summary:
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6533432309>. The tree is clean on
-main; no branch is in flight.
+Refreshed 2026-10-30 (Claude, latest). **#510 step 9, the goal-worth planner, is MERGED: PR #553,
+8b9aac4 on main.** `/code-review 553 medium` plus 3 scoped re-reviews, every finding fixed, none
+dropped; CI green on its head. Record: **ADR 0383**. Design: #510 comment 6534885686. Plan:
+6535169947. Tuning: 6536976812. Open item: 6537387169. The tree is clean on main; no branch in
+flight.
 
-**What #552 does:**
-- The planner pays a recruit's death, and a unit whose death ends the game costs `W.win`. sight runs
-  the game's `SetPidDefeatedFlag` in the sandbox (`sight.objective.gameOver`; Ch5: Eirika).
-- The judge plays the 2 most uncertain kills both ways.
-- Ch5's wiki line is two claims: recruit Joshua by Natasha, and avoid the Myrmidon.
+**What #553 does (Nicolas: "the bot figures out how to get everything done, helped by the guide
+and the goals" -- no per-chapter rules):**
+- `tools/playtest/goals.lua` (new, pure) lists the open goals: villages, chests, Houses, Talk
+  recruits, guide-claimed end-of-chapter rewards, and each unit's way to the objective. Each has
+  a worth in gold (FE8's `GetItemCost`; for an unknown village or House, the mean vanilla gift)
+  and a chance from a board: GAMMA^(max(t,1)-1+late), 0 once a looter closes it first.
+- The planner scores sum of worth x (chance after - chance before) in the beam, each unit's menu
+  and the judge. The win completes the way there and closes the rest, plus one death x (1-GAMMA)
+  for coming now. Retired: the flat ground term, the fixed recruit credit, the no-risk visit rule, the win's own credit
+  (`W.win` prices only a game-over death).
+- Starting values, untuned: GAMMA 0.85 (goals.lua); points per gold careful 0.04 / even 0.08 /
+  bold 0.15.
+- sight: `turnsTo`, `itemCost`, `redCount` (CountRedUnits), and `closings`, which replays the
+  field's looters with the game's AI (our units hidden, a sacked tile marked) and times
+  guide-known waves.
+- Claims: reinforcements resolve to waves (`difficulty.arrival_waves` over the injector's own
+  `inject.units.enemy_bodies`). New `reward` kind; vanilla Ch5's Guiding Ring line uses it.
+- Env: `village_gifts` and `house_gifts`.
 
-**Measured (CPU s):**
-| Run | Result |
-|---|---|
-| Vanilla Ch5 | clean at attempt 9 (none before); Joshua joined in 6 of 9 |
-| Vanilla Ch2 | clean at attempt 1 (9.7-11.2) |
-| Vanilla Ch3 | clean at attempt 1 (16.1-18.3), Colm recruited |
-| Vanilla Ch4 | clean at attempt 1 (21.2-28.2; 19.0 before: the kill branch costs about 30% a turn) |
-| Ours ch01 (New Game) | clean at attempt 1 (9.0-10.2) |
+**Measured, against main's bot on the same envs** (the new claims change the style draw):
+| Chapter | First clean attempt (this) | Main |
+|---|---|---|
+| Vanilla Ch2 | 1 | 1 |
+| Vanilla Ch3 | 1 | 1 |
+| Vanilla Ch4 | 1 | 1 |
+| Vanilla Ch5 | **none in 9** (attempt 5 before the review fixes) | attempt 9 (older env) |
+| Ours ch01 | 1 | 1 |
+| Ours ch02 | never clean (two greens die on turns 2-3) | never clean, the same |
+
+CPU per turn on ours ch02: +9.6% (from the mend's extra judged plans).
 
 **NEXT: the planner's open items, in order.** Start a branch off main.
-1. **Ch5's village at (5,1).** The near-misses (attempts 5 and 8: none lost, Joshua recruited) lose
-   it: the planner takes the win while a reward is open ("unreached"), passes it up ("skipped"), or
-   brigands pillage it ("closed"). Read why first: one instrumented run of attempt 8 (`attempt: 8`).
-2. Ours ch03's boss losses: Nicolas's design call, look-ahead vs a sampled rollout.
-3. The forced-fog stall (part C).
-4. **Curate the other chapters' guide lines as claims, as Ch5's was** (Nicolas: the guides and the
-   research are there to drive the strategy). Ch5 went from `unmodelled` to a clean clear this way.
-
+1. **Vanilla Ch5 loses Joshua to our counter on turn 2** (attempts 2, 4, 5 and 8). An early act
+   leaves a unit he strikes and dies to, and the replan comes after that unit has acted.
+   Details and where to look: #510 comment 6537387169. One instrumented run of attempt 5 first.
+2. **Ours ch02's two greens** (201, 202) die on turns 2-3 in every attempt, on main too.
+3. Ours ch03's boss losses: Nicolas's design call (look-ahead vs a sampled rollout). Re-check
+   after #553: the boss credit is now scaled by `bossWant`.
+4. The forced-fog stall (part C).
+5. **Curate the other chapters' guide lines as claims** (new kinds available: `reward`;
+   reinforcements now resolve to waves).
 
 The older "Still owed" list below is still open too.
 
 **Lessons from this session (tooling):**
-- A rule the game enforces (a lord's death is a game over) is modelled from the game's own read,
-  never asked. Only true tuning (a recruit vs one of ours) goes to Nicolas.
-- Compare two runs' traces at their first diverging plan record, not by outcome: a review-round
-  regression (enemy HP dropped from the plan) first looked like RNG luck.
-- When a fix round rewrites a block, diff the round for deleted lines that are not part of the
-  finding: that is where the dropped `enemyHp` line hid.
-- A probe in `chooseTalk` is the cheapest way in: 13 s a run. Edit harness.lua with a script that
-  asserts its anchor matched, keep a copy of the original, and restore it after every run.
-- An ablation (one half of a change switched off) costs one run and says which half did the work.
-- `print()` from a scenario goes nowhere headless: write to the log (`log(...)`) or a file under /tmp.
-- An overnight background run can take hours of wall time for seconds of CPU (the Mac throttles
-  it). Read `cpu_s`, not wall time.
-- A run that "stalls" while the harness waits: log the GAME's input state per frame
-  (`gKeyStatusPtr` +4 held, +8 new) next to the proc pool. A press the game saw but nothing
-  acted on means the reader proc was locked; look at its blocking child.
-- Ours ch01 has no saved start for the current ROM hash: run from New Game with `last: [2]`
-  (index 1 is the prologue) and `PT_SIMDIR=<scratch>`, so no store is written. The ours env
-  needs `--store` holding every twin: merge `e1-vanilla-ch3` and `scout-vanilla` in scratch.
+- Compare against main's bot on the **same env**. A new claim changes `Campaign.drawStyle`, so
+  "attempt k" is a different style and the old table cannot be compared.
+- To baseline main, swap its Lua in place (`git stash -u`, then `git show origin/main:<f>` for
+  planner/bot/botrun/sight/board/harness), run, `git checkout -- tools/playtest`,
+  `git stash pop`. No worktree.
+- A unit test that only passes on a tie-break proves nothing. Assert the judged gap from
+  `plan.considered`, or the goal's chance after the plan (`goalAfter` in test_bot), and check
+  that it fails with the fix stashed.
+- In test_bot's fakes, a single-unit army's way to the objective is worth a whole death. Give
+  the objective its own direction, or the trade under test gets swamped.
+- `sight.newPhase()` runs before **every decision**, not once per phase. Key caches by what
+  they read.
+- A pure helper (`closingsKey`, `sackedTerrain`, `loots`, `opensChests`, `waveCloses`) is how a
+  game-backed read gets a unit test.
 
 **Running a chapter alone:**
 1. `campaign_env.py vanilla --id e1-vanilla-ch3 --from N` (the store has 0-4 and 6; 6 is Ch5,
    index 7 is Ch6).
 2. Set `last: [N]` and `attempt: k` in the JSON.
 3. Run `PT_VANILLA=1 PT_RUN_TAG=x PT_CAMPAIGN="$(cat env)" tools/playtest/run.sh campaign`.
+4. Many attempts at once: `montecarlo.py attempts --env <env.json> --attempts N --jobs 4
+   --vanilla --out <scratch>/runs.jsonl`. Each record names its gzipped trace; plan events carry
+   `worth` (each goal's before/after/closes) and `win_fell`.
+5. Ours from New Game: `campaign_env.py ours --store <scratch merge of e1-vanilla-ch3 and
+   scout-vanilla>`, `last: [3]` for ch02, `PT_SIMDIR=<scratch>`.
 
 The old start records have no carried team: they resume with a WARNING and `carried_unknown`.
 `attempt` k picks the k-th style drawn from (seed, chapter), so the old clean Ch2 style (bold, no
