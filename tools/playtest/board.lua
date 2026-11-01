@@ -439,8 +439,8 @@ end
 local function fighterOf(mem, b) return mem.u8(b + 0x0B), mem.u8(mem.u32(b) + 4) end
 
 -- Who killed unit index `uid`: the other fighter of the fight it fell in, read off
--- gBattleActor/gBattleTarget (+0x0B the unit index, +0x00 the character) -> its charId and
--- whether it is one of ours (a blue index), or nil. Only while a fight resolves (`fighting`):
+-- gBattleActor/gBattleTarget (+0x0B the unit index, +0x00 the character) -> its charId,
+-- whether it is one of ours (a blue index) and its unit index, or nil. Only while a fight resolves (`fighting`):
 -- the battle structs keep the last fight's units, so a phase start's poison tick or an event's
 -- kill would otherwise be credited to it.
 function Board.killer(mem, SYM, uid, fighting)
@@ -450,7 +450,7 @@ function Board.killer(mem, SYM, uid, fighting)
     elseif fighterOf(mem, SYM.gBattleTarget) == uid then by = SYM.gBattleActor end
     if not by then return nil end
     local id, charId = fighterOf(mem, by)
-    return charId, (id & 0xC0) == 0
+    return charId, (id & 0xC0) == 0, id
 end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end

@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 (ADR 0388): a board seen again is a `board_repeats` count; a stall
+    # is FR-007's (`stall_events`: an unjustified seize skip, or three idle player phases)
+    r'\brec\.stalls\b', r"record's `stalls`",
     # retired by #510 step 9's goal worth (ADR 0383): the planner weighs what is still left to
     # get (goals.lua), never a flat step of ground or a recruit's fixed credit
     r'\bW\.progress\b', r'\bW\.recruit\b', r'\ba\.progress\b',

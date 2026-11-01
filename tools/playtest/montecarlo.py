@@ -171,6 +171,8 @@ def keep_trace(rec, out):
     src = os.path.join(rec['run_dir'], name)
     if not os.path.exists(src):
         rec.pop('trace')
+        for a in rec.get('anomalies') or []:
+            a.pop('narrate', None)
         return
     rel = os.path.join('traces', str(rec.get('campaign') or 'run'), '%s-s%s-a%s-%s.jsonl.gz' % (
         rec.get('chapter'), rec.get('seed'), rec.get('attempt'), uuid.uuid4().hex[:8]))
@@ -179,6 +181,9 @@ def keep_trace(rec, out):
     with open(src, 'rb') as fin, gzip.open(dest, 'wb') as fout:
         shutil.copyfileobj(fin, fout)
     rec['trace'] = rel
+    # each anomaly's story command names the trace where it is kept now, not the run dir
+    for a in rec.get('anomalies') or []:
+        a['narrate'] = narrate(dest, a.get('turn'))
 
 
 class Pool:
@@ -236,6 +241,48 @@ def attempt_tasks(env, n, seed=1, vanilla=False):
              'stamp': {'task_attempt': k}} for k in range(1, n + 1)]
 
 
+def narrate(trace, turn):
+    """The command that tells an anomaly's turns from its run's trace (botrun.lua writes the
+    same shape with the run dir's name; keep_trace points it at the kept file)."""
+    return 'python3 tools/playtest/montecarlo.py story %s --turn %s' % (trace, turn)
+
+
+@functools.lru_cache(maxsize=None)
+def botrun_names(path=os.path.join(HERE, 'botrun.lua')):
+    """The death causes in precedence order, and each detail of "other" with its family, read
+    from botrun.lua's M.CAUSES and M.DETAILS: the one list, never restated here."""
+    with open(path) as fh:
+        text = fh.read()
+    causes = re.search(r'M\.CAUSES = \{([^}]*)\}', text)
+    details = re.search(r'M\.DETAILS = \{(.*?)\n\}', text, re.S)
+    return (tuple(re.findall(r'"(\w+)"', causes.group(1))),
+            dict(re.findall(r'(\w+) = "(\w+)"', details.group(1))))
+
+
+def death(d, who=lambda c: '0x%02X' % c):
+    """One blue or green death, in words: who, when, to whom, and from a graded record (#510
+    step 9, FR-005) its cause, the chance the committing plan gave it and its flags."""
+    out = 'lost %s (%s, turn %s, to %s)' % (who(d['charId']), d.get('faction'), d.get('turn'),
+                                           who(d['killer']) if d.get('killer') is not None
+                                           else 'nobody seen')
+    cause = d.get('cause')
+    if cause is None:
+        return out
+    causes, details = botrun_names()
+    if cause not in causes or (d.get('detail') is not None and d['detail'] not in details):
+        raise ValueError('montecarlo: a death cause botrun.lua does not name: %s/%s'
+                         % (cause, d.get('detail')))
+    out += ' %s' % cause
+    if d.get('detail'):
+        out += ' (%s: %s)' % (details[d['detail']], d['detail'])
+    if d.get('predicted') is not None:
+        out += ' at %.1f%%' % (100 * d['predicted'])
+    flags = [f for f in ('boss',) if (d.get('flags') or {}).get(f)]
+    if d.get('escort'):
+        flags.append('escort')
+    return out + ''.join(', %s' % f for f in flags)
+
+
 def theft(t, who=lambda c: '0x%02X' % c):
     """One theft of a record's `thefts` (ADR 0379), in words."""
     return '%s stole item 0x%02X from %s (turn %s)' % (who(t['thief']), t['item'], who(t['from']),
@@ -247,19 +294,21 @@ def spoiled(r, who=lambda c: '0x%02X' % c):
     lost, each owed recruit missed, each village or chest not taken, each theft ranked above the
     stat boosters (ADR 0379); '' when nothing did."""
     c = r.get('clear') or {}
-    out = ['lost %s (%s, turn %s, to %s)' % (who(d['charId']), d.get('faction'), d.get('turn'),
-                                             who(d['killer']) if d.get('killer') is not None
-                                             else 'nobody seen')
-           for d in c.get('lost') or []]
+    out = [death(d, who) for d in c.get('lost') or []]
     missing = c.get('recruits_missing')
     if missing == 'unchecked':
         out.append('recruits unchecked')
+    elif r.get('missed_recruits') is not None:   # graded: each with its reason (FR-006)
+        out += ['missed %s (%s)' % (who(m['charId']), m['reason']) for m in r['missed_recruits']]
     else:
         out += ['missed %s' % who(m) for m in missing or []]
-    for t in c.get('rewards_missing') or []:
-        out.append('%s %s,%s %s%s' % ('village' if t['kind'] == 'visit' else 'chest', t['x'],
-                                       t['y'], t['why'], ' by %s' % who(t['closed_by'])
-                                       if t.get('closed_by') is not None else ''))
+    graded = r.get('missed_rewards')
+    for t in graded if graded is not None else c.get('rewards_missing') or []:
+        why = t.get('status', t.get('why'))
+        out.append('%s %s,%s %s%s%s' % ('village' if t['kind'] == 'visit' else 'chest', t['x'],
+                                         t['y'], why, ' by %s' % who(t['closed_by'])
+                                         if t.get('closed_by') is not None else '',
+                                         ' (%s)' % t['reason'] if t.get('reason') else ''))
     out += [theft(t, who) for t in c.get('stolen') or []]
     return '; '.join(out)
 
@@ -283,14 +332,22 @@ def attempt_line(r, said):
     why = spoiled(r) if r.get('outcome') == 'won' and r.get('clean') is not True else ''
     # a theft at or below the boosters spoils nothing and is noted (ADR 0379)
     noted = '; '.join(theft(t) for t in r.get('thefts') or [] if not t.get('spoils'))
-    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s%s%s' % (
+    # a lost run's deaths, graded, are what it says about the plan (a won one's are in `why`)
+    if r.get('outcome') != 'won' and any(d.get('cause') for d in r.get('deaths') or []):
+        why = '; '.join(death(d) for d in r['deaths'])
+    stalls = ', '.join('%s turn %s' % (e['kind'], e['turn']) for e in r.get('stall_events') or [])
+    anomalies = ''.join('\n    anomaly: %s turn %s%s' % (
+        a['kind'], a.get('turn'), ' -> %s' % a['narrate'] if a.get('narrate') else '')
+        for a in r.get('anomalies') or [])
+    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s%s%s%s' % (
         r.get('attempt'), r.get('outcome'), ' clean' if r.get('clean') is True else '',
         r.get('turns', '-'), len(r.get('deaths') or []),
         '' if r.get('frames') is None else ', %d frames' % r['frames'],
         '' if cost is None else ', %.1f CPU s' % cost,
         ' (%s)' % r.get('why') if r.get('outcome') == 'crashed' else '',
         ' (%s)' % why if why else '',
-        ' [noted: %s]' % noted if noted else '')
+        ' [noted: %s]' % noted if noted else '',
+        ' [stalls: %s]' % stalls if stalls else '') + anomalies
 
 
 def first_clean(records):
@@ -1013,6 +1070,7 @@ def main(argv=None):
     a.add_argument('--vanilla', action='store_true')
     st = sub.add_parser('story', help="one run's trace as plain text")
     st.add_argument('trace', help='a trace .jsonl or .jsonl.gz')
+    st.add_argument('--turn', type=int, help="only this turn and the one before (an anomaly's)")
     c = sub.add_parser('cell', help='one chapter-and-mode cell, ours vs vanilla, to its verdict')
     c.add_argument('--ours', required=True, help="ours' campaign env .json")
     c.add_argument('--vanilla', required=True, help="the twin's campaign env .json")
@@ -1031,6 +1089,9 @@ def main(argv=None):
         return suite_main(args)
     if args.cmd == 'story':
         events = read_trace(args.trace)
+        if args.turn is not None:
+            events = [e for e in events if e.get('t') in ('start', 'end')
+                      or args.turn - 1 <= (e.get('turn') or 0) <= args.turn]
         game = ((events[0].get('info') or {}).get('game') if events else None) or 'vanilla'
         print('\n'.join(story(events, _names(game), _items(), _classes(game))))
         return 0

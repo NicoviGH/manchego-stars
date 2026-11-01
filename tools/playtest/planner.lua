@@ -43,7 +43,8 @@
 -- Styles are weights (M.WEIGHTS): how much a unit's death costs against progress.
 --
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
--- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts,
+-- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts
+-- (an attack act carries `die`: its counter's chance to kill the attacker),
 -- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
@@ -55,7 +56,8 @@
 -- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
 -- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase),
 -- closes },
--- winFell = the judged phase's chance our counter ends the chapter }.
+-- winFell = the judged phase's chance our counter ends the chapter, talks = the charIds any
+-- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize }.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -142,6 +144,7 @@ local function score(act, st, W, style, odds)
             -- nothing: the game's play of the exchange); the HP it takes is paid once, at the
             -- end, after any heal the plan gives back (the judge's deficit)
             local die, taken = odds({ f.counterDist }, act.unitHp)
+            fx.die = die
             v = v - loss(W, st, act.unit) * die
             fx.hp = math.max(1, act.unitHp - math.floor(taken + 0.5))
             -- the judge chains it with the enemy phase's strikes, so a counter that lands is
@@ -361,6 +364,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- PER_UNIT of them; every Visit and Chest offered,
     -- with its standing chance to die, for the run's trace (the rule's experiment)
     local menus, offered = {}, {}
+    local talks, seizable = {}, false   -- every Talk and Seize the candidates offered
     for _, c in ipairs(cands) do
         local scored = {}
         for _, a in ipairs(c.acts) do
@@ -372,6 +376,11 @@ function M.plan(Bot, board, sight, style, opts)
                                           die = (exposed(a, a.unitHp, {}, odds)) }
             end
             local v, fx = score(a, start, W, style, odds)
+            -- the counter's chance to kill the attacker, for the record (botrun's `predicted`
+            -- on a player-phase death): every attack act passes through here, mends included
+            if a.act == "attack" then a.die = fx.die or 0 end
+            if a.act == "talk" and a.target then talks[a.target] = true end
+            if a.act == "seize" then seizable = true end
             local gone = fx.gone and { [fx.gone] = true } or {}
             -- what the act alone does to the goals: a march toward one earns nothing of its own,
             -- and ranked without this it was cut from the menu (vanilla Ch2: Eirika's walk to
@@ -657,8 +666,9 @@ function M.plan(Bot, board, sight, style, opts)
         -- each unit's chance to die, HP lost and the strikes on it, over every way the phase went
         local judged = st.base
         local die, taken, short, struck = {}, {}, {}, {}
-        local strikers = {}   -- per green unit, the enemies that strike it in any outcome
+        local strikers = {}   -- per unit, ours and green, the enemies that strike it in any outcome
         for _, g in ipairs(greens) do strikers[g.id] = {} end
+        for _, p in ipairs(planned) do strikers[p.unit.id] = {} end
         -- per recruit, its chance our counter kills it (the phase's own `felled`) and the units
         -- of ours it strikes, whose other acts may save it (vanilla Ch5: Joshua, killed by
         -- Seth's counter on turn 3, the planner paying nothing for it)
@@ -711,7 +721,7 @@ function M.plan(Bot, board, sight, style, opts)
             end
             fell = fell + o.p * (1 - lives)
             for _, s in ipairs(o.strikes) do
-                if strikers[s.target] then strikers[s.target][s.enemy] = true end
+                if strikers[s.target] and s.enemy then strikers[s.target][s.enemy] = true end
                 if st.recruits[s.enemy] then
                     felled[s.enemy] = (felled[s.enemy] or 0) + o.p * (s.felled or 0)
                     struckBy[s.enemy] = struckBy[s.enemy] or {}
@@ -745,9 +755,12 @@ function M.plan(Bot, board, sight, style, opts)
         end
         for _, p in ipairs(planned) do
             local id = p.unit.id
+            local by = {}
+            for e in pairs(strikers[id]) do by[#by + 1] = e end
+            table.sort(by)
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
                                             y = p.y, hp = p.hp, die = die[id], taken = taken[id],
-                                            strikes = struck[id] }
+                                            strikes = struck[id], strikers = by }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
             judged = judged - loss(W, st, p.unit.charId) * die[id] - W.taken * short[id]
             if W.fog > 0 then
@@ -898,6 +911,10 @@ function M.plan(Bot, board, sight, style, opts)
     table.sort(best.goals, function(a, b) return a.id < b.id end)
     best.enemies = {}
     for _, e in ipairs(ctx.enemies) do best.enemies[e.id] = true end
+    best.talks = {}
+    for c in pairs(talks) do best.talks[#best.talks + 1] = c end
+    table.sort(best.talks)
+    best.seizable = seizable
     return best.acts[1], best
 end
 

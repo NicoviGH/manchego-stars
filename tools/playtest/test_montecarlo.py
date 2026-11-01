@@ -1,8 +1,11 @@
 """montecarlo.py: the bot's run pool (#510 step 9 PR F, Task 11), its paired verdict and the
 cell driver (Task 12)."""
+import contextlib
+import io
 import json
 import multiprocessing
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -35,11 +38,12 @@ V1 = {'game': 'vanilla', 'rom_hash': 'c25b145e3745', 'chapter': 3, 'mode': 'norm
                                        'killer': 0x81}],
                 'recruits_missing': [], 'rewards_missing': [], 'stolen': []},
       'clean': False, 'costs': {'cpu_s': 12.2, 'sandbox_calls': 900}}
-V2 = dict(V1, instrument='0123456789ab+suite-1', env_status='clean',
-          deaths=[dict(V1['deaths'][0], predicted=0.02, cap=0.01, over_cap=True,
-                       flags={'reinforcement': False, 'fog': False, 'boss': False,
-                              'player_phase': False},
-                       cause='over_cap', detail=None, plan_ref=17, escort=False)],
+_GRADED = [dict(V1['deaths'][0], predicted=0.02, cap=0.01, over_cap=True,
+                flags={'reinforcement': False, 'fog': False, 'boss': True, 'player_phase': False},
+                cause='over_cap', detail=None, plan_ref=17, escort=False)]
+V2 = dict({k: v for k, v in V1.items() if k != 'stalls'}, board_repeats=1,
+          instrument='0123456789ab+suite-1', env_status='clean', deaths=_GRADED,
+          clear=dict(V1['clear'], lost=_GRADED),
           first_death_turn=4, greens={'escort_deaths': [], 'allied_deaths': [0x42]},
           missed_recruits=[], missed_rewards=[], seize_skips=[], stall_events=[],
           turns_to_win=9, anomalies=[],
@@ -60,15 +64,46 @@ class Records(unittest.TestCase):
         self.assertEqual(mc.parse_lines(text, mc.CAMPAIGN), [{'outcome': 'played'}])
 
     def test_a_v2_record_reads_as_its_v1(self):
-        # the plan's contract: parsers ignore fields they do not know, so v1 records still parse
-        # and every reader of today's fields gives a v2 line the same answer
+        # the plan's contract: parsers ignore fields they do not know, so v1 records still parse;
+        # a v2 line says what v1 says and more (T018: its graded causes)
         text = '\n'.join('[f9] BOTRUN ' + json.dumps(r) for r in (V1, V2))
         v1, v2 = mc.parse_lines(text, mc.BOTRUN)
         self.assertEqual((v1, v2), (V1, V2))
-        self.assertEqual(mc.attempt_line(v1, set()), mc.attempt_line(v2, set()))
-        self.assertEqual(mc.spoiled(v1), mc.spoiled(v2))
+        self.assertIn(mc.spoiled(v1), mc.spoiled(v2))
+        self.assertIn('lost 0x42 (green, turn 4, to 0x81)', mc.attempt_line(v1, set()))
         self.assertEqual(mc.chapter_result([v1], 3), mc.chapter_result([v2], 3))
         self.assertEqual(mc.first_clean([v1]), mc.first_clean([v2]))
+
+    def test_a_graded_line_names_causes_reasons_and_anomalies(self):
+        # T018: each death's cause, prediction and flags; each missed goal's reason; each
+        # anomaly with its story command; stalls
+        r = dict(V2, clean=False, missed_recruits=[{'charId': 0x30, 'reason': 'talk_skipped'}],
+                 missed_rewards=[{'x': 3, 'y': 7, 'kind': 'visit', 'status': 'skipped',
+                                  'reason': 'skipped'}],
+                 clear=dict(V2['clear'], recruits_missing=[0x30]),
+                 stall_events=[{'turn': 6, 'kind': 'idle_3'}],
+                 anomalies=[{'kind': 'seize_delay', 'turn': 5,
+                             'narrate': mc.narrate('t.jsonl.gz', 5)}])
+        line = mc.attempt_line(r, set())
+        self.assertIn('lost 0x42 (green, turn 4, to 0x81) over_cap at 2.0%, boss', line)
+        self.assertIn('missed 0x30 (talk_skipped)', line)
+        self.assertIn('village 3,7 skipped (skipped)', line)
+        self.assertIn('[stalls: idle_3 turn 6]', line)
+        self.assertIn('anomaly: seize_delay turn 5 -> python3 tools/playtest/montecarlo.py '
+                      'story t.jsonl.gz --turn 5', line)
+        other = dict(_GRADED[0], cause='other', detail='unrevealed_killer', predicted=0,
+                     flags={})
+        self.assertIn('other (blindspot: unrevealed_killer) at 0.0%', mc.death(other))
+        lost = dict(V2, outcome='lost', deaths=[other])
+        self.assertIn('unrevealed_killer', mc.attempt_line(lost, set()))
+
+    def test_a_cause_botrun_does_not_name_is_refused(self):
+        # the names are botrun.lua's M.CAUSES and M.DETAILS, read from its text
+        causes, details = mc.botrun_names()
+        self.assertEqual(causes, ('over_cap', 'reinforcement', 'fog', 'rng_tail', 'other'))
+        self.assertEqual(details['forecast_desync'], 'sandbox_fault')
+        with self.assertRaises(ValueError):
+            mc.death(dict(_GRADED[0], cause='bad_luck'))
 
     def test_append_is_one_line_per_run(self):
         with tempfile.TemporaryDirectory() as d:
@@ -460,6 +495,23 @@ class Cell(unittest.TestCase):
         with gzip.open(os.path.join(d, 'store', rel), 'rt') as fh:
             self.assertEqual([json.loads(x)['t'] for x in fh], ['start', 'end'])
 
+    def test_an_anomalys_story_command_names_the_kept_trace(self):
+        d = tempfile.mkdtemp()
+        rd = tempfile.mkdtemp()
+        with open(os.path.join(rd, 'tr.jsonl'), 'w') as fh:
+            fh.write('{"t": "start"}\n')
+        rec = {'trace': 'tr.jsonl', 'run_dir': rd, 'chapter': 2, 'seed': 1, 'attempt': 1,
+               'anomalies': [{'kind': 'stall_abort', 'turn': 7,
+                              'narrate': mc.narrate('tr.jsonl', 7)}]}
+        out = os.path.join(d, 'runs.jsonl')
+        mc.keep_trace(rec, out)
+        self.assertEqual(rec['anomalies'][0]['narrate'],
+                         mc.narrate(os.path.join(d, rec['trace']), 7))
+        gone = {'trace': 'none.jsonl', 'run_dir': rd, 'anomalies': [{'kind': 'x', 'turn': 1,
+                                                                    'narrate': 'n'}]}
+        mc.keep_trace(gone, out)
+        self.assertNotIn('narrate', gone['anomalies'][0])
+
 
 # The frozen suite's manifest (#510 step 9 plan, T005; FR-021 and FR-025): a matrix.yaml
 # `instrument:` section, defaults merged into each start as matrix.yaml's rows are.
@@ -758,6 +810,21 @@ class Suite(unittest.TestCase):
 
 
 class Story(unittest.TestCase):
+    def test_story_turn_tells_that_turn_and_the_one_before(self):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 't.jsonl')
+        with open(path, 'w') as fh:
+            for t in ([{'t': 'start', 'turn': 0}]
+                      + [{'t': 'phase', 'phase': 'player', 'turn': n} for n in range(1, 6)]
+                      + [{'t': 'end', 'turn': 5, 'record': {'outcome': 'won', 'turns': 5}}]):
+                fh.write(json.dumps(t) + '\n')
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            mc.main(['story', path, '--turn', '3'])
+        turns = re.findall(r'Turn (\d+)', buf.getvalue())
+        self.assertEqual(turns, ['2', '3'])
+        self.assertIn('Result: won', buf.getvalue())
+
     def test_a_run_reads_as_plain_text(self):
         battle = {'actor': {'charId': 0x10, 'hit': 40, 'crit': -1, 'weapon': 0x01, 'hpBefore': 18,
                             'hp': 18, 'levelUp': False, 'broke': False},
