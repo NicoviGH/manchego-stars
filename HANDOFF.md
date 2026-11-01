@@ -9,11 +9,12 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-30 (Claude, latest). **#510 step 9: two fixes MERGED today.** #554 (5ef00b7):
-the sandbox equip leak. #555 (fb779c6): the talk duty retired (Nicolas's call, ADR 0382 amended).
-Each went through `/code-review <PR> medium` plus scoped re-reviews, every finding fixed, CI green
-on the head. Write-ups: #510 comments 6537709042 and 6538190941. The tree is clean on main; no
-branch in flight.
+Refreshed 2026-11-01 (Claude, latest). **#510 step 9: two fixes MERGED on 2026-10-30.** #554
+(5ef00b7): the sandbox equip leak. #555 (fb779c6): the talk duty retired (Nicolas's call, ADR 0382
+amended). Each went through `/code-review <PR> medium` plus scoped re-reviews, every finding fixed,
+CI green on the head. #556 ("a trip worth nothing sends no one") was CLOSED unmerged after its
+review (NEXT item 1 says why). Write-ups: #510 comments 6537709042, 6538190941, 6538768445,
+6539792750. The tree is clean on main; no branch in flight.
 
 - **#554:** vanilla Ch5's "Joshua lost to our counter on turn 2" was a sandbox leak, not a
   judgement. `EquipUnitItemSlot` reorders the bag, a game write no journal saw, so one judged
@@ -64,6 +65,9 @@ The older "Still owed" list below is still open too.
   planner.** One instrumented run (an uncommitted `PT_PHASELOG` write in `enemyPhase`: every
   enemy's decision, felled, and the target's bag) found #554 in one go. Nested sandboxes undo only
   `api.write*`; a game call that writes a unit struct needs `api.keep16` first.
+- **Regenerate an ours env with `campaign_env.py ours`** before measuring: envs in old scratch
+  dirs predate `house_gifts`, and a House with no prior is worth 0 (that's what sent #556 the
+  wrong way).
 - Ours from a store: `campaign_env` JSON plus `from: 2`, `PT_SIMDIR=<scratch copy>`, then
   `montecarlo.py attempts` (without `--from`, a campaign run retries the chapter until clean and
   never stops on ours ch01).
