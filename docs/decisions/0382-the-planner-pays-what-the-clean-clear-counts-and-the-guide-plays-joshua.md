@@ -8,6 +8,8 @@ issues: [510]
 
 # The planner pays what the clean clear counts (a recruit's death, a lord's as the chapter), plays our uncertain kills both ways, and the guide's line plays Joshua
 
+**Amended by ADR 0384 (2026-11-01).** The planner no longer pays what the clean clear counts: no planner decision reads clean clear, and complete plans are ranked by risk cap, then forfeits, then progress. Playing our uncertain kills both ways becomes the general rule (every protected unit's death chance is a sum over judged branches), and the guide's Joshua line stands.
+
 **Decided (2026-10-30), #510 step 9, the planner's open item "vanilla Ch5's recruit 0x20".**
 ADR 0381's march goal did not recruit Joshua. One instrumented run each found why, in layers:
 

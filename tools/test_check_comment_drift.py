@@ -11,6 +11,7 @@ too narrow to match the comment's actual phrasing. These tests hold both fixes.
 Run: python3 tools/test_check_comment_drift.py
 """
 import builtins
+import io
 import os
 import re
 import sys
@@ -115,6 +116,25 @@ class HandwrittenSourceScan(unittest.TestCase):
         finally:
             check._docs, check._handwritten_sources = orig_docs, orig_src
             os.unlink(path)
+
+    def test_a_research_transcript_is_exempt_but_a_research_record_is_not(self):
+        """A transcript is verbatim and cannot be edited when a phrase it quotes dies; the
+        record that summarises it is prose people follow, so it stays held."""
+        transcripts = os.path.join(check.REPO, 'docs', 'research', 'transcripts')
+        planted = os.path.join(transcripts, 'x.md')
+        record = os.path.join(check.REPO, 'docs', 'research', '9999-x.md')
+        orig_docs, orig_src = check._docs, check._handwritten_sources
+        check._docs = lambda: [planted, record]
+        check._handwritten_sources = lambda: []
+        check.open = lambda path, *a, **k: io.StringIO('zeroed personal growths\n')
+        try:
+            fail = []
+            check.check_no_dead_concepts(fail)
+        finally:
+            check._docs, check._handwritten_sources = orig_docs, orig_src
+            del check.open
+        self.assertEqual(len(fail), 1, fail)
+        self.assertIn('9999-x.md', fail[0])
 
     def test_the_repo_scan_globs_cover_the_incident_file(self):
         sources = [os.path.relpath(p, check.REPO) for p in check._handwritten_sources()]

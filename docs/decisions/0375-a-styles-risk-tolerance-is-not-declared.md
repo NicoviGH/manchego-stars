@@ -8,6 +8,8 @@ issues: [510]
 
 # A style's risk tolerance is not a declared value: the styles are the variation
 
+**Superseded by ADR 0384 (Nicolas, 2026-11-01).** A style's risk tolerance is now declared: each style has a fixed cap (careful 1%, even 5%, bold 15%), and a plan inside the cap outranks any plan outside it, whatever it scores. Nothing below is current once ADR 0384 is built (#510 step 9, PR-C).
+
 **No one picks the death chance a careful player accepts** (Nicolas, 2026-10-28: "I thought the
 point of monte carlo was trying different things"). The planner's styles weigh a unit's death at
 1000 (careful), 300 (even) and 60 (bold) against the damage it deals (`planner.lua`

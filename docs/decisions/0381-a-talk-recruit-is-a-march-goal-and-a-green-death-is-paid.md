@@ -8,6 +8,8 @@ issues: [510]
 
 # A Talk recruit is its nearest talker's march goal, and the planner pays a green unit's death as one of ours
 
+**Amended by ADR 0384 (2026-11-01).** A green unit's death is no longer priced as one of ours: an escort green's death is a forfeit in the plan rank, and an allied green's survival only breaks ties between otherwise equal plans. The Talk-recruit march goal below stands.
+
 **Decided (2026-10-30), #510 step 9 part D (Talk recruits as goals, which protect the recruit;
 Nicolas picked it first of the planner's open items).** Two changes to the planner's view, no
 new game read:
