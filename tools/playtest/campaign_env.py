@@ -213,18 +213,22 @@ def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
 
 def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
     """`store`: a vanilla campaign's states directory, holding `<chapter>.json` per chapter
-    start. Raises when a twin's record is missing: a run without its shops would be a different
-    campaign, not a smaller one."""
+    start, or a list of them, each twin read from the first that holds it (the clean campaign
+    stops at Ch5, so a later twin's shops come from another run). Raises when a twin's record
+    is missing: a run without its shops would be a different campaign, not a smaller one."""
+    stores = [store] if isinstance(store, str) else list(store)
     written = {int(c['chapter_number']) for c in campaign_chapters.load_all(campaign)
                if c.get('status') != 'planned'}
     hosts = {h.number: h.host_index for h in inject.hosts.hosted_chapters() if h.number in written}
     shops = {}
     for number, host in sorted(hosts.items()):
         twin = inject.chapter_settings.twin_rows()[difficulty.VANILLA_CHAIN[number]]
-        path = os.path.join(store, '%d.json' % twin)
-        if not os.path.exists(path):
+        paths = [os.path.join(s, '%d.json' % twin) for s in stores]
+        path = next((p for p in paths if os.path.exists(p)), None)
+        if path is None:
             raise FileNotFoundError('%s: no record of the twin (vanilla chapter %d) for our chapter '
-                                    '%d -- run the vanilla campaign first' % (path, twin, number))
+                                    '%d -- run the vanilla campaign first'
+                                    % (', '.join(paths), twin, number))
         with open(path) as f:
             shops[str(host)] = json.load(f)['shops']
     claims = {}

@@ -30,7 +30,8 @@
 --   Planner            OPTIONAL: planner.lua; when given it plays every style but greedy, and
 --                      a plan's acts are played in turn until Planner.surprise calls for a new
 --                      one (the record's `plans`: made, and acts played from a kept one)
---   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
+--   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, instrument }  what the
+--                      record names; instrument = the bot hash and suite version (PT_INSTRUMENT)
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
 --   villageGifts, houseGifts  OPTIONAL: { items, gold }, what every vanilla village and House
@@ -455,7 +456,7 @@ function M.run(api)
             end
         end
     end
-    local function finish(outcome, why)
+    local function finish(outcome, why, fault)
         rec.outcome, rec.turns, rec.why = outcome, turn, why
         rec.frames = api.frames() - startFrame
         if api.costs then
@@ -502,6 +503,16 @@ function M.run(api)
         end
         rec.watch_faults = explore.dropMissed()
         for _, f in ipairs(deathFaults) do rec.watch_faults[#rec.watch_faults + 1] = f end
+        -- Whether the environment held (#510 step 9 plan, T009): a crash, a timeout or a
+        -- misread board makes the record unreadable, never death-free. Outcome-dependent when
+        -- play had begun (a unit was deployed): which runs fail then can follow what happened
+        -- in them, so dropping them could bias the rest. A bot fault (a tile left open) is
+        -- the bot's own play, measured, not the environment's.
+        fault = fault or (outcome == "crashed" and "crash")
+            or (#rec.watch_faults > 0 and "watch") or nil
+        rec.env_status = fault and { fault = fault, outcome_dependent = #rec.deployed > 0 }
+            or "clean"
+        rec.instrument = api.info.instrument   -- the bot and suite version (montecarlo.py)
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
         trace({ t = "end", record = rec })
         api.emit(M.PREFIX .. Json.encode(rec))
@@ -715,13 +726,15 @@ function M.run(api)
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end
                 return "lost", "the chapter ended without advancing"
             end
-            if phase ~= "player" then return "crashed", "the enemy phase never returned control" end
+            if phase ~= "player" then
+                return "crashed", "the enemy phase never returned control", "timeout"
+            end
         end
     end
 
-    local ok, outcome, why = pcall(play)
+    local ok, outcome, why, fault = pcall(play)
     if not ok then return finish("crashed", "Lua error: " .. tostring(outcome)) end
-    return finish(outcome, why)
+    return finish(outcome, why, fault)
 end
 
 return M

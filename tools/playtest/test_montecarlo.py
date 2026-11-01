@@ -10,6 +10,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import matrix  # noqa: E402
 import montecarlo as mc  # noqa: E402
 
 
@@ -17,6 +18,33 @@ def _append_many(path, who, n):
     # a record long enough that a torn write would show: 4 KB of payload
     for i in range(n):
         mc.append_record(path, {'who': who, 'i': i, 'pad': 'x' * 4096})
+
+
+# A BOTRUN record as botrun.lua's finish() writes it today (v1), and as the #510 step 9 plan's
+# data model extends it (v2): the extra fields are added beside v1's, so every reader of v1 must
+# read a v2 line the same way. Each later PR that writes a v2 field reads it from V2.
+V1 = {'game': 'vanilla', 'rom_hash': 'c25b145e3745', 'chapter': 3, 'mode': 'normal', 'seed': 1,
+      'attempt': 1, 'style': {'aggression': 'careful'}, 'claims_played': [],
+      'claims_unplayed': [], 'outcome': 'won', 'turns': 9, 'why': 'the chapter advanced',
+      'frames': 28445, 'deaths': [{'charId': 0x42, 'faction': 'green', 'turn': 4,
+                                   'killer': 0x81, 'phase': 'enemy'}],
+      'kills': {'1': 3}, 'deployed': [1, 2], 'bot_faults': [], 'watch_faults': [],
+      'thefts': [], 'plans': {'made': 40, 'kept': 31}, 'bag': [], 'stalls': 1,
+      'explore': {}, 'recruits': {'owed': [0x30], 'joined': [0x30]},
+      'clear': {'won': True, 'lost': [{'charId': 0x42, 'faction': 'green', 'turn': 4,
+                                       'killer': 0x81}],
+                'recruits_missing': [], 'rewards_missing': [], 'stolen': []},
+      'clean': False, 'costs': {'cpu_s': 12.2, 'sandbox_calls': 900}}
+V2 = dict(V1, instrument='0123456789ab+suite-1', env_status='clean',
+          deaths=[dict(V1['deaths'][0], predicted=0.02, cap=0.01, over_cap=True,
+                       flags={'reinforcement': False, 'fog': False, 'boss': False,
+                              'player_phase': False},
+                       cause='over_cap', detail=None, plan_ref=17, escort=False)],
+          first_death_turn=4, greens={'escort_deaths': [], 'allied_deaths': [0x42]},
+          missed_recruits=[], missed_rewards=[], seize_skips=[], stall_events=[],
+          turns_to_win=9, anomalies=[],
+          lookahead={'decisions': 40, 'triggered': 3, 'extended': 3, 'skipped_budget': 0,
+                     'calls': 12, 'cpu_s': 0.8})
 
 
 class Records(unittest.TestCase):
@@ -30,6 +58,17 @@ class Records(unittest.TestCase):
         got = mc.parse_lines(text, mc.BOTRUN)
         self.assertEqual([r['attempt'] for r in got], [2, 3])
         self.assertEqual(mc.parse_lines(text, mc.CAMPAIGN), [{'outcome': 'played'}])
+
+    def test_a_v2_record_reads_as_its_v1(self):
+        # the plan's contract: parsers ignore fields they do not know, so v1 records still parse
+        # and every reader of today's fields gives a v2 line the same answer
+        text = '\n'.join('[f9] BOTRUN ' + json.dumps(r) for r in (V1, V2))
+        v1, v2 = mc.parse_lines(text, mc.BOTRUN)
+        self.assertEqual((v1, v2), (V1, V2))
+        self.assertEqual(mc.attempt_line(v1, set()), mc.attempt_line(v2, set()))
+        self.assertEqual(mc.spoiled(v1), mc.spoiled(v2))
+        self.assertEqual(mc.chapter_result([v1], 3), mc.chapter_result([v2], 3))
+        self.assertEqual(mc.first_clean([v1]), mc.first_clean([v2]))
 
     def test_append_is_one_line_per_run(self):
         with tempfile.TemporaryDirectory() as d:
@@ -56,6 +95,36 @@ class Workers(unittest.TestCase):
         with open(out) as fh:
             kept = [json.loads(line) for line in fh]
         return recs, kept
+
+    def test_each_record_carries_its_workers_wall_time_and_its_own_store(self):
+        d = tempfile.mkdtemp()
+        other = os.path.join(d, 'other.jsonl')
+
+        def launch(task, tag, log_path):
+            if task['seed'] == 2:
+                raise RuntimeError('died')
+            return 'BOTRUN {"seed": %d, "outcome": "won"}\n' % task['seed'], '/tmp/x'
+        recs, kept = self.run_pool(launch, [{'seed': 1}, {'seed': 2, 'out': other}])
+        self.assertTrue(all(isinstance(r['wall_s'], float) for r in recs))
+        self.assertEqual([r['seed'] for r in kept], [1])
+        with open(other) as fh:
+            crashed = json.loads(fh.read())
+        self.assertEqual(crashed['env_status'], {'fault': 'crash', 'outcome_dependent': True})
+
+    def test_a_campaign_end_with_no_bot_record_says_its_environment_failed(self):
+        # campaign.lua's own crashes (load, arrive, save, cap) end before the bot plays
+        only = mc.records_of({}, 'CAMPAIGN {"outcome": "crashed", "why": "load: x"}', '/tmp/w',
+                             '/nonexistent.log')
+        self.assertEqual(only[0]['env_status'], mc.unread())
+        both = mc.records_of({}, 'BOTRUN {"outcome": "won", "env_status": "clean"}\n'
+                             'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
+        self.assertEqual([r.get('env_status') for r in both], ['clean', None])
+
+    def test_a_campaigns_own_answer_is_no_environment_fault(self):
+        # campaign.lua ends no_style (fewer styles than the attempt asked) before any bot plays
+        rec = mc.records_of({}, 'CAMPAIGN {"outcome": "no_style"}', '/tmp/w', '/x.log')[0]
+        self.assertNotIn('env_status', rec)
+        self.assertIsNone(mc.attempt_line(dict(rec, kind='campaign', task_attempt=3), set()))
 
     def test_crashed_worker_is_recorded(self):
         def launch(task, tag, log_path):
@@ -390,6 +459,302 @@ class Cell(unittest.TestCase):
         self.assertTrue(rel.startswith('traces/c/4-s3-a1-'), rel)
         with gzip.open(os.path.join(d, 'store', rel), 'rt') as fh:
             self.assertEqual([json.loads(x)['t'] for x in fh], ['start', 'end'])
+
+
+# The frozen suite's manifest (#510 step 9 plan, T005; FR-021 and FR-025): a matrix.yaml
+# `instrument:` section, defaults merged into each start as matrix.yaml's rows are.
+SUITE = {
+    'version': 1, 'held_out_frozen_at': None, 'route': 1,
+    'emulator': {'binary': 'tools/emulator/mgba-headless', 'sha1': 'e' * 40},
+    'seed_sets': {'confirmatory': [1, 200], 'pilot': [3001, 3050]},
+    'defaults': {'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}, 'style': 'drawn',
+                 'invariant': 'record', 'estimate_wall_s': 600,
+                 'budgets': {'beam': 6, 'final': 4, 'branch': 2, 'lookahead_decision': 8,
+                             'lookahead_attempt': 32}},
+    'shops_from': ['references/sim/vanilla/h/states/c'],
+    'starts': [
+        {'start_id': 'vanilla-ch3', 'game': 'vanilla', 'chapter': 3, 'rom_hash': 'c25b145e3745',
+         'state_path': 'references/sim/vanilla/c25b145e3745/states/c/3.ss', 'state_sha1': 'a' * 40,
+         'provenance': {'campaign': 'c', 'seed': 1, 'source': '#510'}, 'label': 'fixture'},
+        {'start_id': 'ours-ch02', 'game': 'ours', 'chapter': 3, 'rom_hash': 'fd3cb9d8dca6',
+         'state_path': 'references/sim/ours/fd3cb9d8dca6/states/o/3.ss', 'state_sha1': 'b' * 40,
+         'provenance': {'campaign': 'o', 'seed': None, 'source': '#510'}, 'label': 'fixture',
+         'seeds': {'tuning': [1003, 1004]}}],
+}
+
+
+class Suite(unittest.TestCase):
+    def load(self, inst):
+        import yaml
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 'matrix.yaml')
+        with open(path, 'w') as fh:
+            yaml.safe_dump({'instrument': inst}, fh)
+        return mc.load_suite(path)
+
+    def suite(self):
+        return json.loads(json.dumps(SUITE))   # a deep copy each test may change
+
+    def refuses(self, inst, words):
+        with self.assertRaises(matrix.ManifestError) as cm:
+            self.load(inst)
+        self.assertIn(words, str(cm.exception))
+
+    def test_a_start_takes_the_defaults_it_does_not_name(self):
+        got = self.load(self.suite())
+        a, b = got['starts']
+        self.assertEqual(a['seeds'], {'tuning': [1001, 1002], 'held_out': [2001, 2002]})
+        # a table a start names merges key by key: its own tuning, the default held-out
+        self.assertEqual(b['seeds'], {'tuning': [1003, 1004], 'held_out': [2001, 2002]})
+        self.assertEqual((a['style'], a['budgets']['lookahead_attempt']), ('drawn', 32))
+        self.assertEqual(got['version'], 1)
+
+    def test_the_shipped_manifest_loads(self):
+        got = mc.load_suite()
+        self.assertEqual(len(got['starts']), 13)   # FR-021: vanilla 6, ours 4, scout 3
+        self.assertEqual(sum(len(s['seeds']['tuning']) + len(s['seeds']['held_out'])
+                             for s in got['starts']), 52)   # SC-001
+        lo, hi = got['seed_sets']['confirmatory']
+        self.assertLessEqual(mc.LOOKS[-1], hi - lo + 1, 'a cell plays seeds 1..LOOKS[-1]')
+
+    def test_a_start_listed_twice_raises(self):
+        inst = self.suite()
+        inst['starts'].append(dict(inst['starts'][0]))
+        self.refuses(inst, 'vanilla-ch3')
+        inst = self.suite()
+        inst['starts'].append(dict(inst['starts'][0], start_id='again'))
+        self.refuses(inst, 'listed twice')
+
+    def test_a_start_without_its_state_hash_raises(self):
+        inst = self.suite()
+        del inst['starts'][1]['state_sha1']
+        self.refuses(inst, 'state_sha1')
+
+    def test_a_seed_in_two_sets_raises(self):
+        for where, seed in (('held_out', 1001), ('tuning', 3010), ('held_out', 150)):
+            inst = self.suite()
+            inst['starts'][1]['seeds'] = {'tuning': [1003, 1004], 'held_out': [2003, 2004]}
+            inst['starts'][1]['seeds'][where][0] = seed
+            self.refuses(inst, str(seed))
+
+    def test_a_missing_budget_raises(self):
+        inst = self.suite()
+        del inst['defaults']['budgets']['lookahead_decision']
+        self.refuses(inst, 'lookahead_decision')
+
+    def test_suite_tasks_play_attempt_one_from_each_pinned_state(self):
+        suite = self.load(self.suite())
+        envs = {'vanilla': {'last': [99], 'claims': {}}, 'ours': {'last': [8], 'shops': {}}}
+        tasks = mc.suite_tasks(suite, envs, 'i+v1', {'vanilla': '/v.jsonl', 'ours': '/o.jsonl'})
+        self.assertEqual(len(tasks), 8)   # two starts x (two tuning + two held-out)
+        t = tasks[0]
+        self.assertEqual(t['campaign'], {'last': [3], 'claims': {}, 'id': 'c', 'from': 3,
+                                         'attempt': 1})
+        self.assertEqual((t['seed'], t['vanilla'], t['instrument'], t['out']),
+                         (1001, True, 'i+v1', '/v.jsonl'))
+        self.assertEqual(t['stamp'], {'task_attempt': 1,
+                                      'suite': {'start_id': 'vanilla-ch3', 'set': 'tuning',
+                                                'version': 1}})
+        self.assertEqual([(x['seed'], x['stamp']['suite']['set']) for x in tasks[4:]],
+                         [(1003, 'tuning'), (1004, 'tuning'), (2001, 'held_out'),
+                          (2002, 'held_out')])
+        self.assertFalse(tasks[4]['vanilla'])
+        self.assertEqual(len(mc.suite_tasks(suite, envs, 'i', {}, sets=('tuning',))), 4)
+
+    def test_a_start_that_no_longer_matches_is_refused(self):
+        d = tempfile.mkdtemp()
+        inst = self.suite()
+        inst['shops_from'] = [d]
+        for s in inst['starts']:
+            s['state_path'] = s['state_path'].replace('references/sim', d)
+        suite = self.load(inst)
+        a, b = suite['starts']
+        os.makedirs(os.path.dirname(a['state_path']))
+        with open(a['state_path'], 'wb') as fh:
+            fh.write(b'not the state')
+        simdirs = {'vanilla': os.path.join(d, 'vanilla', 'c25b145e3745'),
+                   'ours': os.path.join(d, 'ours', '000000000000')}
+        why = mc.check_starts(suite, simdirs, emulator_sha1='e' * 40)
+        self.assertEqual(len(why), 2)
+        self.assertIn('vanilla-ch3', why[0])
+        self.assertIn('no longer hashes to', why[0])
+        self.assertIn('ours-ch02', why[1])
+        self.assertIn('ROM built now is 000000000000', why[1])
+        inst['starts'][0]['state_sha1'] = mc.sha1_file(a['state_path'])
+        self.assertEqual(mc.check_starts(self.load(inst), simdirs, emulator_sha1='e' * 40),
+                         [why[1]])
+        moved = mc.check_starts(self.load(inst), simdirs, emulator_sha1='f' * 40)
+        self.assertIn('the emulator', moved[0])
+        inst['shops_from'] = [os.path.join(d, 'gone')]
+        self.assertIn('the shops store', mc.check_starts(self.load(inst), simdirs,
+                                                         emulator_sha1='e' * 40)[0])
+
+    def test_the_estimate_reads_kept_runs_first(self):
+        suite = self.load(self.suite())
+        tasks = mc.suite_tasks(suite, {'vanilla': {}, 'ours': {}}, 'i', {})
+        kept = {'vanilla-ch3': [30.0, 50.0]}   # measured: 40 s a run; ours-ch02 is not
+        hours = mc.suite_estimate(suite, tasks, kept, jobs=2)
+        self.assertAlmostEqual(hours, (4 * 40 + 4 * 600) / 2 / 3600)
+        self.assertGreater(mc.suite_estimate(suite, tasks * 30, {}, jobs=1), mc.MAX_WALL_H)
+
+    def test_a_job_over_eight_hours_is_refused_before_it_runs(self):
+        suite = self.load(self.suite())
+        played = []
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
+                             play=lambda tasks: played.extend(tasks) or [], jobs=1,
+                             baseline=True, instrument='i', check=lambda *a: [], kept={},
+                             wall_limit_h=0.5)
+        self.assertEqual(played, [])
+        self.assertIn('refused', lines[-1])
+        self.assertIn('8 wall-hours'.replace('8', '0.5'), lines[-1])
+
+    def test_the_baseline_says_each_starts_cost_in_a_sentence(self):
+        suite = self.load(self.suite())
+
+        def play(tasks):
+            # each worker also leaves its campaign's end, stamped alike: never a second run
+            for i, t in enumerate(tasks):
+                yield dict(t['stamp'], outcome='won', seed=t['seed'], wall_s=10.0 + i,
+                           costs={'cpu_s': 2.0})
+                yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
+                           wall_s=10.0 + i)
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
+                             jobs=4, baseline=True, instrument='i', check=lambda *a: [],
+                             kept={})
+        text = '\n'.join(lines)
+        self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 8.0 CPU s and 46.0 '
+                      'wall s in all, 2.0 CPU s a run', text)
+        self.assertIn('ours-ch02 (ours chapter 3, fixture): 4 runs', text)
+        self.assertIn('the suite: 8 runs, 16.0 CPU s', text)
+        self.assertNotIn('won', text, 'a baseline reports cost, never a held-out outcome')
+
+    def test_a_worker_with_no_bot_record_is_one_run_without_a_result(self):
+        suite = self.load(self.suite())
+
+        def play(tasks):
+            for t in tasks:
+                yield dict(t['stamp'], kind='campaign', outcome='crashed', seed=t['seed'],
+                           wall_s=1.0, why='arrive: no saved start')
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
+                             jobs=4, baseline=False, instrument='i', check=lambda *a: [],
+                             kept={})
+        text = '\n'.join(lines)
+        self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 2 runs', text)
+        self.assertIn('2 without a game result', text)
+        self.assertIn('vanilla-ch3 seed 1001: attempt 1: crashed before the bot reported '
+                      '(arrive: no saved start)', text)
+
+    def test_a_start_off_its_pin_refuses_the_whole_suite(self):
+        suite = self.load(self.suite())
+        lines = mc.run_suite(suite, envs=None, simdirs={}, play=None, jobs=1, baseline=True,
+                             instrument='i', check=lambda *a: ['ours-ch02: its state is gone'])
+        self.assertTrue(lines[0].startswith('refused'))
+        self.assertIn('ours-ch02: its state is gone', lines[1])
+
+    def test_a_seed_twice_in_one_set_raises(self):
+        inst = self.suite()
+        inst['starts'][1]['seeds']['tuning'] = [1003, 1003]
+        self.refuses(inst, 'distinct')
+
+    def test_a_manifest_without_its_seed_sets_names_them(self):
+        inst = self.suite()
+        del inst['seed_sets']
+        self.refuses(inst, 'seed_sets')
+
+    def test_a_start_with_no_budgets_anywhere_names_them(self):
+        inst = self.suite()
+        del inst['defaults']['budgets']
+        self.refuses(inst, 'budgets.beam')
+        inst = self.suite()
+        inst['starts'][0]['seeds'] = [1001, 1002]
+        self.refuses(inst, 'not a table')
+
+    def test_a_suite_error_never_reaches_the_instrument_id(self):
+        import yaml
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 'matrix.yaml')
+        inst = self.suite()
+        inst['starts'].append(dict(inst['starts'][0]))   # load_suite refuses this manifest
+        with open(path, 'w') as fh:
+            yaml.safe_dump({'instrument': inst}, fh)
+        with self.assertRaises(matrix.ManifestError):
+            mc.load_suite(path)
+        self.assertTrue(mc.instrument_id(path).endswith('+v1'))
+        del inst['version']
+        path = os.path.join(d, 'unversioned.yaml')   # instrument_id is cached by its path
+        with open(path, 'w') as fh:
+            yaml.safe_dump({'instrument': inst}, fh)
+        with self.assertRaises(matrix.ManifestError):
+            mc.instrument_id(path)
+
+    def test_a_set_simdir_is_refused(self):
+        import contextlib
+        import io
+        from unittest import mock
+
+        def never(*a, **k):   # a guard that moved below these would play the real suite
+            raise AssertionError('the suite went past its PT_SIMDIR guard')
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {'PT_SIMDIR': '/tmp/elsewhere'}), \
+                mock.patch.object(mc, 'simdir', never), \
+                mock.patch.object(mc, 'load_suite', never), \
+                mock.patch.object(mc, 'Pool', never), contextlib.redirect_stdout(buf):
+            code = mc.main(['suite'])
+        self.assertEqual(code, 1)
+        self.assertTrue(buf.getvalue().startswith('refused: PT_SIMDIR is set'))
+
+    def test_a_missing_twin_is_refused_in_words(self):
+        suite = self.load(self.suite())
+
+        def envs():
+            raise FileNotFoundError('7.json: no record of the twin')
+        lines = mc.run_suite(suite, envs=envs, simdirs={}, play=None, jobs=1, baseline=True,
+                             instrument='i', check=lambda *a: [])
+        self.assertEqual(lines, ['refused: a campaign env cannot be built: 7.json: no record '
+                                 'of the twin'])
+
+    def test_a_campaign_end_without_a_bot_record_is_no_result(self):
+        suite = self.load(self.suite())
+
+        def play(tasks):
+            for t in tasks:
+                yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
+                           wall_s=1.0, why='played after 1 chapters', env_status=mc.unread())
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
+                             play=play, jobs=4, baseline=False, instrument='i',
+                             check=lambda *a: [], kept={})
+        text = '\n'.join(lines)
+        self.assertIn('2 without a game result', text)
+        self.assertIn('vanilla-ch3 seed 1001: attempt 1: the bot left no record; the campaign '
+                      'ended played (played after 1 chapters)', text)
+        self.assertNotIn(': None', text)
+
+    def test_no_rom_built_says_so(self):
+        d = tempfile.mkdtemp()
+        why = mc.check_starts(self.load(self.suite()),
+                              {'vanilla': os.path.join(d, 'vanilla', ''),
+                               'ours': os.path.join(d, 'ours', '')}, emulator_sha1='e' * 40)
+        self.assertIn('no vanilla ROM is built', why[-2])
+        self.assertIn('no ours ROM is built', why[-1])
+
+    def test_the_estimate_keeps_only_this_instruments_results(self):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 'runs.jsonl')
+        base = {'suite': {'start_id': 'a'}, 'game': 'vanilla', 'rom_hash': 'h',
+                'instrument': 'i', 'outcome': 'won', 'wall_s': 40.0}
+        for r in (base, dict(base, wall_s=60.0),
+                  dict(base, instrument='old', wall_s=5.0),       # other code
+                  dict(base, rom_hash='g', wall_s=5.0),            # another ROM
+                  dict(base, outcome='crashed', wall_s=5.0),       # died at boot
+                  dict(base, kind='campaign', wall_s=40.0),        # the worker's other record
+                  {'seed': 1, 'wall_s': 5.0}):                     # a cell's run
+            mc.append_record(path, r)
+        self.assertEqual(mc.kept_walls([path], 'i', {'vanilla': 'h'}), {'a': [40.0, 60.0]})
+
+    def test_two_seeds_of_each_kind(self):
+        inst = self.suite()
+        inst['starts'][1]['seeds']['tuning'] = [1003]
+        self.refuses(inst, 'two')
 
 
 class Story(unittest.TestCase):

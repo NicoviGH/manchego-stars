@@ -65,6 +65,22 @@ class Ours(unittest.TestCase):
             twin = twin_rows()[difficulty.VANILLA_CHAIN[number]]
             self.assertEqual(env['shops'][str(host)], [twin, 100 + twin])
 
+    def test_shops_come_from_the_first_store_holding_the_twin(self):
+        # one vanilla campaign rarely reaches every twin (the clean one stops at Ch5): the
+        # scout's store fills in the rest, and the clean one wins where both have it
+        hosts = self.written()
+        twins = sorted({twin_rows()[difficulty.VANILLA_CHAIN[n]] for n in hosts})
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            for i, twin in enumerate(twins):
+                for store, mark in ((a, 'a'), (b, 'b')):
+                    if store == b or i % 2 == 0:
+                        with open(os.path.join(store, '%d.json' % twin), 'w') as f:
+                            json.dump({'shops': [mark]}, f)
+            env = ce.ours_env([a, b])
+        for number, host in hosts.items():
+            twin = twin_rows()[difficulty.VANILLA_CHAIN[number]]
+            self.assertEqual(env['shops'][str(host)], ['a' if twins.index(twin) % 2 == 0 else 'b'])
+
     def test_a_missing_twin_record_raises(self):
         with tempfile.TemporaryDirectory() as store:
             with self.assertRaises(FileNotFoundError):

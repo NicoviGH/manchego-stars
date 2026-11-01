@@ -30,6 +30,14 @@ record 0022; the #510 plan's Task 12, amended 2026-10-27).
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
 forecast and every blow.
 
+    python3 tools/playtest/montecarlo.py suite [--baseline] [--jobs 8]
+
+`suite` plays the difficulty instrument's frozen suite (#510 step 9; matrix.yaml's
+`instrument:` section, ADR 0387): attempt 1 of each pinned chapter start, from its saved state,
+under each of its seeds. Without --baseline it plays the tuning seeds and prints each run;
+--baseline plays the held-out seeds too and prints only what each start cost. It refuses a start
+that no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
+
 `cell` plays one chapter-and-mode cell to its verdict. Pair s is campaign s of each game: from
 New Game, the game seeded once with s and never again, as a player's own save; each chapter is
 retried until it clears clean (campaign.lua), and the pair's result is the campaign's FIRST
@@ -51,10 +59,12 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUN_SH = os.path.join(HERE, 'run.sh')
+sys.path.insert(0, HERE)
 
 BOTRUN, CAMPAIGN = 'BOTRUN', 'CAMPAIGN'
 
@@ -98,6 +108,7 @@ def launch(task, tag, log_path):
         env['PT_VANILLA'] = '1'
     if task.get('mode'):
         env['PT_DIFFICULTY'] = task['mode']
+    env['PT_INSTRUMENT'] = task.get('instrument') or instrument_id()
     with open(log_path, 'w') as log:
         subprocess.run([RUN_SH, scenario], env=env, stdout=log, stderr=subprocess.STDOUT,
                        check=False)
@@ -128,15 +139,26 @@ def records_of(task, text, where, log_path):
         c['kind'] = 'campaign'
         recs.append(c)
     attempt = (task.get('campaign') or {}).get('attempt')
+    bot = any(r.get('kind') != 'campaign' for r in recs)
     for r in recs:
         r['run_dir'] = where
         if r.get('outcome') == 'crashed':
             r['log'], r['log_tail'] = log_path, log_tail(log_path)
+        # the campaign crashed (load, arrive, save, cap) before its bot reported: the
+        # environment did not hold. A no_style or done end is the campaign's own answer.
+        if not bot and r.get('outcome') == 'crashed':
+            r['env_status'] = unread()
     if recs:
         return recs
     return [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'), 'run_dir': where,
-             'log': log_path, 'log_tail': log_tail(log_path),
+             'log': log_path, 'log_tail': log_tail(log_path), 'env_status': unread(),
              'why': 'the worker left no BOTRUN or CAMPAIGN record'}]
+
+
+def unread():
+    """The env_status of a worker that left no record (botrun.lua's, T009): a crash, and
+    outcome-dependent, since nothing says whether play had begun."""
+    return {'fault': 'crash', 'outcome_dependent': True}
 
 
 def keep_trace(rec, out):
@@ -162,7 +184,9 @@ def keep_trace(rec, out):
 class Pool:
     """`jobs` workers at once. `launch(task, tag, log_path) -> (stdout text, run dir)` runs one
     task (the real one drives run.sh; tests pass a fake). A task's `stamp` is written into
-    each of its records."""
+    each of its records, and its records go to its own `out` when it names one (the suite
+    files each game's in that game's store). Each record carries `wall_s`, its worker's
+    wall time."""
 
     def __init__(self, jobs=8, out='runs.jsonl', log_dir=None, launch=launch):
         self.jobs, self.out, self.launch = jobs, out, launch
@@ -176,26 +200,31 @@ class Pool:
         def one(i, task):
             tag = '%s-%d' % (base, i)
             log_path = os.path.join(self.log_dir, tag + '.log')
+            out = task.get('out') or self.out
+            began = time.monotonic()
             try:
                 text, where = self.launch(task, tag, log_path)
             except Exception as err:   # a worker that dies is a record, never a lost run
                 attempt = (task.get('campaign') or {}).get('attempt')
                 recs = [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'),
-                         'log': log_path,
+                         'log': log_path, 'env_status': unread(),
                          'run_dir': run_dir(task.get('scenario', 'campaign'), tag),
                          'why': '%s: %s' % (type(err).__name__, err)}]
             else:
                 recs = records_of(task, text, where, log_path)
+            wall = time.monotonic() - began
             for r in recs:
                 r.update(task.get('stamp') or {})
-                keep_trace(r, self.out)
-            return recs
+                r['wall_s'] = wall
+                keep_trace(r, out)
+            return out, recs
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.jobs) as ex:
             futures = [ex.submit(one, i, t) for i, t in enumerate(tasks)]
             for f in concurrent.futures.as_completed(futures):
-                for rec in f.result():
-                    append_record(self.out, rec)
+                out, recs = f.result()
+                for rec in recs:
+                    append_record(out, rec)
                     yield rec
 
 
@@ -242,10 +271,13 @@ def attempt_line(r, said):
     rewrote) would otherwise vanish from the listing."""
     if r.get('kind') == 'campaign':
         k = r.get('task_attempt')
-        if k is None or k in said or r.get('outcome') != 'crashed':
+        if k is None or k in said or (r.get('outcome') != 'crashed' and r.get('env_status') is None):
             return None
         said.add(k)
-        return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
+        if r.get('outcome') == 'crashed':
+            return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
+        return 'attempt %s: the bot left no record; the campaign ended %s (%s)' % (
+            k, r.get('outcome'), r.get('why'))
     said.add(r.get('attempt'))
     cost = (r.get('costs') or {}).get('cpu_s')
     why = spoiled(r) if r.get('outcome') == 'won' and r.get('clean') is not True else ''
@@ -403,17 +435,25 @@ def campaign_tasks(env, seeds, mode, stamp, vanilla=False):
              'mode': mode, 'vanilla': vanilla, 'stamp': stamp} for s in seeds]
 
 
+def kept(paths, keep, key):
+    """{key(rec): [record]} of the runs kept in `paths` (runs files) that `keep(rec)` takes, in
+    file order."""
+    out = {}
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            for line in fh:
+                rec = json.loads(line)
+                if keep(rec):
+                    out.setdefault(key(rec), []).append(rec)
+    return out
+
+
 def kept_runs(path, stamp):
     """{seed: [record]} of the runs in `path` with this stamp, in file order."""
-    out = {}
-    if not os.path.exists(path):
-        return out
-    with open(path) as fh:
-        for line in fh:
-            rec = json.loads(line)
-            if all(rec.get(k) == v for k, v in stamp.items()) and rec.get('seed') is not None:
-                out.setdefault(rec['seed'], []).append(rec)
-    return out
+    return kept([path], lambda r: all(r.get(k) == v for k, v in stamp.items())
+                and r.get('seed') is not None, lambda r: r['seed'])
 
 
 def chapter_result(recs, chapter):
@@ -513,6 +553,278 @@ def cell_main(args):
             100 * v['ours'], 100 * v['vanilla'], 100 * v['diff'], 100 * v['lo'], 100 * v['hi']))
     print('campaigns played now: ours %(ours)d, vanilla %(vanilla)d' % v['played'])
     return 0
+
+
+# ---- the frozen suite (#510 step 9 plan, PR-A: T006, T010) ----
+# The instrument's regression suite is a section of matrix.yaml (plan R-6: one manifest owns
+# what a playtest needs, ADR 0074): pinned chapter starts, each played on attempt 1 from its
+# saved state under fixed seeds. FR-021 says what an entry names; FR-025 that the tuning,
+# held-out, pilot and confirmatory seeds never meet.
+
+SUITE_TOP = ('version', 'route', 'emulator', 'seed_sets', 'shops_from', 'starts')
+SUITE_KEYS = ('start_id', 'game', 'chapter', 'rom_hash', 'state_path', 'state_sha1',
+              'provenance', 'label', 'seeds', 'style', 'invariant', 'budgets', 'estimate_wall_s')
+BUDGET_KEYS = ('beam', 'final', 'branch', 'lookahead_decision', 'lookahead_attempt')
+LABELS = ('fixture', 'scout', 'snapshot')
+STYLES = ('drawn',)       # attempt 1's own draw (campaign.lua drawStyle), what a cell plays
+INVARIANTS = ('record',)  # the attempt leaves one BOTRUN record with a game result
+
+
+def instrument_section(path=None):
+    """matrix.yaml's `instrument:` section as written, unchecked ({} when there is none)."""
+    import yaml
+    import matrix
+    with open(path or matrix.MANIFEST) as fh:
+        return (yaml.safe_load(fh) or {}).get('instrument') or {}
+
+
+def load_suite(path=None):
+    """matrix.yaml's `instrument:` section, every start with the defaults it does not name
+    merged in (key by key, as matrix.yaml's rows take its defaults). Raises ManifestError on a
+    start listed twice (its id or its state), a field missing, a seed in two sets, or other
+    than two distinct tuning and two distinct held-out seeds a start (FR-021)."""
+    from matrix import ManifestError
+    inst = instrument_section(path)
+    if not inst:
+        raise ManifestError('matrix.yaml has no `instrument:` section')
+    lacking = [k for k in SUITE_TOP if inst.get(k) is None]
+    if lacking:
+        raise ManifestError('the suite manifest has no %s' % ', '.join(lacking))
+    defaults = inst.get('defaults') or {}
+    sets = {name: set(range(lo, hi + 1)) for name, (lo, hi) in inst['seed_sets'].items()}
+    starts, ids, states = [], set(), set()
+    used = {'tuning': {}, 'held_out': {}}   # seed -> the start that uses it
+    for row in inst.get('starts') or []:
+        s = dict(defaults, **row)
+        sid = s.get('start_id')
+        for k in ('seeds', 'budgets'):   # a table merges key by key too
+            for got in (defaults.get(k), row.get(k)):
+                if got is not None and not isinstance(got, dict):
+                    raise ManifestError('suite start %s: %s %r is not a table' % (sid, k, got))
+            s[k] = dict(defaults.get(k) or {}, **(row.get(k) or {}))
+        missing = [k for k in SUITE_KEYS if s.get(k) is None] + \
+            ['budgets.' + k for k in BUDGET_KEYS if s['budgets'].get(k) is None]
+        if missing:
+            raise ManifestError('suite start %s: no %s' % (sid, ', '.join(missing)))
+        if sid in ids:
+            raise ManifestError('suite start %s is listed twice' % sid)
+        if s['state_path'] in states:
+            raise ManifestError('suite start %s: its state %s is listed twice'
+                                % (sid, s['state_path']))
+        ids.add(sid)
+        states.add(s['state_path'])
+        for k, allowed in (('game', ('vanilla', 'ours')), ('label', LABELS), ('style', STYLES),
+                           ('invariant', INVARIANTS)):
+            if s[k] not in allowed:
+                raise ManifestError('suite start %s: %s %r is not one of %s'
+                                    % (sid, k, s[k], ', '.join(allowed)))
+        for kind in ('tuning', 'held_out'):
+            seeds = s['seeds'].get(kind) or []
+            if len(set(seeds)) != 2 or len(seeds) != 2:
+                raise ManifestError('suite start %s: %s seeds %r, not two distinct ones'
+                                    % (sid, kind, seeds))
+            other = 'held_out' if kind == 'tuning' else 'tuning'
+            for seed in seeds:
+                clash = [n for n, r in sets.items() if seed in r]
+                if seed in used[other]:
+                    clash.append('%s (%s)' % (other, used[other][seed]))
+                if clash:
+                    raise ManifestError('suite start %s: %s seed %d is also a %s seed (FR-025)'
+                                        % (sid, kind, seed, ' and '.join(clash)))
+                used[kind][seed] = sid
+        starts.append(s)
+    return dict(inst, starts=starts)
+
+
+REPO = os.path.dirname(os.path.dirname(HERE))
+MAX_WALL_H = 8    # SC-007: a planned job longer than this is split or narrowed, never run
+SEED_SETS = ('tuning', 'held_out')
+
+
+def sha1_file(path):
+    """A file's sha1, as `shasum` prints it (run.sh names a ROM's store by the same hash)."""
+    h = hashlib.sha1()
+    with open(path, 'rb') as fh:
+        for block in iter(lambda: fh.read(1 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+@functools.lru_cache(maxsize=None)
+def instrument_id(path=None):
+    """The instrument a run is played under (the record's `instrument`): the bot code's hash
+    and the suite manifest's version. Read alone, so a cell's runs never hang on the rest of
+    the suite's validation (load_suite's); a manifest with no version raises, since every run
+    would otherwise be stamped with nothing."""
+    from matrix import ManifestError
+    version = instrument_section(path).get('version')
+    if not isinstance(version, int):
+        raise ManifestError('the suite manifest has no integer `version` (%r)' % (version,))
+    return '%s+v%d' % (bot_hash(), version)
+
+
+def check_starts(suite, simdirs, emulator_sha1=None):
+    """Why each pinned start cannot be played as pinned, one sentence each ([] = all can): the
+    emulator is not the pinned build, the ROM built now is not the one that saved the state
+    (`simdirs[game]` is its store, named by its hash), the state is not where the harness
+    loads it from, or its file is gone or changed."""
+    out = ['the shops store %s is gone' % p for p in suite['shops_from']
+           if not os.path.isdir(os.path.join(REPO, p))]
+    emu = suite['emulator']
+    got = emulator_sha1 or sha1_file(os.path.join(REPO, emu['binary']))
+    if got != emu['sha1']:
+        out.append('the emulator %s is not the pinned build (sha1 %s, pinned %s)'
+                   % (emu['binary'], got[:12], emu['sha1'][:12]))
+    for st in suite['starts']:
+        store = simdirs[st['game']]
+        path = os.path.join(REPO, st['state_path'])
+        want = os.path.join(store, 'states', st['provenance']['campaign'],
+                            '%d.ss' % st['chapter'])
+        if not os.path.basename(store):
+            why = 'no %s ROM is built' % st['game']
+        elif os.path.basename(store) != st['rom_hash']:
+            why = 'pinned on ROM %s, but the %s ROM built now is %s' % (
+                st['rom_hash'], st['game'], os.path.basename(store))
+        elif os.path.abspath(path) != os.path.abspath(want):
+            why = 'its state %s is not where the harness loads it (%s)' % (path, want)
+        elif not os.path.exists(path):
+            why = 'its state %s is gone' % path
+        elif sha1_file(path) != st['state_sha1']:
+            why = 'its state %s no longer hashes to %s' % (path, st['state_sha1'][:12])
+        else:
+            continue
+        out.append('%s: %s' % (st['start_id'], why))
+    return out
+
+
+def suite_tasks(suite, envs, instrument, outs, sets=SEED_SETS):
+    """Attempt 1 of each pinned start under each of its seeds in `sets`: the game's campaign env
+    (`envs[game]`, campaign_env's) resumed at the start's chapter from the state its campaign
+    saved, and ended there. An attempt-mode run saves no state, so the pinned file is never
+    rewritten (campaign.lua)."""
+    tasks = []
+    for st in suite['starts']:
+        camp = dict(envs[st['game']], id=st['provenance']['campaign'], attempt=1,
+                    last=[st['chapter']])
+        camp['from'] = st['chapter']
+        for kind in sets:
+            for seed in st['seeds'][kind]:
+                tasks.append({'campaign': camp, 'seed': seed, 'vanilla': st['game'] == 'vanilla',
+                              'instrument': instrument, 'out': outs.get(st['game']),
+                              'stamp': {'task_attempt': 1,
+                                        'suite': {'start_id': st['start_id'], 'set': kind,
+                                                  'version': suite['version']}}})
+    return tasks
+
+
+def kept_walls(paths, instrument, rom_hashes):
+    """{start_id: [wall_s]} of the suite runs kept in `paths` (each game's runs file) that this
+    instrument played on these ROMs ({game: hash}) to a game result: a run of other code, or
+    one that crashed at boot in seconds, says nothing about what the next will take."""
+    runs = kept(paths, lambda r: r.get('suite') and r.get('kind') != 'campaign'
+                and r.get('instrument') == instrument
+                and r.get('rom_hash') == rom_hashes.get(r.get('game'))
+                and r.get('outcome') not in UNUSABLE and r.get('wall_s') is not None,
+                lambda r: r['suite']['start_id'])
+    return {sid: [r['wall_s'] for r in recs] for sid, recs in runs.items()}
+
+
+def suite_estimate(suite, tasks, kept, jobs):
+    """The wall-hours `tasks` would take on `jobs` workers: each start's mean measured wall
+    time a run where a kept run has one (`kept`, kept_walls'), its manifest estimate where
+    none has."""
+    by_id = {st['start_id']: st for st in suite['starts']}
+    total = 0.0
+    for t in tasks:
+        sid = t['stamp']['suite']['start_id']
+        walls = kept.get(sid)
+        total += sum(walls) / len(walls) if walls else by_id[sid]['estimate_wall_s']
+    return total / max(1, min(jobs, len(tasks))) / 3600
+
+
+def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=check_starts,
+              kept=None, wall_limit_h=MAX_WALL_H):
+    """Play the suite and say what it cost, as lines to print. `baseline` plays every seed,
+    tuning and held-out, and reports only cost: a held-out outcome is never shown to whoever
+    is tuning the bot. Without it, the tuning seeds play and each run's line is printed too.
+    Refuses, with the reason, a start that no longer matches its pin or a job over
+    `wall_limit_h` (SC-007), before anything runs. `envs()` builds {game: campaign env}."""
+    lines = []
+    problems = check(suite, simdirs)
+    if problems:
+        return ['refused: %d pinned starts cannot be played as pinned:' % len(problems)] + \
+            ['  ' + p for p in problems]
+    try:
+        envs = envs()   # built after the check: campaign_env raises on a missing twin
+    except FileNotFoundError as err:
+        return ['refused: a campaign env cannot be built: %s' % err]
+    outs = {g: os.path.join(d, 'runs.jsonl') for g, d in simdirs.items()}
+    tasks = suite_tasks(suite, envs, instrument, outs, SEED_SETS if baseline else ('tuning',))
+    hours = suite_estimate(suite, tasks, kept or {}, jobs)
+    lines.append('%d runs on %d workers: about %.2f wall-hours' % (len(tasks), jobs, hours))
+    if hours > wall_limit_h:
+        lines.append('refused: the estimate is over the %g wall-hours one job may take (SC-007); '
+                     'split it or narrow it' % wall_limit_h)
+        return lines
+    per, seen = {}, set()
+    for rec in play(tasks):
+        sid = (rec.get('suite') or {}).get('start_id')
+        # a worker's records come together, its bot's first: its campaign's end is the run
+        # only when the bot left none (records_of)
+        key = (sid, rec.get('seed'))
+        if sid is None or (rec.get('kind') == 'campaign' and key in seen):
+            continue
+        seen.add(key)
+        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0})
+        got['n'] += 1
+        got['cpu'] += (rec.get('costs') or {}).get('cpu_s') or 0.0
+        got['wall'] += rec.get('wall_s') or 0.0
+        # the invariant `record`: one BOTRUN record with a game result; a campaign's end
+        # standing in for it is never one
+        got['unread'] += rec.get('kind') == 'campaign' or rec.get('outcome') in UNUSABLE
+        if not baseline:
+            line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
+                                                                    rec.get('why'))
+            lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
+    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0}
+    for st in suite['starts']:
+        got = per.get(st['start_id'])
+        if not got:
+            lines.append('%s: no run came back' % st['start_id'])
+            continue
+        for k in total:
+            total[k] += got[k]
+        lines.append('%s (%s chapter %d, %s): %d runs, %.1f CPU s and %.1f wall s in all, '
+                     '%.1f CPU s a run%s' % (
+                         st['start_id'], st['game'], st['chapter'], st['label'], got['n'],
+                         got['cpu'], got['wall'], got['cpu'] / got['n'],
+                         '; %d without a game result' % got['unread'] if got['unread'] else ''))
+    lines.append('the suite: %d runs, %.1f CPU s and %.1f wall s of work, %d without a game '
+                 'result' % (total['n'], total['cpu'], total['wall'], total['unread']))
+    return lines
+
+
+def suite_main(args):
+    import campaign_env
+    if os.environ.get('PT_SIMDIR'):
+        print('refused: PT_SIMDIR is set; the suite plays each game from its own store, named '
+              "by the ROM built now (run.sh's simdir)")
+        return 1
+    suite = load_suite()
+    simdirs = {'vanilla': simdir(True), 'ours': simdir(False)}
+
+    def envs():
+        return {'vanilla': campaign_env.vanilla_env(suite['route']),
+                'ours': campaign_env.ours_env([os.path.join(REPO, p)
+                                               for p in suite['shops_from']])}
+    outs = [os.path.join(d, 'runs.jsonl') for d in simdirs.values()]
+    pool = Pool(jobs=args.jobs, out=outs[0])
+    hashes = {g: os.path.basename(d) for g, d in simdirs.items()}
+    lines = run_suite(suite, envs, simdirs, pool.run, args.jobs, args.baseline,
+                      instrument_id(), kept=kept_walls(outs, instrument_id(), hashes))
+    for line in lines:
+        print(line, flush=True)
+    return 1 if any(line.startswith('refused') for line in lines) else 0
 
 
 # ---- one run, told (PR F3) ----
@@ -708,9 +1020,15 @@ def main(argv=None):
     c.add_argument('--vanilla-chapter', type=int, required=True, help="the twin's chapter index")
     c.add_argument('--mode', default='normal')
     c.add_argument('--jobs', type=int, default=4)
+    su = sub.add_parser('suite', help="the frozen suite's pinned starts, attempt 1 each")
+    su.add_argument('--baseline', action='store_true',
+                    help='every seed, tuning and held-out; report cost only')
+    su.add_argument('--jobs', type=int, default=8)
     args = ap.parse_args(argv)
     if args.cmd == 'cell':
         return cell_main(args)
+    if args.cmd == 'suite':
+        return suite_main(args)
     if args.cmd == 'story':
         events = read_trace(args.trace)
         game = ((events[0].get('info') or {}).get('game') if events else None) or 'vanilla'
