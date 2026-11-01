@@ -2584,12 +2584,18 @@ def check_no_dead_concepts(fail):
     single file `decisions.md`; since #384 the records are `docs/decisions/*.md` and the
     index is generated from them, so the exemption follows the content into the directory.
     Everything outside it is still held: the point of this gate is that a dead concept must
-    not be restated anywhere it could be mistaken for current fact."""
+    not be restated anywhere it could be mistaken for current fact.
+
+    A research TRANSCRIPT (`docs/research/transcripts/`) is exempt for the same reason: it is a
+    verbatim record of what was said at the time (research 0023's panel debated the death
+    prices ADR 0384 retires), so it cannot be edited when a phrase it quotes dies, and its
+    record labels it as opinion, never current fact."""
     pat = re.compile('|'.join(DEAD_CONCEPTS), re.I)
     cited = re.compile('|'.join(DEAD_CONCEPT_CITATIONS), re.I)
-    decisions_dir = os.path.join(REPO, 'docs', 'decisions') + os.sep
+    exempt_dirs = tuple(os.path.join(REPO, *parts) + os.sep
+                        for parts in (('docs', 'decisions'), ('docs', 'research', 'transcripts')))
     for d in _docs() + _handwritten_sources():
-        if os.path.basename(d) == 'decisions.md' or d.startswith(decisions_dir):
+        if os.path.basename(d) == 'decisions.md' or d.startswith(exempt_dirs):
             continue
         with open(d, encoding='utf-8') as fh:
             for i, line in enumerate(fh, 1):

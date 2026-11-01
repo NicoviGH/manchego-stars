@@ -8,7 +8,7 @@ issues: [510]
 
 # A clean clear has four parts, a vanilla chapter without one is a bot fault, and the bot clears all of vanilla's Eirika route before any Manchego Stars verdict counts
 
-**Amended by ADRs 0385 and 0386 (Nicolas, 2026-11-01).** Decisions 1 and 2 stand. The verdict no longer counts clean clears: it compares any player death on attempt 1, and clean clear is a reported column (ADR 0385). Decision 3 is narrowed to reinforcement arrival turns only, and was never built (ADR 0386). Decision 4 is now a milestone, not a gate (ADR 0385).
+**Amended by ADRs 0385 and 0386 (Nicolas, 2026-11-01).** Decisions 1 and 2 stand. The verdict no longer counts clean clears: it compares any player death on attempt 1, and clean clear is a reported column (ADR 0385). Decision 3 is narrowed to reinforcement arrival turns only, and was never built (ADR 0386). Decision 4 is now a milestone, not a gate (ADR 0385). Decision 2's `bot_fault` now labels why a campaign stopped; it no longer gates a verdict (ADR 0385).
 
 Decisions 1-4 of the #510 step 9 long-term design (#510 comment 6485197805, accepted by Nicolas
 2026-10-29). Part A built 1 and 2 (#510 comment 6485521139); 3 was never built, and ADR 0386 narrows it.

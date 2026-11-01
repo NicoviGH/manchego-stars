@@ -36,7 +36,8 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 - **Among admitted plans:** fewer irreversible goal forfeitures first, then objective
   completion, then progress.
 - **Among plans over the cap** (only when no plan is admitted): smallest largest excess first,
-  then smallest summed excess, then lowest largest death chance. The chosen plan is labelled
+  then smallest summed excess, then lowest largest death chance, then the admitted plans' order
+  (forfeits, completion, progress). The chosen plan is labelled
   `FALLBACK_SACRIFICE`, so no over-cap death goes unexplained.
 - **Remaining ties:** lower largest death chance, then lower summed death chance, then more
   expected surviving HP, then a stable order.
@@ -44,7 +45,9 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 **4. The completion ledger counts forfeits.** At each decision it snapshots the open goals the
 game can still give: offered villages and chests, owed Talk recruits and declared reward claims
 (the same list as ADR 0383's goals). A plan's forfeits are the goals it closes for good, winning
-first included. An escort green's death is a forfeit. An allied green's survival only breaks
+first included, counted per judged branch and taken from the worst branch, never averaged. A goal
+whose state the game cannot report is unknown, neither kept nor forfeited, and a goal that is
+only out of reach for now is not forfeited. An escort green's death is a forfeit. An allied green's survival only breaks
 ties between admitted plans whose forfeits and completion are equal and whose progress is within
 one turn, and it never defers a legal seize. A seize skipped while a ledger goal is still
 feasible is justified. Progress is the drop, from the decision's starting board, in the game's
@@ -56,6 +59,9 @@ own turns to the assigned goal, and to the objective once the optional goals are
   forfeit; an allied green only breaks ties.
 - **ADR 0382:** the planner no longer pays what the clean clear counts. No planner decision reads
   clean clear; it ranks forfeits.
-- **ADR 0383:** worth × chance (`goals.lua`) stays, but only to order candidates in the beam. It
-  no longer decides between complete plans, and the per-style points per gold stop mattering
-  once the rank decides.
+- **ADR 0383:** worth × chance (`goals.lua`, `GAMMA`) stays, but only to order candidates in the
+  beam, frozen like every candidate-ordering heuristic (spec FR-013). It no longer decides between
+  complete plans, and the per-style points per gold stop mattering once the rank decides. The
+  panel's draft deleted it outright; the final spec keeps it because the beam still needs an order
+  to choose which partial plans reach the judge, and an order cannot buy risk once admission
+  decides.
