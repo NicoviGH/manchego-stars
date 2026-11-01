@@ -688,19 +688,18 @@ class Suite(unittest.TestCase):
             mc.instrument_id(path)
 
     def test_a_set_simdir_is_refused(self):
-        old = os.environ.get('PT_SIMDIR')
-        os.environ['PT_SIMDIR'] = '/tmp/elsewhere'
-        try:
-            import contextlib
-            import io
-            buf = io.StringIO()
-            with contextlib.redirect_stdout(buf):
-                code = mc.main(['suite'])
-        finally:
-            if old is None:
-                del os.environ['PT_SIMDIR']
-            else:
-                os.environ['PT_SIMDIR'] = old
+        import contextlib
+        import io
+        from unittest import mock
+
+        def never(*a, **k):   # a guard that moved below these would play the real suite
+            raise AssertionError('the suite went past its PT_SIMDIR guard')
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {'PT_SIMDIR': '/tmp/elsewhere'}), \
+                mock.patch.object(mc, 'simdir', never), \
+                mock.patch.object(mc, 'load_suite', never), \
+                mock.patch.object(mc, 'Pool', never), contextlib.redirect_stdout(buf):
+            code = mc.main(['suite'])
         self.assertEqual(code, 1)
         self.assertTrue(buf.getvalue().startswith('refused: PT_SIMDIR is set'))
 
