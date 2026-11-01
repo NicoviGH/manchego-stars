@@ -9,7 +9,18 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-01 (Claude, latest). **#510 step 9: two fixes MERGED on 2026-10-30.** #554
+Refreshed 2026-11-01 (Claude, latest). **#510 step 9 has a new spec and plan (2026-11-01), and it
+replaces the NEXT list below.** An advisory panel of model-simulated experts reviewed step 9
+(research record 0023, transcript under `docs/research/transcripts/`). Nicolas decided its open
+items in ADRs 0384 (survival-first rank, risk caps 1/5/15%), 0385 (the verdict is any protected
+unit's death on attempt 1, exact bounds, ±10 margin) and 0386 (retries remember arrival turns
+only), merged as #557 (bd0dcfc). None of it is built yet. Spec: #510 comment 6563384018. Plan
+and tasks, 112 tasks in PR slices A-J, ticked in place: #510 comment 6563384310. **NEXT: PR-A of
+that plan (T001 first), on a branch off main.** ch01's stall below is folded into PR-D (T045-T056:
+no `stuck` on the ch01 store env); vanilla Ch5's Joshua and Gilliam cases are PR-B's live proof
+(T027). The earlier 2026-10-23 design and plan comments are marked superseded.
+
+Earlier, **two fixes MERGED on 2026-10-30.** #554
 (5ef00b7): the sandbox equip leak. #555 (fb779c6): the talk duty retired (Nicolas's call, ADR 0382
 amended). Each went through `/code-review <PR> medium` plus scoped re-reviews, every finding fixed,
 CI green on the head. #556 ("a trip worth nothing sends no one") was CLOSED unmerged after its
@@ -29,7 +40,7 @@ clean clears 0 / 1 / **2**; Joshua recruited 5 / 8 (after #555); Natasha killed 
 Vanilla Ch2 and Ch3 are unchanged (clean at attempt 1). Vanilla Ch4 and ours ch01 are not clean on
 today's envs, on main before either fix as well: the old table's "1"s were stale.
 
-**NEXT: the planner's open items, in order.** Start a branch off main.
+**The planner's open items as of 2026-10-30, now folded into the plan above** (kept for their repro notes):
 1. **The win-procrastination stall: ours ch01.** With every enemy dead, the lord (the only unit
    that can seize) is sent to the House at (13,2), and his march to it picks his own tile (12,7)
    every turn (not `holding`). Next: one look at the field from (13,2) and at `pickMove` on that
