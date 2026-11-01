@@ -120,6 +120,12 @@ class Workers(unittest.TestCase):
                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
         self.assertEqual([r.get('env_status') for r in both], ['clean', None])
 
+    def test_a_campaigns_own_answer_is_no_environment_fault(self):
+        # campaign.lua ends no_style (fewer styles than the attempt asked) before any bot plays
+        rec = mc.records_of({}, 'CAMPAIGN {"outcome": "no_style"}', '/tmp/w', '/x.log')[0]
+        self.assertNotIn('env_status', rec)
+        self.assertIsNone(mc.attempt_line(dict(rec, kind='campaign', task_attempt=3), set()))
+
     def test_crashed_worker_is_recorded(self):
         def launch(task, tag, log_path):
             if task['campaign']['attempt'] == 2:
@@ -655,12 +661,48 @@ class Suite(unittest.TestCase):
         del inst['seed_sets']
         self.refuses(inst, 'seed_sets')
 
-    def test_the_instrument_id_needs_only_the_version(self):
-        mc.instrument_id.cache_clear()
+    def test_a_start_with_no_budgets_anywhere_names_them(self):
+        inst = self.suite()
+        del inst['defaults']['budgets']
+        self.refuses(inst, 'budgets.beam')
+        inst = self.suite()
+        inst['starts'][0]['seeds'] = [1001, 1002]
+        self.refuses(inst, 'not a table')
+
+    def test_a_suite_error_never_reaches_the_instrument_id(self):
+        import yaml
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 'matrix.yaml')
+        inst = self.suite()
+        inst['starts'].append(dict(inst['starts'][0]))   # load_suite refuses this manifest
+        with open(path, 'w') as fh:
+            yaml.safe_dump({'instrument': inst}, fh)
+        with self.assertRaises(matrix.ManifestError):
+            mc.load_suite(path)
+        self.assertTrue(mc.instrument_id(path).endswith('+v1'))
+        del inst['version']
+        path = os.path.join(d, 'unversioned.yaml')   # instrument_id is cached by its path
+        with open(path, 'w') as fh:
+            yaml.safe_dump({'instrument': inst}, fh)
+        with self.assertRaises(matrix.ManifestError):
+            mc.instrument_id(path)
+
+    def test_a_set_simdir_is_refused(self):
+        old = os.environ.get('PT_SIMDIR')
+        os.environ['PT_SIMDIR'] = '/tmp/elsewhere'
         try:
-            self.assertTrue(mc.instrument_id().endswith('+v1'))
+            import contextlib
+            import io
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = mc.main(['suite'])
         finally:
-            mc.instrument_id.cache_clear()
+            if old is None:
+                del os.environ['PT_SIMDIR']
+            else:
+                os.environ['PT_SIMDIR'] = old
+        self.assertEqual(code, 1)
+        self.assertTrue(buf.getvalue().startswith('refused: PT_SIMDIR is set'))
 
     def test_a_missing_twin_is_refused_in_words(self):
         suite = self.load(self.suite())

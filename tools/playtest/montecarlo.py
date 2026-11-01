@@ -144,7 +144,9 @@ def records_of(task, text, where, log_path):
         r['run_dir'] = where
         if r.get('outcome') == 'crashed':
             r['log'], r['log_tail'] = log_path, log_tail(log_path)
-        if not bot:   # the campaign ended with no bot record: the environment did not hold
+        # the campaign crashed (load, arrive, save, cap) before its bot reported: the
+        # environment did not hold. A no_style or done end is the campaign's own answer.
+        if not bot and r.get('outcome') == 'crashed':
             r['env_status'] = unread()
     if recs:
         return recs
@@ -568,15 +570,21 @@ STYLES = ('drawn',)       # attempt 1's own draw (campaign.lua drawStyle), what 
 INVARIANTS = ('record',)  # the attempt leaves one BOTRUN record with a game result
 
 
+def instrument_section(path=None):
+    """matrix.yaml's `instrument:` section as written, unchecked ({} when there is none)."""
+    import yaml
+    import matrix
+    with open(path or matrix.MANIFEST) as fh:
+        return (yaml.safe_load(fh) or {}).get('instrument') or {}
+
+
 def load_suite(path=None):
     """matrix.yaml's `instrument:` section, every start with the defaults it does not name
     merged in (key by key, as matrix.yaml's rows take its defaults). Raises ManifestError on a
     start listed twice (its id or its state), a field missing, a seed in two sets, or other
     than two distinct tuning and two distinct held-out seeds a start (FR-021)."""
-    import yaml
-    from matrix import ManifestError, MANIFEST
-    with open(path or MANIFEST) as fh:
-        inst = (yaml.safe_load(fh) or {}).get('instrument')
+    from matrix import ManifestError
+    inst = instrument_section(path)
     if not inst:
         raise ManifestError('matrix.yaml has no `instrument:` section')
     lacking = [k for k in SUITE_TOP if inst.get(k) is None]
@@ -588,10 +596,12 @@ def load_suite(path=None):
     used = {'tuning': {}, 'held_out': {}}   # seed -> the start that uses it
     for row in inst.get('starts') or []:
         s = dict(defaults, **row)
-        for k, v in defaults.items():   # a table (seeds, budgets) merges key by key too
-            if isinstance(v, dict) and isinstance(row.get(k), dict):
-                s[k] = dict(v, **row[k])
         sid = s.get('start_id')
+        for k in ('seeds', 'budgets'):   # a table merges key by key too
+            for got in (defaults.get(k), row.get(k)):
+                if got is not None and not isinstance(got, dict):
+                    raise ManifestError('suite start %s: %s %r is not a table' % (sid, k, got))
+            s[k] = dict(defaults.get(k) or {}, **(row.get(k) or {}))
         missing = [k for k in SUITE_KEYS if s.get(k) is None] + \
             ['budgets.' + k for k in BUDGET_KEYS if s['budgets'].get(k) is None]
         if missing:
@@ -641,15 +651,16 @@ def sha1_file(path):
 
 
 @functools.lru_cache(maxsize=None)
-def instrument_id():
+def instrument_id(path=None):
     """The instrument a run is played under (the record's `instrument`): the bot code's hash
-    and the suite manifest's version. Read alone, so a cell's runs never hang on the suite's
-    own validation (load_suite's)."""
-    import yaml
-    import matrix
-    with open(matrix.MANIFEST) as fh:
-        version = ((yaml.safe_load(fh) or {}).get('instrument') or {}).get('version')
-    return '%s+v%s' % (bot_hash(), version)
+    and the suite manifest's version. Read alone, so a cell's runs never hang on the rest of
+    the suite's validation (load_suite's); a manifest with no version raises, since every run
+    would otherwise be stamped with nothing."""
+    from matrix import ManifestError
+    version = instrument_section(path).get('version')
+    if not isinstance(version, int):
+        raise ManifestError('the suite manifest has no integer `version` (%r)' % (version,))
+    return '%s+v%d' % (bot_hash(), version)
 
 
 def check_starts(suite, simdirs, emulator_sha1=None):
