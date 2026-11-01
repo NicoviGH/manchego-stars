@@ -9,14 +9,22 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-01 (Claude, latest). **#510 step 9 has a new spec and plan (2026-11-01), and it
+Refreshed 2026-11-01 (Claude, latest). **#510 step 9 PR-A MERGED: #558 (1168f72).** The frozen
+suite is `matrix.yaml`'s `instrument:` section (13 pinned starts, 52 runs), `montecarlo.py suite
+[--baseline]` plays it, and every record carries `env_status` and `instrument` (ADR 0387). Baseline
+on main's play: 52 runs, 1,883.6 CPU s, **6m34s wall on 8 workers**; per-start numbers in the #558
+body. One run had no game result: scout-ch13 tuning seed 1002 crashed on turn 9 (`select_unit:
+fail:not-legal`, #510 comment 6564352001), a controller fault on main. Plan comment ticked
+T001-T011. **NEXT: PR-B (US1, the graded record: T012-T031), on a branch off main.** Every later
+PR reports `suite` CPU against this baseline.
+
+Earlier the same day: **#510 step 9 got a new spec and plan (2026-11-01), and it
 replaces the NEXT list below.** An advisory panel of model-simulated experts reviewed step 9
 (research record 0023, transcript under `docs/research/transcripts/`). Nicolas decided its open
 items in ADRs 0384 (survival-first rank, risk caps 1/5/15%), 0385 (the verdict is any protected
 unit's death on attempt 1, exact bounds, ±10 margin) and 0386 (retries remember arrival turns
 only), merged as #557 (bd0dcfc). None of it is built yet. Spec: #510 comment 6563384018. Plan
-and tasks, 112 tasks in PR slices A-J, ticked in place: #510 comment 6563384310. **NEXT: PR-A of
-that plan (T001 first), on a branch off main.** ch01's stall below is folded into PR-D (T045-T056:
+and tasks, 112 tasks in PR slices A-J, ticked in place: #510 comment 6563384310. ch01's stall below is folded into PR-D (T045-T056:
 no `stuck` on the ch01 store env); vanilla Ch5's Joshua and Gilliam cases are PR-B's live proof
 (T027). The earlier 2026-10-23 design and plan comments are marked superseded.
 
