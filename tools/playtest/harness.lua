@@ -3251,7 +3251,9 @@ INSPECT.botApi = function(game)
         Bot = BOT, Json = Json, Planner = INSPECT.Planner,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, chapter = start,
                  mode = TUNE.difficultyName[TUNE.difficultyWant],
-                 seed = tonumber(PLAYTEST_SEED) or 1 },
+                 seed = tonumber(PLAYTEST_SEED) or 1,
+                 -- the bot hash and suite version montecarlo.py ran it under (botrun's record)
+                 instrument = PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil },
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
         board = BOARD.read,

@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-386 decisions. Read this index, then open the two or three you need — the whole
+387 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -232,6 +232,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0384` | [The planner ranks plans by survival first: a fixed risk cap per style, then what a plan forfeits, then progress; prices...](decisions/0384-the-planner-ranks-survival-first-with-a-fixed-cap-per-style.md) | 2026-11-01 | #510 |
 | `0385` | [Step 9's verdict is any player death on attempt 1, compared with exact bounds at 50, 100 and 200 pairs and a ±10-point...](decisions/0385-the-verdict-is-any-player-death-on-attempt-one.md) | 2026-11-01 | #510 |
 | `0386` | [A retry remembers only the reinforcement arrival turns a failed attempt showed on screen](decisions/0386-a-retry-remembers-only-the-arrival-turns-it-saw.md) | 2026-11-01 | #510 |
+| `0387` | [A run's record says whether its environment held, and a bot fault is not an environment fault](decisions/0387-a-record-says-whether-its-environment-held.md) | 2026-11-01 | #510 |
 
 ---
 

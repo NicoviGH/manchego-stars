@@ -265,3 +265,93 @@ suites:
 
   sandbox:
     - recordunitlist
+
+# The difficulty instrument's frozen suite (#510 step 9, FR-021; the plan's R-6 puts it here,
+# so one manifest still owns what a playtest needs). Each start is a chapter-start state an
+# earlier campaign saved, played on attempt 1 from that state (montecarlo.py `suite`), never
+# re-saved: an attempt-mode run writes no state. A start's `chapter` is the game's chapter
+# index, the store's file name: vanilla 6 is Ch5 (CHAPTER_L_5); ours chapter N is hosted at
+# index N + 1 (inject.hosts), so ours ch00-ch03 are 1-4. A state is only good for the ROM that
+# saved it: `suite` refuses a start whose rom_hash is not the ROM built now, or whose file no
+# longer hashes to state_sha1. The states live under references/ (gitignored).
+instrument:
+  version: 1
+  held_out_frozen_at: null        # the commit that froze the held-out seeds (US5, PR-G)
+  route: 1                        # vanilla's Ch8 split (Eirika): one vanilla env for every start
+  emulator: {binary: tools/emulator/mgba-headless, sha1: 3ac3201187d021aa8a43118dc3fd6741d32e97f2}
+  # FR-025: no seed is in two sets. `confirmatory` is what a cell plays (run_cell: seeds
+  # 1..LOOKS[-1]); `pilot` is the one-cell pilot's 50 (PR-H).
+  seed_sets:
+    confirmatory: [1, 200]
+    pilot: [3001, 3050]
+  # What a start names unless it names its own, merged key by key like matrix.yaml's rows.
+  defaults:
+    seeds: {tuning: [1001, 1002], held_out: [2001, 2002]}
+    style: drawn                  # attempt 1's own draw from (seed, chapter), as a cell plays it
+    invariant: record             # one BOTRUN record with a game result
+    estimate_wall_s: 600          # one attempt's wall time until a suite run measures it
+    # the planner's budgets (planner.lua M.BEAM, M.FINAL, M.BRANCH) and FR-018's lookahead
+    budgets: {beam: 6, final: 4, branch: 2, lookahead_decision: 8, lookahead_attempt: 32}
+  # Ours has no world map of its own: before each chapter it takes its twin's open shops,
+  # read from these vanilla campaigns' start records (campaign_env.ours_env), first one first.
+  shops_from:
+    - references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3
+    - references/sim/vanilla/c25b145e3745/states/scout-vanilla
+  starts:
+    # vanilla, New Game to Ch5 on seed 1, route 1, every chapter cleared clean before the
+    # next (#510 comments 6478205562, 6485521139). Ch5x (5) is never reached: no clean Ch5.
+    - {start_id: vanilla-prologue, game: vanilla, chapter: 0, rom_hash: c25b145e3745, label: fixture,
+       state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/0.ss,
+       state_sha1: e96f8c8e9e48661dfd4646b6defab6ac0fb69ea8,
+       provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6478205562'}}
+    - {start_id: vanilla-ch1, game: vanilla, chapter: 1, rom_hash: c25b145e3745, label: fixture,
+       state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/1.ss,
+       state_sha1: ed797acf1330b84c090de638e37aa5d7a5ede674,
+       provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6478205562'}}
+    - {start_id: vanilla-ch2, game: vanilla, chapter: 2, rom_hash: c25b145e3745, label: fixture,
+       state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/2.ss,
+       state_sha1: 1e9c6dc5958e20c9a9c96037c3d85c26c6782266,
+       provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6478205562'}}
+    - {start_id: vanilla-ch3, game: vanilla, chapter: 3, rom_hash: c25b145e3745, label: fixture,
+       state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/3.ss,
+       state_sha1: cf6a5b1facb7f9304b2fd8b4c96351286eb59d75,
+       provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6478205562'}}
+    - {start_id: vanilla-ch4, game: vanilla, chapter: 4, rom_hash: c25b145e3745, label: fixture,
+       state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/4.ss,
+       state_sha1: f2952884f689f7d0692a5dbbab227c0306f95b31,
+       provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6485521139'}}
+    - {start_id: vanilla-ch5, game: vanilla, chapter: 6, rom_hash: c25b145e3745, label: fixture,
+       state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/6.ss,
+       state_sha1: 44aaa665737bb284914e8ddf7c986342b36cb1fa,
+       provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6485521139'}}
+    # ours, New Game to ch03 (#510 comment 6478205562); the run's seed was not recorded
+    - {start_id: ours-ch00, game: ours, chapter: 1, rom_hash: fd3cb9d8dca6, label: fixture,
+       state_path: references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/1.ss,
+       state_sha1: 2d2d9c87696e272428dd5798df72d2839afe4e4e,
+       provenance: {campaign: e1-ours-ch07, seed: null, source: '#510 comment 6478205562'}}
+    - {start_id: ours-ch01, game: ours, chapter: 2, rom_hash: fd3cb9d8dca6, label: fixture,
+       state_path: references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/2.ss,
+       state_sha1: 471b4474e0df7da4c8a4ff138a2343a11fdfac4d,
+       provenance: {campaign: e1-ours-ch07, seed: null, source: '#510 comment 6478205562'}}
+    - {start_id: ours-ch02, game: ours, chapter: 3, rom_hash: fd3cb9d8dca6, label: fixture,
+       state_path: references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/3.ss,
+       state_sha1: 8827a08f62f4d4538a3962ea096e79aead7fc719,
+       provenance: {campaign: e1-ours-ch07, seed: null, source: '#510 comment 6478205562'}}
+    - {start_id: ours-ch03, game: ours, chapter: 4, rom_hash: fd3cb9d8dca6, label: fixture,
+       state_path: references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/4.ss,
+       state_sha1: a4f891b576808b2025e84d7082962e4df103daef,
+       provenance: {campaign: e1-ours-ch07, seed: null, source: '#510 comment 6478205562'}}
+    # the scout (#510 comment 6484135808): from Ch5 on it counted a win with a death as
+    # cleared, so these starts carry its losses -- labelled `scout`, never a fixture
+    - {start_id: scout-ch10, game: vanilla, chapter: 10, rom_hash: c25b145e3745, label: scout,
+       state_path: references/sim/vanilla/c25b145e3745/states/scout-vanilla/10.ss,
+       state_sha1: 78dfcbd58373be228d00570134c8044109e94184,
+       provenance: {campaign: scout-vanilla, seed: null, source: '#510 comment 6484135808'}}
+    - {start_id: scout-ch13, game: vanilla, chapter: 13, rom_hash: c25b145e3745, label: scout,
+       state_path: references/sim/vanilla/c25b145e3745/states/scout-vanilla/13.ss,
+       state_sha1: 06d9e61e3808e1c1f8d51d6e4e18ae78fa24109a,
+       provenance: {campaign: scout-vanilla, seed: null, source: '#510 comment 6484135808'}}
+    - {start_id: scout-ch14, game: vanilla, chapter: 14, rom_hash: c25b145e3745, label: scout,
+       state_path: references/sim/vanilla/c25b145e3745/states/scout-vanilla/14.ss,
+       state_sha1: 8451f44373deafabd548ecd99c7a9a3cf717e057,
+       provenance: {campaign: scout-vanilla, seed: null, source: '#510 comment 6484135808'}}

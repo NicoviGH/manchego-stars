@@ -332,6 +332,11 @@ local function strikePlayed(t, hp)
     out.takenWorst = Sight.worst(out.takenDist)
     out.counterDist = Sight.damage(blowsOf(t.counterHit, t.counterDmg, t.counterHits,
                                            t.counterCrit), t.strikerHp or math.huge)
+    -- the chance the target's counter kills the striker, as sight.enemyPhase plays it; a
+    -- fixture may give its own
+    if out.felled == nil and t.strikerHp then
+        out.felled = (Sight.odds({ out.counterDist }, t.strikerHp))
+    end
     return out
 end
 local function sightOf(o)
@@ -444,8 +449,14 @@ local function sightOf(o)
                 return played[t]
             end
             for i, t in ipairs(out) do out[i] = play(t) end
+            -- every way the phase went, as sight.enemyPhase gives them: their chances sum to 1
+            local sum = 0
             for _, oc in ipairs(out.outcomes or {}) do
                 for i, t in ipairs(oc.strikes) do oc.strikes[i] = play(t) end
+                sum = sum + oc.p
+            end
+            if out.outcomes and math.abs(sum - 1) > 1e-9 then
+                error("test fixture: enemyPhase outcomes' chances sum to " .. sum .. ", not 1")
             end
             return out
         end
@@ -2134,6 +2145,9 @@ end
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
+    -- a red far off that never strikes: X falling is not the Rout's last kill, which would
+    -- close the village and pay the win (sightOf's strikes carry the counter's `felled`)
+    local Z = red(0x83, 15, 15, { minRange = false })
     local q = Sight.rollChance(2, 50)
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
@@ -2158,7 +2172,7 @@ do
             return {}
         end,
     }
-    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("bold", 10000))
+    local _, plan = Planner.plan(B, boardOf(A, X, Z), sightOf(o), gifted("bold", 10000))
     local die
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.id == 0x01 and p.x == 1 then die = p.die end

@@ -353,6 +353,42 @@ do
     check(recordOf(g).outcome, "crashed", "a wedged enemy phase is recorded as crashed")
 end
 
+-- test_the_record_says_whether_its_environment_held (#510 step 9 plan, T008): `env_status` is
+-- "clean", or the fault that makes the record unreadable and whether it came after play began
+-- (outcome_dependent: dropping such a run could bias what the rest say); `instrument` is the
+-- bot and suite version the harness ran it under.
+do
+    local g = fakeGame { units = rout() }
+    g.api.info.instrument = "0123456789ab+v1"
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.env_status, "clean", "a won run on a sound harness: clean")
+    check(r.instrument, "0123456789ab+v1", "the record names its instrument")
+end
+do
+    local g = fakeGame { units = rout() }
+    g.api.act = function() return false end
+    Botrun.run(g.api)
+    local e = recordOf(g).env_status
+    check(type(e) == "table" and e.fault, "crash", "a controller fault: a crash")
+    check(type(e) == "table" and e.outcome_dependent, true, "after play began: outcome-dependent")
+end
+do
+    local g = fakeGame { units = rout() }
+    g.api.sight = function() error("sight: the symbol table is stale") end
+    Botrun.run(g.api)
+    local e = recordOf(g).env_status
+    check(type(e) == "table" and e.fault, "crash", "a crash before the first board: a crash")
+    check(type(e) == "table" and e.outcome_dependent, false, "before play: not outcome-dependent")
+end
+do
+    local g = fakeGame { move = 0, units = standoff() }
+    g.api.endPhase = function() return nil, {} end
+    Botrun.run(g.api)
+    local e = recordOf(g).env_status
+    check(type(e) == "table" and e.fault, "timeout", "an enemy phase that never returns: a timeout")
+    check(type(e) == "table" and e.outcome_dependent, true, "a timeout in play: outcome-dependent")
+end
 -- A claim kind the bot has no behaviour for is reported, never dropped.
 do
     local g = fakeGame { claims = { { id = "t1", kind = "threat" } }, units = rout() }
@@ -658,6 +694,10 @@ do
     end } }
     check(#r.deaths, 0, "unread slot: no death guessed")
     check(r.watch_faults[1] and r.watch_faults[1].kind, "death_unread", "unread slot: a watch fault")
+    -- T008: a record that misread the board is not a clean environment's
+    local e = r.env_status
+    check(type(e) == "table" and e.fault, "watch", "unread slot: env_status names the watch")
+    check(type(e) == "table" and e.outcome_dependent, true, "unread slot: outcome-dependent")
 end
 
 -- test_a_failed_act_still_records_its_deaths: the act killed one of ours, then the harness
