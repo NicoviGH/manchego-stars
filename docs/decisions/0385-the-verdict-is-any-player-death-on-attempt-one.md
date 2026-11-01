@@ -9,7 +9,7 @@ issues: [510]
 # Step 9's verdict is any player death on attempt 1, compared with exact bounds at 50, 100 and 200 pairs and a ±10-point margin
 
 **Decided (Nicolas, 2026-11-01), #510 step 9.** Taken from the step 9 spec (FR-023 to FR-030 and
-FR-033), which an advisory panel drafted (research record 0023). The plan is on #510. Amends ADR
+FR-033), which an advisory panel drafted (research record 0023): spec #510 comment 6563384018, plan and tasks #510 comment 6563384310. Amends ADR
 0376 and replaces the method `montecarlo.py` runs today: exact McNemar, Haybittle–Peto looks and
 research record 0022's reading. **Not built yet:** until PR-H and PR-I of the plan land,
 `paired_verdict` still reads `clean`.
@@ -85,4 +85,4 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   reported, and it no longer gates a verdict. It does not contradict point 4: a twin can lose
   someone on most first attempts and still be cleared clean on a retry. A campaign that stops
   there leaves the later chapters unreached, and an unreached chapter withholds its campaign
-  cell (point 3's unresolved rule).
+  cell (point 2: a campaign cell compares a chapter only when both arms reach it).

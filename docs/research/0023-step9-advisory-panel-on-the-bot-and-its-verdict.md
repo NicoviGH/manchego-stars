@@ -13,7 +13,7 @@ tags: [panel, review, planner, risk-cap, verdict, endpoint, equivalence, human-c
 outside the project. Six expert roles were played by different frontier models through an
 advisory tool. **These are opinions from simulated personas, not evidence**: nothing here is a
 source in the sense of the other records, and nothing here is a decision. What Nicolas decided
-from it is in ADRs 0384, 0385 and 0386. The plan built from it is on #510.
+from it is in ADRs 0384, 0385 and 0386. The spec and plan built from it are #510 comments 6563384018 and 6563384310.
 
 **The panel.** Each role was played by one model, re-seated on another (with a recap) when a
 provider failed:

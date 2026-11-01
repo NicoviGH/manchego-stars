@@ -9,7 +9,7 @@ issues: [510]
 # The planner ranks plans by survival first: a fixed risk cap per style, then what a plan forfeits, then progress; prices only order candidates
 
 **Decided (Nicolas, 2026-11-01), #510 step 9.** Taken from the step 9 spec (FR-009 to FR-016),
-which an advisory panel drafted (research record 0023). The plan is on #510. Supersedes ADR
+which an advisory panel drafted (research record 0023): spec #510 comment 6563384018, plan and tasks #510 comment 6563384310. Supersedes ADR
 0375 and amends ADRs 0381, 0382 and 0383. **Not built yet:** until PR-C and PR-D of the plan land,
 `planner.lua` still ranks plans by the weighted score those ADRs describe.
 
@@ -60,7 +60,7 @@ own turns to the assigned goal, and to the objective once the optional goals are
 - **ADR 0382:** the planner no longer pays what the clean clear counts. No planner decision reads
   clean clear; it ranks forfeits.
 - **ADR 0383:** worth × chance (`goals.lua`, `GAMMA`) stays, but only to order candidates in the
-  beam, frozen like every candidate-ordering heuristic (spec FR-013). It no longer decides between
+  beam, frozen like every candidate-ordering heuristic (spec FR-013, #510 comment 6563384018). It no longer decides between
   complete plans, and the per-style points per gold stop mattering once the rank decides. The
   panel's draft deleted it outright; the final spec keeps it because the beam still needs an order
   to choose which partial plans reach the judge, and an order cannot buy risk once admission

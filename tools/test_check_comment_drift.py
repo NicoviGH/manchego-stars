@@ -123,7 +123,7 @@ class HandwrittenSourceScan(unittest.TestCase):
         transcripts = os.path.join(check.REPO, 'docs', 'research', 'transcripts')
         planted = os.path.join(transcripts, 'x.md')
         record = os.path.join(check.REPO, 'docs', 'research', '9999-x.md')
-        orig_docs, orig_src, orig_open = check._docs, check._handwritten_sources, open
+        orig_docs, orig_src = check._docs, check._handwritten_sources
         check._docs = lambda: [planted, record]
         check._handwritten_sources = lambda: []
         check.open = lambda path, *a, **k: io.StringIO('zeroed personal growths\n')
