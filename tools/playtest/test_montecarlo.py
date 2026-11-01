@@ -10,6 +10,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import matrix  # noqa: E402
 import montecarlo as mc  # noqa: E402
 
 
@@ -109,6 +110,15 @@ class Workers(unittest.TestCase):
         with open(other) as fh:
             crashed = json.loads(fh.read())
         self.assertEqual(crashed['env_status'], {'fault': 'crash', 'outcome_dependent': True})
+
+    def test_a_campaign_end_with_no_bot_record_says_its_environment_failed(self):
+        # campaign.lua's own crashes (load, arrive, save, cap) end before the bot plays
+        only = mc.records_of({}, 'CAMPAIGN {"outcome": "crashed", "why": "load: x"}', '/tmp/w',
+                             '/nonexistent.log')
+        self.assertEqual(only[0]['env_status'], mc.unread())
+        both = mc.records_of({}, 'BOTRUN {"outcome": "won", "env_status": "clean"}\n'
+                             'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
+        self.assertEqual([r.get('env_status') for r in both], ['clean', None])
 
     def test_crashed_worker_is_recorded(self):
         def launch(task, tag, log_path):
@@ -463,7 +473,7 @@ SUITE = {
         {'start_id': 'ours-ch02', 'game': 'ours', 'chapter': 3, 'rom_hash': 'fd3cb9d8dca6',
          'state_path': 'references/sim/ours/fd3cb9d8dca6/states/o/3.ss', 'state_sha1': 'b' * 40,
          'provenance': {'campaign': 'o', 'seed': None, 'source': '#510'}, 'label': 'fixture',
-         'seeds': {'tuning': [1003, 1004], 'held_out': [2003, 2004]}}],
+         'seeds': {'tuning': [1003, 1004]}}],
 }
 
 
@@ -480,7 +490,7 @@ class Suite(unittest.TestCase):
         return json.loads(json.dumps(SUITE))   # a deep copy each test may change
 
     def refuses(self, inst, words):
-        with self.assertRaises(mc.ManifestError) as cm:
+        with self.assertRaises(matrix.ManifestError) as cm:
             self.load(inst)
         self.assertIn(words, str(cm.exception))
 
@@ -488,7 +498,8 @@ class Suite(unittest.TestCase):
         got = self.load(self.suite())
         a, b = got['starts']
         self.assertEqual(a['seeds'], {'tuning': [1001, 1002], 'held_out': [2001, 2002]})
-        self.assertEqual(b['seeds'], {'tuning': [1003, 1004], 'held_out': [2003, 2004]})
+        # a table a start names merges key by key: its own tuning, the default held-out
+        self.assertEqual(b['seeds'], {'tuning': [1003, 1004], 'held_out': [2001, 2002]})
         self.assertEqual((a['style'], a['budgets']['lookahead_attempt']), ('drawn', 32))
         self.assertEqual(got['version'], 1)
 
@@ -516,6 +527,7 @@ class Suite(unittest.TestCase):
     def test_a_seed_in_two_sets_raises(self):
         for where, seed in (('held_out', 1001), ('tuning', 3010), ('held_out', 150)):
             inst = self.suite()
+            inst['starts'][1]['seeds'] = {'tuning': [1003, 1004], 'held_out': [2003, 2004]}
             inst['starts'][1]['seeds'][where][0] = seed
             self.refuses(inst, str(seed))
 
@@ -538,14 +550,15 @@ class Suite(unittest.TestCase):
                                       'suite': {'start_id': 'vanilla-ch3', 'set': 'tuning',
                                                 'version': 1}})
         self.assertEqual([(x['seed'], x['stamp']['suite']['set']) for x in tasks[4:]],
-                         [(1003, 'tuning'), (1004, 'tuning'), (2003, 'held_out'),
-                          (2004, 'held_out')])
+                         [(1003, 'tuning'), (1004, 'tuning'), (2001, 'held_out'),
+                          (2002, 'held_out')])
         self.assertFalse(tasks[4]['vanilla'])
         self.assertEqual(len(mc.suite_tasks(suite, envs, 'i', {}, sets=('tuning',))), 4)
 
     def test_a_start_that_no_longer_matches_is_refused(self):
         d = tempfile.mkdtemp()
         inst = self.suite()
+        inst['shops_from'] = [d]
         for s in inst['starts']:
             s['state_path'] = s['state_path'].replace('references/sim', d)
         suite = self.load(inst)
@@ -566,6 +579,9 @@ class Suite(unittest.TestCase):
                          [why[1]])
         moved = mc.check_starts(self.load(inst), simdirs, emulator_sha1='f' * 40)
         self.assertIn('the emulator', moved[0])
+        inst['shops_from'] = [os.path.join(d, 'gone')]
+        self.assertIn('the shops store', mc.check_starts(self.load(inst), simdirs,
+                                                         emulator_sha1='e' * 40)[0])
 
     def test_the_estimate_reads_kept_runs_first(self):
         suite = self.load(self.suite())
@@ -578,7 +594,7 @@ class Suite(unittest.TestCase):
     def test_a_job_over_eight_hours_is_refused_before_it_runs(self):
         suite = self.load(self.suite())
         played = []
-        lines = mc.run_suite(suite, envs={'vanilla': {}, 'ours': {}}, simdirs={},
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
                              play=lambda tasks: played.extend(tasks) or [], jobs=1,
                              baseline=True, instrument='i', check=lambda *a: [], kept={},
                              wall_limit_h=0.5)
@@ -596,7 +612,7 @@ class Suite(unittest.TestCase):
                            costs={'cpu_s': 2.0})
                 yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
                            wall_s=10.0 + i)
-        lines = mc.run_suite(suite, envs={'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
                              jobs=4, baseline=True, instrument='i', check=lambda *a: [],
                              kept={})
         text = '\n'.join(lines)
@@ -613,7 +629,7 @@ class Suite(unittest.TestCase):
             for t in tasks:
                 yield dict(t['stamp'], kind='campaign', outcome='crashed', seed=t['seed'],
                            wall_s=1.0, why='arrive: no saved start')
-        lines = mc.run_suite(suite, envs={'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
                              jobs=4, baseline=False, instrument='i', check=lambda *a: [],
                              kept={})
         text = '\n'.join(lines)
@@ -624,10 +640,75 @@ class Suite(unittest.TestCase):
 
     def test_a_start_off_its_pin_refuses_the_whole_suite(self):
         suite = self.load(self.suite())
-        lines = mc.run_suite(suite, envs={}, simdirs={}, play=None, jobs=1, baseline=True,
+        lines = mc.run_suite(suite, envs=None, simdirs={}, play=None, jobs=1, baseline=True,
                              instrument='i', check=lambda *a: ['ours-ch02: its state is gone'])
         self.assertTrue(lines[0].startswith('refused'))
         self.assertIn('ours-ch02: its state is gone', lines[1])
+
+    def test_a_seed_twice_in_one_set_raises(self):
+        inst = self.suite()
+        inst['starts'][1]['seeds']['tuning'] = [1003, 1003]
+        self.refuses(inst, 'distinct')
+
+    def test_a_manifest_without_its_seed_sets_names_them(self):
+        inst = self.suite()
+        del inst['seed_sets']
+        self.refuses(inst, 'seed_sets')
+
+    def test_the_instrument_id_needs_only_the_version(self):
+        mc.instrument_id.cache_clear()
+        try:
+            self.assertTrue(mc.instrument_id().endswith('+v1'))
+        finally:
+            mc.instrument_id.cache_clear()
+
+    def test_a_missing_twin_is_refused_in_words(self):
+        suite = self.load(self.suite())
+
+        def envs():
+            raise FileNotFoundError('7.json: no record of the twin')
+        lines = mc.run_suite(suite, envs=envs, simdirs={}, play=None, jobs=1, baseline=True,
+                             instrument='i', check=lambda *a: [])
+        self.assertEqual(lines, ['refused: a campaign env cannot be built: 7.json: no record '
+                                 'of the twin'])
+
+    def test_a_campaign_end_without_a_bot_record_is_no_result(self):
+        suite = self.load(self.suite())
+
+        def play(tasks):
+            for t in tasks:
+                yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
+                           wall_s=1.0, why='played after 1 chapters', env_status=mc.unread())
+        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
+                             play=play, jobs=4, baseline=False, instrument='i',
+                             check=lambda *a: [], kept={})
+        text = '\n'.join(lines)
+        self.assertIn('2 without a game result', text)
+        self.assertIn('vanilla-ch3 seed 1001: attempt 1: the bot left no record; the campaign '
+                      'ended played (played after 1 chapters)', text)
+        self.assertNotIn(': None', text)
+
+    def test_no_rom_built_says_so(self):
+        d = tempfile.mkdtemp()
+        why = mc.check_starts(self.load(self.suite()),
+                              {'vanilla': os.path.join(d, 'vanilla', ''),
+                               'ours': os.path.join(d, 'ours', '')}, emulator_sha1='e' * 40)
+        self.assertIn('no vanilla ROM is built', why[-2])
+        self.assertIn('no ours ROM is built', why[-1])
+
+    def test_the_estimate_keeps_only_this_instruments_results(self):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 'runs.jsonl')
+        base = {'suite': {'start_id': 'a'}, 'game': 'vanilla', 'rom_hash': 'h',
+                'instrument': 'i', 'outcome': 'won', 'wall_s': 40.0}
+        for r in (base, dict(base, wall_s=60.0),
+                  dict(base, instrument='old', wall_s=5.0),       # other code
+                  dict(base, rom_hash='g', wall_s=5.0),            # another ROM
+                  dict(base, outcome='crashed', wall_s=5.0),       # died at boot
+                  dict(base, kind='campaign', wall_s=40.0),        # the worker's other record
+                  {'seed': 1, 'wall_s': 5.0}):                     # a cell's run
+            mc.append_record(path, r)
+        self.assertEqual(mc.kept_walls([path], 'i', {'vanilla': 'h'}), {'a': [40.0, 60.0]})
 
     def test_two_seeds_of_each_kind(self):
         inst = self.suite()

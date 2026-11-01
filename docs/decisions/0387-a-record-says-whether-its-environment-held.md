@@ -39,5 +39,7 @@ chapter index, which is what the store files are named by. Ours chapter N is hos
 index (#510 comment 6484135808: Saleh's Doorkey in "Ch14"). Ours takes its twins' shops from
 `campaign_env.ours_env`, which now reads a list of vanilla stores, the first holding the twin
 winning. That is needed because the clean vanilla campaign stops at Ch5. `montecarlo.py suite`
-refuses a start whose emulator, ROM, state path or state hash no longer matches its pin, and it
-refuses any job estimated at more than 8 wall-hours (SC-007).
+refuses a start whose emulator, ROM, state path or state hash no longer matches its pin, a gone
+shops store, an unbuilt ROM or a set `PT_SIMDIR`, and any job estimated at more than 8
+wall-hours (SC-007). The estimate reads only runs that this instrument played on these ROMs to a
+game result.

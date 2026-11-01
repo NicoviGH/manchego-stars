@@ -62,14 +62,9 @@ import sys
 import time
 import uuid
 
-import yaml
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUN_SH = os.path.join(HERE, 'run.sh')
 sys.path.insert(0, HERE)
-
-import matrix  # noqa: E402
-from matrix import ManifestError  # noqa: E402,F401  the suite manifest is matrix.yaml's
 
 BOTRUN, CAMPAIGN = 'BOTRUN', 'CAMPAIGN'
 
@@ -144,10 +139,13 @@ def records_of(task, text, where, log_path):
         c['kind'] = 'campaign'
         recs.append(c)
     attempt = (task.get('campaign') or {}).get('attempt')
+    bot = any(r.get('kind') != 'campaign' for r in recs)
     for r in recs:
         r['run_dir'] = where
         if r.get('outcome') == 'crashed':
             r['log'], r['log_tail'] = log_path, log_tail(log_path)
+        if not bot:   # the campaign ended with no bot record: the environment did not hold
+            r['env_status'] = unread()
     if recs:
         return recs
     return [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'), 'run_dir': where,
@@ -271,10 +269,13 @@ def attempt_line(r, said):
     rewrote) would otherwise vanish from the listing."""
     if r.get('kind') == 'campaign':
         k = r.get('task_attempt')
-        if k is None or k in said or r.get('outcome') != 'crashed':
+        if k is None or k in said or (r.get('outcome') != 'crashed' and r.get('env_status') is None):
             return None
         said.add(k)
-        return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
+        if r.get('outcome') == 'crashed':
+            return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
+        return 'attempt %s: the bot left no record; the campaign ended %s (%s)' % (
+            k, r.get('outcome'), r.get('why'))
     said.add(r.get('attempt'))
     cost = (r.get('costs') or {}).get('cpu_s')
     why = spoiled(r) if r.get('outcome') == 'won' and r.get('clean') is not True else ''
@@ -403,6 +404,7 @@ def bot_hash(root=HERE):
     """The bot code a run ran, hashed: the driver files the matrix keys on
     (matrix.driver_source: no generated symbol table, no test) and harness.lua. A change to
     any of them makes kept runs another cell's; rebuilding a ROM or editing a test does not."""
+    import matrix
     files = matrix.driver_source(root)
     harness = os.path.join(root, 'harness.lua')
     if os.path.isfile(harness):
@@ -431,17 +433,25 @@ def campaign_tasks(env, seeds, mode, stamp, vanilla=False):
              'mode': mode, 'vanilla': vanilla, 'stamp': stamp} for s in seeds]
 
 
+def kept(paths, keep, key):
+    """{key(rec): [record]} of the runs kept in `paths` (runs files) that `keep(rec)` takes, in
+    file order."""
+    out = {}
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            for line in fh:
+                rec = json.loads(line)
+                if keep(rec):
+                    out.setdefault(key(rec), []).append(rec)
+    return out
+
+
 def kept_runs(path, stamp):
     """{seed: [record]} of the runs in `path` with this stamp, in file order."""
-    out = {}
-    if not os.path.exists(path):
-        return out
-    with open(path) as fh:
-        for line in fh:
-            rec = json.loads(line)
-            if all(rec.get(k) == v for k, v in stamp.items()) and rec.get('seed') is not None:
-                out.setdefault(rec['seed'], []).append(rec)
-    return out
+    return kept([path], lambda r: all(r.get(k) == v for k, v in stamp.items())
+                and r.get('seed') is not None, lambda r: r['seed'])
 
 
 def chapter_result(recs, chapter):
@@ -549,6 +559,7 @@ def cell_main(args):
 # saved state under fixed seeds. FR-021 says what an entry names; FR-025 that the tuning,
 # held-out, pilot and confirmatory seeds never meet.
 
+SUITE_TOP = ('version', 'route', 'emulator', 'seed_sets', 'shops_from', 'starts')
 SUITE_KEYS = ('start_id', 'game', 'chapter', 'rom_hash', 'state_path', 'state_sha1',
               'provenance', 'label', 'seeds', 'style', 'invariant', 'budgets', 'estimate_wall_s')
 BUDGET_KEYS = ('beam', 'final', 'branch', 'lookahead_decision', 'lookahead_attempt')
@@ -561,18 +572,25 @@ def load_suite(path=None):
     """matrix.yaml's `instrument:` section, every start with the defaults it does not name
     merged in (key by key, as matrix.yaml's rows take its defaults). Raises ManifestError on a
     start listed twice (its id or its state), a field missing, a seed in two sets, or other
-    than two tuning and two held-out seeds a start (FR-021)."""
-    with open(path or matrix.MANIFEST) as fh:
+    than two distinct tuning and two distinct held-out seeds a start (FR-021)."""
+    import yaml
+    from matrix import ManifestError, MANIFEST
+    with open(path or MANIFEST) as fh:
         inst = (yaml.safe_load(fh) or {}).get('instrument')
     if not inst:
         raise ManifestError('matrix.yaml has no `instrument:` section')
+    lacking = [k for k in SUITE_TOP if inst.get(k) is None]
+    if lacking:
+        raise ManifestError('the suite manifest has no %s' % ', '.join(lacking))
     defaults = inst.get('defaults') or {}
     sets = {name: set(range(lo, hi + 1)) for name, (lo, hi) in inst['seed_sets'].items()}
     starts, ids, states = [], set(), set()
     used = {'tuning': {}, 'held_out': {}}   # seed -> the start that uses it
     for row in inst.get('starts') or []:
         s = dict(defaults, **row)
-        s['budgets'] = dict(defaults.get('budgets') or {}, **(row.get('budgets') or {}))
+        for k, v in defaults.items():   # a table (seeds, budgets) merges key by key too
+            if isinstance(v, dict) and isinstance(row.get(k), dict):
+                s[k] = dict(v, **row[k])
         sid = s.get('start_id')
         missing = [k for k in SUITE_KEYS if s.get(k) is None] + \
             ['budgets.' + k for k in BUDGET_KEYS if s['budgets'].get(k) is None]
@@ -592,8 +610,9 @@ def load_suite(path=None):
                                     % (sid, k, s[k], ', '.join(allowed)))
         for kind in ('tuning', 'held_out'):
             seeds = s['seeds'].get(kind) or []
-            if len(seeds) != 2:
-                raise ManifestError('suite start %s: %s seeds %r, not two' % (sid, kind, seeds))
+            if len(set(seeds)) != 2 or len(seeds) != 2:
+                raise ManifestError('suite start %s: %s seeds %r, not two distinct ones'
+                                    % (sid, kind, seeds))
             other = 'held_out' if kind == 'tuning' else 'tuning'
             for seed in seeds:
                 clash = [n for n, r in sets.items() if seed in r]
@@ -624,8 +643,13 @@ def sha1_file(path):
 @functools.lru_cache(maxsize=None)
 def instrument_id():
     """The instrument a run is played under (the record's `instrument`): the bot code's hash
-    and the suite manifest's version."""
-    return '%s+v%d' % (bot_hash(), load_suite()['version'])
+    and the suite manifest's version. Read alone, so a cell's runs never hang on the suite's
+    own validation (load_suite's)."""
+    import yaml
+    import matrix
+    with open(matrix.MANIFEST) as fh:
+        version = ((yaml.safe_load(fh) or {}).get('instrument') or {}).get('version')
+    return '%s+v%s' % (bot_hash(), version)
 
 
 def check_starts(suite, simdirs, emulator_sha1=None):
@@ -633,7 +657,8 @@ def check_starts(suite, simdirs, emulator_sha1=None):
     emulator is not the pinned build, the ROM built now is not the one that saved the state
     (`simdirs[game]` is its store, named by its hash), the state is not where the harness
     loads it from, or its file is gone or changed."""
-    out = []
+    out = ['the shops store %s is gone' % p for p in suite['shops_from']
+           if not os.path.isdir(os.path.join(REPO, p))]
     emu = suite['emulator']
     got = emulator_sha1 or sha1_file(os.path.join(REPO, emu['binary']))
     if got != emu['sha1']:
@@ -644,7 +669,9 @@ def check_starts(suite, simdirs, emulator_sha1=None):
         path = os.path.join(REPO, st['state_path'])
         want = os.path.join(store, 'states', st['provenance']['campaign'],
                             '%d.ss' % st['chapter'])
-        if os.path.basename(store) != st['rom_hash']:
+        if not os.path.basename(store):
+            why = 'no %s ROM is built' % st['game']
+        elif os.path.basename(store) != st['rom_hash']:
             why = 'pinned on ROM %s, but the %s ROM built now is %s' % (
                 st['rom_hash'], st['game'], os.path.basename(store))
         elif os.path.abspath(path) != os.path.abspath(want):
@@ -679,18 +706,16 @@ def suite_tasks(suite, envs, instrument, outs, sets=SEED_SETS):
     return tasks
 
 
-def kept_walls(paths):
-    """{start_id: [wall_s]} of the suite runs kept in `paths` (each game's runs file)."""
-    out = {}
-    for path in paths:
-        if not os.path.exists(path):
-            continue
-        with open(path) as fh:
-            for line in fh:
-                rec = json.loads(line)
-                if rec.get('suite') and rec.get('wall_s') is not None:
-                    out.setdefault(rec['suite']['start_id'], []).append(rec['wall_s'])
-    return out
+def kept_walls(paths, instrument, rom_hashes):
+    """{start_id: [wall_s]} of the suite runs kept in `paths` (each game's runs file) that this
+    instrument played on these ROMs ({game: hash}) to a game result: a run of other code, or
+    one that crashed at boot in seconds, says nothing about what the next will take."""
+    runs = kept(paths, lambda r: r.get('suite') and r.get('kind') != 'campaign'
+                and r.get('instrument') == instrument
+                and r.get('rom_hash') == rom_hashes.get(r.get('game'))
+                and r.get('outcome') not in UNUSABLE and r.get('wall_s') is not None,
+                lambda r: r['suite']['start_id'])
+    return {sid: [r['wall_s'] for r in recs] for sid, recs in runs.items()}
 
 
 def suite_estimate(suite, tasks, kept, jobs):
@@ -712,12 +737,16 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
     tuning and held-out, and reports only cost: a held-out outcome is never shown to whoever
     is tuning the bot. Without it, the tuning seeds play and each run's line is printed too.
     Refuses, with the reason, a start that no longer matches its pin or a job over
-    `wall_limit_h` (SC-007), before anything runs."""
+    `wall_limit_h` (SC-007), before anything runs. `envs()` builds {game: campaign env}."""
     lines = []
     problems = check(suite, simdirs)
     if problems:
         return ['refused: %d pinned starts cannot be played as pinned:' % len(problems)] + \
             ['  ' + p for p in problems]
+    try:
+        envs = envs()   # built after the check: campaign_env raises on a missing twin
+    except FileNotFoundError as err:
+        return ['refused: a campaign env cannot be built: %s' % err]
     outs = {g: os.path.join(d, 'runs.jsonl') for g, d in simdirs.items()}
     tasks = suite_tasks(suite, envs, instrument, outs, SEED_SETS if baseline else ('tuning',))
     hours = suite_estimate(suite, tasks, kept or {}, jobs)
@@ -739,9 +768,13 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
         got['n'] += 1
         got['cpu'] += (rec.get('costs') or {}).get('cpu_s') or 0.0
         got['wall'] += rec.get('wall_s') or 0.0
-        got['unread'] += rec.get('outcome') in UNUSABLE
+        # the invariant `record`: one BOTRUN record with a game result; a campaign's end
+        # standing in for it is never one
+        got['unread'] += rec.get('kind') == 'campaign' or rec.get('outcome') in UNUSABLE
         if not baseline:
-            lines.append('%s seed %s: %s' % (sid, rec.get('seed'), attempt_line(rec, set())))
+            line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
+                                                                    rec.get('why'))
+            lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
     total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0}
     for st in suite['starts']:
         got = per.get(st['start_id'])
@@ -762,16 +795,22 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
 
 def suite_main(args):
     import campaign_env
+    if os.environ.get('PT_SIMDIR'):
+        print('refused: PT_SIMDIR is set; the suite plays each game from its own store, named '
+              "by the ROM built now (run.sh's simdir)")
+        return 1
     suite = load_suite()
     simdirs = {'vanilla': simdir(True), 'ours': simdir(False)}
-    envs = {'vanilla': campaign_env.vanilla_env(suite['route']),
-            'ours': campaign_env.ours_env([os.path.join(REPO, p) for p in suite['shops_from']])}
+
+    def envs():
+        return {'vanilla': campaign_env.vanilla_env(suite['route']),
+                'ours': campaign_env.ours_env([os.path.join(REPO, p)
+                                               for p in suite['shops_from']])}
     outs = [os.path.join(d, 'runs.jsonl') for d in simdirs.values()]
-    for d in simdirs.values():
-        os.makedirs(d, exist_ok=True)
     pool = Pool(jobs=args.jobs, out=outs[0])
+    hashes = {g: os.path.basename(d) for g, d in simdirs.items()}
     lines = run_suite(suite, envs, simdirs, pool.run, args.jobs, args.baseline,
-                      instrument_id(), kept=kept_walls(outs))
+                      instrument_id(), kept=kept_walls(outs, instrument_id(), hashes))
     for line in lines:
         print(line, flush=True)
     return 1 if any(line.startswith('refused') for line in lines) else 0
