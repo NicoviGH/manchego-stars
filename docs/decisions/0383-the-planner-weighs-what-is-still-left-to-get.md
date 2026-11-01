@@ -8,6 +8,8 @@ issues: [510]
 
 # The planner weighs what is still left to get: each open goal's worth x the chance of getting it, and the win closes the rest
 
+**Amended by ADR 0384 (2026-11-01).** Worth × chance still orders the beam's candidates, but it no longer decides between complete plans: the rank does (risk cap, then forfeits, then progress), and the open goals below become the completion ledger's list.
+
 **Decided (2026-10-30), #510 step 9, the planner's open item "Ch5's village at (5,1)".**
 Design: #510 comment 6534885686; plan: #510 comment 6535169947.
 

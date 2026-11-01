@@ -8,8 +8,10 @@ issues: [510]
 
 # A clean clear has four parts, a vanilla chapter without one is a bot fault, and the bot clears all of vanilla's Eirika route before any Manchego Stars verdict counts
 
+**Amended by ADRs 0385 and 0386 (Nicolas, 2026-11-01).** Decisions 1 and 2 stand. The verdict no longer counts clean clears: it compares any player death on attempt 1, and clean clear is a reported column (ADR 0385). Decision 3 is narrowed to reinforcement arrival turns only, and was never built (ADR 0386). Decision 4 is now a milestone, not a gate (ADR 0385).
+
 Decisions 1-4 of the #510 step 9 long-term design (#510 comment 6485197805, accepted by Nicolas
-2026-10-29). Part A built 1 and 2 (#510 comment 6485521139); 3 is built in part C.
+2026-10-29). Part A built 1 and 2 (#510 comment 6485521139); 3 was never built, and ADR 0386 narrows it.
 
 **1. A clean clear has four parts, each read from the game at the chapter's end, never from the
 bot's intentions:** the chapter is won; no unit is lost, blue or green (vanilla Ch6 gives
@@ -63,7 +65,7 @@ line carrying every failed attempt's `clear` and trace. Manchego Stars keeps `in
 the play logs of attempts 1 to k-1 at the same start, each fact filtered by what the game showed
 the player at the moment it was logged (a unit's `US_BIT9`, `board.lua` `fogged`; a tile's
 `gBmMapFog`, `sight.unseen`) ("A player trying again would have seen the
-map and stuff"). Built in part C.
+map and stuff"). Never built; narrowed by ADR 0386 to arrival turns.
 
 **4. No Manchego Stars verdict counts until the bot clears ALL of vanilla's Eirika route clean**,
 the whole route, not chapter by chapter as twins are reached ("Might as well do the whole
