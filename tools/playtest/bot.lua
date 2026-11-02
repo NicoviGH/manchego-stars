@@ -1331,8 +1331,9 @@ local function sendWorth(ctx, u, t)
     return t.gold * c, c
 end
 
-local function exploring(ctx, sent)
+local function exploring(ctx, sent, barred)
     ctx.exploreGoal = {}
+    barred = barred or {}
     local taken = {}
     local function reaches(u, t)
         local d = marchLength(ctx, u, t)
@@ -1349,7 +1350,8 @@ local function exploring(ctx, sent)
         end)
         for _, p in ipairs(pairs_) do
             local k = key(p.t)
-            if not taken[k] and not ctx.exploreGoal[p.u.id] then
+            if not taken[k] and not ctx.exploreGoal[p.u.id]
+                and not barred[p.u.id .. ">" .. tileKey(p.t.x, p.t.y)] then
                 taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
             end
         end
@@ -1381,6 +1383,7 @@ local function exploring(ctx, sent)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
+            and not barred[u.id .. ">" .. tileKey(t.x, t.y)]
             and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
@@ -1465,46 +1468,11 @@ function M.explain(board, sight, style)
     return lines
 end
 
--- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
--- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
--- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
--- every Talk the game offers, its best heal, a Vulnerary, a Visit or Chest on each open tile
--- it reaches (sight.canExplore), the march (to its exploring tile when it was sent to one), the
--- hold, the retreat and a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
--- that can strike it there next phase); an attack its forecast (`f`) and counter worst case
--- (`spent`).
--- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
--- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
--- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
--- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
--- claim gives way).
--- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
--- ids, are the units a blow of ours must not kill; ctx.recruitTalkers who may Talk each over).
-function M.candidates(board, sight, style, opts)
-    local ctx = context(board, sight)
-    ctx.style, ctx.turn = style, board.turn
-    ctx.explored = opts and opts.explored or {}
-    ctx.lost = opts and opts.lost or {}
-    ctx.stalled = opts and opts.stalled
-    -- memoised for the decision: the planner asks it per goal, taker and partial plan, and a
-    -- unit cut off goes through breachFor and the field again each time
-    local turnsMemo = {}
-    ctx.turnsTo = function(u, tile, from)
-        from = from or u
-        local k = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y
-        local v = turnsMemo[k]
-        if v == nil then
-            v = turnsFor(ctx, u, tile, from) or false
-            turnsMemo[k] = v
-        end
-        return v or nil
-    end
-    exploring(ctx, opts and opts.sent)
-    ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
-    -- each unit's way to the objective, for the goals (goals.lua)
-    ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
+-- Every act each unit of ours may take this phase, from the view `ctx` holds (M.candidates'
+-- doc below says what each is).
+local function propose(ctx)
+    local sight, objective = ctx.sight, ctx.sight.objective
     local open = function() return true end
-    local objective = sight.objective
     local out = {}
     for _, u in ipairs(ctx.actors) do
         local acts, seen = {}, {}
@@ -1644,6 +1612,85 @@ function M.candidates(board, sight, style, opts)
             end
         end
         out[#out + 1] = { unit = u, acts = acts }
+    end
+    return out
+end
+
+-- The "unit>x,y" of each unit sent to a tile (ctx.exploreGoal) that no act of its `cands` gets
+-- nearer by the game's turns (ctx.turnsTo), or takes: a Visit or Chest on it, or a Talk with
+-- the recruit standing there. A unit with no act off its own tile is boxed in this turn, and
+-- keeps its goal: no other would get it anywhere either.
+local function unprogressed(ctx, cands)
+    local out = {}
+    for _, c in ipairs(cands) do
+        local u, g = c.unit, ctx.exploreGoal[c.unit.id]
+        local now = g and ctx.turnsTo(u, g)
+        local moves = not g or (now and now <= Goals.DUST)
+        local boxed = true
+        for _, a in ipairs(c.acts) do
+            boxed = boxed and a.move.x == u.x and a.move.y == u.y
+        end
+        moves = moves or boxed
+        local there = g and ctx.standing[tileKey(g.x, g.y)]
+        for _, a in ipairs(moves and {} or c.acts) do
+            local t = now and ctx.turnsTo(u, g, a.move)
+            local takes = (a.act == "visit" or a.act == "chest")
+                    and a.move.x == g.x and a.move.y == g.y
+                or a.act == "talk" and there and a.targetId == there.id
+            if takes or (t and t < now - Goals.DUST) then moves = true break end
+        end
+        if not moves then out[#out + 1] = u.id .. ">" .. tileKey(g.x, g.y) end
+    end
+    return out
+end
+
+-- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
+-- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
+-- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
+-- every Talk the game offers, its best heal, a Vulnerary, a Visit or Chest on each open tile
+-- it reaches (sight.canExplore), the march (to its exploring tile when it was sent to one), the
+-- hold, the retreat and a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
+-- that can strike it there next phase); an attack its forecast (`f`) and counter worst case
+-- (`spent`).
+-- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
+-- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
+-- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
+-- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
+-- claim gives way).
+-- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
+-- ids, are the units a blow of ours must not kill; ctx.recruitTalkers who may Talk each over).
+function M.candidates(board, sight, style, opts)
+    local ctx = context(board, sight)
+    ctx.style, ctx.turn = style, board.turn
+    ctx.explored = opts and opts.explored or {}
+    ctx.lost = opts and opts.lost or {}
+    ctx.stalled = opts and opts.stalled
+    -- memoised for the decision: the planner asks it per goal, taker and partial plan, and a
+    -- unit cut off goes through breachFor and the field again each time
+    local turnsMemo = {}
+    ctx.turnsTo = function(u, tile, from)
+        from = from or u
+        local k = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y
+        local v = turnsMemo[k]
+        if v == nil then
+            v = turnsFor(ctx, u, tile, from) or false
+            turnsMemo[k] = v
+        end
+        return v or nil
+    end
+    ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
+    -- each unit's way to the objective, for the goals (goals.lua)
+    ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
+    -- each unit sent where none of its acts gets it nearer is sent again, elsewhere or to the
+    -- objective (FR-016): a goal it cannot step toward holds it in place for good (ours ch01:
+    -- the lord, sent to a House, held his own tile until the run stopped)
+    local barred, out = {}, nil
+    for _ = 0, #ctx.actors do
+        exploring(ctx, opts and opts.sent, barred)
+        out = propose(ctx)
+        local stuck = unprogressed(ctx, out)
+        if #stuck == 0 then break end
+        for _, k in ipairs(stuck) do barred[k] = true end
     end
     return out, ctx
 end

@@ -1101,11 +1101,14 @@ do
           "greedy has no cap: the over-cap check has not run (null, not false)")
 end
 
--- test_seize_skips_and_stalls (FR-007): a planner offered the Seize keeps waiting. With a
--- village open the skip is justified and no stall; with nothing open each skip is a stall.
--- Three turns with no lord move, kill, visit, talk or chest are an idle_3 stall.
+-- test_seize_skips_and_stalls (FR-007, FR-015, plan T049): a planner offered the Seize keeps
+-- waiting. With a goal of its ledger still feasible the skip is justified and no stall; with
+-- nothing left and a Seize under the cap judged, each skip is a stall. Every Seize plan over
+-- the cap justifies it; none judged at all does not. Three turns with no lord move, kill,
+-- visit, talk or chest are an idle_3 stall.
 do
-    local function seizer(worth)
+    local function seizer(ledger, seize)
+        seize = seize or { judged = true, admitted = true }
         local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) },
                              turnsLeft = 5 }
         g.api.info.trace = "trace.jsonl"
@@ -1126,21 +1129,29 @@ do
                 local a = { unit = 0x01, unitId = 0x01, act = "wait",
                             move = { x = 0, y = n % 2 } }   -- back and forth: a lord moving
                 return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
-                            seizable = true, goalWorth = worth }
+                            seizable = true, ledger = ledger, seizeJudged = seize.judged,
+                            seizeAdmitted = seize.admitted }
             end,
         }
         Botrun.run(g.api)
         return recordOf(g)
     end
-    local r = seizer({ { id = "visit:3,3", kind = "visit", before = 0.5 } })
+    local r = seizer({ { id = "visit:3,3", kind = "visit", status = "feasible" },
+                       { id = "chest:4,4", kind = "chest", status = "unknown" } })
     check(#r.seize_skips, 5, "seize skips: one a turn")
     check(r.seize_skips[1].turn, 1, "seize skips: the turn")
-    check(r.seize_skips[1].ledger[1], "visit:3,3", "seize skips: the ledger")
+    check(table.concat(r.seize_skips[1].ledger, " "), "visit:3,3",
+          "seize skips: the ledger's feasible goals (an unknown one justifies nothing)")
     check(r.seize_skips[1].justified, true, "seize skips: an open village justifies it")
     check(#r.stall_events, 0, "a justified skip alone is not a stall")
     check(r.turns_to_win, 5, "turns to win, on a winner")
     check(#r.anomalies, 0, "a win put off only for open goals is no seize delay")
-    r = seizer({ { id = "objective:1", kind = "objective", before = 1 } })
+    check(seizer({}, { judged = true, admitted = false }).seize_skips[1].justified, true,
+          "seize skips: every Seize over the cap justifies it")
+    local lost = seizer({}, { judged = false, admitted = false }).seize_skips[1]
+    check(tostring(lost.justified) .. " " .. lost.reason, "false no plan with the Seize was judged",
+          "seize skips: a Seize no plan judged is a fault")
+    r = seizer({ { id = "visit:3,3", kind = "visit", status = "closed" } })
     check(r.seize_skips[1].justified, false, "nothing the win would close: unjustified")
     check(r.stall_events[1] and r.stall_events[1].kind, "unjustified_seize_skip",
           "an unjustified skip is a stall")

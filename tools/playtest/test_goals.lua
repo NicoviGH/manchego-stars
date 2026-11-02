@@ -204,5 +204,63 @@ do
     check(find(goals, "visit:2,0").gold, 100 / 3, "house: the House prior, no reward share")
 end
 
+-- TestLedger (FR-014, plan T045): the completion ledger at a decision, and what a plan forfeits.
+local function ids(list) return table.concat(list, " ") end
+local function row(ledger, id)
+    for _, r in ipairs(ledger) do if r.id == id then return r end end
+end
+local function rowIds(ledger)
+    local out = {}
+    for _, r in ipairs(ledger) do out[#out + 1] = r.id end
+    return ids(out)
+end
+do
+    local open = { { x = 4, y = 0, kind = "visit" }, { x = 9, y = 9, kind = "visit" },
+                   { x = 2, y = 0, kind = "chest" } }
+    local joshua = { id = 0x90, charId = 0x20, x = 6, y = 0, faction = "red", onField = true,
+                     items = {} }
+    -- unit 2 has no way to (9,9) this turn (cut off); no unit holds what opens the chest
+    local sight = fakeSight({ open = open, cutOff = { [2] = true }, closings = { ["4,0"] = 1 } })
+    function sight.canExplore(u, x, y, kind)
+        return kind ~= "chest" and not (x == 9 and u.id == 1)
+    end
+    local board = { units = { blue(1, 0, 0), blue(2, 0, 1), joshua }, turn = 1 }
+    local style = { rewards = { { item = 0x68, needs = { { 4, 0 } } } } }
+    local ctx = { recruitTalkers = { [0x90] = { 1 } },
+                  objectiveTile = function() return { x = 20, y = 0 } end }
+    local goals = Goals.list(board, sight, style, ctx)
+    local ledger = Goals.ledger(goals, sight, style, ctx)
+    check(rowIds(ledger), "recruit:144 visit:4,0 visit:9,9 reward:1",
+          "ledger: the goals still open, then rewards")
+    check(row(ledger, "visit:9,9").status, "feasible",
+          "ledger: a goal no taker can reach this turn stays feasible")
+    check(row(ledger, "chest:2,0"), nil, "ledger: a chest no unit of ours may open is no goal")
+    check(row(ledger, "objective:1"), nil, "ledger: the ways to the objective are the win's")
+    check(row(ledger, "visit:4,0").closes_on, 1, "ledger: when a looter closes it")
+    check(ids(row(ledger, "reward:1").needs), "visit:4,0", "ledger: what a reward needs")
+
+    check(ids(Goals.forfeited(ledger, goals, { win = 0, took = { ["visit:4,0"] = true } })), "",
+          "forfeits: taking the closing tile loses nothing")
+    check(ids(Goals.forfeited(ledger, goals, { win = 0 })), "reward:1 visit:4,0",
+          "forfeits: a tile the looter closes after this phase, and the reward needing it")
+    check(ids(Goals.forfeited(ledger, goals, { win = 0.004, took = { ["visit:4,0"] = true } })),
+          "recruit:144 visit:9,9", "forfeits: any chance of the win closes every goal not taken")
+    check(ids(Goals.forfeited(ledger, goals, { win = 1e-12, took = { ["visit:4,0"] = true } })),
+          "", "forfeits: a win chance of float dust is none")
+    check(ids(Goals.forfeited(ledger, goals, { win = 0, took = { ["visit:4,0"] = true },
+                                               lost = { [0x90] = 0.01 } })),
+          "recruit:144", "forfeits: a recruit killed in any branch with p > 0 is lost")
+
+    -- a sight with no read of who may use a tile, or when it closes
+    local blind = fakeSight({ open = open })
+    blind.closings = nil
+    local g2 = Goals.list(board, blind, {}, ctx)
+    local l2 = Goals.ledger(g2, blind, {}, ctx)
+    check(row(l2, "visit:4,0").status, "unknown", "ledger: no closings read, unknown")
+    check(row(l2, "recruit:144").status, "feasible", "ledger: a recruit needs no tile read")
+    check(ids(Goals.forfeited(l2, g2, { win = 1 })), "recruit:144",
+          "forfeits: an unknown goal is neither kept nor lost")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
