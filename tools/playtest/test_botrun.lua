@@ -479,20 +479,21 @@ do
             asked = asked + 1
             if opts and opts.stalled then g.stalledAsk = asked end
             for _, u in ipairs(board.units) do
-                if u.faction == "blue" and u.acted then return nil, nil, 3 end
+                if u.faction == "blue" and u.acted then return nil, nil, { phases = 3, averaged = 0 } end
             end
-            if board.turn > 1 then return nil, nil, 3 end
+            if board.turn > 1 then return nil, nil, { phases = 3, averaged = 1 } end
             local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
                            { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
             return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
-                              enemies = { [0x81] = true }, averaged = 1 }, 3
+                              enemies = { [0x81] = true } }, { phases = 3, averaged = 1 }
         end,
     }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.plans.kept, 1, "C's wait is played from A's plan")
     check(r.plans.phases, 12, "the judged enemy phases of every call, a nil plan's too, summed")
-    check(r.plans.averaged, 1, "the uncertain kills past the branching bound, summed: never silent")
+    check(r.plans.averaged, asked - 1, "the uncertain kills past the bound in every plan judged, "
+          .. "a nil call's too, summed: never silent")
     check(asked, r.plans.made, "every plan asked for is counted")
     check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
           .. "turn 2's board: one stalled ask; turn 4 repeats it again: stuck")
@@ -1274,6 +1275,12 @@ do
     check(d.cap, 0.01, "a game-over green has its style's cap")
     d = Botrun.grade(death(), committed {}, nil, 0.01, {})
     check(d.cap, 0.01, "a blue has its style's cap")
+    -- graded by the planner's own admission: a sum a few ulps over the cap is at it
+    local Planner = dofile(here .. "planner.lua")
+    d = Botrun.grade(death(), committed { predict = { { id = 0x01, die = 0.05 + 1e-15,
+                                                        strikers = { 0x81 } } } },
+                     nil, 0.05, {}, nil, nil, Planner.admits)
+    check(d.over_cap, false, "dust: graded as the planner admitted it")
 end
 
 -- test_a_fallback_plan_and_its_death_are_graded_against_the_cap (#510 step 9 PR-C, FR-011):
@@ -1296,6 +1303,7 @@ do
     end
     g.api.Planner = {
         CAPS = { careful = 0.01 },
+        admits = dofile(here .. "planner.lua").admits,
         surprise = function() return "the plan is played out" end,
         plan = function(_, board)
             -- each blue yet to act gets its own plan: two plans over the cap on turn 1

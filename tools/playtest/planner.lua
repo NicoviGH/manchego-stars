@@ -33,9 +33,8 @@
 --      The enemy phase is played every way it can go where a counter may kill a striker
 --      (its tile freed for the next), and once per way each uncertain kill can go, up to
 --      BRANCH of them (an enemy the average keeps may die, one it removes may live). Last, the
---      best
---      plan is mended: each unit it may lose tries its other acts (a green one, the acts of
---      ours that could save it; a recruit, the acts of the units it strikes), the rest of the
+--      best plan is mended: each unit it may lose tries its other acts (a green one, the acts
+--      of ours that could save it; a recruit, the acts of the units it strikes), the rest of the
 --      plan kept, and those are judged too.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
@@ -69,8 +68,9 @@
 -- closes },
 -- winFell = the judged phase's chance our counter ends the chapter, talks = the charIds any
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
--- seizes = whether this plan takes it }, and the enemy phases the call judged, over every plan
--- it judged (a call that finds no plan judged some too).
+-- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
+-- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
+-- uncertain kills left to the average past BRANCH) }.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -277,7 +277,7 @@ function M.plan(Bot, board, sight, style, opts)
     if not cap then error("planner.lua: no risk cap for style " .. tostring(style.aggression)) end
     local odds = sight.odds
     local cands, ctx = Bot.candidates(board, sight, style, opts)
-    if #cands == 0 then return nil, nil, 0 end
+    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0 } end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
@@ -655,8 +655,9 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
-    -- the enemy phases judged in this call, over every plan it judges: what branching costs
-    local phases = 0
+    -- what this call costs, over every plan it judges: the enemy phases judged, and the
+    -- uncertain kills left to the average past BRANCH (never silent)
+    local cost = { phases = 0, averaged = 0 }
     -- a green unit lost spoils the clear as one of ours does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
@@ -702,6 +703,7 @@ function M.plan(Bot, board, sight, style, opts)
         local ways = { { p = 1, gone = gone, reds = reds } }
         st.branched = math.min(M.BRANCH, #open)
         st.averaged = #open - st.branched
+        cost.averaged = cost.averaged + st.averaged
         for i = 1, st.branched do
             local k, nxt = open[i], {}
             for _, w in ipairs(ways) do
@@ -716,7 +718,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local strikes, outcomes, top, total = {}, {}, nil, 0
         for i, w in ipairs(ways) do
-            if sight.enemyPhase then phases = phases + 1 end
+            if sight.enemyPhase then cost.phases = cost.phases + 1 end
             local s = sight.enemyPhase and sight.enemyPhase({ blues = planned, gone = w.gone,
                                                               reds = w.reds }) or {}
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
@@ -992,7 +994,7 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
     end
-    if not best or #best.acts == 0 then return nil, nil, phases end
+    if not best or #best.acts == 0 then return nil, nil, cost end
     table.sort(considered, function(x, y) return M.outranks(x.rank, y.rank) end)
     best.considered = considered
     -- no plan under the cap: the least over it is played, and says so (FR-011)
@@ -1024,7 +1026,7 @@ function M.plan(Bot, board, sight, style, opts)
     best.seizable = seizable
     best.seizes = false   -- whether the plan takes the Seize offered (botrun's seize skips)
     for _, x in ipairs(best.acts) do best.seizes = best.seizes or x.act == "seize" end
-    return best.acts[1], best, phases
+    return best.acts[1], best, cost
 end
 
 -- Why the board `after` the plan's k-th act (played from `before`) is off what the plan

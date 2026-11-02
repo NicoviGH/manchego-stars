@@ -3626,14 +3626,15 @@ end
 
 -- Three blues, each beside an enemy it kills at 2RN 60 (one blow of 10 on 10 HP). An enemy
 -- left standing kills its blue in the enemy phase; holding leaves it standing for sure.
-local function threeOpenKills()
+local function threeOpenKills(hits)
     local units, reach, fcs, pair = {}, {}, {}, {}
     for k = 1, 3 do
         local a, e = k, 0x80 + k
         units[#units + 1] = blue(a, k - 1, 0, 2 * k)
         units[#units + 1] = red(e, 1, 2 * k, { hp = 10 })
         reach[a] = tiles({ 0, 2 * k })
-        fcs[a] = { [e] = { ["0," .. (2 * k)] = fc { hit = 60, dmg = 10, hits = 1 } } }
+        fcs[a] = { [e] = { ["0," .. (2 * k)] = fc { hit = hits and hits[k] or 60, dmg = 10,
+                                                     hits = 1 } } }
         pair[e] = a
     end
     local o = {
@@ -3670,17 +3671,42 @@ do
               string.format("branches: 0x%02X dies only where its enemy lives", p.id))
     end
     -- every judged plan played 2^3 phases at most; the call's third value counts them all
-    local _, _, phases = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
-    check(phases and phases >= 8, true, "branches: the phases are counted")
+    local _, _, cost = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
+    check(cost and cost.phases >= 8, true, "branches: the phases are counted")
+    check(cost and cost.averaged, 0, "branches: none left to the average")
     check(plan and plan.branched, 3, "branches: each uncertain kill is branched")
-    check(plan and plan.averaged, 0, "branches: none left to the average")
-    -- past the bound, the most uncertain are branched and the rest is counted, never silent
+    check(plan and plan.averaged, 0, "branches: none left to the average, in the plan")
+end
+
+-- test_branching_past_its_bound_plays_the_most_uncertain (PR #560 re-review): the kills land
+-- at 2RN 90, 50 and 70. With BRANCH = 1 only the 50% one is played both ways, the others keep
+-- the average (gone), and the call counts each kill left over in every plan it judged.
+do
+    local units, o = threeOpenKills({ 90, 50, 70 })
+    local both = {}   -- per enemy, the states the phases judging the three attacks saw it in
+    local phase = o.enemyPhase
+    o.enemyPhase = function(plan)
+        local slots = 0
+        for _, b in ipairs(plan.blues) do
+            if b.slot then slots = slots + 1 end
+        end
+        for e = 0x81, slots == 3 and 0x83 or 0x80 do
+            both[e] = both[e] or {}
+            both[e][plan.gone[e] and "dead" or "alive"] = true
+        end
+        return phase(plan)
+    end
     local saved = Planner.BRANCH
-    Planner.BRANCH = 2
-    local _, capped = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
+    Planner.BRANCH = 1
+    local ok, a, plan, cost = pcall(Planner.plan, B, boardOf(table.unpack(units)), sightOf(o),
+                                    style("bold"))
     Planner.BRANCH = saved
-    check(capped and capped.branched, 2, "branches: the bound holds")
-    check(capped and capped.averaged, 1, "branches: the kill past it is recorded as averaged")
+    check(ok, true, "bound: the plan is made")
+    check(plan and plan.branched, 1, "bound: one kill branched")
+    check(plan and plan.averaged, 2, "bound: two left to the average")
+    check(both[0x82] and both[0x82].dead and both[0x82].alive, true, "bound: the 50% kill both ways")
+    check(both[0x81] and both[0x81].alive, nil, "bound: the 90% kill keeps the average")
+    check(cost and cost.averaged >= 2, true, "bound: the call counts what every plan averaged")
     local three = plan and plan.protected and plan.protected[3]
     local sum = 0
     for _, b in ipairs(three and three.branches or {}) do sum = sum + b.p end

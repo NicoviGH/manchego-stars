@@ -520,7 +520,7 @@ SUITE = {
     'seed_sets': {'confirmatory': [1, 200], 'pilot': [3001, 3050]},
     'defaults': {'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}, 'style': 'drawn',
                  'invariant': 'record', 'estimate_wall_s': 600,
-                 'budgets': {'beam': 6, 'final': 4, 'branch': 2, 'lookahead_decision': 8,
+                 'budgets': {'beam': 6, 'final': 4, 'branch': 8, 'lookahead_decision': 8,
                              'lookahead_attempt': 32}},
     'shops_from': ['references/sim/vanilla/h/states/c'],
     'starts': [
@@ -567,6 +567,15 @@ class Suite(unittest.TestCase):
                              for s in got['starts']), 52)   # SC-001
         lo, hi = got['seed_sets']['confirmatory']
         self.assertLessEqual(mc.LOOKS[-1], hi - lo + 1, 'a cell plays seeds 1..LOOKS[-1]')
+        # the budgets the manifest records are the ones the planner plays (PR #560: `branch`
+        # stayed 2 when planner.lua's M.BRANCH moved)
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'planner.lua')).read()
+        for key, const in (('beam', 'BEAM'), ('final', 'FINAL'), ('branch', 'BRANCH')):
+            m = re.search(r'^M\.%s = (\d+)' % const, src, re.M)
+            self.assertIsNotNone(m, 'planner.lua sets M.%s to a number' % const)
+            for s in got['starts']:
+                self.assertEqual(s['budgets'][key], int(m.group(1)),
+                                 '%s: budgets.%s is M.%s' % (s['start_id'], key, const))
 
     def test_a_start_listed_twice_raises(self):
         inst = self.suite()

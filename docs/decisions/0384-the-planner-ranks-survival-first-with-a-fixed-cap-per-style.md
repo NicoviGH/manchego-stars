@@ -71,13 +71,16 @@ own turns to the assigned goal, and to the objective once the optional goals are
 and `M.plan` raises on a style without one. Protected units are every blue and every unit in
 `sight.objective.gameOver`; botrun grades only their deaths against the cap, so an allied
 green's death has no `cap` and no `over_cap`. `judge()` plays every uncertain kill both ways, up
-to `M.BRANCH` = 8 of them (256 phases a plan). Past that, the most uncertain are played, and the
-rest are counted in `plan.averaged` and the record's `plans.averaged`, so the bound is never
-silent. It normalizes the branches' chances and records each protected unit's death per branch
-(`plan.protected`). A kill is branched even when its enemy reaches no protected unit: that
-enemy's death can free a tile for one that does (`test_planner_plays_an_uncertain_kill_both_ways`).
-Admission forgives float dust (`M.admits`: within 1e-9 of the cap). `M.plan` returns the enemy
-phases it judged as a third value, which botrun sums into `plans.phases`, a call with no plan included. Plans are compared by `M.outranks` on `plan.rank`:
+to `M.BRANCH` = 8 of them (256 phases a plan). Past that, the most uncertain are played and
+the rest keep the average. It normalizes the branches' chances and records each protected
+unit's death per branch (`plan.protected`). A kill is branched even when its enemy reaches no
+protected unit: that enemy's death can free a tile for one that does
+(`test_planner_plays_an_uncertain_kill_both_ways`). Admission forgives float dust (`M.admits`:
+within 1e-9 of the cap), and botrun grades `over_cap` through the same `admits`. `M.plan`
+returns what the call cost, over every plan it judged, a call with no plan included:
+`{ phases, averaged }`, which botrun sums into `plans.phases` and `plans.averaged`, so a kill
+left to the average past the bound is never silent. The suite manifest's `budgets.branch` is
+8 too, and `test_montecarlo` fails when it and `M.BRANCH` differ. Plans are compared by `M.outranks` on `plan.rank`:
 admission; for plans over the cap, largest excess, summed excess, largest death chance, then
 the admitted order; for admitted plans, `value` (the judged score), standing in for (4) until
 PR-D; then largest death chance, summed death chance, HP left, and the plan's acts as a key.
