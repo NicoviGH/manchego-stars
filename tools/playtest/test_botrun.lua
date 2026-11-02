@@ -1261,6 +1261,20 @@ do
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
 end
 
+-- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose
+-- death ends the game; an allied green's death is graded with no cap, so never over it.
+do
+    local green = death { faction = "green", charId = 0x41, id = 0x41 }
+    local d = Botrun.grade(green, committed {}, nil, 0.01, { 0x01 })
+    check(d.cap, nil, "an allied green has no cap")
+    check(d.over_cap, nil, "and so no over-cap verdict")
+    local vip = death { faction = "green", charId = 0x41, id = 0x41 }
+    d = Botrun.grade(vip, committed {}, nil, 0.01, { 0x41 })
+    check(d.cap, 0.01, "a game-over green has its style's cap")
+    d = Botrun.grade(death(), committed {}, nil, 0.01, {})
+    check(d.cap, 0.01, "a blue has its style's cap")
+end
+
 -- test_a_fallback_plan_and_its_death_are_graded_against_the_cap (#510 step 9 PR-C, FR-011):
 -- the planner's careful cap (1%) reaches the death's grade, a 30% prediction is over it, and
 -- a committed FALLBACK_SACRIFICE plan is an anomaly on its turn.

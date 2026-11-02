@@ -409,7 +409,8 @@ end
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
 -- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
 -- phase's last plan (its `predict`). `plan.snapshot` is the board when that plan was made,
--- `cap` the style's risk cap (nil for greedy, which plays no plan), `gameOver` the charIds whose
+-- `cap` the style's risk cap (nil for greedy, which plays no plan; kept only on a protected
+-- unit's death), `gameOver` the charIds whose
 -- death ends the game, `diedAt` (optional) each unit index of another side to the decision count
 -- it fell at: one that fell at or after the plan's (`plan.ref`) is no killer from the snapshot,
 -- its slot free for an arrival of the same generic charId. Unknown is nil, never zero: a death
@@ -454,8 +455,13 @@ function M.grade(d, plan, action, cap, gameOver, board, diedAt)
         d.flags.reinforcement = fought and #killers == 0
         d.flags.fog = hidden
     end
-    d.cap = cap
-    if d.predicted ~= nil and cap ~= nil then d.over_cap = d.predicted > cap end
+    -- the cap is on the protected units only (FR-009): blue, or one whose death ends the game
+    local endsGame = false
+    for _, c in ipairs(gameOver or {}) do
+        if c == d.charId then endsGame = true end
+    end
+    if d.faction == "blue" or endsGame then d.cap = cap end
+    if d.predicted ~= nil and d.cap ~= nil then d.over_cap = d.predicted > d.cap end
     local struck, strikers = false, 0
     for _, id in ipairs(judged and judged.strikers or {}) do
         strikers = strikers + 1
@@ -467,12 +473,7 @@ function M.grade(d, plan, action, cap, gameOver, board, diedAt)
                                      counters = action and action.f and action.f.counters })
     d.family = d.detail and M.DETAILS[d.detail]
     d.plan_ref = plan and plan.ref
-    if d.faction == "green" then
-        d.escort = false
-        for _, c in ipairs(gameOver or {}) do
-            if c == d.charId then d.escort = true end
-        end
-    end
+    if d.faction == "green" then d.escort = endsGame end
     return d
 end
 
