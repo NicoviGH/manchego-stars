@@ -980,7 +980,7 @@ end
 
 -- test_cause_precedence (FR-005)
 do
-    local all = { over_cap = true, predicted = 0.3,
+    local all = { over_cap = true, predicted = 0.3, killer = 0x81,
                   flags = { reinforcement = true, fog = true, boss = true, player_phase = true } }
     check(Botrun.cause(all, {}), "over_cap", "over_cap first")
     all.over_cap = false
@@ -1057,11 +1057,11 @@ do
     local why = {}
     for _, m in ipairs(r.missed_recruits) do why[m.charId] = m.reason end
     check(why[0x30], "killed_before_talk", "graded: a recruit killed first")
-    check(why[0x31], "not_reached", "graded: one never offered a Talk")
+    check(why[0x31], "unknown", "graded: greedy records no Talk offers, so it cannot say")
     check(why[0x32], "died_after_joining", "graded: one that joined and fell")
     local m = r.missed_rewards[1]
     check(m and m.kind, "visit", "graded: the missed reward's kind")
-    check(m and m.reason, "unreachable", "graded: never offered")
+    check(m and m.reason, "unknown", "graded: greedy counts no offers, so it cannot say")
     local same = 0
     for _, a in ipairs(r.anomalies) do
         if a.kind == "same_turn_green" then same = same + 1 end
@@ -1088,7 +1088,8 @@ do
     check(r.first_death_turn, 2, "first death turn")
     check(r.turns_to_win, nil, "a loss has no turns to win")
     check(r.deaths[1].cause, "other", "greedy: no plan behind it")
-    check(r.deaths[1].detail, "missing_prediction", "greedy: so no prediction")
+    check(r.deaths[1].detail, "noncombat", "no fighter: noncombat, not a sandbox fault")
+    check(r.deaths[1].over_cap, nil, "no cap yet: the over-cap check has not run (null, not false)")
 end
 
 -- test_seize_skips_and_stalls (FR-007): a planner offered the Seize keeps waiting. With a
@@ -1129,14 +1130,14 @@ do
     check(r.seize_skips[1].justified, true, "seize skips: an open village justifies it")
     check(#r.stall_events, 0, "a justified skip alone is not a stall")
     check(r.turns_to_win, 5, "turns to win, on a winner")
-    check(r.anomalies[1] and r.anomalies[1].kind, "seize_delay", "a win after a skip is delayed")
-    check(r.anomalies[1] and r.anomalies[1].narrate,
-          "python3 tools/playtest/montecarlo.py story trace.jsonl --turn 1",
-          "an anomaly carries its story command")
+    check(#r.anomalies, 0, "a win put off only for open goals is no seize delay")
     r = seizer({ { id = "objective:1", kind = "objective", before = 1 } })
     check(r.seize_skips[1].justified, false, "nothing the win would close: unjustified")
     check(r.stall_events[1] and r.stall_events[1].kind, "unjustified_seize_skip",
           "an unjustified skip is a stall")
+    check(r.anomalies[1] and r.anomalies[1].kind, "seize_delay", "an unjustified skip delays")
+    check(r.anomalies[1] and r.anomalies[1].turn, 1, "from the first unjustified skip")
+    check(r.anomalies[1] and r.anomalies[1].delay, 4, "by how many turns")
 
     -- idle: a lord holding still with nothing to do for three player phases
     local g = fakeGame { units = standoff(), turnsLeft = 4 }
@@ -1163,7 +1164,89 @@ do
     for _, e in ipairs(r2.stall_events) do
         if e.kind == "idle_3" then idle[#idle + 1] = e.turn end
     end
-    check(table.concat(idle, ","), "3", "idle_3: once, on the third idle turn")
+    check(table.concat(idle, ","), "3", "idle_3: on the third idle turn (four turns played)")
+end
+
+-- test_review_fixes (PR #559's review): no fighter is noncombat even with a positive
+-- prediction; a reloaded slot is an arrival; a green no phase saw is unseen_green, not
+-- same-turn; an idle stretch is a stall every third phase; an enemy-phase kill is no progress.
+do
+    local d = Botrun.grade(death { killer = false, killerId = false }, committed {}, nil, nil, {})
+    check(d.cause .. "/" .. tostring(d.detail), "other/noncombat",
+          "no fighter: noncombat before the tail, though the plan predicted 4%")
+    -- slot 0x81 held 0x81 when the plan was made; an arrival 0x90 reloaded it
+    d = Botrun.grade(death { killer = 0x90, killerId = 0x81 }, committed {}, nil, nil, {})
+    check(d.flags.reinforcement, true, "a reloaded slot: matched by index and charId")
+
+    -- a green that arrives in the enemy phase and dies on a later enemy phase before any
+    -- player phase saw it; and an idle stretch of six turns where the enemy dies on a counter
+    local g = fakeGame { units = standoff(), turnsLeft = 7, enemy = function(g, find)
+        if g.turn == 2 then g.units[#g.units + 1] = unit(0x43, 5, "green", 5, 5, 10) end
+        return {}
+    end }
+    local endPhase = g.api.endPhase
+    g.api.endPhase = function()
+        local phase, deaths, acts = endPhase()
+        return phase, deaths, acts
+    end
+    local killed = g.api.killed
+    g.api.killed = function()
+        local out = killed()
+        if g.turn == 3 and not g.greenDone then
+            g.greenDone = true
+            out[#out + 1] = { id = 0x43, charId = 0x43, faction = "green", turn = 2, phase = "enemy" }
+        end
+        if g.turn == 4 and not g.redDone then
+            g.redDone = true
+            out[#out + 1] = { id = 0x99, charId = 0x99, faction = "red", phase = "enemy" }
+        end
+        return out
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local kinds, idle = {}, {}
+    for _, a in ipairs(r.anomalies) do kinds[#kinds + 1] = a.kind end
+    check(table.concat(kinds, ","):find("unseen_green") ~= nil, true, "a green never seen: unseen_green")
+    check(table.concat(kinds, ","):find("same_turn_green"), nil, "and not same_turn_green")
+    for _, e in ipairs(r.stall_events) do
+        if e.kind == "idle_3" then idle[#idle + 1] = e.turn end
+    end
+    check(table.concat(idle, ","), "3,6", "idle_3: every third idle phase; an enemy-phase kill is no progress")
+end
+
+-- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another
+-- side before any offer is closed; never offered is unreachable; a Talk never offered is
+-- not_reached.
+do
+    local tiles = { { x = 9, y = 0, kind = "visit" }, { x = 0, y = 9, kind = "visit" },
+                    { x = 5, y = 5, kind = "chest" } }
+    local open = { tiles[1], tiles[2], tiles[3] }
+    local g = fakeGame { units = standoff(), turnsLeft = 3, recruits = { 0x31 },
+                         explorable = open,
+                         enemy = function(g)
+                             if g.turn == 1 then table.remove(open, 3) end   -- pillaged
+                             return {}
+                         end }
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        explore = { { x = 9, y = 0, die = 0 } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local why = {}
+    for _, m in ipairs(r.missed_rewards) do why[m.x .. "," .. m.y] = m.reason end
+    check(why["9,0"], "skipped", "reasons: offered, never taken")
+    check(why["5,5"], "closed", "reasons: closed by another side before any offer")
+    check(why["0,9"], "unreachable", "reasons: never offered")
+    check(r.missed_recruits[1] and r.missed_recruits[1].reason, "not_reached",
+          "reasons: a Talk never offered")
 end
 
 -- test_a_bait_loop: an enemy drawn between two tiles for four turns is an anomaly, once.

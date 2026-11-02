@@ -57,7 +57,8 @@
 -- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase),
 -- closes },
 -- winFell = the judged phase's chance our counter ends the chapter, talks = the charIds any
--- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize }.
+-- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
+-- seizes = whether this plan takes it }.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -915,6 +916,8 @@ function M.plan(Bot, board, sight, style, opts)
     for c in pairs(talks) do best.talks[#best.talks + 1] = c end
     table.sort(best.talks)
     best.seizable = seizable
+    best.seizes = false   -- whether the plan takes the Seize offered (botrun's seize skips)
+    for _, x in ipairs(best.acts) do best.seizes = best.seizes or x.act == "seize" end
     return best.acts[1], best
 end
 

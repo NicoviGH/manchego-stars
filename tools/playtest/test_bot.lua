@@ -2584,6 +2584,8 @@ do
     check(a and a.die, want, "die: the counter's chance, from sight.odds on counterDist")
     check(want, 0, "die: a counter that cannot kill")
     check(plan and plan.acts[1].die, want, "die: kept in the plan record's acts")
+    check(plan and plan.seizable, false, "no Seize offered")
+    check(plan and plan.seizes, false, "and none taken")
     local mine
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.id == 0x01 then mine = p end

@@ -379,11 +379,13 @@ function M.cause(d, why)
     if d.over_cap then return "over_cap" end
     if f.reinforcement then return "reinforcement" end
     if f.fog then return "fog" end
+    -- no fighter (an event's SET_HP, a phase-start poison tick): no plan's combat odds were
+    -- about it, so it is neither the roll the plan lost nor a plan that failed to read
+    if not d.killer and not d.killerId then return "other", "noncombat" end
     -- a zero is never a tail: it is a death the plan did not see (FR-005)
     if d.predicted and d.predicted > 0 then return "rng_tail" end
     local detail
     if d.predicted == nil then detail = "missing_prediction"
-    elseif d.killer == nil then detail = "noncombat"
     elseif f.player_phase then detail = why.counters and "forecast_desync" or "player_phase_counter"
     elseif not why.struck then detail = "unrevealed_killer"
     elseif (why.strikers or 0) > 1 then detail = "zero_multi_attacker"
@@ -410,24 +412,26 @@ function M.grade(d, plan, action, cap, gameOver, board)
             if p.id == d.id then judged = p; d.predicted = p.die end
         end
     end
-    -- the killer, by unit index when the watch read it, else every red unit of its charId
+    -- the killer: by unit index when the watch read one, and by charId -- FE8 reloads a freed
+    -- slot, so an arrival can hold the index of a unit the snapshot saw die
+    local function isKiller(u)
+        return u.faction == "red" and (not d.killerId or u.id == d.killerId)
+            and (not d.killer or u.charId == d.killer) and (d.killerId or d.killer) and true
+    end
     local killers = {}
     for _, u in pairs(snap) do
-        if u.faction == "red" and ((d.killerId and u.id == d.killerId)
-                or (not d.killerId and u.charId == d.killer)) then
-            killers[#killers + 1] = u
-        end
+        if isKiller(u) then killers[#killers + 1] = u end
     end
     local boss = false
     for _, u in ipairs(killers) do boss = boss or u.isBoss == true end
     for _, u in ipairs(board and board.units or {}) do
-        if d.killerId and u.id == d.killerId and u.isBoss then boss = true end
+        if isKiller(u) and u.isBoss then boss = true end
     end
     local hidden = #killers > 0
     for _, u in ipairs(killers) do
         if plan.enemies and plan.enemies[u.id] then hidden = false end
     end
-    local fought = d.killer ~= nil or d.killerId ~= nil
+    local fought = (d.killer or d.killerId) and true or false
     d.flags = { player_phase = playerPhase, boss = boss }
     if known then
         d.flags.reinforcement = fought and #killers == 0
@@ -478,13 +482,11 @@ function M.run(api)
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
     local gameOver, felled, talked, greenSeen = {}, {}, {}, {}
-    local function anomaly(a)
-        if api.info.trace then
-            a.narrate = string.format("python3 tools/playtest/montecarlo.py story %s --turn %d",
-                                      api.info.trace, a.turn)
-        end
-        rec.anomalies[#rec.anomalies + 1] = a
-    end
+    -- whether the planner plays: only its plans record the Talks and rewards it was offered
+    local planned = api.Planner ~= nil and style.aggression ~= "greedy"
+    -- each with its turn: montecarlo.py's keep_trace gives it the story command (`narrate`)
+    -- once the trace is filed where it will stay
+    local function anomaly(a) rec.anomalies[#rec.anomalies + 1] = a end
     -- whether this turn moved the chapter on: a lord moved, a kill, a Visit, Talk or Chest
     -- (FR-007's stall is three player phases in a row without one)
     local progressed, idle = false, 0
@@ -566,18 +568,25 @@ function M.run(api)
                                     phase = k.phase or phase }, plan, action, nil, gameOver,
                                   lastBoard)
                 rec.deaths[#rec.deaths + 1] = g
-                if g.faction == "green" and (greenSeen[g.id] or g.turn) == g.turn then
-                    -- a green lost on the turn it was first seen: the plan had at most one
-                    -- player phase to save it
+                if g.faction == "green" and greenSeen[g.id] == g.turn then
+                    -- a green lost on the turn it was first seen: the plan had one player
+                    -- phase to save it
                     anomaly({ kind = "same_turn_green", turn = g.turn, charId = g.charId })
+                elseif g.faction == "green" and not greenSeen[g.id] then
+                    -- one no player phase ever saw: no plan could have saved it
+                    anomaly({ kind = "unseen_green", turn = g.turn, charId = g.charId })
                 end
             else
-                felled[k.charId], progressed = true, true
+                felled[k.charId] = true
+                -- a kill is progress when the player phase made it (FR-007's stall counts
+                -- player phases), never an enemy walking onto a counter
+                progressed = progressed or (k.phase or phase) == "player"
             end
         end
         for _, d in ipairs(list) do
             if d.faction ~= "blue" and d.faction ~= "green" then
-                felled[d.charId], progressed = true, true
+                felled[d.charId] = true
+                progressed = progressed or phase == "player"
             end
         end
         -- a red one gone with the fighter that downed it: that fighter's kill
@@ -634,8 +643,12 @@ function M.run(api)
         -- The graded outcomes (FR-006, FR-007), beside the clean clear. `clean` is derived
         -- from them and descriptive only: no decision reads it (FR-008).
         rec.greens = { escort_deaths = {}, allied_deaths = {} }
+        -- a recruit that joined and then fell is out of the party too: its death is a player
+        -- death, and its reason says so (vanilla Ch5 attempt 1: Joshua, turn 9)
+        local fellOurs = {}
         for _, d in ipairs(rec.deaths) do
             if d.faction == "blue" then
+                fellOurs[d.charId] = true
                 rec.first_death_turn = math.min(rec.first_death_turn or d.turn, d.turn)
             else
                 local list = d.escort and rec.greens.escort_deaths or rec.greens.allied_deaths
@@ -643,32 +656,33 @@ function M.run(api)
             end
         end
         if owed then
-            -- one that joined and then fell is out of the party too: its death is a player
-            -- death, and its reason says so (vanilla Ch5 attempt 1: Joshua, turn 9)
-            local fellOurs = {}
-            for _, d in ipairs(rec.deaths) do
-                if d.faction == "blue" then fellOurs[d.charId] = true end
-            end
             rec.missed_recruits = {}
             for _, c in ipairs(missing) do
                 rec.missed_recruits[#rec.missed_recruits + 1] = { charId = c,
                     reason = (fellOurs[c] and "died_after_joining")
                         or (felled[c] and "killed_before_talk")
-                        or (talked[c] and "talk_skipped") or "not_reached" }
+                        or (talked[c] and "talk_skipped")
+                        or (planned and "not_reached") or "unknown" }
             end
         end
         rec.missed_rewards = {}
         for _, t in ipairs(rec.clear.rewards_missing) do
-            -- offered to some unit and never taken, or never offered at all
+            -- offered to a unit and never taken; closed by another side before any offer; or
+            -- never offered. Only the planner counts offers (its plan's `explore`), so a run
+            -- without one cannot tell skipped from unreachable
+            local reason = (not planned and "unknown") or ((t.offers or 0) > 0 and "skipped")
+                or (t.why == "closed" and "closed") or "unreachable"
             rec.missed_rewards[#rec.missed_rewards + 1] = { x = t.x, y = t.y, kind = t.kind,
-                reason = (t.offers or 0) > 0 and "skipped" or "unreachable", status = t.why,
-                closed_by = t.closed_by }
+                reason = reason, status = t.why, closed_by = t.closed_by }
         end
         if outcome == "won" then rec.turns_to_win = turn end
         if outcome == "stuck" then anomaly({ kind = "stall_abort", turn = turn }) end
-        if outcome == "won" and #rec.seize_skips > 0 then
-            local first = rec.seize_skips[1].turn
-            anomaly({ kind = "seize_delay", turn = first, delay = turn - first })
+        -- a win put off with nothing left the win would close (a justified skip waits for a goal)
+        for _, k in ipairs(outcome == "won" and rec.seize_skips or {}) do
+            if not k.justified then
+                anomaly({ kind = "seize_delay", turn = k.turn, delay = turn - k.turn })
+                break
+            end
         end
         if outcome == "won" then
             for _, f in ipairs(explore.leftOpen()) do rec.bot_faults[#rec.bot_faults + 1] = f end
@@ -812,11 +826,7 @@ function M.run(api)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
                             commit = plan
                             for _, c in ipairs(plan.talks or {}) do talked[c] = true end
-                            local seizes = false
-                            for _, x in ipairs(plan.acts or {}) do
-                                seizes = seizes or x.act == "seize"
-                            end
-                            if plan.seizable and not seizes and skipTurn ~= turn then
+                            if plan.seizable and not plan.seizes and skipTurn ~= turn then
                                 -- the win was on offer and the plan did something else: only
                                 -- a goal the win would close justifies it
                                 skipTurn = turn
@@ -962,7 +972,7 @@ function M.run(api)
                 return "crashed", "the enemy phase never returned control", "timeout"
             end
             idle = progressed and 0 or idle + 1
-            if idle == 3 then
+            if idle > 0 and idle % 3 == 0 then
                 rec.stall_events[#rec.stall_events + 1] = { turn = turn, kind = "idle_3" }
             end
             progressed = false

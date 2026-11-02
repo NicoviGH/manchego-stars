@@ -171,8 +171,6 @@ def keep_trace(rec, out):
     src = os.path.join(rec['run_dir'], name)
     if not os.path.exists(src):
         rec.pop('trace')
-        for a in rec.get('anomalies') or []:
-            a.pop('narrate', None)
         return
     rel = os.path.join('traces', str(rec.get('campaign') or 'run'), '%s-s%s-a%s-%s.jsonl.gz' % (
         rec.get('chapter'), rec.get('seed'), rec.get('attempt'), uuid.uuid4().hex[:8]))
@@ -181,7 +179,8 @@ def keep_trace(rec, out):
     with open(src, 'rb') as fin, gzip.open(dest, 'wb') as fout:
         shutil.copyfileobj(fin, fout)
     rec['trace'] = rel
-    # each anomaly's story command names the trace where it is kept now, not the run dir
+    # each anomaly's story command, naming the trace where it is kept (botrun.lua records
+    # only the turn: the trace's final place is known here)
     for a in rec.get('anomalies') or []:
         a['narrate'] = narrate(dest, a.get('turn'))
 
@@ -242,8 +241,7 @@ def attempt_tasks(env, n, seed=1, vanilla=False):
 
 
 def narrate(trace, turn):
-    """The command that tells an anomaly's turns from its run's trace (botrun.lua writes the
-    same shape with the run dir's name; keep_trace points it at the kept file)."""
+    """The command that tells an anomaly's turns from its run's kept trace."""
     return 'python3 tools/playtest/montecarlo.py story %s --turn %s' % (trace, turn)
 
 
@@ -332,9 +330,11 @@ def attempt_line(r, said):
     why = spoiled(r) if r.get('outcome') == 'won' and r.get('clean') is not True else ''
     # a theft at or below the boosters spoils nothing and is noted (ADR 0379)
     noted = '; '.join(theft(t) for t in r.get('thefts') or [] if not t.get('spoils'))
-    # a lost run's deaths, graded, are what it says about the plan (a won one's are in `why`)
-    if r.get('outcome') != 'won' and any(d.get('cause') for d in r.get('deaths') or []):
-        why = '; '.join(death(d) for d in r['deaths'])
+    # a run not won names its graded deaths too (a won one's are in `why`), labelled apart
+    # from a crash's own reason
+    graded = '; '.join(death(d) for d in r.get('deaths') or [] if d.get('cause'))
+    if r.get('outcome') != 'won' and graded:
+        why = 'deaths: ' + graded
     stalls = ', '.join('%s turn %s' % (e['kind'], e['turn']) for e in r.get('stall_events') or [])
     anomalies = ''.join('\n    anomaly: %s turn %s%s' % (
         a['kind'], a.get('turn'), ' -> %s' % a['narrate'] if a.get('narrate') else '')

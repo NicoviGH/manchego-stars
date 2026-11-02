@@ -95,7 +95,9 @@ class Records(unittest.TestCase):
                      flags={})
         self.assertIn('other (blindspot: unrevealed_killer) at 0.0%', mc.death(other))
         lost = dict(V2, outcome='lost', deaths=[other])
-        self.assertIn('unrevealed_killer', mc.attempt_line(lost, set()))
+        self.assertIn('deaths: lost 0x42', mc.attempt_line(lost, set()))
+        crashed = mc.attempt_line(dict(lost, outcome='crashed', why='Lua error'), set())
+        self.assertIn('(Lua error) (deaths: lost 0x42', crashed)   # labelled apart
 
     def test_a_cause_botrun_does_not_name_is_refused(self):
         # the names are botrun.lua's M.CAUSES and M.DETAILS, read from its text
@@ -501,16 +503,14 @@ class Cell(unittest.TestCase):
         with open(os.path.join(rd, 'tr.jsonl'), 'w') as fh:
             fh.write('{"t": "start"}\n')
         rec = {'trace': 'tr.jsonl', 'run_dir': rd, 'chapter': 2, 'seed': 1, 'attempt': 1,
-               'anomalies': [{'kind': 'stall_abort', 'turn': 7,
-                              'narrate': mc.narrate('tr.jsonl', 7)}]}
+               'anomalies': [{'kind': 'stall_abort', 'turn': 7}]}
         out = os.path.join(d, 'runs.jsonl')
         mc.keep_trace(rec, out)
         self.assertEqual(rec['anomalies'][0]['narrate'],
                          mc.narrate(os.path.join(d, rec['trace']), 7))
-        gone = {'trace': 'none.jsonl', 'run_dir': rd, 'anomalies': [{'kind': 'x', 'turn': 1,
-                                                                    'narrate': 'n'}]}
+        gone = {'trace': 'none.jsonl', 'run_dir': rd, 'anomalies': [{'kind': 'x', 'turn': 1}]}
         mc.keep_trace(gone, out)
-        self.assertNotIn('narrate', gone['anomalies'][0])
+        self.assertNotIn('narrate', gone['anomalies'][0])   # no kept trace, no command
 
 
 # The frozen suite's manifest (#510 step 9 plan, T005; FR-021 and FR-025): a matrix.yaml
