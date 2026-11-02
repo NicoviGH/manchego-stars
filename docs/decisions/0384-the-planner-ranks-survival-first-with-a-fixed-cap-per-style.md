@@ -121,7 +121,7 @@ unit's sure death, because it was the smaller excess (#560). `plan.rank.game_ove
 per judged outcome: the chance that any such unit dies there, weighted by the outcome's chance
 (two lords killed in different outcomes make a sure game over, never a product of their
 chances). Chances in the rank are compared to within `M.DUST` (1e-9), so a sum taken in another
-order is no difference. Admitted plans are unchanged.
+order is no difference. Admitted plans' rank is unchanged (see the 2026-11-02 amendment).
 
 **Amended (Nicolas, 2026-11-02): a lord is a working unit, so the cap is its whole protection.**
 "A lord is still a functional unit so over protecting it is not feasible, they need to be put in
