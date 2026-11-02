@@ -1639,7 +1639,9 @@ local function stepsToward(ctx, u, g)
     local now = ctx.turnsTo(u, g)
     if now and now <= Goals.DUST then return true end
     local there = ctx.standing[tileKey(g.x, g.y)]
-    local recruit = there and there.faction ~= "blue"
+    -- a recruit (recruitsOf: one a unit of ours may Talk over), not any unit: an enemy holding
+    -- a village is no goal reached by standing beside it
+    local recruit = there and ctx.recruits[there.id]
     local boxed = true
     for _, t in ipairs(endTiles(ctx, u)) do
         if recruit and manhattan(t.x, t.y, g.x, g.y) == 1 then return true end

@@ -4152,6 +4152,17 @@ do
                                 { stuck = { ["1>5,0"] = { id = 0x01, x = 5, y = 0, since = 1 } } })
     check(ctx.stuck["1>5,0"], nil, "reassign: a unit that can end beside its recruit is not blocked")
     check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 5, "reassign: and it is sent to it")
+    -- an enemy that is no recruit, standing on a village A was sent to: beside it is not there
+    local V = red(0x81, 5, 0, { minRange = false })
+    o.talk, o.explorable = nil, { { x = 5, y = 0, kind = "visit" } }
+    o.canExplore = { [0x01] = { ["5,0"] = "visit" } }
+    board = boardOf(A, V)
+    board.turn = 3
+    _, ctx = B.candidates(board, sightOf(o), gifted("careful", 1000),
+                          { sent = { { id = 0x01, x = 5, y = 0 } },
+                            stuck = { ["1>5,0"] = { id = 0x01, x = 5, y = 0, since = 1 } } })
+    check(ctx.stuck["1>5,0"] ~= nil and ctx.exploreGoal[0x01] == nil, true,
+          "reassign: an enemy on the goal keeps the block, and the goal goes")
 end
 
 -- test_after_a_visit_the_march_returns_to_the_objective (FR-016): the House taken (explored),

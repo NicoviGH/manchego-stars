@@ -213,4 +213,16 @@ progress. It never outranks a forfeit, the win or a whole turn of progress.
   1-3: won clean turn 8, won with one death turn 8, won clean turn 8 (main, same env: stuck,
   won clean turn 8, stuck). Attempt 2 (bold) lost 0x03 on turn 7 at a predicted 51.1%, under a
   labelled fallback. Vanilla Ch2, attempts 1-2: won clean on turns 8 and 6.
-- **Measured, the pinned suite (`suite --baseline`, 52 runs):** SUITE_NUMBERS
+- **Measured, the pinned suite (`suite --baseline`, 52 runs, at the second review round):**
+  2,026.8 CPU s, +7.6% on PR-A's 1,883.6 and inside SC-003's 20% (PR-C's two runs of identical
+  play read 1,925.9 and 2,175.9). 8,004 judged enemy phases against PR-C's 7,020 (+14%), the
+  advance plan among them. The tuning seeds (26 runs, the only outcomes read), PR-C then PR-D:
+  clean clears 10 to 14, wins 22 to 23, turns 245 to 242, deaths 12 to 18. Vanilla Ch1 seed
+  1001 went from `stuck` to clean; both vanilla Ch2 seeds and both vanilla Ch4 seeds from won
+  to clean. Every `over_cap` death came from a labelled fallback, and the six more deaths are
+  all such: vanilla Ch5 6 (PR-C 2), scout-ch10 2 (PR-C 0). With progress compared exactly ahead
+  of the judged score (the first ruling), the same suite read 12 deaths, 14 clean and vanilla
+  Ch5 3: the extra fallbacks come with the judged score ordering plans within the turn. That
+  trade is Nicolas's to weigh (put to him with PR #564). The last fix (only a recruit on a goal
+  tile counts as reached beside it) came after this run and changes play only where an enemy
+  that is no recruit stands on a tile a unit was sent to.
