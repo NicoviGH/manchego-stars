@@ -9,7 +9,40 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-01 (Claude, latest). **#510 step 9 PR-B MERGED: #559 (ba6d09f).** Every attempt
+Refreshed 2026-11-02 (Claude, latest). **#510 step 9 PR-C MERGED: #560 (322101f).** ADR 0384 is
+built in part. The caps are `planner.lua` `M.CAPS` (careful 1%, even 5%, bold 15%), and a style
+with no cap raises. Protected units are every blue plus `sight.objective.gameOver`. The judge
+branches every uncertain kill, up to `M.BRANCH` = 8, and the rest are counted (`plans.averaged`).
+Plans are ranked by `M.outranks` on `plan.rank`: admission first; with none admitted, the least
+excess, labelled `FALLBACK_SACRIFICE` and recorded as one `fallback_sacrifice` anomaly a turn.
+**Admitted plans are still ordered by the judged score until PR-D's ledger.** botrun grades only
+protected deaths against the cap, through `Planner.admits`. `M.plan` returns
+`{ phases, averaged }` as its third value. Review: `/code-review 560 medium` in a subagent,
+10 findings, then 3 scoped re-review rounds, the last clean.
+
+**Measured:**
+- Suite: 7,020 judged phases over 1,005 plans; `BRANCH = 2` judged 6,213.
+- CPU varies about 13% between runs of identical play: 1,925.9 and 2,175.9 s, against PR-A's
+  1,883.6, both inside SC-003's 20%. **Report phases beside CPU.**
+- Vanilla Ch3 with Seth benched (uncommitted bench, seed 1): 8/8 clean (before: 1/8 kept everyone).
+- Vanilla Ch5 attempt 1 (bold): Natasha dies on turn 3 at 68.4% under a labelled fallback, and
+  Joshua is still killed before the Talk.
+- Every `over_cap` death in the suite came from a labelled fallback.
+
+**Two things for Nicolas** (in #560's body):
+- The cap does not weigh a game-over unit above another: with every plan over the cap, a lord's
+  50% is played over a unit's sure death (`test_planner_protects_a_game_over_unit`). His call.
+- While reading suite records, this session printed the held-out runs' deaths too. The caps are
+  fixed, so nothing was tuned on them. From now on, read only the `tuning` set (`rec.suite.set`).
+
+**Rejected:** T037's "branch only the kills whose enemy reaches a protected unit" is unsound. A
+dying enemy frees a tile for another (`test_planner_plays_an_uncertain_kill_both_ways`).
+
+**NEXT: PR-D** (US2 ledger, progress and seize skips, T045-T056), on a branch off main. It
+replaces `value` in the admitted order with forfeits, completion and progress. It takes over
+T034's allied-green and never-defer-a-seize clauses (#560 ruling 2), and ch01's stall.
+
+Earlier, 2026-11-01: **#510 step 9 PR-B MERGED: #559 (ba6d09f).** Every attempt
 record is graded (ADR 0388): each blue/green death carries the committing plan's `predicted`,
 independent flags (reinforcement, fog, boss, player_phase) and one cause by precedence
 (`botrun.lua` `M.CAUSES`, which `montecarlo.py` reads); missed recruits and rewards carry reasons;
@@ -20,9 +53,7 @@ runs vs 1,883.6). Review: `/code-review 559 medium` in a subagent, 12 + 3 + 1 fi
 Plan comment ticked T012-T027. **What the graded records already show** (ADR 0388's Measured):
 vanilla Ch5's unrecruited Joshua kills one of ours in all four suite seeds; ours ch02's greens
 0xC9/0xCA fall on turns 2-3 at a predicted ~48% each; every planner attack has counter `die` 0
-by Bot.candidates' gate, so player-phase deaths read `forecast_desync`. **NEXT: PR-C (US2 risk
-admission and ranking, T029-T044), on a branch off main;** it fills `cap`/`over_cap` and adds the
-`fallback_sacrifice` anomaly. Report `suite` CPU against 1,883.6.
+by Bot.candidates' gate, so player-phase deaths read `forecast_desync`. (PR-C, above, followed.)
 
 Earlier the same day: **#510 step 9 PR-A MERGED: #558 (1168f72).** The frozen suite is
 `matrix.yaml`'s `instrument:` section (13 pinned starts, 52 runs), `montecarlo.py suite
