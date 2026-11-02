@@ -23,8 +23,9 @@
 --      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
 --      The plans are then ranked, not summed (ADR 0384): one whose protected units (every
 --      blue, and any unit whose death ends the game) each die at no more than the style's cap
---      (M.CAPS) outranks any that does not, and with none under it the least over it is
---      played and labelled. The judged score orders the plans under the cap.
+--      (M.CAPS) outranks any that does not. With none under it, the one least likely to end
+--      the game is played, then the least over the cap, and it is labelled. The judged score
+--      orders the plans under the cap.
 --      Two more are judged beside them: on a Defeat Boss map the assault (every unit that
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
 --      never tries), and on a stalled board (opts.stalled) each unit's best act that
@@ -55,7 +56,8 @@
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- ours it strikes, sorted), kind =
 -- "beam"|"assault"|"unstall"|"mend", considered = every plan judged, best first: { judged,
--- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, max_exceed,
+-- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, game_over
+-- (the chance a unit whose death ends the game dies), max_exceed,
 -- sum_exceed, max_die, sum_die, hp_left, value (the judged score), key }, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, branched
@@ -120,25 +122,31 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 
 -- Whether death chance `d` is within `cap`: a sum of branch products can land a few ulps over a
 -- chance that is at the cap, and that is not an excess.
-function M.admits(d, cap) return d <= cap + 1e-9 end
+M.DUST = 1e-9
+function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
--- first. Over the cap, the smallest largest excess, then summed excess, then largest death
--- chance. Then the admitted order: `value`, the judged score, until the completion ledger
--- (PR-D) puts forfeits, completion and progress in its place. Last the largest death chance,
--- the summed one, more HP left, and the plan's acts as a stable key.
+-- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
+-- among others, it ends the chapter (Nicolas, 2026-11-01); then the smallest largest excess,
+-- then summed excess, then largest death chance. Then the admitted order: `value`, the judged
+-- score, until the completion ledger (PR-D) puts forfeits, completion and progress in its
+-- place. Last the largest death chance, the summed one, more HP left, and the plan's acts as a
+-- stable key.
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
     local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }
     if not a.admitted then
-        order = { { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 }, { "value", -1 },
-                  order[2], order[3], order[4] }
+        order = { { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 },
+                  { "value", -1 }, order[2], order[3], order[4] }
     else
         table.insert(order, 1, { "value", -1 })
     end
     for _, o in ipairs(order) do
         local x, y = a[o[1]], b[o[1]]
-        if x ~= y then
+        -- a chance summed in another order differs by float dust, which is no difference
+        local differ = x ~= y
+        if type(x) == "number" and type(y) == "number" then differ = math.abs(x - y) > M.DUST end
+        if differ then
             if o[2] > 0 then return x < y end
             return x > y
         end
@@ -281,8 +289,7 @@ function M.plan(Bot, board, sight, style, opts)
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
-    local gameOver = {}
-    for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do gameOver[c] = true end
+    local gameOver = Bot.gameOver(sight)
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     counter = {}, healed = {},
@@ -737,6 +744,9 @@ function M.plan(Bot, board, sight, style, opts)
         local judged = st.base
         local die, taken, short, struck = {}, {}, {}, {}
         local byWay = {}   -- per unit, per way: its share of the death chance there
+        -- the chance the game ends in the phase: per outcome, any unit whose death ends it
+        -- dies there; deaths in one outcome may come together, never across outcomes
+        local overAll = 0
         local strikers = {}   -- per unit, ours and green, the enemies that strike it in any outcome
         for _, g in ipairs(greens) do strikers[g.id] = {} end
         for _, p in ipairs(planned) do strikers[p.unit.id] = {} end
@@ -745,7 +755,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- Seth's counter on turn 3, the planner paying nothing for it)
         local felled, struckBy, fell, winStruck = {}, {}, 0, {}
         for _, o in ipairs(outcomes) do
-            local onUnit = {}
+            local onUnit, none = {}, 1   -- none: no game-over unit dies in this outcome
             for _, s in ipairs(o.strikes) do
                 onUnit[s.target] = onUnit[s.target] or {}
                 table.insert(onUnit[s.target], s.takenDist)
@@ -771,6 +781,7 @@ function M.plan(Bot, board, sight, style, opts)
                 die[id] = (die[id] or 0) + o.p * d
                 byWay[id] = byWay[id] or {}
                 byWay[id][o.way] = (byWay[id][o.way] or 0) + o.p * d
+                if gameOver[p.unit.charId] then none = none * (1 - d) end
                 taken[id] = (taken[id] or 0) + o.p * t
                 short[id] = (short[id] or 0) + o.p * sh
                 struck[id] = math.max(struck[id] or 0, #phase)
@@ -781,9 +792,11 @@ function M.plan(Bot, board, sight, style, opts)
                 die[g.id] = (die[g.id] or 0) + o.p * d
                 byWay[g.id] = byWay[g.id] or {}
                 byWay[g.id][o.way] = (byWay[g.id][o.way] or 0) + o.p * d
+                if gameOver[g.charId] then none = none * (1 - d) end
                 taken[g.id] = (taken[g.id] or 0) + o.p * t
                 struck[g.id] = math.max(struck[g.id] or 0, #phase)
             end
+            overAll = overAll + o.p * (1 - none)
             -- the strikers our counters fell (felled): the boss, or a Rout's last enemy, is the win
             local left = objective == "rout" and redsLeft(st) or 0
             local lives = 1
@@ -861,8 +874,8 @@ function M.plan(Bot, board, sight, style, opts)
         -- the style's cap, and the rank the plan is compared by
         st.keys = {}
         for _, x in ipairs(st.acts) do st.keys[#st.keys + 1] = key(x) end
-        local rank = { admitted = true, max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0,
-                       hp_left = 0, value = judged, key = table.concat(st.keys, " ") }
+        local rank = { admitted = true, game_over = 0, max_exceed = 0, sum_exceed = 0, max_die = 0,
+                       sum_die = 0, hp_left = 0, value = judged, key = table.concat(st.keys, " ") }
         st.protected = {}
         local function protect(u, hp)
             local d, branches = die[u.id] or 0, {}
@@ -886,6 +899,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, g in ipairs(greens) do
             if gameOver[g.charId] then protect(g, g.hp) end
         end
+        rank.game_over = overAll
         st.rank = rank
     end
 
@@ -997,7 +1011,8 @@ function M.plan(Bot, board, sight, style, opts)
     if not best or #best.acts == 0 then return nil, nil, cost end
     table.sort(considered, function(x, y) return M.outranks(x.rank, y.rank) end)
     best.considered = considered
-    -- no plan under the cap: the least over it is played, and says so (FR-011)
+    -- no plan under the cap: the least likely to end the game, then the least over it, is
+    -- played, and says so (FR-011, ADR 0384 amended)
     best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil
     -- the rule's record: each Visit or Chest offered, and whether the plan played it credited
     -- (its standing chance 0 and the judged phase's 0 too)
