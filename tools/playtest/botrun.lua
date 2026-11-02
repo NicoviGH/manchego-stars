@@ -29,7 +29,8 @@
 --   Bot, Json          bot.lua and json.lua, loaded by the caller
 --   Planner            OPTIONAL: planner.lua; when given it plays every style but greedy, and
 --                      a plan's acts are played in turn until Planner.surprise calls for a new
---                      one (the record's `plans`: made, and acts played from a kept one)
+--                      one (the record's `plans`: made, acts played from a kept one, and the enemy
+--                      phases they judged)
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, instrument }  what the
 --                      record names; instrument = the bot hash and suite version (PT_INSTRUMENT)
 --                      the run by; campaign and attempt only when campaign.lua plays it
@@ -491,7 +492,7 @@ function M.run(api)
                   attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
-                  plans = { made = 0, kept = 0 }, bag = {}, board_repeats = 0,
+                  plans = { made = 0, kept = 0, phases = 0 }, bag = {}, board_repeats = 0,
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
@@ -840,6 +841,7 @@ function M.run(api)
                                                            lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
+                        rec.plans.phases = rec.plans.phases + (plan and plan.phases or 0)
                         if plan then
                             sent = plan.goals
                             -- the board this plan committed to, and its decision index (a

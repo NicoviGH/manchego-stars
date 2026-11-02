@@ -3669,6 +3669,8 @@ do
         check(math.abs(p.die - live) < 1e-9, true,
               string.format("branches: 0x%02X dies only where its enemy lives", p.id))
     end
+    -- every judged plan played 2^3 phases at most; the record counts the calls
+    check(plan and plan.phases and plan.phases >= 8, true, "branches: the phases are counted")
     local three = plan and plan.protected and plan.protected[3]
     local sum = 0
     for _, b in ipairs(three and three.branches or {}) do sum = sum + b.p end

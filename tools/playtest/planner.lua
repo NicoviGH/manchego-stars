@@ -58,7 +58,8 @@
 -- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, max_exceed,
 -- sum_exceed, max_die, sum_die, hp_left, value (the judged score), key }, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
--- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
+-- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, phases =
+-- the enemy phases this call judged, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
 -- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
@@ -643,6 +644,7 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
+    local phases = 0   -- the enemy phases judged for this plan: the cost branching pays
     -- a green unit lost spoils the clear as one of ours does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
@@ -699,6 +701,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local strikes, outcomes, top, total = {}, {}, nil, 0
         for i, w in ipairs(ways) do
+            if sight.enemyPhase then phases = phases + 1 end
             local s = sight.enemyPhase and sight.enemyPhase({ blues = planned, gone = w.gone,
                                                               reds = w.reds }) or {}
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
@@ -979,6 +982,7 @@ function M.plan(Bot, board, sight, style, opts)
     if not best or #best.acts == 0 then return nil end
     table.sort(considered, function(x, y) return M.outranks(x.rank, y.rank) end)
     best.considered = considered
+    best.phases = phases
     -- no plan under the cap: the least over it is played, and says so (FR-011)
     best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil
     -- the rule's record: each Visit or Chest offered, and whether the plan played it credited

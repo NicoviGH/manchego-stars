@@ -485,12 +485,13 @@ do
             local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
                            { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
             return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
-                              enemies = { [0x81] = true } }
+                              enemies = { [0x81] = true }, phases = 3 }
         end,
     }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.plans.kept, 1, "C's wait is played from A's plan")
+    check(r.plans.phases, 3, "the judged enemy phases of every plan made, summed")
     check(asked, r.plans.made, "every plan asked for is counted")
     check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
           .. "turn 2's board: one stalled ask; turn 4 repeats it again: stuck")
