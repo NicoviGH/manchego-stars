@@ -34,12 +34,14 @@ it's not just a risk"). Among plans over the cap, the chance of a game over (`ra
 summed per judged outcome) comes before the excess (ADR 0384 amended). `Bot.gameOver(sight)` owns
 the set of game-over charIds. Rank chances compare to within `M.DUST`. 
 
-**#562 MERGED (0376fdd), the admission question is answered** (Nicolas, 2026-11-02: "a lord is
+**#562 + #563 MERGED, the admission question is answered** (Nicolas, 2026-11-02: "a lord is
 still a functional unit so over protecting it is not feasible, they need to be put in danger to
-win"). A lord gets the style's cap like any unit and admission still comes first (a rank test
-pins it). **For PR-D:** within the cap a game over is NOT a forfeit in the ledger (ADR 0384 §4
-and its 2026-11-02 amendment), else the worst-branch rule makes every lord-risking plan forfeit
-everything and the 0% plan always wins. Among admitted plans a lord's chance only breaks ties.
+win, so its a balance really"). This keeps the spec: no separate cap for a lord (FR-010), and
+admission comes first (FR-011; a rank test pins it). **Open, for PR-D's design (put it to
+Nicolas):** how the ledger counts a game over in an admitted plan. Under §4's worst-branch rule,
+any lord risk would close every open goal, so the plan whose lord is at 0% always wins: the
+over-protection he ruled out. Today's interim `value` already leans that way (`loss()` prices a
+lord's death at `W.win`). ADR 0384's 2026-11-02 amendment has it.
 - **Held-out records were seen:** while reading suite records, this session printed the held-out runs' deaths too. The caps are
   fixed, so nothing was tuned on them. From now on, read only the `tuning` set (`rec.suite.set`).
 
