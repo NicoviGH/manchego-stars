@@ -29,7 +29,9 @@
 --   Bot, Json          bot.lua and json.lua, loaded by the caller
 --   Planner            OPTIONAL: planner.lua; when given it plays every style but greedy, and
 --                      a plan's acts are played in turn until Planner.surprise calls for a new
---                      one (the record's `plans`: made, and acts played from a kept one)
+--                      one (the record's `plans`: made, acts played from a kept one, the enemy
+--                      phases they judged, and the uncertain kills they left to the average past
+--                      Planner.BRANCH: every plan judged, not only the ones played)
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, instrument }  what the
 --                      record names; instrument = the bot hash and suite version (PT_INSTRUMENT)
 --                      the run by; campaign and attempt only when campaign.lua plays it
@@ -408,12 +410,15 @@ end
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
 -- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
 -- phase's last plan (its `predict`). `plan.snapshot` is the board when that plan was made,
--- `cap` the style's risk cap (nil until the planner has one), `gameOver` the charIds whose
--- death ends the game, `diedAt` (optional) each unit index of another side to the decision count
--- it fell at: one that fell at or after the plan's (`plan.ref`) is no killer from the snapshot,
--- its slot free for an arrival of the same generic charId. Unknown is nil, never zero: a death
--- with no plan behind it has no prediction, and so no over-cap, reinforcement or fog flag.
-function M.grade(d, plan, action, cap, gameOver, board, diedAt)
+-- `cap` the style's risk cap (nil for greedy, which plays no plan; kept only on a protected
+-- unit's death), `lords` the set (charId -> true) of the units whose death ends the game,
+-- `admits` the planner's own test of a chance against the cap (Planner.admits: required
+-- whenever `cap` is given), `diedAt` (optional) each unit index of another side to the
+-- decision count it fell at: one that fell at or after the plan's (`plan.ref`) is no killer
+-- from the snapshot, its slot free for an arrival of the same generic charId. Unknown is nil,
+-- never zero: a death with no plan behind it has no prediction, and so no over-cap,
+-- reinforcement or fog flag.
+function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
     local playerPhase = d.phase == "player"
     local snap, known = {}, plan and plan.snapshot ~= nil
     for _, u in ipairs(plan and plan.snapshot or {}) do
@@ -453,8 +458,14 @@ function M.grade(d, plan, action, cap, gameOver, board, diedAt)
         d.flags.reinforcement = fought and #killers == 0
         d.flags.fog = hidden
     end
-    d.cap = cap
-    if d.predicted ~= nil and cap ~= nil then d.over_cap = d.predicted > cap end
+    -- the cap is on the protected units only (FR-009): blue, or one whose death ends the game
+    local endsGame = (lords or {})[d.charId] == true
+    if d.faction == "blue" or endsGame then d.cap = cap end
+    if cap ~= nil and not admits then
+        -- a cap with no test to apply it would leave every death ungraded, never a fault
+        error("botrun.grade: a cap with no admits (Planner.admits) to grade it by")
+    end
+    if d.predicted ~= nil and d.cap ~= nil then d.over_cap = not admits(d.predicted, d.cap) end
     local struck, strikers = false, 0
     for _, id in ipairs(judged and judged.strikers or {}) do
         strikers = strikers + 1
@@ -466,12 +477,7 @@ function M.grade(d, plan, action, cap, gameOver, board, diedAt)
                                      counters = action and action.f and action.f.counters })
     d.family = d.detail and M.DETAILS[d.detail]
     d.plan_ref = plan and plan.ref
-    if d.faction == "green" then
-        d.escort = false
-        for _, c in ipairs(gameOver or {}) do
-            if c == d.charId then d.escort = true end
-        end
-    end
+    if d.faction == "green" then d.escort = endsGame end
     return d
 end
 
@@ -491,18 +497,23 @@ function M.run(api)
                   attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
-                  plans = { made = 0, kept = 0 }, bag = {}, board_repeats = 0,
+                  plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
+                  board_repeats = 0,
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
-    local gameOver, felled, talked, greenSeen = {}, {}, {}, {}
+    local lords, felled, talked, greenSeen = {}, {}, {}, {}
     -- per unit index of another side, the decision count when it fell: a slot the game freed
     -- after a plan's snapshot and reloaded with an arrival is not the snapshot's unit
     local diedAt = {}
     -- whether the planner plays: only its plans record the Talks and rewards it was offered
     local planned = api.Planner ~= nil and style.aggression ~= "greedy"
+    -- the style's risk cap, which every death is graded against (the planner raises on a
+    -- style without one; greedy plays no plan, and so has none)
+    local cap = planned and api.Planner.CAPS and api.Planner.CAPS[style.aggression] or nil
+    local admits = planned and api.Planner.admits or nil   -- the planner's own test of the cap
     -- each with its turn: montecarlo.py's keep_trace gives it the story command (`narrate`)
     -- once the trace is filed where it will stay
     local function anomaly(a) rec.anomalies[#rec.anomalies + 1] = a end
@@ -584,8 +595,8 @@ function M.run(api)
                 local g = M.grade({ id = k.id, charId = k.charId, faction = k.faction,
                                     turn = k.turn or turn, killer = k.killer or d.killer,
                                     killerId = k.killerId or d.killerId,
-                                    phase = k.phase or phase }, plan, action, nil, gameOver,
-                                  lastBoard, diedAt)
+                                    phase = k.phase or phase }, plan, action, cap, lords,
+                                  lastBoard, diedAt, admits)
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
                     -- a green lost on the turn it was first seen: the plan had one player
@@ -730,15 +741,17 @@ function M.run(api)
         trace({ t = "start", info = api.info, style = api.style, claims_played = played,
                 claims_unplayed = unplayed,
                 game_over = sight.objective and sight.objective.gameOver })
-        gameOver = sight.objective and sight.objective.gameOver or {}
-        local lords = {}
-        for _, c in ipairs(gameOver) do lords[c] = true end
+        lords = {}
+        for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do
+            lords[c] = true
+        end
         local seen, waitUntil = {}, nil
         -- the plan that committed to the enemy phase: this phase's last (FR-003)
         local commit
         -- each red unit's tile at every phase start, for a bait loop; the turn of the last
         -- seize skip recorded (one a turn)
         local tiles, baited, skipTurn = {}, {}, nil
+        local fallback   -- this turn's fallback_sacrifice anomaly, once one is recorded
         -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
         -- unit left to act returns none), so the next turn keeps the same senders
         local sent
@@ -831,18 +844,35 @@ function M.run(api)
                             api.log("plan: replan, " .. why)
                         end
                         local replan = playing and why
-                        local a, plan = api.Planner.plan(Bot, board, sight, style,
+                        local a, plan, cost = api.Planner.plan(Bot, board, sight, style,
                                                          { stalled = stalled, sent = sent,
                                                            explored = explore.explored(),
                                                            lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
+                        cost = cost or {}
+                        rec.plans.phases = rec.plans.phases + (cost.phases or 0)
+                        rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         if plan then
                             sent = plan.goals
                             -- the board this plan committed to, and its decision index (a
                             -- death's plan_ref)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
                             commit = plan
+                            if plan.fallback then
+                                -- every plan was over the cap: the least over it was played.
+                                -- One anomaly a turn, however often the turn replans: `plans`
+                                -- counts them, `max_die` the most any of them accepted
+                                local die = plan.rank and plan.rank.max_die or 0
+                                if fallback and fallback.turn == turn then
+                                    fallback.plans = fallback.plans + 1
+                                    fallback.max_die = math.max(fallback.max_die, die)
+                                else
+                                    fallback = { kind = "fallback_sacrifice", turn = turn,
+                                                 plans = 1, max_die = die }
+                                    anomaly(fallback)
+                                end
+                            end
                             for _, c in ipairs(plan.talks or {}) do talked[c] = true end
                             if plan.seizable and not plan.seizes and skipTurn ~= turn then
                                 -- the win was on offer and the plan did something else: only
@@ -869,6 +899,8 @@ function M.run(api)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
                                 ref = plan and plan.ref,
                                 judged = plan and plan.judged, kind = plan and plan.kind,
+                                rank = plan and plan.rank, fallback = plan and plan.fallback,
+                                protected = plan and plan.protected,
                                 considered = plan and plan.considered,
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,

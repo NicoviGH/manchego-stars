@@ -479,18 +479,25 @@ do
             asked = asked + 1
             if opts and opts.stalled then g.stalledAsk = asked end
             for _, u in ipairs(board.units) do
-                if u.faction == "blue" and u.acted then return nil end
+                if u.faction == "blue" and u.acted then
+                    return nil, nil, { phases = 3, averaged = 0 }
+                end
             end
-            if board.turn > 1 then return nil end
+            if board.turn > 1 then return nil, nil, { phases = 3, averaged = 1 } end
             local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
                            { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
             return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
-                              enemies = { [0x81] = true } }
+                              enemies = { [0x81] = true } }, { phases = 3, averaged = 1 }
         end,
     }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.plans.kept, 1, "C's wait is played from A's plan")
+    check(r.plans.phases, 12, "the judged enemy phases of every call, a nil plan's too, summed")
+    -- the stub's calls: turn 1's plan (1) and its played-out ask (0), turn 2's (1), turn 3's
+    -- stalled ask (1)
+    check(r.plans.averaged, 3, "the uncertain kills past the bound in every plan judged, "
+          .. "a nil call's too, summed: never silent")
     check(asked, r.plans.made, "every plan asked for is counted")
     check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
           .. "turn 2's board: one stalled ask; turn 4 repeats it again: stuck")
@@ -938,12 +945,13 @@ do
     check(d.predicted, 0.04, "enemy phase: the last player-phase plan's predict")
     check(d.plan_ref, 3, "enemy phase: which plan")
     check(d.cause, "rng_tail", "a positive prediction under no cap is a tail")
-    check(d.over_cap, nil, "no cap yet: over_cap is null")
+    check(d.over_cap, nil, "no cap given: over_cap is null")
     local act = { unitId = 0x01, die = 0.3, f = { counters = true } }
     d = Botrun.grade(death { phase = "player" }, committed {}, act, nil, {})
     check(d.predicted, 0.3, "player phase: the attack's own counter chance")
     check(d.flags.player_phase, true, "player phase: flagged")
-    d = Botrun.grade(death(), nil, nil, 0.05, {})
+    local admits = dofile(here .. "planner.lua").admits
+    d = Botrun.grade(death(), nil, nil, 0.05, {}, nil, nil, admits)
     check(d.predicted, nil, "no plan: no prediction")
     check(d.over_cap, nil, "no plan: over_cap is null, never false")
     check(d.flags.reinforcement, nil, "no plan: reinforcement unknown")
@@ -1089,7 +1097,8 @@ do
     check(r.turns_to_win, nil, "a loss has no turns to win")
     check(r.deaths[1].cause, "other", "greedy: no plan behind it")
     check(r.deaths[1].detail, "noncombat", "no fighter: noncombat, not a sandbox fault")
-    check(r.deaths[1].over_cap, nil, "no cap yet: the over-cap check has not run (null, not false)")
+    check(r.deaths[1].over_cap, nil,
+          "greedy has no cap: the over-cap check has not run (null, not false)")
 end
 
 -- test_seize_skips_and_stalls (FR-007): a planner offered the Seize keeps waiting. With a
@@ -1258,6 +1267,91 @@ do
     local d = r.deaths[1]
     check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
+end
+
+-- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose
+-- death ends the game; an allied green's death is graded with no cap, so never over it.
+do
+    local green = death { faction = "green", charId = 0x41, id = 0x41 }
+    local admits = dofile(here .. "planner.lua").admits
+    local d = Botrun.grade(green, committed { predict = { { id = 0x41, die = 0.3,
+                                                            strikers = { 0x81 } } } },
+                           nil, 0.01, { [0x01] = true }, nil, nil, admits)
+    check(d.cap, nil, "an allied green has no cap")
+    check(d.over_cap, nil, "and so no over-cap verdict")
+    local vip = death { faction = "green", charId = 0x41, id = 0x41 }
+    d = Botrun.grade(vip, committed {}, nil, 0.01, { [0x41] = true }, nil, nil, admits)
+    check(d.cap, 0.01, "a game-over green has its style's cap")
+    d = Botrun.grade(death(), committed {}, nil, 0.01, {}, nil, nil, admits)
+    check(d.cap, 0.01, "a blue has its style's cap")
+    -- a cap with no test to apply it is a fault, never a death left ungraded (FR-010)
+    local ok, err = pcall(Botrun.grade, death(), committed {}, nil, 0.01, {})
+    check(ok, false, "a cap without admits raises")
+    check(tostring(err):find("admits", 1, true) ~= nil, true, "and says why")
+    -- graded by the planner's own admission: a sum a few ulps over the cap is at it
+    local Planner = dofile(here .. "planner.lua")
+    d = Botrun.grade(death(), committed { predict = { { id = 0x01, die = 0.05 + 1e-15,
+                                                        strikers = { 0x81 } } } },
+                     nil, 0.05, {}, nil, nil, Planner.admits)
+    check(d.over_cap, false, "dust: graded as the planner admitted it")
+end
+
+-- test_a_fallback_plan_and_its_death_are_graded_against_the_cap (#510 step 9 PR-C, FR-011):
+-- the planner's careful cap (1%) reaches the death's grade, a 30% prediction is over it, and
+-- a committed FALLBACK_SACRIFICE plan is an anomaly on its turn.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 5, 20),
+                                   unit(0x81, 0, "red", 0, 1, 10) },
+                         enemy = function(g, find)
+                             local u = find(0x01)
+                             u.hp, u.dead, u.onField = 0, true, false
+                             g.over = true
+                             return {}
+                         end }
+    g.api.killed = function()
+        if g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                   phase = "enemy" } }
+    end
+    g.api.Planner = {
+        CAPS = { careful = 0.01 },
+        admits = dofile(here .. "planner.lua").admits,
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            -- each blue yet to act gets its own plan: two plans over the cap on turn 1
+            local u
+            for _, x in ipairs(board.units) do
+                if x.faction == "blue" and not x.acted and not u then u = x end
+            end
+            if not u then return nil end
+            local a = { unit = u.id, unitId = u.id, act = "wait", move = { x = u.x, y = u.y } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        fallback = "FALLBACK_SACRIFICE",
+                        rank = { admitted = false, max_die = u.id == 0x01 and 0.3 or 0.2,
+                                 max_exceed = 0.29 },
+                        predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = 0.3,
+                                      taken = 20, strikes = 1, strikers = { 0x81 } } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local d = r.deaths[1]
+    check(d and d.cap, 0.01, "cap: the style's cap reaches the grade")
+    check(d and d.over_cap, true, "cap: 30% is over careful's 1%")
+    check(d and d.cause, "over_cap", "cap: so the cause is over_cap")
+    local fb
+    for _, x in ipairs(r.anomalies) do
+        if x.kind == "fallback_sacrifice" then fb = x end
+    end
+    check(fb and fb.turn, 1, "fallback: an anomaly on the turn it was committed")
+    check(fb and fb.max_die, 0.3, "fallback: with the largest death chance it accepted")
+    local n = 0
+    for _, x in ipairs(r.anomalies) do
+        if x.kind == "fallback_sacrifice" then n = n + 1 end
+    end
+    check(n, 1, "fallback: one anomaly a turn, however often it replans")
+    check(fb and fb.plans, 2, "fallback: counting the plans made over the cap that turn")
 end
 
 -- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another

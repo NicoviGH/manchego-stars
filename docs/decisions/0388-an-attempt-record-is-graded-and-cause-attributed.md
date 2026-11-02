@@ -29,7 +29,8 @@ and `predicted` is that attack's counter chance (`die` on the act, `sight.odds` 
 plan's `predict` for the unit. With no plan, or none that read the unit, `predicted` is null,
 and so are `over_cap`, `reinforcement` and `fog`: unknown is never zero. Until PR-C gives each
 style its cap, `cap` and `over_cap` are null on every death: null says the over-cap check has not
-run, where false would say it ran and passed.
+run, where false would say it ran and passed. (PR-C, ADR 0384: every planned style now has its cap,
+so they are filled; greedy, which plays no plan, keeps them null.)
 
 **The flags and the cause** (FR-004, FR-005). The flags are independent facts. `reinforcement`:
 the killer was not on the board the plan was made on (`plan.snapshot`). `fog`: it was on that
