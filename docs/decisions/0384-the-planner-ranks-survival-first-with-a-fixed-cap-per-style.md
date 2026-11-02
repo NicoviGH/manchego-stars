@@ -47,7 +47,7 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 **4. The completion ledger counts forfeits.** At each decision it snapshots the open goals the
 game can still give: offered villages and chests, owed Talk recruits and declared reward claims
 (the same list as ADR 0383's goals). A plan's forfeits are the goals it closes for good, winning
-first included, counted per judged branch and taken from the worst branch, never averaged A goal
+first included, counted per judged branch and taken from the worst branch, never averaged. A goal
 whose state the game cannot report is unknown, neither kept nor forfeited, and a goal that is
 only out of reach for now is not forfeited. An escort green's death is a forfeit. An allied green's survival only breaks
 ties between admitted plans whose forfeits and completion are equal and whose progress is within
@@ -130,8 +130,8 @@ balance really." This keeps the step 9 spec's cap and admission for a game-over 
 protected (FR-009) with its style's cap (FR-010), and admission comes first (FR-011), so a plan
 with a lord at the cap outranks one whose lord is safe and another unit is a hair over it. (The
 order among plans over the cap is the 2026-11-01 amendment's, not FR-011's.) **Open, for PR-D:**
-how the ledger counts a game over in an admitted plan. A branch where the lord dies forfeits the
-win, and §4 takes forfeits from the worst branch, so counted that way any chance at all would
+how the ledger counts a game over in an admitted plan. A branch where the lord dies closes every
+open goal, and §4 takes forfeits from the worst branch, so counted that way any chance at all would
 make the plan whose lord is at 0% beat every plan that puts it in danger, which is the
 over-protection Nicolas ruled out. Neither the spec nor Nicolas settles how instead; it is put to
 Nicolas with PR-D's design. (A line #561 added, that the ledger would count a game over as
