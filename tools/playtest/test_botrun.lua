@@ -938,7 +938,7 @@ do
     check(d.predicted, 0.04, "enemy phase: the last player-phase plan's predict")
     check(d.plan_ref, 3, "enemy phase: which plan")
     check(d.cause, "rng_tail", "a positive prediction under no cap is a tail")
-    check(d.over_cap, nil, "no cap yet: over_cap is null")
+    check(d.over_cap, nil, "no cap given: over_cap is null")
     local act = { unitId = 0x01, die = 0.3, f = { counters = true } }
     d = Botrun.grade(death { phase = "player" }, committed {}, act, nil, {})
     check(d.predicted, 0.3, "player phase: the attack's own counter chance")
@@ -1089,7 +1089,7 @@ do
     check(r.turns_to_win, nil, "a loss has no turns to win")
     check(r.deaths[1].cause, "other", "greedy: no plan behind it")
     check(r.deaths[1].detail, "noncombat", "no fighter: noncombat, not a sandbox fault")
-    check(r.deaths[1].over_cap, nil, "no cap yet: the over-cap check has not run (null, not false)")
+    check(r.deaths[1].over_cap, nil, "greedy has no cap: the over-cap check has not run (null, not false)")
 end
 
 -- test_seize_skips_and_stalls (FR-007): a planner offered the Seize keeps waiting. With a
@@ -1258,6 +1258,52 @@ do
     local d = r.deaths[1]
     check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
+end
+
+-- test_a_fallback_plan_and_its_death_are_graded_against_the_cap (#510 step 9 PR-C, FR-011):
+-- the planner's careful cap (1%) reaches the death's grade, a 30% prediction is over it, and
+-- a committed FALLBACK_SACRIFICE plan is an anomaly on its turn.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 0, 1, 10) },
+                         enemy = function(g, find)
+                             local u = find(0x01)
+                             u.hp, u.dead, u.onField = 0, true, false
+                             g.over = true
+                             return {}
+                         end }
+    g.api.killed = function()
+        if g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                   phase = "enemy" } }
+    end
+    g.api.Planner = {
+        CAPS = { careful = 0.01 },
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        fallback = "FALLBACK_SACRIFICE",
+                        rank = { admitted = false, max_die = 0.3, max_exceed = 0.29 },
+                        predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = 0.3,
+                                      taken = 20, strikes = 1, strikers = { 0x81 } } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local d = r.deaths[1]
+    check(d and d.cap, 0.01, "cap: the style's cap reaches the grade")
+    check(d and d.over_cap, true, "cap: 30% is over careful's 1%")
+    check(d and d.cause, "over_cap", "cap: so the cause is over_cap")
+    local fb
+    for _, x in ipairs(r.anomalies) do
+        if x.kind == "fallback_sacrifice" then fb = x end
+    end
+    check(fb and fb.turn, 1, "fallback: an anomaly on the turn it was committed")
+    check(fb and fb.max_die, 0.3, "fallback: with the death chance it accepted")
 end
 
 -- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another

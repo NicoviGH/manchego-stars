@@ -408,7 +408,7 @@ end
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
 -- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
 -- phase's last plan (its `predict`). `plan.snapshot` is the board when that plan was made,
--- `cap` the style's risk cap (nil until the planner has one), `gameOver` the charIds whose
+-- `cap` the style's risk cap (nil for greedy, which plays no plan), `gameOver` the charIds whose
 -- death ends the game, `diedAt` (optional) each unit index of another side to the decision count
 -- it fell at: one that fell at or after the plan's (`plan.ref`) is no killer from the snapshot,
 -- its slot free for an arrival of the same generic charId. Unknown is nil, never zero: a death
@@ -503,6 +503,9 @@ function M.run(api)
     local diedAt = {}
     -- whether the planner plays: only its plans record the Talks and rewards it was offered
     local planned = api.Planner ~= nil and style.aggression ~= "greedy"
+    -- the style's risk cap, which every death is graded against (the planner raises on a
+    -- style without one; greedy plays no plan, and so has none)
+    local cap = planned and api.Planner.CAPS and api.Planner.CAPS[style.aggression] or nil
     -- each with its turn: montecarlo.py's keep_trace gives it the story command (`narrate`)
     -- once the trace is filed where it will stay
     local function anomaly(a) rec.anomalies[#rec.anomalies + 1] = a end
@@ -584,7 +587,7 @@ function M.run(api)
                 local g = M.grade({ id = k.id, charId = k.charId, faction = k.faction,
                                     turn = k.turn or turn, killer = k.killer or d.killer,
                                     killerId = k.killerId or d.killerId,
-                                    phase = k.phase or phase }, plan, action, nil, gameOver,
+                                    phase = k.phase or phase }, plan, action, cap, gameOver,
                                   lastBoard, diedAt)
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
@@ -843,6 +846,11 @@ function M.run(api)
                             -- death's plan_ref)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
                             commit = plan
+                            if plan.fallback then
+                                -- every plan was over the cap: the least over it was played
+                                anomaly({ kind = "fallback_sacrifice", turn = turn,
+                                          max_die = plan.rank and plan.rank.max_die })
+                            end
                             for _, c in ipairs(plan.talks or {}) do talked[c] = true end
                             if plan.seizable and not plan.seizes and skipTurn ~= turn then
                                 -- the win was on offer and the plan did something else: only
@@ -869,6 +877,8 @@ function M.run(api)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
                                 ref = plan and plan.ref,
                                 judged = plan and plan.judged, kind = plan and plan.kind,
+                                rank = plan and plan.rank, fallback = plan and plan.fallback,
+                                protected = plan and plan.protected,
                                 considered = plan and plan.considered,
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,

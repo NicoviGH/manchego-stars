@@ -1720,6 +1720,15 @@ do
         field = function() return { [0] = { [0] = 5 }, [1] = { [0] = 5, [1] = 9 }, [2] = { [0] = 5 } } end,
         danger = { ["0,0"] = 1 },
         fc = { [0x01] = { [0x81] = { ["0,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 0 and b.y == 0 then
+                    return { { enemy = 0x81, target = b.unit.id, takenHit = 100, takenDmg = 25,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
     }
     local _, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
     local where = {}
@@ -2141,14 +2150,14 @@ end
 -- test_planner_judges_every_way_the_phase_goes: at (1,0) X strikes A for nothing, and A's
 -- counter may kill X (sight.enemyPhase plays the phase both ways, as likely as the counter's
 -- played chance). If it does, Y takes X's tile and kills A. The judge pays A's death in that
--- outcome only: die = that outcome's chance, not 0 and not 1.
+-- outcome only: die = that outcome's chance, not 0 and not 1 (2RN 10, under bold's cap).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
     -- a red far off that never strikes: X falling is not the Rout's last kill, which would
     -- close the village and pay the win (sightOf's strikes carry the counter's `felled`)
     local Z = red(0x83, 15, 15, { minRange = false })
-    local q = Sight.rollChance(2, 50)
+    local q = Sight.rollChance(2, 10)
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
         field = function() return { [0] = { [0] = 40, [1] = 5 } } end,
@@ -2159,7 +2168,7 @@ do
             for _, b in ipairs(plan.blues) do
                 if b.x == 1 then
                     local x = { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
-                                takenHits = 1, takenCrit = 0, counterHit = 50, counterDmg = 20,
+                                takenHits = 1, takenCrit = 0, counterHit = 10, counterDmg = 20,
                                 counterHits = 1, counterCrit = 0, strikerHp = 10,
                                 targetHp = b.hp }
                     local y = { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
@@ -2354,8 +2363,8 @@ do
 end
 
 -- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with
--- a small chance to kill. Careful leaves a village worth 500 gold (20 points against that
--- chance of a 1000-point death) and takes one worth 100000 (4000 points).
+-- a small chance to kill (2RN 10: 2.1%). Careful leaves it at 500 gold and at 100000 too: the
+-- chance is over careful's 1% cap, and no gold buys risk over the cap (ADR 0384).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -2377,8 +2386,8 @@ do
     check(die > 0 and die < 0.1, true, "explore: the strike's chance to kill is small")
     check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))), "0,0",
           "explore: careful leaves a small village to a small risk")
-    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 100000))), "1,0",
-          "explore: careful takes a rich one through it")
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 100000))), "0,0",
+          "explore: careful leaves a rich one too: the risk is over its cap")
 end
 
 -- test_exploring_sends_the_nearest: the village at (8,0) is nearer B by the game's field, so
@@ -2893,10 +2902,11 @@ do
           "planner: a talked-over recruit does not strike in the judged phase")
 end
 
--- test_planner_prices_a_game_over_units_death_as_the_chapter: L's death quote ends the game
+-- test_planner_protects_a_game_over_unit: L's death quote ends the game
 -- (sight.objective.gameOver). Where L stands, X strikes it at even odds; at (1,0) L takes X's
--- strike off C, who then dies for sure. One unit's sure death costs less than an even chance
--- of a game over (vanilla Ch5: Eirika left to Joshua at 0.76 for a recruit's 0.97), so L moves.
+-- strike off C, who then dies for sure. Both plans are over careful's cap, and the fallback
+-- takes the smaller excess (ADR 0384: the cap does not weigh a game over above one death), so
+-- L stays at its even chance. The rank still sees L as protected: its 50% is the plan's max.
 do
     local L = blue(0x01, 0, 0, 0, { minRange = false })
     local C = blue(0x02, 1, 0, 5, { minRange = false })
@@ -2920,7 +2930,8 @@ do
     for _, x in ipairs(plan and plan.acts or {}) do
         if x.unitId == 0x01 then moved = at(x) end
     end
-    check(moved, "1,0", "planner: a game-over unit's death costs the chapter, not one unit")
+    check(moved, "0,0", "planner: over the cap, the smaller excess, a game-over unit's too")
+    check(plan and plan.fallback, "FALLBACK_SACRIFICE", "planner: and labelled")
 end
 
 -- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%
@@ -3575,6 +3586,194 @@ do
     _, plan = Planner.plan(B, boardOf(A, H), sightOf(x), style("careful"))
     win = goalAfter(plan, "win")
     check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
+end
+
+-- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────────
+
+-- test_caps_are_fixed_per_style (FR-010): careful 1%, even 5%, bold 15%, and a style with no
+-- cap is an error, never a silent default.
+do
+    check(Planner.CAPS.careful, 0.01, "caps: careful 1%")
+    check(Planner.CAPS.even, 0.05, "caps: even 5%")
+    check(Planner.CAPS.bold, 0.15, "caps: bold 15%")
+    local saved = Planner.CAPS.even
+    Planner.CAPS.even = nil
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local ok, err = pcall(Planner.plan, B, boardOf(A, X), sightOf {}, style("even"))
+    Planner.CAPS.even = saved
+    check(ok, false, "caps: a style with no cap raises")
+    check(tostring(err):find("no risk cap", 1, true) ~= nil, true, "caps: and says why")
+end
+
+-- test_protected_are_blues_and_game_over_units (FR-009): the blue units and every unit whose
+-- death ends the game are protected, each with its style's cap; an ordinary allied green is not.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 3, { faction = "green", minRange = false })
+    local V = blue(0x31, 6, 5, 5, { faction = "green", minRange = false, charId = 0x40 })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = { objective = { kind = "rout", gameOver = { 0x01, 0x40 } },
+                enemyPhase = function() return {} end }
+    local _, plan = Planner.plan(B, boardOf(A, G, V, X), sightOf(o), style("even"))
+    local ids, caps = {}, {}
+    for _, p in ipairs(plan and plan.protected or {}) do
+        ids[#ids + 1] = string.format("%02X", p.id); caps[#caps + 1] = p.cap
+    end
+    check(table.concat(ids, ","), "01,31", "protected: the blue and the game-over green, not G")
+    check(caps[1] == 0.05 and caps[2] == 0.05, true, "protected: each carries the style's cap")
+end
+
+-- Three blues, each beside an enemy it kills at 2RN 60 (one blow of 10 on 10 HP). An enemy
+-- left standing kills its blue in the enemy phase; holding leaves it standing for sure.
+local function threeOpenKills()
+    local units, reach, fcs, pair = {}, {}, {}, {}
+    for k = 1, 3 do
+        local a, e = k, 0x80 + k
+        units[#units + 1] = blue(a, k - 1, 0, 2 * k)
+        units[#units + 1] = red(e, 1, 2 * k, { hp = 10 })
+        reach[a] = tiles({ 0, 2 * k })
+        fcs[a] = { [e] = { ["0," .. (2 * k)] = fc { hit = 60, dmg = 10, hits = 1 } } }
+        pair[e] = a
+    end
+    local o = {
+        reach = reach, fc = fcs,
+        enemyPhase = function(plan)
+            local out = {}
+            for e, a in pairs(pair) do
+                if not plan.gone[e] then
+                    out[#out + 1] = { enemy = e, target = a, takenHit = 100, takenDmg = 99,
+                                      takenHits = 1, takenCrit = 0 }
+                end
+            end
+            table.sort(out, function(x, y) return x.enemy < y.enemy end)
+            return out
+        end,
+    }
+    return units, o
+end
+
+-- test_death_is_summed_over_branches (FR-009): every uncertain kill is played both ways. The
+-- average keeps a 68% kill gone, so a judge that branched only two kills saw no death for the
+-- third blue; its enemy lives 32% of the time, and then it kills.
+do
+    local units, o = threeOpenKills()
+    local _, plan = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
+    local live = 1 - Sight.rollChance(2, 60)
+    local attacks = 0
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.act == "attack" then attacks = attacks + 1 end
+    end
+    check(attacks, 3, "branches: every blue strikes its enemy")
+    for _, p in ipairs(plan and plan.predict or {}) do
+        check(math.abs(p.die - live) < 1e-9, true,
+              string.format("branches: 0x%02X dies only where its enemy lives", p.id))
+    end
+    local three = plan and plan.protected and plan.protected[3]
+    local sum = 0
+    for _, b in ipairs(three and three.branches or {}) do sum = sum + b.p end
+    check(math.abs(sum - 1) < 1e-9, true, "branches: the record's weights are normalized")
+end
+
+-- test_within_cap_outranks_any_gold (FR-011, AS 1): the village's strike kills at 2RN 10
+-- (2.1%). Careful (1%) leaves it at any gold; even (5%) takes it.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 10, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 10000000))), "0,0",
+          "admission: careful leaves a 2% village at any gold")
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("even", 500))
+    check(at(a), "1,0", "admission: even takes it under its 5%")
+    check(plan and plan.rank and plan.rank.admitted, true, "admission: the plan is admitted")
+    check(plan and plan.fallback, nil, "admission: no fallback label")
+end
+
+-- test_every_plan_over_the_cap_is_a_labelled_fallback (FR-011, AS 2): X kills A wherever it
+-- stands, at 2RN 80 on (0,0) and 2RN 30 on (1,0). Careful takes the smaller excess and says so.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        enemyPhase = function(plan)
+            local b = plan.blues[1]
+            return { { target = b.unit.id, takenHit = b.x == 1 and 30 or 80, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(at(a), "1,0", "fallback: the smallest excess")
+    check(plan and plan.fallback, "FALLBACK_SACRIFICE", "fallback: labelled")
+    check(plan and plan.rank and plan.rank.admitted, false, "fallback: not admitted")
+    local r = plan and plan.rank or {}
+    check(math.abs((r.max_exceed or 0) - (Sight.rollChance(2, 30) - 0.01)) < 1e-9, true,
+          "fallback: its excess is the death chance over the cap")
+end
+
+-- test_rank_order (FR-011, FR-013): the comparator, on rank tuples. Admission first; among
+-- violators the largest excess, the summed excess, then the largest death chance; among the
+-- admitted the order PR-C keeps (`value`, the judged score, until PR-D's ledger); last the
+-- largest death chance, the summed one, more HP left, then the plan's stable key.
+do
+    local function r(o)
+        local t = { admitted = true, max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0,
+                    hp_left = 20, value = 0, key = "a" }
+        for k, v in pairs(o) do t[k] = v end
+        return t
+    end
+    local before = Planner.outranks
+    check(before(r { max_die = 0.009, value = -50 }, r { admitted = false, value = 9e9 }), true,
+          "rank: admitted beats over-cap at any value")
+    check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.3 },
+                 r { admitted = false, max_exceed = 0.2, sum_exceed = 0.2 }), true,
+          "rank: violators by the largest excess first")
+    check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1 },
+                 r { admitted = false, max_exceed = 0.1, sum_exceed = 0.2 }), true,
+          "rank: then by the summed excess")
+    check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2 },
+                 r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.3 }), true,
+          "rank: then by the largest death chance")
+    check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2, value = 5 },
+                 r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2, value = 1 }),
+          true, "rank: then the admitted order")
+    check(before(r { value = 2, max_die = 0.009 }, r { value = 1 }), true,
+          "rank: among the admitted, the admitted order before the death chance")
+    check(before(r { max_die = 0.001 }, r { max_die = 0.002 }), true, "rank: ties, largest death")
+    check(before(r { sum_die = 0.001 }, r { sum_die = 0.002 }), true, "rank: ties, summed death")
+    check(before(r { hp_left = 21 }, r { hp_left = 20 }), true, "rank: ties, more HP left")
+    check(before(r { key = "a" }, r { key = "b" }), true, "rank: ties, the stable key")
+    check(before(r {}, r {}), false, "rank: a plan does not outrank its equal")
+end
+
+-- test_candidate_order_is_frozen (FR-013): the order Bot.candidates proposes acts in, for a
+-- fixed board, is pinned. It orders the beam, never the complete plans: a change to it is a
+-- change to the instrument, so it fails here first.
+do
+    local units, o = threeOpenKills()
+    local cands = B.candidates(boardOf(table.unpack(units)), sightOf(o), style("careful"))
+    local out = {}
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.acts) do
+            out[#out + 1] = string.format("%d:%s@%d,%d>%s", c.unit.id, a.act, a.move.x, a.move.y,
+                                          tostring(a.targetId))
+        end
+    end
+    check(table.concat(out, " "), "1:attack@0,2>129 1:wait@0,2>nil 2:attack@0,4>130 "
+          .. "2:wait@0,4>nil 3:attack@0,6>131 3:wait@0,6>nil", "candidates: the frozen order")
 end
 
 if fails > 0 then
