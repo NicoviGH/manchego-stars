@@ -1177,6 +1177,12 @@ do
     -- slot 0x81 held 0x81 when the plan was made; an arrival 0x90 reloaded it
     d = Botrun.grade(death { killer = 0x90, killerId = 0x81 }, committed {}, nil, nil, {})
     check(d.flags.reinforcement, true, "a reloaded slot: matched by index and charId")
+    -- the same, with a generic of the same charId: the snapshot's 0x81 fell at decision 3 or
+    -- later (diedAt), so the killer in its slot arrived after the plan
+    d = Botrun.grade(death(), committed {}, nil, nil, {}, nil, { [0x81] = 3 })
+    check(d.flags.reinforcement, true, "a reloaded slot, same charId: the snapshot's unit fell")
+    d = Botrun.grade(death(), committed {}, nil, nil, {}, nil, { [0x81] = 2 })
+    check(d.flags.reinforcement, false, "a slot freed before the plan: the snapshot's unit is the killer")
 
     -- a green that arrives in the enemy phase and dies on a later enemy phase before any
     -- player phase saw it; and an idle stretch of six turns where the enemy dies on a counter

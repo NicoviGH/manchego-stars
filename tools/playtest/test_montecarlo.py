@@ -78,8 +78,7 @@ class Records(unittest.TestCase):
         # T018: each death's cause, prediction and flags; each missed goal's reason; each
         # anomaly with its story command; stalls
         r = dict(V2, clean=False, missed_recruits=[{'charId': 0x30, 'reason': 'talk_skipped'}],
-                 missed_rewards=[{'x': 3, 'y': 7, 'kind': 'visit', 'status': 'skipped',
-                                  'reason': 'skipped'}],
+                 missed_rewards=[{'x': 3, 'y': 7, 'kind': 'visit', 'reason': 'skipped'}],
                  clear=dict(V2['clear'], recruits_missing=[0x30]),
                  stall_events=[{'turn': 6, 'kind': 'idle_3'}],
                  anomalies=[{'kind': 'seize_delay', 'turn': 5,
@@ -87,7 +86,7 @@ class Records(unittest.TestCase):
         line = mc.attempt_line(r, set())
         self.assertIn('lost 0x42 (green, turn 4, to 0x81) over_cap at 2.0%, boss', line)
         self.assertIn('missed 0x30 (talk_skipped)', line)
-        self.assertIn('village 3,7 skipped (skipped)', line)
+        self.assertIn('village 3,7 skipped', line)
         self.assertIn('[stalls: idle_3 turn 6]', line)
         self.assertIn('anomaly: seize_delay turn 5 -> python3 tools/playtest/montecarlo.py '
                       'story t.jsonl.gz --turn 5', line)

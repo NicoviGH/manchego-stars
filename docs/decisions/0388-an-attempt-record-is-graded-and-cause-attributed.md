@@ -49,7 +49,9 @@ The killer is matched by unit index and charId together: `Board.killer` now retu
 index as well, and the death watch records it as `killerId`. Generic enemies share a charId (122
 vanilla unit defs are `CHARACTER_MONSTER_BA`), so the charId alone could name the wrong one; and
 FE8 reloads a freed slot, so the index alone could match an arrival to the unit the snapshot saw
-die there.
+die there. A snapshot unit that fell at or after the plan was made (botrun's `diedAt`, set in the
+order the game killed them) is no killer either: a generic arrival of the same charId can take
+its slot.
 
 **Why the counter chance is zero under the planner.** `Bot.candidates` refuses, for every style
 but greedy, an attack whose counter alone can kill the attacker. Every attack the planner is
@@ -61,10 +63,13 @@ side), `killed_before_talk` (its charId fell on another side), `talk_skipped` (a
 candidates offered the Talk: the plan record's `talks`) or `not_reached`. `died_after_joining` is
 not in the spec's list. The live proof needed it: vanilla Ch5 attempt 1's Joshua was talked over
 and fell on turn 9, so ADR 0376 counts him missing (not in the party at the end), and without it
-the record called him `talk_skipped`. A missed reward was `skipped` (offered to a unit and never taken) or `unreachable`
-(never offered). Its `status` keeps the explore log's word (closed, skipped, unreached). Two
-reasons the spec does not list: `closed` (another side closed it before any offer: a pillage or
-a thief) and `unknown`. Only the planner records what it was offered (its plans' `explore` and
+the record called him `talk_skipped`.
+
+A missed reward's reason is the explore log's status, renamed by one table (`M.REWARD_REASONS`):
+`skipped` (offered to a unit and never taken), `unreachable` (never offered), and two the spec
+does not list, `closed` (another side closed it first: a pillage or a thief, offered before or
+not) and `failed` (tried, and the harness could not drive it: the run crashed there). A reward
+offered and then pillaged is `closed`, as its status says. `unknown` is the last reason. Only the planner records what it was offered (its plans' `explore` and
 `talks`), so a run without it (the greedy style) cannot tell skipped from unreachable, or a
 skipped Talk from one never reached, and says `unknown` rather than guess.
 
@@ -90,9 +95,11 @@ only the turn.
 
 **Measured** (T027, 2026-11-01). The planner changes are record-only: `montecarlo.py suite
 --baseline --jobs 8` played all 52 runs with the same outcome, turns, deaths and frame count as
-PR-A's baseline (ADR 0387), in 1,877.0 CPU s against 1,883.6 (5 min 31 s wall), and again after
-the review's fixes in 1,920.4 CPU s (5 min 35 s wall): the 2% between the two runs of nearly the
-same code is run-to-run noise. What the graded records say (the second run):
+PR-A's baseline (ADR 0387), at 1,883.6 CPU s. Three runs on this branch, as the review's fixes
+landed: 1,877.0, 1,920.4 and 1,964.4 CPU s (5 min 31 s to 5 min 47 s wall). Play is frame-for-frame
+the same and the record adds only per-death and per-phase bookkeeping, so the spread reads as
+machine load; it rose each run, so all three are given. The graded records (the last two runs
+agree on every count):
 - 20 blue or green deaths: 17 `rng_tail` (no cap yet, so every positive prediction is a tail;
   PR-C's caps make the high ones `over_cap`), 2 `other/unrevealed_killer` (vanilla Ch5 seed
   1001, scout Ch13 seed 2001) and 1 `other/forecast_desync` (ours ch03 seed 1001, turn 11).

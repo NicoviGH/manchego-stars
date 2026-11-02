@@ -302,11 +302,11 @@ def spoiled(r, who=lambda c: '0x%02X' % c):
         out += ['missed %s' % who(m) for m in missing or []]
     graded = r.get('missed_rewards')
     for t in graded if graded is not None else c.get('rewards_missing') or []:
-        why = t.get('status', t.get('why'))
-        out.append('%s %s,%s %s%s%s' % ('village' if t['kind'] == 'visit' else 'chest', t['x'],
-                                         t['y'], why, ' by %s' % who(t['closed_by'])
-                                         if t.get('closed_by') is not None else '',
-                                         ' (%s)' % t['reason'] if t.get('reason') else ''))
+        # a graded one's reason (botrun.lua's REWARD_REASONS), else the explore log's word
+        out.append('%s %s,%s %s%s' % ('village' if t['kind'] == 'visit' else 'chest', t['x'],
+                                       t['y'], t.get('reason') or t['why'],
+                                       ' by %s' % who(t['closed_by'])
+                                       if t.get('closed_by') is not None else ''))
     out += [theft(t, who) for t in c.get('stolen') or []]
     return '; '.join(out)
 
