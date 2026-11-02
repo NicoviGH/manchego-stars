@@ -35,8 +35,7 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 - **Admission.** A plan with every protected unit at or under its cap outranks every plan that
   is not.
 - **Among admitted plans:** fewer irreversible goal forfeitures first, then objective
-  completion, then progress. The chance of a game over has no rank of its own here: a
-  game-over unit in an admitted plan is at or under its cap (amended below, 2026-11-02).
+  completion, then progress.
 - **Among plans over the cap** (only when no plan is admitted): the smaller chance of a game
   over first (amended below, 2026-11-01), then smallest largest excess, then smallest summed
   excess, then lowest largest death chance, then the admitted plans' order
@@ -48,8 +47,7 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 **4. The completion ledger counts forfeits.** At each decision it snapshots the open goals the
 game can still give: offered villages and chests, owed Talk recruits and declared reward claims
 (the same list as ADR 0383's goals). A plan's forfeits are the goals it closes for good, winning
-first included, counted per judged branch and taken from the worst branch, never averaged
-(a game over within the cap is not a forfeit, amended below, 2026-11-02). A goal
+first included, counted per judged branch and taken from the worst branch, never averaged A goal
 whose state the game cannot report is unknown, neither kept nor forfeited, and a goal that is
 only out of reach for now is not forfeited. An escort green's death is a forfeit. An allied green's survival only breaks
 ties between admitted plans whose forfeits and completion are equal and whose progress is within
@@ -94,7 +92,10 @@ records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fa
 `max_die` the most any of them accepted).
 
 - **What PR-C does not do yet:** an allied green's death still costs the judged score, as
-  ADR 0381 priced it; PR-D's ledger replaces that with the tie-break of (4).
+  ADR 0381 priced it; PR-D's ledger replaces that with the tie-break of (4). A game-over unit's
+  death costs the judged score `W.win` (planner.lua `loss`), so among admitted plans the interim
+  `value` leans toward the plan whose lord is safest; how PR-D counts it is open (amended below,
+  2026-11-02).
 - **Measured, branching (plan T036), the pinned suite, 52 runs:** every kill branched judged
   7,020 enemy phases in 1,005 plans. `BRANCH = 2` on the same code judged 6,213 (13% fewer).
   With the bound of 8 the play was identical (7,020 phases, 1,005 plans, no kill averaged).
@@ -123,14 +124,15 @@ per judged outcome: the chance that any such unit dies there, weighted by the ou
 chances). Chances in the rank are compared to within `M.DUST` (1e-9), so a sum taken in another
 order is no difference. Admitted plans' rank is unchanged (see the 2026-11-02 amendment).
 
-**Amended (Nicolas, 2026-11-02): the spec's cap and admission stand for a lord.** "A lord is
-still a functional unit so over protecting it is not feasible, they need to be put in danger to
-win, so its a balance really." This confirms the step 9 spec as written: a game-over unit is
+**Amended (Nicolas, 2026-11-02): no separate cap for a lord.** "A lord is still a functional
+unit so over protecting it is not feasible, they need to be put in danger to win, so its a
+balance really." This keeps the step 9 spec's cap and admission for a game-over unit: it is
 protected (FR-009) with its style's cap (FR-010), and admission comes first (FR-011), so a plan
-with a lord at the cap outranks one whose lord is safe and another unit is a hair over it. The
-spec sets no separate cap for game-over units, and none is added here. Within the cap a lord's
-death is not a forfeit in §4's ledger. The spec never made it one; the line saying PR-D's ledger
-would count a game over as forfeiting everything was added in #561 and is removed. Counted there,
-taken from the worst branch, any chance at all would forfeit everything, and the plan that keeps
-the lord at 0% would beat every plan that puts it in danger to win. Among admitted plans a lord's
-chance only breaks ties, through the remaining ties' largest and summed death chance (FR-013).
+with a lord at the cap outranks one whose lord is safe and another unit is a hair over it. (The
+order among plans over the cap is the 2026-11-01 amendment's, not FR-011's.) **Open, for PR-D:**
+how the ledger counts a game over in an admitted plan. A branch where the lord dies forfeits the
+win, and §4 takes forfeits from the worst branch, so counted that way any chance at all would
+make the plan whose lord is at 0% beat every plan that puts it in danger, which is the
+over-protection Nicolas ruled out. Neither the spec nor Nicolas settles how instead; it is put to
+Nicolas with PR-D's design. (A line #561 added, that the ledger would count a game over as
+forfeiting everything, was removed in #562.)
