@@ -3817,7 +3817,7 @@ do
     local before = Planner.outranks
     check(before(r { max_die = 0.009, value = -50 }, r { admitted = false, value = 9e9 }), true,
           "rank: admitted beats over-cap at any value")
-    -- ADR 0384, amended 2026-11-02: the cap is a lord's whole protection.
+    -- ADR 0384, amended 2026-11-02: admission comes first for a lord too (FR-011).
     check(before(r { game_over = 0.15, max_die = 0.15 },
                  r { admitted = false, game_over = 0, max_exceed = 0.01 }), true,
           "rank: a lord at the cap is admitted ahead of a safe lord with another unit over it")

@@ -123,12 +123,14 @@ per judged outcome: the chance that any such unit dies there, weighted by the ou
 chances). Chances in the rank are compared to within `M.DUST` (1e-9), so a sum taken in another
 order is no difference. Admitted plans' rank is unchanged (see the 2026-11-02 amendment).
 
-**Amended (Nicolas, 2026-11-02): a lord is a working unit, so the cap is its whole protection.**
-"A lord is still a functional unit so over protecting it is not feasible, they need to be put in
-danger to win, so its a balance really." So a game-over unit gets the style's cap like any
-other, never a lower one, and admission still comes first: a plan with a lord at the cap
-outranks one whose lord is safe and another unit is a hair over it. Within the cap a lord's
-death is not a forfeit in §4's ledger. Counted there, taken from the worst branch, any chance at
-all would forfeit everything, and the plan that keeps the lord at 0% would beat every plan that
-puts it in danger to win. Among admitted plans a lord's chance only breaks ties, through the
-remaining ties' largest and summed death chance.
+**Amended (Nicolas, 2026-11-02): the spec's cap and admission stand for a lord.** "A lord is
+still a functional unit so over protecting it is not feasible, they need to be put in danger to
+win, so its a balance really." This confirms the step 9 spec as written: a game-over unit is
+protected (FR-009) with its style's cap (FR-010), and admission comes first (FR-011), so a plan
+with a lord at the cap outranks one whose lord is safe and another unit is a hair over it. The
+spec sets no separate cap for game-over units, and none is added here. Within the cap a lord's
+death is not a forfeit in §4's ledger. The spec never made it one; the line saying PR-D's ledger
+would count a game over as forfeiting everything was added in #561 and is removed. Counted there,
+taken from the worst branch, any chance at all would forfeit everything, and the plan that keeps
+the lord at 0% would beat every plan that puts it in danger to win. Among admitted plans a lord's
+chance only breaks ties, through the remaining ties' largest and summed death chance (FR-013).
