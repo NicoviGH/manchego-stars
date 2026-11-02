@@ -3060,9 +3060,10 @@ do
           "planner: a game-over green's death is over the cap, and no forfeit")
 end
 
--- test_a_chip_beats_a_step_within_the_turn (Nicolas, 2026-11-02): A can strike X for 20 of
--- its 40 HP from (1,0), a step toward the gate, or march two steps to (2,0). Both are within a
--- turn of the most progress, so the judged score decides before the progress: the strike.
+-- test_a_march_beats_a_chip_a_step_back (the advisory panel, 2026-11-02, record 0024): A can
+-- strike X for 20 of its 40 HP from (1,0), a step toward the gate, or march two steps to (2,0).
+-- Both are within a turn of the most progress, and progress comes before the judged score: the
+-- march. The reverse order (the strike) cost the pinned suite 18 deaths to this order's 14.
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 40, minRange = false })
@@ -3073,7 +3074,7 @@ do
         enemyPhase = function() return {} end,
     }
     local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
-    check(a and a.act .. "@" .. at(a), "attack@1,0", "rank: the chip a step back beats the march")
+    check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the chip a step back")
 end
 
 -- test_rebase_measures_turns_behind_the_best (FR-012): progress 1.6, 0.8 and 0 are 0, 0 and 1
@@ -4022,8 +4023,10 @@ do
           "rank: a green is no tie-break a whole turn behind")
     check(before(r { progress = 0.2, green_die = 0 }, r { progress = 0.9, green_die = 1 }), true,
           "rank: within the turn, the green's survival before the progress")
-    check(before(r { progress = 0.2, value = 500 }, r { progress = 0.9, value = 0 }), true,
-          "rank: within the turn, the judged score before the progress")
+    check(before(r { progress = 0.9, value = 0 }, r { progress = 0.2, value = 500 }), true,
+          "rank: within the turn, the progress before the judged score")
+    check(before(r { progress = 0.9, value = 500 }, r { progress = 0.9, value = 0 }), true,
+          "rank: the judged score breaks a progress tie")
     check(before(r { progress = 0.9, value = 0 }, r { progress = 0.9 - 1e-12, value = 0 }), false,
           "rank: then progress, float dust no difference")
     check(before(r { progress = 0.9 }, r { progress = 0.2 }), true, "rank: then progress")

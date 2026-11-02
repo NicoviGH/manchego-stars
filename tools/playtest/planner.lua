@@ -145,14 +145,15 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- is short of the best's, comes first, then the greens. Measured from the best rather than
 -- between each two plans, it is an order a sort can keep: "within a turn of each other" is
 -- not one (0, 0.8 and 1.6 would each tie their neighbour). `behind` is set by M.plan once
--- every plan is judged (M.rebase). Then `value`, the judged score: what a plan deals, kills,
--- heals and loses in HP (Nicolas, 2026-11-02: without it a unit within the cap never chips an
--- enemy it cannot kill this turn, as the counter's HP is all the rank would see), ahead of the
--- progress within the turn (Nicolas, the same day: a step is a fraction of a turn, and a
--- strike from a tile a step back is still worth taking). Then the progress itself; last the
--- largest death chance, the summed one, more HP left, and the plan's acts as a stable key.
+-- every plan is judged (M.rebase). Then the progress itself, then `value`, the judged score:
+-- what a plan deals, kills, heals and loses in HP (Nicolas, 2026-11-02: without it a unit
+-- within the cap never chips an enemy it cannot kill this turn, as the counter's HP is all
+-- the rank would see). The score after the progress, so a unit chips only from as forward a
+-- tile as its march: the advisory panel's decision (record 0024), the reverse order cost the
+-- pinned suite 18 deaths to this order's 14, all on later turns with no plan within the cap.
+-- Last the largest death chance, the summed one, more HP left, and the acts as a stable key.
 local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
-                   { "green_die", 1 }, { "value", -1 }, { "progress", -1 } }
+                   { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
     local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }

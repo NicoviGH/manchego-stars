@@ -12,7 +12,7 @@ issues: [510]
 which an advisory panel drafted (research record 0023): spec #510 comment 6563384018, plan and tasks #510 comment 6563384310. Supersedes ADR
 0375 and amends ADRs 0381, 0382 and 0383. **Built (PR-C, then PR-D):** the caps, admission,
 the fallback and branch-summed death in PR-C; the completion ledger, forfeits and progress (4)
-in PR-D. Both are below, with two amendments PR-D's design needed (2026-11-02).
+in PR-D. Both are below, with the amendments PR-D's design needed (2026-11-02).
 
 **Why.** A weighted score lets loot buy risk. In vanilla Ch3, careful struck Bazba alone at a
 predicted 12.7% chance of losing Franz, because the kill scored more than the death cost
@@ -159,6 +159,23 @@ within the turn. This amends FR-013's tie list and ADR 0383's line above: worth 
 the beam, and through the judged score it orders complete plans within a turn of the most
 progress. It never outranks a forfeit, the win or a whole turn of progress.
 
+**Amended (the advisory panel, on Nicolas's instruction, 2026-11-02): progress before the
+judged score.** The order above, the score ahead of the progress within the turn, cost the
+pinned suite more deaths. Nicolas handed the trade to the panel to decide ("convene the panel
+again with sidecar and have them make a decision"). It decided 6-0, in both rounds, that
+admitted plans rank the progress itself before the judged score. The order is now forfeits,
+win, whole turns behind, allied greens, progress, judged score, then FR-013's ties.
+- **The measurement** (research record 0024): both orders played on #564's head, only the line
+  changed, tuning seeds only. Progress first had 14 protected deaths; the score first had 18.
+  Wins (23) and clean clears (14) tied, and every over-cap death came on a labelled fallback
+  turn.
+- **What the score still does:** it breaks a progress tie. A unit chips an enemy from a tile as
+  far forward as its march, so the ruling above still holds: without the score, a unit within
+  the cap never chips an enemy it cannot kill this turn.
+- **Whether chipping a step back is what causes the later fallback turns is not proven.** On the
+  run endpoint only 5 runs differ, 4-1. The flip log, a larger paired run and a two-ply
+  tie-break are #565.
+
 **Built (PR-D, 2026-11-02).**
 - **The ledger.** `goals.lua` `Goals.ledger` snapshots every open visit, chest and recruit with
   any chance from the decision's board (`Goals.chance`, the planner's `before`), plus each
@@ -176,8 +193,8 @@ progress. It never outranks a forfeit, the win or a whole turn of progress.
   needs. The plan carries `ledger` (what it forfeits marked `closed`), `forfeited`,
   `seizeJudged`, `seizeAdmitted` and `stuck`.
 - **The rank.** `M.outranks`'s admitted order is `forfeits` ascending, `complete` (the chance the
-  plan ends the chapter) descending, `behind`, `green_die`, `value`, `progress`, then FR-013's
-  ties. `progress` is the turns the plan cuts from each unit's way to its assigned goal, summed:
+  plan ends the chapter) descending, `behind`, `green_die`, `progress`, `value` (the panel's
+  amendment above), then FR-013's ties. `progress` is the turns the plan cuts from each unit's way to its assigned goal, summed:
   the recruit, village or chest it was sent to, else its way to the objective, read once at the
   decision's start, `sight.turnsTo` through the breach when cut off. `behind` is the whole turns
   a plan is short of the most progress among the plans that may be played (`M.rebase`, once
@@ -213,17 +230,15 @@ progress. It never outranks a forfeit, the win or a whole turn of progress.
   1-3: won clean turn 8, won with one death turn 8, won clean turn 8 (main, same env: stuck,
   won clean turn 8, stuck). Attempt 2 (bold) lost 0x03 on turn 7 at a predicted 51.1%, under a
   labelled fallback. Vanilla Ch2, attempts 1-2: won clean on turns 8 and 6.
-- **Measured, the pinned suite (`suite --baseline`, 52 runs, at the second review round):**
-  2,026.8 CPU s, +7.6% on PR-A's 1,883.6 and inside SC-003's 20% (PR-C's two runs of identical
-  play read 1,925.9 and 2,175.9). 8,004 judged enemy phases against PR-C's 7,020 (+14%), the
-  advance plan among them. The tuning seeds (26 runs, the only outcomes read), PR-C then PR-D:
-  clean clears 10 to 14, wins 22 to 23, turns 245 to 242, deaths 12 to 18. Vanilla Ch1 seed
-  1001 went from `stuck` to clean; both vanilla Ch2 seeds and both vanilla Ch4 seeds from won
-  to clean. Every `over_cap` death came from a labelled fallback, and the six more deaths are
-  all such: vanilla Ch5 6 (PR-C 2), scout-ch10 2 (PR-C 0). With progress compared exactly ahead
-  of the judged score (the first ruling), the same suite read 12 deaths, 14 clean and vanilla
-  Ch5 3: the extra fallbacks come with the judged score ordering plans within the turn. That
-  trade is Nicolas's to weigh (put to him with PR #564). The last fix (only a recruit on a goal
-  tile counts as reached beside it) came after this run and changes play only where a unit not
-  ours and no recruit (an enemy, or a green no one may Talk to) stands on a tile a unit was
-  sent to.
+- **Measured, the pinned suite (`suite --baseline`, 52 runs, at #564's head, research record
+  0024).** The tuning seeds (26 runs, the only outcomes read), PR-C then PR-D: clean clears 10
+  to 14, wins 22 to 23, turns 245 to 249, deaths 12 to 14. Vanilla Ch1 seed 1001 went from
+  `stuck` to clean, both vanilla Ch2 seeds and vanilla Ch4 seed 1001 from won to clean. Vanilla
+  Ch4 seed 1002 still won with a village skipped (the chapter ended in the enemy phase). Every
+  `over_cap` death came from a labelled fallback: 8 against PR-C's 6. The order with the
+  judged score ahead of the progress within the turn read 18 deaths (13 over the cap) and 14
+  clean, the trade the panel amendment above settled. CPU is compared by the work done, not by
+  the clock: that order at review round 2 and at the head made the same calls and read
+  2,026.8 and 2,462.5 CPU s, a machine about 21% slower the second day. PR-D does 7,011
+  sandbox calls and 565,656 `AiDecideMain` calls (PR-C 6,699 and 400,220), 2,558.3 CPU s that
+  day: about 2,105 s at the round-2 speed, +12% on PR-A's 1,883.6 and inside SC-003's 20%.
