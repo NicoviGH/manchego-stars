@@ -70,27 +70,39 @@ own turns to the assigned goal, and to the objective once the optional goals are
 **Built (PR-C, 2026-11-01).** `planner.lua` `M.CAPS` holds careful 0.01, even 0.05 and bold 0.15,
 and `M.plan` raises on a style without one. Protected units are every blue and every unit in
 `sight.objective.gameOver`; botrun grades only their deaths against the cap, so an allied
-green's death has no `cap` and no `over_cap`. `judge()` plays every uncertain kill both ways
-(`M.BRANCH = math.huge`), normalizes the branches' chances, and records each protected unit's
-death per branch (`plan.protected`). Plans are compared by `M.outranks` on `plan.rank`:
+green's death has no `cap` and no `over_cap`. `judge()` plays every uncertain kill both ways, up
+to `M.BRANCH` = 8 of them (256 phases a plan). Past that, the most uncertain are played, and the
+rest are counted in `plan.averaged` and the record's `plans.averaged`, so the bound is never
+silent. It normalizes the branches' chances and records each protected unit's death per branch
+(`plan.protected`). A kill is branched even when its enemy reaches no protected unit: that
+enemy's death can free a tile for one that does (`test_planner_plays_an_uncertain_kill_both_ways`).
+Admission forgives float dust (`M.admits`: within 1e-9 of the cap). `M.plan` returns the enemy
+phases it judged as a third value, which botrun sums into `plans.phases`, a call with no plan included. Plans are compared by `M.outranks` on `plan.rank`:
 admission; for plans over the cap, largest excess, summed excess, largest death chance, then
 the admitted order; for admitted plans, `value` (the judged score), standing in for (4) until
 PR-D; then largest death chance, summed death chance, HP left, and the plan's acts as a key.
 A plan chosen with none under the cap carries `fallback = "FALLBACK_SACRIFICE"`, which botrun
-records as a `fallback_sacrifice` anomaly.
+records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fallback plans,
+`max_die` the most any of them accepted).
 
 - **What PR-C does not do yet:** an allied green's death still costs the judged score, as
   ADR 0381 priced it; PR-D's ledger replaces that with the tie-break of (4). The cap does not
   weigh a game-over unit's death above another's: with every plan over the cap, a lord's even
   chance is played over another unit's sure death, because it is the smaller excess.
 - **Measured, branching (plan T036), the pinned suite, 52 runs:** every kill branched judged
-  7,020 enemy phases in 1,005 plans, at 1,925.9 CPU s (PR-A's baseline 1,883.6: +2.2%, inside
-  SC-003's 20%). `BRANCH = 2` on the same code judged 6,213 phases. Its CPU (2,120.9 s) is not
-  comparable, because another process shared the machine during that run. Full branching is kept, and
-  the written fallback (T037) is not needed.
+  7,020 enemy phases in 1,005 plans. `BRANCH = 2` on the same code judged 6,213 (13% fewer).
+  With the bound of 8 the play was identical (7,020 phases, 1,005 plans, no kill averaged).
+  CPU is the noisy figure. Two runs of that identical play read 1,925.9 and 2,175.9 CPU s,
+  +2.2% and +15.5% on PR-A's baseline of 1,883.6, both inside SC-003's 20%. PR-B's three runs
+  ranged 1,877-1,964. The written fallback (T037) is not built: branching only the kills whose
+  enemy reaches a protected unit is unsound, because a kill frees tiles.
 - **Measured, live (plan T043):** vanilla Ch3 with Seth benched (ADR 0375's case), seed 1,
   attempts 1-8: 8 of 8 won clean with no deaths (before: 1 of 8 kept every unit). Careful won
   on turn 26 and kept Franz, with no fallback plan. Vanilla Ch5 attempt 1, seed 1 (bold):
   won on turn 8, 62.6 CPU s; Natasha (0x0D) died on turn 3 at a predicted 68.4%, graded
   `over_cap` under a plan labelled `FALLBACK_SACRIFICE`, and Joshua was killed before the
   Talk (as on main). In the suite, every `over_cap` death came from a labelled fallback.
+- **Not built, and why:** the review of PR #560 asked for the protected death to add the
+  counter's own death. `bot.lua` refuses every attack whose counter alone can kill (every style
+  but greedy), so that share is 0 for every attack the planner judges. A counter-and-phase death
+  (Franz's 12.7%) is all in the phase share, which admission reads.

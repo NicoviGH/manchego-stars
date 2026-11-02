@@ -31,8 +31,9 @@
 --      changes the board, of which the best is played: a careful player that has stopped
 --      making progress takes the least it must.
 --      The enemy phase is played every way it can go where a counter may kill a striker
---      (its tile freed for the next), and once per way the plan's BRANCH most uncertain kills
---      can go (an enemy the average keeps may die, one it removes may live). Last, the best
+--      (its tile freed for the next), and once per way each uncertain kill can go, up to
+--      BRANCH of them (an enemy the average keeps may die, one it removes may live). Last, the
+--      best
 --      plan is mended: each unit it may lose tries its other acts (a green one, the acts of
 --      ours that could save it; a recruit, the acts of the units it strikes), the rest of the
 --      plan kept, and those are judged too.
@@ -58,8 +59,9 @@
 -- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, max_exceed,
 -- sum_exceed, max_die, sum_die, hp_left, value (the judged score), key }, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
--- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, phases =
--- the enemy phases this call judged, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
+-- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, branched
+-- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
+-- to the average, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
 -- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
@@ -67,7 +69,8 @@
 -- closes },
 -- winFell = the judged phase's chance our counter ends the chapter, talks = the charIds any
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
--- seizes = whether this plan takes it }.
+-- seizes = whether this plan takes it }, and the enemy phases the call judged, over every plan
+-- it judged (a call that finds no plan judged some too).
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -81,10 +84,14 @@ M.BEAM = 6         -- partial plans kept at each depth
 M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam tries (and its
                    -- hold and retreat, always: the way out survives the cut)
 M.FINAL = 4        -- complete plans judged against the enemy phase
--- a plan's uncertain kills the judge plays both ways (2^n enemy phases): every one, so a
--- protected unit's death chance is a sum over the ways the phase can go, never read off an
--- average that keeps a likely kill gone (FR-009; ADR 0384 says what branching all of them costs)
-M.BRANCH = math.huge
+-- the uncertain kills the judge plays both ways (2^n enemy phases), so a protected unit's death
+-- chance is a sum over the ways the phase can go, never read off an average that keeps a
+-- likely kill gone (FR-009). Even an enemy that reaches no one is played both ways: its death
+-- can free a tile for one that does (test_planner_plays_an_uncertain_kill_both_ways). This
+-- many at most, so a board of uncertain kills cannot cost thousands of phases a plan: past
+-- it, the most uncertain are branched and the plan records how many it left to the average
+-- (`averaged`). ADR 0384 has the cost.
+M.BRANCH = 8
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
 
@@ -110,6 +117,10 @@ M.WEIGHTS = {
 -- FR-010): fixed, never drawn, so a pinned run reproduces exactly. A plan over it never
 -- outranks one under it, whatever it gains: a weight can be outbid, a cap cannot.
 M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
+
+-- Whether death chance `d` is within `cap`: a sum of branch products can land a few ulps over a
+-- chance that is at the cap, and that is not an excess.
+function M.admits(d, cap) return d <= cap + 1e-9 end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
 -- first. Over the cap, the smallest largest excess, then summed excess, then largest death
@@ -266,7 +277,7 @@ function M.plan(Bot, board, sight, style, opts)
     if not cap then error("planner.lua: no risk cap for style " .. tostring(style.aggression)) end
     local odds = sight.odds
     local cands, ctx = Bot.candidates(board, sight, style, opts)
-    if #cands == 0 then return nil end
+    if #cands == 0 then return nil, nil, 0 end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
@@ -644,7 +655,8 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
-    local phases = 0   -- the enemy phases judged for this plan: the cost branching pays
+    -- the enemy phases judged in this call, over every plan it judges: what branching costs
+    local phases = 0
     -- a green unit lost spoils the clear as one of ours does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
@@ -664,10 +676,11 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
-        -- the plan's BRANCH most uncertain kills, each played both ways: the average (an enemy
-        -- gone at a kill >= 0.5, else standing at its mean HP) hides the way the rolls go
-        -- otherwise (vanilla Ch5 turn 5: Eirika's attack killed an enemy the plan kept
-        -- standing, and Joshua's AI turned on her). The rest keep the average.
+        -- each uncertain kill, played both ways: the average (an enemy gone at a kill >= 0.5,
+        -- else standing at its mean HP) hides the way the rolls go otherwise (vanilla Ch5 turn
+        -- 5: Eirika's attack killed an enemy the plan kept standing, and Joshua's AI turned on
+        -- her). Past BRANCH of them, the most uncertain are played and the rest keep the
+        -- average, counted (`averaged`) so it is never silent.
         local open, gone = {}, copy(st.gone)
         for id, blows in pairs(st.kill) do
             -- the plan's blows on it together, at its own HP: each blow alone was scored at the
@@ -687,7 +700,9 @@ function M.plan(Bot, board, sight, style, opts)
             return x.id < y.id
         end)
         local ways = { { p = 1, gone = gone, reds = reds } }
-        for i = 1, math.min(M.BRANCH, #open) do
+        st.branched = math.min(M.BRANCH, #open)
+        st.averaged = #open - st.branched
+        for i = 1, st.branched do
             local k, nxt = open[i], {}
             for _, w in ipairs(ways) do
                 local dead, lives = copy(w.gone), copy(w.gone)
@@ -842,10 +857,10 @@ function M.plan(Bot, board, sight, style, opts)
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
         -- allied green is not one. Each one's death chance, summed over the branches, against
         -- the style's cap, and the rank the plan is compared by
-        local keys = {}
-        for _, x in ipairs(st.acts) do keys[#keys + 1] = key(x) end
+        st.keys = {}
+        for _, x in ipairs(st.acts) do st.keys[#st.keys + 1] = key(x) end
         local rank = { admitted = true, max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0,
-                       hp_left = 0, value = judged, key = table.concat(keys, " ") }
+                       hp_left = 0, value = judged, key = table.concat(st.keys, " ") }
         st.protected = {}
         local function protect(u, hp)
             local d, branches = die[u.id] or 0, {}
@@ -857,7 +872,7 @@ function M.plan(Bot, board, sight, style, opts)
             end
             st.protected[#st.protected + 1] = { id = u.id, charId = u.charId, die = d,
                                                 branches = branches, cap = cap }
-            local over = math.max(0, d - cap)
+            local over = M.admits(d, cap) and 0 or d - cap
             rank.admitted = rank.admitted and over == 0
             rank.max_exceed = math.max(rank.max_exceed, over)
             rank.sum_exceed = rank.sum_exceed + over
@@ -898,9 +913,7 @@ function M.plan(Bot, board, sight, style, opts)
     local function consider(st, kind)
         judge(st)
         st.kind = kind
-        local keys = {}
-        for _, x in ipairs(st.acts) do keys[#keys + 1] = key(x) end
-        considered[#considered + 1] = { judged = st.judged, acts = keys, kind = kind,
+        considered[#considered + 1] = { judged = st.judged, acts = st.keys, kind = kind,
                                         rank = st.rank }
         if (not stalled or changes(st)) and (not best or M.outranks(st.rank, best.rank)) then
             best = st
@@ -979,10 +992,9 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
     end
-    if not best or #best.acts == 0 then return nil end
+    if not best or #best.acts == 0 then return nil, nil, phases end
     table.sort(considered, function(x, y) return M.outranks(x.rank, y.rank) end)
     best.considered = considered
-    best.phases = phases
     -- no plan under the cap: the least over it is played, and says so (FR-011)
     best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil
     -- the rule's record: each Visit or Chest offered, and whether the plan played it credited
@@ -1012,7 +1024,7 @@ function M.plan(Bot, board, sight, style, opts)
     best.seizable = seizable
     best.seizes = false   -- whether the plan takes the Seize offered (botrun's seize skips)
     for _, x in ipairs(best.acts) do best.seizes = best.seizes or x.act == "seize" end
-    return best.acts[1], best
+    return best.acts[1], best, phases
 end
 
 -- Why the board `after` the plan's k-th act (played from `before`) is off what the plan

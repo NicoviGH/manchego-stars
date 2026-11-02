@@ -479,19 +479,20 @@ do
             asked = asked + 1
             if opts and opts.stalled then g.stalledAsk = asked end
             for _, u in ipairs(board.units) do
-                if u.faction == "blue" and u.acted then return nil end
+                if u.faction == "blue" and u.acted then return nil, nil, 3 end
             end
-            if board.turn > 1 then return nil end
+            if board.turn > 1 then return nil, nil, 3 end
             local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
                            { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
             return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
-                              enemies = { [0x81] = true }, phases = 3 }
+                              enemies = { [0x81] = true }, averaged = 1 }, 3
         end,
     }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.plans.kept, 1, "C's wait is played from A's plan")
-    check(r.plans.phases, 3, "the judged enemy phases of every plan made, summed")
+    check(r.plans.phases, 12, "the judged enemy phases of every call, a nil plan's too, summed")
+    check(r.plans.averaged, 1, "the uncertain kills past the branching bound, summed: never silent")
     check(asked, r.plans.made, "every plan asked for is counted")
     check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
           .. "turn 2's board: one stalled ask; turn 4 repeats it again: stuck")
@@ -1265,11 +1266,11 @@ end
 -- death ends the game; an allied green's death is graded with no cap, so never over it.
 do
     local green = death { faction = "green", charId = 0x41, id = 0x41 }
-    local d = Botrun.grade(green, committed {}, nil, 0.01, { 0x01 })
+    local d = Botrun.grade(green, committed {}, nil, 0.01, { [0x01] = true })
     check(d.cap, nil, "an allied green has no cap")
     check(d.over_cap, nil, "and so no over-cap verdict")
     local vip = death { faction = "green", charId = 0x41, id = 0x41 }
-    d = Botrun.grade(vip, committed {}, nil, 0.01, { 0x41 })
+    d = Botrun.grade(vip, committed {}, nil, 0.01, { [0x41] = true })
     check(d.cap, 0.01, "a game-over green has its style's cap")
     d = Botrun.grade(death(), committed {}, nil, 0.01, {})
     check(d.cap, 0.01, "a blue has its style's cap")
@@ -1279,7 +1280,8 @@ end
 -- the planner's careful cap (1%) reaches the death's grade, a 30% prediction is over it, and
 -- a committed FALLBACK_SACRIFICE plan is an anomaly on its turn.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 0, 1, 10) },
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 5, 20),
+                                   unit(0x81, 0, "red", 0, 1, 10) },
                          enemy = function(g, find)
                              local u = find(0x01)
                              u.hp, u.dead, u.onField = 0, true, false
@@ -1296,13 +1298,17 @@ do
         CAPS = { careful = 0.01 },
         surprise = function() return "the plan is played out" end,
         plan = function(_, board)
-            for _, u in ipairs(board.units) do
-                if u.faction == "blue" and u.acted then return nil end
+            -- each blue yet to act gets its own plan: two plans over the cap on turn 1
+            local u
+            for _, x in ipairs(board.units) do
+                if x.faction == "blue" and not x.acted and not u then u = x end
             end
-            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            if not u then return nil end
+            local a = { unit = u.id, unitId = u.id, act = "wait", move = { x = u.x, y = u.y } }
             return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
                         fallback = "FALLBACK_SACRIFICE",
-                        rank = { admitted = false, max_die = 0.3, max_exceed = 0.29 },
+                        rank = { admitted = false, max_die = u.id == 0x01 and 0.3 or 0.2,
+                                 max_exceed = 0.29 },
                         predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = 0.3,
                                       taken = 20, strikes = 1, strikers = { 0x81 } } } }
         end,
@@ -1318,7 +1324,13 @@ do
         if x.kind == "fallback_sacrifice" then fb = x end
     end
     check(fb and fb.turn, 1, "fallback: an anomaly on the turn it was committed")
-    check(fb and fb.max_die, 0.3, "fallback: with the death chance it accepted")
+    check(fb and fb.max_die, 0.3, "fallback: with the largest death chance it accepted")
+    local n = 0
+    for _, x in ipairs(r.anomalies) do
+        if x.kind == "fallback_sacrifice" then n = n + 1 end
+    end
+    check(n, 1, "fallback: one anomaly a turn, however often it replans")
+    check(fb and fb.plans, 2, "fallback: counting the plans made over the cap that turn")
 end
 
 -- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another

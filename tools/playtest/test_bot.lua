@@ -3669,12 +3669,29 @@ do
         check(math.abs(p.die - live) < 1e-9, true,
               string.format("branches: 0x%02X dies only where its enemy lives", p.id))
     end
-    -- every judged plan played 2^3 phases at most; the record counts the calls
-    check(plan and plan.phases and plan.phases >= 8, true, "branches: the phases are counted")
+    -- every judged plan played 2^3 phases at most; the call's third value counts them all
+    local _, _, phases = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
+    check(phases and phases >= 8, true, "branches: the phases are counted")
+    check(plan and plan.branched, 3, "branches: each uncertain kill is branched")
+    check(plan and plan.averaged, 0, "branches: none left to the average")
+    -- past the bound, the most uncertain are branched and the rest is counted, never silent
+    local saved = Planner.BRANCH
+    Planner.BRANCH = 2
+    local _, capped = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
+    Planner.BRANCH = saved
+    check(capped and capped.branched, 2, "branches: the bound holds")
+    check(capped and capped.averaged, 1, "branches: the kill past it is recorded as averaged")
     local three = plan and plan.protected and plan.protected[3]
     local sum = 0
     for _, b in ipairs(three and three.branches or {}) do sum = sum + b.p end
     check(math.abs(sum - 1) < 1e-9, true, "branches: the record's weights are normalized")
+end
+
+-- test_admission_forgives_float_dust (PR #560 review): a death chance a few ulps over the cap
+-- is at the cap, not over it.
+do
+    check(Planner.admits(0.05 + 1e-15, 0.05), true, "dust: at the cap")
+    check(Planner.admits(0.0501, 0.05), false, "dust: a real excess is over")
 end
 
 -- test_within_cap_outranks_any_gold (FR-011, AS 1): the village's strike kills at 2RN 10
