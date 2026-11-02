@@ -35,7 +35,8 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 - **Admission.** A plan with every protected unit at or under its cap outranks every plan that
   is not.
 - **Among admitted plans:** fewer irreversible goal forfeitures first, then objective
-  completion, then progress.
+  completion, then progress. The chance of a game over has no rank of its own here: a
+  game-over unit in an admitted plan is at or under its cap (amended below, 2026-11-02).
 - **Among plans over the cap** (only when no plan is admitted): the smaller chance of a game
   over first (amended below, 2026-11-01), then smallest largest excess, then smallest summed
   excess, then lowest largest death chance, then the admitted plans' order
@@ -47,7 +48,8 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 **4. The completion ledger counts forfeits.** At each decision it snapshots the open goals the
 game can still give: offered villages and chests, owed Talk recruits and declared reward claims
 (the same list as ADR 0383's goals). A plan's forfeits are the goals it closes for good, winning
-first included, counted per judged branch and taken from the worst branch, never averaged. A goal
+first included, counted per judged branch and taken from the worst branch, never averaged
+(a game over within the cap is not a forfeit, amended below, 2026-11-02). A goal
 whose state the game cannot report is unknown, neither kept nor forfeited, and a goal that is
 only out of reach for now is not forfeited. An escort green's death is a forfeit. An allied green's survival only breaks
 ties between admitted plans whose forfeits and completion are equal and whose progress is within
@@ -119,10 +121,14 @@ unit's sure death, because it was the smaller excess (#560). `plan.rank.game_ove
 per judged outcome: the chance that any such unit dies there, weighted by the outcome's chance
 (two lords killed in different outcomes make a sure game over, never a product of their
 chances). Chances in the rank are compared to within `M.DUST` (1e-9), so a sum taken in another
-order is no difference. Admitted plans are unchanged: a game-over unit in them is already at or
-under the cap, and PR-D's ledger counts a game over as forfeiting everything. Admission still
-comes first, so a plan with a lord at the cap outranks one whose lord is safe and another unit
-is a hair over it, and that stands (Nicolas, 2026-11-02: "a lord is still a functional unit so
-over protecting it is not feasible, they need to be put in danger to win, so its a balance
-really"). A game-over unit gets the style's cap like any other, never a lower one; the balance
-between its risk and the goals is PR-D's ledger, where a game over forfeits everything.
+order is no difference. Admitted plans are unchanged.
+
+**Amended (Nicolas, 2026-11-02): a lord is a working unit, so the cap is its whole protection.**
+"A lord is still a functional unit so over protecting it is not feasible, they need to be put in
+danger to win, so its a balance really." So a game-over unit gets the style's cap like any
+other, never a lower one, and admission still comes first: a plan with a lord at the cap
+outranks one whose lord is safe and another unit is a hair over it. Within the cap a lord's
+death is not a forfeit in §4's ledger. Counted there, taken from the worst branch, any chance at
+all would forfeit everything, and the plan that keeps the lord at 0% would beat every plan that
+puts it in danger to win. Among admitted plans a lord's chance only breaks ties, through the
+remaining ties' largest and summed death chance.
