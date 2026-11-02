@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-02 (Claude, latest). **#510 step 9 PR-C MERGED: #560 (322101f).** ADR 0384 is
+Refreshed 2026-11-01 (Claude, latest). **#510 step 9 PR-C MERGED: #560 (322101f).** ADR 0384 is
 built in part. The caps are `planner.lua` `M.CAPS` (careful 1%, even 5%, bold 15%), and a style
 with no cap raises. Protected units are every blue plus `sight.objective.gameOver`. The judge
 branches every uncertain kill, up to `M.BRANCH` = 8, and the rest are counted (`plans.averaged`).
@@ -29,10 +29,11 @@ protected deaths against the cap, through `Planner.admits`. `M.plan` returns
   Joshua is still killed before the Talk.
 - Every `over_cap` death in the suite came from a labelled fallback.
 
-**Two things for Nicolas** (in #560's body):
-- The cap does not weigh a game-over unit above another: with every plan over the cap, a lord's
-  50% is played over a unit's sure death (`test_planner_protects_a_game_over_unit`). His call.
-- While reading suite records, this session printed the held-out runs' deaths too. The caps are
+**In flight: #561** (Nicolas, 2026-11-01: "the lord's death auto triggers game over so it's not
+just a risk"). Among plans over the cap, the chance of a game over comes before the excess (ADR
+0384 amended). Open on it: admission still comes first, so a lord at the cap outranks a safe
+lord with another unit a hair over.
+- **Held-out records were seen:** while reading suite records, this session printed the held-out runs' deaths too. The caps are
   fixed, so nothing was tuned on them. From now on, read only the `tuning` set (`rec.suite.set`).
 
 **Rejected:** T037's "branch only the kills whose enemy reaches a protected unit" is unsound. A
