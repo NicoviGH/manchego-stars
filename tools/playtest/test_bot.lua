@@ -2905,7 +2905,7 @@ end
 -- test_planner_protects_a_game_over_unit: L's death quote ends the game
 -- (sight.objective.gameOver). Where L stands, X strikes it at even odds; at (1,0) L takes X's
 -- strike off C, who then dies for sure. Both plans are over careful's cap. A game over is not
--- one more risk: it ends the chapter (Nicolas, 2026-11-02, ADR 0384), so the fallback with the
+-- one more risk: it ends the chapter (Nicolas, 2026-11-01, ADR 0384), so the fallback with the
 -- smaller chance of it comes first, whatever the excess: L moves.
 do
     local L = blue(0x01, 0, 0, 0, { minRange = false })
@@ -3714,6 +3714,37 @@ do
     check(math.abs(sum - 1) < 1e-9, true, "branches: the record's weights are normalized")
 end
 
+-- test_a_game_over_is_counted_per_branch (PR #561 review): two lords, and X kills one or the
+-- other, each half the time. Each alone dies at 50%, but a game over comes in every branch:
+-- its chance is 1, never the 75% the two chances multiplied as if apart would give.
+do
+    local L1 = blue(0x01, 0, 0, 0, { minRange = false })
+    local L2 = blue(0x02, 1, 0, 4, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local kill = function(t) return { enemy = 0x81, target = t, takenHit = 100, takenDmg = 99,
+                                      takenHits = 1, takenCrit = 0, targetHp = 20 } end
+    local o = {
+        objective = { kind = "rout", gameOver = { 0x01, 0x02 } },
+        enemyPhase = function()
+            local a, b = kill(0x01), kill(0x02)
+            local out = { a }
+            out.outcomes = { { p = 0.5, strikes = { a } }, { p = 0.5, strikes = { b } } }
+            return out
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(L1, L2, X), sightOf(o), style("careful"))
+    local g = plan and plan.rank and plan.rank.game_over
+    check(g and math.abs(g - 1) < 1e-9, true, "game over: summed per branch, 1 not 0.75")
+end
+
+-- test_game_over_units_are_the_games_word: the set of charIds whose death ends the game, as
+-- sight.objective.gameOver lists them, the one place the planner and botrun read it from.
+do
+    local set = B.gameOver({ objective = { gameOver = { 0x01, 0x0F } } })
+    check(set[0x01] and set[0x0F] and not set[0x02], true, "game over set: the listed charIds")
+    check(next(B.gameOver({})), nil, "game over set: none without an objective")
+end
+
 -- test_admission_forgives_float_dust (PR #560 review): a death chance a few ulps over the cap
 -- is at the cap, not over it.
 do
@@ -3749,7 +3780,8 @@ do
 end
 
 -- test_every_plan_over_the_cap_is_a_labelled_fallback (FR-011, AS 2): X kills A wherever it
--- stands, at 2RN 80 on (0,0) and 2RN 30 on (1,0). Careful takes the smaller excess and says so.
+-- stands, at 2RN 80 on (0,0) and 2RN 30 on (1,0). A is no game-over unit, so careful takes the
+-- smaller excess and says so.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -3771,7 +3803,8 @@ do
 end
 
 -- test_rank_order (FR-011, FR-013): the comparator, on rank tuples. Admission first; among
--- violators the largest excess, the summed excess, then the largest death chance; among the
+-- violators the chance of a game over, the largest excess, the summed excess, then the largest
+-- death chance; among the
 -- admitted the order PR-C keeps (`value`, the judged score, until PR-D's ledger); last the
 -- largest death chance, the summed one, more HP left, then the plan's stable key.
 do
@@ -3787,6 +3820,9 @@ do
     check(before(r { admitted = false, game_over = 0, max_exceed = 0.99 },
                  r { admitted = false, game_over = 0.02, max_exceed = 0.01 }), true,
           "rank: violators by the chance of a game over first, whatever the excess")
+    check(before(r { admitted = false, game_over = 0.1 + 0.2, max_exceed = 0.2 },
+                 r { admitted = false, game_over = 0.3, max_exceed = 0.9 }), true,
+          "rank: a chance's float dust is no difference (0.1 + 0.2 is 0.3)")
     check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.3 },
                  r { admitted = false, max_exceed = 0.2, sum_exceed = 0.2 }), true,
           "rank: then by the largest excess")

@@ -479,6 +479,15 @@ local function canSeize(ctx, u) return ctx.sight.canSeize(u) end
 
 local function reaches(ctx, e, x, y) return ctx.sight.threat(e)(x, y) > 0 end
 
+-- The charIds whose death ends the game, as a set (charId -> true): the game's own list,
+-- sight.objective.gameOver (a lord's death quote sets EVFLAG_GAMEOVER). The planner and botrun
+-- both read it from here.
+function M.gameOver(sight)
+    local set = {}
+    for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do set[c] = true end
+    return set
+end
+
 local function listed(list, v)
     for _, x in ipairs(list) do
         if x == v then return true end

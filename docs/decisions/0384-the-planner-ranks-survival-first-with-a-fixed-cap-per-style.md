@@ -37,7 +37,7 @@ only the outcomes that can change whether a protected unit can die (plan task T0
 - **Among admitted plans:** fewer irreversible goal forfeitures first, then objective
   completion, then progress.
 - **Among plans over the cap** (only when no plan is admitted): the smaller chance of a game
-  over first (amended below, 2026-11-02), then smallest largest excess, then smallest summed
+  over first (amended below, 2026-11-01), then smallest largest excess, then smallest summed
   excess, then lowest largest death chance, then the admitted plans' order
   (forfeits, completion, progress). The chosen plan is labelled
   `FALLBACK_SACRIFICE`, so no over-cap death goes unexplained.
@@ -83,17 +83,16 @@ returns what the call cost, over every plan it judged, a call with no plan inclu
 left to the average past the bound is never silent. The suite manifest's `budgets.branch` is
 8 too, and `test_montecarlo` fails when it and `M.BRANCH` differ. Plans are compared by
 `M.outranks` on `plan.rank`:
-admission; for plans over the cap, largest excess, summed excess, largest death chance, then
-the admitted order; for admitted plans, `value` (the judged score), standing in for (4) until
-PR-D; then largest death chance, summed death chance, HP left, and the plan's acts as a key.
+admission; for plans over the cap, the chance of a game over (amended below), largest excess,
+summed excess, largest death chance, then the admitted order; for admitted plans, `value` (the
+judged score), standing in for (4) until PR-D; then largest death chance, summed death chance,
+HP left, and the plan's acts as a key.
 A plan chosen with none under the cap carries `fallback = "FALLBACK_SACRIFICE"`, which botrun
 records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fallback plans,
 `max_die` the most any of them accepted).
 
 - **What PR-C does not do yet:** an allied green's death still costs the judged score, as
-  ADR 0381 priced it; PR-D's ledger replaces that with the tie-break of (4). The cap does not
-  weigh a game-over unit's death above another's: with every plan over the cap, a lord's even
-  chance is played over another unit's sure death, because it is the smaller excess.
+  ADR 0381 priced it; PR-D's ledger replaces that with the tie-break of (4).
 - **Measured, branching (plan T036), the pinned suite, 52 runs:** every kill branched judged
   7,020 enemy phases in 1,005 plans. `BRANCH = 2` on the same code judged 6,213 (13% fewer).
   With the bound of 8 the play was identical (7,020 phases, 1,005 plans, no kill averaged).
@@ -112,11 +111,15 @@ records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fa
   but greedy), so that share is 0 for every attack the planner judges. A counter-and-phase death
   (Franz's 12.7%) is all in the phase share, which admission reads.
 
-**Amended (Nicolas, 2026-11-02): a game over comes before the excess.** A unit whose death ends
+**Amended (Nicolas, 2026-11-01): a game over comes before the excess.** A unit whose death ends
 the game (a lord's, `sight.objective.gameOver`) is not one more risk among the protected: its
 death ends the chapter. So among plans over the cap, the one with the smaller chance that such a
 unit dies comes first, whatever the excess. Before this, a lord's 50% was played over another
-unit's sure death, because it was the smaller excess (#560). `plan.rank.game_over` is
-1 - Π(1 - die) over those units, each death taken as apart from the others. Admitted plans
-are unchanged: a game-over unit in them is already at or under the cap, and PR-D's ledger
-counts a game over as forfeiting everything.
+unit's sure death, because it was the smaller excess (#560). `plan.rank.game_over` is summed
+per judged outcome: the chance that any such unit dies there, weighted by the outcome's chance
+(two lords killed in different outcomes make a sure game over, never a product of their
+chances). Chances in the rank are compared to within `M.DUST` (1e-9), so a sum taken in another
+order is no difference. Admitted plans are unchanged: a game-over unit in them is already at or
+under the cap, and PR-D's ledger counts a game over as forfeiting everything. **Open (#561):**
+admission still comes first, so a plan with a lord at the cap outranks one whose lord is safe
+and another unit is a hair over it.

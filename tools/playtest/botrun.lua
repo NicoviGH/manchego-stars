@@ -741,10 +741,7 @@ function M.run(api)
         trace({ t = "start", info = api.info, style = api.style, claims_played = played,
                 claims_unplayed = unplayed,
                 game_over = sight.objective and sight.objective.gameOver })
-        lords = {}
-        for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do
-            lords[c] = true
-        end
+        lords = Bot.gameOver(sight)
         local seen, waitUntil = {}, nil
         -- the plan that committed to the enemy phase: this phase's last (FR-003)
         local commit
@@ -860,7 +857,8 @@ function M.run(api)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
                             commit = plan
                             if plan.fallback then
-                                -- every plan was over the cap: the least over it was played.
+                                -- every plan was over the cap: the least likely to end the
+                                -- game, then the least over it, was played.
                                 -- One anomaly a turn, however often the turn replans: `plans`
                                 -- counts them, `max_die` the most any of them accepted
                                 local die = plan.rank and plan.rank.max_die or 0
