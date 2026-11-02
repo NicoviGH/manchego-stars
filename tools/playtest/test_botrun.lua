@@ -494,7 +494,9 @@ do
     check(asked, r.plans.made, "every plan asked for is counted")
     check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
           .. "turn 2's board: one stalled ask; turn 4 repeats it again: stuck")
-    check(r.stalls, 1, "the first repeat is a stall, not stuck")
+    check(r.board_repeats, 1, "the first repeat is a board repeat, not stuck (R-9)")
+    check(r.stalls, nil, "the old name is gone")
+    check(r.anomalies[1] and r.anomalies[1].kind, "stall_abort", "stuck is a stall abort")
     check(g.stalledAsk, 4, "the stalled ask is told it is stalled")
     check(r.outcome, "stuck", "a board that comes round again after a stall is stuck")
 end
@@ -911,6 +913,402 @@ do
     local r = recordOf(g)
     check(r.clear.recruits_missing, "unchecked", "no list: unchecked")
     check(r.clean, nil, "no list: not judged")
+end
+
+-- The graded record (#510 step 9, US1). A death graded against the plan that committed to
+-- its board: M.grade, then the run-level outcomes.
+
+-- a plan as botrun keeps it: made on a board (its snapshot), predicting each unit's phase
+local function committed(o)
+    return { ref = o.ref or 3, enemies = o.enemies or { [0x81] = true },
+             snapshot = o.snapshot or { { id = 0x01, charId = 0x01, faction = "blue" },
+                                        { id = 0x81, charId = 0x81, faction = "red" } },
+             predict = o.predict or { { id = 0x01, die = 0.04, strikers = { 0x81 } } } }
+end
+local function death(o)
+    local d = { id = 0x01, charId = 0x01, faction = "blue", turn = 2, killer = 0x81,
+                killerId = 0x81, phase = "enemy" }
+    for k, v in pairs(o or {}) do d[k] = v end
+    return d
+end
+
+-- test_grade_takes_the_committing_plans_prediction (FR-003)
+do
+    local d = Botrun.grade(death(), committed {}, nil, nil, {})
+    check(d.predicted, 0.04, "enemy phase: the last player-phase plan's predict")
+    check(d.plan_ref, 3, "enemy phase: which plan")
+    check(d.cause, "rng_tail", "a positive prediction under no cap is a tail")
+    check(d.over_cap, nil, "no cap yet: over_cap is null")
+    local act = { unitId = 0x01, die = 0.3, f = { counters = true } }
+    d = Botrun.grade(death { phase = "player" }, committed {}, act, nil, {})
+    check(d.predicted, 0.3, "player phase: the attack's own counter chance")
+    check(d.flags.player_phase, true, "player phase: flagged")
+    d = Botrun.grade(death(), nil, nil, 0.05, {})
+    check(d.predicted, nil, "no plan: no prediction")
+    check(d.over_cap, nil, "no plan: over_cap is null, never false")
+    check(d.flags.reinforcement, nil, "no plan: reinforcement unknown")
+    check(d.cause .. "/" .. tostring(d.detail), "other/missing_prediction",
+          "no plan: never counted as zero risk")
+    check(d.family, "sandbox_fault", "missing prediction: a sandbox fault")
+    d = Botrun.grade(death(), committed { predict = {} }, nil, nil, {})
+    check(d.predicted, nil, "a plan with no read for the unit: null")
+end
+
+-- test_grade_flags_are_independent (FR-004)
+do
+    -- the killer was not on the board the plan was made on: an arrival
+    local d = Botrun.grade(death { killer = 0x90, killerId = 0x90 }, committed {}, nil, nil, {})
+    check(d.flags.reinforcement, true, "reinforcement: killer absent from the snapshot")
+    check(d.flags.fog, false, "reinforcement: not fog")
+    -- on the board but not among the enemies the plan saw
+    d = Botrun.grade(death(), committed { enemies = {} }, nil, nil, {})
+    check(d.flags.fog, true, "fog: killer absent from the plan's enemies")
+    check(d.flags.reinforcement, false, "fog: not an arrival")
+    -- the boss flag, as the board says
+    local snap = { { id = 0x01, charId = 0x01, faction = "blue" },
+                   { id = 0x81, charId = 0x81, faction = "red", isBoss = true } }
+    d = Botrun.grade(death(), committed { snapshot = snap }, nil, nil, {})
+    check(d.flags.boss, true, "boss: the killer's isBoss")
+    check(d.flags.fog or d.flags.reinforcement, false, "boss alone")
+    -- by charId, when the watch read no index: a generic shares its charId with others
+    snap = { { id = 0x81, charId = 0x50, faction = "red" }, { id = 0x82, charId = 0x50, faction = "red" } }
+    d = Botrun.grade(death { killer = 0x50, killerId = false }, committed { snapshot = snap,
+        enemies = { [0x82] = true } }, nil, nil, {})
+    check(d.flags.fog, false, "by charId: one of them was seen")
+    check(d.flags.player_phase, false, "enemy phase")
+end
+
+-- test_cause_precedence (FR-005)
+do
+    local all = { over_cap = true, predicted = 0.3, killer = 0x81,
+                  flags = { reinforcement = true, fog = true, boss = true, player_phase = true } }
+    check(Botrun.cause(all, {}), "over_cap", "over_cap first")
+    all.over_cap = false
+    check(Botrun.cause(all, {}), "reinforcement", "then reinforcement")
+    all.flags.reinforcement = false
+    check(Botrun.cause(all, {}), "fog", "then fog")
+    all.flags.fog = false
+    check(Botrun.cause(all, {}), "rng_tail", "then a positive prediction under the cap")
+    local zero = { predicted = 0, killer = 0x81, flags = {} }
+    local c, detail = Botrun.cause(zero, { struck = true, strikers = 1 })
+    check(c .. "/" .. detail, "other/forecast_desync", "zero, its lone judged striker killed it")
+    check(Botrun.DETAILS[detail], "sandbox_fault", "a desync is a sandbox fault")
+    c, detail = Botrun.cause(zero, { struck = true, strikers = 2 })
+    check(detail, "zero_multi_attacker", "zero, among several judged strikers")
+    check(Botrun.DETAILS[detail], "blindspot", "a blindspot")
+    c, detail = Botrun.cause(zero, { struck = false, strikers = 1 })
+    check(detail, "unrevealed_killer", "zero, a killer the judged phase never sent")
+    c, detail = Botrun.cause({ predicted = 0, flags = {} }, {})
+    check(detail, "noncombat", "zero, no fighter")
+    c, detail = Botrun.cause({ predicted = 0, killer = 0x81, flags = { player_phase = true } },
+                             { counters = false })
+    check(detail, "player_phase_counter", "a counter the forecast did not expect")
+    c, detail = Botrun.cause({ predicted = 0, killer = 0x81, flags = { player_phase = true } },
+                             { counters = true })
+    check(detail, "forecast_desync", "a counter expected at zero that killed")
+    for _, name in ipairs(Botrun.CAUSES) do
+        check(type(name), "string", "the cause list is names")
+    end
+end
+
+-- test_graded_outcomes (FR-006, FR-008): an escort green and an allied green die; the owed
+-- recruit 0x30 was killed, 0x31 never reached; a village was never offered; the run is won.
+do
+    local units = rout()
+    units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
+    units[#units + 1] = unit(0x42, 1, "green", 6, 6, 10)
+    units[#units + 1] = unit(0x30, 2, "red", 9, 0, 1)
+    -- 0x32 is owed, and on our side and dead by the run's end: it joined and fell
+    units[#units + 1] = unit(0x32, 3, "blue", 0, 9, 10)
+    local g = fakeGame { units = units, recruits = { 0x30, 0x31, 0x32 },
+                         party = function(g)
+                             local out = {}
+                             for _, u in ipairs(g.units) do
+                                 if u.faction == "blue" and not u.dead and u.charId ~= 0x32
+                                     or (u.charId == 0x32 and g.turn > 1 and not u.dead) then
+                                     out[#out + 1] = u.charId
+                                 end
+                             end
+                             return out
+                         end,
+                         explorable = { { x = 9, y = 9, kind = "visit" } },
+                         enemy = function(g, find)
+                             if g.turn ~= 1 then return {} end
+                             for _, id in ipairs({ 0x41, 0x42, 0x30, 0x32 }) do
+                                 local v = find(id)
+                                 v.hp, v.dead, v.onField = 0, true, false
+                             end
+                             return {}
+                         end }
+    local sight = g.api.sight
+    g.api.sight = function()
+        local s = sight()
+        s.objective.gameOver = { 0x41 }
+        return s
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "won", "graded: a win with misses stays won (AS 2)")
+    check(r.clean, false, "graded: and not clean")
+    check(r.turns_to_win, r.turns, "graded: turns to win")
+    check(r.greens.escort_deaths[1], 0x41, "graded: the escort green, as the game says")
+    check(r.greens.allied_deaths[1], 0x42, "graded: the allied green")
+    check(r.first_death_turn, 1, "graded: the joined recruit's death is a player death")
+    local why = {}
+    for _, m in ipairs(r.missed_recruits) do why[m.charId] = m.reason end
+    check(why[0x30], "killed_before_talk", "graded: a recruit killed first")
+    check(why[0x31], "unknown", "graded: greedy records no Talk offers, so it cannot say")
+    check(why[0x32], "died_after_joining", "graded: one that joined and fell")
+    local m = r.missed_rewards[1]
+    check(m and m.kind, "visit", "graded: the missed reward's kind")
+    check(m and m.reason, "unknown", "graded: greedy counts no offers, so it cannot say")
+    local same = 0
+    for _, a in ipairs(r.anomalies) do
+        if a.kind == "same_turn_green" then same = same + 1 end
+    end
+    check(same, 2, "graded: greens lost on the turn first seen")
+end
+
+-- test_first_death_turn_and_a_lost_run_has_no_turns_to_win
+do
+    local g = fakeGame {
+        hit = 1,
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 30) },
+        enemy = function(g, find)
+            if g.turn == 2 then
+                local a = find(0x01)
+                a.hp, a.dead, a.onField = 0, true, false
+                g.over = true
+            end
+            return {}
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.first_death_turn, 2, "first death turn")
+    check(r.turns_to_win, nil, "a loss has no turns to win")
+    check(r.deaths[1].cause, "other", "greedy: no plan behind it")
+    check(r.deaths[1].detail, "noncombat", "no fighter: noncombat, not a sandbox fault")
+    check(r.deaths[1].over_cap, nil, "no cap yet: the over-cap check has not run (null, not false)")
+end
+
+-- test_seize_skips_and_stalls (FR-007): a planner offered the Seize keeps waiting. With a
+-- village open the skip is justified and no stall; with nothing open each skip is a stall.
+-- Three turns with no lord move, kill, visit, talk or chest are an idle_3 stall.
+do
+    local function seizer(worth)
+        local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) },
+                             turnsLeft = 5 }
+        g.api.info.trace = "trace.jsonl"
+        local sight = g.api.sight
+        g.api.sight = function()
+            local s = sight()
+            s.objective.gameOver = { 0x01 }
+            return s
+        end
+        local n = 0
+        g.api.Planner = {
+            surprise = function() return "the plan is played out" end,
+            plan = function(_, board)
+                for _, u in ipairs(board.units) do
+                    if u.faction == "blue" and u.acted then return nil end
+                end
+                n = n + 1
+                local a = { unit = 0x01, unitId = 0x01, act = "wait",
+                            move = { x = 0, y = n % 2 } }   -- back and forth: a lord moving
+                return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                            seizable = true, goalWorth = worth }
+            end,
+        }
+        Botrun.run(g.api)
+        return recordOf(g)
+    end
+    local r = seizer({ { id = "visit:3,3", kind = "visit", before = 0.5 } })
+    check(#r.seize_skips, 5, "seize skips: one a turn")
+    check(r.seize_skips[1].turn, 1, "seize skips: the turn")
+    check(r.seize_skips[1].ledger[1], "visit:3,3", "seize skips: the ledger")
+    check(r.seize_skips[1].justified, true, "seize skips: an open village justifies it")
+    check(#r.stall_events, 0, "a justified skip alone is not a stall")
+    check(r.turns_to_win, 5, "turns to win, on a winner")
+    check(#r.anomalies, 0, "a win put off only for open goals is no seize delay")
+    r = seizer({ { id = "objective:1", kind = "objective", before = 1 } })
+    check(r.seize_skips[1].justified, false, "nothing the win would close: unjustified")
+    check(r.stall_events[1] and r.stall_events[1].kind, "unjustified_seize_skip",
+          "an unjustified skip is a stall")
+    check(r.anomalies[1] and r.anomalies[1].kind, "seize_delay", "an unjustified skip delays")
+    check(r.anomalies[1] and r.anomalies[1].turn, 1, "from the first unjustified skip")
+    check(r.anomalies[1] and r.anomalies[1].delay, 4, "by how many turns")
+
+    -- idle: a lord holding still with nothing to do for three player phases
+    local g = fakeGame { units = standoff(), turnsLeft = 4 }
+    local sight = g.api.sight
+    g.api.sight = function()
+        local s = sight()
+        s.objective.gameOver = { 0x01 }
+        return s
+    end
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true } }
+        end,
+    }
+    g.eventTurn = 99
+    Botrun.run(g.api)
+    local r2 = recordOf(g)
+    local idle = {}
+    for _, e in ipairs(r2.stall_events) do
+        if e.kind == "idle_3" then idle[#idle + 1] = e.turn end
+    end
+    check(table.concat(idle, ","), "3", "idle_3: on the third idle turn (four turns played)")
+end
+
+-- test_review_fixes (PR #559's review): no fighter is noncombat even with a positive
+-- prediction; a reloaded slot is an arrival; a green no phase saw is unseen_green, not
+-- same-turn; an idle stretch is a stall every third phase; an enemy-phase kill is no progress.
+do
+    local d = Botrun.grade(death { killer = false, killerId = false }, committed {}, nil, nil, {})
+    check(d.cause .. "/" .. tostring(d.detail), "other/noncombat",
+          "no fighter: noncombat before the tail, though the plan predicted 4%")
+    -- slot 0x81 held 0x81 when the plan was made; an arrival 0x90 reloaded it
+    d = Botrun.grade(death { killer = 0x90, killerId = 0x81 }, committed {}, nil, nil, {})
+    check(d.flags.reinforcement, true, "a reloaded slot: matched by index and charId")
+    -- the same, with a generic of the same charId: the snapshot's 0x81 fell at decision 3 or
+    -- later (diedAt), so the killer in its slot arrived after the plan
+    d = Botrun.grade(death(), committed {}, nil, nil, {}, nil, { [0x81] = 3 })
+    check(d.flags.reinforcement, true, "a reloaded slot, same charId: the snapshot's unit fell")
+    d = Botrun.grade(death(), committed {}, nil, nil, {}, nil, { [0x81] = 2 })
+    check(d.flags.reinforcement, false, "a slot freed before the plan: the snapshot's unit is the killer")
+
+    -- a green that arrives in the enemy phase and dies on a later enemy phase before any
+    -- player phase saw it; and an idle stretch of six turns where the enemy dies on a counter
+    local g = fakeGame { units = standoff(), turnsLeft = 7, enemy = function(g, find)
+        if g.turn == 2 then g.units[#g.units + 1] = unit(0x43, 5, "green", 5, 5, 10) end
+        return {}
+    end }
+    local endPhase = g.api.endPhase
+    g.api.endPhase = function()
+        local phase, deaths, acts = endPhase()
+        return phase, deaths, acts
+    end
+    local killed = g.api.killed
+    g.api.killed = function()
+        local out = killed()
+        if g.turn == 3 and not g.greenDone then
+            g.greenDone = true
+            out[#out + 1] = { id = 0x43, charId = 0x43, faction = "green", turn = 2, phase = "enemy" }
+        end
+        if g.turn == 4 and not g.redDone then
+            g.redDone = true
+            out[#out + 1] = { id = 0x99, charId = 0x99, faction = "red", phase = "enemy" }
+        end
+        return out
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local kinds, idle = {}, {}
+    for _, a in ipairs(r.anomalies) do kinds[#kinds + 1] = a.kind end
+    check(table.concat(kinds, ","):find("unseen_green") ~= nil, true, "a green never seen: unseen_green")
+    check(table.concat(kinds, ","):find("same_turn_green"), nil, "and not same_turn_green")
+    for _, e in ipairs(r.stall_events) do
+        if e.kind == "idle_3" then idle[#idle + 1] = e.turn end
+    end
+    check(table.concat(idle, ","), "3,6", "idle_3: every third idle phase; an enemy-phase kill is no progress")
+end
+
+-- test_a_killer_that_dies_later_in_the_phase_is_still_the_killer: in one enemy phase X kills
+-- A, then dies on B's counter. The game lists the deaths in that order, so A's grade still
+-- finds X on the plan's board: no reinforcement.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                   unit(0x81, 0, "red", 0, 1, 10) },
+                         enemy = function(g, find)
+                             for _, id in ipairs({ 0x01, 0x81 }) do
+                                 local u = find(id)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                             end
+                             return {}
+                         end }
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                   phase = "enemy" },
+                 { id = 0x81, charId = 0x81, faction = "red", killer = 0x02, killerId = 0x02,
+                   phase = "enemy" } }
+    end
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 0, y = 2 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = 0.3,
+                                      taken = 6, strikes = 1, strikers = { 0x81 } } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local d = r.deaths[1]
+    check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
+    check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
+end
+
+-- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another
+-- side before any offer is closed; never offered is unreachable; a Talk never offered is
+-- not_reached.
+do
+    local tiles = { { x = 9, y = 0, kind = "visit" }, { x = 0, y = 9, kind = "visit" },
+                    { x = 5, y = 5, kind = "chest" } }
+    local open = { tiles[1], tiles[2], tiles[3] }
+    local g = fakeGame { units = standoff(), turnsLeft = 3, recruits = { 0x31 },
+                         explorable = open,
+                         enemy = function(g)
+                             if g.turn == 1 then table.remove(open, 3) end   -- pillaged
+                             return {}
+                         end }
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        explore = { { x = 9, y = 0, die = 0 } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local why = {}
+    for _, m in ipairs(r.missed_rewards) do why[m.x .. "," .. m.y] = m.reason end
+    check(why["9,0"], "skipped", "reasons: offered, never taken")
+    check(why["5,5"], "closed", "reasons: closed by another side before any offer")
+    check(why["0,9"], "unreachable", "reasons: never offered")
+    check(r.missed_recruits[1] and r.missed_recruits[1].reason, "not_reached",
+          "reasons: a Talk never offered")
+end
+
+-- test_a_bait_loop: an enemy drawn between two tiles for four turns is an anomaly, once.
+do
+    local g = fakeGame { units = standoff(), turnsLeft = 7, enemy = function(g, find)
+        local e = find(0x81)
+        e.x = e.x == 9 and 8 or 9
+        return {}
+    end }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local n = 0
+    for _, a in ipairs(r.anomalies) do
+        if a.kind == "bait_loop" then n = n + 1; check(a.turn, 4, "bait loop: on the fourth turn") end
+    end
+    check(n, 1, "bait loop: once")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

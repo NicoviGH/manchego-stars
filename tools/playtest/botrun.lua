@@ -13,9 +13,9 @@
 --   lost     the game-over screen came up (api.lost), or the enemy phase reached it
 --   stuck    a player phase began on a board already seen this run, and nothing ahead can
 --            change it -- for the planner, a board that comes round again AFTER the planner was
---            made to change it once (its first repeat is a stall: opts.stalled, counted in the
---            record's `stalls`): the hash holds every on-field unit's id, tile and HP, the objective's
---            turns left, and the turns until the next arrival a reinforcements claim cites --
+--            made to change it once (its first repeat: opts.stalled, counted in the record's
+--            `board_repeats`): the hash holds every on-field unit's id, tile and HP, the
+--            objective's turns left, and the turns until the next arrival a reinforcements claim cites --
 --            everything Bot.decide reads -- and the game's own turn-event check
 --            (sight.nextTurnEvent) finds no event still to fire. A repeat with an event ahead
 --            waits for that turn.
@@ -125,7 +125,8 @@ function M.snapshot(board)
             local items = {}
             for _, it in ipairs(u.items or {}) do items[#items + 1] = it.id end
             out[#out + 1] = { id = u.id, charId = u.charId, classId = u.classId,
-                              faction = u.faction, x = u.x, y = u.y, hp = u.hp, items = items }
+                              faction = u.faction, x = u.x, y = u.y, hp = u.hp, items = items,
+                              isBoss = u.isBoss or nil }
         end
     end
     return out
@@ -190,10 +191,15 @@ local function fallen(before, after, action)
         local n = now[u.id]
         local joined = u.faction ~= "blue" and blue[u.charId]
         if u.onField and not u.dead and (n == nil or n.dead) and not joined then
-            local killer
-            if action and u.id == action.unitId then killer = action.target end
-            if action and u.id == action.targetId then killer = action.unit end
+            local killer, killerId
+            if action and u.id == action.unitId then
+                killer, killerId = action.target, action.targetId
+            end
+            if action and u.id == action.targetId then
+                killer, killerId = action.unit, action.unitId
+            end
             out[#out + 1] = { id = u.id, charId = u.charId, faction = u.faction, killer = killer,
+                              killerId = killerId,
                               ours = action ~= nil and u.id == action.targetId }
         end
     end
@@ -354,6 +360,121 @@ function M.exploreLog()
     return log
 end
 
+-- A death's primary cause, in precedence order (#510 step 9, FR-005): the plan took a risk
+-- above its style's cap; the killer arrived after the plan was made; the killer was on the
+-- field but hidden from the plan; the plan saw the chance and lost the roll; anything else.
+-- The one list montecarlo.py reads these names from.
+M.CAUSES = { "over_cap", "reinforcement", "fog", "rng_tail", "other" }
+-- What "other" was, by family: the plan's own reads failed it (a sandbox fault), or it read
+-- the board right and could not see this death coming (a blindspot).
+M.DETAILS = {
+    missing_prediction = "sandbox_fault",    -- no committing plan, or none for this unit
+    forecast_desync = "sandbox_fault",       -- the plan played this very strike and saw no death
+    zero_multi_attacker = "blindspot",       -- several strikers the plan judged, at zero together
+    unrevealed_killer = "blindspot",         -- a seen enemy the judged phase never sent at it
+    player_phase_counter = "blindspot",      -- a counter the forecast said would not come
+    noncombat = "blindspot",                 -- no fighter: an event or a phase-start tick
+}
+
+-- A missed reward's reason, from the explore log's status (exploreLog.summary): offered to a
+-- unit and never taken; never offered; closed by another side first (a pillage, a thief); or
+-- tried and the harness could not drive it (the run crashed there).
+M.REWARD_REASONS = { skipped = "skipped", unreached = "unreachable", closed = "closed",
+                     failed = "failed" }
+
+-- d: a graded death ({ predicted, over_cap, flags, killer }); why: what the committing plan
+-- judged of it ({ struck: its killer among the judged strikers, strikers: how many,
+-- counters: the attack expected a counter }) -> cause, detail (nil unless "other").
+function M.cause(d, why)
+    local f = d.flags
+    if d.over_cap then return "over_cap" end
+    if f.reinforcement then return "reinforcement" end
+    if f.fog then return "fog" end
+    -- no fighter (an event's SET_HP, a phase-start poison tick): no plan's combat odds were
+    -- about it, so it is neither the roll the plan lost nor a plan that failed to read
+    if not d.killer and not d.killerId then return "other", "noncombat" end
+    -- a zero is never a tail: it is a death the plan did not see (FR-005)
+    if d.predicted and d.predicted > 0 then return "rng_tail" end
+    local detail
+    if d.predicted == nil then detail = "missing_prediction"
+    elseif f.player_phase then detail = why.counters and "forecast_desync" or "player_phase_counter"
+    elseif not why.struck then detail = "unrevealed_killer"
+    elseif (why.strikers or 0) > 1 then detail = "zero_multi_attacker"
+    else detail = "forecast_desync" end
+    return "other", detail
+end
+
+-- Grade blue or green death `d` (its id, charId, faction, killer, killerId, phase) against
+-- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
+-- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
+-- phase's last plan (its `predict`). `plan.snapshot` is the board when that plan was made,
+-- `cap` the style's risk cap (nil until the planner has one), `gameOver` the charIds whose
+-- death ends the game, `diedAt` (optional) each unit index of another side to the decision count
+-- it fell at: one that fell at or after the plan's (`plan.ref`) is no killer from the snapshot,
+-- its slot free for an arrival of the same generic charId. Unknown is nil, never zero: a death
+-- with no plan behind it has no prediction, and so no over-cap, reinforcement or fog flag.
+function M.grade(d, plan, action, cap, gameOver, board, diedAt)
+    local playerPhase = d.phase == "player"
+    local snap, known = {}, plan and plan.snapshot ~= nil
+    for _, u in ipairs(plan and plan.snapshot or {}) do
+        local at = diedAt and diedAt[u.id]
+        if not (at and at >= plan.ref) then snap[u.id] = u end
+    end
+    local judged
+    if playerPhase then
+        if action and action.unitId == d.id then d.predicted = action.die end
+    else
+        for _, p in ipairs(plan and plan.predict or {}) do
+            if p.id == d.id then judged = p; d.predicted = p.die end
+        end
+    end
+    -- the killer: by unit index when the watch read one, and by charId -- FE8 reloads a freed
+    -- slot, so an arrival can hold the index of a unit the snapshot saw die
+    local function isKiller(u)
+        return u.faction == "red" and (not d.killerId or u.id == d.killerId)
+            and (not d.killer or u.charId == d.killer) and (d.killerId or d.killer) and true
+    end
+    local killers = {}
+    for _, u in pairs(snap) do
+        if isKiller(u) then killers[#killers + 1] = u end
+    end
+    local boss = false
+    for _, u in ipairs(killers) do boss = boss or u.isBoss == true end
+    for _, u in ipairs(board and board.units or {}) do
+        if isKiller(u) and u.isBoss then boss = true end
+    end
+    local hidden = #killers > 0
+    for _, u in ipairs(killers) do
+        if plan.enemies and plan.enemies[u.id] then hidden = false end
+    end
+    local fought = (d.killer or d.killerId) and true or false
+    d.flags = { player_phase = playerPhase, boss = boss }
+    if known then
+        d.flags.reinforcement = fought and #killers == 0
+        d.flags.fog = hidden
+    end
+    d.cap = cap
+    if d.predicted ~= nil and cap ~= nil then d.over_cap = d.predicted > cap end
+    local struck, strikers = false, 0
+    for _, id in ipairs(judged and judged.strikers or {}) do
+        strikers = strikers + 1
+        for _, u in ipairs(killers) do
+            if u.id == id then struck = true end
+        end
+    end
+    d.cause, d.detail = M.cause(d, { struck = struck, strikers = strikers,
+                                     counters = action and action.f and action.f.counters })
+    d.family = d.detail and M.DETAILS[d.detail]
+    d.plan_ref = plan and plan.ref
+    if d.faction == "green" then
+        d.escort = false
+        for _, c in ipairs(gameOver or {}) do
+            if c == d.charId then d.escort = true end
+        end
+    end
+    return d
+end
+
 function M.run(api)
     local Bot, Json = api.Bot, api.Json
     local style = Bot.applyClaims(api.claims or {}, api.style)
@@ -370,8 +491,24 @@ function M.run(api)
                   attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
-                  plans = { made = 0, kept = 0 }, bag = {} }
+                  plans = { made = 0, kept = 0 }, bag = {}, board_repeats = 0,
+                  seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
+    -- what the graded record reads (FR-003..007): the charIds whose death ends the game
+    -- (sight.objective.gameOver), every charId of another side that fell, every charId a
+    -- Talk was offered to, and the turn each green unit was first seen at a phase's start
+    local gameOver, felled, talked, greenSeen = {}, {}, {}, {}
+    -- per unit index of another side, the decision count when it fell: a slot the game freed
+    -- after a plan's snapshot and reloaded with an arrival is not the snapshot's unit
+    local diedAt = {}
+    -- whether the planner plays: only its plans record the Talks and rewards it was offered
+    local planned = api.Planner ~= nil and style.aggression ~= "greedy"
+    -- each with its turn: montecarlo.py's keep_trace gives it the story command (`narrate`)
+    -- once the trace is filed where it will stay
+    local function anomaly(a) rec.anomalies[#rec.anomalies + 1] = a end
+    -- whether this turn moved the chapter on: a lord moved, a kill, a Visit, Talk or Chest
+    -- (FR-007's stall is three player phases in a row without one)
+    local progressed, idle = false, 0
     -- the clean clear's recruits part, read from the game's party (api.party: the game's own
     -- MakePrepUnitList, i.e. IsUnitInCurrentRoster), never from the unit arrays: owed =
     -- api.recruits() less the party at the first read; joined = owed and in the party at the
@@ -431,8 +568,10 @@ function M.run(api)
     -- A blue or green death is one the game ran UnitKill on (api.killed); `list`, the board's
     -- falls, gives the red kills and a killer where the watch saw no fight. A slot the watch
     -- could not read is a watch fault, never a guess.
+    -- Each blue or green death is graded against the plan that committed to its board (plan,
+    -- and for a player-phase death the action that struck: M.grade).
     local deathFaults = {}
-    local function record(list, phase)
+    local function record(list, phase, plan, action)
         local seen = {}
         for _, d in ipairs(list) do seen[d.id] = d end
         for _, k in ipairs(api.killed()) do
@@ -442,9 +581,31 @@ function M.run(api)
                                                   turn = turn, phase = phase }
             elseif k.faction == "blue" or k.faction == "green" then
                 local d = seen[k.id] or {}
-                rec.deaths[#rec.deaths + 1] = { charId = k.charId, faction = k.faction,
-                                                turn = k.turn or turn, killer = k.killer or d.killer,
-                                                phase = k.phase or phase }
+                local g = M.grade({ id = k.id, charId = k.charId, faction = k.faction,
+                                    turn = k.turn or turn, killer = k.killer or d.killer,
+                                    killerId = k.killerId or d.killerId,
+                                    phase = k.phase or phase }, plan, action, nil, gameOver,
+                                  lastBoard, diedAt)
+                rec.deaths[#rec.deaths + 1] = g
+                if g.faction == "green" and greenSeen[g.id] == g.turn then
+                    -- a green lost on the turn it was first seen: the plan had one player
+                    -- phase to save it
+                    anomaly({ kind = "same_turn_green", turn = g.turn, charId = g.charId })
+                elseif g.faction == "green" and not greenSeen[g.id] then
+                    -- one no player phase ever saw: no plan could have saved it
+                    anomaly({ kind = "unseen_green", turn = g.turn, charId = g.charId })
+                end
+            else
+                felled[k.charId], diedAt[k.id] = true, rec.plans.made
+                -- a kill is progress when the player phase made it (FR-007's stall counts
+                -- player phases), never an enemy walking onto a counter
+                progressed = progressed or (k.phase or phase) == "player"
+            end
+        end
+        for _, d in ipairs(list) do
+            if d.faction ~= "blue" and d.faction ~= "green" then
+                felled[d.charId], diedAt[d.id] = true, diedAt[d.id] or rec.plans.made
+                progressed = progressed or phase == "player"
             end
         end
         -- a red one gone with the fighter that downed it: that fighter's kill
@@ -498,6 +659,48 @@ function M.run(api)
             and #stolen == 0
         if not held or (owed and #missing > 0) then rec.clean = false
         elseif owed then rec.clean = true end
+        -- The graded outcomes (FR-006, FR-007), beside the clean clear. `clean` is derived
+        -- from them and descriptive only: no decision reads it (FR-008).
+        rec.greens = { escort_deaths = {}, allied_deaths = {} }
+        -- a recruit that joined and then fell is out of the party too: its death is a player
+        -- death, and its reason says so (vanilla Ch5 attempt 1: Joshua, turn 9)
+        local fellOurs = {}
+        for _, d in ipairs(rec.deaths) do
+            if d.faction == "blue" then
+                fellOurs[d.charId] = true
+                rec.first_death_turn = math.min(rec.first_death_turn or d.turn, d.turn)
+            else
+                local list = d.escort and rec.greens.escort_deaths or rec.greens.allied_deaths
+                list[#list + 1] = d.charId
+            end
+        end
+        if owed then
+            rec.missed_recruits = {}
+            for _, c in ipairs(missing) do
+                rec.missed_recruits[#rec.missed_recruits + 1] = { charId = c,
+                    reason = (fellOurs[c] and "died_after_joining")
+                        or (felled[c] and "killed_before_talk")
+                        or (talked[c] and "talk_skipped")
+                        or (planned and "not_reached") or "unknown" }
+            end
+        end
+        rec.missed_rewards = {}
+        for _, t in ipairs(rec.clear.rewards_missing) do
+            -- M.REWARD_REASONS. Only the planner counts offers (its plans' `explore`), so a run
+            -- without one cannot tell skipped from unreachable
+            rec.missed_rewards[#rec.missed_rewards + 1] = { x = t.x, y = t.y, kind = t.kind,
+                reason = planned and M.REWARD_REASONS[t.why] or "unknown",
+                closed_by = t.closed_by }
+        end
+        if outcome == "won" then rec.turns_to_win = turn end
+        if outcome == "stuck" then anomaly({ kind = "stall_abort", turn = turn }) end
+        -- a win put off with nothing left the win would close (a justified skip waits for a goal)
+        for _, k in ipairs(outcome == "won" and rec.seize_skips or {}) do
+            if not k.justified then
+                anomaly({ kind = "seize_delay", turn = k.turn, delay = turn - k.turn })
+                break
+            end
+        end
         if outcome == "won" then
             for _, f in ipairs(explore.leftOpen()) do rec.bot_faults[#rec.bot_faults + 1] = f end
         end
@@ -527,8 +730,15 @@ function M.run(api)
         trace({ t = "start", info = api.info, style = api.style, claims_played = played,
                 claims_unplayed = unplayed,
                 game_over = sight.objective and sight.objective.gameOver })
+        gameOver = sight.objective and sight.objective.gameOver or {}
+        local lords = {}
+        for _, c in ipairs(gameOver) do lords[c] = true end
         local seen, waitUntil = {}, nil
-        local lastPlan
+        -- the plan that committed to the enemy phase: this phase's last (FR-003)
+        local commit
+        -- each red unit's tile at every phase start, for a bait loop; the turn of the last
+        -- seize skip recorded (one a turn)
+        local tiles, baited, skipTurn = {}, {}, nil
         -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
         -- unit left to act returns none), so the next turn keeps the same senders
         local sent
@@ -555,13 +765,13 @@ function M.run(api)
                 if not waitUntil then
                     -- the first repeat is a stall: the planner must change the board (its
                     -- opts.stalled); a board that comes round again after that is stuck
-                    if seen[h] == "stalled" or not api.Planner or style.aggression == "greedy" then
+                    if seen[h] == "stalled" or not planned then
                         for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
                         return "stuck", "a player phase began on a board seen before, and no turn "
                             .. "event is left to change it"
                     end
                     stalled = true
-                    rec.stalls = (rec.stalls or 0) + 1
+                    rec.board_repeats = rec.board_repeats + 1
                     api.log(string.format("botrun: board repeats on turn %d; the plan must change it",
                         turn))
                 else
@@ -571,6 +781,23 @@ function M.run(api)
             end
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
+            commit = nil
+            for _, u in ipairs(board.units) do
+                if u.onField and u.faction == "green" then
+                    greenSeen[u.id] = greenSeen[u.id] or turn
+                elseif u.onField and u.faction == "red" and not baited[u.id] then
+                    -- an enemy drawn back and forth between two tiles for four turns
+                    local t = tiles[u.id] or {}
+                    t[#t + 1] = u.x .. "," .. u.y
+                    tiles[u.id] = t
+                    local n = #t
+                    if n >= 4 and t[n] == t[n - 2] and t[n - 1] == t[n - 3]
+                        and t[n] ~= t[n - 1] then
+                        baited[u.id] = true
+                        anomaly({ kind = "bait_loop", turn = turn, charId = u.charId, id = u.id })
+                    end
+                end
+            end
             if sight.explorable then
                 -- whether any unit could use each tile now: every unit can act at phase start
                 explore.open(sight.explorable(), turn, function(t)
@@ -587,7 +814,7 @@ function M.run(api)
                 -- one decision's reads in one save/load (sight.batch), when the sight batches
                 -- the planner plays every style but greedy, the old clear bot (bot.lua)
                 local function decide()
-                    if api.Planner and style.aggression ~= "greedy" then
+                    if planned then
                         local why
                         if playing then
                             why = api.Planner.surprise(playing, nextAct - 1, before, board,
@@ -609,11 +836,38 @@ function M.run(api)
                                                            explored = explore.explored(),
                                                            lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
-                        lastPlan = plan
-                        if plan then sent = plan.goals end
                         rec.plans.made = rec.plans.made + 1
+                        if plan then
+                            sent = plan.goals
+                            -- the board this plan committed to, and its decision index (a
+                            -- death's plan_ref)
+                            plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
+                            commit = plan
+                            for _, c in ipairs(plan.talks or {}) do talked[c] = true end
+                            if plan.seizable and not plan.seizes and skipTurn ~= turn then
+                                -- the win was on offer and the plan did something else: only
+                                -- a goal the win would close justifies it
+                                skipTurn = turn
+                                local ledger = {}
+                                for _, g in ipairs(plan.goalWorth or {}) do
+                                    if g.kind ~= "objective" and (g.before or 0) > 0 then
+                                        ledger[#ledger + 1] = g.id
+                                    end
+                                end
+                                local justified = #ledger > 0
+                                rec.seize_skips[#rec.seize_skips + 1] = { turn = turn,
+                                    ledger = ledger, justified = justified,
+                                    reason = justified and "goals the win would close are open"
+                                        or "nothing left the win would close" }
+                                if not justified then
+                                    rec.stall_events[#rec.stall_events + 1] = { turn = turn,
+                                        kind = "unjustified_seize_skip" }
+                                end
+                            end
+                        end
                         explore.offered(plan and plan.explore)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
+                                ref = plan and plan.ref,
                                 judged = plan and plan.judged, kind = plan and plan.kind,
                                 considered = plan and plan.considered,
                                 predict = plan and plan.predict,
@@ -645,12 +899,15 @@ function M.run(api)
                     explore.failed(action, turn)
                 end
                 if done == false then
-                    record({}, "player")   -- the deaths the act caused before it failed
+                    record({}, "player", playing, action)   -- the deaths the act caused first
                     return "crashed", "the harness could not perform " .. action.act
                         .. (why and (": " .. why) or "")
                 end
                 if action.act == "visit" or action.act == "chest" then
                     explore.visited(action, turn)
+                end
+                if action.act == "visit" or action.act == "chest" or action.act == "talk" then
+                    progressed = true
                 end
                 local battle = action.act == "attack" and api.battle and api.battle() or nil
                 local after = api.board()
@@ -659,7 +916,11 @@ function M.run(api)
                 local actor = byId(after)[action.unitId]
                 local from = byId(board)[action.unitId]
                 local fell = fallen(board, after, action)
-                record(fell, "player")
+                if lords[action.unit] and from
+                    and (from.x ~= action.move.x or from.y ~= action.move.y) then
+                    progressed = true
+                end
+                record(fell, "player", playing, action)
                 trace({ t = "act", phase = "player", unit = action.unit, id = action.unitId,
                         from = from and { x = from.x, y = from.y }, to = action.move,
                         act = action.act, target = action.target, battles = { battle },
@@ -682,7 +943,7 @@ function M.run(api)
             end
             local before = api.board()
             -- what the last plan expected of this enemy phase, beside what it did
-            for _, p in ipairs(lastPlan and lastPlan.predict or {}) do
+            for _, p in ipairs(commit and commit.predict or {}) do
                 if p.strikes > 0 then
                     api.log(string.format("plan: 0x%02X @%d,%d hp %d: %d strikes, die %.2f, taken %.1f",
                         p.charId, p.x, p.y, p.hp, p.strikes, p.die, p.taken))
@@ -720,7 +981,7 @@ function M.run(api)
             for _, d in ipairs(fallen(before, api.board(), nil)) do
                 if not counted[d.id] then all[#all + 1] = d end
             end
-            record(all, "enemy")
+            record(all, "enemy", commit, nil)
             if phase == "gameover" then return "lost", "game over in the enemy phase" end
             if phase == "ended" then
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end
@@ -729,6 +990,11 @@ function M.run(api)
             if phase ~= "player" then
                 return "crashed", "the enemy phase never returned control", "timeout"
             end
+            idle = progressed and 0 or idle + 1
+            if idle > 0 and idle % 3 == 0 then
+                rec.stall_events[#rec.stall_events + 1] = { turn = turn, kind = "idle_3" }
+            end
+            progressed = false
         end
     end
 

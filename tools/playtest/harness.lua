@@ -3060,7 +3060,7 @@ INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(),
 -- than caught at UnitKill's entry: a breakpoint held through every act and phase cost 56% more
 -- CPU (Manchego Stars ch01, 20.4 CPU s against 13.1), and arming it per caller would have to
 -- list every proc that can kill.
--- -> stop() -> { id, charId, faction, killer, ours } per kill, and per slot the watch could not
+-- -> stop() -> { id, charId, faction, killer, killerId, ours } per kill, and per slot the watch could not
 -- read ({ fault = "replaced", id, charId, faction }: freed and reloaded within a frame).
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
@@ -3074,10 +3074,12 @@ INSPECT.watchDeaths = function()
             local fate = BOARD.fate(ru32(SYM.gUnitLookup + uid * 4), who)
             if fate == "killed" then
                 -- turn and phase when it fell (a phase start's poison tick is the next phase's)
-                local killer, ours = BOARD.killer(uid, procActive(SYM.sProcScr_CombatAction))
+                local killer, ours, killerId = BOARD.killer(uid,
+                    procActive(SYM.sProcScr_CombatAction))
                 local now = BOARD.header()
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
-                                        killer = killer, ours = ours == true,
+                                        killer = killer, killerId = killerId,
+                                        ours = ours == true,
                                         turn = now.turn,
                                         phase = now.phase == "blue" and "player" or "enemy" }
             elseif fate == "replaced" then

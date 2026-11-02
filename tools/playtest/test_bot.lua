@@ -2555,6 +2555,44 @@ do
     check(a and a.act ~= "attack", true, "chain: no strike whose landed counter leaves A to die")
 end
 
+-- test_planner_records_the_counters_death_chance (#510 step 9, T012): A (20 HP) strikes X for
+-- 20 without killing it, and X's counter (30, 15) answers. The attack act the plan plays
+-- carries `die`, sight.odds on its counterDist at A's HP: zero here, as for every attack the
+-- planner is offered, since Bot.candidates refuses one whose counter alone can kill. A
+-- player-phase death after it is then a death the plan did not see (botrun's M.cause). The
+-- judged phase names the striker of each of ours (`strikers`), not only of greens.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 2, 0, { hp = 40 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
+                                                    counterHit = 30, counterDmg = 15,
+                                                    counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                out[#out + 1] = { target = b.unit.id, enemy = 0x81, takenHit = 0, takenDmg = 0,
+                                  takenHits = 1, takenCrit = 0 }
+            end
+            return out
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    check(a and a.act, "attack", "die: the plan strikes X")
+    local want = a and a.f and (Sight.odds({ a.f.counterDist }, 20))
+    check(a and a.die, want, "die: the counter's chance, from sight.odds on counterDist")
+    check(want, 0, "die: a counter that cannot kill")
+    check(plan and plan.acts[1].die, want, "die: kept in the plan record's acts")
+    check(plan and plan.seizable, false, "no Seize offered")
+    check(plan and plan.seizes, false, "and none taken")
+    local mine
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x01 then mine = p end
+    end
+    check(mine and mine.strikers and mine.strikers[1], 0x81, "a blue unit's judged strikers")
+end
+
 -- test_planner_unstalls: A holding at (0,0) is the best plan, but botrun has seen this board
 -- before (opts.stalled): the plan played must change it, and the least it can is the step to
 -- (1,0) that X reaches with a small chance to kill.
