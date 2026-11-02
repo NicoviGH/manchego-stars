@@ -412,11 +412,12 @@ end
 -- phase's last plan (its `predict`). `plan.snapshot` is the board when that plan was made,
 -- `cap` the style's risk cap (nil for greedy, which plays no plan; kept only on a protected
 -- unit's death), `lords` the set (charId -> true) of the units whose death ends the game,
--- `admits` the planner's own test of a chance against the cap (Planner.admits: no over-cap
--- verdict without it), `diedAt` (optional) each unit index of another side to the decision count
--- it fell at: one that fell at or after the plan's (`plan.ref`) is no killer from the snapshot,
--- its slot free for an arrival of the same generic charId. Unknown is nil, never zero: a death
--- with no plan behind it has no prediction, and so no over-cap, reinforcement or fog flag.
+-- `admits` the planner's own test of a chance against the cap (Planner.admits: required
+-- whenever `cap` is given), `diedAt` (optional) each unit index of another side to the
+-- decision count it fell at: one that fell at or after the plan's (`plan.ref`) is no killer
+-- from the snapshot, its slot free for an arrival of the same generic charId. Unknown is nil,
+-- never zero: a death with no plan behind it has no prediction, and so no over-cap,
+-- reinforcement or fog flag.
 function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
     local playerPhase = d.phase == "player"
     local snap, known = {}, plan and plan.snapshot ~= nil
@@ -460,9 +461,11 @@ function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
     -- the cap is on the protected units only (FR-009): blue, or one whose death ends the game
     local endsGame = (lords or {})[d.charId] == true
     if d.faction == "blue" or endsGame then d.cap = cap end
-    if d.predicted ~= nil and d.cap ~= nil and admits then
-        d.over_cap = not admits(d.predicted, d.cap)
+    if cap ~= nil and not admits then
+        -- a cap with no test to apply it would leave every death ungraded, never a fault
+        error("botrun.grade: a cap with no admits (Planner.admits) to grade it by")
     end
+    if d.predicted ~= nil and d.cap ~= nil then d.over_cap = not admits(d.predicted, d.cap) end
     local struck, strikers = false, 0
     for _, id in ipairs(judged and judged.strikers or {}) do
         strikers = strikers + 1
@@ -739,7 +742,9 @@ function M.run(api)
                 claims_unplayed = unplayed,
                 game_over = sight.objective and sight.objective.gameOver })
         lords = {}
-        for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do lords[c] = true end
+        for _, c in ipairs(sight.objective and sight.objective.gameOver or {}) do
+            lords[c] = true
+        end
         local seen, waitUntil = {}, nil
         -- the plan that committed to the enemy phase: this phase's last (FR-003)
         local commit
@@ -863,8 +868,8 @@ function M.run(api)
                                     fallback.plans = fallback.plans + 1
                                     fallback.max_die = math.max(fallback.max_die, die)
                                 else
-                                    fallback = { kind = "fallback_sacrifice", turn = turn, plans = 1,
-                                                 max_die = die }
+                                    fallback = { kind = "fallback_sacrifice", turn = turn,
+                                                 plans = 1, max_die = die }
                                     anomaly(fallback)
                                 end
                             end

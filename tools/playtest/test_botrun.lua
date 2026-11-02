@@ -479,7 +479,9 @@ do
             asked = asked + 1
             if opts and opts.stalled then g.stalledAsk = asked end
             for _, u in ipairs(board.units) do
-                if u.faction == "blue" and u.acted then return nil, nil, { phases = 3, averaged = 0 } end
+                if u.faction == "blue" and u.acted then
+                    return nil, nil, { phases = 3, averaged = 0 }
+                end
             end
             if board.turn > 1 then return nil, nil, { phases = 3, averaged = 1 } end
             local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
@@ -492,7 +494,9 @@ do
     local r = recordOf(g)
     check(r.plans.kept, 1, "C's wait is played from A's plan")
     check(r.plans.phases, 12, "the judged enemy phases of every call, a nil plan's too, summed")
-    check(r.plans.averaged, asked - 1, "the uncertain kills past the bound in every plan judged, "
+    -- the stub's calls: turn 1's plan (1) and its played-out ask (0), turn 2's (1), turn 3's
+    -- stalled ask (1)
+    check(r.plans.averaged, 3, "the uncertain kills past the bound in every plan judged, "
           .. "a nil call's too, summed: never silent")
     check(asked, r.plans.made, "every plan asked for is counted")
     check(asked, 4, "turn 1: the plan and the played-out ask; turn 2: one ask; turn 3 repeats "
@@ -946,7 +950,8 @@ do
     d = Botrun.grade(death { phase = "player" }, committed {}, act, nil, {})
     check(d.predicted, 0.3, "player phase: the attack's own counter chance")
     check(d.flags.player_phase, true, "player phase: flagged")
-    d = Botrun.grade(death(), nil, nil, 0.05, {})
+    local admits = dofile(here .. "planner.lua").admits
+    d = Botrun.grade(death(), nil, nil, 0.05, {}, nil, nil, admits)
     check(d.predicted, nil, "no plan: no prediction")
     check(d.over_cap, nil, "no plan: over_cap is null, never false")
     check(d.flags.reinforcement, nil, "no plan: reinforcement unknown")
@@ -1092,7 +1097,8 @@ do
     check(r.turns_to_win, nil, "a loss has no turns to win")
     check(r.deaths[1].cause, "other", "greedy: no plan behind it")
     check(r.deaths[1].detail, "noncombat", "no fighter: noncombat, not a sandbox fault")
-    check(r.deaths[1].over_cap, nil, "greedy has no cap: the over-cap check has not run (null, not false)")
+    check(r.deaths[1].over_cap, nil,
+          "greedy has no cap: the over-cap check has not run (null, not false)")
 end
 
 -- test_seize_skips_and_stalls (FR-007): a planner offered the Seize keeps waiting. With a
@@ -1267,14 +1273,21 @@ end
 -- death ends the game; an allied green's death is graded with no cap, so never over it.
 do
     local green = death { faction = "green", charId = 0x41, id = 0x41 }
-    local d = Botrun.grade(green, committed {}, nil, 0.01, { [0x01] = true })
+    local admits = dofile(here .. "planner.lua").admits
+    local d = Botrun.grade(green, committed { predict = { { id = 0x41, die = 0.3,
+                                                            strikers = { 0x81 } } } },
+                           nil, 0.01, { [0x01] = true }, nil, nil, admits)
     check(d.cap, nil, "an allied green has no cap")
     check(d.over_cap, nil, "and so no over-cap verdict")
     local vip = death { faction = "green", charId = 0x41, id = 0x41 }
-    d = Botrun.grade(vip, committed {}, nil, 0.01, { [0x41] = true })
+    d = Botrun.grade(vip, committed {}, nil, 0.01, { [0x41] = true }, nil, nil, admits)
     check(d.cap, 0.01, "a game-over green has its style's cap")
-    d = Botrun.grade(death(), committed {}, nil, 0.01, {})
+    d = Botrun.grade(death(), committed {}, nil, 0.01, {}, nil, nil, admits)
     check(d.cap, 0.01, "a blue has its style's cap")
+    -- a cap with no test to apply it is a fault, never a death left ungraded (FR-010)
+    local ok, err = pcall(Botrun.grade, death(), committed {}, nil, 0.01, {})
+    check(ok, false, "a cap without admits raises")
+    check(tostring(err):find("admits", 1, true) ~= nil, true, "and says why")
     -- graded by the planner's own admission: a sum a few ulps over the cap is at it
     local Planner = dofile(here .. "planner.lua")
     d = Botrun.grade(death(), committed { predict = { { id = 0x01, die = 0.05 + 1e-15,

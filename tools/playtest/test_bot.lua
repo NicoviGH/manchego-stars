@@ -3588,7 +3588,7 @@ do
     check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
 end
 
--- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────────
+-- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────
 
 -- test_caps_are_fixed_per_style (FR-010): careful 1%, even 5%, bold 15%, and a style with no
 -- cap is an error, never a silent default.
@@ -3701,10 +3701,11 @@ do
     local ok, a, plan, cost = pcall(Planner.plan, B, boardOf(table.unpack(units)), sightOf(o),
                                     style("bold"))
     Planner.BRANCH = saved
-    check(ok, true, "bound: the plan is made")
+    check(ok, true, "bound: the plan is made" .. (ok and "" or (": " .. tostring(a))))
     check(plan and plan.branched, 1, "bound: one kill branched")
     check(plan and plan.averaged, 2, "bound: two left to the average")
-    check(both[0x82] and both[0x82].dead and both[0x82].alive, true, "bound: the 50% kill both ways")
+    check(both[0x82] and both[0x82].dead and both[0x82].alive, true,
+          "bound: the 50% kill both ways")
     check(both[0x81] and both[0x81].alive, nil, "bound: the 90% kill keeps the average")
     check(cost and cost.averaged >= 2, true, "bound: the call counts what every plan averaged")
     local three = plan and plan.protected and plan.protected[3]
@@ -3792,9 +3793,11 @@ do
     check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2 },
                  r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.3 }), true,
           "rank: then by the largest death chance")
-    check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2, value = 5 },
-                 r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2, value = 1 }),
-          true, "rank: then the admitted order")
+    local tied = { admitted = false, max_exceed = 0.1, sum_exceed = 0.1, max_die = 0.2 }
+    tied.value = 5
+    local more = r(tied)
+    tied.value = 1
+    check(before(more, r(tied)), true, "rank: then the admitted order")
     check(before(r { value = 2, max_die = 0.009 }, r { value = 1 }), true,
           "rank: among the admitted, the admitted order before the death chance")
     check(before(r { max_die = 0.001 }, r { max_die = 0.002 }), true, "rank: ties, largest death")

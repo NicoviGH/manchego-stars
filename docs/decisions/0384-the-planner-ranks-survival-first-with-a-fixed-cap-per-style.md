@@ -80,7 +80,8 @@ within 1e-9 of the cap), and botrun grades `over_cap` through the same `admits`.
 returns what the call cost, over every plan it judged, a call with no plan included:
 `{ phases, averaged }`, which botrun sums into `plans.phases` and `plans.averaged`, so a kill
 left to the average past the bound is never silent. The suite manifest's `budgets.branch` is
-8 too, and `test_montecarlo` fails when it and `M.BRANCH` differ. Plans are compared by `M.outranks` on `plan.rank`:
+8 too, and `test_montecarlo` fails when it and `M.BRANCH` differ. Plans are compared by
+`M.outranks` on `plan.rank`:
 admission; for plans over the cap, largest excess, summed excess, largest death chance, then
 the admitted order; for admitted plans, `value` (the judged score), standing in for (4) until
 PR-D; then largest death chance, summed death chance, HP left, and the plan's acts as a key.
