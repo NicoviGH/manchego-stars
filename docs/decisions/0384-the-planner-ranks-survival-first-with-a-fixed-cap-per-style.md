@@ -36,8 +36,9 @@ only the outcomes that can change whether a protected unit can die (plan task T0
   is not.
 - **Among admitted plans:** fewer irreversible goal forfeitures first, then objective
   completion, then progress.
-- **Among plans over the cap** (only when no plan is admitted): smallest largest excess first,
-  then smallest summed excess, then lowest largest death chance, then the admitted plans' order
+- **Among plans over the cap** (only when no plan is admitted): the smaller chance of a game
+  over first (amended below, 2026-11-02), then smallest largest excess, then smallest summed
+  excess, then lowest largest death chance, then the admitted plans' order
   (forfeits, completion, progress). The chosen plan is labelled
   `FALLBACK_SACRIFICE`, so no over-cap death goes unexplained.
 - **Remaining ties:** lower largest death chance, then lower summed death chance, then more
@@ -110,3 +111,12 @@ records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fa
   counter's own death. `bot.lua` refuses every attack whose counter alone can kill (every style
   but greedy), so that share is 0 for every attack the planner judges. A counter-and-phase death
   (Franz's 12.7%) is all in the phase share, which admission reads.
+
+**Amended (Nicolas, 2026-11-02): a game over comes before the excess.** A unit whose death ends
+the game (a lord's, `sight.objective.gameOver`) is not one more risk among the protected: its
+death ends the chapter. So among plans over the cap, the one with the smaller chance that such a
+unit dies comes first, whatever the excess. Before this, a lord's 50% was played over another
+unit's sure death, because it was the smaller excess (#560). `plan.rank.game_over` is
+1 - Π(1 - die) over those units, each death taken as apart from the others. Admitted plans
+are unchanged: a game-over unit in them is already at or under the cap, and PR-D's ledger
+counts a game over as forfeiting everything.

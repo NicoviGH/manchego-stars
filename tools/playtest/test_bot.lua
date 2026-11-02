@@ -2904,9 +2904,9 @@ end
 
 -- test_planner_protects_a_game_over_unit: L's death quote ends the game
 -- (sight.objective.gameOver). Where L stands, X strikes it at even odds; at (1,0) L takes X's
--- strike off C, who then dies for sure. Both plans are over careful's cap, and the fallback
--- takes the smaller excess (ADR 0384: the cap does not weigh a game over above one death), so
--- L stays at its even chance. The rank still sees L as protected: its 50% is the plan's max.
+-- strike off C, who then dies for sure. Both plans are over careful's cap. A game over is not
+-- one more risk: it ends the chapter (Nicolas, 2026-11-02, ADR 0384), so the fallback with the
+-- smaller chance of it comes first, whatever the excess: L moves.
 do
     local L = blue(0x01, 0, 0, 0, { minRange = false })
     local C = blue(0x02, 1, 0, 5, { minRange = false })
@@ -2930,7 +2930,7 @@ do
     for _, x in ipairs(plan and plan.acts or {}) do
         if x.unitId == 0x01 then moved = at(x) end
     end
-    check(moved, "0,0", "planner: over the cap, the smaller excess, a game-over unit's too")
+    check(moved, "1,0", "planner: over the cap, the smaller chance of a game over first")
     check(plan and plan.fallback, "FALLBACK_SACRIFICE", "planner: and labelled")
 end
 
@@ -3776,17 +3776,20 @@ end
 -- largest death chance, the summed one, more HP left, then the plan's stable key.
 do
     local function r(o)
-        local t = { admitted = true, max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0,
-                    hp_left = 20, value = 0, key = "a" }
+        local t = { admitted = true, game_over = 0, max_exceed = 0, sum_exceed = 0, max_die = 0,
+                    sum_die = 0, hp_left = 20, value = 0, key = "a" }
         for k, v in pairs(o) do t[k] = v end
         return t
     end
     local before = Planner.outranks
     check(before(r { max_die = 0.009, value = -50 }, r { admitted = false, value = 9e9 }), true,
           "rank: admitted beats over-cap at any value")
+    check(before(r { admitted = false, game_over = 0, max_exceed = 0.99 },
+                 r { admitted = false, game_over = 0.02, max_exceed = 0.01 }), true,
+          "rank: violators by the chance of a game over first, whatever the excess")
     check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.3 },
                  r { admitted = false, max_exceed = 0.2, sum_exceed = 0.2 }), true,
-          "rank: violators by the largest excess first")
+          "rank: then by the largest excess")
     check(before(r { admitted = false, max_exceed = 0.1, sum_exceed = 0.1 },
                  r { admitted = false, max_exceed = 0.1, sum_exceed = 0.2 }), true,
           "rank: then by the summed excess")

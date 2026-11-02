@@ -55,7 +55,8 @@
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- ours it strikes, sorted), kind =
 -- "beam"|"assault"|"unstall"|"mend", considered = every plan judged, best first: { judged,
--- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, max_exceed,
+-- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, game_over
+-- (the chance a unit whose death ends the game dies), max_exceed,
 -- sum_exceed, max_die, sum_die, hp_left, value (the judged score), key }, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, branched
@@ -123,16 +124,17 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 function M.admits(d, cap) return d <= cap + 1e-9 end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
--- first. Over the cap, the smallest largest excess, then summed excess, then largest death
--- chance. Then the admitted order: `value`, the judged score, until the completion ledger
+-- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
+-- among others, it ends the chapter (Nicolas, 2026-11-02); then the smallest largest excess,
+-- then summed excess, then largest death chance. Then the admitted order: `value`, the judged score, until the completion ledger
 -- (PR-D) puts forfeits, completion and progress in its place. Last the largest death chance,
 -- the summed one, more HP left, and the plan's acts as a stable key.
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
     local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }
     if not a.admitted then
-        order = { { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 }, { "value", -1 },
-                  order[2], order[3], order[4] }
+        order = { { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 },
+                  { "value", -1 }, order[2], order[3], order[4] }
     else
         table.insert(order, 1, { "value", -1 })
     end
@@ -861,8 +863,12 @@ function M.plan(Bot, board, sight, style, opts)
         -- the style's cap, and the rank the plan is compared by
         st.keys = {}
         for _, x in ipairs(st.acts) do st.keys[#st.keys + 1] = key(x) end
-        local rank = { admitted = true, max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0,
-                       hp_left = 0, value = judged, key = table.concat(st.keys, " ") }
+        local rank = { admitted = true, game_over = 0, max_exceed = 0, sum_exceed = 0, max_die = 0,
+                       sum_die = 0, hp_left = 0, value = judged, key = table.concat(st.keys, " ") }
+        -- the chance no unit whose death ends the game dies, each one's death taken as apart
+        -- from the others' (a map with two such units counts a shared strike twice: the
+        -- larger figure, the conservative side)
+        local lives = 1
         st.protected = {}
         local function protect(u, hp)
             local d, branches = die[u.id] or 0, {}
@@ -881,11 +887,13 @@ function M.plan(Bot, board, sight, style, opts)
             rank.max_die = math.max(rank.max_die, d)
             rank.sum_die = rank.sum_die + d
             rank.hp_left = rank.hp_left + (hp - (taken[u.id] or 0))
+            if gameOver[u.charId] then lives = lives * (1 - d) end
         end
         for _, p in ipairs(planned) do protect(p.unit, p.hp) end
         for _, g in ipairs(greens) do
             if gameOver[g.charId] then protect(g, g.hp) end
         end
+        rank.game_over = 1 - lives
         st.rank = rank
     end
 
