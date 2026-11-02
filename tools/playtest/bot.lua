@@ -822,9 +822,13 @@ local function opener(ctx, u)
     return ctx.openers[u.id]
 end
 
+-- A unit and a goal tile as one key, "unit id>x,y": breachFor's cache, and M.candidates'
+-- record of the goals units are blocked from.
+local function goalKey(id, t) return id .. ">" .. tileKey(t.x, t.y) end
+
 local function breachFor(ctx, u, goal)
     if not (goal and ctx.sight.obstacles) then return nil end
-    local k = u.id .. ">" .. tileKey(goal.x, goal.y)
+    local k = goalKey(u.id, goal)
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
     b = false
@@ -1331,9 +1335,6 @@ local function sendWorth(ctx, u, t)
     return t.gold * c, c
 end
 
--- The key a unit's goal is barred by (M.candidates' reassignment): "unit id>x,y".
-local function barKey(id, t) return id .. ">" .. tileKey(t.x, t.y) end
-
 local function exploring(ctx, sent, barred)
     ctx.exploreGoal = {}
     barred = barred or {}
@@ -1354,7 +1355,7 @@ local function exploring(ctx, sent, barred)
         for _, p in ipairs(pairs_) do
             local k = key(p.t)
             if not taken[k] and not ctx.exploreGoal[p.u.id]
-                and not barred[barKey(p.u.id, p.t)] then
+                and not barred[goalKey(p.u.id, p.t)] then
                 taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
             end
         end
@@ -1386,7 +1387,7 @@ local function exploring(ctx, sent, barred)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and not barred[barKey(u.id, t)]
+            and not barred[goalKey(u.id, t)]
             and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
@@ -1630,24 +1631,23 @@ local function propose(ctx, last, was)
 end
 
 -- Whether `u` can get nearer goal tile `g` this turn by the game's turns (ctx.turnsTo) or take
--- it: it stands on it, a tile it may end on is nearer, or `acts` (its own) hold a Talk with the
--- recruit standing there. A unit with no tile but its own is boxed in, and counts as able: no
--- other goal would get it anywhere either. The turns are the terrain's alone, so what stops a
--- unit with moves is a unit in its way.
-local function stepsToward(ctx, u, g, acts)
+-- it: it stands on it, a tile it may end on is nearer, or, with a recruit standing on `g` (a
+-- tile no one of ours ends on), it may end beside it, where a Talk is made. A unit with no tile
+-- but its own is boxed in, and counts as able: no other goal would get it anywhere either. The
+-- turns are the terrain's alone, so what stops a unit with moves is a unit in its way.
+local function stepsToward(ctx, u, g)
     local now = ctx.turnsTo(u, g)
     if now and now <= Goals.DUST then return true end
-    local tiles, boxed = endTiles(ctx, u), true
-    for _, t in ipairs(tiles) do
+    local there = ctx.standing[tileKey(g.x, g.y)]
+    local recruit = there and there.faction ~= "blue"
+    local boxed = true
+    for _, t in ipairs(endTiles(ctx, u)) do
+        if recruit and manhattan(t.x, t.y, g.x, g.y) == 1 then return true end
         if t.x ~= u.x or t.y ~= u.y then
             boxed = false
             local n = now and ctx.turnsTo(u, g, t)
             if n and n < now - Goals.DUST then return true end
         end
-    end
-    local there = ctx.standing[tileKey(g.x, g.y)]
-    for _, a in ipairs(acts or {}) do
-        if a.act == "talk" and there and a.targetId == there.id then return true end
     end
     return boxed
 end
@@ -1718,8 +1718,8 @@ function M.candidates(board, sight, style, opts)
         local more = false
         for _, c in ipairs(out) do
             local g = ctx.exploreGoal[c.unit.id]
-            local k = g and barKey(c.unit.id, g)
-            if g and not stepsToward(ctx, c.unit, g, c.acts) then
+            local k = g and goalKey(c.unit.id, g)
+            if g and not stepsToward(ctx, c.unit, g) then
                 ctx.stuck[k] = ctx.stuck[k] or { id = c.unit.id, x = g.x, y = g.y, since = turn }
                 more = more or (ctx.stuck[k].since < turn and not barred[k])
             end

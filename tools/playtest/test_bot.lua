@@ -4127,6 +4127,33 @@ do
           "reassign: a boxed-in unit keeps it")
 end
 
+-- test_a_block_on_a_recruit_lifts_beside_it (FR-016): A was found blocked from recruit T on an
+-- earlier turn. T's tile is one no unit of ours ends on, so no tile is ever nearer it than the
+-- tiles beside it: A, beside T now, has none nearer. It can end beside T, where the Talk is
+-- made, so the record lifts and A is still sent to T.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local T = blue(0x30, 5, 5, 0, { faction = "green", minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 4, 0 }, { 3, 0 }) },
+        talk = { [0x01] = { [0x30] = true } },
+        field = function(goal)
+            local f = {}
+            for y = 0, 9 do
+                f[y] = {}
+                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+            end
+            return f
+        end,
+    }
+    local board = boardOf(A, T)
+    board.turn = 3
+    local _, ctx = B.candidates(board, sightOf(o), style("careful"),
+                                { stuck = { ["1>5,0"] = { id = 0x01, x = 5, y = 0, since = 1 } } })
+    check(ctx.stuck["1>5,0"], nil, "reassign: a unit that can end beside its recruit is not blocked")
+    check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 5, "reassign: and it is sent to it")
+end
+
 -- test_after_a_visit_the_march_returns_to_the_objective (FR-016): the House taken (explored),
 -- the lord sent there last turn marches on the gate.
 do

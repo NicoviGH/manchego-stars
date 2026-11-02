@@ -145,66 +145,72 @@ This covers every unit whose death ends the game, so it overrides FR-012's first
 an escort green: an escort green (one in `sight.objective.gameOver`) is protected, and its risk
 is admission's, not a forfeit.
 
-**Amended (Nicolas, 2026-11-02): the judged score comes after progress.** Under FR-011 and
-FR-013 as written, nothing among admitted plans counted damage dealt: the order ran forfeits,
-completion, progress, then death chance and HP left. A strike that cannot kill this turn then
-always lost to a wait, because the counter lowers HP left and the damage counts nowhere (a test:
-bold, 20 of an enemy's 40 HP, waited). Units would stand beside an enemy that takes two turns to
-kill and never chip it. Nicolas put the judged score (`value`: damage, kills, heals, HP taken,
-worth × chance) after progress and before FR-013's ties. This amends FR-013's tie list and
-ADR 0383's line above: worth × chance orders the beam, and through the judged score it breaks
-ties among complete plans after progress. It never outranks a forfeit, the win or progress.
+**Amended (Nicolas, 2026-11-02): the judged score comes after whole turns of progress.**
+Under FR-011 and FR-013 as written, nothing among admitted plans counted damage dealt: the
+order ran forfeits, completion, progress, then death chance and HP left. A strike that cannot
+kill this turn then always lost to a wait, because the counter lowers HP left and the damage
+counts nowhere (a test: bold, 20 of an enemy's 40 HP, waited). Units would stand beside an
+enemy that takes two turns to kill and never chip it. Nicolas first put the judged score
+(`value`: damage, kills, heals, HP taken, worth × chance) after progress. The review of PR #564
+then showed progress compared exactly leaves the score only exact ties: a strike from a tile a
+step back still lost to a march a step on, and a step is a fraction of a turn. Asked, Nicolas
+put the score after the whole turns of progress (`behind`, below) and ahead of the progress
+within the turn. This amends FR-013's tie list and ADR 0383's line above: worth × chance orders
+the beam, and through the judged score it orders complete plans within a turn of the most
+progress. It never outranks a forfeit, the win or a whole turn of progress.
 
 **Built (PR-D, 2026-11-02).**
 - **The ledger.** `goals.lua` `Goals.ledger` snapshots every open visit, chest and recruit with
-  a taker, plus each declared reward with the goals it needs. A goal no unit of ours may use at
-  all (a chest with no key in the army) has no taker and is not on it. A village or chest is
-  `unknown` when the sight has no `canExplore` or `closings` read. `Goals.forfeited` counts what
-  a plan closes, conservatively: a win chance above 1e-9 (`Goals.DUST`, which `planner.lua`'s
-  `DUST` now reads) closes every goal the plan does not take. A recruit closes when our blow, our
-  counter or the enemy phase may kill it: a green recruit's death is a forfeit, an allied
-  green's is not. A tile a looter takes after this phase (`closes` 1) closes when the plan does
-  not take it, and a reward closes with any goal it needs. The plan carries `ledger` (what it
-  forfeits marked `closed`), `forfeited`, `seizeJudged` and `seizeAdmitted`.
+  any chance from the decision's board (`Goals.chance`, the planner's `before`), plus each
+  declared reward with the goals it needs. A goal with no chance at all is not on it: the game
+  lets no unit of ours use it (a chest with no key in the army), none has a way there
+  (`sight.turnsTo` reads the terrain alone, through a breach), or a looter takes it first. Kept,
+  it would close with every win and forbid the win for good. A unit in the way leaves the
+  chance as it was, so such a goal stays `feasible`. A reward needing a goal that is not on the
+  ledger is not either. A village or chest is `unknown` when the sight has no `canExplore` or
+  `closings` read. `Goals.forfeited` counts what a plan closes, conservatively: a win chance
+  above 1e-9 (`Goals.DUST`, which `planner.lua`'s `DUST` now reads) closes every goal the plan
+  does not take. A recruit closes when our blow, our counter or the enemy phase may kill it: a
+  green recruit's death is a forfeit, an allied green's is not. A tile a looter takes after this
+  phase (`closes` 1) closes when the plan does not take it, and a reward closes with any goal it
+  needs. The plan carries `ledger` (what it forfeits marked `closed`), `forfeited`,
+  `seizeJudged`, `seizeAdmitted` and `stuck`.
 - **The rank.** `M.outranks`'s admitted order is `forfeits` ascending, `complete` (the chance the
-  plan ends the chapter) descending, `behind`, `green_die`, `progress`, `value`, then FR-013's
+  plan ends the chapter) descending, `behind`, `green_die`, `value`, `progress`, then FR-013's
   ties. `progress` is the turns the plan cuts from each unit's way to its assigned goal, summed:
   the recruit, village or chest it was sent to, else its way to the objective, read once at the
-  decision's start, `sight.turnsTo` through the breach when cut off. FR-012's "within one turn"
-  is `behind`, the whole turns a plan is short of the most progress judged (`M.rebase`, run
-  every time a plan is judged). "Within one turn of each other" is no order a sort can keep:
-  0, 0.8 and 1.6 each tie their neighbour.
-- **Reassignment (FR-016).** `Bot.candidates` re-runs `exploring` without a unit's goal when
-  the unit has moves and none of them gets it nearer by the game's turns, or takes the goal. A
-  unit boxed in (no act off its own tile) keeps its goal. After a Visit, the tile is explored,
-  so the unit's march heads for the objective again (`test_after_a_visit_the_march_returns_to_the_objective`).
+  decision's start, `sight.turnsTo` through the breach when cut off. `behind` is the whole turns
+  a plan is short of the most progress among the plans that may be played (`M.rebase`, once
+  after the finals and once after the mends). It stands for FR-012's "within one turn": "within
+  a turn of each other" is no order a sort can keep (0, 0.8 and 1.6 each tie their neighbour).
+  `green_die` sums allied greens' death chances, a recruit's and a game-over green's left out.
+- **Reassignment (FR-016).** `Bot.candidates` sends a unit elsewhere, or to the objective, when
+  it has had no step toward its goal since an earlier turn: no tile it may end on is nearer by
+  the game's turns, it is not on the goal, and no tile beside a recruit standing there. One turn
+  so is a unit in the way, and the unit holds that turn; sending it on at once handed a tile
+  between units, which `sent` was made to stop. The record (`ctx.stuck`: the unit, the tile and
+  the turn first found blocked) is carried by botrun as `opts.stuck`, tested again at every
+  decision, and lifts once the way opens. A unit boxed in (no tile but its own) keeps its goal.
+  Only the units whose goal changed are proposed again. After a Visit the tile is explored, so
+  the unit's march heads for the objective again.
 - **The advance, a search addition.** The spec defers search changes until an audit shows a
   search miss under the corrected scoring. ours ch01 showed one: the beam orders partial plans
   by the judged score, where a House worth 4.7 never paid for the lord's steps away from the
   gate (each unit's way there is worth 250), so all four plans it handed the judge had him
-  waiting. One more plan is judged beside the beam's and the assault: each unit's act that
-  gains the most turns toward its goal, among acts whose standing death chance is within the
-  cap. It is skipped when no unit gains ground or the beam already has the plan.
+  waiting. One more plan is judged beside the beam's and the assault: each unit takes, of its
+  acts that gain ground within the cap, the one that gains the most, falling to the next when a
+  tile is still taken. A unit refused every one is tried again once the others have moved. It
+  is skipped when no unit gains ground or the beam already has the plan.
 - **Seize skips (FR-015).** botrun justifies a skip while a ledger goal is `feasible`, or when
   every judged plan with the Seize was over the cap. It is a fault (`unjustified_seize_skip`)
   when a Seize under the cap was judged and nothing was left to get, or when no judged plan had
   the Seize at all.
-- **What changes in play.** Within the cap, progress now comes before HP left and before an
-  allied green. Careful takes a blow that cannot kill for ground it gains, and blocks for a
-  green only when the block costs less than a turn of progress. Any style keeps out of a
+- **What changes in play.** Within the cap, a whole turn of progress now comes before HP left and
+  before an allied green. Careful takes a blow that cannot kill for a whole turn of ground, and
+  blocks for a green only when the block costs less than a turn. Any style keeps out of a
   recruit's reach when its counter may kill it, since that is a forfeit.
 - **Measured, live (plan T055).** ours ch01 from its store (`from: 2`, `house_gifts`), attempts
-  1-3: won clean turn 9, won with 2 deaths turn 9, won clean turn 9 (main, same env: stuck,
-  won clean turn 8, stuck). Attempt 2 (bold) lost Rootis on turn 2 to a Goblin Fighter the plan
-  could not see (`unrevealed_killer`, predicted 0%), then 0x02 on turn 6 under a labelled
-  fallback (51.9%). Vanilla Ch2, attempts 1-2: both won clean on turn 5.
-- **Measured, the pinned suite (`suite --baseline`, 52 runs):** 2,131.5 CPU s, +13.2% on
-  PR-A's 1,883.6 and inside SC-003's 20% (PR-C's two runs of identical play read 1,925.9 and
-  2,175.9). 8,324 judged enemy phases against PR-C's 7,020 (+18.6%), the advance plan among
-  them. Vanilla Ch4 costs the most more: 156.2 to 287.9 CPU s, for 1,115 to 1,306 phases.
-  The tuning seeds (26 runs, the only outcomes read): clean clears 10 to 14, wins 22 to 23,
-  deaths 12 to 12, turns 245 to 236. Vanilla Ch1 seed 1001 went from `stuck` to clean, and both
-  vanilla Ch2 seeds and one vanilla Ch4 seed from won to clean. Ours ch01 seed 1001 went from
-  clean to won with two deaths, the case measured live above. Every `over_cap` death came from
-  a labelled fallback.
-
+  1-3: won clean turn 8, won with one death turn 8, won clean turn 8 (main, same env: stuck,
+  won clean turn 8, stuck). Attempt 2 (bold) lost 0x03 on turn 7 at a predicted 51.1%, under a
+  labelled fallback. Vanilla Ch2, attempts 1-2: won clean on turns 8 and 6.
+- **Measured, the pinned suite (`suite --baseline`, 52 runs):** SUITE_NUMBERS
