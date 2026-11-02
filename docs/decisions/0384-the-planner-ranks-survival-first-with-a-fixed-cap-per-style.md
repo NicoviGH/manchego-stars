@@ -224,5 +224,6 @@ progress. It never outranks a forfeit, the win or a whole turn of progress.
   of the judged score (the first ruling), the same suite read 12 deaths, 14 clean and vanilla
   Ch5 3: the extra fallbacks come with the judged score ordering plans within the turn. That
   trade is Nicolas's to weigh (put to him with PR #564). The last fix (only a recruit on a goal
-  tile counts as reached beside it) came after this run and changes play only where an enemy
-  that is no recruit stands on a tile a unit was sent to.
+  tile counts as reached beside it) came after this run and changes play only where a unit not
+  ours and no recruit (an enemy, or a green no one may Talk to) stands on a tile a unit was
+  sent to.
