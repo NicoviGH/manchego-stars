@@ -9,14 +9,27 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-01 (Claude, latest). **#510 step 9 PR-A MERGED: #558 (1168f72).** The frozen
-suite is `matrix.yaml`'s `instrument:` section (13 pinned starts, 52 runs), `montecarlo.py suite
-[--baseline]` plays it, and every record carries `env_status` and `instrument` (ADR 0387). Baseline
-on main's play: 52 runs, 1,883.6 CPU s, **6m34s wall on 8 workers**; per-start numbers in the #558
-body. One run had no game result: scout-ch13 tuning seed 1002 crashed on turn 9 (`select_unit:
-fail:not-legal`, #510 comment 6564352001), a controller fault on main. Plan comment ticked
-T001-T011. **NEXT: PR-B (US1, the graded record: T012-T031), on a branch off main.** Every later
-PR reports `suite` CPU against this baseline.
+Refreshed 2026-11-01 (Claude, latest). **#510 step 9 PR-B MERGED: #559 (ba6d09f).** Every attempt
+record is graded (ADR 0388): each blue/green death carries the committing plan's `predicted`,
+independent flags (reinforcement, fog, boss, player_phase) and one cause by precedence
+(`botrun.lua` `M.CAUSES`, which `montecarlo.py` reads); missed recruits and rewards carry reasons;
+`seize_skips`, `stall_events`, `anomalies` (each with a `story --turn` command), `turns_to_win`,
+`first_death_turn`; `stalls` is now `board_repeats`. `cap`/`over_cap` stay null until PR-C. Play is
+unchanged: the suite's 52 runs are frame-identical to PR-A's baseline (CPU 1,877-1,964 s over three
+runs vs 1,883.6). Review: `/code-review 559 medium` in a subagent, 12 + 3 + 1 findings, all fixed.
+Plan comment ticked T012-T027. **What the graded records already show** (ADR 0388's Measured):
+vanilla Ch5's unrecruited Joshua kills one of ours in all four suite seeds; ours ch02's greens
+0xC9/0xCA fall on turns 2-3 at a predicted ~48% each; every planner attack has counter `die` 0
+by Bot.candidates' gate, so player-phase deaths read `forecast_desync`. **NEXT: PR-C (US2 risk
+admission and ranking, T029-T044), on a branch off main;** it fills `cap`/`over_cap` and adds the
+`fallback_sacrifice` anomaly. Report `suite` CPU against 1,883.6.
+
+Earlier the same day: **#510 step 9 PR-A MERGED: #558 (1168f72).** The frozen suite is
+`matrix.yaml`'s `instrument:` section (13 pinned starts, 52 runs), `montecarlo.py suite
+[--baseline]` plays it, and every record carries `env_status` and `instrument` (ADR 0387). Baseline:
+52 runs, 1,883.6 CPU s, 6m34s wall on 8 workers; per-start numbers in the #558 body. scout-ch13
+tuning seed 1002 crashes on turn 9 (`select_unit: fail:not-legal`, #510 comment 6564352001), a
+controller fault on main, still open.
 
 Earlier the same day: **#510 step 9 got a new spec and plan (2026-11-01), and it
 replaces the NEXT list below.** An advisory panel of model-simulated experts reviewed step 9
