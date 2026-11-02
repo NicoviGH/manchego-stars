@@ -29,10 +29,13 @@ protected deaths against the cap, through `Planner.admits`. `M.plan` returns
   Joshua is still killed before the Talk.
 - Every `over_cap` death in the suite came from a labelled fallback.
 
-**In flight: #561** (Nicolas, 2026-11-01: "the lord's death auto triggers game over so it's not
-just a risk"). Among plans over the cap, the chance of a game over comes before the excess (ADR
-0384 amended). Open on it: admission still comes first, so a lord at the cap outranks a safe
-lord with another unit a hair over.
+**#561 MERGED (415b143)** (Nicolas, 2026-11-01: "the lord's death auto triggers game over so
+it's not just a risk"). Among plans over the cap, the chance of a game over (`rank.game_over`,
+summed per judged outcome) comes before the excess (ADR 0384 amended). `Bot.gameOver(sight)` owns
+the set of game-over charIds. Rank chances compare to within `M.DUST`. **Open, for Nicolas
+(#561's body):** admission still comes first, so a lord at the cap (bold 15%) outranks a safe
+lord with Franz at 16%. Options: (a) leave it to PR-D's ledger, (b) a lower cap for game-over
+units, (c) game_over before admission.
 - **Held-out records were seen:** while reading suite records, this session printed the held-out runs' deaths too. The caps are
   fixed, so nothing was tuned on them. From now on, read only the `tuning` set (`rec.suite.set`).
 
