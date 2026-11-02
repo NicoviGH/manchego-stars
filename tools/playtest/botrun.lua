@@ -750,8 +750,9 @@ function M.run(api)
         local tiles, baited, skipTurn = {}, {}, nil
         local fallback   -- this turn's fallback_sacrifice anomaly, once one is recorded
         -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
-        -- unit left to act returns none), so the next turn keeps the same senders
-        local sent
+        -- unit left to act returns none), so the next turn keeps the same senders; and the
+        -- goals units were found blocked from, since which turn (Bot.candidates' opts.stuck)
+        local sent, stuck
         -- the plan being played this phase: its next act's index, and the board before the
         -- last act it played (Planner.surprise compares the two)
         local playing, nextAct, before
@@ -843,6 +844,7 @@ function M.run(api)
                         local replan = playing and why
                         local a, plan, cost = api.Planner.plan(Bot, board, sight, style,
                                                          { stalled = stalled, sent = sent,
+                                                           stuck = stuck,
                                                            explored = explore.explored(),
                                                            lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
@@ -851,7 +853,7 @@ function M.run(api)
                         rec.plans.phases = rec.plans.phases + (cost.phases or 0)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         if plan then
-                            sent = plan.goals
+                            sent, stuck = plan.goals, plan.stuck
                             -- the board this plan committed to, and its decision index (a
                             -- death's plan_ref)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)

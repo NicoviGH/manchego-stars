@@ -41,15 +41,19 @@
 -- least phase 1) is 0 for it. Over the takers, the expected best as each lives (alive), the
 -- best first.
 --
--- Goals.ledger(goals, sight, style, ctx) -> { row }, the completion ledger (FR-014): at the
--- decision, every goal of Goals.list's still to get (the objective's ways there are the win's,
--- not goals of their own), and each declared reward still to be had (style.rewards).
+-- Goals.ledger(goals, sight, style, ctx, chances) -> { row }, the completion ledger (FR-014):
+-- at the decision, every goal of Goals.list's still to get (the objective's ways there are the
+-- win's, not goals of their own), and each declared reward still to be had (style.rewards).
+-- chances[goal id] is its chance from the decision's board (Goals.chance).
 -- row = { id, kind (visit, chest, recruit, reward), status, closes_on, needs (a reward's: the
 -- ids of the goals it needs) }. status: `feasible`; `unknown` for a village or chest when the
 -- sight has no read of who may use it or when it closes (sight.canExplore, sight.closings);
--- a reward is unknown when a goal it needs is. A goal no unit can reach this turn (an enemy in
--- the way, a door) stays feasible: only a closure loses it. One the game lets no unit of ours
--- use at all (a chest with no key in the army) has no taker and is no goal of ours.
+-- a reward is unknown when a goal it needs is. A goal no unit can reach this turn (a unit in
+-- the way) stays feasible: only a closure loses it. One with no chance at all is no goal of
+-- ours: the game lets no unit of ours use it (a chest with no key in the army), none has a way
+-- there (sight.turnsTo reads the terrain, through a breach), or a looter takes it first. Kept,
+-- it would close with every win and so forbid the win for good. A reward needing one of those
+-- can never be had, and is no row either.
 -- Goals.forfeited(ledger, goals, closes) -> the sorted ids of the feasible rows a plan loses
 -- for good (FR-011's forfeits), `closes` what the plan does in the judged phase, each a chance
 -- over its judged branches: { win (the chapter ends), took = { [goal id] = true }, lost =
@@ -183,11 +187,11 @@ end
 -- a chance this small is none: sums of branch products leave float dust (planner.lua's DUST)
 M.DUST = 1e-9
 
-function M.ledger(goals, sight, style, ctx)
+function M.ledger(goals, sight, style, ctx, chances)
     local reads = sight.canExplore ~= nil and sight.closings ~= nil
     local rows, byId = {}, {}
     for _, g in ipairs(goals) do
-        if g.kind ~= "objective" and #g.takerUnits > 0 then
+        if g.kind ~= "objective" and (chances[g.id] or 0) > M.DUST then
             local known = g.kind == "recruit" or reads
             local row = { id = g.id, kind = g.kind, status = known and "feasible" or "unknown",
                           closes_on = g.closes }
@@ -196,15 +200,16 @@ function M.ledger(goals, sight, style, ctx)
     end
     for i, r in ipairs(style.rewards or {}) do
         if not voided(r, ctx.lost) then
-            local ids, status = {}, "feasible"
+            local ids, status, lost = {}, "feasible", false
             for _, g in ipairs(goals) do
-                if byId[g.id] and needs(r, g) then
+                if g.kind ~= "objective" and needs(r, g) then
                     ids[#ids + 1] = g.id
-                    if byId[g.id].status == "unknown" then status = "unknown" end
+                    lost = lost or not byId[g.id]
+                    if byId[g.id] and byId[g.id].status == "unknown" then status = "unknown" end
                 end
             end
-            -- every goal it needs already taken: the reward is the game's to give, nothing to get
-            if #ids > 0 then
+            -- none of what it needs left open: taken already, so the game gives it, nothing to get
+            if #ids > 0 and not lost then
                 rows[#rows + 1] = { id = "reward:" .. i, kind = "reward", status = status,
                                     needs = ids }
             end

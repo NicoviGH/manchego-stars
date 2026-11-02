@@ -214,27 +214,40 @@ local function rowIds(ledger)
     for _, r in ipairs(ledger) do out[#out + 1] = r.id end
     return ids(out)
 end
+local function chancesOf(goals, sight)
+    local out = {}
+    for _, g in ipairs(goals) do out[g.id] = Goals.chance(g, before(goals), G, sight.turnsTo) end
+    return out
+end
 do
-    local open = { { x = 4, y = 0, kind = "visit" }, { x = 9, y = 9, kind = "visit" },
+    local open = { { x = 4, y = 0, kind = "visit" }, { x = 14, y = 9, kind = "visit" },
+                   { x = 9, y = 9, kind = "visit" }, { x = 12, y = 0, kind = "visit" },
                    { x = 2, y = 0, kind = "chest" } }
     local joshua = { id = 0x90, charId = 0x20, x = 6, y = 0, faction = "red", onField = true,
                      items = {} }
-    -- unit 2 has no way to (9,9) this turn (cut off); no unit holds what opens the chest
-    local sight = fakeSight({ open = open, cutOff = { [2] = true }, closings = { ["4,0"] = 1 } })
+    -- (14,9) is turns away for unit 1; only unit 2 may use (9,9), and it has no way there
+    -- (cut off); a looter takes (12,0) after phase 2, a turn before anyone gets there; no
+    -- unit holds what opens the chest
+    local sight = fakeSight({ open = open, cutOff = { [2] = true },
+                              closings = { ["4,0"] = 1, ["12,0"] = 2 } })
     function sight.canExplore(u, x, y, kind)
         return kind ~= "chest" and not (x == 9 and u.id == 1)
     end
     local board = { units = { blue(1, 0, 0), blue(2, 0, 1), joshua }, turn = 1 }
-    local style = { rewards = { { item = 0x68, needs = { { 4, 0 } } } } }
+    local style = { rewards = { { item = 0x68, needs = { { 4, 0 } } },
+                                { item = 0x69, needs = { { 4, 0 }, { 9, 9 } } } } }
     local ctx = { recruitTalkers = { [0x90] = { 1 } },
                   objectiveTile = function() return { x = 20, y = 0 } end }
     local goals = Goals.list(board, sight, style, ctx)
-    local ledger = Goals.ledger(goals, sight, style, ctx)
-    check(rowIds(ledger), "recruit:144 visit:4,0 visit:9,9 reward:1",
+    local ledger = Goals.ledger(goals, sight, style, ctx, chancesOf(goals, sight))
+    check(rowIds(ledger), "recruit:144 visit:14,9 visit:4,0 reward:1",
           "ledger: the goals still open, then rewards")
-    check(row(ledger, "visit:9,9").status, "feasible",
+    check(row(ledger, "visit:14,9").status, "feasible",
           "ledger: a goal no taker can reach this turn stays feasible")
+    check(row(ledger, "visit:9,9"), nil, "ledger: a goal no taker has any way to is no goal")
+    check(row(ledger, "visit:12,0"), nil, "ledger: nor one a looter takes before we arrive")
     check(row(ledger, "chest:2,0"), nil, "ledger: a chest no unit of ours may open is no goal")
+    check(row(ledger, "reward:2"), nil, "ledger: a reward needing a goal we cannot get is none")
     check(row(ledger, "objective:1"), nil, "ledger: the ways to the objective are the win's")
     check(row(ledger, "visit:4,0").closes_on, 1, "ledger: when a looter closes it")
     check(ids(row(ledger, "reward:1").needs), "visit:4,0", "ledger: what a reward needs")
@@ -244,7 +257,7 @@ do
     check(ids(Goals.forfeited(ledger, goals, { win = 0 })), "reward:1 visit:4,0",
           "forfeits: a tile the looter closes after this phase, and the reward needing it")
     check(ids(Goals.forfeited(ledger, goals, { win = 0.004, took = { ["visit:4,0"] = true } })),
-          "recruit:144 visit:9,9", "forfeits: any chance of the win closes every goal not taken")
+          "recruit:144 visit:14,9", "forfeits: any chance of the win closes every goal not taken")
     check(ids(Goals.forfeited(ledger, goals, { win = 1e-12, took = { ["visit:4,0"] = true } })),
           "", "forfeits: a win chance of float dust is none")
     check(ids(Goals.forfeited(ledger, goals, { win = 0, took = { ["visit:4,0"] = true },
@@ -255,7 +268,7 @@ do
     local blind = fakeSight({ open = open })
     blind.closings = nil
     local g2 = Goals.list(board, blind, {}, ctx)
-    local l2 = Goals.ledger(g2, blind, {}, ctx)
+    local l2 = Goals.ledger(g2, blind, {}, ctx, chancesOf(g2, blind))
     check(row(l2, "visit:4,0").status, "unknown", "ledger: no closings read, unknown")
     check(row(l2, "recruit:144").status, "feasible", "ledger: a recruit needs no tile read")
     check(ids(Goals.forfeited(l2, g2, { win = 1 })), "recruit:144",

@@ -3060,6 +3060,22 @@ do
           "planner: a game-over green's death is over the cap, and no forfeit")
 end
 
+-- test_a_chip_beats_a_step_within_the_turn (Nicolas, 2026-11-02): A can strike X for 20 of
+-- its 40 HP from (1,0), a step toward the gate, or march two steps to (2,0). Both are within a
+-- turn of the most progress, so the judged score decides before the progress: the strike.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local X = red(0x81, 1, 1, { hp = 40, minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
+        enemyPhase = function() return {} end,
+    }
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    check(a and a.act .. "@" .. at(a), "attack@1,0", "rank: the chip a step back beats the march")
+end
+
 -- test_rebase_measures_turns_behind_the_best (FR-012): progress 1.6, 0.8 and 0 are 0, 0 and 1
 -- whole turns behind the best, and the best of those `ok` allows is returned.
 do
@@ -3073,6 +3089,32 @@ do
     check(ranks[1].behind .. ranks[2].behind .. ranks[3].behind .. " " .. best, "100 3",
           "rebase: whole turns behind the most progress, and the best")
     check(Planner.rebase(ranks, function(i) return i ~= 3 end), 2, "rebase: the best allowed")
+    check(ranks[1].behind .. ranks[2].behind, "00",
+          "rebase: a plan that may not be played is no measure of progress")
+end
+
+-- test_the_advance_gives_way_on_a_shared_tile (FR-016): U1 and U2 both gain the most ground at
+-- (3,0); U1, first, takes it, and U2's advance falls to its next tile forward, (2,1), not to
+-- a hold. U2 is slow (MOV 2), so (3,0) is worth more turns to it: the beam's one plan gives it
+-- U2, and only the advance has U1 there and U2 at (2,1).
+do
+    local U1 = blue(0x01, 0, 0, 0, { minRange = false })
+    local U2 = blue(0x02, 1, 1, 1, { minRange = false, mov = 2 })
+    local Z = red(0x83, 14, 9, { minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 3, 0 }), [0x02] = tiles({ 1, 1 }, { 3, 0 }, { 2, 1 }) },
+        enemyPhase = function() return {} end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local _, plan = Planner.plan(B, boardOf(U1, U2, Z), sightOf(o), style("bold"))
+    Planner.BEAM = beam
+    local adv
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "advance" then adv = table.concat(c.acts, " ") end
+    end
+    check(adv, "1>wait@3,0>nil 2>wait@2,1>nil", "advance: the second unit takes its next tile")
 end
 
 -- test_a_visit_comes_before_the_win (SC-002, plan T047): the lord can Seize now, or Visit a
@@ -3545,12 +3587,25 @@ local function greenRecruitPlay(gold, talk)
                        takenHits = 1, takenCrit = 0, targetHp = 10 } }
         end,
     }
-    return at((Planner.plan(B, boardOf(A, G, X), sightOf(o), gifted("bold", gold))))
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), gifted("bold", gold))
+    return at(a), plan
 end
 for _, gold in ipairs({ 1500, 3000 }) do
     check(greenRecruitPlay(gold, true), "1,0",
           "goals: a green recruit's death is a forfeit, at " .. gold)
     check(greenRecruitPlay(gold, false), "0,1", "goals: an allied green's is not, at " .. gold)
+end
+-- and a recruit's death is counted once, as the forfeit: never in the allied greens' share
+do
+    local function marchRank(talk)
+        local _, plan = greenRecruitPlay(1500, talk)
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if table.concat(c.acts, " ") == "1>wait@0,1>nil" then return c.rank end
+        end
+    end
+    local r, g = marchRank(true), marchRank(false)
+    check(r and r.forfeits .. " " .. r.green_die, "1 0", "goals: a recruit's death, the forfeit only")
+    check(g and g.forfeits == 0 and g.green_die, 1, "goals: an allied green's, its share only")
 end
 
 
@@ -3918,8 +3973,8 @@ end
 -- test_rank_order (FR-011 to FR-013, plan T034): the comparator, on rank tuples. Admission
 -- first; among violators the chance of a game over, the largest excess, the summed excess,
 -- then the largest death chance; then the admitted order: fewer forfeits, the likelier win,
--- the whole turns behind the most progress, allied greens' summed death chance, the progress
--- itself, the judged score (Nicolas, 2026-11-02); last the largest death chance, the summed
+-- the whole turns behind the most progress, allied greens' summed death chance, the judged
+-- score, the progress itself (Nicolas, 2026-11-02); last the largest death chance, the summed
 -- one, more HP left, then the plan's stable key.
 do
     local function r(o)
@@ -3967,8 +4022,11 @@ do
           "rank: a green is no tie-break a whole turn behind")
     check(before(r { progress = 0.2, green_die = 0 }, r { progress = 0.9, green_die = 1 }), true,
           "rank: within the turn, the green's survival before the progress")
-    check(before(r { progress = 0.9, value = 0 }, r { progress = 0.2, value = 500 }), true,
-          "rank: then progress before the judged score")
+    check(before(r { progress = 0.2, value = 500 }, r { progress = 0.9, value = 0 }), true,
+          "rank: within the turn, the judged score before the progress")
+    check(before(r { progress = 0.9, value = 0 }, r { progress = 0.9 - 1e-12, value = 0 }), false,
+          "rank: then progress, float dust no difference")
+    check(before(r { progress = 0.9 }, r { progress = 0.2 }), true, "rank: then progress")
     check(before(r { value = 500, max_die = 0.009 }, r { value = 0 }), true,
           "rank: the judged score before the death chance")
     check(before(r { complete = 0.3 }, r { complete = 0.1 + 0.2 }), false,
@@ -3983,7 +4041,7 @@ do
 end
 
 -- The ch01 stall's shape (FR-016, plan T048), no chapter named: every enemy gone, the lord L
--- (the only unit that may Seize) sent to a village two turns up while the gate is far east.
+-- (the only unit that may Seize) sent to a village a turn up (his whole move) while the gate is far east.
 -- `reach` is L's move this turn; the field is open ground (Manhattan) to whichever goal.
 local function lordSentAway(reach, extra)
     local L = blue(0x01, 0, 12, 7, { charId = 0x0F, minRange = false })
@@ -4000,8 +4058,8 @@ local function lordSentAway(reach, extra)
             end
             return f
         end,
-        explorable = { { x = 12, y = 2, kind = "visit" } },
-        canExplore = { [0x01] = { ["12,2"] = "visit" }, [0x02] = { ["12,2"] = "visit" } },
+        explorable = { { x = 12, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["12,0"] = "visit" }, [0x02] = { ["12,0"] = "visit" } },
         enemyPhase = function() return {} end,
     }
     return units, o
@@ -4013,51 +4071,69 @@ end
 -- in ours ch01, with no tile east on his menu, he held until the run stopped (attempts 1 and
 -- 3). By the rank's progress, the step toward his goal comes first.
 do
-    local units, o = lordSentAway(tiles({ 12, 7 }, { 12, 4 }, { 15, 7 }))
+    local units, o = lordSentAway(tiles({ 12, 7 }, { 12, 2 }, { 15, 7 }))
     local board = boardOf(table.unpack(units))
     local a, plan = Planner.plan(B, board, sightOf(o), gifted("careful", 100))
-    check(at(a), "12,4", "progress: the lord steps toward the House, not holding")
-    check(plan and plan.goals[1] and plan.goals[1].x .. "," .. plan.goals[1].y, "12,2",
+    check(at(a), "12,2", "progress: the lord steps toward the House, not holding")
+    check(plan and plan.goals[1] and plan.goals[1].x .. "," .. plan.goals[1].y, "12,0",
           "progress: he is sent to the House")
-    check(plan and plan.rank.progress, 3 / 5, "progress: three steps nearer, in turns (MOV 5)")
+    check(plan and math.abs(plan.rank.progress - 1) < 1e-9, true,
+          "progress: five steps nearer, a whole turn (MOV 5)")
     -- the beam keeps one plan, the judged score's (east, toward the gate): only the advance,
     -- judged beside it, has the step north
     local beam = Planner.BEAM
     Planner.BEAM = 1
-    units, o = lordSentAway(tiles({ 12, 7 }, { 12, 4 }, { 15, 7 }))
+    units, o = lordSentAway(tiles({ 12, 7 }, { 12, 2 }, { 15, 7 }))
     a, plan = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), gifted("careful", 100))
     Planner.BEAM = beam
-    check(at(a) .. " " .. tostring(plan and plan.kind), "12,4 advance",
+    check(at(a) .. " " .. tostring(plan and plan.kind), "12,2 advance",
           "progress: the advance is judged where the beam cut the step")
 end
 
 -- test_no_progressing_step_reassigns_the_goal (FR-016): L, sent to the House, has moves but
--- none nearer it (a wall north, say), so the House goes to M, whose step north is nearer, and
--- L's way is the objective's.
+-- none nearer it (a unit in its way north, say). One turn so is a unit in the way: L keeps
+-- the House and the turn is recorded. Blocked since an earlier turn, the House goes to M,
+-- whose step north is nearer, and L's way is the objective's. Once L can step north again, the
+-- record lifts.
 do
     local M = blue(0x02, 1, 10, 7, { minRange = false })
     local units, o = lordSentAway(tiles({ 12, 7 }, { 13, 8 }, { 14, 7 }), { M })
     o.reach[0x02] = tiles({ 10, 7 }, { 10, 6 })
+    local sent = { { id = 0x01, x = 12, y = 0 } }
     local _, ctx = B.candidates(boardOf(table.unpack(units)), sightOf(o), style("careful"),
-                                { sent = { { id = 0x01, x = 12, y = 2 } } })
-    check(ctx.exploreGoal[0x01], nil, "reassign: no step nearer, L is not held to the House")
+                                { sent = sent })
+    check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].y, 0,
+          "reassign: one blocked turn keeps the goal")
+    local rec = ctx.stuck["1>12,0"]
+    check(rec and rec.since, 1, "reassign: the blocked turn is recorded")
+    local board = boardOf(table.unpack(units))
+    board.turn = 2
+    _, ctx = B.candidates(board, sightOf(o), style("careful"), { sent = sent, stuck = ctx.stuck })
+    check(ctx.exploreGoal[0x01], nil, "reassign: blocked since an earlier turn, L is sent again")
     check(ctx.exploreGoal[0x02] and ctx.exploreGoal[0x02].x .. "," .. ctx.exploreGoal[0x02].y,
-          "12,2", "reassign: the House goes to the unit that can step toward it")
+          "12,0", "reassign: the House goes to the unit that can step toward it")
+    local held = ctx.stuck
+    units, o = lordSentAway(tiles({ 12, 7 }, { 12, 2 }), { M })
+    o.reach[0x02] = tiles({ 10, 7 }, { 10, 6 })
+    board = boardOf(table.unpack(units))
+    board.turn = 3
+    _, ctx = B.candidates(board, sightOf(o), style("careful"), { sent = sent, stuck = held })
+    check(ctx.stuck["1>12,0"], nil, "reassign: the way open again, the record lifts")
     -- boxed in (no act off its own tile), L keeps its goal: no other gets it anywhere
     units, o = lordSentAway(tiles({ 12, 7 }))
     _, ctx = B.candidates(boardOf(table.unpack(units)), sightOf(o), style("careful"),
-                          { sent = { { id = 0x01, x = 12, y = 2 } } })
-    check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].y, 2,
+                          { sent = { { id = 0x01, x = 12, y = 0 } } })
+    check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].y, 0,
           "reassign: a boxed-in unit keeps it")
 end
 
 -- test_after_a_visit_the_march_returns_to_the_objective (FR-016): the House taken (explored),
 -- the lord sent there last turn marches on the gate.
 do
-    local units, o = lordSentAway(tiles({ 12, 7 }, { 12, 4 }, { 15, 7 }))
+    local units, o = lordSentAway(tiles({ 12, 7 }, { 12, 2 }, { 15, 7 }))
     local cands, ctx = B.candidates(boardOf(table.unpack(units)), sightOf(o), style("careful"),
-                                    { sent = { { id = 0x01, x = 12, y = 2 } },
-                                      explored = { ["12,2"] = true } })
+                                    { sent = { { id = 0x01, x = 12, y = 0 } },
+                                      explored = { ["12,0"] = true } })
     check(ctx.exploreGoal[0x01], nil, "after a visit: no longer sent")
     local march
     for _, a in ipairs(cands[1].acts) do
