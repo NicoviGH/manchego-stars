@@ -1220,6 +1220,46 @@ do
     check(table.concat(idle, ","), "3,6", "idle_3: every third idle phase; an enemy-phase kill is no progress")
 end
 
+-- test_a_killer_that_dies_later_in_the_phase_is_still_the_killer: in one enemy phase X kills
+-- A, then dies on B's counter. The game lists the deaths in that order, so A's grade still
+-- finds X on the plan's board: no reinforcement.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                   unit(0x81, 0, "red", 0, 1, 10) },
+                         enemy = function(g, find)
+                             for _, id in ipairs({ 0x01, 0x81 }) do
+                                 local u = find(id)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                             end
+                             return {}
+                         end }
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                   phase = "enemy" },
+                 { id = 0x81, charId = 0x81, faction = "red", killer = 0x02, killerId = 0x02,
+                   phase = "enemy" } }
+    end
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 0, y = 2 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = 0.3,
+                                      taken = 6, strikes = 1, strikers = { 0x81 } } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local d = r.deaths[1]
+    check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
+    check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
+end
+
 -- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another
 -- side before any offer is closed; never offered is unreachable; a Talk never offered is
 -- not_reached.
