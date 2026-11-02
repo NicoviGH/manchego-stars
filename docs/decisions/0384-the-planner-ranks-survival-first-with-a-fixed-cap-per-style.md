@@ -120,6 +120,9 @@ per judged outcome: the chance that any such unit dies there, weighted by the ou
 (two lords killed in different outcomes make a sure game over, never a product of their
 chances). Chances in the rank are compared to within `M.DUST` (1e-9), so a sum taken in another
 order is no difference. Admitted plans are unchanged: a game-over unit in them is already at or
-under the cap, and PR-D's ledger counts a game over as forfeiting everything. **Open (#561):**
-admission still comes first, so a plan with a lord at the cap outranks one whose lord is safe
-and another unit is a hair over it.
+under the cap, and PR-D's ledger counts a game over as forfeiting everything. Admission still
+comes first, so a plan with a lord at the cap outranks one whose lord is safe and another unit
+is a hair over it, and that stands (Nicolas, 2026-11-02: "a lord is still a functional unit so
+over protecting it is not feasible, they need to be put in danger to win, so its a balance
+really"). A game-over unit gets the style's cap like any other, never a lower one; the balance
+between its risk and the goals is PR-D's ledger, where a game over forfeits everything.
