@@ -89,9 +89,6 @@ DEAD_CONCEPTS = [
     # retired by ADR 0384's amendment (Nicolas, 2026-11-01): over the cap, a game over comes
     # before the excess; a lord's death is never one more risk among the protected
     r'does not\s+weigh a game-over', r'\bthe least over it is\s+played\b',
-    # retired by ADR 0384's amendment (Nicolas, 2026-11-02): within the cap a game over is not a
-    # ledger forfeit; the cap is a lord's whole protection
-    r'counts a game over as\s+forfeiting everything',
     # retired by #510 step 9 PR-C (ADR 0384): the judge branches every uncertain kill up to
     # BRANCH (8) and counts the rest, and the call returns the phases it judged
     r"BRANCH most uncertain kills", r'\bplan\.phases\b',
