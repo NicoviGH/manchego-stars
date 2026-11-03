@@ -17,11 +17,14 @@ durable record is in three places:
 - **Research record 0024:** the panel and its transcript.
 
 **NEXT:**
-1. **#567 (closes #566), in review:** SC-003's stand-in baseline is re-based on PR-D, in
-   `AiDecideMain` calls: 565,656, a budget of 678,787 (Nicolas, 2026-11-03; ADR 0384 amended,
-   spec line edited). `suite --baseline` prints the verdict. The cuts measured first, none
-   taken, are in #566's comment 6613787561.
-2. **PR-E onward** per the plan comment.
+1. **PR-E onward** per the plan comment.
+
+**#566 CLOSED by #567 (47cd148), 2026-11-03.** SC-003's stand-in baseline is PR-D's work:
+565,656 `AiDecideMain` calls, a budget of 678,787 (`montecarlo.py` `SC003_BASELINE_CALLS`,
+ADR 0384 amended, spec line edited). `suite --baseline` prints the verdict, and withholds it for
+a partial suite. The cuts measured first, none taken (`M.FINAL` 3 cut 26% but moved play), are
+in #566's comment 6613787561. Review: `/code-review 567 medium` in a subagent, 9 findings, one
+scoped re-review, all fixed.
 
 **#565 is on hold** (label `on-hold`). Its hold comment says what reopens it; do not start it without
 that evidence.
