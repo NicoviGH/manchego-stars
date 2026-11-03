@@ -9,81 +9,39 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-02 (Claude, latest). **#510 step 9 PR-D is OPEN: #564
-(`feat/510-pr-d-ledger`, head 7bd05c6a), NOT merged.** Built, `/code-review 564 medium` in a
-subagent (10 findings, then 3, 1 and 1 in scoped re-reviews, the last clean, every one fixed),
-CI green on the head. The plan comment (#510 comment 6563384310) has T034 and T045-T056 ticked.
-ADR 0384 carries the "Built (PR-D)" paragraph and Nicolas's two 2026-11-02 rulings.
+Refreshed 2026-11-03 (Claude, latest). **#510 step 9 PR-D MERGED: #564 (e20db82).** The
+completion ledger, `behind`, the advance, reassignment and seize skips are built (ADR 0384's
+Built (PR-D)). The plan comment (#510 comment 6563384310) has T034 and T045-T056 ticked.
 
-**NEXT, before anything else: reconvene the advisory panel and have it DECIDE #564's open
-trade** (Nicolas, 2026-11-02: "convene the panel again with sidecar and have them make a
-decision"). He delegated this one call to the panel. Record its verdict as a research record
-(next free id after 0023, with its transcript under `docs/research/transcripts/`), and the
-decision in ADR 0384 as an amendment saying the panel decided on Nicolas's instruction. Then
-merge #564 as it stands (allowed after review and CI: memory "merge-after-review"), or amend
-it, re-review the change scoped, and merge.
-- **How to convene:** as record 0023 did. Its six roles (game-AI search researcher, playtesting
-  lead, Fire Emblem designer, engineering lead, simulation statistician, RL/ML engineer), each
-  played by a different frontier model through the sidecar advisor tools (the
-  `start_advisor_chat` / `send_advisor_message` / `wait_advisor_job` family; check
-  `list_chat_models` for what is available now). Read `docs/research/0023-*.md` and the head
-  of its transcript for the prompt shape. Keep the dossier to what this decision needs: the
-  question below, ADR 0384, the #564 body, and the numbers. Not all of #510.
-- **The question.** Among plans within the risk cap, where does the judged score (`value`:
-  damage, kills, heals, HP taken, worth x chance) sit against progress (turns gained toward
-  each unit's goal)? Both orders are tested and are one line apart in `planner.lua`'s `ADMITTED`:
-  - **A, built (#564 head):** forfeits, win, `behind` (whole turns short of the best progress),
-    allied greens, **value, then progress**. Within a turn of the most progress, a strike from a
-    tile a step back beats a march a step on (`test_a_chip_beats_a_step_within_the_turn`).
-  - **B (#564 before review round 1):** forfeits, win, behind, greens, **progress, then value**.
-    Any fraction of a turn gained beats any damage, so a unit chips an enemy only from as
-    forward a tile as its march.
-  - Without value at all (the spec's letter), a unit within the cap never chips an enemy it
-    cannot kill this turn. Nicolas ruled that out.
-- **The numbers** (pinned suite, `suite --baseline`, 52 runs; tuning seeds' outcomes only, 26
-  runs; PR-C is main):
+**The panel decided value vs progress** (Nicolas delegated it, 2026-11-02). Order B: among
+admitted plans, progress before the judged score, 6-0 in both rounds. Research record 0024 and
+its transcript have the detail; the decision is ADR 0384's panel amendment. Same code, tuning
+seeds: 14 protected deaths against A's 18, wins and clean clears tied, B 7 turns slower. The
+sidecar's frontier models returned HTTP 402. Round 1 ran on its flash models plus Claude
+subagents, and round 2 on Claude subagents only ("keep trying or use anthropic models").
 
-  | | PR-C | B | A |
-  |---|---|---|---|
-  | clean clears | 10 | 14 | 14 |
-  | wins | 22 | 23 | 23 |
-  | deaths | 12 | 12 | **18** |
-  | vanilla Ch5 over-cap deaths | 2 | 3 | **6** |
-  | scout-ch10 deaths | 0 | 0 | 2 |
-  | CPU s | 1,925.9 / 2,175.9 | 2,131.5 | 2,026.8 |
+**Open, from it:**
+- **#565:** whether chipping a step back is what causes the later fallback turns. Its order is
+  a flip log (logging only), then a larger paired run (about 8 tuning seeds per start), then
+  the candidates: a two-ply tie-break, a progress band measured from the best plan, and a
+  sure kill ahead of the progress (candidate 5, which Nicolas agreed belongs there rather than
+  in #564). Under B a heal and a sure kill a step back lose to a march, and tests pin it.
+- **#566:** PR-D merged **over SC-003's CPU budget** on Nicolas's call ("Merge, follow up").
+  PR-A's code and PR-D were timed back to back on one quiet machine: +34% and +20% in the two
+  orders, +26% pooled. `AiDecideMain` calls over the suite are +41% on PR-C. The growth is
+  more branches per plan (vanilla Ch4, scout-ch10), the advance plan, and vanilla Ch5's longer
+  games. Nothing is judged twice, so any cut changes play.
 
-  Every over-cap death in A and B came from a labelled `FALLBACK_SACRIFICE`, and no death was
-  unexplained. B was measured at #564's first commit (c90b6e75), before round 1's other fixes
-  (ledger by chance, the two-turn bar, the advance's fallback), so B against A is not only the
-  one line. A fair comparison runs B on the head too: flip `ADMITTED`'s last two entries,
-  `suite --baseline`, read the tuning set only. **Run that before convening** (about 7 min
-  wall) and give the panel both columns from the same code.
-- **Reading records:** `references/sim/*/*/runs.jsonl`, filter `instrument` and
-  `rec.suite.set == "tuning"`, one record per (start_id, seed) with `kind ~= "campaign"`. A has
-  instrument `113beb4c29fe+v1`, B `cadeba892508+v1`, PR-C `3a29e931c310+v1`. Never print the
-  held-out outcomes.
+**NEXT:** #566 or #565, then PR-E onward per the plan comment. Nicolas's call which comes first.
 
-**What #564 does** (detail: the PR body and ADR 0384's Built (PR-D)):
-- **Ledger** (`goals.lua` `Goals.ledger` / `Goals.forfeited`). Each decision snapshots the
-  open goals with any chance, so a goal no unit can ever get is not one. Forfeits are counted
-  conservatively per branch, and a win closes every open goal. A lord's (or escort green's)
-  death is no forfeit (Nicolas's ruling 1). botrun judges seize skips from `plan.ledger`.
-- **Rank** (`planner.lua` `M.outranks`, `M.rebase`). `behind` is the whole turns short of the
-  best progress among playable plans; FR-012's "within one turn", as an order a sort can keep.
-- **The advance:** one more judged plan, each unit's most-progressing act within the cap. The
-  search addition ours ch01 needed: the beam never kept the lord's walk to the House.
-- **Reassignment** (`bot.lua`). A goal is barred after a whole turn with no step toward it,
-  carried as `opts.stuck`, retested each decision.
-- **Live (T055):** ours ch01 store attempts 1-3: clean t8, won with one death t8, clean t8
-  (main: stuck, clean, stuck). Vanilla Ch2 attempts 1-2: clean t8, clean t6.
+**Machine note:** on 2026-11-02/03, Siri AI ran at 340-420% CPU (load average 60-116). It
+slowed everything, and it hung a pre-commit `check.py` for two hours. `killall "Siri AI"` stops
+it (launchd restarts it idle). CPU figures from those days are not comparable; compare the work
+done (`costs.game_calls`), or time pairs back to back.
 
-**Tried and dropped this session:** a progress bucket of `floor(progress)`. A hold (0) and a
-block costing 0.8 of a turn fell in different buckets, so the green tie-break never fired;
-replaced by `behind`, measured from the best. Barring a goal on the first blocked turn handed a
-tile between units (ch02's (12,3) shape); now it takes a whole blocked turn.
-
-**After #564:** PR-E onward per the plan comment. vanilla Ch4 is the costliest start
-(156 to 219 CPU s from PR-C to A); worth a look if SC-003's budget tightens.
+**Process change (Nicolas, 2026-11-03):** the `review-to-clean` skill is now one pass. One
+review with a duplicate check, every finding fixed in one wave, and at most one scoped
+re-review, only when the fix changed behaviour. #564's four re-review rounds were the reason.
 
 Earlier, 2026-11-01. **#510 step 9 PR-C MERGED: #560 (322101f).** ADR 0384 is
 built in part. The caps are `planner.lua` `M.CAPS` (careful 1%, even 5%, bold 15%), and a style
