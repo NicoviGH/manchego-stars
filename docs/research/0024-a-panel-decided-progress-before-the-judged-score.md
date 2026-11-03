@@ -43,10 +43,9 @@ changed (`suite --baseline`, 52 runs), and only the tuning seeds were read (26 r
   - ours ch03: one death in each order, on opposite seeds.
   - vanilla Ch4 seed 1002: B skipped a village.
 - **On the run endpoint (ADR 0385):** 5 runs differ, 4-1 against A.
-- **CPU** is not comparable across days. A at review round 2 and A at the head did the same work
-  to the call (6,408 sandbox calls, 454,453 `AiDecideMain`) and read 2,026.8 and 2,462.5 CPU s.
-  B does 9% more sandbox calls and 24% more `AiDecideMain` calls than A. At the round-2
-  machine's speed that puts B near 2,105 s, +12% on PR-A's 1,883.6 and inside SC-003's 20%.
+- **CPU** is not comparable across days, so the cost was timed again on one quiet machine,
+  PR-A's code and B back to back, in both orders: +34% and +20%, +26% pooled. That is over
+  SC-003's 20%. Nicolas merged it anyway and opened #566 to bring it back.
 
 **The panel.** The sidecar served the cheaper models only intermittently; its frontier models
 all returned HTTP 402. On Nicolas's instruction ("keep trying or use anthropic models"), seats

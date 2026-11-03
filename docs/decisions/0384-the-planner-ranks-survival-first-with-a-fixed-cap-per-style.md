@@ -241,8 +241,15 @@ win, whole turns behind, allied greens, progress, judged score, then FR-013's ti
   Ch4 seed 1002 still won with a village skipped (the chapter ended in the enemy phase). Every
   `over_cap` death came from a labelled fallback: 8 against PR-C's 6. The order with the
   judged score ahead of the progress within the turn read 18 deaths (13 over the cap) and 14
-  clean, the trade the panel amendment above settled. CPU is compared by the work done, not by
-  the clock: that order at review round 2 and at the head made the same calls and read
-  2,026.8 and 2,462.5 CPU s, a machine about 21% slower the second day. PR-D does 7,011
-  sandbox calls and 565,656 `AiDecideMain` calls (PR-C 6,699 and 400,220), 2,558.3 CPU s that
-  day: about 2,105 s at the round-2 speed, +12% on PR-A's 1,883.6 and inside SC-003's 20%.
+  clean, the trade the panel amendment above settled.
+- **Cost: over SC-003's budget, merged on Nicolas's call (2026-11-03: "Merge, follow up").**
+  PR-A's code and PR-D's head were timed back to back on one quiet machine, both orders:
+  - PR-A first: 2,259.3 against 3,023.2 CPU s (+34%).
+  - PR-D first: 3,115.6 against 2,600.7 CPU s (+20%).
+  - Pooled: **+26%** against SC-003's 20%.
+
+  The clock differs between days, so the work is the measure. `AiDecideMain` calls over the suite
+  were 400,220 on PR-C and 565,656 on PR-D (+41%). The growth is in three places: more branches
+  per judged plan on vanilla Ch4 and scout-ch10, the advance's one more plan per decision, and
+  vanilla Ch5's longer games (9.5 turns against 6.8). No plan is judged twice in a turn, so
+  there is nothing to cache; any cut changes play. Bringing it back within 20% is #566.
