@@ -684,11 +684,42 @@ class Suite(unittest.TestCase):
                              kept={})
         text = '\n'.join(lines)
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 26 AiDecideMain calls, '
-                      '8.0 CPU s and 46.0 wall s in all, 2.0 CPU s a run', text)
+                      '8.0 CPU s and 46.0 wall s in all, 6 calls and 2.0 CPU s a run', text)
         self.assertIn('ours-ch02 (ours chapter 3, fixture): 4 runs', text)
         # SC-003's measure (ADR 0384): the AI's decisions only, never another game call
-        self.assertIn('the suite: 8 runs, 68 AiDecideMain calls (SC-003), 16.0 CPU s', text)
+        self.assertIn('the suite: 8 runs, 68 AiDecideMain calls, 16.0 CPU s', text)
+        self.assertIn('SC-003: 68 AiDecideMain calls against a budget of %d' % int(
+            mc.SC003_BASELINE_CALLS * 1.2), text)
+        self.assertIn(': within', text)
         self.assertNotIn('won', text, 'a baseline reports cost, never a held-out outcome')
+
+    def sc003(self, records):
+        """The suite's lines when each task's run is `records(i, task)`."""
+        suite = self.load(self.suite())
+
+        def play(tasks):
+            for i, t in enumerate(tasks):
+                yield dict(t['stamp'], seed=t['seed'], wall_s=1.0, **records(i, t))
+        return '\n'.join(mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
+                                       play=play, jobs=4, baseline=True, instrument='i',
+                                       check=lambda *a: [], kept={}))
+
+    def test_sc003_counts_a_record_without_game_calls_as_none(self):
+        text = self.sc003(lambda i, t: {'outcome': 'won', 'costs': {'cpu_s': 1.0}})
+        self.assertIn('the suite: 8 runs, 0 AiDecideMain calls', text)
+
+    def test_sc003_leaves_a_run_without_a_result_out_and_is_not_judged(self):
+        # a crashed run asked for fewer calls: counted, it would read as a saving
+        text = self.sc003(lambda i, t: {
+            'outcome': 'crashed' if i == 0 else 'won',
+            'costs': {'cpu_s': 1.0, 'game_calls': {'AiDecideMain': 10}}})
+        self.assertIn('the suite: 8 runs, 70 AiDecideMain calls', text)
+        self.assertIn('SC-003: not judged, 1 runs without a game result', text)
+
+    def test_sc003_says_over_when_the_calls_pass_the_budget(self):
+        text = self.sc003(lambda i, t: {
+            'outcome': 'won', 'costs': {'game_calls': {'AiDecideMain': mc.SC003_BASELINE_CALLS}}})
+        self.assertIn(': OVER', text)
 
     def test_a_worker_with_no_bot_record_is_one_run_without_a_result(self):
         suite = self.load(self.suite())

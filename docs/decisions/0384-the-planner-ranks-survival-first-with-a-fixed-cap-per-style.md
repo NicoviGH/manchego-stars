@@ -265,11 +265,14 @@ CPU is still reported beside it.
   is kept, for the growth after it.
 - **Why calls, not seconds.** Main's identical play measured 2,321, 2,499 and 2,841 CPU s on
   2026-11-03. That spread is wider than the budget. The call count is the same on every run of
-  the same code (all six of #566's instrumented runs reproduced 565,656).
+  the same code that plays to a game result (all six of #566's instrumented runs reproduced
+  565,656). A run cut short asks for fewer, so a suite with one is not judged.
 - **What #566 measured before this** (its comment 6613787561). Judging 3 beam plans instead of
   4 (`M.FINAL`) cut the calls 26%, but play moved: two tuning wins became losses and one run
   gained a clean clear. Mending only the likeliest unit cut 7% and lost a clean clear.
   Stopping a plan's phases once it is over the cap beside an admitted plan never changes play,
   but it saves 2.5% of phases, too little to build. `M.BRANCH = 8` never binds: no judged plan
-  had more than 5 uncertain kills. `suite --baseline` prints each start's calls and the
-  suite's total beside its CPU.
+  had more than 5 uncertain kills.
+- **Where it is checked.** `montecarlo.py`'s `SC003_BASELINE_CALLS` and `SC003_MARGIN` hold
+  the numbers. `suite --baseline` prints each start's calls beside its CPU, then the total
+  against the budget, within or OVER.

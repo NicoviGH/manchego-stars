@@ -390,6 +390,15 @@ def wanted_symbols(symbols, wanted):
     missing = [w for w in wanted if w not in found]
     if missing:
         raise KeyError('symbols not found in ELF: %s' % ', '.join(missing))
+    # one name per address: the harness names each game call it counts by its address
+    # (costs().game_calls, which SC-003 reads as AiDecideMain), so two names on one address
+    # would file the count under either
+    at = {}
+    for name in sorted(found):
+        at.setdefault(found[name] & ~1, []).append(name)
+    shared = [' = '.join(v) for v in at.values() if len(v) > 1]
+    if shared:
+        raise KeyError('symbols sharing one address: %s' % '; '.join(shared))
     return found
 
 
