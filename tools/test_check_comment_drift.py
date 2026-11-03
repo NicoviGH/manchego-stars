@@ -77,6 +77,19 @@ class DeadConceptPatterns(unittest.TestCase):
                    'room under the 200-local ceiling'):
             self.assertIsNone(DEAD_PAT.search(ok), ok)
 
+    def test_the_retired_rank_order_is_caught_and_progression_is_not(self):
+        """ADR 0384's panel amendment retired the judged score ahead of the progress among
+        admitted plans; its inflections are the same claim, "progression" is another word."""
+        for dead in ('the judged score ahead of the progress within the turn',
+                     'the score comes before progressing toward the goal',
+                     'value ahead of progresses', 'score before progress',
+                     'the chip a step back beats the march'):
+            self.assertIsNotNone(DEAD_PAT.search(dead), dead)
+        for ok in ('progress before the judged score',
+                   'the score comes before progression rewards',
+                   'the judged score breaks a progress tie'):
+            self.assertIsNone(DEAD_PAT.search(ok), ok)
+
     def test_a_COLOUR_count_is_not_a_wrap_width(self):
         """`col\\w*` reaches "colours", and a palette depth that happens to end in 28 is not a
         line width. The registry is read by people fixing real drift; a guard that cries wolf

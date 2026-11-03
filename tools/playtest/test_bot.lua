@@ -3060,16 +3060,11 @@ do
           "planner: a game-over green's death is over the cap, and no forfeit")
 end
 
--- The march-against-an-act board the rank tests below share: unit `id` on (0,0) can reach
--- (1,0) and (2,0) toward a gate at (10,0), with no enemy phase; `extra` adds the act's reads
--- (a forecast, staves and heals).
-local function marchSight(id, extra)
-    local o = {
-        objective = { kind = "seize", tile = { x = 10, y = 0 } },
-        reach = { [id] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
-        enemyPhase = function() return {} end,
-    }
-    for k, v in pairs(extra) do o[k] = v end
+-- The seize board the rank tests below share: a gate at (10,0) and no enemy phase, each
+-- filled only where the test's own reads `o` (reach, forecasts, staves) leave it unset.
+local function seizeSight(o)
+    o.objective = o.objective or { kind = "seize", tile = { x = 10, y = 0 } }
+    o.enemyPhase = o.enemyPhase or function() return {} end
     return sightOf(o)
 end
 
@@ -3080,7 +3075,8 @@ end
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 40, minRange = false })
-    local sight = marchSight(0x01, {
+    local sight = seizeSight({
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
     })
     local a = Planner.plan(B, boardOf(A, X), sight, style("bold"))
@@ -3092,7 +3088,8 @@ end
 do
     local H = blue(0x02, 0, 0, 0, { minRange = false })
     local W = blue(0x03, 1, 1, 1, { hp = 5, maxhp = 30, minRange = false, acted = true })
-    local sight = marchSight(0x02, {
+    local sight = seizeSight({
+        reach = { [0x02] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         staves = { [0x02] = { { slot = 0, amount = 10 } } },
         heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x03 } } } } },
     })
@@ -3105,7 +3102,8 @@ end
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 20, minRange = false })
-    local sight = marchSight(0x01, {
+    local sight = seizeSight({
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
     })
     local a = Planner.plan(B, boardOf(A, X), sight, style("careful"))
@@ -3119,7 +3117,8 @@ end
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 2, 1, { hp = 40, minRange = false })
-    local sight = marchSight(0x01, {
+    local sight = seizeSight({
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
                                                     counterHit = 100, counterDmg = 5,
                                                     counterHits = 1 } } } },
@@ -3153,14 +3152,12 @@ do
     local U1 = blue(0x01, 0, 0, 0, { minRange = false })
     local U2 = blue(0x02, 1, 1, 1, { minRange = false, mov = 2 })
     local Z = red(0x83, 14, 9, { minRange = false })
-    local o = {
-        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+    local sight = seizeSight({
         reach = { [0x01] = tiles({ 0, 0 }, { 3, 0 }), [0x02] = tiles({ 1, 1 }, { 3, 0 }, { 2, 1 }) },
-        enemyPhase = function() return {} end,
-    }
+    })
     local beam = Planner.BEAM
     Planner.BEAM = 1
-    local _, plan = Planner.plan(B, boardOf(U1, U2, Z), sightOf(o), style("bold"))
+    local _, plan = Planner.plan(B, boardOf(U1, U2, Z), sight, style("bold"))
     Planner.BEAM = beam
     local adv
     for _, c in ipairs(plan and plan.considered or {}) do
