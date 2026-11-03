@@ -20,19 +20,27 @@ seeds: 14 protected deaths against A's 18, wins and clean clears tied, B 7 turns
 sidecar's frontier models returned HTTP 402. Round 1 ran on its flash models plus Claude
 subagents, and round 2 on Claude subagents only ("keep trying or use anthropic models").
 
-**Open, from it:**
-- **#565:** whether chipping a step back is what causes the later fallback turns. Its order is
-  a flip log (logging only), then a larger paired run (about 8 tuning seeds per start), then
-  the candidates: a two-ply tie-break, a progress band measured from the best plan, and a
-  sure kill ahead of the progress (candidate 5, which Nicolas agreed belongs there rather than
-  in #564). Under B a heal and a sure kill a step back lose to a march, and tests pin it.
-- **#566:** PR-D merged **over SC-003's CPU budget** on Nicolas's call ("Merge, follow up").
-  PR-A's code and PR-D were timed back to back on one quiet machine: +34% and +20% in the two
-  orders, +26% pooled. `AiDecideMain` calls over the suite are +41% on PR-C. The growth is
-  more branches per plan (vanilla Ch4, scout-ch10), the advance plan, and vanilla Ch5's longer
-  games. Nothing is judged twice, so any cut changes play.
+**NEXT, in order (Nicolas, 2026-11-03):**
+1. **#566: bring the pinned suite back within SC-003's 20% CPU budget.** Do it timeboxed: one
+   change aimed at the branching that grew, then one measurement.
+   - PR-D merged over budget on Nicolas's call ("Merge, follow up"). PR-A's code (1168f72) and
+     PR-D were timed back to back on one quiet machine: +34% and +20% in the two orders, +26%
+     pooled.
+   - `AiDecideMain` calls over the suite: PR-C 400,220, PR-D 565,656 (+41%).
+   - The growth is concentrated: vanilla Ch4 went from 1,399 to 2,818 calls a turn, and
+     scout-ch10 from 1,183 to 2,253. Those plans carry more uncertain kills, each branching up to
+     `M.BRANCH` = 8 enemy phases. The advance adds one plan per decision. Vanilla Ch5's longer
+     games (9.5 turns against 6.8) are play, not overhead.
+   - Nothing is judged twice in a turn, so a cache saves nothing; any cut changes play.
+   - Measure it as #566 says: the same seeds, the run endpoint and fallback turns beside CPU,
+     and PR-A against the new head timed back to back, both orders, on a quiet machine.
+2. **PR-E onward** per the plan comment.
 
-**NEXT:** #566 or #565, then PR-E onward per the plan comment. Nicolas's call which comes first.
+**On hold: #565** (whether chipping a step back causes the later fallback turns). Nicolas,
+2026-11-03: it reopens only if ADR 0385's human calibration, or a chapter's readings, show the
+bot failing where players would not. The one live item is candidate 5, a sure kill ahead of the
+progress. Under order B a heal and a sure kill a step back lose to a march, and
+`test_bot.lua`'s rank tests pin it.
 
 **Machine note:** on 2026-11-02/03, Siri AI ran at 340-420% CPU (load average 60-116). It
 slowed everything, and it hung a pre-commit `check.py` for two hours. `killall "Siri AI"` stops
