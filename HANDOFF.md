@@ -10,37 +10,19 @@ live in GitHub issues. Before a context rollover, warn Nicolas, refresh this fil
 fresh instance — don't rely on auto-compaction.
 
 Refreshed 2026-11-03 (Claude, latest). **#510 step 9 PR-D MERGED: #564 (e20db82).** The
-completion ledger, `behind`, the advance, reassignment and seize skips are built (ADR 0384's
-Built (PR-D)). The plan comment (#510 comment 6563384310) has T034 and T045-T056 ticked.
+durable record is in three places:
+- **#510's plan comment (6563384310):** PR-D's checkpoint note, and #566 slotted before PR-E.
+- **ADR 0384:** Built (PR-D); the panel amendment (progress before the judged score); the
+  measured cost.
+- **Research record 0024:** the panel and its transcript.
 
-**The panel decided value vs progress** (Nicolas delegated it, 2026-11-02). Order B: among
-admitted plans, progress before the judged score, 6-0 in both rounds. Research record 0024 and
-its transcript have the detail; the decision is ADR 0384's panel amendment. Same code, tuning
-seeds: 14 protected deaths against A's 18, wins and clean clears tied, B 7 turns slower. The
-sidecar's frontier models returned HTTP 402. Round 1 ran on its flash models plus Claude
-subagents, and round 2 on Claude subagents only ("keep trying or use anthropic models").
-
-**NEXT, in order (Nicolas, 2026-11-03):**
-1. **#566: bring the pinned suite back within SC-003's 20% CPU budget.** Do it timeboxed: one
-   change aimed at the branching that grew, then one measurement.
-   - PR-D merged over budget on Nicolas's call ("Merge, follow up"). PR-A's code (1168f72) and
-     PR-D were timed back to back on one quiet machine: +34% and +20% in the two orders, +26%
-     pooled.
-   - `AiDecideMain` calls over the suite: PR-C 400,220, PR-D 565,656 (+41%).
-   - The growth is concentrated: vanilla Ch4 went from 1,399 to 2,818 calls a turn, and
-     scout-ch10 from 1,183 to 2,253. Those plans carry more uncertain kills, each branching up to
-     `M.BRANCH` = 8 enemy phases. The advance adds one plan per decision. Vanilla Ch5's longer
-     games (9.5 turns against 6.8) are play, not overhead.
-   - Nothing is judged twice in a turn, so a cache saves nothing; any cut changes play.
-   - Measure it as #566 says: the same seeds, the run endpoint and fallback turns beside CPU,
-     and PR-A against the new head timed back to back, both orders, on a quiet machine.
+**NEXT:**
+1. **#566:** bring the suite back within SC-003's 20% (PR-D is +26%). Timeboxed. The issue has
+   the numbers, where the growth is, and how to measure.
 2. **PR-E onward** per the plan comment.
 
-**On hold: #565** (whether chipping a step back causes the later fallback turns). Nicolas,
-2026-11-03: it reopens only if ADR 0385's human calibration, or a chapter's readings, show the
-bot failing where players would not. The one live item is candidate 5, a sure kill ahead of the
-progress. Under order B a heal and a sure kill a step back lose to a march, and
-`test_bot.lua`'s rank tests pin it.
+**#565 is on hold** (label `on-hold`). Its body says what reopens it; do not start it without
+that evidence.
 
 **Machine note:** on 2026-11-02/03, Siri AI ran at 340-420% CPU (load average 60-116). It
 slowed everything, and it hung a pre-commit `check.py` for two hours. `killall "Siri AI"` stops
