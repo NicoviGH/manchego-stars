@@ -657,20 +657,21 @@ class Suite(unittest.TestCase):
         self.assertAlmostEqual(hours, (4 * 40 + 4 * 600) / 2 / 3600)
         self.assertGreater(mc.suite_estimate(suite, tasks * 30, {}, jobs=1), mc.MAX_WALL_H)
 
+    def suite_lines(self, play, baseline=True, jobs=4, **kw):
+        """The lines run_suite prints for `play`, with no ROM, env or kept run behind it."""
+        return mc.run_suite(self.load(self.suite()),
+                            envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
+                            jobs=jobs, baseline=baseline, instrument='i', check=lambda *a: [],
+                            kept={}, **kw)
+
     def test_a_job_over_eight_hours_is_refused_before_it_runs(self):
-        suite = self.load(self.suite())
         played = []
-        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
-                             play=lambda tasks: played.extend(tasks) or [], jobs=1,
-                             baseline=True, instrument='i', check=lambda *a: [], kept={},
-                             wall_limit_h=0.5)
+        lines = self.suite_lines(lambda tasks: played.extend(tasks) or [], jobs=1, wall_limit_h=0.5)
         self.assertEqual(played, [])
         self.assertIn('refused', lines[-1])
         self.assertIn('8 wall-hours'.replace('8', '0.5'), lines[-1])
 
     def test_the_baseline_says_each_starts_cost_in_a_sentence(self):
-        suite = self.load(self.suite())
-
         def play(tasks):
             # each worker also leaves its campaign's end, stamped alike: never a second run
             for i, t in enumerate(tasks):
@@ -679,12 +680,9 @@ class Suite(unittest.TestCase):
                                                                'RefreshEntityBmMaps': 99}})
                 yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
                            wall_s=10.0 + i)
-        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
-                             jobs=4, baseline=True, instrument='i', check=lambda *a: [],
-                             kept={})
-        text = '\n'.join(lines)
+        text = '\n'.join(self.suite_lines(play))
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 26 AiDecideMain calls, '
-                      '8.0 CPU s and 46.0 wall s in all, 6 calls and 2.0 CPU s a run', text)
+                      '8.0 CPU s and 46.0 wall s in all, 6.5 calls and 2.0 CPU s a run', text)
         self.assertIn('ours-ch02 (ours chapter 3, fixture): 4 runs', text)
         # SC-003's measure (ADR 0384): the AI's decisions only, never another game call
         self.assertIn('the suite: 8 runs, 68 AiDecideMain calls, 16.0 CPU s', text)
@@ -693,16 +691,13 @@ class Suite(unittest.TestCase):
         self.assertIn(': within', text)
         self.assertNotIn('won', text, 'a baseline reports cost, never a held-out outcome')
 
-    def sc003(self, records):
-        """The suite's lines when each task's run is `records(i, task)`."""
-        suite = self.load(self.suite())
-
+    def sc003(self, records, baseline=True, keep=lambda t: True):
+        """The suite's lines when each task `keep` allows comes back as `records(i, task)`."""
         def play(tasks):
             for i, t in enumerate(tasks):
-                yield dict(t['stamp'], seed=t['seed'], wall_s=1.0, **records(i, t))
-        return '\n'.join(mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
-                                       play=play, jobs=4, baseline=True, instrument='i',
-                                       check=lambda *a: [], kept={}))
+                if keep(t):
+                    yield dict(t['stamp'], seed=t['seed'], wall_s=1.0, **records(i, t))
+        return '\n'.join(self.suite_lines(play, baseline=baseline))
 
     def test_sc003_counts_a_record_without_game_calls_as_none(self):
         text = self.sc003(lambda i, t: {'outcome': 'won', 'costs': {'cpu_s': 1.0}})
@@ -714,7 +709,19 @@ class Suite(unittest.TestCase):
             'outcome': 'crashed' if i == 0 else 'won',
             'costs': {'cpu_s': 1.0, 'game_calls': {'AiDecideMain': 10}}})
         self.assertIn('the suite: 8 runs, 70 AiDecideMain calls', text)
-        self.assertIn('SC-003: not judged, 1 runs without a game result', text)
+        self.assertIn('SC-003: not judged, 1 run without a game result', text)
+
+    def test_sc003_is_not_judged_when_a_start_sent_no_run(self):
+        # a start missing from the total reads as a saving, as a crashed run does
+        text = self.sc003(lambda i, t: {'outcome': 'won'},
+                          keep=lambda t: t['stamp']['suite']['start_id'] != 'ours-ch02')
+        self.assertIn('ours-ch02: no run came back', text)
+        self.assertIn('SC-003: not judged, 4 of 8 runs came back', text)
+
+    def test_sc003_judges_only_the_whole_suite(self):
+        # the tuning seeds alone are half of it, never measured against the whole's budget
+        text = self.sc003(lambda i, t: {'outcome': 'won'}, baseline=False)
+        self.assertNotIn('SC-003', text)
 
     def test_sc003_says_over_when_the_calls_pass_the_budget(self):
         text = self.sc003(lambda i, t: {
@@ -722,16 +729,11 @@ class Suite(unittest.TestCase):
         self.assertIn(': OVER', text)
 
     def test_a_worker_with_no_bot_record_is_one_run_without_a_result(self):
-        suite = self.load(self.suite())
-
         def play(tasks):
             for t in tasks:
                 yield dict(t['stamp'], kind='campaign', outcome='crashed', seed=t['seed'],
                            wall_s=1.0, why='arrive: no saved start')
-        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
-                             jobs=4, baseline=False, instrument='i', check=lambda *a: [],
-                             kept={})
-        text = '\n'.join(lines)
+        text = '\n'.join(self.suite_lines(play, baseline=False))
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 2 runs', text)
         self.assertIn('2 without a game result', text)
         self.assertIn('vanilla-ch3 seed 1001: attempt 1: crashed before the bot reported '
@@ -807,16 +809,11 @@ class Suite(unittest.TestCase):
                                  'of the twin'])
 
     def test_a_campaign_end_without_a_bot_record_is_no_result(self):
-        suite = self.load(self.suite())
-
         def play(tasks):
             for t in tasks:
                 yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
                            wall_s=1.0, why='played after 1 chapters', env_status=mc.unread())
-        lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
-                             play=play, jobs=4, baseline=False, instrument='i',
-                             check=lambda *a: [], kept={})
-        text = '\n'.join(lines)
+        text = '\n'.join(self.suite_lines(play, baseline=False))
         self.assertIn('2 without a game result', text)
         self.assertIn('vanilla-ch3 seed 1001: attempt 1: the bot left no record; the campaign '
                       'ended played (played after 1 chapters)', text)

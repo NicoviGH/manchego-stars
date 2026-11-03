@@ -96,10 +96,10 @@ only the turn.
 
 **Measured** (T027, 2026-11-01). The planner changes are record-only: `montecarlo.py suite
 --baseline --jobs 8` played all 52 runs with the same outcome, turns, deaths and frame count as
-PR-A's baseline (ADR 0387), at 1,883.6 CPU s (SC-003's stand-in until ADR 0384's
-2026-11-03 amendment re-based it on PR-D's `AiDecideMain` calls). Three runs on this branch, as the review's fixes
-landed: 1,877.0, 1,920.4 and 1,964.4 CPU s (5 min 31 s to 5 min 47 s wall). Play is frame-for-frame
-the same and the record adds only per-death and per-phase bookkeeping, so the spread reads as
+PR-A's baseline (ADR 0387), at 1,883.6 CPU s (SC-003's stand-in until ADR 0384's 2026-11-03
+amendment re-based it on PR-D's `AiDecideMain` calls). Three runs on this branch, as the
+review's fixes landed: 1,877.0, 1,920.4 and 1,964.4 CPU s (5 min 31 s to 5 min 47 s wall).
+Play is frame-for-frame the same and the record adds only per-death and per-phase bookkeeping, so the spread reads as
 machine load; it rose each run, so all three are given. The graded records (the last two runs
 agree on every count):
 - 20 blue or green deaths: 17 `rng_tail` (no cap yet, so every positive prediction is a tail;

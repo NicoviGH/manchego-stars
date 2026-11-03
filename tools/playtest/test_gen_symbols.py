@@ -40,9 +40,9 @@ class WantedSymbols(unittest.TestCase):
 
     def test_two_names_on_one_address_are_refused(self):
         # a Thumb address (bit 0 set) is the same function as the even one
-        syms = gs.parse_nm('0801c9e0 T PlayerPhase_MainIdle\n0801c9e1 T AnAlias\n')
         with self.assertRaises(KeyError) as err:
-            gs.wanted_symbols(syms, ['PlayerPhase_MainIdle', 'AnAlias'])
+            gs.one_name_per_address({'PlayerPhase_MainIdle': 0x0801C9E0, 'AnAlias': 0x0801C9E1,
+                                     'gPlaySt': 0x0202BCF0})
         self.assertIn('AnAlias = PlayerPhase_MainIdle', str(err.exception))
 
     def test_missing_symbol_is_reported_not_silently_dropped(self):

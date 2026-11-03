@@ -855,16 +855,18 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
     total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0}
+    missing = 0
     for st in suite['starts']:
         got = per.get(st['start_id'])
         if not got:
             lines.append('%s: no run came back' % st['start_id'])
+            missing += 1
             continue
         for k in total:
             total[k] += got[k]
         played = got['n'] - got['unread']
         lines.append('%s (%s chapter %d, %s): %d runs, %d AiDecideMain calls, %.1f CPU s and '
-                     '%.1f wall s in all, %.0f calls and %.1f CPU s a run%s' % (
+                     '%.1f wall s in all, %.1f calls and %.1f CPU s a run%s' % (
                          st['start_id'], st['game'], st['chapter'], st['label'], got['n'],
                          got['calls'], got['cpu'], got['wall'], got['calls'] / max(1, played),
                          got['cpu'] / got['n'],
@@ -872,9 +874,16 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
     lines.append('the suite: %d runs, %d AiDecideMain calls, %.1f CPU s and %.1f wall s of work, '
                  '%d without a game result' % (total['n'], total['calls'], total['cpu'],
                                                total['wall'], total['unread']))
+    # SC-003 is a whole suite's cost: the tuning seeds alone are half of it, and a run that never
+    # came back or played to no result would read as a saving
     budget = int(SC003_BASELINE_CALLS * (1 + SC003_MARGIN))
-    if total['unread']:
-        lines.append('SC-003: not judged, %d runs without a game result' % total['unread'])
+    if not baseline:
+        pass
+    elif missing or total['n'] != len(tasks):
+        lines.append('SC-003: not judged, %d of %d runs came back' % (total['n'], len(tasks)))
+    elif total['unread']:
+        lines.append('SC-003: not judged, %d run%s without a game result' % (
+            total['unread'], '' if total['unread'] == 1 else 's'))
     else:
         lines.append('SC-003: %d AiDecideMain calls against a budget of %d (%+.1f%% on the '
                      'baseline of %d): %s' % (

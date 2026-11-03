@@ -390,16 +390,21 @@ def wanted_symbols(symbols, wanted):
     missing = [w for w in wanted if w not in found]
     if missing:
         raise KeyError('symbols not found in ELF: %s' % ', '.join(missing))
-    # one name per address: the harness names each game call it counts by its address
-    # (costs().game_calls, which SC-003 reads as AiDecideMain), so two names on one address
-    # would file the count under either
+    return found
+
+
+def one_name_per_address(addrs):
+    """`addrs` ({name: address}, all of SYM), or KeyError naming the names that share an address.
+    The harness names each game call it counts by its address, bit 0 masked as here
+    (costs().game_calls, which SC-003 reads as AiDecideMain), so two names on one address would
+    file the count under either."""
     at = {}
-    for name in sorted(found):
-        at.setdefault(found[name] & ~1, []).append(name)
+    for name in sorted(addrs):
+        at.setdefault(addrs[name] & ~1, []).append(name)
     shared = [' = '.join(v) for v in at.values() if len(v) > 1]
     if shared:
         raise KeyError('symbols sharing one address: %s' % '; '.join(shared))
-    return found
+    return addrs
 
 
 
@@ -632,6 +637,7 @@ def main():
         if os.path.exists(link_map):        # a PT_ELF build may ship no map; SYM then lacks them
             with open(link_map, encoding='utf-8') as fh:
                 addrs.update(static_ewram_symbols(fh.read()))
+        one_name_per_address(addrs)
         facts = campaign_ids()
     except KeyError as missing:
         sys.exit('ERROR: %s' % missing.args[0])
