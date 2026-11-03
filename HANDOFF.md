@@ -17,8 +17,10 @@ durable record is in three places:
 - **Research record 0024:** the panel and its transcript.
 
 **NEXT:**
-1. **#566:** bring the suite back within SC-003's 20% (PR-D is +26%). Timeboxed. The issue has
-   the numbers, where the growth is, and how to measure.
+1. **#567 (closes #566), in review:** SC-003's stand-in baseline is re-based on PR-D, in
+   `AiDecideMain` calls: 565,656, a budget of 678,787 (Nicolas, 2026-11-03; ADR 0384 amended,
+   spec line edited). `suite --baseline` prints the verdict. The cuts measured first, none
+   taken, are in #566's comment 6613787561.
 2. **PR-E onward** per the plan comment.
 
 **#565 is on hold** (label `on-hold`). Its hold comment says what reopens it; do not start it without
@@ -47,7 +49,7 @@ protected deaths against the cap, through `Planner.admits`. `M.plan` returns
 **Measured:**
 - Suite: 7,020 judged phases over 1,005 plans; `BRANCH = 2` judged 6,213.
 - CPU varies about 13% between runs of identical play: 1,925.9 and 2,175.9 s, against PR-A's
-  1,883.6, both inside SC-003's 20%. **Report phases beside CPU.**
+  1,883.6, both under the 20% budget of the time (SC-003 is now counted in calls). **Report phases beside CPU.**
 - Vanilla Ch3 with Seth benched (uncommitted bench, seed 1): 8/8 clean (before: 1/8 kept everyone).
 - Vanilla Ch5 attempt 1 (bold): Natasha dies on turn 3 at 68.4% under a labelled fallback, and
   Joshua is still killed before the Talk.
