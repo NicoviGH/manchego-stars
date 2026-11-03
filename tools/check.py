@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0384's 2026-11-03 amendment (#566): SC-003's stand-in baseline is PR-D's
+    # AiDecideMain calls, never PR-A's CPU
+    r'\bwithin 20% of PR-A\b', r"\b(?:within|inside) SC-003's 20%",
     # retired by ADR 0384's panel amendment (2026-11-02, research record 0024): among admitted
     # plans the progress comes before the judged score; the score only breaks a progress tie.
     # Matched a line at a time, as every pattern here: a phrase wrapped across lines escapes

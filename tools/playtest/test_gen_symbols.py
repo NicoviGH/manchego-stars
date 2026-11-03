@@ -38,6 +38,13 @@ class WantedSymbols(unittest.TestCase):
         got = gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt', 'ProcScr_PrepMenu'])
         self.assertEqual(got, {'gPlaySt': 0x0202BCF0, 'ProcScr_PrepMenu': 0x08A39190})
 
+    def test_two_names_on_one_address_are_refused(self):
+        # a Thumb address (bit 0 set) is the same function as the even one
+        with self.assertRaises(KeyError) as err:
+            gs.one_name_per_address({'PlayerPhase_MainIdle': 0x0801C9E0, 'AnAlias': 0x0801C9E1,
+                                     'gPlaySt': 0x0202BCF0})
+        self.assertIn('AnAlias = PlayerPhase_MainIdle', str(err.exception))
+
     def test_missing_symbol_is_reported_not_silently_dropped(self):
         with self.assertRaises(KeyError) as raised:
             gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt', 'NoSuchSymbol'])

@@ -393,6 +393,20 @@ def wanted_symbols(symbols, wanted):
     return found
 
 
+def one_name_per_address(addrs):
+    """`addrs` ({name: address}, all of SYM), or KeyError naming the names that share an address.
+    The harness names each game call it counts by its address, bit 0 masked as here
+    (costs().game_calls, which SC-003 reads as AiDecideMain), so two names on one address would
+    file the count under either."""
+    at = {}
+    for name in sorted(addrs):
+        at.setdefault(addrs[name] & ~1, []).append(name)
+    shared = [' = '.join(v) for v in at.values() if len(v) > 1]
+    if shared:
+        raise KeyError('symbols sharing one address: %s' % '; '.join(shared))
+    return addrs
+
+
 
 # A file-static array has no name in the ELF, so the harness can only find it through the
 # linker map: the start of its object's ewram_data section, which must hold exactly what that
@@ -623,6 +637,7 @@ def main():
         if os.path.exists(link_map):        # a PT_ELF build may ship no map; SYM then lacks them
             with open(link_map, encoding='utf-8') as fh:
                 addrs.update(static_ewram_symbols(fh.read()))
+        one_name_per_address(addrs)
         facts = campaign_ids()
     except KeyError as missing:
         sys.exit('ERROR: %s' % missing.args[0])

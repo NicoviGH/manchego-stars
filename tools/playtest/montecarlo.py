@@ -695,6 +695,10 @@ def load_suite(path=None):
 
 REPO = os.path.dirname(os.path.dirname(HERE))
 MAX_WALL_H = 8    # SC-007: a planned job longer than this is split or narrowed, never run
+# SC-003 (ADR 0384, amended 2026-11-03): the suite's AiDecideMain calls may be at most this much
+# over the stand-in baseline, PR-D's (e20db82) count, until US5 freezes the baseline
+SC003_BASELINE_CALLS = 565656
+SC003_MARGIN = 0.20
 SEED_SETS = ('tuning', 'held_out')
 
 
@@ -832,32 +836,60 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
         if sid is None or (rec.get('kind') == 'campaign' and key in seen):
             continue
         seen.add(key)
-        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0})
+        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0})
+        costs = rec.get('costs') or {}
         got['n'] += 1
-        got['cpu'] += (rec.get('costs') or {}).get('cpu_s') or 0.0
+        got['cpu'] += costs.get('cpu_s') or 0.0
         got['wall'] += rec.get('wall_s') or 0.0
         # the invariant `record`: one BOTRUN record with a game result; a campaign's end
         # standing in for it is never one
-        got['unread'] += rec.get('kind') == 'campaign' or rec.get('outcome') in UNUSABLE
+        unread = rec.get('kind') == 'campaign' or rec.get('outcome') in UNUSABLE
+        got['unread'] += unread
+        # SC-003's measure (ADR 0384, 2026-11-03): the AI decisions the bot asked the game for,
+        # the same on every run of the same code that plays to a game result, which the clock
+        # is not. A run cut short asked for fewer, so it is left out rather than read as a saving
+        if not unread:
+            got['calls'] += (costs.get('game_calls') or {}).get('AiDecideMain') or 0
         if not baseline:
             line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
-    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0}
+    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0}
+    missing = 0
     for st in suite['starts']:
         got = per.get(st['start_id'])
         if not got:
             lines.append('%s: no run came back' % st['start_id'])
+            missing += 1
             continue
         for k in total:
             total[k] += got[k]
-        lines.append('%s (%s chapter %d, %s): %d runs, %.1f CPU s and %.1f wall s in all, '
-                     '%.1f CPU s a run%s' % (
+        played = got['n'] - got['unread']
+        lines.append('%s (%s chapter %d, %s): %d runs, %d AiDecideMain calls, %.1f CPU s and '
+                     '%.1f wall s in all, %.1f calls and %.1f CPU s a run%s' % (
                          st['start_id'], st['game'], st['chapter'], st['label'], got['n'],
-                         got['cpu'], got['wall'], got['cpu'] / got['n'],
+                         got['calls'], got['cpu'], got['wall'], got['calls'] / max(1, played),
+                         got['cpu'] / got['n'],
                          '; %d without a game result' % got['unread'] if got['unread'] else ''))
-    lines.append('the suite: %d runs, %.1f CPU s and %.1f wall s of work, %d without a game '
-                 'result' % (total['n'], total['cpu'], total['wall'], total['unread']))
+    lines.append('the suite: %d runs, %d AiDecideMain calls, %.1f CPU s and %.1f wall s of work, '
+                 '%d without a game result' % (total['n'], total['calls'], total['cpu'],
+                                               total['wall'], total['unread']))
+    # SC-003 is a whole suite's cost: the tuning seeds alone are half of it, and a run that never
+    # came back or played to no result would read as a saving
+    budget = int(SC003_BASELINE_CALLS * (1 + SC003_MARGIN))
+    if not baseline:
+        pass
+    elif missing or total['n'] != len(tasks):
+        lines.append('SC-003: not judged, %d of %d runs came back' % (total['n'], len(tasks)))
+    elif total['unread']:
+        lines.append('SC-003: not judged, %d run%s without a game result' % (
+            total['unread'], '' if total['unread'] == 1 else 's'))
+    else:
+        lines.append('SC-003: %d AiDecideMain calls against a budget of %d (%+.1f%% on the '
+                     'baseline of %d): %s' % (
+                         total['calls'], budget,
+                         100.0 * (total['calls'] / SC003_BASELINE_CALLS - 1),
+                         SC003_BASELINE_CALLS, 'within' if total['calls'] <= budget else 'OVER'))
     return lines
 
 
