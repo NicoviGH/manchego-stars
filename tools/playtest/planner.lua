@@ -148,10 +148,11 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- every plan is judged (M.rebase). Then the progress itself, then `value`, the judged score:
 -- what a plan deals, kills, heals and loses in HP (Nicolas, 2026-11-02: without it a unit
 -- within the cap never chips an enemy it cannot kill this turn, as the counter's HP is all
--- the rank would see). The score after the progress, so a unit chips only from as forward a
--- tile as its march: the advisory panel's decision (record 0024), the reverse order cost the
--- pinned suite 18 deaths to this order's 14, all on later turns with no plan within the cap.
--- Last the largest death chance, the summed one, more HP left, and the acts as a stable key.
+-- the rank would see). The score after the progress, so a unit chips, heals or kills only
+-- from as forward a tile as its march: the advisory panel's decision, on Nicolas's
+-- instruction (ADR 0384's amendment of 2026-11-02, research record 0024, which has the
+-- numbers; why the reverse order lost more units is open, #565). Last the largest death
+-- chance, the summed one, more HP left, and the acts as a stable key.
 local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
                    { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
 function M.outranks(a, b)

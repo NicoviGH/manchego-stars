@@ -3060,10 +3060,10 @@ do
           "planner: a game-over green's death is over the cap, and no forfeit")
 end
 
--- test_a_march_beats_a_chip_a_step_back (the advisory panel, 2026-11-02, record 0024): A can
--- strike X for 20 of its 40 HP from (1,0), a step toward the gate, or march two steps to (2,0).
--- Both are within a turn of the most progress, and progress comes before the judged score: the
--- march. The reverse order (the strike) cost the pinned suite 18 deaths to this order's 14.
+-- test_a_march_beats_a_chip_a_step_back (ADR 0384's panel amendment, research record 0024): A
+-- can strike X for 20 of its 40 HP from (1,0), a step toward the gate, or march two steps to
+-- (2,0). Both are within a turn of the most progress, and progress comes before the judged
+-- score: the march. (Under the order this replaced, the test expected the strike.)
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 40, minRange = false })
@@ -3075,6 +3075,50 @@ do
     }
     local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the chip a step back")
+end
+
+-- test_a_march_beats_a_heal_or_a_kill_a_step_back (ADR 0384's panel amendment): a heal and a
+-- kill are the judged score too, so the order holds for them. H can heal W from (1,0), or
+-- march to (2,0); A can kill X (20 HP, a sure 20) from (1,0), or march to (2,0). Each marches.
+do
+    local H = blue(0x02, 0, 0, 0, { minRange = false })
+    local W = blue(0x03, 1, 1, 1, { hp = 5, maxhp = 30, minRange = false, acted = true })
+    local o = {
+        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+        reach = { [0x02] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x03 } } } } },
+        enemyPhase = function() return {} end,
+    }
+    local a = Planner.plan(B, boardOf(H, W), sightOf(o), style("careful"))
+    check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the heal a step back")
+    local A = blue(0x01, 0, 0, 0)
+    local X = red(0x81, 1, 1, { hp = 20, minRange = false })
+    o = {
+        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
+        enemyPhase = function() return {} end,
+    }
+    a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the kill a step back")
+end
+
+-- test_the_chip_is_kept_from_the_forward_tile (ADR 0384's panel amendment): A can strike X for
+-- 20 of its 40 HP from (2,0), its march's tile, or wait there. Progress ties, so the score
+-- decides (the advance takes the better act on its tile, the beam the better score): the chip
+-- is played from the forward tile, not given up for the wait.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local X = red(0x81, 2, 1, { hp = 40, minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
+        enemyPhase = function() return {} end,
+    }
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    check(a and a.act .. "@" .. at(a), "attack@2,0", "rank: the chip from the march's tile")
 end
 
 -- test_rebase_measures_turns_behind_the_best (FR-012): progress 1.6, 0.8 and 0 are 0, 0 and 1
@@ -4027,6 +4071,8 @@ do
           "rank: within the turn, the progress before the judged score")
     check(before(r { progress = 0.9, value = 500 }, r { progress = 0.9, value = 0 }), true,
           "rank: the judged score breaks a progress tie")
+    check(before(r { progress = 0.9 - 1e-12, value = 500 }, r { progress = 0.9, value = 0 }), true,
+          "rank: the judged score breaks a progress tie within float dust")
     check(before(r { progress = 0.9, value = 0 }, r { progress = 0.9 - 1e-12, value = 0 }), false,
           "rank: then progress, float dust no difference")
     check(before(r { progress = 0.9 }, r { progress = 0.2 }), true, "rank: then progress")

@@ -79,7 +79,11 @@ answer as a recap.
   chip from a tile as forward as the march is taken.
 
 **What shipped with it, and what did not:**
-- **Rename the test that pins A: NOW, 6-0.** It is now `test_a_march_beats_a_chip_a_step_back`.
+- **Rename the test that pins A: NOW, 6-0.** It is renamed AND inverted: it pinned A's strike
+  (`attack@1,0`) and now pins B's march (`wait@2,0`) as `test_a_march_beats_a_chip_a_step_back`.
+  The review of that commit added three tests beside it. A heal and a kill a step back lose to
+  the march too. The chip is kept from the march's own tile. The score still breaks a progress
+  tie within float dust.
 - **Deferred to #565, in order:**
   1. **A counterfactual flip log:** 5-1 LATER, its own author included. It is logging only, off
      by default, with a byte-identical guard.

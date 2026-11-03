@@ -88,7 +88,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 DEAD_CONCEPTS = [
     # retired by ADR 0384's panel amendment (2026-11-02, research record 0024): among admitted
     # plans the progress comes before the judged score; the score only breaks a progress tie
-    r'judged score (?:before|ahead of) the progress', r'\bchip a step back beats\b',
+    r'(?:judged\s+)?score\s+(?:comes\s+)?(?:before|ahead\s+of)\s+the\s+progress',
+    r'\bvalue\s+(?:before|ahead\s+of)\s+(?:the\s+)?progress', r'\bchip\s+a\s+step\s+back\s+beats\b',
     # retired by ADR 0384's amendment (Nicolas, 2026-11-01): over the cap, a game over comes
     # before the excess; a lord's death is never one more risk among the protected
     r'does not\s+weigh a game-over', r'\bthe least over it is\s+played\b',

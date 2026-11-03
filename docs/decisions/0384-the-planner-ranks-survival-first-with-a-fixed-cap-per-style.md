@@ -167,8 +167,8 @@ admitted plans rank the progress itself before the judged score. The order is no
 win, whole turns behind, allied greens, progress, judged score, then FR-013's ties.
 - **The measurement** (research record 0024): both orders played on #564's head, only the line
   changed, tuning seeds only. Progress first had 14 protected deaths; the score first had 18.
-  Wins (23) and clean clears (14) tied, and every over-cap death came on a labelled fallback
-  turn.
+  Wins (23) and clean clears (14) tied. Progress first took 7 more turns over the 26 runs (249
+  against 242), the trade's other side. Every over-cap death came on a labelled fallback turn.
 - **What the score still does:** it breaks a progress tie. A unit chips an enemy from a tile as
   far forward as its march, so the ruling above still holds: without the score, a unit within
   the cap never chips an enemy it cannot kill this turn.
