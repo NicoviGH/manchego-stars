@@ -832,9 +832,12 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
         if sid is None or (rec.get('kind') == 'campaign' and key in seen):
             continue
         seen.add(key)
-        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0})
+        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0})
         got['n'] += 1
         got['cpu'] += (rec.get('costs') or {}).get('cpu_s') or 0.0
+        # SC-003's measure (ADR 0384, 2026-11-03): the AI decisions the bot asked the game for,
+        # the same on every run of the same code, which the clock is not
+        got['calls'] += ((rec.get('costs') or {}).get('game_calls') or {}).get('AiDecideMain') or 0
         got['wall'] += rec.get('wall_s') or 0.0
         # the invariant `record`: one BOTRUN record with a game result; a campaign's end
         # standing in for it is never one
@@ -843,7 +846,7 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
             line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
-    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0}
+    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0}
     for st in suite['starts']:
         got = per.get(st['start_id'])
         if not got:
@@ -851,13 +854,14 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
             continue
         for k in total:
             total[k] += got[k]
-        lines.append('%s (%s chapter %d, %s): %d runs, %.1f CPU s and %.1f wall s in all, '
-                     '%.1f CPU s a run%s' % (
+        lines.append('%s (%s chapter %d, %s): %d runs, %d AiDecideMain calls, %.1f CPU s and '
+                     '%.1f wall s in all, %.1f CPU s a run%s' % (
                          st['start_id'], st['game'], st['chapter'], st['label'], got['n'],
-                         got['cpu'], got['wall'], got['cpu'] / got['n'],
+                         got['calls'], got['cpu'], got['wall'], got['cpu'] / got['n'],
                          '; %d without a game result' % got['unread'] if got['unread'] else ''))
-    lines.append('the suite: %d runs, %.1f CPU s and %.1f wall s of work, %d without a game '
-                 'result' % (total['n'], total['cpu'], total['wall'], total['unread']))
+    lines.append('the suite: %d runs, %d AiDecideMain calls (SC-003), %.1f CPU s and %.1f wall s '
+                 'of work, %d without a game result' % (total['n'], total['calls'], total['cpu'],
+                                                       total['wall'], total['unread']))
     return lines
 
 

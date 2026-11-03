@@ -675,17 +675,19 @@ class Suite(unittest.TestCase):
             # each worker also leaves its campaign's end, stamped alike: never a second run
             for i, t in enumerate(tasks):
                 yield dict(t['stamp'], outcome='won', seed=t['seed'], wall_s=10.0 + i,
-                           costs={'cpu_s': 2.0})
+                           costs={'cpu_s': 2.0, 'game_calls': {'AiDecideMain': 5 + i,
+                                                               'RefreshEntityBmMaps': 99}})
                 yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
                            wall_s=10.0 + i)
         lines = mc.run_suite(suite, envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
                              jobs=4, baseline=True, instrument='i', check=lambda *a: [],
                              kept={})
         text = '\n'.join(lines)
-        self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 8.0 CPU s and 46.0 '
-                      'wall s in all, 2.0 CPU s a run', text)
+        self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 26 AiDecideMain calls, '
+                      '8.0 CPU s and 46.0 wall s in all, 2.0 CPU s a run', text)
         self.assertIn('ours-ch02 (ours chapter 3, fixture): 4 runs', text)
-        self.assertIn('the suite: 8 runs, 16.0 CPU s', text)
+        # SC-003's measure (ADR 0384): the AI's decisions only, never another game call
+        self.assertIn('the suite: 8 runs, 68 AiDecideMain calls (SC-003), 16.0 CPU s', text)
         self.assertNotIn('won', text, 'a baseline reports cost, never a held-out outcome')
 
     def test_a_worker_with_no_bot_record_is_one_run_without_a_result(self):

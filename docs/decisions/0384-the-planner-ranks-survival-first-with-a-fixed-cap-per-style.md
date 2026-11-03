@@ -252,4 +252,24 @@ win, whole turns behind, allied greens, progress, judged score, then FR-013's ti
   were 400,220 on PR-C and 565,656 on PR-D (+41%). The growth is in three places: more branches
   per judged plan on vanilla Ch4 and scout-ch10, the advance's one more plan per decision, and
   vanilla Ch5's longer games (9.5 turns against 6.8). No plan is judged twice in a turn, so
-  there is nothing to cache; any cut changes play. Bringing it back within 20% is #566.
+  there is nothing to cache; any cut changes play. #566 measured the cuts, and the budget was
+  re-based instead (below).
+
+**Amended (Nicolas, 2026-11-03, #566): SC-003's stand-in baseline is PR-D's work, counted in
+`AiDecideMain` calls.** SC-003 measures against the frozen baseline US5 promotes. Until then a
+stand-in gives each PR a number to compare against, and that stand-in was PR-A's CPU. It is
+now PR-D's (e20db82) `AiDecideMain` calls over the suite: **565,656, so the budget is 678,787**.
+CPU is still reported beside it.
+- **Why PR-D.** Its growth is play Nicolas chose: the completion ledger, progress first and
+  the advance. Measured against PR-A, every later PR would pay for that choice again. The 20%
+  is kept, for the growth after it.
+- **Why calls, not seconds.** Main's identical play measured 2,321, 2,499 and 2,841 CPU s on
+  2026-11-03. That spread is wider than the budget. The call count is the same on every run of
+  the same code (all six of #566's instrumented runs reproduced 565,656).
+- **What #566 measured before this** (its comment 6613787561). Judging 3 beam plans instead of
+  4 (`M.FINAL`) cut the calls 26%, but play moved: two tuning wins became losses and one run
+  gained a clean clear. Mending only the likeliest unit cut 7% and lost a clean clear.
+  Stopping a plan's phases once it is over the cap beside an admitted plan never changes play,
+  but it saves 2.5% of phases, too little to build. `M.BRANCH = 8` never binds: no judged plan
+  had more than 5 uncertain kills. `suite --baseline` prints each start's calls and the
+  suite's total beside its CPU.
