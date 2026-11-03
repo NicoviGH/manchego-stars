@@ -3077,9 +3077,8 @@ do
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the chip a step back")
 end
 
--- test_a_march_beats_a_heal_or_a_kill_a_step_back (ADR 0384's panel amendment): a heal and a
--- kill are the judged score too, so the order holds for them. H can heal W from (1,0), or
--- march to (2,0); A can kill X (20 HP, a sure 20) from (1,0), or march to (2,0). Each marches.
+-- test_a_march_beats_a_heal_a_step_back (ADR 0384's panel amendment): a heal is the judged
+-- score too, so the order holds for it. H can heal W from (1,0), or march to (2,0): it marches.
 do
     local H = blue(0x02, 0, 0, 0, { minRange = false })
     local W = blue(0x03, 1, 1, 1, { hp = 5, maxhp = 30, minRange = false, acted = true })
@@ -3092,32 +3091,38 @@ do
     }
     local a = Planner.plan(B, boardOf(H, W), sightOf(o), style("careful"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the heal a step back")
+end
+
+-- test_a_march_beats_a_kill_a_step_back (ADR 0384's panel amendment): a kill is the judged score
+-- too. A can kill X (20 HP, a sure 20) from (1,0), or march to (2,0): it marches.
+do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 20, minRange = false })
-    o = {
+    local o = {
         objective = { kind = "seize", tile = { x = 10, y = 0 } },
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
         enemyPhase = function() return {} end,
     }
-    a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the kill a step back")
 end
 
 -- test_the_chip_is_kept_from_the_forward_tile (ADR 0384's panel amendment): A can strike X for
--- 20 of its 40 HP from (2,0), its march's tile, or wait there. Progress ties, so the score
--- decides (the advance takes the better act on its tile, the beam the better score): the chip
--- is played from the forward tile, not given up for the wait.
+-- 20 of its 40 HP from (2,0), its march's tile, and take a 5 back, or wait there. Progress
+-- ties, so the judged score decides: the chip, though HP left (the next tie) favours the wait.
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 2, 1, { hp = 40, minRange = false })
     local o = {
         objective = { kind = "seize", tile = { x = 10, y = 0 } },
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
-        fc = { [0x01] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
+        fc = { [0x01] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
+                                                    counterHit = 100, counterDmg = 5,
+                                                    counterHits = 1 } } } },
         enemyPhase = function() return {} end,
     }
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
     check(a and a.act .. "@" .. at(a), "attack@2,0", "rank: the chip from the march's tile")
 end
 

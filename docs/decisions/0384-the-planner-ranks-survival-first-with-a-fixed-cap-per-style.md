@@ -172,6 +172,10 @@ win, whole turns behind, allied greens, progress, judged score, then FR-013's ti
 - **What the score still does:** it breaks a progress tie. A unit chips an enemy from a tile as
   far forward as its march, so the ruling above still holds: without the score, a unit within
   the cap never chips an enemy it cannot kill this turn.
+- **A heal and a sure kill are the score too,** so they also lose to a march a tile further on
+  (`test_a_march_beats_a_heal_a_step_back`, `test_a_march_beats_a_kill_a_step_back`). The panel
+  debated chips. The measured suite plays this order, kills included, but no run singles a
+  kill out, and whether a sure kill should come ahead of the progress is open on #565.
 - **Whether chipping a step back is what causes the later fallback turns is not proven.** On the
   run endpoint only 5 runs differ, 4-1. The flip log, a larger paired run and a two-ply
   tie-break are #565.
