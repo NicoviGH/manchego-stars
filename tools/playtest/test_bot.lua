@@ -3060,12 +3060,17 @@ do
           "planner: a game-over green's death is over the cap, and no forfeit")
 end
 
--- The seize board the rank tests below share: a gate at (10,0) and no enemy phase, each
--- filled only where the test's own reads `o` (reach, forecasts, staves) leave it unset.
-local function seizeSight(o)
-    o.objective = o.objective or { kind = "seize", tile = { x = 10, y = 0 } }
-    o.enemyPhase = o.enemyPhase or function() return {} end
-    return sightOf(o)
+-- The seize board the rank tests below share. It sets only the gate at (10,0), no enemy phase
+-- and, given `mover`, that unit's march: reach to (0,0), (1,0) and (2,0). Each is set only
+-- where `o` leaves it unset; forecasts, staves and heals are the test's to give. `o` is
+-- copied, never written.
+local function seizeSight(o, mover)
+    local s = {}
+    for k, v in pairs(o) do s[k] = v end
+    s.objective = s.objective or { kind = "seize", tile = { x = 10, y = 0 } }
+    s.enemyPhase = s.enemyPhase or function() return {} end
+    if mover then s.reach = s.reach or { [mover] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) } end
+    return sightOf(s)
 end
 
 -- test_a_march_beats_a_chip_a_step_back (ADR 0384's panel amendment, research record 0024): A
@@ -3076,9 +3081,8 @@ do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 40, minRange = false })
     local sight = seizeSight({
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
-    })
+    }, 0x01)
     local a = Planner.plan(B, boardOf(A, X), sight, style("bold"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the chip a step back")
 end
@@ -3089,10 +3093,9 @@ do
     local H = blue(0x02, 0, 0, 0, { minRange = false })
     local W = blue(0x03, 1, 1, 1, { hp = 5, maxhp = 30, minRange = false, acted = true })
     local sight = seizeSight({
-        reach = { [0x02] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         staves = { [0x02] = { { slot = 0, amount = 10 } } },
         heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x03 } } } } },
-    })
+    }, 0x02)
     local a = Planner.plan(B, boardOf(H, W), sight, style("careful"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the heal a step back")
 end
@@ -3103,9 +3106,8 @@ do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 20, minRange = false })
     local sight = seizeSight({
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
-    })
+    }, 0x01)
     local a = Planner.plan(B, boardOf(A, X), sight, style("careful"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the kill a step back")
 end
@@ -3118,11 +3120,10 @@ do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 2, 1, { hp = 40, minRange = false })
     local sight = seizeSight({
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
         fc = { [0x01] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
                                                     counterHit = 100, counterDmg = 5,
                                                     counterHits = 1 } } } },
-    })
+    }, 0x01)
     local a = Planner.plan(B, boardOf(A, X), sight, style("careful"))
     check(a and a.act .. "@" .. at(a), "attack@2,0", "rank: the chip from the march's tile")
 end

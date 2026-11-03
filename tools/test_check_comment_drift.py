@@ -87,6 +87,8 @@ class DeadConceptPatterns(unittest.TestCase):
             self.assertIsNotNone(DEAD_PAT.search(dead), dead)
         for ok in ('progress before the judged score',
                    'the score comes before progression rewards',
+                   'the score before progressive scaling', 'a score before progressed',
+                   'the score before progress_bar',
                    'the judged score breaks a progress tie'):
             self.assertIsNone(DEAD_PAT.search(ok), ok)
 
