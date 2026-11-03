@@ -40,6 +40,30 @@
 -- A goal closed before the phase the taker really arrives on (closes < ceil(t) + late, at
 -- least phase 1) is 0 for it. Over the takers, the expected best as each lives (alive), the
 -- best first.
+--
+-- Goals.ledger(goals, sight, style, ctx, chances) -> { row }, the completion ledger (FR-014):
+-- at the decision, every goal of Goals.list's still to get (the objective's ways there are the
+-- win's, not goals of their own), and each declared reward still to be had (style.rewards).
+-- chances[goal id] is its chance from the decision's board (Goals.chance).
+-- row = { id, kind (visit, chest, recruit, reward), status, closes_on, needs (a reward's: the
+-- ids of the goals it needs) }. status: `feasible`; `unknown` for a village or chest when the
+-- sight has no read of who may use it or when it closes (sight.canExplore, sight.closings);
+-- a reward is unknown when a goal it needs is. A goal no unit can reach this turn (a unit in
+-- the way) stays feasible: only a closure loses it. One with no chance at all is no goal of
+-- ours: the game lets no unit of ours use it (a chest with no key in the army), none has a way
+-- there (sight.turnsTo reads the terrain, through a breach), or a looter takes it first. Kept,
+-- it would close with every win and so forbid the win for good. A reward needing one of those
+-- can never be had, and is no row either.
+-- Goals.forfeited(ledger, goals, closes) -> the sorted ids of the feasible rows a plan loses
+-- for good (FR-011's forfeits), `closes` what the plan does in the judged phase, each a chance
+-- over its judged branches: { win (the chapter ends), took = { [goal id] = true }, lost =
+-- { [recruit unit id] = chance it dies } }. Counted conservatively (FR-014): a goal is lost
+-- when it is lost in any branch with p > 0, so any chance at all is the whole goal. A win
+-- closes every goal the plan does not take; a recruit's death closes its Talk; a looter's
+-- closing after this phase (`closes` 1) closes a tile the plan does not take; a reward closes
+-- with any goal it needs. A unit whose death ends the game closes nothing here: its risk is
+-- admission's, within the style's cap, and counted again as a forfeit the plan whose lord is
+-- at 0% would beat every plan that puts it in danger (Nicolas, 2026-11-02: ADR 0384).
 
 local M = {}
 
@@ -158,6 +182,60 @@ function M.list(board, sight, style, ctx)
     end
     table.sort(goals, function(a, b) return a.id < b.id end)
     return goals
+end
+
+-- a chance this small is none: sums of branch products leave float dust (planner.lua's DUST)
+M.DUST = 1e-9
+
+function M.ledger(goals, sight, style, ctx, chances)
+    local reads = sight.canExplore ~= nil and sight.closings ~= nil
+    local rows, byId = {}, {}
+    for _, g in ipairs(goals) do
+        if g.kind ~= "objective" and (chances[g.id] or 0) > M.DUST then
+            local known = g.kind == "recruit" or reads
+            local row = { id = g.id, kind = g.kind, status = known and "feasible" or "unknown",
+                          closes_on = g.closes }
+            rows[#rows + 1], byId[g.id] = row, row
+        end
+    end
+    for i, r in ipairs(style.rewards or {}) do
+        if not voided(r, ctx.lost) then
+            local ids, status, lost = {}, "feasible", false
+            for _, g in ipairs(goals) do
+                if g.kind ~= "objective" and needs(r, g) then
+                    ids[#ids + 1] = g.id
+                    lost = lost or not byId[g.id]
+                    if byId[g.id] and byId[g.id].status == "unknown" then status = "unknown" end
+                end
+            end
+            -- none of what it needs left open: taken already, so the game gives it, nothing to get
+            if #ids > 0 and not lost then
+                rows[#rows + 1] = { id = "reward:" .. i, kind = "reward", status = status,
+                                    needs = ids }
+            end
+        end
+    end
+    return rows
+end
+
+function M.forfeited(ledger, goals, closes)
+    local took, lost, shut = closes.took or {}, closes.lost or {}, {}
+    local wins = (closes.win or 0) > M.DUST
+    for _, g in ipairs(goals) do
+        if g.kind ~= "objective" and not took[g.id] then
+            shut[g.id] = wins
+                or (g.kind == "recruit" and (lost[g.unitId] or 0) > M.DUST)
+                or (g.kind ~= "recruit" and g.closes ~= nil and g.closes <= 1)
+        end
+    end
+    local out = {}
+    for _, r in ipairs(ledger) do
+        local gone = shut[r.id]
+        for _, id in ipairs(r.needs or {}) do gone = gone or shut[id] end
+        if r.status == "feasible" and gone then out[#out + 1] = r.id end
+    end
+    table.sort(out)
+    return out
 end
 
 function M.worth(goal, W)

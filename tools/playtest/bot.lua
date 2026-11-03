@@ -822,9 +822,13 @@ local function opener(ctx, u)
     return ctx.openers[u.id]
 end
 
+-- A unit and a goal tile as one key, "unit id>x,y": breachFor's cache, and M.candidates'
+-- record of the goals units are blocked from.
+local function goalKey(id, t) return id .. ">" .. tileKey(t.x, t.y) end
+
 local function breachFor(ctx, u, goal)
     if not (goal and ctx.sight.obstacles) then return nil end
-    local k = u.id .. ">" .. tileKey(goal.x, goal.y)
+    local k = goalKey(u.id, goal)
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
     b = false
@@ -1331,8 +1335,9 @@ local function sendWorth(ctx, u, t)
     return t.gold * c, c
 end
 
-local function exploring(ctx, sent)
+local function exploring(ctx, sent, barred)
     ctx.exploreGoal = {}
+    barred = barred or {}
     local taken = {}
     local function reaches(u, t)
         local d = marchLength(ctx, u, t)
@@ -1349,7 +1354,8 @@ local function exploring(ctx, sent)
         end)
         for _, p in ipairs(pairs_) do
             local k = key(p.t)
-            if not taken[k] and not ctx.exploreGoal[p.u.id] then
+            if not taken[k] and not ctx.exploreGoal[p.u.id]
+                and not barred[goalKey(p.u.id, p.t)] then
                 taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
             end
         end
@@ -1381,6 +1387,7 @@ local function exploring(ctx, sent)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
+            and not barred[goalKey(u.id, t)]
             and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
@@ -1465,6 +1472,188 @@ function M.explain(board, sight, style)
     return lines
 end
 
+-- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
+-- each is).
+local function proposeOne(ctx, u)
+    local sight, objective = ctx.sight, ctx.sight.objective
+    local open = function() return true end
+    local acts, seen = {}, {}
+    local function add(a, why)
+        if not a then return end
+        local k = a.act .. "@" .. a.move.x .. "," .. a.move.y .. ">" .. tostring(a.targetId)
+            .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
+        if seen[k] then return end
+        seen[k] = true
+        a.why = why
+        acts[#acts + 1] = a
+    end
+    local s = ctx.seizeTile
+    if s and canSeize(ctx, u) then
+        for _, t in ipairs(endTiles(ctx, u)) do
+            if t.x == s.x and t.y == s.y then add(action(u, t, "seize"), "seize") end
+        end
+    end
+    local best, safe = {}, {}
+    for _, c in ipairs(attackOptions(ctx, u, open)) do
+        local e = c.target
+        if not best[e] or betterAttack(c, best[e]) then best[e] = c end
+        c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
+        if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
+    end
+    local function offer(c)
+        local a = strikeAct(u, c)
+        a.f, a.spent, a.first = c.f, c.spent, c.first
+        add(a, "attack")
+    end
+    for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
+        for _, list in ipairs({ best, safe }) do
+            if list[e] then offer(list[e]) end
+        end
+    end
+    -- the boss from every tile: the planner's assault seats several strikers around it,
+    -- and two tiles per unit gave them all the same one (ours ch03's corner Mogall: three
+    -- of six strikers dropped, the rest of its tiles empty)
+    for _, c in ipairs(attackOptions(ctx, u, open)) do
+        if c.target.isBoss then offer(c) end
+    end
+    add(breach(ctx, u, open, objective), "breach")
+    for _, t in ipairs(ctx.onField) do
+        if t.faction ~= "blue" then add(talkFrom(ctx, u, t, open), "talk") end
+    end
+    add(staffHeal(ctx, open, u), "heal")
+    -- a heal the plan may need after its blows land: per ally the game would let `u`
+    -- heal were it hurt, from the safest tile that reaches it
+    if ctx.sight.heals and ctx.sight.staves and #ctx.sight.staves(u) > 0 then
+        local others, best = {}, {}
+        for _, b in ipairs(ctx.blues) do
+            if b ~= u then others[#others + 1] = b end
+        end
+        for _, t in ipairs(waitTiles(ctx, u)) do
+            local w = worstCase(ctx, u, t.x, t.y, nil).sum
+            for _, h in ipairs(ctx.sight.heals(u, t.x, t.y, others)) do
+                for _, id in ipairs(h.targets) do
+                    if not best[id] or w < best[id].w then
+                        best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount }
+                    end
+                end
+            end
+        end
+        for _, b in ipairs(others) do
+            local c = best[b.id]
+            if c then
+                local a = action(u, c.tile, "staff", b)
+                a.slot, a.amount = c.slot, c.amount
+                add(a, "heal")
+            end
+        end
+    end
+    add(mend(ctx, u, open), "mend")
+    -- a village or chest the game lets `u` use, from the tile itself (whether it is worth
+    -- the trip is the planner's: its worth against the unit's risk there, goals.lua)
+    if ctx.sight.explorable then
+        local ends = {}
+        for _, t in ipairs(endTiles(ctx, u)) do ends[tileKey(t.x, t.y)] = true end
+        for _, t in ipairs(openTiles(ctx)) do
+            if ends[tileKey(t.x, t.y)] and ctx.sight.canExplore(u, t.x, t.y, t.kind) then
+                add(action(u, t, t.kind), "explore")
+            end
+        end
+    end
+    -- the march over every tile, and over free tiles only: a tile an ally may vacate is
+    -- an extra way forward, never the only one (vanilla Ch3: Eirika held behind the army
+    -- for five turns, the throne open, every forward tile an ally's who stayed put)
+    add(action(u, march(ctx, u, open, objective), "wait"), "march")
+    ctx.freeOnly = true
+    add(action(u, march(ctx, u, open, objective), "wait"), "march")
+    ctx.freeOnly = nil
+    local holds = bySafety(ctx, u, waitTiles(ctx, u))
+    add(holds[1] and action(u, holds[1], "wait"), "hold")
+    -- progress: how much nearer its march goal (the game's field to it) each act ends it
+    local goal = marchGoal(ctx, u, objective)
+    local field = fieldFor(ctx, goal)
+    local function fd(x, y)
+        if field then return field[y] and field[y][x] end
+        return goal and manhattan(x, y, goal.x, goal.y)
+    end
+    local here = fd(u.x, u.y)
+    local function gain(x, y)
+        local there = fd(x, y)
+        return (here and there) and (here - there) or 0
+    end
+    -- the retreat: the safest tile that still gains ground, the most ground on a tie, so a
+    -- unit has a way forward that is not the march's exposed front
+    local function retreatOver(tiles)
+        local retreat, rw, rg
+        for _, t in ipairs(tiles) do
+            local g = gain(t.x, t.y)
+            if g > 0 then
+                local w = worstCase(ctx, u, t.x, t.y, nil).sum
+                if not rw or w < rw or (w == rw and g > rg) then retreat, rw, rg = t, w, g end
+            end
+        end
+        return retreat
+    end
+    local retreat = retreatOver(waitTiles(ctx, u))
+    if retreat then add(action(u, retreat, "wait"), "retreat") end
+    ctx.freeOnly = true
+    retreat = retreatOver(waitTiles(ctx, u))
+    ctx.freeOnly = nil
+    if retreat then add(action(u, retreat, "wait"), "retreat") end
+    -- the next safest holds too: another unit the plan moves first may take the safest,
+    -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
+    -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
+    for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
+    for _, a in ipairs(acts) do
+        local friend = vacated(ctx, u, a.move.x, a.move.y)
+        a.vacate = friend and friend.id
+        -- what can strike it there next phase, each enemy's own strike (the planner's odds)
+        a.exposure = {}
+        local held = a.act == "attack" and a.slot or nil
+        for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
+            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
+        end
+    end
+    return { unit = u, acts = acts }
+end
+
+-- Every unit's acts (proposeOne). Given the last proposal `last` and the goals it was made for
+-- (`was`, ctx.exploreGoal then), only the units whose goal has changed since are proposed again.
+local function propose(ctx, last, was)
+    local out, kept = {}, {}
+    for _, c in ipairs(last or {}) do
+        local a, b = was[c.unit.id], ctx.exploreGoal[c.unit.id]
+        if (a == nil) == (b == nil) and (not a or (a.x == b.x and a.y == b.y)) then
+            kept[c.unit.id] = c
+        end
+    end
+    for _, u in ipairs(ctx.actors) do out[#out + 1] = kept[u.id] or proposeOne(ctx, u) end
+    return out
+end
+
+-- Whether `u` can get nearer goal tile `g` this turn by the game's turns (ctx.turnsTo) or take
+-- it: it stands on it, a tile it may end on is nearer, or, with a recruit standing on `g` (a
+-- tile no one of ours ends on), it may end beside it, where a Talk is made. A unit with no tile
+-- but its own is boxed in, and counts as able: no other goal would get it anywhere either. The
+-- turns are the terrain's alone, so what stops a unit with moves is a unit in its way.
+local function stepsToward(ctx, u, g)
+    local now = ctx.turnsTo(u, g)
+    if now and now <= Goals.DUST then return true end
+    local there = ctx.standing[tileKey(g.x, g.y)]
+    -- a recruit (recruitsOf: one a unit of ours may Talk over), not any unit: an enemy holding
+    -- a village is no goal reached by standing beside it
+    local recruit = there and ctx.recruits[there.id]
+    local boxed = true
+    for _, t in ipairs(endTiles(ctx, u)) do
+        if recruit and manhattan(t.x, t.y, g.x, g.y) == 1 then return true end
+        if t.x ~= u.x or t.y ~= u.y then
+            boxed = false
+            local n = now and ctx.turnsTo(u, g, t)
+            if n and n < now - Goals.DUST then return true end
+        end
+    end
+    return boxed
+end
+
 -- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
 -- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
 -- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
@@ -1477,7 +1666,8 @@ end
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
 -- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
--- claim gives way).
+-- claim gives way); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
+-- each goal a unit was found with no step toward, and the turn it was first found so).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
 -- ids, are the units a blow of ours must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
@@ -1499,151 +1689,44 @@ function M.candidates(board, sight, style, opts)
         end
         return v or nil
     end
-    exploring(ctx, opts and opts.sent)
     ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
-    local open = function() return true end
-    local objective = sight.objective
-    local out = {}
-    for _, u in ipairs(ctx.actors) do
-        local acts, seen = {}, {}
-        local function add(a, why)
-            if not a then return end
-            local k = a.act .. "@" .. a.move.x .. "," .. a.move.y .. ">" .. tostring(a.targetId)
-                .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
-            if seen[k] then return end
-            seen[k] = true
-            a.why = why
-            acts[#acts + 1] = a
+    -- A unit sent where it has had no step nearer since an earlier turn is sent again,
+    -- elsewhere or to the objective (FR-016): a goal it cannot step toward would hold it in
+    -- place for good. One turn blocked is only a unit in the way, so it holds that turn: re-
+    -- sending at once handed a tile between units (ch02's (12,3), which `sent` was made to
+    -- stop). opts.stuck (botrun's memory, the last plan's `stuck`) holds each blocked goal and
+    -- the turn it was first found blocked; each is tested again here, and kept while it still
+    -- is, so a bar lifts once the way opens. ctx.stuck is the record to carry on.
+    local turn, byId = board.turn or 0, {}
+    for _, u in ipairs(ctx.blues) do byId[u.id] = u end
+    local actor = {}
+    for _, u in ipairs(ctx.actors) do actor[u.id] = true end
+    ctx.stuck = {}
+    for k, e in pairs(opts and opts.stuck or {}) do
+        local u = byId[e.id]
+        -- a unit that has acted keeps its record until it can move again
+        if u and (not actor[u.id] or not stepsToward(ctx, u, e)) then ctx.stuck[k] = e end
+    end
+    local barred, out = {}, nil
+    for _ = 0, #ctx.actors do
+        for k, e in pairs(ctx.stuck) do
+            if e.since < turn then barred[k] = true end
         end
-        local s = ctx.seizeTile
-        if s and canSeize(ctx, u) then
-            for _, t in ipairs(endTiles(ctx, u)) do
-                if t.x == s.x and t.y == s.y then add(action(u, t, "seize"), "seize") end
+        local before = ctx.exploreGoal
+        exploring(ctx, opts and opts.sent, barred)
+        out = propose(ctx, out, before)
+        local more = false
+        for _, c in ipairs(out) do
+            local g = ctx.exploreGoal[c.unit.id]
+            local k = g and goalKey(c.unit.id, g)
+            if g and not stepsToward(ctx, c.unit, g) then
+                ctx.stuck[k] = ctx.stuck[k] or { id = c.unit.id, x = g.x, y = g.y, since = turn }
+                more = more or (ctx.stuck[k].since < turn and not barred[k])
             end
         end
-        local best, safe = {}, {}
-        for _, c in ipairs(attackOptions(ctx, u, open)) do
-            local e = c.target
-            if not best[e] or betterAttack(c, best[e]) then best[e] = c end
-            c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
-            if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
-        end
-        local function offer(c)
-            local a = strikeAct(u, c)
-            a.f, a.spent, a.first = c.f, c.spent, c.first
-            add(a, "attack")
-        end
-        for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
-            for _, list in ipairs({ best, safe }) do
-                if list[e] then offer(list[e]) end
-            end
-        end
-        -- the boss from every tile: the planner's assault seats several strikers around it,
-        -- and two tiles per unit gave them all the same one (ours ch03's corner Mogall: three
-        -- of six strikers dropped, the rest of its tiles empty)
-        for _, c in ipairs(attackOptions(ctx, u, open)) do
-            if c.target.isBoss then offer(c) end
-        end
-        add(breach(ctx, u, open, objective), "breach")
-        for _, t in ipairs(ctx.onField) do
-            if t.faction ~= "blue" then add(talkFrom(ctx, u, t, open), "talk") end
-        end
-        add(staffHeal(ctx, open, u), "heal")
-        -- a heal the plan may need after its blows land: per ally the game would let `u`
-        -- heal were it hurt, from the safest tile that reaches it
-        if ctx.sight.heals and ctx.sight.staves and #ctx.sight.staves(u) > 0 then
-            local others, best = {}, {}
-            for _, b in ipairs(ctx.blues) do
-                if b ~= u then others[#others + 1] = b end
-            end
-            for _, t in ipairs(waitTiles(ctx, u)) do
-                local w = worstCase(ctx, u, t.x, t.y, nil).sum
-                for _, h in ipairs(ctx.sight.heals(u, t.x, t.y, others)) do
-                    for _, id in ipairs(h.targets) do
-                        if not best[id] or w < best[id].w then
-                            best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount }
-                        end
-                    end
-                end
-            end
-            for _, b in ipairs(others) do
-                local c = best[b.id]
-                if c then
-                    local a = action(u, c.tile, "staff", b)
-                    a.slot, a.amount = c.slot, c.amount
-                    add(a, "heal")
-                end
-            end
-        end
-        add(mend(ctx, u, open), "mend")
-        -- a village or chest the game lets `u` use, from the tile itself (whether it is worth
-        -- the trip is the planner's: its worth against the unit's risk there, goals.lua)
-        if ctx.sight.explorable then
-            local ends = {}
-            for _, t in ipairs(endTiles(ctx, u)) do ends[tileKey(t.x, t.y)] = true end
-            for _, t in ipairs(openTiles(ctx)) do
-                if ends[tileKey(t.x, t.y)] and ctx.sight.canExplore(u, t.x, t.y, t.kind) then
-                    add(action(u, t, t.kind), "explore")
-                end
-            end
-        end
-        -- the march over every tile, and over free tiles only: a tile an ally may vacate is
-        -- an extra way forward, never the only one (vanilla Ch3: Eirika held behind the army
-        -- for five turns, the throne open, every forward tile an ally's who stayed put)
-        add(action(u, march(ctx, u, open, objective), "wait"), "march")
-        ctx.freeOnly = true
-        add(action(u, march(ctx, u, open, objective), "wait"), "march")
-        ctx.freeOnly = nil
-        local holds = bySafety(ctx, u, waitTiles(ctx, u))
-        add(holds[1] and action(u, holds[1], "wait"), "hold")
-        -- progress: how much nearer its march goal (the game's field to it) each act ends it
-        local goal = marchGoal(ctx, u, objective)
-        local field = fieldFor(ctx, goal)
-        local function fd(x, y)
-            if field then return field[y] and field[y][x] end
-            return goal and manhattan(x, y, goal.x, goal.y)
-        end
-        local here = fd(u.x, u.y)
-        local function gain(x, y)
-            local there = fd(x, y)
-            return (here and there) and (here - there) or 0
-        end
-        -- the retreat: the safest tile that still gains ground, the most ground on a tie, so a
-        -- unit has a way forward that is not the march's exposed front
-        local function retreatOver(tiles)
-            local retreat, rw, rg
-            for _, t in ipairs(tiles) do
-                local g = gain(t.x, t.y)
-                if g > 0 then
-                    local w = worstCase(ctx, u, t.x, t.y, nil).sum
-                    if not rw or w < rw or (w == rw and g > rg) then retreat, rw, rg = t, w, g end
-                end
-            end
-            return retreat
-        end
-        local retreat = retreatOver(waitTiles(ctx, u))
-        if retreat then add(action(u, retreat, "wait"), "retreat") end
-        ctx.freeOnly = true
-        retreat = retreatOver(waitTiles(ctx, u))
-        ctx.freeOnly = nil
-        if retreat then add(action(u, retreat, "wait"), "retreat") end
-        -- the next safest holds too: another unit the plan moves first may take the safest,
-        -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
-        -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
-        for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
-        for _, a in ipairs(acts) do
-            local friend = vacated(ctx, u, a.move.x, a.move.y)
-            a.vacate = friend and friend.id
-            -- what can strike it there next phase, each enemy's own strike (the planner's odds)
-            a.exposure = {}
-            local held = a.act == "attack" and a.slot or nil
-            for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
-                a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
-            end
-        end
-        out[#out + 1] = { unit = u, acts = acts }
+        if not more then break end
     end
     return out, ctx
 end

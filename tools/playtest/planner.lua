@@ -24,11 +24,15 @@
 --      The plans are then ranked, not summed (ADR 0384): one whose protected units (every
 --      blue, and any unit whose death ends the game) each die at no more than the style's cap
 --      (M.CAPS) outranks any that does not. With none under it, the one least likely to end
---      the game is played, then the least over the cap, and it is labelled. The judged score
---      orders the plans under the cap.
---      Two more are judged beside them: on a Defeat Boss map the assault (every unit that
+--      the game is played, then the least over the cap, and it is labelled. Under the cap,
+--      the plan that forfeits fewer goals for good (the completion ledger, goals.lua), then
+--      the likelier win, then the more turns gained toward each unit's goal, then the judged
+--      score.
+--      More are judged beside them: on a Defeat Boss map the assault (every unit that
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
---      never tries), and on a stalled board (opts.stalled) each unit's best act that
+--      never tries), the advance (each unit's act that gains the most ground toward its goal,
+--      which the beam's judged score can cut while the rank puts it first), and on a stalled
+--      board (opts.stalled) each unit's best act that
 --      changes the board, of which the best is played: a careful player that has stopped
 --      making progress takes the least it must.
 --      The enemy phase is played every way it can go where a counter may kill a striker
@@ -55,10 +59,16 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- ours it strikes, sorted), kind =
--- "beam"|"assault"|"unstall"|"mend", considered = every plan judged, best first: { judged,
--- acts, kind, rank }, rank = what plans are compared by (M.outranks): { admitted, game_over
--- (the chance a unit whose death ends the game dies), max_exceed,
--- sum_exceed, max_die, sum_die, hp_left, value (the judged score), key }, fallback =
+-- "beam"|"assault"|"advance"|"unstall"|"mend", considered = every plan judged, best first:
+-- { judged, acts, kind, rank, seizes }, rank = what plans are compared by (M.outranks): { admitted,
+-- forfeits (how many ledger goals it closes for good), complete (its chance to end the
+-- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
+-- (whole turns short of the most progress judged), green_die (allied greens' summed death
+-- chance), value (the judged score), game_over (the chance a unit whose death ends the game
+-- dies), max_exceed, sum_exceed, max_die, sum_die, hp_left, key }, forfeited = the ids it
+-- closes, ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
+-- seizeJudged / seizeAdmitted = whether any plan judged took the Seize, and one within the
+-- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
@@ -122,24 +132,42 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 
 -- Whether death chance `d` is within `cap`: a sum of branch products can land a few ulps over a
 -- chance that is at the cap, and that is not an excess.
-M.DUST = 1e-9
+M.DUST = Goals.DUST
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
 -- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
 -- among others, it ends the chapter (Nicolas, 2026-11-01); then the smallest largest excess,
--- then summed excess, then largest death chance. Then the admitted order: `value`, the judged
--- score, until the completion ledger (PR-D) puts forfeits, completion and progress in its
--- place. Last the largest death chance, the summed one, more HP left, and the plan's acts as a
--- stable key.
+-- then summed excess, then largest death chance. Then the admitted order: fewer goals forfeited
+-- (the completion ledger's), the likelier win, more progress. Allied greens' summed death
+-- chance breaks ties among the plans within a turn of the most progress judged (FR-012: only
+-- there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
+-- is short of the best's, comes first, then the greens. Measured from the best rather than
+-- between each two plans, it is an order a sort can keep: "within a turn of each other" is
+-- not one (0, 0.8 and 1.6 would each tie their neighbour). `behind` is set by M.plan once
+-- every plan is judged (M.rebase). Then the progress itself, then `value`, the judged score:
+-- what a plan deals, kills, heals and loses in HP (Nicolas, 2026-11-02: without it a unit
+-- within the cap never chips an enemy it cannot kill this turn, as the counter's HP is all
+-- the rank would see). The score after the progress, so a unit chips, heals or kills only
+-- from as forward a tile as its march: the advisory panel's decision, on Nicolas's
+-- instruction (ADR 0384's amendment of 2026-11-02, research record 0024, which has the
+-- numbers; why the reverse order lost more units is open, #565). Last the largest death
+-- chance, the summed one, more HP left, and the acts as a stable key.
+local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
+                   { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
     local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }
+    local lead = {}
     if not a.admitted then
-        order = { { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 },
-                  { "value", -1 }, order[2], order[3], order[4] }
-    else
-        table.insert(order, 1, { "value", -1 })
+        lead = { { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 } }
+    end
+    for _, o in ipairs(ADMITTED) do lead[#lead + 1] = o end
+    for i = #lead, 1, -1 do table.insert(order, 1, lead[i]) end
+    -- `behind` says nothing until M.rebase has set it over the plans compared: one rank with it
+    -- and one without is a plan compared outside that set
+    if (a.behind == nil) ~= (b.behind == nil) then
+        error("planner.lua: a rank compared before M.rebase set how far behind it is")
     end
     for _, o in ipairs(order) do
         local x, y = a[o[1]], b[o[1]]
@@ -152,6 +180,23 @@ function M.outranks(a, b)
         end
     end
     return false
+end
+
+-- Sets each rank's `behind` (M.outranks) from the most progress among the ranks `ok` allows
+-- (all when nil: a plan that may not be played is no measure), and returns the index of the
+-- best of those.
+function M.rebase(ranks, ok)
+    local top
+    for i, r in ipairs(ranks) do
+        if (not ok or ok(i)) and (not top or r.progress > top) then top = r.progress end
+    end
+    top = top or 0
+    local best
+    for _, r in ipairs(ranks) do r.behind = math.floor(top - r.progress + M.DUST) end
+    for i, r in ipairs(ranks) do
+        if (not ok or ok(i)) and (not best or M.outranks(r, ranks[best])) then best = i end
+    end
+    return best
 end
 
 -- `act`'s standing exposure for a unit at `hp`, the enemies in `gone` left out: the chance
@@ -272,6 +317,21 @@ local function key(act)
         tostring(act.targetId or (act.obstacle and (act.obstacle.x .. "," .. act.obstacle.y))))
 end
 
+-- a plan's acts as keys, in order: what tells two plans apart
+local function keysOf(st)
+    local out = {}
+    for _, x in ipairs(st.acts) do out[#out + 1] = key(x) end
+    return out
+end
+
+-- whether a plan takes the Seize
+local function seizesIn(st)
+    for _, x in ipairs(st.acts) do
+        if x.act == "seize" then return true end
+    end
+    return false
+end
+
 local function copy(t)
     local out = {}
     for k, v in pairs(t) do out[k] = v end
@@ -331,6 +391,29 @@ function M.plan(Bot, board, sight, style, opts)
         local pos = positions(start)
         for _, g in ipairs(goals) do before[g.id] = Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
     end
+    -- the completion ledger (FR-014): what is still to get at this decision, for the rank's
+    -- forfeits and botrun's seize skips
+    local ledger = Goals.ledger(goals, sight, style, ctx, before)
+    -- each unit's assigned goal as the decision starts (FR-016): the recruit, village or chest
+    -- it was sent to, else its way to the objective, and its turns there now. Progress is what a
+    -- plan cuts from those turns, the game's own (sight.turnsTo, through a breach when cut off)
+    local assigned, goalOf = {}, {}
+    for _, u in ipairs(ctx.blues) do
+        local tile = (ctx.exploreGoal or {})[u.id] or (ctx.objectiveTile and ctx.objectiveTile(u))
+        local t = tile and turnsTo(u, tile)
+        if t then
+            assigned[#assigned + 1] = { u = u, tile = tile, turns = t }
+            goalOf[u.id] = assigned[#assigned]
+        end
+    end
+    local function progress(st)
+        local pos, out = positions(st), 0
+        for _, a in ipairs(assigned) do
+            local t = turnsTo(a.u, a.tile, pos[a.u.id])
+            if t then out = out + (a.turns - t) end
+        end
+        return out
+    end
     -- how much the win is wanted now: its worth now (one death x (1 - GAMMA), goalTerm's)
     -- against that and everything else still open, worth x chance (score's boss credit)
     do
@@ -371,9 +454,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- the phase (the boss, or a Rout's last enemy, striking and dying: vanilla Ch5 attempt 8's
     -- boss died so on turn 5 with (5,1) still open); `rows` (optional) gets each goal's { id,
     -- kind, gold, worth, before, after }, the plan record's goalWorth
+    local function winOf(st, fell) return 1 - (1 - winChance(st)) * (1 - (fell or 0)) end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
-        local pWin = 1 - (1 - winChance(st)) * (1 - (fell or 0))
+        local pWin = winOf(st, fell)
         for _, g in ipairs(goals) do
             local c
             if st.took[g.id] then
@@ -451,6 +535,7 @@ function M.plan(Bot, board, sight, style, opts)
                             recruitHit = fx.recruitHit and { [fx.recruitHit.id] = fx.recruitHit.p } or {},
                             win = fx.win or 0, gone = gone }
             scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, gone) + goalTerm(alone) }
+            a.own = scored[#scored].v   -- the advance's tie-break
         end
         table.sort(scored, function(x, y)
             if x.v ~= y.v then return x.v > y.v end
@@ -649,6 +734,53 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         return complete(st)
+    end
+
+    -- The advance (FR-016): each unit in turn takes the act that gains it the most turns toward
+    -- its goal, of those whose standing chance to die is within the cap (the better by its own
+    -- score on a tie: a Visit before a wait on the same tile). The beam orders partial plans by
+    -- the judged score, where a House worth a few points never pays for the steps away from the
+    -- gate, so no plan it kept had the lord walk there (ours ch01: four plans judged, each with
+    -- him waiting, and the run stuck); the rank puts progress first, but picks only among the
+    -- plans judged. nil when no unit gains ground, or when the beam already has this plan.
+    local function advance(have)
+        local st, moved = start, false
+        -- each unit's acts that gain ground, the most first: one a tile still taken refuses
+        -- (extend) gives way to the next. A unit refused every one is tried again once the
+        -- others have moved: the tile it wants may be one they vacate
+        local waiting = {}
+        for _, c in ipairs(cands) do
+            local goal, ranked = goalOf[c.unit.id], {}
+            for _, a in ipairs(goal and c.acts or {}) do
+                local t = turnsTo(c.unit, goal.tile, a.move)
+                if t and goal.turns - t > M.DUST
+                    and M.admits((exposed(a, a.unitHp, {}, odds)), cap) then
+                    ranked[#ranked + 1] = { a = a, g = goal.turns - t }
+                end
+            end
+            table.sort(ranked, function(x, y)
+                if math.abs(x.g - y.g) > M.DUST then return x.g > y.g end
+                if (x.a.own or 0) ~= (y.a.own or 0) then return (x.a.own or 0) > (y.a.own or 0) end
+                return key(x.a) < key(y.a)
+            end)
+            if #ranked > 0 then waiting[#waiting + 1] = { uid = c.unit.id, ranked = ranked } end
+        end
+        repeat
+            local placed, left = false, {}
+            for _, w in ipairs(waiting) do
+                local n
+                for _, r in ipairs(w.ranked) do
+                    n = extend(st, r.a, w.uid)
+                    if n then break end
+                end
+                if n then st, moved, placed = n, true, true else left[#left + 1] = w end
+            end
+            waiting = left
+        until not placed or #waiting == 0
+        if not moved then return nil end
+        st = complete(st)
+        if have[table.concat(keysOf(st), " ")] then return nil end
+        return st
     end
 
     -- whether a plan changes the board: any act but a wait on the unit's own tile
@@ -872,10 +1004,29 @@ function M.plan(Bot, board, sight, style, opts)
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
         -- allied green is not one. Each one's death chance, summed over the branches, against
         -- the style's cap, and the rank the plan is compared by
-        st.keys = {}
-        for _, x in ipairs(st.acts) do st.keys[#st.keys + 1] = key(x) end
-        local rank = { admitted = true, game_over = 0, max_exceed = 0, sum_exceed = 0, max_die = 0,
-                       sum_die = 0, hp_left = 0, value = judged, key = table.concat(st.keys, " ") }
+        st.keys = keysOf(st)
+        -- what the plan forfeits for good (the ledger's goals it closes in any judged branch),
+        -- how likely it ends the chapter, and the turns it gains toward each unit's goal
+        local lost = {}
+        for id, p in pairs(st.recruitHit) do lost[id] = p end
+        for id, p in pairs(felled) do lost[id] = (lost[id] or 0) + p end
+        for _, g in ipairs(greens) do
+            if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
+        end
+        st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
+                                                       lost = lost })
+        local gain = progress(st)
+        local greenDie = 0
+        for _, g in ipairs(greens) do
+            -- a game-over green is admission's, a recruit's death a forfeit: neither again here
+            if not gameOver[g.charId] and not st.recruits[g.id] then
+                greenDie = greenDie + (die[g.id] or 0)
+            end
+        end
+        local rank = { admitted = true, forfeits = #st.forfeited, complete = winOf(st, fell),
+                       progress = gain, green_die = greenDie, value = judged, game_over = 0,
+                       max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0,
+                       key = table.concat(st.keys, " ") }
         st.protected = {}
         local function protect(u, hp)
             local d, branches = die[u.id] or 0, {}
@@ -911,6 +1062,10 @@ function M.plan(Bot, board, sight, style, opts)
     for i = 1, math.min(M.FINAL, #beam) do finals[#finals + 1] = { st = beam[i], kind = "beam" } end
     local a = assault()
     if a then finals[#finals + 1] = { st = a, kind = "assault" } end
+    local have = {}
+    for _, f in ipairs(finals) do have[table.concat(keysOf(f.st), " ")] = true end
+    local adv = advance(have)
+    if adv then finals[#finals + 1] = { st = adv, kind = "advance" } end
     if stalled then
         for _, c in ipairs(cands) do
             local pick
@@ -924,18 +1079,24 @@ function M.plan(Bot, board, sight, style, opts)
         end
     end
     local best
-    -- every plan judged, for the run's trace: its acts, its score and where it came from
-    local considered = {}
+    -- every plan judged, for the run's trace: its acts, its score and where it came from; and
+    -- the plans themselves, with whether a stalled board lets each be played
+    local considered, judgedPlans = {}, {}
+    local function pick()
+        local ranks = {}
+        for i, j in ipairs(judgedPlans) do ranks[i] = j.st.rank end
+        local i = M.rebase(ranks, function(k) return judgedPlans[k].ok end)
+        best = i and judgedPlans[i].st
+    end
     local function consider(st, kind)
         judge(st)
         st.kind = kind
         considered[#considered + 1] = { judged = st.judged, acts = st.keys, kind = kind,
-                                        rank = st.rank }
-        if (not stalled or changes(st)) and (not best or M.outranks(st.rank, best.rank)) then
-            best = st
-        end
+                                        rank = st.rank, seizes = seizesIn(st) or nil }
+        judgedPlans[#judgedPlans + 1] = { st = st, ok = not stalled or changes(st) }
     end
     for _, f in ipairs(finals) do consider(f.st, f.kind) end
+    pick()   -- the plan the mend starts from; once more after the mends
     -- the best plan judged, mended where the judge finds it may lose someone: each such unit,
     -- the likeliest to die first, tries every other act of its menu, the rest of the plan kept
     -- where it still fits. The beam ranks acts by their own score, so a plan where one unit
@@ -1007,6 +1168,7 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
         end
+        pick()
     end
     if not best or #best.acts == 0 then return nil, nil, cost end
     table.sort(considered, function(x, y) return M.outranks(x.rank, y.rank) end)
@@ -1039,8 +1201,26 @@ function M.plan(Bot, board, sight, style, opts)
     for c in pairs(talks) do best.talks[#best.talks + 1] = c end
     table.sort(best.talks)
     best.seizable = seizable
-    best.seizes = false   -- whether the plan takes the Seize offered (botrun's seize skips)
-    for _, x in ipairs(best.acts) do best.seizes = best.seizes or x.act == "seize" end
+    -- whether the plan takes the Seize offered, whether any plan judged took it, and whether
+    -- one did within the cap: a skip is a fault only when a legal Seize under the cap was there
+    -- to take (FR-015, botrun's seize skips)
+    best.seizes, best.seizeJudged, best.seizeAdmitted = seizesIn(best), false, false
+    best.stuck = ctx.stuck   -- the goals units are blocked from (Bot.candidates' opts.stuck)
+    for _, c in ipairs(considered) do
+        if c.seizes then
+            best.seizeJudged = true
+            best.seizeAdmitted = best.seizeAdmitted or c.rank.admitted
+        end
+    end
+    -- the ledger as this plan leaves it: what it forfeits is closed
+    local shut = {}
+    for _, id in ipairs(best.forfeited) do shut[id] = true end
+    best.ledger = {}
+    for _, r in ipairs(ledger) do
+        best.ledger[#best.ledger + 1] = { id = r.id, kind = r.kind, closes_on = r.closes_on,
+                                          needs = r.needs,
+                                          status = shut[r.id] and "closed" or r.status }
+    end
     return best.acts[1], best, cost
 end
 

@@ -1,18 +1,18 @@
 ---
 id: 384
-title: "The planner ranks plans by survival first: a fixed risk cap per style, then what a plan forfeits, then progress; prices only order candidates"
+title: "The planner ranks plans by survival first: a fixed risk cap per style, then what a plan forfeits, then progress; prices order candidates and break the ties after progress"
 date: "2026-11-01"
 section: "Combat System"
 issues: [510]
 ---
 
-# The planner ranks plans by survival first: a fixed risk cap per style, then what a plan forfeits, then progress; prices only order candidates
+# The planner ranks plans by survival first: a fixed risk cap per style, then what a plan forfeits, then progress; prices order candidates and break the ties after progress
 
 **Decided (Nicolas, 2026-11-01), #510 step 9.** Taken from the step 9 spec (FR-009 to FR-016),
 which an advisory panel drafted (research record 0023): spec #510 comment 6563384018, plan and tasks #510 comment 6563384310. Supersedes ADR
-0375 and amends ADRs 0381, 0382 and 0383. **Built in part (PR-C):** the caps, admission, the
-fallback and branch-summed death are built (below); the completion ledger, forfeits and
-progress (4) wait for PR-D, and until then the weighted score orders the admitted plans.
+0375 and amends ADRs 0381, 0382 and 0383. **Built (PR-C, then PR-D):** the caps, admission,
+the fallback and branch-summed death in PR-C; the completion ledger, forfeits and progress (4)
+in PR-D. Both are below, with the amendments PR-D's design needed (2026-11-02).
 
 **Why.** A weighted score lets loot buy risk. In vanilla Ch3, careful struck Bazba alone at a
 predicted 12.7% chance of losing Franz, because the kill scored more than the death cost
@@ -94,8 +94,8 @@ records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fa
 - **What PR-C does not do yet:** an allied green's death still costs the judged score, as
   ADR 0381 priced it; PR-D's ledger replaces that with the tie-break of (4). A game-over unit's
   death costs the judged score `W.win` (planner.lua `loss`), so among admitted plans the interim
-  `value` leans toward the plan whose lord is safest; how PR-D counts it is open (amended below,
-  2026-11-02).
+  `value` leans toward the plan whose lord is safest; PR-D settles how the ledger counts it
+  (amended below, 2026-11-02, and Built (PR-D)).
 - **Measured, branching (plan T036), the pinned suite, 52 runs:** every kill branched judged
   7,020 enemy phases in 1,005 plans. `BRANCH = 2` on the same code judged 6,213 (13% fewer).
   With the bound of 8 the play was identical (7,020 phases, 1,005 plans, no kill averaged).
@@ -129,10 +129,127 @@ unit so over protecting it is not feasible, they need to be put in danger to win
 balance really." This keeps the step 9 spec's cap and admission for a game-over unit: it is
 protected (FR-009) with its style's cap (FR-010), and admission comes first (FR-011), so a plan
 with a lord at the cap outranks one whose lord is safe and another unit is a hair over it. (The
-order among plans over the cap is the 2026-11-01 amendment's, not FR-011's.) **Open, for PR-D:**
-how the ledger counts a game over in an admitted plan. A branch where the lord dies closes every
-open goal, and §4 takes forfeits from the worst branch, so counted that way any chance at all would
-make the plan whose lord is at 0% beat every plan that puts it in danger, which is the
-over-protection Nicolas ruled out. Neither the spec nor Nicolas settles how instead; it is put to
-Nicolas with PR-D's design. (A line #561 added, that the ledger would count a game over as
-forfeiting everything, was removed in #562.)
+order among plans over the cap is the 2026-11-01 amendment's, not FR-011's.) **Was open, for PR-D,
+and answered below:** how the ledger counts a game over in an admitted plan. A branch where the
+lord dies closes every open goal, and §4 takes forfeits from the worst branch, so counted that
+way any chance at all would make the plan whose lord is at 0% beat every plan that puts it in
+danger, which is the over-protection Nicolas ruled out. (A line #561 added, that the ledger
+would count a game over as forfeiting everything, was removed in #562.)
+
+**Amended (Nicolas, 2026-11-02): a game over is no forfeit.** Asked how the ledger counts a
+branch where the lord dies, Nicolas chose "not a forfeit": admission already lets a game-over
+unit's risk up to the style's cap, so the ledger counts only the closures in the branches where
+the game goes on, and the risk is never charged twice. Among plans equal on forfeits, completion
+and progress, the judged score and FR-013's largest death chance still prefer the safer lord.
+This covers every unit whose death ends the game, so it overrides FR-012's first sentence for
+an escort green: an escort green (one in `sight.objective.gameOver`) is protected, and its risk
+is admission's, not a forfeit.
+
+**Amended (Nicolas, 2026-11-02): the judged score comes after whole turns of progress.**
+Under FR-011 and FR-013 as written, nothing among admitted plans counted damage dealt: the
+order ran forfeits, completion, progress, then death chance and HP left. A strike that cannot
+kill this turn then always lost to a wait, because the counter lowers HP left and the damage
+counts nowhere (a test: bold, 20 of an enemy's 40 HP, waited). Units would stand beside an
+enemy that takes two turns to kill and never chip it. Nicolas first put the judged score
+(`value`: damage, kills, heals, HP taken, worth × chance) after progress. The review of PR #564
+then showed progress compared exactly leaves the score only exact ties: a strike from a tile a
+step back still lost to a march a step on, and a step is a fraction of a turn. Asked, Nicolas
+put the score after the whole turns of progress (`behind`, below) and ahead of the progress
+within the turn. This amends FR-013's tie list and ADR 0383's line above: worth × chance orders
+the beam, and through the judged score it orders complete plans within a turn of the most
+progress. It never outranks a forfeit, the win or a whole turn of progress.
+
+**Amended (the advisory panel, on Nicolas's instruction, 2026-11-02): progress before the
+judged score.** The order above, the score ahead of the progress within the turn, cost the
+pinned suite more deaths. Nicolas handed the trade to the panel to decide ("convene the panel
+again with sidecar and have them make a decision"). It decided 6-0, in both rounds, that
+admitted plans rank the progress itself before the judged score. The order is now forfeits,
+win, whole turns behind, allied greens, progress, judged score, then FR-013's ties.
+- **The measurement** (research record 0024): both orders played on #564's head, only the line
+  changed, tuning seeds only. Progress first had 14 protected deaths; the score first had 18.
+  Wins (23) and clean clears (14) tied. Progress first took 7 more turns over the 26 runs (249
+  against 242), the trade's other side. Every over-cap death came on a labelled fallback turn.
+- **What the score still does:** it breaks a progress tie. A unit chips an enemy from a tile as
+  far forward as its march, so the ruling above still holds: without the score, a unit within
+  the cap never chips an enemy it cannot kill this turn.
+- **A heal and a sure kill are the score too,** so they also lose to a march a tile further on
+  (`test_a_march_beats_a_heal_a_step_back`, `test_a_march_beats_a_kill_a_step_back`). The panel
+  debated chips. The measured suite plays this order, kills included, but no run singles a
+  kill out, and whether a sure kill should come ahead of the progress is open on #565.
+- **Whether chipping a step back is what causes the later fallback turns is not proven.** On the
+  run endpoint only 5 runs differ, 4-1. The flip log, a larger paired run and a two-ply
+  tie-break are #565.
+
+**Built (PR-D, 2026-11-02).**
+- **The ledger.** `goals.lua` `Goals.ledger` snapshots every open visit, chest and recruit with
+  any chance from the decision's board (`Goals.chance`, the planner's `before`), plus each
+  declared reward with the goals it needs. A goal with no chance at all is not on it: the game
+  lets no unit of ours use it (a chest with no key in the army), none has a way there
+  (`sight.turnsTo` reads the terrain alone, through a breach), or a looter takes it first. Kept,
+  it would close with every win and forbid the win for good. A unit in the way leaves the
+  chance as it was, so such a goal stays `feasible`. A reward needing a goal that is not on the
+  ledger is not either. A village or chest is `unknown` when the sight has no `canExplore` or
+  `closings` read. `Goals.forfeited` counts what a plan closes, conservatively: a win chance
+  above 1e-9 (`Goals.DUST`, which `planner.lua`'s `DUST` now reads) closes every goal the plan
+  does not take. A recruit closes when our blow, our counter or the enemy phase may kill it: a
+  green recruit's death is a forfeit, an allied green's is not. A tile a looter takes after this
+  phase (`closes` 1) closes when the plan does not take it, and a reward closes with any goal it
+  needs. The plan carries `ledger` (what it forfeits marked `closed`), `forfeited`,
+  `seizeJudged`, `seizeAdmitted` and `stuck`.
+- **The rank.** `M.outranks`'s admitted order is `forfeits` ascending, `complete` (the chance the
+  plan ends the chapter) descending, `behind`, `green_die`, `progress`, `value` (the panel's
+  amendment above), then FR-013's ties. `progress` is the turns the plan cuts from each unit's way to its assigned goal, summed:
+  the recruit, village or chest it was sent to, else its way to the objective, read once at the
+  decision's start, `sight.turnsTo` through the breach when cut off. `behind` is the whole turns
+  a plan is short of the most progress among the plans that may be played (`M.rebase`, once
+  after the finals and once after the mends). It stands for FR-012's "within one turn": "within
+  a turn of each other" is no order a sort can keep (0, 0.8 and 1.6 each tie their neighbour).
+  `green_die` sums allied greens' death chances, a recruit's and a game-over green's left out.
+- **Reassignment (FR-016).** `Bot.candidates` sends a unit elsewhere, or to the objective, when
+  it has had no step toward its goal since an earlier turn: no tile it may end on is nearer by
+  the game's turns, it is not on the goal, and no tile beside a recruit standing there. One turn
+  so is a unit in the way, and the unit holds that turn; sending it on at once handed a tile
+  between units, which `sent` was made to stop. The record (`ctx.stuck`: the unit, the tile and
+  the turn first found blocked) is carried by botrun as `opts.stuck`, tested again at every
+  decision, and lifts once the way opens. A unit boxed in (no tile but its own) keeps its goal.
+  Only the units whose goal changed are proposed again. After a Visit the tile is explored, so
+  the unit's march heads for the objective again.
+- **The advance, a search addition.** The spec defers search changes until an audit shows a
+  search miss under the corrected scoring. ours ch01 showed one: the beam orders partial plans
+  by the judged score, where a House worth 4.7 never paid for the lord's steps away from the
+  gate (each unit's way there is worth 250), so all four plans it handed the judge had him
+  waiting. One more plan is judged beside the beam's and the assault: each unit takes, of its
+  acts that gain ground within the cap, the one that gains the most, falling to the next when a
+  tile is still taken. A unit refused every one is tried again once the others have moved. It
+  is skipped when no unit gains ground or the beam already has the plan.
+- **Seize skips (FR-015).** botrun justifies a skip while a ledger goal is `feasible`, or when
+  every judged plan with the Seize was over the cap. It is a fault (`unjustified_seize_skip`)
+  when a Seize under the cap was judged and nothing was left to get, or when no judged plan had
+  the Seize at all.
+- **What changes in play.** Within the cap, a whole turn of progress now comes before HP left and
+  before an allied green. Careful takes a blow that cannot kill for a whole turn of ground, and
+  blocks for a green only when the block costs less than a turn. Any style keeps out of a
+  recruit's reach when its counter may kill it, since that is a forfeit.
+- **Measured, live (plan T055).** ours ch01 from its store (`from: 2`, `house_gifts`), attempts
+  1-3: won clean turn 8, won with one death turn 8, won clean turn 8 (main, same env: stuck,
+  won clean turn 8, stuck). Attempt 2 (bold) lost 0x03 on turn 7 at a predicted 51.1%, under a
+  labelled fallback. Vanilla Ch2, attempts 1-2: won clean on turns 8 and 6.
+- **Measured, the pinned suite (`suite --baseline`, 52 runs, at #564's head, research record
+  0024).** The tuning seeds (26 runs, the only outcomes read), PR-C then PR-D: clean clears 10
+  to 14, wins 22 to 23, turns 245 to 249, deaths 12 to 14. Vanilla Ch1 seed 1001 went from
+  `stuck` to clean, both vanilla Ch2 seeds and vanilla Ch4 seed 1001 from won to clean. Vanilla
+  Ch4 seed 1002 still won with a village skipped (the chapter ended in the enemy phase). Every
+  `over_cap` death came from a labelled fallback: 8 against PR-C's 6. The order with the
+  judged score ahead of the progress within the turn read 18 deaths (13 over the cap) and 14
+  clean, the trade the panel amendment above settled.
+- **Cost: over SC-003's budget, merged on Nicolas's call (2026-11-03: "Merge, follow up").**
+  PR-A's code and PR-D's head were timed back to back on one quiet machine, both orders:
+  - PR-A first: 2,259.3 against 3,023.2 CPU s (+34%).
+  - PR-D first: 3,115.6 against 2,600.7 CPU s (+20%).
+  - Pooled: **+26%** against SC-003's 20%.
+
+  The clock differs between days, so the work is the measure. `AiDecideMain` calls over the suite
+  were 400,220 on PR-C and 565,656 on PR-D (+41%). The growth is in three places: more branches
+  per judged plan on vanilla Ch4 and scout-ch10, the advance's one more plan per decision, and
+  vanilla Ch5's longer games (9.5 turns against 6.8). No plan is judged twice in a turn, so
+  there is nothing to cache; any cut changes play. Bringing it back within 20% is #566.

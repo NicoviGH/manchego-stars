@@ -750,8 +750,9 @@ function M.run(api)
         local tiles, baited, skipTurn = {}, {}, nil
         local fallback   -- this turn's fallback_sacrifice anomaly, once one is recorded
         -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
-        -- unit left to act returns none), so the next turn keeps the same senders
-        local sent
+        -- unit left to act returns none), so the next turn keeps the same senders; and the
+        -- goals units were found blocked from, since which turn (Bot.candidates' opts.stuck)
+        local sent, stuck
         -- the plan being played this phase: its next act's index, and the board before the
         -- last act it played (Planner.surprise compares the two)
         local playing, nextAct, before
@@ -843,6 +844,7 @@ function M.run(api)
                         local replan = playing and why
                         local a, plan, cost = api.Planner.plan(Bot, board, sight, style,
                                                          { stalled = stalled, sent = sent,
+                                                           stuck = stuck,
                                                            explored = explore.explored(),
                                                            lost = explore.lost() })
                         stalled = false   -- one changed act is the change; the rest plans freely
@@ -851,7 +853,7 @@ function M.run(api)
                         rec.plans.phases = rec.plans.phases + (cost.phases or 0)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         if plan then
-                            sent = plan.goals
+                            sent, stuck = plan.goals, plan.stuck
                             -- the board this plan committed to, and its decision index (a
                             -- death's plan_ref)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
@@ -873,20 +875,30 @@ function M.run(api)
                             end
                             for _, c in ipairs(plan.talks or {}) do talked[c] = true end
                             if plan.seizable and not plan.seizes and skipTurn ~= turn then
-                                -- the win was on offer and the plan did something else: only
-                                -- a goal the win would close justifies it
+                                -- the win was on offer and the plan did something else (FR-015):
+                                -- justified while a goal of the ledger is still to get, or when
+                                -- every plan that took the Seize was over the cap. A fault when a
+                                -- Seize under the cap was judged and nothing was left, or when no
+                                -- plan with it was judged at all (the beam lost it)
                                 skipTurn = turn
                                 local ledger = {}
-                                for _, g in ipairs(plan.goalWorth or {}) do
-                                    if g.kind ~= "objective" and (g.before or 0) > 0 then
-                                        ledger[#ledger + 1] = g.id
-                                    end
+                                for _, g in ipairs(plan.ledger or {}) do
+                                    if g.status == "feasible" then ledger[#ledger + 1] = g.id end
+                                end
+                                local reason
+                                if #ledger > 0 then
+                                    reason = "goals the win would close are open"
+                                elseif plan.seizeJudged and not plan.seizeAdmitted then
+                                    reason = "every plan with the Seize was over the cap"
+                                elseif plan.seizeJudged then
+                                    reason = "nothing left the win would close"
+                                else
+                                    reason = "no plan with the Seize was judged"
                                 end
                                 local justified = #ledger > 0
+                                    or (plan.seizeJudged and not plan.seizeAdmitted) or false
                                 rec.seize_skips[#rec.seize_skips + 1] = { turn = turn,
-                                    ledger = ledger, justified = justified,
-                                    reason = justified and "goals the win would close are open"
-                                        or "nothing left the win would close" }
+                                    ledger = ledger, justified = justified, reason = reason }
                                 if not justified then
                                     rec.stall_events[#rec.stall_events + 1] = { turn = turn,
                                         kind = "unjustified_seize_skip" }
@@ -903,6 +915,7 @@ function M.run(api)
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,
                                 worth = plan and plan.goalWorth,
+                                ledger = plan and plan.ledger,
                                 win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then
