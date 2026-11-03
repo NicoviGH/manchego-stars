@@ -3060,6 +3060,19 @@ do
           "planner: a game-over green's death is over the cap, and no forfeit")
 end
 
+-- The march-against-an-act board the rank tests below share: unit `id` on (0,0) can reach
+-- (1,0) and (2,0) toward a gate at (10,0), with no enemy phase; `extra` adds the act's reads
+-- (a forecast, staves and heals).
+local function marchSight(id, extra)
+    local o = {
+        objective = { kind = "seize", tile = { x = 10, y = 0 } },
+        reach = { [id] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        enemyPhase = function() return {} end,
+    }
+    for k, v in pairs(extra) do o[k] = v end
+    return sightOf(o)
+end
+
 -- test_a_march_beats_a_chip_a_step_back (ADR 0384's panel amendment, research record 0024): A
 -- can strike X for 20 of its 40 HP from (1,0), a step toward the gate, or march two steps to
 -- (2,0). Both are within a turn of the most progress, and progress comes before the judged
@@ -3067,13 +3080,10 @@ end
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 40, minRange = false })
-    local o = {
-        objective = { kind = "seize", tile = { x = 10, y = 0 } },
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+    local sight = marchSight(0x01, {
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
-        enemyPhase = function() return {} end,
-    }
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    })
+    local a = Planner.plan(B, boardOf(A, X), sight, style("bold"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the chip a step back")
 end
 
@@ -3082,14 +3092,11 @@ end
 do
     local H = blue(0x02, 0, 0, 0, { minRange = false })
     local W = blue(0x03, 1, 1, 1, { hp = 5, maxhp = 30, minRange = false, acted = true })
-    local o = {
-        objective = { kind = "seize", tile = { x = 10, y = 0 } },
-        reach = { [0x02] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+    local sight = marchSight(0x02, {
         staves = { [0x02] = { { slot = 0, amount = 10 } } },
         heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x03 } } } } },
-        enemyPhase = function() return {} end,
-    }
-    local a = Planner.plan(B, boardOf(H, W), sightOf(o), style("careful"))
+    })
+    local a = Planner.plan(B, boardOf(H, W), sight, style("careful"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the heal a step back")
 end
 
@@ -3098,31 +3105,26 @@ end
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 1, 1, { hp = 20, minRange = false })
-    local o = {
-        objective = { kind = "seize", tile = { x = 10, y = 0 } },
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+    local sight = marchSight(0x01, {
         fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 20, hits = 1 } } } },
-        enemyPhase = function() return {} end,
-    }
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    })
+    local a = Planner.plan(B, boardOf(A, X), sight, style("careful"))
     check(a and a.act .. "@" .. at(a), "wait@2,0", "rank: the march beats the kill a step back")
 end
 
 -- test_the_chip_is_kept_from_the_forward_tile (ADR 0384's panel amendment): A can strike X for
 -- 20 of its 40 HP from (2,0), its march's tile, and take a 5 back, or wait there. Progress
--- ties, so the judged score decides: the chip, though HP left (the next tie) favours the wait.
+-- ties, so the judged score decides: the chip. Without it the wait would win, as neither can
+-- die (the death chances tie) and the wait keeps more HP (the tie after them).
 do
     local A = blue(0x01, 0, 0, 0)
     local X = red(0x81, 2, 1, { hp = 40, minRange = false })
-    local o = {
-        objective = { kind = "seize", tile = { x = 10, y = 0 } },
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+    local sight = marchSight(0x01, {
         fc = { [0x01] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 20, hits = 1, counters = true,
                                                     counterHit = 100, counterDmg = 5,
                                                     counterHits = 1 } } } },
-        enemyPhase = function() return {} end,
-    }
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    })
+    local a = Planner.plan(B, boardOf(A, X), sight, style("careful"))
     check(a and a.act .. "@" .. at(a), "attack@2,0", "rank: the chip from the march's tile")
 end
 
