@@ -21,7 +21,7 @@ durable record is in three places:
    the numbers, where the growth is, and how to measure.
 2. **PR-E onward** per the plan comment.
 
-**#565 is on hold** (label `on-hold`). Its body says what reopens it; do not start it without
+**#565 is on hold** (label `on-hold`). Its hold comment says what reopens it; do not start it without
 that evidence.
 
 **Machine note:** on 2026-11-02/03, Siri AI ran at 340-420% CPU (load average 60-116). It
