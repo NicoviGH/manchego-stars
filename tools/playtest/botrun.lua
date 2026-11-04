@@ -498,9 +498,17 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
-                  board_repeats = 0,
+                  board_repeats = 0, arrivals_seen = {},
+                  -- the planner's lookahead, summed over the attempt (FR-018): decisions
+                  -- planned, triggered, extended, skipped for budget, its calls and CPU
+                  lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
+                                calls = 0, cpu_s = 0 },
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
+    -- the lookahead's calls left this attempt (Planner.LOOK_ATTEMPT, FR-018)
+    local function lookLeft()
+        return (api.Planner and api.Planner.LOOK_ATTEMPT or 0) - rec.lookahead.calls
+    end
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
@@ -555,7 +563,7 @@ function M.run(api)
                     spoils = t.spoils })
         end
     end
-    local lastBoard
+    local lastBoard, actedIn
     local function changes(after)
         if api.recruits and not owed then
             local party = {}
@@ -566,12 +574,24 @@ function M.run(api)
             end
         end
         if lastBoard then
+            local now = byId(after)
             for _, e in ipairs(M.events(lastBoard, after)) do
                 e.t = "event"
                 trace(e)
+                -- what a retry may remember (ADR 0386): a reinforcement's turn and tile, only
+                -- as the screen showed it -- one that arrived under fog was never seen arrive.
+                -- Its turn as a guide claim cites one: the player phase it arrives on, or the
+                -- enemy phase's own turn when it acted there (one that landed then and did not
+                -- act reads as the next turn's)
+                if e.kind == "arrive" and e.faction == "red" and not now[e.id].fogged then
+                    local inPhase = actedIn and actedIn.ids[e.id] and actedIn.turn
+                    rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = inPhase or after.turn or turn,
+                                                                  x = e.x, y = e.y,
+                                                                  charId = e.charId }
+                end
             end
         end
-        lastBoard = after
+        lastBoard, actedIn = after, nil
     end
 
     -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
@@ -846,12 +866,16 @@ function M.run(api)
                                                          { stalled = stalled, sent = sent,
                                                            stuck = stuck,
                                                            explored = explore.explored(),
-                                                           lost = explore.lost() })
+                                                           lost = explore.lost(),
+                                                           budget = { attempt = lookLeft() } })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
                         cost = cost or {}
                         rec.plans.phases = rec.plans.phases + (cost.phases or 0)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
+                        for k, v in pairs(cost.look or {}) do
+                            rec.lookahead[k] = rec.lookahead[k] + v
+                        end
                         if plan then
                             sent, stuck = plan.goals, plan.stuck
                             -- the board this plan committed to, and its decision index (a
@@ -916,6 +940,7 @@ function M.run(api)
                                 explore = plan and plan.explore, goals = plan and plan.goals,
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
+                                lookahead = plan and plan.lookahead,
                                 win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then
@@ -995,6 +1020,10 @@ function M.run(api)
             changes(before)
             trace({ t = "phase", phase = "enemy", units = M.snapshot(before) })
             local phase, deaths, acts = api.endPhase()
+            -- who acted in it: an arrival among them landed in this enemy phase, not the next
+            -- player phase the board is read on (arrivals_seen's turn)
+            actedIn = { turn = turn, ids = {} }
+            for _, a in ipairs(acts or {}) do actedIn.ids[a.id] = true end
             bagged()
             local was, now = byId(before), byId(api.board())
             for _, a in ipairs(acts or {}) do

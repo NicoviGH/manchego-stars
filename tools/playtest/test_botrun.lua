@@ -564,6 +564,41 @@ do
     check(kinds:find("plan", 1, true) ~= nil, true, "decisions are traced")
 end
 
+-- test_arrivals_seen_lists_only_what_the_screen_showed (ADR 0386, T060): a reinforcement's
+-- arrival turn and tile are in the record only when it came up on screen; one under fog is not.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                g.units[#g.units + 1] = unit(0x82, 1, "red", 9, 9, 10)
+                local hid = unit(0x83, 2, "red", 9, 8, 10)
+                hid.fogged = true
+                g.units[#g.units + 1] = hid
+                g.units[#g.units + 1] = unit(0x84, 3, "red", 8, 8, 10)
+            end
+            return {}
+        end,
+    }
+    -- 0x84 lands in enemy phase 1 and acts there
+    local endPhase = g.api.endPhase
+    g.api.endPhase = function()
+        local phase, deaths = endPhase()
+        local acts = {}
+        if g.turn == 2 then acts = { { id = 0x84, charId = 0x84, battles = {} } } end
+        return phase, deaths, acts
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(#r.arrivals_seen, 2, "two arrivals were on screen, the fogged one is not listed")
+    local a, b = r.arrivals_seen[1] or {}, r.arrivals_seen[2] or {}
+    if a.charId == 0x84 then a, b = b, a end
+    check(a.charId, 0x82, "the seen arrival")
+    check(a.turn, 2, "the player phase whose board first showed it")
+    check(a.x .. "," .. a.y, "9,9", "and its tile")
+    check(b.turn, 1, "one that acted in the enemy phase it landed in: that phase's turn")
+end
+
 -- Botrun.events: a recruit is a unit whose character was on another side; items are diffed.
 do
     local b = { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 3, 3, 15) } }
@@ -1414,6 +1449,45 @@ do
         if a.kind == "bait_loop" then n = n + 1; check(a.turn, 4, "bait loop: on the fourth turn") end
     end
     check(n, 1, "bait loop: once")
+end
+
+-- test_the_record_sums_the_lookahead (T064, FR-018): each decision's lookahead cost is summed
+-- into rec.lookahead, and the planner is told the attempt's calls left (Planner.LOOK_ATTEMPT
+-- less those spent).
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = rout() }
+    local left = {}
+    g.api.Planner = {
+        surprise = Planner.surprise, LOOK_ATTEMPT = Planner.LOOK_ATTEMPT,
+        plan = function(_, board, _, _, opts)
+            left[#left + 1] = opts.budget.attempt
+            local look = { decisions = 1, triggered = 1, extended = 1, skipped_budget = 0,
+                           calls = 3, cpu_s = 0.5 }
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil, nil, { look = look } end
+            end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                             targetId = 0x81, move = { x = 0, y = 0 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                              lookahead = { trigger = { "boss" }, extended = true, calls = 3 } },
+                { look = look }
+        end,
+    }
+    local traced
+    g.api.trace = function(ev)
+        if ev.t == "plan" and ev.lookahead then traced = ev.lookahead end
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(traced and traced.trigger[1], "boss", "the plan's trace says what triggered it")
+    local n = #left
+    check(n >= 2, true, "more than one decision")
+    check(r.lookahead.decisions, n, "every decision counted")
+    check(r.lookahead.calls, 3 * n, "their calls summed")
+    check(r.lookahead.cpu_s, 0.5 * n, "and their CPU")
+    check(left[1], 32, "the first is told the whole attempt budget")
+    check(left[2], 29, "the next what the first left")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

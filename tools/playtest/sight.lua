@@ -85,6 +85,12 @@
 --                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went.
+--   nextPhase(plan)          the enemy phase AFTER the next, our units holding between (the
+--                            planner's lookahead, FR-017): plan as enemyPhase's; the next phase
+--                            played along its expected way, every enemy moving, then the turn
+--                            advanced, the fog refreshed and the second played as enemyPhase
+--                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
+--                            HP when it begins, 0 if dead) and .moved. See s.nextPhase.
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
 --                            boss = on a Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
@@ -1315,87 +1321,183 @@ function M.new(outer)
         return M.strikeOf(t)
     end
 
-    function s.enemyPhase(plan)
-        return sandbox(function(call, proc)
-            local byId = {}
-            for _, o in ipairs(units()) do byId[o.id] = o end
-            for _, b in ipairs(plan.blues) do
-                standOn(b.unit, b.x, b.y)
-                api.write8(b.unit.addr + UNIT_HP, b.hp)
-                M.equip(api, call, S, b.unit, b.slot)
+    -- the enemy's turn order, built as on its phase (cp_order.c), inside an open sandbox
+    local function aiOrder(call)
+        api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
+        local n = call(S.BuildAiUnitList, {})
+        if n > 0 then call(S.SortAiUnitList, { n }) end
+        local out = {}
+        for i = 0, n - 1 do out[#out + 1] = mem.u8(S.gAiState + i) end
+        return out
+    end
+    -- after aiDecide(e): e stood where the decision moves it -> that tile, or nil when it
+    -- performs nothing
+    local function followMove(e)
+        local D, DEC = S.gAiDecision, Board.AI_DEC
+        if mem.u8(D + DEC.PERFORMED) == 0 then return nil end
+        local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+        standOn(e, x, y)
+        return x, y
+    end
+
+    -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
+    -- our units stood and their HP set, the reds' HP, the gone off the map
+    local function stagePhase(call, plan)
+        local byId = {}
+        for _, o in ipairs(units()) do byId[o.id] = o end
+        for _, b in ipairs(plan.blues) do
+            standOn(b.unit, b.x, b.y)
+            api.write8(b.unit.addr + UNIT_HP, b.hp)
+            M.equip(api, call, S, b.unit, b.slot)
+        end
+        for id, hp in pairs(plan.reds or {}) do
+            if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
+        end
+        local function remove(e, x, y)
+            if mem.u8(cell(mem, S.gBmMapUnit, x, y)) == e.id then
+                api.write8(cell(mem, S.gBmMapUnit, x, y), 0)
             end
-            for id, hp in pairs(plan.reds or {}) do
-                if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
-            end
-            local function remove(e, x, y)
-                if mem.u8(cell(mem, S.gBmMapUnit, x, y)) == e.id then
-                    api.write8(cell(mem, S.gBmMapUnit, x, y), 0)
-                end
-                api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN)
-            end
-            for id in pairs(plan.gone or {}) do
-                if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
-            end
-            -- the game's own turn order, built as on its phase (cp_order.c)
-            api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
-            local n = call(S.BuildAiUnitList, {})
-            if n > 0 then call(S.SortAiUnitList, { n }) end
-            local order = {}
-            for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
-            -- the phase from order[i] on, after `done`'s strikes -> its outcomes. A striker
-            -- the counter may kill splits it: the enemies after it decide once with it
-            -- standing and once with its tile free (each in a nested sandbox, so neither
-            -- sees the other's board), the second as likely as its played counter kills it.
-            local function play(i, done)
-                for k = i, #order do
-                    local id = order[k]
-                    local e = byId[id]
-                    if e and not (plan.gone or {})[id]
-                            and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
-                        local target, side = aiDecide(call, proc, e)
-                        if target then
-                            local t = M.strikeOf(side)
-                            t.enemy, t.target = id, target
-                            local addr = mem.u32(S.gUnitLookup + target * 4)
-                            t.strikerHp, t.targetHp = mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP)
-                            t.felled = (M.odds({ t.counterDist }, t.strikerHp))
-                            local now = {}
-                            for x = 1, #done do now[x] = done[x] end
-                            now[#now + 1] = t
-                            done = now
-                            standOn(e, side.tile.x, side.tile.y)
-                            local _, mean = M.odds({ t.takenDist }, t.targetHp)
-                            api.write8(addr + UNIT_HP, t.targetHp - math.floor(mean + 0.5))
-                            local q = t.felled
-                            if q > 0 then
-                                local out = {}
-                                local stood = sandbox(function() return play(k + 1, done) end)
-                                local fell = sandbox(function()
-                                    remove(e, side.tile.x, side.tile.y)
-                                    return play(k + 1, done)
-                                end)
-                                for _, o in ipairs(stood) do
-                                    out[#out + 1] = { p = o.p * (1 - q), strikes = o.strikes }
-                                end
-                                for _, o in ipairs(fell) do
-                                    out[#out + 1] = { p = o.p * q, strikes = o.strikes }
-                                end
-                                return out
+            api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN)
+        end
+        local gone = {}
+        for id in pairs(plan.gone or {}) do
+            gone[id] = true
+            if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
+        end
+        local function order() return aiOrder(call) end
+        -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog)
+        local function decides(id)
+            local e = byId[id]
+            return e and not gone[id] and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 and e
+        end
+        -- e strikes as it decided: stood on its tile, its expected damage off the target
+        local function strike(e, id, target, side, done)
+            local t = M.strikeOf(side)
+            t.enemy, t.target = id, target
+            local addr = mem.u32(S.gUnitLookup + target * 4)
+            t.strikerHp, t.targetHp = mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP)
+            t.felled = (M.odds({ t.counterDist }, t.strikerHp))
+            local now = {}
+            for x = 1, #done do now[x] = done[x] end
+            now[#now + 1] = t
+            standOn(e, side.tile.x, side.tile.y)
+            local _, mean = M.odds({ t.takenDist }, t.targetHp)
+            api.write8(addr + UNIT_HP, t.targetHp - math.floor(mean + 0.5))
+            return t, now, addr
+        end
+        return byId, order, decides, strike, remove, gone
+    end
+
+    -- the phase from order[i] on, after `done`'s strikes -> its outcomes. A striker the counter
+    -- may kill splits it: the enemies after it decide once with it standing and once with its
+    -- tile free (each in a nested sandbox, so neither sees the other's board), the second as
+    -- likely as its played counter kills it.
+    local function playPhase(call, proc, list, decides, strike, remove)
+        local function play(i, done)
+            for k = i, #list do
+                local id = list[k]
+                local e = decides(id)
+                if e then
+                    local target, side = aiDecide(call, proc, e)
+                    if target then
+                        local t
+                        t, done = strike(e, id, target, side, done)
+                        local q = t.felled
+                        if q > 0 then
+                            local out = {}
+                            local stood = sandbox(function() return play(k + 1, done) end)
+                            local fell = sandbox(function()
+                                remove(e, side.tile.x, side.tile.y)
+                                return play(k + 1, done)
+                            end)
+                            for _, o in ipairs(stood) do
+                                out[#out + 1] = { p = o.p * (1 - q), strikes = o.strikes }
                             end
+                            for _, o in ipairs(fell) do
+                                out[#out + 1] = { p = o.p * q, strikes = o.strikes }
+                            end
+                            return out
                         end
                     end
                 end
-                return { { p = 1, strikes = done } }
             end
-            local outcomes = play(1, {})
-            -- the list is the likeliest outcome's strikes; every outcome rides on it
-            local top = outcomes[1]
-            for _, o in ipairs(outcomes) do
-                if o.p > top.p then top = o end
+            return { { p = 1, strikes = done } }
+        end
+        local outcomes = play(1, {})
+        -- the list is the likeliest outcome's strikes; every outcome rides on it
+        local top = outcomes[1]
+        for _, o in ipairs(outcomes) do
+            if o.p > top.p then top = o end
+        end
+        local out = {}
+        for x, t in ipairs(top.strikes) do out[x] = t end
+        out.outcomes = outcomes
+        return out
+    end
+
+    function s.enemyPhase(plan)
+        return sandbox(function(call, proc)
+            local _, order, decides, strike, remove = stagePhase(call, plan)
+            return playPhase(call, proc, order(), decides, strike, remove)
+        end)
+    end
+
+    -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
+    -- FR-017; the hold is the R-8 spike's intervening player turn). plan as enemyPhase's. The
+    -- next phase is played along its expected way, unbranched: each enemy goes where its own
+    -- decision takes it (a strike's tile, or the move it decides without striking), a strike
+    -- takes its expected damage, a unit of ours left at 0 HP is off the map, and a striker our
+    -- counter kills at even odds or better is gone. The turn then advances and the second phase
+    -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
+    -- sees decides, in both: an enemy hidden by fog does not act, and no arrival is placed (one
+    -- the screen has not shown is not known; ADR 0386 remembers turns, never units).
+    -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
+    -- begins, 0 when the first left it dead }
+    -- and .moved = the enemies the first phase moved, { { id, x, y } }.
+    function s.nextPhase(plan)
+        return sandbox(function(call, proc)
+            local byId, order, decides, strike, remove = stagePhase(call, plan)
+            local moved = {}
+            for _, id in ipairs(order()) do
+                local e = decides(id)
+                if e then
+                    local target, side = aiDecide(call, proc, e)
+                    if target then
+                        local t, _, addr = strike(e, id, target, side, {})
+                        moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
+                        if mem.u8(addr + UNIT_HP) == 0 then
+                            local u = byId[target]
+                            if u then remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)) end
+                        end
+                        if t.felled >= 0.5 then
+                            remove(e, side.tile.x, side.tile.y)
+                        else
+                            -- it lives: our counter's expected damage stays on it, as a
+                            -- strike's stays on its target
+                            local _, back = M.odds({ t.counterDist }, t.strikerHp)
+                            api.write8(e.addr + UNIT_HP,
+                                math.max(1, t.strikerHp - math.floor(back + 0.5)))
+                        end
+                    else
+                        local x, y = followMove(e)
+                        if x then moved[#moved + 1] = { id = id, x = x, y = y } end
+                    end
+                end
             end
-            local out = {}
-            for x, t in ipairs(top.strikes) do out[x] = t end
-            out.outcomes = outcomes
+            -- ours and the greens: a green whose death ends the game is protected too
+            local hp = {}
+            for id, o in pairs(byId) do
+                if o.faction ~= "red" then
+                    local hidden = (mem.u32(o.addr + UNIT_STATE) & US_HIDDEN) ~= 0
+                    hp[id] = hidden and 0 or mem.u8(o.addr + UNIT_HP)
+                end
+            end
+            api.write16(S.gPlaySt + PLAY_TURN, mem.u16(S.gPlaySt + PLAY_TURN) + 1)
+            -- the fog as the first phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
+            -- enemy that walked out of it is seen, one that walked into it is not
+            call(S.RefreshEntityBmMaps, {})
+            local out = playPhase(call, proc, order(), decides, strike, remove)
+            out.hp, out.moved = hp, moved
             return out
         end)
     end
@@ -1454,17 +1556,12 @@ function M.new(outer)
             local D, DEC = S.gAiDecision, Board.AI_DEC
             for phase = 1, next(looter) and k or 0 do
                 api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
-                api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
-                local n = call(S.BuildAiUnitList, {})
-                if n > 0 then call(S.SortAiUnitList, { n }) end
-                local order = {}
-                for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
-                for _, id in ipairs(order) do
+                for _, id in ipairs(aiOrder(call)) do
                     local e = looter[id] and byId[id]
                     if e and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
                         aiDecide(call, proc, e)
-                        if mem.u8(D + DEC.PERFORMED) ~= 0 then
-                            local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+                        local x, y = followMove(e)
+                        if x then
                             if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                 close(x, y, phase)
                                 -- the tile is taken: AiPillageAction opens a chest (it empties)
@@ -1475,7 +1572,6 @@ function M.new(outer)
                                 api.write8(cell(mem, S.gBmMapTerrain, x, y),
                                     M.sackedTerrain(open[x .. "," .. y]))
                             end
-                            standOn(e, x, y)
                         end
                     end
                 end
