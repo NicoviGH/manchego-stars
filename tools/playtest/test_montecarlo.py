@@ -195,12 +195,12 @@ class RunDirs(unittest.TestCase):
             recs = self.pool(outcome, extra=extra)
             self.assertTrue(os.path.isdir(recs[0]['run_dir']), outcome + extra)
 
-    def test_a_campaign_stopped_short_is_failing(self):
-        for end in ('bot_fault', 'infeasible', 'played'):
+    def test_a_campaign_passes_on_its_own_answer_and_fails_on_a_crash(self):
+        for end, passed in (('played', True), ('done', True), ('bot_fault', True),
+                            ('infeasible', True), ('crashed', False), ('no_style', False)):
             text = ('BOTRUN {"seed": 1, "chapter": 2, "outcome": "won"}\n'
                     'CAMPAIGN {"outcome": "%s"}\n' % end)
-            self.assertEqual(mc.passing(mc.records_of({}, text, '/w', '/x.log')),
-                             end == 'played', end)
+            self.assertEqual(mc.passing(mc.records_of({}, text, '/w', '/x.log')), passed, end)
 
     def test_only_the_newest_failing_dirs_are_kept(self):
         self.pool('crashed', n=5, keep=2)

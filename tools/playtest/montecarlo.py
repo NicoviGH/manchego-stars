@@ -171,13 +171,16 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
 
 
 PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
-PASSED_CAMPAIGN = ('done', 'played')  # a campaign's ends that are its own answer
+# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts (campaign.lua
+# noClean), and kept as FAILED they would crowd real crashes out of KEEP_FAILED
+PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible')
 
 
 def passing(recs):
     """A run that needs no dir to explain it: every BOTRUN record a game result in a clean
     environment, and the campaign (if any) ended on its own answer. Anything else -- a crash,
-    a stall, a fault, a campaign stopped short of its chapters -- keeps its dir as evidence."""
+    a stall, an environment fault, a campaign that crashed or ran out of styles -- keeps its
+    dir as evidence."""
     for r in recs:
         if r.get('kind') == 'campaign':
             if r.get('outcome') not in PASSED_CAMPAIGN:
@@ -312,9 +315,9 @@ class Pool:
         run's dir is deleted as it ends; a failing one's is kept, the newest `keep_failed`."""
         os.makedirs(self.log_dir, exist_ok=True)
         prune_runs(self.run_root, self.keep_failed)
-        # unique in this process: `cell` makes a Pool per look, and a reused tag would let run.sh
-        # wipe an earlier Pool's kept failing dir
-        base = '%d-%d' % (os.getpid(), next(POOL_SERIAL))
+        # unique: `cell` makes a Pool per look, and a reused tag would let run.sh wipe an earlier
+        # Pool's kept failing dir; the time part covers a pid the OS has reused
+        base = '%d-%d-%x' % (os.getpid(), next(POOL_SERIAL), int(time.time()))
 
         def one(i, task):
             tag = '%s-%d' % (base, i)

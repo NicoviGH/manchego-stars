@@ -6,7 +6,8 @@ that way, and where two runs first diverge (#236).
     tools/playtest/inspect_state.py diff /tmp/accepted.log /tmp/playtest-ch01/playtest.log
 
 run.sh renders a failing run through this automatically; the commands above are for
-re-reading a log later, or diffing two runs.
+re-reading a log later, or diffing two runs. The path is a direct `run.sh ch01`'s; after a
+green matrix run the log is in the scenario's `.matrix-verdictcache` slot (#574).
 
 The harness emits the state; this names and formats it. Addresses resolve against
 symbols.json (written by gen_symbols.py, which run.sh invokes before every run -- `make`
