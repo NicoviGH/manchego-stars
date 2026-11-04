@@ -9,22 +9,28 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-03 (Claude, latest). **#510 step 9 PR-E MERGED: #568 (4b08719).**
+Refreshed 2026-11-04 (Claude, latest). **#570 MERGED: #571 (22c411f).** PR-E's open items
+are decided (Nicolas, 2026-11-04: "keep that north star [a trustworthy difficulty model] and go
+with your recommendations"; ADR 0389's Decided section):
+- **The hold stays.** Reopen only on a failure PR-F's replays tie to it.
+- **The lookahead budget is 128 calls an attempt** (was 32), not a narrower boss trigger: 32 ran out
+  before the boss fight on ours-ch03 (every assault decision skipped) and on two vanilla games.
+  Measured: 0 skips (80 before), SC-003 566,389 calls (+1.3%, within 678,787); tuning play 19 of
+  26 unchanged, wins 23, clean clears 13 -> 14, deaths 14 -> 15. A run the budget still leaves
+  one phase deep now carries a `lookahead_budget` anomaly.
+- **The breach's "first crossing" is decided not built.**
 
-**NEXT:**
-1. **Open the session with a progress report on #510 for Nicolas** (his ask, 2026-11-03). Keep it
-   short and plain. Cover:
-   - where step 9 stands: PR-A to PR-E merged, PR-F to PR-J left, with one line each on what
-     they do (read the ticks in #510's plan comment 6563384310);
-   - the open items below.
-2. Then **PR-F** (T071-T080, diagnostics) per the plan comment.
+**NEXT: PR-F** (T071-T080, diagnostics) per #510's plan comment 6563384310. Its T079 live proof
+gains a third case: ours-ch03 tuning seed 1002's unit 3, killed by the boss on turn 21 under a
+labelled fallback (new with #570; whether the hold caused it is what the replay must witness).
+Report step 9 to Nicolas in plain words; he lost track of the series after the panel.
 
-**What PR-E built** (ADR 0389, ADR 0386 Built):
+Earlier, 2026-11-03: **#510 step 9 PR-E MERGED: #568 (4b08719).** **What PR-E built** (ADR 0389, ADR 0386 Built):
 - **Retry memory:** a retry remembers only the turns earlier failed attempts saw reinforcements
   arrive. Attempt 1, and so every measured cell, is untouched.
 - **Lookahead:** at a door or wall breach, or a unit's first step into a seen boss's reach, the
   top 4 plans face a second enemy phase, our units holding in between (Nicolas chose the hold).
-  Budget: 8 calls a decision, 32 an attempt.
+  Budget: 8 calls a decision, 32 an attempt (128 since #570).
 - **Arrival trigger dropped** (Nicolas: "drop it"): the second phase can't place the wave.
   #569 (on hold) brings it back for claims.
 - **Measured** (with the arrival trigger still in; the final build was not re-measured):
@@ -33,12 +39,6 @@ Refreshed 2026-11-03 (Claude, latest). **#510 step 9 PR-E MERGED: #568 (4b08719)
     clean clear fewer.
 - **Review:** `/code-review 568 medium` in a subagent, 10 findings: 9 fixed, 1 decided by
   Nicolas. One scoped re-review, clean. CI green on the head.
-
-**Open from PR-E** (ADR 0389's Open section; for Nicolas):
-- Keep the hold, or build the re-propose (it needs a staged `sight`)?
-- On a Defeat Boss map the boss trigger fires on most decisions and spends the budget (ours-ch03:
-  62 of the suite's 80 skips).
-- The breach's "first crossing" is not built.
 
 **#566 CLOSED by #567 (47cd148), 2026-11-03.** SC-003's stand-in baseline is PR-D's work:
 565,656 `AiDecideMain` calls, a budget of 678,787 (`montecarlo.py` `SC003_BASELINE_CALLS`,
