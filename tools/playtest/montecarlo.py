@@ -49,8 +49,10 @@ at: the cell stops and reports what that run said.
 
 Comparing two versions of the bot: play both on the SAME env. A new claim changes
 `Campaign.drawStyle`, so "attempt k" is a different style and an old table cannot be compared.
-To baseline main, swap its Lua in place (`git stash -u`, `git show origin/main:<f> > <f>` for the
-playtest Lua, run, `git checkout -- tools/playtest`, `git stash pop`), never a worktree; time
+To baseline main when the branch changes only playtest Lua (the ROM and the Python stay the
+branch's), swap main's Lua in place: `git stash -u`, `git show origin/main:<f> > <f>` for each
+changed file, run, `git checkout -- tools/playtest` and `git clean -f tools/playtest` (a file
+only main has would block the pop), `git stash pop`. Never a worktree. Time
 base and branch back to back, or compare `costs.game_calls`, which load does not move. Read only
 the suite's `tuning` records (`rec.suite.set`) while changing the bot: the held-out seeds stay
 unseen until the verdict, or they stop being held out.

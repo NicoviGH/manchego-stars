@@ -28,22 +28,20 @@ character id, a class to its id and every reskin built on it (a reskin plays as 
 resolves to nothing raises. A claim whose fields need a model the runner has not got
 (`reinforcements`' arrival turns) goes as kind `unresolved`, so the run reports it unplayed.
 
-Playing one chapter alone (a fast loop, no New Game):
-1. `campaign_env.py vanilla --id e1-vanilla-ch3 --from N` (or `ours --store ... --id X --from N`).
-   `--from` is the STORE's chapter index, not the chapter's name: vanilla's e1-vanilla-ch3 holds
-   0-4 and 6 (6 is Ch5; Ch5x follows Ch5, ADR 0376), and ours' index 4 is ch03.
-2. Set `last: [N]` in the JSON, and `attempt: k` to play only the k-th style drawn (campaign.lua).
-3. `PT_CAMPAIGN="$(cat env.json)" tools/playtest/run.sh campaign` (`PT_VANILLA=1` for retail), or
-   many attempts at once with `montecarlo.py attempts --env env.json`. A campaign run without
-   `from` retries the chapter until it clears clean, and never stops on ours ch01.
-Regenerate an ours env with this script before measuring: an env kept in an old scratch dir
-predates `house_gifts`, and a House with no prior is worth 0 (that sent #556 the wrong way). To
-play from a copy of a store, point `PT_SIMDIR` at it. A full (non-`attempt`) run re-saves the
-starts it passes, so back the store up first.
-
 --from N resumes at chapter index N's start as an earlier run of the same --id saved it
 (references/sim/<game>/<rom-hash>/states/<id>/N.ss), so a fault in a late chapter is studied
 without replaying the chapters before it. It needs --id: the default id names no earlier run.
+N is an index, not a chapter's name: vanilla's is the chapter id in constants/chapters.h (Ch5 is
+6, Ch5x 5), ours' the host slot in tools/inject/hosts.py (ch03 is CH03_HOST_INDEX, 4).
+
+To play that one chapter alone, set `last: [N]` in the JSON too, and `attempt: k` to play only
+the k-th style drawn: without `attempt`, campaign.lua retries the chapter until it clears clean
+and plays on to the next. Then `PT_CAMPAIGN="$(cat env.json)" tools/playtest/run.sh campaign`
+(`PT_VANILLA=1` for retail), or many attempts at once with `montecarlo.py attempts --env
+env.json`. Regenerate an ours env with this script before measuring: an env kept in an old
+scratch dir predates `house_gifts`, and a House with no prior is worth 0 (that sent #556 the
+wrong way). To play from a copy of a store, point `PT_SIMDIR` at it. A run without `attempt`
+re-saves the starts it passes, so back the store up first.
 """
 import argparse
 import functools

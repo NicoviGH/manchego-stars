@@ -59,8 +59,7 @@ Read these at the top of every session before touching code:
 > after a merge** — a run whose result cannot change your next action is pure cost. When a
 > scenario fails, spend **one instrumented run** that dumps everything your next three
 > hypotheses would need, not one run per guess. Long form + what it cost: `docs/decisions.md` →
-> "Playtest runs are the most expensive thing in this repo". #255 built the verdict cache that
-> serves an unchanged green scenario without re-running it.
+> "Playtest runs are the most expensive thing in this repo".
 
 ## Searching: 86% of this repo is not this repo
 
@@ -180,9 +179,9 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
   closes the PRs on it, and a closed PR can't be retargeted. This rule lives here, not in the
   decision record — the pointer that used to claim otherwise named nothing.
-- **One checkout, one writer: a task is a plain branch in `/Users/Yonick/Projects/manchego-stars`.**
-  Never create a worktree without Nicolas's say-so (2026-10-29), and never run two ROM builds in
-  one tree (they corrupt each other). Cut a branch from `origin/main`; a local `main` holding
+- **One checkout, one writer: a task is a plain branch in the repo's main checkout** (ADR 0390).
+  Never create a worktree without Nicolas's say-so, and never run two ROM builds in one tree
+  (they corrupt each other). Cut a branch from `origin/main`; a local `main` holding
   unpushed HANDOFF commits makes the branch look like it edits HANDOFF.
 - **The checkout keeps three gitignored folders** (`.agents/`, `map-review/`, `review/`):
   preserve them and stage paths explicitly. `.agents/skills` links to `.claude/skills`, the

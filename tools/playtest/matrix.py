@@ -24,8 +24,8 @@ Use `make matrix SUITE=<chapter>` while iterating; the full matrix is the push g
     tools/playtest/matrix.py list
 
 A run leaves the tree's ROM built for the last configuration it played (ch06boot, say), not the
-canonical one: `controller_turn` then refuses to run and the pre-commit `test_scene_actors`
-fails, until `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
+canonical one: the next `run.sh` of a scenario that needs the canonical ROM refuses it
+(`check-rom`) until `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
 
 `matrix.yaml` is the single source of truth for what a scenario needs: its ROM
 configuration, its PT_HOST_CHAPTER, its checkpoint, and its fps/vsync/deadline

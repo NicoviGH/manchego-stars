@@ -10,7 +10,7 @@ The interesting cases are not the happy path -- they are the two states that MUS
 fail, because a guard that cries wolf gets bypassed:
   * a branch that never touched HANDOFF while main moved on (git's 3-way merge keeps
     main's version, so there is nothing to warn about);
-  * a branch whose copy is byte-identical to main's tip (the ideal worktree state).
+  * a branch whose copy is byte-identical to main's tip (tolerated, never advised: ADR 0390).
 """
 import contextlib
 import io
@@ -35,8 +35,8 @@ _GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
 
 
 def _run(repo, *args):
-    subprocess.run(['git', '-C', repo, '-c', 'core.hooksPath=/dev/null'] + list(args),
-                   check=True, capture_output=True, env=_GIT_ENV)
+    return subprocess.run(['git', '-C', repo, '-c', 'core.hooksPath=/dev/null'] + list(args),
+                          check=True, capture_output=True, env=_GIT_ENV, text=True).stdout
 
 
 def _commit(repo, path, body, msg):
@@ -113,13 +113,34 @@ class HandoffBranchGuard(unittest.TestCase):
         fail = self._fails()
         self.assertEqual(len(fail), 1)
         self.assertIn('HANDOFF.md', fail[0])
-        self.assertIn('git merge origin/main', fail[0])
+        self.assertIn('the branch wrote it', fail[0])
+        self.assertIn('git checkout $(git merge-base', fail[0])
+        # and the advised fix clears it: the branch's starting copy, restored and committed
+        base = _run(self.tmp, 'merge-base', 'main', 'HEAD').strip()
+        _run(self.tmp, 'checkout', base, '--', 'HANDOFF.md')
+        _run(self.tmp, 'commit', '-qm', 'undo the branch HANDOFF')
+        _run(self.tmp, 'checkout', '-q', 'main')
+        _commit(self.tmp, 'HANDOFF.md', 'state v2\n', 'refresh on main')
+        _run(self.tmp, 'checkout', '-q', 'feat/x')
+        self.assertEqual(self._state(), 'ok', "main's next refresh no longer trips it")
+
+    def test_mains_unpushed_commits_are_fixed_by_a_merge(self):
+        """A branch cut from a local main that holds unpushed HANDOFF commits carries main's
+        own edit: push main, then merge it (ADR 0390)."""
+        head = _run(self.tmp, 'rev-parse', 'HEAD').strip()
+        _run(self.tmp, 'update-ref', 'refs/remotes/origin/main', head)
+        _commit(self.tmp, 'HANDOFF.md', 'state v2\n', 'refresh on main, not pushed')
+        _run(self.tmp, 'checkout', '-q', '-b', 'feat/x')
+        _commit(self.tmp, 'other.txt', 'y\n', 'work')
+        self.assertEqual(self._state(), 'diverged')
+        self.assertIn('unpushed', self._fails()[0])
+        _run(self.tmp, 'update-ref', 'refs/remotes/origin/main', 'main')   # the push
+        _run(self.tmp, 'merge', '-q', 'origin/main')
+        self.assertEqual(self._state(), 'ok')
 
     def test_branch_synced_to_mains_tip_passes(self):
-        """The ideal worktree state, and the reason the rule is livable.
-
-        The branch edited HANDOFF, but only to match main exactly -- merging it is a no-op,
-        and people reading HANDOFF in their worktree see true live state.
+        """A copy byte-identical to main's tip merges as a no-op, so the guard tolerates it.
+        It is never the advised fix: main's next refresh makes it drift again (ADR 0390).
         """
         _run(self.tmp, 'checkout', '-q', '-b', 'feat/x')
         _commit(self.tmp, 'HANDOFF.md', 'branch-local state\n', 'drifted')
@@ -132,12 +153,11 @@ class HandoffBranchGuard(unittest.TestCase):
         self.assertEqual(self._fails(), [])
 
     def test_staging_mains_copy_passes_before_the_commit(self):
-        """The guard's own advised fix must get past pre-commit.
+        """A merge of main into a drifted branch stages main's copy before its commit exists.
 
-        `git checkout main -- HANDOFF.md` stages main's copy, and so does a merge of main into
-        a drifted branch. The commit that syncs the branch runs this guard on the INDEX, so a
-        staged copy identical to main's is SYNCED, not drift (it blocked the #510 step-9
-        merge, 2026-10-28; the test above commits with hooks off and never saw it).
+        That commit runs this guard on the INDEX, so a staged copy identical to main's is
+        SYNCED, not drift (it blocked the #510 step-9 merge, 2026-10-28; the test above commits
+        with hooks off and never saw it). Staged here by checkout, the same index state.
         """
         _run(self.tmp, 'checkout', '-q', '-b', 'feat/x')
         _commit(self.tmp, 'HANDOFF.md', 'branch-local state\n', 'drifted')

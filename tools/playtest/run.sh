@@ -59,11 +59,11 @@
 #                           prints one `BOTRUN <json>` record. PT_SEED=N seeds the game's RNG,
 #                           PT_STYLE / PT_CLAIMS are JSON (bot.lua's style, resolved claims).
 #   campaign             -- #510 step 9 PR E: the bot plays chapter to chapter from New Game
-#                           (campaign.lua), restarting a chapter until a clean clear; PT_CAMPAIGN
-#                           is the JSON ITSELF, not a path: PT_CAMPAIGN="$(cat env.json)". A path
-#                           is ignored, and a New Game runs.
-#                           (id, last, shops, claims; harness.lua's scenario says), and
-#                           states land in PT_SIMDIR (references/sim/<game>/<rom-hash>).
+#                           (campaign.lua), restarting a chapter until a clean clear. PT_CAMPAIGN
+#                           is the JSON itself (id, last, shops, claims; harness.lua's scenario
+#                           says), not a path: PT_CAMPAIGN="$(cat env.json)". A path is ignored
+#                           and a New Game runs. States land in PT_SIMDIR
+#                           (references/sim/<game>/<rom-hash>).
 #                           PT_VANILLA=1: retail Ch1, after the bot plays the Prologue
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast

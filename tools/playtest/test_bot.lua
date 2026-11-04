@@ -8,8 +8,6 @@
 --   with the fix stashed.
 -- - In these fakes a single-unit army's way to the objective is worth a whole death: give the
 --   objective its own direction, or it swamps the trade under test.
--- - A game-backed read gets a unit test through a pure helper beside it (`closingsKey`,
---   `sackedTerrain`, `loots`, `opensChests`, `waveCloses`).
 local here = (arg[0]:match("(.*/)")) or "./"
 local B = dofile(here .. "bot.lua")
 local Planner = dofile(here .. "planner.lua")
