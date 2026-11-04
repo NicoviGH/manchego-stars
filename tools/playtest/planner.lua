@@ -144,9 +144,10 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 -- chance that is at the cap, and that is not an excess.
 M.DUST = Goals.DUST
 -- the lookahead's budget (FR-018): extra judged calls (sight.nextPhase, one a finalist) per
--- decision and per attempt
+-- decision and per attempt. 128 an attempt, not 32: 32 ran out before the boss fight on
+-- ours ch03 and two vanilla starts, so the decisive turns were judged one phase deep (#570)
 M.LOOK_DECISION = 8
-M.LOOK_ATTEMPT = 32
+M.LOOK_ATTEMPT = 128
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission

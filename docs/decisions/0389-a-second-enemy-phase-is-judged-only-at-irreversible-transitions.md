@@ -25,7 +25,7 @@ due. At those moments, and only then, the finalists meet a second enemy phase:
   Placing a claim's wave, and with it the trigger, is #569.
 - **All or none (FR-018).** The finalists are the best `M.FINAL` plans judged, by rank. If any
   triggers, each one gets one call to `sight.nextPhase`, or none does. The budget is
-  `M.LOOK_DECISION` = 8 calls a decision and `M.LOOK_ATTEMPT` = 32 an attempt (botrun passes what is
+  `M.LOOK_DECISION` = 8 calls a decision and `M.LOOK_ATTEMPT` = 128 an attempt (32 until #570; botrun passes what is
   left as `opts.budget.attempt`). Too little left keeps the one-phase horizon, tagged `skipped`.
 - **What the second phase reads.** Every unit the first phase may strike (ours and the allied
   greens) is asked again at the HP the first phase left it. Each protected unit's death chance
@@ -50,8 +50,10 @@ due. At those moments, and only then, the finalists meet a second enemy phase:
   triggered, extended, skipped_budget, calls, cpu_s }`. `montecarlo.py suite` prints it per start
   and for the whole suite.
 
-**Not built.** The "first crossing" of a breach (FR-017's second half of the first trigger) is
-left out: a door or wall struck triggers, but stepping through it later does not.
+**Decided not to build (Nicolas, 2026-11-04).** The "first crossing" of a breach (FR-017's second
+half of the first trigger): a door or wall struck triggers, stepping through it later does not.
+Opening it is the move that cannot be taken back, and it already triggers; the step through is an
+ordinary move the one-phase judgment covers. Reopen only on a death a replay (PR-F) ties to one.
 
 Both measures below were taken WITH the arrival trigger, before it was dropped; the build without
 it was not re-measured.
@@ -92,10 +94,16 @@ second phase.
   - Clean clears fall from 14 to 13 (vanilla Ch5 seed 1002, Joshua killed before the Talk).
   - `fallback_sacrifice` labels across all 26 runs rise from 17 to 22, none with a death behind it.
 
-**Open (for Nicolas).**
-- **The hold or the re-proposal.** The hold overstates risk: a real player would retreat or heal
-  between the phases. The re-proposal (R-8's first proposal) needs `sight` to stage a hypothetical
-  board for every read `Bot.candidates` makes. Its cost is not measured.
-- **The boss trigger on a Defeat Boss map.** It fires on most decisions there and spends the
-  attempt's budget (ours-ch03). "First entry" may want to mean the first unit of the attempt, not
-  each unit.
+**Decided (Nicolas, 2026-11-04, on Claude's recommendation).**
+- **The hold stays.** The hold overstates risk: a real player would retreat or heal between the
+  phases. Against PR-D it cost no win and no death, and no unit died over its cap. The
+  re-proposal (R-8's first proposal) needs `sight` to stage a hypothetical board for every read
+  `Bot.candidates` makes, at a cost never measured. Reopen only on a failure PR-F's replays tie to
+  the hold.
+- **The budget, not the boss trigger (#570).** On ours-ch03 the 32-call attempt budget was spent on
+  the breaches (turns 5-7) and the approach (turns 3, 10-12), so every decision of the boss
+  assault was skipped (turns 13-16 on tuning seed 1001, 15-23 on 1002); two vanilla tuning games
+  hit it too. Narrowing the boss trigger to a unit's first entry was proposed first and rejected:
+  the budget is gone before most units reach the boss. `M.LOOK_ATTEMPT` is 128 (the most any
+  tuning game wanted was 19 triggered decisions, 76 calls); FR-018's "32 per attempt" is amended to
+  match. Measured in "After #570" below.

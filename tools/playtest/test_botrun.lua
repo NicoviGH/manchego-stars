@@ -1486,8 +1486,8 @@ do
     check(r.lookahead.decisions, n, "every decision counted")
     check(r.lookahead.calls, 3 * n, "their calls summed")
     check(r.lookahead.cpu_s, 0.5 * n, "and their CPU")
-    check(left[1], 32, "the first is told the whole attempt budget")
-    check(left[2], 29, "the next what the first left")
+    check(left[1], Planner.LOOK_ATTEMPT, "the first is told the whole attempt budget")
+    check(left[2], Planner.LOOK_ATTEMPT - 3, "the next what the first left")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

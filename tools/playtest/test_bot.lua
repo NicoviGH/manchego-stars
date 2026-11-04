@@ -4371,8 +4371,8 @@ do
     board, sight, st = looksAhead(true)
     a, plan = Planner.plan(B, board, sight, st, { budget = { decision = 1 } })
     check(plan.lookahead.skipped, true, "lookahead: a decision budget below the finalists skips")
-    check(Planner.LOOK_DECISION .. "/" .. Planner.LOOK_ATTEMPT, "8/32",
-          "lookahead: 8 calls a decision, 32 an attempt (FR-018)")
+    check(Planner.LOOK_DECISION .. "/" .. Planner.LOOK_ATTEMPT, "8/128",
+          "lookahead: 8 calls a decision, 128 an attempt (FR-018, #570)")
 end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
