@@ -1,6 +1,15 @@
 -- Tests for bot.lua -- the pure policy (no emulator): the greedy core the clear scenarios
 -- drive, then Bot.decide's styles over hand-built boards and a fake `sight`.
 -- Run: lua tools/playtest/test_bot.lua
+--
+-- Writing a planner test here:
+-- - A test that passes only on a tie-break proves nothing. Assert the judged gap (from
+--   `plan.considered`) or the goal's chance after the plan (`goalAfter`), and check that it fails
+--   with the fix stashed.
+-- - In these fakes a single-unit army's way to the objective is worth a whole death: give the
+--   objective its own direction, or it swamps the trade under test.
+-- - A game-backed read gets a unit test through a pure helper beside it (`closingsKey`,
+--   `sackedTerrain`, `loots`, `opensChests`, `waveCloses`).
 local here = (arg[0]:match("(.*/)")) or "./"
 local B = dofile(here .. "bot.lua")
 local Planner = dofile(here .. "planner.lua")

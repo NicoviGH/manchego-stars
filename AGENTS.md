@@ -44,7 +44,7 @@ Read these at the top of every session before touching code:
    main's copy, never the working tree's: a feature branch carries the snapshot from when it was
    cut, and the guard only stops a branch from EDITING it (a session opened on #487 read a day-old
    copy, 2026-10-15).
-3. `docs/decisions.md` — the INDEX of settled decisions (283 of them, one file each under
+3. `docs/decisions.md` — the INDEX of settled decisions (one file each under
    `docs/decisions/`). Read the index, then open the two or three your task needs. Do not
    re-litigate what is in there. It was a single 728 KB file until #384 — ~197,000 tokens,
    which is a whole context window spent before any work starts, so this line was being
@@ -59,7 +59,8 @@ Read these at the top of every session before touching code:
 > after a merge** — a run whose result cannot change your next action is pure cost. When a
 > scenario fails, spend **one instrumented run** that dumps everything your next three
 > hypotheses would need, not one run per guess. Long form + what it cost: `docs/decisions.md` →
-> "Playtest runs are the most expensive thing in this repo". The permanent fix is **#255**.
+> "Playtest runs are the most expensive thing in this repo". #255 built the verdict cache that
+> serves an unchanged green scenario without re-running it.
 
 ## Searching: 86% of this repo is not this repo
 
@@ -179,8 +180,16 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
   closes the PRs on it, and a closed PR can't be retargeted. This rule lives here, not in the
   decision record — the pointer that used to claim otherwise named nothing.
-- **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
-  a single writer may work the provisioned main tree — see `HANDOFF.md`).
+- **One checkout, one writer: a task is a plain branch in `/Users/Yonick/Projects/manchego-stars`.**
+  Never create a worktree without Nicolas's say-so (2026-10-29), and never run two ROM builds in
+  one tree (they corrupt each other). Cut a branch from `origin/main`; a local `main` holding
+  unpushed HANDOFF commits makes the branch look like it edits HANDOFF.
+- **The checkout keeps three gitignored folders** (`.agents/`, `map-review/`, `review/`):
+  preserve them and stage paths explicitly. `.agents/skills` links to `.claude/skills`, the
+  tracked skills Codex reads.
+- **Codex works here between Claude sessions** and leaves an explicit HANDOFF entry: what
+  changed, branch and PR state, the verification it ran, the exact next step.
+- **A commit takes about a minute:** the pre-commit hook runs the whole `tools/check.py`.
 - **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine patch series in
   `engine/patches/`, which applies whole or fails the build — the directory is the authoritative
   list, don't cite a count). Desk ownership is a review judgment

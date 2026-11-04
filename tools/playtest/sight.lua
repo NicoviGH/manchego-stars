@@ -16,6 +16,11 @@
 -- range (SetBattleUnitWeapon, BattleInitTargetCanCounter), so it never shows an enemy's strike
 -- on a tile it is not beside.
 --
+-- WHEN A JUDGED PHASE DISAGREES WITH THE BOARD ONE ACT LATER, SUSPECT THIS FILE BEFORE THE
+-- PLANNER. Nested sandboxes undo only api.write*; a game call that writes a unit struct (an
+-- equip reorders the bag) needs api.keep16 first, or one judged plan leaks into the next (#554:
+-- found in one instrumented run that logged every enemy decision and the target's bag).
+--
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
 --        Board (board.lua's bound reader, Board.bind: itemRange(item), distance(ax, ay, bx, by)),

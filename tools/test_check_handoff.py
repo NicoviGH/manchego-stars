@@ -113,7 +113,7 @@ class HandoffBranchGuard(unittest.TestCase):
         fail = self._fails()
         self.assertEqual(len(fail), 1)
         self.assertIn('HANDOFF.md', fail[0])
-        self.assertIn('git checkout main -- HANDOFF.md', fail[0])
+        self.assertIn('git merge origin/main', fail[0])
 
     def test_branch_synced_to_mains_tip_passes(self):
         """The ideal worktree state, and the reason the rule is livable.

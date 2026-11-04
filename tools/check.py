@@ -3266,12 +3266,12 @@ def check_handoff_only_on_main(fail):
         fail.append(
             '%s %s. Live state is global and belongs on main -- a branch copy silently '
             'overwrites main\'s when it merges (this cost us ch04\'s state on 2026-07-30). '
-            'Fix: `git checkout main -- %s`, which also leaves the worktree showing TRUE live '
-            'state for whoever reads it there. On a long-lived branch, where main\'s HANDOFF '
-            'may move again, `git checkout $(git merge-base main HEAD) -- %s` instead zeroes '
-            'the branch\'s net diff so it stays clean -- at the cost of a stale copy in the '
-            'worktree. Either way, refresh HANDOFF on main AFTER the merge, never on the '
-            'branch.' % (HANDOFF_FILE, detail, HANDOFF_FILE, HANDOFF_FILE))
+            'Fix: `git merge origin/main` into the branch -- the merge-base moves to main\'s '
+            'tip, so the branch\'s net %s diff is zero. Never copy main\'s file onto the '
+            'branch (`git checkout main -- %s`): every later refresh on main trips the guard '
+            'again, and each copy adds another branch commit of it (Nicolas, 2026-10-29). '
+            'Refresh HANDOFF on main, never on the branch.'
+            % (HANDOFF_FILE, detail, HANDOFF_FILE, HANDOFF_FILE))
     elif state == 'unknown':
         print('  note: HANDOFF branch guard skipped -- %s' % detail)
 
