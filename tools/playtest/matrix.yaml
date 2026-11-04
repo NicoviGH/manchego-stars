@@ -290,8 +290,9 @@ instrument:
     style: drawn                  # attempt 1's own draw from (seed, chapter), as a cell plays it
     invariant: record             # one BOTRUN record with a game result
     estimate_wall_s: 600          # one attempt's wall time until a suite run measures it
-    # the planner's budgets (planner.lua M.BEAM, M.FINAL, M.BRANCH) and FR-018's lookahead
-    budgets: {beam: 6, final: 4, branch: 8, lookahead_decision: 8, lookahead_attempt: 32}
+    # the planner's budgets (planner.lua M.BEAM, M.FINAL, M.BRANCH, M.LOOK_DECISION,
+    # M.LOOK_ATTEMPT; FR-018), equal to them (test_montecarlo's shipped-manifest test)
+    budgets: {beam: 6, final: 4, branch: 8, lookahead_decision: 8, lookahead_attempt: 128}
   # Ours has no world map of its own: before each chapter it takes its twin's open shops,
   # read from these vanilla campaigns' start records (campaign_env.ours_env), first one first.
   shops_from:

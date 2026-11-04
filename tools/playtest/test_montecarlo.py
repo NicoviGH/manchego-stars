@@ -521,7 +521,7 @@ SUITE = {
     'defaults': {'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}, 'style': 'drawn',
                  'invariant': 'record', 'estimate_wall_s': 600,
                  'budgets': {'beam': 6, 'final': 4, 'branch': 8, 'lookahead_decision': 8,
-                             'lookahead_attempt': 32}},
+                             'lookahead_attempt': 128}},
     'shops_from': ['references/sim/vanilla/h/states/c'],
     'starts': [
         {'start_id': 'vanilla-ch3', 'game': 'vanilla', 'chapter': 3, 'rom_hash': 'c25b145e3745',
@@ -557,7 +557,7 @@ class Suite(unittest.TestCase):
         self.assertEqual(a['seeds'], {'tuning': [1001, 1002], 'held_out': [2001, 2002]})
         # a table a start names merges key by key: its own tuning, the default held-out
         self.assertEqual(b['seeds'], {'tuning': [1003, 1004], 'held_out': [2001, 2002]})
-        self.assertEqual((a['style'], a['budgets']['lookahead_attempt']), ('drawn', 32))
+        self.assertEqual((a['style'], a['budgets']['lookahead_attempt']), ('drawn', 128))
         self.assertEqual(got['version'], 1)
 
     def test_the_shipped_manifest_loads(self):
@@ -568,9 +568,11 @@ class Suite(unittest.TestCase):
         lo, hi = got['seed_sets']['confirmatory']
         self.assertLessEqual(mc.LOOKS[-1], hi - lo + 1, 'a cell plays seeds 1..LOOKS[-1]')
         # the budgets the manifest records are the ones the planner plays (PR #560: `branch`
-        # stayed 2 when planner.lua's M.BRANCH moved)
+        # stayed 2 when planner.lua's M.BRANCH moved; #571: `lookahead_attempt` stayed 32)
         src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'planner.lua')).read()
-        for key, const in (('beam', 'BEAM'), ('final', 'FINAL'), ('branch', 'BRANCH')):
+        for key, const in (('beam', 'BEAM'), ('final', 'FINAL'), ('branch', 'BRANCH'),
+                           ('lookahead_decision', 'LOOK_DECISION'),
+                           ('lookahead_attempt', 'LOOK_ATTEMPT')):
             m = re.search(r'^M\.%s = (\d+)' % const, src, re.M)
             self.assertIsNotNone(m, 'planner.lua sets M.%s to a number' % const)
             for s in got['starts']:

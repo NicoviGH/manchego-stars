@@ -1486,8 +1486,41 @@ do
     check(r.lookahead.decisions, n, "every decision counted")
     check(r.lookahead.calls, 3 * n, "their calls summed")
     check(r.lookahead.cpu_s, 0.5 * n, "and their CPU")
-    check(left[1], 32, "the first is told the whole attempt budget")
-    check(left[2], 29, "the next what the first left")
+    check(left[1], Planner.LOOK_ATTEMPT, "the first is told the whole attempt budget")
+    check(left[2], Planner.LOOK_ATTEMPT - 3, "the next what the first left")
+end
+
+-- test_an_exhausted_lookahead_is_an_anomaly (#570): a decision the attempt's budget left one
+-- phase deep is visible in the record -- one lookahead_budget anomaly an attempt, on the first
+-- such turn, counting every decision skipped -- not only as a sum in rec.lookahead.
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = rout() }
+    g.api.Planner = {
+        surprise = Planner.surprise, LOOK_ATTEMPT = 0,
+        plan = function(_, board)
+            local look = { decisions = 1, triggered = 1, extended = 0, skipped_budget = 1,
+                           calls = 0, cpu_s = 0 }
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil, nil, { look = look } end
+            end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                             targetId = 0x81, move = { x = 0, y = 0 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                              lookahead = { trigger = { "boss" }, skipped = true, calls = 0 } },
+                { look = look }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local seen = {}
+    for _, a in ipairs(r.anomalies) do
+        if a.kind == "lookahead_budget" then seen[#seen + 1] = a end
+    end
+    check(r.lookahead.skipped_budget > 1, true, "more than one decision skipped")
+    check(#seen, 1, "one lookahead_budget anomaly an attempt")
+    check(seen[1] and seen[1].skipped, r.lookahead.skipped_budget, "counting every skip")
+    check(seen[1] and seen[1].turn ~= nil, true, "on the turn it first ran out")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

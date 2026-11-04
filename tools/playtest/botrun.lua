@@ -509,6 +509,10 @@ function M.run(api)
     local function lookLeft()
         return (api.Planner and api.Planner.LOOK_ATTEMPT or 0) - rec.lookahead.calls
     end
+    -- the attempt's lookahead_budget anomaly, once one is recorded: a decision the attempt's
+    -- budget left one phase deep shows in the record, not only in the sum (#570: 32 calls ran
+    -- out before ours-ch03's boss fight, and only `skipped_budget` said so)
+    local lookOut
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
@@ -875,6 +879,14 @@ function M.run(api)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         for k, v in pairs(cost.look or {}) do
                             rec.lookahead[k] = rec.lookahead[k] + v
+                        end
+                        if (cost.look or {}).skipped_budget == 1 then
+                            if lookOut then
+                                lookOut.skipped = lookOut.skipped + 1
+                            else
+                                lookOut = { kind = "lookahead_budget", turn = turn, skipped = 1 }
+                                anomaly(lookOut)
+                            end
                         end
                         if plan then
                             sent, stuck = plan.goals, plan.stuck
