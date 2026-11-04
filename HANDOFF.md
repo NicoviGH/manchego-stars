@@ -9,15 +9,36 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-11-03 (Claude, latest). **#510 step 9 PR-D MERGED: #564 (e20db82).** The
-durable record is in three places:
-- **#510's plan comment (6563384310):** PR-D's checkpoint note, and #566 slotted before PR-E.
-- **ADR 0384:** Built (PR-D); the panel amendment (progress before the judged score); the
-  measured cost.
-- **Research record 0024:** the panel and its transcript.
+Refreshed 2026-11-03 (Claude, latest). **#510 step 9 PR-E MERGED: #568 (4b08719).**
 
 **NEXT:**
-1. **PR-E onward** per the plan comment.
+1. **Open the session with a progress report on #510 for Nicolas** (his ask, 2026-11-03). Keep it
+   short and plain. Cover:
+   - where step 9 stands: PR-A to PR-E merged, PR-F to PR-J left, with one line each on what
+     they do (read the ticks in #510's plan comment 6563384310);
+   - the open items below.
+2. Then **PR-F** (T071-T080, diagnostics) per the plan comment.
+
+**What PR-E built** (ADR 0389, ADR 0386 Built):
+- **Retry memory:** a retry remembers only the turns earlier failed attempts saw reinforcements
+  arrive. Attempt 1, and so every measured cell, is untouched.
+- **Lookahead:** at a door or wall breach, or a unit's first step into a seen boss's reach, the
+  top 4 plans face a second enemy phase, our units holding in between (Nicolas chose the hold).
+  Budget: 8 calls a decision, 32 an attempt.
+- **Arrival trigger dropped** (Nicolas: "drop it"): the second phase can't place the wave.
+  #569 (on hold) brings it back for claims.
+- **Measured** (with the arrival trigger still in; the final build was not re-measured):
+  - SC-003: 559,289 calls, 1.1% under PR-D, within budget.
+  - Play, tuning seeds against PR-D: 20 of 26 runs unchanged; same wins and deaths; one
+    clean clear fewer.
+- **Review:** `/code-review 568 medium` in a subagent, 10 findings: 9 fixed, 1 decided by
+  Nicolas. One scoped re-review, clean. CI green on the head.
+
+**Open from PR-E** (ADR 0389's Open section; for Nicolas):
+- Keep the hold, or build the re-propose (it needs a staged `sight`)?
+- On a Defeat Boss map the boss trigger fires on most decisions and spends the budget (ours-ch03:
+  62 of the suite's 80 skips).
+- The breach's "first crossing" is not built.
 
 **#566 CLOSED by #567 (47cd148), 2026-11-03.** SC-003's stand-in baseline is PR-D's work:
 565,656 `AiDecideMain` calls, a budget of 678,787 (`montecarlo.py` `SC003_BASELINE_CALLS`,
