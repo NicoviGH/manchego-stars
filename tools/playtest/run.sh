@@ -109,7 +109,8 @@
 #   e.g. tools/playtest/make_gif.py recordscene intro --name ch02-opening --fps 15 --open
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
-# tools/emulator/mGBA-dev.app on first run. Results land in /tmp/playtest-<scenario>/.
+# tools/emulator/mGBA-dev.app on first run. Results land in /tmp/playtest-<scenario>/ (see
+# PT_RUN_TAG below for a tagged run's).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"

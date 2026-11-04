@@ -84,7 +84,8 @@ test:
 #   make matrix SUITE=ch04      # every ch04 scenario off one CH04BOOT=1 build
 #   make matrix SUITE=all       # every non-manual verdict scenario (long)
 # Artifacts + results.json land in /tmp/playtest-matrix; per-scenario screenshots and
-# logs stay in /tmp/playtest-<scenario>/ as before.
+# logs in /tmp/playtest-<scenario>/, except a green verdict scenario's, which move to its
+# .matrix-verdictcache slot (#574).
 SUITE ?= gate
 matrix:
 ifeq ($(strip $(SUITE)),all)

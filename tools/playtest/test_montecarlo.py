@@ -6,10 +6,12 @@ import json
 import multiprocessing
 import os
 import re
+import shutil
 import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -135,18 +137,25 @@ def setUpModule():
 
 
 def tearDownModule():
+    shutil.rmtree(mc.RUN_ROOT, True)
     mc.RUN_ROOT = _RUN_ROOT
 
 
 class RunDirs(unittest.TestCase):
     """#574: a passing run leaves no dir behind; a failing one's is kept, the newest N."""
 
+    def tmp(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        return d
+
     def setUp(self):
-        self.root = tempfile.mkdtemp()
-        self.d = tempfile.mkdtemp()
+        self.root, self.d = self.tmp(), self.tmp()
         self.out = os.path.join(self.d, 'runs.jsonl')
 
-    def launch(self, outcome):
+    def launch(self, line):
+        """A fake run.sh: a tagged run dir with a ROM and a trace, and `line` (a format taking
+        the task's seed) as its stdout."""
         def launch(task, tag, log_path):
             where = os.path.join(self.root, 'playtest-campaign@' + tag)
             os.makedirs(where)
@@ -154,12 +163,14 @@ class RunDirs(unittest.TestCase):
                 fh.write(b'rom')
             with open(os.path.join(where, 'trace-1.jsonl'), 'w') as fh:
                 fh.write('{"t": "start"}\n')
-            return ('BOTRUN {"seed": %d, "outcome": "%s", "trace": "trace-1.jsonl"}\n'
-                    % (task['seed'], outcome), where)
+            return (line % task['seed'] if line else ''), where
         return launch
 
-    def pool(self, outcome, n=1, keep=mc.KEEP_FAILED):
-        return list(mc.Pool(jobs=2, out=self.out, launch=self.launch(outcome),
+    def pool(self, outcome, n=1, keep=mc.KEEP_FAILED, extra=''):
+        line = None if outcome is None else (
+            'BOTRUN {"seed": %%d, "outcome": "%s", "trace": "trace-1.jsonl"%s}\n'
+            % (outcome, extra))
+        return list(mc.Pool(jobs=2, out=self.out, launch=self.launch(line),
                             run_root=self.root, keep_failed=keep).run(
             [{'seed': s} for s in range(1, n + 1)]))
 
@@ -169,6 +180,9 @@ class RunDirs(unittest.TestCase):
         for r in recs:
             self.assertTrue(os.path.isfile(os.path.join(self.d, r['trace'])),
                             'the trace is filed before the dir goes')
+            self.assertNotIn('run_dir', r, 'a record never names a dir that is gone')
+        with open(self.out) as fh:
+            self.assertEqual(len(fh.read().splitlines()), 3, 'records are kept on disk')
 
     def test_a_failing_run_keeps_its_dir_marked(self):
         recs = self.pool('crashed')
@@ -176,46 +190,71 @@ class RunDirs(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(recs[0]['run_dir'], mc.FAILED_MARK)))
         self.assertTrue(os.path.isfile(os.path.join(recs[0]['run_dir'], 'fireemblem8.gba')))
 
+    def test_a_stall_or_a_fault_is_failing(self):
+        for outcome, extra in (('stuck', ''), ('won', ', "env_status": {"fault": "watch"}')):
+            recs = self.pool(outcome, extra=extra)
+            self.assertTrue(os.path.isdir(recs[0]['run_dir']), outcome + extra)
+
+    def test_a_campaign_stopped_short_is_failing(self):
+        for end in ('bot_fault', 'infeasible', 'played'):
+            text = ('BOTRUN {"seed": 1, "chapter": 2, "outcome": "won"}\n'
+                    'CAMPAIGN {"outcome": "%s"}\n' % end)
+            self.assertEqual(mc.passing(mc.records_of({}, text, '/w', '/x.log')),
+                             end == 'played', end)
+
     def test_only_the_newest_failing_dirs_are_kept(self):
         self.pool('crashed', n=5, keep=2)
         self.assertEqual(len(os.listdir(self.root)), 2)
 
     def test_a_worker_that_left_no_record_is_failing(self):
-        def launch(task, tag, log_path):
-            where = os.path.join(self.root, 'playtest-campaign@' + tag)
-            os.makedirs(where)
-            return '', where
-        recs = list(mc.Pool(jobs=1, out=self.out, launch=launch, run_root=self.root).run(
-            [{'seed': 1}]))
+        recs = self.pool(None)
         self.assertTrue(os.path.isdir(recs[0]['run_dir']))
 
-    def make(self, name, age, failed=False):
+    def test_a_cleanup_error_never_costs_the_run(self):
+        """A full disk while marking a failing run is said, and the Pool goes on."""
+        where = self.launch(None)({'seed': 1}, 'z', '/x.log')[1]
+        with mock.patch.object(mc, 'prune_runs', side_effect=OSError(28, 'No space left')), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            mc.settle_run_dir(where, False, self.root)
+        self.assertIn('No space left', err.getvalue())
+
+    def make(self, name, age, failed=False, deep=False):
         where = os.path.join(self.root, name)
-        os.makedirs(where)
-        files = ['mgba-stdout.log'] + ([mc.FAILED_MARK] if failed else [])
+        os.makedirs(os.path.join(where, 'shots'))
         then = time.time() - age
+        files = ['mgba-stdout.log'] + ([mc.FAILED_MARK] if failed else [])
         for f in files:
             open(os.path.join(where, f), 'w').close()
             os.utime(os.path.join(where, f), (then, then))
+        if deep:   # a live run writing only into a subdir
+            open(os.path.join(where, 'shots', '01.png'), 'w').close()
+        os.utime(os.path.join(where, 'shots'), (then, then))
         os.utime(where, (then, then))
         return where
 
     def test_the_next_run_prunes_dead_and_surplus_dirs(self):
         dead = self.make('playtest-campaign@1-1-0', age=2 * mc.STALE_S)
         live = self.make('playtest-campaign@1-1-1', age=60)
+        deep = self.make('playtest-campaign@1-1-2', age=2 * mc.STALE_S, deep=True)
         old = [self.make('playtest-campaign@2-1-%d' % i, age=3600 + i, failed=True)
                for i in range(4)]
         other = self.make('playtest-ch01', age=2 * mc.STALE_S)   # untagged: not the pool's
         self.pool('won', keep=2)
         left = set(os.path.join(self.root, n) for n in os.listdir(self.root))
-        self.assertEqual(left, {live, old[0], old[1], other})
+        self.assertEqual(left, {live, deep, old[0], old[1], other})
         self.assertFalse(os.path.exists(dead))
 
+    def test_two_pools_never_share_a_tag(self):
+        """`cell` makes a Pool per look: a reused tag would overwrite a kept failing dir."""
+        first = self.pool('crashed')[0]['run_dir']
+        second = self.pool('crashed')[0]['run_dir']
+        self.assertNotEqual(first, second)
+        self.assertTrue(os.path.isdir(first) and os.path.isdir(second))
+
     def test_a_dir_outside_the_run_root_is_never_touched(self):
-        elsewhere = tempfile.mkdtemp()
-        where = os.path.join(elsewhere, 'playtest-campaign@x')
+        where = os.path.join(self.tmp(), 'playtest-campaign@x')
         os.makedirs(where)
-        mc.settle_run_dir(where, [{'outcome': 'won'}], self.root)
+        mc.settle_run_dir(where, True, self.root)
         self.assertTrue(os.path.isdir(where))
 
 
@@ -896,7 +935,6 @@ class Suite(unittest.TestCase):
     def test_a_set_simdir_is_refused(self):
         import contextlib
         import io
-        from unittest import mock
 
         def never(*a, **k):   # a guard that moved below these would play the real suite
             raise AssertionError('the suite went past its PT_SIMDIR guard')

@@ -1450,10 +1450,17 @@ class PassingRunDirs(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(out.artifacts, 'playtest.log')),
                         'the log moved to the cache before the dir went')
 
-    def test_a_passing_run_with_the_cache_off_still_leaves_no_dir(self):
+    def test_a_passing_run_with_the_cache_off_keeps_its_only_log(self):
         where, out = self.store('a', 'PASS', fingerprint=None)
-        self.assertFalse(os.path.exists(where))
-        self.assertEqual(out.artifacts, '')
+        self.assertTrue(os.path.isdir(where), 'no cache slot holds its log')
+        self.assertEqual(out.artifacts, where)
+
+    def test_a_slot_never_records_a_tmp_path_it_did_not_fill(self):
+        outcome = mx.Outcome('a', 'canonical', 'PASS', 1.0, os.path.join(self.dir, 'gone'))
+        kept = mx.store_cached_verdict('a', 'fp1', outcome, cache_dir=self.cache_dir)
+        self.assertIsNone(kept)
+        hit = mx.load_cached_verdict('a', 'fp1', cache_dir=self.cache_dir)
+        self.assertEqual(hit['artifacts'], '', 'the next run would overwrite that path')
 
     def test_a_failing_run_keeps_its_dir(self):
         for verdict in ('FAIL', 'ERROR'):
