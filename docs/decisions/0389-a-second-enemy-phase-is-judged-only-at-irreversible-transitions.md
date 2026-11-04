@@ -107,3 +107,18 @@ second phase.
   the budget is gone before most units reach the boss. `M.LOOK_ATTEMPT` is 128 (the most any
   tuning game wanted was 19 triggered decisions, 76 calls); FR-018's "32 per attempt" is amended to
   match. Measured in "After #570" below.
+
+**After #570 (measured 2026-11-04, `suite --baseline`, 52 runs, `M.LOOK_ATTEMPT` = 128).**
+- **SC-003:** 566,389 `AiDecideMain` calls against the budget of 678,787 (+1.3% on PR-E's 559,289,
+  +0.1% on the 565,656 baseline). The lookahead made 608 `nextPhase` calls (10.2 CPU s).
+- **No decision skipped for budget** (80 before): 152 of 701 decisions triggered, all extended.
+  ours-ch03 extended 62 of 62.
+- **Play, tuning seeds, against PR-E's final measure:**
+  - 19 of 26 runs are unchanged in outcome, turns, deaths and labelled fallbacks.
+  - Wins stay at 23. Clean clears rise from 13 to 14 (vanilla Ch5 seed 1002, a turn faster).
+  - Deaths rise from 14 to 15: ours-ch03 seed 1002 loses unit 3 to the boss on turn 21 (predicted
+    0.90, a labelled fallback). By turn 20 no plan judged was under the cap, even on one phase; the
+    run had parted from PR-E's earlier, and PR-E's had a safe hold there. Whether the hold (which
+    makes standing by the boss read as a second-phase death) caused it is not witnessed: it is a
+    live-proof case for PR-F's replays (#570).
+  - `fallback_sacrifice` labels rise from 22 to 29.
