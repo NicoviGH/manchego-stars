@@ -1516,6 +1516,7 @@ do
     for _, a in ipairs(r.anomalies) do
         if a.kind == "lookahead_budget" then seen[#seen + 1] = a end
     end
+    check(r.lookahead.skipped_budget > 1, true, "more than one decision skipped")
     check(#seen, 1, "one lookahead_budget anomaly an attempt")
     check(seen[1] and seen[1].skipped, r.lookahead.skipped_budget, "counting every skip")
     check(seen[1] and seen[1].turn ~= nil, true, "on the turn it first ran out")
