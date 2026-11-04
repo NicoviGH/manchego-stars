@@ -2921,9 +2921,11 @@ def _git(args):
 # Two states pass, and the second is what makes the rule livable:
 #   * UNTOUCHED  -- the branch never edited HANDOFF (git's 3-way merge then keeps main's
 #     version, so main advancing while the branch is open is harmless and must not fail);
-#   * SYNCED     -- the branch's copy is byte-identical to main's tip, which is the ideal
-#     state for a worktree, since people read HANDOFF where they are working.
-# Anything else is a branch carrying live state it does not own.
+#   * SYNCED     -- the branch's copy is byte-identical to main's tip. Tolerated, never
+#     advised: a copy made on the branch drifts again with main's next refresh (ADR 0390).
+# Anything else is a branch carrying live state it does not own, and the guard's message
+# names the fix for how it got there (ADR 0390): unstage a staged edit; merge main's own
+# unpushed commits once they are pushed; restore the branch's starting copy over its own.
 
 HANDOFF_FILE = 'HANDOFF.md'
 
@@ -2949,14 +2951,32 @@ def _handoff_branch_state():
               or HANDOFF_FILE in _diff_names(base))
     if not edited:
         return 'ok', ''                                  # UNTOUCHED
-    # The INDEX, not HEAD: the commit that syncs a drifted branch (`git checkout main --
-    # HANDOFF.md`, or a merge of main) is checked here before it exists.
+    # The INDEX, not HEAD: the commit that undoes a drift (a merge of main, or the branch's
+    # starting copy restored) is checked here before it exists.
     if not _git(['diff', '--cached', '--name-only', main_ref, '--', HANDOFF_FILE]):
         return 'ok', ''                                  # SYNCED to main's tip
     if HANDOFF_FILE in staged:
-        return 'diverged', 'staged for commit on `%s`' % branch
-    return 'diverged', ('committed on `%s` and it differs from %s'
-                        % (branch, main_ref))
+        return 'diverged', ('staged for commit on `%s`. Fix: `git restore --staged --worktree '
+                            '%s` drops the edit' % (branch, HANDOFF_FILE))
+    # Branch commits that touch HANDOFF and are not on the local main: none means they are
+    # main's own commits, not yet pushed, that the branch was cut on top of
+    mains = (main_ref != base_ref and bool(_git(['rev-parse', '--verify', '--quiet', base_ref]))
+             and not _git(['log', '--format=%H', '%s..HEAD' % base_ref, '--', HANDOFF_FILE]))
+    if mains:
+        fix = ('they are %s\'s own unpushed commits: push %s, then `git merge %s` into the '
+               'branch' % (base_ref, base_ref, main_ref))
+    else:
+        # a local main still holding unpushed HANDOFF commits would be undone by the restore
+        first = ''
+        if (main_ref != base_ref and _git(['rev-parse', '--verify', '--quiet', base_ref])
+                and _git(['log', '--format=%H', '%s..%s' % (main_ref, base_ref), '--',
+                          HANDOFF_FILE])):
+            first = 'push %s and `git merge %s` first; then ' % (base_ref, main_ref)
+        fix = ('the branch wrote it: %srestore the copy it started from and commit it '
+               '(`git checkout $(git merge-base %s HEAD) -- %s`), so its net change is zero'
+               % (first, main_ref, HANDOFF_FILE))
+    return 'diverged', ('committed on `%s` and it differs from %s. Fix: %s'
+                        % (branch, main_ref, fix))
 
 
 def check_every_test_actually_runs(fail):
@@ -3266,12 +3286,10 @@ def check_handoff_only_on_main(fail):
         fail.append(
             '%s %s. Live state is global and belongs on main -- a branch copy silently '
             'overwrites main\'s when it merges (this cost us ch04\'s state on 2026-07-30). '
-            'Fix: `git checkout main -- %s`, which also leaves the worktree showing TRUE live '
-            'state for whoever reads it there. On a long-lived branch, where main\'s HANDOFF '
-            'may move again, `git checkout $(git merge-base main HEAD) -- %s` instead zeroes '
-            'the branch\'s net diff so it stays clean -- at the cost of a stale copy in the '
-            'worktree. Either way, refresh HANDOFF on main AFTER the merge, never on the '
-            'branch.' % (HANDOFF_FILE, detail, HANDOFF_FILE, HANDOFF_FILE))
+            'Never copy main\'s file onto the branch (`git checkout main -- %s`): main\'s '
+            'next refresh trips the guard again, and each copy is another branch commit of it '
+            '(Nicolas, 2026-10-29; ADR 0390). Refresh HANDOFF on main, never on the branch.'
+            % (HANDOFF_FILE, detail, HANDOFF_FILE))
     elif state == 'unknown':
         print('  note: HANDOFF branch guard skipped -- %s' % detail)
 

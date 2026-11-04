@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-389 decisions. Read this index, then open the two or three you need — the whole
+390 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -70,8 +70,9 @@ no update ever propagated. These conventions keep a single source of truth.
 - *Work backlog* → GitHub issues (milestones M0–M4).
 
 **HANDOFF.md is authored on `main` only (2026-07-30).** Gated by
-`check.py check_handoff_only_on_main`; a branch may leave it untouched or sync it to main's
-tip, but may not author its own. Refresh it on main *after* a merge, never on the branch.
+`check.py check_handoff_only_on_main`; a branch leaves it untouched. A branch that drifts is
+undone by how it drifted, never synced by copying main's file (ADR 0390). Refresh it on main
+*after* a merge, never on the branch.
 
 *Why it needed a gate rather than a habit.* HANDOFF describes **global** live state, but it
 is a tracked repo-root file — so every branch and worktree gets a private copy that quietly
@@ -88,7 +89,7 @@ next starts"* (below), showing up in a file instead of a rebase — and it had *
 caught once**, on 2026-07-21, with the mitigation "keep the copies in sync". That is a
 memory, not a control, and it failed nine days later. Hence a check: the guard passes the
 two states that are actually safe (untouched — git's 3-way merge keeps main's version; or
-byte-identical to main's tip, the ideal state for a worktree people read HANDOFF in) and
+byte-identical to main's tip, tolerated but never the advised fix, ADR 0390) and
 fails only a branch carrying live state it does not own. It reports *skipped* rather than
 *violated* when it cannot see a base, because a guard that cries wolf gets bypassed.
 - *Live state* → the single **`HANDOFF.md`** (one trunk, feature-flow — the per-track handoffs were retired 2026-06-24); `/handoff` refreshes it in place. Keep it lean: live Now/Next + gotchas + pointers, no per-session history (that's `git log` + closed issues). *Vision/pitch* → `PRD.md` (no specifics that live elsewhere).
@@ -115,6 +116,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0291` | [A guard that SKIPS declares who covers it, and the declaration is checked](decisions/0291-a-skip-message-is-a-declaration-not-a-sentence.md) | 2026-09-17 | #379 |
 | `0296` | [A DEAD_CONCEPTS pattern is keyed on the UNIT, not on the sentence that happened to survive](decisions/0296-a-dead-concept-pattern-is-keyed-on-the-unit-not-the-sentence.md) | 2026-09-18 | #393 #298 #311 |
 | `0298` | [Every registered check proves it can FAIL, against the real tree with one input doctored](decisions/0298-every-registered-check-proves-it-can-fail.md) | 2026-09-30 | #407 |
+| `0390` | [One checkout, one writer; a branch's HANDOFF drift is undone, never synced](decisions/0390-one-checkout-one-writer-and-handoff-drift-is-undone.md) | 2026-11-04 | #572 |
 
 ---
 

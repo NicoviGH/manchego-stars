@@ -31,6 +31,17 @@ resolves to nothing raises. A claim whose fields need a model the runner has not
 --from N resumes at chapter index N's start as an earlier run of the same --id saved it
 (references/sim/<game>/<rom-hash>/states/<id>/N.ss), so a fault in a late chapter is studied
 without replaying the chapters before it. It needs --id: the default id names no earlier run.
+N is an index, not a chapter's name: vanilla's is the chapter id in constants/chapters.h (Ch5 is
+6, Ch5x 5), ours' the host slot in tools/inject/hosts.py (ch03 is CH03_HOST_INDEX, 4).
+
+To play that one chapter alone, set `last: [N]` in the JSON too, and `attempt: k` to play only
+the k-th style drawn: without `attempt`, campaign.lua retries the chapter until it clears clean
+and plays on to the next. Then `PT_CAMPAIGN="$(cat env.json)" tools/playtest/run.sh campaign`
+(`PT_VANILLA=1` for retail), or many attempts at once with `montecarlo.py attempts --env
+env.json`. Regenerate an ours env with this script before measuring: an env kept in an old
+scratch dir predates `house_gifts`, and a House with no prior is worth 0 (that sent #556 the
+wrong way). To play from a copy of a store, point `PT_SIMDIR` at it. A run without `attempt`
+re-saves the starts it passes, so back the store up first.
 """
 import argparse
 import functools

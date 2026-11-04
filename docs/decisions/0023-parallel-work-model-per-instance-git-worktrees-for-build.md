@@ -8,6 +8,8 @@ issues: []
 
 # Parallel work model: per-instance git worktrees for build isolation, not branch-per-track.
 
+**Superseded by ADR 0390 (Nicolas, 2026-10-29; recorded 2026-11-04).** One checkout, one writer: a task is a plain branch in the main checkout, and a worktree is made only with Nicolas's say-so. Nothing below is current.
+
 The two tracks above run as two Claude instances against trunk. The load-bearing requirement is
 **build isolation**: `make` mutates the `fireemblem8u` submodule working tree, so two instances in
 one checkout would race and corrupt each other's build. Each instance therefore gets its own
