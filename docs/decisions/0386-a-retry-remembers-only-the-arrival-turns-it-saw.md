@@ -48,4 +48,8 @@ attempts, and measured attempts here do not either.
   no earlier result to remember: the workers run side by side. So pool attempt k plays the style and
   team the loop would after k - 1 failures, but without the memory. Attempt 1, and so every measured
   cell (ADR 0385), is the same either way (`test_campaign.lua` pins `api.only = 1`).
-- The measured counts of remembered arrivals and CPU come with the PR-E live proof (plan T069).
+- **Measured (2026-11-03).** The suite's tuning seeds (26 first attempts) saw 137 arrivals on
+  screen: scout-ch13 48, scout-ch10 28, scout-ch14 20, vanilla Ch4 13, Ch5 11, Ch1 5, Ch2 2, ours
+  ch01 6, ch02 4, the rest none. The suite plays attempt 1 only, so none was remembered and its play
+  and CPU are untouched (ADR 0389 has the suite's cost). A remembered arrival is used only on a
+  campaign's retry, which no suite run makes.

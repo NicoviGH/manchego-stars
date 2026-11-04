@@ -691,6 +691,19 @@ class Suite(unittest.TestCase):
         self.assertIn(': within', text)
         self.assertNotIn('won', text, 'a baseline reports cost, never a held-out outcome')
 
+    def test_the_suite_reports_the_lookahead(self):
+        # FR-018 / SC-003: the trigger rate, coverage, skipped extensions and CPU, per start and
+        # summed; a record from before the lookahead has none and adds nothing
+        look = {'decisions': 10, 'triggered': 2, 'extended': 1, 'skipped_budget': 1,
+                'calls': 4, 'cpu_s': 0.25}
+        text = self.sc003(lambda i, t: {'outcome': 'won', 'lookahead': look} if i % 2 == 0
+                          else {'outcome': 'won'})
+        self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs', text)
+        self.assertIn('lookahead: 4 of 20 decisions triggered (20.0%), 2 extended, 2 skipped '
+                      'for budget, 8 calls, 0.5 CPU s', text)
+        self.assertIn('the suite\'s lookahead: 8 of 40 decisions triggered (20.0%), 4 extended, '
+                      '4 skipped for budget, 16 calls, 1.0 CPU s', text)
+
     def sc003(self, records, baseline=True, keep=lambda t: True):
         """The suite's lines when each task `keep` allows comes back as `records(i, task)`."""
         def play(tasks):

@@ -803,6 +803,19 @@ def suite_estimate(suite, tasks, kept, jobs):
     return total / max(1, min(jobs, len(tasks))) / 3600
 
 
+# the planner's lookahead, as botrun sums it into rec.lookahead (FR-018)
+LOOKAHEAD = ('decisions', 'triggered', 'extended', 'skipped_budget', 'calls', 'cpu_s')
+
+
+def lookahead_line(look):
+    """The lookahead's trigger rate, coverage, skipped extensions and CPU (SC-003), in words."""
+    return ('lookahead: %d of %d decisions triggered (%.1f%%), %d extended, %d skipped for '
+            'budget, %d calls, %.1f CPU s' % (
+                look['triggered'], look['decisions'],
+                100.0 * look['triggered'] / max(1, look['decisions']), look['extended'],
+                look['skipped_budget'], look['calls'], look['cpu_s']))
+
+
 def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=check_starts,
               kept=None, wall_limit_h=MAX_WALL_H):
     """Play the suite and say what it cost, as lines to print. `baseline` plays every seed,
@@ -836,8 +849,11 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
         if sid is None or (rec.get('kind') == 'campaign' and key in seen):
             continue
         seen.add(key)
-        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0})
+        got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0,
+                                   'look': dict.fromkeys(LOOKAHEAD, 0)})
         costs = rec.get('costs') or {}
+        for k, v in (rec.get('lookahead') or {}).items():
+            got['look'][k] += v
         got['n'] += 1
         got['cpu'] += costs.get('cpu_s') or 0.0
         got['wall'] += rec.get('wall_s') or 0.0
@@ -854,7 +870,8 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
             line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
-    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0}
+    total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0,
+             'look': dict.fromkeys(LOOKAHEAD, 0)}
     missing = 0
     for st in suite['starts']:
         got = per.get(st['start_id'])
@@ -863,7 +880,11 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
             missing += 1
             continue
         for k in total:
-            total[k] += got[k]
+            if k == 'look':
+                for j in LOOKAHEAD:
+                    total[k][j] += got[k][j]
+            else:
+                total[k] += got[k]
         played = got['n'] - got['unread']
         lines.append('%s (%s chapter %d, %s): %d runs, %d AiDecideMain calls, %.1f CPU s and '
                      '%.1f wall s in all, %.1f calls and %.1f CPU s a run%s' % (
@@ -871,9 +892,11 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
                          got['calls'], got['cpu'], got['wall'], got['calls'] / max(1, played),
                          got['cpu'] / got['n'],
                          '; %d without a game result' % got['unread'] if got['unread'] else ''))
+        lines.append('  ' + lookahead_line(got['look']))
     lines.append('the suite: %d runs, %d AiDecideMain calls, %.1f CPU s and %.1f wall s of work, '
                  '%d without a game result' % (total['n'], total['calls'], total['cpu'],
                                                total['wall'], total['unread']))
+    lines.append("the suite's " + lookahead_line(total['look']))
     # SC-003 is a whole suite's cost: the tuning seeds alone are half of it, and a run that never
     # came back or played to no result would read as a saving
     budget = int(SC003_BASELINE_CALLS * (1 + SC003_MARGIN))

@@ -1440,5 +1440,44 @@ do
     check(n, 1, "bait loop: once")
 end
 
+-- test_the_record_sums_the_lookahead (T064, FR-018): each decision's lookahead cost is summed
+-- into rec.lookahead, and the planner is told the attempt's calls left (Planner.LOOK_ATTEMPT
+-- less those spent).
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = rout() }
+    local left = {}
+    g.api.Planner = {
+        surprise = Planner.surprise, LOOK_ATTEMPT = Planner.LOOK_ATTEMPT,
+        plan = function(_, board, _, _, opts)
+            left[#left + 1] = opts.budget.attempt
+            local look = { decisions = 1, triggered = 1, extended = 1, skipped_budget = 0,
+                           calls = 3, cpu_s = 0.5 }
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil, nil, { look = look } end
+            end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                             targetId = 0x81, move = { x = 0, y = 0 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                              lookahead = { trigger = { "boss" }, extended = true, calls = 3 } },
+                { look = look }
+        end,
+    }
+    local traced
+    g.api.trace = function(ev)
+        if ev.t == "plan" and ev.lookahead then traced = ev.lookahead end
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(traced and traced.trigger[1], "boss", "the plan's trace says what triggered it")
+    local n = #left
+    check(n >= 2, true, "more than one decision")
+    check(r.lookahead.decisions, n, "every decision counted")
+    check(r.lookahead.calls, 3 * n, "their calls summed")
+    check(r.lookahead.cpu_s, 0.5 * n, "and their CPU")
+    check(left[1], 32, "the first is told the whole attempt budget")
+    check(left[2], 29, "the next what the first left")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

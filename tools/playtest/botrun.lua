@@ -499,8 +499,16 @@ function M.run(api)
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
                   board_repeats = 0, arrivals_seen = {},
+                  -- the planner's lookahead, summed over the attempt (FR-018): decisions
+                  -- planned, triggered, extended, skipped for budget, its calls and CPU
+                  lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
+                                calls = 0, cpu_s = 0 },
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
+    -- the lookahead's calls left this attempt (Planner.LOOK_ATTEMPT, FR-018)
+    local function lookLeft()
+        return (api.Planner and api.Planner.LOOK_ATTEMPT or 0) - rec.lookahead.calls
+    end
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
@@ -854,12 +862,16 @@ function M.run(api)
                                                          { stalled = stalled, sent = sent,
                                                            stuck = stuck,
                                                            explored = explore.explored(),
-                                                           lost = explore.lost() })
+                                                           lost = explore.lost(),
+                                                           budget = { attempt = lookLeft() } })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
                         cost = cost or {}
                         rec.plans.phases = rec.plans.phases + (cost.phases or 0)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
+                        for k, v in pairs(cost.look or {}) do
+                            rec.lookahead[k] = rec.lookahead[k] + v
+                        end
                         if plan then
                             sent, stuck = plan.goals, plan.stuck
                             -- the board this plan committed to, and its decision index (a
@@ -924,6 +936,7 @@ function M.run(api)
                                 explore = plan and plan.explore, goals = plan and plan.goals,
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
+                                lookahead = plan and plan.lookahead,
                                 win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then

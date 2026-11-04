@@ -279,14 +279,21 @@ end
 -- Every equip in sight.lua goes through Sight.equip: a sandbox read that called
 -- EquipUnitItemSlot itself would leak the reordered bag into the next judged plan again
 -- (the test above proves only the helper). Read off the source: the strike and the enemy
--- phase each equip through it, and the game call appears in Sight.equip alone.
+-- phases' staging each equip through it, both phases stage through that, and the game call
+-- appears in Sight.equip alone.
 do
     local f = assert(io.open(here .. "sight.lua"))
     local src = f:read("a")
     f:close()
     local _, direct = src:gsub("S%.EquipUnitItemSlot", "")
     check(direct, 1, "equip: EquipUnitItemSlot is called from Sight.equip alone")
-    for _, name in ipairs({ "s.strike", "s.enemyPhase" }) do
+    for _, name in ipairs({ "s.enemyPhase", "s.nextPhase" }) do
+        local at = src:find("function " .. name .. "(", 1, true)
+        local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
+        check(body ~= nil and body:find("stagePhase(call, plan)", 1, true) ~= nil, true,
+              "equip: " .. name .. " stages through stagePhase")
+    end
+    for _, name in ipairs({ "s.strike", "stagePhase" }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
         check(body ~= nil and body:find("M.equip(api, call, S, ", 1, true) ~= nil, true,
