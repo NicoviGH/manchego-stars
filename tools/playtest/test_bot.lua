@@ -4265,8 +4265,8 @@ end
 
 -- ── The lookahead (PR-E: FR-017, FR-018) ──────────────────────────────────────────────────
 
--- test_lookahead_triggers (T057): a door opened or a wall struck, a step into a seen boss's
--- reach from outside it, and the turn on or before a known arrival; nothing else.
+-- test_lookahead_triggers (T057): a door opened or a wall struck, and a step into a seen boss's
+-- reach from outside it; nothing else (no arrival trigger: ADR 0389).
 do
     local A = blue(0x01, 0, 0, 0)
     local K = red(0x81, 5, 0, { isBoss = true, minRange = 1, maxRange = 1 })
@@ -4278,9 +4278,8 @@ do
         for k, v in pairs(extra or {}) do a[k] = v end
         return a
     end
-    local st = style("careful")
-    local function why(fin, enemies, turn, s)
-        local t = Planner.triggers(B, fin, byId, enemies or {}, sight, s or st, turn or 1)
+    local function why(fin, enemies)
+        local t = Planner.triggers(fin, byId, enemies or {}, sight)
         return t and table.concat(t, ",") or "none"
     end
     check(why({ plan(act(1)) }), "none", "lookahead: a plain move is no transition")
@@ -4295,20 +4294,17 @@ do
     K.fogged = true
     check(why({ plan(act(4)) }, { K }), "none", "lookahead: a boss the fog hides is not seen")
     K.fogged = nil
-    local s3 = style("careful"); s3.arrivals = { { 3 } }
-    check(why({ plan(act(1)) }, {}, 3, s3), "arrival", "lookahead: the arrival's own turn")
-    check(why({ plan(act(1)) }, {}, 2, s3), "arrival", "lookahead: the turn before it")
-    check(why({ plan(act(1)) }, {}, 1, s3), "none", "lookahead: two turns before it, not yet")
-    check(why({ plan(act(1)) }, {}, 4, s3), "none", "lookahead: after it")
 end
 
 -- A at (0,0) is pulled to (1,0) toward a village; the next enemy phase leaves (1,0) alone, the
--- one after it kills a unit there for sure (o.nextPhase). `arrivals`: the style's.
-local function looksAhead(arrivals)
+-- one after it kills a unit there for sure (o.nextPhase). `boss`: a boss stands at (2,0), so
+-- (1,0) is a first step into its reach -- the lookahead's trigger.
+local function looksAhead(boss)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 0, 9, { minRange = false })
+    local K = boss and red(0x82, 2, 9, { isBoss = true, minRange = 1, maxRange = 1 })
     local o = {
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x82] = tiles({ 1, 1 }) },
         field = function(t)
             return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
         end,
@@ -4325,9 +4321,7 @@ local function looksAhead(arrivals)
             return {}
         end,
     }
-    local st = gifted("careful", 1000)
-    st.arrivals = arrivals
-    return boardOf(A, X), sightOf(o), st
+    return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
 
 -- test_lookahead_extends_all_finalists_or_none (T058, AS 1 and AS 2): with room, every
@@ -4338,7 +4332,7 @@ do
     check(at(Planner.plan(B, board, sight, st)), "1,0", "lookahead: no trigger, the march goes")
     check(sight.asked, nil, "lookahead: no trigger asks no second phase")
 
-    board, sight, st = looksAhead({ { 2 } })
+    board, sight, st = looksAhead(true)
     local a, plan, cost = Planner.plan(B, board, sight, st)
     check(at(a), "0,0", "lookahead: the second phase's sure death keeps A back")
     local fin = 0
@@ -4368,13 +4362,13 @@ do
     check(hold.rank.value, hold.judged, "lookahead: a safe hold pays nothing more")
     check(plan.protected[1].second, 0, "lookahead: holding at (0,0) is safe in the second phase")
 
-    board, sight, st = looksAhead({ { 2 } })
+    board, sight, st = looksAhead(true)
     a, plan, cost = Planner.plan(B, board, sight, st, { budget = { attempt = 1 } })
     check(at(a), "1,0", "lookahead: an exhausted budget keeps the original horizon")
     check(sight.asked, nil, "lookahead: and asks no finalist")
     check(plan.lookahead.skipped, true, "lookahead: tagged skipped")
     check(cost.look.skipped_budget, 1, "lookahead: counted as skipped")
-    board, sight, st = looksAhead({ { 2 } })
+    board, sight, st = looksAhead(true)
     a, plan = Planner.plan(B, board, sight, st, { budget = { decision = 1 } })
     check(plan.lookahead.skipped, true, "lookahead: a decision budget below the finalists skips")
     check(Planner.LOOK_DECISION .. "/" .. Planner.LOOK_ATTEMPT, "8/32",
@@ -4385,7 +4379,7 @@ end
 -- alone -- our units, the enemies gone, the enemies' HP -- and nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.
 do
-    local board, sight, st = looksAhead({ { 2 } })
+    local board, sight, st = looksAhead(true)
     Planner.plan(B, board, sight, st)
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
@@ -4401,8 +4395,9 @@ do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
+    local K = red(0x82, 2, 9, { isBoss = true, minRange = 1, maxRange = 1 })
     local o = {
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x82] = tiles({ 1, 1 }) },
         field = function(t)
             return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
         end,
@@ -4416,9 +4411,7 @@ do
                        takenCrit = 0, targetHp = 10 }, hp = hp }
         end,
     }
-    local st = gifted("careful", 1000)
-    st.arrivals = { { 2 } }
-    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), st)
+    local a, plan = Planner.plan(B, boardOf(A, G, X, K), sightOf(o), gifted("careful", 1000))
     check(plan.lookahead.extended, true, "lookahead: extended")
     for _, c in ipairs(plan.considered) do
         if c.extended then

@@ -45,8 +45,10 @@ attempts, and measured attempts here do not either.
 - **What is remembered.** `campaign.lua` keeps, per chapter start, the union of the TURNS in every
   earlier failed attempt's `arrivals_seen`, each once, in order, and from attempt 2 on hands them to
   the play as one more list in `style.arrivals`: where a reinforcements claim's turns go, read by
-  `Bot.nextArrival`. The tile and the unit stay in the record and are never passed on. Attempt 1
-  gets nothing.
+  `Bot.nextArrival`, so the march holds the turn before, as a claim makes it. The tile and the unit
+  stay in the record and are never passed on. Attempt 1 gets nothing. It is NOT a lookahead trigger:
+  that trigger was dropped (ADR 0389), because the second phase cannot place the wave, and a turn
+  alone never could.
 - **One consequence.** An attempt played alone (`api.only = k`, `montecarlo.py attempts`' pool) has
   no earlier result to remember: the workers run side by side. So pool attempt k plays the style and
   team the loop would after k - 1 failures, but without the memory. Attempt 1, and so every measured

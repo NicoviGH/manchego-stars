@@ -42,7 +42,7 @@
 --      of ours that could save it; a recruit, the acts of the units it strikes), the rest of the
 --      plan kept, and those are judged too.
 --      At an irreversible transition (M.triggers: a door opened or a wall struck, a first step
---      into a seen boss's reach, the turn on or before a known arrival) the best M.FINAL plans
+--      into a seen boss's reach) the best M.FINAL plans
 --      each meet a second enemy phase, our units holding between (sight.nextPhase): all of
 --      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
 --      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
@@ -365,10 +365,11 @@ end
 -- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
 -- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
 -- struck ("breach"); a unit stepping into a visible boss's reach from outside it ("boss": its
--- end tile under sight.threat, its start tile not); the turn on or before a known arrival
--- ("arrival": style.arrivals, guide claims and a retry's memory, through Bot.nextArrival).
--- `enemies` are the ones in sight (Bot.candidates' ctx.enemies). -> the kinds, sorted, or nil.
-function M.triggers(Bot, fin, byId, enemies, sight, style, turn)
+-- end tile under sight.threat, its start tile not). No arrival trigger: the second phase
+-- cannot place the wave yet, so it would learn nothing about it (ADR 0389, Nicolas
+-- 2026-11-03). `enemies` are the ones in sight (Bot.candidates' ctx.enemies).
+-- -> the kinds, sorted, or nil.
+function M.triggers(fin, byId, enemies, sight)
     local hit = {}
     local bosses = {}
     for _, e in ipairs(enemies or {}) do
@@ -383,9 +384,6 @@ function M.triggers(Bot, fin, byId, enemies, sight, style, turn)
             end
         end
     end
-    -- the next arrival from the turn before this one: 1 is this turn's, 2 the next
-    local n = turn and Bot.nextArrival(style.arrivals, turn - 1)
-    if n == 1 or n == 2 then hit.arrival = true end
     local out = {}
     for k in pairs(hit) do out[#out + 1] = k end
     table.sort(out)
@@ -1260,7 +1258,7 @@ function M.plan(Bot, board, sight, style, opts)
         end)
         local fin = {}
         for i = 1, math.min(M.FINAL, #idx) do fin[i] = judgedPlans[idx[i]].st end
-        look.trigger = M.triggers(Bot, fin, byId, ctx.enemies, sight, style, board.turn)
+        look.trigger = M.triggers(fin, byId, ctx.enemies, sight)
         if look.trigger then
             cost.look.triggered = 1
             local budget = opts and opts.budget or {}

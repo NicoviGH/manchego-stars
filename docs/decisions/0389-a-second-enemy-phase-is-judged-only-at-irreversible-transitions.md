@@ -16,9 +16,13 @@ later: a door or wall opened onto a room, a unit stepping into a boss's reach, a
 due. At those moments, and only then, the finalists meet a second enemy phase:
 
 - **Triggers** (`planner.lua` `M.triggers`): a door opened or a wall struck (`breach`); a unit ending
-  in a seen boss's reach (`sight.threat`) from a tile outside it (`boss`); the turn on, or the turn
-  before, a known arrival (`arrival`: `style.arrivals`, a guide claim's or a retry's memory, ADR
-  0386, through `Bot.nextArrival`). A boss the fog hides triggers nothing.
+  in a seen boss's reach (`sight.threat`) from a tile outside it (`boss`). A boss the fog hides
+  triggers nothing.
+- **No arrival trigger (Nicolas, 2026-11-03: "drop it").** FR-017 also named the turn on or before
+  a known arrival. But `nextPhase` cannot place units, so that second phase played without the wave
+  and learned nothing about it. In the measures below it took 24 of 101 triggered decisions on the
+  tuning seeds. Known arrivals still make the march hold the turn before (`Bot.nextArrival`).
+  Placing a claim's wave, and with it the trigger, is #569.
 - **All or none (FR-018).** The finalists are the best `M.FINAL` plans judged, by rank. If any
   triggers, each one gets one call to `sight.nextPhase`, or none does. The budget is
   `M.LOOK_DECISION` = 8 calls a decision and `M.LOOK_ATTEMPT` = 32 an attempt (botrun passes what is
@@ -48,6 +52,9 @@ due. At those moments, and only then, the finalists meet a second enemy phase:
 
 **Not built.** The "first crossing" of a breach (FR-017's second half of the first trigger) is
 left out: a door or wall struck triggers, but stepping through it later does not.
+
+Both measures below were taken WITH the arrival trigger, before it was dropped; the build without
+it was not re-measured.
 
 **Measured (2026-11-03, one 8-core Mac, load average about 2.5), before the review's fixes**
 (see "After the review" below for the re-measure). `suite --baseline`, 52 runs:
@@ -89,10 +96,6 @@ second phase.
 - **The hold or the re-proposal.** The hold overstates risk: a real player would retreat or heal
   between the phases. The re-proposal (R-8's first proposal) needs `sight` to stage a hypothetical
   board for every read `Bot.candidates` makes. Its cost is not measured.
-- **The arrival trigger places no arrival.** It spends the budget for a second phase without the
-  wave that triggered it: `nextPhase` plays only the enemies on the map. Placing a claim's wave
-  (its units are known, `style.waves`) needs the sandbox to load units; a retry's memory has turns
-  only (ADR 0386).
 - **The boss trigger on a Defeat Boss map.** It fires on most decisions there and spends the
   attempt's budget (ours-ch03). "First entry" may want to mean the first unit of the attempt, not
   each unit.
