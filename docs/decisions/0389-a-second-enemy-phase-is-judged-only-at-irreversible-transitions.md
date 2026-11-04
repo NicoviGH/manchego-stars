@@ -70,6 +70,21 @@ left out: a door or wall struck triggers, but stepping through it later does not
     The hold makes a unit that stays in reach take the second phase, so more finalists are over
     the cap.
 
+**After the review (re-measured 2026-11-03, `suite --baseline`, 52 runs).** The `/code-review 568
+medium` fixes change play: the second phase now counts every green and moves `green_die`, `hp_left`
+and `value`, a surviving striker keeps our counter's damage, and the fog is refreshed before the
+second phase.
+- **SC-003:** 559,289 `AiDecideMain` calls against the budget of 678,787, 1.1% under PR-D's 565,656.
+  The lookahead made 620 `nextPhase` calls. The machine's load average reached 45 during this run
+  (2,791.5 CPU s for the suite, 19.8 s for the lookahead), so its CPU is not comparable with the
+  first measure; the calls are the measure (ADR 0384).
+- **Triggered:** 235 of 770 decisions (30.5%); 155 extended, 80 skipped for budget.
+- **Play, tuning seeds, against PR-D's (`df18d70b20fa`):**
+  - 20 of 26 runs are unchanged in outcome, turns, deaths and labelled fallbacks.
+  - Wins stay at 23, deaths at 14, deaths over the cap at 0.
+  - Clean clears fall from 14 to 13 (vanilla Ch5 seed 1002, Joshua killed before the Talk).
+  - `fallback_sacrifice` labels across all 26 runs rise from 17 to 22, none with a death behind it.
+
 **Open (for Nicolas).**
 - **The hold or the re-proposal.** The hold overstates risk: a real player would retreat or heal
   between the phases. The re-proposal (R-8's first proposal) needs `sight` to stage a hypothetical

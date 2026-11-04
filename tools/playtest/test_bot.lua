@@ -4356,6 +4356,16 @@ do
         if c.extended and not c.rank.admitted then over = true end
     end
     check(over, true, "lookahead: the finalist at (1,0) dies in the second phase, over the cap")
+    -- the HP it loses there leaves the rank too, and the judged score pays the death; the
+    -- trace's `judged` stays the next phase's alone
+    local hold, march
+    for _, c in ipairs(plan.considered) do
+        if c.extended and c.rank.admitted then hold = hold or c end
+        if c.extended and not c.rank.admitted then march = march or c end
+    end
+    check(march.rank.hp_left < hold.rank.hp_left, true, "lookahead: the second phase's HP lost")
+    check(march.rank.value < march.judged, true, "lookahead: the value pays the second death")
+    check(hold.rank.value, hold.judged, "lookahead: a safe hold pays nothing more")
     check(plan.protected[1].second, 0, "lookahead: holding at (0,0) is safe in the second phase")
 
     board, sight, st = looksAhead({ { 2 } })

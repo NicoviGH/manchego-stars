@@ -1292,7 +1292,9 @@ function M.plan(Bot, board, sight, style, opts)
                     end
                     -- each unit's death in either phase, and what the rank reads of it: the
                     -- protected units' admission, the greens' summed death, the HP left, and
-                    -- the judged score's price for each death and for the HP lost
+                    -- the judged score's price for each death and for the HP lost. Only the
+                    -- rank (and `protected`) take the second phase: `judged` and `predict` stay
+                    -- the next phase's, which botrun grades against the phase that follows
                     local rank, first = st.rank, {}
                     for _, p in ipairs(st.predict) do first[p.id] = p end
                     local protected = {}
