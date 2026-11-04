@@ -1274,7 +1274,7 @@ def store_cached_verdict(scenario, fingerprint, outcome, cache_dir=None):
     scenario, gitignored, and the whole gate lands around 100 MB.
     """
     cache_dir = cache_dir or VERDICT_CACHE_DIR
-    keep = None
+    keep = kept = None
     if fingerprint and outcome.verdict == 'PASS':
         keep = _verdict_slot(scenario, fingerprint, cache_dir)
         os.makedirs(cache_dir, exist_ok=True)
@@ -1304,6 +1304,21 @@ def store_cached_verdict(scenario, fingerprint, outcome, cache_dir=None):
                 os.remove(old)
             except OSError:
                 pass
+    return kept
+
+
+def discard_passing_run(scenario, outcome, kept=None):
+    """A green VERDICT run's /tmp/playtest-<name> goes as soon as it passes (#574): what it
+    proved is the verdict, and its log is in the cache slot when there is one (`kept`), which
+    the outcome then points at. A record or diagnostic run keeps its dir -- its frames are
+    what it is for -- and a red keeps its dir as the failure's artifacts, overwritten by the
+    scenario's next run, so the matrix holds at most one dir per scenario."""
+    if outcome.verdict != 'PASS' or scenario.kind != 'verdict' or outcome.cached:
+        return outcome
+    if outcome.artifacts and outcome.artifacts != kept and os.path.isdir(outcome.artifacts):
+        shutil.rmtree(outcome.artifacts, ignore_errors=True)
+    outcome.artifacts = kept or ''
+    return outcome
 
 
 class VerdictCache(object):
@@ -1383,9 +1398,10 @@ class VerdictCache(object):
             with open(log, errors='replace') as fh:
                 store_observed(scenario.name, fh.read())
         fingerprint = self.fingerprints.get(scenario.name) if self.enabled else None
+        kept = None
         if fingerprint or outcome.verdict != 'PASS':
-            store_cached_verdict(scenario.name, fingerprint, outcome)
-        return outcome
+            kept = store_cached_verdict(scenario.name, fingerprint, outcome)
+        return discard_passing_run(scenario, outcome, kept)
 
 
 def parse_verdict(text, returncode):

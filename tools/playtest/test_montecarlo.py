@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -121,6 +122,101 @@ class Records(unittest.TestCase):
             recs = [json.loads(line) for line in lines]   # every line parses whole
             for w in ('a', 'b'):
                 self.assertEqual(sorted(r['i'] for r in recs if r['who'] == w), list(range(100)))
+
+
+_RUN_ROOT = None
+
+
+def setUpModule():
+    # no test may prune or delete the real /tmp's run dirs
+    global _RUN_ROOT
+    _RUN_ROOT = mc.RUN_ROOT
+    mc.RUN_ROOT = tempfile.mkdtemp()
+
+
+def tearDownModule():
+    mc.RUN_ROOT = _RUN_ROOT
+
+
+class RunDirs(unittest.TestCase):
+    """#574: a passing run leaves no dir behind; a failing one's is kept, the newest N."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.d = tempfile.mkdtemp()
+        self.out = os.path.join(self.d, 'runs.jsonl')
+
+    def launch(self, outcome):
+        def launch(task, tag, log_path):
+            where = os.path.join(self.root, 'playtest-campaign@' + tag)
+            os.makedirs(where)
+            with open(os.path.join(where, 'fireemblem8.gba'), 'wb') as fh:
+                fh.write(b'rom')
+            with open(os.path.join(where, 'trace-1.jsonl'), 'w') as fh:
+                fh.write('{"t": "start"}\n')
+            return ('BOTRUN {"seed": %d, "outcome": "%s", "trace": "trace-1.jsonl"}\n'
+                    % (task['seed'], outcome), where)
+        return launch
+
+    def pool(self, outcome, n=1, keep=mc.KEEP_FAILED):
+        return list(mc.Pool(jobs=2, out=self.out, launch=self.launch(outcome),
+                            run_root=self.root, keep_failed=keep).run(
+            [{'seed': s} for s in range(1, n + 1)]))
+
+    def test_a_passing_run_leaves_no_dir_and_keeps_its_trace(self):
+        recs = self.pool('won', n=3)
+        self.assertEqual(os.listdir(self.root), [])
+        for r in recs:
+            self.assertTrue(os.path.isfile(os.path.join(self.d, r['trace'])),
+                            'the trace is filed before the dir goes')
+
+    def test_a_failing_run_keeps_its_dir_marked(self):
+        recs = self.pool('crashed')
+        self.assertTrue(os.path.isdir(recs[0]['run_dir']))
+        self.assertTrue(os.path.isfile(os.path.join(recs[0]['run_dir'], mc.FAILED_MARK)))
+        self.assertTrue(os.path.isfile(os.path.join(recs[0]['run_dir'], 'fireemblem8.gba')))
+
+    def test_only_the_newest_failing_dirs_are_kept(self):
+        self.pool('crashed', n=5, keep=2)
+        self.assertEqual(len(os.listdir(self.root)), 2)
+
+    def test_a_worker_that_left_no_record_is_failing(self):
+        def launch(task, tag, log_path):
+            where = os.path.join(self.root, 'playtest-campaign@' + tag)
+            os.makedirs(where)
+            return '', where
+        recs = list(mc.Pool(jobs=1, out=self.out, launch=launch, run_root=self.root).run(
+            [{'seed': 1}]))
+        self.assertTrue(os.path.isdir(recs[0]['run_dir']))
+
+    def make(self, name, age, failed=False):
+        where = os.path.join(self.root, name)
+        os.makedirs(where)
+        files = ['mgba-stdout.log'] + ([mc.FAILED_MARK] if failed else [])
+        then = time.time() - age
+        for f in files:
+            open(os.path.join(where, f), 'w').close()
+            os.utime(os.path.join(where, f), (then, then))
+        os.utime(where, (then, then))
+        return where
+
+    def test_the_next_run_prunes_dead_and_surplus_dirs(self):
+        dead = self.make('playtest-campaign@1-1-0', age=2 * mc.STALE_S)
+        live = self.make('playtest-campaign@1-1-1', age=60)
+        old = [self.make('playtest-campaign@2-1-%d' % i, age=3600 + i, failed=True)
+               for i in range(4)]
+        other = self.make('playtest-ch01', age=2 * mc.STALE_S)   # untagged: not the pool's
+        self.pool('won', keep=2)
+        left = set(os.path.join(self.root, n) for n in os.listdir(self.root))
+        self.assertEqual(left, {live, old[0], old[1], other})
+        self.assertFalse(os.path.exists(dead))
+
+    def test_a_dir_outside_the_run_root_is_never_touched(self):
+        elsewhere = tempfile.mkdtemp()
+        where = os.path.join(elsewhere, 'playtest-campaign@x')
+        os.makedirs(where)
+        mc.settle_run_dir(where, [{'outcome': 'won'}], self.root)
+        self.assertTrue(os.path.isdir(where))
 
 
 class Workers(unittest.TestCase):

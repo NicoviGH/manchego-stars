@@ -104,9 +104,81 @@ def append_record(path, rec):
         os.close(fd)
 
 
+RUN_ROOT = '/tmp'     # where run.sh puts a tagged run's dir (its `out`)
+KEEP_FAILED = 20      # failing runs' dirs kept at once, newest first (~15 MB each)
+STALE_S = 24 * 3600   # an unmarked run dir idle this long is a dead process's, never a live run
+FAILED_MARK = 'FAILED'
+
+
 def run_dir(scenario, tag):
     """Where run.sh keeps a tagged run (its PT_RUN_TAG)."""
-    return '/tmp/playtest-%s@%s' % (scenario, tag)
+    return os.path.join(RUN_ROOT, 'playtest-%s@%s' % (scenario, tag))
+
+
+def tagged_dirs(root):
+    """Every tagged run dir under `root`: run.sh's `playtest-<scenario>@<tag>`, nothing else."""
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return []
+    return [os.path.join(root, n) for n in names
+            if n.startswith('playtest-') and '@' in n and os.path.isdir(os.path.join(root, n))]
+
+
+def last_touched(path):
+    """The newest mtime in a run dir: its log is appended to while the run lives."""
+    times = [os.path.getmtime(path)]
+    for n in os.listdir(path):
+        try:
+            times.append(os.path.getmtime(os.path.join(path, n)))
+        except OSError:
+            pass
+    return max(times)
+
+
+def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
+    """Bound the tagged run dirs under `root` (#574). A failing run's dir carries FAILED_MARK
+    and is kept for its report, but only the `keep` newest; an unmarked dir is a run still
+    playing (left alone) or one whose process died (deleted once idle `stale_s`). A passing
+    run's dir is never here: its Pool deletes it the moment the run ends."""
+    root = root or RUN_ROOT
+    now = time.time() if now is None else now
+    failed, gone = [], []
+    for d in tagged_dirs(root):
+        mark = os.path.join(d, FAILED_MARK)
+        try:
+            if os.path.exists(mark):
+                failed.append((os.path.getmtime(mark), d))
+            elif now - last_touched(d) > stale_s:
+                gone.append(d)
+        except OSError:
+            continue   # another pool removed it between the listing and the look
+    failed.sort(reverse=True)
+    gone += [d for _, d in failed[keep:]]
+    for d in gone:
+        shutil.rmtree(d, ignore_errors=True)
+    return sorted(gone)
+
+
+def failing(recs):
+    """A run whose records hold no game result: its dir is the evidence, so it is kept."""
+    return any(r.get('outcome') in UNUSABLE for r in recs)
+
+
+def settle_run_dir(where, recs, root=None, keep=KEEP_FAILED):
+    """After a run's records are read and its trace filed: delete a passing run's dir, mark a
+    failing one's and prune the kept ones to `keep`. Only a tagged dir under `root` is ever
+    touched (a launch may name any path)."""
+    root = root or RUN_ROOT
+    if not where or os.path.dirname(os.path.abspath(where)) != os.path.abspath(root) \
+            or where not in tagged_dirs(root):
+        return
+    if not failing(recs):
+        shutil.rmtree(where, ignore_errors=True)
+        return
+    with open(os.path.join(where, FAILED_MARK), 'w') as fh:
+        fh.write('\n'.join(sorted({str(r.get('outcome')) for r in recs})) + '\n')
+    prune_runs(root, keep)
 
 
 def launch(task, tag, log_path):
@@ -203,13 +275,17 @@ class Pool:
     files each game's in that game's store). Each record carries `wall_s`, its worker's
     wall time."""
 
-    def __init__(self, jobs=8, out='runs.jsonl', log_dir=None, launch=launch):
+    def __init__(self, jobs=8, out='runs.jsonl', log_dir=None, launch=launch, run_root=None,
+                 keep_failed=KEEP_FAILED):
         self.jobs, self.out, self.launch = jobs, out, launch
         self.log_dir = log_dir or os.path.join(os.path.dirname(os.path.abspath(out)), 'workers')
+        self.run_root, self.keep_failed = run_root or RUN_ROOT, keep_failed
 
     def run(self, tasks):
-        """Yield every record as its worker finishes, each appended to `out` first."""
+        """Yield every record as its worker finishes, each appended to `out` first. A passing
+        run's dir is deleted as it ends; a failing one's is kept, the newest `keep_failed`."""
         os.makedirs(self.log_dir, exist_ok=True)
+        prune_runs(self.run_root, self.keep_failed)
         base = '%d-%d' % (os.getpid(), id(self) % 10000)
 
         def one(i, task):
@@ -232,6 +308,8 @@ class Pool:
                 r.update(task.get('stamp') or {})
                 r['wall_s'] = wall
                 keep_trace(r, out)
+            # every record names the one run dir (records_of, and the crash record above)
+            settle_run_dir(recs[0].get('run_dir'), recs, self.run_root, self.keep_failed)
             return out, recs
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.jobs) as ex:
