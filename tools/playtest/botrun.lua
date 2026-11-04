@@ -563,7 +563,7 @@ function M.run(api)
                     spoils = t.spoils })
         end
     end
-    local lastBoard
+    local lastBoard, actedIn
     local function changes(after)
         if api.recruits and not owed then
             local party = {}
@@ -579,15 +579,19 @@ function M.run(api)
                 e.t = "event"
                 trace(e)
                 -- what a retry may remember (ADR 0386): a reinforcement's turn and tile, only
-                -- as the screen showed it -- one that arrived under fog was never seen arrive
+                -- as the screen showed it -- one that arrived under fog was never seen arrive.
+                -- Its turn as a guide claim cites one: the player phase it arrives on, or the
+                -- enemy phase's own turn when it acted there (one that landed then and did not
+                -- act reads as the next turn's)
                 if e.kind == "arrive" and e.faction == "red" and not now[e.id].fogged then
-                    rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = after.turn or turn,
+                    local inPhase = actedIn and actedIn.ids[e.id] and actedIn.turn
+                    rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = inPhase or after.turn or turn,
                                                                   x = e.x, y = e.y,
                                                                   charId = e.charId }
                 end
             end
         end
-        lastBoard = after
+        lastBoard, actedIn = after, nil
     end
 
     -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
@@ -1016,6 +1020,10 @@ function M.run(api)
             changes(before)
             trace({ t = "phase", phase = "enemy", units = M.snapshot(before) })
             local phase, deaths, acts = api.endPhase()
+            -- who acted in it: an arrival among them landed in this enemy phase, not the next
+            -- player phase the board is read on (arrivals_seen's turn)
+            actedIn = { turn = turn, ids = {} }
+            for _, a in ipairs(acts or {}) do actedIn.ids[a.id] = true end
             bagged()
             local was, now = byId(before), byId(api.board())
             for _, a in ipairs(acts or {}) do

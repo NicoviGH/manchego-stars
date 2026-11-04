@@ -4383,6 +4383,50 @@ do
     check(table.concat(keys, ","), "blues,gone,reds", "lookahead: the staged board, nothing more")
 end
 
+-- test_lookahead_counts_a_green_and_ranks_the_list_once (review of #568): an allied green the
+-- second phase kills is paid in the rank's green_die and value, not only the protected units;
+-- and the played plan heads `considered`, the finalists before the plans never asked the second
+-- phase, every `behind` measured from the one best progress.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function(t)
+            return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
+        end,
+        explorable = { { x = 9, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["9,0"] = "visit" } },
+        enemyPhase = function() return {} end,
+        nextPhase = function(plan)
+            local hp = { [0x30] = 10 }
+            for _, b in ipairs(plan.blues) do hp[b.unit.id] = b.hp end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0, targetHp = 10 }, hp = hp }
+        end,
+    }
+    local st = gifted("careful", 1000)
+    st.arrivals = { { 2 } }
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), st)
+    check(plan.lookahead.extended, true, "lookahead: extended")
+    for _, c in ipairs(plan.considered) do
+        if c.extended then
+            check(c.rank.green_die > 0.99, true, "lookahead: the green's second-phase death is paid")
+        end
+    end
+    check(plan.considered[1].acts[1], plan.rank.key:match("^%S+"),
+          "lookahead: the played plan heads the list")
+    local seenPlain = false
+    for _, c in ipairs(plan.considered) do
+        if not c.extended then seenPlain = true end
+        if c.extended and seenPlain then
+            check(false, true, "lookahead: a finalist sorted below a plan never extended")
+        end
+        check(c.rank.behind ~= nil, true, "lookahead: every rank is rebased")
+    end
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

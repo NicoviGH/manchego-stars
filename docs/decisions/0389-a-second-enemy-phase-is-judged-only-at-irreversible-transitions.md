@@ -23,17 +23,24 @@ due. At those moments, and only then, the finalists meet a second enemy phase:
   triggers, each one gets one call to `sight.nextPhase`, or none does. The budget is
   `M.LOOK_DECISION` = 8 calls a decision and `M.LOOK_ATTEMPT` = 32 an attempt (botrun passes what is
   left as `opts.budget.attempt`). Too little left keeps the one-phase horizon, tagged `skipped`.
-- **What the second phase reads.** Each protected unit's death chance becomes the chance it dies in
-  either phase, `1 - (1 - first) * (1 - second)`. Its first-phase branches are kept. The game-over
-  chance composes the same way. The finalists are then ranked again among themselves. A plan
-  outside them lost to each one on the first phase and was never asked the second.
+- **What the second phase reads.** Every unit the first phase may strike (ours and the allied
+  greens) is asked again at the HP the first phase left it. Each protected unit's death chance
+  becomes the chance it dies in either phase, `1 - (1 - first) * (1 - second)`; its first-phase
+  branches are kept. The game-over chance composes the same way. A green that is neither protected
+  nor a recruit adds its extra death to `green_die`. The judged score (`value`) pays each unit's
+  extra death at its price and our units' HP lost, and `hp_left` loses it too. Both phases share
+  one routine (`struckIn`). The finalists are then ranked again among themselves, with every
+  plan's `behind` measured from the one best progress. A plan outside them lost to each one on the
+  first phase and was never asked the second. In `considered`, the finalists come first.
 - **The intervening player turn is a hold (the R-8 spike).** `sight.nextPhase` plays the next phase
   along its expected way, unbranched. Every enemy goes where its own decision takes it: a strike's
   tile, or the move it makes without striking (`enemyPhase` stands only strikers). Strikes take
-  their expected damage. A unit of ours left at 0 HP is off the map, and a striker our counter kills
-  at even odds or better is gone. Our units then hold, the turn advances, and the second phase is
-  played as `enemyPhase` plays one, every way a counter may kill. Only what the player sees decides:
-  an enemy hidden by fog does not act, and no arrival is placed on the map.
+  their expected damage. A unit of ours left at 0 HP is off the map. A striker our counter kills at
+  even odds or better is gone; otherwise the counter's expected damage stays on it. Our units then
+  hold, the turn advances, the fog is refreshed for where everyone now stands
+  (`RefreshEntityBmMaps`), and the second phase is played as `enemyPhase` plays one, every way a
+  counter may kill. Only what the player sees decides: an enemy hidden by fog does not act, and no
+  arrival is placed on the map.
 - **Recorded.** The plan's `lookahead` = `{ trigger, extended, skipped, calls }`, in the trace too;
   `considered[].extended`; and `protected[].second`. botrun sums `rec.lookahead` = `{ decisions,
   triggered, extended, skipped_budget, calls, cpu_s }`. `montecarlo.py suite` prints it per start
@@ -42,7 +49,8 @@ due. At those moments, and only then, the finalists meet a second enemy phase:
 **Not built.** The "first crossing" of a breach (FR-017's second half of the first trigger) is
 left out: a door or wall struck triggers, but stepping through it later does not.
 
-**Measured (2026-11-03, one 8-core Mac, load average about 2.5).** `suite --baseline`, 52 runs:
+**Measured (2026-11-03, one 8-core Mac, load average about 2.5), before the review's fixes**
+(see "After the review" below for the re-measure). `suite --baseline`, 52 runs:
 - **SC-003:** 557,932 `AiDecideMain` calls against the budget of 678,787, 1.4% under PR-D's
   565,656. The lookahead's own cost was 616 calls to `nextPhase` and 16.0 CPU s, of 2,310.1 CPU s
   for the whole suite.
@@ -66,6 +74,10 @@ left out: a door or wall struck triggers, but stepping through it later does not
 - **The hold or the re-proposal.** The hold overstates risk: a real player would retreat or heal
   between the phases. The re-proposal (R-8's first proposal) needs `sight` to stage a hypothetical
   board for every read `Bot.candidates` makes. Its cost is not measured.
+- **The arrival trigger places no arrival.** It spends the budget for a second phase without the
+  wave that triggered it: `nextPhase` plays only the enemies on the map. Placing a claim's wave
+  (its units are known, `style.waves`) needs the sandbox to load units; a retry's memory has turns
+  only (ADR 0386).
 - **The boss trigger on a Defeat Boss map.** It fires on most decisions there and spends the
   attempt's budget (ours-ch03). "First entry" may want to mean the first unit of the attempt, not
   each unit.

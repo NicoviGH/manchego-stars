@@ -876,6 +876,31 @@ function M.plan(Bot, board, sight, style, opts)
             rank.sum_die = rank.sum_die + pr.die
         end
     end
+    -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, hp0? }):
+    -- per id { d (its chance to die), t (HP taken), sh (HP short at the end, when maxhp is
+    -- given), n (strikes) }, and the chance no unit whose death ends the game dies. A unit with
+    -- `back` (our counter's blows on it, from the plan's attack) takes them and the phase as one
+    -- chain on hp0, the HP it had: the phase's share of the death is the chain's less the
+    -- counter's own, which score() already paid.
+    local function struckIn(strikes, units)
+        local onUnit, res, none = blowsOn(strikes), {}, 1
+        for _, u in ipairs(units) do
+            local phase = onUnit[u.id] or {}
+            local d, t = odds(phase, u.hp)
+            local sh = u.maxhp and (u.maxhp - u.hp) + t
+            if u.back then
+                local chain = {}
+                for _, x in ipairs(u.back) do chain[#chain + 1] = x end
+                for _, x in ipairs(phase) do chain[#chain + 1] = x end
+                local all, lost = odds(chain, u.hp0)
+                d = math.max(0, all - (odds(u.back, u.hp0)))
+                sh = (u.maxhp - u.hp0) + lost
+            end
+            res[u.id] = { d = d, t = t, sh = sh, n = #phase }
+            if gameOver[u.charId] then none = none * (1 - d) end
+        end
+        return res, none
+    end
     local function judge(st)
         local planned, at = {}, {}
         for _, a in ipairs(st.acts) do at[a.unitId] = a end
@@ -959,43 +984,27 @@ function M.plan(Bot, board, sight, style, opts)
         -- of ours it strikes, whose other acts may save it (vanilla Ch5: Joshua, killed by
         -- Seth's counter on turn 3, the planner paying nothing for it)
         local felled, struckBy, fell, winStruck = {}, {}, 0, {}
+        -- the units the phase may strike: ours as the plan leaves them (its counter chained),
+        -- then the greens where they stand; kept for the lookahead's second phase
+        local hit = {}
+        for _, p in ipairs(planned) do
+            local id = p.unit.id
+            hit[#hit + 1] = { id = id, charId = p.unit.charId, hp = p.hp,
+                              maxhp = p.unit.maxhp or p.hp, back = st.counter[id],
+                              hp0 = p.unit.hp + (st.healed[id] or 0) }
+        end
+        for _, g in ipairs(greens) do hit[#hit + 1] = { id = g.id, charId = g.charId, hp = g.hp } end
+        st.phase.hit = hit
         for _, o in ipairs(outcomes) do
-            local onUnit, none = blowsOn(o.strikes), 1   -- none: no game-over unit dies here
-            for _, p in ipairs(planned) do
-                local id = p.unit.id
-                local phase = onUnit[id] or {}
-                local d, t = odds(phase, p.hp)
-                local back = st.counter[id]
-                local sh = ((p.unit.maxhp or p.hp) - p.hp) + t
-                if back then
-                    -- the counter and the phase as one chain on the HP the unit had (and any
-                    -- heal the plan gives it): the phase's share of the death is the chain's
-                    -- less the counter's own, which score() already paid
-                    local chain = {}
-                    for _, x in ipairs(back) do chain[#chain + 1] = x end
-                    for _, x in ipairs(phase) do chain[#chain + 1] = x end
-                    local hp0 = p.unit.hp + (st.healed[id] or 0)
-                    local all, lost = odds(chain, hp0)
-                    d = math.max(0, all - (odds(back, hp0)))
-                    sh = ((p.unit.maxhp or p.hp) - hp0) + lost
-                end
-                die[id] = (die[id] or 0) + o.p * d
+            local res, none = struckIn(o.strikes, hit)   -- none: no game-over unit dies here
+            for _, u in ipairs(hit) do
+                local id, r = u.id, res[u.id]
+                die[id] = (die[id] or 0) + o.p * r.d
                 byWay[id] = byWay[id] or {}
-                byWay[id][o.way] = (byWay[id][o.way] or 0) + o.p * d
-                if gameOver[p.unit.charId] then none = none * (1 - d) end
-                taken[id] = (taken[id] or 0) + o.p * t
-                short[id] = (short[id] or 0) + o.p * sh
-                struck[id] = math.max(struck[id] or 0, #phase)
-            end
-            for _, g in ipairs(greens) do
-                local phase = onUnit[g.id] or {}
-                local d, t = odds(phase, g.hp)
-                die[g.id] = (die[g.id] or 0) + o.p * d
-                byWay[g.id] = byWay[g.id] or {}
-                byWay[g.id][o.way] = (byWay[g.id][o.way] or 0) + o.p * d
-                if gameOver[g.charId] then none = none * (1 - d) end
-                taken[g.id] = (taken[g.id] or 0) + o.p * t
-                struck[g.id] = math.max(struck[g.id] or 0, #phase)
+                byWay[id][o.way] = (byWay[id][o.way] or 0) + o.p * r.d
+                taken[id] = (taken[id] or 0) + o.p * r.t
+                if r.sh then short[id] = (short[id] or 0) + o.p * r.sh end
+                struck[id] = math.max(struck[id] or 0, r.n)
             end
             overAll = overAll + o.p * (1 - none)
             -- the strikers our counters fell (felled): the boss, or a Rout's last enemy, is the win
@@ -1266,33 +1275,60 @@ function M.plan(Bot, board, sight, style, opts)
                     local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
                                                 reds = st.phase.reds })
                     look.calls = look.calls + 1
-                    local second, over = {}, 0
+                    -- every unit the first phase may strike, alive at its start: its HP then
+                    local live = {}
+                    for _, u in ipairs(st.phase.hit) do
+                        local hp = r.hp and r.hp[u.id] or 0
+                        if hp > 0 then live[#live + 1] = { id = u.id, charId = u.charId, hp = hp } end
+                    end
+                    local second, lost, over = {}, {}, 0
                     for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
-                        local onUnit, none = blowsOn(o.strikes), 1
-                        for _, pr in ipairs(st.protected) do
-                            local hp = r.hp and r.hp[pr.id] or 0
-                            local d = hp > 0 and (odds(onUnit[pr.id] or {}, hp)) or 0
-                            second[pr.id] = (second[pr.id] or 0) + o.p * d
-                            if gameOver[pr.charId] then none = none * (1 - d) end
+                        local res, none = struckIn(o.strikes, live)
+                        for _, u in ipairs(live) do
+                            second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
+                            lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
                         end
                         over = over + o.p * (1 - none)
                     end
+                    -- each unit's death in either phase, and what the rank reads of it: the
+                    -- protected units' admission, the greens' summed death, the HP left, and
+                    -- the judged score's price for each death and for the HP lost
+                    local rank, first = st.rank, {}
+                    for _, p in ipairs(st.predict) do first[p.id] = p end
+                    local protected = {}
                     for _, pr in ipairs(st.protected) do
+                        protected[pr.id] = true
                         pr.second = second[pr.id] or 0
                         pr.die = 1 - (1 - pr.die) * (1 - pr.second)
+                        rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end
-                    st.rank.game_over = 1 - (1 - st.rank.game_over) * (1 - over)
+                    for _, u in ipairs(st.phase.hit) do
+                        local f = first[u.id]
+                        local was = f and f.die or 0
+                        local more = (1 - was) * (second[u.id] or 0)
+                        rank.value = rank.value - loss(W, st, u.charId) * more
+                        if u.maxhp then rank.value = rank.value - W.taken * (lost[u.id] or 0) end
+                        if f and f.green and not protected[u.id] and not st.recruits[u.id] then
+                            rank.green_die = rank.green_die + more
+                        end
+                    end
+                    rank.game_over = 1 - (1 - rank.game_over) * (1 - over)
                     admit(st)
                     st.extended = true
                 end
                 cost.look.cpu_s = os.clock() - clock
                 cost.look.extended = 1
                 look.extended = true
-                -- the finalists alone, ranked again: a plan outside them lost to each on the
+                -- every rank's `behind` from the one best progress, as pick() sets it, then
+                -- the best of the finalists alone: a plan outside them lost to each on the
                 -- first phase, and was never asked the second
                 local ranks = {}
-                for i, st in ipairs(fin) do ranks[i] = st.rank end
-                best = fin[M.rebase(ranks)]
+                for i, j in ipairs(judgedPlans) do ranks[i] = j.st.rank end
+                M.rebase(ranks, function(k) return judgedPlans[k].ok end)
+                best = fin[1]
+                for _, st in ipairs(fin) do
+                    if M.outranks(st.rank, best.rank) then best = st end
+                end
                 for _, c in ipairs(considered) do
                     for _, st in ipairs(fin) do
                         if c.rank == st.rank then c.extended = true end
@@ -1304,7 +1340,14 @@ function M.plan(Bot, board, sight, style, opts)
     end
     if not best or #best.acts == 0 then return nil, nil, cost end
     best.lookahead = look
-    table.sort(considered, function(x, y) return M.outranks(x.rank, y.rank) end)
+    -- best first; after a lookahead the finalists before the rest, whose ranks were never asked
+    -- the second phase (the played plan heads the list either way)
+    table.sort(considered, function(x, y)
+        if look.extended and (x.extended == true) ~= (y.extended == true) then
+            return x.extended == true
+        end
+        return M.outranks(x.rank, y.rank)
+    end)
     best.considered = considered
     -- no plan under the cap: the least likely to end the game, then the least over it, is
     -- played, and says so (FR-011, ADR 0384 amended)

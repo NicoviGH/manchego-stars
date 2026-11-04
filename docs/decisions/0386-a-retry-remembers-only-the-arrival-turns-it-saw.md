@@ -38,7 +38,10 @@ attempts, and measured attempts here do not either.
 - **What is seen.** botrun's record carries `arrivals_seen`: `{ turn, x, y, charId }` for each red
   unit that came onto the field, read from the arrival `event`s botrun already traces, and only
   when the board that first showed it did not have it `fogged` (the game's own fog flag on the
-  unit). The turn is that board's. An arrival under fog is not listed, even once it is later seen.
+  unit). An arrival under fog is not listed, even once it is later seen. Its turn is the one a guide
+  claim would cite (player-phase turns, `difficulty._vanilla_reinforcement_turns`): the player
+  phase whose board first shows it. One that acted in the enemy phase it landed in gets that
+  phase's turn instead. One that landed in an enemy phase and did not act reads as the next turn's.
 - **What is remembered.** `campaign.lua` keeps, per chapter start, the union of the TURNS in every
   earlier failed attempt's `arrivals_seen`, each once, in order, and from attempt 2 on hands them to
   the play as one more list in `style.arrivals`: where a reinforcements claim's turns go, read by

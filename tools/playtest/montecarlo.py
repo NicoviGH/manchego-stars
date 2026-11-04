@@ -48,6 +48,7 @@ run without a game result (a crash, a campaign that never reached the chapter) i
 at: the cell stops and reports what that run said.
 """
 import argparse
+import collections
 import concurrent.futures
 import functools
 import gzip
@@ -803,12 +804,10 @@ def suite_estimate(suite, tasks, kept, jobs):
     return total / max(1, min(jobs, len(tasks))) / 3600
 
 
-# the planner's lookahead, as botrun sums it into rec.lookahead (FR-018)
-LOOKAHEAD = ('decisions', 'triggered', 'extended', 'skipped_budget', 'calls', 'cpu_s')
-
-
 def lookahead_line(look):
-    """The lookahead's trigger rate, coverage, skipped extensions and CPU (SC-003), in words."""
+    """The lookahead's trigger rate, coverage, skipped extensions and CPU (SC-003), in words.
+    `look` is a Counter of botrun's rec.lookahead fields (FR-018), summed: a field no record
+    had reads 0."""
     return ('lookahead: %d of %d decisions triggered (%.1f%%), %d extended, %d skipped for '
             'budget, %d calls, %.1f CPU s' % (
                 look['triggered'], look['decisions'],
@@ -850,10 +849,9 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
             continue
         seen.add(key)
         got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0,
-                                   'look': dict.fromkeys(LOOKAHEAD, 0)})
+                                   'look': collections.Counter()})
         costs = rec.get('costs') or {}
-        for k, v in (rec.get('lookahead') or {}).items():
-            got['look'][k] += v
+        got['look'].update(rec.get('lookahead') or {})
         got['n'] += 1
         got['cpu'] += costs.get('cpu_s') or 0.0
         got['wall'] += rec.get('wall_s') or 0.0
@@ -871,7 +869,7 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
     total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0,
-             'look': dict.fromkeys(LOOKAHEAD, 0)}
+             'look': collections.Counter()}
     missing = 0
     for st in suite['starts']:
         got = per.get(st['start_id'])
@@ -880,11 +878,7 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
             missing += 1
             continue
         for k in total:
-            if k == 'look':
-                for j in LOOKAHEAD:
-                    total[k][j] += got[k][j]
-            else:
-                total[k] += got[k]
+            total[k] += got[k]
         played = got['n'] - got['unread']
         lines.append('%s (%s chapter %d, %s): %d runs, %d AiDecideMain calls, %.1f CPU s and '
                      '%.1f wall s in all, %.1f calls and %.1f CPU s a run%s' % (

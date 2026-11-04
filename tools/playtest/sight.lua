@@ -85,6 +85,12 @@
 --                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went.
+--   nextPhase(plan)          the enemy phase AFTER the next, our units holding between (the
+--                            planner's lookahead, FR-017): plan as enemyPhase's; the next phase
+--                            played along its expected way, every enemy moving, then the turn
+--                            advanced, the fog refreshed and the second played as enemyPhase
+--                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
+--                            HP when it begins, 0 if dead) and .moved. See s.nextPhase.
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
 --                            boss = on a Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
@@ -1315,6 +1321,25 @@ function M.new(outer)
         return M.strikeOf(t)
     end
 
+    -- the enemy's turn order, built as on its phase (cp_order.c), inside an open sandbox
+    local function aiOrder(call)
+        api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
+        local n = call(S.BuildAiUnitList, {})
+        if n > 0 then call(S.SortAiUnitList, { n }) end
+        local out = {}
+        for i = 0, n - 1 do out[#out + 1] = mem.u8(S.gAiState + i) end
+        return out
+    end
+    -- after aiDecide(e): e stood where the decision moves it -> that tile, or nil when it
+    -- performs nothing
+    local function followMove(e)
+        local D, DEC = S.gAiDecision, Board.AI_DEC
+        if mem.u8(D + DEC.PERFORMED) == 0 then return nil end
+        local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+        standOn(e, x, y)
+        return x, y
+    end
+
     -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
     -- our units stood and their HP set, the reds' HP, the gone off the map
     local function stagePhase(call, plan)
@@ -1339,15 +1364,7 @@ function M.new(outer)
             gone[id] = true
             if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
         end
-        -- the game's own turn order, built as on its phase (cp_order.c)
-        local function order()
-            api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
-            local n = call(S.BuildAiUnitList, {})
-            if n > 0 then call(S.SortAiUnitList, { n }) end
-            local out = {}
-            for i = 0, n - 1 do out[#out + 1] = mem.u8(S.gAiState + i) end
-            return out
-        end
+        local function order() return aiOrder(call) end
         -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog)
         local function decides(id)
             local e = byId[id]
@@ -1440,7 +1457,6 @@ function M.new(outer)
     function s.nextPhase(plan)
         return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
-            local D, DEC = S.gAiDecision, Board.AI_DEC
             local moved = {}
             for _, id in ipairs(order()) do
                 local e = decides(id)
@@ -1453,11 +1469,18 @@ function M.new(outer)
                             local u = byId[target]
                             if u then remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)) end
                         end
-                        if t.felled >= 0.5 then remove(e, side.tile.x, side.tile.y) end
-                    elseif mem.u8(D + DEC.PERFORMED) ~= 0 then
-                        local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
-                        standOn(e, x, y)
-                        moved[#moved + 1] = { id = id, x = x, y = y }
+                        if t.felled >= 0.5 then
+                            remove(e, side.tile.x, side.tile.y)
+                        else
+                            -- it lives: our counter's expected damage stays on it, as a
+                            -- strike's stays on its target
+                            local _, back = M.odds({ t.counterDist }, t.strikerHp)
+                            api.write8(e.addr + UNIT_HP,
+                                math.max(1, t.strikerHp - math.floor(back + 0.5)))
+                        end
+                    else
+                        local x, y = followMove(e)
+                        if x then moved[#moved + 1] = { id = id, x = x, y = y } end
                     end
                 end
             end
@@ -1470,6 +1493,9 @@ function M.new(outer)
                 end
             end
             api.write16(S.gPlaySt + PLAY_TURN, mem.u16(S.gPlaySt + PLAY_TURN) + 1)
+            -- the fog as the first phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
+            -- enemy that walked out of it is seen, one that walked into it is not
+            call(S.RefreshEntityBmMaps, {})
             local out = playPhase(call, proc, order(), decides, strike, remove)
             out.hp, out.moved = hp, moved
             return out
@@ -1530,17 +1556,12 @@ function M.new(outer)
             local D, DEC = S.gAiDecision, Board.AI_DEC
             for phase = 1, next(looter) and k or 0 do
                 api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
-                api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
-                local n = call(S.BuildAiUnitList, {})
-                if n > 0 then call(S.SortAiUnitList, { n }) end
-                local order = {}
-                for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
-                for _, id in ipairs(order) do
+                for _, id in ipairs(aiOrder(call)) do
                     local e = looter[id] and byId[id]
                     if e and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
                         aiDecide(call, proc, e)
-                        if mem.u8(D + DEC.PERFORMED) ~= 0 then
-                            local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+                        local x, y = followMove(e)
+                        if x then
                             if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                 close(x, y, phase)
                                 -- the tile is taken: AiPillageAction opens a chest (it empties)
@@ -1551,7 +1572,6 @@ function M.new(outer)
                                 api.write8(cell(mem, S.gBmMapTerrain, x, y),
                                     M.sackedTerrain(open[x .. "," .. y]))
                             end
-                            standOn(e, x, y)
                         end
                     end
                 end

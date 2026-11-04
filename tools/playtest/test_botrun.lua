@@ -575,17 +575,28 @@ do
                 local hid = unit(0x83, 2, "red", 9, 8, 10)
                 hid.fogged = true
                 g.units[#g.units + 1] = hid
+                g.units[#g.units + 1] = unit(0x84, 3, "red", 8, 8, 10)
             end
             return {}
         end,
     }
+    -- 0x84 lands in enemy phase 1 and acts there
+    local endPhase = g.api.endPhase
+    g.api.endPhase = function()
+        local phase, deaths = endPhase()
+        local acts = {}
+        if g.turn == 2 then acts = { { id = 0x84, charId = 0x84, battles = {} } } end
+        return phase, deaths, acts
+    end
     Botrun.run(g.api)
     local r = recordOf(g)
-    check(#r.arrivals_seen, 1, "one arrival was on screen, the fogged one is not listed")
-    local a = r.arrivals_seen[1] or {}
+    check(#r.arrivals_seen, 2, "two arrivals were on screen, the fogged one is not listed")
+    local a, b = r.arrivals_seen[1] or {}, r.arrivals_seen[2] or {}
+    if a.charId == 0x84 then a, b = b, a end
     check(a.charId, 0x82, "the seen arrival")
-    check(a.turn, 2, "the turn its board first showed it")
+    check(a.turn, 2, "the player phase whose board first showed it")
     check(a.x .. "," .. a.y, "9,9", "and its tile")
+    check(b.turn, 1, "one that acted in the enemy phase it landed in: that phase's turn")
 end
 
 -- Botrun.events: a recruit is a unit whose character was on another side; items are diffed.
