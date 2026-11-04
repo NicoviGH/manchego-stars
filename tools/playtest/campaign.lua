@@ -18,13 +18,18 @@
 -- stops. The game's RNG is never re-seeded on a restart: FE8 seeds it once at power-on and a
 -- suspend save stores it, so a restart differs from the last only by the bot's new style and
 -- the game's RNG follows from that different play (the amendment, #510).
+-- A retry remembers one thing (ADR 0386): from attempt 2 on, the turns on which any earlier
+-- failed attempt at this start saw a reinforcement arrive on screen (botrun's
+-- `arrivals_seen`), handed to the play as one more list in style.arrivals, where a
+-- reinforcements claim's turns go. No tile, unit or outcome is passed on.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
--- start state, the game's RNG in it; the draws restart at each chapter start (api.seed) and
--- never read a result; and the start carries the team the campaign carried in (api.save,
--- arrive). So attempt k plays exactly as it would after k - 1 failures: k workers side by
--- side find what the loop finds, the lowest k that clears clean. It saves no state (the
--- workers share the start's files) and moves on to no chapter.
+-- start state, the game's RNG in it; the style draws restart at each chapter start (api.seed)
+-- and never read a result; and the start carries the team the campaign carried in (api.save,
+-- arrive). So attempt k plays the style and team it would after k - 1 failures, but WITHOUT the
+-- retry's memory: the workers side by side share no results. Attempt 1, every measured cell
+-- (ADR 0385), is the same either way. It saves no state (the workers share the start's files)
+-- and moves on to no chapter.
 -- A campaign stops when:
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)
@@ -228,7 +233,7 @@ function M.run(api)
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end
             local need = cap and api.needs(api.roster()) or nil
             entry.demands = need and need.demands or nil
-            local tried = {}
+            local tried, remembered, known = {}, {}, {}
             while true do
                 local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
                 -- one attempt alone: the styles before it are drawn, never played
@@ -251,6 +256,10 @@ function M.run(api)
                     return "crashed", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, bwhy)
                 end
+                -- a retry's memory (ADR 0386): the turns earlier failures here saw a
+                -- reinforcement arrive on screen, read where a reinforcements claim's are
+                -- (style.arrivals); attempt 1, and any attempt alone, has none
+                if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
                 local rec = api.play(style, followed, entry.attempts)
                 if api.only then
                     entry.outcome, entry.turns = rec.outcome, rec.turns
@@ -279,6 +288,13 @@ function M.run(api)
                     return "crashed", string.format("chapter %d attempt %d crashed", ch,
                         entry.attempts)
                 end
+                for _, a in ipairs(rec.arrivals_seen or {}) do
+                    if not known[a.turn] then
+                        known[a.turn] = true
+                        remembered[#remembered + 1] = a.turn
+                    end
+                end
+                table.sort(remembered)
                 if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
                 local lok, lwhy = api.load(ch)
                 if not lok then

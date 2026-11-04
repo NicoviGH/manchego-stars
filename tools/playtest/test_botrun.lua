@@ -564,6 +564,30 @@ do
     check(kinds:find("plan", 1, true) ~= nil, true, "decisions are traced")
 end
 
+-- test_arrivals_seen_lists_only_what_the_screen_showed (ADR 0386, T060): a reinforcement's
+-- arrival turn and tile are in the record only when it came up on screen; one under fog is not.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                g.units[#g.units + 1] = unit(0x82, 1, "red", 9, 9, 10)
+                local hid = unit(0x83, 2, "red", 9, 8, 10)
+                hid.fogged = true
+                g.units[#g.units + 1] = hid
+            end
+            return {}
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(#r.arrivals_seen, 1, "one arrival was on screen, the fogged one is not listed")
+    local a = r.arrivals_seen[1] or {}
+    check(a.charId, 0x82, "the seen arrival")
+    check(a.turn, 2, "the turn its board first showed it")
+    check(a.x .. "," .. a.y, "9,9", "and its tile")
+end
+
 -- Botrun.events: a recruit is a unit whose character was on another side; items are diffed.
 do
     local b = { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 3, 3, 15) } }

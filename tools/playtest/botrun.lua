@@ -498,7 +498,7 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
-                  board_repeats = 0,
+                  board_repeats = 0, arrivals_seen = {},
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
@@ -566,9 +566,17 @@ function M.run(api)
             end
         end
         if lastBoard then
+            local now = byId(after)
             for _, e in ipairs(M.events(lastBoard, after)) do
                 e.t = "event"
                 trace(e)
+                -- what a retry may remember (ADR 0386): a reinforcement's turn and tile, only
+                -- as the screen showed it -- one that arrived under fog was never seen arrive
+                if e.kind == "arrive" and e.faction == "red" and not now[e.id].fogged then
+                    rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = after.turn or turn,
+                                                                  x = e.x, y = e.y,
+                                                                  charId = e.charId }
+                end
             end
         end
         lastBoard = after

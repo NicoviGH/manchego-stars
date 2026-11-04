@@ -36,7 +36,8 @@ end
 -- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"... },
 -- options = n (a route split before it), needs = Bot.team's demands/answers/strength } };
 -- "dead" is a win with a death, "spoiled" a win with a recruit missed. o.route = the
--- campaign's route setting, o.game the game (default "fake").
+-- campaign's route setting, o.game the game (default "fake"). ch.seen = { [attempt] =
+-- arrivals_seen } (the record's reinforcements seen on screen, ADR 0386).
 local function fakeGame(o)
     local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, promoted = {},
                 plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0 }
@@ -90,6 +91,7 @@ local function fakeGame(o)
             local won = out == "won" or out == "dead" or out == "spoiled"
             return { outcome = won and "won" or out, clean = out == "won", turns = 4,
                      deaths = deaths, trace = "t" .. g.attempt,
+                     arrivals_seen = (ch.seen or {})[g.attempt] or {},
                      clear = { won = won, lost = deaths,
                                recruits_missing = out == "spoiled" and { 0x30 } or {},
                                rewards_missing = {} } }
@@ -428,6 +430,38 @@ local function test_resume_without_a_carried_team_says_so()
     check(g.carriedSaved[3], nil, "with its team still unknown, so the next resume says so too")
 end
 test_resume_without_a_carried_team_says_so()
+
+-- A retry remembers only the arrivals it saw (ADR 0386, T061): attempt k >= 2 is given, in
+-- style.arrivals, the turns of every earlier failed attempt's arrivals_seen at this start, and
+-- nothing else from them; attempt 1 none; one attempt alone (api.only) none either: the pool's
+-- workers share no results.
+local function test_a_retry_remembers_only_the_arrivals_it_saw()
+    local seen = { [1] = { { turn = 4, x = 9, y = 9, charId = 0x82 } },
+                   [2] = { { turn = 4, x = 8, y = 9, charId = 0x83 },
+                           { turn = 6, x = 9, y = 0, charId = 0x84 } } }
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" }, seen = seen } } }
+    Campaign.run(g.api)
+    check(#g.plays, 3, "three attempts")
+    check(g.plays[1].style.arrivals, nil, "attempt 1 remembers nothing")
+    check(table.concat(g.plays[2].style.arrivals[1], ","), "4", "attempt 2: attempt 1's arrival turn")
+    check(#g.plays[2].style.arrivals, 1, "as one list, beside any claim's")
+    check(table.concat(g.plays[3].style.arrivals[1], ","), "4,6",
+          "attempt 3: the union over both failures, each turn once, in order")
+    local keys = {}
+    for k in pairs(g.plays[3].style) do keys[#keys + 1] = k end
+    table.sort(keys)
+    check(table.concat(keys, ","), "aggression,arrivals,claims",
+          "no tile, unit or outcome rides along")
+    local alone = fakeGame { chapters = { { id = 1, seen = seen } } }
+    alone.api.only = 1
+    Campaign.run(alone.api)
+    check(alone.plays[1].style.arrivals, nil, "a measured cell (api.only = 1) is untouched")
+    local third = fakeGame { chapters = { { id = 1, seen = seen } } }
+    third.api.only = 3
+    Campaign.run(third.api)
+    check(third.plays[1].style.arrivals, nil, "a pool attempt k has no earlier result to remember")
+end
+test_a_retry_remembers_only_the_arrivals_it_saw()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)
