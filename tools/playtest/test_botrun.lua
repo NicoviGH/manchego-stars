@@ -1494,9 +1494,10 @@ end
 -- phase deep is visible in the record -- one lookahead_budget anomaly an attempt, on the first
 -- such turn, counting every decision skipped -- not only as a sum in rec.lookahead.
 do
+    local Planner = dofile(here .. "planner.lua")
     local g = fakeGame { units = rout() }
     g.api.Planner = {
-        LOOK_ATTEMPT = 0,
+        surprise = Planner.surprise, LOOK_ATTEMPT = 0,
         plan = function(_, board)
             local look = { decisions = 1, triggered = 1, extended = 0, skipped_budget = 1,
                            calls = 0, cpu_s = 0 }
