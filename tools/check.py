@@ -2966,9 +2966,15 @@ def _handoff_branch_state():
         fix = ('they are %s\'s own unpushed commits: push %s, then `git merge %s` into the '
                'branch' % (base_ref, base_ref, main_ref))
     else:
-        fix = ('the branch wrote it: restore the copy it started from and commit it '
+        # a local main still holding unpushed HANDOFF commits would be undone by the restore
+        first = ''
+        if (main_ref != base_ref and _git(['rev-parse', '--verify', '--quiet', base_ref])
+                and _git(['log', '--format=%H', '%s..%s' % (main_ref, base_ref), '--',
+                          HANDOFF_FILE])):
+            first = 'push %s and `git merge %s` first; then ' % (base_ref, main_ref)
+        fix = ('the branch wrote it: %srestore the copy it started from and commit it '
                '(`git checkout $(git merge-base %s HEAD) -- %s`), so its net change is zero'
-               % (main_ref, HANDOFF_FILE))
+               % (first, main_ref, HANDOFF_FILE))
     return 'diverged', ('committed on `%s` and it differs from %s. Fix: %s'
                         % (branch, main_ref, fix))
 

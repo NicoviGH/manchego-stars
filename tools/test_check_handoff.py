@@ -138,6 +138,18 @@ class HandoffBranchGuard(unittest.TestCase):
         _run(self.tmp, 'merge', '-q', 'origin/main')
         self.assertEqual(self._state(), 'ok')
 
+    def test_a_branch_edit_on_top_of_unpushed_main_pushes_main_first(self):
+        """Restoring the merge-base copy would also undo main's unpushed edit, so the advice
+        says to push main and merge it first."""
+        head = _run(self.tmp, 'rev-parse', 'HEAD').strip()
+        _run(self.tmp, 'update-ref', 'refs/remotes/origin/main', head)
+        _commit(self.tmp, 'HANDOFF.md', 'state v2\n', 'refresh on main, not pushed')
+        _run(self.tmp, 'checkout', '-q', '-b', 'feat/x')
+        _commit(self.tmp, 'HANDOFF.md', 'branch-local state\n', 'drifted')
+        fail = self._fails()
+        self.assertIn('the branch wrote it', fail[0])
+        self.assertIn('push main and `git merge origin/main` first', fail[0])
+
     def test_branch_synced_to_mains_tip_passes(self):
         """A copy byte-identical to main's tip merges as a no-op, so the guard tolerates it.
         It is never the advised fix: main's next refresh makes it drift again (ADR 0390).
