@@ -25,8 +25,10 @@ due. At those moments, and only then, the finalists meet a second enemy phase:
   Placing a claim's wave, and with it the trigger, is #569.
 - **All or none (FR-018).** The finalists are the best `M.FINAL` plans judged, by rank. If any
   triggers, each one gets one call to `sight.nextPhase`, or none does. The budget is
-  `M.LOOK_DECISION` = 8 calls a decision and `M.LOOK_ATTEMPT` = 128 an attempt (32 until #570; botrun passes what is
-  left as `opts.budget.attempt`). Too little left keeps the one-phase horizon, tagged `skipped`.
+  `M.LOOK_DECISION` = 8 calls a decision and `M.LOOK_ATTEMPT` = 128 an attempt (botrun passes
+  what is left as `opts.budget.attempt`). Too little left keeps the one-phase horizon, tagged
+  `skipped`, and the attempt's first such decision is a `lookahead_budget` anomaly counting
+  every one skipped (#570).
 - **What the second phase reads.** Every unit the first phase may strike (ours and the allied
   greens) is asked again at the HP the first phase left it. Each protected unit's death chance
   becomes the chance it dies in either phase, `1 - (1 - first) * (1 - second)`; its first-phase
@@ -96,7 +98,8 @@ second phase.
 
 **Decided (Nicolas, 2026-11-04, on Claude's recommendation).**
 - **The hold stays.** The hold overstates risk: a real player would retreat or heal between the
-  phases. Against PR-D it cost no win and no death, and no unit died over its cap. The
+  phases. Against PR-D it cost no win and no death, and no death came without a labelled
+  fallback (but see ours-ch03 seed 1002 under "After #570", a case for PR-F). The
   re-proposal (R-8's first proposal) needs `sight` to stage a hypothetical board for every read
   `Bot.candidates` makes, at a cost never measured. Reopen only on a failure PR-F's replays tie to
   the hold.
@@ -106,9 +109,14 @@ second phase.
   hit it too. Narrowing the boss trigger to a unit's first entry was proposed first and rejected:
   the budget is gone before most units reach the boss. `M.LOOK_ATTEMPT` is 128 (the most any
   tuning game wanted was 19 triggered decisions, 76 calls); FR-018's "32 per attempt" is amended to
-  match. Measured in "After #570" below.
+  match, and `matrix.yaml`'s suite manifest records 128 (test_montecarlo holds it to
+  planner.lua). Raising the cap moves the limit rather than reserving any of it for late turns:
+  a longer Defeat Boss map could spend it again, so a run that does now says so in its record
+  (`lookahead_budget`). Measured in "After #570" below.
 
-**After #570 (measured 2026-11-04, `suite --baseline`, 52 runs, `M.LOOK_ATTEMPT` = 128).**
+**After #570 (measured 2026-11-04, `suite --baseline`, 52 runs, `M.LOOK_ATTEMPT` = 128).** PR-E's
+final measure, the comparison below, was taken with the arrival trigger; this build has neither
+it nor the 32-call cap, so every change below is the two together.
 - **SC-003:** 566,389 `AiDecideMain` calls against the budget of 678,787 (+1.3% on PR-E's 559,289,
   +0.1% on the 565,656 baseline). The lookahead made 608 `nextPhase` calls (10.2 CPU s).
 - **No decision skipped for budget** (80 before): 152 of 701 decisions triggered, all extended.
@@ -121,4 +129,7 @@ second phase.
     run had parted from PR-E's earlier, and PR-E's had a safe hold there. Whether the hold (which
     makes standing by the boss read as a second-phase death) caused it is not witnessed: it is a
     live-proof case for PR-F's replays (#570).
+  - Deaths over the cap (a death's `over_cap`) rise from 8 to 9, every one on a turn with a
+    labelled fallback. The unlabelled ones, which the earlier measures' "over the cap at 0"
+    counted, stay at 0.
   - `fallback_sacrifice` labels rise from 22 to 29.
