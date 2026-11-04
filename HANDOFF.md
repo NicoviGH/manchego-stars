@@ -24,6 +24,15 @@ with your recommendations"; ADR 0389's Decided section):
 gains a third case: ours-ch03 tuning seed 1002's unit 3, killed by the boss on turn 21 under a
 labelled fallback (new with #570; whether the hold caused it is what the replay must witness).
 Report step 9 to Nicolas in plain words; he lost track of the series after the panel.
+- **PR-F starts from:** `tools/playtest/harness.lua` (T074 pre-decision states and replay),
+  `tools/playtest/sight.lua` (T071/T075 fog-off sandbox hook, spike first),
+  `tools/playtest/planner.lua` (T076 audit fields), `tools/playtest/montecarlo.py` (T077 `audit`
+  beside `story`, reusing `read_trace`), tests in `test_sight.lua`, `test_botrun.lua`,
+  `test_montecarlo.py`. Suite traces: `references/sim/{ours,vanilla}/<rom>/traces/` (ours-ch03 is
+  store chapter 4). Read only the `tuning` set.
+- **Check CI yourself:** this session's PR monitor is off, so no CI notification arrives. Wait on
+  `gh run list --branch <b> --json headSha,status,conclusion` for the head sha (#571 sat green,
+  unmerged, until Nicolas asked).
 
 Earlier, 2026-11-03: **#510 step 9 PR-E MERGED: #568 (4b08719).** **What PR-E built** (ADR 0389, ADR 0386 Built):
 - **Retry memory:** a retry remembers only the turns earlier failed attempts saw reinforcements
