@@ -1523,5 +1523,219 @@ do
     check(seen[1] and seen[1].turn ~= nil, true, "on the turn it first ran out")
 end
 
+-- The diagnostic replay (#510 step 9 PR F, T072/T074, FR-019): the attempt played again from
+-- the same start, matched against its original trace up to the pinned decision `ref`, then
+-- the diagnostic's plan played there. A in the rout attacks from (0,0) and the enemy phase
+-- kills a unit standing on (0,0) on turn 1; the forced wait on (0,1) avoids that.
+local Planner = dofile(here .. "planner.lua")
+local function deadly(g, find)
+    local a = find(0x01)
+    if g.turn == 1 and a and not a.dead and a.x == 0 and a.y == 0 then
+        a.hp, a.dead, a.onField = 0, true, false
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81 } }
+    end
+    return {}
+end
+-- the planner the original run played: A attacks from where it stands; nothing once A acted
+local function attacker(seen)
+    return {
+        surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf,
+        plan = function(_, board, _, _, opts)
+            if seen then seen[#seen + 1] = opts and opts.diag or "baseline" end
+            for _, u in ipairs(board.units) do
+                if u.id == 0x01 and u.onField and not u.acted then
+                    local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                                     targetId = 0x81, move = { x = 0, y = 0 } } }
+                    return acts[1], { acts = acts, expect = { { hp = 20 } },
+                                      enemies = { [0x81] = true } }, { phases = 1, averaged = 0 }
+                end
+            end
+            return nil, nil, { phases = 0, averaged = 0 }
+        end,
+    }
+end
+local function original()
+    local g = fakeGame { units = rout(), enemy = deadly }
+    local evs = {}
+    g.api.Planner = attacker()
+    g.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    Botrun.run(g.api)
+    return evs
+end
+local function replay(diag, seen, tweak)
+    local g = fakeGame { units = rout(), enemy = deadly }
+    g.api.Planner = attacker(seen)
+    g.api.diag = diag
+    if tweak then tweak(g) end
+    local ok, why, rec = Botrun.run(g.api)
+    local diags, botruns = {}, 0
+    for _, l in ipairs(g.emitted) do
+        if l:sub(1, #Botrun.DIAG_PREFIX) == Botrun.DIAG_PREFIX then
+            diags[#diags + 1] = Json.decode(l:sub(#Botrun.DIAG_PREFIX + 1))
+        elseif l:sub(1, #Botrun.PREFIX) == Botrun.PREFIX then
+            botruns = botruns + 1
+        end
+    end
+    return diags, botruns, rec, g, ok, why
+end
+local failure = { charId = 0x01, turn = 1 }
+local run = { game = "fake", chapter = 1, seed = 7, attempt = 1 }
+
+-- test_a_diagnostic_writes_only_its_DIAG_line: no BOTRUN record, no record handed back (the
+-- retry memory and the campaign's endpoint read it), one DIAG line
+do
+    local evs = original()
+    local diags, botruns, rec = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil" },
+                                        failure = failure, run = run, original = evs })
+    check(botruns, 0, "a diagnostic emits no BOTRUN record")
+    check(rec, nil, "and hands no record back: no retry memory, no endpoint, no label")
+    check(#diags, 1, "one DIAG line")
+    local d = diags[1] or {}
+    check(d.matched, true, "the replay matched the original trace up to the pinned decision")
+    check(d.mode, "force", "the mode is named")
+    check(d.ref, 1, "and the pinned decision")
+    check(d.run and d.run.seed, 7, "and the original attempt's identity")
+    check(d.baseline and d.baseline[1], "1>attack@0,0>129", "the baseline is the planner's plan")
+    check(d.chosen and d.chosen[1], "1>wait@0,1>nil", "the forced plan was played")
+    check(d.differs, true, "and it differs from the baseline")
+    check(d.avoided, true, "standing off (0,0) avoids the turn-1 death")
+    check(d.failure and d.failure.turn, 1, "the failure tested is named")
+end
+
+-- test_a_replay_that_leaves_its_original_is_unmatched: the original's turn-1 snapshot says A
+-- had other HP, so the replay is not the same attempt: matched is false, said, never a witness
+do
+    local evs = original()
+    for _, e in ipairs(evs) do
+        if e.t == "phase" then e.units[1].hp = 19; break end
+    end
+    local diags, botruns = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil" },
+                                    failure = failure, run = run, original = evs })
+    check(botruns, 0, "an unmatched diagnostic writes no record either")
+    check(diags[1] and diags[1].matched, false, "a replay off its original is unmatched")
+    check(diags[1] and diags[1].avoided, false, "and witnesses nothing")
+end
+
+-- test_a_pinned_decision_never_reached_is_unmatched
+do
+    local diags = replay({ ref = 99, mode = "deep", failure = failure, run = run,
+                           original = original() })
+    check(#diags, 1, "a replay that never reaches its decision still says so")
+    check(diags[1] and diags[1].matched, false, "unmatched")
+end
+
+-- test_deep_and_full_info_plan_from_the_same_decision: deep asks the planner with opts.diag;
+-- full_info asks it inside sight.fullInfo, never inside a batch; each beside the baseline
+do
+    local seen = {}
+    local diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                           original = original() }, seen)
+    check(table.concat(seen, ","):match("^baseline,deep") ~= nil, true,
+          "the baseline, then the deep plan, at the same decision")
+    check(diags[1] and diags[1].differs, false, "the same plan both ways does not differ")
+    check(diags[1] and diags[1].avoided, false, "and does not avoid the death")
+    local full, inBatch = 0, false
+    seen = {}
+    replay({ ref = 1, mode = "full_info", failure = failure, run = run, original = original() },
+        seen, function(g)
+            local sight = g.api.sight
+            g.api.sight = function()
+                local s = sight()
+                local batching = false
+                s.batch = function(fn)
+                    batching = true
+                    local out = table.pack(fn())
+                    batching = false
+                    return table.unpack(out, 1, out.n)
+                end
+                s.fullInfo = function(fn)
+                    full = full + 1
+                    inBatch = inBatch or batching
+                    return fn(g.api.board())
+                end
+                return s
+            end
+        end)
+    check(full, 1, "full_info plans once inside sight.fullInfo")
+    check(inBatch, false, "never inside a batch")
+end
+
+-- test_a_death_moved_onto_another_unit_is_not_avoided: the forced wait saves A, but the enemy
+-- phase kills B instead; the failure's unit lives, yet nothing was avoided (ours-ch03 seed
+-- 1002's force replay, 2026-11-07: unit 3 lived and unit 5 fell to the same boss)
+do
+    local function trade(g, find)
+        local a, b = find(0x01), find(0x02)
+        if g.turn ~= 1 then return {} end
+        local v = (a.x == 0 and a.y == 0) and a or b
+        v.hp, v.dead, v.onField = 0, true, false
+        return { { id = v.id, charId = v.charId, faction = "blue", killer = 0x81 } }
+    end
+    local function units()
+        local u = rout()
+        u[#u + 1] = unit(0x02, 1, "blue", 5, 5, 20)
+        return u
+    end
+    local g0 = fakeGame { units = units(), enemy = trade }
+    local evs = {}
+    g0.api.Planner = attacker()
+    g0.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    Botrun.run(g0.api)
+    local g = fakeGame { units = units(), enemy = trade }
+    g.api.Planner = attacker()
+    g.api.diag = { ref = 1, mode = "force", force = { "1>wait@0,1>nil" }, failure = failure,
+                   run = run, original = evs }
+    Botrun.run(g.api)
+    local d = Json.decode(g.emitted[#g.emitted]:sub(#Botrun.DIAG_PREFIX + 1))
+    check(d.matched, true, "the trade replay matched")
+    check(d.traded and d.traded[1], 0x02, "B, lost in A's place, is named")
+    check(d.avoided, false, "a death moved onto another unit is not avoided")
+end
+
+-- test_the_pinned_state_is_checked_by_loading_it_back: the state kept at the pinned decision,
+-- loaded back, holds the board that decision read; one that does not is said
+do
+    local kept
+    local function keeper(g, wrong)
+        g.api.pinned = function(ref)
+            kept = g.api.board()
+            return "pinned-r" .. ref .. ".ss"
+        end
+        g.api.reload = function(file)
+            check(file, "pinned-r1.ss", "the file the pin kept is the one loaded back")
+            if wrong then kept.units[1].hp = 1 end
+            return kept
+        end
+    end
+    local diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                           original = original() }, nil, function(g) keeper(g) end)
+    check(diags[1] and diags[1].pinned_board, true, "the kept state holds the pinned board")
+    diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                     original = original() }, nil, function(g) keeper(g, true) end)
+    check(diags[1] and diags[1].pinned_board, false, "a kept state off the pinned board is said")
+end
+
+-- test_a_plan_event_carries_the_plans_audit (FR-020): what the planner offered, saw and spent
+-- is in the trace, for `montecarlo.py audit` to read
+do
+    local g = fakeGame { units = rout() }
+    local evs = {}
+    local P = attacker()
+    local plan = P.plan
+    P.plan = function(...)
+        local a, p, c = plan(...)
+        if p then p.audit = { offered = { "1>attack@0,0>129" }, budget = { exhausted = false } } end
+        return a, p, c
+    end
+    g.api.Planner = P
+    g.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    Botrun.run(g.api)
+    local audit
+    for _, e in ipairs(evs) do
+        if e.t == "plan" and e.ref == 1 then audit = e.audit end
+    end
+    check(audit and audit.offered[1], "1>attack@0,0>129", "the plan event carries plan.audit")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

@@ -1012,6 +1012,9 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE',
                      'PT_CAMPAIGN', 'PT_SIMDIR',
                      # The instrument a run is stamped with (montecarlo.instrument_id, ADR 0387).
                      'PT_INSTRUMENT',
+                     # A diagnostic replay (#510 PR-F, ADR 0392): it forks the bot's play at a
+                     # pinned decision, so it is a different run from the same start without it.
+                     'PT_DIAG',
                      # The #345 watchdog knobs. Neither should change a verdict -- they bound
                      # how patient run.sh is, not what the scenario proves -- but the guard
                      # that keeps this list honest cannot tell, and a run killed early by a

@@ -30,13 +30,17 @@ record 0022; the #510 plan's Task 12, amended 2026-10-27).
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
 forecast and every blow.
 
-    python3 tools/playtest/montecarlo.py suite [--baseline] [--jobs 8]
+    python3 tools/playtest/montecarlo.py audit <runs .jsonl> --diag <log> [--diag <log> ...]
 
-`suite` plays the difficulty instrument's frozen suite (#510 step 9; matrix.yaml's
-`instrument:` section, ADR 0387): attempt 1 of each pinned chapter start, from its saved state,
-under each of its seeds. Without --baseline it plays the tuning seeds and prints each run;
---baseline plays the held-out seeds too and prints only what each start cost. It refuses a start
-that no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
+    python3 tools/playtest/montecarlo.py replay <runs .jsonl> \\
+        --record <campaign>/<seed>/<chapter>/<attempt> --mode force|full_info|deep \\
+        [--force <act key> ...] [--char 0xNN] [--ref N]
+
+`replay` plays one diagnostic replay of a suite run's death from that run's own task, pinned at
+the decision that committed to it, and appends only its DIAG lines to diag.jsonl beside the runs
+file: never a record. `audit` labels each death of the runs from those DIAG lines: a label counts
+only when a matched replay of a different plan avoided the death (ADR 0392). Every other death
+stays unclassified, its own grading shown as proposed only.
 
 `cell` plays one chapter-and-mode cell to its verdict. Pair s is campaign s of each game: from
 New Game, the game seeded once with s and never again, as a player's own save; each chapter is
@@ -93,10 +97,12 @@ def parse_lines(text, prefix):
     return out
 
 
-def append_record(path, rec):
+def append_record(path, rec, prefix=None):
     """Append `rec` to `path` as ONE line, in one write on an O_APPEND descriptor: two
-    workers' records never interleave, and a reader never sees half of one."""
-    data = (json.dumps(rec, sort_keys=True) + '\n').encode('utf-8')
+    workers' records never interleave, and a reader never sees half of one. With `prefix`, the
+    line is `<prefix> <json>`, as the emulator printed it (parse_lines reads it back)."""
+    head = prefix + ' ' if prefix else ''
+    data = (head + json.dumps(rec, sort_keys=True) + '\n').encode('utf-8')
     fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
     try:
         if os.write(fd, data) != len(data):
@@ -218,6 +224,8 @@ def launch(task, tag, log_path):
     if task.get('mode'):
         env['PT_DIFFICULTY'] = task['mode']
     env['PT_INSTRUMENT'] = task.get('instrument') or instrument_id()
+    if task.get('diag'):   # a diagnostic replay (`replay`): harness.lua prints DIAG lines only
+        env['PT_DIAG'] = json.dumps(task['diag'])
     with open(log_path, 'w') as log:
         subprocess.run([RUN_SH, scenario], env=env, stdout=log, stderr=subprocess.STDOUT,
                        check=False)
@@ -1038,12 +1046,13 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
     return lines
 
 
-def suite_main(args):
+def suite_setup():
+    """(suite, simdirs, envs) to play suite starts from, or a refusal: each game plays from its
+    own store, named by the ROM built now. `envs()` builds {game: campaign env}."""
     import campaign_env
     if os.environ.get('PT_SIMDIR'):
-        print('refused: PT_SIMDIR is set; the suite plays each game from its own store, named '
-              "by the ROM built now (run.sh's simdir)")
-        return 1
+        return ('refused: PT_SIMDIR is set; the suite plays each game from its own store, named '
+                "by the ROM built now (run.sh's simdir)")
     suite = load_suite()
     simdirs = {'vanilla': simdir(True), 'ours': simdir(False)}
 
@@ -1051,6 +1060,15 @@ def suite_main(args):
         return {'vanilla': campaign_env.vanilla_env(suite['route']),
                 'ours': campaign_env.ours_env([os.path.join(REPO, p)
                                                for p in suite['shops_from']])}
+    return suite, simdirs, envs
+
+
+def suite_main(args):
+    setup = suite_setup()
+    if isinstance(setup, str):
+        print(setup)
+        return 1
+    suite, simdirs, envs = setup
     outs = [os.path.join(d, 'runs.jsonl') for d in simdirs.values()]
     pool = Pool(jobs=args.jobs, out=outs[0])
     hashes = {g: os.path.basename(d) for g, d in simdirs.items()}
@@ -1059,6 +1077,162 @@ def suite_main(args):
     for line in lines:
         print(line, flush=True)
     return 1 if any(line.startswith('refused') for line in lines) else 0
+
+
+# ---- a diagnostic replay of one death (#510 step 9 PR-F, T074; ADR 0392) ----
+
+def bot_records(records):
+    """The BOTRUN records of a runs file, in its order: the last is the newest."""
+    return [r for r in records if r.get('kind') != 'campaign']
+
+
+def find_record(records, spec, trace=None):
+    """The BOTRUN record of `records` that `spec` names, '<campaign>/<seed>/<chapter>/<attempt>':
+    the one whose filed trace is `trace`, else the newest (the last in the file). The suite
+    replays a start under every instrument, so a name alone is never unique in a store."""
+    want = spec.split('/')
+    if len(want) != 4:
+        raise ValueError('a record is <campaign>/<seed>/<chapter>/<attempt>, not %r' % spec)
+    got = [r for r in bot_records(records)
+           if [str(r.get(k)) for k in ('campaign', 'seed', 'chapter', 'attempt')] == want
+           and (trace is None or r.get('trace') == trace)]
+    if not got:
+        raise ValueError('no record is %s%s' % (spec, ' with trace %s' % trace if trace else ''))
+    return got[-1]
+
+
+def moved_ref(events, d):
+    """The last decision (a plan's `ref`) whose act moved death `d`'s unit before it fell, from
+    the run's trace `events`, or None. A kept act is played under the plan that made it, so a
+    plan event without a ref keeps the one before. The death's own `plan_ref` is the plan that
+    committed to the phase it fell in, which need not move it at all."""
+    cur = last = None
+    for e in events:
+        if any(f.get('charId') == d.get('charId') for f in e.get('fell') or []):
+            break
+        if e.get('t') == 'plan' and e.get('ref') is not None:
+            cur = e['ref']
+        elif (e.get('t') == 'act' and e.get('phase') == 'player'
+              and e.get('unit') == d.get('charId')):
+            last = cur
+    return last
+
+
+def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=()):
+    """PT_DIAG for one diagnostic replay of a death of suite run `rec` (whose trace is filed
+    relative to `base`): the decision to pin, the mode, the forced plan, the death, the
+    original trace and the run. Without `ref`, the decision is the last that moved the unit in
+    the original trace `events` (moved_ref), else the death's plan_ref; `ref_from` says which
+    ('asked', 'act' or 'plan_ref'). Raises ValueError, saying why, on a replay it cannot make:
+    a run not of the suite (a campaign's chapter is reached through every chapter before it),
+    a held-out run (FR-025: held-out play stays unseen while the bot is being tuned), or a
+    death or plan it cannot name."""
+    suite = rec.get('suite') or {}
+    if not suite.get('start_id'):
+        raise ValueError('not a suite run: only a pinned start replays to a decision')
+    if suite.get('set') == 'held_out':
+        raise ValueError('a held-out run is never replayed while the bot is tuned (FR-025)')
+    deaths = [d for d in rec.get('deaths') or [] if char is None or d.get('charId') == char]
+    if not deaths:
+        raise ValueError('no death of 0x%02X in that run' % char if char is not None
+                         else 'that run has no death')
+    if len(deaths) > 1:
+        raise ValueError('%d deaths in that run: name one with --char' % len(deaths))
+    if (mode == 'force') != bool(force):
+        raise ValueError('force needs --force' if mode == 'force'
+                         else '--force goes only with force')
+    if not rec.get('trace'):
+        raise ValueError('that run has no kept trace to match the replay against')
+    d = deaths[0]
+    ref_from = 'asked'
+    if ref is None:
+        ref = moved_ref(events, d)
+        ref_from = 'act'
+    if ref is None:
+        ref, ref_from = d.get('plan_ref'), 'plan_ref'
+    return {'ref': ref, 'ref_from': ref_from, 'mode': mode,
+            'force': list(force) if force else None,
+            'failure': {'charId': d['charId'], 'turn': d.get('turn')},
+            'original_trace': os.path.join(base, rec['trace']),
+            'run': {k: rec.get(k) for k in RUN_KEYS}}
+
+
+def replay_task(rec, suite, envs, diag, instrument):
+    """Suite run `rec`'s own task (suite_tasks': its start, seed and instrument) with `diag`,
+    and without the runs file and stamp a record would take: a replay leaves none."""
+    sid, kind = rec['suite']['start_id'], rec['suite']['set']
+    one = dict(suite, starts=[s for s in suite['starts'] if s['start_id'] == sid])
+    task = [t for t in suite_tasks(one, envs, instrument, {}, (kind,))
+            if t['seed'] == rec.get('seed')][0]
+    for k in ('out', 'stamp'):
+        task.pop(k, None)
+    task['diag'] = diag
+    return task
+
+
+def replay_run(task, base, launch=launch, run_root=None):
+    """Play one replay; append its DIAG lines to `base`/diag.jsonl, each replay trace filed
+    beside the runs file (keep_trace) and named relative to it. Its BOTRUN line, if any, is
+    dropped: a diagnostic feeds no record (FR-019). A replay that printed no DIAG line keeps
+    its run dir as a failure."""
+    out = os.path.join(base, 'diag.jsonl')
+    log_dir = os.path.join(base, 'workers')
+    os.makedirs(log_dir, exist_ok=True)
+    tag = 'diag-%d-%x' % (os.getpid(), int(time.time()))
+    text, where = launch(task, tag, os.path.join(log_dir, tag + '.log'))
+    diags = parse_lines(text, DIAG)
+    for g in diags:
+        run = g.get('run') or {}
+        kept = {'trace': g.get('trace'), 'run_dir': where, 'campaign': 'diag',
+                'chapter': run.get('chapter'), 'seed': run.get('seed'),
+                'attempt': '%s-%s' % (run.get('attempt'), g.get('mode'))}
+        keep_trace(kept, out)
+        g['trace'] = kept.get('trace')
+        # the state at the pinned decision (harness.lua's api.pinned) is a board fixture
+        # (T084): filed beside the trace before the run dir goes, and named in the line
+        names = os.listdir(where) if where and os.path.isdir(where) else []
+        pinned = [n for n in names if n.startswith('pinned-')
+                  and n.endswith('-r%s.ss' % g.get('ref'))]
+        for name in pinned[:1]:
+            rel = os.path.join('traces', 'diag', '%s-%s' % (uuid.uuid4().hex[:8], name))
+            os.makedirs(os.path.join(base, 'traces', 'diag'), exist_ok=True)
+            shutil.copyfile(os.path.join(where, name), os.path.join(base, rel))
+            g['pinned'] = rel
+        append_record(out, g, DIAG)
+    settle_run_dir(where, bool(diags), run_root)
+    return diags
+
+
+def replay_main(args):
+    base = os.path.dirname(os.path.abspath(args.runs))
+    try:
+        rec = find_record(read_trace(args.runs), args.record, args.trace)
+        print('replaying the run filed as %s' % rec.get('trace'))
+        original = rec.get('trace') and os.path.join(base, rec['trace'])
+        events = read_trace(original) if original and os.path.exists(original) else []
+        diag = replay_diag(rec, args.mode, args.force,
+                           None if args.char is None else int(args.char, 0), args.ref, base,
+                           events)
+        print('pinned at decision %s (%s)' % (diag['ref'], {
+            'asked': '--ref', 'act': 'the last that moved the unit',
+            'plan_ref': "nothing moved the unit: the death's plan_ref"}[diag['ref_from']]))
+    except ValueError as err:
+        print('refused: %s' % err)
+        return 1
+    setup = suite_setup()
+    if isinstance(setup, str):
+        print(setup)
+        return 1
+    suite, simdirs, envs = setup
+    one = dict(suite, starts=[s for s in suite['starts']
+                              if s['start_id'] == rec['suite']['start_id']])
+    problems = check_starts(one, simdirs)
+    if problems:
+        print('refused: %s' % '; '.join(problems))
+        return 1
+    for g in replay_run(replay_task(rec, suite, envs(), diag, instrument_id()), base) or [None]:
+        print('DIAG %s' % json.dumps(g) if g else 'the replay printed no DIAG line')
+    return 0
 
 
 # ---- one run, told (PR F3) ----
@@ -1235,6 +1409,202 @@ def story(events, names=None, items=None, classes=None):
     return lines
 
 
+# ---- the failure audit (#510 step 9 PR-F, FR-019, FR-020, SC-004; ADR 0392) ----
+
+DIAG = 'DIAG'
+# The labels a witness can support, in the order the primary one is picked: a defect the bot
+# owns (it never offered the plan, misjudged its risk, misranked it) before a limit of its
+# search, and that before what it could not have known.
+AUDIT_LABELS = ('missing_action', 'mis_predicted_safety', 'mis_scored', 'search_miss',
+                'information_unavailable')
+# planner.lua's rejection of a judged plan (the trace's `considered`), by what it says of a forced
+# plan that then lived: judged too risky, or ranked below the one played. A `stalled` plan may
+# not be played at all, so it places nothing.
+REJECTED_LABEL = {'over_cap': 'mis_predicted_safety', 'outranked': 'mis_scored'}
+SC004_BAR = 0.9
+# a run's identity in a DIAG line: its filed trace tells apart the runs of one start and seed
+# under different instruments, which share the rest
+RUN_KEYS = ('game', 'chapter', 'seed', 'attempt', 'trace')
+
+
+def run_key(r):
+    return tuple(r.get(k) for k in RUN_KEYS)
+
+
+def diag_of(g, r, d):
+    """Whether DIAG line `g` replays death `d` of record `r`."""
+    f = g.get('failure') or {}
+    return (run_key(g.get('run') or {}) == run_key(r) and f.get('charId') == d.get('charId')
+            and f.get('turn') == d.get('turn'))
+
+
+def orphans(records, diags):
+    """The DIAG lines that replay no death of `records`: a stale line whose run left the
+    store, or whose death the run no longer has. Never dropped: a replay that answers nothing
+    the audit reads must be seen, not lost."""
+    return [g for g in diags if not any(diag_of(g, r, d) for r in records
+                                        for d in r.get('deaths') or [])]
+
+
+def witness_label(diag, plan):
+    """(label, None) for a DIAG replay that witnesses one, else (None, why not). A witness is a
+    replay that matched the original up to the decision (`matched`), played a DIFFERENT plan and
+    kept the unit alive. Its label: a deep or full-information replay says what that diagnostic
+    added; a forced plan is placed by what the planner itself recorded at that decision (`plan`,
+    the trace's `plan` event: `audit.offered`, every act it was offered, and `considered`,
+    every plan it judged), and without that record nothing is claimed."""
+    mode = diag.get('mode')
+    if not diag.get('matched'):
+        return None, 'UNMATCHED: the %s fork did not replay the original up to decision %s' % (
+            mode, diag.get('ref'))
+    if not diag.get('differs') or diag.get('chosen') == diag.get('baseline'):
+        return None, '%s: chose the same plan' % mode
+    if diag.get('traded'):
+        # the unit lived and another protected unit died in its place (harness.lua's `traded`):
+        # the failure moved, it was not avoided
+        return None, '%s: traded it for %s' % (mode, ', '.join('0x%02X' % c
+                                                              for c in diag['traded']))
+    if not diag.get('avoided'):
+        return None, '%s: did not avoid it' % mode
+    if mode == 'deep':
+        return 'search_miss', None
+    if mode == 'full_info':
+        return 'information_unavailable', None
+    offered = ((plan or {}).get('audit') or {}).get('offered')
+    if offered is None:
+        return None, 'force: avoided it, but the trace has no plan audit at decision %s' % (
+            diag.get('ref'))
+    chosen = list(diag.get('chosen') or [])
+    if any(k not in offered for k in chosen):
+        return 'missing_action', None
+    for c in plan.get('considered') or []:
+        if list(c.get('acts') or []) == chosen:
+            label = REJECTED_LABEL.get(c.get('rejected'))
+            if label is None:
+                return None, 'force: avoided it, but the planner judged that plan %s' % (
+                    c.get('rejected') or 'the one it played')
+            return label, None
+    # every act was offered, and the plan was never judged: the beam or the budget cut it
+    return 'search_miss', None
+
+
+def audit(records, diags, events_of):
+    """One finding per blue or green death of `records` (BOTRUN records): every label a DIAG
+    replay of that death witnesses, the primary one, each witness, and why each other replay is
+    none. `events_of(record)`: that run's trace events (read_trace), [] when it has none."""
+    findings = []
+    for r in records:
+        if r.get('kind') == 'campaign' or not r.get('deaths'):
+            continue
+        plans = {e.get('ref'): e for e in events_of(r) if e.get('t') == 'plan'
+                 and e.get('ref') is not None}
+        for d in r['deaths']:
+            mine = [g for g in diags if diag_of(g, r, d)]
+            # a replay run again (its harness made stricter, say) appends a new line: the
+            # newest line of each replay -- one decision, mode and plan -- is the one that counts
+            newest = {}
+            for g in mine:
+                newest[(g.get('ref'), g.get('mode'), json.dumps(g.get('chosen')))] = g
+            mine = list(newest.values())
+            labels, witnesses, notes = set(), [], []
+            for g in mine:
+                label, why = witness_label(g, plans.get(g.get('ref')))
+                if label:
+                    labels.add(label)
+                    witnesses.append(dict(g, label=label))
+                else:
+                    notes.append(why)
+            ordered = [x for x in AUDIT_LABELS if x in labels]
+            findings.append({'record': r, 'death': d, 'labels': ordered,
+                             'primary': ordered[0] if ordered else None,
+                             'witnesses': witnesses, 'notes': notes})
+    return findings
+
+
+def audit_lines(findings, who=lambda c: '0x%02X' % c):
+    """The findings in words. An unclassified failure shows the run's own grading of the death
+    as proposed only (AS 2): it is what the bot thought, never a witnessed label."""
+    lines = []
+    for f in findings:
+        r, d = f['record'], f['death']
+        head = '%s chapter %s, seed %s, attempt %s: %s' % (
+            r.get('game'), r.get('chapter'), r.get('seed'), r.get('attempt'), death(d, who))
+        if f['primary']:
+            lines.append('%s -> primary %s; supported: %s' % (head, f['primary'],
+                                                              ', '.join(f['labels'])))
+        else:
+            lines.append('%s -> unclassified (proposed: %s, not witnessed)' % (
+                head, d.get('cause') or 'nothing'))
+        for w in f['witnesses']:
+            lines.append('    witness (%s): %s at decision %s played %s instead of %s -> '
+                         'python3 tools/playtest/montecarlo.py story %s' % (
+                             w['label'], w.get('mode'), w.get('ref'), w.get('chosen'),
+                             w.get('baseline'), w.get('trace')))
+        for n in f['notes']:
+            lines.append('    no witness: %s' % n)
+    return lines
+
+
+def coverage(findings, instrument=None, orphaned=0):
+    """SC-004's sentence for one instrument's runs: how many audited failures have a witnessed
+    label, against its bar, and the DIAG lines that matched no failure (`orphaned`)."""
+    n = len(findings)
+    head = 'SC-004 (instrument %s): ' % instrument
+    tail = ' %d orphan DIAG lines (no record matches their run).' % orphaned if orphaned else ''
+    if not n:
+        return head + 'no failures to audit.' + tail
+    k = sum(1 for f in findings if f['primary'])
+    # an unclassified failure whose replay could not reach the original's decision is a fault of
+    # the replay, not an answer about the bot: counted apart so it is never read as one
+    lost = sum(1 for f in findings if not f['primary']
+               and any(n.startswith('UNMATCHED') for n in f['notes']))
+    return head + ('%d of %d audited failures (%.0f%%) have a witnessed label; '
+                   '%d unclassified%s. The bar is %.0f%%: %s.' % (
+                       k, n, 100.0 * k / n, n - k,
+                       ' (%d with an UNMATCHED replay)' % lost if lost else '',
+                       100 * SC004_BAR, 'met' if k >= SC004_BAR * n else 'not met')) + tail
+
+
+def audit_main(args):
+    records = read_trace(args.runs)
+    base = os.path.dirname(os.path.abspath(args.runs))
+
+    def events_of(r):
+        # keep_trace names a run's trace relative to the runs file
+        path = r.get('trace') and os.path.join(base, r['trace'])
+        return read_trace(path) if path and os.path.exists(path) else []
+
+    diags = []
+    for path in args.diag or []:
+        with open(path) as fh:
+            got = parse_lines(fh.read(), DIAG)
+        for g in got:
+            # `replay` files a witness's trace relative to its diag file
+            if g.get('trace') and not os.path.isabs(g['trace']):
+                g['trace'] = os.path.join(os.path.dirname(os.path.abspath(path)), g['trace'])
+        diags.extend(got)
+    # one instrument's runs: two instruments are two bots, and one sentence over both measures
+    # neither. The newest run's, as `replay` picks the newest run, unless --instrument says
+    runs = bot_records(records)
+    inst = args.instrument if args.instrument is not None else (
+        runs[-1].get('instrument') if runs else None)
+    mine = [r for r in runs if r.get('instrument') == inst]
+    # a line for another instrument's run belongs to that instrument's audit
+    others = {run_key(r) for r in runs if r.get('instrument') != inst}
+    diags = [g for g in diags if run_key(g.get('run') or {}) not in others]
+    findings = audit(mine, diags, events_of)
+    lost = orphans(mine, diags)
+    game = next((r.get('game') for r in mine if r.get('game')), None) or 'vanilla'
+    names = _names(game)
+    for line in audit_lines(findings, lambda c: names.get(c) or '0x%02X' % c):
+        print(line)
+    for g in lost:
+        print('orphan (no record matches its run): %s, failure %s, %s at decision %s' % (
+            g.get('run'), g.get('failure'), g.get('mode'), g.get('ref')))
+    print(coverage(findings, inst, len(lost)))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -1248,6 +1618,20 @@ def main(argv=None):
     st = sub.add_parser('story', help="one run's trace as plain text")
     st.add_argument('trace', help='a trace .jsonl or .jsonl.gz')
     st.add_argument('--turn', type=int, help="only this turn and the one before (an anomaly's)")
+    au = sub.add_parser('audit', help="each failure's witnessed labels, from DIAG replays")
+    au.add_argument('runs', help='a runs .jsonl (its records name their kept traces)')
+    au.add_argument('--instrument', help="the instrument whose runs to audit (default: the "
+                    "newest run's)")
+    au.add_argument('--diag', action='append', help='a log or file with DIAG lines (repeatable)')
+    rp = sub.add_parser('replay', help="one diagnostic replay of a suite run's death")
+    rp.add_argument('runs', help='the runs .jsonl the run is in')
+    rp.add_argument('--record', required=True, help='<campaign>/<seed>/<chapter>/<attempt>')
+    rp.add_argument('--mode', required=True, choices=('force', 'full_info', 'deep'))
+    rp.add_argument('--force', action='append',
+                    help='one act key of the plan to force (repeat it, in act order)')
+    rp.add_argument('--trace', help="the run's filed trace (default: the newest run so named)")
+    rp.add_argument('--char', help="the dead unit's character id (default: the run's one death)")
+    rp.add_argument('--ref', type=int, help="the decision to pin (default: the death's plan_ref)")
     c = sub.add_parser('cell', help='one chapter-and-mode cell, ours vs vanilla, to its verdict')
     c.add_argument('--ours', required=True, help="ours' campaign env .json")
     c.add_argument('--vanilla', required=True, help="the twin's campaign env .json")
@@ -1264,6 +1648,10 @@ def main(argv=None):
         return cell_main(args)
     if args.cmd == 'suite':
         return suite_main(args)
+    if args.cmd == 'replay':
+        return replay_main(args)
+    if args.cmd == 'audit':
+        return audit_main(args)
     if args.cmd == 'story':
         events = read_trace(args.trace)
         if args.turn is not None:

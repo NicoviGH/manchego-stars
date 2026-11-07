@@ -74,6 +74,9 @@
 --   claims(chapter)       that chapter's resolved claims (bot.lua's Claims)
 --   play(style, claims, attempt) -> botrun's record (it emits its own BOTRUN line)
 --   only                  OPTIONAL: the one attempt to play (see above)
+--   diag                  OPTIONAL, with only: that attempt is a diagnostic replay (botrun.lua's
+--                         api.diag). Its one DIAG line is all it writes: no CAMPAIGN line, so
+--                         no endpoint is recorded, and it hands no record back
 --   emit(line), log(s)
 -- Campaign.run(api) -> ok, why, chapters. Each chapter emits ONE stdout line,
 -- `CAMPAIGN <json>`, and the campaign a last one with `chapter = nil`.
@@ -180,6 +183,7 @@ function M.run(api)
     local route = info.route
     local chapters = {}
     local function line(t)
+        if api.diag then return end   -- a diagnostic writes only its DIAG line (botrun.lua)
         t.campaign, t.game, t.rom_hash, t.mode, t.seed =
             info.campaign, info.game, info.rom_hash, info.mode, info.seed
         api.emit(M.PREFIX .. Json.encode(t))
@@ -261,6 +265,10 @@ function M.run(api)
                 -- (style.arrivals); attempt 1, and any attempt alone, has none
                 if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
                 local rec = api.play(style, followed, entry.attempts)
+                if api.diag then
+                    return "played", string.format("chapter %d attempt %d: diagnostic replayed", ch,
+                        entry.attempts)
+                end
                 if api.only then
                     entry.outcome, entry.turns = rec.outcome, rec.turns
                     line(entry)

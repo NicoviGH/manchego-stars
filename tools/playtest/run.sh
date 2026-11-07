@@ -64,8 +64,11 @@
 #                           says), not a path: PT_CAMPAIGN="$(cat env.json)". A path is ignored
 #                           and a New Game runs. States land in PT_SIMDIR
 #                           (references/sim/<game>/<rom-hash>).
-#                           PT_VANILLA=1: retail Ch1, after the bot plays the Prologue
-#   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
+#                           PT_VANILLA=1: retail Ch1, after the bot plays the Prologue.
+#                           PT_DIAG (JSON, with PT_CAMPAIGN's attempt): replay that attempt as a
+#                           diagnostic (botrun.lua); it prints one `DIAG <json>` line and no
+#                           record. `montecarlo.py replay` builds both.
+#   sightprobe          -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
 #                           handshakes with an EXTERNAL sidecar over PT_LLM_DIR (default
@@ -307,6 +310,7 @@ PLAYTEST_STYLE = os.getenv("PT_STYLE") or ""
 PLAYTEST_CLAIMS = os.getenv("PT_CLAIMS") or ""
 PLAYTEST_CAMPAIGN = os.getenv("PT_CAMPAIGN") or ""
 PLAYTEST_INSTRUMENT = os.getenv("PT_INSTRUMENT") or ""
+PLAYTEST_DIAG = os.getenv("PT_DIAG") or ""
 PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"

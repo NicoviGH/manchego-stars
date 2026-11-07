@@ -66,7 +66,10 @@
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- ours it strikes, sorted), kind =
 -- "beam"|"assault"|"advance"|"unstall"|"mend", considered = every plan judged, best first:
--- { judged, acts, kind, rank, seizes, extended (it met the lookahead's second phase) }, rank = what plans are compared by (M.outranks): { admitted,
+-- { judged, acts (its key list, M.keysOf), kind, rank, seizes, extended (it met the lookahead's
+-- second phase), played (the one played), rejected (why not: "over_cap", "outranked", "stalled"),
+-- weights (its judged phase's likeliest ways' chances) }, rank = what plans are compared by
+-- (M.outranks): { admitted,
 -- forfeits (how many ledger goals it closes for good), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
@@ -78,7 +81,10 @@
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both) }, lookahead =
--- { trigger = the kinds M.triggers found | nil, extended, skipped, calls }, branched
+-- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
+-- failure audit's (FR-020): { offered = every act Bot.candidates offered, by M.key, visibility =
+-- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
+-- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
 -- to the average, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
@@ -93,6 +99,9 @@
 -- uncertain kills left to the average past BRANCH), look = { decisions, triggered, extended,
 -- skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
 -- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
+-- opts.diag = "deep" (a diagnostic replay's, FR-019): every decision's finalists meet the
+-- lookahead's second phase, no trigger or budget asked. A forced plan is botrun's (its acts
+-- may be ones no candidate offered); "full_info" is sight.fullInfo around the call.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -114,6 +123,7 @@ M.FINAL = 4        -- complete plans judged against the enemy phase
 -- it, the most uncertain are branched and the plan records how many it left to the average
 -- (`averaged`). ADR 0384 has the cost.
 M.BRANCH = 8
+M.AUDIT_WAYS = 4  -- the judged phase's ways whose chances a plan's audit record keeps
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
 
@@ -338,6 +348,10 @@ local function keysOf(st)
     for _, x in ipairs(st.acts) do out[#out + 1] = key(x) end
     return out
 end
+
+-- One act's identity and a plan's, for the diagnostics too: a forced replay, its DIAG line and
+-- the audit name a plan by this list (botrun, montecarlo.py), never by a second spelling
+M.key, M.keysOf = key, keysOf
 
 -- whether a plan takes the Seize
 local function seizesIn(st)
@@ -969,6 +983,12 @@ function M.plan(Bot, board, sight, style, opts)
             if total ~= 1 then o.p = total > 0 and o.p / total or 0 end
             wayP[o.way] = (wayP[o.way] or 0) + o.p
         end
+        -- the audit's branch weights (FR-020): the likeliest AUDIT_WAYS ways' chances, rounded
+        st.weights = {}
+        for i = 1, #ways do st.weights[i] = wayP[i] or 0 end
+        table.sort(st.weights, function(x, y) return x > y end)
+        for i = #st.weights, M.AUDIT_WAYS + 1, -1 do st.weights[i] = nil end
+        for i, p in ipairs(st.weights) do st.weights[i] = math.floor(p * 1e4 + 0.5) / 1e4 end
         -- each unit's chance to die, HP lost and the strikes on it, over every way the phase went
         local judged = st.base
         local die, taken, short, struck = {}, {}, {}, {}
@@ -1153,7 +1173,7 @@ function M.plan(Bot, board, sight, style, opts)
     local best
     -- every plan judged, for the run's trace: its acts, its score and where it came from; and
     -- the plans themselves, with whether a stalled board lets each be played
-    local considered, judgedPlans = {}, {}
+    local considered, judgedPlans, playable = {}, {}, {}
     local function pick()
         local ranks = {}
         for i, j in ipairs(judgedPlans) do ranks[i] = j.st.rank end
@@ -1163,9 +1183,11 @@ function M.plan(Bot, board, sight, style, opts)
     local function consider(st, kind)
         judge(st)
         st.kind = kind
-        considered[#considered + 1] = { judged = st.judged, acts = st.keys, kind = kind,
-                                        rank = st.rank, seizes = seizesIn(st) or nil }
+        local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
+                    seizes = seizesIn(st) or nil, weights = st.weights }
+        considered[#considered + 1] = c
         judgedPlans[#judgedPlans + 1] = { st = st, ok = not stalled or changes(st) }
+        playable[c] = judgedPlans[#judgedPlans].ok
     end
     for _, f in ipairs(finals) do consider(f.st, f.kind) end
     pick()   -- the plan the mend starts from; once more after the mends
@@ -1260,11 +1282,15 @@ function M.plan(Bot, board, sight, style, opts)
         local fin = {}
         for i = 1, math.min(M.FINAL, #idx) do fin[i] = judgedPlans[idx[i]].st end
         look.trigger = M.triggers(fin, byId, ctx.enemies, sight)
-        if look.trigger then
-            cost.look.triggered = 1
+        -- the deep diagnostic (FR-019): this same second phase on every decision, whatever
+        -- the board and the budget, so a replay can ask whether one more cycle saw the death
+        local deep = opts and opts.diag == "deep"
+        look.deep = deep or nil
+        if look.trigger or deep then
+            if look.trigger then cost.look.triggered = 1 end
             local budget = opts and opts.budget or {}
-            local room = math.min(budget.decision or M.LOOK_DECISION,
-                                  budget.attempt or M.LOOK_ATTEMPT)
+            local room = deep and math.huge or math.min(budget.decision or M.LOOK_DECISION,
+                                                        budget.attempt or M.LOOK_ATTEMPT)
             if #fin > room then
                 look.skipped = true
                 cost.look.skipped_budget = 1
@@ -1350,6 +1376,30 @@ function M.plan(Bot, board, sight, style, opts)
         return M.outranks(x.rank, y.rank)
     end)
     best.considered = considered
+    -- why each plan judged was not played (FR-020), for the failure audit: the played one
+    -- nothing; else a stalled board's plan that changes nothing, one over the cap, or one the
+    -- rank put below the played one. A plan the beam or a menu cut was never complete, so it
+    -- is in no list: the audit finds it missing from `considered` while its acts are offered
+    for _, c in ipairs(considered) do
+        if c.rank == best.rank then
+            c.played = true
+        elseif not playable[c] then
+            c.rejected = "stalled"
+        else
+            c.rejected = c.rank.admitted and "outranked" or "over_cap"
+        end
+    end
+    local keysOffered, seen, fogged = {}, 0, 0
+    for _, c in ipairs(cands) do
+        for _, x in ipairs(c.acts) do keysOffered[#keysOffered + 1] = key(x) end
+    end
+    for _, u in ipairs(board.units) do
+        if u.faction == "red" and u.onField and not u.dead then
+            if u.fogged then fogged = fogged + 1 else seen = seen + 1 end
+        end
+    end
+    best.audit = { offered = keysOffered, visibility = { seen = seen, fogged = fogged },
+                   budget = { exhausted = look.skipped == true, averaged = best.averaged or 0 } }
     -- no plan under the cap: the least likely to end the game, then the least over it, is
     -- played, and says so (FR-011, ADR 0384 amended)
     best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil

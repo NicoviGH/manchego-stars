@@ -4444,6 +4444,72 @@ do
     end
 end
 
+-- test_plan_record_carries_the_audit_fields (T076, FR-020): every act offered, by its key; each
+-- plan judged says why it was not played (the played one: nothing, and `played`) and the
+-- chances of the ways its phase went; the enemies seen and fogged; and whether the lookahead's
+-- budget ran out.
+do
+    local board, sight, st = looksAhead(true)
+    board.units[#board.units + 1] = red(0x83, 9, 5, { fogged = true, minRange = false })
+    local _, plan = Planner.plan(B, board, sight, st)
+    local cands = B.candidates(board, sight, st)
+    local offered, n = {}, 0
+    for _, k in ipairs(plan.audit.offered) do offered[k] = true end
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.acts) do
+            n = n + 1
+            check(offered[Planner.key(a)], true, "audit: offered " .. Planner.key(a))
+        end
+    end
+    check(#plan.audit.offered, n, "audit: every offered act, once")
+    check(plan.audit.visibility.seen .. "/" .. plan.audit.visibility.fogged, "2/1",
+          "audit: the red units seen and fogged")
+    check(plan.audit.budget.exhausted, false, "audit: the lookahead had room")
+    check(plan.audit.budget.averaged, 0, "audit: no uncertain kill left to the average")
+    local why = {}
+    for i, c in ipairs(plan.considered) do
+        if i == 1 then
+            check(c.played, true, "audit: the played plan heads the list, marked")
+            check(c.rejected, nil, "audit: and is rejected for nothing")
+            check(table.concat(c.acts, " "), table.concat(Planner.keysOf(plan), " "),
+                  "audit: its key list is the plan's")
+        else
+            check(c.played, nil, "audit: only one plan played")
+            why[c.rejected] = true
+            check(c.rejected == (c.rank.admitted and "outranked" or "over_cap"), true,
+                  "audit: a plan over the cap is over_cap, one under it outranked")
+        end
+        check(#c.weights >= 1 and math.abs(c.weights[1] - 1) < 1e-9, true,
+              "audit: one way, all the weight")
+    end
+    check(why.over_cap, true, "audit: the march the second phase kills is over_cap")
+    -- no transition, no second phase: both plans within the cap, the hold ranked below
+    board, sight, st = looksAhead(nil)
+    _, plan = Planner.plan(B, board, sight, st)
+    check(plan.considered[2] and plan.considered[2].rejected, "outranked",
+          "audit: a plan within the cap the rank put below is outranked")
+
+    board, sight, st = looksAhead(true)
+    _, plan = Planner.plan(B, board, sight, st, { budget = { attempt = 1 } })
+    check(plan.audit.budget.exhausted, true, "audit: a skipped lookahead is an exhausted budget")
+end
+
+-- test_deep_diagnostic_adds_one_cycle (FR-019): opts.diag = "deep" sends every finalist to the
+-- lookahead's second phase -- the same machinery, no trigger and no budget asked -- and the
+-- plan says so; without it the same board asks nothing.
+do
+    local board, sight, st = looksAhead(nil)
+    local a, plan = Planner.plan(B, board, sight, st, { diag = "deep", budget = { attempt = 0 } })
+    check(sight.asked ~= nil and #sight.asked >= 2, true,
+          "deep: every finalist meets a second phase")
+    check(plan.lookahead.deep and plan.lookahead.extended, true, "deep: tagged and extended")
+    check(plan.lookahead.trigger, nil, "deep: no transition was found, none is claimed")
+    check(at(a), "0,0", "deep: the second phase's death keeps A back")
+    board, sight, st = looksAhead(nil)
+    _, plan = Planner.plan(B, board, sight, st)
+    check(sight.asked == nil and plan.lookahead.deep == nil, true, "deep: off by default")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
