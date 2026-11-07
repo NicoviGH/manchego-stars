@@ -109,7 +109,8 @@
 #   e.g. tools/playtest/make_gif.py recordscene intro --name ch02-opening --fps 15 --open
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
-# tools/emulator/mGBA-dev.app on first run. Results land in /tmp/playtest-<scenario>/.
+# tools/emulator/mGBA-dev.app on first run. Results land in /tmp/playtest-<scenario>/ (see
+# PT_RUN_TAG below for a tagged run's).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -138,7 +139,8 @@ KEEP_OPEN="${2:-}"
 # PT_RUN_TAG=<tag>: one of several copies of THIS scenario running at once (montecarlo.py's
 # pool, #510 step 9 PR F). Its run dir is /tmp/playtest-<scenario>@<tag>, the leftover kill
 # below reaches only that dir, and it boots its own copy of the ROM there, so the save mGBA
-# keeps beside the ROM is its own: untagged, every run deletes and shares one .sav.
+# keeps beside the ROM is its own: untagged, every run deletes and shares one .sav. The pool
+# deletes the dir once the run passes and keeps only its newest failing ones (#574).
 RUN_TAG=""
 if [ -n "${PT_RUN_TAG:-}" ]; then
     case "$PT_RUN_TAG" in
@@ -271,7 +273,13 @@ run_mgba() {
     if [ "$scen" = "$SCENARIO" ]; then out="$out$RUN_TAG"; fi
     log="$out/playtest.log"
     rm -rf "$out" && mkdir -p "$out"
-    if [ "$out" != "/tmp/playtest-$scen" ]; then rom="$out/$(basename "$ROM")"; cp "$ROM" "$rom"; fi
+    # A tagged run boots its own ROM so the .sav beside it is its own. A CLONE, not a byte copy
+    # (#574): APFS shares the blocks, so a run costs no 15 MB of disk, and unlike a symlink or
+    # hard link it is a file of its own, which a rebuild of the tree's ROM never rewrites under
+    # a live emulator. `cp` without -c is the fallback where the disk cannot clone.
+    if [ "$out" != "/tmp/playtest-$scen" ]; then
+        rom="$out/$(basename "$ROM")"; cp -c "$ROM" "$rom" 2>/dev/null || cp "$ROM" "$rom"
+    fi
     # A DECLARED case (#314) has no function in harness.lua: its chapter YAML declares what
     # it proves and declared.py emits it here, fresh, for every run. Generated into the run
     # directory rather than committed -- a generated file in the tree is a second copy of the

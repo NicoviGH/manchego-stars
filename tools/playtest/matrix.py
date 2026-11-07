@@ -1274,18 +1274,18 @@ def store_cached_verdict(scenario, fingerprint, outcome, cache_dir=None):
     scenario, gitignored, and the whole gate lands around 100 MB.
     """
     cache_dir = cache_dir or VERDICT_CACHE_DIR
-    keep = None
+    keep = kept = None
     if fingerprint and outcome.verdict == 'PASS':
         keep = _verdict_slot(scenario, fingerprint, cache_dir)
         os.makedirs(cache_dir, exist_ok=True)
-        kept = outcome.artifacts
         if outcome.artifacts and os.path.isdir(outcome.artifacts):
             shutil.rmtree(keep, ignore_errors=True)
             shutil.copytree(outcome.artifacts, keep)
             kept = keep
+        # only a slot this call filled: a /tmp path is the next run's
         with open(keep + '.json', 'w') as fh:
             json.dump({'scenario': scenario, 'rom': outcome.rom, 'verdict': outcome.verdict,
-                       'seconds': round(outcome.seconds, 1), 'artifacts': kept,
+                       'seconds': round(outcome.seconds, 1), 'artifacts': kept or '',
                        'fingerprint': fingerprint, 'stored': time.time()}, fh, indent=2)
     # One slot per scenario: the cache tracks HEAD, not history. The `-` in the glob is
     # load-bearing -- `ch01-*` must not sweep away `ch01win`'s slot.
@@ -1304,6 +1304,21 @@ def store_cached_verdict(scenario, fingerprint, outcome, cache_dir=None):
                 os.remove(old)
             except OSError:
                 pass
+    return kept
+
+
+def discard_passing_run(scenario, outcome, kept=None):
+    """A green VERDICT run's /tmp/playtest-<name> goes once its log and screenshots are in the
+    cache slot (`kept`), which the outcome then names (#574). With no slot (the cache off, no
+    fingerprint) the dir is the run's only log, so it stays. A record or diagnostic run keeps
+    its dir -- its frames are what it is for -- and a red keeps its dir as the failure's
+    artifacts; the scenario's next run overwrites it, so there is at most one per scenario."""
+    if outcome.verdict != 'PASS' or scenario.kind != 'verdict' or outcome.cached or not kept:
+        return outcome
+    if outcome.artifacts and outcome.artifacts != kept and os.path.isdir(outcome.artifacts):
+        shutil.rmtree(outcome.artifacts, ignore_errors=True)
+    outcome.artifacts = kept
+    return outcome
 
 
 class VerdictCache(object):
@@ -1383,9 +1398,10 @@ class VerdictCache(object):
             with open(log, errors='replace') as fh:
                 store_observed(scenario.name, fh.read())
         fingerprint = self.fingerprints.get(scenario.name) if self.enabled else None
+        kept = None
         if fingerprint or outcome.verdict != 'PASS':
-            store_cached_verdict(scenario.name, fingerprint, outcome)
-        return outcome
+            kept = store_cached_verdict(scenario.name, fingerprint, outcome)
+        return discard_passing_run(scenario, outcome, kept)
 
 
 def parse_verdict(text, returncode):

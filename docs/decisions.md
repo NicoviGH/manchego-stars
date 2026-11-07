@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-390 decisions. Read this index, then open the two or three you need — the whole
+391 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -531,6 +531,7 @@ session state. `HANDOFF.md` points here._
 | `0366` | [The harness's emu is a write-counting guard, so a per-frame read memo cannot go stale](decisions/0366-the-harness-emu-is-a-write-counting-guard.md) | 2026-10-23 | #531 |
 | `0367` | [Record and diagnostic scenarios are archived, not owed: a scene is filmed when it changes](decisions/0367-headed-scenarios-are-archived-not-owed.md) | 2026-10-24 | #538 #531 |
 | `0378` | [A save state's units read offline, with no emulator run](decisions/0378-a-save-states-units-read-offline.md) | 2026-10-29 | #510 |
+| `0391` | [A passing playtest run leaves no dir behind; failing ones are kept, the newest 20](decisions/0391-a-passing-run-leaves-no-dir-behind.md) | 2026-11-04 | #574 |
 
 ---
 

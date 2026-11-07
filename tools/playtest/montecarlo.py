@@ -63,6 +63,7 @@ import concurrent.futures
 import functools
 import gzip
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -104,9 +105,106 @@ def append_record(path, rec):
         os.close(fd)
 
 
-def run_dir(scenario, tag):
+RUN_ROOT = '/tmp'     # where run.sh puts a tagged run's dir (its `out`)
+KEEP_FAILED = 20      # failing runs' dirs kept at once, newest first (~15 MB each)
+STALE_S = 24 * 3600   # an unmarked run dir idle this long is a dead process's, never a live run
+FAILED_MARK = 'FAILED'
+
+
+def run_dir(scenario, tag, root=None):
     """Where run.sh keeps a tagged run (its PT_RUN_TAG)."""
-    return '/tmp/playtest-%s@%s' % (scenario, tag)
+    return os.path.join(root or RUN_ROOT, 'playtest-%s@%s' % (scenario, tag))
+
+
+def is_tagged_dir(path, root):
+    """True for run.sh's `<root>/playtest-<scenario>@<tag>` dir, and nothing else: the only
+    dirs the pool ever deletes (a launch may name any path)."""
+    name = os.path.basename(path)
+    return (os.path.dirname(os.path.abspath(path)) == os.path.abspath(root)
+            and name.startswith('playtest-') and '@' in name and os.path.isdir(path))
+
+
+def tagged_dirs(root):
+    """Every tagged run dir under `root`."""
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return []
+    return [p for p in (os.path.join(root, n) for n in names) if is_tagged_dir(p, root)]
+
+
+def last_touched(path):
+    """The newest mtime anywhere in a run dir: a live run appends to its log, so a run that
+    is still playing never looks idle, however long it has been going."""
+    newest = os.path.getmtime(path)
+    for top, dirs, files in os.walk(path):
+        for n in dirs + files:
+            try:
+                newest = max(newest, os.path.getmtime(os.path.join(top, n)))
+            except OSError:
+                pass
+    return newest
+
+
+def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
+    """Bound the tagged run dirs under `root` (#574). A failing run's dir carries FAILED_MARK
+    and is kept for its report, but only the `keep` newest; an unmarked dir is a run still
+    playing (left alone) or one whose process died (deleted once idle `stale_s`). A passing
+    run's dir is never here: its Pool deletes it the moment the run ends."""
+    root = root or RUN_ROOT
+    now = time.time() if now is None else now
+    failed, gone = [], []
+    for d in tagged_dirs(root):
+        mark = os.path.join(d, FAILED_MARK)
+        try:
+            if os.path.exists(mark):
+                failed.append((os.path.getmtime(mark), d))
+            elif now - last_touched(d) > stale_s:
+                gone.append(d)
+        except OSError:
+            continue   # another pool removed it between the listing and the look
+    failed.sort(reverse=True)
+    gone += [d for _, d in failed[keep:]]
+    for d in gone:
+        shutil.rmtree(d, ignore_errors=True)
+    return sorted(gone)
+
+
+PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
+# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts (campaign.lua
+# noClean), and kept as FAILED they would crowd real crashes out of KEEP_FAILED
+PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible')
+
+
+def passing(recs):
+    """A run that needs no dir to explain it: every BOTRUN record a game result in a clean
+    environment, and the campaign (if any) ended on its own answer. Anything else -- a crash,
+    a stall, an environment fault, a campaign that crashed or ran out of styles -- keeps its
+    dir as evidence."""
+    for r in recs:
+        if r.get('kind') == 'campaign':
+            if r.get('outcome') not in PASSED_CAMPAIGN:
+                return False
+        elif r.get('outcome') not in PASSED_BOT or r.get('env_status', 'clean') != 'clean':
+            return False
+    return bool(recs)
+
+
+def settle_run_dir(where, passed, root=None, keep=KEEP_FAILED):
+    """Once a run's records are in the runs file: delete a passing run's dir; mark a failing
+    one's and prune the kept ones to `keep`. Cleanup never costs a run: an error here (a full
+    disk) is said and dropped."""
+    root = root or RUN_ROOT
+    if not where or not is_tagged_dir(where, root):
+        return
+    try:
+        if passed:
+            shutil.rmtree(where, ignore_errors=True)
+            return
+        open(os.path.join(where, FAILED_MARK), 'w').close()
+        prune_runs(root, keep)
+    except OSError as err:
+        print('montecarlo: could not settle %s: %s' % (where, err), file=sys.stderr)
 
 
 def launch(task, tag, log_path):
@@ -196,6 +294,9 @@ def keep_trace(rec, out):
         a['narrate'] = narrate(dest, a.get('turn'))
 
 
+POOL_SERIAL = itertools.count(1)
+
+
 class Pool:
     """`jobs` workers at once. `launch(task, tag, log_path) -> (stdout text, run dir)` runs one
     task (the real one drives run.sh; tests pass a fake). A task's `stamp` is written into
@@ -203,14 +304,20 @@ class Pool:
     files each game's in that game's store). Each record carries `wall_s`, its worker's
     wall time."""
 
-    def __init__(self, jobs=8, out='runs.jsonl', log_dir=None, launch=launch):
+    def __init__(self, jobs=8, out='runs.jsonl', log_dir=None, launch=launch, run_root=None,
+                 keep_failed=KEEP_FAILED):
         self.jobs, self.out, self.launch = jobs, out, launch
         self.log_dir = log_dir or os.path.join(os.path.dirname(os.path.abspath(out)), 'workers')
+        self.run_root, self.keep_failed = run_root or RUN_ROOT, keep_failed
 
     def run(self, tasks):
-        """Yield every record as its worker finishes, each appended to `out` first."""
+        """Yield every record as its worker finishes, each appended to `out` first. A passing
+        run's dir is deleted as it ends; a failing one's is kept, the newest `keep_failed`."""
         os.makedirs(self.log_dir, exist_ok=True)
-        base = '%d-%d' % (os.getpid(), id(self) % 10000)
+        prune_runs(self.run_root, self.keep_failed)
+        # unique: `cell` makes a Pool per look, and a reused tag would let run.sh wipe an earlier
+        # Pool's kept failing dir; the time part covers a pid the OS has reused
+        base = '%d-%d-%x' % (os.getpid(), next(POOL_SERIAL), int(time.time()))
 
         def one(i, task):
             tag = '%s-%d' % (base, i)
@@ -223,7 +330,8 @@ class Pool:
                 attempt = (task.get('campaign') or {}).get('attempt')
                 recs = [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'),
                          'log': log_path, 'env_status': unread(),
-                         'run_dir': run_dir(task.get('scenario', 'campaign'), tag),
+                         'run_dir': run_dir(task.get('scenario', 'campaign'), tag,
+                                            self.run_root),
                          'why': '%s: %s' % (type(err).__name__, err)}]
             else:
                 recs = records_of(task, text, where, log_path)
@@ -232,14 +340,23 @@ class Pool:
                 r.update(task.get('stamp') or {})
                 r['wall_s'] = wall
                 keep_trace(r, out)
-            return out, recs
+            # every record names the one run dir (records_of, and the crash record above); a
+            # passing run's is deleted below, so its records stop naming it
+            where, passed = recs[0].get('run_dir'), passing(recs)
+            if passed:
+                for r in recs:
+                    r.pop('run_dir', None)
+            return out, recs, where, passed
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.jobs) as ex:
             futures = [ex.submit(one, i, t) for i, t in enumerate(tasks)]
             for f in concurrent.futures.as_completed(futures):
-                out, recs = f.result()
+                out, recs, where, passed = f.result()
                 for rec in recs:
                     append_record(out, rec)
+                # only once its records are on disk: a kill before this keeps the dir
+                settle_run_dir(where, passed, self.run_root, self.keep_failed)
+                for rec in recs:
                     yield rec
 
 
@@ -613,7 +730,8 @@ def cell_main(args):
     v = run_cell(sides, pool_play(args.jobs))
     print(v['reason'])
     for p in v.get('problems') or []:
-        print('  %s seed %s: %s (%s)' % (p['side'], p['seed'], p['why'], p.get('run_dir')))
+        print('  %s seed %s: %s (%s)' % (p['side'], p['seed'], p['why'],
+                                         p.get('run_dir') or 'its run passed: no run dir kept'))
         for line in (p.get('log_tail') or [])[-5:]:
             print('      ' + line)
     if v.get('look') and not v.get('problems'):

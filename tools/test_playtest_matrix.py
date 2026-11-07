@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, 'playtest'))
@@ -1413,6 +1414,65 @@ class CacheScope(unittest.TestCase):
         cache = mx.VerdictCache([m.resolve(n) for n in ('a', 'recordx', 'probe')])
         self.assertEqual(set(cache.fingerprints), {'a'},
                          'only a verdict scenario is a candidate for being skipped')
+
+
+class PassingRunDirs(unittest.TestCase):
+    """#574: a green verdict run's /tmp dir goes once it passes; a red's, a record's and a
+    diagnostic's stay."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.cache_dir = os.path.join(self.dir, 'cache')
+        self.m = manifest(scenarios={'a': {}, 'recordx': {'kind': 'record'},
+                                     'probe': {'kind': 'diagnostic'}})
+
+    def run_dir(self, name):
+        where = os.path.join(self.dir, 'playtest-' + name)
+        os.makedirs(where)
+        with open(os.path.join(where, 'playtest.log'), 'w') as fh:
+            fh.write('[f000001] RESULT: PASS -- proved it\n')
+        return where
+
+    def store(self, name, verdict, fingerprint='fp1'):
+        where = self.run_dir(name)
+        outcome = mx.Outcome(name, 'canonical', verdict, 1.0, where)
+        with mock.patch.object(mx, 'VERDICT_CACHE_DIR', self.cache_dir), \
+                mock.patch.object(mx, 'store_observed'):
+            cache = mx.VerdictCache([self.m.resolve(name)], enabled=fingerprint is not None)
+            cache.fingerprints[name] = fingerprint
+            return where, cache.store(self.m.resolve(name), outcome)
+
+    def test_a_passing_verdict_run_leaves_no_dir_and_points_at_its_cache_slot(self):
+        where, out = self.store('a', 'PASS')
+        self.assertFalse(os.path.exists(where))
+        self.assertTrue(out.artifacts.startswith(self.cache_dir))
+        self.assertTrue(os.path.isfile(os.path.join(out.artifacts, 'playtest.log')),
+                        'the log moved to the cache before the dir went')
+
+    def test_a_passing_run_with_the_cache_off_keeps_its_only_log(self):
+        where, out = self.store('a', 'PASS', fingerprint=None)
+        self.assertTrue(os.path.isdir(where), 'no cache slot holds its log')
+        self.assertEqual(out.artifacts, where)
+
+    def test_a_slot_never_records_a_tmp_path_it_did_not_fill(self):
+        outcome = mx.Outcome('a', 'canonical', 'PASS', 1.0, os.path.join(self.dir, 'gone'))
+        kept = mx.store_cached_verdict('a', 'fp1', outcome, cache_dir=self.cache_dir)
+        self.assertIsNone(kept)
+        hit = mx.load_cached_verdict('a', 'fp1', cache_dir=self.cache_dir)
+        self.assertEqual(hit['artifacts'], '', 'the next run would overwrite that path')
+
+    def test_a_failing_run_keeps_its_dir(self):
+        for verdict in ('FAIL', 'ERROR'):
+            where, out = self.store('a', verdict)
+            self.assertTrue(os.path.isdir(where), verdict)
+            self.assertEqual(out.artifacts, where)
+            shutil.rmtree(where)
+
+    def test_record_and_diagnostic_runs_keep_their_frames(self):
+        for name in ('recordx', 'probe'):
+            where, out = self.store(name, 'PASS')
+            self.assertTrue(os.path.isdir(where), name)
 
 
 class FailureInvalidates(unittest.TestCase):
