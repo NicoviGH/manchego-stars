@@ -351,12 +351,25 @@ local function saveState(name)
     end
     return ok
 end
-local function loadState(name)
+-- Any state file loaded (a checkpoint, a diagnostic's pinned state), and the live state written
+-- to one from the state buffer: saveStateFile writes zeros under mgba-headless (saveState), the
+-- buffer does not. writeStateFile returns the buffer it wrote (`st`, or the live one), nil when
+-- the file could not be opened.
+INSPECT.loadStateFile = function(path)
     local ok = false
-    pcall(function() ok = emu:loadStateFile(statePath(name)) end)
-    log("loadState " .. name .. " -> " .. tostring(ok))
+    pcall(function() ok = emu:loadStateFile(path) end)
+    log("loadState " .. path .. " -> " .. tostring(ok))
     return ok
 end
+INSPECT.writeStateFile = function(path, st)
+    st = st or emu:saveStateBuffer()
+    local f = io.open(path, "wb")
+    if not f then return nil end
+    f:write(st)
+    f:close()
+    return st
+end
+local function loadState(name) return INSPECT.loadStateFile(statePath(name)) end
 
 -- ============================================================================
 -- GENERIC CUTSCENE RECORDER (record-tooling generalized 2026-07-09)
@@ -3355,18 +3368,16 @@ INSPECT.botApi = function(game)
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
     -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
-    -- Written from the state buffer: saveStateFile writes zeros under mgba-headless (saveState).
     api.pinned = function(ref)
         local name = string.format("%s/pinned-%s-%d-a%d-r%d.ss", PLAYTEST_SHOTDIR, game,
                                    api.info.chapter, api.info.attempt or 1, ref)
-        local fh = io.open(name, "wb")
-        if fh then fh:write(emu:saveStateBuffer()); fh:close() end
-        log("botrun: pinned state -> " .. (fh and name or "not written"))
-        return fh and name or nil
+        local wrote = INSPECT.writeStateFile(name) ~= nil
+        log("botrun: pinned state -> " .. (wrote and name or "not written"))
+        return wrote and name or nil
     end
     -- the kept state loaded back from its file, as a later run would, and the board read there
     api.reload = function(file)
-        assert(emu:loadStateFile(file), "loadStateFile refused " .. file)
+        assert(INSPECT.loadStateFile(file), "loadStateFile refused " .. file)
         return BOARD.read()
     end
     -- A failed act returns false and, where the driver knows it, why (the crash record says it).
@@ -3932,17 +3943,16 @@ INSPECT.campaignApi = function(game)
         local st = emu:saveStateBuffer()
         states[ch] = st
         os.execute(string.format('mkdir -p "%s"', dir))
-        local f = io.open(string.format("%s/%d.ss", dir, ch), "wb")
-        if not f then return nil, "cannot write " .. dir end
-        f:write(st)
-        f:close()
+        if not INSPECT.writeStateFile(string.format("%s/%d.ss", dir, ch), st) then
+            return nil, "cannot write " .. dir
+        end
         local party = {}
         for _, u in ipairs(units()) do
             local items = {}
             for _, it in ipairs(u.items) do items[#items + 1] = it.id end
             party[#party + 1] = { charId = u.charId, classId = u.classId, level = u.level, items = items }
         end
-        f = io.open(string.format("%s/%d.json", dir, ch), "w")
+        local f = io.open(string.format("%s/%d.json", dir, ch), "w")
         if not f then return nil, "cannot write " .. dir end
         f:write(Json.encode({ game = game, chapter = ch, gold = gold(), party = party,
                               shops = openNodes(ch), carried = carried }))

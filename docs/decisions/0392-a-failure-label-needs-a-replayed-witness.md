@@ -25,21 +25,29 @@ shown as proposed, never as the label (AS 2). A cause can be wrong in a way only
 - a **deep** replay (one more player/enemy cycle in the lookahead) that avoids it: `search_miss`;
 - a **full-information** replay (fog off inside the sandbox; no future arrival, no RNG) that
   avoids it: `information_unavailable`;
-- a **forced** plan that avoids it is placed by what the planner itself recorded at that
-  decision, in the trace's `plan` event (`planner.lua`, T076): an act of it not in
-  `audit.offered` (every act key `Bot.candidates` offered), `missing_action`; every act offered
-  but the plan in no `considered` entry (the beam or the budget cut it before it was judged),
-  `search_miss`; judged and rejected `over_cap`, `mis_predicted_safety`; judged and
-  `outranked`, `mis_scored`. A forced witness at a decision with no `audit`, or on a plan
-  rejected as `stalled` (one the planner may not play), claims nothing.
+- a **forced** plan that avoids it: with an act `Bot.candidates` did not offer on the board that
+  act was played on (the replay's `unoffered`, checked as it plays), `missing_action`. The
+  pinned board alone cannot say this: a later act of the plan is played on a board the earlier
+  ones changed. Otherwise the plan is placed by what the planner recorded at the pinned decision,
+  in the trace's `plan` event (`planner.lua`, T076): in no `considered` entry (the beam or the
+  budget cut it before it was judged), `search_miss`; judged and rejected `over_cap`,
+  `mis_predicted_safety`; judged and `outranked`, `mis_scored`. A forced line with no
+  `unoffered`, a decision with no plan `audit`, or a plan rejected as `stalled` (one the planner
+  may not play) claims nothing.
 
-A replay that played the same plan, did not avoid the death, or traded it for another unit's is
-no witness, and the audit says which it was. The trade is not hypothetical: on ours-ch03 seed
+A replay that planned the same plan, could not play its plan to the end (`broken`, the first
+act it did not play; `chosen` is then what it did play), did not avoid the death, or traded it for another unit's is no witness, and the audit says which it was. The trade is not hypothetical: on ours-ch03 seed
 1002 the forced plan (unit 3 not attacking, decision 45) saved unit 3, and the boss killed unit 5
 instead. That moved the failure; it did not avoid it. A replay run again appends a new line, and
 the newest line of each replay (one decision, mode and plan) is the one the audit reads. A replay whose fork did not match the original (`matched` false) is shown as
 **UNMATCHED** and counted apart in the SC-004 sentence: it is a fault of the replay, not an
 answer about the bot, and is never dropped as a plain non-witness.
+
+**A line from before `planned` claims nothing.** Until the replay recorded its whole plan
+(`planned`) and where it broke off (`broken`), a replay that stopped at the pinned decision
+printed `avoided` true, and a full-information plan could use acts only the fog-off board offered
+(fixed: the diagnostic reveals knowledge, not powers). Such a line is stale: the audit names it
+and asks for a re-run, and it counts as no witness.
 
 **Every supported label is reported, plus one primary**, picked in this order: `missing_action`,
 `mis_predicted_safety`, `mis_scored`, `search_miss`, `information_unavailable`. A defect the bot
@@ -48,12 +56,13 @@ first is the one a fix acts on.
 
 **Diagnostics never feed production** (FR-019). A diagnostic or forced replay writes no `BOTRUN`
 record, no retry memory, no endpoint and no label. It prints only `DIAG <json>` lines:
-`{ run, ref, mode, matched, baseline, chosen, differs, failure, avoided, traded, trace,
-pinned, pinned_board }` (`pinned_board`: the filed state, loaded back, holds the board the
-pinned decision read), where `run` is
-the original attempt's game, chapter, seed, attempt and filed trace (the suite reruns a start
-under every instrument, so only the trace tells those runs apart), and `ref` the death's
-`plan_ref`. A
+`{ run, ref, mode, matched, baseline, planned, chosen, differs, failure, avoided, traded, unoffered,
+broken, trace, pinned, pinned_board }` (`pinned_board`: the filed state, loaded back, holds the board the
+pinned decision read), where `run` names
+the original attempt (its campaign, seed, chapter and attempt, the name `replay --record` takes,
+and its game) and identifies it by its filed trace: the suite reruns a start under every
+instrument, so only the trace tells those runs apart, and the audit matches a line to its run by
+the trace alone. `ref` is the pinned decision. A
 diagnostic plays with information or depth production does not have; if its choices reached a
 record or a retry, the instrument would measure the diagnostic, not the bot.
 
@@ -82,8 +91,11 @@ equals the filed original trace's (the old traces carry no board hash). Determin
 identical traces. **The hazard:** Lua seeds its string hash per process, so a `pairs` over string
 keys that picks a winner would break a replay. The prefix match is the guard, which is why an
 unmatched fork is reported and never silently read as "no witness". Only suite runs replay (a
-campaign's chapter is reached through every chapter before it), and a held-out run is refused
-while the bot is being tuned (FR-025). The replay's trace is filed beside the runs file, its
+campaign's chapter is reached through every chapter before it), a held-out run is refused
+while the bot is being tuned (FR-025), and so is a run of another instrument than the code now:
+a newer planner would play the diagnostic, and its witness would count toward the old
+instrument. A death no plan committed to and no decision moved (a greedy phase's) has no
+decision to pin, and is refused too. The replay's trace is filed beside the runs file, its
 DIAG lines go to `diag.jsonl` there, and its BOTRUN line, if any, is dropped. The game's state at
 the pinned decision (`pinned-*.ss`) is filed beside that trace and named in the DIAG line
 (`pinned`): it is the failing decision's board fixture (T084).
@@ -101,31 +113,43 @@ vision range (gPlaySt +0x0D) written 0 through the journaled api, then the game'
 unit no event has loaded yet and no RNG is drawn, so neither is revealed; the sandbox's load
 undoes the game's writes, and it refuses inside an open sandbox. Its unit test (`test_sight.lua`,
 T071) passes, and it is proven live off the suite: vanilla chapter 7 (Ch6, fog), scout state,
-seed 1001, where the original lost on turn 2 when Eirika died in the enemy phase. The full_info
-replay at decision 4 matched, chose a different plan, avoided the death with nothing traded, and
-saw 24 units with 0 fogged, against the original's 3 seen and 21 fogged. The real `replay`
-command cannot reach a fog start yet: no suite start has fog (in `chapter_settings.json` only
-chapters 7, 19, 32, 61 and 62 do), so PR-G adds one.
+seed 1001, where the original lost on turn 2 when Eirika died in the enemy phase. The first
+full_info replay at decision 4 ran before the diagnostic was limited to knowledge, not powers: its
+plan could use acts only the fog-off board offered, so it was stale. Re-run under the fixed code,
+the replay at decision 4 matched, and played all 10 acts of a different plan, each offered on
+the fogged board (attacks on units 134 and 148 among them). Nothing was traded, Eirika lived to
+the end of turn 2, and the pinned state reloaded to the same board. The audit of the probe's
+runs file (`fogprobe.jsonl`, instrument `b74ed95f600a+v1`) reads it as witnessing
+`information_unavailable`: "1 of 1 audited failures (100%) have a witnessed label". The real
+`replay` command cannot reach a fog start yet: no suite start has fog (in
+`chapter_settings.json` only chapters 7, 19, 32, 61 and 62 do), so PR-G adds one.
 
 **Built** (T079, 2026-11-07). One instrumented replay per case:
+- vanilla chapter 7, seed 1001, Eirika: `full_info` witnessed `information_unavailable` (above).
 - ours ch02 (chapter 3), seed 1002, the green 0xC9 (Klimt): `deep` witnessed `search_miss`.
 - ours ch03 (chapter 4), seed 1002, unit 3, turn 21: `deep` chose the same plan at decisions 45
   and 46. Forcing the second-ranked plan at 45 saved unit 3 and traded it for 0x05. Every plan
-  judged at 45 was over the cap (max_die 0.905 to 0.93), so the death stays unclassified: a
-  fallback on a board where no judged plan was safe.
+  judged at 45 was over the cap (max_die 0.905 to 0.93): a fallback on a board where no judged
+  plan was safe.
 - The pinned state reloads to the same board in the same emulator process (`pinned_board`
   true). Loading it in a fresh emulator is PR-G's T084.
 - Each replay took 6 to 30 wall seconds.
 
-The audit on both stores, instrument `1edeb96ff443+v1`:
+**The two ours lines are stale.** Both were written before `planned` and `broken` were recorded,
+so the audit counts neither, and neither can be re-run: the bot code changed in this PR, so the
+instrument of those suite runs is no longer the code's, and `replay` refuses them. They are
+evidence of what the diagnostics can show, not witnesses. They count again only once the suite
+is re-played under the new instrument and the deaths are replayed.
+
+The audit on both stores, instrument `1edeb96ff443+v1`, after those rules:
 - vanilla: "0 of 17 audited failures (0%) have a witnessed label; 17 unclassified. The bar is 90%:
-  not met. 2 orphan DIAG lines (no record matches their run)."
-- ours: "1 of 13 audited failures (8%) have a witnessed label; 12 unclassified. The bar is 90%:
+  not met. 4 orphan DIAG lines (no record matches their run)."
+- ours: "0 of 13 audited failures (0%) have a witnessed label; 13 unclassified. The bar is 90%:
   not met. 2 orphan DIAG lines (no record matches their run)."
 
-SC-004 is far below 90% because replays were run for only a handful of deaths. It is PR-F's
-measuring stick, not its checkpoint: the checkpoint is that a failure is labelled only with a
-witness, and every other one stays visible as unclassified. The orphans are lines written before
-the run identity carried the trace, and the chapter 7 full-information line, whose scout run is kept in the probe's own runs file
-(`fogprobe.jsonl`), not in the store's `runs.jsonl`. Audited against that file (instrument
-`b74ed95f600a+v1`), the line witnesses `information_unavailable`: "1 of 1 audited failures (100%)".
+SC-004 is far below 90% because replays were run for only a handful of deaths, and the ones run
+on the suite are stale. It is PR-F's measuring stick, not its checkpoint: the checkpoint is that
+a failure is labelled only with a witness, and every other one stays visible as unclassified.
+The orphans are lines written before the run identity carried the trace, and the chapter 7
+full-information lines, whose scout run is kept in the probe's own runs file, not the store's
+`runs.jsonl`.

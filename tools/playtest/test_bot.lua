@@ -4444,7 +4444,7 @@ do
     end
 end
 
--- test_plan_record_carries_the_audit_fields (T076, FR-020): every act offered, by its key; each
+-- test_plan_record_carries_the_audit_fields (T076, FR-020): how many acts were offered; each
 -- plan judged says why it was not played (the played one: nothing, and `played`) and the
 -- chances of the ways its phase went; the enemies seen and fogged; and whether the lookahead's
 -- budget ran out.
@@ -4453,15 +4453,10 @@ do
     board.units[#board.units + 1] = red(0x83, 9, 5, { fogged = true, minRange = false })
     local _, plan = Planner.plan(B, board, sight, st)
     local cands = B.candidates(board, sight, st)
-    local offered, n = {}, 0
-    for _, k in ipairs(plan.audit.offered) do offered[k] = true end
-    for _, c in ipairs(cands) do
-        for _, a in ipairs(c.acts) do
-            n = n + 1
-            check(offered[Planner.key(a)], true, "audit: offered " .. Planner.key(a))
-        end
-    end
-    check(#plan.audit.offered, n, "audit: every offered act, once")
+    local n = 0
+    for _, c in ipairs(cands) do n = n + #c.acts end
+    check(plan.audit.offered_n, n, "audit: how many acts were offered (the count, not the keys)")
+    check(plan.audit.offered, nil, "audit: no key list in every plan event (review #18)")
     check(plan.audit.visibility.seen .. "/" .. plan.audit.visibility.fogged, "2/1",
           "audit: the red units seen and fogged")
     check(plan.audit.budget.exhausted, false, "audit: the lookahead had room")
@@ -4508,6 +4503,62 @@ do
     board, sight, st = looksAhead(nil)
     _, plan = Planner.plan(B, board, sight, st)
     check(sight.asked == nil and plan.lookahead.deep == nil, true, "deep: off by default")
+end
+
+-- test_unkey_inverts_key (review #8): Planner.unkey reads back every act kind's key -- a unit
+-- target, a wall, none, a negative tile -- as the act's identity, and keys back to the same
+-- string, so botrun's forced replay has one spelling of a key, the planner's.
+do
+    local acts = {
+        { unitId = 1, act = "attack", move = { x = 3, y = 4 }, targetId = 0x81 },
+        { unitId = 1, act = "attack", move = { x = 3, y = 4 }, obstacle = { x = 5, y = 6 } },
+        { unitId = 2, act = "wait", move = { x = 0, y = 0 } },
+        { unitId = 2, act = "talk", move = { x = 1, y = 0 }, targetId = 0x40 },
+        { unitId = 3, act = "staff", move = { x = 2, y = 2 }, targetId = 2 },
+        { unitId = 3, act = "item", move = { x = 2, y = 2 } },
+        { unitId = 4, act = "seize", move = { x = 9, y = 1 } },
+        { unitId = 4, act = "visit", move = { x = 7, y = 3 } },
+        { unitId = 4, act = "chest", move = { x = 7, y = 3 } },
+        { unitId = 4, act = "door", move = { x = 7, y = 3 } },
+        { unitId = 5, act = "wait", move = { x = -1, y = 12 } },
+    }
+    for _, a in ipairs(acts) do
+        local k = Planner.key(a)
+        local b = Planner.unkey(k)
+        check(Planner.key(b), k, "unkey: " .. k .. " keys back to itself")
+        check(b.unitId .. b.act .. b.move.x .. "," .. b.move.y, a.unitId .. a.act .. a.move.x
+              .. "," .. a.move.y, "unkey: " .. k .. " unit, act and tile")
+        check(b.targetId, a.targetId, "unkey: " .. k .. " target")
+        check(b.obstacle and (b.obstacle.x .. "," .. b.obstacle.y),
+              a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y), "unkey: " .. k .. " wall")
+    end
+    check(pcall(Planner.unkey, "not a key"), false, "unkey: a string that is no key raises")
+end
+
+-- test_offer_plans_the_fogged_acts_judged_in_full (review #3): opts.offer = Bot.candidates'
+-- (cands, ctx) read on the fogged board. A full-information replay judges on the board with
+-- the fog off, but plays on the fogged game, which offers no attack on an enemy it hides: the
+-- plan takes its acts from the offer and never reads them again.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local X = red(0x81, 1, 0, { hp = 5 })
+    local o = { fc = { [0x01] = { [0x81] = { ["0,0"] = fc({ hit = 100, dmg = 10, hits = 1,
+                                                              killsTarget = true }) } } },
+                enemyPhase = function() return {} end }
+    local st = style("careful")
+    -- with the fog off, the attack is offered and played
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), st)
+    check(a and a.act, "attack", "offer: the seen enemy is attacked")
+    -- the offer read with X hidden, the plan made on the board with it seen
+    local fogged = boardOf(blue(0x01, 0, 0, 0), red(0x81, 1, 0, { hp = 5, fogged = true }))
+    local sight = sightOf(o)
+    local cands, ctx = B.candidates(fogged, sight, st)
+    local n = 0
+    for _, c in ipairs(cands) do n = n + #c.acts end
+    local plan
+    a, plan = Planner.plan(B, boardOf(A, X), sight, st, { offer = { cands = cands, ctx = ctx } })
+    check(a and a.act ~= "attack", true, "offer: no attack on the enemy the fogged game hides")
+    check(plan.audit.offered_n, n, "offer: the plan's acts are the offer's")
 end
 
 if fails > 0 then

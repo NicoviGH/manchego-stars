@@ -1540,6 +1540,7 @@ end
 local function attacker(seen)
     return {
         surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf,
+        unkey = Planner.unkey,
         plan = function(_, board, _, _, opts)
             if seen then seen[#seen + 1] = opts and opts.diag or "baseline" end
             for _, u in ipairs(board.units) do
@@ -1609,11 +1610,64 @@ do
     for _, e in ipairs(evs) do
         if e.t == "phase" then e.units[1].hp = 19; break end
     end
+    local seen = {}
     local diags, botruns = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil" },
-                                    failure = failure, run = run, original = evs })
+                                    failure = failure, run = run, original = evs }, seen)
     check(botruns, 0, "an unmatched diagnostic writes no record either")
     check(diags[1] and diags[1].matched, false, "a replay off its original is unmatched")
     check(diags[1] and diags[1].avoided, false, "and witnesses nothing")
+    -- it stops at the first difference: the turn-1 snapshot, before any decision is asked for
+    check(#seen, 0, "a replay that left its original plays on no further")
+    check(diags[1] and diags[1].why:match("^unmatched") ~= nil, true, "and says why it stopped")
+end
+
+-- test_chosen_is_what_was_played: a forced plan whose second key has no unit to play it
+-- (unit 3 is not on the field) is broken there; `chosen` holds only the act played
+do
+    local diags = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil", "3>wait@4,4>nil" },
+                           failure = failure, run = run, original = original() })
+    local d = diags[1] or {}
+    check(d.chosen and #d.chosen, 1, "chosen holds the acts played, not the forced list")
+    check(d.chosen and d.chosen[1], "1>wait@0,1>nil", "the first forced act was played")
+    check(d.broken, "3>wait@4,4>nil", "the key that could not be played is named")
+end
+
+-- test_a_forced_act_with_no_unit_witnesses_nothing: the replay stops at the pin, nothing was
+-- played, so nothing was avoided
+do
+    local diags = replay({ ref = 1, mode = "force", force = { "3>wait@4,4>nil" },
+                           failure = failure, run = run, original = original() })
+    local d = diags[1] or {}
+    check(d.avoided, false, "a forced plan never played avoids nothing")
+    check(d.chosen and #d.chosen, 0, "and played nothing")
+    check(d.broken, "3>wait@4,4>nil", "its key is named")
+end
+
+-- test_a_kept_act_builds_no_planner_memory: the memory a plan call reads (the lookahead budget
+-- left: Planner.LOOK_ATTEMPT) is read only when the planner is asked, never for a kept act
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 5, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) } }
+    local reads, asked = 0, 0
+    local P = { surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf }
+    P.plan = function(_, board)
+        asked = asked + 1
+        for _, u in ipairs(board.units) do
+            if u.faction == "blue" and u.acted then return nil, nil, {} end
+        end
+        if board.turn > 1 then return nil, nil, {} end
+        local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
+                       { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
+        return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
+                          enemies = { [0x81] = true } }, {}
+    end
+    g.api.Planner = setmetatable(P, { __index = function(_, k)
+        if k == "LOOK_ATTEMPT" then reads = reads + 1; return 0 end
+    end })
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.plans.kept, 1, "one act was kept")
+    check(reads, asked, "the planner's memory is built once per plan asked for, never for a kept act")
 end
 
 -- test_a_pinned_decision_never_reached_is_unmatched
@@ -1633,8 +1687,13 @@ do
     check(table.concat(seen, ","):match("^baseline,deep") ~= nil, true,
           "the baseline, then the deep plan, at the same decision")
     check(diags[1] and diags[1].differs, false, "the same plan both ways does not differ")
+    -- the pinned plan, played out, is no plan cut short (vanilla Ch6's live full_info replay
+    -- crashed here, 2026-11-07)
+    check(diags[1] and diags[1].outcome, "diag", "a played-out pinned plan replans cleanly")
+    check(diags[1] and diags[1].broken, nil, "and is not broken")
     check(diags[1] and diags[1].avoided, false, "and does not avoid the death")
     local full, inBatch = 0, false
+    local offeredOn, fullOffer
     seen = {}
     replay({ ref = 1, mode = "full_info", failure = failure, run = run, original = original() },
         seen, function(g)
@@ -1651,12 +1710,31 @@ do
                 s.fullInfo = function(fn)
                     full = full + 1
                     inBatch = inBatch or batching
-                    return fn(g.api.board())
+                    local b = g.api.board()
+                    b.revealed = true   -- the fog-off board
+                    return fn(b)
                 end
                 return s
             end
+            -- which board the acts were offered on, and what the full_info plan was given
+            local Bot0 = g.api.Bot
+            g.api.Bot = setmetatable({ candidates = function(board, ...)
+                offeredOn = offeredOn or {}
+                offeredOn[#offeredOn + 1] = board.revealed and "revealed" or "fogged"
+                return Bot0.candidates(board, ...)
+            end }, { __index = Bot0 })
+            local plan = g.api.Planner.plan
+            g.api.Planner.plan = function(B, board, sgt, st, opts)
+                if board.revealed then fullOffer = opts and opts.offer end
+                return plan(B, board, sgt, st, opts)
+            end
         end)
     check(full, 1, "full_info plans once inside sight.fullInfo")
+    -- knowledge, not powers: the acts are the ones the fogged game allows; only the judging
+    -- sees every enemy
+    check(fullOffer ~= nil and fullOffer.cands ~= nil, true,
+          "the full_info plan is given the acts offered on the fogged board")
+    check(offeredOn and table.concat(offeredOn, ","), "fogged", "offered on the fogged board only")
     check(inBatch, false, "never inside a batch")
 end
 
@@ -1724,7 +1802,7 @@ do
     local plan = P.plan
     P.plan = function(...)
         local a, p, c = plan(...)
-        if p then p.audit = { offered = { "1>attack@0,0>129" }, budget = { exhausted = false } } end
+        if p then p.audit = { offered_n = 1, budget = { exhausted = false } } end
         return a, p, c
     end
     g.api.Planner = P
@@ -1734,7 +1812,7 @@ do
     for _, e in ipairs(evs) do
         if e.t == "plan" and e.ref == 1 then audit = e.audit end
     end
-    check(audit and audit.offered[1], "1>attack@0,0>129", "the plan event carries plan.audit")
+    check(audit and audit.offered_n, 1, "the plan event carries plan.audit")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

@@ -96,12 +96,15 @@
 -- (only the baseline's lookahead is charged, as the original was): `force` plays the given
 -- keys in order (an act Bot.candidates never offered is built from its key: missing_action's
 -- witness), `deep` asks the planner with opts.diag = "deep", `full_info` asks it inside
--- sight.fullInfo, never inside a batch. The replay then plays on to the end of the failure's
--- turn and stops. It never writes what production reads: no BOTRUN line, no record handed back
+-- sight.fullInfo, never inside a batch, over the acts the fogged board offers (it knows more,
+-- it may do no more). A replay that leaves its original stops there; one that reaches its pin
+-- plays on to the end of the failure's turn and stops. It never writes what production reads: no BOTRUN line, no record handed back
 -- (the retry memory and campaign.lua's endpoint read it), only ONE `DIAG <json>` line:
--- { run, ref, mode, matched, baseline, chosen, differs, failure, avoided (the failure's unit
--- alive at the end of its turn, and no other blue or green unit lost in its place: `traded`),
--- outcome, why, unoffered (forced keys never offered), trace }.
+-- { run, ref, mode, matched, baseline, planned (the diagnostic's plan), chosen (its acts
+-- actually played), broken (its first act not played), differs, failure, avoided (the
+-- diagnostic's plan played whole, the failure's unit alive at the end of its turn, and no other
+-- blue or green unit lost in its place: `traded`), outcome, why, unoffered (forced keys never
+-- offered), pinned_board, trace }.
 --
 -- The TRACE (#510 step 9 F3, Nicolas 2026-10-27: "I want to be able to understand everything
 -- about how it went"): one event per api.trace call, each with `t` its kind and `turn`:
@@ -632,7 +635,11 @@ function M.run(api)
     local turn = 0
     local function trace(ev)
         ev.turn = ev.turn or turn
-        if watch then watch.see(ev) end
+        if watch then
+            watch.see(ev)
+            -- a replay that left its original stops at once: nothing past it is the same attempt
+            if watch.why and not pin then halt = halt or ("unmatched: " .. watch.why) end
+        end
         if api.trace then api.trace(ev) end
     end
     -- each full-bag answer the harness gave, and each drop the game gave one of ours, since
@@ -867,9 +874,11 @@ function M.run(api)
             end
             api.emit(M.DIAG_PREFIX .. Json.encode({ run = diag.run, ref = diag.ref, mode = diag.mode,
                 matched = matched, baseline = pin and pin.baseline or {},
-                chosen = pin and pin.chosen or {}, differs = pin and pin.differs or false,
+                chosen = pin and pin.chosen or {}, planned = pin and pin.planned or {},
+                differs = pin and pin.differs or false,
                 failure = diag.failure,
-                avoided = matched and not died and #traded == 0 and outcome ~= "crashed" or false,
+                avoided = matched and #pin.chosen > 0 and not pin.broken and not died
+                    and #traded == 0 and outcome ~= "crashed" or false,
                 traded = traded,
                 unoffered = pin and pin.unoffered or {}, broken = pin and pin.broken,
                 pinned_board = pinnedBoard,
@@ -920,21 +929,13 @@ function M.run(api)
                     if api.Planner.key(a) == k then return a end
                 end
             end
-            local id, act, x, y, tgt = k:match("^(%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")
-            if not id then error("botrun: a forced key it cannot read: " .. k) end
+            local a = api.Planner.unkey(k)
             local byIdNow = byId(board)
-            local u = byIdNow[tonumber(id)]
+            local u = byIdNow[a.unitId]
             if not (u and u.faction == "blue" and u.onField and not u.acted) then return nil end
             pin.unoffered[#pin.unoffered + 1] = k
-            local a = { unit = u.charId, unitId = u.id, act = act,
-                        move = { x = tonumber(x), y = tonumber(y) } }
-            local ox, oy = tgt:match("^(%-?%d+),(%-?%d+)$")
-            if ox then
-                a.obstacle = { x = tonumber(ox), y = tonumber(oy) }
-            elseif tgt ~= "nil" then
-                a.targetId = tonumber(tgt)
-                a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId
-            end
+            a.unit = u.charId
+            if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end
             return a
         end
         -- The pinned decision: the baseline, then the diagnostic's plan from the same board and
@@ -942,7 +943,8 @@ function M.run(api)
         local function pinDecision(board, opts)
             local P = api.Planner
             local a, plan, cost = batched(function() return P.plan(Bot, board, sight, style, opts) end)
-            pin = { baseline = plan and P.keysOf(plan) or {}, unoffered = {}, turn = turn }
+            pin = { baseline = plan and P.keysOf(plan) or {}, unoffered = {}, chosen = {},
+                    turn = turn }
             pin.matched = watch.at(a and actOf(a))
             pin.board = M.snapshot(board)
             if api.pinned then pin.file = api.pinned(diag.ref) end
@@ -957,10 +959,16 @@ function M.run(api)
                 dopts.diag = "deep"
                 da, dplan = batched(function() return P.plan(Bot, board, sight, style, dopts) end)
             elseif diag.mode == "full_info" then
+                -- knowledge, not powers: the acts are the ones the fogged game allows (offered on
+                -- this board, in its own sandbox: fullInfo refuses to run inside one); only the
+                -- judging sees every enemy
+                local cands, ctx = batched(function() return Bot.candidates(board, sight, style, dopts) end)
+                dopts.offer = { cands = cands, ctx = ctx }
                 da, dplan = sight.fullInfo(function(b) return P.plan(Bot, b, sight, style, dopts) end)
             elseif diag.mode == "force" then
                 da = batched(function() return forcedAct(board, diag.force[1], opts) end)
                 if not da then
+                    pin.broken = diag.force[1]
                     halt = "the forced act " .. diag.force[1] .. " has no unit to play it"
                     return nil, nil, cost
                 end
@@ -969,8 +977,12 @@ function M.run(api)
             else
                 error("botrun: no diagnostic mode " .. tostring(diag.mode))
             end
-            pin.chosen = diag.mode == "force" and diag.force or (dplan and P.keysOf(dplan) or {})
-            pin.differs = not same(pin.chosen, pin.baseline)
+            -- `planned` is the diagnostic's plan; `chosen` grows by each of its acts actually
+            -- played, and `broken` names the first that was not (pinPlayed)
+            pin.planned = diag.mode == "force" and diag.force or (dplan and P.keysOf(dplan) or {})
+            pin.differs = not same(pin.planned, pin.baseline)
+            pin.plan = dplan
+            if da then pin.chosen[1] = P.key(da) end
             return da, dplan, cost
         end
         while true do
@@ -1041,20 +1053,25 @@ function M.run(api)
             trace({ t = "phase", phase = "player", units = M.snapshot(board) })
             playing = nil
             while true do
+                if halt then return "diag", halt end
                 -- one decision's reads in one save/load (sight.batch), when the sight batches
                 -- the planner plays every style but greedy, the old clear bot (bot.lua)
                 local function decide()
                     if planned then
                         local why
-                        local memo = { stalled = stalled, sent = sent, stuck = stuck,
-                                       explored = explore.explored(), lost = explore.lost(),
-                                       budget = { attempt = lookLeft() } }
+                        -- what a plan call reads of the run: built only when one is asked for
+                        local function memo()
+                            return { stalled = stalled, sent = sent, stuck = stuck,
+                                     explored = explore.explored(), lost = explore.lost(),
+                                     budget = { attempt = lookLeft() } }
+                        end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board
                             local k = diag.force[nextAct]
-                            local a = k and forcedAct(board, k, memo)
+                            local a = k and forcedAct(board, k, memo())
                             if a then
                                 nextAct = nextAct + 1
+                                pin.chosen[#pin.chosen + 1] = k
                                 trace({ t = "plan", kept = true, forced = true, choice = actOf(a) })
                                 return a
                             end
@@ -1066,6 +1083,9 @@ function M.run(api)
                                 sight.legal)
                             if not why then
                                 local a = playing.acts[nextAct]
+                                if pin and playing == pin.plan then
+                                    pin.chosen[#pin.chosen + 1] = api.Planner.key(a)
+                                end
                                 nextAct = nextAct + 1
                                 rec.plans.kept = rec.plans.kept + 1
                                 trace({ t = "plan", kept = true, choice = actOf(a) })
@@ -1074,13 +1094,18 @@ function M.run(api)
                                 return a
                             end
                             api.log("plan: replan, " .. why)
+                            local cut = pin and playing == pin.plan and playing.acts[nextAct]
+                            if cut and not pin.broken then
+                                -- the diagnostic's plan was cut short: what it did not play
+                                pin.broken = api.Planner.key(cut)
+                            end
                         end
                         local replan = playing and why
                         local a, plan, cost
                         if pinNow() then
-                            a, plan, cost = pinDecision(board, memo)
+                            a, plan, cost = pinDecision(board, memo())
                         else
-                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, memo)
+                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, memo())
                         end
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
@@ -1233,6 +1258,7 @@ function M.run(api)
                 if api.lost() then return "lost", "game over" end
                 if board.phase ~= "blue" or board.turn ~= turn then break end
             end
+            if halt then return "diag", halt end
             local before = api.board()
             -- what the last plan expected of this enemy phase, beside what it did
             for _, p in ipairs(commit and commit.predict or {}) do

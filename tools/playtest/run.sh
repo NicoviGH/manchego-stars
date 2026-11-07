@@ -68,7 +68,7 @@
 #                           PT_DIAG (JSON, with PT_CAMPAIGN's attempt): replay that attempt as a
 #                           diagnostic (botrun.lua); it prints one `DIAG <json>` line and no
 #                           record. `montecarlo.py replay` builds both.
-#   sightprobe          -- what sight.lua reads at ch01's start (retail: the Prologue), logged
+#   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
 #                           handshakes with an EXTERNAL sidecar over PT_LLM_DIR (default

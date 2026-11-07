@@ -82,7 +82,7 @@
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
--- failure audit's (FR-020): { offered = every act Bot.candidates offered, by M.key, visibility =
+-- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, visibility =
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
@@ -101,7 +101,9 @@
 -- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
 -- opts.diag = "deep" (a diagnostic replay's, FR-019): every decision's finalists meet the
 -- lookahead's second phase, no trigger or budget asked. A forced plan is botrun's (its acts
--- may be ones no candidate offered); "full_info" is sight.fullInfo around the call.
+-- may be ones no candidate offered: M.unkey reads its keys); "full_info" is sight.fullInfo
+-- around the call, with opts.offer = { cands, ctx } (Bot.candidates on the fogged board, read
+-- before it): the acts the fogged game allows, judged with every enemy seen.
 -- Planner.surprise(plan, k, before, after, legal)
 -- -> why the board after its k-th act calls for a new plan, or nil to play act k + 1. legal
 -- (optional) = sight.legal: the game no longer offering the next act ends the plan.
@@ -349,9 +351,24 @@ local function keysOf(st)
     return out
 end
 
+-- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle } read back,
+-- for a forced replay's act no candidate offered (botrun). It raises on a string no key gave.
+local function unkey(k)
+    local id, act, x, y, tgt = k:match("^(%-?%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")
+    if not id then error("planner.lua: not an act key: " .. k) end
+    local a = { unitId = tonumber(id), act = act, move = { x = tonumber(x), y = tonumber(y) } }
+    local ox, oy = tgt:match("^(%-?%d+),(%-?%d+)$")
+    if ox then
+        a.obstacle = { x = tonumber(ox), y = tonumber(oy) }
+    elseif tgt ~= "nil" then
+        a.targetId = tonumber(tgt) or error("planner.lua: not an act key: " .. k)
+    end
+    return a
+end
+
 -- One act's identity and a plan's, for the diagnostics too: a forced replay, its DIAG line and
 -- the audit name a plan by this list (botrun, montecarlo.py), never by a second spelling
-M.key, M.keysOf = key, keysOf
+M.key, M.keysOf, M.unkey = key, keysOf, unkey
 
 -- whether a plan takes the Seize
 local function seizesIn(st)
@@ -411,7 +428,15 @@ function M.plan(Bot, board, sight, style, opts)
     local cap = M.CAPS[style.aggression]
     if not cap then error("planner.lua: no risk cap for style " .. tostring(style.aggression)) end
     local odds = sight.odds
-    local cands, ctx = Bot.candidates(board, sight, style, opts)
+    -- opts.offer: the acts read on another board (a full-information replay's: the fogged
+    -- one, whose game is the one that plays them), judged on this one
+    local offer = opts and opts.offer
+    local cands, ctx
+    if offer then
+        cands, ctx = offer.cands, offer.ctx
+    else
+        cands, ctx = Bot.candidates(board, sight, style, opts)
+    end
     if #cands == 0 then return nil, nil, { phases = 0, averaged = 0 } end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
@@ -1389,16 +1414,14 @@ function M.plan(Bot, board, sight, style, opts)
             c.rejected = c.rank.admitted and "outranked" or "over_cap"
         end
     end
-    local keysOffered, seen, fogged = {}, 0, 0
-    for _, c in ipairs(cands) do
-        for _, x in ipairs(c.acts) do keysOffered[#keysOffered + 1] = key(x) end
-    end
+    local offeredN, seen, fogged = 0, 0, 0
+    for _, c in ipairs(cands) do offeredN = offeredN + #c.acts end
     for _, u in ipairs(board.units) do
         if u.faction == "red" and u.onField and not u.dead then
             if u.fogged then fogged = fogged + 1 else seen = seen + 1 end
         end
     end
-    best.audit = { offered = keysOffered, visibility = { seen = seen, fogged = fogged },
+    best.audit = { offered_n = offeredN, visibility = { seen = seen, fogged = fogged },
                    budget = { exhausted = look.skipped == true, averaged = best.averaged or 0 } }
     -- no plan under the cap: the least likely to end the game, then the least over it, is
     -- played, and says so (FR-011, ADR 0384 amended)
