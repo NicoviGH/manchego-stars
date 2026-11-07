@@ -113,43 +113,59 @@ vision range (gPlaySt +0x0D) written 0 through the journaled api, then the game'
 unit no event has loaded yet and no RNG is drawn, so neither is revealed; the sandbox's load
 undoes the game's writes, and it refuses inside an open sandbox. Its unit test (`test_sight.lua`,
 T071) passes, and it is proven live off the suite: vanilla chapter 7 (Ch6, fog), scout state,
-seed 1001, where the original lost on turn 2 when Eirika died in the enemy phase. The first
-full_info replay at decision 4 ran before the diagnostic was limited to knowledge, not powers: its
-plan could use acts only the fog-off board offered, so it was stale. Re-run under the fixed code,
-the replay at decision 4 matched, and played all 10 acts of a different plan, each offered on
-the fogged board (attacks on units 134 and 148 among them). Nothing was traded, Eirika lived to
-the end of turn 2, and the pinned state reloaded to the same board. The audit of the probe's
-runs file (`fogprobe.jsonl`, instrument `b74ed95f600a+v1`) reads it as witnessing
-`information_unavailable`: "1 of 1 audited failures (100%) have a witnessed label". The real
-`replay` command cannot reach a fog start yet: no suite start has fog (in
-`chapter_settings.json` only chapters 7, 19, 32, 61 and 62 do), so PR-G adds one.
+seed 1001, where the original, played fresh under instrument `e1a4192ff78f+v1`, lost on turn 2
+when Eirika died in the enemy phase (decision 4, the fog flag set). The full_info replay at
+decision 4 (17.2 s, through the probe script with the instrument check; the older probe record
+was refused) matched. Where the fogged board showed 3 units and fogged 21, it judged with none
+fogged, and its acts were still the fogged board's offer: the diagnostic reveals knowledge, not
+powers. It played all of a different plan (attacks on units 134 and 148 among its acts), traded
+no one, and Eirika lived. An earlier full_info line, made before the knowledge-not-powers fix,
+could use acts only the fog-off board offered, and is stale. The real `replay` command cannot
+reach a fog start yet: no suite start has fog (in `chapter_settings.json` only chapters 7, 19,
+32, 61 and 62 do), so it stays off the suite until PR-G adds one.
 
-**Built** (T079, 2026-11-07). One instrumented replay per case:
-- vanilla chapter 7, seed 1001, Eirika: `full_info` witnessed `information_unavailable` (above).
-- ours ch02 (chapter 3), seed 1002, the green 0xC9 (Klimt): `deep` witnessed `search_miss`.
-- ours ch03 (chapter 4), seed 1002, unit 3, turn 21: `deep` chose the same plan at decisions 45
-  and 46. Forcing the second-ranked plan at 45 saved unit 3 and traded it for 0x05. Every plan
-  judged at 45 was over the cap (max_die 0.905 to 0.93): a fallback on a board where no judged
-  plan was safe.
-- The pinned state reloads to the same board in the same emulator process (`pinned_board`
-  true). Loading it in a fresh emulator is PR-G's T084.
-- Each replay took 6 to 30 wall seconds.
+**Built** (T079, 2026-11-07, instrument `e1a4192ff78f+v1`). The originals were played fresh
+under the code that replays them (the suite's tasks for ours, the scout start for vanilla
+chapter 7), and every named death happened again. Every replay matched, and every pinned state
+reloaded to the board its decision read (`pinned_board`; a fresh emulator's load is PR-G's
+T084).
+- **ours ch02 (chapter 3), seed 1002** (16.6 s, won): Klimt (0xC9) fell on turn 1 (decision 1)
+  and Dara (0xCA) on turn 3, both `rng_tail`. A `deep` replay of Klimt's death, pinned at its
+  `plan_ref` (decision 1: a green unit has no act that moves it), took 5.5 s. It moved unit 3 to
+  4,4 instead of 2,6, played the whole plan, traded no one, and Klimt lived: `search_miss`,
+  witnessed.
+- **ours ch03 (chapter 4), seed 1002** (31.7 s, won): unit 0x4 fell on turn 11 and Meesmickle
+  (unit 3) on turn 21, both `over_cap`. The last decision that moved Meesmickle was 45 (an attack);
+  the death's `plan_ref` is 46.
+  - `deep` at 45 (29.6 s) planned the baseline's plan and broke at `4>wait@14,4>nil`, on a
+    surprise replan after Meesmickle's attack, which the original made too (at 46). No witness.
+  - `force` at 45 (29.8 s): the best-ranked judged plan in which Meesmickle does not attack (max_die
+    0.931, against the played plan's 0.905; every judged plan was over the cap). It played whole,
+    every act offered. Meesmickle lived, and unit 5 died instead (`traded` [5]): no witness. Nothing
+    says the hold caused the death: every judged plan was over the cap, and the alternative only
+    moves the death to another unit. It stays unclassified, a fallback on a board where no judged
+    plan was safe.
+- **vanilla chapter 7, seed 1001** (8.1 s, lost): `full_info` witnessed `information_unavailable`
+  (above).
+- Each replay took 5.5 to 30 wall seconds.
 
-**The two ours lines are stale.** Both were written before `planned` and `broken` were recorded,
-so the audit counts neither, and neither can be re-run: the bot code changed in this PR, so the
-instrument of those suite runs is no longer the code's, and `replay` refuses them. They are
-evidence of what the diagnostics can show, not witnesses. They count again only once the suite
-is re-played under the new instrument and the deaths are replayed.
+**A normal replan breaks a deep or full-information replay.** `broken` is set when a surprise
+replan cuts the diagnostic's plan short, even where the original replanned at the same point, as
+in Meesmickle's `deep` replay. It cost nothing there (the plan was the baseline's), but it can
+block a witness: such a replay plays a plan that differs only in what came after the cut. This
+PR leaves it so, the strict reading. Counting a cut the original also made as not broken is a
+change to make with the evidence of a case where it matters.
 
-The audit on both stores, instrument `1edeb96ff443+v1`, after those rules:
-- vanilla: "0 of 17 audited failures (0%) have a witnessed label; 17 unclassified. The bar is 90%:
-  not met. 4 orphan DIAG lines (no record matches their run)."
-- ours: "0 of 13 audited failures (0%) have a witnessed label; 13 unclassified. The bar is 90%:
-  not met. 2 orphan DIAG lines (no record matches their run)."
+The audit, instrument `e1a4192ff78f+v1`:
+- ours (`runs.jsonl`): "1 of 4 audited failures (25%) have a witnessed label; 3 unclassified. The
+  bar is 90%: not met. 2 orphan DIAG lines (no record matches their run)."
+- vanilla (`fogprobe.jsonl`): "1 of 1 audited failures (100%) have a witnessed label; 0
+  unclassified. The bar is 90%: met. 1 orphan DIAG lines (no record matches their run)."
+- vanilla's `runs.jsonl` has no run under this instrument, so its audit picks the newest run's,
+  `1edeb96ff443+v1`: 0 of 17.
 
-SC-004 is far below 90% because replays were run for only a handful of deaths, and the ones run
-on the suite are stale. It is PR-F's measuring stick, not its checkpoint: the checkpoint is that
-a failure is labelled only with a witness, and every other one stays visible as unclassified.
-The orphans are lines written before the run identity carried the trace, and the chapter 7
-full-information lines, whose scout run is kept in the probe's own runs file, not the store's
-`runs.jsonl`.
+SC-004 is far below 90% because replays were run for only a handful of deaths. It is PR-F's
+measuring stick, not its checkpoint: the checkpoint is that a failure is labelled only with a
+witness, and every other one stays visible as unclassified. The orphans are stale lines whose run
+is not in the runs file: written before the run identity carried the trace, or naming a run no
+longer kept there.
