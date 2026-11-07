@@ -4561,6 +4561,27 @@ do
     check(plan.audit.offered_n, n, "offer: the plan's acts are the offer's")
 end
 
+-- test_offer_judges_every_enemy_seen (re-review A): the offer brings the fogged board's acts
+-- only; the enemies the judging knows are the fog-off board's. A boss the fog hides when the
+-- acts are read still makes the step into its reach a lookahead trigger, and the second
+-- phase's death keeps A back, as it does with the boss seen all along.
+do
+    local board, sight, st = looksAhead(true)
+    local fogged = { turn = board.turn, phase = board.phase, map = board.map, units = {} }
+    for i, u in ipairs(board.units) do
+        local c = {}
+        for k, v in pairs(u) do c[k] = v end
+        c.fogged = c.id == 0x82
+        fogged.units[i] = c
+    end
+    local cands, ctx = B.candidates(fogged, sight, st)
+    local a, plan = Planner.plan(B, board, sight, st, { offer = { cands = cands, ctx = ctx } })
+    check(plan.lookahead.trigger and plan.lookahead.trigger[1], "boss",
+          "offer: the boss the fog hid is seen by the trigger")
+    check(at(a), "0,0", "offer: and its second phase keeps A back")
+    check(plan.enemies[0x82], true, "offer: the plan's enemies hold the boss")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

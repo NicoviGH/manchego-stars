@@ -1115,7 +1115,7 @@ def _plan(ref=17, considered=None):
                       {'acts': ['c'], 'rejected': 'over_cap'},
                       {'acts': ['e'], 'rejected': 'stalled'}]
     return {'t': 'plan', 'turn': 4, 'ref': ref, 'considered': considered, 'audit': {
-        'offered': 5, 'visibility': {'seen': 5, 'fogged': 2},
+        'offered_n': 5, 'visibility': {'seen': 5, 'fogged': 2},
         'budget': {'exhausted': False, 'averaged': 0}}}
 
 

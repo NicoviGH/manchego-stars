@@ -429,11 +429,13 @@ function M.plan(Bot, board, sight, style, opts)
     if not cap then error("planner.lua: no risk cap for style " .. tostring(style.aggression)) end
     local odds = sight.odds
     -- opts.offer: the acts read on another board (a full-information replay's: the fogged
-    -- one, whose game is the one that plays them), judged on this one
+    -- one, whose game is the one that plays them), judged on this one -- with this board's
+    -- enemies, so the trigger, the assault and the record see one the fog hid there
     local offer = opts and opts.offer
     local cands, ctx
     if offer then
-        cands, ctx = offer.cands, offer.ctx
+        cands, ctx = offer.cands, setmetatable({ enemies = Bot.enemiesOf(board, sight) },
+                                               { __index = offer.ctx })
     else
         cands, ctx = Bot.candidates(board, sight, style, opts)
     end

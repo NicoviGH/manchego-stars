@@ -98,8 +98,9 @@
 -- witness), `deep` asks the planner with opts.diag = "deep", `full_info` asks it inside
 -- sight.fullInfo, never inside a batch, over the acts the fogged board offers (it knows more,
 -- it may do no more). A replay that leaves its original stops there; one that reaches its pin
--- plays on to the end of the failure's turn and stops. It never writes what production reads: no BOTRUN line, no record handed back
--- (the retry memory and campaign.lua's endpoint read it), only ONE `DIAG <json>` line:
+-- plays on to the end of the failure's turn and stops. It never writes what production reads:
+-- no BOTRUN line, no record handed back (the retry memory and campaign.lua's endpoint read
+-- it), only ONE `DIAG <json>` line:
 -- { run, ref, mode, matched, baseline, planned (the diagnostic's plan), chosen (its acts
 -- actually played), broken (its first act not played), differs, failure, avoided (the
 -- diagnostic's plan played whole, the failure's unit alive at the end of its turn, and no other

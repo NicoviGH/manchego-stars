@@ -1476,6 +1476,8 @@ AUDIT_LABELS = ('missing_action', 'mis_predicted_safety', 'mis_scored', 'search_
 # not be played at all, so it places nothing.
 REJECTED_LABEL = {'over_cap': 'mis_predicted_safety', 'outranked': 'mis_scored'}
 SC004_BAR = 0.9
+
+
 def diag_of(g, r, d):
     """Whether DIAG line `g` replays death `d` of record `r`."""
     f = g.get('failure') or {}
