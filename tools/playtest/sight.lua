@@ -75,6 +75,9 @@
 --                            tile nil, takenDist nothing) when the AI does not strike `u` there.
 --   batch(fn)                fn's reads in one save/load: one decision's worth of questions
 --                            cost one state round trip, not one each.
+--   fullInfo(fn)             batch(), the fog off (M.fullInfo): fn(board), the board read with
+--                            no unit fogged. A diagnostic's (FR-019), in place of batch, never
+--                            inside a sandbox; nothing it reads outlives the call.
 --   enemyPhase(plan)         the enemy phase the AI would play against a planned board, in
 --                            one batch. plan = { blues = { { unit, x, y, hp } }, gone =
 --                            { [enemy id] = true } }: our units stand where the plan leaves
@@ -883,6 +886,31 @@ function M.equip(api, call, S, u, slot)
     call(S.EquipUnitItemSlot, { u.addr, slot })
 end
 
+-- Sight.fullInfo(sandbox, open, api, S, isolate, fn): FR-019's full-information diagnostic
+-- (R-7), never production. fn(board) runs in one outermost sandbox with the fog off -- the
+-- vision range (gPlaySt +0D) written 0 through the journaled api, then the game's own
+-- RefreshEntityBmMaps, whose RefreshUnitsOnBmMap clears US_BIT9 on every red it now sees
+-- (bmmap.c) -- and is handed the board read there, no unit `fogged`. That one write is all it
+-- changes: an arrival is a unit no event has loaded yet, and no RNG is drawn, so neither is
+-- revealed. The game's writes (unit states, the fog and unit maps) are not journaled, so only
+-- the outermost load undoes them: inside an open sandbox it refuses. isolate() swaps the
+-- caller's caches for fresh ones and returns their restore, run however fn ends: an answer
+-- read with the fog off must not be kept for the fogged board.
+function M.fullInfo(sandbox, open, api, S, isolate, fn)
+    if open() then
+        error("sight.lua: fullInfo inside an open sandbox would leak its game writes", 0)
+    end
+    local restore = isolate()
+    local ok, a, b = pcall(sandbox, function(call)
+        api.write8(S.gPlaySt + PLAY_VISION, 0)
+        call(S.RefreshEntityBmMaps, {})
+        return fn(api.board())
+    end)
+    restore()
+    if not ok then error(a, 0) end
+    return a, b
+end
+
 function M.new(outer)
     local sandbox, api, open = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
@@ -1112,6 +1140,16 @@ function M.new(outer)
     function s.newPhase()
         s.refresh()
         s.cache = {}
+    end
+
+    -- fn(board) with the fog off (M.fullInfo): the board's answers and the phase's cache are
+    -- fresh for the call and the fogged ones come back after it
+    function s.fullInfo(fn)
+        return M.fullInfo(sandbox, open, api, S, function()
+            local keptSeen, keptCache = seen, s.cache
+            seen, s.cache = { threats = {}, grids = {} }, {}
+            return function() seen, s.cache = keptSeen, keptCache end
+        end, fn)
     end
 
     function s.danger(x, y)

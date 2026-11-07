@@ -665,5 +665,88 @@ do
     check(Sight.sackedTerrain({ kind = "visit" }), 0x04, "sackedTerrain: a closed village")
 end
 
+-- test_full_info_reveals_inside_one_call_only (T071, R-7): Sight.fullInfo runs `fn` with fog
+-- off -- the vision byte written 0 through the journaled api, then the game's own
+-- RefreshEntityBmMaps, which clears a seen unit's US_BIT9 (bmmap.c RefreshUnitsOnBmMap) --
+-- and hands it the board read there. Its writes are the vision byte alone, so no RNG seed and
+-- no arrival is touched (an arrival is a unit not loaded yet: no write loads it); the game's
+-- own writes are undone by the outermost load; the sight's caches are swapped for the call and
+-- put back; and it refuses to run inside an open sandbox, whose load would come too late.
+do
+    local cpu = fakeCpu(1)
+    local VISION, UNIT, SEED, ARRIVAL = 0x300 + 0x0D, 0x400, 0x500, 0x600
+    local bytes = { [VISION] = 3, [UNIT] = Board.US_BIT9, [SEED] = 0x1234, [ARRIVAL] = 0 }
+    -- the emulator's state round trip: RAM is saved and loaded with the registers
+    local save0, load0 = cpu.save, cpu.load
+    function cpu.save()
+        local st, ram = save0(), {}
+        for k, v in pairs(bytes) do ram[k] = v end
+        st.ram = ram
+        return st
+    end
+    function cpu.load(st)
+        load0(st)
+        for k in pairs(bytes) do bytes[k] = nil end
+        for k, v in pairs(st.ram) do bytes[k] = v end
+    end
+    -- the game's RefreshEntityBmMaps: with no fog, the unit's US_BIT9 cleared (a game write)
+    local frames0, refreshes = cpu.frames, 0
+    function cpu.frames(done, max)
+        if cpu.read("pc") == 0x08001000 then
+            refreshes = refreshes + 1
+            if bytes[VISION] == 0 then bytes[UNIT] = bytes[UNIT] & ~Board.US_BIT9 end
+        end
+        return frames0(done, max)
+    end
+    local writes = {}
+    local function writer(a, v) writes[#writes + 1] = a; bytes[a] = v end
+    local function byte(a) return bytes[a] or 0 end
+    local mem = { u8 = byte, u16 = byte, u32 = byte }
+    local outer = { cpu = cpu, mem = mem, write8 = writer, write16 = writer, write32 = writer,
+                    board = function()
+                        local fogged = (bytes[UNIT] & Board.US_BIT9) ~= 0
+                        return { units = { { id = 0x81, fogged = fogged } } }
+                    end }
+    local sandbox, api, open = Sight.batching(outer)
+    local S = { gPlaySt = 0x300, RefreshEntityBmMaps = 0x08001000 }
+    local caches = { "fogged answers" }
+    local function isolate()
+        local kept = caches[1]
+        caches[1] = "fresh"
+        return function() caches[1] = kept end
+    end
+    local inside = {}
+    local got = Sight.fullInfo(sandbox, open, api, S, isolate, function(board)
+        inside.fogged = board.units[1].fogged
+        inside.vision, inside.seed, inside.arrival = bytes[VISION], bytes[SEED], bytes[ARRIVAL]
+        inside.cache = caches[1]
+        inside.writes = #writes
+        return "plan"
+    end)
+    check(got, "plan", "fullInfo: fn's result comes back")
+    check(inside.fogged, false, "fullInfo: the hidden unit is seen inside the call")
+    check(inside.vision, 0, "fullInfo: fog off inside")
+    check(refreshes, 1, "fullInfo: the game's RefreshEntityBmMaps rebuilt the maps once")
+    check(inside.writes, 1, "fullInfo: its one write is the vision byte")
+    check(writes[1], VISION, "fullInfo: ...at gPlaySt + 0x0D")
+    check(inside.seed .. "/" .. inside.arrival, 0x1234 .. "/0", "fullInfo: no RNG seed, no arrival")
+    check(inside.cache, "fresh", "fullInfo: the sight's caches swapped for the call")
+    check(caches[1], "fogged answers", "fullInfo: and put back after it")
+    check(bytes[VISION], 3, "fullInfo: the vision range restored")
+    check((bytes[UNIT] & Board.US_BIT9) ~= 0, true, "fullInfo: the game's own write undone")
+    check(outer.board().units[1].fogged, true,
+          "fullInfo: outside the call, the unit is hidden again")
+    -- an error inside still puts the caches back
+    local ok = pcall(Sight.fullInfo, sandbox, open, api, S, isolate, function() error("boom") end)
+    check(ok, false, "fullInfo: fn's error is raised")
+    check(caches[1] .. "/" .. bytes[VISION], "fogged answers/3",
+          "fullInfo: restored after an error")
+    -- inside an open sandbox the game's writes would outlive the call: refused
+    local refused = sandbox(function()
+        return not pcall(Sight.fullInfo, sandbox, open, api, S, isolate, function() end)
+    end)
+    check(refused, true, "fullInfo: refused inside an open sandbox")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

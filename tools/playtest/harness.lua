@@ -12,6 +12,7 @@
 --   PLAYTEST_STATEDIR -- save-state checkpoint dir (ckpt_*/record* scenarios)
 --   PLAYTEST_SEED     -- fuzz/llm seed (PT_SEED)
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
+--   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -350,12 +351,25 @@ local function saveState(name)
     end
     return ok
 end
-local function loadState(name)
+-- Any state file loaded (a checkpoint, a diagnostic's pinned state), and the live state written
+-- to one from the state buffer: saveStateFile writes zeros under mgba-headless (saveState), the
+-- buffer does not. writeStateFile returns the buffer it wrote (`st`, or the live one), nil when
+-- the file could not be opened.
+INSPECT.loadStateFile = function(path)
     local ok = false
-    pcall(function() ok = emu:loadStateFile(statePath(name)) end)
-    log("loadState " .. name .. " -> " .. tostring(ok))
+    pcall(function() ok = emu:loadStateFile(path) end)
+    log("loadState " .. path .. " -> " .. tostring(ok))
     return ok
 end
+INSPECT.writeStateFile = function(path, st)
+    st = st or emu:saveStateBuffer()
+    local f = io.open(path, "wb")
+    if not f then return nil end
+    f:write(st)
+    f:close()
+    return st
+end
+local function loadState(name) return INSPECT.loadStateFile(statePath(name)) end
 
 -- ============================================================================
 -- GENERIC CUTSCENE RECORDER (record-tooling generalized 2026-07-09)
@@ -3228,6 +3242,25 @@ INSPECT.watchEnemyActs = function()
     return function() close(); callbacks:remove(id); return acts end
 end
 
+-- A diagnostic replay (PT_DIAG, montecarlo.py's `replay`): { ref, mode, force, failure, run,
+-- original_trace = the original attempt's filed trace, gzipped or not }, as botrun.lua's api.diag
+-- with the trace read in (`original`). nil when the run is no diagnostic.
+INSPECT.diag = function(Json)
+    if PLAYTEST_DIAG == nil or PLAYTEST_DIAG == "" then return nil end
+    local d = Json.decode(PLAYTEST_DIAG)
+    local path = assert(d.original_trace, "PT_DIAG: no original_trace")
+    local fh = path:match("%.gz$") and io.popen("gzip -dc '" .. path:gsub("'", "'\\''") .. "'")
+        or io.open(path)
+    assert(fh, "PT_DIAG: cannot read " .. path)
+    d.original = {}
+    for line in fh:lines() do
+        if line ~= "" then d.original[#d.original + 1] = Json.decode(line) end
+    end
+    fh:close()
+    assert(#d.original > 0, "PT_DIAG: the original trace " .. path .. " is empty")
+    return d
+end
+
 -- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
 INSPECT.botApi = function(game)
     -- the entries `list` gained since the last look at it
@@ -3318,10 +3351,15 @@ INSPECT.botApi = function(game)
     -- The run's trace (botrun.lua): one JSON line per event in the run dir, a file per chapter
     -- attempt, named in the record (montecarlo.py files it in the store).
     local traceFile
+    -- a diagnostic replay's trace is its own file, never the original's name
+    api.diag = INSPECT.diag(Json)
     api.trace = function(ev)
         if not traceFile then
-            api.info.trace = string.format("trace-%s-%d-a%d.jsonl", game, api.info.chapter,
-                                           api.info.attempt or 1)
+            api.info.trace = api.diag
+                and string.format("diag-%s-%d-a%d-r%d-%s.jsonl", game, api.info.chapter,
+                                  api.info.attempt or 1, api.diag.ref, api.diag.mode)
+                or string.format("trace-%s-%d-a%d.jsonl", game, api.info.chapter,
+                                 api.info.attempt or 1)
             traceFile = assert(io.open(PLAYTEST_SHOTDIR .. "/" .. api.info.trace, "w"))
         end
         traceFile:write(Json.encode(ev), "\n")
@@ -3329,6 +3367,19 @@ INSPECT.botApi = function(game)
     end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
+    -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
+    api.pinned = function(ref)
+        local name = string.format("%s/pinned-%s-%d-a%d-r%d.ss", PLAYTEST_SHOTDIR, game,
+                                   api.info.chapter, api.info.attempt or 1, ref)
+        local wrote = INSPECT.writeStateFile(name) ~= nil
+        log("botrun: pinned state -> " .. (wrote and name or "not written"))
+        return wrote and name or nil
+    end
+    -- the kept state loaded back from its file, as a later run would, and the board read there
+    api.reload = function(file)
+        assert(INSPECT.loadStateFile(file), "loadStateFile refused " .. file)
+        return BOARD.read()
+    end
     -- A failed act returns false and, where the driver knows it, why (the crash record says it).
     -- One action of Bot.decide's or the planner's: move, then attack the chosen enemy, wait,
     -- Talk, open a door, heal, use an item, Visit, open a chest, or Seize.
@@ -3717,6 +3768,9 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
     end
     api.only = cfg.attempt
+    -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi)
+    api.diag = (PLAYTEST_DIAG or "") ~= "" or nil
+    if api.diag and not api.only then error("PT_DIAG replays one attempt: PT_CAMPAIGN needs attempt") end
     -- Priced by the game for each unit that could buy, on the map: GetItemPurchasePrice reads
     -- the buyer (a Silver Card halves it) and charges half again while BM_FLAG_PREPSCREEN is
     -- set, and the bot buys on the map.
@@ -3889,17 +3943,16 @@ INSPECT.campaignApi = function(game)
         local st = emu:saveStateBuffer()
         states[ch] = st
         os.execute(string.format('mkdir -p "%s"', dir))
-        local f = io.open(string.format("%s/%d.ss", dir, ch), "wb")
-        if not f then return nil, "cannot write " .. dir end
-        f:write(st)
-        f:close()
+        if not INSPECT.writeStateFile(string.format("%s/%d.ss", dir, ch), st) then
+            return nil, "cannot write " .. dir
+        end
         local party = {}
         for _, u in ipairs(units()) do
             local items = {}
             for _, it in ipairs(u.items) do items[#items + 1] = it.id end
             party[#party + 1] = { charId = u.charId, classId = u.classId, level = u.level, items = items }
         end
-        f = io.open(string.format("%s/%d.json", dir, ch), "w")
+        local f = io.open(string.format("%s/%d.json", dir, ch), "w")
         if not f then return nil, "cannot write " .. dir end
         f:write(Json.encode({ game = game, chapter = ch, gold = gold(), party = party,
                               shops = openNodes(ch), carried = carried }))

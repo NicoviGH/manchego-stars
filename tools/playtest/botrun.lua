@@ -76,7 +76,35 @@
 --                      record carries what the run itself spent
 --   emit(line)         print one line to stdout
 --   log(s)
+--   diag               OPTIONAL: a diagnostic replay (FR-019, below): { ref, mode = "force" |
+--                      "full_info" | "deep", force = { Planner.key... } (force only), failure =
+--                      { charId, turn }, run = { game, chapter, seed, attempt } (the original
+--                      attempt's), original = the original attempt's trace events, decoded }
+--   pinned(ref)        OPTIONAL, with diag: keep the game's state at the pinned decision (a
+--                      board fixture: botrun's own memory is not in it); returns its file
+--   reload(file)       OPTIONAL, with pinned: load that file back and read the board there;
+--                      the DIAG line's `pinned_board` says whether it is the pinned board
 -- Botrun.run(api) -> ok, why, record. It emits the record as ONE stdout line, `BOTRUN <json>`.
+--
+-- A DIAGNOSTIC REPLAY (#510 step 9 PR F, T074): the attempt is played again from the same start
+-- with the same seed, style and budgets, which reproduces it: 156 of 156 reruns in the stores
+-- traced identically (2026-11-07). Lua seeds its string hash per process, so a `pairs` over
+-- string keys that picks a winner would break that; nothing is assumed, then: every phase
+-- snapshot, act and choice up to decision `ref` is compared with the original trace's, and a
+-- replay that leaves it is `matched = false`, never a witness. At `ref` the planner's own plan
+-- (the baseline) and the diagnostic's are made from the same board with the same budget left
+-- (only the baseline's lookahead is charged, as the original was): `force` plays the given
+-- keys in order (an act Bot.candidates never offered is built from its key: missing_action's
+-- witness), `deep` asks the planner with opts.diag = "deep", `full_info` asks it inside
+-- sight.fullInfo, never inside a batch, over the acts the fogged board offers (it knows more,
+-- it may do no more). A replay that leaves its original stops there; one that reaches its pin
+-- plays on to the end of the failure's turn and stops. It never writes what production reads: no BOTRUN line, no record handed back
+-- (the retry memory and campaign.lua's endpoint read it), only ONE `DIAG <json>` line:
+-- { run, ref, mode, matched, baseline, planned (the diagnostic's plan), chosen (its acts
+-- actually played), broken (its first act not played), differs, failure, avoided (the
+-- diagnostic's plan played whole, the failure's unit alive at the end of its turn, and no other
+-- blue or green unit lost in its place: `traded`), outcome, why, unoffered (forced keys never
+-- offered), pinned_board, trace }.
 --
 -- The TRACE (#510 step 9 F3, Nicolas 2026-10-27: "I want to be able to understand everything
 -- about how it went"): one event per api.trace call, each with `t` its kind and `turn`:
@@ -99,6 +127,65 @@
 local M = {}
 
 M.PREFIX = "BOTRUN "
+M.DIAG_PREFIX = "DIAG "
+
+-- Deep equality of two decoded JSON values (the replay's events against the original trace's)
+local function same(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+    for k, v in pairs(a) do
+        if not same(v, b[k]) then return false end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then return false end
+    end
+    return true
+end
+
+-- What a replay must reproduce of its original trace before the pinned decision `ref`: every
+-- phase snapshot, every act, and every decision's choice (its other fields are the planner's
+-- working, which a newer planner may add to without changing the play). Returns the watch:
+-- see(ev) for each event the replay traces; at(choice) at the pinned decision: whether the
+-- replay matched so far, every original event before it seen, and the baseline chose what the
+-- original did there; why, the first difference.
+function M.matcher(original, ref, Json)
+    local function shape(ev)
+        if ev.t == "plan" then
+            return { t = ev.t, turn = ev.turn, choice = ev.choice, kept = ev.kept, ref = ev.ref }
+        end
+        return ev
+    end
+    local want, pinned = {}, nil
+    for _, ev in ipairs(original or {}) do
+        if ev.t == "plan" and ev.ref == ref then pinned = ev; break end
+        if ev.t == "phase" or ev.t == "act" or ev.t == "plan" then want[#want + 1] = shape(ev) end
+    end
+    local w = { seen = 0 }
+    function w.see(ev)
+        if w.done or w.why or not (ev.t == "phase" or ev.t == "act" or ev.t == "plan") then return end
+        w.seen = w.seen + 1
+        local got, exp = Json.decode(Json.encode(shape(ev))), want[w.seen]
+        if not exp then
+            w.why = string.format("event %d (%s) is past the original's decision %d", w.seen,
+                ev.t, ref)
+        elseif not same(got, exp) then
+            w.why = string.format("event %d (%s, turn %s) differs from the original's", w.seen,
+                ev.t, tostring(ev.turn))
+        end
+    end
+    function w.at(choice)
+        if not w.why and not pinned then
+            w.why = "the original trace has no decision " .. tostring(ref)
+        elseif not w.why and w.seen ~= #want then
+            w.why = string.format("the replay reached decision %d after %d events, the original "
+                .. "after %d", ref, w.seen, #want)
+        elseif not w.why and not same(Json.decode(Json.encode({ c = choice })).c, pinned.choice) then
+            w.why = "the baseline's choice at the pinned decision differs from the original's"
+        end
+        w.done = true   -- past the pin the replay is meant to differ
+        return not w.why
+    end
+    return w
+end
 
 -- What Bot.decide reads at a player phase's start, as one string: who stands where with what
 -- HP, the objective's turns left, and the turns until the next claimed arrival.
@@ -505,6 +592,11 @@ function M.run(api)
                                 calls = 0, cpu_s = 0 },
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
+    -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
+    -- baseline and chosen keys once it is reached; `halt`, why the replay stops early
+    local diag = api.diag
+    local watch = diag and M.matcher(diag.original, diag.ref, Json)
+    local pin, halt
     -- the lookahead's calls left this attempt (Planner.LOOK_ATTEMPT, FR-018)
     local function lookLeft()
         return (api.Planner and api.Planner.LOOK_ATTEMPT or 0) - rec.lookahead.calls
@@ -542,10 +634,13 @@ function M.run(api)
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
     local function trace(ev)
-        if api.trace then
-            ev.turn = ev.turn or turn
-            api.trace(ev)
+        ev.turn = ev.turn or turn
+        if watch then
+            watch.see(ev)
+            -- a replay that left its original stops at once: nothing past it is the same attempt
+            if watch.why and not pin then halt = halt or ("unmatched: " .. watch.why) end
         end
+        if api.trace then api.trace(ev) end
     end
     -- each full-bag answer the harness gave, and each drop the game gave one of ours, since
     -- the last look (api.bag, api.drops)
@@ -753,6 +848,45 @@ function M.run(api)
         rec.instrument = api.info.instrument   -- the bot and suite version (montecarlo.py)
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
         trace({ t = "end", record = rec })
+        if diag then
+            -- the replay's one line: never the record, which production reads
+            -- avoided: the failure's unit alive at the end of its turn, and no other blue or
+            -- green unit lost in its place from the pinned turn on (`traded`): a plan that
+            -- moves the death onto someone else avoided nothing
+            local died, traded = false, {}
+            for _, d in ipairs(rec.deaths) do
+                if d.turn <= diag.failure.turn then
+                    if d.charId == diag.failure.charId then
+                        died = true
+                    elseif pin and d.turn >= pin.turn then
+                        traded[#traded + 1] = d.charId
+                    end
+                end
+            end
+            local matched = pin ~= nil and pin.matched
+            -- the kept state, loaded back, must hold the board the pinned decision read (a
+            -- fixture that does not is said, never used)
+            local pinnedBoard
+            if pin and pin.file and api.reload then
+                local ok, b = pcall(api.reload, pin.file)
+                pinnedBoard = ok and same(Json.decode(Json.encode(M.snapshot(b))),
+                                          Json.decode(Json.encode(pin.board))) or false
+            end
+            api.emit(M.DIAG_PREFIX .. Json.encode({ run = diag.run, ref = diag.ref, mode = diag.mode,
+                matched = matched, baseline = pin and pin.baseline or {},
+                chosen = pin and pin.chosen or {}, planned = pin and pin.planned or {},
+                differs = pin and pin.differs or false,
+                failure = diag.failure,
+                avoided = matched and #pin.chosen > 0 and not pin.broken and not died
+                    and #traded == 0 and outcome ~= "crashed" or false,
+                traded = traded,
+                unoffered = pin and pin.unoffered or {}, broken = pin and pin.broken,
+                pinned_board = pinnedBoard,
+                outcome = outcome, why = why, trace = api.info.trace }))
+            api.log(string.format("botrun: diagnostic %s at decision %d: %s (%s)", diag.mode,
+                diag.ref, outcome, why))
+            return false, why, nil
+        end
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
         return outcome == "won" or outcome == "lost" or outcome == "stuck", why, rec
@@ -780,11 +914,84 @@ function M.run(api)
         -- the plan being played this phase: its next act's index, and the board before the
         -- last act it played (Planner.surprise compares the two)
         local playing, nextAct, before
+        -- the diagnostic's pinned decision is the next plan made (diag.ref is its plan.ref)
+        local function pinNow() return diag and not pin and rec.plans.made + 1 == diag.ref end
+        local function batched(fn)
+            if sight.batch then return sight.batch(fn) end
+            return fn()
+        end
+        -- a forced key as an act on this board: the one Bot.candidates offers with that key,
+        -- else built from the key (an act never offered, kept in pin.unoffered); nil when its
+        -- unit cannot act any more
+        local function forcedAct(board, k, opts)
+            for _, c in ipairs(Bot.candidates(board, sight, style, opts)) do
+                for _, a in ipairs(c.acts) do
+                    if api.Planner.key(a) == k then return a end
+                end
+            end
+            local a = api.Planner.unkey(k)
+            local byIdNow = byId(board)
+            local u = byIdNow[a.unitId]
+            if not (u and u.faction == "blue" and u.onField and not u.acted) then return nil end
+            pin.unoffered[#pin.unoffered + 1] = k
+            a.unit = u.charId
+            if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end
+            return a
+        end
+        -- The pinned decision: the baseline, then the diagnostic's plan from the same board and
+        -- budget; the baseline's cost is the one charged (the original paid it here)
+        local function pinDecision(board, opts)
+            local P = api.Planner
+            local a, plan, cost = batched(function() return P.plan(Bot, board, sight, style, opts) end)
+            pin = { baseline = plan and P.keysOf(plan) or {}, unoffered = {}, chosen = {},
+                    turn = turn }
+            pin.matched = watch.at(a and actOf(a))
+            pin.board = M.snapshot(board)
+            if api.pinned then pin.file = api.pinned(diag.ref) end
+            if not pin.matched then
+                halt = "unmatched: " .. watch.why
+                return nil, nil, cost
+            end
+            local dopts = {}
+            for k, v in pairs(opts) do dopts[k] = v end
+            local da, dplan
+            if diag.mode == "deep" then
+                dopts.diag = "deep"
+                da, dplan = batched(function() return P.plan(Bot, board, sight, style, dopts) end)
+            elseif diag.mode == "full_info" then
+                -- knowledge, not powers: the acts are the ones the fogged game allows (offered on
+                -- this board, in its own sandbox: fullInfo refuses to run inside one); only the
+                -- judging sees every enemy
+                local cands, ctx = batched(function() return Bot.candidates(board, sight, style, dopts) end)
+                dopts.offer = { cands = cands, ctx = ctx }
+                da, dplan = sight.fullInfo(function(b) return P.plan(Bot, b, sight, style, dopts) end)
+            elseif diag.mode == "force" then
+                da = batched(function() return forcedAct(board, diag.force[1], opts) end)
+                if not da then
+                    pin.broken = diag.force[1]
+                    halt = "the forced act " .. diag.force[1] .. " has no unit to play it"
+                    return nil, nil, cost
+                end
+                dplan = { acts = { da }, forced = true, goals = plan and plan.goals,
+                          stuck = plan and plan.stuck }
+            else
+                error("botrun: no diagnostic mode " .. tostring(diag.mode))
+            end
+            -- `planned` is the diagnostic's plan; `chosen` grows by each of its acts actually
+            -- played, and `broken` names the first that was not (pinPlayed)
+            pin.planned = diag.mode == "force" and diag.force or (dplan and P.keysOf(dplan) or {})
+            pin.differs = not same(pin.planned, pin.baseline)
+            pin.plan = dplan
+            if da then pin.chosen[1] = P.key(da) end
+            return da, dplan, cost
+        end
         while true do
             if api.won() then return "won", "the chapter advanced" end
             if api.lost() then return "lost", "game over" end
             local board = api.board()
             turn = board.turn
+            if halt then return "diag", halt end
+            if pin and turn > diag.failure.turn then return "diag", "the failure's turn is over" end
             sight.newPhase()
             if #rec.deployed == 0 then
                 for _, u in ipairs(board.units) do
@@ -846,16 +1053,39 @@ function M.run(api)
             trace({ t = "phase", phase = "player", units = M.snapshot(board) })
             playing = nil
             while true do
+                if halt then return "diag", halt end
                 -- one decision's reads in one save/load (sight.batch), when the sight batches
                 -- the planner plays every style but greedy, the old clear bot (bot.lua)
                 local function decide()
                     if planned then
                         local why
+                        -- what a plan call reads of the run: built only when one is asked for
+                        local function memo()
+                            return { stalled = stalled, sent = sent, stuck = stuck,
+                                     explored = explore.explored(), lost = explore.lost(),
+                                     budget = { attempt = lookLeft() } }
+                        end
+                        if playing and playing.forced then
+                            -- a forced plan plays its keys in turn, each read on this board
+                            local k = diag.force[nextAct]
+                            local a = k and forcedAct(board, k, memo())
+                            if a then
+                                nextAct = nextAct + 1
+                                pin.chosen[#pin.chosen + 1] = k
+                                trace({ t = "plan", kept = true, forced = true, choice = actOf(a) })
+                                return a
+                            end
+                            if k then pin.broken = k end
+                            playing = nil
+                        end
                         if playing then
                             why = api.Planner.surprise(playing, nextAct - 1, before, board,
                                 sight.legal)
                             if not why then
                                 local a = playing.acts[nextAct]
+                                if pin and playing == pin.plan then
+                                    pin.chosen[#pin.chosen + 1] = api.Planner.key(a)
+                                end
                                 nextAct = nextAct + 1
                                 rec.plans.kept = rec.plans.kept + 1
                                 trace({ t = "plan", kept = true, choice = actOf(a) })
@@ -864,14 +1094,19 @@ function M.run(api)
                                 return a
                             end
                             api.log("plan: replan, " .. why)
+                            local cut = pin and playing == pin.plan and playing.acts[nextAct]
+                            if cut and not pin.broken then
+                                -- the diagnostic's plan was cut short: what it did not play
+                                pin.broken = api.Planner.key(cut)
+                            end
                         end
                         local replan = playing and why
-                        local a, plan, cost = api.Planner.plan(Bot, board, sight, style,
-                                                         { stalled = stalled, sent = sent,
-                                                           stuck = stuck,
-                                                           explored = explore.explored(),
-                                                           lost = explore.lost(),
-                                                           budget = { attempt = lookLeft() } })
+                        local a, plan, cost
+                        if pinNow() then
+                            a, plan, cost = pinDecision(board, memo())
+                        else
+                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, memo())
+                        end
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
                         cost = cost or {}
@@ -943,7 +1178,7 @@ function M.run(api)
                         end
                         explore.offered(plan and plan.explore)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
-                                ref = plan and plan.ref,
+                                ref = plan and plan.ref, audit = plan and plan.audit,
                                 judged = plan and plan.judged, kind = plan and plan.kind,
                                 rank = plan and plan.rank, fallback = plan and plan.fallback,
                                 protected = plan and plan.protected,
@@ -971,7 +1206,9 @@ function M.run(api)
                     return a
                 end
                 local action
-                if sight.batch then action = sight.batch(decide) else action = decide() end
+                -- the pinned decision is not batched: full_info's sandbox must be the outermost
+                if sight.batch and not pinNow() then action = sight.batch(decide) else action = decide() end
+                if halt then return "diag", halt end
                 if not action then break end
                 local done, why = api.act(action)
                 bagged()
@@ -1021,6 +1258,7 @@ function M.run(api)
                 if api.lost() then return "lost", "game over" end
                 if board.phase ~= "blue" or board.turn ~= turn then break end
             end
+            if halt then return "diag", halt end
             local before = api.board()
             -- what the last plan expected of this enemy phase, beside what it did
             for _, p in ipairs(commit and commit.predict or {}) do

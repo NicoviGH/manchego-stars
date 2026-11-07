@@ -150,6 +150,22 @@ local function test_one_attempt_alone_is_the_loops_kth()
 end
 test_one_attempt_alone_is_the_loops_kth()
 
+-- A diagnostic replay of attempt k (botrun.lua's api.diag, #510 step 9 PR F): its DIAG line is
+-- all it writes. botrun hands no record back, and the campaign writes no CAMPAIGN line, so no
+-- endpoint is recorded.
+local function test_a_diagnostic_attempt_writes_no_campaign_line()
+    local g = fakeGame({ chapters = { { id = 3 }, { id = 4 } } })
+    g.api.only, g.api.diag = 1, { ref = 1, mode = "deep" }
+    local play = g.api.play
+    g.api.play = function(...) play(...); return nil end
+    local ok, why = Campaign.run(g.api)
+    check(ok, true, "a diagnostic attempt played is a finished run")
+    check(#g.plays, 1, "the one attempt is played")
+    check(#lines(g), 0, "no CAMPAIGN line is written")
+    check(why, "chapter 3 attempt 1: diagnostic replayed", "and it says what it did")
+end
+test_a_diagnostic_attempt_writes_no_campaign_line()
+
 local function test_attempts_recorded()
     local g = fakeGame({ chapters = { { id = 3, outcomes = { "lost", "stuck", "won" } },
                                       { id = 4, outcomes = { "won" } } } })
