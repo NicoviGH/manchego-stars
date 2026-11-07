@@ -9,8 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-04 (Claude). Cut from 598 lines to live state (#572): what was history is in
-ADRs 0353-0389 and on #510; the lessons moved to their files in PR #573.
+Refreshed 2026-11-07 (Claude): #574 merged (playtest run dirs no longer pile up in /tmp).
 
 ## Where things stand
 
@@ -28,8 +27,10 @@ ADRs 0353-0389 and on #510; the lessons moved to their files in PR #573.
     skipped for budget; every one of the 52 runs has a game result.
 - **On hold** (label `on-hold`, the hold comment says what reopens each): #565 (chipping a step
   back), #569 (placing a claim's wave in the lookahead).
-- **Open PR #573** (#572): the moved lessons and the handoff guard's advice. Not a step 9 PR, so
-  it waits for Nicolas's "merge" after its review.
+- **#574 merged (PR #575, ADR 0391):** a passing tagged run's `/tmp/playtest-<scenario>@<tag>`
+  is deleted once its records are written; failing ones are kept (marked `FAILED`, newest 20);
+  the per-run ROM is an APFS clone. The matrix drops a green verdict run's `/tmp` dir once the
+  verdict cache holds it. If `/tmp` fills again, look there first.
 
 ## Next
 
@@ -37,7 +38,8 @@ ADRs 0353-0389 and on #510; the lessons moved to their files in PR #573.
    plan avoids it. Its T079 live proof has three cases: vanilla Ch5's Gilliam death, ours ch02's
    green deaths, and ours-ch03 tuning seed 1002's unit 3, killed by the boss on turn 21 under a
    labelled fallback since #570 (did the hold cause it?). Starts from `harness.lua` (T074),
-   `sight.lua` (T071/T075, spike first), `planner.lua` (T076), `montecarlo.py` (T077, reuse
+   `sight.lua` (T071/T075, spike first), `planner.lua` (T076), `montecarlo.py` (T077; since #574 a
+   passing run's dir is gone, so read its filed trace, not `run_dir`; reuse
    `read_trace`).
 2. Then PR-G (freeze the suite), PR-H (the ours-vs-twin pilot), PR-I (validity), PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
