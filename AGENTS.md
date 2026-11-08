@@ -13,6 +13,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Unit class / promotion | `campaigns/.../{pcs,npcs}/*.yaml` → generated `docs/CLASSES.md` |
 | Settled design decisions (combat, triangle, economy, class mapping, promotion seam) | `docs/decisions.md` |
 | Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
+| Writing or reviewing a playtest-bot decision (planner, candidates, lookahead) | **ADR 0396**: a decision orders the game's outcomes, only the game forbids; the five tests every new rule passes |
 | Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
 | Borrowable enemy reskin art (what the FE-Repo has) | **`docs/fe-repo-scouting.md`** (scouting log) + per-unit `skin:` fields in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
 | Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook; its shared-helper table is the recipe, ADR 0340) |
