@@ -9,9 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-08, evening (Claude): T100a-R built and piloted on ch03 with no effect (and one
-spike reverted); ADR 0396 (how a bot rule is written) is PR #583, reviewed. Next: a fresh session
-investigates why careful has no plan under its cap on ch03's boss fight.
+Refreshed 2026-11-08, night (Claude): the careful-on-ch03 investigation found four causes (on
+#510 plan comment 6563384310, under T100b); a tile fix was piloted and not kept as is. Nicolas:
+"we're chasing this in circles". Next: check whether the bot's death numbers near the boss are
+right, from records only, before any more fixes.
 
 ## Where things stand
 
@@ -45,6 +46,8 @@ investigates why careful has no plan under its cap on ch03's boss fight.
     `suite --held-out` and read its promotion line before trusting it.
 - **On hold** (label `on-hold`, the hold comment says what reopens each): #565 (chipping a step
   back), #569 (placing a claim's wave in the lookahead).
+- **Merged 2026-11-08:** #583 (ADR 0396: a bot decision is an ordering of the game's outcomes;
+  only the game forbids), on Nicolas's "merge".
 - **Merged 2026-11-07 after review, every finding fixed:**
   - **#578** (closed #577, ADR 0393): agent teams only for a named reason;
     `.claude/settings.json` holds the subagent prompt cache for an hour
@@ -63,33 +66,26 @@ investigates why careful has no plan under its cap on ch03's boss fight.
 
 ## Next
 
-1. **Investigate careful on ch03, from records only (no new runs first).** Nicolas's order
-   (2026-11-08): style first (done, #583), then this, in a fresh context. Question: on careful's
-   death turns, why was **no** plan under the 1% cap? Read the pilot's plan records (each death's
-   `plan_ref` → the trace's plan entry: `considered`, `protected`, `audit.offered_n`, what
-   `Bot.candidates` refused). Turns: game B (12 runs; any careful seed but game A's six) turn 11 (unit 4, 0.79) and
-   turn 21 (unit 5, 0.91); game A (seed 3001) turn 22 (unit 28) and 26 (the lord). Records:
-   `references/sim/ours/fd3cb9d8dca6/runs.jsonl`, instrument `bc53967aab08+v2` (T100a-R) and
-   `e6fc3854f2a3+v2` (main); `montecarlo.py story <trace> --turn N` narrates a turn.
-   - **First lead:** `bot.lua`'s counter refusal (`spent < u.hp`, every style but greedy) means
-     the cap never sees counter risk, so careful near the boss may be left only bad moves (ADR
-     0396 "Known breaks"; research record 0025). **Second:** turn-start fort/throne heals are not
-     modelled, so holding on one reads as waiting for nothing. Changing the refusal changes play:
-     **Nicolas's call**, then one pilot, then the frozen suite (`suite --held-out`) before keeping.
-   - Write every fix as ADR 0396 says: an ordering or price over the game's outcomes, no ban,
-     no chapter named; check every style, turns to win, and the suite, not only ch03.
-2. **The T100a-R branch** (`feat/510-t100a-r`, commit 62d0c023, local only, not pushed, no PR):
-   the lookahead's turn between plays our units' blows; the cap gives way to a striking plan when
-   the plan under it only waits (`COMMIT_OVER_CAP`). **Piloted: no change** (18 of 50 deaths both,
-   bold and even identical, the commit never fired; ADR 0384's "Piloted" bullet on that branch).
-   Hold it until step 1 says whether it earns its place. Owed before review: the rewrites listed
-   on the plan comment's T100a-R (ADR 0396). Its first pilot found a real bug, fixed
-   (`Sight.betweenMay`): a strike between phases could kill one of ours unseen.
-3. **PR #583 (ADR 0396 + research record 0025)**: reviewed at medium, every finding fixed
-   (docs/comments only, no re-review). Needs CI on its head and **Nicolas's "merge"** (not covered
-   by the step-9 standing OK: it is a docs PR, not PR-A..J).
-4. Then T100b (the enemy phase branches on our counter: Wolfram, turn 16, is still dying), T100c,
-   T100d (**still unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then #510 step 10.
+1. **Break the circle: check the bot's death numbers against what happened (records only, no
+   runs).** Three changes (pull-back, T100a-R, the reseat) each fixed one ch03 death and exposed
+   another, all by changing which plans are offered, while every plan near the boss reads 80-95%
+   death. The exact check, its inputs and how its answer decides the next step: #510 plan comment
+   6563384310, the last bullets under **T100b** ("Next, decided with Nicolas"). Report it to
+   Nicolas in plain words before building anything.
+   - Findings so far (same place): the turn-11 heal lost its one tile; a unit left out of a plan
+     for want of a tile; no judged plan ever pulls everyone out of the boss's reach; the second
+     phase's hold. **Cause 1 (counters averaged) was wrong and is withdrawn**: `judge` chains the
+     counter on real HP (`struckIn`). Read the code before saying what it does.
+   - The Mogall attacks only from 14,1, range 1-2 (319 of 319 attacks over 60 traces); the
+     recorder's moving `from` is T100c's stale `from`.
+2. **Branch `feat/510-t100b-counter-outcomes`** (local, not pushed, no PR): b0c5a099 seats a hold
+   or heal on its next free tile (`Bot.reseat`); piloted 21 of 50 lost (main 18): careful game B
+   saved, careful game A stalls out of reach (6 of 6 `stuck`), bold 13 of 22 lose Baxby on turn
+   13 (witnessed: the boss fight's, not a misplaced seat). 162aa67c records each judged plan's
+   units at risk (`considered[].dies`), no play change, keep either way. Waits on step 1.
+3. **The T100a-R branch** (`feat/510-t100a-r`, 62d0c023, local): shelved, no effect.
+4. Then T100b as written (the AI's target choice on real boards), T100c, T100d (**still
+   unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then #510 step 10.
 5. **Tried and dropped 2026-11-08** (so nobody retries it): ranking "chance to end the chapter"
    right after "game over" among plans over the cap. ch03 pilot: 40 of 50 runs lost someone (bold
    lost the lord on turn 14 in 13 of 22), careful unchanged. Reverted, never committed. Output:
