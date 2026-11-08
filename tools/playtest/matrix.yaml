@@ -276,7 +276,8 @@ suites:
 # longer hashes to state_sha1. The states live under references/ (gitignored).
 instrument:
   version: 2                       # 2: PR-G added the fog start scout-ch6 (ADR 0395)
-  held_out_frozen_at: null        # the commit that froze the held-out seeds (US5, PR-G)
+  # the commit that froze the held-out seeds: PR-A set 2001/2002, never played in tuning since
+  held_out_frozen_at: 1168f72d
   route: 1                        # vanilla's Ch8 split (Eirika): one vanilla env for every start
   emulator: {binary: tools/emulator/mgba-headless, sha1: 3ac3201187d021aa8a43118dc3fd6741d32e97f2}
   # FR-025: no seed is in two sets. `confirmatory` is what a cell plays (run_cell: seeds
@@ -307,18 +308,21 @@ instrument:
        state_path: references/sim/ours/fd3cb9d8dca6/traces/diag/3934fac7-pinned-ours-3-a1-r1.ss,
        state_sha1: af7f630c1e1e89444d238516266a4b803b2e4f97,
        board_path: references/sim/ours/fd3cb9d8dca6/traces/diag/3934fac7-pinned-ours-3-a1-r1.json,
+       board_sha1: 8ec29588dad93dc881636918e5dbbb0d363f97bd,
        provenance: {seed: 1002, set: tuning, ref: 1, mode: deep, char: 0xC9,
                     source: 'ADR 0392 T079; search_miss, witnessed'}}
     - {snapshot_id: ours-ch03-1002-meesmickle, start_id: ours-ch03, invariant: pinned_board,
        state_path: references/sim/ours/fd3cb9d8dca6/traces/diag/234ead3c-pinned-ours-4-a1-r45.ss,
        state_sha1: a44c37c2001bd6c7493122b64167d4fcfae78f36,
        board_path: references/sim/ours/fd3cb9d8dca6/traces/diag/234ead3c-pinned-ours-4-a1-r45.json,
+       board_sha1: 29176ff47d2aa59e8651c36fed5ed5f29605f9e1,
        provenance: {seed: 1002, set: tuning, ref: 45, mode: deep, char: 0x03,
                     source: 'ADR 0392 T079; unclassified: every judged plan over the cap'}}
     - {snapshot_id: scout-ch6-1001-eirika, start_id: scout-ch6, invariant: pinned_board,
        state_path: references/sim/vanilla/c25b145e3745/traces/diag/5f07775f-pinned-vanilla-7-a1-r4.ss,
        state_sha1: f4f955aef37815541ad6af856bfcf18fdf2fd1c2,
        board_path: references/sim/vanilla/c25b145e3745/traces/diag/5f07775f-pinned-vanilla-7-a1-r4.json,
+       board_sha1: 5d7903779c133dbfe14488a58320391ff8d4186f,
        provenance: {seed: 1001, set: tuning, ref: 4, mode: full_info, char: 0x01,
                     source: 'ADR 0392 T079; information_unavailable, witnessed'}}
   starts:

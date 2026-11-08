@@ -49,20 +49,14 @@
    "unlabelled": 0
   },
   "ours-ch02/1001": {
-   "deaths": [
-    201,
-    202
-   ],
+   "deaths": [],
    "invariant": true,
    "lost": false,
    "stalls": 0,
    "unlabelled": 0
   },
   "ours-ch02/1002": {
-   "deaths": [
-    201,
-    202
-   ],
+   "deaths": [],
    "invariant": true,
    "lost": false,
    "stalls": 0,

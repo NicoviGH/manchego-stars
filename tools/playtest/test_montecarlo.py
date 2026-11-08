@@ -1038,6 +1038,7 @@ SNAPSHOT = {'snapshot_id': 'ours-ch03-1002-r45', 'start_id': 'ours-ch02', 'invar
             'state_path': 'references/sim/ours/fd3cb9d8dca6/traces/diag/x-pinned-ours-3-a1-r45.ss',
             'state_sha1': 'c' * 40,
             'board_path': 'references/sim/ours/fd3cb9d8dca6/traces/diag/x-pinned-ours-3-a1-r45.json',
+            'board_sha1': 'd' * 40,
             'provenance': {'seed': 1003, 'set': 'tuning', 'ref': 45, 'mode': 'deep', 'char': 3,
                            'source': 'ADR 0392'}}
 
@@ -1092,11 +1093,13 @@ class Frozen(unittest.TestCase):
         now = {'a/1': outcome(deaths=[1, 2]), 'b/1': outcome(stalls=1)}
         self.assertEqual(mc.regressions(frozen, now), [
             ('a/1: 0x02 dies, and lived when frozen; unexplained', True),
-            ('b/1: 1 stall, 0 when frozen; unexplained', True)])
+            ('b/1: 1 stall, 0 when frozen', True)])
         # the same death, witnessed by a replay, is said and does not block
-        regs = mc.regressions(frozen, now, lambda key, c: 'search_miss' if c == 2 else None)
+        regs = mc.regressions(frozen, now, lambda key, c: 'search_miss')
         self.assertEqual(regs[0], ('a/1: 0x02 dies, and lived when frozen; witnessed: search_miss',
                                    False))
+        # nothing witnesses a stall: it blocks whatever the explainer says (ADR 0395)
+        self.assertEqual(regs[1], ('b/1: 1 stall, 0 when frozen', True))
         # a death the frozen run had too is no regression, nor a start the baseline lacks
         self.assertEqual(mc.regressions({'a/1': outcome(deaths=[1])}, {'a/1': outcome(deaths=[1]),
                                                                         'c/1': outcome()}),
@@ -1138,11 +1141,12 @@ class Frozen(unittest.TestCase):
             {'charId': 3, 'turn': 4, 'over_cap': False}]}
         self.assertTrue(mc.is_bot(rec))
         got = mc.run_outcome(rec)
-        self.assertEqual((got['unlabelled'], got['deaths']), (2, [1, 2, 3, 0xC9, 0xCA]))
+        # the non-escort green is no death the bot answers for: neither counted nor a regression
+        self.assertEqual((got['unlabelled'], got['deaths']), (2, [1, 2, 3, 0xCA]))
         text = self.lines(lambda i, t: dict(self.clean()(i, t), **{
             k: rec[k] for k in ('anomalies', 'deaths')}) if i == 0 else self.clean()(i, t),
-            frozen=self.frozen_all_clean(**{'vanilla-ch3/1001': outcome(deaths=[1, 2, 3, 0xC9,
-                                                                               0xCA])}))
+            frozen=self.frozen_all_clean(**{'vanilla-ch3/1001': outcome(deaths=[1, 2, 3, 0xCA])}))
+        self.assertIn('regressions on the frozen baseline (instrument f+v1): none', text)
         self.assertIn('vanilla-ch3/1001: 2 unlabelled fallbacks', text)
         self.assertIn('promotion: refused, 2 unlabelled fallbacks', text)
 
@@ -1199,6 +1203,12 @@ class Frozen(unittest.TestCase):
         with self.assertRaises(matrix.ManifestError) as cm:
             self.load(inst)   # 2001 is still vanilla-ch3's held-out seed
         self.assertIn('held-out seed 2001, which is still held out', str(cm.exception))
+        # the seed decides, not the label: a fixture from 2001 mislabelled tuning is refused too
+        inst['starts'][2]['provenance']['set'] = 'tuning'
+        with self.assertRaises(matrix.ManifestError) as cm:
+            self.load(inst)
+        self.assertIn('held-out seed 2001, which is still held out', str(cm.exception))
+        inst['starts'][2]['provenance']['set'] = 'held_out'
         for s in inst['starts'][:2]:
             s['seeds'] = dict(s.get('seeds') or {}, held_out=[2101 + 2 * inst['starts'].index(s),
                                                               2102 + 2 * inst['starts'].index(s)])
@@ -1265,11 +1275,11 @@ class Frozen(unittest.TestCase):
                 jobs=4, held_out=True, instrument='i', check=lambda *a: [], kept={},
                 frozen=self.frozen_all_clean(), snapshots=snap, result=result))
             return text, result
-        text, result = lines_with(lambda: (['snapshot s: loads to a board other than its own'],
-                                           ['s']))
+        text, result = lines_with(lambda envs: (['snapshot s: loads to a board other than its '
+                                                 'own'], ['s']))
         self.assertIn('promotion: refused, 1 deterministic regression', text)
         self.assertEqual(mc.freeze_record(result, 'i', 1), (None, 'snapshot s fails its invariant'))
-        text, result = lines_with(lambda: (['snapshot s: loads back to its board'], []))
+        text, result = lines_with(lambda envs: (['snapshot s: loads back to its board'], []))
         rec, why = mc.freeze_record(result, 'i+v1', 2, today='2026-11-07')
         self.assertIsNone(why)
         self.assertEqual((rec['instrument'], rec['manifest_version'], rec['frozen_on']),
@@ -1291,6 +1301,12 @@ class Frozen(unittest.TestCase):
         result = {}
         self.lines(self.clean(), result=result)
         self.assertIsNone(mc.freeze_record(result, 'i', 1)[1])
+        # but a fallback no label names is never frozen as the reference
+        result = {}
+        self.lines(lambda i, t: dict(self.clean()(i, t), deaths=[
+            {'charId': 1, 'turn': 4, 'over_cap': True}]) if i == 0 else self.clean()(i, t),
+            result=result)
+        self.assertEqual(mc.freeze_record(result, 'i', 1)[1], 'the candidate is not promoted')
         # a held-out loss is kept hashed: the file never names the held-out run
         result = {}
         self.lines(lambda i, t: dict(self.clean()(i, t), outcome='lost') if t['seed'] == 2002
@@ -1298,6 +1314,44 @@ class Frozen(unittest.TestCase):
         self.assertEqual(result['held_out_losses'], sorted(
             [mc.held_out_tag('vanilla-ch3', 2002), mc.held_out_tag('ours-ch02', 2002)]))
         self.assertNotIn('2002', json.dumps(result))
+
+    def test_a_snapshot_whose_board_file_changed_is_off_its_pin(self):
+        d = tempfile.mkdtemp()
+        for name, body in (('s.ss', b'state'), ('b.json', b'[]')):
+            with open(os.path.join(d, name), 'wb') as fh:
+                fh.write(body)
+        rel = lambda n: os.path.relpath(os.path.join(d, n), mc.REPO)
+        sn = dict(SNAPSHOT, state_path=rel('s.ss'), state_sha1=mc.sha1_file(os.path.join(d, 's.ss')),
+                  board_path=rel('b.json'), board_sha1=mc.sha1_file(os.path.join(d, 'b.json')))
+        suite = {'shops_from': [], 'emulator': {'binary': 'x', 'sha1': 'e' * 40}, 'starts': [],
+                 'snapshots': [sn]}
+        self.assertEqual(mc.check_starts(suite, {}, emulator_sha1='e' * 40), [])
+        with open(os.path.join(d, 'b.json'), 'w') as fh:
+            fh.write('[{"hp": 1}]')   # a later replay wrote over the frozen board
+        why = mc.check_starts(suite, {}, emulator_sha1='e' * 40)
+        self.assertEqual(len(why), 1)
+        self.assertIn('its board', why[0])
+        self.assertIn('no longer hashes to', why[0])
+
+    def test_the_snapshots_are_checked_with_the_envs_the_run_built(self):
+        inst = self.suite()
+        inst['snapshots'] = [dict(SNAPSHOT)]
+        got = []
+        built = {'vanilla': {'v': 1}, 'ours': {'o': 1}}
+        mc.run_suite(self.load(inst), envs=lambda: built, simdirs={},
+                     play=lambda tasks: iter(()), jobs=1, held_out=False, instrument='i',
+                     check=lambda *a: [], kept={},
+                     snapshots=lambda envs: got.append(envs) or ([], []))
+        self.assertIs(got[0], built, 'no second build of every campaign env')
+
+    def test_two_launches_in_one_second_never_share_a_tag(self):
+        tags = []
+        launch = lambda task, tag, log: tags.append((tag, log)) or ('', None)
+        d = tempfile.mkdtemp()
+        mc.launch_tagged({}, 'pinned', d, launch)
+        mc.launch_tagged({}, 'pinned', d, launch)
+        self.assertNotEqual(tags[0], tags[1])
+        self.assertTrue(all(t.startswith('pinned-') and l.endswith(t + '.log') for t, l in tags))
 
     def test_kept_runs_are_judged_without_playing_again(self):
         d = tempfile.mkdtemp()
