@@ -149,9 +149,7 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
 - A task = a GitHub issue → short-lived `feat/<n>-slug` branch off `main` → PR → CI + `/code-review`
   → squash-merge → delete the branch. A feature may span engine + content — ownership lives on the
   PR + issue, not a file glob.
-- **An agent team only for a named reason** (ADR 0393): one writer per file slice, seams agreed
-  in a shared file before coding, models by judgement load (Opus lead/design/reviewer, Sonnet
-  builders, the lead does nits), a fresh agent over a long-lived one, live proof once at the end.
+- **An agent team only for a named reason**: the rules and their cost evidence are ADR 0393.
 - **Merge only on CI for the PR's HEAD commit.** `gh pr checks --watch` returns at once when a
   fresh push's runs have not registered yet, and #443 merged before its CI ran. Wait on
   `gh run list --branch <b> --json headSha,status` until both workflows for the head sha complete.

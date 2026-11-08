@@ -14,9 +14,9 @@ from the re-review, all fixed), but subagents were 86% of a $35.99 session and s
 limit. Each agent was woken back up 2 to 8 times, at 100k-330k of context each time. The retro
 checked what went wrong against current published practice (Anthropic's multi-agent research
 system and harness posts, Claude Code's agent-teams, sub-agents, costs and prompt-caching docs,
-and Cognition's 2025 and 2026 multi-agent posts). It is the cost half of the 2026-10-26 call
-behind inline implementation (100-200k subagent tokens per task under subagent-driven
-development), now measured for teams.
+and Cognition's 2025 and 2026 multi-agent posts). It extends Nicolas's chat call of 2026-10-26, which
+this ADR is the first repo record of: implement inline by default, because subagent-driven
+development cost 100-200k subagent tokens per task. This is the same cost, measured for teams.
 
 ## The rules
 
@@ -44,8 +44,9 @@ development), now measured for teams.
    mechanical work saved 25-62% per task. An agent's model is never changed mid-task, because
    that rebuilds its whole cache.
 5. **A fresh agent with a short brief beats waking an old one.** Each wake-up re-reads the
-   agent's whole conversation. Agent definitions cap the window at `autoCompactWindow: 200000`
-   (an integer: `200k` reads as 200). Past it, or at a handoff point, the slice goes to a fresh
+   agent's whole conversation. When a team uses agent definitions (`.claude/agents/*.md`; this
+   repo has none yet), each one sets `autoCompactWindow: 200000` in its frontmatter (an integer
+   from 100000 to 1000000, per the sub-agents doc). Past that window, or at a handoff point, the slice goes to a fresh
    agent with a brief.
 6. **Results come back as files.** An agent writes its report or output to a file and returns
    the path, so the lead's context does not carry copies, and peers read the file instead of
@@ -55,7 +56,8 @@ development), now measured for teams.
    mid-review goes stale when a fix changes the bot (the instrument hash), and PR-F paid for
    two rounds of proof that way.
 9. **The subagent prompt cache is held for an hour** (`subagentPromptCacheTtl: "1h"` in
-   `.claude/settings.json`). Subagent caches default to five minutes even on a subscription. A
+   `.claude/settings.json`; the key and its `"5m"`/`"1h"` values are in Claude Code's settings
+   reference). Subagent caches default to five minutes even on a subscription. A
    teammate idle longer than that between rounds re-writes its whole conversation at the cache
    write price (1.25x input) instead of reading it (0.05x on Opus 5.5 and Sonnet 5.5). A 1-hour
    write costs 2x, which pays as soon as one idle gap passes five minutes.
@@ -68,6 +70,7 @@ Fixes after a team's review go to each file's owner, all at once (one wave), per
 Sources: https://www.anthropic.com/engineering/multi-agent-research-system,
 https://anthropic.com/engineering/harness-design-long-running-apps,
 https://code.claude.com/docs/en/agent-teams, https://code.claude.com/docs/en/sub-agents,
+https://code.claude.com/docs/en/settings-reference.md,
 https://code.claude.com/docs/en/costs.md, https://code.claude.com/docs/en/prompt-caching.md,
 https://cognition.com/blog/dont-build-multi-agents, https://cognition.com/blog/multi-agents-working,
 https://cognition.com/blog/devin-fusion. Some figures from the Anthropic and Cognition blog posts
