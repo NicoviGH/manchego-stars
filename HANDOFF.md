@@ -9,9 +9,9 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-08, later (Claude): T100a's pull-back was built, piloted and parked; Nicolas
-decided the root cause is the lookahead's hold, and T100a-R replaces it (plan comment 6563384310,
-Phase 9). Next: design T100a-R with Nicolas, then build.
+Refreshed 2026-11-08, evening (Claude): T100a-R built and piloted on ch03 with no effect (and one
+spike reverted); ADR 0396 (how a bot rule is written) is PR #583, reviewed. Next: a fresh session
+investigates why careful has no plan under its cap on ch03's boss fight.
 
 ## Where things stand
 
@@ -63,34 +63,38 @@ Phase 9). Next: design T100a-R with Nicolas, then build.
 
 ## Next
 
-1. **PR-I starts with T100a-R** (plan comment 6563384310, Phase 9: the "Tried and parked" note
-   and T100a-R under T100a). In short: the lookahead's second phase lets committed units keep
-   attacking instead of holding (reopens ADR 0389's "the hold stays"), and the cap becomes the
-   style's preferred risk: while waiting buys nothing, the least risky commit is played over it,
-   labelled. **No chapter- or map-specific rule** (Nicolas: design it so it scales). Run
-   `superpowers:brainstorming` to settle what "waiting buys nothing" means in general, write the
-   design into that plan comment (one comment, edited in place), get his OK, then build.
-   - The parked pull-back is a LOCAL branch, `park/510-t100a-pullback` (never pushed, not for
-     merge). Its pilot output: `build/pilot/ch03-pilot-t100a.txt`; instrument `77c73226efaf+v2`.
-   - T100b, T100c, T100e stand as planned. **T100c's cause is found:** the phantom enemy `wait` is
-     the phase-start terrain-heal display (`MassEffectDisplay_Check`, bmusailment.c, sets
-     `gActionData.subjectIndex`), so it shows only once the Mogall heals on its tile. Fix: open an
-     act in `watchEnemyActs` only when `gActiveUnit` is the subject (UnitBeginAction sets both).
-   - **T100d is still unanswered.** Nicolas asked if Wolfram's death is really a blind spot (no
-     fog on ch03: confirmed, 0 fogged in every plan record). "Blind spot" is the grader's word for
-     a 0% first-phase number; the two-phase number was 94%. Ask again for the OK.
-   Together they make one new instrument: refreeze, then read `suite --held-out`'s promotion line.
-   Then T100-T108 as planned.
-2. **Why the pilot looked the way it did** (so nobody re-derives it): a pinned start keeps the
-   dice in its save, and the seed only draws the style (`harness.lua:3863-3896`, ADR 0374). The
-   50 ours runs were 8 distinct games from 30 style draws. Every ours death was careful-style.
-   Replays: Wolfram (seed 3001, turn 16) is `search_miss`; Pinky (turn 24) is `missing_action`.
-3. Then PR-J (polish).
-   They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
-4. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
-   party levers (#510's checklist; #459, #547, #526 with #543 first).
-5. Tell Nicolas where step 9 stands in plain words at the start of a session: he lost track of
-   the series after the advisory panel.
+1. **Investigate careful on ch03, from records only (no new runs first).** Nicolas's order
+   (2026-11-08): style first (done, #583), then this, in a fresh context. Question: on careful's
+   death turns, why was **no** plan under the 1% cap? Read the pilot's plan records (each death's
+   `plan_ref` → the trace's plan entry: `considered`, `protected`, `audit.offered_n`, what
+   `Bot.candidates` refused). Turns: game B (12 runs; any careful seed but game A's six) turn 11 (unit 4, 0.79) and
+   turn 21 (unit 5, 0.91); game A (seed 3001) turn 22 (unit 28) and 26 (the lord). Records:
+   `references/sim/ours/fd3cb9d8dca6/runs.jsonl`, instrument `bc53967aab08+v2` (T100a-R) and
+   `e6fc3854f2a3+v2` (main); `montecarlo.py story <trace> --turn N` narrates a turn.
+   - **First lead:** `bot.lua`'s counter refusal (`spent < u.hp`, every style but greedy) means
+     the cap never sees counter risk, so careful near the boss may be left only bad moves (ADR
+     0396 "Known breaks"; research record 0025). **Second:** turn-start fort/throne heals are not
+     modelled, so holding on one reads as waiting for nothing. Changing the refusal changes play:
+     **Nicolas's call**, then one pilot, then the frozen suite (`suite --held-out`) before keeping.
+   - Write every fix as ADR 0396 says: an ordering or price over the game's outcomes, no ban,
+     no chapter named; check every style, turns to win, and the suite, not only ch03.
+2. **The T100a-R branch** (`feat/510-t100a-r`, commit 62d0c023, local only, not pushed, no PR):
+   the lookahead's turn between plays our units' blows; the cap gives way to a striking plan when
+   the plan under it only waits (`COMMIT_OVER_CAP`). **Piloted: no change** (18 of 50 deaths both,
+   bold and even identical, the commit never fired; ADR 0384's "Piloted" bullet on that branch).
+   Hold it until step 1 says whether it earns its place. Owed before review: the rewrites listed
+   on the plan comment's T100a-R (ADR 0396). Its first pilot found a real bug, fixed
+   (`Sight.betweenMay`): a strike between phases could kill one of ours unseen.
+3. **PR #583 (ADR 0396 + research record 0025)**: reviewed at medium, every finding fixed
+   (docs/comments only, no re-review). Needs CI on its head and **Nicolas's "merge"** (not covered
+   by the step-9 standing OK: it is a docs PR, not PR-A..J).
+4. Then T100b (the enemy phase branches on our counter: Wolfram, turn 16, is still dying), T100c,
+   T100d (**still unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then #510 step 10.
+5. **Tried and dropped 2026-11-08** (so nobody retries it): ranking "chance to end the chapter"
+   right after "game over" among plans over the cap. ch03 pilot: 40 of 50 runs lost someone (bold
+   lost the lord on turn 14 in 13 of 22), careful unchanged. Reverted, never committed. Output:
+   `build/pilot/ch03-pilot-complete.txt`.
+6. Tell Nicolas where step 9 stands in plain words at the start of a session.
 
 ## Parked or owed elsewhere
 
