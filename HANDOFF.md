@@ -9,8 +9,9 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-08 (Claude): #510 PR-H merged (#582, ADR 0385 "Built (PR-H)"): the verdict
-and the ch03 pilot. Next: confirm and diagnose the pilot's findings, then PR-I.
+Refreshed 2026-11-08 (Claude): the ch03 pilot is checked (#510 comment 6718140525, "Checked"
+section): its deaths are careful-style bot faults, witnessed by replay. Next: Nicolas's calls,
+then PR-I.
 
 ## Where things stand
 
@@ -62,15 +63,14 @@ and the ch03 pilot. Next: confirm and diagnose the pilot's findings, then PR-I.
 
 ## Next
 
-1. **Before PR-I: confirm, then diagnose, the ch03 pilot** (#510 comment 6718140525, which
-   holds the evidence, the three unconfirmed claims and the two runs to replay). First prove or
-   disprove each claim: careful's fallback never pulls back out of the Mogall's range 2; the
-   blind spot is the bot misjudging the Mogall's reach (the story's changing "from" tile vs the
-   YAML's GuardTile); 36% overstates ch03. Then `montecarlo.py replay` the two seed-3001
-   deaths named there. Tell Nicolas what each one showed in plain words.
-2. **PR-I** (validity, T100+): ADR 0385 point 4's bar, built on what step 1 found. Bring
-   Nicolas the "a seed only draws the style" finding before building around it: it decides
-   what a chapter cell measures.
+1. **Waiting on Nicolas (before PR-I)**, from the pilot check (#510 comment 6718140525,
+   "Checked"): (a) careful's missing pull-back (`bot.lua` `retreatOver` only gains ground
+   toward the boss; the beam never brings an all-out-of-reach plan to the finals) and the
+   average-HP enemy phase (`planner.lua` `judge`) are bot faults, so fixing them makes a new
+   instrument; (b) the ours arm was 8 distinct plays in 50 runs, which decides what a chapter
+   cell measures; (c) the recorder's phantom enemy `wait` with a stale `from`
+   (`harness.lua` ~3207) misleads the story. Ask which go before PR-I.
+2. **PR-I** (validity, T100+): ADR 0385 point 4's bar, built on his answers.
 3. Then PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
 4. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
