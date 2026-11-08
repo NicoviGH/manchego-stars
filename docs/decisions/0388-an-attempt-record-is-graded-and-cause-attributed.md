@@ -54,8 +54,8 @@ die there. A snapshot unit that fell at or after the plan was made (botrun's `di
 order the game killed them) is no killer either: a generic arrival of the same charId can take
 its slot.
 
-**Why the counter chance is zero under the planner.** `Bot.candidates` refuses, for every style
-but greedy, an attack whose counter alone can kill the attacker. Every attack the planner is
+**Why the counter chance is zero under the planner.** `Bot.candidates` refuses (a known break of
+ADR 0396), for every style but greedy, an attack whose counter alone can kill the attacker. Every attack the planner is
 offered therefore has `die` 0, and a player-phase death after one is `other/forecast_desync`. That
 is the honest reading: the forecast said the counter could not kill.
 

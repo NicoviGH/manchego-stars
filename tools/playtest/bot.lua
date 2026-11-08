@@ -62,7 +62,8 @@
 -- SURE kill (every way the attack goes kills it) is left out: it is dead before the enemy
 -- phase. An attack's own counter is its worst case too (counterWorst: nothing when the enemy
 -- cannot answer or is dead before it can, as the game plays the exchange). An attack
--- whose counter alone can kill the unit is refused by every style but greedy; then:
+-- whose counter alone can kill the unit is refused by every style but greedy (a known break of
+-- ADR 0396: a ban the game does not make, so the planner's cap never sees that risk); then:
 --   careful: the worst case < the unit's HP after that counter
 --   even:    no SINGLE enemy's worst case >= that same HP
 --   bold:    nothing more (the exchange alone)
@@ -667,7 +668,8 @@ local function safest(ctx, u, tiles) return bySafety(ctx, u, tiles)[1] end
 
 -- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
 -- `spent` (the attack's own counter, f.counterWorst) already off its HP. An attack whose
--- counter alone can kill is refused before any gate is asked (every style but greedy).
+-- counter alone can kill is refused before any gate is asked (every style but greedy; a known
+-- break of ADR 0396).
 -- bold's gate never weighs the enemy phase, so it asks for no strike to do so.
 local GATES = {
     careful = function(ctx, u, x, y, spared, spent)

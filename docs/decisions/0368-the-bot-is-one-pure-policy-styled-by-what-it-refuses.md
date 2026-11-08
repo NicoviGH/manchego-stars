@@ -164,3 +164,6 @@ Vulnerary only for a unit holding none (a held item can carry `kind = "vulnerary
 order, Vulneraries before weapons, stands. Claim tags that were folded too far by keyword went
 back to what their lines mean: "keep Ross and Garcia safe if you want to recruit them" is
 `escort`, "putting her in a nearby forest and rescuing her" is `rescue`.
+
+**Note (2026-11-08).** ADR 0396 lists the counter refusal as a known break: it is a ban the game
+does not make, so the cap never sees that risk. It stands until it is changed with its own measure.

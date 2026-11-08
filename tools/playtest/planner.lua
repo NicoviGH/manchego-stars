@@ -1,8 +1,8 @@
 -- planner.lua -- the bot plans each player phase (#510 step 9; the plan comment's "The
 -- planner"). Its own chunk, pure: no emu, SYM or harness global, so test_bot.lua drives it
 -- with a fake sight.
--- How a decision here is written (ADR 0396): an ordering of the game's outcomes, never a ban
--- only the game would make; a new rule passes that record's five tests first.
+-- How a decision here is written (ADR 0396): an ordering of the game's outcomes, never a ban,
+-- except one the game itself makes; a new rule passes that record's five tests first.
 --
 -- One call plans the phase from the board as it stands (botrun calls it again after every act:
 -- a receding horizon, so a miss, a kill or a newly seen enemy is planned around at once):
