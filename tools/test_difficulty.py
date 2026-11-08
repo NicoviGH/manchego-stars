@@ -12,6 +12,7 @@ import contextlib
 import copy
 import io
 import dataclasses
+import glob
 import os
 import re
 import sys
@@ -3369,6 +3370,57 @@ class TalkRecruits(unittest.TestCase):
     def test_a_talk_without_cusa_recruits_no_one(self):
         # ch15b's talks are conversations: none of their scripts turns a unit blue
         self.assertEqual(df._talk_recruits('ch15b'), {})
+
+# Dealt across SHARDS files so the parallel runner can spread them: whole, this file was the
+# slowest test by far (43 s under the pre-commit hook's load, #579), so every commit that
+# touched a difficulty input waited on it alone. Each file runs every SHARDS-th TestCase class
+# in name order, after HEAVY places the few slow classes by hand (measured 2026-11-07, s:
+# Mirror 8.2, ChapterPressure 7.0, KitPaths 4.2, AiFindings 3.7, MirrorInTheCurve 2.5 of 32
+# in all), spread by measured time. test_difficulty_shard<k>.py runs shard k through
+# shard_main, which reads k from its file name, and DealtWhole proves the deal covers every
+# class exactly once, HEAVY names only classes that exist, and each shard has its file.
+SHARDS = 3
+SHARD = 0
+HEAVY = {'MirrorIsModeInvariant': 0, 'ChapterPressureInMode': 1, 'KitPaths': 2,
+         'AiFindingsInTheCurveReport': 2, 'MirrorInTheCurveReport': 1}
+
+
+def all_classes():
+    return [v for n, v in sorted(globals().items())
+            if isinstance(v, type) and issubclass(v, unittest.TestCase) and v.__module__ == __name__]
+
+
+def shard_classes(k):
+    rest = [c for c in all_classes() if c.__name__ not in HEAVY]
+    return [c for c in all_classes() if HEAVY.get(c.__name__) == k] + rest[k::SHARDS]
+
+
+def shard_suite(loader, k):
+    return unittest.TestSuite(loader.loadTestsFromTestCase(c) for c in shard_classes(k))
+
+
+def load_tests(loader, tests, pattern):
+    return shard_suite(loader, SHARD)
+
+
+def shard_main(path):
+    """Run the shard a test_difficulty_shard<k>.py stub names."""
+    k = int(re.search(r'_shard(\d+)\.py$', path).group(1))
+    result = unittest.TextTestRunner().run(shard_suite(unittest.defaultTestLoader, k))
+    sys.exit(0 if result.wasSuccessful() else 1)
+
+
+class DealtWhole(unittest.TestCase):
+    def test_every_class_in_exactly_one_shard(self):
+        dealt = [c for k in range(SHARDS) for c in shard_classes(k)]
+        self.assertEqual(sorted(c.__name__ for c in dealt),
+                         sorted(c.__name__ for c in all_classes()))
+        self.assertLessEqual(set(HEAVY), {c.__name__ for c in all_classes()})
+        here = os.path.dirname(os.path.abspath(__file__))
+        stubs = glob.glob(os.path.join(here, 'test_difficulty_shard*.py'))
+        self.assertEqual(sorted(os.path.basename(p) for p in stubs),
+                         ['test_difficulty_shard%d.py' % k for k in range(1, SHARDS)])
+
 
 if __name__ == '__main__':
     unittest.main()

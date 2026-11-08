@@ -103,21 +103,14 @@ class ParityInputs(unittest.TestCase):
     def setUpClass(cls):
         import contextlib
         import io
-        root = vd.REPO
-        cls.opened = set()
-
-        def hook(event, args):
-            if event == 'open' and isinstance(args[0], str):
-                p = os.path.abspath(args[0])
-                if p.startswith(root + os.sep) and '__pycache__' not in p:
-                    cls.opened.add(os.path.relpath(p, root))
-        sys.addaudithook(hook)
+        import run_tests
+        rec = run_tests.ReadRecorder().start()
         with contextlib.redirect_stdout(io.StringIO()):
             import difficulty
             difficulty.curve_report(vd.CAMPAIGN, mode='normal')
-        cls.modules = {os.path.relpath(m.__file__, root) for m in list(sys.modules.values())
-                       if getattr(m, '__file__', None)
-                       and os.path.abspath(m.__file__).startswith(root + os.sep)}
+        rec.stop()
+        cls.opened = rec.reads
+        cls.modules = {p for p in rec.reads if p.endswith('.py')}
         cls.inputs = vd.parity_inputs()
 
     def test_every_module_the_read_loads_is_an_input(self):
