@@ -9,7 +9,8 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-07 (Claude): #510 PR-F merged (#576); agent-team conventions in review (PR #578).
+Refreshed 2026-11-07 (Claude): #510 PR-F merged (#576). Two PRs open and unreviewed: #578 (agent-team
+conventions) and #580 (faster pre-commit).
 
 ## Where things stand
 
@@ -30,6 +31,19 @@ Refreshed 2026-11-07 (Claude): #510 PR-F merged (#576); agent-team conventions i
     skipped for budget; every one of the 52 runs has a game result.
 - **On hold** (label `on-hold`, the hold comment says what reopens each): #565 (chipping a step
   back), #569 (placing a claim's wave in the lookahead).
+- **Open PRs, both needing `/code-review` then Nicolas's "merge"** (not step-9 PRs, so no
+  standing OK):
+  - **#578** (closes #577, branch `docs/agent-team-conventions`): ADR 0393, the agent-team
+    conventions from the PR-F retro; an AGENTS.md pointer; `.claude/settings.json`
+    `subagentPromptCacheTtl: "1h"`. Docs plus one setting: review at `low` on a Sonnet subagent.
+  - **#580** (closes #579, branch `feat/precommit-speed`): the pre-commit hook runs only the unit
+    tests a staged path can reach (`run_tests.py` records each test's reads; ADR 0394), and
+    `test_difficulty.py` is split into three shards. It changes a gate, so review at `medium`
+    on Opus.
+  - Both regenerate `docs/decisions.md`, so whichever merges second needs
+    `python3 tools/gen_decisions_index.py` after merging main in.
+  - Outside the repo, already done: the `implement-inline` memory and the `review-to-clean`
+    skill (fixes go to file owners when a team built the PR).
 - **#574 merged (PR #575, ADR 0391):** a passing tagged run's `/tmp/playtest-<scenario>@<tag>`
   is deleted once its records are written; failing ones are kept (marked `FAILED`, newest 20);
   the per-run ROM is an APFS clone. The matrix drops a green verdict run's `/tmp` dir once the
@@ -37,15 +51,17 @@ Refreshed 2026-11-07 (Claude): #510 PR-F merged (#576); agent-team conventions i
 
 ## Next
 
-1. **PR-G** (T081-T087, freeze the suite). Two items PR-F left it, on the #510 plan comment:
+1. **Review and land #578 and #580** (above). Inline by default (ADR 0393): the review runs in
+   one fresh subagent per PR; the session fixes findings itself.
+2. **PR-G** (T081-T087, freeze the suite). Two items PR-F left it, on the #510 plan comment:
    add a fog start (vanilla Ch6 = chapter 7, `states/scout-vanilla/7.ss`), and decide whether a
    normal surprise replan marks a deep/full_info replay `broken`. Both change the instrument, so
    before the freeze.
-2. Then PR-H (the ours-vs-twin pilot), PR-I (validity), PR-J (polish).
+3. Then PR-H (the ours-vs-twin pilot), PR-I (validity), PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
-3. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
+4. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
    party levers (#510's checklist; #459, #547, #526 with #543 first).
-4. Tell Nicolas where step 9 stands in plain words at the start of a session: he lost track of
+5. Tell Nicolas where step 9 stands in plain words at the start of a session: he lost track of
    the series after the advisory panel.
 
 ## Parked or owed elsewhere

@@ -117,6 +117,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0296` | [A DEAD_CONCEPTS pattern is keyed on the UNIT, not on the sentence that happened to survive](decisions/0296-a-dead-concept-pattern-is-keyed-on-the-unit-not-the-sentence.md) | 2026-09-18 | #393 #298 #311 |
 | `0298` | [Every registered check proves it can FAIL, against the real tree with one input doctored](decisions/0298-every-registered-check-proves-it-can-fail.md) | 2026-09-30 | #407 |
 | `0390` | [One checkout, one writer; a branch's HANDOFF drift is undone, never synced](decisions/0390-one-checkout-one-writer-and-handoff-drift-is-undone.md) | 2026-11-04 | #572 |
+| `0393` | [Agent teams: only for a named reason, one writer per slice, seams agreed first, models by judgement](decisions/0393-agent-teams-only-for-a-named-reason.md) | 2026-11-07 | #577 #510 |
 
 ---
 
