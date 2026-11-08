@@ -26,7 +26,8 @@ The two orders differ by one line in `planner.lua`'s `ADMITTED`:
 - **B** (progress, then value): a unit chips only from a tile as far forward as its march.
 
 **The measurement.** Both orders were played on #564's head (7bd05c6a) with only that line
-changed (`suite --baseline`, 52 runs), and only the tuning seeds were read (26 runs):
+changed (the whole suite, tuning and held-out seeds, 52 runs), and only the tuning seeds were
+read (26 runs):
 
 | | PR-C (main) | B | A |
 |---|---|---|---|

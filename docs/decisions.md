@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-394 decisions. Read this index, then open the two or three you need — the whole
+395 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -239,6 +239,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0388` | [An attempt record is graded and cause-attributed; a clean clear is derived and descriptive](decisions/0388-an-attempt-record-is-graded-and-cause-attributed.md) | 2026-11-01 | #510 |
 | `0389` | [A second enemy phase is judged only at irreversible transitions, under a fixed budget](decisions/0389-a-second-enemy-phase-is-judged-only-at-irreversible-transitions.md) | 2026-11-03 | #510 |
 | `0392` | [A failure label needs a replayed witness; diagnostics never feed production](decisions/0392-a-failure-label-needs-a-replayed-witness.md) | 2026-11-07 | #510 |
+| `0395` | [The instrument is frozen on a pinned suite with held-out seeds; promotion rules](decisions/0395-the-instrument-is-frozen-on-a-pinned-suite-with-held-out-seeds.md) | 2026-11-07 | #510 |
 
 ---
 

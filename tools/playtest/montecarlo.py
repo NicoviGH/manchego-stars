@@ -30,13 +30,18 @@ record 0022; the #510 plan's Task 12, amended 2026-10-27).
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
 forecast and every blow.
 
-    python3 tools/playtest/montecarlo.py suite [--baseline] [--jobs 8]
+    python3 tools/playtest/montecarlo.py suite [--held-out | --freeze] [--kept] [--jobs 8]
 
 `suite` plays the difficulty instrument's frozen suite (#510 step 9; matrix.yaml's
 `instrument:` section, ADR 0387): attempt 1 of each pinned chapter start, from its saved state,
-under each of its seeds. Without --baseline it plays the tuning seeds and prints each run;
---baseline plays the held-out seeds too and prints only what each start cost. It refuses a start
-that no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
+under each of its seeds, and checks each failing-decision snapshot still loads to its board.
+The tuning seeds print each run and are judged on the frozen baseline (suite-frozen.json,
+ADR 0395): an invariant that held and fails, a new unexplained death or stall, an unlabelled
+fallback, and SC-003's calls more than 20% over the frozen count. --held-out plays the held-out
+seeds too, said only as counts, and gives the promotion result; --freeze does that and writes
+the frozen baseline when the candidate is promoted. --kept judges this instrument's kept runs
+again instead of playing them (after a replay witnessed a new death). It refuses a start that
+no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
 
     python3 tools/playtest/montecarlo.py audit <runs .jsonl> --diag <log> [--diag <log> ...]
 
@@ -78,7 +83,6 @@ import concurrent.futures
 import functools
 import gzip
 import hashlib
-import itertools
 import json
 import math
 import os
@@ -247,6 +251,8 @@ def launch(task, tag, log_path):
     env['PT_INSTRUMENT'] = task.get('instrument') or instrument_id()
     if task.get('diag'):   # a diagnostic replay (`replay`): harness.lua prints DIAG lines only
         env['PT_DIAG'] = json.dumps(task['diag'])
+    if task.get('pinned'):   # a snapshot's check (`suite`): one PINNED line, nothing played
+        env['PT_PINNED'] = task['pinned']
     with open(log_path, 'w') as log:
         subprocess.run([RUN_SH, scenario], env=env, stdout=log, stderr=subprocess.STDOUT,
                        check=False)
@@ -323,7 +329,11 @@ def keep_trace(rec, out):
         a['narrate'] = narrate(dest, a.get('turn'))
 
 
-POOL_SERIAL = itertools.count(1)
+def unique_tag(prefix):
+    """A run tag no other launch shares: `prefix`, the pid, and a random part. A reused tag
+    would let run.sh wipe an earlier run's kept failing dir (a `cell` makes a Pool per look),
+    and two launches in one second, or a pid the OS has reused, must still differ."""
+    return '%s-%d-%s' % (prefix, os.getpid(), uuid.uuid4().hex[:8])
 
 
 class Pool:
@@ -344,9 +354,7 @@ class Pool:
         run's dir is deleted as it ends; a failing one's is kept, the newest `keep_failed`."""
         os.makedirs(self.log_dir, exist_ok=True)
         prune_runs(self.run_root, self.keep_failed)
-        # unique: `cell` makes a Pool per look, and a reused tag would let run.sh wipe an earlier
-        # Pool's kept failing dir; the time part covers a pid the OS has reused
-        base = '%d-%d-%x' % (os.getpid(), next(POOL_SERIAL), int(time.time()))
+        base = unique_tag('pool')   # one base a batch, each worker `<base>-<i>`
 
         def one(i, task):
             tag = '%s-%d' % (base, i)
@@ -783,6 +791,12 @@ BUDGET_KEYS = ('beam', 'final', 'branch', 'lookahead_decision', 'lookahead_attem
 LABELS = ('fixture', 'scout', 'snapshot')
 STYLES = ('drawn',)       # attempt 1's own draw (campaign.lua drawStyle), what a cell plays
 INVARIANTS = ('record',)  # the attempt leaves one BOTRUN record with a game result
+# A failing decision's kept state (FR-021, T084): a fresh emulator's load of it holds the board
+# its decision read
+SNAPSHOT_KEYS = ('snapshot_id', 'start_id', 'state_path', 'state_sha1', 'board_path',
+                 'board_sha1', 'provenance', 'invariant')
+SNAPSHOT_PROVENANCE = ('seed', 'set', 'ref', 'mode', 'char', 'source')
+SNAPSHOT_INVARIANTS = ('pinned_board',)
 
 
 def instrument_section(path=None):
@@ -848,15 +862,48 @@ def load_suite(path=None):
                                         % (sid, kind, seed, ' and '.join(clash)))
                 used[kind][seed] = sid
         starts.append(s)
-    return dict(inst, starts=starts)
+    held = set(used['held_out'])
+    by_id = {s['start_id']: s for s in starts}
+    snaps, snap_ids = [], set()
+    for row in inst.get('snapshots') or []:
+        sid = row.get('snapshot_id')
+        missing = [k for k in SNAPSHOT_KEYS if row.get(k) is None] + \
+            ['provenance.' + k for k in SNAPSHOT_PROVENANCE
+             if (row.get('provenance') or {}).get(k) is None]
+        if missing:
+            raise ManifestError('suite snapshot %s: no %s' % (sid, ', '.join(missing)))
+        if sid in snap_ids:
+            raise ManifestError('suite snapshot %s is listed twice' % sid)
+        snap_ids.add(sid)
+        if row['start_id'] not in by_id:
+            raise ManifestError('suite snapshot %s: no start %s' % (sid, row['start_id']))
+        if row['invariant'] not in SNAPSHOT_INVARIANTS:
+            raise ManifestError('suite snapshot %s: invariant %r is not one of %s'
+                                % (sid, row['invariant'], ', '.join(SNAPSHOT_INVARIANTS)))
+        snaps.append(dict(row, game=by_id[row['start_id']]['game']))
+    # AS 2: a fixture made from a held-out run's failure enters only once that seed is no
+    # longer held out, its replacement frozen: until then it would tune the bot to it
+    for kind, sid, prov in ([('start', s['start_id'], s['provenance']) for s in starts]
+                            + [('snapshot', s['snapshot_id'], s['provenance']) for s in snaps]):
+        if prov.get('set') == 'held_out' and not inst.get('held_out_frozen_at'):
+            raise ManifestError('suite %s %s comes from a held-out run, and the manifest names '
+                                'no commit that froze its held-out seeds (held_out_frozen_at)'
+                                % (kind, sid))
+        # by the seed, whatever the label says: a fixture mislabelled `tuning` is refused too
+        if prov.get('seed') in held:
+            raise ManifestError('suite %s %s comes from held-out seed %s, which is still held '
+                                'out: freeze its replacement first (AS 2)'
+                                % (kind, sid, prov.get('seed')))
+    return dict(inst, starts=starts, snapshots=snaps)
 
 
 REPO = os.path.dirname(os.path.dirname(HERE))
 MAX_WALL_H = 8    # SC-007: a planned job longer than this is split or narrowed, never run
-# SC-003 (ADR 0384, amended 2026-11-03): the suite's AiDecideMain calls may be at most this much
-# over the stand-in baseline, PR-D's (e20db82) count, until US5 freezes the baseline
-SC003_BASELINE_CALLS = 565656
-SC003_MARGIN = 0.20
+# The frozen baseline (#510 step 9 PR-G, ADR 0395): what the instrument did when it was frozen,
+# the comparator every later change is judged on. SC-003 / FR-022: a suite's AiDecideMain calls
+# more than FROZEN_MARGIN over the frozen count are a regression.
+FROZEN = os.path.join(HERE, 'suite-frozen.json')
+FROZEN_MARGIN = 0.20
 SEED_SETS = ('tuning', 'held_out')
 
 
@@ -913,6 +960,19 @@ def check_starts(suite, simdirs, emulator_sha1=None):
         else:
             continue
         out.append('%s: %s' % (st['start_id'], why))
+    for sn in suite.get('snapshots') or []:
+        path = os.path.join(REPO, sn['state_path'])
+        if not os.path.exists(path):
+            why = 'its state %s is gone' % path
+        elif sha1_file(path) != sn['state_sha1']:
+            why = 'its state %s no longer hashes to %s' % (path, sn['state_sha1'][:12])
+        elif not os.path.exists(os.path.join(REPO, sn['board_path'])):
+            why = 'its board %s is gone' % sn['board_path']
+        elif sha1_file(os.path.join(REPO, sn['board_path'])) != sn['board_sha1']:
+            why = 'its board %s no longer hashes to %s' % (sn['board_path'], sn['board_sha1'][:12])
+        else:
+            continue
+        out.append('%s: %s' % (sn['snapshot_id'], why))
     return out
 
 
@@ -936,14 +996,20 @@ def suite_tasks(suite, envs, instrument, outs, sets=SEED_SETS):
     return tasks
 
 
+def suite_run_of(instrument, rom_hashes):
+    """Whether a kept record is a suite run this instrument played on these ROMs ({game:
+    hash}): what kept_walls and kept_play both read."""
+    return lambda r: (bool(r.get('suite')) and is_bot(r) and r.get('instrument') == instrument
+                      and r.get('rom_hash') == rom_hashes.get(r.get('game')))
+
+
 def kept_walls(paths, instrument, rom_hashes):
     """{start_id: [wall_s]} of the suite runs kept in `paths` (each game's runs file) that this
     instrument played on these ROMs ({game: hash}) to a game result: a run of other code, or
     one that crashed at boot in seconds, says nothing about what the next will take."""
-    runs = kept(paths, lambda r: r.get('suite') and is_bot(r)
-                and r.get('instrument') == instrument
-                and r.get('rom_hash') == rom_hashes.get(r.get('game'))
-                and r.get('outcome') not in UNUSABLE and r.get('wall_s') is not None,
+    mine = suite_run_of(instrument, rom_hashes)
+    runs = kept(paths, lambda r: mine(r) and r.get('outcome') not in UNUSABLE
+                and r.get('wall_s') is not None,
                 lambda r: r['suite']['start_id'])
     return {sid: [r['wall_s'] for r in recs] for sid, recs in runs.items()}
 
@@ -972,13 +1038,100 @@ def lookahead_line(look):
                 look['skipped_budget'], look['calls'], look['cpu_s']))
 
 
-def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=check_starts,
-              kept=None, wall_limit_h=MAX_WALL_H):
-    """Play the suite and say what it cost, as lines to print. `baseline` plays every seed,
-    tuning and held-out, and reports only cost: a held-out outcome is never shown to whoever
-    is tuning the bot. Without it, the tuning seeds play and each run's line is printed too.
-    Refuses, with the reason, a start that no longer matches its pin or a job over
-    `wall_limit_h` (SC-007), before anything runs. `envs()` builds {game: campaign env}."""
+def held_out_tag(start_id, seed):
+    """A held-out run's name as the frozen baseline keeps it: hashed, so reading the file does
+    not tell whoever tunes the bot which held-out run lost (FR-025). It keeps the honest
+    honest; it hides nothing from someone who hashes every start and seed on purpose."""
+    return hashlib.sha1(('%s/%s' % (start_id, seed)).encode()).hexdigest()[:16]
+
+
+def run_outcome(rec):
+    """What a regression is judged on in one suite run, and the frozen baseline keeps of a
+    tuning run: whether its invariant held (`record`: one BOTRUN record with a game result),
+    which units it answers for died (blue, or an escort green: a green the bot does not escort
+    is not its to keep alive), its stalls, whether it lost, and its unlabelled fallbacks: those
+    deaths over the cap on a turn no fallback_sacrifice anomaly names (FR-022)."""
+    held = is_bot(rec) and rec.get('outcome') not in UNUSABLE
+    # the deaths the bot answers for: a blue unit's, or an escort green's (a green's death
+    # carries `escort`; a blue's does not)
+    deaths = [d for d in (rec.get('deaths') or []) if d.get('escort', True)] if held else []
+    labelled = {a.get('turn') for a in rec.get('anomalies') or []
+                if a.get('kind') == 'fallback_sacrifice'}
+    return {'invariant': held,
+            'deaths': sorted({d['charId'] for d in deaths if d.get('charId') is not None}),
+            'stalls': len(rec.get('stall_events') or []) if held else 0,
+            'lost': held and rec.get('outcome') == 'lost',
+            'unlabelled': sum(1 for d in deaths if d.get('over_cap')
+                              and d.get('turn') not in labelled)}
+
+
+def regressions(frozen, now, explained=lambda key, char: None):
+    """FR-022's regressions of the tuning runs `now` ({'<start>/<seed>': run_outcome}) on the
+    frozen baseline's runs, as (sentence, blocking): an invariant that held when frozen and
+    fails now; a death of a unit the frozen run kept alive that no witnessed replay explains
+    (`explained(key, charId)`: the audit's primary label, or None); more stalls than it had.
+    An explained death is said and does not block. A stall always blocks: a replay witnesses
+    a death, and nothing witnesses a stall. A run the baseline lacks (a start
+    added since) has nothing to regress from, and says so."""
+    out = []
+    for key in sorted(now):
+        got, was = now[key], frozen.get(key)
+        if was is None:
+            out.append(('%s: not in the frozen baseline, nothing to compare it with' % key, False))
+            continue
+        if was['invariant'] and not got['invariant']:
+            out.append(('%s: its invariant held when frozen and fails now' % key, True))
+            continue
+        for c in got['deaths']:
+            if c not in was['deaths']:
+                label = explained(key, c)
+                out.append(('%s: 0x%02X dies, and lived when frozen; %s' % (
+                    key, c, 'witnessed: %s' % label if label else 'unexplained'), not label))
+        if got['stalls'] > was['stalls']:
+            out.append(('%s: %d stall%s, %d when frozen' % (
+                key, got['stalls'], '' if got['stalls'] == 1 else 's', was['stalls']), True))
+    return out
+
+
+def promotion(regs, unlabelled, reproducible, complete):
+    """(promoted, reasons): a candidate is promoted only with every run back with a game
+    result, no blocking regression (each is deterministic: a seed plays the same every time),
+    no unlabelled fallback and no reproducible held-out loss (FR-022)."""
+    why = []
+    if not complete:
+        why.append('not every run came back with a game result')
+    blocking = sum(1 for _, b in regs if b)
+    for n, what in ((blocking, 'deterministic regression'), (unlabelled, 'unlabelled fallback'),
+                    (reproducible, 'reproducible held-out loss')):
+        if n:
+            why.append('%d %s%s' % (n, what, '' if n == 1 else ('es' if what.endswith('s')
+                                                               else 's')))
+    return not why, why
+
+
+def load_frozen(path=FROZEN):
+    """The frozen baseline (ADR 0395), or None before the first freeze."""
+    if not os.path.exists(path):
+        return None
+    with open(path) as fh:
+        return json.load(fh)
+
+
+def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=check_starts,
+              kept=None, wall_limit_h=MAX_WALL_H, frozen=None, explain=None, snapshots=None,
+              result=None, again=None):
+    """Play the suite and say what it did, as lines to print. The tuning seeds always play,
+    each run's line printed, and are judged on the frozen baseline (`frozen`, load_frozen's):
+    regressions, unlabelled fallbacks and SC-003's calls on the same seeds frozen. With
+    `held_out` the held-out seeds play too, said only as counts, never a start or seed: a
+    held-out outcome is never shown to whoever is tuning the bot. A new held-out loss (one the
+    frozen baseline did not have) is played again (`again`, `play` unless given), and one that
+    loses again is reproducible. Only then is there a promotion result. `explain(rec, charId)`
+    is a new death's witnessed label, or None. `snapshots(envs)` checks the snapshots
+    (snapshot_check's lines and failures), handed the envs this run built. Refuses, with the
+    reason, a start that no longer matches its pin or a
+    job over `wall_limit_h` (SC-007), before anything runs. `envs()` builds {game: campaign
+    env}. `result`, a dict, is filled with what a freeze keeps."""
     lines = []
     problems = check(suite, simdirs)
     if problems:
@@ -989,39 +1142,42 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
     except FileNotFoundError as err:
         return ['refused: a campaign env cannot be built: %s' % err]
     outs = {g: os.path.join(d, 'runs.jsonl') for g, d in simdirs.items()}
-    tasks = suite_tasks(suite, envs, instrument, outs, SEED_SETS if baseline else ('tuning',))
+    sets = SEED_SETS if held_out else ('tuning',)
+    tasks = suite_tasks(suite, envs, instrument, outs, sets)
     hours = suite_estimate(suite, tasks, kept or {}, jobs)
     lines.append('%d runs on %d workers: about %.2f wall-hours' % (len(tasks), jobs, hours))
     if hours > wall_limit_h:
         lines.append('refused: the estimate is over the %g wall-hours one job may take (SC-007); '
                      'split it or narrow it' % wall_limit_h)
         return lines
-    per, seen = {}, set()
+    per, seen, outcome, recs = {}, set(), {}, {}
+    by_set = {k: {'n': 0, 'calls': 0, 'cpu': 0.0, 'wall': 0.0, 'unread': 0} for k in sets}
     for rec in play(tasks):
-        sid = (rec.get('suite') or {}).get('start_id')
+        st = rec.get('suite') or {}
+        sid, kind = st.get('start_id'), st.get('set')
         # a worker's records come together, its bot's first: its campaign's end is the run
         # only when the bot left none (records_of)
         key = (sid, rec.get('seed'))
-        if sid is None or (not is_bot(rec) and key in seen):
+        if sid is None or kind not in by_set or (not is_bot(rec) and key in seen):
             continue
         seen.add(key)
         got = per.setdefault(sid, {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0,
                                    'look': collections.Counter()})
         costs = rec.get('costs') or {}
         got['look'].update(rec.get('lookahead') or {})
-        got['n'] += 1
-        got['cpu'] += costs.get('cpu_s') or 0.0
-        got['wall'] += rec.get('wall_s') or 0.0
-        # the invariant `record`: one BOTRUN record with a game result; a campaign's end
-        # standing in for it is never one
-        unread = not is_bot(rec) or rec.get('outcome') in UNUSABLE
-        got['unread'] += unread
+        o = run_outcome(rec)
+        outcome[key], recs[key] = (kind, o), rec
         # SC-003's measure (ADR 0384, 2026-11-03): the AI decisions the bot asked the game for,
         # the same on every run of the same code that plays to a game result, which the clock
         # is not. A run cut short asked for fewer, so it is left out rather than read as a saving
-        if not unread:
-            got['calls'] += (costs.get('game_calls') or {}).get('AiDecideMain') or 0
-        if not baseline:
+        calls = (costs.get('game_calls') or {}).get('AiDecideMain') or 0 if o['invariant'] else 0
+        for into in (got, by_set[kind]):
+            into['n'] += 1
+            into['cpu'] += costs.get('cpu_s') or 0.0
+            into['wall'] += rec.get('wall_s') or 0.0
+            into['unread'] += not o['invariant']
+            into['calls'] += calls
+        if kind == 'tuning':
             line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
@@ -1048,23 +1204,139 @@ def run_suite(suite, envs, simdirs, play, jobs, baseline, instrument, check=chec
                  '%d without a game result' % (total['n'], total['calls'], total['cpu'],
                                                total['wall'], total['unread']))
     lines.append("the suite's " + lookahead_line(total['look']))
-    # SC-003 is a whole suite's cost: the tuning seeds alone are half of it, and a run that never
-    # came back or played to no result would read as a saving
-    budget = int(SC003_BASELINE_CALLS * (1 + SC003_MARGIN))
-    if not baseline:
-        pass
+    complete = not missing and total['n'] == len(tasks) and not total['unread']
+
+    # the tuning runs, judged on the frozen baseline (FR-022)
+    tuning = {'%s/%s' % k: o for k, (kind, o) in outcome.items() if kind == 'tuning'}
+    unlabelled = sum(o['unlabelled'] for _, o in outcome.values())
+    regs = []
+    if frozen is None:
+        lines.append('regressions: none judged, there is no frozen baseline yet')
+    else:
+        named = {'%s/%s' % k: r for k, r in recs.items()}
+        regs = regressions(frozen['tuning'], tuning,
+                           lambda key, char: explain(named[key], char) if explain else None)
+    for key in sorted(tuning):
+        if tuning[key]['unlabelled']:
+            lines.append('%s: %d unlabelled fallback%s (a death over the cap no fallback names)'
+                         % (key, tuning[key]['unlabelled'],
+                            '' if tuning[key]['unlabelled'] == 1 else 's'))
+    held = sum(o['unlabelled'] for kind, o in outcome.values() if kind == 'held_out')
+    if held:
+        lines.append('the held-out runs: %d unlabelled fallback%s' % (held, '' if held == 1
+                                                                       else 's'))
+    # SC-003 on the seeds played: a run that never came back or played to no result would read
+    # as a saving, so the calls are judged only on a whole set
+    calls = sum(by_set[k]['calls'] for k in sets)
+    over = False
+    if frozen is None:
+        lines.append('SC-003: not judged, there is no frozen baseline yet')
     elif missing or total['n'] != len(tasks):
         lines.append('SC-003: not judged, %d of %d runs came back' % (total['n'], len(tasks)))
     elif total['unread']:
         lines.append('SC-003: not judged, %d run%s without a game result' % (
             total['unread'], '' if total['unread'] == 1 else 's'))
     else:
-        lines.append('SC-003: %d AiDecideMain calls against a budget of %d (%+.1f%% on the '
-                     'baseline of %d): %s' % (
-                         total['calls'], budget,
-                         100.0 * (total['calls'] / SC003_BASELINE_CALLS - 1),
-                         SC003_BASELINE_CALLS, 'within' if total['calls'] <= budget else 'OVER'))
+        base = sum(frozen['calls'][k] for k in sets)
+        budget = int(base * (1 + FROZEN_MARGIN))
+        over = calls > budget
+        lines.append('SC-003 (%s seeds): %d AiDecideMain calls against a budget of %d (%+.1f%% '
+                     'on the frozen %d): %s' % (
+                         ' and '.join(k.replace('_', '-') for k in sets), calls, budget,
+                         100.0 * (calls / max(1, base) - 1), base,
+                         'OVER' if over else 'within'))
+        if over:
+            regs.append(('the suite asked for more than %d%% over the frozen calls'
+                         % int(FROZEN_MARGIN * 100), True))
+    # the snapshots: a fixture that loaded back to its board when it entered the manifest
+    snaps_failed = []
+    if snapshots is not None and suite.get('snapshots'):
+        snap_lines, failed = snapshots(envs)
+        lines.extend(snap_lines)
+        snaps_failed = failed
+        regs.extend(('snapshot %s: its invariant fails' % f, True) for f in failed)
+    if frozen is not None:
+        lines.append('regressions on the frozen baseline (instrument %s): %s' % (
+            frozen.get('instrument'), '%d' % sum(1 for _, b in regs if b) if regs else 'none'))
+        lines.extend('  ' + r for r, _ in regs)
+    if not held_out:
+        if result is not None:
+            result.clear()
+        return lines
+    # held-out losses: counts only (FR-025)
+    known = set((frozen or {}).get('held_out_losses') or [])
+    losses = {k for k, (kind, o) in outcome.items() if kind == 'held_out' and o['lost']}
+    new = [k for k in losses if held_out_tag(*k) not in known]
+    reproducible = 0
+    if new and frozen is not None:
+        again_tasks = [t for t in tasks if t['stamp']['suite']['set'] == 'held_out'
+                 and (t['stamp']['suite']['start_id'], t['seed']) in new]
+        lost_again = set()
+        for rec in (again or play)(again_tasks):
+            if is_bot(rec) and run_outcome(rec)['lost']:
+                lost_again.add((rec['suite']['start_id'], rec.get('seed')))
+        reproducible = len(lost_again)
+        lines.append('the held-out runs: %d of %d lost, %d of them new since the freeze; played '
+                     'again, %d lost again (reproducible)%s' % (
+                         len(losses), by_set['held_out']['n'], len(new), reproducible,
+                         '' if reproducible == len(new) else
+                         '; %d did not: the play is not deterministic' % (len(new) - reproducible)))
+    else:
+        lines.append('the held-out runs: %d of %d lost%s' % (
+            len(losses), by_set['held_out']['n'],
+            '' if frozen is None else ', none new since the freeze'))
+    if frozen is not None:
+        ok, why = promotion(regs, unlabelled, reproducible, complete)
+        lines.append('promotion: %s' % ('PROMOTED' if ok else 'refused, ' + '; '.join(why)))
+    if result is not None:
+        result.clear()
+        if complete:
+            result.update({
+                'tuning': tuning,
+                'held_out_losses': sorted(held_out_tag(*k) for k in losses),
+                'calls': {k: by_set[k]['calls'] for k in sets},
+                'cpu_s': {k: round(by_set[k]['cpu'], 1) for k in sets},
+                'wall_s': {k: round(by_set[k]['wall'], 1) for k in sets},
+                'snapshots_failed': snaps_failed,
+                # the first freeze has no regression to judge, but a fallback no label names
+                # is still never frozen as the reference
+                'promoted': promotion([] if frozen is None else regs, unlabelled,
+                                      reproducible, complete)[0]})
     return lines
+
+
+PINNED = 'PINNED'
+
+
+def snapshot_check(suite, envs, instrument, launch=launch, run_root=None, jobs=8):
+    """Each snapshot's invariant, `pinned_board`: its kept state, loaded in a fresh emulator
+    (PT_PINNED, botrun.lua's check_pinned), holds the board its decision read, the board file
+    kept beside it when the replay pinned it (ADR 0392's in-run reload, made from outside the
+    run). Booted from its start's own task (start_task's); nothing is played. The checks run
+    side by side, at most `jobs` emulators at once (the suite's own --jobs), and each run dir
+    is settled on this thread, as Pool settles its own. (lines, failed snapshot ids), in
+    manifest order."""
+    snaps = suite.get('snapshots') or []
+
+    def one(sn):
+        task = start_task(suite, envs, instrument, sn['start_id'], 'tuning')
+        task['pinned'] = os.path.join(REPO, sn['state_path'])
+        text, where = launch_tagged(task, 'pinned', os.path.join(REPO, 'build', 'suite-workers'),
+                                    launch)
+        got = parse_lines(text, PINNED)
+        with open(os.path.join(REPO, sn['board_path'])) as fh:
+            want = json.load(fh)
+        ok = bool(got) and got[-1].get('board') == want
+        return ok, where, 'snapshot %s (%s, decision %s, %s): %s' % (
+            sn['snapshot_id'], sn['start_id'], sn['provenance']['ref'], sn['provenance']['mode'],
+            'loads back to its board' if ok else
+            'printed no PINNED line' if not got else 'loads to a board other than its own')
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(jobs, len(snaps)))) as ex:
+        done = list(ex.map(one, snaps))
+    for ok, where, _ in done:
+        settle_run_dir(where, ok, run_root)
+    return ([line for _, _, line in done],
+            [sn['snapshot_id'] for sn, (ok, _, _) in zip(snaps, done) if not ok])
 
 
 def suite_setup():
@@ -1084,6 +1356,54 @@ def suite_setup():
     return suite, simdirs, envs
 
 
+def kept_play(paths, instrument, rom_hashes):
+    """A `play` that plays nothing: each task's newest kept suite run of this instrument on
+    these ROMs ({game: hash}), so a suite is judged again once a replay has witnessed why a
+    new death happened (its DIAG lines name that run's trace, and a fresh run's trace is new)."""
+    runs = kept(paths, suite_run_of(instrument, rom_hashes),
+                lambda r: (r['suite']['start_id'], r['suite']['set'], r.get('seed')))
+
+    def play(tasks):
+        for t in tasks:
+            st = t['stamp']['suite']
+            got = runs.get((st['start_id'], st['set'], t['seed']))
+            if got:
+                yield got[-1]
+    return play
+
+
+def store_explain(simdirs):
+    """`explain(rec, charId)` for run_suite: the audit's primary label of that death, from the
+    DIAG lines in the run's store (diag.jsonl, `replay`'s), or None."""
+    diags = {game: load_diag(os.path.join(d, 'diag.jsonl'))
+             if os.path.exists(os.path.join(d, 'diag.jsonl')) else []
+             for game, d in simdirs.items()}
+
+    def explain(rec, char):
+        base = simdirs[rec.get('game')]
+        for f in audit([rec], diags.get(rec.get('game')) or [],
+                       lambda r: record_events(r, base)):
+            if f['death'].get('charId') == char and f['primary']:
+                return f['primary']
+        return None
+    return explain
+
+
+def freeze_record(result, instrument, version, today=None):
+    """What `suite --freeze` writes (FROZEN): the run's result stamped with its instrument,
+    the manifest's version and the day. None, with why, when the run may not be frozen."""
+    if not result:
+        return None, 'not every run came back with a game result'
+    if result['snapshots_failed']:
+        return None, 'snapshot %s fails its invariant' % ', '.join(result['snapshots_failed'])
+    if not result['promoted']:
+        return None, 'the candidate is not promoted'
+    rec = {k: v for k, v in result.items() if k not in ('promoted', 'snapshots_failed')}
+    rec.update(instrument=instrument, manifest_version=version,
+               frozen_on=today or time.strftime('%Y-%m-%d'))
+    return rec, None
+
+
 def suite_main(args):
     setup = suite_setup()
     if isinstance(setup, str):
@@ -1093,11 +1413,28 @@ def suite_main(args):
     outs = [os.path.join(d, 'runs.jsonl') for d in simdirs.values()]
     pool = Pool(jobs=args.jobs, out=outs[0])
     hashes = {g: os.path.basename(d) for g, d in simdirs.items()}
-    lines = run_suite(suite, envs, simdirs, pool.run, args.jobs, args.baseline,
-                      instrument_id(), kept=kept_walls(outs, instrument_id(), hashes))
+    inst = instrument_id()
+    play = kept_play(outs, inst, hashes) if args.kept else pool.run
+    result = {}
+    lines = run_suite(suite, envs, simdirs, play, args.jobs, args.held_out or args.freeze, inst,
+                      kept=kept_walls(outs, inst, hashes), frozen=load_frozen(),
+                      explain=store_explain(simdirs), result=result, again=pool.run,
+                      snapshots=lambda built: snapshot_check(suite, built, inst,
+                                                             jobs=args.jobs))
     for line in lines:
         print(line, flush=True)
-    return 1 if any(line.startswith('refused') for line in lines) else 0
+    if any(line.startswith('refused') for line in lines):
+        return 1
+    if args.freeze:
+        rec, why = freeze_record(result, inst, suite['version'])
+        if rec is None:
+            print('not frozen: %s' % why)
+            return 1
+        with open(FROZEN, 'w') as fh:
+            json.dump(rec, fh, indent=1, sort_keys=True)
+            fh.write('\n')
+        print('frozen: %s (instrument %s)' % (os.path.relpath(FROZEN, REPO), inst))
+    return 0
 
 
 # ---- a diagnostic replay of one death (#510 step 9 PR-F, T074; ADR 0392) ----
@@ -1203,20 +1540,37 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
                         trace=run_key(rec))}
 
 
-def replay_task(rec, suite, envs, diag, instrument):
-    """Suite run `rec`'s own task (suite_tasks': its start, seed and instrument) with `diag`,
-    and without the runs file and stamp a record would take: a replay leaves none. Raises
-    ValueError when the suite no longer has that start or seed."""
-    sid, kind = rec['suite']['start_id'], rec['suite']['set']
+def start_task(suite, envs, instrument, sid, kind, seed=None):
+    """Start `sid`'s suite task (suite_tasks': its start, instrument and seed in set `kind`;
+    the set's first when `seed` is None) without the runs file and stamp a record would take:
+    a replay or a snapshot's check leaves none. None when the suite has no such start or seed."""
     one = dict(suite, starts=[s for s in suite['starts'] if s['start_id'] == sid])
     tasks = [t for t in suite_tasks(one, envs, instrument, {}, (kind,))
-             if t['seed'] == rec.get('seed')]
+             if seed is None or t['seed'] == seed]
     if not tasks:
-        raise ValueError('%s seed %s of %s is no longer in the suite'
-                         % (kind, rec.get('seed'), sid))
+        return None
     task = tasks[0]
     for k in ('out', 'stamp'):
         task.pop(k, None)
+    return task
+
+
+def launch_tagged(task, prefix, log_dir, launch=launch):
+    """One launch of `task` outside a Pool, under a tag of its own (unique_tag's), its log in
+    `log_dir`. Returns launch's (stdout, run dir)."""
+    os.makedirs(log_dir, exist_ok=True)
+    tag = unique_tag(prefix)
+    return launch(task, tag, os.path.join(log_dir, tag + '.log'))
+
+
+def replay_task(rec, suite, envs, diag, instrument):
+    """Suite run `rec`'s own task (start_task's) with `diag`. Raises ValueError when the
+    suite no longer has that start or seed."""
+    sid, kind = rec['suite']['start_id'], rec['suite']['set']
+    task = start_task(suite, envs, instrument, sid, kind, rec.get('seed'))
+    if task is None:
+        raise ValueError('%s seed %s of %s is no longer in the suite'
+                         % (kind, rec.get('seed'), sid))
     task['diag'] = diag
     return task
 
@@ -1227,10 +1581,7 @@ def replay_run(task, base, launch=launch, run_root=None):
     dropped: a diagnostic feeds no record (FR-019). A replay that printed no DIAG line keeps
     its run dir as a failure."""
     out = os.path.join(base, 'diag.jsonl')
-    log_dir = os.path.join(base, 'workers')
-    os.makedirs(log_dir, exist_ok=True)
-    tag = 'diag-%d-%x' % (os.getpid(), int(time.time()))
-    text, where = launch(task, tag, os.path.join(log_dir, tag + '.log'))
+    text, where = launch_tagged(task, 'diag', os.path.join(base, 'workers'), launch)
     diags = parse_lines(text, DIAG)
     for g in diags:
         run = g.get('run') or {}
@@ -1249,6 +1600,11 @@ def replay_run(task, base, launch=launch, run_root=None):
             os.makedirs(os.path.join(base, 'traces', 'diag'), exist_ok=True)
             shutil.copyfile(os.path.join(where, name), os.path.join(base, rel))
             g['pinned'] = rel
+            # the board its decision read, kept beside it: a snapshot's check (PR-G T084)
+            board = os.path.join(where, name[:-len('.ss')] + '.json')
+            if os.path.exists(board):
+                shutil.copyfile(board, os.path.join(base, rel[:-len('.ss')] + '.json'))
+                g['pinned_board_file'] = rel[:-len('.ss')] + '.json'
         append_record(out, g, DIAG)
     settle_run_dir(where, bool(diags), run_root)
     return diags
@@ -1637,19 +1993,21 @@ def coverage(findings, instrument=None, orphaned=0):
                        100 * SC004_BAR, 'met' if k >= SC004_BAR * n else 'not met')) + tail
 
 
+def load_diag(path):
+    """The DIAG lines of a log or diag file, each witness's trace made absolute: `replay`
+    files it relative to its diag file."""
+    with open(path) as fh:
+        got = parse_lines(fh.read(), DIAG)
+    for g in got:
+        if g.get('trace') and not os.path.isabs(g['trace']):
+            g['trace'] = os.path.join(os.path.dirname(os.path.abspath(path)), g['trace'])
+    return got
+
+
 def audit_main(args):
     records = read_trace(args.runs)
     base = os.path.dirname(os.path.abspath(args.runs))
-
-    diags = []
-    for path in args.diag or []:
-        with open(path) as fh:
-            got = parse_lines(fh.read(), DIAG)
-        for g in got:
-            # `replay` files a witness's trace relative to its diag file
-            if g.get('trace') and not os.path.isabs(g['trace']):
-                g['trace'] = os.path.join(os.path.dirname(os.path.abspath(path)), g['trace'])
-        diags.extend(got)
+    diags = [g for path in args.diag or [] for g in load_diag(path)]
     # one instrument's runs: two instruments are two bots, and one sentence over both measures
     # neither. The newest run's, as `replay` picks the newest run, unless --instrument says
     runs = bot_records(records)
@@ -1708,8 +2066,12 @@ def main(argv=None):
     c.add_argument('--mode', default='normal')
     c.add_argument('--jobs', type=int, default=4)
     su = sub.add_parser('suite', help="the frozen suite's pinned starts, attempt 1 each")
-    su.add_argument('--baseline', action='store_true',
-                    help='every seed, tuning and held-out; report cost only')
+    su.add_argument('--held-out', action='store_true',
+                    help='the held-out seeds too, as counts only, and the promotion result')
+    su.add_argument('--freeze', action='store_true',
+                    help='as --held-out, then write the frozen baseline if promoted')
+    su.add_argument('--kept', action='store_true',
+                    help="judge this instrument's kept runs instead of playing them again")
     su.add_argument('--jobs', type=int, default=8)
     args = ap.parse_args(argv)
     if args.cmd == 'cell':
