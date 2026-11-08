@@ -9,9 +9,9 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-08 (Claude): the ch03 pilot is checked (#510 comment 6718140525, "Checked"
-section): its deaths are careful-style bot faults, witnessed by replay. Next: Nicolas's calls,
-then PR-I.
+Refreshed 2026-11-08 (Claude): the ch03 pilot is checked (#510 comment 6718140525, "Checked")
+and Nicolas decided what comes first in PR-I (T100a-e in the plan comment 6563384310). Next:
+PR-I, starting with T100a.
 
 ## Where things stand
 
@@ -63,14 +63,24 @@ then PR-I.
 
 ## Next
 
-1. **Waiting on Nicolas (before PR-I)**, from the pilot check (#510 comment 6718140525,
-   "Checked"): (a) careful's missing pull-back (`bot.lua` `retreatOver` only gains ground
-   toward the boss; the beam never brings an all-out-of-reach plan to the finals) and the
-   average-HP enemy phase (`planner.lua` `judge`) are bot faults, so fixing them makes a new
-   instrument; (b) the ours arm was 8 distinct plays in 50 runs, which decides what a chapter
-   cell measures; (c) the recorder's phantom enemy `wait` with a stale `from`
-   (`harness.lua` ~3207) misleads the story. Ask which go before PR-I.
-2. **PR-I** (validity, T100+): ADR 0385 point 4's bar, built on his answers.
+1. **PR-I, starting with its new first tasks** (plan comment 6563384310, Phase 9, "Decided
+   before PR-I", Nicolas 2026-11-08). Evidence: the pilot comment 6718140525's "Checked" section.
+   - T100a: careful pulls back. `bot.lua` `retreatOver` only gains ground toward the boss, and
+     no plan with every unit out of reach is ever judged.
+   - T100b: branch the enemy phase on our attacker's counter, not average HP (`planner.lua`
+     `judge`).
+   - T100c: drop the recorder's phantom enemy `wait` and its stale `from` (`harness.lua` ~3207).
+   - T100e: several starts per chapter cell, each from its own New Game campaign seed (ADR 0370
+     holds: never re-seeded). 10 starts for a verdict, fewer while trying a change; every ours
+     start is remade on any ROM change.
+   - **T100d still needs Nicolas's OK:** the grade reading the plan's two-phase chance changes
+     what the 10% blind-spot bar counts. Ask before building it.
+   Together they make one new instrument: refreeze, then read `suite --held-out`'s promotion
+   line. Then T100-T108 as planned, built on the refrozen instrument.
+2. **Why the pilot looked the way it did** (so nobody re-derives it): a pinned start keeps the
+   dice in its save, and the seed only draws the style (`harness.lua:3863-3896`, ADR 0374). The
+   50 ours runs were 8 distinct games from 30 style draws. Every ours death was careful-style.
+   Replays: Wolfram (seed 3001, turn 16) is `search_miss`; Pinky (turn 24) is `missing_action`.
 3. Then PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
 4. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
