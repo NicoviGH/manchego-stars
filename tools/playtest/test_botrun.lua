@@ -1793,6 +1793,35 @@ do
     check(diags[1] and diags[1].pinned_board, false, "a kept state off the pinned board is said")
 end
 
+-- test_a_pinned_check_reports_the_board_and_plays_nothing (PR-G T084): a suite snapshot's state,
+-- loaded in a fresh emulator, reports the board it holds -- and the pin keeps the board its
+-- decision read beside the state, for the check to be compared with
+do
+    local pinnedWith
+    local diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                           original = original() }, nil, function(g)
+        g.api.pinned = function(ref, board) pinnedWith = board; return "pinned-r1.ss" end
+    end)
+    check(#diags, 1, "the replay still emits its DIAG line")
+    check(pinnedWith and #pinnedWith > 0, true, "the pin is handed the decision's board")
+    local g = fakeGame { units = rout() }
+    local loaded
+    g.api.check_pinned = "snap.ss"
+    g.api.reload = function(file) loaded = file; return g.api.board() end
+    local ok, why, rec = Botrun.run(g.api)
+    check(loaded, "snap.ss", "the snapshot's own state is the one loaded")
+    check(ok, false, "a pinned check is no run")
+    check(rec, nil, "and hands no record back")
+    check(#g.emitted, 1, "one line only: no BOTRUN record, no DIAG line")
+    local line = g.emitted[1] or ""
+    check(line:sub(1, #Botrun.PINNED_PREFIX), Botrun.PINNED_PREFIX, "the line is a PINNED line")
+    local p = Json.decode(line:sub(#Botrun.PINNED_PREFIX + 1))
+    check(p.file, "snap.ss", "naming the state")
+    check(Json.encode(p.board), Json.encode(Botrun.snapshot(g.api.board())),
+          "and carrying the board it holds, as the pin kept it")
+    check(why ~= nil, true, "with why")
+end
+
 -- test_a_plan_event_carries_the_plans_audit (FR-020): what the planner offered, saw and spent
 -- is in the trace, for `montecarlo.py audit` to read
 do

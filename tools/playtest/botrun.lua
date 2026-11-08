@@ -80,10 +80,14 @@
 --                      "full_info" | "deep", force = { Planner.key... } (force only), failure =
 --                      { charId, turn }, run = { game, chapter, seed, attempt } (the original
 --                      attempt's), original = the original attempt's trace events, decoded }
---   pinned(ref)        OPTIONAL, with diag: keep the game's state at the pinned decision (a
---                      board fixture: botrun's own memory is not in it); returns its file
+--   pinned(ref, board) OPTIONAL, with diag: keep the game's state at the pinned decision (a
+--                      board fixture: botrun's own memory is not in it) and the board that
+--                      decision read (M.snapshot) beside it; returns the state's file
 --   reload(file)       OPTIONAL, with pinned: load that file back and read the board there;
 --                      the DIAG line's `pinned_board` says whether it is the pinned board
+--   check_pinned       OPTIONAL: a kept decision state (a suite snapshot, PR-G T084). The run
+--                      loads it through reload, emits ONE `PINNED <json>` line, { file, board },
+--                      and plays nothing: no record, no DIAG line
 -- Botrun.run(api) -> ok, why, record. It emits the record as ONE stdout line, `BOTRUN <json>`.
 --
 -- A DIAGNOSTIC REPLAY (#510 step 9 PR F, T074): the attempt is played again from the same start
@@ -129,6 +133,7 @@ local M = {}
 
 M.PREFIX = "BOTRUN "
 M.DIAG_PREFIX = "DIAG "
+M.PINNED_PREFIX = "PINNED "
 
 -- Deep equality of two decoded JSON values (the replay's events against the original trace's)
 local function same(a, b)
@@ -571,6 +576,11 @@ end
 
 function M.run(api)
     local Bot, Json = api.Bot, api.Json
+    if api.check_pinned then
+        local board = M.snapshot(api.reload(api.check_pinned))
+        api.emit(M.PINNED_PREFIX .. Json.encode({ file = api.check_pinned, board = board }))
+        return false, "pinned state read", nil
+    end
     local style = Bot.applyClaims(api.claims or {}, api.style)
     style.villageGifts, style.houseGifts = api.villageGifts, api.houseGifts
     local unplayed = Bot.unplayed(api.claims or {})
@@ -948,7 +958,7 @@ function M.run(api)
                     turn = turn }
             pin.matched = watch.at(a and actOf(a))
             pin.board = M.snapshot(board)
-            if api.pinned then pin.file = api.pinned(diag.ref) end
+            if api.pinned then pin.file = api.pinned(diag.ref, pin.board) end
             if not pin.matched then
                 halt = "unmatched: " .. watch.why
                 return nil, nil, cost

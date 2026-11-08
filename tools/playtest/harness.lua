@@ -13,6 +13,7 @@
 --   PLAYTEST_SEED     -- fuzz/llm seed (PT_SEED)
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
+--   PLAYTEST_PINNED   -- a pinned decision state to load and read (PT_PINNED; api.check_pinned)
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -3353,6 +3354,9 @@ INSPECT.botApi = function(game)
     local traceFile
     -- a diagnostic replay's trace is its own file, never the original's name
     api.diag = INSPECT.diag(Json)
+    -- a suite snapshot (PT_PINNED, #510 step 9 PR-G T084): load that kept decision state in
+    -- this fresh emulator and report its board, playing nothing (botrun.lua)
+    api.check_pinned = (PLAYTEST_PINNED or "") ~= "" and PLAYTEST_PINNED or nil
     api.trace = function(ev)
         if not traceFile then
             api.info.trace = api.diag
@@ -3368,10 +3372,17 @@ INSPECT.botApi = function(game)
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
     -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
-    api.pinned = function(ref)
+    -- The board that decision read goes beside it (.json): what a fresh emulator's load of the
+    -- state is checked against once the state is a suite snapshot (PT_PINNED).
+    api.pinned = function(ref, board)
         local name = string.format("%s/pinned-%s-%d-a%d-r%d.ss", PLAYTEST_SHOTDIR, game,
                                    api.info.chapter, api.info.attempt or 1, ref)
         local wrote = INSPECT.writeStateFile(name) ~= nil
+        if wrote and board then
+            local fh = assert(io.open((name:gsub("%.ss$", ".json")), "w"))
+            fh:write(Json.encode(board), "\n")
+            fh:close()
+        end
         log("botrun: pinned state -> " .. (wrote and name or "not written"))
         return wrote and name or nil
     end
@@ -3768,9 +3779,10 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
     end
     api.only = cfg.attempt
-    -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi)
-    api.diag = (PLAYTEST_DIAG or "") ~= "" or nil
-    if api.diag and not api.only then error("PT_DIAG replays one attempt: PT_CAMPAIGN needs attempt") end
+    -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
+    -- a pinned state's check (PT_PINNED) is one too: it hands no record back, writes no line
+    api.diag = ((PLAYTEST_DIAG or "") ~= "" or (PLAYTEST_PINNED or "") ~= "") or nil
+    if api.diag and not api.only then error("PT_DIAG and PT_PINNED play one attempt: PT_CAMPAIGN needs attempt") end
     -- Priced by the game for each unit that could buy, on the map: GetItemPurchasePrice reads
     -- the buyer (a Silver Card halves it) and charges half again while BM_FLAG_PREPSCREEN is
     -- set, and the bot buys on the map.

@@ -669,6 +669,12 @@ SUITE = {
 }
 
 
+def frozen_fixture(tuning_calls, held_out_calls, tuning=None, losses=()):
+    """A frozen baseline (suite-frozen.json's shape) with these calls a set."""
+    return {'instrument': 'f+v1', 'calls': {'tuning': tuning_calls, 'held_out': held_out_calls},
+            'tuning': tuning or {}, 'held_out_losses': list(losses)}
+
+
 class Suite(unittest.TestCase):
     def load(self, inst):
         import yaml
@@ -697,9 +703,10 @@ class Suite(unittest.TestCase):
 
     def test_the_shipped_manifest_loads(self):
         got = mc.load_suite()
-        self.assertEqual(len(got['starts']), 13)   # FR-021: vanilla 6, ours 4, scout 3
+        # FR-021: vanilla 6, ours 4, scout 4 (Ch6, the fog map, PR-G; Ch10, Ch13, Ch14)
+        self.assertEqual(len(got['starts']), 14)
         self.assertEqual(sum(len(s['seeds']['tuning']) + len(s['seeds']['held_out'])
-                             for s in got['starts']), 52)   # SC-001
+                             for s in got['starts']), 56)   # SC-001, amended by PR-G
         lo, hi = got['seed_sets']['confirmatory']
         self.assertLessEqual(mc.LOOKS[-1], hi - lo + 1, 'a cell plays seeds 1..LOOKS[-1]')
         # the budgets the manifest records are the ones the planner plays (PR #560: `branch`
@@ -794,11 +801,11 @@ class Suite(unittest.TestCase):
         self.assertAlmostEqual(hours, (4 * 40 + 4 * 600) / 2 / 3600)
         self.assertGreater(mc.suite_estimate(suite, tasks * 30, {}, jobs=1), mc.MAX_WALL_H)
 
-    def suite_lines(self, play, baseline=True, jobs=4, **kw):
+    def suite_lines(self, play, held_out=True, jobs=4, **kw):
         """The lines run_suite prints for `play`, with no ROM, env or kept run behind it."""
         return mc.run_suite(self.load(self.suite()),
                             envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
-                            jobs=jobs, baseline=baseline, instrument='i', check=lambda *a: [],
+                            jobs=jobs, held_out=held_out, instrument='i', check=lambda *a: [],
                             kept={}, **kw)
 
     def test_a_job_over_eight_hours_is_refused_before_it_runs(self):
@@ -817,16 +824,17 @@ class Suite(unittest.TestCase):
                                                                'RefreshEntityBmMaps': 99}})
                 yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
                            wall_s=10.0 + i)
-        text = '\n'.join(self.suite_lines(play))
+        text = '\n'.join(self.suite_lines(play, frozen=frozen_fixture(30, 30)))
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 26 AiDecideMain calls, '
                       '8.0 CPU s and 46.0 wall s in all, 6.5 calls and 2.0 CPU s a run', text)
         self.assertIn('ours-ch02 (ours chapter 3, fixture): 4 runs', text)
         # SC-003's measure (ADR 0384): the AI's decisions only, never another game call
         self.assertIn('the suite: 8 runs, 68 AiDecideMain calls, 16.0 CPU s', text)
-        self.assertIn('SC-003: 68 AiDecideMain calls against a budget of %d' % int(
-            mc.SC003_BASELINE_CALLS * 1.2), text)
-        self.assertIn(': within', text)
-        self.assertNotIn('won', text, 'a baseline reports cost, never a held-out outcome')
+        self.assertIn('SC-003 (tuning and held-out seeds): 68 AiDecideMain calls against a '
+                      'budget of 72 (+13.3% on the frozen 60): within', text)
+        for seed in (2001, 2002):   # FR-025: a held-out outcome is a count, never a run
+            self.assertNotIn('seed %d' % seed, text)
+        self.assertIn('vanilla-ch3 seed 1001:', text, 'a tuning run is said')
 
     def test_the_suite_reports_the_lookahead(self):
         # FR-018 / SC-003: the trigger rate, coverage, skipped extensions and CPU, per start and
@@ -841,13 +849,14 @@ class Suite(unittest.TestCase):
         self.assertIn('the suite\'s lookahead: 8 of 40 decisions triggered (20.0%), 4 extended, '
                       '4 skipped for budget, 16 calls, 1.0 CPU s', text)
 
-    def sc003(self, records, baseline=True, keep=lambda t: True):
+    def sc003(self, records, held_out=True, keep=lambda t: True, frozen=None):
         """The suite's lines when each task `keep` allows comes back as `records(i, task)`."""
         def play(tasks):
             for i, t in enumerate(tasks):
                 if keep(t):
                     yield dict(t['stamp'], seed=t['seed'], wall_s=1.0, **records(i, t))
-        return '\n'.join(self.suite_lines(play, baseline=baseline))
+        return '\n'.join(self.suite_lines(play, held_out=held_out,
+                                          frozen=frozen or frozen_fixture(30, 30)))
 
     def test_sc003_counts_a_record_without_game_calls_as_none(self):
         text = self.sc003(lambda i, t: {'outcome': 'won', 'costs': {'cpu_s': 1.0}})
@@ -868,22 +877,33 @@ class Suite(unittest.TestCase):
         self.assertIn('ours-ch02: no run came back', text)
         self.assertIn('SC-003: not judged, 4 of 8 runs came back', text)
 
-    def test_sc003_judges_only_the_whole_suite(self):
-        # the tuning seeds alone are half of it, never measured against the whole's budget
-        text = self.sc003(lambda i, t: {'outcome': 'won'}, baseline=False)
-        self.assertNotIn('SC-003', text)
+    def test_sc003_judges_the_seeds_played_against_the_same_seeds_frozen(self):
+        # the tuning seeds alone are half of the suite: judged on the tuning seeds' frozen calls,
+        # never on the whole's
+        text = self.sc003(lambda i, t: {'outcome': 'won', 'costs': {
+            'game_calls': {'AiDecideMain': 10}}}, held_out=False, frozen=frozen_fixture(30, 1000))
+        self.assertIn('SC-003 (tuning seeds): 40 AiDecideMain calls against a budget of 36 '
+                      '(+33.3% on the frozen 30): OVER', text)
+
+    def test_sc003_is_not_judged_without_a_frozen_baseline(self):
+        text = '\n'.join(self.suite_lines(lambda tasks: (dict(t['stamp'], seed=t['seed'],
+                                                             outcome='won') for t in tasks)))
+        self.assertIn('SC-003: not judged, there is no frozen baseline yet', text)
+        self.assertIn('regressions: none judged, there is no frozen baseline yet', text)
+        self.assertNotIn('promotion', text, 'nothing to promote over')
 
     def test_sc003_says_over_when_the_calls_pass_the_budget(self):
         text = self.sc003(lambda i, t: {
-            'outcome': 'won', 'costs': {'game_calls': {'AiDecideMain': mc.SC003_BASELINE_CALLS}}})
+            'outcome': 'won', 'costs': {'game_calls': {'AiDecideMain': 10}}})
         self.assertIn(': OVER', text)
+        self.assertIn('promotion: refused, 1 deterministic regression', text)
 
     def test_a_worker_with_no_bot_record_is_one_run_without_a_result(self):
         def play(tasks):
             for t in tasks:
                 yield dict(t['stamp'], kind='campaign', outcome='crashed', seed=t['seed'],
                            wall_s=1.0, why='arrive: no saved start')
-        text = '\n'.join(self.suite_lines(play, baseline=False))
+        text = '\n'.join(self.suite_lines(play, held_out=False))
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 2 runs', text)
         self.assertIn('2 without a game result', text)
         self.assertIn('vanilla-ch3 seed 1001: attempt 1: crashed before the bot reported '
@@ -891,7 +911,7 @@ class Suite(unittest.TestCase):
 
     def test_a_start_off_its_pin_refuses_the_whole_suite(self):
         suite = self.load(self.suite())
-        lines = mc.run_suite(suite, envs=None, simdirs={}, play=None, jobs=1, baseline=True,
+        lines = mc.run_suite(suite, envs=None, simdirs={}, play=None, jobs=1, held_out=True,
                              instrument='i', check=lambda *a: ['ours-ch02: its state is gone'])
         self.assertTrue(lines[0].startswith('refused'))
         self.assertIn('ours-ch02: its state is gone', lines[1])
@@ -952,7 +972,7 @@ class Suite(unittest.TestCase):
 
         def envs():
             raise FileNotFoundError('7.json: no record of the twin')
-        lines = mc.run_suite(suite, envs=envs, simdirs={}, play=None, jobs=1, baseline=True,
+        lines = mc.run_suite(suite, envs=envs, simdirs={}, play=None, jobs=1, held_out=True,
                              instrument='i', check=lambda *a: [])
         self.assertEqual(lines, ['refused: a campaign env cannot be built: 7.json: no record '
                                  'of the twin'])
@@ -962,7 +982,7 @@ class Suite(unittest.TestCase):
             for t in tasks:
                 yield dict(t['stamp'], kind='campaign', outcome='played', seed=t['seed'],
                            wall_s=1.0, why='played after 1 chapters', env_status=mc.unread())
-        text = '\n'.join(self.suite_lines(play, baseline=False))
+        text = '\n'.join(self.suite_lines(play, held_out=False))
         self.assertIn('2 without a game result', text)
         self.assertIn('vanilla-ch3 seed 1001: attempt 1: the bot left no record; the campaign '
                       'ended played (played after 1 chapters)', text)
@@ -994,6 +1014,292 @@ class Suite(unittest.TestCase):
         inst = self.suite()
         inst['starts'][1]['seeds']['tuning'] = [1003]
         self.refuses(inst, 'two')
+
+
+def outcome(**kw):
+    """run_outcome's shape, every field defaulted to a clean run."""
+    return dict({'invariant': True, 'deaths': [], 'stalls': 0, 'lost': False, 'unlabelled': 0},
+                **kw)
+
+
+SNAPSHOT = {'snapshot_id': 'ours-ch03-1002-r45', 'start_id': 'ours-ch02', 'invariant': 'pinned_board',
+            'state_path': 'references/sim/ours/fd3cb9d8dca6/traces/diag/x-pinned-ours-3-a1-r45.ss',
+            'state_sha1': 'c' * 40,
+            'board_path': 'references/sim/ours/fd3cb9d8dca6/traces/diag/x-pinned-ours-3-a1-r45.json',
+            'provenance': {'seed': 1003, 'set': 'tuning', 'ref': 45, 'mode': 'deep', 'char': 3,
+                           'source': 'ADR 0392'}}
+
+
+class Frozen(unittest.TestCase):
+    """#510 step 9 PR-G (T081-T083): the suite judged on its frozen baseline."""
+
+    def load(self, inst):
+        return Suite.load(self, inst)
+
+    def suite(self):
+        return json.loads(json.dumps(SUITE))
+
+    def lines(self, records, held_out=True, frozen=None, again=None, snapshots=None,
+              result=None, explain=None):
+        """run_suite's text when task i comes back as `records(i, task)` (None: no run)."""
+        def play(tasks):
+            for i, t in enumerate(tasks):
+                r = records(i, t)
+                if r is not None:
+                    yield dict(t['stamp'], seed=t['seed'], wall_s=1.0, **r)
+        return '\n'.join(mc.run_suite(
+            self.load(self.suite()), envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={},
+            play=play, jobs=4, held_out=held_out, instrument='i', check=lambda *a: [], kept={},
+            frozen=frozen, again=again, snapshots=snapshots, result=result, explain=explain))
+
+    def clean(self, calls=10):
+        return lambda i, t: {'outcome': 'won', 'costs': {'game_calls': {'AiDecideMain': calls}}}
+
+    def frozen_all_clean(self, **over):
+        tuning = {k: outcome() for k in ('vanilla-ch3/1001', 'vanilla-ch3/1002',
+                                         'ours-ch02/1003', 'ours-ch02/1004')}
+        tuning.update(over)
+        return frozen_fixture(40, 40, tuning)
+
+    # ---- T081: each of these is a regression (AS 1)
+
+    def test_an_invariant_that_held_when_frozen_and_fails_now_is_a_regression(self):
+        regs = mc.regressions({'a/1': outcome()}, {'a/1': outcome(invariant=False)})
+        self.assertEqual(regs, [('a/1: its invariant held when frozen and fails now', True)])
+        # one that failed when frozen is no regression: it never passed
+        self.assertEqual(mc.regressions({'a/1': outcome(invariant=False)},
+                                        {'a/1': outcome(invariant=False)}), [])
+        text = self.lines(lambda i, t: {'outcome': 'crashed'} if i == 0 else self.clean()(i, t),
+                          frozen=self.frozen_all_clean())
+        self.assertIn('vanilla-ch3/1001: its invariant held when frozen and fails now', text)
+        self.assertIn('promotion: refused, not every run came back with a game result; '
+                      '1 deterministic regression', text)
+
+    def test_a_new_death_or_stall_is_a_regression_unless_a_replay_explains_it(self):
+        frozen = {'a/1': outcome(deaths=[1]), 'b/1': outcome()}
+        now = {'a/1': outcome(deaths=[1, 2]), 'b/1': outcome(stalls=1)}
+        self.assertEqual(mc.regressions(frozen, now), [
+            ('a/1: 0x02 dies, and lived when frozen; unexplained', True),
+            ('b/1: 1 stall, 0 when frozen; unexplained', True)])
+        # the same death, witnessed by a replay, is said and does not block
+        regs = mc.regressions(frozen, now, lambda key, c: 'search_miss' if c == 2 else None)
+        self.assertEqual(regs[0], ('a/1: 0x02 dies, and lived when frozen; witnessed: search_miss',
+                                   False))
+        # a death the frozen run had too is no regression, nor a start the baseline lacks
+        self.assertEqual(mc.regressions({'a/1': outcome(deaths=[1])}, {'a/1': outcome(deaths=[1]),
+                                                                        'c/1': outcome()}),
+                         [('c/1: not in the frozen baseline, nothing to compare it with', False)])
+        # through the suite: the run's record is what the explainer is asked about
+        asked = []
+        text = self.lines(lambda i, t: dict(self.clean()(i, t), deaths=[{'charId': 5, 'turn': 2}])
+                          if i == 1 else self.clean()(i, t), frozen=self.frozen_all_clean(),
+                          explain=lambda rec, c: asked.append((rec['seed'], c)))
+        self.assertEqual(asked, [(1002, 5)])
+        self.assertIn('vanilla-ch3/1002: 0x05 dies, and lived when frozen; unexplained', text)
+
+    def test_calls_more_than_a_fifth_over_the_frozen_baseline_are_a_regression(self):
+        # 8 runs of 12 calls = 96 against 80 frozen: 1.2x exactly is within
+        text = self.lines(self.clean(12), frozen=self.frozen_all_clean())
+        self.assertIn('budget of 96 (+20.0% on the frozen 80): within', text)
+        self.assertIn('promotion: PROMOTED', text)
+        text = self.lines(self.clean(13), frozen=self.frozen_all_clean())
+        self.assertIn(': OVER', text)
+        self.assertIn('the suite asked for more than 20% over the frozen calls', text)
+        self.assertIn('promotion: refused, 1 deterministic regression', text)
+
+    # ---- T082: promotion, and the held-out seeds (AS 2)
+
+    def test_promotion_needs_no_regression_no_unlabelled_fallback_and_no_reproducible_loss(self):
+        self.assertEqual(mc.promotion([], 0, 0, True), (True, []))
+        self.assertEqual(mc.promotion([('x', False)], 0, 0, True), (True, []))
+        self.assertEqual(mc.promotion([('x', True), ('y', True)], 1, 2, False)[1], [
+            'not every run came back with a game result', '2 deterministic regressions',
+            '1 unlabelled fallback', '2 reproducible held-out losses'])
+
+    def test_an_unlabelled_fallback_is_an_over_cap_death_of_a_protected_unit_no_anomaly_names(self):
+        rec = {'kind': 'bot', 'outcome': 'won', 'anomalies': [
+            {'kind': 'fallback_sacrifice', 'turn': 3}], 'deaths': [
+            {'charId': 1, 'turn': 3, 'over_cap': True},                    # labelled
+            {'charId': 2, 'turn': 4, 'over_cap': True},                    # not: counted
+            {'charId': 0xC9, 'turn': 4, 'over_cap': True, 'escort': False},  # not the bot's
+            {'charId': 0xCA, 'turn': 4, 'over_cap': True, 'escort': True},   # escorted: counted
+            {'charId': 3, 'turn': 4, 'over_cap': False}]}
+        self.assertTrue(mc.is_bot(rec))
+        got = mc.run_outcome(rec)
+        self.assertEqual((got['unlabelled'], got['deaths']), (2, [1, 2, 3, 0xC9, 0xCA]))
+        text = self.lines(lambda i, t: dict(self.clean()(i, t), **{
+            k: rec[k] for k in ('anomalies', 'deaths')}) if i == 0 else self.clean()(i, t),
+            frozen=self.frozen_all_clean(**{'vanilla-ch3/1001': outcome(deaths=[1, 2, 3, 0xC9,
+                                                                               0xCA])}))
+        self.assertIn('vanilla-ch3/1001: 2 unlabelled fallbacks', text)
+        self.assertIn('promotion: refused, 2 unlabelled fallbacks', text)
+
+    def test_held_out_seeds_never_run_in_tuning_mode(self):
+        played = []
+
+        def play(tasks):
+            played.extend(tasks)
+            return iter(())
+        mc.run_suite(self.load(self.suite()), envs=lambda: {'vanilla': {}, 'ours': {}},
+                     simdirs={}, play=play, jobs=1, held_out=False, instrument='i',
+                     check=lambda *a: [], kept={}, frozen=self.frozen_all_clean())
+        self.assertEqual({t['stamp']['suite']['set'] for t in played}, {'tuning'})
+        text = self.lines(self.clean(), held_out=False, frozen=self.frozen_all_clean())
+        self.assertNotIn('held-out', text)
+        self.assertNotIn('promotion', text, 'no promotion without the held-out seeds')
+
+    def test_a_new_held_out_loss_is_played_again_and_said_only_as_a_count(self):
+        lost = lambda i, t: dict(self.clean()(i, t), outcome='lost') \
+            if t['seed'] == 2001 else self.clean()(i, t)
+        replayed = []
+
+        def again(tasks):
+            replayed.extend((t['stamp']['suite']['start_id'], t['seed']) for t in tasks)
+            for t in tasks:
+                yield dict(t['stamp'], seed=t['seed'], outcome='lost')
+        text = self.lines(lost, frozen=self.frozen_all_clean(), again=again)
+        self.assertEqual(sorted(replayed), [('ours-ch02', 2001), ('vanilla-ch3', 2001)])
+        self.assertIn('the held-out runs: 2 of 4 lost, 2 of them new since the freeze; played '
+                      'again, 2 lost again (reproducible)', text)
+        self.assertIn('promotion: refused, 2 reproducible held-out losses', text)
+        self.assertNotIn('2001', text, 'a held-out run is never named')
+        # a loss the frozen baseline had is not new, and plays no second time
+        known = frozen_fixture(40, 40, self.frozen_all_clean()['tuning'],
+                               [mc.held_out_tag('vanilla-ch3', 2001),
+                                mc.held_out_tag('ours-ch02', 2001)])
+        replayed[:] = []
+        text = self.lines(lost, frozen=known, again=again)
+        self.assertEqual(replayed, [])
+        self.assertIn('the held-out runs: 2 of 4 lost, none new since the freeze', text)
+        self.assertIn('promotion: PROMOTED', text)
+
+    def test_a_held_out_failure_becomes_a_fixture_only_after_its_seed_is_replaced(self):
+        inst = self.suite()
+        inst['starts'].append(dict(inst['starts'][0], start_id='from-held-out',
+                                   state_path='references/sim/vanilla/c25b145e3745/states/c/4.ss',
+                                   provenance={'campaign': 'c', 'seed': 2001, 'set': 'held_out',
+                                               'source': 'x'},
+                                   seeds={'tuning': [1005, 1006], 'held_out': [2005, 2006]}))
+        with self.assertRaises(matrix.ManifestError) as cm:
+            self.load(inst)
+        self.assertIn('no replacement held-out seeds are frozen', str(cm.exception))
+        inst['held_out_frozen_at'] = 'abc1234'
+        with self.assertRaises(matrix.ManifestError) as cm:
+            self.load(inst)   # 2001 is still vanilla-ch3's held-out seed
+        self.assertIn('held-out seed 2001, which is still held out', str(cm.exception))
+        for s in inst['starts'][:2]:
+            s['seeds'] = dict(s.get('seeds') or {}, held_out=[2101 + 2 * inst['starts'].index(s),
+                                                              2102 + 2 * inst['starts'].index(s)])
+        self.assertEqual(len(self.load(inst)['starts']), 3)
+
+    # ---- the snapshots (T084)
+
+    def test_a_snapshot_names_its_start_provenance_and_invariant(self):
+        inst = self.suite()
+        inst['snapshots'] = [dict(SNAPSHOT)]
+        got = self.load(inst)['snapshots'][0]
+        self.assertEqual((got['game'], got['provenance']['ref']), ('ours', 45))
+        for drop, words in (('board_path', 'board_path'), ('start_id', 'start_id')):
+            inst['snapshots'] = [{k: v for k, v in SNAPSHOT.items() if k != drop}]
+            Suite.refuses(self, inst, words)
+        inst['snapshots'] = [dict(SNAPSHOT, start_id='nowhere')]
+        Suite.refuses(self, inst, 'no start nowhere')
+        inst['snapshots'] = [dict(SNAPSHOT, provenance=dict(SNAPSHOT['provenance'], ref=None))]
+        Suite.refuses(self, inst, 'provenance.ref')
+        inst['snapshots'] = [dict(SNAPSHOT), dict(SNAPSHOT)]
+        Suite.refuses(self, inst, 'listed twice')
+
+    def test_a_snapshot_loads_back_to_its_board_in_a_fresh_emulator(self):
+        d = tempfile.mkdtemp()
+        board = [{'id': 1, 'charId': 1, 'x': 2, 'y': 3, 'hp': 20, 'faction': 'blue'}]
+        rel = os.path.relpath(os.path.join(d, 'b.json'), mc.REPO)
+        with open(os.path.join(d, 'b.json'), 'w') as fh:
+            json.dump(board, fh)
+        inst = self.suite()
+        inst['snapshots'] = [dict(SNAPSHOT, board_path=rel)]
+        suite = self.load(inst)
+        seen = []
+
+        def launch(task, tag, log_path, printed=board):
+            seen.append(task)
+            return 'PINNED %s\n' % json.dumps({'file': task['pinned'], 'board': printed}), None
+        lines, failed = mc.snapshot_check(suite, {'vanilla': {}, 'ours': {}}, 'i', launch=launch)
+        self.assertEqual(failed, [])
+        self.assertIn('snapshot ours-ch03-1002-r45 (ours-ch02, decision 45, deep): loads back to '
+                      'its board', lines[0])
+        self.assertTrue(seen[0]['pinned'].endswith(SNAPSHOT['state_path']))
+        self.assertNotIn('out', seen[0], 'a check writes no record')
+        self.assertEqual(seen[0]['campaign']['attempt'], 1)
+        moved = [dict(board[0], hp=1)]
+        lines, failed = mc.snapshot_check(suite, {'vanilla': {}, 'ours': {}}, 'i',
+                                          launch=lambda *a: launch(*a, printed=moved))
+        self.assertEqual(failed, ['ours-ch03-1002-r45'])
+        self.assertIn('loads to a board other than its own', lines[0])
+        lines, failed = mc.snapshot_check(suite, {'vanilla': {}, 'ours': {}}, 'i',
+                                          launch=lambda *a: ('', None))
+        self.assertIn('printed no PINNED line', lines[0])
+
+    def test_a_failing_snapshot_is_a_regression_and_refuses_a_freeze(self):
+        def lines_with(snap):
+            inst = self.suite()
+            inst['snapshots'] = [dict(SNAPSHOT)]
+            result = {}
+
+            def play(tasks):
+                for t in tasks:
+                    yield dict(t['stamp'], seed=t['seed'], wall_s=1.0, **self.clean()(0, t))
+            text = '\n'.join(mc.run_suite(
+                self.load(inst), envs=lambda: {'vanilla': {}, 'ours': {}}, simdirs={}, play=play,
+                jobs=4, held_out=True, instrument='i', check=lambda *a: [], kept={},
+                frozen=self.frozen_all_clean(), snapshots=snap, result=result))
+            return text, result
+        text, result = lines_with(lambda: (['snapshot s: loads to a board other than its own'],
+                                           ['s']))
+        self.assertIn('promotion: refused, 1 deterministic regression', text)
+        self.assertEqual(mc.freeze_record(result, 'i', 1), (None, 'snapshot s fails its invariant'))
+        text, result = lines_with(lambda: (['snapshot s: loads back to its board'], []))
+        rec, why = mc.freeze_record(result, 'i+v1', 2, today='2026-11-07')
+        self.assertIsNone(why)
+        self.assertEqual((rec['instrument'], rec['manifest_version'], rec['frozen_on']),
+                         ('i+v1', 2, '2026-11-07'))
+        self.assertEqual(rec['calls'], {'tuning': 40, 'held_out': 40})
+        self.assertEqual(sorted(rec['tuning']), ['ours-ch02/1003', 'ours-ch02/1004',
+                                                 'vanilla-ch3/1001', 'vanilla-ch3/1002'])
+        self.assertNotIn('promoted', rec)
+
+    def test_a_freeze_needs_every_run_and_a_promotion(self):
+        result = {}
+        self.lines(lambda i, t: None if i == 0 else self.clean()(i, t), result=result)
+        self.assertEqual(mc.freeze_record(result, 'i', 1)[1],
+                         'not every run came back with a game result')
+        result = {}
+        self.lines(self.clean(99), frozen=self.frozen_all_clean(), result=result)
+        self.assertEqual(mc.freeze_record(result, 'i', 1)[1], 'the candidate is not promoted')
+        # the first freeze has nothing to be promoted over
+        result = {}
+        self.lines(self.clean(), result=result)
+        self.assertIsNone(mc.freeze_record(result, 'i', 1)[1])
+        # a held-out loss is kept hashed: the file never names the held-out run
+        result = {}
+        self.lines(lambda i, t: dict(self.clean()(i, t), outcome='lost') if t['seed'] == 2002
+                   else self.clean()(i, t), result=result)
+        self.assertEqual(result['held_out_losses'], sorted(
+            [mc.held_out_tag('vanilla-ch3', 2002), mc.held_out_tag('ours-ch02', 2002)]))
+        self.assertNotIn('2002', json.dumps(result))
+
+    def test_kept_runs_are_judged_without_playing_again(self):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, 'runs.jsonl')
+        stamp = {'start_id': 'vanilla-ch3', 'set': 'tuning', 'version': 1}
+        with open(path, 'w') as fh:
+            for i, inst in enumerate(('old', 'i', 'i')):
+                fh.write(json.dumps({'kind': 'bot', 'suite': stamp, 'seed': 1001, 'n': i,
+                                     'instrument': inst, 'game': 'vanilla',
+                                     'rom_hash': 'h'}) + '\n')
+        play = mc.kept_play([path], 'i', {'vanilla': 'h'})
+        got = list(play([{'seed': 1001, 'stamp': {'suite': stamp}},
+                         {'seed': 1002, 'stamp': {'suite': stamp}}]))
+        self.assertEqual([r['n'] for r in got], [2], 'the newest of this instrument; none for 1002')
 
 
 class Story(unittest.TestCase):
