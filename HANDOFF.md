@@ -9,7 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-07 (Claude): #574 merged (playtest run dirs no longer pile up in /tmp).
+Refreshed 2026-11-07 (Claude): #510 PR-F merged (#576); agent-team conventions in review (PR #578).
 
 ## Where things stand
 
@@ -18,8 +18,11 @@ Refreshed 2026-11-07 (Claude): #574 merged (playtest run dirs no longer pile up 
 - **#510 step 9, the difficulty instrument** (a bot plays the real ROM, both games; the plan is
   #510 comment 6563384310, ticked in place, spec 6563384018):
   - **Merged:** PR-A #558 (frozen suite), PR-B #559 (graded records), PR-C #560 (risk caps),
-    PR-D #564 (goal ledger, no stalls), PR-E #568 (lookahead, retry memory), and #570's fix #571
-    (lookahead budget 128 an attempt, so the boss fight is no longer judged one phase deep).
+    PR-D #564 (goal ledger, no stalls), PR-E #568 (lookahead, retry memory), #570's fix #571
+    (lookahead budget 128 an attempt, so the boss fight is no longer judged one phase deep), and
+    PR-F #576 (a failure label needs a replayed witness: `montecarlo.py replay` / `audit`, ADR 0392).
+    PR-F's answer to ours-ch03 seed 1002 unit 3: no evidence the hold caused it; every judged plan
+    was over the cap, and the best alternative traded the death to unit 5.
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
@@ -34,14 +37,11 @@ Refreshed 2026-11-07 (Claude): #574 merged (playtest run dirs no longer pile up 
 
 ## Next
 
-1. **PR-F** (T071-T080, diagnostics): a failure gets a label only when a replay of a different
-   plan avoids it. Its T079 live proof has three cases: vanilla Ch5's Gilliam death, ours ch02's
-   green deaths, and ours-ch03 tuning seed 1002's unit 3, killed by the boss on turn 21 under a
-   labelled fallback since #570 (did the hold cause it?). Starts from `harness.lua` (T074),
-   `sight.lua` (T071/T075, spike first), `planner.lua` (T076), `montecarlo.py` (T077; since #574 a
-   passing run's dir is gone, so read its filed trace, not `run_dir`; reuse
-   `read_trace`).
-2. Then PR-G (freeze the suite), PR-H (the ours-vs-twin pilot), PR-I (validity), PR-J (polish).
+1. **PR-G** (T081-T087, freeze the suite). Two items PR-F left it, on the #510 plan comment:
+   add a fog start (vanilla Ch6 = chapter 7, `states/scout-vanilla/7.ss`), and decide whether a
+   normal surprise replan marks a deep/full_info replay `broken`. Both change the instrument, so
+   before the freeze.
+2. Then PR-H (the ours-vs-twin pilot), PR-I (validity), PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
 3. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
    party levers (#510's checklist; #459, #547, #526 with #543 first).
