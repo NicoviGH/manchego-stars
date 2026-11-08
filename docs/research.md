@@ -6,7 +6,7 @@
 > **This file is GENERATED.** Each record is one file under `docs/research/`; add or
 > edit one, then regenerate: `python3 tools/gen_decisions_index.py`.
 
-24 records. Search the titles and tags here, then open the ones you need.
+25 records. Search the titles and tags here, then open the ones you need.
 
 **Contents:** [Playtesting bots](#playtesting-bots) · [FE8: between battles](#fe8-between-battles) · [FE8: building the party](#fe8-building-the-party) · [FE8: whom guides field, by chapter](#fe8-whom-guides-field-by-chapter)
 
@@ -21,6 +21,7 @@
 | `0022` | [Monte Carlo comparisons: stopping when the interval excludes 0 inflates false findings; binary rates need Wilson or...](research/0022-monte-carlo-comparisons-stopping-intervals-and-pairing.md) | 2026-10-27 | #510 | monte-carlo, stopping-rule, sequential-testing, confidence-interval, wilson, mcnemar, common-random-numbers, pairing |
 | `0023` | [A model-simulated expert panel reviewed step 9's bot and verdict: keep the ROM sandbox, rank survival first, measure...](research/0023-step9-advisory-panel-on-the-bot-and-its-verdict.md) | 2026-11-01 | #510 | panel, review, planner, risk-cap, verdict, endpoint, equivalence, human-calibration, retry-memory |
 | `0024` | [A model-simulated panel, on Nicolas's instruction, decided admitted plans rank progress before the judged score: 14...](research/0024-a-panel-decided-progress-before-the-judged-score.md) | 2026-11-02 | #510 #564 #565 | panel, planner, rank, value, progress, fallback-sacrifice, paired-comparison |
+| `0025` | [Bot decision logic that generalises scores outcomes and keeps a hard no for what the game forbids: utility AI,...](research/0025-bot-decisions-as-orderings-of-outcomes.md) | 2026-11-08 | #510 | planner, style, utility-ai, goap, htn, chance-constraint, risk-cap, rules |
 
 ---
 

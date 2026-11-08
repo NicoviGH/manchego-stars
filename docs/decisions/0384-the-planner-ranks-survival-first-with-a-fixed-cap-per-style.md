@@ -111,7 +111,7 @@ records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fa
   Talk (as on main). In the suite, every `over_cap` death came from a labelled fallback.
 - **Not built, and why:** the review of PR #560 asked for the protected death to add the
   counter's own death. `bot.lua` refuses every attack whose counter alone can kill (every style
-  but greedy), so that share is 0 for every attack the planner judges. A counter-and-phase death
+  but greedy; a known break of ADR 0396), so that share is 0 for every attack the planner judges. A counter-and-phase death
   (Franz's 12.7%) is all in the phase share, which admission reads.
 
 **Amended (Nicolas, 2026-11-01): a game over comes before the excess.** A unit whose death ends
