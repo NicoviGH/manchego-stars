@@ -74,7 +74,8 @@ class Records(unittest.TestCase):
         self.assertEqual((v1, v2), (V1, V2))
         self.assertIn(mc.spoiled(v1), mc.spoiled(v2))
         self.assertIn('lost 0x42 (green, turn 4, to 0x81)', mc.attempt_line(v1, set()))
-        self.assertEqual(mc.chapter_result([v1], 3), mc.chapter_result([v2], 3))
+        r1, r2 = mc.chapter_result([v1], 3), mc.chapter_result([v2], 3)
+        self.assertEqual((r1['died'], r1['clean']), (r2['died'], r2['clean']))
         self.assertEqual(mc.first_clean([v1]), mc.first_clean([v2]))
 
     def test_a_graded_line_names_causes_reasons_and_anomalies(self):
@@ -396,75 +397,167 @@ class Attempts(unittest.TestCase):
 
 
 class Verdict(unittest.TestCase):
-    """paired_verdict: the #510 plan's Task 12 rule as amended 2026-10-27 (record 0022)."""
+    """The verdict (ADR 0385, #510 step 9 PR-H): any protected death on attempt 1, exact
+    Clopper-Pearson bounds at alpha / (4 x 3 x N), the +-10-point margin, at every look."""
 
-    def test_identical_runs_run_to_cap(self):
-        pairs = [(True, True)] * 200
-        self.assertFalse(mc.paired_verdict(pairs[:50])['settled'], 'no gap settles nothing early')
-        self.assertFalse(mc.paired_verdict(pairs[:199])['settled'])
-        v = mc.paired_verdict(pairs)
-        self.assertTrue(v['settled'])
-        self.assertFalse(v['differs'])
-        self.assertEqual(v['diff'], 0)
-        self.assertEqual(v['look'], 200)
+    N = 24   # ch00-ch07 in three modes, the frozen cell count ADR 0385's figures are for
 
-    def test_large_gap_settles_early(self):
-        v = mc.paired_verdict([(True, False)] * 30 + [(True, True)] * 20)
-        self.assertTrue(v['settled'])
-        self.assertTrue(v['differs'])
-        self.assertEqual(v['look'], 50)
+    def test_clopper_pearson_matches_published_exact_values(self):
+        # T088. Newcombe 1998a (Stat Med 17:857-872), Table I, method 5 (the exact
+        # Clopper-Pearson interval), its four worked examples, each two-sided 95%: one-sided
+        # bounds at 0.025 each
+        for k, n, lo, hi in ((81, 263, 0.2527, 0.3676), (15, 148, 0.0578, 0.1617),
+                             (0, 20, 0.0, 0.1684), (1, 29, 0.0009, 0.1776)):
+            got = mc.clopper_pearson(k, n, 0.025)
+            self.assertAlmostEqual(got[0], lo, places=4, msg=(k, n))
+            self.assertAlmostEqual(got[1], hi, places=4, msg=(k, n))
+        # k = 0 and k = n have a closed form: 1 - level^(1/n), and its mirror
+        self.assertEqual(mc.clopper_pearson(0, 50, 0.01)[0], 0.0)
+        self.assertAlmostEqual(mc.clopper_pearson(0, 50, 0.01)[1], 1 - 0.01 ** (1 / 50), places=9)
+        self.assertEqual(mc.clopper_pearson(20, 20, 0.025), (1 - mc.clopper_pearson(0, 20, 0.025)[1], 1.0))
+        with self.assertRaises(ValueError):
+            mc.clopper_pearson(3, 2, 0.025)
+
+    def test_each_bound_takes_its_share_of_the_familywise_alpha(self):
+        # T089, FR-026: four bounds a look, three looks, N cells
+        self.assertAlmostEqual(mc.bound_level(self.N), 0.05 / (4 * 3 * 24))
+        self.assertAlmostEqual(mc.bound_level(1), 0.05 / 12)
+        for bad in (0, -1, 2.0, True, None):
+            with self.assertRaises(ValueError):
+                mc.bound_level(bad)
+
+    def test_paired_bounds_the_discordant_proportions_marginal_the_arms(self):
+        # T089: a both-died b only-ours c only-twin d neither
+        table = (30, 6, 2, 62)
+        level = mc.bound_level(self.N)
+        lb, ub = mc.clopper_pearson(6, 100, level)
+        lc, uc = mc.clopper_pearson(2, 100, level)
+        self.assertEqual(mc.confirmatory_interval(table, self.N, 'paired'), (lb - uc, ub - lc))
+        l1, u1 = mc.clopper_pearson(36, 100, level)
+        l2, u2 = mc.clopper_pearson(32, 100, level)
+        self.assertEqual(mc.confirmatory_interval(table, self.N, 'marginal'), (l1 - u2, u1 - l2))
+        p, m = (mc.confirmatory_interval(table, self.N, a) for a in ('paired', 'marginal'))
+        self.assertLess(p[1] - p[0], m[1] - m[0], 'pairs that covary narrow the interval')
+        with self.assertRaises(ValueError):
+            mc.confirmatory_interval(table, self.N, 'mcnemar')
+
+    def test_zero_discordance_needs_no_rule_of_its_own(self):
+        # T090: the bounds handle 0 of n; ADR 0385's figures at N = 24
+        v = mc.paired_verdict([(False, False)] * 50, self.N, 'paired')
+        self.assertAlmostEqual(v['hi'], 0.159, places=3)
+        self.assertEqual((v['look'], v['verdict'], v['settled']), (50, 'INCONCLUSIVE', False))
+        self.assertIn('next look is at 100', v['reason'])
+        v = mc.paired_verdict([(True, True), (False, False)] * 100, self.N, 'paired')
+        self.assertAlmostEqual(v['hi'], 0.042, places=3)
+        self.assertAlmostEqual(v['lo'], -0.042, places=3)
+        self.assertEqual((v['look'], v['verdict'], v['settled']), (200, 'EQUIVALENT', True))
+
+    def test_the_labels_are_checked_in_order_at_every_look(self):
+        # T090, FR-028: equivalence first, then a side, then nothing
+        self.assertEqual(mc.label(-0.05, 0.08), 'EQUIVALENT')
+        self.assertEqual(mc.label(0.01, 0.09), 'EQUIVALENT', 'inside the margin wins over a side')
+        self.assertEqual(mc.label(0.01, 0.30), 'HARDER')
+        self.assertEqual(mc.label(-0.30, -0.01), 'EASIER')
+        self.assertEqual(mc.label(-0.12, 0.12), 'INCONCLUSIVE')
+        # a large gap is called at the first look: ours loses someone on 30 of 50, the twin never
+        v = mc.paired_verdict([(True, False)] * 30 + [(False, False)] * 20, self.N, 'paired')
+        self.assertEqual((v['look'], v['verdict'], v['settled']), (50, 'HARDER', True))
         self.assertAlmostEqual(v['diff'], 0.6)
-        self.assertLess(v['lo'], 0.6)
-        self.assertGreater(v['lo'], 0)
-
-    def test_close_call_runs_to_cap(self):
-        # ours clean 3 more times in every 50: a real but small gap
-        block = [(True, False)] * 6 + [(False, True)] * 3 + [(True, True)] * 41
+        v = mc.paired_verdict([(False, True)] * 30 + [(False, False)] * 20, self.N, 'paired')
+        self.assertEqual(v['verdict'], 'EASIER')
+        # a small real gap never settles early, and the last look settles INCONCLUSIVE
+        block = [(True, False)] * 6 + [(False, True)] * 3 + [(False, False)] * 41
         for n in (50, 100):
-            self.assertFalse(mc.paired_verdict(block * (n // 50))['settled'], n)
-        v = mc.paired_verdict(block * 4)
-        self.assertTrue(v['settled'])
-        self.assertEqual(v['discordant'], 36)
+            self.assertFalse(mc.paired_verdict(block * (n // 50), self.N, 'paired')['settled'])
+        v = mc.paired_verdict(block * 4, self.N, 'paired')
+        self.assertEqual((v['verdict'], v['settled'], v['discordant']), ('INCONCLUSIVE', True, 36))
 
     def test_no_look_between_planned_ones(self):
-        # 70 pairs: the last 20 are a wall of ours-only clears, but the look is at 50, on the
+        # 70 pairs: the last 20 are a wall of ours-only deaths, but the look is at 50, on the
         # first 50 alone, and those are even
         pairs = [(True, False), (False, True)] * 25 + [(True, False)] * 20
-        v = mc.paired_verdict(pairs)
-        self.assertEqual(v['look'], 50)
+        v = mc.paired_verdict(pairs, self.N, 'paired')
+        self.assertEqual((v['look'], v['diff']), (50, 0))
         self.assertFalse(v['settled'])
-        self.assertEqual(v['diff'], 0)
-        self.assertIn('next look is at 100', v['reason'])
-        self.assertIsNone(mc.paired_verdict(pairs[:49])['look'])
+        self.assertIsNone(mc.paired_verdict(pairs[:49], self.N, 'paired')['look'])
+        with self.assertRaises(ValueError):
+            mc.paired_verdict(pairs, self.N, 'paired', look=70)
 
-    def test_intervals_match_published_values(self):
-        lo, hi = mc.wilson(0, 10)              # the score interval's 0/n case: z^2 / (n + z^2)
-        self.assertEqual(lo, 0.0)
-        self.assertAlmostEqual(hi, 0.2775, places=4)
-        # Newcombe 1998a's worked example, 56/70 vs 48/80 (method 10): 0.0524 to 0.3339
-        lo, hi = mc.square_and_add(56, 70, 48, 80)
-        self.assertAlmostEqual(lo, 0.0524, places=4)
-        self.assertAlmostEqual(hi, 0.3339, places=4)
-        self.assertAlmostEqual(mc.mcnemar_exact(0, 6), 2 / 64)   # all six discordant one way
-        self.assertEqual(mc.mcnemar_exact(0, 0), 1.0)
-        lo, hi = mc.newcombe_paired(10, 4, 4, 12)
-        self.assertLess(lo, 0)
-        self.assertGreater(hi, 0)
-        self.assertAlmostEqual(lo, -hi)
+    def test_unresolved_attempts_stay_in_the_denominators_bounded_both_ways(self):
+        # T091, FR-027: each unresolved pair is read as the worst case each way
+        pairs = [(False, False)] * 196 + [(None, False), (False, None), (None, None),
+                                          (True, None)]
+        low, high = mc.bound_unresolved(pairs)
+        self.assertEqual(low, mc.table_of([(False, False)] * 196 + [
+            (False, False), (False, True), (False, True), (True, True)]))
+        self.assertEqual(high, mc.table_of([(False, False)] * 196 + [
+            (True, False), (False, False), (True, False), (True, False)]))
+        self.assertEqual(sum(low), 200, 'nothing is dropped')
+        v = mc.paired_verdict(pairs, self.N, 'paired')
+        self.assertEqual(v['unresolved'], 4)
+        self.assertEqual(v['lo'], mc.confirmatory_interval(low, self.N, 'paired')[0])
+        self.assertEqual(v['hi'], mc.confirmatory_interval(high, self.N, 'paired')[1])
+
+    def test_a_verdict_the_bounded_interval_does_not_support_is_withheld(self):
+        # T091: 200 even pairs are EQUIVALENT; 20 of them unresolved widen it past the margin,
+        # and an interval that then decides nothing is withheld, not inconclusive
+        even = [(False, False)] * 200
+        self.assertEqual(mc.paired_verdict(even, self.N, 'paired')['verdict'], 'EQUIVALENT')
+        v = mc.paired_verdict([(None, None)] * 20 + even[20:], self.N, 'paired')
+        self.assertEqual((v['verdict'], v['settled']), ('WITHHELD', True))
+        self.assertIn('20 unresolved', v['reason'])
+        # a gap clear even at the worst case is still called
+        v = mc.paired_verdict([(True, False)] * 40 + [(None, None)] * 2 + [(False, False)] * 8,
+                              self.N, 'paired')
+        self.assertEqual(v['verdict'], 'HARDER')
+
+    def test_the_pilot_reports_its_table_and_picks_its_analysis(self):
+        # T093, FR-025: 5 both, 3 only ours, 2 only the twin, 40 neither
+        pairs = [(True, True)] * 5 + [(True, False)] * 3 + [(False, True)] * 2 + \
+            [(False, False)] * 40 + [(None, True)]
+        s = mc.pilot_summary(pairs, self.N, cpu_s=3600.0, reach={'ours': {'reached': 51}})
+        self.assertEqual((s['table'], s['ours_only'], s['twin_only'], s['unresolved']),
+                         ((5, 3, 2, 40), 3, 2, 1))
+        self.assertAlmostEqual(s['diff'], 0.02)
+        self.assertAlmostEqual(s['discordance'], 0.1)
+        self.assertAlmostEqual(s['corr'], (5 * 40 - 6) / (8 * 42 * 7 * 43) ** 0.5)
+        self.assertEqual(s['analysis'], 'paired', 'the arms covary positively')
+        # ADR 0385's reference at 200 pairs and N = 24: 10% discordance reads +-11.7
+        self.assertAlmostEqual(s['half_width'], 0.117, places=3)
+        self.assertFalse(s['reachable'])
+        self.assertEqual((s['cpu_s'], s['reach']), (3600.0, {'ours': {'reached': 51}}))
+        self.assertNotIn('verdict', s, 'pilot pairs are never confirmatory')
+        # 5% discordance reads +-8.8, inside the margin
+        s = mc.pilot_summary([(True, False), (False, True)] + [(False, False)] * 38, self.N)
+        self.assertAlmostEqual(s['half_width'], 0.088, places=3)
+        self.assertTrue(s['reachable'])
+
+    def test_arms_that_do_not_covary_are_analysed_marginally(self):
+        # independent arms: covariance 0 (a d = b c), so marginal, its width at the pooled rate
+        s = mc.pilot_summary([(True, True)] * 1 + [(True, False)] * 9 + [(False, True)] * 9 +
+                             [(False, False)] * 81, self.N)
+        self.assertEqual((s['cov'], s['analysis']), (0.0, 'marginal'))
+        level = mc.bound_level(self.N)
+        lo, hi = mc.clopper_pearson(20, 200, level)
+        self.assertAlmostEqual(s['half_width'], hi - lo)
+        with self.assertRaises(ValueError):
+            mc.pilot_summary([(None, True)], self.N)
 
 
 class Cell(unittest.TestCase):
-    """run_cell over a fake `play`: `fate(name, seed) -> records of that campaign` (each a
-    BOTRUN of the cell's chapter, attempt 1, unless the fate says otherwise)."""
+    """run_cell and cell_pairs over a fake `play`: `fate(name, seed, chapter) -> records of
+    that replicate` (a campaign cell's: BOTRUN records then its CAMPAIGN summary)."""
+
+    N = 24
 
     def sides(self, store_dir=None):
         d = store_dir or tempfile.mkdtemp()
         out = {}
         for n, ch in (('ours', 4), ('vanilla', 3)):
             env = {'last': [ch], 'claims': {}, 'game': n}
-            out[n] = {'env': env, 'chapter': ch, 'mode': 'normal', 'vanilla': n == 'vanilla',
-                      'store': os.path.join(d, n + '.jsonl'),
-                      'stamp': mc.cell_stamp(env, 'normal', 'bot1')}
+            out[n] = mc.campaign_side(env, ch, 'normal', os.path.join(d, n + '.jsonl'),
+                                      mc.cell_stamp(env, 'normal', 'bot1'), n == 'vanilla')
+            out[n]['stamp'] = mc.cell_stamp(env, 'normal', 'bot1')
         return out
 
     def play(self, fate, log):
@@ -479,86 +572,139 @@ class Cell(unittest.TestCase):
         return play
 
     @staticmethod
-    def clean(yes, chapter):
-        return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'clean': yes},
+    def died(yes, chapter, clean=None):
+        deaths = [{'charId': 1, 'faction': 'blue'}] if yes else []
+        return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'deaths': deaths,
+                 'clean': (not yes) if clean is None else clean},
                 {'kind': 'campaign', 'outcome': 'done'}]
 
-    def test_vanilla_pairs_read_from_the_store_first(self):
+    def test_kept_pairs_are_read_from_the_store_first(self):
         sides = self.sides()
         for s in range(1, 51):
-            for r in self.clean(True, 3):
+            for r in self.died(False, 3):
                 mc.append_record(sides['vanilla']['store'],
                                  dict(r, seed=s, **sides['vanilla']['stamp']))
         log = []
-        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.clean(False, ch), log))
-        self.assertTrue(v['settled'], 'ours 0/50 vs vanilla 50/50 settles at the first look')
+        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.died(True, ch), log), self.N,
+                        'paired')
+        self.assertEqual((v['verdict'], v['look']), ('HARDER', 50))
         self.assertEqual(v['played'], {'ours': 50, 'vanilla': 0})
         self.assertNotIn('vanilla', {n for n, _ in log})
 
     def test_a_kept_run_of_another_env_is_played_again(self):
         sides = self.sides()
-        other = mc.cell_stamp(dict(sides['vanilla']['env'], claims={'3': ['x']}), 'normal', 'bot1')
+        env = {'last': [3], 'claims': {'3': ['x']}, 'game': 'vanilla'}
+        other = mc.cell_stamp(env, 'normal', 'bot1')
         self.assertNotEqual(other, sides['vanilla']['stamp'], 'claims are in the stamp')
         for s in range(1, 51):
-            for r in self.clean(True, 3):
+            for r in self.died(True, 3):
                 mc.append_record(sides['vanilla']['store'], dict(r, seed=s, **other))
-        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.clean(n == 'vanilla', ch), []))
+        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.died(n == 'ours', ch), []),
+                        self.N, 'paired')
         self.assertEqual(v['played']['vanilla'], 50)
 
-    def test_identical_cell_runs_to_the_last_look(self):
-        v = mc.run_cell(self.sides(), self.play(lambda n, s, ch: self.clean(s % 2 == 0, ch), []))
-        self.assertEqual(v['look'], 200)
-        self.assertTrue(v['settled'])
-        self.assertFalse(v['differs'])
+    def test_a_cell_stops_at_the_first_look_that_decides(self):
+        # no discordance: +-15.9 at 50 is too wide, +-8.3 at 100 is inside the margin
+        v = mc.run_cell(self.sides(), self.play(lambda n, s, ch: self.died(False, ch), []),
+                        self.N, 'paired')
+        self.assertEqual((v['look'], v['verdict'], v['settled']), (100, 'EQUIVALENT', True))
+        self.assertEqual(v['played'], {'ours': 100, 'vanilla': 100})
+        # 10% discordance, evenly split, decides nothing anywhere and plays to the last look
+        v = mc.run_cell(self.sides(), self.play(
+            lambda n, s, ch: self.died((s % 20 == 0) if n == 'ours' else (s % 20 == 10), ch),
+            []), self.N, 'paired')
+        self.assertEqual((v['look'], v['verdict'], v['settled']), (200, 'INCONCLUSIVE', True))
         self.assertEqual(v['played'], {'ours': 200, 'vanilla': 200})
 
-    def test_the_pair_is_the_first_attempt(self):
-        def fate(n, s, ch):
-            return [{'chapter': ch, 'attempt': 1, 'outcome': 'lost', 'clean': False},
-                    {'chapter': ch, 'attempt': 2, 'outcome': 'won', 'clean': True},
-                    {'kind': 'campaign', 'outcome': 'done'}]
-        v = mc.run_cell(self.sides(), self.play(fate, []))
-        self.assertEqual((v['ours'], v['vanilla']), (0.0, 0.0), 'a later clean retry is not it')
+    def test_the_endpoint_is_any_death_in_attempt_one_and_clean_is_only_reported(self):
+        # a won attempt with a death is a death; a lost attempt with none is not; a later
+        # retry is not the first attempt
+        recs = [{'chapter': 3, 'attempt': 1, 'outcome': 'won', 'clean': False,
+                 'deaths': [{'charId': 2, 'faction': 'blue'}]},
+                {'chapter': 3, 'attempt': 2, 'outcome': 'won', 'clean': True, 'deaths': []}]
+        r = mc.chapter_result(recs, 3)
+        self.assertEqual((r['status'], r['died'], r['clean']), ('played', True, False))
+        r = mc.chapter_result([{'chapter': 3, 'attempt': 1, 'outcome': 'lost', 'deaths': []}], 3)
+        self.assertEqual((r['died'], r['clean']), (False, False))
+        # a green whose death does not end the game is not the endpoint; one that does is
+        green = {'charId': 9, 'faction': 'green', 'escort': False}
+        vip = dict(green, escort=True)
+        for d, want in ((green, False), (vip, True)):
+            r = mc.chapter_result([{'chapter': 3, 'attempt': 1, 'outcome': 'won',
+                                    'deaths': [d]}], 3)
+            self.assertEqual(r['died'], want, d)
 
-    def test_a_crash_stops_the_cell_and_says_why(self):
+    def test_a_crash_is_retried_once_on_its_own_seed_then_bounded(self):
+        # T091: ours seed 3 crashes twice; it stays in the pairs as unresolved
         def fate(n, s, ch):
             if (n, s) == ('ours', 3):
                 return [{'chapter': ch, 'attempt': 1, 'outcome': 'crashed', 'run_dir': '/tmp/r3',
                          'why': 'Lua error: boom', 'log_tail': ['RESULT: FAIL']},
                         {'kind': 'campaign', 'outcome': 'crashed', 'why': 'chapter 4 attempt 1'}]
-            return self.clean(True, ch)
+            return self.died(False, ch)
         log = []
-        v = mc.run_cell(self.sides(), self.play(fate, log))
-        self.assertFalse(v['settled'])
-        self.assertIn('stopped at 50 pairs', v['reason'])
-        p = v['problems']
-        self.assertEqual([(x['side'], x['seed']) for x in p], [('ours', 3)])
-        self.assertEqual(p[0]['why'], 'Lua error: boom')
-        self.assertEqual(p[0]['log_tail'], ['RESULT: FAIL'])
-        self.assertEqual(log.count(('ours', 3)), 1, 'never played again')
+        got = mc.cell_pairs(self.sides(), self.play(fate, log), list(range(1, 51)))
+        self.assertEqual(log.count(('ours', 3)), 2, 'played, then retried once on its seed')
         self.assertNotIn(('ours', 51), log, 'and no seed stands in for it')
+        self.assertEqual(len(got['pairs']), 50)
+        self.assertEqual(got['pairs'][2], (None, False))
+        p = got['problems']
+        self.assertEqual([(x['side'], x['seed'], x['status']) for x in p],
+                         [('ours', 3, 'unresolved')])
+        self.assertEqual((p[0]['why'], p[0]['log_tail']), ('Lua error: boom', ['RESULT: FAIL']))
+        self.assertFalse(got['withheld'])
 
-    def test_a_campaign_that_never_reached_the_chapter_says_where_it_stopped(self):
+    def test_a_retry_that_plays_is_the_first_attempt(self):
+        tries = []
+
+        def fate(n, s, ch):
+            if (n, s) == ('ours', 3) and not tries:
+                tries.append(1)
+                return [{'chapter': ch, 'attempt': 1, 'outcome': 'crashed', 'why': 'x'},
+                        {'kind': 'campaign', 'outcome': 'crashed'}]
+            return self.died(n == 'ours', ch)
+        got = mc.cell_pairs(self.sides(), self.play(fate, []), [3])
+        self.assertEqual(got['pairs'], [(True, False)])
+        self.assertEqual(got['problems'], [])
+
+    def test_a_campaign_cell_compares_only_what_both_arms_reach(self):
+        # T092, FR-024: vanilla seed 7 lost an earlier chapter; the pair is left out and counted
         def fate(n, s, ch):
             if (n, s) == ('vanilla', 7):
-                return [{'chapter': 2, 'attempt': 1, 'outcome': 'lost', 'clean': False},
-                        {'kind': 'campaign', 'outcome': 'infeasible',
+                return [{'chapter': 2, 'attempt': 1, 'outcome': 'lost'},
+                        {'kind': 'campaign', 'outcome': 'bot_fault',
                          'why': 'chapter 2: no clean clear in 300 attempts'}]
-            return self.clean(True, ch)
-        v = mc.run_cell(self.sides(), self.play(fate, []))
-        p = v['problems'][0]
-        self.assertEqual((p['side'], p['seed']), ('vanilla', 7))
+            return self.died(False, ch)
+        got = mc.cell_pairs(self.sides(), self.play(fate, []), list(range(1, 11)))
+        self.assertEqual(len(got['pairs']), 9)
+        self.assertEqual(got['reach']['vanilla'], {'reached': 9, 'unreached': 1, 'unresolved': 0})
+        self.assertEqual(got['reach']['ours'], {'reached': 10, 'unreached': 0, 'unresolved': 0})
+        p = got['problems'][0]
+        self.assertEqual((p['side'], p['seed'], p['status']), ('vanilla', 7, 'unreached'))
         self.assertIn('never played chapter 3', p['why'])
         self.assertIn('300 attempts', p['why'])
+        self.assertFalse(got['withheld'])
 
-    def test_an_earlier_crash_is_reported_in_its_own_words(self):
+    def test_unresolved_reachability_withholds_the_comparison(self):
+        # T091: a campaign that crashed before the chapter, twice
         def fate(n, s, ch):
             if (n, s) == ('ours', 1):
                 return [{'chapter': 2, 'attempt': 1, 'outcome': 'crashed', 'why': 'Lua error: x'},
                         {'kind': 'campaign', 'outcome': 'crashed', 'why': 'chapter 2 crashed'}]
-            return self.clean(True, ch)
-        p = mc.run_cell(self.sides(), self.play(fate, []))['problems'][0]
+            return self.died(False, ch)
+        log = []
+        v = mc.run_cell(self.sides(), self.play(fate, log), self.N, 'paired')
+        self.assertEqual((v['verdict'], v['settled'], v['look']), ('WITHHELD', False, 50))
+        self.assertIn('whether it reaches it is unknown', v['reason'])
+        p = v['problems'][0]
+        self.assertEqual(p['status'], 'reach_unresolved')
         self.assertIn('crashed (chapter 2, attempt 1): Lua error: x', p['why'])
+        self.assertEqual(log.count(('ours', 1)), 2)
+
+    def test_a_cell_needs_its_last_looks_seeds(self):
+        with self.assertRaises(ValueError):
+            mc.run_cell(self.sides(), self.play(lambda n, s, ch: [], []), self.N, 'paired',
+                        seeds=range(1, 100))
 
     def test_campaign_tasks_keep_their_seed_from_new_game(self):
         stamp = mc.cell_stamp({'last': [7]}, 'difficult', 'b')
@@ -652,7 +798,7 @@ class Cell(unittest.TestCase):
 SUITE = {
     'version': 1, 'held_out_frozen_at': None, 'route': 1,
     'emulator': {'binary': 'tools/emulator/mgba-headless', 'sha1': 'e' * 40},
-    'seed_sets': {'confirmatory': [1, 200], 'pilot': [3001, 3050]},
+    'seed_sets': {'confirmatory': [1, 200], 'pilot': [3001, 3050]}, 'cells': 24,
     'defaults': {'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}, 'style': 'drawn',
                  'invariant': 'record', 'estimate_wall_s': 600,
                  'budgets': {'beam': 6, 'final': 4, 'branch': 8, 'lookahead_decision': 8,
@@ -776,6 +922,61 @@ class Suite(unittest.TestCase):
                           (2002, 'held_out')])
         self.assertFalse(tasks[4]['vanilla'])
         self.assertEqual(len(mc.suite_tasks(suite, envs, 'i', {}, sets=('tuning',))), 4)
+
+    def test_chapter_tasks_give_each_replicate_its_own_seed_on_the_pinned_start(self):
+        # T092, FR-024: one task a seed, both arms from their pinned starts, attempt 1 only
+        suite = self.load(self.suite())
+        envs = {'vanilla': {'last': [99], 'claims': {}}, 'ours': {'last': [8], 'shops': {}}}
+        outs = {'vanilla': '/v.jsonl', 'ours': '/o.jsonl'}
+        arms = [mc.chapter_tasks(suite, envs, 'i', outs, sid, 'pilot')
+                for sid in ('ours-ch02', 'vanilla-ch3')]
+        for tasks in arms:
+            self.assertEqual([t['seed'] for t in tasks], list(range(3001, 3051)))
+            self.assertEqual({t['stamp']['suite']['set'] for t in tasks}, {'pilot'})
+        self.assertEqual(arms[0][0]['campaign'], {'last': [3], 'shops': {}, 'id': 'o', 'from': 3,
+                                                  'attempt': 1})
+        self.assertEqual((arms[1][0]['campaign']['from'], arms[1][0]['out']), (3, '/v.jsonl'))
+        some = mc.chapter_tasks(suite, envs, 'i', outs, 'vanilla-ch3', 'confirmatory', [7, 2])
+        self.assertEqual([t['seed'] for t in some], [2, 7])
+        for bad in (('vanilla-ch3', 'pilot', [7]), ('vanilla-ch3', 'tuning', [2001]),
+                    ('vanilla-ch3', 'nope', None), ('ours-ch99', 'pilot', None)):
+            with self.assertRaises(ValueError):
+                mc.chapter_tasks(suite, envs, 'i', outs, *bad)
+
+    def test_a_chapter_side_reads_only_its_own_kept_runs(self):
+        suite = self.load(self.suite())
+        d = tempfile.mkdtemp()
+        store = os.path.join(d, 'runs.jsonl')
+        base = {'game': 'vanilla', 'rom_hash': 'h', 'instrument': 'i', 'chapter': 3,
+                'attempt': 1, 'outcome': 'won'}
+        for seed, inst, sid, kind, rom in ((3001, 'i', 'vanilla-ch3', 'pilot', 'h'),
+                                           (3002, 'old', 'vanilla-ch3', 'pilot', 'h'),
+                                           (3003, 'i', 'vanilla-ch3', 'tuning', 'h'),
+                                           (3004, 'i', 'ours-ch02', 'pilot', 'h'),
+                                           (3005, 'i', 'vanilla-ch3', 'pilot', 'other')):
+            mc.append_record(store, dict(base, seed=seed, instrument=inst, rom_hash=rom,
+                                         suite={'start_id': sid, 'set': kind, 'version': 1}))
+        side = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', 'vanilla-ch3', 'pilot',
+                               store, 'h')
+        self.assertEqual(sorted(side['kept']()), [3001])
+        self.assertEqual((side['chapter'], side['vanilla']), (3, True))
+        self.assertEqual([t['seed'] for t in side['tasks']([3009])], [3009])
+
+    def test_the_pilot_and_confirmatory_seeds_never_meet(self):
+        # T092, FR-025 (the tuning and held-out seeds' clash is test_a_seed_in_two_sets_raises)
+        inst = self.suite()
+        inst['seed_sets']['pilot'] = [150, 199]
+        self.refuses(inst, 'confirmatory and pilot seeds meet at 150')
+
+    def test_the_frozen_cell_count_is_a_positive_count(self):
+        for bad in (0, 2.5, True, 'x'):
+            inst = self.suite()
+            inst['cells'] = bad
+            self.refuses(inst, 'frozen N')
+        inst = self.suite()
+        del inst['cells']
+        self.refuses(inst, 'cells')
+        self.assertEqual(mc.load_suite()['cells'], 24, 'ch00-ch07 in three modes (ADR 0385)')
 
     def test_a_start_that_no_longer_matches_is_refused(self):
         d = tempfile.mkdtemp()
