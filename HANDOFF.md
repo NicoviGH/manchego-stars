@@ -10,7 +10,7 @@ here should still be true in a month. Before a context rollover, warn Nicolas, r
 and start a fresh instance; don't rely on auto-compaction.
 
 Refreshed 2026-11-08 (Claude): #510 PR-H merged (#582, ADR 0385 "Built (PR-H)"): the verdict
-and the ch03 pilot. PR-I is next.
+and the ch03 pilot. Next: confirm and diagnose the pilot's findings, then PR-I.
 
 ## Where things stand
 
@@ -62,11 +62,16 @@ and the ch03 pilot. PR-I is next.
 
 ## Next
 
-1. **PR-I** (validity, T100+): the validity bar of ADR 0385 point 4. Start from the pilot's two
-   findings above (the ch03 blind-spot rate, and seeds that only draw the style); bring
-   Nicolas the second one before building around it, since it decides what a chapter cell
-   measures.
-2. Then PR-J (polish).
+1. **Before PR-I: confirm, then diagnose, the ch03 pilot** (#510 comment 6718140525, which
+   holds the evidence, the three unconfirmed claims and the two runs to replay). First prove or
+   disprove each claim: careful's fallback never pulls back out of the Mogall's range 2; the
+   blind spot is the bot misjudging the Mogall's reach (the story's changing "from" tile vs the
+   YAML's GuardTile); 36% overstates ch03. Then `montecarlo.py replay` the two seed-3001
+   deaths named there. Tell Nicolas what each one showed in plain words.
+2. **PR-I** (validity, T100+): ADR 0385 point 4's bar, built on what step 1 found. Bring
+   Nicolas the "a seed only draws the style" finding before building around it: it decides
+   what a chapter cell measures.
+3. Then PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
 3. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
    party levers (#510's checklist; #459, #547, #526 with #543 first).
