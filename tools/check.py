@@ -549,17 +549,22 @@ def _staged_files():
     import subprocess
     env = {k: v for k, v in os.environ.items()
            if not k.startswith('GIT_') or k == 'GIT_INDEX_FILE'}
-    r = subprocess.run(['git', '-C', REPO, 'diff', '--cached', '--name-only'],
-                       capture_output=True, text=True, env=env)
+    # --no-renames: a staged rename must list its OLD path too, which a test may still open
+    # by name. -z: no quoting of unusual paths.
+    r = subprocess.run(['git', '-C', REPO, 'diff', '--cached', '--name-only', '--no-renames',
+                        '-z'], capture_output=True, text=True, env=env)
     if r.returncode != 0:
         return None                      # unknown -- and unknown must RUN the canaries
-    return [line for line in r.stdout.splitlines() if line.strip()]
+    return [p for p in r.stdout.split('\0') if p.strip()]
 
 
-def _hook_skips_canaries():
-    if os.environ.get('MS_PRECOMMIT') != '1':
-        return False
-    staged = _staged_files()
+def _hook_staged():
+    """What this commit stages under the pre-commit hook; None outside it, or when unknown."""
+    return _staged_files() if os.environ.get('MS_PRECOMMIT') == '1' else None
+
+
+def _hook_skips_canaries(staged):
+    """`staged` is _staged_files() under the hook, None outside it or when unknown."""
     if staged is None:
         return False
     inputs = _canary_input_files()
@@ -595,11 +600,11 @@ def check_tests_pass(fail):
     # gate and the target can never drift into testing different sets (#382).
     import run_tests
     paths = run_tests.test_files()
-    if _hook_skips_canaries():
+    staged = _hook_staged()
+    if _hook_skips_canaries(staged):
         paths = [p for p in paths if not os.path.basename(p).startswith('test_check_canaries')]
         print('check_tests_pass: canaries skipped in the hook -- no tools/ Python and no file '
               'a canary doctors is staged; `make check`, `make test` and CI run them')
-    staged = _staged_files() if os.environ.get('MS_PRECOMMIT') == '1' else None
     if staged is not None:
         # The hook runs only the tests a staged path can reach, from what each one read on its
         # last passing run (run_tests.affected, #579). A test with no record, a failing one,

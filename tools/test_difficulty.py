@@ -12,6 +12,7 @@ import contextlib
 import copy
 import io
 import dataclasses
+import glob
 import os
 import re
 import sys
@@ -3375,8 +3376,9 @@ class TalkRecruits(unittest.TestCase):
 # touched a difficulty input waited on it alone. Each file runs every SHARDS-th TestCase class
 # in name order, after HEAVY places the few slow classes by hand (measured 2026-11-07, s:
 # Mirror 8.2, ChapterPressure 7.0, KitPaths 4.2, AiFindings 3.7, MirrorInTheCurve 2.5 of 32
-# in all) so no shard holds two of them. test_difficulty_shard*.py set SHARD, and DealtWhole
-# proves the deal covers every class exactly once and HEAVY names only classes that exist.
+# in all), spread by measured time. test_difficulty_shard<k>.py runs shard k through
+# shard_main, which reads k from its file name, and DealtWhole proves the deal covers every
+# class exactly once, HEAVY names only classes that exist, and each shard has its file.
 SHARDS = 3
 SHARD = 0
 HEAVY = {'MirrorIsModeInvariant': 0, 'ChapterPressureInMode': 1, 'KitPaths': 2,
@@ -3401,6 +3403,13 @@ def load_tests(loader, tests, pattern):
     return shard_suite(loader, SHARD)
 
 
+def shard_main(path):
+    """Run the shard a test_difficulty_shard<k>.py stub names."""
+    k = int(re.search(r'_shard(\d+)\.py$', path).group(1))
+    result = unittest.TextTestRunner().run(shard_suite(unittest.defaultTestLoader, k))
+    sys.exit(0 if result.wasSuccessful() else 1)
+
+
 class DealtWhole(unittest.TestCase):
     def test_every_class_in_exactly_one_shard(self):
         dealt = [c for k in range(SHARDS) for c in shard_classes(k)]
@@ -3408,9 +3417,9 @@ class DealtWhole(unittest.TestCase):
                          sorted(c.__name__ for c in all_classes()))
         self.assertLessEqual(set(HEAVY), {c.__name__ for c in all_classes()})
         here = os.path.dirname(os.path.abspath(__file__))
-        for k in range(1, SHARDS):
-            with open(os.path.join(here, 'test_difficulty_shard%d.py' % k)) as fh:
-                self.assertIn('SHARD = %d' % k, fh.read())
+        stubs = glob.glob(os.path.join(here, 'test_difficulty_shard*.py'))
+        self.assertEqual(sorted(os.path.basename(p) for p in stubs),
+                         ['test_difficulty_shard%d.py' % k for k in range(1, SHARDS)])
 
 
 if __name__ == '__main__':

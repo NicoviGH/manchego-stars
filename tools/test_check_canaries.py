@@ -28,6 +28,7 @@ import io
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -37,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check                                                         # noqa: E402
 from inject import hosts                                             # noqa: E402
 from inject import source                                            # noqa: E402
+from inject.decomp import git_env                                   # noqa: E402
 
 REPO = check.REPO
 CHAPTERS = 'campaigns/rime-of-the-frostmaiden/chapters/'
@@ -604,7 +606,7 @@ class TheHookSkipsCanariesOnlyWhenNoCheckCodeIsStaged(unittest.TestCase):
                 mock.patch.object(check, '_staged_files', lambda: list(staged)):
             if not hook:
                 os.environ.pop('MS_PRECOMMIT', None)
-            return check._hook_skips_canaries()
+            return check._hook_skips_canaries(check._hook_staged())
 
     def test_a_content_commit_skips_them(self):
         self.assertTrue(self._skips([CHAPTERS + 'ch05-the-elven-tomb.yaml', 'docs/roadmap.md']))
@@ -630,17 +632,35 @@ class TheHookSkipsCanariesOnlyWhenNoCheckCodeIsStaged(unittest.TestCase):
 
         def fake_run(cmd, **kw):
             seen.update(kw['env'])
-            return mock.Mock(stdout='tools/check.py\n', returncode=0)
+            seen['cmd'] = cmd
+            return mock.Mock(stdout='tools/check.py\0', returncode=0)
         env = {'GIT_INDEX_FILE': '/tmp/next-index', 'GIT_DIR': '/elsewhere/.git'}
         with mock.patch.dict(os.environ, env), mock.patch('subprocess.run', fake_run):
             self.assertEqual(['tools/check.py'], check._staged_files())
         self.assertEqual('/tmp/next-index', seen.get('GIT_INDEX_FILE'))
         self.assertNotIn('GIT_DIR', seen)
+        # A staged rename lists its old path too, which a test may still open by name (#579).
+        self.assertIn('--no-renames', seen['cmd'])
+
+    def test_a_staged_rename_lists_both_paths(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        git = lambda *a: subprocess.run(['git', '-C', tmp] + list(a), check=True,
+                                        capture_output=True, env=git_env())
+        git('init', '-q')
+        with open(os.path.join(tmp, 'old name.yaml'), 'w') as fh:
+            fh.write('x: 1\n' * 20)
+        git('add', '.')
+        git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'a')
+        git('mv', 'old name.yaml', 'new.yaml')
+        with mock.patch.object(check, 'REPO', tmp), \
+                mock.patch.dict(os.environ, {'GIT_INDEX_FILE': os.path.join(tmp, '.git', 'index')}):
+            self.assertEqual(sorted(check._staged_files()), ['new.yaml', 'old name.yaml'])
 
     def test_a_git_failure_runs_them_rather_than_skipping(self):
         with mock.patch.dict(os.environ, {'MS_PRECOMMIT': '1'}), \
                 mock.patch.object(check, '_staged_files', lambda: None):
-            self.assertFalse(check._hook_skips_canaries())
+            self.assertFalse(check._hook_skips_canaries(check._hook_staged()))
 
     def test_an_undeclared_doctoring_is_refused(self):
         with self.assertRaisesRegex(AssertionError, 'CANARY_FILES'):
