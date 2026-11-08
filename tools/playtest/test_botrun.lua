@@ -1523,5 +1523,297 @@ do
     check(seen[1] and seen[1].turn ~= nil, true, "on the turn it first ran out")
 end
 
+-- The diagnostic replay (#510 step 9 PR F, T072/T074, FR-019): the attempt played again from
+-- the same start, matched against its original trace up to the pinned decision `ref`, then
+-- the diagnostic's plan played there. A in the rout attacks from (0,0) and the enemy phase
+-- kills a unit standing on (0,0) on turn 1; the forced wait on (0,1) avoids that.
+local Planner = dofile(here .. "planner.lua")
+local function deadly(g, find)
+    local a = find(0x01)
+    if g.turn == 1 and a and not a.dead and a.x == 0 and a.y == 0 then
+        a.hp, a.dead, a.onField = 0, true, false
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81 } }
+    end
+    return {}
+end
+-- the planner the original run played: A attacks from where it stands; nothing once A acted
+local function attacker(seen)
+    return {
+        surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf,
+        unkey = Planner.unkey,
+        plan = function(_, board, _, _, opts)
+            if seen then seen[#seen + 1] = opts and opts.diag or "baseline" end
+            for _, u in ipairs(board.units) do
+                if u.id == 0x01 and u.onField and not u.acted then
+                    local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                                     targetId = 0x81, move = { x = 0, y = 0 } } }
+                    return acts[1], { acts = acts, expect = { { hp = 20 } },
+                                      enemies = { [0x81] = true } }, { phases = 1, averaged = 0 }
+                end
+            end
+            return nil, nil, { phases = 0, averaged = 0 }
+        end,
+    }
+end
+local function original()
+    local g = fakeGame { units = rout(), enemy = deadly }
+    local evs = {}
+    g.api.Planner = attacker()
+    g.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    Botrun.run(g.api)
+    return evs
+end
+local function replay(diag, seen, tweak)
+    local g = fakeGame { units = rout(), enemy = deadly }
+    g.api.Planner = attacker(seen)
+    g.api.diag = diag
+    if tweak then tweak(g) end
+    local ok, why, rec = Botrun.run(g.api)
+    local diags, botruns = {}, 0
+    for _, l in ipairs(g.emitted) do
+        if l:sub(1, #Botrun.DIAG_PREFIX) == Botrun.DIAG_PREFIX then
+            diags[#diags + 1] = Json.decode(l:sub(#Botrun.DIAG_PREFIX + 1))
+        elseif l:sub(1, #Botrun.PREFIX) == Botrun.PREFIX then
+            botruns = botruns + 1
+        end
+    end
+    return diags, botruns, rec, g, ok, why
+end
+local failure = { charId = 0x01, turn = 1 }
+local run = { game = "fake", chapter = 1, seed = 7, attempt = 1 }
+
+-- test_a_diagnostic_writes_only_its_DIAG_line: no BOTRUN record, no record handed back (the
+-- retry memory and the campaign's endpoint read it), one DIAG line
+do
+    local evs = original()
+    local diags, botruns, rec = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil" },
+                                        failure = failure, run = run, original = evs })
+    check(botruns, 0, "a diagnostic emits no BOTRUN record")
+    check(rec, nil, "and hands no record back: no retry memory, no endpoint, no label")
+    check(#diags, 1, "one DIAG line")
+    local d = diags[1] or {}
+    check(d.matched, true, "the replay matched the original trace up to the pinned decision")
+    check(d.mode, "force", "the mode is named")
+    check(d.ref, 1, "and the pinned decision")
+    check(d.run and d.run.seed, 7, "and the original attempt's identity")
+    check(d.baseline and d.baseline[1], "1>attack@0,0>129", "the baseline is the planner's plan")
+    check(d.chosen and d.chosen[1], "1>wait@0,1>nil", "the forced plan was played")
+    check(d.differs, true, "and it differs from the baseline")
+    check(d.avoided, true, "standing off (0,0) avoids the turn-1 death")
+    check(d.failure and d.failure.turn, 1, "the failure tested is named")
+end
+
+-- test_a_replay_that_leaves_its_original_is_unmatched: the original's turn-1 snapshot says A
+-- had other HP, so the replay is not the same attempt: matched is false, said, never a witness
+do
+    local evs = original()
+    for _, e in ipairs(evs) do
+        if e.t == "phase" then e.units[1].hp = 19; break end
+    end
+    local seen = {}
+    local diags, botruns = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil" },
+                                    failure = failure, run = run, original = evs }, seen)
+    check(botruns, 0, "an unmatched diagnostic writes no record either")
+    check(diags[1] and diags[1].matched, false, "a replay off its original is unmatched")
+    check(diags[1] and diags[1].avoided, false, "and witnesses nothing")
+    -- it stops at the first difference: the turn-1 snapshot, before any decision is asked for
+    check(#seen, 0, "a replay that left its original plays on no further")
+    check(diags[1] and diags[1].why:match("^unmatched") ~= nil, true, "and says why it stopped")
+end
+
+-- test_chosen_is_what_was_played: a forced plan whose second key has no unit to play it
+-- (unit 3 is not on the field) is broken there; `chosen` holds only the act played
+do
+    local diags = replay({ ref = 1, mode = "force", force = { "1>wait@0,1>nil", "3>wait@4,4>nil" },
+                           failure = failure, run = run, original = original() })
+    local d = diags[1] or {}
+    check(d.chosen and #d.chosen, 1, "chosen holds the acts played, not the forced list")
+    check(d.chosen and d.chosen[1], "1>wait@0,1>nil", "the first forced act was played")
+    check(d.broken, "3>wait@4,4>nil", "the key that could not be played is named")
+end
+
+-- test_a_forced_act_with_no_unit_witnesses_nothing: the replay stops at the pin, nothing was
+-- played, so nothing was avoided
+do
+    local diags = replay({ ref = 1, mode = "force", force = { "3>wait@4,4>nil" },
+                           failure = failure, run = run, original = original() })
+    local d = diags[1] or {}
+    check(d.avoided, false, "a forced plan never played avoids nothing")
+    check(d.chosen and #d.chosen, 0, "and played nothing")
+    check(d.broken, "3>wait@4,4>nil", "its key is named")
+end
+
+-- test_a_kept_act_builds_no_planner_memory: the memory a plan call reads (the lookahead budget
+-- left: Planner.LOOK_ATTEMPT) is read only when the planner is asked, never for a kept act
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 5, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) } }
+    local reads, asked = 0, 0
+    local P = { surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf }
+    P.plan = function(_, board)
+        asked = asked + 1
+        for _, u in ipairs(board.units) do
+            if u.faction == "blue" and u.acted then return nil, nil, {} end
+        end
+        if board.turn > 1 then return nil, nil, {} end
+        local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
+                       { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
+        return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
+                          enemies = { [0x81] = true } }, {}
+    end
+    g.api.Planner = setmetatable(P, { __index = function(_, k)
+        if k == "LOOK_ATTEMPT" then reads = reads + 1; return 0 end
+    end })
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.plans.kept, 1, "one act was kept")
+    check(reads, asked, "the planner's memory is built once per plan asked for, never for a kept act")
+end
+
+-- test_a_pinned_decision_never_reached_is_unmatched
+do
+    local diags = replay({ ref = 99, mode = "deep", failure = failure, run = run,
+                           original = original() })
+    check(#diags, 1, "a replay that never reaches its decision still says so")
+    check(diags[1] and diags[1].matched, false, "unmatched")
+end
+
+-- test_deep_and_full_info_plan_from_the_same_decision: deep asks the planner with opts.diag;
+-- full_info asks it inside sight.fullInfo, never inside a batch; each beside the baseline
+do
+    local seen = {}
+    local diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                           original = original() }, seen)
+    check(table.concat(seen, ","):match("^baseline,deep") ~= nil, true,
+          "the baseline, then the deep plan, at the same decision")
+    check(diags[1] and diags[1].differs, false, "the same plan both ways does not differ")
+    -- the pinned plan, played out, is no plan cut short (vanilla Ch6's live full_info replay
+    -- crashed here, 2026-11-07)
+    check(diags[1] and diags[1].outcome, "diag", "a played-out pinned plan replans cleanly")
+    check(diags[1] and diags[1].broken, nil, "and is not broken")
+    check(diags[1] and diags[1].avoided, false, "and does not avoid the death")
+    local full, inBatch = 0, false
+    local offeredOn, fullOffer
+    seen = {}
+    replay({ ref = 1, mode = "full_info", failure = failure, run = run, original = original() },
+        seen, function(g)
+            local sight = g.api.sight
+            g.api.sight = function()
+                local s = sight()
+                local batching = false
+                s.batch = function(fn)
+                    batching = true
+                    local out = table.pack(fn())
+                    batching = false
+                    return table.unpack(out, 1, out.n)
+                end
+                s.fullInfo = function(fn)
+                    full = full + 1
+                    inBatch = inBatch or batching
+                    local b = g.api.board()
+                    b.revealed = true   -- the fog-off board
+                    return fn(b)
+                end
+                return s
+            end
+            -- which board the acts were offered on, and what the full_info plan was given
+            local Bot0 = g.api.Bot
+            g.api.Bot = setmetatable({ candidates = function(board, ...)
+                offeredOn = offeredOn or {}
+                offeredOn[#offeredOn + 1] = board.revealed and "revealed" or "fogged"
+                return Bot0.candidates(board, ...)
+            end }, { __index = Bot0 })
+            local plan = g.api.Planner.plan
+            g.api.Planner.plan = function(B, board, sgt, st, opts)
+                if board.revealed then fullOffer = opts and opts.offer end
+                return plan(B, board, sgt, st, opts)
+            end
+        end)
+    check(full, 1, "full_info plans once inside sight.fullInfo")
+    -- knowledge, not powers: the acts are the ones the fogged game allows; only the judging
+    -- sees every enemy
+    check(fullOffer ~= nil and fullOffer.cands ~= nil, true,
+          "the full_info plan is given the acts offered on the fogged board")
+    check(offeredOn and table.concat(offeredOn, ","), "fogged", "offered on the fogged board only")
+    check(inBatch, false, "never inside a batch")
+end
+
+-- test_a_death_moved_onto_another_unit_is_not_avoided: the forced wait saves A, but the enemy
+-- phase kills B instead; the failure's unit lives, yet nothing was avoided (ours-ch03 seed
+-- 1002's force replay, 2026-11-07: unit 3 lived and unit 5 fell to the same boss)
+do
+    local function trade(g, find)
+        local a, b = find(0x01), find(0x02)
+        if g.turn ~= 1 then return {} end
+        local v = (a.x == 0 and a.y == 0) and a or b
+        v.hp, v.dead, v.onField = 0, true, false
+        return { { id = v.id, charId = v.charId, faction = "blue", killer = 0x81 } }
+    end
+    local function units()
+        local u = rout()
+        u[#u + 1] = unit(0x02, 1, "blue", 5, 5, 20)
+        return u
+    end
+    local g0 = fakeGame { units = units(), enemy = trade }
+    local evs = {}
+    g0.api.Planner = attacker()
+    g0.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    Botrun.run(g0.api)
+    local g = fakeGame { units = units(), enemy = trade }
+    g.api.Planner = attacker()
+    g.api.diag = { ref = 1, mode = "force", force = { "1>wait@0,1>nil" }, failure = failure,
+                   run = run, original = evs }
+    Botrun.run(g.api)
+    local d = Json.decode(g.emitted[#g.emitted]:sub(#Botrun.DIAG_PREFIX + 1))
+    check(d.matched, true, "the trade replay matched")
+    check(d.traded and d.traded[1], 0x02, "B, lost in A's place, is named")
+    check(d.avoided, false, "a death moved onto another unit is not avoided")
+end
+
+-- test_the_pinned_state_is_checked_by_loading_it_back: the state kept at the pinned decision,
+-- loaded back, holds the board that decision read; one that does not is said
+do
+    local kept
+    local function keeper(g, wrong)
+        g.api.pinned = function(ref)
+            kept = g.api.board()
+            return "pinned-r" .. ref .. ".ss"
+        end
+        g.api.reload = function(file)
+            check(file, "pinned-r1.ss", "the file the pin kept is the one loaded back")
+            if wrong then kept.units[1].hp = 1 end
+            return kept
+        end
+    end
+    local diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                           original = original() }, nil, function(g) keeper(g) end)
+    check(diags[1] and diags[1].pinned_board, true, "the kept state holds the pinned board")
+    diags = replay({ ref = 1, mode = "deep", failure = failure, run = run,
+                     original = original() }, nil, function(g) keeper(g, true) end)
+    check(diags[1] and diags[1].pinned_board, false, "a kept state off the pinned board is said")
+end
+
+-- test_a_plan_event_carries_the_plans_audit (FR-020): what the planner offered, saw and spent
+-- is in the trace, for `montecarlo.py audit` to read
+do
+    local g = fakeGame { units = rout() }
+    local evs = {}
+    local P = attacker()
+    local plan = P.plan
+    P.plan = function(...)
+        local a, p, c = plan(...)
+        if p then p.audit = { offered_n = 1, budget = { exhausted = false } } end
+        return a, p, c
+    end
+    g.api.Planner = P
+    g.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+    Botrun.run(g.api)
+    local audit
+    for _, e in ipairs(evs) do
+        if e.t == "plan" and e.ref == 1 then audit = e.audit end
+    end
+    check(audit and audit.offered_n, 1, "the plan event carries plan.audit")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

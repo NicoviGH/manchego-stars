@@ -385,6 +385,19 @@ end
 
 -- One decide call's view: the board split by role, and memos so an attack, a strike or a reach
 -- the caller pays for (an emulator round trip, in the ROM) is asked for once.
+-- The enemies a player knows of on `board`: every red on the field the game does not hide in
+-- fog (US_BIT9, board.lua), the Defeat Boss map's boss marked as the game names it
+-- (sight.objective.boss), CA_BOSS or not. The planner asks it again for a board it judges on
+-- that is not the one its acts were read on (a full-information replay's, opts.offer).
+function M.enemiesOf(board, sight)
+    local o, out = sight.objective, {}
+    for _, u in ipairs(board.units) do
+        if o and o.boss and u.faction == "red" and u.charId == o.boss then u.isBoss = true end
+        if u.onField and u.faction == "red" and not u.fogged then out[#out + 1] = u end
+    end
+    return out
+end
+
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
@@ -394,18 +407,13 @@ local function context(board, sight)
                   talkTiles = {}, openers = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
+    ctx.enemies = M.enemiesOf(board, sight)
     for _, u in ipairs(board.units) do
-        -- the Defeat Boss map's boss as the game names it (sight.objective.boss), CA_BOSS or not
-        if o and o.boss and u.faction == "red" and u.charId == o.boss then u.isBoss = true end
         if u.onField then
             ctx.onField[#ctx.onField + 1] = u
             ctx.standing[tileKey(u.x, u.y)] = u
             if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
             if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
-            -- the enemies a player knows of: none the game hides in fog (US_BIT9, board.lua)
-            if u.faction == "red" and not u.fogged then
-                ctx.enemies[#ctx.enemies + 1] = u
-            end
         end
     end
     table.sort(ctx.actors, function(a, b) return a.slot < b.slot end)

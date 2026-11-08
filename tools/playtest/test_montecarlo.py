@@ -1089,5 +1089,444 @@ class Story(unittest.TestCase):
             self.assertEqual(names[pid], name.replace('-', ' ').title())
 
 
+# ---- the failure audit (#510 step 9 PR-F, FR-019/FR-020, SC-004) ----
+
+# a run's identity: the suite reruns a start under every instrument, so only its filed trace
+# tells two runs of one campaign, seed, chapter and attempt apart
+RUN = {'game': 'ours', 'chapter': 2, 'seed': 3, 'attempt': 1, 'trace': 't.jsonl'}
+
+
+def _rec(*deaths, trace='t.jsonl'):
+    return dict(RUN, outcome='lost', deaths=list(deaths), trace=trace)
+
+
+def _death(cid=0x01, turn=4, ref=17, cause='fog'):
+    return {'charId': cid, 'faction': 'blue', 'turn': turn, 'killer': 0x40, 'plan_ref': ref,
+            'cause': cause}
+
+
+def _plan(ref=17, considered=None):
+    # the trace's `plan` event at decision `ref` (planner.lua, T076): `considered` is every judged
+    # plan, the played ['a'] first, ['b'] ranked below it, ['c'] over the cap, ['e'] stalled;
+    # ['d'] was offered and never judged as a plan (the beam cut it)
+    if considered is None:
+        considered = [{'acts': ['a'], 'played': True, 'rejected': None},
+                      {'acts': ['b'], 'rejected': 'outranked'},
+                      {'acts': ['c'], 'rejected': 'over_cap'},
+                      {'acts': ['e'], 'rejected': 'stalled'}]
+    return {'t': 'plan', 'turn': 4, 'ref': ref, 'considered': considered, 'audit': {
+        'offered_n': 5, 'visibility': {'seen': 5, 'fogged': 2},
+        'budget': {'exhausted': False, 'averaged': 0}}}
+
+
+OFFERED = ('a', 'b', 'c', 'd', 'e')   # the acts the game offered on the boards they were played on
+
+
+def _diag(mode='force', chosen=('b',), avoided=True, matched=True, cid=0x01, turn=4, ref=17,
+          trace='t.jsonl', unoffered=None):
+    # `unoffered` (harness.lua): each played act Bot.candidates did not offer on the board it
+    # was played on
+    chosen = list(chosen)
+    if unoffered is None:
+        unoffered = [k for k in chosen if k not in OFFERED]
+    # `planned`: the diagnostic's whole plan; `chosen`: the acts of it actually played (all of
+    # them here, as no line below is broken)
+    return {'run': dict(RUN, trace=trace), 'ref': ref, 'mode': mode, 'matched': matched,
+            'baseline': ['a'], 'planned': chosen, 'chosen': chosen, 'differs': chosen != ['a'],
+            'avoided': avoided,
+            'failure': {'charId': cid, 'turn': turn}, 'trace': 'diag-%s.jsonl' % mode,
+            'unoffered': unoffered}
+
+
+class Audit(unittest.TestCase):
+    def audit(self, recs, diags, events=None):
+        events = [_plan()] if events is None else events
+        return mc.audit(recs, diags, lambda r: events)
+
+    def test_a_label_is_witnessed_only_by_a_matched_replay_of_a_different_plan_that_avoids(self):
+        # AS 1: the forced plan ['b'] was kept but ranked below the played ['a'], and it avoided
+        # the death from the same pinned state: mis-scored, cited with its replay
+        [f] = self.audit([_rec(_death())], [_diag()])
+        self.assertEqual(f['labels'], ['mis_scored'])
+        self.assertEqual(f['primary'], 'mis_scored')
+        self.assertEqual([w['trace'] for w in f['witnesses']], ['diag-force.jsonl'])
+        # none of these is a witness: the same plan, a fork that did not match the original's
+        # board, a replay that did not avoid the death, a replay of another failure
+        for d in (_diag(chosen=['a']), _diag(matched=False), _diag(avoided=False),
+                  _diag(cid=0x02), _diag(turn=5), _diag(trace='another-run.jsonl')):
+            [f] = self.audit([_rec(_death())], [d])
+            self.assertEqual(f['labels'], [], d)
+            self.assertIsNone(f['primary'], d)
+
+    def test_a_line_from_before_planned_was_recorded_claims_nothing(self):
+        # before the replay recorded `planned` and `broken`, a stop at the pin printed avoided
+        # true, and a full-information plan could use acts only the fog-off board offered: such
+        # a line is stale until it is re-run
+        for mode in ('force', 'deep', 'full_info'):
+            old = _diag(mode=mode)
+            del old['planned']
+            [f] = self.audit([_rec(_death())], [old])
+            self.assertEqual(f['labels'], [], mode)
+            self.assertIn('re-run it', ' '.join(f['notes']))
+
+    def test_a_forced_plan_is_placed_by_its_whole_plan(self):
+        # the plan the planner judged is the whole one (`planned`), whatever `chosen` holds
+        [f] = self.audit([_rec(_death())], [dict(_diag(), chosen=['b', 'x'], planned=['b'])])
+        self.assertEqual(f['labels'], ['mis_scored'])
+
+    def test_a_replay_that_failed_is_shown_as_failed_not_as_not_avoiding(self):
+        # vanilla chapter 7 (T079 re-run): the replay matched, then the planner raised; the unit
+        # died because the run stopped, which says nothing about the plan
+        line = dict(_diag(avoided=False), outcome='crashed',
+                    why="Lua error: planner.lua:343: attempt to index nil")
+        findings = self.audit([_rec(_death())], [line])
+        self.assertIn('REPLAY FAILED: force: Lua error', ' '.join(findings[0]['notes']))
+        self.assertIn('1 with a failed replay', mc.coverage(findings))
+        # every replay that reached its pin ends with a reason: that is no failure
+        [f] = self.audit([_rec(_death())], [dict(_diag(), outcome='diag',
+                                                 why="the failure's turn is over")])
+        self.assertEqual(f['labels'], ['mis_scored'])
+
+    def test_a_broken_replay_is_no_witness(self):
+        # the replay could not play the plan it chose to the end (`broken`): `chosen` is what it
+        # did play, and a plan cut short avoided nothing on its own
+        [f] = self.audit([_rec(_death())], [dict(_diag(), broken='the act was refused')])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('broken', ' '.join(f['notes']))
+
+    def test_a_missing_action_is_judged_on_the_board_each_act_was_played_on(self):
+        # the pinned board offered 'b', the board it was played on did not: missing_action.
+        # 'z', offered where it was played and never judged at the pin: the search cut it
+        [f] = self.audit([_rec(_death())], [_diag(unoffered=['b'])])
+        self.assertEqual(f['labels'], ['missing_action'])
+        [f] = self.audit([_rec(_death())], [_diag(chosen=['z'], unoffered=[])])
+        self.assertEqual(f['labels'], ['search_miss'])
+        # a forced line that never checked (an older harness): nothing is claimed
+        old = _diag()
+        del old['unoffered']
+        [f] = self.audit([_rec(_death())], [old])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('unoffered', ' '.join(f['notes']))
+
+    def test_a_trace_is_read_only_for_a_run_a_diag_line_replays(self):
+        read = []
+        recs = [_rec(_death(), trace='a.jsonl'), _rec(_death(), trace='b.jsonl')]
+        mc.audit(recs, [_diag(trace='b.jsonl')], lambda r: read.append(r['trace']) or [_plan()])
+        self.assertEqual(read, ['b.jsonl'])
+
+    def test_a_replay_that_trades_the_death_for_another_is_no_witness(self):
+        # ours-ch03 seed 1002 (T079): the forced plan saved unit 3, and the boss killed unit 5
+        # instead. That moves the failure, it does not avoid it
+        d = dict(_diag(avoided=False), traded=[0x05])
+        [f] = self.audit([_rec(_death())], [d])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('traded it for 0x05', ' '.join(f['notes']))
+        # a line that says avoided while naming a trade is never read as a witness either
+        [f] = self.audit([_rec(_death())], [dict(_diag(), traded=[0x05])])
+        self.assertEqual(f['labels'], [])
+
+    def test_the_newest_line_of_a_replay_supersedes_the_older(self):
+        # a replay re-run (a stricter `avoided`) appends a new line; the newest one counts
+        old, new = _diag(), _diag(avoided=False)
+        [f] = self.audit([_rec(_death())], [old, new])
+        self.assertEqual((f['labels'], f['notes']), ([], ['force: did not avoid it']))
+        [f] = self.audit([_rec(_death())], [new, old])
+        self.assertEqual(f['labels'], ['mis_scored'])
+        # another plan forced at the same decision is another replay, kept beside it
+        [f] = self.audit([_rec(_death())], [old, _diag(chosen=['z'], avoided=False)])
+        self.assertEqual(f['labels'], ['mis_scored'])
+        self.assertEqual(len(f['notes']), 1)
+
+    def test_each_witness_says_which_label_it_supports(self):
+        cases = {('force', 'b'): 'mis_scored', ('force', 'c'): 'mis_predicted_safety',
+                 ('force', 'd'): 'search_miss', ('force', 'z'): 'missing_action',
+                 ('force', 'b', 'z'): 'missing_action',
+                 ('deep', 'b'): 'search_miss', ('full_info', 'b'): 'information_unavailable'}
+        for (mode, *keys), label in cases.items():
+            [f] = self.audit([_rec(_death())], [_diag(mode=mode, chosen=keys)])
+            self.assertEqual(f['labels'], [label], (mode, keys))
+
+    def test_a_forced_witness_without_the_plans_audit_stays_unresolved(self):
+        # the trace has no audit at that decision: the replay avoided the death, but which
+        # label it supports cannot be told, so none is claimed
+        [f] = self.audit([_rec(_death())], [_diag()], events=[{'t': 'plan', 'ref': 17}])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('no plan audit', ' '.join(f['notes']))
+        # a stalled plan may not be played: that it avoided the death places nothing
+        [f] = self.audit([_rec(_death())], [_diag(chosen=['e'])])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('stalled', ' '.join(f['notes']))
+
+    def test_an_unmatched_replay_is_shown_never_dropped(self):
+        # the fork's board differed from the original's before the pinned decision (a hash
+        # seeded per process, say): it witnesses nothing, and the audit and SC-004 say so
+        findings = self.audit([_rec(_death())], [_diag(matched=False)])
+        text = '\n'.join(mc.audit_lines(findings))
+        self.assertIn('UNMATCHED', text)
+        self.assertIn('1 with an UNMATCHED replay', mc.coverage(findings))
+
+    def test_an_unwitnessed_explanation_stays_unresolved(self):
+        # AS 2: the run's own grading says fog, and nothing replayed it: unclassified, and the
+        # grading is shown as proposed, never as the label
+        recs = [_rec(_death())]
+        [f] = self.audit(recs, [])
+        self.assertIsNone(f['primary'])
+        text = '\n'.join(mc.audit_lines(self.audit(recs, [])))
+        self.assertIn('unclassified', text)
+        self.assertIn('proposed: fog, not witnessed', text)
+        self.assertNotIn('information_unavailable', text)
+
+    def test_every_supported_label_plus_a_primary_and_unclassified_kept(self):
+        recs = [_rec(_death(), _death(cid=0x02, turn=6, ref=30))]
+        diags = [_diag(mode='full_info'), _diag(mode='force', chosen=['z'])]
+        f, g = self.audit(recs, diags, [_plan(), _plan(ref=30)])
+        self.assertEqual(f['labels'], ['missing_action', 'information_unavailable'])
+        self.assertEqual(f['primary'], 'missing_action', 'a defect the bot owns comes first')
+        self.assertIsNone(g['primary'])
+        text = '\n'.join(mc.audit_lines([f, g]))
+        self.assertIn('primary missing_action; supported: missing_action, information_unavailable',
+                      text)
+        self.assertIn('unclassified', text)
+
+    def test_the_audit_prints_the_sc004_coverage_sentence(self):
+        recs = [_rec(_death(), _death(cid=0x02, turn=6, ref=30))]
+        findings = self.audit(recs, [_diag()], [_plan(), _plan(ref=30)])
+        self.assertEqual(mc.coverage(findings, 'abc+v1'),
+                         'SC-004 (instrument abc+v1): 1 of 2 audited failures (50%) have a '
+                         'witnessed label; 1 unclassified. The bar is 90%: not met.')
+        self.assertEqual(mc.coverage([], 'abc+v1'),
+                         'SC-004 (instrument abc+v1): no failures to audit.')
+
+    def test_audit_reads_the_runs_traces_and_diag_logs(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        with open(os.path.join(d, 'runs.jsonl'), 'w') as fh:
+            fh.write(json.dumps(_rec(_death(), trace='traces/t.jsonl')) + '\n')
+            fh.write(json.dumps({'kind': 'campaign', 'outcome': 'done'}) + '\n')
+        os.makedirs(os.path.join(d, 'traces'))
+        with open(os.path.join(d, 'traces', 't.jsonl'), 'w') as fh:
+            fh.write(json.dumps(_plan()) + '\n')
+        log = os.path.join(d, 'mgba-stdout.log')
+        with open(log, 'w') as fh:
+            fh.write('[f120] noise\n[f121] DIAG %s\n' % json.dumps(_diag(trace='traces/t.jsonl')))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(mc.main(['audit', os.path.join(d, 'runs.jsonl'), '--diag', log]), 0)
+        out = buf.getvalue()
+        self.assertIn('primary mis_scored', out)
+        self.assertIn('story %s' % os.path.join(d, 'diag-force.jsonl'), out,
+                      "a witness's trace, named relative to its diag file")
+        self.assertIn('SC-004 (instrument None): 1 of 1 audited failures (100%)', out)
+
+    def run_audit(self, recs, diags, *extra):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        with open(os.path.join(d, 'runs.jsonl'), 'w') as fh:
+            for r in recs:
+                fh.write(json.dumps(r) + '\n')
+        log = os.path.join(d, 'diag.jsonl')
+        with open(log, 'w') as fh:
+            for g in diags:
+                fh.write('DIAG %s\n' % json.dumps(g))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.assertEqual(mc.main(['audit', os.path.join(d, 'runs.jsonl'), '--diag', log]
+                                     + list(extra)), 0)
+        return buf.getvalue()
+
+    def test_audit_reads_one_instrument_the_newest_unless_asked(self):
+        # the suite reruns a start under every instrument: two instruments' failures are two
+        # different bots', and one SC-004 sentence over both would measure neither
+        old = dict(_rec(_death(), trace='a.jsonl'), instrument='old')
+        new = dict(_rec(_death(cid=0x02), trace='b.jsonl'), instrument='new')
+        out = self.run_audit([old, new], [])
+        self.assertIn('SC-004 (instrument new): 0 of 1 audited failures', out)
+        self.assertNotIn('lost 0x01', out)
+        out = self.run_audit([old, new], [], '--instrument', 'old')
+        self.assertIn('SC-004 (instrument old): 0 of 1 audited failures', out)
+        self.assertNotIn('lost 0x02', out)
+
+    def test_a_diag_line_that_matches_no_record_is_an_orphan_never_dropped(self):
+        # a stale line (its run gone from the store, or a death the run no longer has) is
+        # counted apart, with its run, like an UNMATCHED replay; one for another instrument's
+        # run belongs to that instrument's audit and is not an orphan here
+        old = dict(_rec(_death(), trace='a.jsonl'), instrument='old')
+        new = dict(_rec(_death(), trace='b.jsonl'), instrument='new')
+        stale, other = _diag(trace='gone.jsonl'), _diag(trace='a.jsonl')
+        out = self.run_audit([old, new], [stale, other, _diag(trace='b.jsonl', cid=0x07)])
+        self.assertEqual(out.count('orphan (no record matches its run)'), 2, out)
+        self.assertIn("'trace': 'gone.jsonl'", out)
+        self.assertIn('2 orphan DIAG lines', out)
+
+
+class Replay(unittest.TestCase):
+    """`replay`: one diagnostic replay of a suite run's death (T074's driver). It plays the
+    run's own suite task with PT_DIAG, and keeps only DIAG lines: never a record (FR-019)."""
+
+    def rec(self, **kw):
+        r = dict(RUN, campaign='e1-ours-ch07', outcome='lost', trace='traces/t.jsonl.gz',
+                 deaths=[_death()], suite={'start_id': 'ours-ch02', 'set': 'tuning', 'version': 1})
+        r.update(kw)
+        return r
+
+    def test_the_diag_names_the_death_its_decision_and_the_original_trace(self):
+        d = mc.replay_diag(self.rec(), 'force', ['b'], base='/runs')
+        self.assertEqual(d, {'ref': 17, 'ref_from': 'plan_ref', 'mode': 'force', 'force': ['b'],
+                             'failure': {'charId': 0x01, 'turn': 4},
+                             'original_trace': '/runs/traces/t.jsonl.gz',
+                             'run': dict(RUN, campaign='e1-ours-ch07',
+                                         trace='traces/t.jsonl.gz')})
+        two = self.rec(deaths=[_death(), _death(cid=0x02, turn=6, ref=30)])
+        self.assertEqual(mc.replay_diag(two, 'deep', char=0x02, base='/r')['ref'], 30)
+        self.assertEqual(mc.replay_diag(two, 'deep', char=0x02, ref=29, base='/r')['ref'], 29)
+
+    def test_a_replays_run_matches_its_record_and_no_other(self):
+        # one owner of a run's identity: the run a replay names is the record it was made from
+        rec, twin = self.rec(), self.rec(trace='traces/other.gz')
+        d = mc.replay_diag(rec, 'deep', base='/r')
+        line = {'run': d['run'], 'failure': d['failure']}
+        self.assertTrue(mc.diag_of(line, rec, rec['deaths'][0]))
+        self.assertFalse(mc.diag_of(line, twin, twin['deaths'][0]))
+        self.assertEqual(mc.find_record([twin, rec], mc.run_name(rec)), rec)
+
+    def test_a_death_with_no_decision_to_pin_is_refused(self):
+        # a greedy phase's death: no plan committed to it and none moved the unit
+        rec = self.rec(deaths=[dict(_death(), plan_ref=None)])
+        with self.assertRaisesRegex(ValueError, 'no decision to pin'):
+            mc.replay_diag(rec, 'deep', base='/r')
+
+    def test_a_replay_under_another_instrument_is_refused(self):
+        # a newer planner would play the diagnostic, and its witness count toward the old one
+        rec = self.rec(instrument='old+v1')
+        with self.assertRaisesRegex(ValueError, 'instrument'):
+            mc.replay_diag(rec, 'deep', base='/r', instrument='new+v1')
+        self.assertEqual(mc.replay_diag(rec, 'deep', base='/r', instrument='old+v1')['ref'], 17)
+
+    def test_a_seed_gone_from_the_suite_is_refused_not_a_crash(self):
+        suite = {'version': 1, 'starts': [
+            {'start_id': 'ours-ch02', 'game': 'ours', 'chapter': 3,
+             'provenance': {'campaign': 'e1-ours-ch07'},
+             'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}}]}
+        for rec in (self.rec(seed=1003), self.rec(suite={'start_id': 'gone', 'set': 'tuning'})):
+            with self.assertRaisesRegex(ValueError, 'no longer'):
+                mc.replay_task(rec, suite, {'ours': {}}, {}, 'inst')
+
+    def test_a_records_trace_is_read_relative_to_the_runs_file(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        with open(os.path.join(d, 't.jsonl'), 'w') as fh:
+            fh.write(json.dumps(_plan()) + '\n')
+        self.assertEqual(mc.record_events({'trace': 't.jsonl'}, d), [_plan()])
+        self.assertEqual(mc.record_events({'trace': 'gone.jsonl'}, d), [])
+        self.assertEqual(mc.record_events({}, d), [])
+
+    def test_the_record_is_the_newest_of_its_name_unless_a_trace_picks_one(self):
+        old, new = self.rec(trace='traces/old.gz'), self.rec(trace='traces/new.gz')
+        other = self.rec(seed=9, trace='traces/x.gz')
+        spec = 'e1-ours-ch07/3/2/1'
+        self.assertIs(mc.find_record([old, other, new], spec), new)
+        self.assertIs(mc.find_record([old, other, new], spec, 'traces/old.gz'), old)
+        with self.assertRaisesRegex(ValueError, 'no record is'):
+            mc.find_record([other], spec)
+        with self.assertRaisesRegex(ValueError, 'no record is'):
+            mc.find_record([old, new], spec, 'traces/gone.gz')
+
+    def test_the_default_decision_is_the_last_that_moved_the_dead_unit(self):
+        # ours-ch03 seed 1002 (T079): unit 3 struck under plan 45 as a KEPT act (a plan event
+        # with no ref of its own), and died in the enemy phase plan 46 committed to; 46 never
+        # moved it, so a replay pinned there could not change what killed it
+        events = [{'t': 'plan', 'turn': 2, 'ref': 44},
+                  {'t': 'act', 'turn': 2, 'phase': 'player', 'unit': 0x03},
+                  {'t': 'plan', 'turn': 2, 'ref': 45},
+                  {'t': 'act', 'turn': 2, 'phase': 'player', 'unit': 0x04},
+                  {'t': 'plan', 'turn': 2, 'kept': True},
+                  {'t': 'act', 'turn': 2, 'phase': 'player', 'unit': 0x03},
+                  {'t': 'plan', 'turn': 2, 'ref': 46},
+                  {'t': 'act', 'turn': 2, 'phase': 'player', 'unit': 0x05},
+                  {'t': 'act', 'turn': 2, 'phase': 'enemy', 'unit': 0x03,
+                   'fell': [{'charId': 0x03}]},
+                  {'t': 'plan', 'turn': 3, 'ref': 47},
+                  {'t': 'act', 'turn': 3, 'phase': 'player', 'unit': 0x03}]
+        rec = self.rec(deaths=[_death(cid=0x03, turn=2, ref=46)])
+        d = mc.replay_diag(rec, 'deep', base='/r', events=events)
+        self.assertEqual((d['ref'], d['ref_from']), (45, 'act'))
+        # nothing moved it: the plan that committed to its death, said so
+        d = mc.replay_diag(rec, 'deep', base='/r', events=events[6:])
+        self.assertEqual((d['ref'], d['ref_from']), (46, 'plan_ref'))
+        d = mc.replay_diag(rec, 'deep', ref=40, base='/r', events=events)
+        self.assertEqual((d['ref'], d['ref_from']), (40, 'asked'))
+
+    def test_a_replay_is_refused_with_its_reason(self):
+        two = self.rec(deaths=[_death(), _death(cid=0x02, turn=6, ref=30)])
+        for rec, mode, force, char, why in (
+                (self.rec(suite=None), 'deep', None, None, 'not a suite run'),
+                (self.rec(suite={'start_id': 'x', 'set': 'held_out'}), 'deep', None, None,
+                 'held-out'),
+                (two, 'deep', None, None, 'name one with --char'),
+                (self.rec(), 'deep', None, 0x09, 'no death of 0x09'),
+                (self.rec(), 'force', None, None, 'needs --force'),
+                (self.rec(), 'deep', ['b'], None, 'only with force'),
+                (self.rec(trace=None), 'deep', None, None, 'no kept trace')):
+            with self.assertRaisesRegex(ValueError, why):
+                mc.replay_diag(rec, mode, force, char, base='/r')
+
+    def test_the_task_is_the_runs_own_suite_task_plus_the_diag(self):
+        suite = {'version': 1, 'starts': [
+            {'start_id': 'ours-ch02', 'game': 'ours', 'chapter': 3,
+             'provenance': {'campaign': 'e1-ours-ch07'},
+             'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}},
+            {'start_id': 'other', 'game': 'ours', 'chapter': 4,
+             'provenance': {'campaign': 'e1-ours-ch07'},
+             'seeds': {'tuning': [1001, 1002], 'held_out': [2001, 2002]}}]}
+        rec = self.rec(seed=1002)
+        diag = {'ref': 17}
+        t = mc.replay_task(rec, suite, {'ours': {'name': 'ours'}}, diag, 'inst')
+        self.assertEqual((t['campaign']['from'], t['seed'], t['instrument'], t['diag']),
+                         (3, 1002, 'inst', diag))
+        self.assertNotIn('out', t, 'a replay never writes a runs file')
+        self.assertNotIn('stamp', t)
+
+    def test_launch_passes_the_diag_to_run_sh(self):
+        seen = {}
+
+        def run(cmd, env, **kw):
+            seen.update(env)
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        with mock.patch.object(mc.subprocess, 'run', run):
+            mc.launch({'seed': 1, 'instrument': 'i', 'diag': {'ref': 3}}, 'tag',
+                      os.path.join(d, 'log'))
+        self.assertEqual(json.loads(seen['PT_DIAG']), {'ref': 3})
+
+    def test_only_diag_lines_are_kept_and_the_witness_trace_is_filed(self):
+        base, root = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base)
+        self.addCleanup(shutil.rmtree, root)
+        where = mc.run_dir('campaign', 'tag', root)
+
+        def launch(task, tag, log_path):
+            os.makedirs(where)
+            with open(os.path.join(where, 'diag-trace.jsonl'), 'w') as fh:
+                fh.write(json.dumps(_plan()) + '\n')
+            with open(os.path.join(where, 'pinned-ours-2-a1-r17.ss'), 'wb') as fh:
+                fh.write(b'state')
+            text = ('[f1] BOTRUN {"outcome": "lost"}\n[f2] DIAG %s\n'
+                    % json.dumps(dict(_diag(), trace='diag-trace.jsonl')))
+            return text, where
+        diags = mc.replay_run({'seed': 1}, base, launch=launch, run_root=root)
+        self.assertEqual(len(diags), 1)
+        self.assertFalse(os.path.exists(os.path.join(base, 'runs.jsonl')), 'no record written')
+        with open(os.path.join(base, 'diag.jsonl')) as fh:
+            [kept] = mc.parse_lines(fh.read(), mc.DIAG)
+        self.assertTrue(kept['trace'].startswith('traces/diag/'))
+        self.assertEqual(mc.read_trace(os.path.join(base, kept['trace'])), [_plan()])
+        self.assertFalse(os.path.exists(where), "a replay that reported leaves no dir")
+        # the pinned decision's state is a fixture (T084): filed beside the trace, and named
+        self.assertTrue(kept['pinned'].startswith('traces/diag/'), kept['pinned'])
+        self.assertTrue(kept['pinned'].endswith('pinned-ours-2-a1-r17.ss'))
+        with open(os.path.join(base, kept['pinned']), 'rb') as fh:
+            self.assertEqual(fh.read(), b'state')
+
+
 if __name__ == '__main__':
     unittest.main()
