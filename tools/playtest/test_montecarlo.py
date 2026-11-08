@@ -1010,7 +1010,7 @@ class Suite(unittest.TestCase):
 
     def test_pinned_setup_checks_only_the_named_starts_and_refuses_the_rest(self):
         suite = self.load(self.suite())
-        suite['snapshots'] = [{'snapshot_id': 'x', 'start_id': 'ours-ch02'}]
+        suite['snapshots'] = [{'snapshot_id': 'x', 'start_id': 'vanilla-ch3'}]
         simdirs = {'vanilla': '/v', 'ours': '/o'}
         seen = []
 
@@ -1023,7 +1023,7 @@ class Suite(unittest.TestCase):
             self.assertEqual(mc.pinned_setup(['vanilla-ch3'])[0], suite)
             self.assertIn('its state is gone', mc.pinned_setup(['vanilla-ch3']))
             self.assertIn('no start nope', mc.pinned_setup(['nope']))
-        self.assertEqual(seen[0], (['vanilla-ch3'], []), "another start's snapshot is not its")
+        self.assertEqual(seen[0], (['vanilla-ch3'], []), 'it plays no snapshot, so checks none')
 
     def test_the_cell_count_is_checked_before_anything_plays(self):
         # review of #582: --cells 0 is refused, never read as "the manifest's"
@@ -1043,6 +1043,28 @@ class Suite(unittest.TestCase):
                       '--ours-chapter', '4']):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 mc.main(argv)
+
+    def test_a_pilot_with_no_resolved_pair_refuses_and_says_why(self):
+        # re-review of #582: every pair unresolved is a refusal with each run's words, not a
+        # traceback after the runs
+        suite = self.load(self.suite())
+        side = {'kept': dict, 'tasks': lambda seeds: [], 'chapter': 3, 'pinned': True}
+        problem = {'side': 'ours', 'seed': 3001, 'status': 'unresolved', 'why': 'Lua error: x'}
+        out = io.StringIO()
+        with mock.patch.object(mc, 'pinned_setup',
+                               return_value=(suite, {'ours': '/o', 'vanilla': '/v'}, dict)), \
+                mock.patch.object(mc, 'instrument_id', return_value='i'), \
+                mock.patch.object(mc, 'chapter_sides', return_value={'ours': side,
+                                                                     'vanilla': side}), \
+                mock.patch.object(mc, 'kept_walls', return_value={}), \
+                mock.patch.object(mc, 'cell_pairs', return_value={
+                    'pairs': [(None, False)] * 50, 'problems': [problem], 'cpu_s': 0.0,
+                    'reach': {}, 'results': {}}), \
+                contextlib.redirect_stdout(out):
+            self.assertEqual(mc.main(['pilot', '--ours-start', 'ours-ch02', '--vanilla-start',
+                                      'vanilla-ch3']), 1)
+        self.assertIn('refused: no pilot pair has a game result', out.getvalue())
+        self.assertIn('Lua error: x', out.getvalue())
 
     def test_a_cell_with_no_resolved_pair_prints_its_withheld_verdict(self):
         # review of #582: no resolved pair leaves the rates None, and that must not crash

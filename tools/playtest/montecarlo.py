@@ -855,11 +855,19 @@ RETRIES = 1   # FR-027: an attempt with no game result is played once more on it
 
 def again(recs, chapter, pinned=False):
     """Whether a replicate is (re)played: never played, or with no game result where it
-    stopped and no more than RETRIES plays like that behind it (the first and its retry)."""
+    stopped and at most RETRIES plays that stopped there behind it: the first play earns
+    one retry, and once both are behind it, it is not played again."""
     if not recs:
         return True
     r = chapter_result(recs, chapter, pinned)
     return r['status'] in ('unresolved', 'reach_unresolved') and r['tries'] <= RETRIES
+
+
+def pair_of(got):
+    """A seed's pair from its {arm: chapter_result}: (ours_died, twin_died), None in an arm
+    whose attempt is unresolved."""
+    return tuple(got[n]['died'] if got[n]['status'] == 'played' else None
+                 for n in ('ours', 'vanilla'))
 
 
 def cell_pairs(sides, play, seeds, have=None):
@@ -908,8 +916,7 @@ def cell_pairs(sides, play, seeds, have=None):
                                  'log': r.get('log'), 'log_tail': r.get('log_tail')})
         if any(got[n]['status'] == 'unreached' for n in names):
             continue
-        pairs.append(tuple(got[n]['died'] if got[n]['status'] == 'played' else None
-                           for n in names))
+        pairs.append(pair_of(got))
     withheld = any(reach[n]['unresolved'] for n in names)
     return {'pairs': pairs, 'reach': reach, 'problems': problems, 'played': played,
             'withheld': withheld, 'have': have, 'cpu_s': cpu, 'results': results}
@@ -1109,7 +1116,8 @@ def pilot_main(args):
     todo = []
     for n, side in sides.items():
         have = side['kept']()
-        todo += side['tasks']([s for s in seeds if again(have.get(s), side['chapter'], True)])
+        todo += side['tasks']([s for s in seeds
+                               if again(have.get(s), side['chapter'], side['pinned'])])
     hours = suite_estimate(suite, todo, kept_walls(outs, inst, hashes), args.jobs)
     print('%d runs to play on %d workers: about %.2f wall-hours' % (len(todo), args.jobs, hours))
     if hours > MAX_WALL_H:
@@ -1117,14 +1125,17 @@ def pilot_main(args):
               'split it' % MAX_WALL_H)
         return 1
     got = cell_pairs(sides, pool_play(args.jobs), seeds)
+    if not any(None not in p for p in got['pairs']):
+        print('refused: no pilot pair has a game result in both arms; each run says why:')
+        print('\n'.join(problem_lines(got['problems'])))
+        return 1
     s = pilot_summary(got['pairs'], cells, got['cpu_s'], got['reach'])
     for line in pilot_lines(s, arms['ours'], arms['vanilla']) + problem_lines(got['problems']):
         print(line)
     print('discordant pairs (story <trace> reads each):')
     for seed in seeds:
         res = got['results'][seed]
-        pair = tuple(res[n]['died'] if res[n]['status'] == 'played' else None
-                     for n in ('ours', 'vanilla'))
+        pair = pair_of(res)
         if None not in pair and pair[0] != pair[1]:
             print('  seed %d, only %s lost someone: ours %s, vanilla %s' % (
                 seed, 'ours' if pair[0] else 'the twin',
@@ -1738,19 +1749,19 @@ def suite_setup():
 
 def pinned_setup(start_ids):
     """suite_setup's (suite, simdirs, envs) for playing the named pinned starts, or the
-    refusal to print: an unknown start, or one check_starts says no longer matches its pin
-    (its ROM, its state, the emulator), with only those starts' own snapshots checked. What
-    `pilot`, a chapter `cell` and `replay` each check before anything plays."""
+    refusal to print: an unknown start, or what check_starts finds wrong for those starts
+    (the shops store, the emulator, each start's ROM and state). No snapshot is checked:
+    these play a start's state and load no snapshot, and `suite` checks them. What `pilot`,
+    a chapter `cell` and `replay` each check before anything plays."""
     setup = suite_setup()
     if isinstance(setup, str):
         return setup
     suite, simdirs, envs = setup
-    known = {s['start_id'] for s in suite['starts']}
-    unknown = [sid for sid in start_ids if sid not in known]
-    if unknown:
-        return 'refused: the suite has no start %s' % ', '.join(unknown)
-    one = dict(suite, starts=[s for s in suite['starts'] if s['start_id'] in start_ids],
-               snapshots=[s for s in suite.get('snapshots') or [] if s['start_id'] in start_ids])
+    try:
+        starts = [start_of(suite, sid) for sid in start_ids]
+    except ValueError as err:
+        return 'refused: %s' % err
+    one = dict(suite, starts=starts, snapshots=[])
     problems = check_starts(one, simdirs)
     if problems:
         return '\n'.join(['refused: %d pinned starts cannot be played as pinned:'

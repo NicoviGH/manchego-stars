@@ -102,7 +102,8 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   decisive look settles the cell. At N = 24 the bounds give ±15.9 points at 0 of 50, ±8.3 at
   0 of 100 (so an even cell settles EQUIVALENT at the second look) and ±4.2 at 0 of 200.
 - **Unresolved attempts:** an attempt with no game result is played once more on its own seed
-  (`RETRIES` = 1). If it still has none, `bound_unresolved` reads it as the worst case each way
+  (`RETRIES` = 1). The retry is counted where the play stopped, so a campaign that crashes
+  before the chapter and then, on its retry, at the chapter gets one retry at each. If it still has none, `bound_unresolved` reads it as the worst case each way
   and it stays in the denominator. An interval that then decides nothing is labelled
   **WITHHELD**, not INCONCLUSIVE. In a campaign cell, a campaign that crashed before the
   chapter withholds the whole comparison, and one that ended with a game result before it is
