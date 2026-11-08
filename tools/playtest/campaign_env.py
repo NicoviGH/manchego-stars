@@ -256,6 +256,14 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
     return env
 
 
+def pinned_env(env, campaign_id, chapter):
+    """`env` resumed at chapter index `chapter` from the start state campaign `campaign_id`
+    saved, attempt 1 only, ended there: a pinned chapter start, as the suite and a chapter
+    cell play it (#510 step 9, FR-024). Attempt mode saves no state, so the pinned file is
+    never rewritten (campaign.lua)."""
+    return dict(env, id=campaign_id, attempt=1, last=[chapter], **{'from': chapter})
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('game', choices=('vanilla', 'ours'))

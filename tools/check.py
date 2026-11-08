@@ -86,6 +86,11 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 PR-H (ADR 0385, built): the verdict is exact Clopper-Pearson bounds on
+    # any protected death at every look; exact McNemar, the Haybittle-Peto early bar and the
+    # score intervals it reported with are gone, and a cell no longer counts clean clears
+    r'\bmcnemar_exact\b', r'\bEARLY_P\b', r'\bFINAL_P\b', r'\bnewcombe_paired\b',
+    r'\bsquare_and_add\b', r'\bHaybittle[-\u2013 ]Peto\b',
     # retired by #510 step 9 PR-G (ADR 0395): the suite's held-out seeds play under `--held-out`
     # (counts only, with the promotion result) or `--freeze`; `--baseline` is gone
     r'\bsuite --baseline\b',

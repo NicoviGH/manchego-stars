@@ -282,10 +282,13 @@ instrument:
   route: 1                        # vanilla's Ch8 split (Eirika): one vanilla env for every start
   emulator: {binary: tools/emulator/mgba-headless, sha1: 3ac3201187d021aa8a43118dc3fd6741d32e97f2}
   # FR-025: no seed is in two sets. `confirmatory` is what a cell plays (run_cell: seeds
-  # 1..LOOKS[-1]); `pilot` is the one-cell pilot's 50 (PR-H).
+  # 1..LOOKS[-1]); `pilot` is the one-cell pilot's 50 (`montecarlo.py pilot`, PR-H).
   seed_sets:
     confirmatory: [1, 200]
     pilot: [3001, 3050]
+  # N, the frozen cell count every confirmatory bound is split over (ADR 0385, FR-026): ch00-ch07
+  # in three modes. Adding cells widens every interval, so it changes only with the cells
+  cells: 24
   # What a start names unless it names its own, merged key by key like matrix.yaml's rows.
   defaults:
     seeds: {tuning: [1001, 1002], held_out: [2001, 2002]}

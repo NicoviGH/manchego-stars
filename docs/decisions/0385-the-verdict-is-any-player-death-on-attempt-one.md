@@ -10,9 +10,9 @@ issues: [510]
 
 **Decided (Nicolas, 2026-11-01), #510 step 9.** Taken from the step 9 spec (FR-023 to FR-030 and
 FR-033), which an advisory panel drafted (research record 0023): spec #510 comment 6563384018, plan and tasks #510 comment 6563384310. Amends ADR
-0376 and replaces the method `montecarlo.py` runs today: exact McNemar, Haybittle–Peto looks and
-research record 0022's reading. **Not built yet:** until PR-H and PR-I of the plan land,
-`paired_verdict` still reads `clean`.
+0376 and replaced the method `montecarlo.py` ran until then (exact McNemar with an early-look
+bar, research record 0022's reading). **Built in PR-H** (points 1 to 3, see "Built (PR-H)" at
+the end); point 4's validity bar and point 5 are PR-I's.
 
 **Why.** A clean clear mixes two things: how dangerous a map is, and how well the bot collects
 everything. A Manchego Stars chapter can fail clean clears more often than its twin only because
@@ -86,3 +86,57 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   someone on most first attempts and still be cleared clean on a retry. A campaign that stops
   there leaves the later chapters unreached, and an unreached chapter withholds its campaign
   cell (point 2: a campaign cell compares a chapter only when both arms reach it).
+
+**Built (PR-H, 2026-11-07).**
+- **`paired_verdict` was reworked in place**, with no second verdict function. It reads each
+  pair as (did ours lose a protected unit anywhere in attempt 1, did the twin), where a
+  protected unit is a blue one or a green whose death ends the game (`protected_deaths`, the
+  same rule the suite's `run_outcome` uses). `chapter_result` returns that endpoint and keeps
+  `clean` as a reported column. Exact McNemar, its early-look bar and the score intervals it
+  reported with are gone, and their names are in `DEAD_CONCEPTS`.
+- **The bounds** are `clopper_pearson` (exact, found by bisection on the binomial tail; it
+  matches Newcombe 1998a's exact column for all four of that paper's worked examples), each at
+  `bound_level(N)` = 0.05 / (4 × 3 × N). N is the manifest's `instrument.cells`, 24.
+  `confirmatory_interval` bounds the discordant proportions (paired) or the arms' rates
+  (marginal). The label is checked in FR-028's order at 50, 100 and 200 pairs, and the first
+  decisive look settles the cell. At N = 24 the bounds give ±15.9 points at 0 of 50, ±8.3 at
+  0 of 100 (so an even cell settles EQUIVALENT at the second look) and ±4.2 at 0 of 200.
+- **Unresolved attempts:** an attempt with no game result is played once more on its own seed
+  (`RETRIES` = 1). The retry is counted where the play stopped, so a campaign that crashes
+  before the chapter and then, on its retry, at the chapter gets one retry at each. If it still has none, `bound_unresolved` reads it as the worst case each way
+  and it stays in the denominator. An interval that then decides nothing is labelled
+  **WITHHELD**, not INCONCLUSIVE. In a campaign cell, a campaign that crashed before the
+  chapter withholds the whole comparison, and one that ended with a game result before it is
+  counted in the reachability report and left out of the pairs. A chapter cell starts at the
+  chapter, so any play there with no game result (a worker that died before writing a record
+  included) is one unresolved pair, never a withheld cell.
+- **Chapter cells:** `chapter_tasks` gives each seed of a set (the start's own tuning or
+  held-out seeds, or the manifest's pilot or confirmatory range) one attempt-1 task on the
+  pinned start, through `campaign_env.pinned_env`. The suite uses it too. `load_suite` refuses
+  seed sets that overlap. `cell` plays either kind of cell to its verdict with the pilot's
+  analysis. `pilot` estimates its wall time first and refuses a job over 8 hours.
+- **The pilot** (Nicolas chose the cell: ours ch03 against vanilla Ch3, pinned starts,
+  pilot seeds 3001–3050). 100 runs, estimated at 0.20 wall-hours on 8 workers, took 0.85
+  CPU-hours. Every replicate reached the chapter and every attempt had a game result:
+  - **The 2×2 table:** a protected unit died in ours on 18 of 50 attempts (36%) and in the
+    twin on 0 of 50. So both 0, only ours 18, only the twin 0, neither 32: 18 discordant pairs
+    (36%), a difference of +36 points.
+  - **Analysis: marginal.** The covariance is exactly 0 because the twin never lost anyone,
+    and the rule picks paired only when it is positive. With one arm constant the paired and
+    marginal intervals are the same here.
+  - **Can ±10 be reached?** No: with no difference at these death rates, 200 pairs would read
+    ±19.7. That matters only for EQUIVALENT. If these rates held, the confirmatory look would
+    read HARDER at 100 pairs (+11.9 to +54.3) and at 200 (+20.2 to +48.8). Pilot data is never
+    confirmatory, and this is a projection, not a verdict.
+- **The trace review (SC-005):**
+  - **All 18 ours deaths are in careful-style runs.** Careful plays ch03 in 23 to 25 turns,
+    bold and even in 14 to 16. The deaths come from that longer exposure, mostly at the Mogall
+    boss: 30 of the 42 deaths were over-cap fallbacks, 6 were RNG tails under 1%, and 6 were a
+    blind spot (`unrevealed_killer`: the Mogall killed a unit the plan never saw it reach).
+  - **The 6 blind-spot runs are 12% of ours' attempts.** That is over the 10% that point 4
+    allows, so PR-I's validity check would rate this cell NOT READABLE.
+  - **A seed only draws the style and the claims it plays.** Two seeds that draw the same
+    style play the pinned start frame for frame the same, so each arm's 50 seeds made 30
+    distinct plays. The bounds still hold, because the draws are independent and the outcome
+    is fixed once the style is drawn. But a chapter cell measures the style mix, not the
+    game's RNG. Recorded on #510 for PR-I's validity work.
