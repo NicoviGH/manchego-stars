@@ -1,0 +1,247 @@
+{
+ "calls": {
+  "held_out": 357368,
+  "tuning": 210261
+ },
+ "cpu_s": {
+  "held_out": 1730.1,
+  "tuning": 1356.5
+ },
+ "frozen_on": "2026-11-07",
+ "held_out_losses": [
+  "39ef3ff2dfc1805e",
+  "41716bbc9e6f8c03",
+  "68f164b2935f7ddb",
+  "6f1c8d09df958c72"
+ ],
+ "instrument": "e6fc3854f2a3+v2",
+ "manifest_version": 2,
+ "tuning": {
+  "ours-ch00/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "ours-ch00/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "ours-ch01/1001": {
+   "deaths": [
+    2,
+    6
+   ],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "ours-ch01/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 1,
+   "unlabelled": 0
+  },
+  "ours-ch02/1001": {
+   "deaths": [
+    201,
+    202
+   ],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "ours-ch02/1002": {
+   "deaths": [
+    201,
+    202
+   ],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "ours-ch03/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 1,
+   "unlabelled": 0
+  },
+  "ours-ch03/1002": {
+   "deaths": [
+    3,
+    4
+   ],
+   "invariant": true,
+   "lost": false,
+   "stalls": 2,
+   "unlabelled": 0
+  },
+  "scout-ch10/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "scout-ch10/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "scout-ch13/1001": {
+   "deaths": [
+    1,
+    5
+   ],
+   "invariant": true,
+   "lost": true,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "scout-ch13/1002": {
+   "deaths": [
+    19
+   ],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "scout-ch14/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 4,
+   "unlabelled": 0
+  },
+  "scout-ch14/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 4,
+   "unlabelled": 0
+  },
+  "scout-ch6/1001": {
+   "deaths": [
+    1
+   ],
+   "invariant": true,
+   "lost": true,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "scout-ch6/1002": {
+   "deaths": [
+    1
+   ],
+   "invariant": true,
+   "lost": true,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch1/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch1/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch2/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch2/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch3/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch3/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch4/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch4/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch5/1001": {
+   "deaths": [
+    6,
+    8,
+    13,
+    19
+   ],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-ch5/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-prologue/1001": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  },
+  "vanilla-prologue/1002": {
+   "deaths": [],
+   "invariant": true,
+   "lost": false,
+   "stalls": 0,
+   "unlabelled": 0
+  }
+ },
+ "wall_s": {
+  "held_out": 2419.9,
+  "tuning": 1993.6
+ }
+}

@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 PR-G (ADR 0395): the suite's held-out seeds play under `--held-out`
+    # (counts only, with the promotion result) or `--freeze`; `--baseline` is gone
+    r'\bsuite --baseline\b',
     # retired by ADR 0384's 2026-11-03 amendment (#566): SC-003's stand-in baseline is PR-D's
     # AiDecideMain calls, never PR-A's CPU
     r'\bwithin 20% of PR-A\b', r"\b(?:within|inside) SC-003's 20%",

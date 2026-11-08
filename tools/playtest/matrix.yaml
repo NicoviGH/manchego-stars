@@ -298,6 +298,29 @@ instrument:
   shops_from:
     - references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3
     - references/sim/vanilla/c25b145e3745/states/scout-vanilla
+  # the failing decision snapshots (FR-021, T084): each state a replay pinned at the decision
+  # it replays, and the board that decision read beside it; `suite` loads each in a fresh
+  # emulator and checks it holds that board. Pinned on instrument e6fc3854f2a3+v2 (ADR 0392's
+  # three T079 deaths, played again; the label is the audit's, for reading only)
+  snapshots:
+    - {snapshot_id: ours-ch02-1002-klimt, start_id: ours-ch02, invariant: pinned_board,
+       state_path: references/sim/ours/fd3cb9d8dca6/traces/diag/3934fac7-pinned-ours-3-a1-r1.ss,
+       state_sha1: af7f630c1e1e89444d238516266a4b803b2e4f97,
+       board_path: references/sim/ours/fd3cb9d8dca6/traces/diag/3934fac7-pinned-ours-3-a1-r1.json,
+       provenance: {seed: 1002, set: tuning, ref: 1, mode: deep, char: 0xC9,
+                    source: 'ADR 0392 T079; search_miss, witnessed'}}
+    - {snapshot_id: ours-ch03-1002-meesmickle, start_id: ours-ch03, invariant: pinned_board,
+       state_path: references/sim/ours/fd3cb9d8dca6/traces/diag/234ead3c-pinned-ours-4-a1-r45.ss,
+       state_sha1: a44c37c2001bd6c7493122b64167d4fcfae78f36,
+       board_path: references/sim/ours/fd3cb9d8dca6/traces/diag/234ead3c-pinned-ours-4-a1-r45.json,
+       provenance: {seed: 1002, set: tuning, ref: 45, mode: deep, char: 0x03,
+                    source: 'ADR 0392 T079; unclassified: every judged plan over the cap'}}
+    - {snapshot_id: scout-ch6-1001-eirika, start_id: scout-ch6, invariant: pinned_board,
+       state_path: references/sim/vanilla/c25b145e3745/traces/diag/5f07775f-pinned-vanilla-7-a1-r4.ss,
+       state_sha1: f4f955aef37815541ad6af856bfcf18fdf2fd1c2,
+       board_path: references/sim/vanilla/c25b145e3745/traces/diag/5f07775f-pinned-vanilla-7-a1-r4.json,
+       provenance: {seed: 1001, set: tuning, ref: 4, mode: full_info, char: 0x01,
+                    source: 'ADR 0392 T079; information_unavailable, witnessed'}}
   starts:
     # vanilla, New Game to Ch5 on seed 1, route 1, every chapter cleared clean before the
     # next (#510 comments 6478205562, 6485521139). Ch5x (5) is never reached: no clean Ch5.

@@ -707,6 +707,18 @@ class Suite(unittest.TestCase):
         self.assertEqual(len(got['starts']), 14)
         self.assertEqual(sum(len(s['seeds']['tuning']) + len(s['seeds']['held_out'])
                              for s in got['starts']), 56)   # SC-001, amended by PR-G
+        # T084: the failing decision snapshots, one per witnessed or unresolved T079 death
+        self.assertEqual(sorted(sn['start_id'] for sn in got['snapshots']),
+                         ['ours-ch02', 'ours-ch03', 'scout-ch6'])
+        # the frozen baseline (ADR 0395) is this manifest's: every tuning run it keeps is one the
+        # manifest plays, and every one the manifest plays is kept, so a start added or a seed
+        # moved since the freeze is a refreeze, never a silent gap
+        frozen = mc.load_frozen()
+        self.assertIsNotNone(frozen, 'suite-frozen.json is committed')
+        self.assertEqual(frozen['manifest_version'], got['version'])
+        self.assertEqual(sorted(frozen['tuning']), sorted(
+            '%s/%s' % (s['start_id'], seed) for s in got['starts'] for seed in s['seeds']['tuning']))
+        self.assertEqual(len(frozen['held_out_losses']), len(set(frozen['held_out_losses'])))
         lo, hi = got['seed_sets']['confirmatory']
         self.assertLessEqual(mc.LOOKS[-1], hi - lo + 1, 'a cell plays seeds 1..LOOKS[-1]')
         # the budgets the manifest records are the ones the planner plays (PR #560: `branch`
