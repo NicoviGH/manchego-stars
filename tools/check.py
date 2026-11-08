@@ -599,6 +599,15 @@ def check_tests_pass(fail):
         paths = [p for p in paths if not os.path.basename(p).startswith('test_check_canaries')]
         print('check_tests_pass: canaries skipped in the hook -- no tools/ Python and no file '
               'a canary doctors is staged; `make check`, `make test` and CI run them')
+    staged = _staged_files() if os.environ.get('MS_PRECOMMIT') == '1' else None
+    if staged is not None:
+        # The hook runs only the tests a staged path can reach, from what each one read on its
+        # last passing run (run_tests.affected, #579). A test with no record, a failing one,
+        # or one that ran a subprocess the tracer cannot see into always runs.
+        whole = len(paths)
+        paths = run_tests.affected(paths, staged)
+        print('check_tests_pass: %d of %d test files can reach a staged path; `make check`, '
+              '`make test` and CI run them all' % (len(paths), whole))
     for rel, output in run_tests.run(paths):
         tail = output.strip().splitlines()
         fail.append('unit tests fail: %s (%s)' % (rel, tail[-1] if tail else 'see output'))

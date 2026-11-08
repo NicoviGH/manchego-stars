@@ -188,7 +188,8 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   tracked skills Codex reads.
 - **Codex works here between Claude sessions** and leaves an explicit HANDOFF entry: what
   changed, branch and PR state, the verification it ran, the exact next step.
-- **A commit takes about a minute:** the pre-commit hook runs the whole `tools/check.py`.
+- **The pre-commit hook runs `tools/check.py`, but only the unit tests a staged path can reach**
+  (ADR 0394); `make check`, `make test` and CI run them all.
 - **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine patch series in
   `engine/patches/`, which applies whole or fails the build — the directory is the authoritative
   list, don't cite a count). Desk ownership is a review judgment
