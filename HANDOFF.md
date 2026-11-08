@@ -73,9 +73,9 @@ and the ch03 pilot. Next: confirm and diagnose the pilot's findings, then PR-I.
    what a chapter cell measures.
 3. Then PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
-3. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
+4. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
    party levers (#510's checklist; #459, #547, #526 with #543 first).
-4. Tell Nicolas where step 9 stands in plain words at the start of a session: he lost track of
+5. Tell Nicolas where step 9 stands in plain words at the start of a session: he lost track of
    the series after the advisory panel.
 
 ## Parked or owed elsewhere
