@@ -9,8 +9,8 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-07 (Claude): #510 PR-G merged (#581, ADR 0395): the instrument is frozen.
-PR-H is next.
+Refreshed 2026-11-08 (Claude): #510 PR-H merged (#582, ADR 0385 "Built (PR-H)"): the verdict
+and the ch03 pilot. PR-I is next.
 
 ## Where things stand
 
@@ -28,7 +28,13 @@ PR-H is next.
     tuning runs on it; `--held-out` adds the held-out seeds as counts plus the promotion result;
     `--freeze` refreezes; `--kept` re-judges kept runs. The fog start (vanilla Ch6) was added and
     three failing-decision snapshots load back to their boards in a fresh emulator. The
-    surprise-replan rule stayed strict (no bot change).
+    surprise-replan rule stayed strict (no bot change). **PR-H #582** (ADR 0385, "Built
+    (PR-H)"): `paired_verdict` now judges any protected death on attempt 1 with exact bounds
+    (N = 24 in `instrument.cells`, ±10 margin); chapter cells, `pilot` and `cell`. The pilot
+    (ours ch03 vs vanilla Ch3, Nicolas's pick): ours lost someone on 18 of 50 first attempts,
+    the twin on 0 of 50. Every death was a careful-style run; 6 of 50 (12%) were blind-spot
+    deaths, over PR-I's 10% validity bar; and a seed only draws the style, so 50 seeds made 30
+    distinct plays an arm. PR-I has to weigh both.
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
@@ -56,10 +62,11 @@ PR-H is next.
 
 ## Next
 
-1. **PR-H** (T088-T099, the ours-vs-twin pilot): the statistics first (pure Python), then the
-   one-cell pilot on 50 held-out seeds an arm, the cell chosen by Nicolas (T098). Estimate its
-   wall time before running it (SC-007).
-2. Then PR-I (validity), PR-J (polish).
+1. **PR-I** (validity, T100+): the validity bar of ADR 0385 point 4. Start from the pilot's two
+   findings above (the ch03 blind-spot rate, and seeds that only draw the style); bring
+   Nicolas the second one before building around it, since it decides what a chapter cell
+   measures.
+2. Then PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
 3. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
    party levers (#510's checklist; #459, #547, #526 with #543 first).
