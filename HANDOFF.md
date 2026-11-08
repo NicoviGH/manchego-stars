@@ -9,9 +9,9 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-08 (Claude): the ch03 pilot is checked (#510 comment 6718140525, "Checked")
-and Nicolas decided what comes first in PR-I (T100a-e in the plan comment 6563384310). Next:
-PR-I, starting with T100a.
+Refreshed 2026-11-08, later (Claude): T100a's pull-back was built, piloted and parked; Nicolas
+decided the root cause is the lookahead's hold, and T100a-R replaces it (plan comment 6563384310,
+Phase 9). Next: design T100a-R with Nicolas, then build.
 
 ## Where things stand
 
@@ -63,20 +63,24 @@ PR-I, starting with T100a.
 
 ## Next
 
-1. **PR-I, starting with its new first tasks** (plan comment 6563384310, Phase 9, "Decided
-   before PR-I", Nicolas 2026-11-08). Evidence: the pilot comment 6718140525's "Checked" section.
-   - T100a: careful pulls back. `bot.lua` `retreatOver` only gains ground toward the boss, and
-     no plan with every unit out of reach is ever judged.
-   - T100b: branch the enemy phase on our attacker's counter, not average HP (`planner.lua`
-     `judge`).
-   - T100c: drop the recorder's phantom enemy `wait` and its stale `from` (`harness.lua` ~3207).
-   - T100e: several starts per chapter cell, each from its own New Game campaign seed (ADR 0370
-     holds: never re-seeded). 10 starts for a verdict, fewer while trying a change; every ours
-     start is remade on any ROM change.
-   - **T100d still needs Nicolas's OK:** the grade reading the plan's two-phase chance changes
-     what the 10% blind-spot bar counts. Ask before building it.
-   Together they make one new instrument: refreeze, then read `suite --held-out`'s promotion
-   line. Then T100-T108 as planned, built on the refrozen instrument.
+1. **PR-I starts with T100a-R** (plan comment 6563384310, Phase 9: the "Tried and parked" note
+   and T100a-R under T100a). In short: the lookahead's second phase lets committed units keep
+   attacking instead of holding (reopens ADR 0389's "the hold stays"), and the cap becomes the
+   style's preferred risk: while waiting buys nothing, the least risky commit is played over it,
+   labelled. **No chapter- or map-specific rule** (Nicolas: design it so it scales). Run
+   `superpowers:brainstorming` to settle what "waiting buys nothing" means in general, write the
+   design into that plan comment (one comment, edited in place), get his OK, then build.
+   - The parked pull-back is a LOCAL branch, `park/510-t100a-pullback` (never pushed, not for
+     merge). Its pilot output: `build/pilot/ch03-pilot-t100a.txt`; instrument `77c73226efaf+v2`.
+   - T100b, T100c, T100e stand as planned. **T100c's cause is found:** the phantom enemy `wait` is
+     the phase-start terrain-heal display (`MassEffectDisplay_Check`, bmusailment.c, sets
+     `gActionData.subjectIndex`), so it shows only once the Mogall heals on its tile. Fix: open an
+     act in `watchEnemyActs` only when `gActiveUnit` is the subject (UnitBeginAction sets both).
+   - **T100d is still unanswered.** Nicolas asked if Wolfram's death is really a blind spot (no
+     fog on ch03: confirmed, 0 fogged in every plan record). "Blind spot" is the grader's word for
+     a 0% first-phase number; the two-phase number was 94%. Ask again for the OK.
+   Together they make one new instrument: refreeze, then read `suite --held-out`'s promotion line.
+   Then T100-T108 as planned.
 2. **Why the pilot looked the way it did** (so nobody re-derives it): a pinned start keeps the
    dice in its save, and the seed only draws the style (`harness.lua:3863-3896`, ADR 0374). The
    50 ours runs were 8 distinct games from 30 style draws. Every ours death was careful-style.
