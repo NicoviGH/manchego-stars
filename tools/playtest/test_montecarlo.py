@@ -1198,7 +1198,7 @@ class Frozen(unittest.TestCase):
                                    seeds={'tuning': [1005, 1006], 'held_out': [2005, 2006]}))
         with self.assertRaises(matrix.ManifestError) as cm:
             self.load(inst)
-        self.assertIn('no replacement held-out seeds are frozen', str(cm.exception))
+        self.assertIn('names no commit that froze its held-out seeds', str(cm.exception))
         inst['held_out_frozen_at'] = 'abc1234'
         with self.assertRaises(matrix.ManifestError) as cm:
             self.load(inst)   # 2001 is still vanilla-ch3's held-out seed
@@ -1260,6 +1260,24 @@ class Frozen(unittest.TestCase):
         lines, failed = mc.snapshot_check(suite, {'vanilla': {}, 'ours': {}}, 'i',
                                           launch=lambda *a: ('', None))
         self.assertIn('printed no PINNED line', lines[0])
+        # never more emulators at once than the suite's --jobs
+        import threading
+        live, peak, lock = [0], [0], threading.Lock()
+
+        def slow(task, tag, log_path):
+            with lock:
+                live[0] += 1
+                peak[0] = max(peak[0], live[0])
+            time.sleep(0.05)
+            with lock:
+                live[0] -= 1
+            return launch(task, tag, log_path)
+        inst['snapshots'] = [dict(SNAPSHOT, board_path=rel, snapshot_id='s%d' % i)
+                             for i in range(4)]
+        lines, failed = mc.snapshot_check(self.load(inst), {'vanilla': {}, 'ours': {}}, 'i',
+                                          launch=slow, jobs=2)
+        self.assertEqual((failed, peak[0]), ([], 2))
+        self.assertEqual([ln.split(' ')[1] for ln in lines], ['s0', 's1', 's2', 's3'])
 
     def test_a_failing_snapshot_is_a_regression_and_refuses_a_freeze(self):
         def lines_with(snap):

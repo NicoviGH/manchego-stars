@@ -83,7 +83,6 @@ import concurrent.futures
 import functools
 import gzip
 import hashlib
-import itertools
 import json
 import math
 import os
@@ -330,7 +329,11 @@ def keep_trace(rec, out):
         a['narrate'] = narrate(dest, a.get('turn'))
 
 
-POOL_SERIAL = itertools.count(1)
+def unique_tag(prefix):
+    """A run tag no other launch shares: `prefix`, the pid, and a random part. A reused tag
+    would let run.sh wipe an earlier run's kept failing dir (a `cell` makes a Pool per look),
+    and two launches in one second, or a pid the OS has reused, must still differ."""
+    return '%s-%d-%s' % (prefix, os.getpid(), uuid.uuid4().hex[:8])
 
 
 class Pool:
@@ -351,9 +354,7 @@ class Pool:
         run's dir is deleted as it ends; a failing one's is kept, the newest `keep_failed`."""
         os.makedirs(self.log_dir, exist_ok=True)
         prune_runs(self.run_root, self.keep_failed)
-        # unique: `cell` makes a Pool per look, and a reused tag would let run.sh wipe an earlier
-        # Pool's kept failing dir; the time part covers a pid the OS has reused
-        base = '%d-%d-%x' % (os.getpid(), next(POOL_SERIAL), int(time.time()))
+        base = unique_tag('pool')   # one base a batch, each worker `<base>-<i>`
 
         def one(i, task):
             tag = '%s-%d' % (base, i)
@@ -885,8 +886,9 @@ def load_suite(path=None):
     for kind, sid, prov in ([('start', s['start_id'], s['provenance']) for s in starts]
                             + [('snapshot', s['snapshot_id'], s['provenance']) for s in snaps]):
         if prov.get('set') == 'held_out' and not inst.get('held_out_frozen_at'):
-            raise ManifestError('suite %s %s comes from a held-out run, and no replacement '
-                                'held-out seeds are frozen (held_out_frozen_at)' % (kind, sid))
+            raise ManifestError('suite %s %s comes from a held-out run, and the manifest names '
+                                'no commit that froze its held-out seeds (held_out_frozen_at)'
+                                % (kind, sid))
         # by the seed, whatever the label says: a fixture mislabelled `tuning` is refused too
         if prov.get('seed') in held:
             raise ManifestError('suite %s %s comes from held-out seed %s, which is still held '
@@ -1125,8 +1127,9 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
     held-out outcome is never shown to whoever is tuning the bot. A new held-out loss (one the
     frozen baseline did not have) is played again (`again`, `play` unless given), and one that
     loses again is reproducible. Only then is there a promotion result. `explain(rec, charId)`
-    is a new death's witnessed label, or None. `snapshots()` checks the snapshots (snapshot_check's
-    lines and failures), handed the envs this run built. Refuses, with the reason, a start that no longer matches its pin or a
+    is a new death's witnessed label, or None. `snapshots(envs)` checks the snapshots
+    (snapshot_check's lines and failures), handed the envs this run built. Refuses, with the
+    reason, a start that no longer matches its pin or a
     job over `wall_limit_h` (SC-007), before anything runs. `envs()` builds {game: campaign
     env}. `result`, a dict, is filled with what a freeze keeps."""
     lines = []
@@ -1305,12 +1308,14 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
 PINNED = 'PINNED'
 
 
-def snapshot_check(suite, envs, instrument, launch=launch, run_root=None):
+def snapshot_check(suite, envs, instrument, launch=launch, run_root=None, jobs=8):
     """Each snapshot's invariant, `pinned_board`: its kept state, loaded in a fresh emulator
     (PT_PINNED, botrun.lua's check_pinned), holds the board its decision read, the board file
     kept beside it when the replay pinned it (ADR 0392's in-run reload, made from outside the
     run). Booted from its start's own task (start_task's); nothing is played. The checks run
-    at once, one emulator each. (lines, failed snapshot ids), in manifest order."""
+    side by side, at most `jobs` emulators at once (the suite's own --jobs), and each run dir
+    is settled on this thread, as Pool settles its own. (lines, failed snapshot ids), in
+    manifest order."""
     snaps = suite.get('snapshots') or []
 
     def one(sn):
@@ -1322,15 +1327,16 @@ def snapshot_check(suite, envs, instrument, launch=launch, run_root=None):
         with open(os.path.join(REPO, sn['board_path'])) as fh:
             want = json.load(fh)
         ok = bool(got) and got[-1].get('board') == want
-        settle_run_dir(where, ok, run_root)
-        return ok, 'snapshot %s (%s, decision %s, %s): %s' % (
+        return ok, where, 'snapshot %s (%s, decision %s, %s): %s' % (
             sn['snapshot_id'], sn['start_id'], sn['provenance']['ref'], sn['provenance']['mode'],
             'loads back to its board' if ok else
             'printed no PINNED line' if not got else 'loads to a board other than its own')
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(snaps))) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(jobs, len(snaps)))) as ex:
         done = list(ex.map(one, snaps))
-    return ([line for _, line in done],
-            [sn['snapshot_id'] for sn, (ok, _) in zip(snaps, done) if not ok])
+    for ok, where, _ in done:
+        settle_run_dir(where, ok, run_root)
+    return ([line for _, _, line in done],
+            [sn['snapshot_id'] for sn, (ok, _, _) in zip(snaps, done) if not ok])
 
 
 def suite_setup():
@@ -1413,7 +1419,8 @@ def suite_main(args):
     lines = run_suite(suite, envs, simdirs, play, args.jobs, args.held_out or args.freeze, inst,
                       kept=kept_walls(outs, inst, hashes), frozen=load_frozen(),
                       explain=store_explain(simdirs), result=result, again=pool.run,
-                      snapshots=lambda built: snapshot_check(suite, built, inst))
+                      snapshots=lambda built: snapshot_check(suite, built, inst,
+                                                             jobs=args.jobs))
     for line in lines:
         print(line, flush=True)
     if any(line.startswith('refused') for line in lines):
@@ -1549,11 +1556,10 @@ def start_task(suite, envs, instrument, sid, kind, seed=None):
 
 
 def launch_tagged(task, prefix, log_dir, launch=launch):
-    """One launch of `task` under a tag of its own (`prefix`, the pid and a random part: two
-    launches in one second never share a log or run dir), its log in `log_dir`. Returns
-    launch's (stdout, run dir)."""
+    """One launch of `task` outside a Pool, under a tag of its own (unique_tag's), its log in
+    `log_dir`. Returns launch's (stdout, run dir)."""
     os.makedirs(log_dir, exist_ok=True)
-    tag = '%s-%d-%s' % (prefix, os.getpid(), uuid.uuid4().hex[:8])
+    tag = unique_tag(prefix)
     return launch(task, tag, os.path.join(log_dir, tag + '.log'))
 
 

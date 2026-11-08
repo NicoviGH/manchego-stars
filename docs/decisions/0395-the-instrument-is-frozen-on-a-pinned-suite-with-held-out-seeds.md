@@ -55,8 +55,11 @@ still refuses it: nothing a promotion would refuse is frozen as the reference.
 **A held-out failure becomes a fixture only after its seed is replaced** (AS 2): `load_suite`
 refuses a start or snapshot whose provenance seed is still some start's held-out seed, whatever
 its `set` label says, and one labelled `set: held_out` while `held_out_frozen_at` is unset.
-`held_out_frozen_at` is `1168f72d`, PR-A (#558), which set the held-out seeds 2001 and 2002;
-no tuning run has played them since.
+`held_out_frozen_at` is the commit that last froze the held-out seeds: `1168f72d`, PR-A (#558),
+which set 2001 and 2002; no tuning run has played them since. The seed check is the guard that
+does the work; the field is the record of when the seeds were frozen, and a commit that replaces
+any start's held-out seeds sets it to itself (`git log -1` of that change), so a fixture from the
+old seeds is admitted only once the replacement is on record.
 
 **The snapshots** (FR-021, T084) are the states ADR 0392's replays pinned at a failing
 decision, each with the board that decision read kept beside it (`.json`, written by the pin

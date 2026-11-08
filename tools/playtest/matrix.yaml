@@ -276,7 +276,8 @@ suites:
 # longer hashes to state_sha1. The states live under references/ (gitignored).
 instrument:
   version: 2                       # 2: PR-G added the fog start scout-ch6 (ADR 0395)
-  # the commit that froze the held-out seeds: PR-A set 2001/2002, never played in tuning since
+  # the commit that last froze the held-out seeds (PR-A set 2001/2002, never played in tuning
+  # since). A commit that changes any start's held_out seeds sets it to itself (ADR 0395)
   held_out_frozen_at: 1168f72d
   route: 1                        # vanilla's Ch8 split (Eirika): one vanilla env for every start
   emulator: {binary: tools/emulator/mgba-headless, sha1: 3ac3201187d021aa8a43118dc3fd6741d32e97f2}
