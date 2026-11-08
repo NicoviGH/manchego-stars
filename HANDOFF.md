@@ -9,8 +9,8 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-07 (Claude): #578 (agent-team conventions) and #580 (faster pre-commit) merged
-after review; PR-G is next.
+Refreshed 2026-11-07 (Claude): #510 PR-G merged (#581, ADR 0395): the instrument is frozen.
+PR-H is next.
 
 ## Where things stand
 
@@ -23,12 +23,19 @@ after review; PR-G is next.
     (lookahead budget 128 an attempt, so the boss fight is no longer judged one phase deep), and
     PR-F #576 (a failure label needs a replayed witness: `montecarlo.py replay` / `audit`, ADR 0392).
     PR-F's answer to ours-ch03 seed 1002 unit 3: no evidence the hold caused it; every judged plan
-    was over the cap, and the best alternative traded the death to unit 5.
+    was over the cap, and the best alternative traded the death to unit 5. **PR-G #581** (ADR
+    0395): the instrument is frozen in `tools/playtest/suite-frozen.json`. `suite` judges the
+    tuning runs on it; `--held-out` adds the held-out seeds as counts plus the promotion result;
+    `--freeze` refreezes; `--kept` re-judges kept runs. The fog start (vanilla Ch6) was added and
+    three failing-decision snapshots load back to their boards in a fresh emulator. The
+    surprise-replan rule stayed strict (no bot change).
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
-  - **Suite now:** 566,389 `AiDecideMain` calls against SC-003's budget of 678,787; no decision
-    skipped for budget; every one of the 52 runs has a game result.
+  - **Frozen suite** (instrument `e6fc3854f2a3+v2`): 14 starts, 56 runs, 642.6 wall s on 8
+    workers, 567,629 `AiDecideMain` calls (SC-003's baseline now, budget 681,154); every run has
+    a game result; 4 of 28 held-out runs lost. A bot change makes a new instrument: run
+    `suite --held-out` and read its promotion line before trusting it.
 - **On hold** (label `on-hold`, the hold comment says what reopens each): #565 (chipping a step
   back), #569 (placing a claim's wave in the lookahead).
 - **Merged 2026-11-07 after review, every finding fixed:**
@@ -49,11 +56,10 @@ after review; PR-G is next.
 
 ## Next
 
-1. **PR-G** (T081-T087, freeze the suite). Two items PR-F left it, on the #510 plan comment:
-   add a fog start (vanilla Ch6 = chapter 7, `states/scout-vanilla/7.ss`), and decide whether a
-   normal surprise replan marks a deep/full_info replay `broken`. Both change the instrument, so
-   before the freeze.
-2. Then PR-H (the ours-vs-twin pilot), PR-I (validity), PR-J (polish).
+1. **PR-H** (T088-T099, the ours-vs-twin pilot): the statistics first (pure Python), then the
+   one-cell pilot on 50 held-out seeds an arm, the cell chosen by Nicolas (T098). Estimate its
+   wall time before running it (SC-007).
+2. Then PR-I (validity), PR-J (polish).
    They merge after `/code-review` + CI on the head (Nicolas's standing OK for step 9).
 3. Then **#510 step 10**: re-evaluate every chapter with the instrument and bring Nicolas the
    party levers (#510's checklist; #459, #547, #526 with #543 first).
