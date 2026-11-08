@@ -104,9 +104,11 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
 - **Unresolved attempts:** an attempt with no game result is played once more on its own seed
   (`RETRIES` = 1). If it still has none, `bound_unresolved` reads it as the worst case each way
   and it stays in the denominator. An interval that then decides nothing is labelled
-  **WITHHELD**, not INCONCLUSIVE. A campaign that crashed before the chapter withholds the
-  whole comparison. A campaign that ended with a game result before the chapter is counted in
-  the reachability report and left out of the pairs.
+  **WITHHELD**, not INCONCLUSIVE. In a campaign cell, a campaign that crashed before the
+  chapter withholds the whole comparison, and one that ended with a game result before it is
+  counted in the reachability report and left out of the pairs. A chapter cell starts at the
+  chapter, so any play there with no game result (a worker that died before writing a record
+  included) is one unresolved pair, never a withheld cell.
 - **Chapter cells:** `chapter_tasks` gives each seed of a set (the start's own tuning or
   held-out seeds, or the manifest's pilot or confirmatory range) one attempt-1 task on the
   pinned start, through `campaign_env.pinned_env`. The suite uses it too. `load_suite` refuses

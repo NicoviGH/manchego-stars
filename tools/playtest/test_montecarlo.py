@@ -701,6 +701,39 @@ class Cell(unittest.TestCase):
         self.assertIn('crashed (chapter 2, attempt 1): Lua error: x', p['why'])
         self.assertEqual(log.count(('ours', 1)), 2)
 
+    def test_a_pinned_attempt_that_crashed_unwritten_is_unresolved_not_unreached(self):
+        # review of #582: a chapter cell starts at the chapter, so a worker that died before
+        # writing one is attempt 1 unresolved, bounded, never a withheld comparison
+        crash = [{'outcome': 'crashed', 'attempt': 1, 'why': 'launch died'}]
+        self.assertEqual(mc.chapter_result(crash, 3)['status'], 'reach_unresolved')
+        r = mc.chapter_result(crash, 3, pinned=True)
+        self.assertEqual((r['status'], r['tries']), ('unresolved', 1))
+        self.assertTrue(mc.again(crash, 3, True), 'its retry is owed')
+        self.assertFalse(mc.again(crash * 2, 3, True), 'and only one')
+        sides = self.sides()
+        for side in sides.values():
+            side['pinned'] = True
+        got = mc.cell_pairs(sides, self.play(
+            lambda n, s, ch: crash if (n, s) == ('ours', 2) else self.died(False, ch)[:1], []),
+            [1, 2, 3])
+        self.assertFalse(got['withheld'])
+        self.assertEqual(got['pairs'], [(False, False), (None, False), (False, False)])
+        self.assertEqual(got['results'][2]['ours']['status'], 'unresolved')
+
+    def test_a_retry_counts_only_the_plays_that_stopped_where_this_one_did(self):
+        # review of #582: an earlier chapter's crash the campaign got past is not a retry
+        recs = [{'chapter': 2, 'attempt': 1, 'outcome': 'crashed'},
+                {'chapter': 2, 'attempt': 2, 'outcome': 'won'},
+                {'chapter': 3, 'attempt': 1, 'outcome': 'crashed'},
+                {'kind': 'campaign', 'outcome': 'crashed'}]
+        r = mc.chapter_result(recs, 3)
+        self.assertEqual((r['status'], r['tries']), ('unresolved', 1))
+        self.assertTrue(mc.again(recs, 3))
+        before = [{'chapter': 2, 'attempt': 1, 'outcome': 'crashed'},
+                  {'kind': 'campaign', 'outcome': 'crashed'}]
+        self.assertEqual(mc.chapter_result(before, 3)['tries'], 1)
+        self.assertFalse(mc.again(before * 2, 3))
+
     def test_a_cell_needs_its_last_looks_seeds(self):
         with self.assertRaises(ValueError):
             mc.run_cell(self.sides(), self.play(lambda n, s, ch: [], []), self.N, 'paired',
@@ -961,6 +994,76 @@ class Suite(unittest.TestCase):
         self.assertEqual(sorted(side['kept']()), [3001])
         self.assertEqual((side['chapter'], side['vanilla']), (3, True))
         self.assertEqual([t['seed'] for t in side['tasks']([3009])], [3009])
+
+    def test_an_arm_must_name_its_own_games_start(self):
+        # review of #582: swapped flags would file the twin's runs as ours'
+        suite = self.load(self.suite())
+        simdirs = {'vanilla': '/s/vanilla/h1', 'ours': '/s/ours/h2'}
+        envs = {'vanilla': {}, 'ours': {}}
+        sides = mc.chapter_sides(suite, simdirs, envs, 'i',
+                                 {'ours': 'ours-ch02', 'vanilla': 'vanilla-ch3'}, 'pilot')
+        self.assertEqual(sides['ours']['store'], '/s/ours/h2/runs.jsonl')
+        with self.assertRaises(ValueError) as cm:
+            mc.chapter_sides(suite, simdirs, envs, 'i',
+                             {'ours': 'vanilla-ch3', 'vanilla': 'ours-ch02'}, 'pilot')
+        self.assertIn('--ours-start vanilla-ch3 is a vanilla start', str(cm.exception))
+
+    def test_pinned_setup_checks_only_the_named_starts_and_refuses_the_rest(self):
+        suite = self.load(self.suite())
+        suite['snapshots'] = [{'snapshot_id': 'x', 'start_id': 'ours-ch02'}]
+        simdirs = {'vanilla': '/v', 'ours': '/o'}
+        seen = []
+
+        def check(one, dirs):
+            seen.append(([s['start_id'] for s in one['starts']],
+                         [s['snapshot_id'] for s in one['snapshots']]))
+            return ['vanilla-ch3: its state is gone'] if len(seen) > 1 else []
+        with mock.patch.object(mc, 'suite_setup', return_value=(suite, simdirs, dict)), \
+                mock.patch.object(mc, 'check_starts', check):
+            self.assertEqual(mc.pinned_setup(['vanilla-ch3'])[0], suite)
+            self.assertIn('its state is gone', mc.pinned_setup(['vanilla-ch3']))
+            self.assertIn('no start nope', mc.pinned_setup(['nope']))
+        self.assertEqual(seen[0], (['vanilla-ch3'], []), "another start's snapshot is not its")
+
+    def test_the_cell_count_is_checked_before_anything_plays(self):
+        # review of #582: --cells 0 is refused, never read as "the manifest's"
+        suite = {'cells': 24}
+        self.assertEqual(mc.frozen_cells(mock.Mock(cells=None), suite), 24)
+        self.assertEqual(mc.frozen_cells(mock.Mock(cells=8), suite), 8)
+        for bad in (0, -1):
+            with self.assertRaises(ValueError):
+                mc.frozen_cells(mock.Mock(cells=bad), suite)
+
+    def test_a_cell_takes_one_kind_of_flags(self):
+        # review of #582: a mix of chapter and campaign flags is an error, never half-read
+        for argv in (['cell', '--analysis', 'paired', '--ours-start', 'a'],
+                     ['cell', '--analysis', 'paired', '--ours-start', 'a', '--vanilla-start',
+                      'b', '--ours', 'o.json'],
+                     ['cell', '--analysis', 'paired', '--ours', 'o', '--vanilla', 'v',
+                      '--ours-chapter', '4']):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                mc.main(argv)
+
+    def test_a_cell_with_no_resolved_pair_prints_its_withheld_verdict(self):
+        # review of #582: no resolved pair leaves the rates None, and that must not crash
+        v = mc.paired_verdict([(None, None)] * 50, 24, 'paired', look=50)
+        self.assertEqual((v['verdict'], v['ours'], v['table']), ('WITHHELD', None, (0, 0, 0, 0)))
+        d = tempfile.mkdtemp()
+        for n in ('o', 'v'):
+            with open(os.path.join(d, n), 'w') as fh:
+                json.dump({'last': [3]}, fh)
+        reach = {n: {'reached': 50, 'unreached': 0, 'unresolved': 0} for n in ('ours', 'vanilla')}
+        out = io.StringIO()
+        with mock.patch.object(mc, 'load_suite', return_value={'cells': 24}), \
+                mock.patch.object(mc, 'simdir', return_value=d), \
+                mock.patch.object(mc, 'bot_hash', return_value='b'), \
+                mock.patch.object(mc, 'run_cell', return_value=dict(
+                    v, reach=reach, problems=[], played={'ours': 50, 'vanilla': 50})), \
+                contextlib.redirect_stdout(out):
+            self.assertEqual(mc.main(['cell', '--analysis', 'paired', '--ours',
+                                      os.path.join(d, 'o'), '--vanilla', os.path.join(d, 'v'),
+                                      '--ours-chapter', '4', '--vanilla-chapter', '3']), 0)
+        self.assertIn('WITHHELD at 50', out.getvalue())
 
     def test_the_pilot_and_confirmatory_seeds_never_meet(self):
         # T092, FR-025 (the tuning and held-out seeds' clash is test_a_seed_in_two_sets_raises)

@@ -786,6 +786,14 @@ def kept_runs(path, stamp):
                 and r.get('seed') is not None, lambda r: r['seed'])
 
 
+def start_of(suite, start_id):
+    """The suite's pinned start `start_id`; ValueError when it has none."""
+    st = next((s for s in suite['starts'] if s['start_id'] == start_id), None)
+    if st is None:
+        raise ValueError('montecarlo: the suite has no start %s' % start_id)
+    return st
+
+
 def protected_deaths(rec):
     """The deaths in a played record that the bot answers for (ADR 0384, 0385): a blue unit's,
     or a green's whose death ends the game (its `escort`, botrun.grade's). A green whose
@@ -794,7 +802,7 @@ def protected_deaths(rec):
     return [d for d in rec.get('deaths') or [] if d.get('escort', d.get('faction') != 'green')]
 
 
-def chapter_result(recs, chapter):
+def chapter_result(recs, chapter, pinned=False):
     """What one replicate's records say of its FIRST attempt at `chapter`, as a dict whose
     `status` is:
     - 'played': `died` (the endpoint: a protected unit died anywhere in it, ADR 0385) and
@@ -806,27 +814,35 @@ def chapter_result(recs, chapter):
     - 'reach_unresolved': it crashed before the chapter, so whether it would have reached it
       is unknown (FR-027: that withholds the comparison);
     - 'unplayed': no record of it.
-    Every status but 'played' carries the run's own words for why (`why`), and `tries` counts
-    the plays that came back with no game result."""
+    `pinned` is a chapter cell's replicate: it starts at the chapter, so every play with no
+    game result is attempt 1 unresolved (a worker that died before writing a chapter
+    included), never 'reach_unresolved'. Every status but 'played' carries the run's own
+    words for why (`why`), and `tries` counts the plays that stopped with no game result
+    where this status says they stopped: at the chapter for 'unresolved', before it for
+    'reach_unresolved'."""
     bots = bot_records(recs)
-    tries = sum(1 for r in bots if r.get('outcome') in UNUSABLE)
-    here = [r for r in bots if r.get('chapter') == chapter and r.get('attempt') == 1]
+    here = [r for r in bots if (r.get('chapter') == chapter and r.get('attempt') == 1)
+            or (pinned and r.get('chapter') is None)]
     for r in here:
         if r.get('outcome') not in UNUSABLE:
             return {'status': 'played', 'died': bool(protected_deaths(r)),
-                    'clean': r.get('clean') is True, 'rec': r, 'tries': tries}
+                    'clean': r.get('clean') is True, 'rec': r,
+                    'tries': sum(1 for x in here if x.get('outcome') in UNUSABLE)}
     if here:
-        return dict(here[-1], status='unresolved', tries=tries, rec=here[-1])
+        return dict(here[-1], status='unresolved', tries=len(here), rec=here[-1])
     # an earlier attempt's crash, in its own words, before the campaign's summary of it
     crashed = [r for r in bots if r.get('outcome') in UNUSABLE]
-    ends = [r for r in recs if not is_bot(r)] or crashed
+    summaries = [r for r in recs if not is_bot(r)]
+    ends = summaries or crashed
     if not ends:
-        return {'status': 'unplayed', 'why': 'no record of this replicate', 'tries': tries}
+        return {'status': 'unplayed', 'why': 'no record of this replicate', 'tries': 0}
     last = ends[-1]
-    if last.get('outcome') in UNUSABLE or (crashed and last is crashed[-1]):
+    if last.get('outcome') in UNUSABLE or not summaries:
         status, said = 'reach_unresolved', crashed[-1] if crashed else last
+        tries = sum(1 for r in summaries if r.get('outcome') in UNUSABLE) if summaries \
+            else len(crashed)
     else:
-        status, said = 'unreached', last
+        status, said, tries = 'unreached', last, 0
     where = ' (chapter %s, attempt %s)' % (said['chapter'], said.get('attempt')) \
         if is_bot(said) and said.get('chapter') is not None else ''
     return dict(said, status=status, tries=tries, rec=said,
@@ -837,12 +853,12 @@ def chapter_result(recs, chapter):
 RETRIES = 1   # FR-027: an attempt with no game result is played once more on its own seed
 
 
-def again(recs, chapter):
+def again(recs, chapter, pinned=False):
     """Whether a replicate is (re)played: never played, or with no game result where it
-    stopped and fewer than RETRIES same-seed retries behind it."""
+    stopped and no more than RETRIES plays like that behind it (the first and its retry)."""
     if not recs:
         return True
-    r = chapter_result(recs, chapter)
+    r = chapter_result(recs, chapter, pinned)
     return r['status'] in ('unresolved', 'reach_unresolved') and r['tries'] <= RETRIES
 
 
@@ -854,16 +870,19 @@ def cell_pairs(sides, play, seeds, have=None):
     (RETRIES), then stays unresolved. `have`, {name: {seed: [record]}}, carries kept and
     played records between looks.
 
-    Returns {'pairs', 'reach', 'problems', 'played', 'withheld', 'have', 'cpu_s'}: a pair
-    is (ours_died, twin_died), None where unresolved; a seed one arm did not reach is left
-    out and counted in `reach`; `withheld` is set when an arm's reachability is unresolved."""
+    Returns {'pairs', 'reach', 'problems', 'played', 'withheld', 'have', 'cpu_s',
+    'results'}: a pair is (ours_died, twin_died), None where unresolved; a seed one arm did
+    not reach is left out and counted in `reach`; `withheld` is set when an arm's
+    reachability is unresolved; `results` is {seed: {arm: chapter_result}}. A side with
+    `pinned` set is a chapter cell's (chapter_result's `pinned`)."""
     names = ('ours', 'vanilla')
     have = have if have is not None else {n: sides[n]['kept']() for n in names}
     played = {n: 0 for n in names}
     for n in names:
         side = sides[n]
         for _ in range(1 + RETRIES):
-            todo = [s for s in seeds if again(have[n].get(s), side['chapter'])]
+            todo = [s for s in seeds if again(have[n].get(s), side['chapter'],
+                                              side.get('pinned', False))]
             if not todo:
                 break
             for rec in play(side, side['tasks'](todo)):
@@ -871,10 +890,11 @@ def cell_pairs(sides, play, seeds, have=None):
                     raise RuntimeError('montecarlo: a run record without its seed: %r' % rec)
                 have[n].setdefault(rec['seed'], []).append(rec)
             played[n] += len(todo)
-    pairs, problems, cpu = [], [], 0.0
+    pairs, problems, cpu, results = [], [], 0.0, {}
     reach = {n: {'reached': 0, 'unreached': 0, 'unresolved': 0} for n in names}
     for s in seeds:
-        got = {n: chapter_result(have[n].get(s, []), sides[n]['chapter']) for n in names}
+        got = results[s] = {n: chapter_result(have[n].get(s, []), sides[n]['chapter'],
+                                              sides[n].get('pinned', False)) for n in names}
         for n in names:
             r = got[n]
             st = r['status']
@@ -892,7 +912,7 @@ def cell_pairs(sides, play, seeds, have=None):
                            for n in names))
     withheld = any(reach[n]['unresolved'] for n in names)
     return {'pairs': pairs, 'reach': reach, 'problems': problems, 'played': played,
-            'withheld': withheld, 'have': have, 'cpu_s': cpu}
+            'withheld': withheld, 'have': have, 'cpu_s': cpu, 'results': results}
 
 
 def run_cell(sides, play, cells, analysis, seeds=None, looks=LOOKS):
@@ -936,12 +956,10 @@ def chapter_side(suite, envs, instrument, start_id, kind, store, rom_hash):
     """One arm of a chapter cell: attempt 1 of pinned start `start_id` under each seed of
     seed set `kind` (chapter_tasks), its records in `store` (the game's runs file); a kept
     run counts when this instrument played it on the ROM built now (`rom_hash`)."""
-    st = next((s for s in suite['starts'] if s['start_id'] == start_id), None)
-    if st is None:
-        raise ValueError('montecarlo: the suite has no start %s' % start_id)
+    st = start_of(suite, start_id)
     mine = suite_run_of(instrument, {st['game']: rom_hash})
     return {'chapter': st['chapter'], 'store': store, 'vanilla': st['game'] == 'vanilla',
-            'start': st,
+            'start': st, 'pinned': True,
             'tasks': lambda seeds: chapter_tasks(suite, envs, instrument, {st['game']: store},
                                                  start_id, kind, seeds),
             'kept': lambda: kept([store], lambda r: mine(r)
@@ -969,25 +987,54 @@ def problem_lines(problems):
     return out
 
 
+def frozen_cells(args, suite):
+    """The cell count N a run is judged on: `--cells` when given, else the manifest's,
+    checked before anything plays (bound_level raises on a bad one)."""
+    cells = suite['cells'] if args.cells is None else args.cells
+    bound_level(cells)
+    return cells
+
+
+def chapter_sides(suite, simdirs, envs, inst, arms, kind):
+    """{arm: chapter_side} for `arms` ({'ours': start id, 'vanilla': start id}) on seed set
+    `kind`, each arm in its own game's store: ValueError when an arm names another game's
+    start (its records would be filed, and read, as the other arm's)."""
+    sides = {}
+    for arm, sid in arms.items():
+        st = start_of(suite, sid)
+        if st['game'] != arm:
+            raise ValueError('montecarlo: --%s-start %s is a %s start' % (arm, sid, st['game']))
+        sides[arm] = chapter_side(suite, envs, inst, sid, kind,
+                                  os.path.join(simdirs[arm], 'runs.jsonl'),
+                                  os.path.basename(simdirs[arm]))
+    return sides
+
+
 def cell_main(args):
     """`cell`: one cell to its verdict, a chapter cell from two pinned starts or a campaign
     cell from two campaign envs, judged with the pilot's analysis and the frozen N."""
-    suite = load_suite()
-    cells = args.cells or suite['cells']
     if args.ours_start:
-        setup = suite_setup()
+        setup = pinned_setup([args.ours_start, args.vanilla_start])
         if isinstance(setup, str):
             print(setup)
             return 1
         suite, simdirs, envs = setup
-        built, inst = envs(), instrument_id()
-        sides = {n: chapter_side(suite, built, inst, sid, 'confirmatory',
-                                 os.path.join(simdirs[n], 'runs.jsonl'),
-                                 os.path.basename(simdirs[n]))
-                 for n, sid in (('ours', args.ours_start), ('vanilla', args.vanilla_start))}
+        try:
+            cells = frozen_cells(args, suite)
+            sides = chapter_sides(suite, simdirs, envs(), instrument_id(),
+                                  {'ours': args.ours_start, 'vanilla': args.vanilla_start},
+                                  'confirmatory')
+        except ValueError as err:
+            print('refused: %s' % err)
+            return 1
         lo, hi = suite['seed_sets']['confirmatory']
         seeds = range(lo, hi + 1)
     else:
+        try:
+            cells = frozen_cells(args, load_suite())
+        except ValueError as err:
+            print('refused: %s' % err)
+            return 1
         bot, sides, seeds = bot_hash(), {}, None
         for name, path, chapter in (('ours', args.ours, args.ours_chapter),
                                     ('vanilla', args.vanilla, args.vanilla_chapter)):
@@ -999,8 +1046,9 @@ def cell_main(args):
                                         cell_stamp(env, args.mode, bot), vanilla)
     v = run_cell(sides, pool_play(args.jobs), cells, args.analysis, seeds)
     print(v['reason'])
-    print('\n'.join(problem_lines(v['problems'])) or '', end='\n' if v['problems'] else '')
-    if v.get('table'):
+    for line in problem_lines(v['problems']):
+        print(line)
+    if v.get('ours') is not None:   # some pair resolved in both arms
         a, b, c, d = v['table']
         print('a protected unit died: ours %.0f%%, vanilla %.0f%%; only ours %d, only the '
               'twin %d, both %d, neither %d (%s analysis, N = %d)' % (
@@ -1039,47 +1087,48 @@ def pilot_main(args):
     """`pilot`: the one-cell pilot (FR-025): both pinned starts on the 50 pilot seeds,
     estimated first and refused over SC-007's 8 wall-hours, then pilot_summary's report and
     each discordant pair's two traces, for `story`."""
-    setup = suite_setup()
+    arms = {'ours': args.ours_start, 'vanilla': args.vanilla_start}
+    setup = pinned_setup(list(arms.values()))
     if isinstance(setup, str):
         print(setup)
         return 1
     suite, simdirs, envs = setup
-    names = {'ours': args.ours_start, 'vanilla': args.vanilla_start}
-    one = dict(suite, starts=[s for s in suite['starts'] if s['start_id'] in names.values()],
-               snapshots=[])
-    problems = check_starts(one, simdirs)
-    if problems:
-        print('refused: %d pinned starts cannot be played as pinned:' % len(problems))
-        print('\n'.join('  ' + p for p in problems))
+    inst = instrument_id()
+    try:
+        cells = frozen_cells(args, suite)
+        sides = chapter_sides(suite, simdirs, envs(), inst, arms, 'pilot')
+    except ValueError as err:
+        print('refused: %s' % err)
         return 1
-    built, inst = envs(), instrument_id()
-    outs = {g: os.path.join(d, 'runs.jsonl') for g, d in simdirs.items()}
+    outs = [os.path.join(d, 'runs.jsonl') for d in simdirs.values()]
     hashes = {g: os.path.basename(d) for g, d in simdirs.items()}
     lo, hi = suite['seed_sets']['pilot']
     seeds = list(range(lo, hi + 1))
-    sides = {n: chapter_side(suite, built, inst, sid, 'pilot', outs[n], hashes[n])
-             for n, sid in names.items()}
-    todo = [t for n in names for t in sides[n]['tasks'](
-        [s for s in seeds if s not in sides[n]['kept']()])]
-    hours = suite_estimate(suite, todo, kept_walls(list(outs.values()), inst, hashes), args.jobs)
+    # every seed cell_pairs will play now: unplayed, or kept with no game result and a retry
+    # still owed (a play that crashes from here on adds its one retry to this)
+    todo = []
+    for n, side in sides.items():
+        have = side['kept']()
+        todo += side['tasks']([s for s in seeds if again(have.get(s), side['chapter'], True)])
+    hours = suite_estimate(suite, todo, kept_walls(outs, inst, hashes), args.jobs)
     print('%d runs to play on %d workers: about %.2f wall-hours' % (len(todo), args.jobs, hours))
     if hours > MAX_WALL_H:
         print('refused: the estimate is over the %g wall-hours one job may take (SC-007); '
               'split it' % MAX_WALL_H)
         return 1
     got = cell_pairs(sides, pool_play(args.jobs), seeds)
-    s = pilot_summary(got['pairs'], args.cells or suite['cells'], got['cpu_s'], got['reach'])
-    print('\n'.join(pilot_lines(s, names['ours'], names['vanilla'])))
-    print('\n'.join(problem_lines(got['problems'])) or '', end='\n' if got['problems'] else '')
+    s = pilot_summary(got['pairs'], cells, got['cpu_s'], got['reach'])
+    for line in pilot_lines(s, arms['ours'], arms['vanilla']) + problem_lines(got['problems']):
+        print(line)
     print('discordant pairs (story <trace> reads each):')
     for seed in seeds:
-        res = {n: chapter_result(got['have'][n].get(seed, []), sides[n]['chapter'])
-               for n in names}
-        if all(r['status'] == 'played' for r in res.values()) and \
-                res['ours']['died'] != res['vanilla']['died']:
+        res = got['results'][seed]
+        pair = tuple(res[n]['died'] if res[n]['status'] == 'played' else None
+                     for n in ('ours', 'vanilla'))
+        if None not in pair and pair[0] != pair[1]:
             print('  seed %d, only %s lost someone: ours %s, vanilla %s' % (
-                seed, 'ours' if res['ours']['died'] else 'the twin',
-                *(os.path.join(os.path.dirname(outs[n]), res[n]['rec'].get('trace') or '?')
+                seed, 'ours' if pair[0] else 'the twin',
+                *(os.path.join(simdirs[n], res[n]['rec'].get('trace') or '?')
                   for n in ('ours', 'vanilla'))))
     return 0
 
@@ -1307,9 +1356,7 @@ def chapter_tasks(suite, envs, instrument, outs, start_id, kind, seeds=None):
     picks some of them. An attempt-mode run saves no state, so the pinned file is never
     rewritten (campaign.lua)."""
     import campaign_env
-    st = next((s for s in suite['starts'] if s['start_id'] == start_id), None)
-    if st is None:
-        raise ValueError('montecarlo: the suite has no start %s' % start_id)
+    st = start_of(suite, start_id)
     if kind in SEED_SETS:
         allowed = list(st['seeds'][kind])
     elif kind in suite['seed_sets']:
@@ -1689,6 +1736,28 @@ def suite_setup():
     return suite, simdirs, envs
 
 
+def pinned_setup(start_ids):
+    """suite_setup's (suite, simdirs, envs) for playing the named pinned starts, or the
+    refusal to print: an unknown start, or one check_starts says no longer matches its pin
+    (its ROM, its state, the emulator), with only those starts' own snapshots checked. What
+    `pilot`, a chapter `cell` and `replay` each check before anything plays."""
+    setup = suite_setup()
+    if isinstance(setup, str):
+        return setup
+    suite, simdirs, envs = setup
+    known = {s['start_id'] for s in suite['starts']}
+    unknown = [sid for sid in start_ids if sid not in known]
+    if unknown:
+        return 'refused: the suite has no start %s' % ', '.join(unknown)
+    one = dict(suite, starts=[s for s in suite['starts'] if s['start_id'] in start_ids],
+               snapshots=[s for s in suite.get('snapshots') or [] if s['start_id'] in start_ids])
+    problems = check_starts(one, simdirs)
+    if problems:
+        return '\n'.join(['refused: %d pinned starts cannot be played as pinned:'
+                          % len(problems)] + ['  ' + p for p in problems])
+    return setup
+
+
 def kept_play(paths, instrument, rom_hashes):
     """A `play` that plays nothing: each task's newest kept suite run of this instrument on
     these ROMs ({game: hash}), so a suite is judged again once a replay has witnessed why a
@@ -1957,17 +2026,11 @@ def replay_main(args):
     except ValueError as err:
         print('refused: %s' % err)
         return 1
-    setup = suite_setup()
+    setup = pinned_setup([rec['suite']['start_id']])
     if isinstance(setup, str):
         print(setup)
         return 1
     suite, simdirs, envs = setup
-    one = dict(suite, starts=[s for s in suite['starts']
-                              if s['start_id'] == rec['suite']['start_id']])
-    problems = check_starts(one, simdirs)
-    if problems:
-        print('refused: %s' % '; '.join(problems))
-        return 1
     try:
         task = replay_task(rec, suite, envs(), diag, instrument_id())
     except ValueError as err:
@@ -2418,9 +2481,10 @@ def main(argv=None):
     su.add_argument('--jobs', type=int, default=8)
     args = ap.parse_args(argv)
     if args.cmd == 'cell':
-        chapter = args.ours_start and args.vanilla_start
-        campaign = None not in (args.ours, args.vanilla, args.ours_chapter, args.vanilla_chapter)
-        if bool(chapter) == campaign:
+        chapter = [args.ours_start, args.vanilla_start]
+        campaign = [args.ours, args.vanilla, args.ours_chapter, args.vanilla_chapter]
+        given = [x is not None for x in chapter + campaign]
+        if given not in ([True] * 2 + [False] * 4, [False] * 2 + [True] * 4):
             ap.error('cell takes either --ours-start and --vanilla-start (a chapter cell) or '
                      '--ours, --vanilla, --ours-chapter and --vanilla-chapter (a campaign cell)')
         return cell_main(args)
