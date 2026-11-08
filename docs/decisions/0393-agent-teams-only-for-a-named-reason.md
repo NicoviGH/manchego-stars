@@ -26,6 +26,10 @@ development), now measured for teams.
    work with many dependencies between pieces, stays with one agent. Claude Code's docs put a
    team at about 7x the tokens of a normal session when teammates plan first; Anthropic puts
    multi-agent at about 15x chat tokens, against about 4x for one agent.
+   A single subagent is the cheaper choice for READING-heavy work with a short answer
+   (research, a wide search, a log dig): what it read never enters the main context, which every
+   later call would re-read. For WRITING code it rarely pays, because the lead needs that
+   context back to review and integrate the work, and the agent has paid for its own copy too.
 2. **One writer per file slice.** Every file has one owning agent; a file nobody owns is named
    before work starts (PR-F's `matrix.py` was nobody's and failed the drift check late).
 3. **Seams are agreed in a shared file before coding.** Each interface between slices states
