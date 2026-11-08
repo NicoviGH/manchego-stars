@@ -111,9 +111,12 @@ def _inert_git(argv, root):
         return False
     decomp = tuple(os.path.join(root, d) for d in _INERT_GIT)
     for a in rest:
-        rel = _inside(a, root) if (os.path.isabs(a) or os.path.exists(a)) else None
-        if rel and not os.path.join(root, rel).startswith(decomp):
-            return False
+        # git resolves a relative argument in its -C directory, not in this process's cwd.
+        for base in [os.getcwd()] + targets:
+            full = a if os.path.isabs(a) else os.path.join(base, a)
+            rel = _inside(full, root) if os.path.exists(full) else None
+            if rel and not os.path.join(root, rel).startswith(decomp):
+                return False
     return True
 
 
@@ -125,63 +128,89 @@ def _stamp(rel, root):
     return [st.st_mtime_ns, st.st_size]
 
 
-def _trace_run(path, out):
-    """Run test `path` as `python path` would, recording what it reads (sys.addaudithook)."""
-    reads, dirs, globs, opaque = set(), set(), set(), []
-    root = _real_root()
+class ReadRecorder:
+    """What the running process reads from the repo, from audit events (sys.addaudithook): the
+    files it opened or imported, the directories it listed, the globs it matched, and the
+    processes it ran that this cannot see into (`opaque`). One owner for every caller that
+    traces a real run: _trace_run here, and test_verdict_diff's parity-input check. Audit
+    hooks cannot be removed, so `recording` only gates what is kept."""
 
-    def add_glob(pattern, root_dir=None, dir_fd=None):
+    def __init__(self):
+        self.root = _real_root()
+        self.reads, self.dirs, self.globs, self.opaque = set(), set(), set(), []
+        self.recording = False
+
+    def start(self):
+        self.recording = True
+        sys.addaudithook(self._hook)
+        return self
+
+    def stop(self):
+        """Stop keeping events, adding every repo module still loaded."""
+        for mod in list(sys.modules.values()):
+            self._read(getattr(mod, '__file__', None) or '')
+        if any(m in sys.modules for m in _MP_STARTED):
+            self.opaque.append('multiprocessing worker')
+        self.recording = False
+        self.reads.discard('.')
+        return self
+
+    def _read(self, p):
+        rel = _inside(p, self.root)
+        if rel and '__pycache__' not in rel:
+            self.reads.add(rel)
+
+    def _glob(self, pattern, root_dir=None, dir_fd=None):
         if dir_fd is not None:
-            opaque.append('glob with dir_fd')
+            self.opaque.append('glob with dir_fd')
             return
         pattern = os.fsdecode(pattern)
         if not os.path.isabs(pattern):
             pattern = os.path.join(os.fsdecode(root_dir) if root_dir else os.getcwd(), pattern)
-        rel = _inside(pattern, root)
+        rel = _inside(pattern, self.root)
         if rel:
-            globs.add(rel)
+            self.globs.add(rel)
 
-    def hook(event, args):
+    def _hook(self, event, args):
+        if not self.recording:
+            return
         if event == 'open' and args and isinstance(args[0], (str, bytes, os.PathLike)):
-            rel = _inside(args[0], root)
-            if rel and '__pycache__' not in rel:
-                reads.add(rel)
+            self._read(args[0])
         elif event == 'exec' and args and isinstance(getattr(args[0], 'co_filename', None), str):
             # An import served from bytecode opens only the .pyc -- in __pycache__, or under
             # sys.pycache_prefix outside the repo (Apple's python3) -- never its source. The
             # module's code object still names the source it was compiled from.
-            rel = _inside(args[0].co_filename, root)
-            if rel and os.path.isfile(os.path.join(root, rel)):
-                reads.add(rel)
+            if os.path.isfile(args[0].co_filename):
+                self._read(args[0].co_filename)
         elif event in ('os.listdir', 'os.scandir') and args:
-            rel = _inside(args[0] if args[0] is not None else '.', root)
+            rel = _inside(args[0] if args[0] is not None else '.', self.root)
             if rel:
-                dirs.add(rel)
+                self.dirs.add(rel)
         elif event == 'glob.glob/2' and args:
-            add_glob(*args[:1], *args[2:4])
+            self._glob(*args[:1], *args[2:4])
         elif event == 'glob.glob' and args and sys.version_info < (3, 10):
-            add_glob(args[0])               # 3.10+ also raises glob.glob/2, with root_dir
+            self._glob(args[0])             # 3.10+ also raises glob.glob/2, with root_dir
         elif event == 'os.fork':
-            opaque.append('os.fork')
+            self.opaque.append('os.fork')
         elif event in ('subprocess.Popen', 'os.system', 'os.posix_spawn', 'os.exec'):
             argv = args[1] if event == 'subprocess.Popen' else args[0]
             argv = [os.fspath(a) for a in argv] if isinstance(argv, (list, tuple)) else [argv]
-            if not _inert_git(argv, root):
-                opaque.append(' '.join(str(a) for a in argv)[:200])
+            if not _inert_git(argv, self.root):
+                self.opaque.append(' '.join(str(a) for a in argv)[:200])
+
+
+def _trace_run(path, out):
+    """Run test `path` as `python path` would, recording what it reads."""
+    rec = ReadRecorder()
 
     def write():
-        for mod in list(sys.modules.values()):
-            rel = _inside(getattr(mod, '__file__', None) or '', root)
-            if rel and '__pycache__' not in rel:
-                reads.add(rel)
-        if any(m in sys.modules for m in _MP_STARTED):
-            opaque.append('multiprocessing worker')
-        files = sorted(r for r in reads if r != '.')
+        rec.stop()
+        files = sorted(rec.reads)
         os.makedirs(os.path.dirname(out), exist_ok=True)
         with open(out + '.tmp', 'w') as fh:
-            json.dump({'reads': files, 'stamps': [_stamp(r, root) for r in files],
-                       'dirs': sorted(dirs), 'globs': sorted(globs),
-                       'opaque': opaque[:5]}, fh)
+            json.dump({'reads': files, 'stamps': [_stamp(r, rec.root) for r in files],
+                       'dirs': sorted(rec.dirs), 'globs': sorted(rec.globs),
+                       'opaque': rec.opaque[:5]}, fh)
         os.replace(out + '.tmp', out)
 
     import atexit
@@ -189,7 +218,7 @@ def _trace_run(path, out):
     atexit.register(write)
     sys.argv = [path]
     sys.path[0] = os.path.dirname(path)
-    sys.addaudithook(hook)
+    rec.start()
     runpy.run_path(path, run_name='__main__')
 
 

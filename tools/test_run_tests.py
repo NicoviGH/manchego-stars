@@ -94,7 +94,9 @@ class Records(unittest.TestCase):
         patch = os.path.join(REPO, 'AGENTS.md')
         for argv, opaque in ((['git', '-C', decomp, 'apply', '--check', patch], True),
                              (['git', '-C', decomp, '-c', 'a.b=c', 'show', 'HEAD:Makefile'], False),
-                             (['git', '-C', decomp, 'diff', '--', patch], True)):
+                             (['git', '-C', decomp, 'diff', '--', patch], True),
+                             (['git', '-C', decomp, 'diff', '--no-index', '../AGENTS.md',
+                               'CONTRIBUTING.md'], True)):
             rel, out = self.run_test_file('''
                 import subprocess
                 subprocess.run(%r, capture_output=True)
