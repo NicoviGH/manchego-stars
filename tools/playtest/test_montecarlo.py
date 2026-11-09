@@ -1668,6 +1668,14 @@ class Frozen(unittest.TestCase):
         result = {}
         self.lines(self.clean(99), frozen=self.frozen_all_clean(), result=result)
         self.assertEqual(mc.freeze_record(result, 'i', 1)[1], 'the candidate is not promoted')
+        # Nicolas's explicit override freezes a refused candidate, and the file says why
+        rec, why = mc.freeze_record(result, 'i', 1, override='accepted cost')
+        self.assertIsNone(why)
+        self.assertEqual(rec['override'], 'accepted cost')
+        self.assertNotIn('override', mc.freeze_record({}, 'i', 1)[0] or {})
+        # it never covers an incomplete run
+        self.assertEqual(mc.freeze_record({}, 'i', 1, override='x')[1],
+                         'not every run came back with a game result')
         # the first freeze has nothing to be promoted over
         result = {}
         self.lines(self.clean(), result=result)

@@ -1,21 +1,22 @@
 {
  "calls": {
-  "held_out": 357368,
-  "tuning": 210261
+  "held_out": 1976732,
+  "tuning": 510403
  },
  "cpu_s": {
-  "held_out": 1730.1,
-  "tuning": 1356.5
+  "held_out": 3727.7,
+  "tuning": 1802.7
  },
- "frozen_on": "2026-11-07",
+ "frozen_on": "2026-11-09",
  "held_out_losses": [
   "39ef3ff2dfc1805e",
   "41716bbc9e6f8c03",
   "68f164b2935f7ddb",
   "6f1c8d09df958c72"
  ],
- "instrument": "e6fc3854f2a3+v2",
+ "instrument": "4385f97ef0f3+v2",
  "manifest_version": 2,
+ "override": "Nicolas, 2026-11-09: refreeze anyway. Cost is T100b's counter branches (accepted); vanilla-ch5/1001 Lute is a fog death (unrevealed_killer); vanilla-ch5/1002 Natasha is honest risk the frozen bot survived on a 93% roll. Held-out 4 of 28 lost, none new.",
  "tuning": {
   "ours-ch00/1001": {
    "deaths": [],
@@ -70,10 +71,7 @@
    "unlabelled": 0
   },
   "ours-ch03/1002": {
-   "deaths": [
-    3,
-    4
-   ],
+   "deaths": [],
    "invariant": true,
    "lost": false,
    "stalls": 2,
@@ -204,6 +202,7 @@
    "deaths": [
     6,
     8,
+    12,
     13,
     19
    ],
@@ -213,7 +212,9 @@
    "unlabelled": 0
   },
   "vanilla-ch5/1002": {
-   "deaths": [],
+   "deaths": [
+    13
+   ],
    "invariant": true,
    "lost": false,
    "stalls": 0,
@@ -235,7 +236,7 @@
   }
  },
  "wall_s": {
-  "held_out": 2419.9,
-  "tuning": 1993.6
+  "held_out": 4078.8,
+  "tuning": 2120.9
  }
 }

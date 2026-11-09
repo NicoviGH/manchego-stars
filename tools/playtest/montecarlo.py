@@ -35,7 +35,7 @@ analysis; `cell` then plays the confirmatory seeds with that choice.
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
 forecast and every blow.
 
-    python3 tools/playtest/montecarlo.py suite [--held-out | --freeze] [--kept] [--jobs 8]
+    python3 tools/playtest/montecarlo.py suite [--held-out | --freeze [--override WHY]] [--kept] [--jobs 8]
 
 `suite` plays the difficulty instrument's frozen suite (#510 step 9; matrix.yaml's
 `instrument:` section, ADR 0387): attempt 1 of each pinned chapter start, from its saved state,
@@ -44,7 +44,8 @@ The tuning seeds print each run and are judged on the frozen baseline (suite-fro
 ADR 0395): an invariant that held and fails, a new unexplained death or stall, an unlabelled
 fallback, and SC-003's calls more than 20% over the frozen count. --held-out plays the held-out
 seeds too, said only as counts, and gives the promotion result; --freeze does that and writes
-the frozen baseline when the candidate is promoted. --kept judges this instrument's kept runs
+the frozen baseline when the candidate is promoted (--override WHY freezes a refused one, on
+Nicolas's word, and keeps WHY in the file). --kept judges this instrument's kept runs
 again instead of playing them (after a replay witnessed a new death). It refuses a start that
 no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
 
@@ -1820,22 +1821,30 @@ def store_explain(simdirs):
     return explain
 
 
-def freeze_record(result, instrument, version, today=None):
+def freeze_record(result, instrument, version, today=None, override=None):
     """What `suite --freeze` writes (FROZEN): the run's result stamped with its instrument,
-    the manifest's version and the day. None, with why, when the run may not be frozen."""
+    the manifest's version and the day. None, with why, when the run may not be frozen.
+    `override`, Nicolas's reason, freezes a candidate the promotion refused and is kept in the
+    file (ADR 0395): a refusal can be his call to accept, an incomplete run or a broken
+    snapshot never."""
     if not result:
         return None, 'not every run came back with a game result'
     if result['snapshots_failed']:
         return None, 'snapshot %s fails its invariant' % ', '.join(result['snapshots_failed'])
-    if not result['promoted']:
+    if not result['promoted'] and not override:
         return None, 'the candidate is not promoted'
     rec = {k: v for k, v in result.items() if k not in ('promoted', 'snapshots_failed')}
+    if not result['promoted']:
+        rec['override'] = override
     rec.update(instrument=instrument, manifest_version=version,
                frozen_on=today or time.strftime('%Y-%m-%d'))
     return rec, None
 
 
 def suite_main(args):
+    if args.override and not args.freeze:
+        print('--override only goes with --freeze')
+        return 2
     setup = suite_setup()
     if isinstance(setup, str):
         print(setup)
@@ -1857,7 +1866,7 @@ def suite_main(args):
     if any(line.startswith('refused') for line in lines):
         return 1
     if args.freeze:
-        rec, why = freeze_record(result, inst, suite['version'])
+        rec, why = freeze_record(result, inst, suite['version'], override=args.override)
         if rec is None:
             print('not frozen: %s' % why)
             return 1
@@ -2508,6 +2517,9 @@ def main(argv=None):
                     help='the held-out seeds too, as counts only, and the promotion result')
     su.add_argument('--freeze', action='store_true',
                     help='as --held-out, then write the frozen baseline if promoted')
+    su.add_argument('--override', metavar='WHY',
+                    help='with --freeze: freeze a refused candidate, WHY kept in the file '
+                         '(Nicolas\'s call only, ADR 0395)')
     su.add_argument('--kept', action='store_true',
                     help="judge this instrument's kept runs instead of playing them again")
     su.add_argument('--jobs', type=int, default=8)
