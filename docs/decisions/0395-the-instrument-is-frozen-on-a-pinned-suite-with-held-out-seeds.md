@@ -115,3 +115,11 @@ the death it came from is not a regression.
   Held-out: 4 of 28 lost, none new. Tuning: 3 of 28 lost and 13 protected deaths, both as
   frozen. Nicolas: "refreeze anyway"; written with `suite --freeze --kept --override`. The
   new SC-003 baseline is 2,487,135 calls.
+- **Refrozen after PR #585's review, 2026-11-09 (instrument `01d1ea0ad925+v2`).** The review's
+  bot fixes (a counter death no later heal undoes, branched or averaged; a too-wide branch dim
+  no longer stops the narrower ones; the strike least likely to die by its counter offered
+  beside the best and the least exposed; decide holds a benched unit) made a new instrument.
+  `suite --held-out` on it: no regressions on `4385f97ef0f3+v2`, held-out 4 of 28 lost, none
+  new, SC-003 2,490,781 calls (+0.1%), **PROMOTED**; frozen with `suite --freeze --kept`, no
+  override (the file's `override` from the freeze above is gone with it, its reason kept
+  here).
