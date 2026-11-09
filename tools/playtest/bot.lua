@@ -1262,6 +1262,17 @@ local function greedy(ctx, objective)
     return action(u, tile, "wait")
 end
 
+-- An experiment's benched unit (style.bench: a playthrough without it, botrun's api.bench)
+-- only waits where it stands, and is still in the enemy's reach there: its wait, else nil.
+-- Every way the bot acts reads it, the planner's candidates and decide alike, so a benched
+-- run never plays the unit (PR #585 review: decide, the greedy style's and the planner's
+-- fallback, played it).
+local function benchedWait(ctx, u)
+    if ctx.style and ctx.style.bench and listed(ctx.style.bench, u.charId) then
+        return action(u, u, "wait")
+    end
+end
+
 function M.decide(board, sight, style)
     local aggression = style and style.aggression
     local gate = GATES[aggression]
@@ -1275,6 +1286,10 @@ function M.decide(board, sight, style)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     if #ctx.actors == 0 then return nil end
+    for _, u in ipairs(ctx.actors) do
+        local held = benchedWait(ctx, u)
+        if held then return held end
+    end
     local objective = sight.objective
     local s = seize(ctx)
     if s then return s end
@@ -1487,8 +1502,6 @@ function M.explain(board, sight, style)
     return lines
 end
 
--- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
--- each is).
 -- `acts` of `u`, each told the ally its end tile asks to move (`vacate`) and what can strike
 -- it there next phase (`exposure`, each enemy's own strike: the planner's odds).
 local function exposed(ctx, u, acts)
@@ -1504,13 +1517,13 @@ local function exposed(ctx, u, acts)
     return acts
 end
 
+-- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
+-- each is).
 local function proposeOne(ctx, u)
-    -- an experiment's benched unit (style.bench: a playthrough without it, botrun's
-    -- api.bench) only waits where it stands, and is still in the enemy's reach there
-    if ctx.style and ctx.style.bench and listed(ctx.style.bench, u.charId) then
-        local a = action(u, u, "wait")
-        a.why = "hold"
-        return { unit = u, acts = exposed(ctx, u, { a }) }
+    local held = benchedWait(ctx, u)
+    if held then
+        held.why = "hold"
+        return { unit = u, acts = exposed(ctx, u, { held }) }
     end
     local sight, objective = ctx.sight, ctx.sight.objective
     local open = function() return true end
@@ -1530,12 +1543,19 @@ local function proposeOne(ctx, u)
             if t.x == s.x and t.y == s.y then add(action(u, t, "seize"), "seize") end
         end
     end
+    -- per enemy, the best strike and the safest: the safest is the least likely to die, by
+    -- its own counter first (these attacks are `priced`: a counter that can kill is offered,
+    -- ADR 0396), then the enemy phase's worst case. Exposure alone could leave out the one
+    -- strike whose counter cannot kill, so the planner never had it to choose (PR #585 review).
     local best, safe = {}, {}
     for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         local e = c.target
         if not best[e] or betterAttack(c, best[e]) then best[e] = c end
         c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
-        if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
+        local s = safe[e]
+        if not s or c.f.die < s.f.die or (c.f.die == s.f.die and c.worst < s.worst) then
+            safe[e] = c
+        end
     end
     local function offer(c)
         local a = strikeAct(u, c)

@@ -1824,9 +1824,9 @@ def store_explain(simdirs):
 def freeze_record(result, instrument, version, today=None, override=None):
     """What `suite --freeze` writes (FROZEN): the run's result stamped with its instrument,
     the manifest's version and the day. None, with why, when the run may not be frozen.
-    `override`, Nicolas's reason, freezes a candidate the promotion refused and is kept in the
-    file (ADR 0395): a refusal can be his call to accept, an incomplete run or a broken
-    snapshot never."""
+    `override`, Nicolas's reason, freezes a candidate the promotion refused, and is kept in the
+    file whenever it is given, promoted or not, so a reason he gave is never dropped (ADR 0395):
+    a refusal can be his call to accept, an incomplete run or a broken snapshot never."""
     if not result:
         return None, 'not every run came back with a game result'
     if result['snapshots_failed']:
@@ -1834,7 +1834,7 @@ def freeze_record(result, instrument, version, today=None, override=None):
     if not result['promoted'] and not override:
         return None, 'the candidate is not promoted'
     rec = {k: v for k, v in result.items() if k not in ('promoted', 'snapshots_failed')}
-    if not result['promoted']:
+    if override:
         rec['override'] = override
     rec.update(instrument=instrument, manifest_version=version,
                frozen_on=today or time.strftime('%Y-%m-%d'))
@@ -1873,7 +1873,9 @@ def suite_main(args):
         with open(FROZEN, 'w') as fh:
             json.dump(rec, fh, indent=1, sort_keys=True)
             fh.write('\n')
-        print('frozen: %s (instrument %s)' % (os.path.relpath(FROZEN, REPO), inst))
+        print('frozen: %s (instrument %s)%s' % (
+            os.path.relpath(FROZEN, REPO), inst,
+            ', override: %s' % rec['override'] if 'override' in rec else ''))
     return 0
 
 

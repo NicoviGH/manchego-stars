@@ -1680,6 +1680,9 @@ class Frozen(unittest.TestCase):
         result = {}
         self.lines(self.clean(), result=result)
         self.assertIsNone(mc.freeze_record(result, 'i', 1)[1])
+        # an override given for a run that turns out promoted is still kept (PR #585 review)
+        self.assertEqual(mc.freeze_record(result, 'i', 1, override='accepted cost')[0]['override'],
+                         'accepted cost')
         # but a fallback no label names is never frozen as the reference
         result = {}
         self.lines(lambda i, t: dict(self.clean()(i, t), deaths=[
