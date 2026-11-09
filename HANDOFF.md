@@ -9,10 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, late (Claude): **T100b merged (PR #585, 909219b5).** The review's bot
-fixes made a new instrument; `suite --held-out` promoted it (no regressions, held-out 4 of 28
-lost, none new, SC-003 +0.1%) and it is refrozen without an override (`01d1ea0ad925+v2`, ADR
-0395). T100d declined (Nicolas; the grade keeps the next phase's chance). Next: T100c.
+Refreshed 2026-11-09, night (Claude): **T100c is PR #586, CI green, reviewed (every finding
+fixed), waiting on Nicolas's "merge"** (T100c is not in the standing merge permission). Same
+play as frozen; the recorder drops 86 phantom enemy acts, keeps `trapped` acts, fixes one stale
+`from`; refrozen without an override (`986bb37beebe+v2`). Next after the merge: T100e.
 
 ## Where things stand
 
@@ -77,8 +77,7 @@ lost, none new, SC-003 +0.1%) and it is refrozen without an override (`01d1ea0ad
 3. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
    #547 on #547). Ours ch03's boss: 36 HP vs Bazba's 25, hits our army for a mean 14 (up to 16)
    vs Bazba's 8.6 on vanilla's, same throne heal. Stop chasing ch03 deaths in the bot.
-4. Then, on #510's plan comment 6563384310: T100c (the recorder's phantom enemy `wait`; it changes
-   the instrument's hash but no play, so one `suite --held-out` should come back identical), T100e
+4. Then, on #510's plan comment 6563384310 (T100c ticked; PR #586 holds its evidence): T100e
    (several starts per chapter cell, each its own campaign), then T100-T108 and PR-J, then #510
    step 10.
 5. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
