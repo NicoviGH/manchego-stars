@@ -1824,9 +1824,15 @@ end
 -- wait -- unit names and menus decode through the same function and overwrite it.
 INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
 
+-- struct ProcCmd (include/proc.h): opcode, dataImm, dataPtr at +04 -- 8 bytes a command
+INSPECT.PROC_CMD_SIZE = 8
+-- scrCur as an offset from the script head: the exact PROC_* command it sits on, -1 before it
+INSPECT.procStep = function(p)
+    return (p.scrCur >= p.script) and ((p.scrCur - p.script) // INSPECT.PROC_CMD_SIZE) or -1
+end
+
 local function procLine(i, p, prev)
-    -- scrCur as an offset from the script head: the exact PROC_* command it sits on.
-    local step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1
+    local step = INSPECT.procStep(p)
     local moved = ""
     if prev then
         moved = (prev.scrCur == p.scrCur and prev.sleep == p.sleep and prev.lock == p.lock)
@@ -1932,7 +1938,7 @@ INSPECT.snapshot = function(tag, explanation, sampled)
                 script_name = INSPECT.scriptName(p.script),
                 -- The decomp's PROC_NAME string: colour only, never identity.
                 proc_name = p.name,
-                step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1,
+                step = INSPECT.procStep(p),
                 idle = string.format("0x%08X", codeAddr(p.idleCb)),
                 sleep = p.sleep, mark = p.mark, flags = p.flags, lock = p.lock,
                 frozen = prev ~= nil and prev.scrCur == p.scrCur and prev.sleep == p.sleep
@@ -3194,8 +3200,8 @@ INSPECT.watchEnemyActs = function()
     -- the script command that calls CpPerform_BeginUnitMovement (a CALL's +04 is its function)
     local beginCmd = SYM.gProcScr_CpPerform
     while (ru32(beginCmd + 4) & ~1) ~= SYM.CpPerform_BeginUnitMovement do
-        beginCmd = beginCmd + 8
-        assert(beginCmd < SYM.gProcScr_CpPerform + 8 * 32, "gProcScr_CpPerform calls no CpPerform_BeginUnitMovement")
+        beginCmd = beginCmd + INSPECT.PROC_CMD_SIZE
+        assert(beginCmd < SYM.gProcScr_CpPerform + INSPECT.PROC_CMD_SIZE * 32, "gProcScr_CpPerform calls no CpPerform_BeginUnitMovement")
     end
     local function real() return (ru16(SYM.gBattleStats) & BOARD.BATTLE_REAL) ~= 0 end
     local function close()
@@ -3236,17 +3242,20 @@ INSPECT.watchEnemyActs = function()
         -- gAiDecision is this unit's while its act plays (CpDecide decides one unit, then
         -- CpPerform plays it): cur's unit was read off it
         local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
-        if decided and not cur.dest then
+        if not cur.dest then
             local x, y = ru8(SYM.gAiDecision + BOARD.AI_DEC.X), ru8(SYM.gAiDecision + BOARD.AI_DEC.Y)
             cur.dest = { x = x, y = y, chest = terrainAt(x, y) == INSPECT.Sight.TERRAIN_CHEST_FULL }
         end
-        if decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
+        if cur.trapped then
+            -- a trap that stopped the move ends the act: the game sets WAIT once it has gone
+            -- off (bmtrap.c), and a decided pillage never happens (AiDummyAction)
+        elseif kind == BOARD.ACTION_TRAPPED then
+            -- the pillage below may have named its village before the act began
+            cur.trapped, cur.act, cur.tile = true, BOARD.ACTIONS[kind], nil
+        elseif decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
             -- AiPillageAction on a village: the tile event above it, no action type set
             cur.act, cur.tile = "pillage", { x = cur.dest.x, y = cur.dest.y - 1 }
-        elseif kind ~= 0 and not cur.trapped then
-            -- a trap that stopped the move ends the act: the game sets WAIT once it has gone
-            -- off (bmtrap.c), and that WAIT must not hide it
-            cur.trapped = kind == BOARD.ACTION_TRAPPED
+        elseif kind ~= 0 then
             cur.act = BOARD.ACTIONS[kind] or string.format("0x%02X", kind)
             -- only AiStartCombatAction and AiStaffAction set +0D: any other act leaves the
             -- last one's target there
