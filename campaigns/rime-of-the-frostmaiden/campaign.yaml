@@ -459,8 +459,9 @@ enemy_class_reskins:
         - {dir: staff,   txt: Staff.txt,   abbr: lamy_st, wtypes: ["0x0100 | ITYPE_STAFF"]}
         - {dir: unarmed, txt: Unarmed.txt, abbr: lamy_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
   # Vanilla Ch6's one Bael, re-dressed as Tentacruel: a lake beast that is neither a spider nor a
-  # crab, which is Braulo's. Pokémon art (ADR 0144's non-FE sources). The battle anim is Manchego
-  # Stars' own, posed from the Black/White animated sprite (battle_anims/tentacruel/poses.yaml has
+  # crab, which is Braulo's. Pokémon art (ADR 0144's non-FE sources). The battle anim is
+  # Manchego Stars' own, posed from the Black/White animated sprite
+  # (battle_anims/tentacruel/poses.yaml has
   # the recipe), hence `derived`. Red in battle as on the map (Nicolas, 2026-10-05):
   # `enemy-red.json` moves the body onto the enemy map palette's red ramp and the gems onto cream,
   # yellow and amber. The map sheets are PMD SpriteCollab's, authored DIRECTLY in the standard SMS

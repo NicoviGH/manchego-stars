@@ -16,7 +16,7 @@ once.
 
 ## Book
 
-In ''Rime of the Frostmaiden'' (p. 27), he is Bremen's "town speaker and oldest living resident," twice found "wandering the frozen shores of the Shaengarne in heavy furs, with no memory of how he got there." Ours keeps his wits; the forgetful speaker is the book's.
+In ''Rime of the Frostmaiden'' (p. 27), he is Bremen's "town speaker and oldest living resident," twice found "wandering the frozen shores of the Shaengarne in heavy furs, with no memory of how he got there." In Manchego Stars he keeps his wits; the forgetful speaker is the book's.
 
 ## Source canon
 
@@ -24,7 +24,7 @@ In ''Rime of the Frostmaiden'' (p. 27), he is Bremen's "town speaker and oldest 
   standards." Lawful good. The book plays him as addled; **we do not** (Nicolas, 2026-10-09).
 - DM notes: he refused to pay, claiming the party was never promised anything; Braulo swung first.
 
-## Who he is (ours)
+## Who he is (Manchego Stars)
 
 Grizzled, stubborn and angry. He has shared Maer Dualdon with its creatures all his life, and he
 has decided that killing this one beast will fix Bremen's winter. Privately he is close to giving

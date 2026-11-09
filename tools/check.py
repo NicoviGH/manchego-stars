@@ -70,7 +70,13 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
              # cleared. It holds more authored prose than any doc in this repo -- dialogue
              # rationale, wiring notes, the locked-beat record -- and every line of it is
              # doctrine the next session reads.
-             'campaigns/*/campaign.yaml', 'campaigns/*/chapters/*.yaml']
+             'campaigns/*/campaign.yaml', 'campaigns/*/chapters/*.yaml',
+             # #588's review found the rest of the authored campaign prose unscanned -- the
+             # lore files, the unit files, the onboarding catalog and opening montage -- and
+             # the playtest matrix's notes: each had live "ours" lines while the gate was green.
+             'campaigns/*/*.yaml', 'campaigns/*/events/*.yaml', 'campaigns/*/pcs/*.yaml',
+             'campaigns/*/npcs/*.yaml', 'campaigns/*/lore/*.md', 'campaigns/*/maps/README.md',
+             'tools/playtest/matrix.yaml', 'CREDITS.md']
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
 # abandoned tools, dead code symbols, retired implementation phrases. decisions.md
@@ -338,7 +344,8 @@ DEAD_CONCEPTS = [
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as
 # docs. The decomp submodule, generated artifacts, and caches are not ours to lint.
-CODE_GLOBS = ['tools/*.py', 'tools/inject/*.py', 'tools/playtest/*.py',
+CODE_GLOBS = ['tools/*.py', 'tools/inject/*.py', 'tools/inject/chapters/*.py', 'tools/wiki/*.py',
+              'tools/playtest/*.py',
               'tools/playtest/*.lua', 'tools/*.sh', 'tools/playtest/*.sh',
               'engine/**/*.c', 'engine/**/*.h', 'engine/**/*.patch', 'Makefile']
 
@@ -2666,8 +2673,8 @@ def _testimony_files(extra_exempt=()):
 # "vanilla" (Nicolas, 2026-10-29), so prose names the game Manchego Stars (#588). The word is
 # held, not the meaning: a plain possessive is rephrased too, because no pattern can tell
 # "one of ours" (the player's) from "ours" (the game), and both read the same to a stranger.
-# Not part of a longer name: `ours_only`, `ours-ch03`, 'ours', ours.c.
-OURS = re.compile(r"(?<![\w'`\-])ours(?![\w'`\-]|\.\w)", re.I)
+# Not part of a longer name: `ours_only`, `ours-ch03`, 'ours', ours.c, a path's `sim/ours/`.
+OURS = re.compile(r"(?<![\w'`\-/])ours(?![\w'`\-/]|\.\w)", re.I)
 # A quoted span is not the author's prose: a code id in backticks, or a line of dialogue or the
 # book in double quotes ("She said the fishermen were ours to take.").
 QUOTED_SPAN = re.compile('`[^`\n]*`|"[^"\n]*"|\u201c[^\u201d\n]*\u201d'
@@ -2677,8 +2684,22 @@ QUOTED_SPAN = re.compile('`[^`\n]*`|"[^"\n]*"|\u201c[^\u201d\n]*\u201d'
 COMMAND_LINE = re.compile(r'^\s*(?:\$ )?(?:python3|make)\s')
 # A Python string that is an identifier, not a sentence: 'ours', 'ours-ch03', a path.
 ID_LITERAL = re.compile(r'^[\w\-./:@+]*$')
-COMMENT_MARKS = {'.lua': ('--',), '.c': ('/*', '//', '*'), '.h': ('/*', '//', '*'),
-                 '.patch': ('/*', '//')}
+# The YAML keys whose value is GAME text -- dialogue, quotes, help and visit lines, a FE8 line
+# quoted as vanilla shipped it: written in the story's voice, where "ours" is a word, never a
+# name for the rom hack. Their comments are still prose.
+GAME_TEXT_KEYS = ('script', 'death_quote', 'defeat_quote', 'taunt', 'help_text', 'visit_text',
+                  'text', 'vanilla_text', 'title')
+GAME_TEXT_KEY = re.compile(r'^(\s*(?:- )?)(?:%s):(.*)$' % '|'.join(GAME_TEXT_KEYS))
+# A YAML `key: "value"` line: the quotes delimit the author's own value, not a quotation.
+YAML_QUOTED_VALUE = re.compile(r'^(\s*(?:- )?[\w-]+:\s*)"(.*)"(\s*(?:#.*)?)$')
+# A YAML value that is the game id itself (`game: ours,` in a flow map) is data.
+YAML_ID_VALUE = re.compile(r'(:\s*)ours(?=\s*(?:[,}\]]|#|$))')
+
+
+def _names_ours(line):
+    """Does this line of prose name the game "ours"? The one predicate the gate and its tests
+    share."""
+    return not COMMAND_LINE.match(line) and bool(OURS.search(QUOTED_SPAN.sub('', line)))
 
 
 def _comment_part(line, marks):
@@ -2702,44 +2723,100 @@ def _comment_part(line, marks):
 
 
 def _python_prose(text):
-    """(line, text) for every comment and every non-identifier string (docstrings, messages)."""
+    """(line, text) for every comment and every non-identifier string (docstrings, messages).
+
+    Python 3.12 splits an f-string into FSTRING_START/MIDDLE/END tokens (CI runs 3.12); its
+    MIDDLE parts are the literal text, read like any string's body."""
     import io
     import tokenize
+    fstring_middle = getattr(tokenize, 'FSTRING_MIDDLE', None)
     try:
         for tok in tokenize.generate_tokens(io.StringIO(text).readline):
             if tok.type == tokenize.COMMENT:
                 yield tok.start[0], tok.string
-            elif tok.type == tokenize.STRING:
+                continue
+            if tok.type == tokenize.STRING:
                 # Its delimiters off, so QUOTED_SPAN cannot read the string itself as a quote.
                 lit = tok.string.lstrip('rbfuRBFU')
-                fence = 3 if lit[:3] in ('"""', "'''") else 1
+                fence = 3 if lit[:3] in ('"' * 3, "'" * 3) else 1
                 body = lit[fence:-fence]
-                if not ID_LITERAL.match(body):
-                    for k, line in enumerate(body.split('\n')):
-                        yield tok.start[0] + k, line
+            elif tok.type == fstring_middle:
+                body = tok.string
+            else:
+                continue
+            if not ID_LITERAL.match(body):
+                for k, line in enumerate(body.split('\n')):
+                    yield tok.start[0] + k, line
     except (tokenize.TokenError, IndentationError, SyntaxError):
         return   # check_python_compiles owns a file that does not parse
 
 
 def _yaml_prose(lines):
-    """Every line but the dialogue under a `script:` block, whose comments are still prose."""
-    script = None
+    """Every line but GAME text (GAME_TEXT_KEYS: a value on the key's line, and every line
+    nested under the key), whose comments are still prose. A double-quoted value is the
+    author's own, so its quotes come off."""
+    game = None
     for i, line in enumerate(lines, 1):
         indent = len(line) - len(line.lstrip())
-        if script is not None and line.strip() and indent <= script:
-            script = None
-        if script is not None:
+        if game is not None and line.strip() and indent <= game:
+            game = None
+        if game is not None:
             yield i, _comment_part(line, ('#',))
             continue
-        m = re.match(r'(\s*)(?:- )?script:', line)
+        m = GAME_TEXT_KEY.match(line)
         if m:
-            script = len(m.group(1))
-        yield i, line
+            # The KEY's column, past a list item's `- `: a sibling key of the same item
+            # (`  - script:` then `    why:`) ends the block.
+            game = len(m.group(1))
+            yield i, _comment_part(m.group(2), ('#',))
+            continue
+        q = YAML_QUOTED_VALUE.match(line)
+        yield i, YAML_ID_VALUE.sub(r'\1', (q.group(1) + q.group(2) + q.group(3)) if q else line)
+
+
+def _c_prose(lines):
+    """The comments of C source: `//` to the line's end, and `/* ... */` across lines."""
+    block = False
+    for i, line in enumerate(lines, 1):
+        out = []
+        rest = line
+        while rest:
+            if block:
+                end = rest.find('*/')
+                out.append(rest if end < 0 else rest[:end])
+                if end < 0:
+                    break
+                block, rest = False, rest[end + 2:]
+                continue
+            tail = _comment_part(rest, ('/*', '//'))
+            if not tail:
+                break
+            if tail.startswith('//'):
+                out.append(tail)
+                break
+            block, rest = True, tail[2:]
+        yield i, ' '.join(out)
+
+
+def _patch_prose(lines):
+    """An engine patch: its message (everything before the first `diff --git`) whole, then
+    the C comments of the lines it adds or keeps (a removed `-` line is the old code)."""
+    body = []
+    for i, line in enumerate(lines, 1):
+        if body or line.startswith('diff --git'):
+            body.append((i, line))
+        else:
+            yield i, line
+    code = [(i, line[1:]) for i, line in body
+            if line[:1] in ('+', ' ') and not line.startswith('+++')]
+    for k, text in _c_prose([t for _, t in code]):
+        yield code[k - 1][0], text
 
 
 def _prose_lines(path, text):
     """(line number, prose) for the author's own words in one file: a doc whole, a YAML file
-    but its dialogue, a source file's comments (and, for Python, its non-identifier strings)."""
+    but its game text, a source file's comments (and, for Python, its non-identifier
+    strings)."""
     ext = os.path.splitext(path)[1]
     if ext == '.py':
         return _python_prose(text)
@@ -2748,7 +2825,11 @@ def _prose_lines(path, text):
         return enumerate(lines, 1)
     if ext == '.yaml':
         return _yaml_prose(lines)
-    marks = COMMENT_MARKS.get(ext, ('#',))
+    if ext in ('.c', '.h'):
+        return _c_prose(lines)
+    if ext == '.patch':
+        return _patch_prose(lines)
+    marks = ('--',) if ext == '.lua' else ('#',)
     return ((i, _comment_part(line, marks)) for i, line in enumerate(lines, 1))
 
 
@@ -2762,7 +2843,7 @@ def check_prose_names_manchego_stars(fail):
         with open(d, encoding='utf-8') as fh:
             text = fh.read()
         for i, line in _prose_lines(d, text):
-            if not COMMAND_LINE.match(line) and OURS.search(QUOTED_SPAN.sub('', line)):
+            if _names_ours(line):
                 fail.append('%s:%d names the game "ours" in prose -- say Manchego Stars (vs '
                             'vanilla), or rephrase a possessive; quote a code id in backticks'
                             % (os.path.relpath(d, REPO), i))

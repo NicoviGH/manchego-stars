@@ -45,7 +45,7 @@ CH06_ENDING_SCRIPT = 'EventScr_Ch7_EndingScene'
 # UnitDefinition array and loads them from a TURN-4 PLAYER-PHASE event through
 # `EventScr_LoadReinforceHardMode`, which is Difficult-only (it returns early on tutorial and
 # on not-hard, events_script_utils.c). We field the same three on the same clock through the
-# same shared script -- so "Hard only" is FE8's own predicate and not a dial of ours.
+# same shared script -- so "Hard only" is FE8's own predicate and not a dial Manchego Stars added.
 CH06_HARD_WAVE_TURN = 4
 CH06_HARD_WAVE_SCRIPT = 'EventScr_089F2CFC'      # slot 7's own turn-1 Murray bark; unreachable
                                                  # once the Turn list below is stripped (verified
@@ -97,8 +97,9 @@ def repoint_boat_safe_ai_list(char_ids, why, owner):
 
     ch06's map puts a killable hull inside the merfolk line, which vanilla Ch6 never does: over
     Ch6Map, with each class's own cost table, ZERO of its seventeen strikers can reach a
-    villager in one turn. Ours reach a boat on enemy phase 1, four of them, and a hull tuned as
-    a one-pursuer fuse sinks on turn 4 instead of 7. Vanilla buys that protection with TERRAIN
+    villager in one turn. Manchego Stars' strikers reach a boat on enemy phase 1, four of them, and
+    a hull tuned as a one-pursuer fuse sinks on turn 4 instead of 7. Vanilla buys that protection
+    with TERRAIN
     -- a mountain ring no Armour or Cavalier can cross -- and our frozen lake has no analogue,
     so we buy it with the AI byte vanilla itself provides for exactly this job.
 
@@ -106,7 +107,7 @@ def repoint_boat_safe_ai_list(char_ids, why, owner):
     through `AiIsUnitEnemyAndNotInScrList`, which calls `AiIsInShortList(script->unk_08, ...)`
     against each candidate's `pCharacterData->number`. `unk_08` is the list below. Copying the
     byte alone does NOT protect our hulls, because the list holds a literal character id and
-    ours are raw pids of our own -- the same trap `repoint_escort_safe_ai_list` documents for
+    the hulls are raw pids of our own -- the same trap `repoint_escort_safe_ai_list` documents for
     AI_A_07, and this is that function's twin.
 
     THE LIST IS WIDENED, and that is not cosmetic. `AiIsInShortList` takes a `const u16*` and
@@ -752,7 +753,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     repoint_boat_safe_ai_list([CH06_BOAT_PIDS['boat-east'], CH06_BOAT_PIDS['boat-west']],
                               'ch06 the two marooned hulls', owner='ch06')
 
-    # 3. Wire ours into the host slot's event group; every list not named here is written
+    # 3. Wire the Manchego Stars lists into the host slot's event group; every list not named here
+    # is written
     #    empty, INCLUDING Location. That is a real decision and not an oversight: vanilla Ch7's
     #    list is a Seize plus two Houses, and ch06 has no village terrain anywhere on the map
     #    (the two former village bodies are the boat pockets, and their doors were repainted to

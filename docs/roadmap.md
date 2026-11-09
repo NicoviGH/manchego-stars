@@ -6,7 +6,8 @@
 > map donor, the vanilla payload it owes, the recruit roles it fills, sources, and its own
 > `open_questions`. **Read them through the wiki**: `python3 tools/gen_wiki.py` writes
 > `build/wiki/index.html`, one page per chapter laid out like the Fire Emblem Wiki, with
-> the twin's payload read from the decomp and checked against Manchego Stars'. Open questions
+> the twin's payload read from the decomp and checked against Manchego Stars' chapter. Open
+questions
 > stay in the YAML and on #486, not on the wiki. This file keeps only what has no chapter to
 > live in.
 >

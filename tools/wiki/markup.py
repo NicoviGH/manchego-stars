@@ -99,7 +99,7 @@ def toc(entries, prefix):
             % (prefix, prefix, prefix, ''.join(out)))
 
 
-# ── tabs (the wiki's tab_main; site JS switches them, ours does too) ───────────
+# ── tabs (the wiki's tab_main; site JS switches them, Manchego Stars' JS does too) ───────────
 
 def tabs(labels, contents, selected=0, width='100%', boxed=False):
     if len(contents) == 1:

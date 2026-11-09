@@ -84,7 +84,7 @@ CH01_BODY_MSG = 0x956    # the dismembered sled-driver (dead vanilla Ch2 slot-2 
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (no vanilla event-script ref at all)
 # Wolfram's turn-1 line on the healing forts + gate, after the taunt (#21). Vanilla teaches the same
 # thing in Ch1 (EventScr_Ch1Tut_GuideTerrainHeal), but only in tutorial mode; ADR 0104 keeps tutorial
-# mode off Normal, so ours is party dialogue and plays on every difficulty.
+# mode off Normal, so Manchego Stars' warning is party dialogue and plays on every difficulty.
 CH01_TERRAIN_HEAL_MSG = appended_message_id('ch01', 'terrain-heal-warning')
 # Guide "Fortresses & Castle Gates" (MSG_0627). Vanilla's beat ends on ENUT(0xCE); without SOME Guide
 # flag set, IsGuideLocked() hides the Guide command from the map menu entirely.
@@ -741,7 +741,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # inject_ch02; see the generated EventScr_Ch2_EndingScene below). Before ch02 landed
     # it parked on the dev placeholder instead.
     # Vanilla Ch1's 5,000 gold is paid in Castle Frelia's scene right after it (`lordsplit`,
-    # King Hayden's war funds); ours rides the YAML's `economy.scene_gold` (#495).
+    # King Hayden's war funds); Manchego Stars' gold rides the YAML's `economy.scene_gold` (#495).
     end_bg = 'BG_MS_BRYN_SHANDER_WINTER'
     end_gold = scene_gold(chap, 'chapter_end', len(end_beats), end_bg)
     end_text_calls = _scenic_beat_calls(

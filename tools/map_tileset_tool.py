@@ -377,7 +377,8 @@ def vanilla_layout_tileset_assets(dec, layout):
 
 # ── FEBuilder/FE-Repo tileset import (#40) ────────────────────────────────────────
 
-CONFIG_SIZE = 9216          # 8192 B TSA + 1024 B terrain -- byte-identical to Manchego Stars'
+# 8192 B TSA + 1024 B terrain -- byte-identical to the Manchego Stars config
+CONFIG_SIZE = 9216
 OBJECT_SHEET_PX = 256       # object PNG: 256x256 mode-P, 4-bit local pixel indices
 PALETTE_BANKS = 10          # FE8 map BG palette: 10 banks x 16 (the .gbapal 320 B)
 LIT_PALETTE_BANKS = 5       # banks 5-9 are derived fog copies, never TSA authoring banks
@@ -756,8 +757,8 @@ def port_structure(tileset_dirs, source_dir, source_grid, slot_grid, bank, terra
     """Port a multi-metatile building from another tileset into empty slots.
 
     One map loads one tileset, so a building another tileset has (snowy-fields' castle) is
-    carried INTO Manchego Stars': each source pixel is recoloured to its nearest colour in our lit
-    ``bank``, and the source's own ground -- the ``ground`` colours reachable from the
+    carried INTO Manchego Stars' tileset: each source pixel is recoloured to its nearest colour in
+    our lit ``bank``, and the source's own ground -- the ``ground`` colours reachable from the
     structure's outer edge -- is replaced by our ``backdrop`` metatile, so the building
     stands on the same snow as the map around it. A quarter that is all ground reuses the
     backdrop's own TSA entry (its bank, its tile), so the seam is pixel-exact. Written to a

@@ -1,4 +1,4 @@
-# Scene pacing — vanilla FE8 measured, and where Manchego Stars' sit
+# Scene pacing — vanilla FE8 measured, and where Manchego Stars' scenes sit
 
 Measured 2026-07-23 with **`python3 tools/vanilla_scene.py <ch> [SceneFragment]`**, which pairs
 a decomp eventscript's `TEXTSHOW` ids with the decoded bodies in `texts/texts.txt` and prints

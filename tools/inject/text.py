@@ -105,8 +105,8 @@ def _eats_end(lines):
 
 
 def write_help_text(lines, slot, unit):
-    """Write `unit`'s `help_text:` over its slot's description, so R on its name reads Manchego
-    Stars'."""
+    """Write `unit`'s `help_text:` over its slot's description, so R on its name reads
+    Manchego Stars'."""
     set_message_body(lines, slot_desc_text_id(slot), help_text_body(unit['help_text']))
 
 

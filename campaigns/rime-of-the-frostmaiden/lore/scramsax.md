@@ -16,7 +16,7 @@ himself included.
 
 ## Book
 
-In ''Rime of the Frostmaiden'' (p. 33), Scramsax keeps the Northlook, "a retired sellsword" who lets adventurers between jobs stay on credit and then hands them "a bill inflated by interest charges." The book keeps him at his inn; joining Hlin's hunt for Sephek is ours.
+In ''Rime of the Frostmaiden'' (p. 33), Scramsax keeps the Northlook, "a retired sellsword" who lets adventurers between jobs stay on credit and then hands them "a bill inflated by interest charges." The book keeps him at his inn; joining Hlin's hunt for Sephek is Manchego Stars' invention.
 
 ## Concept
 

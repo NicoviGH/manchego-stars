@@ -1,8 +1,8 @@
 # Research — Manchego Stars
 
 > Reference research: what sources say, each claim cited. **Evidence, not decisions:**
-> what we do is in `docs/decisions.md`. Vanilla facts only; Manchego Stars' live in the
-> YAML.
+> what we do is in `docs/decisions.md`. Vanilla facts only; Manchego Stars' facts live
+> in the YAML.
 >
 > **This file is GENERATED.** Each record is one file under `docs/research/`; add or
 > edit one, then regenerate: `python3 tools/gen_decisions_index.py`.

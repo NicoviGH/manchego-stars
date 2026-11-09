@@ -21,7 +21,7 @@ walked into danger under escort, who turns the ancient duelist Sahnar against Ra
 
 ## Book
 
-In ''Rime of the Frostmaiden'' (p. 85), hiding beside Ravisin is "an awakened shrub (a berry bush) that follows Ravisin everywhere, in case the druid gets hungry and wants some berries to munch on." The book never names the shrub; Basil is ours.
+In ''Rime of the Frostmaiden'' (p. 85), hiding beside Ravisin is "an awakened shrub (a berry bush) that follows Ravisin everywhere, in case the druid gets hungry and wants some berries to munch on." The book never names the shrub; Basil is Manchego Stars' name for it.
 
 ## Concept
 

@@ -59,8 +59,8 @@ battle_anim:
   # No class slot: rides the per-character _u25 table (#65 M-B). Deploys as vanilla Archer --
   # which is why the rescale once rendered CYAN: GetBanimPalette forces CLASS_ARCHER to the
   # vanilla bow palette (0x25) regardless of banim_id, painting RBG's custom tiles with the
-  # wrong palette. Fixed by engine_hooks._patch_banim_palette_custom_guard (custom appended
-  # banims keep their own palette); see decisions.md Art & Audio.
+  # wrong palette. Fixed by engine/patches/0008-patch-banim-palette-custom-guard.patch (custom
+  # appended banims keep their own palette); see decisions.md Art & Audio.
   abbr: rbg_ar1                         # banim asset stem (<=12 chars)
   frames:                              # 1-3, in beat order (Ready -> Wind-up -> Peak)
     - prof-rbg/ready.png

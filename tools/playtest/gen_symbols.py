@@ -550,9 +550,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     return {
         'CAST': cast,
         # The help text R on a unit's name must read, by pid: the message and its first line
-        # (the words tell Manchego Stars' from vanilla's where the id is vanilla's own). A classed
-        # cast member's is its slot's descTextId, which the names pass writes (ADR 0346); a raw
-        # pid's is RAW_PID_HELP's (a chapter's generics, #493). `casthelp` and the declared
+        # (the words tell Manchego Stars' text from vanilla's where the id is vanilla's own). A
+        # classed cast member's is its slot's descTextId, which the names pass writes (ADR 0346); a
+        # raw pid's is RAW_PID_HELP's (a chapter's generics, #493). `casthelp` and the declared
         # `help:` step both read it.
         'HELP': {**{char(slot): help_row(slot_desc_text_id(slot),
                                          load_unit(campaign, uid)['help_text'])

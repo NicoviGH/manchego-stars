@@ -546,9 +546,9 @@ def inject_ch02(campaign, verbose=True):
                 '[FID_%s]' % CH02_CHWINGA_PORTRAIT_SLOT[dict(CH02_CHWINGA)[guest['id']]])
         set_message_body(lines, msg, _script_to_message(
             [{who: line} for who, line in village_boxes(village)], speakers))
-    # Boss/miniboss ride vanilla slots (Bazba/Bone) -- rename their name plates to ours,
-    # or the vanilla "Bazba"/"Bone" leaks on the unit window + death quote (cf. inject_ch01,
-    # which renames its Breguet boss slot). display_name uses the YAML fe_name (<=12).
+    # Boss/miniboss ride vanilla slots (Bazba/Bone) -- rename their name plates to the Manchego
+    # Stars names, or the vanilla "Bazba"/"Bone" leaks on the unit window + death quote (cf.
+    # inject_ch01, which renames its Breguet boss slot). display_name uses the YAML fe_name (<=12).
     write_nameplate(lines, CH02_BOSS_SLOT, halvar)
     write_nameplate(lines, CH02_MINIBOSS_SLOT, grukk)
     # VANILLA'S OWN WORDING, restored 2026-07-31 (Nicolas: "it should never have been altered

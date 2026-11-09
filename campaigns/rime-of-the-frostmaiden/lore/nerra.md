@@ -16,9 +16,9 @@ slips back under the water, meaning to return.
 ## Source canon
 
 None. The merfolk, their unwritten coexistence with Bremen's fishers, and Auril emboldening them
-are all ours (ADR 0332). Nerra's name is ours too.
+are all Manchego Stars' invention (ADR 0332), and so is Nerra's name.
 
-## Who she is (ours)
+## Who she is (Manchego Stars)
 
 The oldest and largest of the merfolk. For generations her people let Bremen's boats work the
 lake. This winter someone promised them the fishermen, and she took the promise as a licence.

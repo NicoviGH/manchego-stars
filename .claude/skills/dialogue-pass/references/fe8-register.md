@@ -21,8 +21,8 @@ owns the *Frostmaiden content* (who these people are); this one owns the *FE8 fo
 
 ## The villain register (the main finding)
 
-FE8 villains are **theatrical and enjoying themselves.** Manchego Stars' were failing because they
-were written as calm, self-explaining ideologues. Six habits, all over the corpus:
+FE8 villains are **theatrical and enjoying themselves.** Manchego Stars' villains were failing
+because they were written as calm, self-explaining ideologues. Six habits, all over the corpus:
 
 1. **Address the party directly, with an insult-name** — dogs, wretches, rats, fools, scum.
 2. **Relish it.** Appetite is on the page: hunger, blood, fun, prey.
@@ -66,7 +66,7 @@ check, "people talking, not mood-narration."
 
 ## Archetype spread (so villains don't converge)
 
-The corpus deliberately varies them — use this to keep Manchego Stars' distinct:
+The corpus deliberately varies them — use this to keep Manchego Stars' villains distinct:
 
 | shape | example | texture |
 |---|---|---|
@@ -76,7 +76,8 @@ The corpus deliberately varies them — use this to keep Manchego Stars' distinc
 | gruff careerist | Caellach | complains, ambitious, mercenary, "Bah!" |
 | serene executioner | (Manchego Stars: Sephek) | calm, liturgical, pitying — *never* raises voice |
 
-Manchego Stars' already occupy some of these: **Sephek** = serene executioner (his own bible),
+Manchego Stars' villains already occupy some of these: **Sephek** = serene executioner (his own
+bible),
 **Izobai** = mocking bandit-warlord. So a new villain should be checked against this table for
 collision before drafting — that check is the villain half of SKILL.md's cover-the-name test.
 

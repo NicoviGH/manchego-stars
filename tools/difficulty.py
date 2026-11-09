@@ -727,7 +727,8 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
 # ── Vanilla enemy extraction (the #48 parity reference force) ─────────────────────
 # A chapter's `parity_reference` (e.g. "FE8 Ch1") names the vanilla chapter whose enemy
 # pressure sets its bar. We resolve that to the decomp UnitDefinition array(s) holding the
-# fightable red force and project each enemy off class base -- the same footing as Manchego Stars'.
+# fightable red force and project each enemy off class base -- the same footing as Manchego Stars'
+# force.
 
 # decomp item enum -> fe_combat weapon key: the ITEM_ENUM entries fe_combat models. Staves,
 # consumables and keys are absent on purpose (an enemy carrying only those resolves to no
@@ -1253,7 +1254,7 @@ def _ally_combatant(char_enum, class_enum, weapon, level=None):
     donor-base inheritance our cast uses, mirroring player_combatant). Allies aren't
     autoleveled: their CharacterData stats are already the join-level display. `level`, when
     it is above that join level, grows them on their OWN curve the way `player_combatant`
-    grows Manchego Stars', so a leveled read compares like with like.
+    grows Manchego Stars' units, so a leveled read compares like with like.
     Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
     return _stats_to_combatant(_ally_name(char_enum),
                                _median_line(_ally_lines(char_enum, class_enum, level)),
@@ -1882,7 +1883,8 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
     threat/slot = Σ damage_per_round(enemy -> yardstick) ÷ deploy_cap -- how much incoming
     damage each of our slots must weather. clear-load/slot = Σ metric_rounds_to_kill(enemy)
     ÷ deploy_cap -- how much killing each slot must do to clear the map. Both measured against
-    the fixed YARDSTICK so Manchego Stars' and the vanilla reference land on one scale; the metric
+    the fixed YARDSTICK so Manchego Stars' chapter and the vanilla reference land on one scale; the
+    metric
     is a static proxy (no positioning/AI/terrain), read as a ratio within a tolerance band."""
     cap = max(1, deploy_cap)
     threat = sum(fc.damage_per_round(e, yardstick) for e in enemies) / cap
@@ -2007,8 +2009,8 @@ def _map_order(careers, forced=()):
     order FE8's AI breaks a tie in: `SortPlayerUnitsForPrepScreen` (prepscreen.c) pushes the
     force-deployed units first, then everyone else, each in their existing order, which is the
     order they joined (`careers` comes in join order: Manchego Stars' `inject.cast.load_order`, read
-    off the
-    ROM by `ch07blueorder`; the twin's `vanilla_recruits`, from the decomp's LOADs and talks)."""
+    off the ROM by `ch07blueorder`; the twin's `vanilla_recruits`, from the decomp's LOADs and
+    talks)."""
     return ([m for m in careers if m in forced]
             + [m for m in careers if m not in forced])
 
@@ -2979,8 +2981,8 @@ def role_findings(chap, parity_ref, campaign=None, mode=None):
     the chapter's real centre of gravity. Returns a list of strings (empty == clean).
 
     With a `campaign` and a twin the party model reaches, every arm reads both forces against
-    the party that meets Manchego Stars' (`_role_findings_vs_party`), each side loaded for `mode`
-    (#510 step 2): a boss that holds on Normal can still fold on Tutorial. Otherwise it falls
+    the party that meets Manchego Stars' force (`_role_findings_vs_party`), each side loaded for
+    `mode` (#510 step 2): a boss that holds on Normal can still fold on Tutorial. Otherwise it falls
     back to the fixed YARDSTICK on the declared levels, as the aggregate does off VANILLA_CHAIN."""
     if campaign and parity_ref in VANILLA_CHAIN:
         matchup = chapter_matchup(chap, campaign, mode=mode)
@@ -3107,11 +3109,11 @@ def _role_findings_vs_party(chap, parity_ref, matchup, mode=None):
     """The role check on instrument v2 (#430 step 6): our force and the twin's, BOTH met by our
     arriving party (the matchup's `cross` read), so each comparison isolates what authoring
     controls. Reading the twin against vanilla's own party would charge it for Lute's Res: the
-    same Shaman with the same Flux hits Manchego Stars' for 31.3 and vanilla's for 19.6.
+    same Shaman with the same Flux hits Manchego Stars' party for 31.3 and vanilla's for 19.6.
 
     Each arm asks the yardstick arm's question, relative to the twin rather than in absolute
     terms. A line unit out-hitting the boss is common in FE8 itself (Ch2's archer out-hits
-    Bone), so an inversion is flagged only when Manchego Stars' runs past the twin's own by the
+    Bone), so an inversion is flagged only when Manchego Stars' unit runs past the twin's own by the
     band. The
     twin's boss is the body whose CHARACTER carries CA_BOSS, which is where FE8 records it."""
     import exp_curve                        # exp_curve imports this module
@@ -3527,7 +3529,7 @@ def vanilla_economy(parity_ref):
 def chapter_economy(chap):
     """Our chapter's declared economy from its YAML: explicit gold + item ids by vehicle.
     Campaign item ids aren't valued here (they aren't vanilla enums) -- the vanilla bar is the
-    gold target; Manchego Stars' is listed alongside for a same-glance compare.
+    gold target; Manchego Stars' total is listed alongside for a same-glance compare.
 
     Every DELIVERY VEHICLE we ship has to be listed here, not just the vanilla-shaped ones. ch06
     hands out FE8 Ch6's own two rewards -- an Antitoxin and the Orion's Bolt gated on keeping

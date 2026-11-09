@@ -94,7 +94,7 @@ map:
                                   #         Impassable to every ground class, cost 1 to a
                                   #         FLIER -- so Pinky may work a hull from four cells
                                   #         where everyone else has one. That asymmetry is
-                                  #         vanilla's, not Manchego Stars'.
+                                  #         vanilla's, not a Manchego Stars choice.
     ice_walls: TERRAIN_PEAK       # 0x12 -- permanent ridges. NOT glacier: TERRAIN_GLACIER
                                   #         costs 1 for EVERY class, so it shapes nothing.
   terrain_note: >
@@ -187,10 +187,10 @@ difficulty_note: >
   EMPTY-MAP walk, and a unit cannot move through an enemy body. With the line standing, the WEST
   door is turn 6 for foot (vanilla Ch6's own foot number) after moving one corking body off the
   channel, and the EAST door is a FLIER-and-Braulo objective: foot, cavalry and Trex cannot reach
-  it at all. That is deliberate and it is Manchego Stars' own, not parity -- vanilla's rescue is
-  reachable by everything except Cavalier and Armour. ch06 makes the east hull Pinky's beat the way
-  vanilla builds whole chapters around a flier or a thief; the west hull is the one the party saves
-  together.
+  it at all. That is deliberate and it is Manchego Stars' own design, not parity -- vanilla's rescue
+  is reachable by everything except Cavalier and Armour. ch06 makes the east hull Pinky's beat the
+  way vanilla builds whole chapters around a flier or a thief; the west hull is the one the party
+  saves together.
 
   THE FUSES ARE VANILLA'S SLACK, MEASURED. Vanilla Ch6's foot reaches the villagers a turn
   before the Bael's one-bite death (decisions.md -> "Vanilla Ch6's urgency is TRAVEL TIME"),
@@ -266,7 +266,8 @@ deployment:
     - [4, 2]
     - [6, 1]
     - [10, 0]
-  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting is ours). Braulo (Pirate, river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
+  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar
+  (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting does the same). Braulo (Pirate, river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same level,
 # same donor and AI, and (but for five) the same class and inventory -- re-dressed as merfolk.
@@ -314,8 +315,9 @@ deployment:
 #   aggressive            {0x0, 0x0, 0x1, 0x0}    -- already ch03/ch04/ch05's spelling
 #
 # One divergence, declared: vanilla gives ONE of its four L7 Iron-Lance Soldiers the pursuing
-# all-zero AI and the other three AttackInRange. Manchego Stars' are a single `count: 4` entry and
-# take the majority behaviour; splitting one out is a placement-time decision, not a roster one.
+# all-zero AI and the other three AttackInRange. Manchego Stars' soldiers are a single `count: 4`
+# entry and take the majority behaviour; splitting one out is a placement-time decision, not a
+# roster one.
 generic_name: "Merfolk"   # the unit window's name for every generic enemy here (the merfolk and the beasts they ride and lead; #493)
 generic_help: "Merfolk of Maer Dualdon, emboldened this winter by the Frostmaiden."   # R on their name (#493)
 enemy_units:
@@ -970,8 +972,8 @@ events:
       - braulo: "Intelligent... It ruled these waters before the first keel touched them."
       - braulo: "Lower your weapons."
       # ── C: what he is, and why ──
-      # (The book's own lines, p.31, the Frostmaiden named as written. Why he rams is Manchego
-      # Stars' own, ADR 0332.)
+      # (The book's own lines, p.31, the Frostmaiden named as written. Why he rams is
+      # Manchego Stars' own, ADR 0332.)
       - braulo: "What are you?"
       - messie: "I used to just swim around the lake and eat fish."
       - messie: "The human who gave me this gift is Ravisin."
@@ -1157,8 +1159,8 @@ terrain_divergence:
 # The chapter's CLOCK, declared. `check_rescue_targets` proves nothing else on the board can
 # attack a hull: every other unit that can reach one carries an ACTION byte that cannot target
 # it. Vanilla Ch6 gets this from terrain -- zero of its seventeen strikers can reach a villager
-# in one turn, and its clock is pursuers only. Manchego Stars' is the same shape, bought with the AI
-# byte.
+# in one turn, and its clock is pursuers only. Manchego Stars' ch06 is the same shape, bought with
+# the AI byte.
 rescue_pursuers:
 - id: merfolk-thrower           # east: JAVELIN, range 1-2, so the pocket door never stops it
 - id: tentacruel                # west: range 1, so it must OCCUPY the door -- and it does

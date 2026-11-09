@@ -7322,7 +7322,8 @@ scenarios.ch05recruit = function(opts)
     --    a Talk pointed at vanilla's 0x9CC recruits Sahnar just as well, and that is exactly the
     --    bug this chapter shipped with for months -- Hlin Trollbane's bust talking to vanilla
     --    Joshua, with every text decoder green. Box COUNT is the cheapest in-engine witness to
-    --    which message id the script actually showed: Manchego Stars' is 21 A-presses, vanilla's is
+    --    which message id the script actually showed: Manchego Stars' scene is 21 A-presses,
+    --    vanilla's is
     --    32.
     log(string.format("ch05recruit: the recruit scene ran %d boxes, message 0x%X",
         boxes, playedMsg or 0))
@@ -8521,10 +8522,11 @@ end
 --
 -- Vanilla's Fighter carries {Iron Axe, Halberd} and drops his LAST item. The AI equips the
 -- weapon it swings (cp_perform.c), so once he attacks with the Halberd it moves to the front
--- and he drops the Iron Axe: rush him before he attacks. Manchego Stars' is a Cavalier carrying
--- {Iron Lance, Horseslayer}. The AI scores a weapon by damage x hit (cp_battle.c), so against
--- a foot unit it swings the Iron Lance (equal Mt, +10 Hit) and the drop stays the Horseslayer;
--- against a mounted unit the Horseslayer's triple Mt wins and the drop flips. Two arms, one run:
+-- and he drops the Iron Axe: rush him before he attacks. Manchego Stars' boss is a Cavalier
+-- carrying {Iron Lance, Horseslayer}. The AI scores a weapon by damage x hit (cp_battle.c), so
+-- against a foot unit it swings the Iron Lance (equal Mt, +10 Hit) and the drop stays the
+-- Horseslayer; against a mounted unit the Horseslayer's triple Mt wins and the drop flips. Two
+-- arms, one run:
 --
 --   * FOOT: a foot unit stands beside him until he attacks it. His inventory is unchanged.
 --   * MOUNTED: a unit of a class on the Horseslayer's own effectiveness list (read from

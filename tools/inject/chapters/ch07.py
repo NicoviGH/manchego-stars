@@ -29,7 +29,8 @@ CH07_LINE_TABLE = 'MS_Ch07Line'                  # vanilla Ch7's 19, re-dressed 
 
 CH07_LAYOUT = ('Ch07BremenMap', 'ch07-blood-in-bremen')   # (asset label, maps/ stem)
 # The goal donor is slot 8 ITSELF: vanilla Ch7's own Seize template, on the slot we host, which
-# nothing before inject_ch07 writes. Its window text is replaced by ours below either way.
+# nothing before inject_ch07 writes. Its window text is replaced by Manchego Stars' text
+# below either way.
 CH07_GOAL_DONOR = CH07_HOST_INDEX
 CH07_SEIZE_TEXT = 'Seize hall'                   # vanilla's "Seize gate", for the Town Hall door
 

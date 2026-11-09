@@ -218,8 +218,8 @@ CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 #
 #   FE8'S:    vanilla inserted chapter 5X at slot 5, so from slot 6 on the slot INDEX and the
 #             vanilla symbol NAME disagree in the BASE GAME -- slot 6 ships Ch5EventData,
-#             slot 7 ships Ch6Events. This is the one that reads like a bug and is not Manchego
-#             Stars'.
+#             slot 7 ships Ch6Events. This is the one that reads like a bug and is not
+#             Manchego Stars'.
 #
 # ch05 is a 1:1 retile of vanilla Ch5 and mines Ch5 for everything that is CONTENT -- the
 # geometry, the terrain, all sixteen line placements (Ch5's REDA destinations), the nine

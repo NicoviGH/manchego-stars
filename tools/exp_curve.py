@@ -2,8 +2,8 @@
 """The campaign's EXP economy, and the party-level band derived from it (#367 proposal 3).
 
 `difficulty.py`'s parity ratio answers *is this chapter at parity with its vanilla twin*, and
-since ADR 0316 it answers it against the party this module says arrives: Manchego Stars' against its
-own, the twin's against vanilla's.
+since ADR 0316 it answers it against the party this module says arrives: Manchego Stars' force
+against its party own, the twin's against vanilla's.
 
 Every ABSOLUTE question -- *can this unit survive that trip, is this fuse long enough for
 a real party, is this objective a coin flip* -- needs the party's level, and had none. During
@@ -422,8 +422,8 @@ def _banks_exp(chap):
 
     Read off the deploy cap, because that is what Pick Units is: prep from ch01 on is
     standing protocol and the CAP is the parity (decisions.md -> the deploy cap / prep
-    screen). A chapter with no cap is a FIXED-ROSTER chapter, and Manchego Stars' is ch00, whose two
-    units are guests -- Hlin and Scramsax never join, so nobody in the party fights it.
+    screen). A chapter with no cap is a FIXED-ROSTER chapter, and Manchego Stars' only one is ch00,
+    whose two units are guests -- Hlin and Scramsax never join, so nobody in the party fights it.
     Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the founding
     party is handed what the twin pays instead (`founding_grant`, ADR 0320)."""
     return (chap.get('deployment') or {}).get('deploy_limit') is not None
@@ -499,7 +499,7 @@ def _total_exp(careers):
 def simulate(campaign='rime-of-the-frostmaiden'):
     """One row per HOSTED chapter, in chapter order, carrying the party level forward.
 
-    Two parties are run: Manchego Stars', fed our rosters, and a twin party fed each chapter's
+    Two parties are run: Manchego Stars' party, fed our rosters, and a twin party fed each chapter's
     vanilla reference force. Both are OUR cast -- same classes, same `classRelativePower` -- so the
     only difference between the two curves is the enemy force, which is the comparison
     #367 asked for. The per-chapter `yield_ratio` is stricter still: both pots are measured
@@ -539,10 +539,11 @@ def simulate(campaign='rime-of-the-frostmaiden'):
                 career.fight(bodies, cap, number)
         grant = {}
         if twin is not None and ref not in spent:
-            # The twin party fights its own chapter whether or not Manchego Stars' banks this one
-            # (see _banks_exp), and its members join on OUR recruitment schedule, so the
+            # The twin party fights its own chapter whether or not the Manchego Stars party banks
+            # this one (see _banks_exp), and its members join on OUR recruitment schedule, so the
             # only difference between the two curves stays the enemy force. It fights each
-            # twin ONCE, as FE8's party does: a reused twin pays Manchego Stars' and not it.
+            # twin ONCE, as FE8's party does: a reused twin pays the Manchego Stars party and not
+            # it.
             spent.add(ref)
             for career in twin_party:
                 gained = career.fight(twin, cap, number)
@@ -621,7 +622,8 @@ def _simulated(campaign):
 
 def founding_grant(campaign='rime-of-the-frostmaiden'):
     """{uid: exp} the founding party is handed before it first deploys: what the twin pays
-    each founding career for the fixed-roster chapter Manchego Stars' banks nothing from (ch00, ADR
+    each founding career for the fixed-roster chapter the Manchego Stars party banks nothing from
+    (ch00, ADR
     0320).
 
     The engine applies it once, at ch01's first prep (`FoundingExp_ApplyOnce`), so it must
@@ -650,8 +652,8 @@ def entering(campaign, chapter_number, parity_ref=None):
 
     {'party': {uid: (join level, level on entering)} for every unit that has joined by this
     chapter, 'vanilla': {CHARACTER_*: level on entering `parity_ref`} for FE8's own party
-    (`vanilla_arrivals`), or None off the chain}. Manchego Stars' is the previous hosted chapter's
-    closing level, so a chapter is never credited with its own exp. This is what
+    (`vanilla_arrivals`), or None off the chain}. Manchego Stars' level is the previous hosted
+    chapter's closing level, so a chapter is never credited with its own exp. This is what
     `difficulty.load_field(leveled=True)` fields (#430 step 1)."""
     before = [r for r in _simulated(campaign) if r['chapter_number'] < chapter_number]
     prior = before[-1] if before else None

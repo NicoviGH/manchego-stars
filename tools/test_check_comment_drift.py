@@ -440,9 +440,7 @@ class ProseNamesManchegoStars(unittest.TestCase):
     """#588: prose names the rom hack Manchego Stars; `ours` survives only as a code id."""
 
     def _flagged(self, path, text):
-        return [n for n, line in check._prose_lines(path, text)
-                if not check.COMMAND_LINE.match(line)
-                and check.OURS.search(check.QUOTED_SPAN.sub('', line))]
+        return [n for n, line in check._prose_lines(path, text) if check._names_ours(line)]
 
     def test_a_python_comment_and_docstring_are_prose_but_ids_are_code(self):
         text = ('"""ours ch03 vs the twin."""\n'
@@ -475,6 +473,70 @@ class ProseNamesManchegoStars(unittest.TestCase):
     def test_a_quoted_span_and_another_word_are_not_flagged(self):
         self.assertEqual(self._flagged('x.md', 'Run `--game ours`. "Victory is ours." Yours.\n'
                                                 'ours.c and ours_only\n'), [])
+
+    def test_a_quoted_yaml_value_is_the_authors_prose(self):
+        self.assertEqual(self._flagged('x.yaml', 'note: "the sighting is ours. Positions set."\n'),
+                         [1])
+
+    def test_a_sibling_key_after_script_ends_the_dialogue(self):
+        text = '  - script:\n      - a: x\n    why: the moose is ours\n'
+        self.assertEqual(self._flagged('x.yaml', text), [3])
+
+    def test_game_text_keys_are_not_prose(self):
+        text = ('death_quote: "Victory was ours..."\n'
+                'vanilla_text: Victory is ours\n'
+                'help_text: >\n'
+                '  The day is ours.\n'
+                'note: the line is ours\n')
+        self.assertEqual(self._flagged('x.yaml', text), [5])
+
+    def test_yaml_data_naming_the_game_id_is_not_prose(self):
+        text = ('- {start_id: ours-ch00, game: ours, chapter: 1,\n'
+                '  state_path: references/sim/ours/fd3c/states/1.ss}\n')
+        self.assertEqual(self._flagged('x.yaml', text), [])
+
+    def test_c_code_is_not_a_comment_but_a_block_comment_is_read_whole(self):
+        text = ('x = a * ours;\n'
+                'struct Unit *ours;\n'
+                '/* the first line\n'
+                ' * and ours on the second\n'
+                ' */ int ours = 1; // ours\n')
+        self.assertEqual(self._flagged('x.c', text), [4, 5])
+
+    def test_a_patch_reads_its_message_and_its_added_comments(self):
+        text = ('Subject: ours ever clears BG1\n'
+                '---\n'
+                'diff --git a/src/x.c b/src/x.c\n'
+                '+/* added,\n'
+                '+ * ours */\n'
+                '-/* removed: ours */\n'
+                '+int ours = 0;\n')
+        self.assertEqual(self._flagged('x.patch', text), [1, 5])
+
+    @unittest.skipUnless(hasattr(__import__('tokenize'), 'FSTRING_MIDDLE'),
+                         'f-strings tokenize whole before Python 3.12 and are read as STRING')
+    def test_an_f_string_message_is_prose_on_312(self):
+        self.assertEqual(self._flagged('x.py', "print(f'only ours lost {n}')\n"), [1])
+
+    def test_an_f_string_message_is_prose(self):
+        self.assertEqual(self._flagged('x.py', "msg = f'only ours lost {n}'\n"), [1])
+
+    def test_the_scan_covers_the_authored_campaign_prose(self):
+        """#588's review: lore, unit files, the chapter injectors and the wiki sources held live
+        "ours" lines while the gate was green, because no glob reached them."""
+        scanned = {os.path.relpath(p, check.REPO)
+                   for p in check._docs() + check._handwritten_sources()}
+        for rel in ('campaigns/rime-of-the-frostmaiden/lore/nerra.md',
+                    'campaigns/rime-of-the-frostmaiden/pcs/prof-rbg.yaml',
+                    'campaigns/rime-of-the-frostmaiden/onboarding-catalog.yaml',
+                    'tools/inject/chapters/ch05.py', 'tools/wiki/site.py',
+                    'tools/playtest/matrix.yaml'):
+            self.assertIn(rel, scanned)
+
+    def test_the_live_tree_is_clean(self):
+        fail = []
+        check.check_prose_names_manchego_stars(fail)
+        self.assertEqual([], fail)
 
     def test_the_generated_scene_book_is_exempt_but_a_doc_is_not(self):
         scenes = os.path.join(check.REPO, 'docs', 'scenes', 'x.md')

@@ -44,7 +44,8 @@ PROLOGUE_GUEST_SPRITES = [
 # can bind on them. ch01/ch02/ch03 keep the ids their donors already gave them (measured by running
 # the injector -- HEAD and the working tree both lie about post-injection goal ids); only ch04 had
 # to move, because its donor IS ch02's host slot.
-CH01_GOAL_WINDOW_MSG = 0x19F     # vanilla slot 1's seize window ("Seize camp" is Manchego Stars')
+# vanilla slot 1's seize window ("Seize camp" is Manchego Stars' text)
+CH01_GOAL_WINDOW_MSG = 0x19F
 CH01_GOAL_STATUS_MSG = 0x1A3
 CH01_BOSS_SLOT = 'BREGUET'   # vanilla Ch1's boss slot: CA_BOSS + hand-authored
 # Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
@@ -335,13 +336,13 @@ CH05_ARRIVAL_NO_LUPIN_MSG = 0x9ED
 # ── Scene 5 (#25): Basil trundles up, cracks the tourist joke, and JOINS ─────────────────────
 # The opening's FIRST on-map beat, so it wraps at the talk bubble's budget
 # -- and the one scene whose PLACEMENT does not inherit from the twin. Vanilla plays its 0x9C2
-# BEFORE the prep CALL, but it can: it LOAD1s its speaking party onto the street first. Manchego
-# Stars' is placed BY prep (the ally table is never LOADed on a prep chapter -- decisions.md "How
-# the deploy cap + prep screen are actually wired"), so before the CALL the field holds the risen
-# line, Ravisin, and a green shrub with nobody to be talking to. The beat therefore plays AFTER
-# prep, in vanilla's own after-prep shape (FADU(16) -> CUMO -> STAL -> CURE -> TEXTSTART, which is
-# exactly what its 0x9C3/0x9C4 do) -- and it lands adjacent to the CUSA that was already there, so
-# the ask and the flip are one beat rather than two across a screen.
+# BEFORE the prep CALL, but it can: it LOAD1s its speaking party onto the street first.
+# Manchego Stars' party is placed BY prep (the ally table is never LOADed on a prep chapter --
+# decisions.md "How the deploy cap + prep screen are actually wired"), so before the CALL the field
+# holds the risen line, Ravisin, and a green shrub with nobody to be talking to. The beat therefore
+# plays AFTER prep, in vanilla's own after-prep shape (FADU(16) -> CUMO -> STAL -> CURE ->
+# TEXTSTART, which is exactly what its 0x9C3/0x9C4 do) -- and it lands adjacent to the CUSA that was
+# already there, so the ask and the flip are one beat rather than two across a screen.
 CH05_BASIL_JOIN_SLOT = ('vanilla 0x9C2', 0x9EE, 3,
                         'Basil trundles up, cracks the tourist joke, joins')
 CH05_BASIL_JOIN_NO_LUPIN_MSG = 0x9EF

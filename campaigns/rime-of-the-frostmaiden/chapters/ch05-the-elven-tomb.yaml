@@ -153,8 +153,8 @@ lose_condition: lord_defeated
 
 difficulty_note: >
   Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar; `make
-  difficulty CH=ch05` gives the live verdict against the party that meets it. Manchego Stars' reads
-  line 16 · reinf 6 · convertible 1 — the twin's structure exactly, with Sahnar the one true
+  difficulty CH=ch05` gives the live verdict against the party that meets it. Manchego Stars' force
+  reads line 16 · reinf 6 · convertible 1 — the twin's structure exactly, with Sahnar the one true
   convertible (Basil's Talk). The force is RISEN
   ELVEN GUARDIANS on vanilla FE8 infantry classes, skinned undead — the ch01 "vanilla class,
   our skin" pattern. Because the stats ARE living-class stats, clear-load parity comes for
@@ -298,8 +298,8 @@ enemy_units:
   # fighting tiles, one-for-one. Vanilla parks its line off-field and walks it in via REDA,
   # so the tile to lift is the REDA DESTINATION, not the .xPosition (which is a staging tile
   # like (10,0) or (0,0) for seven different units). Same call as the reliquary sites and
-  # ch04's cottage: on a 1:1 retile the placement is vanilla's, not Manchego Stars' — which is also
-  # what keeps `make difficulty CH=ch05` measuring the twin it claims to.
+  # ch04's cottage: on a 1:1 retile the placement is vanilla's, not a Manchego Stars choice — which
+  # is also what keeps `make difficulty CH=ch05` measuring the twin it claims to.
   - id: ravisin
     face: ravisin                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Ravisin"
@@ -459,8 +459,8 @@ enemy_units:
     ai_override:
       ai: '{DefaultAI, 0x9, 0x0}'
       why: >
-        the moose is Manchego Stars' own -- vanilla Ch5 fields no beast to borrow from. It hunts, so
-        it takes vanilla Ch5's own pursue vector rather than a static one.
+        the moose is Manchego Stars' own enemy -- vanilla Ch5 fields no beast to borrow from. It
+        hunts, so it takes vanilla Ch5's own pursue vector rather than a static one.
     convertible: false          # #171 — a difficulty-model flag. `difficulty.py` reads it to
                                 # exempt a unit from the role-inversion check and to apply
                                 # CONVERT_CLEAR_DISCOUNT (0.5) to clear-load, and BOTH would be
@@ -822,9 +822,9 @@ enemy_units:
 # Fixed 2026-07-29; the tool now prints each message's id and channel. If a mined beat looks
 # absent from a scene, suspect the miner before concluding vanilla lacks it.
 # NOTE ON 9BC: vanilla's orders come from GLEN (a superior officer), never from Vigarde --
-# so Manchego Stars' come from SEPHEK, not Auril. `lore/frostmaiden-voices.md` keeps the Frostmaiden
-# OFF the page ("commands through frost giants and winter wolves"). Sephek is the prologue
-# boss who rimed over and escaped: his return makes the Children of Auril concrete, earns
+# so Manchego Stars' orders come from SEPHEK, not Auril. `lore/frostmaiden-voices.md` keeps the
+# Frostmaiden OFF the page ("commands through frost giants and winter wolves"). Sephek is the
+# prologue boss who rimed over and escaped: his return makes the Children of Auril concrete, earns
 # Ravisin's "she has other hands" drop, and re-arms him for his Act-II death.
 events:
   # ── 9BB — the two RECRUITS meet, before the party ever arrives ────────────────
@@ -1352,8 +1352,8 @@ events:
       her own will, believing the party are the intruders she was left for; a fast crit-Myrmidon
       (smells faintly of pumpkin spice). She flips only when Basil reaches her.
       DIALOGUE BUDGET — vanilla spends 3 boxes (`EventScr_089F22A4`, the bandits who join the
-      fight mid-map); Manchego Stars' spends 4 because the wired reliquary race needs an explicit
-      warning. The structural rule taken from the twin: **the ARRIVING FORCE speaks
+      fight mid-map); Manchego Stars' scene spends 4 because the wired reliquary race needs an
+      explicit warning. The structural rule taken from the twin: **the ARRIVING FORCE speaks
       and the party never reacts.** Vanilla gives Eirika and Seth not one line here. So these
       boxes belong to the arriving side. (Phantom Ship's quake beat does the opposite —
       Ephraim reacts to it — but Ch11b is only our THEME base for the EARTHQUAKE/TILECHANGE
@@ -1377,20 +1377,20 @@ events:
       Frostmaiden has need of you" (she is named plenty elsewhere and does not need a third
       mention); and "the BLADE under the stone" keeps Sahnar as inventory, echoing 9BD where
       Ravisin appraises her as exactly that.
-      TWIN = EventScr_089F22A4, 3 boxes; Manchego Stars' is 4 after adding the race warning. Its
-      structural rule is that the ARRIVING FORCE speaks while the party never reacts (vanilla gives
-      Eirika and Seth no lines). Both twins
+      TWIN = EventScr_089F22A4, 3 boxes; Manchego Stars' scene is 4 after adding the race warning.
+      Its structural rule is that the ARRIVING FORCE speaks while the party never reacts (vanilla
+      gives Eirika and Seth no lines). Both twins
       agree the SPECTACLE lives in the event macros, never in the prose.
       THE RACE IS NAMED HERE, and that is what the second box buys (Nicolas, 2026-08-09). Vanilla
       spends its equivalent box on the raiders' intent — "steal our way through this pathetic
-      town" — which is the only warning the player gets that the reward-sites are at stake. Manchego
-      Stars' said nothing about them, so the race (now actually wired, #25) would have announced
-      itself with the engine's "The village was destroyed." popup, after a site was already gone.
-      REVISED 2026-08-09 (Nicolas): all four boxes are Ravisin's, and Sahnar's "The tomb is
-      closed. Turn back." is CUT. That box used to be the setup 0x9CC breaks from — she starts the
-      same rote line at the recruit and stops at "Far enough. The tomb is--" because she has seen
-      Basil. ACCEPTED as-is (Nicolas, 2026-08-09) after being raised: 0x9CC simply opens on the
-      rote line cold. Recorded so a later pass does not "restore" a box that was cut on purpose.
+      town" — which is the only warning the player gets that the reward-sites are at stake.
+      Manchego Stars' scene said nothing about them, so the race (now actually wired, #25) would have
+      announced itself with the engine's "The village was destroyed." popup, after a site was
+      already gone. REVISED 2026-08-09 (Nicolas): all four boxes are Ravisin's, and Sahnar's "The
+      tomb is closed. Turn back." is CUT. That box used to be the setup 0x9CC breaks from — she
+      starts the same rote line at the recruit and stops at "Far enough. The tomb is--" because she
+      has seen Basil. ACCEPTED as-is (Nicolas, 2026-08-09) after being raised: 0x9CC simply opens on
+      the rote line cold. Recorded so a later pass does not "restore" a box that was cut on purpose.
       LOCKED 2026-08-09 (dialogue-pass, co-written with Nicolas). 4 boxes, all Ravisin.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       # (EARTHQUAKE_START + sequential TILECHANGE; the floor breaks and more dead come up.
@@ -1424,7 +1424,8 @@ events:
     ea_file: events/ch05-sahnar-recruit.ea
     description: >
       THE CHAPTER'S PAYOFF. Basil chaperoned safely to Sahnar → she turns and joins. The
-      escort-recruit (Ch5's Joshua beat, twin `EventScr_089F2270`, 32 boxes; Manchego Stars' is 16 —
+      escort-recruit (Ch5's Joshua beat, twin `EventScr_089F2270`, 32 boxes; Manchego Stars' scene
+      is 16 —
       the relationship was already built in 9BB, so this scene only has to turn her).
       The turn is NOT an argument won and NOT a rescue. Its mechanism, beat for beat off the
       twin: RECOGNITION → duty stated flatly → the other pleads → the recruit turns on
@@ -1500,7 +1501,8 @@ events:
   # BASIL HAS NO CHAPTER-SPECIFIC DEATH BOX, and the empty vanilla 0x9C6 anatomy slot is not an
   # invitation to write one (Nicolas, 2026-08-16). Vanilla fills it for Natasha because the
   # escort a chapter is built around should be mourned in that chapter's own words, and Basil
-  # holds exactly that role here — but Manchego Stars' said the same thing as her universal line in
+  # holds exactly that role here — but Manchego Stars' quote said the same thing as her universal
+  # line in
   # the same shape (an interrupted apology holding an undelivered berry), so the second box bought a
   # mechanism and no line. The berry quote MOVED to her universal one (npcs/basil.yaml) and
   # fires wherever she falls; the constraints it was written against still hold there. It must
@@ -1514,14 +1516,13 @@ events:
       Ravisin's battle quote when a player unit engages her. ONE BOX — vanilla's whole boss taunt
       is "Enemy of the empire! Death's too good for you!" and nothing else. Her weight comes from
       the 9BC orders scene, not from talking on the field.
-      Manchego Stars' is the twin with one word swapped (Nicolas, 2026-07-29): empire ->
-      Frostmaiden. That is
-      the entire change, and it is the right size of change. The line already does what her
-      register needs — direct address plus an insult-name, then contempt — and swapping the
-      allegiance is what makes it hers. "Frostmaiden" is the chapter's established reverent
-      epithet (9BC twice, this taunt, and the later death quote); Auril is never named (see 9C8).
-      Note it is contempt, not grievance: she is not owed anything and is not avenging anything,
-      which keeps it clear of her bible's banned grudge/revenge framing.
+      Manchego Stars' taunt is the twin with one word swapped (Nicolas, 2026-07-29): empire ->
+      Frostmaiden. That is the entire change, and it is the right size of change. The line already
+      does what her register needs — direct address plus an insult-name, then contempt — and
+      swapping the allegiance is what makes it hers. "Frostmaiden" is the chapter's established
+      reverent epithet (9BC twice, this taunt, and the later death quote); Auril is never named (see
+      9C8). Note it is contempt, not grievance: she is not owed anything and is not avenging
+      anything, which keeps it clear of her bible's banned grudge/revenge framing.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 1 box.
     script:                           # LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas)
       - ravisin: "Enemy of the Frostmaiden! Death's too good for you!"
@@ -1692,9 +1693,9 @@ events:
         · then the deliberation runs NEARLY VERBATIM from 0x9C9, with exactly ONE line changed
           to mark what was lost — "If she had lived, we might have learned more, but...." — and
           the closing box repeated word for word.
-      Manchego Stars' does the same, at the same discount: 13 boxes against 0x9C9's 18, and the
-      closing run
-      is 0x9C9's own, with Braulo's final box carrying the one changed clause.
+      Manchego Stars' scene does the same, at the same discount: 13 boxes against 0x9C9's 18, and
+      the
+      closing run is 0x9C9's own, with Braulo's final box carrying the one changed clause.
       THE CONCEIT IS INHERITED WHOLESALE. Natasha's map death is deferred to the cutscene — she
       is mortally wounded there, whenever she actually fell. Basil is a broken shrub in the snow
       still talking, whether she went down on turn 2 or turn 12. It reads better for a plant than
@@ -1769,7 +1770,8 @@ events:
   #   (1) a RESIDENT says what the win meant  -> Basil's "...I don't have to prepare her berries."
   #       The hollow is the only place she has ever been; that line is the whole coda in one box.
   #   (2) the resident's own future           -> the repot. Vanilla's townsman apologises that he
-  #       can do nothing and stays behind to wait; Manchego Stars' can do something, and comes
+  #       can do nothing and stays behind to wait; Manchego Stars' resident can do something, and
+  #       comes
   #       along. The
   #       coda INVERTED is the strongest use of it available to us.
   #   (3) a second resident, if earned        -> the conditional Sahnar block. Her home, her tomb,
@@ -1800,7 +1802,7 @@ economy:
 # ch05 priced at 350g against the twin's ~27,760g while the gifts were "already decided".
 # TILES are vanilla Ch5's own village coordinates, preserved by the retile (the map carries
 # TERRAIN_VILLAGE_REGULAR on exactly these four -- see decisions.md, a retile inherits vanilla's
-# terrain). Placement is vanilla's, not Manchego Stars', the same call as ch04's cottage.
+# terrain). Placement is vanilla's, not a Manchego Stars choice, the same call as ch04's cottage.
 # `assert_village_tiles_visitable` rejects any of these standing on scenery.
 # THE RESIDENTS ARE THE TOMB'S OWN DEAD (Nicolas, 2026-08-08). No village at a tomb, so the four
 # sites are answered by four risen elves, not villagers. WHY THEY HELP YOU WHEN THE REST OF THE
@@ -1827,7 +1829,7 @@ economy:
 # boxes reads as monotone. Every handover gets its own box, as three of vanilla's four do.
 # LORE RIDES UNDER CHARACTER, not over it: vanilla spends its village budget on somebody's small
 # private business (a packing list, an old man's vanity, a dancer's over-tipping), so each of
-# Manchego Stars' is interrupted mid-task and the tomb's history arrives only where the task
+# Manchego Stars' sites is interrupted mid-task and the tomb's history arrives only where the task
 # produces it.
 # Orem/the amphitheatre come from lore/sahnar.md §Source canon; Corellon, Arvandor and Ostoria
 # stay OFF the page as before -- named as events ("a god took him up alive"), never as proper
@@ -1863,11 +1865,10 @@ villages:
     # LOCKED 2026-08-08 (dialogue-pass, co-written with Nicolas). Speaker: the MAGE, the tomb's
     # archivist. Register twin is vanilla's own Secret Book village (MSG_9CF): an old man who only
     # mentions his life's knowledge because he is afraid it dies with him, and hands over a book
-    # he wrote for that reason. Manchego Stars' has the same engine -- he is evacuating the
+    # he wrote for that reason. Manchego Stars' visit has the same engine -- he is evacuating the
     # archive because the party is about to fight in it, which is what makes Orem come up at all
     # (Nicolas: "he kinda brings up the chieftain out of nowhere"). Box 2 sets the stakes box 7
-    # pays off.
-    # 7 boxes against vanilla's 6, deliberately: the extra box buys "He came back dead."
+    # pays off. 7 boxes against vanilla's 6, deliberately: the extra box buys "He came back dead."
     visit_text:
       - "Mm. Visitors. Don't touch the-- ...you touched it. It's fine."
       - "You'll be fighting in here, I expect. ...Everyone always fights in here."
@@ -1885,6 +1886,7 @@ villages:
     # woke up and went straight back to counting stock. Register twin is vanilla's own Armorslayer
     # village (MSG_9CD), the one site that is plainly useful: it states what the weapon does in
     # flat words ("It'll cut through even the strongest armor") and sends you off. Manchego Stars'
+    # visit
     # does the
     # same. A draft ended on "It remembers bigger things" -- cut 2026-08-08 (Nicolas: "sounds
     # silly"); it was mood-narration in a quartermaster's mouth, which the craft check calls dead.

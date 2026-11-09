@@ -270,10 +270,9 @@ entering, grown to the median of simulated level-ups on its growth donor. FE8's 
 it: every vanilla recruit so far, run through the same exp model on vanilla's own force from
 its own join level, and grown the same way. The cast tables, the fielded party, the lord sweep and the
 vanilla delta all read that party (ADR 0310), and so does the parity ratio: each force is
-measured against the party that meets it, Manchego Stars' against its own and the twin's against
-vanilla's, with the threat landing where FE8's AI would send it (ADR 0316).
-
-⚠️ **The exp column is the only quantity in this repo that integrates across chapters**, which
+measured against the party that meets it, Manchego Stars' force against its own party and the twin's
+against vanilla's, with the threat landing where FE8's AI would send it (ADR 0316).
+ ⚠️ **The exp column is the only quantity in this repo that integrates across chapters**, which
 is why `tools/test_exp_curve.py` asserts every chapter within ±12% of its twin. A chapter that
 reuses a twin an earlier chapter already spent — ch07 is planned against FE8 Ch6, which ch06
 already banked — hands the party an extra chapter of exp the vanilla curve does not contain,

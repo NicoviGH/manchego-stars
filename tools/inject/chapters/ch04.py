@@ -513,10 +513,10 @@ def inject_ch04(campaign, boot=False, verbose=True):
                    ' /* turn-2 reveal: 5 Mauthe Doogs + Lupin (red pack leader) */\n'
                    '    TurnEventPlayer(0, EventScr_089F22EC, 3) /* turn-3 reinf: revenant + bonewalker packs */\n'
                    '    END_MAIN\n}')
-    # Location = the villages (#205). Vanilla Ch4's Location list is two `Village` entries; ours
-    # keeps the ITEM one at the same tile (the parley took the recruit one's job). Blanking this
-    # list is what made ch04's Iron Axe unobtainable -- and the map's door tile had ALSO lost its
-    # village terrain in the reskin, so both halves had to come back.
+    # Location = the villages (#205). Vanilla Ch4's Location list is two `Village` entries;
+    # Manchego Stars' list keeps the ITEM one at the same tile (the parley took the recruit one's
+    # job). Blanking this list is what made ch04's Iron Axe unobtainable -- and the map's door tile
+    # had ALSO lost its village terrain in the reskin, so both halves had to come back.
     assert_village_tiles_visitable(chap, maps_dir, CH04_LAYOUT[1])
     # No-op today -- ch04's forest is a from-scratch canvas, so its `map:` block names no
     # `vanilla_layout:` and there is no vanilla gift placement to inherit. Wired anyway so the
@@ -566,9 +566,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
                  '    REMA /* clear the cottage portraits before the cut */\n'
                  '    FADI(16)\n'
                  # Vanilla Ch4 opens on its forest-ambience loop (SONG_52, song082_y_mori_3 in
-                 # sound/song_table.s) and closes on Distant Roads (ADR 0336). Ours has one beat
-                 # here and Preparations before the map, so the ambience carries the beat and
-                 # Distant Roads arrives as the map theme itself (chapter_bgm).
+                 # sound/song_table.s) and closes on Distant Roads (ADR 0336). Manchego Stars has
+                 # one beat here and Preparations before the map, so the ambience carries the beat
+                 # and Distant Roads arrives as the map theme itself (chapter_bgm).
                  + backdrop(CH04_OPENING_FOREST_BG,
                             'CUT to the forest edge, fog hanging between the trees', rearm=True,
                             cue='    MUSC(SONG_52) /* forest ambience, as vanilla Ch4 opens */\n')

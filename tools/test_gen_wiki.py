@@ -91,7 +91,7 @@ class TestGenWiki(unittest.TestCase):
         # vanilla Ch5's village/clear gifts all reach ch05 (ADR 0049's 1:1 economy)
         ch05 = section(self.page, 'ch05/design')
         self.assertIn('ITEM_GUIDINGRING', ch05)
-        self.assertNotIn('not found in ours</span>', ch05)
+        self.assertNotIn('not found in Manchego Stars</span>', ch05)
 
     def test_item_names_are_the_games_own(self):
         self.assertEqual(gen_wiki.item_name('ITEM_BOOSTER_POW'), 'Energy Ring')

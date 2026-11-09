@@ -1885,7 +1885,8 @@ def character_pages(chs, units, files):
 
 
 def design_page(chap, navbox_html=''):
-    """Manchego Stars', not the wiki's: the plan the cloned article has no section for (#487)."""
+    """Manchego Stars' own page, not the wiki's: the plan the cloned article has no section for
+    (#487)."""
     slug, title = chap['_slug'], chap.get('title', chap['_slug'])
     plan = chap.get('plan') or {}
     ckey = twin_key(chap.get('parity_reference'))
@@ -1984,7 +1985,7 @@ def twin_payload_html(chap, ckey):
                                                           deviations)):
         rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e),
                      _payload_mark(verdict, deviations.get(e, ''))))
-    # The twin's gold, counted against Manchego Stars' the same way: an amount either of our
+    # The twin's gold, counted against Manchego Stars' gold the same way: an amount either of our
     # vehicles pays.
     gold = [(g, 'Chest') for g in v.get('gold_chests') or []] \
         + [(g, 'Given by an event') for g in v.get('gold_gifts') or []] \
@@ -2150,9 +2151,10 @@ def inline_urls(text):
     return re.sub(r'url\((?!["\']?data:)([^)]*)\)', inline, text)
 
 
-# Manchego Stars', not the wiki's: one file holds every page, so the router shows one at a time; and
-# the site's banner slot (#p-logo, over the 15.25rem the content leaves it) shows our title screen
-# where the Fire Emblem Wiki shows its logo, embedded since the viewer loads nothing remote.
+# Added by Manchego Stars, not the wiki's: one file holds every page, so the router shows one at a
+# time; and the site's banner slot (#p-logo, over the 15.25rem the content leaves it) shows our
+# title screen where the Fire Emblem Wiki shows its logo, embedded since the viewer loads nothing
+# remote.
 TITLE_SCREEN = os.path.join(TOOLS, 'wiki', 'assets', 'title-screen.png')
 PAGE_CSS = """
 /* jquery.makeCollapsible.styles (MediaWiki core; not in the vendored skin) */
@@ -2163,15 +2165,15 @@ section.page[hidden]{display:none!important}
 .mw-wiki-logo.fallback{width:288px!important;height:192px;background-size:contain;
   image-rendering:pixelated;border-radius:6px}
 #p-logo{transform:translate(-50%,26%)!important}
-/* Manchego Stars': Page tools on a phone. The skin hides that sidebar's heading there
+/* Added by Manchego Stars: Page tools on a phone. The skin hides that sidebar's heading there
    (Timeless reaches page actions through a header menu we do not ship), so it opens from the
    header's right with Timeless's own page icon, where its own user menu sits (right:1.2em
    leaves room for the arrow), as the Navigation menu does from its left. */
 @media screen and (max-width:850px){
 #page-tools h2{display:block;right:1.2em;background-image:url(/w/skins/Timeless/resources/images/page-misc-grey.svg);filter:var(--invert)}
 #page-tools .sidebar-inner{right:0;left:auto}}
-/* Manchego Stars': on a phone a table wider than the column scrolls in its own box (#493), where
-the skin
+/* Added by Manchego Stars: on a phone a table wider than the column scrolls in its own box (#493),
+where the skin
    only sets width:100% and the column clips the rest. The wrapper is inert at desktop width. */
 .ms-scroll{display:contents}
 @media screen and (max-width:850px){.ms-scroll{display:block;overflow-x:auto}}

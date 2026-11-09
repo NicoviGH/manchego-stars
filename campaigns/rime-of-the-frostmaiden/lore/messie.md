@@ -16,7 +16,7 @@ Bremen with the party to make peace.
 
 ## Book
 
-In ''Rime of the Frostmaiden'' (p. 28), the lake monster of Maer Dualdon is "an awakened plesiosaurus," and the druid who woke it "expects the plesiosaurus to attack fishing boats from Bremen." It tells the party (p. 31), "I used to just swim around the lake and eat fish." The book never names it. Ours rams boats only to turn their crews home before they reach merfolk water, and has drowned no one.
+In ''Rime of the Frostmaiden'' (p. 28), the lake monster of Maer Dualdon is "an awakened plesiosaurus," and the druid who woke it "expects the plesiosaurus to attack fishing boats from Bremen." It tells the party (p. 31), "I used to just swim around the lake and eat fish." The book never names it. In Manchego Stars he rams boats only to turn their crews home before they reach merfolk water, and has drowned no one.
 
 ## Source canon
 
@@ -28,10 +28,10 @@ In ''Rime of the Frostmaiden'' (p. 28), the lake monster of Maer Dualdon is "an 
   the awakening is permanent, and he then promises to stop attacking fishers.
 - DM notes: Marty spoke with him; the party proposed him for Speaker.
 
-## Who he is (ours)
+## Who he is (Manchego Stars)
 
 - **He has talked with the merfolk all along**, and he protests quietly: he rams Bremen's boats
-  so the crews turn home before they reach merfolk water. He has never drowned anyone (ours; the
+  so the crews turn home before they reach merfolk water. He has never drowned anyone (Manchego Stars' invention; the
   book's Pronged Goat crew did drown, p.29). ADR 0332.
 - He hides the protest behind obedience, because he fears Ravisin will take his mind back.
 - ch06 ends with him going back to Bremen with the party to make peace. The Speaker idea comes

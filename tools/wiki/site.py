@@ -1,8 +1,8 @@
 """Our pages through the wiki's templates (#493): where a link goes, what a file is, one render.
 
 Every page is wikitext that calls the Fire Emblem Wiki's own templates (`tools/wiki/vendor/`)
-with our data, rendered by `mw` + `render`. Two answers are ours rather than the wiki's, and both
-live here:
+with our data, rendered by `mw` + `render`. Two answers are Manchego Stars' rather than the wiki's,
+and both live here:
 
 - **A link.** `[[Page]]` opens our page when we publish one under that title, and the Fire
   Emblem Wiki's article otherwise -- a vanilla class, item or stat keeps its real article
