@@ -9,10 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, evening (Claude): **T100b is PR #585, refrozen on Nicolas's override;
-next, review it and merge.** The suite run (held-out 4 of 28 lost, none new; tuning 3 of 28 lost
-and 13 protected deaths, both as frozen) refused on two vanilla-ch5 deaths and cost; Nicolas said
-"refreeze anyway", recorded in `suite-frozen.json` (`override`) and ADR 0395.
+Refreshed 2026-11-09, late (Claude): **T100b merged (PR #585, 909219b5).** The review's bot
+fixes made a new instrument; `suite --held-out` promoted it (no regressions, held-out 4 of 28
+lost, none new, SC-003 +0.1%) and it is refrozen without an override (`01d1ea0ad925+v2`, ADR
+0395). Next: T100c, and ask Nicolas about T100d.
 
 ## Where things stand
 
@@ -40,10 +40,11 @@ and 13 protected deaths, both as frozen) refused on two vanilla-ch5 deaths and c
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
-  - **Frozen suite** (instrument `e6fc3854f2a3+v2`): 14 starts, 56 runs, 642.6 wall s on 8
-    workers, 567,629 `AiDecideMain` calls (SC-003's baseline now, budget 681,154); every run has
-    a game result; 4 of 28 held-out runs lost. A bot change makes a new instrument: run
-    `suite --held-out` and read its promotion line before trusting it.
+  - **Frozen suite** (instrument `01d1ea0ad925+v2`, PR #585's head): 14 starts, 56 runs, 25 min
+    wall on 8 workers, 2,490,781 `AiDecideMain` calls (SC-003's baseline; the jump from 567,629
+    is T100b's counter branches, accepted by Nicolas); every run has a game result; 4 of 28
+    held-out runs lost. A bot change makes a new instrument: run `suite --held-out` and read its
+    promotion line before trusting it.
 - **On hold** (label `on-hold`, the hold comment says what reopens each): #565 (chipping a step
   back), #569 (placing a claim's wave in the lookahead).
 - **Merged 2026-11-08:** #583 (ADR 0396: a bot decision is an ordering of the game's outcomes;
@@ -66,22 +67,9 @@ and 13 protected deaths, both as frozen) refused on two vanilla-ch5 deaths and c
 
 ## Next
 
-1. **Review and merge PR #585** (branch `feat/510-t100b-counter-branch`, pushed, rebased on main
-   this session; `make test` green). Holds T100b's counter branches, the counter-kill attacks,
-   the over-cap order (next phase first), the replan's rest of the plan in hand, `pilot
-   --bench-vanilla`, ADRs 0384/0389/0396, and the refreeze. **New in it:** `suite --freeze
-   --override WHY` (`montecarlo.py` `freeze_record`, test in `test_montecarlo.py`
-   `test_a_freeze_needs_every_run_and_a_promotion`), and ADR 0395's override rule plus its
-   "Refrozen on an override" bullet. Steps: `/code-review 585 medium` by a separate reviewer
-   (subagent), fix every finding with `review-to-clean`, CI on the head sha, merge (step 9 PRs
-   merge after review + CI). Squash drops the 86abf243/d7dad9ca experiment and its revert.
-   **Do not re-run the suite for the review**: the refreeze is from this head's kept runs
-   (instrument `4385f97ef0f3+v2`); a reviewer fix to bot code changes the instrument, and then
-   one `suite --held-out` decides whether it needs another freeze.
-   **Known, do not re-derive:** the new SC-003 baseline is 2,487,135 calls (all T100b's counter
-   branches, 5.3x the enemy phases judged; Nicolas accepts the cost). vanilla-ch5/1001's new
-   death is Lute (0x0C), a fog death (`unrevealed_killer`, read 0.0%), Eirika lives;
-   vanilla-ch5/1002's is Natasha (0x0D), honest risk the frozen bot survived on a 93% roll.
+1. **T100b is merged** (PR #585). Known, do not re-derive: vanilla-ch5/1001's Lute (0x0C)
+   death is a fog death (`unrevealed_killer`, read 0.0%); vanilla-ch5/1002's Natasha (0x0D) is
+   honest risk the old bot survived on a 93% roll. Both are in the frozen baseline now.
 2. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
    held-out counts, the pilot's ours-vs-twin numbers), crashes, stalls and cost. Proposed, not
    decided: make a tuning-seed death flip a thing to read, not a promotion gate (ADR 0395); log
@@ -92,7 +80,7 @@ and 13 protected deaths, both as frozen) refused on two vanilla-ch5 deaths and c
 4. Then, on #510's plan comment 6563384310: T100c (the recorder's phantom enemy `wait`), T100d
    (**still unanswered: ask Nicolas** whether the grade reads the plan's two-phase chance), T100e
    (several starts per chapter cell, each its own campaign), then T100-T108 and PR-J, then #510
-   step 10. Tick T100b in the plan comment once #585 merges.
+   step 10.
 5. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
    `considered[].dies`, is worth porting), `feat/510-t100a-r`, `feat/510-lookahead-between-turn`
    (honest turn-between: right numbers, 4.6x cost), `park/510-t100a-pullback`.
