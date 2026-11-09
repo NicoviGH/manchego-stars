@@ -9,10 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, midday (Claude): **ship the T100b branch** (Nicolas: "push it and move
-on"). T100b's counter branches cost the 4.6x calls (Nicolas accepts the cost: the suite is rarely
-re-run). A new fix, the replan judges the rest of the plan in hand, cleared 3 of the 4 death
-regressions. Next: one suite run, refreeze on this bot with Nicolas's OK, PR, review, merge.
+Refreshed 2026-11-09, evening (Claude): **T100b is PR #585, refrozen on Nicolas's override;
+next, review it and merge.** The suite run (held-out 4 of 28 lost, none new; tuning 3 of 28 lost
+and 13 protected deaths, both as frozen) refused on two vanilla-ch5 deaths and cost; Nicolas said
+"refreeze anyway", recorded in `suite-frozen.json` (`override`) and ADR 0395.
 
 ## Where things stand
 
@@ -66,27 +66,22 @@ regressions. Next: one suite run, refreeze on this bot with Nicolas's OK, PR, re
 
 ## Next
 
-1. **Ship branch `feat/510-t100b-counter-branch`** (local, not pushed, no PR; off main 09c350aa,
-   now several commits behind: rebase on `origin/main` first). Holds 33538ed1 (T100b: the enemy
-   phase on each way a counter leaves its attacker), d754facd (counter-kill attacks offered),
-   5a936ef4 (over the cap, the next phase ranks first), bb3d7820 (ADRs 0384/0389/0396),
-   5af47bb5 (`pilot --bench-vanilla`), and **59b44c66 (new, 2026-11-09): a replan judges the
-   rest of the plan in hand** (`opts.rest`, kind `rest`; ADR 0384's bullet beside the advance;
-   tests in `test_bot.lua` and `test_botrun.lua`, both fail without it). 1c350f2e is reverted.
-   The findings and numbers are on #510's plan comment 6563384310, last bullets under T100b.
-   Steps, in order:
-   1. Rebase; `make test` green.
-   2. One `suite --held-out` run (~25 min). Tell Nicolas the death rates in plain words (held-out
-      lost N of 28, vs 4 of 28 frozen), not each death.
-   3. It will refuse promotion (cost, and vanilla-ch5/1002's death). **Ask Nicolas for "refreeze
-      anyway"**; on his yes, write the new baseline (`suite --freeze` writes only when promoted,
-      so the override must be explicit and recorded in ADR 0395 with why) in the same PR.
-   4. PR, `/code-review <PR> medium` by a separate reviewer (subagent), fix every finding, CI on
-      the head sha, merge (step 9 PRs merge after review + CI).
-   **What is already known (do not re-derive):** the cost is all 33538ed1 (5.3x enemy phases
-   judged, same decisions); vanilla-ch5/1002 Natasha's death is honest risk plus ADR 0384's
-   over-cap order (game over ranks first: a 6.85% lord risk lost to a 62% Lute risk); ours-ch03/
-   1002 now wins t23 with no deaths; vanilla-ch5/1001 wins (Lute dies to a fogged killer).
+1. **Review and merge PR #585** (branch `feat/510-t100b-counter-branch`, pushed, rebased on main
+   this session; `make test` green). Holds T100b's counter branches, the counter-kill attacks,
+   the over-cap order (next phase first), the replan's rest of the plan in hand, `pilot
+   --bench-vanilla`, ADRs 0384/0389/0396, and the refreeze. **New in it:** `suite --freeze
+   --override WHY` (`montecarlo.py` `freeze_record`, test in `test_montecarlo.py`
+   `test_a_freeze_needs_every_run_and_a_promotion`), and ADR 0395's override rule plus its
+   "Refrozen on an override" bullet. Steps: `/code-review 585 medium` by a separate reviewer
+   (subagent), fix every finding with `review-to-clean`, CI on the head sha, merge (step 9 PRs
+   merge after review + CI). Squash drops the 86abf243/d7dad9ca experiment and its revert.
+   **Do not re-run the suite for the review**: the refreeze is from this head's kept runs
+   (instrument `4385f97ef0f3+v2`); a reviewer fix to bot code changes the instrument, and then
+   one `suite --held-out` decides whether it needs another freeze.
+   **Known, do not re-derive:** the new SC-003 baseline is 2,487,135 calls (all T100b's counter
+   branches, 5.3x the enemy phases judged; Nicolas accepts the cost). vanilla-ch5/1001's new
+   death is Lute (0x0C), a fog death (`unrevealed_killer`, read 0.0%), Eirika lives;
+   vanilla-ch5/1002's is Natasha (0x0D), honest risk the frozen bot survived on a 93% roll.
 2. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
    held-out counts, the pilot's ours-vs-twin numbers), crashes, stalls and cost. Proposed, not
    decided: make a tuning-seed death flip a thing to read, not a promotion gate (ADR 0395); log
@@ -94,12 +89,16 @@ regressions. Next: one suite run, refreeze on this bot with Nicolas's OK, PR, re
 3. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
    #547 on #547). Ours ch03's boss: 36 HP vs Bazba's 25, hits our army for a mean 14 (up to 16)
    vs Bazba's 8.6 on vanilla's, same throne heal. Stop chasing ch03 deaths in the bot.
-4. Then T100c, T100d (**still unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then
-   #510 step 10.
+4. Then, on #510's plan comment 6563384310: T100c (the recorder's phantom enemy `wait`), T100d
+   (**still unanswered: ask Nicolas** whether the grade reads the plan's two-phase chance), T100e
+   (several starts per chapter cell, each its own campaign), then T100-T108 and PR-J, then #510
+   step 10. Tick T100b in the plan comment once #585 merges.
 5. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
    `considered[].dies`, is worth porting), `feat/510-t100a-r`, `feat/510-lookahead-between-turn`
    (honest turn-between: right numbers, 4.6x cost), `park/510-t100a-pullback`.
-6. Tell Nicolas where step 9 stands in plain words at the start of a session.
+6. Tell Nicolas where step 9 stands in plain words at the start of a session. **When a log
+   gives a character ID, name it from `fireemblem8u/include/constants/characters.h` and add
+   nothing you have not read** (this session called Lute a Pegasus Knight from memory).
 
 ## Parked or owed elsewhere
 
