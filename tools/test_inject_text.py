@@ -371,5 +371,31 @@ class HelpText(unittest.TestCase):
                 self.assertEqual(' '.join(unit['help_text'].split()),
                                  inject.text.slot_help_text(slot, unit))
 
+class CharacterNamesAreWhatTheUnitWindowPrints(unittest.TestCase):
+    """`character_names`: each row's `.nameTextId` message, keyed by its enum or raw pid (#590)."""
+
+    FILES = {
+        'include/constants/characters.h': 'enum {\n    CHARACTER_EIRIKA = 0x01,\n    CHARACTER_KLIMT = 0xC9,\n};\n',
+        'texts/texts.txt': '## MSG_212\nBraulo[X]\n\n## MSG_255\nRime[X]\n\n## MSG_256\nRaider[X]\n',
+        'src/data_characters.c': (
+            '    [CHARACTER_EIRIKA - 1] = {\n        .nameTextId = 0x212,\n        .number = 0x01,\n    },\n'
+            '    [CHARACTER_KLIMT - 1] = {\n        .nameTextId = 0x255,\n    },\n'
+            '    [0x95 - 1] = {\n        .nameTextId = 0x256,\n    },\n'
+            '    [0x96 - 1] = {\n        .nameTextId = 0x999,\n    },\n'),
+    }
+
+    def test_rows_are_named_by_enum_and_by_raw_pid(self):
+        files = self.FILES
+
+        def source(rel):    # a plain function: the readers memoise on it
+            return files[rel]
+
+        self.assertEqual(inject.text.character_row_names(source),
+                         {'CHARACTER_EIRIKA': 'Braulo', 'CHARACTER_KLIMT': 'Rime', '0x95': 'Raider'})
+        # a row whose message the table lacks has no name to print, so it is left out
+        self.assertEqual(inject.text.character_names(source),
+                         {0x01: 'Braulo', 0xC9: 'Rime', 0x95: 'Raider'})
+
+
 if __name__ == '__main__':
     unittest.main()

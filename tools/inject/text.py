@@ -157,6 +157,38 @@ def messages(texts):
     return types.MappingProxyType({i: plain_message(b) for i, b in message_bodies(texts).items()})
 
 
+
+@functools.lru_cache(maxsize=None)
+def character_row_names(source):
+    """{row key: name} for every row of a character table, by its `.nameTextId`: the name the
+    unit window and the map hover box print (player_interface.c, unitinfowindow.c). A row's key
+    is what its `[key - 1]` index names: a CHARACTER_ enum or, for a raw pid, its number as
+    written. `source(rel)` reads a decomp file: `inject.decomp.rom_text` for the ROM as built,
+    `vanilla_decomp_text` for vanilla's."""
+    text = messages(source('texts/texts.txt'))
+    out = {}
+    for key, body in re.findall(r'\[\s*(\w+)\s*-\s*1\s*\]\s*=\s*\{(.*?)\n\s*\}',
+                                source('src/data_characters.c'), re.S):
+        m = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', body)
+        if m and text.get(int(m.group(1), 0)):
+            out[key] = text[int(m.group(1), 0)]
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def character_names(source):
+    """{pid: name}: `character_row_names` keyed by the pid each row is."""
+    from inject.decomp import enum_values
+    enum = enum_values(source('include/constants/characters.h'), 'CHARACTER_')
+    out = {}
+    for key, name in character_row_names(source).items():
+        pid = enum.get(key)
+        if pid is None and re.fullmatch(r'0x[0-9a-fA-F]+|\d+', key):
+            pid = int(key, 0)
+        if pid is not None:
+            out[pid] = name
+    return out
+
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'
 
 

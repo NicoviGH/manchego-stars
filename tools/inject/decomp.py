@@ -246,6 +246,32 @@ def vanilla_decomp_text(relpath):
                                    encoding='utf-8', env=env)
 
 
+@functools.lru_cache(maxsize=None)
+def rom_text(rel):
+    """A decomp source as the ROM is built from it: the build tree's copy, which holds every
+    injection, when it exists; the pristine submodule otherwise. Memoised like
+    `vanilla_decomp_text`: a reader (the wiki, a run's story) reads one build."""
+    path = os.path.join(DECOMP, rel)
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    return vanilla_decomp_text(rel)
+
+
+@functools.lru_cache(maxsize=None)
+def rom_block(rel, token):
+    """One `[token - 1] = {...}` entry of a data table (characters, classes) as the ROM is
+    built from it, or ''."""
+    if not token:
+        return ''
+    text = rom_text(rel)
+    try:
+        s, e = _find_brace_block(text, '[%s - 1]' % token, rel)
+    except (Exception, SystemExit):
+        return ''
+    return text[s:e]
+
+
 @functools.lru_cache(maxsize=1)
 def vanilla_event_files():
     """{relpath: text} of every file under src/events/ at HEAD, read in ONE `git cat-file

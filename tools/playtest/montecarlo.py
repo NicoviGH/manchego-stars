@@ -2316,17 +2316,26 @@ def replay_main(args):
 
 @functools.lru_cache(maxsize=None)
 def _names(game):
-    """{character id: name}: ours' cast by its PCs' and guests' names, then every character
-    the decomp names (vanilla's cast and the generic enemies both games share)."""
+    """{character id: name}: every character by its decomp enum (vanilla's cast and the generic
+    enemies), then, for Manchego Stars, every pid the build renamed by the name the ROM prints
+    for it (`inject.text.character_names` on the build tree): the PCs and guests, and a chapter
+    unit on a reused vanilla slot, which printed the vanilla name before (ch02's Rime Spark rode
+    KLIMT and read "Klimt", #590). A ROM name several pids share (a chapter's generic "Raider")
+    keeps its pid beside it, so a story still tells two of them apart."""
     sys.path.insert(0, os.path.dirname(HERE))
     import inject.decomp
-    from inject.scene_actors import cast_pids
+    import inject.text
     text = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
     out = {v: k[len('CHARACTER_'):].replace('_', ' ').title()
            for k, v in inject.decomp.enum_values(text, 'CHARACTER_').items()}
     if game == 'ours':
-        for name, pid in cast_pids().items():
-            out[pid] = name.replace('-', ' ').title()
+        vanilla = inject.text.character_names(inject.decomp.vanilla_decomp_text)
+        renamed = {pid: name
+                   for pid, name in inject.text.character_names(inject.decomp.rom_text).items()
+                   if name != vanilla.get(pid)}
+        shared = collections.Counter(renamed.values())
+        for pid, name in renamed.items():
+            out[pid] = name if shared[name] == 1 else '%s 0x%02X' % (name, pid)
     return out
 
 

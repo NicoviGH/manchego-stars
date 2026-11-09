@@ -2006,15 +2006,32 @@ class Story(unittest.TestCase):
         self.assertTrue(mc._items())
         self.assertEqual(mc._classes()[0x01], 'Lord')
 
-    def test_ours_names_and_claims_share_one_cast_lookup(self):
-        # a run's id names the cast member a claim with that name resolves to
+    def test_a_claim_names_the_pid_its_cast_member_rides(self):
+        # a claim's cast name resolves to the slot that member fills
         import campaign_env as ce
         from inject.scene_actors import cast_pids
-        names = mc._names('ours')
         for name, pid in cast_pids().items():
             self.assertEqual(ce._unit_id(name, 'ours', None), pid)
-            self.assertEqual(names[pid], name.replace('-', ' ').title())
 
+    def test_ours_names_a_pid_by_the_name_the_rom_prints(self):
+        # #590: ch02's Rime Spark rides KLIMT (0xC9) and a story printed "Klimt"; every pid the
+        # build renamed now reads the ROM's name, and a name two pids share keeps each pid
+        import inject.decomp
+        import inject.text
+        vanilla = {0x01: 'Eirika', 0xC9: 'Klimt', 0x92: 'Enemy', 0x93: 'Enemy', 0x83: 'Soldier'}
+        rom = {0x01: 'Braulo', 0xC9: 'Rime', 0x92: 'Raider', 0x93: 'Raider', 0x83: 'Soldier'}
+        tables = {inject.decomp.vanilla_decomp_text: vanilla, inject.decomp.rom_text: rom}
+        mc._names.cache_clear()
+        try:
+            with mock.patch.object(inject.text, 'character_names', tables.__getitem__):
+                names = mc._names('ours')
+                vanilla_game = mc._names('vanilla')
+        finally:
+            mc._names.cache_clear()
+        self.assertEqual((names[0x01], names[0xC9]), ('Braulo', 'Rime'))
+        self.assertEqual((names[0x92], names[0x93]), ('Raider 0x92', 'Raider 0x93'))
+        self.assertEqual(names[0x83], 'Soldier 83')     # not renamed: the decomp's enum name
+        self.assertEqual((vanilla_game[0x01], vanilla_game[0xC9]), ('Eirika', 'Klimt'))
 
 # ---- the failure audit (#510 step 9 PR-F, FR-019/FR-020, SC-004) ----
 

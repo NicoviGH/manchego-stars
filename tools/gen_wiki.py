@@ -732,31 +732,12 @@ def chapter_shifts(chap):
     return inject.chapter_settings.chapter_difficulty_shifts(chap)
 
 
-BUILD_TREE = os.path.join(ROOT, 'build', 'fireemblem8u')
+BUILD_TREE = inject.decomp.DECOMP
 
 
-@functools.lru_cache(maxsize=None)
-def rom_text(rel):
-    """A decomp source as the ROM is built from it: the build tree's copy, which holds every
-    injection, when it exists; the pristine submodule otherwise."""
-    path = os.path.join(BUILD_TREE, rel)
-    if os.path.isfile(path):
-        with open(path, encoding='utf-8') as f:
-            return f.read()
-    return inject.decomp.vanilla_decomp_text(rel)
-
-
-@functools.lru_cache(maxsize=None)
-def rom_block(rel, token):
-    """One `[token - 1] = {...}` entry of a data table (characters, classes), or ''."""
-    if not token:
-        return ''
-    text = rom_text(rel)
-    try:
-        s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % token, rel)
-    except (Exception, SystemExit):
-        return ''
-    return text[s:e]
+# The ROM-side reads are inject.decomp's, shared with the playtest story (montecarlo._names).
+rom_text = inject.decomp.rom_text
+rom_block = inject.decomp.rom_block
 
 
 def enemy_token(chap, ed):
@@ -799,8 +780,7 @@ def rom_unit_name(chap, ed):
         return ''
     if pid in inject.cast.RAW_PID_PORTRAITS:
         return inject.cast.RAW_PID_PORTRAITS[pid][3]
-    nid = _field(rom_block('src/data_characters.c', pid), 'nameTextId')
-    return inject.text.messages(rom_text('texts/texts.txt')).get(nid, '') if nid else ''
+    return inject.text.character_row_names(rom_text).get(pid, '')
 
 
 def rom_portrait(chap, ed):
