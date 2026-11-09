@@ -67,7 +67,7 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- ours it strikes, sorted), kind =
--- "beam"|"assault"|"advance"|"unstall"|"mend", considered = every plan judged, best first:
+-- "beam"|"assault"|"advance"|"unstall"|"mend"|"rest", considered = every plan judged, best first:
 -- { judged, acts (its key list, M.keysOf), kind, rank, seizes, extended (it met the lookahead's
 -- second phase), played (the one played), rejected (why not: "over_cap", "outranked", "stalled"),
 -- weights (its judged phase's likeliest ways' chances) }, rank = what plans are compared by
@@ -101,6 +101,8 @@
 -- uncertain kills left to the average past BRANCH), look = { decisions, triggered, extended,
 -- skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
 -- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
+-- opts.rest = the act keys (M.key) of the plan in hand not yet played (optional; botrun's on a
+-- replan): judged as one more plan, kind "rest", its acts as this board still offers them.
 -- opts.diag = "deep" (a diagnostic replay's, FR-019): every decision's finalists meet the
 -- lookahead's second phase, no trigger or budget asked. A forced plan is botrun's (its acts
 -- may be ones no candidate offered: M.unkey reads its keys); "full_info" is sight.fullInfo
@@ -1328,6 +1330,33 @@ function M.plan(Bot, board, sight, style, opts)
     for _, f in ipairs(finals) do have[table.concat(keysOf(f.st), " ")] = true end
     local adv = advance(have)
     if adv then finals[#finals + 1] = { st = adv, kind = "advance" } end
+    -- the rest of the plan in hand (opts.rest, botrun's on a replan): its acts as this board
+    -- still offers them, in order, kept where they still fit as the mend keeps a plan, the
+    -- units it leaves holding. The beam keeps only what scores well act by act, so a replan
+    -- could lose a plan already found and judge only worse ones (vanilla Ch6 seed 1001 turn 4:
+    -- a counter hit Eirika, the replan judged 4 plans, every one 30.8% or more to end the
+    -- game; the rest of the plan in hand, replayed on that board, lost no lord).
+    local rest = opts and opts.rest
+    if rest and #rest > 0 then
+        local byKey = {}
+        for _, c in ipairs(cands) do
+            for _, x in ipairs(c.acts) do byKey[key(x)] = { a = x, uid = c.unit.id } end
+        end
+        local st, kept = start, 0
+        for _, k in ipairs(rest) do
+            local o = byKey[k]
+            local n = o and extend(st, o.a, o.uid)
+            if n then st, kept = n, kept + 1 end
+        end
+        if kept > 0 then
+            st = complete(st)
+            local k = table.concat(keysOf(st), " ")
+            if not have[k] then
+                have[k] = true
+                finals[#finals + 1] = { st = st, kind = "rest" }
+            end
+        end
+    end
     if stalled then
         for _, c in ipairs(cands) do
             local pick

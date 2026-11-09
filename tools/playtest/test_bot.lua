@@ -3276,6 +3276,46 @@ do
     check(adv, "1>wait@3,0>nil 2>wait@2,1>nil", "advance: the second unit takes its next tile")
 end
 
+-- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
+-- acts of the plan in hand not yet played (opts.rest). The beam (one plan wide) and the advance
+-- never build U2 holding at (1,1) with U1 marching to (3,0); handed those acts, the planner
+-- judges that plan too, kind "rest". An act this board no longer offers is dropped and its
+-- unit holds; a rest the other plans already hold is not judged twice. (Vanilla Ch6 seed 1001
+-- turn 4: the replan after a counter judged 4 plans, every one 30.8% or more to end the game,
+-- and the rest of the plan in hand, replayed, lost no lord.)
+do
+    local U1 = blue(0x01, 0, 0, 0, { minRange = false })
+    local U2 = blue(0x02, 1, 1, 1, { minRange = false, mov = 2 })
+    local Z = red(0x83, 14, 9, { minRange = false })
+    local sight = seizeSight({
+        reach = { [0x01] = tiles({ 0, 0 }, { 3, 0 }), [0x02] = tiles({ 1, 1 }, { 3, 0 }, { 2, 1 }) },
+    })
+    local function judged(rest)
+        local beam = Planner.BEAM
+        Planner.BEAM = 1
+        local _, plan = Planner.plan(B, boardOf(U1, U2, Z), sight, style("bold"), { rest = rest })
+        Planner.BEAM = beam
+        local out = {}
+        for _, c in ipairs(plan and plan.considered or {}) do
+            out[#out + 1] = c.kind .. ": " .. table.concat(c.acts, " ")
+        end
+        table.sort(out)
+        return table.concat(out, " | ")
+    end
+    local plain = judged(nil)
+    check(plain:find("1>wait@3,0>nil 2>wait@1,1>nil", 1, true)
+          or plain:find("2>wait@1,1>nil 1>wait@3,0>nil", 1, true), nil,
+          "rest: no other plan holds U2 at (1,1) with U1 marching")
+    check(judged({ "2>wait@1,1>nil", "1>wait@3,0>nil" }),
+          plain .. " | rest: 2>wait@1,1>nil 1>wait@3,0>nil",
+          "rest: the plan in hand is judged too, in its order")
+    check(judged({ "1>wait@5,5>nil", "2>wait@1,1>nil" }),
+          plain .. " | rest: 2>wait@1,1>nil 1>wait@0,0>nil",
+          "rest: an act no longer offered is dropped, and its unit holds")
+    check(judged({ "2>wait@3,0>nil", "1>wait@0,0>nil" }), plain,
+          "rest: a plan already judged is not judged twice")
+end
+
 -- test_a_visit_comes_before_the_win (SC-002, plan T047): the lord can Seize now, or Visit a
 -- village in reach first. The Seize would close the village: one forfeit, which the Visit
 -- does not have, so the Visit is played and the Seize waits.

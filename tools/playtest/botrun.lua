@@ -1114,11 +1114,20 @@ function M.run(api)
                             end
                         end
                         local replan = playing and why
+                        local opts = memo()
+                        if replan then
+                            -- the plan in hand, from the act it did not play: judged again on
+                            -- this board beside the new ones (Planner.plan's opts.rest)
+                            opts.rest = {}
+                            for i = nextAct, #playing.acts do
+                                opts.rest[#opts.rest + 1] = api.Planner.key(playing.acts[i])
+                            end
+                        end
                         local a, plan, cost
                         if pinNow() then
-                            a, plan, cost = pinDecision(board, memo())
+                            a, plan, cost = pinDecision(board, opts)
                         else
-                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, memo())
+                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, opts)
                         end
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1

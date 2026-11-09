@@ -230,6 +230,16 @@ win, whole turns behind, allied greens, progress, judged score, then FR-013's ti
   acts that gain ground within the cap, the one that gains the most, falling to the next when a
   tile is still taken. A unit refused every one is tried again once the others have moved. It
   is skipped when no unit gains ground or the beam already has the plan.
+- **The rest of the plan in hand, a search addition (2026-11-09, #510; Nicolas: "yes go
+  ahead").** A replan (botrun, when `M.surprise` finds the board off the plan) judges the acts
+  of the plan in hand not yet played (`opts.rest`, kind `rest`) beside the new plans, rebuilt
+  from this board's offers, an act no longer offered dropped and its unit holding. The witnessed
+  search miss: vanilla Ch6 (suite start `vanilla-ch5`) seed 1001 turn 4, a counter hit Eirika
+  (18 → 8 HP), and the replan judged 4 plans, every one 30.8% or more to end the game; she died
+  and the chapter was lost. A forced replay of the plan in hand on that board (DIAG
+  `6-s1001-a1-force-f1d311e4`) lost no lord. With the rest judged, the replan played it (0% game
+  over) and the chapter was won (instrument `4385f97ef0f3+v2`). One plan more a replan;
+  vanilla-ch5 seed 1002's calls 62,949 → 63,243.
 - **Seize skips (FR-015).** botrun justifies a skip while a ledger goal is `feasible`, or when
   every judged plan with the Seize was over the cap. It is a fault (`unjustified_seize_skip`)
   when a Seize under the cap was judged and nothing was left to get, or when no judged plan had
