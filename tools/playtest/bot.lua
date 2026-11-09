@@ -405,7 +405,7 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, exposures = {}, options = {}, breaches = {}, keyed = {}, talks = {},
+                  worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
                   talkTiles = {}, openers = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
@@ -740,9 +740,13 @@ local function healCredit(ctx, u, e, t)
 end
 
 -- Every attack the gate allows `u` this call, worked out once (decide's pass and a claim's
--- filtered pass read the same list).
-local function attackOptions(ctx, u, gate)
-    local opts = ctx.options[u]
+-- filtered pass read the same list). `priced` (the planner's proposals): an attack whose
+-- counter can kill is offered, its death chance (the forecast's `die`) judged against the
+-- cap like any other (ADR 0396: only the game forbids). Without it, decide's own refusal of
+-- every attack whose counter's worst case reaches the unit's HP (ADR 0368's gates).
+local function attackOptions(ctx, u, gate, priced)
+    local store = priced and ctx.priced or ctx.options
+    local opts = store[u]
     if opts then return opts end
     opts = {}
     local answers = claimsOn(ctx, "answers", u)
@@ -762,7 +766,7 @@ local function attackOptions(ctx, u, gate)
                 -- what the counter leaves before the enemy phase, a heal claim's heal counted
                 local left = f and math.max(u.hp - (u.maxhp or u.hp),
                                             spent - healCredit(ctx, u, e, t))
-                if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
+                if f and (priced or spent < u.hp) and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
                     opts[#opts + 1] = { tile = t, target = e, slot = w.slot, sure = sure,
                                         answered = answered, first = first, f = f,
                                         spent = spent, killChance = killChance(f),
@@ -771,7 +775,7 @@ local function attackOptions(ctx, u, gate)
             end
         end
     end
-    ctx.options[u] = opts
+    store[u] = opts
     return opts
 end
 
@@ -1505,7 +1509,7 @@ local function proposeOne(ctx, u)
         end
     end
     local best, safe = {}, {}
-    for _, c in ipairs(attackOptions(ctx, u, open)) do
+    for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         local e = c.target
         if not best[e] or betterAttack(c, best[e]) then best[e] = c end
         c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
@@ -1524,7 +1528,7 @@ local function proposeOne(ctx, u)
     -- the boss from every tile: the planner's assault seats several strikers around it,
     -- and two tiles per unit gave them all the same one (ours ch03's corner Mogall: three
     -- of six strikers dropped, the rest of its tiles empty)
-    for _, c in ipairs(attackOptions(ctx, u, open)) do
+    for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         if c.target.isBoss then offer(c) end
     end
     add(breach(ctx, u, open, objective), "breach")

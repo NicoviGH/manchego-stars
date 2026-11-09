@@ -2619,6 +2619,43 @@ do
     check(alone and alone.act ~= "attack", true, "assault: a lone strike is not made")
 end
 
+-- test_an_attack_whose_counter_can_kill_is_offered (ADR 0396's known break, the counter
+-- refusal; ours ch03 even, turn 15: Rootis, 10 HP, beside a boss on 2 HP whose counter hits for
+-- 11, and his blow, first, wins the chapter 98 times in 100 -- never offered, so never judged).
+-- A cannot get out of the boss's reach, and holding is a sure death; its blow kills the boss
+-- nine times in ten, and only a miss lets the 30-damage counter kill it. The attack is offered,
+-- its death chance is the counter's, and it is played over the sure death.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 1, 1, { isBoss = true, hp = 10 })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 1, 1 }) },
+        danger = { ["0,0"] = 1, ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 90, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 30,
+                                                   counterHits = 1, takenHit = 100,
+                                                   takenDmg = 30, takenHits = 1 } } } },
+        enemyPhase = function(plan)
+            if plan.gone[0x81] then return {} end
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                out[#out + 1] = { target = b.unit.id, takenHit = 100, takenDmg = 30,
+                                  takenHits = 1, takenCrit = 0 }
+            end
+            return out
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    local blow
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.rank.key:find(">attack@1,0>") then blow = c.rank.max_die end
+    end
+    check(blow and math.abs(blow - (1 - Sight.rollChance(2, 90))) < 1e-9, true,
+          "counter refusal lifted: the blow is judged, at the counter's chance to kill")
+    check(a and a.act, "attack", "counter refusal lifted: the blow is played over a sure death")
+end
+
 -- test_planner_chains_the_counter: A (30 HP) strikes the boss for 20; the boss's counter (66,
 -- 15) and its own strike next phase (sure, 15) kill A whenever the counter lands. Averaging
 -- the counter leaves A at 18, out of the phase's reach to kill: the chain does not.

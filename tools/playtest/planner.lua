@@ -451,7 +451,7 @@ function M.plan(Bot, board, sight, style, opts)
     local gameOver = Bot.gameOver(sight)
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
-                    counter = {}, exchange = {}, healed = {},
+                    counter = {}, counterDie = {}, exchange = {}, healed = {},
                     walls = {}, objective = objective, recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {} }
 
@@ -669,7 +669,8 @@ function M.plan(Bot, board, sight, style, opts)
                     used = copy(st.used), tiles = copy(st.tiles), gone = copy(st.gone),
                     enemyHp = copy(st.enemyHp), hp = copy(st.hp), took = copy(st.took),
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
-                    counter = copy(st.counter), exchange = copy(st.exchange),
+                    counter = copy(st.counter), counterDie = copy(st.counterDie),
+                    exchange = copy(st.exchange),
                     healed = copy(st.healed), walls = copy(st.walls),
                     objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill) }
@@ -692,7 +693,7 @@ function M.plan(Bot, board, sight, style, opts)
                 + fx.heals.hp - (st.hp[fx.heals.id] or (byId[fx.heals.id] or {}).hp or fx.heals.hp)
             n.hp[fx.heals.id] = fx.heals.hp
         end
-        if fx.counter then n.counter[uid] = fx.counter end
+        if fx.counter then n.counter[uid], n.counterDie[uid] = fx.counter, fx.die end
         if fx.exchange then n.exchange[uid] = fx.exchange end
         if fx.took then n.took[fx.took] = true end
         if fx.recruitHit then
@@ -1263,14 +1264,32 @@ function M.plan(Bot, board, sight, style, opts)
                        max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0,
                        key = table.concat(st.keys, " ") }
         st.protected = {}
+        -- a unit's death in the plan: its counter's (score's fx.die, the chance the exchange
+        -- kills it) and the phase's after it. The cap reads both: a counter that can kill is
+        -- offered (Bot.candidates, `priced`), so it is the cap's to judge (ADR 0396). Where a
+        -- way played the counter, its death is that way's; else it is spread over the ways.
+        local own, played = {}, {}
+        for id, d in pairs(st.counterDie) do own[id] = d end
+        for _, w in ipairs(ways) do
+            for id in pairs(w.dead) do played[id] = true end
+            for id in pairs(w.hp) do played[id] = true end
+        end
         local function protect(u, hp)
-            local d, branches = die[u.id] or 0, {}
+            local o = own[u.id] or 0
+            local d, branches = (die[u.id] or 0) + o, {}
             for i = 1, #ways do
                 local p = wayP[i] or 0
                 if p > 0 then
-                    branches[#branches + 1] = { p = p, die = ((byWay[u.id] or {})[i] or 0) / p }
+                    local mine = (byWay[u.id] or {})[i] or 0
+                    if played[u.id] then
+                        if ways[i].dead[u.id] then mine = mine + p end
+                    else
+                        mine = mine + o * p
+                    end
+                    branches[#branches + 1] = { p = p, die = mine / p }
                 end
             end
+            if gameOver[u.charId] and o > 0 then overAll = 1 - (1 - overAll) * (1 - o) end
             st.protected[#st.protected + 1] = { id = u.id, charId = u.charId, die = d,
                                                 branches = branches, cap = cap }
             rank.hp_left = rank.hp_left + (hp - (taken[u.id] or 0))
