@@ -40,8 +40,8 @@ read (26 runs):
 - **Where they differ:**
   - vanilla Ch5 seed 1002: B clean; A three deaths.
   - scout-ch10, both seeds: B no deaths; A one death on turn 3 in each.
-  - ours ch01 seed 1001: A one death fewer.
-  - ours ch03: one death in each order, on opposite seeds.
+  - Manchego Stars ch01 seed 1001: A one death fewer.
+  - Manchego Stars ch03: one death in each order, on opposite seeds.
   - vanilla Ch4 seed 1002: B skipped a village.
 - **On the run endpoint (ADR 0385):** 5 runs differ, 4-1 against A.
 - **CPU** is not comparable across days, so the cost was timed again on one quiet machine,

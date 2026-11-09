@@ -254,7 +254,7 @@ def assert_reachable_scenes_load_their_actors(roots_by_chapter=None, bodies=None
 
     Runs in the build after the injectors, like the census beside it, because the question is
     what our build points at -- at HEAD every one of these fields still points at the donor's
-    scenes, and the guard would report the donor's bugs as ours.
+    scenes, and the guard would report the donor's bugs as Manchego Stars'.
 
     An unreadable script is raised, not skipped. The product of this guard is a NEGATIVE, and
     a symbol whose body could not be read ends its branch silently: everything behind it then
@@ -283,9 +283,9 @@ def assert_reachable_scenes_load_their_actors(roots_by_chapter=None, bodies=None
             'AND deployed them, so the unit lookup returns NULL the first time someone reaches '
             'the beat having lost them.\n'
             '  If the scene is vanilla\'s, the fix is usually to stop POINTING at it; if it is '
-            'ours, LOAD the actor or stage the beat with CUMO_AT (a tile). Where a CALLER is '
-            'named below it already LOADs that character, so the chain may well be safe -- '
-            'check that EVERY path to the scene goes through it, then say so here.'
+            'Manchego Stars\', LOAD the actor or stage the beat with CUMO_AT (a tile). Where a '
+            'CALLER is named below it already LOADs that character, so the chain may well be '
+            'safe -- check that EVERY path to the scene goes through it, then say so here.'
             % '\n  - '.join(
                 '%s reaches %s (%s): %s -- the chapter %s%s'
                 % (f.chapter, f.script, f.file, f.unit_id, f.outcome,
@@ -312,7 +312,7 @@ def _udef_sources():
 
 
 def _unit_def_pids(symbol):
-    """The character pids a UnitDefinition array carries, ours or vanilla's."""
+    """The character pids a UnitDefinition array carries, Manchego Stars' or vanilla's."""
     import difficulty
     for text in _udef_sources():
         if (symbol + '[]') not in text:

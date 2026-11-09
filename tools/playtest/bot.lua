@@ -295,7 +295,7 @@ function M.pickMove(reachable, opts)
 end
 
 M.tileKey = tileKey
-M.distance = manhattan   -- the planner's too (which of ours could save a green unit)
+M.distance = manhattan   -- the planner's too (which player unit could save a green unit)
 
 -- The stall watchdog's distance (#510 step 9): the nearest field distance to the target among
 -- the units that could still be the one to finish -- on the field, and not excluded.
@@ -530,7 +530,7 @@ end
 -- tile is always left, so a unit boxed in on the throne still has somewhere to wait.
 -- A tile an ally who has yet to act stands on is left in: the plan may move that ally first
 -- (vacated, below; the planner holds the act until it has), unless ctx.freeOnly is set
--- (candidates' second march and retreat). Ours ch03: the corner's safe tiles held our
+-- (candidates' second march and retreat). Manchego Stars ch03: the corner's safe tiles held our
 -- lightest hitters, and Braulo, the heaviest, never reached the boss.
 local function vacated(ctx, u, x, y)
     local there = ctx.standing[tileKey(x, y)]
@@ -990,10 +990,11 @@ local function talkersOf(ctx, t, by)
     return out
 end
 
--- The units one of ours may Talk over (mayTalkOver), by id: a recruit lost to any blow spoils
+-- The units a player unit may Talk over (mayTalkOver), by id: a recruit lost to any blow spoils
 -- the clear (botrun's recruits_missing), as a green unit's death does. Every blue counts, one
 -- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
--- -> out[id] = true, and talkers[id] = the ids of ours that may Talk it over (goals.lua's takers).
+-- -> out[id] = true, and talkers[id] = the player units' ids that may Talk it over (goals.lua's
+-- takers).
 local function recruitsOf(ctx)
     local out, talkers = {}, {}
     for _, t in ipairs(ctx.onField) do
@@ -1570,7 +1571,7 @@ local function proposeOne(ctx, u)
         end
     end
     -- the boss from every tile: the planner's assault seats several strikers around it,
-    -- and two tiles per unit gave them all the same one (ours ch03's corner Mogall: three
+    -- and two tiles per unit gave them all the same one (Manchego Stars ch03's corner Mogall: three
     -- of six strikers dropped, the rest of its tiles empty)
     for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         if c.target.isBoss then offer(c) end
@@ -1659,8 +1660,8 @@ local function proposeOne(ctx, u)
     ctx.freeOnly = nil
     if retreat then add(action(u, retreat, "wait"), "retreat") end
     -- the next safest holds too: another unit the plan moves first may take the safest,
-    -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
-    -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
+    -- and with one hold the unit had only exposed tiles left (Manchego Stars ch03: Braulo, at 16
+    -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)
     for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
     return { unit = u, acts = exposed(ctx, u, acts) }
 end
@@ -1681,14 +1682,14 @@ end
 
 -- Whether `u` can get nearer goal tile `g` this turn by the game's turns (ctx.turnsTo) or take
 -- it: it stands on it, a tile it may end on is nearer, or, with a recruit standing on `g` (a
--- tile no one of ours ends on), it may end beside it, where a Talk is made. A unit with no tile
+-- tile no player unit ends on), it may end beside it, where a Talk is made. A unit with no tile
 -- but its own is boxed in, and counts as able: no other goal would get it anywhere either. The
 -- turns are the terrain's alone, so what stops a unit with moves is a unit in its way.
 local function stepsToward(ctx, u, g)
     local now = ctx.turnsTo(u, g)
     if now and now <= Goals.DUST then return true end
     local there = ctx.standing[tileKey(g.x, g.y)]
-    -- a recruit (recruitsOf: one a unit of ours may Talk over), not any unit: an enemy holding
+    -- a recruit (recruitsOf: one a player unit may Talk over), not any unit: an enemy holding
     -- a village is no goal reached by standing beside it
     local recruit = there and ctx.recruits[there.id]
     local boxed = true
@@ -1718,7 +1719,7 @@ end
 -- claim gives way); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
 -- each goal a unit was found with no step toward, and the turn it was first found so).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
--- ids, are the units a blow of ours must not kill; ctx.recruitTalkers who may Talk each over).
+-- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn

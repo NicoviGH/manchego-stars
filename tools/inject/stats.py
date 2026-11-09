@@ -72,7 +72,7 @@ GROWTH_DONOR = dict(STAT_DONOR, meesmickle='CHARACTER_EWAN')
 # ranks from the rank donor. So an FE-strict unit (fe_stats == class base, the
 # default) lands exactly on its donor's statline -- vanilla character data under a
 # new identity, not "naked class" frailty (decisions.md: even character-level
-# mechanical data is vanilla; ours is the donor CHOICE + cosmetics + levels).
+# mechanical data is vanilla; Manchego Stars' is the donor CHOICE + cosmetics + levels).
 # Any deliberate YAML divergence still stacks on top so displayed stats ==
 # fe_stats. Gender IS driven from YAML (_set_gender rewrites .attributes CA_FEMALE);
 # only portraitId and pSupportData are left as the vanilla slot's -- supports are a

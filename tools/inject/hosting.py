@@ -108,7 +108,7 @@ GOAL_TEMPLATE = ('windowDataType', 'destPosX', 'destPosY', 'protectCharacterInde
 
 def map_writes(indices):
     """The `map` block a hosted chapter writes: its own layout, tileset and palette, and no
-    object/palette animation or change layer (none of ours declares one)."""
+    object/palette animation or change layer (no Manchego Stars map declares one)."""
     obj_idx, pal_idx, cfg_idx, layout_idx = indices
     return [('map.obj1Id', obj_idx), ('map.obj2Id', 0), ('map.paletteId', pal_idx),
             ('map.tileConfigId', cfg_idx), ('map.mainLayerId', layout_idx),

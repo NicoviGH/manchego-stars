@@ -436,5 +436,62 @@ class VanillaReadsComeFromHEAD(unittest.TestCase):
         self.assertEqual([], fail)
 
 
+class ProseNamesManchegoStars(unittest.TestCase):
+    """#588: prose names the rom hack Manchego Stars; `ours` survives only as a code id."""
+
+    def _flagged(self, path, text):
+        return [n for n, line in check._prose_lines(path, text)
+                if not check.COMMAND_LINE.match(line)
+                and check.OURS.search(check.QUOTED_SPAN.sub('', line))]
+
+    def test_a_python_comment_and_docstring_are_prose_but_ids_are_code(self):
+        text = ('"""ours ch03 vs the twin."""\n'
+                "game = 'ours'          # the id\n"
+                'ours = load()          # a variable\n'
+                "start = 'ours-ch03'\n"
+                "print('played: %(ours)d' % v)\n"
+                '# the bot judges ours\n'
+                "msg = 'only ours lost someone'\n")
+        self.assertEqual(self._flagged('x.py', text), [1, 6, 7])
+
+    def test_a_usage_line_in_a_docstring_is_a_command(self):
+        self.assertEqual(self._flagged('x.py', '"""Usage:\n\n    python3 x.py ours --n 1\n"""\n'),
+                         [])
+
+    def test_yaml_dialogue_is_not_prose_but_its_comments_and_notes_are(self):
+        text = ('note: ours is the fight at the crossing\n'
+                'scenes:\n'
+                '  - script:            # ours rides the taunt\n'
+                '      - nerra: >-\n'
+                '          the fishermen were ours to take\n'
+                '  - why: the moose is ours\n')
+        self.assertEqual(self._flagged('x.yaml', text), [1, 3, 6])
+
+    def test_lua_code_is_not_prose_but_its_comment_is(self):
+        text = ('local ours = {}   -- one of ours\n'
+                'print("--ours")\n')
+        self.assertEqual(self._flagged('x.lua', text), [1])
+
+    def test_a_quoted_span_and_another_word_are_not_flagged(self):
+        self.assertEqual(self._flagged('x.md', 'Run `--game ours`. "Victory is ours." Yours.\n'
+                                                'ours.c and ours_only\n'), [])
+
+    def test_the_generated_scene_book_is_exempt_but_a_doc_is_not(self):
+        scenes = os.path.join(check.REPO, 'docs', 'scenes', 'x.md')
+        doc = os.path.join(check.REPO, 'docs', 'x.md')
+        orig_docs, orig_src = check._docs, check._handwritten_sources
+        check._docs = lambda: [scenes, doc]
+        check._handwritten_sources = lambda: []
+        check.open = lambda path, *a, **k: io.StringIO('ours to take\n')
+        try:
+            fail = []
+            check.check_prose_names_manchego_stars(fail)
+        finally:
+            check._docs, check._handwritten_sources = orig_docs, orig_src
+            del check.open
+        self.assertEqual(len(fail), 1, fail)
+        self.assertIn('docs/x.md:1', fail[0])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -53,8 +53,8 @@ _PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_
              'SHIP_WRECK'}
 # TERRAIN_ROAD is not a category we invented: it has its own slot in the 66-entry
 # BanimTerrainGround_* array, and vanilla's own tables use it -- the slot-6 table ch05 was
-# inheriting puts `michi1`, the dirt road, exactly here (Nicolas, 2026-08-16). Ours had been
-# collapsing it into "everything else" and giving a paved winter town the open-snow ground.
+# inheriting puts `michi1`, the dirt road, exactly here (Nicolas, 2026-08-16). Manchego Stars' had
+# been collapsing it into "everything else" and giving a paved winter town the open-snow ground.
 _PLAT_ROAD = {'ROAD'}
 _PLAT_ROUGH = {'MOUNTAIN', 'PEAK', 'CLIFF', 'VALLEY', 'RUINS_REGULAR', 'RUINS_VILLAGE',
                'RUBBLE', 'PILLAR', 'WALL_REGULAR', 'WALL_DAMAGED', 'FENCE_REGULAR',

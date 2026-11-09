@@ -2640,17 +2640,132 @@ def check_no_dead_concepts(fail):
     record labels it as opinion, never current fact."""
     pat = re.compile('|'.join(DEAD_CONCEPTS), re.I)
     cited = re.compile('|'.join(DEAD_CONCEPT_CITATIONS), re.I)
-    exempt_dirs = tuple(os.path.join(REPO, *parts) + os.sep
-                        for parts in (('docs', 'decisions'), ('docs', 'research', 'transcripts')))
-    for d in _docs() + _handwritten_sources():
-        if os.path.basename(d) == 'decisions.md' or d.startswith(exempt_dirs):
-            continue
+    for d in _testimony_files():
         with open(d, encoding='utf-8') as fh:
             for i, line in enumerate(fh, 1):
                 m = pat.search(line)
                 if m and not cited.search(line):
                     fail.append('dead concept %r in %s:%d'
                                 % (m.group(0), os.path.relpath(d, REPO), i))
+
+
+# What the prose gates read: every doc and hand-written source, less the RECORD (the ADRs and
+# their index, the research transcripts), which has to name what it retired or quote what was
+# said. `generated` dirs are exempt too for a gate whose sources are scanned instead.
+TESTIMONY_EXEMPT = (('docs', 'decisions'), ('docs', 'research', 'transcripts'))
+
+
+def _testimony_files(extra_exempt=()):
+    exempt_dirs = tuple(os.path.join(REPO, *parts) + os.sep
+                        for parts in TESTIMONY_EXEMPT + tuple(extra_exempt))
+    return [d for d in _docs() + _handwritten_sources()
+            if os.path.basename(d) != 'decisions.md' and not d.startswith(exempt_dirs)]
+
+
+# "ours" is the code's id for the rom hack (`game = 'ours'`); in prose it read as a riddle beside
+# "vanilla" (Nicolas, 2026-10-29), so prose names the game Manchego Stars (#588). The word is
+# held, not the meaning: a plain possessive is rephrased too, because no pattern can tell
+# "one of ours" (the player's) from "ours" (the game), and both read the same to a stranger.
+# Not part of a longer name: `ours_only`, `ours-ch03`, 'ours', ours.c.
+OURS = re.compile(r"(?<![\w'`\-])ours(?![\w'`\-]|\.\w)", re.I)
+# A quoted span is not the author's prose: a code id in backticks, or a line of dialogue or the
+# book in double quotes ("She said the fishermen were ours to take.").
+QUOTED_SPAN = re.compile('`[^`\n]*`|"[^"\n]*"|\u201c[^\u201d\n]*\u201d'
+                         # a format key (`%(ours)d`, `{ours}`) is a code id too
+                         r'|%\(\w+\)|\{\w+\}')
+# A usage line (`python3 tools/playtest/campaign_env.py ours ...`) is a command, not prose.
+COMMAND_LINE = re.compile(r'^\s*(?:\$ )?(?:python3|make)\s')
+# A Python string that is an identifier, not a sentence: 'ours', 'ours-ch03', a path.
+ID_LITERAL = re.compile(r'^[\w\-./:@+]*$')
+COMMENT_MARKS = {'.lua': ('--',), '.c': ('/*', '//', '*'), '.h': ('/*', '//', '*'),
+                 '.patch': ('/*', '//')}
+
+
+def _comment_part(line, marks):
+    """The text from the first comment mark that is not inside a quoted string, else ''."""
+    quote = None
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if quote:
+            if c == '\\':
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in '"\'':
+            quote = c
+        elif any(line.startswith(m, i) for m in marks):
+            return line[i:]
+        i += 1
+    return ''
+
+
+def _python_prose(text):
+    """(line, text) for every comment and every non-identifier string (docstrings, messages)."""
+    import io
+    import tokenize
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                yield tok.start[0], tok.string
+            elif tok.type == tokenize.STRING:
+                # Its delimiters off, so QUOTED_SPAN cannot read the string itself as a quote.
+                lit = tok.string.lstrip('rbfuRBFU')
+                fence = 3 if lit[:3] in ('"""', "'''") else 1
+                body = lit[fence:-fence]
+                if not ID_LITERAL.match(body):
+                    for k, line in enumerate(body.split('\n')):
+                        yield tok.start[0] + k, line
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return   # check_python_compiles owns a file that does not parse
+
+
+def _yaml_prose(lines):
+    """Every line but the dialogue under a `script:` block, whose comments are still prose."""
+    script = None
+    for i, line in enumerate(lines, 1):
+        indent = len(line) - len(line.lstrip())
+        if script is not None and line.strip() and indent <= script:
+            script = None
+        if script is not None:
+            yield i, _comment_part(line, ('#',))
+            continue
+        m = re.match(r'(\s*)(?:- )?script:', line)
+        if m:
+            script = len(m.group(1))
+        yield i, line
+
+
+def _prose_lines(path, text):
+    """(line number, prose) for the author's own words in one file: a doc whole, a YAML file
+    but its dialogue, a source file's comments (and, for Python, its non-identifier strings)."""
+    ext = os.path.splitext(path)[1]
+    if ext == '.py':
+        return _python_prose(text)
+    lines = text.split('\n')
+    if ext == '.md':
+        return enumerate(lines, 1)
+    if ext == '.yaml':
+        return _yaml_prose(lines)
+    marks = COMMENT_MARKS.get(ext, ('#',))
+    return ((i, _comment_part(line, marks)) for i, line in enumerate(lines, 1))
+
+
+def check_prose_names_manchego_stars(fail):
+    """Prose names the rom hack Manchego Stars, never "ours" (#588).
+
+    `ours` stays the code's game id: a quoted id (`ours`, 'ours') and a variable are code, not
+    prose. The scene book (docs/scenes/) is exempt as GENERATED from the chapter YAML's
+    dialogue, which this gate already skips at its source."""
+    for d in _testimony_files(extra_exempt=(('docs', 'scenes'),)):
+        with open(d, encoding='utf-8') as fh:
+            text = fh.read()
+        for i, line in _prose_lines(d, text):
+            if not COMMAND_LINE.match(line) and OURS.search(QUOTED_SPAN.sub('', line)):
+                fail.append('%s:%d names the game "ours" in prose -- say Manchego Stars (vs '
+                            'vanilla), or rephrase a possessive; quote a code id in backticks'
+                            % (os.path.relpath(d, REPO), i))
 
 
 def check_generated_indexes_fresh(fail):
@@ -3638,6 +3753,7 @@ CHECKS = (
     check_rescue_targets, check_rescue_fuse_forecast,
     check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
+    check_prose_names_manchego_stars,
     check_campaign_declares_no_chapter_list, check_skip_claims_name_a_live_test,
     check_one_tileset_default,
     check_generated_indexes_fresh,

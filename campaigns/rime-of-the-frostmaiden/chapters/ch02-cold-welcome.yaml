@@ -83,7 +83,7 @@ map:
 # ── Objective ──────────────────────────────────────────────────────────────────
 # Mirrors FE8 Ch2 "The Protected": DefeatAll with a protect layer. FE8's "protect" is a
 # SOFT fail — you lose the green ally/village if too slow, not a game over (Ross/Garcia
-# are green allies you shield, not a hard escort). Ours: three GREEN chwinga (harmless
+# are green allies you shield, not a hard escort). Manchego Stars': three GREEN chwinga (harmless
 # snow-spirits, lightly armed) are the protected allies. The signature beat is PER-UNIT
 # soft-fail: a chwinga that dies forfeits ITS OWN charm-gift only (a flag is set on its
 # death and checked at chapter end), never a game over. Hard lose = party wiped (lord rule).
@@ -181,7 +181,7 @@ deployment:
   # (Journeyman, Mov 4, 5 HP, on a FORT, carrying a Vulnerary) and Garcia (Fighter, Mov 5,
   # in FOREST) deep EAST at (10,5)/(10,4) and puts its villages on the PLAYER's side, so
   # six pillaging bandits walk away from the greens while the player races to reach them.
-  # Ours had three Mov-7 FLIERS parked one tile in front of the deploy ring -- the most
+  # Manchego Stars' had three Mov-7 FLIERS parked one tile in front of the deploy ring -- the most
   # mobile chassis in the chapter, given to the units that are supposed to need rescuing,
   # with nothing pulling the raid off them.
   #
@@ -218,7 +218,7 @@ deployment:
       inventory: [heal-staff, vulnerary]   # Ross's own kit: a staff cannot heal its carrier
       donor: {at: [10, 4], allegiance: GREEN}   # Garcia's posture, not Ross's: Ross runs the
                                 # scripted-approach AI_B_0A that walks him to this fort, and
-                                # ours starts on it. Holding is what we want from both.
+                                # this chwinga starts on it. Holding is what we want from both.
       gift: vulnerary             # a token, as Mote's
   # Glimmerfrost is NOT a map unit: she is the inhabitant of the village at (1,12) and
   # hands over the Pure Water when reached -- vanilla's own item on vanilla's own tile
@@ -455,7 +455,7 @@ playtest:
 #
 # (1,12) is vanilla's own southern village tile, and it takes vanilla's own item and beat.
 # (12,3) is vanilla's fourth village-TERRAIN cell, which vanilla itself leaves unbacked;
-# ours gives it a line so the hut stops promising a reward that is not there.
+# Manchego Stars' gives it a line so the hut stops promising a reward that is not there.
 villages:
   - id: targos-hut-south
     tile: [1, 12]              # vanilla's southern village, same tile: `Village(EVFLAG_TMP(11),
@@ -490,9 +490,9 @@ villages:
     # gives nothing is a let-down, and ch02's wealth is fixed at three items with all three
     # spoken for -- so this pays in the one fact the chapter never states anywhere else:
     # THE CHWINGA REPAY YOU. Vanilla tells the player Ross and Garcia can be recruited, which
-    # is why defending them is worth doing; nothing told ours that the spirits give charms.
-    # Not duplicated: ch01's houses teach fort terrain and the boss counter, RBG's turn-1 line
-    # teaches fliers-vs-bows, and Halvar's turn-1 bark announces the raid's target.
+    # is why defending them is worth doing; nothing told the Manchego Stars player that the spirits
+    # give charms. Not duplicated: ch01's houses teach fort terrain and the boss counter, RBG's
+    # turn-1 line teaches fliers-vs-bows, and Halvar's turn-1 bark announces the raid's target.
     visit_text:
       - resident: "Those little masked ones out on the road --"
       - resident: "Show them a kindness and they don't forget it."

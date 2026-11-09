@@ -11,7 +11,7 @@ Nothing on a page is typed by hand. Each section names its source:
   * the twin's play   -- the Fire Emblem Wiki's own Strategy section, read from its vendored
                          copy in tools/wiki/vendor/twins/ and labelled as theirs
 The stylesheets in tools/wiki/assets/ are the wiki's own (Timeless skin + site styles), so the
-page reads like the reference it borrows from; the branding is ours.
+page reads like the reference it borrows from; the branding is Manchego Stars'.
 """
 import base64
 import collections
@@ -250,7 +250,7 @@ def _seen_by(stem):
     return _SEEN.get(stem, set())
 
 
-# ── ours, from the YAML ────────────────────────────────────────────────────────
+# ── Manchego Stars, from the YAML ──────────────────────────────────────────────
 
 def load_yaml(path):
     with open(path, encoding='utf-8') as f:
@@ -1524,7 +1524,8 @@ def lore_profiles():
 
 def lore_book(stem):
     """A lore file's `## Book` section: what *Rime of the Frostmaiden* says of the character,
-    page cited and quoted, and where ours departs (lore/README.md). One Trivia line, or None."""
+    page cited and quoted, and where Manchego Stars departs (lore/README.md). One Trivia line, or
+    None."""
     if not stem:
         return None
     path = os.path.join(LORE, stem + '.md')
@@ -1884,7 +1885,7 @@ def character_pages(chs, units, files):
 
 
 def design_page(chap, navbox_html=''):
-    """Ours, not the wiki's: the plan the cloned article has no section for (#487)."""
+    """Manchego Stars', not the wiki's: the plan the cloned article has no section for (#487)."""
     slug, title = chap['_slug'], chap.get('title', chap['_slug'])
     plan = chap.get('plan') or {}
     ckey = twin_key(chap.get('parity_reference'))
@@ -1937,15 +1938,16 @@ def our_gold_amounts(chap):
 
 
 def _payload_mark(verdict, why=''):
-    """How the twin table marks one row of the twin's payload against ours."""
+    """How the twin table marks one row of the twin's payload against Manchego Stars'."""
     return {'delivered': '<span style="color:var(--yes-checkmark-color)">delivered</span>',
-            'missing': '<span style="color:var(--no-xmark-color)">not found in ours</span>'
+            'missing': ('<span style="color:var(--no-xmark-color)">not found in Manchego Stars'
+                        '</span>')
             }.get(verdict) or 'recorded deviation: %s' % esc(why)
 
 
 def payload_verdicts(twin_items, ours_counts, deviations):
     """'delivered' / 'deviation' / 'missing' per twin item, COUNTED: a twin item handed out
-    twice needs two of ours, so a set test would read the second copy as delivered."""
+    twice needs two in Manchego Stars, so a set test would read the second copy as delivered."""
     left = collections.Counter(ours_counts)
     out = []
     for e in twin_items:
@@ -1982,7 +1984,8 @@ def twin_payload_html(chap, ckey):
                                                           deviations)):
         rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e),
                      _payload_mark(verdict, deviations.get(e, ''))))
-    # The twin's gold, counted against ours the same way: an amount either of our vehicles pays.
+    # The twin's gold, counted against Manchego Stars' the same way: an amount either of our
+    # vehicles pays.
     gold = [(g, 'Chest') for g in v.get('gold_chests') or []] \
         + [(g, 'Given by an event') for g in v.get('gold_gifts') or []] \
         + [(g, 'Given in the scene after the chapter') for g in v.get('interlude_gold') or []]
@@ -2011,8 +2014,9 @@ def twin_payload_html(chap, ckey):
         out.append('<p><b>Where the twin\'s payload lands:</b></p>' +
                    para(chap['plan']['payload_notes']))
     out.append('<p><small>Read from <code>src/events/%s-event*.h</code> at HEAD. "Not found in '
-               'ours" compares vanilla enums with the items this chapter\'s YAML resolves, '
-               'counted: a twin item given twice needs two of ours.</small></p>' % esc(v['stem']))
+               'Manchego Stars" compares vanilla enums with the items this chapter\'s YAML '
+               'resolves, counted: a twin item given twice needs two in Manchego Stars.'
+               '</small></p>' % esc(v['stem']))
     return ''.join(out)
 
 
@@ -2041,7 +2045,7 @@ LORD_SELECT_TITLE = 'Lord select'
 
 
 def home_page(chs, units, navbox_html=''):
-    """The Fire Emblem Wiki's game page (its The Sacred Stones article), filled with ours:
+    """The Fire Emblem Wiki's game page (its The Sacred Stones article), filled with Manchego Stars:
     infobox, lead, Plot by act, Gameplay, Chapters, Characters. Acts and the gameplay notes
     come from campaign.yaml; everything else from the chapters and units."""
     camp = campaign_yaml()
@@ -2146,8 +2150,8 @@ def inline_urls(text):
     return re.sub(r'url\((?!["\']?data:)([^)]*)\)', inline, text)
 
 
-# Ours, not the wiki's: one file holds every page, so the router shows one at a time; and the
-# site's banner slot (#p-logo, over the 15.25rem the content leaves it) shows our title screen
+# Manchego Stars', not the wiki's: one file holds every page, so the router shows one at a time; and
+# the site's banner slot (#p-logo, over the 15.25rem the content leaves it) shows our title screen
 # where the Fire Emblem Wiki shows its logo, embedded since the viewer loads nothing remote.
 TITLE_SCREEN = os.path.join(TOOLS, 'wiki', 'assets', 'title-screen.png')
 PAGE_CSS = """
@@ -2159,14 +2163,15 @@ section.page[hidden]{display:none!important}
 .mw-wiki-logo.fallback{width:288px!important;height:192px;background-size:contain;
   image-rendering:pixelated;border-radius:6px}
 #p-logo{transform:translate(-50%,26%)!important}
-/* Ours: Page tools on a phone. The skin hides that sidebar's heading there (Timeless reaches
-   page actions through a header menu we do not ship), so it opens from the header's right
-   with Timeless's own page icon, where its own user menu sits (right:1.2em leaves room for the
-   arrow), as the Navigation menu does from its left. */
+/* Manchego Stars': Page tools on a phone. The skin hides that sidebar's heading there
+   (Timeless reaches page actions through a header menu we do not ship), so it opens from the
+   header's right with Timeless's own page icon, where its own user menu sits (right:1.2em
+   leaves room for the arrow), as the Navigation menu does from its left. */
 @media screen and (max-width:850px){
 #page-tools h2{display:block;right:1.2em;background-image:url(/w/skins/Timeless/resources/images/page-misc-grey.svg);filter:var(--invert)}
 #page-tools .sidebar-inner{right:0;left:auto}}
-/* Ours: on a phone a table wider than the column scrolls in its own box (#493), where the skin
+/* Manchego Stars': on a phone a table wider than the column scrolls in its own box (#493), where
+the skin
    only sets width:100% and the column clips the rest. The wrapper is inert at desktop width. */
 .ms-scroll{display:contents}
 @media screen and (max-width:850px){.ms-scroll{display:block;overflow-x:auto}}

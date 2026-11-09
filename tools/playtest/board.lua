@@ -410,7 +410,7 @@ Board.AI_ACTION_COMBAT, Board.AI_ACTION_ESCAPE, Board.AI_ACTION_STEAL, Board.AI_
 --             hazard, a trap, an event's kill): US_DEAD on a blue unit; on any other only its
 --             character pointer cleared, the rest of the unit kept
 --   phantom   a blue summon's UnitKill (UNIT_IS_PHANTOM: only the pointer cleared), never a
---             unit of ours
+--             player unit
 --   escaped   AiEscapeAction (cp_perform.c) clears the same pointer without UnitKill: the unit
 --             is gActiveUnit with gAiDecision an escape
 --   unloaded  ClearUnit zeroed it, its class pointer too: a script removed it (a chapter
@@ -440,9 +440,9 @@ local function fighterOf(mem, b) return mem.u8(b + 0x0B), mem.u8(mem.u32(b) + 4)
 
 -- Who killed unit index `uid`: the other fighter of the fight it fell in, read off
 -- gBattleActor/gBattleTarget (+0x0B the unit index, +0x00 the character) -> its charId,
--- whether it is one of ours (a blue index) and its unit index, or nil. Only while a fight resolves (`fighting`):
--- the battle structs keep the last fight's units, so a phase start's poison tick or an event's
--- kill would otherwise be credited to it.
+-- whether it is a player unit (a blue index) and its unit index, or nil. Only while a fight
+-- resolves (`fighting`): the battle structs keep the last fight's units, so a phase start's poison
+-- tick or an event's kill would otherwise be credited to it.
 function Board.killer(mem, SYM, uid, fighting)
     if not fighting then return nil end
     local by

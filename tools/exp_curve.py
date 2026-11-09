@@ -2,8 +2,8 @@
 """The campaign's EXP economy, and the party-level band derived from it (#367 proposal 3).
 
 `difficulty.py`'s parity ratio answers *is this chapter at parity with its vanilla twin*, and
-since ADR 0316 it answers it against the party this module says arrives: ours against ours,
-the twin's against vanilla's.
+since ADR 0316 it answers it against the party this module says arrives: Manchego Stars' against its
+own, the twin's against vanilla's.
 
 Every ABSOLUTE question -- *can this unit survive that trip, is this fuse long enough for
 a real party, is this objective a coin flip* -- needs the party's level, and had none. During
@@ -12,8 +12,8 @@ turned on it. `entering` hands that level to `difficulty.load_field(leveled=True
 
 This is that floor, and it is DERIVED rather than asserted: FE8's own exp formulas
 (`fireemblem8u/src/bmbattle.c`, transcribed below and cited per function) run over the real
-per-chapter rosters -- ours and each chapter's vanilla twin -- and the party's level curve
-falls out of the enemy force it eats.
+per-chapter rosters -- Manchego Stars' and each chapter's vanilla twin -- and the party's level
+curve falls out of the enemy force it eats.
 
     python3 tools/exp_curve.py                 # the per-chapter table
     python3 tools/exp_curve.py --write         # regenerate the block in the pacing doc
@@ -280,8 +280,8 @@ def join_level(campaign, uid, unit=None, recruited=_UNSET):
     LEVEL 5, Joshua's level, cited to his bytes, because she is his archetype and vanilla's
     Joshua joins at 5 -- and `UnitInitFromDefinition` takes `unit->level` straight from that
     UnitDefinition. The unit YAML's `fe_stats.level` writes CharacterData.baseLevel, which the
-    engine reads on two paths a placed player recruit of ours takes neither of:
-    `UnitAutolevelRealistic` (needs `.autolevel`, which no player recruit of ours sets) and
+    engine reads on two paths a placed player Manchego Stars recruit takes neither of:
+    `UnitAutolevelRealistic` (needs `.autolevel`, which no Manchego Stars player recruit sets) and
     `UnitAutolevelPenalty` (the difficulty-mode shift, which `eventscr.c` applies only from pid
     0x3C up). A recruit with no roster placement -- basil, trex, lupin, baxby, joined by the
     recruit pass or off-map -- has only the YAML number, so that is what it starts at.
@@ -422,7 +422,7 @@ def _banks_exp(chap):
 
     Read off the deploy cap, because that is what Pick Units is: prep from ch01 on is
     standing protocol and the CAP is the parity (decisions.md -> the deploy cap / prep
-    screen). A chapter with no cap is a FIXED-ROSTER chapter, and ours is ch00, whose two
+    screen). A chapter with no cap is a FIXED-ROSTER chapter, and Manchego Stars' is ch00, whose two
     units are guests -- Hlin and Scramsax never join, so nobody in the party fights it.
     Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the founding
     party is handed what the twin pays instead (`founding_grant`, ADR 0320)."""
@@ -499,8 +499,8 @@ def _total_exp(careers):
 def simulate(campaign='rime-of-the-frostmaiden'):
     """One row per HOSTED chapter, in chapter order, carrying the party level forward.
 
-    Two parties are run: ours, fed our rosters, and a twin party fed each chapter's vanilla
-    reference force. Both are OUR cast -- same classes, same `classRelativePower` -- so the
+    Two parties are run: Manchego Stars', fed our rosters, and a twin party fed each chapter's
+    vanilla reference force. Both are OUR cast -- same classes, same `classRelativePower` -- so the
     only difference between the two curves is the enemy force, which is the comparison
     #367 asked for. The per-chapter `yield_ratio` is stricter still: both pots are measured
     against OUR party's state, so a ratio is never contaminated by the two curves having
@@ -539,10 +539,10 @@ def simulate(campaign='rime-of-the-frostmaiden'):
                 career.fight(bodies, cap, number)
         grant = {}
         if twin is not None and ref not in spent:
-            # The twin party fights its own chapter whether or not ours banks this one
+            # The twin party fights its own chapter whether or not Manchego Stars' banks this one
             # (see _banks_exp), and its members join on OUR recruitment schedule, so the
             # only difference between the two curves stays the enemy force. It fights each
-            # twin ONCE, as FE8's party does: a reused twin pays ours and not it.
+            # twin ONCE, as FE8's party does: a reused twin pays Manchego Stars' and not it.
             spent.add(ref)
             for career in twin_party:
                 gained = career.fight(twin, cap, number)
@@ -621,7 +621,8 @@ def _simulated(campaign):
 
 def founding_grant(campaign='rime-of-the-frostmaiden'):
     """{uid: exp} the founding party is handed before it first deploys: what the twin pays
-    each founding career for the fixed-roster chapter ours banks nothing from (ch00, ADR 0320).
+    each founding career for the fixed-roster chapter Manchego Stars' banks nothing from (ch00, ADR
+    0320).
 
     The engine applies it once, at ch01's first prep (`FoundingExp_ApplyOnce`), so it must
     come from exactly one chapter that precedes every chapter the party fights, and stay
@@ -649,8 +650,8 @@ def entering(campaign, chapter_number, parity_ref=None):
 
     {'party': {uid: (join level, level on entering)} for every unit that has joined by this
     chapter, 'vanilla': {CHARACTER_*: level on entering `parity_ref`} for FE8's own party
-    (`vanilla_arrivals`), or None off the chain}. Ours is the previous hosted chapter's closing
-    level, so a chapter is never credited with its own exp. This is what
+    (`vanilla_arrivals`), or None off the chain}. Manchego Stars' is the previous hosted chapter's
+    closing level, so a chapter is never credited with its own exp. This is what
     `difficulty.load_field(leveled=True)` fields (#430 step 1)."""
     before = [r for r in _simulated(campaign) if r['chapter_number'] < chapter_number]
     prior = before[-1] if before else None
@@ -700,7 +701,7 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
            '<!-- Derived from FE8\'s own exp formulas over the real rosters. Do not hand-edit:',
            '     the next regen silently discards it, and tools/test_exp_curve.py fails the',
            '     build while it is stale. -->', '',
-           '| chapter | bar | field | exp ours/twin | benched | typical | fed | lowest |',
+           '| chapter | bar | field | exp MS/twin | benched | typical | fed | lowest |',
            '|---|---|---|---|---|---|---|---|']
     for r in rows:
         ratio = ('%d / %d (x%.2f)' % (round(r['pot']), round(r['twin_pot']), r['yield_ratio'])
@@ -724,8 +725,8 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
                last['lowest_recruit'] if last['lowest_recruit'] is not None else '?'),
             'A recruit starts at the level its own chapter PLACES it at:',
             _join_levels_phrase(campaign) + '.', '',
-            'The same cast fed each chapter\'s VANILLA twin instead of ours reaches **%s** over'
-            % twin,
+            'The same cast fed each chapter\'s VANILLA twin instead of Manchego Stars\' reaches'
+            ' **%s** over' % twin,
             'the same span: the party lands where FE8\'s party lands, which is what makes the',
             'absolute number usable.', '']
     unbanked = [r for r in rows if not r['banks']]

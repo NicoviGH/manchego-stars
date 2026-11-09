@@ -121,6 +121,39 @@ id in engine sources; chapter numbers and plot events are a review call.
   desk ownership (`check_lane_ownership`) is advisory.
 - Never commit the `fireemblem8u` submodule pointer.
 
+## Standing rules (Nicolas)
+
+Each was a correction; the date says when (#588 moved them here from agent memory).
+
+- **Name the game Manchego Stars** (vs vanilla) in prose: chat, issues, commits, docs, comments.
+  `ours` is only the code's game id, in backticks. "ours" vs vanilla read as a riddle
+  (2026-10-29); `check.py check_prose_names_manchego_stars` holds it.
+- **Findings live on the GitHub issue**, HANDOFF only points at them: HANDOFF is rewritten each
+  session (2026-10-19). An issue's status is on the issue too: on hold is the `on-hold` label
+  plus ONE comment saying why and what reopens it (2026-11-03).
+- **No design docs.** A design or plan is ONE comment on its issue, edited in place; the body
+  links to it, nothing copies it, and the PR records the settled call as an ADR (2026-10-22,
+  2026-10-23). This overrides the brainstorming skill's spec file.
+- **Never make tests, the parity read or CI slower** without fixing the cost in the same PR;
+  report before/after timings, base and branch timed back to back with `uptime` and CPU time
+  (2026-10-21).
+- **No loose threads.** Before a handoff, prove every "unproven" or "assumed" claim (decomp
+  citation, probe, test) or turn it into a guard that fails loudly; a docstring caveat is not
+  enough (2026-10-21).
+- **Run the proof a change needs without asking.** The run-cost rule forbids pointless runs, not
+  proof; never ask for a run budget, nor for the obvious application of a standing rule
+  (2026-10-29).
+- **#510's north star is a trustworthy difficulty model.** Recommend and act; test each call by
+  whether it makes the bot's reading more trustworthy; say so before a rabbit hole if you
+  disagree (2026-11-04).
+- **No tidy design rules.** Don't turn a pattern from a few drafts into a principle; test it
+  against vanilla's own units first, and frame design by the role a unit fills (2026-10-22).
+- **The planned chapters after ch07 are drafts.** Cite their `joins_roles`, twins and chapter
+  count as "the current draft says", never as constraints (2026-10-21).
+- **No table record past Revel's End (ch08).** The book and vanilla FE8 are both inspiration and
+  the best story wins: "the book doesn't have it" rules nothing out; say which parts are
+  invented (2026-10-22).
+
 ## Design placement test
 
 Push each line to the desk that owns it; talk over interfaces; judge a boundary by the *named*

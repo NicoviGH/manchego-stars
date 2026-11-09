@@ -101,7 +101,7 @@ def initializer(symbol, source):
 
 
 def classify(field_names, ours, vanilla, rewritten=None):
-    """field -> WRITTEN / INHERITED / ABSENT, ours against the donor's.
+    """field -> WRITTEN / INHERITED / ABSENT, Manchego Stars' against the donor's.
 
     A field is WRITTEN when we changed the POINTER **or** rewrote what it points AT, and
     `rewritten` supplies the second half. That distinction is the whole guard: our injectors
@@ -246,7 +246,7 @@ _GROUP_DEFN = re.compile(r'^struct ChapterEventGroup\s+(\w+)\s*=\s*\{', re.M)
 # set walks the donor's scenes and stops dead at our own -- measured: ch05 reaches 40 scripts,
 # not the 26 an `EventScr_`-only walk reports, and ch06 22 rather than 19. The 14 it could not
 # see include every ch05 talk, visit and arena trigger. Worse than the undercount: a vanilla
-# scene reachable ONLY through one of ours would be invisible here AND to the writer-side
+# scene reachable ONLY through a Manchego Stars scene would be invisible here AND to the writer-side
 # guard, which is exactly the gap #398 exists to close. Same mistake, same cause, as #337's
 # first cut filtering on `EventScr_` at the write hook.
 _SCRIPT_TOKEN = re.compile(r'\b(EventScr\w*|EventListScr\w*|MS_\w*)\b')

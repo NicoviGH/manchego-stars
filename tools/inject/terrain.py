@@ -46,7 +46,8 @@ TERRAIN_TABLE_OFFSET = 8192     # a tile config is 8192 B TSA + 1024 B terrain (
 def _map_terrain_grid(maps_dir, stem):
     """(width, height, terrain[y][x]) for a painted chapter layout, resolved through its OWN
     tileset's terrain table. Reads the campaign tileset asset, not the decomp's copy of it --
-    ours is the committed source, the decomp's is the untracked artifact injection writes."""
+    Manchego Stars' is the committed source, the decomp's is the untracked artifact injection
+    writes."""
     with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         meta = json.load(f)
     width, tileset = meta['width'], map_tileset(meta)

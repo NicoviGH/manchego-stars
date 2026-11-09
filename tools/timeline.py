@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Instrument v2, layer 2 (#430 step 2b): WHEN a chapter's force reaches the party, ours and
-the vanilla twin's, turn by turn.
+"""Instrument v2, layer 2 (#430 step 2b): WHEN a chapter's force reaches the party, Manchego Stars'
+and the vanilla twin's, turn by turn.
 
 Layer 1 (`difficulty.chapter_matchup`) says how hard each force is against the party that
 meets it. This says when they arrive, and `engagements` says which of them the party meets
 together: the heaviest engagement is layer 1's threat (#510 step 7, ADR 0364). Both sides are
-read on `danger_map.Board`: ours from the chapter YAML, the twin's from the decomp (its
+read on `danger_map.Board`: Manchego Stars' from the chapter YAML, the twin's from the decomp (its
 layout through `gChapterDataAssetTable`, its red UnitDefinitions with their AI bytes and
 REDA end tiles, and the turns its eventscript loads each wave).
 

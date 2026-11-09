@@ -1,4 +1,4 @@
-# Scene pacing — vanilla FE8 measured, and where ours sit
+# Scene pacing — vanilla FE8 measured, and where Manchego Stars' sit
 
 Measured 2026-07-23 with **`python3 tools/vanilla_scene.py <ch> [SceneFragment]`**, which pairs
 a decomp eventscript's `TEXTSHOW` ids with the decoded bodies in `texts/texts.txt` and prints
@@ -37,7 +37,7 @@ is a *punch*, not a scene. An enemy announcing a turn of the battle gets ~3 boxe
 
 ## Where our chapters sit (script lines in the chapter YAML)
 
-| ours | ch00 | ch01 | ch02 | ch03 | ch04 | ch05 |
+| Manchego Stars | ch00 | ch01 | ch02 | ch03 | ch04 | ch05 |
 |---|---|---|---|---|---|---|
 | opening | 10 | 29 | 10 | 14 | 8 | **60 boxes / 7 slots** (twin 98) |
 | ending | 6 | 22 | 11 | 7 | 3 | **25 boxes** (twin 34) |

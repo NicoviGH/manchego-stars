@@ -279,8 +279,8 @@ def assert_village_gifts_match_vanilla(chap, gifts=None):
     That is exactly what ch05 shipped. `(12,19)` is the south-east site and the turn-2 eruption
     pair spawns at `(14,16)/(14,15)`, right beside it: vanilla puts its RICHEST gift there
     (Dracoshield, 8000g) and its cheapest at `(5,1)` (Torch, 500g), which sits behind the whole
-    enemy line. Ours had them swapped, paying the most for the safest errand in a chapter whose
-    structure IS the race for the reward-sites.
+    enemy line. Manchego Stars' had them swapped, paying the most for the safest errand in a chapter
+    whose structure IS the race for the reward-sites.
 
     Deliberate divergence stays cheap -- a village may carry `vanilla_gift_divergence: <why>` and
     is then skipped by name. The default is inheritance because exceptions are rarer than

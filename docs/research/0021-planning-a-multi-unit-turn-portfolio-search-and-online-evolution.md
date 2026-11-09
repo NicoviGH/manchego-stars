@@ -27,7 +27,8 @@ record covers what it did not: how to search one player phase where every unit a
   replace the hill climb with evolution (Portfolio Online Evolution) or stack it (Hierarchical
   Portfolio Search, Prismata). MicroRTS ships an implementation
   (<https://github.com/Farama-Foundation/MicroRTS/wiki/Artificial-Intelligence>).
-- **What this says about ours.** The planner (#510 plan comment, "The planner") is already a
+- **What this says about the Manchego Stars bot.** The planner (#510 plan comment, "The planner") is
+already a
   portfolio search: `Bot.candidates` is each unit's portfolio (attack, breach, Talk, heal,
   march, hold, retreat, Seize), the beam assigns acts across units, and the judge's playout is
   the game's own enemy phase run in the sandbox. The literature's one stronger move, if the
@@ -36,7 +37,7 @@ record covers what it did not: how to search one player phase where every unit a
   act. Not adopted; recorded as the next option.
 - **FE's enemy order is fixed by the game.** A complexity analysis of Fire Emblem-style games
   (<https://arxiv.org/abs/1909.07816>) distinguishes enemies that attack whatever is in range
-  from those that wait, and fixes the enemy move order by creation order. Ours runs the game's
+  from those that wait, and fixes the enemy move order by creation order. The bot runs the game's
   own order (`BuildAiUnitList`, `SortAiUnitList`) and each enemy's own decision, so neither is
   modelled.
 - **Learned FE enemies exist; they are not for us.** "Mirror Mode in Fire Emblem"

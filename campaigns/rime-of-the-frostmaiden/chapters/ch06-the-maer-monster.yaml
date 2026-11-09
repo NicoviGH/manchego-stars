@@ -94,7 +94,7 @@ map:
                                   #         Impassable to every ground class, cost 1 to a
                                   #         FLIER -- so Pinky may work a hull from four cells
                                   #         where everyone else has one. That asymmetry is
-                                  #         vanilla's, not ours.
+                                  #         vanilla's, not Manchego Stars'.
     ice_walls: TERRAIN_PEAK       # 0x12 -- permanent ridges. NOT glacier: TERRAIN_GLACIER
                                   #         costs 1 for EVERY class, so it shapes nothing.
   terrain_note: >
@@ -110,7 +110,7 @@ map:
     sit in a mountain-ringed pocket a Paladin or a flier reaches on turn 4 and foot on turn 6,
     while an unpromoted Cavalier and an Armour cannot reach them AT ALL -- which is why the
     guide says to send Seth. Its lone pursuing Bael is beside them on turn 7, and a villager
-    is 7 HP at Def 0, so contact IS death. Ours reproduces the outcome, not the mechanism:
+    is 7 HP at Def 0, so contact IS death. Manchego Stars reproduces the outcome, not the mechanism:
     a boat is tougher than a child, so the clock is a fuse instead of one bite.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
@@ -187,9 +187,9 @@ difficulty_note: >
   EMPTY-MAP walk, and a unit cannot move through an enemy body. With the line standing, the WEST
   door is turn 6 for foot (vanilla Ch6's own foot number) after moving one corking body off the
   channel, and the EAST door is a FLIER-and-Braulo objective: foot, cavalry and Trex cannot reach
-  it at all. That is deliberate and it is OURS, not parity -- vanilla's rescue is reachable by
-  everything except Cavalier and Armour. ch06 makes the east hull Pinky's beat the way vanilla
-  builds whole chapters around a flier or a thief; the west hull is the one the party saves
+  it at all. That is deliberate and it is Manchego Stars' own, not parity -- vanilla's rescue is
+  reachable by everything except Cavalier and Armour. ch06 makes the east hull Pinky's beat the way
+  vanilla builds whole chapters around a flier or a thief; the west hull is the one the party saves
   together.
 
   THE FUSES ARE VANILLA'S SLACK, MEASURED. Vanilla Ch6's foot reaches the villagers a turn
@@ -255,7 +255,7 @@ deployment:
                                 # `start_area` claims, verified against the decomp rather than
                                 # taken on trust. The donor ships ELEVEN and our cap is TEN, so
                                 # we take the donor's own order and drop its last entry; the
-                                # first is its lord tile, which stays ours.
+                                # first is its lord tile, which stays the lord's.
     - [7, 1]                    # lord tile (vanilla Ephraim's)
     - [6, 0]
     - [5, 1]
@@ -314,8 +314,8 @@ deployment:
 #   aggressive            {0x0, 0x0, 0x1, 0x0}    -- already ch03/ch04/ch05's spelling
 #
 # One divergence, declared: vanilla gives ONE of its four L7 Iron-Lance Soldiers the pursuing
-# all-zero AI and the other three AttackInRange. Ours are a single `count: 4` entry and take
-# the majority behaviour; splitting one out is a placement-time decision, not a roster one.
+# all-zero AI and the other three AttackInRange. Manchego Stars' are a single `count: 4` entry and
+# take the majority behaviour; splitting one out is a placement-time decision, not a roster one.
 generic_name: "Merfolk"   # the unit window's name for every generic enemy here (the merfolk and the beasts they ride and lead; #493)
 generic_help: "Merfolk of Maer Dualdon, emboldened this winter by the Frostmaiden."   # R on their name (#493)
 enemy_units:
@@ -326,14 +326,14 @@ enemy_units:
       why: >
         Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
         own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
-        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
-        a hull inside the line instead of in a mountain-ringed corner -- its (18,14) body is two steps from the east hull, so it steps out and swings.
-        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
-        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
-        precedent). The donor's approach byte is kept, so this unit fights the player exactly
-        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
-        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
-        ACTION".
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Manchego Stars can, because our
+        map put a hull inside the line instead of in a mountain-ringed corner -- its (18,14) body is
+        two steps from the east hull, so it steps out and swings. Only the ACTION half changes, to
+        vanilla's own AI_A_08, whose do-not-attack list is repointed at the two boat pids
+        (repoint_boat_safe_ai_list, on ch05's AI_A_07 precedent). The donor's approach byte is kept,
+        so this unit fights the player exactly as its donor does and simply will not swing at a hull
+        -- the behaviour vanilla gets from terrain and our map cannot. decisions.md -> "AI_B is the
+        APPROACH and AI_A is the ACTION".
     name: "Mermaid"
     count: 4
     class: soldier              # vanilla: 4x Lv7 Soldier, Iron Lance
@@ -411,12 +411,12 @@ enemy_units:
       why: >
         Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
         own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
-        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
-        a hull inside the line instead of in a mountain-ringed corner -- (16,15) reaches the east door in one move.
-        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
-        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
-        precedent). The donor's approach byte is kept, so this unit fights the player exactly
-        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Manchego Stars can, because our
+        map put a hull inside the line instead of in a mountain-ringed corner -- (16,15) reaches the
+        east door in one move. Only the ACTION half changes, to vanilla's own AI_A_08, whose
+        do-not-attack list is repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's
+        AI_A_07 precedent). The donor's approach byte is kept, so this unit fights the player
+        exactly as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
         from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
         ACTION".
     name: "Shark Rider"
@@ -571,14 +571,14 @@ enemy_units:
       why: >
         Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
         own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
-        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
-        a hull inside the line instead of in a mountain-ringed corner -- its JAVELIN reaches the east hull from (15,12), one step away.
-        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
-        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
-        precedent). The donor's approach byte is kept, so this unit fights the player exactly
-        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
-        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
-        ACTION".
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Manchego Stars can, because our
+        map put a hull inside the line instead of in a mountain-ringed corner -- its JAVELIN reaches
+        the east hull from (15,12), one step away. Only the ACTION half changes, to vanilla's own
+        AI_A_08, whose do-not-attack list is repointed at the two boat pids
+        (repoint_boat_safe_ai_list, on ch05's AI_A_07 precedent). The donor's approach byte is kept,
+        so this unit fights the player exactly as its donor does and simply will not swing at a hull
+        -- the behaviour vanilla gets from terrain and our map cannot. decisions.md -> "AI_B is the
+        APPROACH and AI_A is the ACTION".
     name: "Ironshell"
     count: 1
     class: armor-knight         # vanilla: 1x Lv6 Knight, Horseslayer + Javelin
@@ -658,14 +658,14 @@ enemy_units:
       why: >
         Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
         own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
-        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
-        a hull inside the line instead of in a mountain-ringed corner -- an iron bow reaches the hull from (17,14), three steps from its post.
-        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
-        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
-        precedent). The donor's approach byte is kept, so this unit fights the player exactly
-        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
-        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
-        ACTION".
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Manchego Stars can, because our
+        map put a hull inside the line instead of in a mountain-ringed corner -- an iron bow reaches
+        the hull from (17,14), three steps from its post. Only the ACTION half changes, to vanilla's
+        own AI_A_08, whose do-not-attack list is repointed at the two boat pids
+        (repoint_boat_safe_ai_list, on ch05's AI_A_07 precedent). The donor's approach byte is kept,
+        so this unit fights the player exactly as its donor does and simply will not swing at a hull
+        -- the behaviour vanilla gets from terrain and our map cannot. decisions.md -> "AI_B is the
+        APPROACH and AI_A is the ACTION".
     name: "Mermaid"
     count: 1
     class: archer               # vanilla: 1x Lv6 Archer, Iron Bow
@@ -699,7 +699,7 @@ enemy_units:
   # spawning behind you", and the whole of its Normal->Difficult delta (24 -> 27; the wiki
   # calls it "a UNIT change, not a level shift"). We field the same three, as shark riders,
   # with vanilla's own levels and inventories. #48's static bar folds that array in on the
-  # vanilla side unconditionally, so declaring ours is what makes the two sides count the
+  # vanilla side unconditionally, so declaring the riders is what makes the two sides count the
   # same force: with them, the comparison reads x1.00 on both metrics instead of x0.88/x0.82.
   - id: shark-rider-hard-javelin
     name: "Shark Rider"
@@ -970,7 +970,8 @@ events:
       - braulo: "Intelligent... It ruled these waters before the first keel touched them."
       - braulo: "Lower your weapons."
       # ── C: what he is, and why ──
-      # (The book's own lines, p.31, the Frostmaiden named as written. Why he rams is ours, ADR 0332.)
+      # (The book's own lines, p.31, the Frostmaiden named as written. Why he rams is Manchego
+      # Stars' own, ADR 0332.)
       - braulo: "What are you?"
       - messie: "I used to just swim around the lake and eat fish."
       - messie: "The human who gave me this gift is Ravisin."
@@ -1156,7 +1157,8 @@ terrain_divergence:
 # The chapter's CLOCK, declared. `check_rescue_targets` proves nothing else on the board can
 # attack a hull: every other unit that can reach one carries an ACTION byte that cannot target
 # it. Vanilla Ch6 gets this from terrain -- zero of its seventeen strikers can reach a villager
-# in one turn, and its clock is pursuers only. Ours is the same shape, bought with the AI byte.
+# in one turn, and its clock is pursuers only. Manchego Stars' is the same shape, bought with the AI
+# byte.
 rescue_pursuers:
 - id: merfolk-thrower           # east: JAVELIN, range 1-2, so the pocket door never stops it
 - id: tentacruel                # west: range 1, so it must OCCUPY the door -- and it does

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Strategy as data (#510 step 6): each Strategy section, the twin's and ours, curated into
-claims the parity model checks.
+"""Strategy as data (#510 step 6): each Strategy section, the twin's and Manchego Stars', curated
+into claims the parity model checks.
 
 A Strategy section is the best record we have of how a chapter is actually PLAYED: the
-twin's is the Fire Emblem Wiki's (vendored under `tools/wiki/vendor/twins/`), ours is the
+twin's is the Fire Emblem Wiki's (vendored under `tools/wiki/vendor/twins/`), Manchego Stars' is the
 chapter YAML's `strategy:`. Each claim cites the line it comes from, verbatim (wiki markup
 stripped), and a claim whose citation is not in its section raises -- a claim nobody can
 point at is the model's opinion, not the strategy's.
@@ -48,8 +48,8 @@ Kinds (each side's claims are read against that side's OWN party and force):
               (ADR 0365: healing, the arena, keys and steals, none of which changes what a
               unit fights with). Recorded so the curation is complete.
 
-Topics are ONE shared taxonomy (TOPICS, KIT_TOPICS) for ours, the twin's and the step-9 bot,
-so the same play carries the same tag on both sides: a line is tagged by what it MEANS, never
+Topics are ONE shared taxonomy (TOPICS, KIT_TOPICS) for Manchego Stars, the twin's and the step-9
+bot, so the same play carries the same tag on both sides: a line is tagged by what it MEANS, never
 by a word it happens to use ("the undead race to desecrate them" and "save the western
 Village" are both `site-race`). A topic outside the taxonomy raises; a new tag is added here,
 with its meaning, before any claim uses it.

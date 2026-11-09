@@ -34,8 +34,8 @@
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)
 --   no_style    api.only: this chapter start has fewer than k styles
---   infeasible  ours: a chapter used MAX_ATTEMPTS, or every style, without a clean clear: no
---               later chapter is reached by a clean run, so none is played
+--   infeasible  Manchego Stars: a chapter used MAX_ATTEMPTS, or every style, without a clean
+--               clear: no later chapter is reached by a clean run, so none is played
 --   bot_fault   the same on vanilla, which strong players clear clean: the bot is what failed,
 --               never the chapter (#510 step 9 design, decision 2). The chapter line's failures
 --               carry what spoiled each attempt and its trace
@@ -197,7 +197,8 @@ function M.run(api)
         return outcome == "done" or outcome == "played" or outcome == "no_style", why, chapters
     end
 
-    -- a chapter with no clean clear left to try: on vanilla the bot's fault, on ours infeasible
+    -- a chapter with no clean clear left to try: on vanilla the bot's fault, on
+    -- Manchego Stars infeasible
     local function noClean(entry, tried)
         local fault = info.game == "vanilla"
         entry.outcome = fault and "bot_fault" or "infeasible"

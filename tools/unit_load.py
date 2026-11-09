@@ -13,7 +13,7 @@ path, and keeps its randomness as a range the way the Fire Emblem Wiki prints ge
                                  Difficult (bmdifficulty.c:53) -- when its class is promoted.
   UnitAutolevelRealistic         an autolevelled CA_BOSS or pid < 0x40 levels up from its
                                  baseLevel on its PERSONAL growths instead (vanilla Ch13's
-                                 Amelia and Cormag; none of ours).
+                                 Amelia and Cormag; no Manchego Stars unit).
   eventscr.c:2328                every red unit with pid >= 0x3C then takes the chapter's
                                  shift, flagged or not: Difficult adds `bonus` levels of class
                                  growths (UnitAutolevelCore); Easy/Normal run

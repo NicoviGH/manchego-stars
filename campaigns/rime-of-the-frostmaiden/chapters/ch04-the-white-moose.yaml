@@ -303,8 +303,8 @@ enemy_units:
       ai: '{DefaultAI, 0xC, 0x0}'
       why: >
         vanilla's matching wave is four L2 revenants stacked on (0,0)
-        (UnitDef_088B4C24); ours is a six-wolf pack on its own spawn tiles because Marty's
-        parley needs each wolf individually addressable (#203). Their AI is those
+        (UnitDef_088B4C24); Manchego Stars' is a six-wolf pack on its own spawn tiles because
+        Marty's parley needs each wolf individually addressable (#203). Their AI is those
         revenants' own -- pursue -- minus the stray GuardTile bit one of the four carries.
     convertible: true           # #171 — the pack parley (Marty). Convertible REINFORCEMENT: arrives
                                 # turn 2 then recruited rather than ground down (the clear-load discount).
@@ -448,8 +448,8 @@ villages:
     # give-item tail when a village declares no reward.
     #
     # NOTHING TO COPY: vanilla's text here is pure Lute recruit dialogue (9B2/9B3/9B4, three
-    # variants by visitor, zero lore), and our recruit arrives by parley — so this line is ours.
-    # Nicolas asked for "at least a lore drop or a hint" (2026-08-03).
+    # variants by visitor, zero lore), and our recruit arrives by parley — so this line is Manchego
+    # Stars' own. Nicolas asked for "at least a lore drop or a hint" (2026-08-03).
     #
     # WRITTEN 2026-08-05 (dialogue-pass, co-written with Nicolas — he assembled it from three
     # sourced drafts). SOURCES, both previously unspent:

@@ -73,8 +73,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # efxbattle.h. The gMSChargeFlashes table rides data_banimconfunk.c
                         # (listed below); the struct/extern ride ekrbattle.h (listed above).
                         'src/banim-efxmisc.c', 'src/banim-main.c', 'include/efxbattle.h',
-                        # No step writes vanilla's banim script any more (patch 0016 moved ours to
-                        # BANIM_LINKER); restoring it cleans a tree built before that.
+                        # No step writes vanilla's banim script any more (patch 0016 moved Manchego
+                        # Stars' to BANIM_LINKER); restoring it cleans a tree built before that.
                         'linker_script_banim.txt',
                         # #65 M-B (character-unique anims, no class slot): the per-character
                         # config table gets the AnimConf appended; the combat-lookup engine
@@ -524,7 +524,7 @@ def restore_vanilla_sources():
     # always resets to the committed vanilla source.
     subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--'] + PATCHED_DECOMP_FILES, env=git_env(),
                    check=True)
-    # The ext battle-anim script is ours alone (vanilla has none), so restoring it means
+    # The ext battle-anim script is Manchego Stars' alone (vanilla has none), so restoring it means
     # deleting it; the battle-anim steps append to it from empty.
     if os.path.exists(BANIM_LINKER):
         os.remove(BANIM_LINKER)

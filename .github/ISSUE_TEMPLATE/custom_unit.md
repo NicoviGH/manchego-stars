@@ -23,7 +23,7 @@ prose doc** — each step links its source of truth:
 - [ ] **Battle anim** — 3 hi-res poses → BOX-descale to `campaigns/.../battle_anims/<unit>/{ready,
       windup,peak}.png`; add the `battle_anim:` YAML block naming its `clone_from` donor class.
       (An FE-native community anim goes through `import:` instead — the `.txt` owns the cadence,
-      so do NOT hand it one of ours.)
+      so do NOT hand it a generated pose sheet.)
       ⚠️ confirm `AnimConf .index == anim_id + 1` (else purple dragon).
       ⚠️ repoint **every** slot the donor's AnimConf carries, including `ITYPE_ITEM` — that is the
       UNARMED entry, and a slot left vanilla draws the donor's human body the moment the unit's

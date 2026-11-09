@@ -18,9 +18,9 @@ of one line on an O_APPEND descriptor, so writers never interleave. A worker tha
 BOTRUN record is recorded as `crashed` with its run dir, or as `no_style` when its campaign
 says the chapter start has fewer styles than the attempt asked for.
 
-`paired_verdict` says where one chapter-and-mode cell stands from its ours/twin pairs, on one
-endpoint: did a protected unit die anywhere in attempt 1 (ADR 0385). It is read at 50, 100 and
-200 pairs with exact Clopper-Pearson bounds split over the bounds, the looks and the frozen
+`paired_verdict` says where one chapter-and-mode cell stands from its Manchego Stars/twin pairs,
+on one endpoint: did a protected unit die anywhere in attempt 1 (ADR 0385). It is read at 50, 100
+and 200 pairs with exact Clopper-Pearson bounds split over the bounds, the looks and the frozen
 cell count, and labelled EQUIVALENT (inside +-10 points), HARDER, EASIER or INCONCLUSIVE.
 `pilot` plays one chapter cell on the 50 pilot seeds first and chooses paired or marginal
 analysis; `cell` then plays the confirmatory seeds with that choice.
@@ -594,7 +594,7 @@ def bound_level(cells, alpha=ALPHA):
 
 def table_of(pairs):
     """The paired 2x2 table (a, b, c, d) of resolved pairs (ours_died, twin_died): a both
-    lost someone, b only ours did, c only the twin did, d neither did."""
+    lost someone, b only Manchego Stars did, c only the twin did, d neither did."""
     a = sum(1 for x, y in pairs if x and y)
     b = sum(1 for x, y in pairs if x and not y)
     c = sum(1 for x, y in pairs if y and not x)
@@ -624,8 +624,8 @@ def confirmatory_interval(table, cells, analysis, alpha=ALPHA):
 def bound_unresolved(pairs):
     """The two worst-case tables (low, high) of `pairs` (ours_died, twin_died), None where an
     attempt has no game result even after its same-seed retry (FR-027): `low` reads each
-    unresolved ours as everyone surviving and each unresolved twin as a death, `high` the
-    reverse. The low table's lower bound and the high table's upper bound hold whatever the
+    unresolved Manchego Stars run as everyone surviving and each unresolved twin as a death, `high`
+    the reverse. The low table's lower bound and the high table's upper bound hold whatever the
     unresolved attempts would have done, so those attempts stay in the denominators."""
     def fill(ours, twin):
         return table_of([(ours if x is None else bool(x), twin if y is None else bool(y))
@@ -1120,13 +1120,14 @@ def cell_main(args):
         print(line)
     if v.get('ours') is not None:   # some pair resolved in both arms
         a, b, c, d = v['table']
-        print('a protected unit died: ours %.0f%%, vanilla %.0f%%; only ours %d, only the '
+        print('a protected unit died: Manchego Stars %.0f%%, vanilla %.0f%%; only Manchego Stars '
+              '%d, only the '
               'twin %d, both %d, neither %d (%s analysis, N = %d)' % (
                   100 * v['ours'], 100 * v['vanilla'], b, c, a, d, v['analysis'], cells))
     for n in ('ours', 'vanilla'):
         print('%s: %d replicates reached the chapter, %d did not, %d unknown' % (
             n, v['reach'][n]['reached'], v['reach'][n]['unreached'], v['reach'][n]['unresolved']))
-    print('played now: ours %(ours)d, vanilla %(vanilla)d' % v['played'])
+    print('played now: Manchego Stars %(ours)d, vanilla %(vanilla)d' % v['played'])
     return 0
 
 
@@ -1134,12 +1135,14 @@ def pilot_lines(s, chapter, games):
     """pilot_summary's report in sentences (FR-025, AS 1); `games` says over how many games
     each arm's pairs were played (games_line)."""
     a, b, c, d = s['table']
-    out = ['pilot: ours ch%02d vs its twin, %d pairs %s%s' % (
+    out = ['pilot: Manchego Stars ch%02d vs its twin, %d pairs %s%s' % (
                chapter, s['n'], games,
                ' (%d unresolved, left out)' % s['unresolved'] if s['unresolved'] else ''),
-           '  a protected unit died: ours %d of %d (%.0f%%), the twin %d of %d (%.0f%%)' % (
+           '  a protected unit died: Manchego Stars %d of %d (%.0f%%), the twin %d of %d '
+           '(%.0f%%)' % (
                a + b, s['n'], 100 * s['ours'], a + c, s['n'], 100 * s['vanilla']),
-           '  both %d, only ours %d, only the twin %d, neither %d: %d discordant (%.0f%%)' % (
+           '  both %d, only Manchego Stars %d, only the twin %d, neither %d: %d discordant '
+           '(%.0f%%)' % (
                a, b, c, d, b + c, 100 * s['discordance']),
            '  difference %+.1f points; correlation %s; covariance %+.4f, so %s analysis' % (
                100 * s['diff'], '%.2f' % s['corr'] if s['corr'] is not None else 'undefined',
@@ -1203,7 +1206,7 @@ def pilot_main(args):
         res = got['results'][seed]
         pair = pair_of(res)
         if None not in pair and pair[0] != pair[1]:
-            print('  seed %d (%s), only %s lost someone: ours %s, vanilla %s' % (
+            print('  seed %d (%s), only %s lost someone: Manchego Stars %s, vanilla %s' % (
                 seed, ', '.join(res[n]['rec']['suite']['start_id'] for n in ('ours', 'vanilla')),
                 'ours' if pair[0] else 'the twin',
                 *(os.path.join(simdirs[n], res[n]['rec'].get('trace') or '?')
@@ -1942,7 +1945,7 @@ def cell_setup(number, k):
     suite, simdirs, envs = setup
     pair = campaign_env.cell_chapters().get(number)
     if pair is None:
-        return 'refused: chapter %d is not a written chapter of ours' % number
+        return 'refused: chapter %d is not a written chapter of Manchego Stars' % number
     try:
         starts = {arm: cell_starts(suite, simdirs[arm], arm, index, k)
                   for arm, index in zip(('ours', 'vanilla'), pair)}
@@ -2338,8 +2341,8 @@ def _items():
 
 @functools.lru_cache(maxsize=None)
 def _classes(game='vanilla'):
-    """{class id: name}: every vanilla class by FE8's name, and for ours each enemy reskin by
-    its own (campaign.yaml), on the slot it takes."""
+    """{class id: name}: every vanilla class by FE8's name, and for Manchego Stars each enemy reskin
+    by its own (campaign.yaml), on the slot it takes."""
     sys.path.insert(0, os.path.dirname(HERE))
     from inject import class_ids, reskins
     import campaign_env
@@ -2722,7 +2725,8 @@ def main(argv=None):
     rp.add_argument('--char', help="the dead unit's character id (default: the run's one death)")
     rp.add_argument('--ref', type=int, help='the decision to pin (default: the last that moved '
                     "the dead unit, else the death's plan_ref)")
-    c = sub.add_parser('cell', help='one cell, ours vs its twin, to its verdict (ADR 0385)')
+    c = sub.add_parser('cell',
+                       help='one cell, Manchego Stars vs its twin, to its verdict (ADR 0385)')
     c.add_argument('--analysis', required=True, choices=('paired', 'marginal'),
                    help="the pilot's choice, frozen before any confirmatory seed plays")
     c.add_argument('--cells', type=int, help="the frozen cell count N (default: the manifest's)")

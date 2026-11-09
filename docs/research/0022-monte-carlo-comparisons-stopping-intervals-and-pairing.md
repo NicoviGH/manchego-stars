@@ -54,8 +54,8 @@ settled in the plan's amendment, so these are findings for Nicolas, not changes.
   CRN needs a separate random stream per system so the two stay in step (Haas, UMass CS590M,
   <https://people.cs.umass.edu/~phaas/CS590M/slides/slecture11a.pdf>). A 2025 paper casts
   paired-seed evaluation of agent simulators the same way (<https://arxiv.org/abs/2512.24145>).
-  Ours pairs two different games (ours vs the vanilla twin) by seed and style index. The
-  style is common to both; the game's RNG stream is not (different maps consume it
+  The bot pairs two different games (Manchego Stars vs the vanilla twin) by seed and style index.
+  The style is common to both; the game's RNG stream is not (different maps consume it
   differently). So how much the pairing buys is an empirical question: the measured
   correlation of the pairs says.
 - **Multiple chapters x modes are multiple comparisons.** Each settled cell is one test at 5%,

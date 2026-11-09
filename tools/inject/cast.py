@@ -25,7 +25,7 @@ from inject.text import display_name
 # Palette index 0 of an FE8 bust is the transparent key. Our busts keep whatever colour their
 # source put there (green, magenta, sage; the game never draws it) and mark index 0 transparent
 # in the file (tools/test_bust_key.py). Named because _vendor_mug_to_bust has to WRITE a key:
-# a community mug arrives keyed on whatever green its artist used, and ours is magenta.
+# a community mug arrives keyed on whatever green its artist used, and Manchego Stars' is magenta.
 PORTRAIT_TRANSPARENT_RGB = (255, 0, 255)
 
 

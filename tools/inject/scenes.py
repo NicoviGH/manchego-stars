@@ -484,7 +484,7 @@ def _branch_on_slot_c(test, if_true, if_false, label_base, why):
 
 
 def branch_on_check_alive(character, if_alive, if_absent, label_base=0):
-    """The same branch, asking the ROSTER instead of a flag: is this unit ours and alive?
+    """The same branch, asking the ROSTER instead of a flag: is this unit the player's and alive?
 
     ch05's conditional scenes address units the player may never have recruited, and this is
     vanilla's own answer for that question rather than a flag we would have to carry across a
