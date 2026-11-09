@@ -1,246 +1,158 @@
 # AGENTS.md — Manchego Stars
 
-Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE8), built from the `fireemblem8u` C decompilation. It turns a completed D&D 5e *Rime of the Frostmaiden* campaign into a playable tactics game: 8 player characters become FE units (FE8 classes, FE8 stats), and the campaign's narrative chapters become FE maps. **Combat is vanilla FE8 — FE hit/avoid/might/crit, FE stats, no conversion.** D&D is flavor layered on top; the d20 survives only as a cosmetic nat-20 animation triggered by FE's own crit math. Distribution is private — pre-patched ROM sent to the campaign players.
+Manchego Stars is a GBA tactics ROM hack of *Fire Emblem: The Sacred Stones* (FE8), built from the `fireemblem8u` C decompilation. It turns a completed D&D 5e *Rime of the Frostmaiden* campaign into a playable tactics game: 8 player characters become FE units (FE8 classes, FE8 stats), and the campaign's narrative chapters become FE maps. **Combat is vanilla FE8 — FE hit/avoid/might/crit, FE stats, no conversion.** D&D is flavor; the d20 survives only as a cosmetic nat-20 animation on FE's own crits. Distribution is private — a pre-patched ROM sent to the campaign players.
+
+This file is loaded into every session, so it holds operating rules and pointers only; the why
+and the history live in `docs/decisions.md`.
 
 ## Source of Truth
 
-The data is the doc — facts live in exactly one place, and indexes are generated (see
-`docs/decisions.md` §Documentation Model):
+The data is the doc — facts live in one place, indexes are generated (`decisions.md` §Documentation Model):
 
 | For… | Look at… |
 |---|---|
-| Per-chapter facts (objective, recruits, enemies, rewards) | `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml` → generated `docs/CHAPTERS.md` |
+| Per-chapter facts | `campaigns/rime-of-the-frostmaiden/chapters/ch*.yaml` → generated `docs/CHAPTERS.md` |
 | Unit class / promotion | `campaigns/.../{pcs,npcs}/*.yaml` → generated `docs/CLASSES.md` |
-| Settled design decisions (combat, triangle, economy, class mapping, promotion seam) | `docs/decisions.md` |
+| Settled design decisions | `docs/decisions.md` |
 | Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
-| Writing or reviewing a playtest-bot decision (planner, candidates, lookahead) | **ADR 0396**: a decision orders the game's outcomes, only the game forbids; the five tests every new rule passes |
-| Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
-| Borrowable enemy reskin art (what the FE-Repo has) | **`docs/fe-repo-scouting.md`** (scouting log) + per-unit `skin:` fields in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
-| Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook; its shared-helper table is the recipe, ADR 0340) |
-| What a playtest scenario needs (ROM flag, host chapter, checkpoint, timing) | A hosted chapter's scenarios are DECLARED in its own YAML under `playtest:` and their rows + chapter suite are derived (`tools/playtest/declared.py`, #314). Everything a chapter does not own — the spine, chapter-generic probes, checkpoint builders, ROM configs, timing classes, `gate` — stays in **`tools/playtest/matrix.yaml`**. A name in both RAISES. |
-| Prep screen / deploy cap / force-deployment | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol — the CAP is the parity, Pick Units only chooses which PCs fill it. Never re-derive this from the decomp, and never from `hasPrepScreen` (dead FE7 leftover, false everywhere).** |
+| A playtest-bot decision (planner, candidates, lookahead) | **ADR 0396**: a decision orders the game's outcomes, only the game forbids; the five tests every new rule passes |
+| A unit's art / battle anim / platform | `inject_battle_anims` / `inject_battle_platforms` docstrings (how) + `decisions.md` Art & Audio (why) + the `custom_unit` issue template |
+| Borrowable enemy reskin art | `docs/fe-repo-scouting.md` + per-unit `skin:` in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
+| Hosting a new chapter | `docs/adding-a-chapter.md` (runbook; shared-helper table, ADR 0340) |
+| A playtest scenario's needs | Declared in the chapter YAML under `playtest:` (`tools/playtest/declared.py`, #314); everything a chapter does not own stays in `tools/playtest/matrix.yaml`. A name in both RAISES. |
+| Prep screen / deploy cap | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol; the CAP is the parity. Never re-derive it from the decomp or from `hasPrepScreen` (dead FE7 field).** |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
-| How players play vanilla (party, prep, resets, shops) and what playtesting research says about bots | **`docs/research.md`** (generated index; one record per topic under `docs/research/`, searchable by its frontmatter title and tags). Evidence the decisions cite, never a decision itself |
-| The back half's plan (ch09–ch20) | `status: planned` chapter YAMLs, read through the wiki (`python3 tools/gen_wiki.py` → `build/wiki/index.html`); `docs/roadmap.md` holds the arc and the recruit cadence |
-| Vision / architecture / phased roadmap | `docs/PRD.md` |
-| Work backlog | **GitHub issues** (milestones M0–M4) |
+| How players play vanilla; playtesting research | `docs/research.md` (generated index of `docs/research/`) — evidence, never a decision |
+| The back half (ch09–ch20) | `status: planned` chapter YAMLs via the wiki (`tools/gen_wiki.py`); `docs/roadmap.md` |
+| Vision / roadmap | `docs/PRD.md` |
+| Backlog | GitHub issues (milestones M0–M4); current state → `HANDOFF.md` |
 
-## The decomp answers "what does vanilla do." It never answers "what do WE do."
+## The decomp answers "what does vanilla do," never "what do WE do"
 
-For any question about our own conventions — prep, deploy caps, objectives, economy, class
-mapping, art pipeline — **read `docs/decisions.md` first and cite the ADR.** Reaching into
-`fireemblem8u/` to re-derive a settled call produces confident wrong answers, because vanilla's
-data describes vanilla: it has no idea what we decided to diverge on, and some of its fields are
-dead weight the decomp itself flags as unused. (Live example, and why this section exists: a
-session "discovered" from `hasPrepScreen` that our prep screen was a divergence. That field is an
-FE7 leftover, false for every chapter including ones that plainly have prep — and prep from ch01
-has been standing protocol since 2026-06-10, where the *cap* is the parity.) If `decisions.md` is
-silent, ask; don't infer it from the ROM.
+For our own conventions (prep, caps, objectives, economy, class mapping, art) **read
+`docs/decisions.md` and cite the ADR**; vanilla's data knows nothing of what we diverged on. If
+`decisions.md` is silent, ask — don't infer from the ROM.
 
 ## Session Start Checklist
 
-Read these at the top of every session before touching code:
 1. `AGENTS.md` (this file)
-2. **`git show main:HANDOFF.md`** — most recent session's state, blockers, and next steps. Read
-   main's copy, never the working tree's: a feature branch carries the snapshot from when it was
-   cut, and the guard only stops a branch from EDITING it (a session opened on #487 read a day-old
-   copy, 2026-10-15).
-3. `docs/decisions.md` — the INDEX of settled decisions (one file each under
-   `docs/decisions/`). Read the index, then open the two or three your task needs. Do not
-   re-litigate what is in there. It was a single 728 KB file until #384 — ~197,000 tokens,
-   which is a whole context window spent before any work starts, so this line was being
-   skipped rather than followed.
-4. The current chapter or feature YAML/source file being worked on
+2. **`git show main:HANDOFF.md`** — main's copy, never the working tree's (a branch carries a stale snapshot).
+3. `docs/decisions.md` — the INDEX; open only the two or three records your task needs. Don't re-litigate.
+4. The chapter or feature YAML/source being worked on
 5. `git status` + `git log --oneline -10`
 
-> **Before you run a playtest scenario, read this.** Nicolas watches every run happen, and since
-> the matrix landed the standing complaint is *"I have seen you run old scenes a million times
-> and it has to stop"* (2026-08-10). **Never run the full `make matrix` gate locally.** Run only
-> the scenarios that could possibly be affected by what you changed, and **never run anything
-> after a merge** — a run whose result cannot change your next action is pure cost. When a
-> scenario fails, spend **one instrumented run** that dumps everything your next three
-> hypotheses would need, not one run per guess. Long form + what it cost: `docs/decisions.md` →
-> "Playtest runs are the most expensive thing in this repo".
+> **Playtest runs are the most expensive thing in this repo.**
+> Never run the full `make matrix` gate locally; run only scenarios your change could affect;
+> never run anything after a merge; on a failure spend **one instrumented run** covering your
+> next three hypotheses, not one run per guess.
 
-## Searching: 86% of this repo is not this repo
+## Searching and context
 
-`rg --files` counts 7,423 files and **6,361 of them (86%) are the `fireemblem8u` submodule**.
-Searches are fast either way; the cost is that decomp matches land in context and stay there
-(`unit`: 17,556 hits repo-wide vs 3,738 scoped).
-
-- **Our code, content, docs** — `rg <pat> -g '!fireemblem8u'`. The default.
-- **What vanilla FE8 does** — search `fireemblem8u/` ON PURPOSE and say so. Grounding an FE8
-  claim in the decomp is required — see "The decomp answers 'what does vanilla do.'" above;
-  stumbling into it while grepping for one of our own symbols is not the same thing.
-- **Never read a decomp source whole** (`src/events_udefs.c` is 1.78 MB).
-  `inject.decomp.vanilla_decomp_text` reads them at HEAD and is memoised for that reason.
-
-## Context is the budget
-
-Every call re-reads the whole context, so **cost is `size × remaining calls`, not size**. The
-measurements are in `docs/decisions/` → *"Context is the budget, and the expensive thing is what
-enters it early"*; the rules that follow from them:
-
-- **Hand off before the context gets large, not when the task ends.** `/handoff` at task
-  boundaries, `/clear` on task switches.
-- **Don't leave a session idle for an hour** — the prompt cache expires and the whole prefix is
-  re-paid at 12.5x. Hand off and start fresh instead.
-- **What enters context early and never leaves is the expensive thing.** Read `decisions.md`'s
-  index and open the two or three records you need, not the corpus.
-- **`sed -n`/`grep` over whole-file reads; redirect big output to a file and grep it.** Bash
-  results average 314 tokens, Read results 18,808.
+- 86% of the files are the `fireemblem8u` submodule. Search our code with
+  `rg <pat> -g '!fireemblem8u'`; search the decomp only on purpose, and say so. Never read a
+  decomp source whole (`inject.decomp.vanilla_decomp_text` reads them at HEAD, memoised).
+- Context is the budget: cost is `size × remaining calls` (`decisions/` → "Context is the
+  budget…"). `/handoff` at task boundaries, `/clear` on switches, don't idle a session past the
+  cache's hour, prefer `sed -n`/`grep` to whole-file reads, redirect big output to a file.
 
 ## Key File Locations
 
 | What | Where |
 |---|---|
-| Source assets (base ROM, Battle Anims, the books, `References/`) | `references/`: a gitignored link in the repo root to `~/Projects/manchego-stars-assets` (copyrighted, never committed). Every path below goes through it, so moving the folder means repointing one link (`ln -sfn <dir> references`). |
+| Source assets (base ROM, anims, books) | `references/` — gitignored link to `~/Projects/manchego-stars-assets` (copyrighted, never committed) |
 | Base ROM | `references/Fire Emblem - The Sacred Stones (USA, Australia).gba` |
-| Reference PDFs (Tasha's, Metallurgist, etc.) | `references/References/` (PDFs + frostmaiden-resources.md; frostmaiden-resources.md is also copied to `docs/`) |
-| *Rime of the Frostmaiden*, searchable | `rime-of-the-frostmaiden-ocr.txt` in that References folder: the book PDF is an image-only scan, and this is its OCR text (macOS Vision, 2026-10-11), one `===== PDF page N (printed p.N-1) =====` header per page. grep it; open the page image only to see art or a map. |
-| PC D&D Beyond JSON sheets | `data/pc-sheets/*.json` |
-| PC portrait URLs | `data/pc-sheets/portraits.json` |
-| FE8 decomp | `fireemblem8u/` (git submodule) |
-| Engine changes (a patch series on the decomp) | `engine/patches/` (applied by `tools/inject/engine_patches.py`) |
+| Reference PDFs | `references/References/` (frostmaiden-resources.md also in `docs/`) |
+| *Rime of the Frostmaiden*, searchable | `references/References/rime-of-the-frostmaiden-ocr.txt` — OCR of the scanned PDF, one `===== PDF page N (printed p.N-1) =====` header per page; grep it |
+| PC sheets / portraits | `data/pc-sheets/*.json`, `data/pc-sheets/portraits.json` |
+| FE8 decomp | `fireemblem8u/` (submodule, stays vanilla) |
+| Engine changes | `engine/patches/` (applied by `tools/inject/engine_patches.py`) |
 | Campaign data | `campaigns/rime-of-the-frostmaiden/` |
-| Planning docs | `docs/` |
 
-## Build Command
+## Build
 
 ```sh
 make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba -j$(nproc)
 ```
 
-The decomp's own quickstart (to verify the base ROM builds clean):
-```sh
-cd fireemblem8u
-./scripts/quickstart.sh --rom "../references/Fire Emblem - The Sacred Stones (USA, Australia).gba"
-```
-
+Base-ROM check: `cd fireemblem8u && ./scripts/quickstart.sh --rom "../references/Fire Emblem - The Sacred Stones (USA, Australia).gba"`.
 **`make` must be green at the end of every session. Never commit a broken build.**
 
 ## Coding Conventions
 
-- Follow existing decomp C style throughout — GCC 2.95.1 / `agbcc`
-- No C99 features: no VLAs, no `//` comments in new C files (use `/* */`), no designated initializers (`.field = value`)
-- No `stdint.h` types in engine files — use the decomp's existing typedefs (`u8`, `u16`, `u32`, `s8`, `s16`, `s32`)
-- Match the existing file and function naming conventions in `fireemblem8u/src/`
-- New engine behavior ships as a patch in `engine/patches/` (a plain C diff, applied with `git apply`;
-  `tools/inject/engine_patches.py` says how to edit one) — never hand-edits to the decomp. The
-  injector writes `build/fireemblem8u` (a git worktree of the submodule, restored on every build)
-  and the `fireemblem8u` submodule itself stays vanilla (#408)
-- Before changing a signature, or what a parameter MEANS: `tools/callsites.py` (grep cannot bind
-  positional arguments), then diff the OUTPUT.
-- Comments say **why**; the **what** lives in code + tests. When a change retires a mechanism or term,
-  register its key phrases in `tools/check.py` `DEAD_CONCEPTS` in the same commit — the drift lint scans
-  docs AND hand-written code comments (`docs/decisions.md` → "Comments are testimony").
+- Decomp C style, GCC 2.95.1 / `agbcc`: no C99 (no VLAs, no `//` in new C files, no designated
+  initializers), no `stdint.h` types (use `u8`…`s32`), match `fireemblem8u/src/` naming.
+- New engine behavior ships as a patch in `engine/patches/` (`git apply`; `engine_patches.py` says
+  how to edit one), never a hand-edit to the decomp. The injector writes `build/fireemblem8u` (#408).
+- Before changing a signature or a parameter's meaning: `tools/callsites.py`, then diff the output.
+- Comments say **why**. When a change retires a mechanism or term, register its phrases in
+  `tools/check.py` `DEAD_CONCEPTS` in the same commit ("Comments are testimony").
 
 ## Engine / Content Boundary Rule
 
 > **If it references a character name, chapter number, or plot event, it goes in YAML, not C.**
 
-- Engine code (`engine/`, `fireemblem8u/src/`) must be campaign-agnostic
-- Campaign data (`campaigns/rime-of-the-frostmaiden/`) is injected at build time by `tools/build_campaign.py`
-- If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
-- Enforced: `check.py check_engine_campaign_agnostic` (CI + pre-commit) scans the hand-written engine sources (`engine/**`, the patch series included, and `decomp.py`) for any campaign character id and rejects it. (Chapter-number / plot-event references stay a review-judgment call.)
+Engine code (`engine/`, `fireemblem8u/src/`) is campaign-agnostic; campaign data is injected by
+`tools/build_campaign.py`. `check.py check_engine_campaign_agnostic` rejects a campaign character
+id in engine sources; chapter numbers and plot events are a review call.
 
 ## Coordination: feature-flow (one feature, one branch, one PR)
 
-Rationale + long form: `docs/decisions.md` → Coordination model. The operating rules:
-- A task = a GitHub issue → short-lived `feat/<n>-slug` branch off `main` → PR → CI + `/code-review`
-  → squash-merge → delete the branch. A feature may span engine + content — ownership lives on the
-  PR + issue, not a file glob.
-- **An agent team only for a named reason**: the rules and their cost evidence are ADR 0393.
-- **Merge only on CI for the PR's HEAD commit.** `gh pr checks --watch` returns at once when a
-  fresh push's runs have not registered yet, and #443 merged before its CI ran. Wait on
-  `gh run list --branch <b> --json headSha,status` until both workflows for the head sha complete.
-- **Review is `/code-review`, and the author is never the reviewer.** It is the default on every
-  PR, not an optional extra, and a hand-rolled reviewer prompt is not a substitute — a skill
-  reconstructed from memory runs last month's process. Use
-  `superpowers:requesting-code-review` instead only for a STACK or where the PR needs context
-  the diff cannot carry: one fresh reviewer per PR, reviewed DOWN the stack, since a fix to an
-  earlier PR rebases every PR above it.
-- **Review the WRITTEN surface, not the generated or moved bulk.** When a change is mechanical
-  — code moved, files split, output regenerated — and a machine gate proves the output is
-  unchanged (a round-trip diff, a fingerprint of what the injector wrote, a byte-identical ROM),
-  point the review at the hand-written part: the generator, the guards, their tests. Reading 283
-  relocated files at high effort finds nothing a byte-for-byte proof did not already establish,
-  and it is expensive. **This narrows the review's scope, never its existence** — the
-  hand-written surface is exactly where the defects in those changes have actually been.
-- **Review depth is an ARGUMENT, not a setting: `/code-review <PR> medium`.** The level rides
-  with that one run — low/medium return fewer, high-confidence findings; high/max buy broader
-  coverage and admit uncertain ones. **Say the level every time.** Omitting it does not mean
-  `medium`: the skill reuses the level typed LAST, so one `max` run quietly prices every later
-  bare review at `max`. `medium` is the right default to type; type `high`/`max` when a PR
-  earns it.
-  ⚠️ **Never reach for `effortLevel` in `~/.claude/settings.json` to do this** — that is the
-  model's GLOBAL reasoning effort for every session in every project, so raising it to buy one
-  deep review prices all later work at the top, outside this repo included. What it is set to on
-  any given machine is not this repo's business and is deliberately not recorded here.
-- **A stack of PRs lands with `--merge`, not `--squash`, and every child is retargeted to `main`
-  (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
-  closes the PRs on it, and a closed PR can't be retargeted. This rule lives here, not in the
-  decision record — the pointer that used to claim otherwise named nothing.
-- **One checkout, one writer: a task is a plain branch in the repo's main checkout** (ADR 0390).
-  Never create a worktree without Nicolas's say-so, and never run two ROM builds in one tree
-  (they corrupt each other). Cut a branch from `origin/main`; a local `main` holding
-  unpushed HANDOFF commits makes the branch look like it edits HANDOFF.
-- **The checkout keeps three gitignored folders** (`.agents/`, `map-review/`, `review/`):
-  preserve them and stage paths explicitly. `.agents/skills` links to `.claude/skills`, the
-  tracked skills Codex reads.
-- **Codex works here between Claude sessions** and leaves an explicit HANDOFF entry: what
-  changed, branch and PR state, the verification it ran, the exact next step.
-- **The pre-commit hook runs `tools/check.py`, but only the unit tests a staged path can reach**
-  (ADR 0394); `make check`, `make test` and CI run them all.
-- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine patch series in
-  `engine/patches/`, which applies whole or fails the build — the directory is the authoritative
-  list, don't cite a count). Desk ownership is a review judgment
-  (`check_lane_ownership` is advisory).
+- Task = GitHub issue → `feat/<n>-slug` branch cut from `origin/main` → PR → CI + `/code-review`
+  → squash-merge → delete the branch.
+- Agent teams only for a named reason (ADR 0393).
+- **Merge only on CI for the PR's HEAD commit**: wait on
+  `gh run list --branch <b> --json headSha,status` until both workflows for the head sha
+  complete (`gh pr checks --watch` can return before runs register).
+- **Review is `/code-review`; the author never reviews.** `superpowers:requesting-code-review`
+  only for a stack (one fresh reviewer per PR, down the stack) or context the diff can't carry.
+  For mechanical changes proven unchanged by a machine gate, review the hand-written surface only.
+- **Say the review level every time: `/code-review <PR> medium`** (a bare run reuses the last
+  level). Never change `effortLevel` in `~/.claude/settings.json` for a review — it is global.
+- **A stack lands with `--merge`**, and every child is retargeted to `main`
+  (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted.
+- **One checkout, one writer** (ADR 0390): no worktree without Nicolas's say-so, never two ROM
+  builds in one tree.
+- Keep the gitignored `.agents/`, `map-review/`, `review/` folders; stage paths explicitly.
+  `.agents/skills` links to `.claude/skills` for Codex, which works here between Claude sessions
+  and leaves a HANDOFF entry (changes, branch/PR, verification, next step).
+- Pre-commit runs `tools/check.py` and only the unit tests a staged path reaches (ADR 0394);
+  `make check`, `make test` and CI run them all.
+- The engine/content invariant and the patch series (applies whole or fails) are hard gates;
+  desk ownership (`check_lane_ownership`) is advisory.
 - Never commit the `fireemblem8u` submodule pointer.
 
-## Design placement test ("not my job" / "no need to know")
+## Design placement test
 
-Long form + examples: `docs/decisions.md` → Coordination model. In brief (Cockburn): push each line
-to the desk that owns it; talk over interfaces, never reach into another module's private state; judge
-a boundary by which *named* future changes it makes cheap (don't refactor for futures you can't name —
-e.g. a chapter's Lua lives in its OWN chunk, because the named future is "add a chapter" and
-it costs top-level `local` slots against a 200-per-chunk ceiling — see `decisions.md` → "A
-CHAPTER costs local slots"; the earlier reading of this same test named "add a scenario",
-which is free, and got the boundary wrong).
-**Code-review rule:** a change that reaches into another desk's cabinet or scatters one decision
-across desks is rejected; localize the decision first.
+Push each line to the desk that owns it; talk over interfaces; judge a boundary by the *named*
+future changes it makes cheap (`decisions.md` → "A CHAPTER costs local slots").
+**A change that reaches into another desk's cabinet or scatters one decision across desks is
+rejected in review.**
 
-## Working Conventions (Definition of Done)
+## Definition of Done
 
-Rationale and the long form: `docs/decisions.md` → Working Conventions. Every change:
-- ships its **doc + YAML updates in the same commit** (no "update docs later");
-- says `Closes #N` if it completes tracked work; open/retitle the issue if scope changes;
+Every change (`decisions.md` → Working Conventions):
+- ships its doc + YAML updates in the same commit;
+- says `Closes #N` when it completes tracked work;
 - builds `make` green, and passes `python3 tools/verify_text.py` after any text change;
-- records a new non-obvious decision in `docs/decisions.md` (dated) — not only in chat/memory;
-- never commits the `fireemblem8u` submodule pointer (our decomp edits live in `build/fireemblem8u`).
+- records a new non-obvious decision in `docs/decisions.md` (dated).
 
-Single source of truth: don't restate a fact that lives elsewhere — link to it. Keep this
-file lean (operating instructions + pointers, not a fact store).
+Don't restate a fact that lives elsewhere — link to it.
 
-## Current State & Backlog
+## Tools
 
-- **Where things stand right now** → `HANDOFF.md` (read at session start).
-- **Work backlog & milestones (M0–M4)** → GitHub issues.
-- **Phased roadmap & vision** → `docs/PRD.md §13`.
+Each tool's docstring is its manual; this table only says when to reach for it.
 
-## Build / Inject / Verify Tools
-
-| Tool | Role |
+| Tool | Use it to… |
 |---|---|
-| `tools/build_campaign.py` | Inject campaign content (portraits, names, character class/stats) into the decomp before `make`. |
-| `tools/verify_text.py` | Decode message text from the built ROM (regression gate; no mGBA). |
-| `make scene SCENE=chNN/<n>` | **See a scene without building a ROM** (`tools/scene_preview.py`, #311): renders an authored scene exactly as FE8 will wrap it — box by box, speaker, podium, and every line's drawn width against its channel's pixel budget — straight from the chapter YAML, no build and no emulator. `SCENE=chNN` for a whole chapter, no `SCENE=` to list what it knows. The committed book under `docs/scenes/` is regenerated with `--write` and diffed by `tools/test_scene_preview.py`, so a wrap or staging regression fails in `make check`. **This replaces the AUTHORING loop, never the proof** — a scene still gets one real run before it ships. |
-| `tools/playtest/run.sh <scenario>` | Automated in-emulator playtest of ONE scenario (mGBA Lua scripting; memory-asserted PASS/FAIL). Takes the scenario's ROM flag, host chapter, checkpoint and timing from `tools/playtest/matrix.yaml`. |
-| `tools/playtest/inspect_state.py` | Read a playtest log semantically: `render` prints what FE8 was doing and why the controller classified it that way (procs named by exact symbol); `diff` reports the first divergence between two runs. |
-| `make matrix [SUITE=…]` | The live regression matrix (`tools/playtest/matrix.py`): builds each ROM configuration at most once, runs its scenarios, prints a verdict table. `SUITE=gate` (default), a chapter suite, or `all`. A green scenario whose inputs are byte-identical is served from the **verdict cache** and does not re-run (`source: cached`; `--no-verdict-cache`/`MX_NO_CACHE=1` opts out) — `--dry-run` says what would actually run, for free. Invalidation is **build-attributed**: the build records what each injection step wrote, so a ch05 edit re-runs ch05's scenarios and caches the rest (measured: 6 of 20). **Three tiers, and they are not interchangeable.** WHILE YOU WORK: the smallest set that covers what you changed — the chapter suite, or `matrix.py run --scenarios a,b,c`. This is the default and the other two are exceptions. BEFORE A MERGE: `SUITE=gate` — the spine plus the two most recently hosted chapters, bounded by `check_gate_chapter_window` so it cannot accumulate. BEFORE A PLAYTEST BUILD you send the group (and after a week of tooling work): `SUITE=all` — the only tier that catches a chapter which aged out of the gate breaking three chapters later. **A full run is a deliberate act, never a reflex**: never after a merge, never to re-watch a green scene, and never one run per guess when something fails (Nicolas, 2026-08-10). **On a failure, spend one INSTRUMENTED run, not one run per guess.** All of it: `decisions.md` → "Playtest runs are the most expensive thing in this repo". |
-| `make chapter CH=chNN` | **How a fresh session gets oriented on a chapter** (`tools/chapter_status.py`, #312): declared-vs-built, derived at the moment you ask — scenes (declared / boxes / real A-presses / previewable), message-id headroom against the chapter's host block, art per named unit, **each enemy's AI behaviour and the vanilla donor it is borrowed from** (#335), which scenarios cover it and what each last said, and everything declared but unbuilt. No `CH=` lists every chapter at a glance. No ROM build, no emulator. **Read this instead of asking `HANDOFF.md` where a chapter stands** — a generated answer cannot go stale, and prose someone had to remember to update always does. |
-| `make verdict-diff [BASE=ref]` | **Every chapter's parity verdict, before vs after** (`tools/verdict_diff.py`, #510 step 0, ADR 0353): the campaign curve on the base commit and on this tree, in Tutorial, Normal and Difficult, and every cell whose verdict, ratio or finding moved. CI runs it on a PR that touches a parity input (`verdict_diff.py needed` says which) and comments only when a cell moved. While #510 has the chapters unlocked it is the regression signal the lock was; it never fails a build. ~50s. |
-| `tools/gen_wiki.py` | **The chapter wiki** (#486): one page per chapter in the Fire Emblem Wiki's layout, generated from the chapter YAML and the decomp (the twin's payload, recruits and red units read at HEAD, checked against ours), with the wiki mirror's Strategy section for the twin and the map donor. Open questions stay in each chapter's `open_questions` and on #486. Writes `build/wiki/index.html`; CI rebuilds it on every run and deploys `main`'s to <https://nicovigh.github.io/manchego-stars/> (ADR 0347), so nobody publishes it by hand. `node tools/wiki/phone_shots.mjs <dir>` screenshots it as a phone shows it and fails on a page that scrolls sideways. |
-| `tools/portrait_tool.py`, `tools/ref_to_bust.py` | Bust art pipeline (ref → indexed FE8 portrait). |
-| `tools/build_mgba_headless.sh` | One-time build of mGBA's **headless** frontend (with Lua) into `tools/emulator/`. A `kind: verdict` scenario then runs with **no window** — it asserts on memory and needs no pixels — so a run stops costing Nicolas's attention. `record`/`diagnostic` stay headed on purpose; `PT_HEADED=1` forces it. Nobody ships a macOS binary with both headless and Lua, hence the build (`decisions.md` → "A verdict scenario needs no pixels"). |
-| `tools/setup-toolchain.sh` | One-time macOS toolchain setup (brew deps, agbcc, python numpy/pillow/pyyaml). |
+| `tools/build_campaign.py` | inject campaign content into the decomp before `make` |
+| `tools/verify_text.py` | decode the built ROM's message text (regression gate, no mGBA) |
+| `make scene SCENE=chNN[/<n>]` | preview a scene's wrapping and staging from YAML, no build (#311); `docs/scenes/` is the diffed book. Authoring loop only — a scene still gets one real run. |
+| `make chapter [CH=chNN]` | get oriented on a chapter: declared vs built, scenes, art, enemy AI donors, scenario verdicts (#312). Prefer it to HANDOFF prose. |
+| `tools/playtest/run.sh <scenario>` | run ONE in-emulator scenario (rows from `matrix.yaml`) |
+| `tools/playtest/inspect_state.py` | `render` a playtest log, or `diff` two runs to the first divergence |
+| `make matrix [SUITE=…]` | the regression matrix, with a verdict cache (`--dry-run` is free). While working: the smallest covering set (`--scenarios a,b,c`). Before a merge: `SUITE=gate`. Before a build for the group: `SUITE=all`. |
+| `make verdict-diff [BASE=ref]` | every chapter's parity verdict, base vs this tree (ADR 0353; CI comments when a cell moves) |
+| `tools/gen_wiki.py` | the chapter wiki (#486, ADR 0347; CI deploys main's) |
+| `tools/portrait_tool.py`, `tools/ref_to_bust.py` | bust art pipeline |
+| `tools/build_mgba_headless.sh` | one-time headless mGBA build so `kind: verdict` scenarios run windowless (`PT_HEADED=1` forces a window) |
+| `tools/setup-toolchain.sh` | one-time macOS toolchain setup |
