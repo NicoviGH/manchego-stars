@@ -9,8 +9,8 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, late (Claude): **T100e is PR #587**, every review finding fixed, CI green,
-ready; **waiting on Nicolas's "merge"**. A chapter cell now plays K starts an arm, each from its
+Refreshed 2026-11-09, late (Claude): **T100e merged (PR #587, fc120754)**, every review
+finding fixed. A chapter cell now plays K starts an arm, each from its
 own New Game campaign (`montecarlo.py starts`, `cell`/`pilot --chapter N --starts K`). Refrozen
 on `ce1e3adb8c57+v2` (identical play). **The first starts found that no Manchego Stars campaign
 gets past ch02** (#510 comment 6751678084): Nicolas's call.
@@ -41,7 +41,7 @@ gets past ch02** (#510 comment 6751678084): Nicolas's call.
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
-  - **Frozen suite** (instrument `ce1e3adb8c57+v2`, PR #587's head; same play as #585's): 14 starts, 56 runs, 25 min
+  - **Frozen suite** (instrument `ce1e3adb8c57+v2`, PR #587; same play as #585's): 14 starts, 56 runs, 25 min
     wall on 8 workers, 2,490,781 `AiDecideMain` calls (SC-003's baseline; the jump from 567,629
     is T100b's counter branches, accepted by Nicolas); every run has a game result; 4 of 28
     held-out runs lost. A bot change makes a new instrument: run `suite --held-out` and read its
@@ -68,8 +68,7 @@ gets past ch02** (#510 comment 6751678084): Nicolas's call.
 
 ## Next
 
-1. **Merge PR #587 (T100e) on Nicolas's word**, then tick T100e on #510's plan comment
-   6563384310 (its design bullet sits under it).
+1. **T100e is merged and ticked** on #510's plan comment 6563384310 (design bullet under it).
 2. **Nicolas's call: Manchego Stars ch02** (#510 comment 6751678084). All 10 starts campaigns
    (120 attempts) won ch02 and lost both green chwinga, Rime Spark (0xC9) and Snow Mote (0xCA),
    mostly by turn 3, so none cleared clean and Manchego Stars has no starts past ch02. Either
