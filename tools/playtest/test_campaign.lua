@@ -126,6 +126,20 @@ local function test_restart_redraws_style_not_seed()
 end
 test_restart_redraws_style_not_seed()
 
+-- api.startOnly = n (montecarlo.py `starts`, T100e): the campaign stops once chapter n's start
+-- state is saved, never playing it, since a cell only loads that start.
+local function test_a_starts_campaign_stops_at_its_last_start()
+    local g = fakeGame({ chapters = { { id = 1, outcomes = { "won" } },
+                                      { id = 2, outcomes = { "won" } } } })
+    g.api.startOnly = 2
+    local ok, why = Campaign.run(g.api)
+    check(ok, true, "stopping at the last start is a finished run")
+    check(#g.saved, 2, "both starts are saved")
+    check(#g.plays, 1, "the last chapter is never played")
+    check(why, "chapter 2's start is saved", "and it says where it stopped")
+end
+test_a_starts_campaign_stops_at_its_last_start()
+
 -- api.only = k plays the style the loop plays at attempt k after k - 1 failures, and only
 -- it: no state saved, no chapter after it, and a k past the styles there are says so.
 local function test_one_attempt_alone_is_the_loops_kth()

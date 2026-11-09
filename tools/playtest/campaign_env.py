@@ -222,18 +222,27 @@ def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
     return lords.index(uid)
 
 
+def cell_chapters(campaign=campaign_chapters.CAMPAIGN):
+    """{chapter number: (ours chapter index, the twin's chapter index)} for every written
+    chapter: where each game's campaign stands at that chapter's start, so a chapter cell
+    reads the same chapter in both (the host slot, ADR 0211; the twin, ADR 0330)."""
+    written = {int(c['chapter_number']) for c in campaign_chapters.load_all(campaign)
+               if c.get('status') != 'planned'}
+    rows = inject.chapter_settings.twin_rows()
+    return {h.number: (h.host_index, rows[difficulty.VANILLA_CHAIN[h.number]])
+            for h in inject.hosts.hosted_chapters() if h.number in written}
+
+
 def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
     """`store`: a vanilla campaign's states directory, holding `<chapter>.json` per chapter
     start, or a list of them, each twin read from the first that holds it (the clean campaign
     stops at Ch5, so a later twin's shops come from another run). Raises when a twin's record
     is missing: a run without its shops would be a different campaign, not a smaller one."""
     stores = [store] if isinstance(store, str) else list(store)
-    written = {int(c['chapter_number']) for c in campaign_chapters.load_all(campaign)
-               if c.get('status') != 'planned'}
-    hosts = {h.number: h.host_index for h in inject.hosts.hosted_chapters() if h.number in written}
+    pairs = cell_chapters(campaign)
+    hosts = {number: host for number, (host, _twin) in pairs.items()}
     shops = {}
-    for number, host in sorted(hosts.items()):
-        twin = inject.chapter_settings.twin_rows()[difficulty.VANILLA_CHAIN[number]]
+    for number, (host, twin) in sorted(pairs.items()):
         paths = [os.path.join(s, '%d.json' % twin) for s in stores]
         path = next((p for p in paths if os.path.exists(p)), None)
         if path is None:

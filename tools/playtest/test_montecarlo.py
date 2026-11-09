@@ -677,6 +677,7 @@ class Cell(unittest.TestCase):
             return self.died(False, ch)
         got = mc.cell_pairs(self.sides(), self.play(fate, []), list(range(1, 11)))
         self.assertEqual(len(got['pairs']), 9)
+        self.assertEqual(got['paired'], [1, 2, 3, 4, 5, 6, 8, 9, 10], 'the seeds that made a pair')
         self.assertEqual(got['reach']['vanilla'], {'reached': 9, 'unreached': 1, 'unresolved': 0})
         self.assertEqual(got['reach']['ours'], {'reached': 10, 'unreached': 0, 'unresolved': 0})
         p = got['problems'][0]
@@ -750,6 +751,8 @@ class Cell(unittest.TestCase):
         self.assertEqual((tasks[0]['mode'], tasks[0]['vanilla']), ('difficult', True))
         with self.assertRaises(ValueError):
             mc.campaign_tasks({'from': 4}, [1], 'normal', stamp)
+        named = mc.campaign_tasks({'last': [7]}, [5], None, {'x': 1}, prefix='cs')
+        self.assertEqual(named[0]['campaign']['id'], 'cs-s5')
 
     def test_a_tasks_stamp_reaches_every_record_crashed_too(self):
         d = tempfile.mkdtemp()
@@ -961,7 +964,7 @@ class Suite(unittest.TestCase):
         suite = self.load(self.suite())
         envs = {'vanilla': {'last': [99], 'claims': {}}, 'ours': {'last': [8], 'shops': {}}}
         outs = {'vanilla': '/v.jsonl', 'ours': '/o.jsonl'}
-        arms = [mc.chapter_tasks(suite, envs, 'i', outs, sid, 'pilot')
+        arms = [mc.chapter_tasks(suite, envs, 'i', outs, mc.start_of(suite, sid), 'pilot')
                 for sid in ('ours-ch02', 'vanilla-ch3')]
         for tasks in arms:
             self.assertEqual([t['seed'] for t in tasks], list(range(3001, 3051)))
@@ -969,31 +972,48 @@ class Suite(unittest.TestCase):
         self.assertEqual(arms[0][0]['campaign'], {'last': [3], 'shops': {}, 'id': 'o', 'from': 3,
                                                   'attempt': 1})
         self.assertEqual((arms[1][0]['campaign']['from'], arms[1][0]['out']), (3, '/v.jsonl'))
-        some = mc.chapter_tasks(suite, envs, 'i', outs, 'vanilla-ch3', 'confirmatory', [7, 2])
+        v3 = mc.start_of(suite, 'vanilla-ch3')
+        some = mc.chapter_tasks(suite, envs, 'i', outs, v3, 'confirmatory', [7, 2])
         self.assertEqual([t['seed'] for t in some], [2, 7])
-        for bad in (('vanilla-ch3', 'pilot', [7]), ('vanilla-ch3', 'tuning', [2001]),
-                    ('vanilla-ch3', 'nope', None), ('ours-ch99', 'pilot', None)):
+        for bad in (('pilot', [7]), ('tuning', [2001]), ('nope', None)):
             with self.assertRaises(ValueError):
-                mc.chapter_tasks(suite, envs, 'i', outs, *bad)
+                mc.chapter_tasks(suite, envs, 'i', outs, v3, *bad)
 
-    def test_a_chapter_side_reads_only_its_own_kept_runs(self):
+    def cell_start(self, campaign, chapter=3, game='vanilla', seed=4001):
+        return {'start_id': '%s/%d' % (campaign, chapter), 'game': game, 'chapter': chapter,
+                'rom_hash': 'h', 'state_path': 'x', 'state_sha1': 'y', 'estimate_wall_s': 600,
+                'provenance': {'campaign': campaign, 'seed': seed}}
+
+    def test_a_chapter_side_deals_each_seed_its_start_and_reads_only_those_runs(self):
+        # T100e: seed s plays start (s - first) % K whichever seeds a look plays, and a kept
+        # run counts only on the start its seed is dealt
         suite = self.load(self.suite())
         d = tempfile.mkdtemp()
         store = os.path.join(d, 'runs.jsonl')
+        starts = [self.cell_start('cs-s4001'), self.cell_start('cs-s4002', seed=4002)]
         base = {'game': 'vanilla', 'rom_hash': 'h', 'instrument': 'i', 'chapter': 3,
                 'attempt': 1, 'outcome': 'won'}
-        for seed, inst, sid, kind, rom in ((3001, 'i', 'vanilla-ch3', 'pilot', 'h'),
-                                           (3002, 'old', 'vanilla-ch3', 'pilot', 'h'),
-                                           (3003, 'i', 'vanilla-ch3', 'tuning', 'h'),
-                                           (3004, 'i', 'ours-ch02', 'pilot', 'h'),
-                                           (3005, 'i', 'vanilla-ch3', 'pilot', 'other')):
+        for seed, inst, sid, kind, rom in ((3001, 'i', 'cs-s4001/3', 'pilot', 'h'),
+                                           (3002, 'i', 'cs-s4002/3', 'pilot', 'h'),
+                                           (3003, 'i', 'cs-s4002/3', 'pilot', 'h'),  # not its
+                                           (3004, 'old', 'cs-s4002/3', 'pilot', 'h'),
+                                           (3005, 'i', 'cs-s4001/3', 'tuning', 'h'),
+                                           (3007, 'i', 'cs-s4001/3', 'pilot', 'other')):
             mc.append_record(store, dict(base, seed=seed, instrument=inst, rom_hash=rom,
                                          suite={'start_id': sid, 'set': kind, 'version': 1}))
-        side = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', 'vanilla-ch3', 'pilot',
+        side = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', starts, 'pilot',
                                store, 'h')
-        self.assertEqual(sorted(side['kept']()), [3001])
-        self.assertEqual((side['chapter'], side['vanilla']), (3, True))
-        self.assertEqual([t['seed'] for t in side['tasks']([3009])], [3009])
+        self.assertEqual(sorted(side['kept']()), [3001, 3002])
+        self.assertEqual((side['chapter'], side['vanilla'], side['starts']), (3, True, starts))
+        got = side['tasks']([3009, 3002, 3001])
+        self.assertEqual(sorted((t['seed'], t['stamp']['suite']['start_id'], t['campaign']['id'])
+                                for t in got),
+                         [(3001, 'cs-s4001/3', 'cs-s4001'), (3002, 'cs-s4002/3', 'cs-s4002'),
+                          (3009, 'cs-s4001/3', 'cs-s4001')])
+        one = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', starts[:1], 'pilot',
+                              store, 'h')
+        self.assertEqual({t['campaign']['id'] for t in one['tasks']([3001, 3002])},
+                         {'cs-s4001'}, 'one start takes every seed')
 
     def test_a_benched_arm_plays_and_keeps_under_its_own_instrument(self):
         # the benched-twin experiment: its runs are never read as the instrument's, nor its
@@ -1005,35 +1025,187 @@ class Suite(unittest.TestCase):
         os.makedirs(d)
         store = os.path.join(d, 'runs.jsonl')
         base = {'game': 'vanilla', 'rom_hash': 'h', 'chapter': 3, 'attempt': 1,
-                'outcome': 'won', 'suite': {'start_id': 'vanilla-ch3', 'set': 'pilot',
+                'outcome': 'won', 'suite': {'start_id': 'cs-s4001/3', 'set': 'pilot',
                                             'version': 1}}
         mc.append_record(store, dict(base, seed=3001, instrument='i'))
         mc.append_record(store, dict(base, seed=3002, instrument='i+bench02'))
         simdirs = {'vanilla': d, 'ours': '/s/ours/h2'}
-        sides = mc.chapter_sides(suite, simdirs, {'vanilla': {}, 'ours': {}}, 'i',
-                                 {'ours': 'ours-ch02', 'vanilla': 'vanilla-ch3'}, 'pilot',
-                                 {'vanilla': [0x02]})
+        starts = {'vanilla': [self.cell_start('cs-s4001')],
+                  'ours': [self.cell_start('cs-s4001', 4, 'ours')]}
+        sides = mc.chapter_sides(suite, simdirs, {'vanilla': {}, 'ours': {}}, 'i', starts,
+                                 'pilot', {'vanilla': [0x02]})
         self.assertEqual(sorted(sides['vanilla']['kept']()), [3002])
         task = sides['vanilla']['tasks']([3009])[0]
         self.assertEqual((task['instrument'], task['bench']), ('i+bench02', [0x02]))
         self.assertNotIn('bench', sides['ours']['tasks']([3009])[0])
         self.assertEqual(sides['ours']['tasks']([3009])[0]['instrument'], 'i')
-        plain = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', 'vanilla-ch3',
+        self.assertEqual(sides['ours']['store'], '/s/ours/h2/runs.jsonl')
+        plain = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', starts['vanilla'],
                                 'pilot', store, 'h')
         self.assertEqual(sorted(plain['kept']()), [3001])
+        sides['ours']['reached'], sides['vanilla']['reached'] = (1, 3), (1, 1)
+        self.assertEqual(mc.games_line(sides, [3001, 3002]),
+                         'over 1 MS games (1 of 3 pinned campaigns reached the chapter) and '
+                         '1 vanilla games (1 of 1 pinned campaigns reached the chapter)')
 
-    def test_an_arm_must_name_its_own_games_start(self):
-        # review of #582: swapped flags would file the twin's runs as ours'
+    def test_the_games_line_counts_only_the_starts_the_seeds_were_dealt(self):
+        # review of #587: K starts asked, fewer dealt (more starts than seeds, or an early look)
         suite = self.load(self.suite())
-        simdirs = {'vanilla': '/s/vanilla/h1', 'ours': '/s/ours/h2'}
-        envs = {'vanilla': {}, 'ours': {}}
-        sides = mc.chapter_sides(suite, simdirs, envs, 'i',
-                                 {'ours': 'ours-ch02', 'vanilla': 'vanilla-ch3'}, 'pilot')
-        self.assertEqual(sides['ours']['store'], '/s/ours/h2/runs.jsonl')
+        sides = {n: mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i',
+                                    [self.cell_start('cs-s%d' % s, game=n, seed=s)
+                                     for s in range(4001, 4061)], 'pilot', '/r.jsonl', 'h')
+                 for n in ('ours', 'vanilla')}
+        for side in sides.values():
+            side['reached'] = (60, 60)
+        self.assertIn('over 50 MS games', mc.games_line(sides, range(3001, 3051)))
+        self.assertIn('and 2 vanilla games', mc.games_line(sides, [3001, 3002, 3061]))
+
+    def pins(self, store, campaigns):
+        os.makedirs(store, exist_ok=True)
+        mc.write_pins(store, [{'campaign': 'cs-s%d' % seed, 'seed': seed, 'outcome': 'done',
+                               'why': None, 'chapters': {str(c): 'sha%d' % c for c in chs}}
+                              for seed, chs in campaigns])
+
+    def test_cell_starts_are_the_first_k_pinned_campaigns_that_reached_the_chapter(self):
+        suite = self.load(self.suite())
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        store = os.path.join(top, 'h')
+        self.pins(store, [(4003, [0, 1, 2, 3]), (4001, [0, 1, 2, 3]), (4002, [0, 1]),
+                          (4004, [0, 1, 2, 3])])
+        got = mc.cell_starts(suite, store, 'vanilla', 3, 2)
+        self.assertEqual([st['start_id'] for st in got], ['cs-s4001/3', 'cs-s4003/3'])
+        st = got[0]
+        self.assertEqual((st['game'], st['chapter'], st['rom_hash'], st['state_sha1'],
+                          st['provenance'], st['estimate_wall_s']),
+                         ('vanilla', 3, 'h', 'sha3', {'campaign': 'cs-s4001', 'seed': 4001}, 600))
+        # where the harness loads it from, so check_starts takes it as pinned
+        self.assertEqual(os.path.abspath(os.path.join(mc.REPO, st['state_path'])),
+                         os.path.abspath(os.path.join(store, 'states', 'cs-s4001', '3.ss')))
+        self.assertEqual(len(mc.cell_starts(suite, store, 'vanilla', 1, 4)), 4)
         with self.assertRaises(ValueError) as cm:
-            mc.chapter_sides(suite, simdirs, envs, 'i',
-                             {'ours': 'vanilla-ch3', 'vanilla': 'ours-ch02'}, 'pilot')
-        self.assertIn('--ours-start vanilla-ch3 is a vanilla start', str(cm.exception))
+            mc.cell_starts(suite, store, 'vanilla', 3, 4)
+        self.assertIn('3 vanilla campaigns', str(cm.exception))
+        self.assertIn('starts --game vanilla', str(cm.exception))
+        self.assertEqual(mc.cell_pins(os.path.join(top, 'none')), [])
+
+    def test_a_cell_runs_start_is_found_by_its_id_so_replay_can_play_it(self):
+        # review of #587: a pilot's discordant pair names cs-s4001/3, and replay must find it
+        suite = self.load(self.suite())
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        simdirs = {'vanilla': os.path.join(top, 'v'), 'ours': os.path.join(top, 'o')}
+        # both games name their starts campaigns cs-s<seed>, so one id is in both stores:
+        # the record's game picks the store (re-review of #587)
+        self.pins(simdirs['vanilla'], [(4001, [3, 4])])
+        self.pins(simdirs['ours'], [(4001, [3, 4])])
+        for game in ('ours', 'vanilla'):
+            st = mc.start_by_id(suite, simdirs, 'cs-s4001/3', game)
+            self.assertEqual((st['game'], st['chapter'], st['state_sha1']), (game, 3, 'sha3'))
+            self.assertTrue(st['state_path'].endswith(
+                os.path.join(os.path.basename(simdirs[game]), 'states', 'cs-s4001', '3.ss')))
+        self.assertEqual(mc.start_by_id(suite, simdirs, 'vanilla-ch3', 'vanilla')['start_id'],
+                         'vanilla-ch3')
+        for bad in ('cs-s4001/5', 'cs-s4009/3', 'cs-s4001/x', 'nope'):
+            with self.assertRaises(ValueError):
+                mc.start_by_id(suite, simdirs, bad, 'vanilla')
+        with mock.patch.object(mc, 'suite_setup', return_value=(suite, simdirs, dict)), \
+                mock.patch.object(mc, 'check_starts', return_value=[]):
+            one, _dirs, _envs = mc.pinned_setup(['cs-s4001/3'], 'vanilla')
+        task = mc.start_task(one, {'vanilla': {'last': [9]}, 'ours': {}}, 'i', 'cs-s4001/3',
+                             'pilot', 3007)
+        self.assertEqual((task['seed'], task['campaign']['id'], task['campaign']['from']),
+                         (3007, 'cs-s4001', 3))
+
+    def test_cell_setup_refuses_what_cannot_be_played(self):
+        suite = self.load(self.suite())
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        simdirs = {'vanilla': os.path.join(top, 'v'), 'ours': os.path.join(top, 'o')}
+        self.pins(simdirs['vanilla'], [(4001, [3])])
+        self.pins(simdirs['ours'], [(4001, [4])])
+        with mock.patch.object(mc, 'suite_setup', return_value=(suite, simdirs, dict)), \
+                mock.patch.object(mc, 'check_starts', return_value=[]) as check:
+            suite_, dirs, _envs, starts = mc.cell_setup(3, 1)
+            self.assertEqual({a: [st['start_id'] for st in v] for a, v in starts.items()},
+                             {'ours': ['cs-s4001/4'], 'vanilla': ['cs-s4001/3']})
+            checked = check.call_args[0][0]
+            self.assertEqual(([st['start_id'] for st in checked['starts']],
+                              checked['snapshots']), (['cs-s4001/4', 'cs-s4001/3'], []))
+            sides = mc.chapter_sides(suite_, dirs, {'vanilla': {}, 'ours': {}}, 'i', starts,
+                                     'pilot')
+            self.assertEqual((sides['ours']['reached'], sides['vanilla']['reached']),
+                             ((1, 1), (1, 1)))
+            self.assertIn('needs a start an arm', mc.cell_setup(3, 0))
+            self.assertIn('not a written chapter', mc.cell_setup(99, 1))
+            self.assertIn('1 ours campaigns', mc.cell_setup(3, 2))
+            check.return_value = ['cs-s4001/3: its state is gone']
+            self.assertIn('its state is gone', mc.cell_setup(3, 1))
+
+    def test_starts_plays_only_unpinned_seeds_and_pins_each_campaign_as_it_ends(self):
+        suite = self.load(self.suite())
+        suite['seed_sets']['starts'] = [4001, 4005]
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        store = os.path.join(top, 'h')
+        simdirs = {'vanilla': store, 'ours': os.path.join(top, 'o')}
+        self.pins(store, [(4002, [0, 1])])
+        # a killed earlier play of 4001 left a start this play never reaches
+        os.makedirs(os.path.join(store, 'states', 'cs-s4001'))
+        with open(os.path.join(store, 'states', 'cs-s4001', '7.ss'), 'wb') as fh:
+            fh.write(b'stale')
+        played = []
+
+        class Fake:
+            def run(self, tasks):
+                for t in tasks:
+                    played.append((t['seed'], t['campaign']['id'], t['campaign']['last'],
+                                   t['campaign']['start_only'], t['vanilla']))
+                    if t['seed'] == 4004:   # the harness failed: never pinned, played again
+                        yield {'seed': 4004, 'outcome': 'crashed', 'why': 'no ROM'}
+                        continue
+                    d = os.path.join(store, 'states', t['campaign']['id'])
+                    os.makedirs(d, exist_ok=True)
+                    for c in (0, 1, 2):
+                        with open(os.path.join(d, '%d.ss' % c), 'wb') as fh:
+                            fh.write(b'%d' % c)
+                    with open(os.path.join(d, '2.json'), 'w') as fh:
+                        fh.write('{}')
+                    yield {'seed': t['seed'], 'chapter': 2, 'outcome': 'lost'}   # an attempt
+                    # the campaign's end: no chapter
+                    yield {'kind': 'campaign', 'seed': t['seed'], 'outcome': 'infeasible',
+                           'why': '300 attempts'}
+                    # each worker's end is pinned before the next worker's runs are read
+                    self_pins = {c['seed'] for c in mc.cell_pins(store)}
+                    assert t['seed'] in self_pins, self_pins
+        out = io.StringIO()
+        with mock.patch.object(mc, 'suite_setup', return_value=(
+                suite, simdirs, lambda: {'vanilla': {'last': [99]}, 'ours': {}})), \
+                contextlib.redirect_stdout(out):
+            self.assertEqual(mc.starts_main(mock.Mock(game='vanilla', count=3, jobs=2),
+                                            Fake()), 0)
+            self.assertEqual(mc.starts_main(mock.Mock(game='vanilla', count=4, jobs=2),
+                                            Fake()), 1, 'a crash fails the command')
+            self.assertEqual(mc.starts_main(mock.Mock(game='vanilla', count=4, jobs=2),
+                                            Fake()), 1)
+            self.assertEqual(mc.starts_main(mock.Mock(game='vanilla', count=6, jobs=2),
+                                            Fake()), 1)
+        last = max(p[1] for p in __import__('campaign_env').cell_chapters().values())
+        self.assertEqual(played, [(4001, 'cs-s4001', [last], last, True),
+                                  (4003, 'cs-s4003', [last], last, True),
+                                  (4004, 'cs-s4004', [last], last, True),
+                                  (4004, 'cs-s4004', [last], last, True)])
+        pins = {c['seed']: c for c in mc.cell_pins(store)}
+        self.assertEqual(sorted(pins), [4001, 4002, 4003], 'the crash is not pinned')
+        self.assertIn('cs-s4004: crashed, not pinned (no ROM', out.getvalue())
+        self.assertEqual(pins[4001]['outcome'], 'infeasible')
+        self.assertEqual(pins[4001]['chapters'],
+                         {str(c): mc.sha1_file(os.path.join(store, 'states', 'cs-s4001',
+                                                            '%d.ss' % c)) for c in (0, 1, 2)})
+        self.assertEqual(pins[4002]['chapters'], {'0': 'sha0', '1': 'sha1'}, 'kept as pinned')
+        self.assertIn('refused: --count 6', out.getvalue())
+        self.assertIn('ch01 (index 1): 3 of 3 pinned campaigns reached its start\n'
+                      'ch02 (index 2): 2 of 3', out.getvalue())
 
     def test_pinned_setup_checks_only_the_named_starts_and_refuses_the_rest(self):
         suite = self.load(self.suite())
@@ -1047,9 +1219,10 @@ class Suite(unittest.TestCase):
             return ['vanilla-ch3: its state is gone'] if len(seen) > 1 else []
         with mock.patch.object(mc, 'suite_setup', return_value=(suite, simdirs, dict)), \
                 mock.patch.object(mc, 'check_starts', check):
-            self.assertEqual(mc.pinned_setup(['vanilla-ch3'])[0], suite)
-            self.assertIn('its state is gone', mc.pinned_setup(['vanilla-ch3']))
-            self.assertIn('no start nope', mc.pinned_setup(['nope']))
+            self.assertEqual(mc.pinned_setup(['vanilla-ch3'], 'vanilla')[0],
+                             dict(suite, starts=[mc.start_of(suite, 'vanilla-ch3')]))
+            self.assertIn('its state is gone', mc.pinned_setup(['vanilla-ch3'], 'vanilla'))
+            self.assertIn('no start nope', mc.pinned_setup(['nope'], 'vanilla'))
         self.assertEqual(seen[0], (['vanilla-ch3'], []), 'it plays no snapshot, so checks none')
 
     def test_the_cell_count_is_checked_before_anything_plays(self):
@@ -1063,9 +1236,9 @@ class Suite(unittest.TestCase):
 
     def test_a_cell_takes_one_kind_of_flags(self):
         # review of #582: a mix of chapter and campaign flags is an error, never half-read
-        for argv in (['cell', '--analysis', 'paired', '--ours-start', 'a'],
-                     ['cell', '--analysis', 'paired', '--ours-start', 'a', '--vanilla-start',
-                      'b', '--ours', 'o.json'],
+        for argv in (['cell', '--analysis', 'paired', '--chapter', '3', '--ours', 'o.json'],
+                     ['cell', '--analysis', 'paired', '--chapter', '3', '--ours', 'o',
+                      '--vanilla', 'v', '--ours-chapter', '4', '--vanilla-chapter', '3'],
                      ['cell', '--analysis', 'paired', '--ours', 'o', '--vanilla', 'v',
                       '--ours-chapter', '4']):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -1078,8 +1251,8 @@ class Suite(unittest.TestCase):
         side = {'kept': dict, 'tasks': lambda seeds: [], 'chapter': 3, 'pinned': True}
         problem = {'side': 'ours', 'seed': 3001, 'status': 'unresolved', 'why': 'Lua error: x'}
         out = io.StringIO()
-        with mock.patch.object(mc, 'pinned_setup',
-                               return_value=(suite, {'ours': '/o', 'vanilla': '/v'}, dict)), \
+        with mock.patch.object(mc, 'cell_setup', return_value=(
+                suite, {'ours': '/o', 'vanilla': '/v'}, dict, {'ours': [], 'vanilla': []})), \
                 mock.patch.object(mc, 'instrument_id', return_value='i'), \
                 mock.patch.object(mc, 'chapter_sides', return_value={'ours': side,
                                                                      'vanilla': side}), \
@@ -1088,8 +1261,7 @@ class Suite(unittest.TestCase):
                     'pairs': [(None, False)] * 50, 'problems': [problem], 'cpu_s': 0.0,
                     'reach': {}, 'results': {}}), \
                 contextlib.redirect_stdout(out):
-            self.assertEqual(mc.main(['pilot', '--ours-start', 'ours-ch02', '--vanilla-start',
-                                      'vanilla-ch3']), 1)
+            self.assertEqual(mc.main(['pilot', '--chapter', '2']), 1)
         self.assertIn('refused: no pilot pair has a game result', out.getvalue())
         self.assertIn('Lua error: x', out.getvalue())
 

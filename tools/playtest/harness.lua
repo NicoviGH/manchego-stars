@@ -3816,6 +3816,8 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
     end
     api.only = cfg.attempt
+    -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
+    api.startOnly = cfg.start_only
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
     -- a pinned state's check (PT_PINNED) is one too: it hands no record back, writes no line
     api.diag = ((PLAYTEST_DIAG or "") ~= "" or (PLAYTEST_PINNED or "") ~= "") or nil

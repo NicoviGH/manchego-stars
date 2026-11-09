@@ -34,6 +34,22 @@ class VanillaIndex(unittest.TestCase):
         self.assertEqual(ce.vanilla_env()['groups'][str(0x05)], 'mounted')
 
 
+class CellChapters(unittest.TestCase):
+    def test_each_written_chapter_is_its_host_and_its_twin(self):
+        # review of #587: the one owner of "our chapter N -> each game's index at its start"
+        got = ce.cell_chapters()
+        hosts = {h.number: h.host_index for h in inject.hosts.hosted_chapters()}
+        chapters = {int(c['chapter_number']): c
+                    for c in campaign_chapters.load_all(campaign_chapters.CAMPAIGN)}
+        written = sorted(n for n, c in chapters.items() if c.get('status') != 'planned')
+        self.assertEqual(sorted(got), [n for n in written if n in hosts])
+        self.assertEqual(got[3], (hosts[3], twin_rows()['FE8 Ch3']))
+        self.assertEqual(got[5][1], 6, 'ch05 twins Ch5, which sits past Ch5x')
+        planned = [n for n, c in chapters.items() if c.get('status') == 'planned']
+        self.assertTrue(planned, 'the campaign has planned chapters to leave out')
+        self.assertFalse(set(planned) & set(got), 'a planned chapter has no start')
+
+
 class LeadRow(unittest.TestCase):
     def test_a_pc_is_its_menu_row(self):
         lords = [u for u, *_ in ce.inject.cast._classed_cast(campaign_chapters.CAMPAIGN,
