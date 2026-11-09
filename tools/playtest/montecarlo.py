@@ -1930,7 +1930,7 @@ def starts_main(args, pool=None):
     todo = [s for s in range(lo, lo + args.count) if s not in pins]
     last = max(pair[1 if vanilla else 0] for pair in campaign_env.cell_chapters().values())
     print('%d %s campaigns pinned, %d to play to chapter index %d on %d workers'
-          % (len(pins), args.game, len(todo), last, args.jobs))
+          % (len(pins), args.game, len(todo), last, args.jobs), flush=True)
     os.makedirs(store, exist_ok=True)
     pool = pool or Pool(jobs=args.jobs, out=os.path.join(store, 'runs.jsonl'))
     for rec in pool.run(starts_tasks(envs()[args.game], todo, vanilla, last)):
@@ -1941,7 +1941,8 @@ def starts_main(args, pool=None):
         write_pins(store, pins.values())
         print('  cs-s%d: %s (%s), %d chapter starts' % (seed, rec.get('outcome'),
                                                        rec.get('why'),
-                                                       len(pins[seed]['chapters'])))
+                                                       len(pins[seed]['chapters'])),
+              flush=True)
     for number, pair in sorted(campaign_env.cell_chapters().items()):
         index = pair[1 if vanilla else 0]
         n = sum(1 for c in pins.values() if str(index) in c['chapters'])
