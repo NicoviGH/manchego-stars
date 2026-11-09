@@ -4479,6 +4479,63 @@ do
     check(plan.lookahead.extended, true, "lookahead: room left after ours-ch03's 19 triggers")
 end
 
+-- test_over_the_cap_this_phase_comes_first (#510 T100b, ours ch03 careful seed 3010 turn 18,
+-- replayed): every plan is over the cap. The march to (1,0) may die in the next enemy phase
+-- (70% shown); the hold at (0,0) is safe there, and dies only in the lookahead's second phase,
+-- which has it stand still for another round (the guess the records found far too high: 0 of
+-- 8 such readings came true). Over the cap the next phase's own chances rank first, the second
+-- phase's only break their ties: the hold is played. Before, the larger two-phase number
+-- decided, and the march (the smaller) was played and died.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local K = red(0x82, 2, 9, { isBoss = true, minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x82] = tiles({ 1, 1 }) },
+        field = function(t)
+            return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
+        end,
+        explorable = { { x = 9, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["9,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { enemy = 0x82, target = b.unit.id, takenHit = 70, takenDmg = 99,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+        nextPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 0 then
+                    return { { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X, K), sightOf(o), gifted("careful", 1000))
+    check(plan.lookahead.extended, true, "over the cap: the boss trigger asked the second phase")
+    local hold, march
+    for _, c in ipairs(plan.considered) do
+        if c.extended and c.acts[1]:match("@0,0>") then hold = hold or c end
+        if c.extended and c.acts[1]:match("@1,0>") then march = march or c end
+    end
+    check(hold ~= nil and march ~= nil, true, "over the cap: both the hold and the march judged")
+    check(hold.rank.admitted or march.rank.admitted, false, "over the cap: neither is admitted")
+    -- the gap the order turns on, both ways: the two-phase numbers favour the march, the next
+    -- phase's favour the hold
+    check(march.rank.max_die < hold.rank.max_die - 0.1, true,
+          "over the cap: the march's two-phase chance is the smaller")
+    check(hold.rank.first_max_exceed, 0, "over the cap: the hold is safe in the next phase")
+    check(march.rank.first_max_exceed > 0.3, true, "over the cap: the march is not")
+    check(at(a), "0,0", "over the cap: the next phase's chance ranks first, the hold is played")
+    check(plan.protected[1].first, 0, "over the cap: the record keeps the next phase's chance")
+    check(plan.protected[1].die > 0.99, true, "over the cap: and the two-phase one")
+end
+
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
 -- alone -- our units, the enemies gone, the enemies' HP -- and nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.

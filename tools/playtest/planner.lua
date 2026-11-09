@@ -167,7 +167,12 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
 -- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
 -- among others, it ends the chapter (Nicolas, 2026-11-01); then the smallest largest excess,
--- then summed excess, then largest death chance. Then the admitted order: fewer goals forfeited
+-- then summed excess, then largest death chance. Each of those is read on the next enemy
+-- phase first (`first_*`) and on both phases only to break its ties: the lookahead's second
+-- phase has our units stand still another round, and over ours ch03's pilots its readings
+-- came true 0 of 8 times where the next phase's were about right, so ranking by both let a
+-- unit be sent to an 82% death to dodge another's second-phase 90% (ADR 0389, amended
+-- 2026-11-08; careful seed 3010 turn 18, replayed). Then the admitted order: fewer goals forfeited
 -- (the completion ledger's), the likelier win, more progress. Allied greens' summed death
 -- chance breaks ties among the plans within a turn of the most progress judged (FR-012: only
 -- there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
@@ -189,7 +194,8 @@ function M.outranks(a, b)
     local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }
     local lead = {}
     if not a.admitted then
-        lead = { { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 } }
+        lead = { { "first_game_over", 1 }, { "first_max_exceed", 1 }, { "first_sum_exceed", 1 },
+                 { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 } }
     end
     for _, o in ipairs(ADMITTED) do lead[#lead + 1] = o end
     for i = #lead, 1, -1 do table.insert(order, 1, lead[i]) end
@@ -911,11 +917,17 @@ function M.plan(Bot, board, sight, style, opts)
     end
     -- the rank's admission (FR-009 to FR-011) from each protected unit's death chance against
     -- the cap: set once the phase is judged, and again when the lookahead adds a second phase
+    -- The first call is the next phase's alone, and its numbers are kept (`first_*`, a
+    -- protected unit's `first`): over the cap they rank ahead of the two-phase ones
+    -- (M.outranks), which the lookahead's call overwrites.
     local function admit(st)
         local rank = st.rank
+        local firstCall = rank.first_game_over == nil
+        if firstCall then rank.first_game_over = rank.game_over end
         rank.admitted, rank.max_exceed, rank.sum_exceed, rank.max_die, rank.sum_die =
             true, 0, 0, 0, 0
         for _, pr in ipairs(st.protected) do
+            if firstCall then pr.first = pr.die end
             local over = M.admits(pr.die, cap) and 0 or pr.die - cap
             rank.admitted = rank.admitted and over == 0
             rank.max_exceed = math.max(rank.max_exceed, over)
@@ -923,6 +935,7 @@ function M.plan(Bot, board, sight, style, opts)
             rank.max_die = math.max(rank.max_die, pr.die)
             rank.sum_die = rank.sum_die + pr.die
         end
+        if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
     -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, hp0? }):
     -- per id { d (its chance to die), t (HP taken), sh (HP short at the end, when maxhp is
