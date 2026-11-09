@@ -34,8 +34,8 @@ gets past ch02** (#510 comment 6751678084): Nicolas's call.
     surprise-replan rule stayed strict (no bot change). **PR-H #582** (ADR 0385, "Built
     (PR-H)"): `paired_verdict` now judges any protected death on attempt 1 with exact bounds
     (N = 24 in `instrument.cells`, ±10 margin); chapter cells, `pilot` and `cell`. The pilot
-    (ours ch03 vs vanilla Ch3, Nicolas's pick): ours lost someone on 18 of 50 first attempts,
-    the twin on 0 of 50. Every death was a careful-style run; 6 of 50 (12%) were blind-spot
+    (Manchego Stars ch03 vs vanilla Ch3, Nicolas's pick): Manchego Stars lost someone on 18 of
+    50 first attempts, the twin on 0 of 50. Every death was a careful-style run; 6 of 50 (12%) were blind-spot
     deaths, over PR-I's 10% validity bar; and a seed only draws the style, so 50 seeds made 30
     distinct plays an arm. PR-I has to weigh both.
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
