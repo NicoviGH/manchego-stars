@@ -677,6 +677,7 @@ class Cell(unittest.TestCase):
             return self.died(False, ch)
         got = mc.cell_pairs(self.sides(), self.play(fate, []), list(range(1, 11)))
         self.assertEqual(len(got['pairs']), 9)
+        self.assertEqual(got['paired'], [1, 2, 3, 4, 5, 6, 8, 9, 10], 'the seeds that made a pair')
         self.assertEqual(got['reach']['vanilla'], {'reached': 9, 'unreached': 1, 'unresolved': 0})
         self.assertEqual(got['reach']['ours'], {'reached': 10, 'unreached': 0, 'unresolved': 0})
         p = got['problems'][0]
@@ -1094,17 +1095,23 @@ class Suite(unittest.TestCase):
         top = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, top)
         simdirs = {'vanilla': os.path.join(top, 'v'), 'ours': os.path.join(top, 'o')}
-        self.pins(simdirs['vanilla'], [(4001, [3])])
-        self.pins(simdirs['ours'], [(4001, [4])])
-        st = mc.start_by_id(suite, simdirs, 'cs-s4001/4')
-        self.assertEqual((st['game'], st['chapter'], st['state_sha1']), ('ours', 4, 'sha4'))
-        self.assertEqual(mc.start_by_id(suite, simdirs, 'vanilla-ch3')['start_id'], 'vanilla-ch3')
+        # both games name their starts campaigns cs-s<seed>, so one id is in both stores:
+        # the record's game picks the store (re-review of #587)
+        self.pins(simdirs['vanilla'], [(4001, [3, 4])])
+        self.pins(simdirs['ours'], [(4001, [3, 4])])
+        for game in ('ours', 'vanilla'):
+            st = mc.start_by_id(suite, simdirs, 'cs-s4001/3', game)
+            self.assertEqual((st['game'], st['chapter'], st['state_sha1']), (game, 3, 'sha3'))
+            self.assertTrue(st['state_path'].endswith(
+                os.path.join(os.path.basename(simdirs[game]), 'states', 'cs-s4001', '3.ss')))
+        self.assertEqual(mc.start_by_id(suite, simdirs, 'vanilla-ch3', 'vanilla')['start_id'],
+                         'vanilla-ch3')
         for bad in ('cs-s4001/5', 'cs-s4009/3', 'cs-s4001/x', 'nope'):
             with self.assertRaises(ValueError):
-                mc.start_by_id(suite, simdirs, bad)
+                mc.start_by_id(suite, simdirs, bad, 'vanilla')
         with mock.patch.object(mc, 'suite_setup', return_value=(suite, simdirs, dict)), \
                 mock.patch.object(mc, 'check_starts', return_value=[]):
-            one, _dirs, _envs = mc.pinned_setup(['cs-s4001/3'])
+            one, _dirs, _envs = mc.pinned_setup(['cs-s4001/3'], 'vanilla')
         task = mc.start_task(one, {'vanilla': {'last': [9]}, 'ours': {}}, 'i', 'cs-s4001/3',
                              'pilot', 3007)
         self.assertEqual((task['seed'], task['campaign']['id'], task['campaign']['from']),
@@ -1212,10 +1219,10 @@ class Suite(unittest.TestCase):
             return ['vanilla-ch3: its state is gone'] if len(seen) > 1 else []
         with mock.patch.object(mc, 'suite_setup', return_value=(suite, simdirs, dict)), \
                 mock.patch.object(mc, 'check_starts', check):
-            self.assertEqual(mc.pinned_setup(['vanilla-ch3'])[0],
+            self.assertEqual(mc.pinned_setup(['vanilla-ch3'], 'vanilla')[0],
                              dict(suite, starts=[mc.start_of(suite, 'vanilla-ch3')]))
-            self.assertIn('its state is gone', mc.pinned_setup(['vanilla-ch3']))
-            self.assertIn('no start nope', mc.pinned_setup(['nope']))
+            self.assertIn('its state is gone', mc.pinned_setup(['vanilla-ch3'], 'vanilla'))
+            self.assertIn('no start nope', mc.pinned_setup(['nope'], 'vanilla'))
         self.assertEqual(seen[0], (['vanilla-ch3'], []), 'it plays no snapshot, so checks none')
 
     def test_the_cell_count_is_checked_before_anything_plays(self):
