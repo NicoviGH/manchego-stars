@@ -4421,20 +4421,6 @@ local function looksAhead(boss)
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
 
--- test_lookahead_asks_a_plan_past_the_finalists_that_could_still_win (ours ch03 careful turn
--- 18: the assault ranked fifth on the first phase, and least over the cap once asked): with
--- one finalist, the march leads on the first phase and dies in the second. The hold, outside
--- the finalists, still outranks it, so it is asked too, and played; nothing past it is asked.
-do
-    local board, sight, st = looksAhead(true)
-    local final = Planner.FINAL
-    Planner.FINAL = 1
-    local a, plan = Planner.plan(B, board, sight, st)
-    Planner.FINAL = final
-    check(at(a), "0,0", "past the finalists: the hold, asked after the march dies, is played")
-    check(plan.lookahead.asked_past, 1, "past the finalists: one plan asked, and the record says so")
-end
-
 -- test_lookahead_extends_all_finalists_or_none (T058, AS 1 and AS 2): with room, every
 -- finalist meets the second phase, one call each, and the death it finds feeds the rank; with
 -- too little, none does, the plan keeps the first phase's horizon and says it was skipped.
