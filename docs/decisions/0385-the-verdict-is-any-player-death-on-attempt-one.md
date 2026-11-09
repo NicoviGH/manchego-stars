@@ -144,8 +144,8 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   longer plays one pinned start. `montecarlo.py starts --game ours|vanilla` plays campaigns from
   New Game on the `starts` seeds (4001-4100), each seeded once and never again (ADR 0370), and
   pins every chapter-start state each left in its game's store (`cell-starts.json` beside
-  `runs.jsonl`). The pins live in the store and not in git because a store is one ROM: an ours
-  ROM change (a class, a stat, a line of text) is a new store with no starts until they are
+  `runs.jsonl`). The pins live in the store and not in git because a store is one ROM: a Manchego
+  Stars ROM change (a class, a stat, a line of text) is a new store with no starts until they are
   remade. The vanilla starts are made once. `cell` and `pilot` take `--chapter N` (our chapter
   number; the twin comes from `campaign_env.cell_chapters`) and `--starts K`. Each arm plays the
   first K pinned campaigns, by seed, that reached the chapter's start. Seed s is dealt start
@@ -153,4 +153,14 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   10 for a verdict to trust, and fewer (say 4) while a change is being tried. A cell refuses
   when fewer campaigns reached the chapter, and names the command that makes more. Every line
   that counts pairs says how many games they came from. A cell run costs the same as before.
-  `replay` still replays suite runs only.
+  - **A start is a survivor.** A campaign reaches chapter n only by clearing every chapter
+    before it clean, and the games stop for different reasons (Manchego Stars `infeasible`,
+    vanilla `bot_fault`). So an arm whose campaigns fall short more often plays only the parties that
+    got through. Each cell line says how many of an arm's pinned campaigns reached the chapter.
+  - **What `starts` spends.** A campaign stops once the last chapter's start is saved
+    (`start_only`, campaign.lua's `startOnly`): no cell plays past it. A campaign that crashed
+    is left unpinned and played again by the next `starts`, since a crash is the harness and
+    not the bot (ADR 0370). A seed played again starts from an empty states folder, so a
+    killed earlier play cannot leave it a start it never reached.
+  - `replay` finds a cell run's start by its id (`cs-s<seed>/<chapter>`), as it finds a
+    suite run's.

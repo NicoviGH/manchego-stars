@@ -31,12 +31,13 @@ analysis; `cell` then plays the confirmatory seeds with that choice.
         (--chapter <n> [--starts 10] | --ours <env .json> --vanilla <env .json> \
          --ours-chapter <i> --vanilla-chapter <i> [--mode normal]) [--jobs 4]
 
-A chapter cell (our chapter n and its twin) plays attempt 1 from pinned chapter starts, each
+A chapter cell (Manchego Stars chapter n and its twin) plays attempt 1 from pinned chapter starts, each
 from its own New Game campaign with its own seed, so each start carries its own dice and party
 (T100e): seed s plays the ((s - the set's first seed) mod K)-th of an arm's K starts, the
 first K pinned (by seed) that reached the chapter. `starts` plays and pins those campaigns
 (the `starts` seed set, campaign `cs-s<seed>`) in each game's store (cell-starts.json beside
-runs.jsonl): the store is the ROM's, so an ours ROM change means `starts --game ours` again.
+runs.jsonl): the store is the ROM's, so a Manchego Stars ROM change means
+`starts --game ours` again.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
@@ -765,14 +766,16 @@ def cell_stamp(env, mode, bot):
     return {'cell': {'env': hashlib.sha1(key).hexdigest()[:12], 'bot': bot}}
 
 
-def campaign_tasks(env, seeds, mode, stamp, vanilla=False):
+def campaign_tasks(env, seeds, mode, stamp, vanilla=False, prefix=None):
     """Campaign s for each seed s: from New Game, the game seeded once with s and never again
     (a player's own save), every chapter to the env's last retried until it clears clean
-    (campaign.lua). Its id is the sweep's and the seed, so its chapter starts are its own."""
+    (campaign.lua). Its id is `<prefix>-s<seed>`, the prefix the sweep's (its stamp's env
+    hash) unless given, so its chapter starts are its own."""
     if env.get('from') is not None or env.get('attempt') is not None:
         raise ValueError('montecarlo: a cell plays whole campaigns, each keeping its seed: '
                          'an env with `from` or `attempt` would cut one short')
-    return [{'campaign': dict(env, id='%s-s%d' % (stamp['cell']['env'][:8], s)), 'seed': s,
+    prefix = prefix or stamp['cell']['env'][:8]
+    return [{'campaign': dict(env, id='%s-s%d' % (prefix, s)), 'seed': s,
              'mode': mode, 'vanilla': vanilla, 'stamp': stamp} for s in seeds]
 
 
@@ -959,7 +962,7 @@ def run_cell(sides, play, cells, analysis, seeds=None, looks=LOOKS):
         if verdict['settled']:
             break
     return dict(verdict, played=played, reach=got['reach'], problems=got['problems'],
-                cpu_s=got['cpu_s'])
+                cpu_s=got['cpu_s'], seeds=seeds[:look])
 
 
 def campaign_side(env, chapter, mode, store, stamp, vanilla):
@@ -993,15 +996,16 @@ def chapter_side(suite, envs, instrument, starts, kind, store, rom_hash, bench=N
 
     def tasks(seeds):
         out = []
-        for seed in seeds:
-            out += chapter_tasks(suite, envs, instrument, {game: store}, dealt(seed), kind,
-                                 [seed])
+        for st in starts:
+            mine = [seed for seed in seeds if dealt(seed) is st]
+            if mine:
+                out += chapter_tasks(suite, envs, instrument, {game: store}, st, kind, mine)
         for t in out:
             if bench:
                 t['bench'] = list(bench)
         return out
     return {'chapter': starts[0]['chapter'], 'store': store, 'vanilla': game == 'vanilla',
-            'starts': starts, 'pinned': True,
+            'starts': starts, 'pinned': True, 'dealt': dealt,
             'tasks': tasks,
             'kept': lambda: kept([store], lambda r: mine(r)
                                  and r['suite'].get('set') == kind
@@ -1037,27 +1041,40 @@ def frozen_cells(args, suite):
     return cells
 
 
-def games_line(sides):
-    """How many games a chapter cell's pairs come from, arm by arm (T100e)."""
-    return 'over %d ours and %d vanilla games' % (len(sides['ours']['starts']),
-                                                   len(sides['vanilla']['starts']))
+def games_line(sides, seeds):
+    """How many games a chapter cell's pairs on `seeds` came from, arm by arm (T100e): the
+    starts those seeds were dealt, so a look that reaches only some of the K says so. Each
+    arm also says how many of its pinned campaigns reached the chapter at all: a start is a
+    campaign that cleared every chapter before it clean, so an arm whose campaigns fell short
+    more often plays the stronger parties (ADR 0385, T100e)."""
+    def arm(n):
+        side = sides[n]
+        reached, pinned = side['reached']
+        return '%d %s games (%d of %d pinned campaigns reached the chapter)' % (
+            len({side['dealt'](s)['start_id'] for s in seeds}), GAME_NAMES[n], reached, pinned)
+    return 'over %s and %s' % (arm('ours'), arm('vanilla'))
 
 
 def chapter_sides(suite, simdirs, envs, inst, starts, kind, bench=None):
     """{arm: chapter_side} for `starts` ({arm: [cell start]}, cell_setup's) on seed set
     `kind`, each arm in its own game's store, `bench` ({arm: charIds}) benching an arm's
-    units."""
-    return {arm: chapter_side(suite, envs, inst, starts[arm], kind,
-                              os.path.join(simdirs[arm], 'runs.jsonl'),
-                              os.path.basename(simdirs[arm]), (bench or {}).get(arm))
-            for arm in ('ours', 'vanilla')}
+    units. Each side carries `reached`: (pinned campaigns that reached its chapter, pinned)."""
+    sides = {}
+    for arm in ('ours', 'vanilla'):
+        sides[arm] = chapter_side(suite, envs, inst, starts[arm], kind,
+                                  os.path.join(simdirs[arm], 'runs.jsonl'),
+                                  os.path.basename(simdirs[arm]), (bench or {}).get(arm))
+        pins = cell_pins(simdirs[arm])
+        sides[arm]['reached'] = (sum(1 for c in pins if str(starts[arm][0]['chapter'])
+                                     in c['chapters']), len(pins))
+    return sides
 
 
 def cell_main(args):
-    """`cell`: one cell to its verdict, a chapter cell from two pinned starts or a campaign
-    cell from two campaign envs, judged with the pilot's analysis and the frozen N."""
-    games = None
-    if args.chapter is not None:
+    """`cell`: one cell to its verdict, a chapter cell over K pinned starts an arm
+    (cell_setup) or a campaign cell from two campaign envs, judged with the pilot's analysis and the frozen N."""
+    chapter_cell = args.chapter is not None
+    if chapter_cell:
         setup = cell_setup(args.chapter, args.starts)
         if isinstance(setup, str):
             print(setup)
@@ -1067,7 +1084,6 @@ def cell_main(args):
             cells = frozen_cells(args, suite)
             sides = chapter_sides(suite, simdirs, envs(), instrument_id(), starts,
                                   'confirmatory')
-            games = games_line(sides)
         except ValueError as err:
             print('refused: %s' % err)
             return 1
@@ -1089,7 +1105,8 @@ def cell_main(args):
                                         os.path.join(simdir(vanilla), 'runs.jsonl'),
                                         cell_stamp(env, args.mode, bot), vanilla)
     v = run_cell(sides, pool_play(args.jobs), cells, args.analysis, seeds)
-    print(v['reason'] + (' (%d pairs %s)' % (v['n'], games) if games else ''))
+    print(v['reason'] + (' (%d pairs %s)' % (v['n'], games_line(sides, v['seeds']))
+                         if chapter_cell else ''))
     for line in problem_lines(v['problems']):
         print(line)
     if v.get('ours') is not None:   # some pair resolved in both arms
@@ -1169,7 +1186,7 @@ def pilot_main(args):
         print('\n'.join(problem_lines(got['problems'])))
         return 1
     s = pilot_summary(got['pairs'], cells, got['cpu_s'], got['reach'])
-    for line in pilot_lines(s, args.chapter, games_line(sides)) + \
+    for line in pilot_lines(s, args.chapter, games_line(sides, seeds)) + \
             problem_lines(got['problems']):
         print(line)
     print('discordant pairs (story <trace> reads each):')
@@ -1789,33 +1806,39 @@ def suite_setup():
 
 
 def pinned_setup(start_ids):
-    """suite_setup's (suite, simdirs, envs) for playing the named pinned starts, or the
-    refusal to print: an unknown start, or what check_starts finds wrong for those starts
-    (the shops store, the emulator, each start's ROM and state). No snapshot is checked:
-    these play a start's state and load no snapshot, and `suite` checks them. What `pilot`,
-    a chapter `cell` and `replay` each check before anything plays."""
+    """suite_setup's (suite, simdirs, envs) with the named starts (a suite start, or a cell
+    start: start_by_id) as the suite's `starts`, or the refusal to print: an unknown start, or
+    `unplayable`'s. What `replay` checks before it plays."""
     setup = suite_setup()
     if isinstance(setup, str):
         return setup
     suite, simdirs, envs = setup
     try:
-        starts = [start_of(suite, sid) for sid in start_ids]
+        starts = [start_by_id(suite, simdirs, sid) for sid in start_ids]
     except ValueError as err:
         return 'refused: %s' % err
-    one = dict(suite, starts=starts, snapshots=[])
-    problems = check_starts(one, simdirs)
+    setup = (dict(suite, starts=starts), simdirs, envs)
+    return unplayable(suite, simdirs, starts) or setup
+
+
+def unplayable(suite, simdirs, starts):
+    """The refusal to print when check_starts finds any of `starts` cannot be played as
+    pinned (the shops store, the emulator, each start's ROM and state), else None. No snapshot
+    is checked: a cell or a replay plays a start's state and loads none; `suite` checks them."""
+    problems = check_starts(dict(suite, starts=starts, snapshots=[]), simdirs)
     if problems:
         return '\n'.join(['refused: %d pinned starts cannot be played as pinned:'
                           % len(problems)] + ['  ' + p for p in problems])
-    return setup
+    return None
 
 
 # ---- a chapter cell's starts (#510 step 9, T100e) ----
 # A cell's pairs are spread over several chapter starts, each from its own New Game campaign
 # (its own dice, its own party), so a verdict is not one save's. `starts` plays the campaigns
-# and pins what each left in its game's store: a store is one ROM, so an ours ROM change is a
-# new store with no starts until they are remade, and the cell says how.
+# and pins what each left in its game's store: a store is one ROM, so a Manchego Stars ROM
+# change is a new store with no starts until they are remade, and the cell says how.
 STARTS_FILE = 'cell-starts.json'
+GAME_NAMES = {'ours': 'MS', 'vanilla': 'vanilla'}   # how a sentence names a game
 CELL_STARTS = 10   # starts an arm for a verdict to trust; a cell being tried may ask fewer
 
 
@@ -1849,22 +1872,45 @@ def pin_of(store, campaign, seed, end):
                          if n.endswith('.ss') and n[:-3].isdigit()}}
 
 
+def cell_start(suite, store, game, pin, chapter):
+    """Pinned campaign `pin`'s start at chapter index `chapter` as a pinned start in the
+    suite's shape (check_starts and chapter_tasks read it), or None when it never got there."""
+    sha = pin['chapters'].get(str(chapter))
+    if sha is None:
+        return None
+    return {'start_id': '%s/%d' % (pin['campaign'], chapter), 'game': game, 'chapter': chapter,
+            'rom_hash': os.path.basename(store),
+            'state_path': os.path.relpath(
+                os.path.join(store, 'states', pin['campaign'], '%d.ss' % chapter), REPO),
+            'state_sha1': sha, 'estimate_wall_s': suite['defaults']['estimate_wall_s'],
+            'provenance': {'campaign': pin['campaign'], 'seed': pin['seed']}}
+
+
+def start_by_id(suite, simdirs, start_id):
+    """The suite's start `start_id`, or the cell start it names (`<campaign>/<chapter>`, in
+    either game's store): what a record's `suite.start_id` says it was played from.
+    ValueError when neither has it."""
+    if '/' not in start_id:
+        return start_of(suite, start_id)
+    campaign, chapter = start_id.rsplit('/', 1)
+    for game in ('ours', 'vanilla'):
+        pin = next((c for c in cell_pins(simdirs[game]) if c['campaign'] == campaign), None)
+        st = pin and chapter.isdigit() and cell_start(suite, simdirs[game], game, pin,
+                                                      int(chapter))
+        if st:
+            return st
+    raise ValueError('montecarlo: no suite start or pinned cell start %s' % start_id)
+
+
 def cell_starts(suite, store, game, chapter, k):
     """The first `k` campaigns pinned in `store` (by seed) that reached chapter index
     `chapter`, each as a pinned start in the suite's shape (check_starts and chapter_tasks
     read it). ValueError, with the count and the command that makes more, when fewer did."""
     got = []
-    for c in cell_pins(store):
-        sha = c['chapters'].get(str(chapter))
-        if sha is None:
-            continue
-        got.append({'start_id': '%s/%d' % (c['campaign'], chapter), 'game': game,
-                    'chapter': chapter, 'rom_hash': os.path.basename(store),
-                    'state_path': os.path.relpath(
-                        os.path.join(store, 'states', c['campaign'], '%d.ss' % chapter), REPO),
-                    'state_sha1': sha,
-                    'estimate_wall_s': suite['defaults']['estimate_wall_s'],
-                    'provenance': {'campaign': c['campaign'], 'seed': c['seed']}})
+    for pin in cell_pins(store):
+        st = cell_start(suite, store, game, pin, chapter)
+        if st:
+            got.append(st)
         if len(got) == k:
             return got
     raise ValueError('%d %s campaigns pinned in %s reached chapter index %d, and the cell asks '
@@ -1873,8 +1919,8 @@ def cell_starts(suite, store, game, chapter, k):
 
 
 def cell_setup(number, k):
-    """(suite, simdirs, envs, {arm: [cell start]}) for a chapter cell of our chapter `number`
-    and its twin on `k` starts an arm, or the refusal to print: not a written chapter, fewer
+    """(suite, simdirs, envs, {arm: [cell start]}) for a chapter cell of Manchego Stars
+    chapter `number` and its twin on `k` starts an arm, or the refusal to print: not a written chapter, fewer
     than `k` pinned campaigns reached it in an arm, or what check_starts finds wrong with the
     starts dealt (the shops store, the emulator, each start's ROM and state)."""
     import campaign_env
@@ -1892,20 +1938,8 @@ def cell_setup(number, k):
                   for arm, index in zip(('ours', 'vanilla'), pair)}
     except ValueError as err:
         return 'refused: %s' % err
-    problems = check_starts(dict(suite, starts=starts['ours'] + starts['vanilla'],
-                                 snapshots=[]), simdirs)
-    if problems:
-        return '\n'.join(['refused: %d cell starts cannot be played as pinned:'
-                          % len(problems)] + ['  ' + p for p in problems])
-    return suite, simdirs, envs, starts
-
-
-def starts_tasks(env, seeds, vanilla, last):
-    """Campaign `cs-s<seed>` for each seed: from New Game, the game seeded once with the seed
-    and never again (a player's own save), every chapter to index `last` retried until it
-    clears clean (campaign.lua), each start state saved as it arrives."""
-    return [{'campaign': dict(env, id='cs-s%d' % s, last=[last]), 'seed': s,
-             'vanilla': vanilla, 'stamp': {'cell_starts': True}} for s in seeds]
+    return unplayable(suite, simdirs, starts['ours'] + starts['vanilla']) or \
+        (suite, simdirs, envs, starts)
 
 
 def starts_main(args, pool=None):
@@ -1928,26 +1962,44 @@ def starts_main(args, pool=None):
         return 1
     pins = {c['seed']: c for c in cell_pins(store)}
     todo = [s for s in range(lo, lo + args.count) if s not in pins]
-    last = max(pair[1 if vanilla else 0] for pair in campaign_env.cell_chapters().values())
-    print('%d %s campaigns pinned, %d to play to chapter index %d on %d workers'
+    index = {n: pair[1 if vanilla else 0] for n, pair in campaign_env.cell_chapters().items()}
+    last = max(index.values())
+    print('%d %s campaigns pinned, %d to play to chapter index %d\'s start on %d workers'
           % (len(pins), args.game, len(todo), last, args.jobs), flush=True)
+    # a seed played again starts clean: states an earlier, killed play left would be pinned
+    # as starts this play never reached (api.save only overwrites)
+    for s in todo:
+        shutil.rmtree(os.path.join(store, 'states', 'cs-s%d' % s), ignore_errors=True)
     os.makedirs(store, exist_ok=True)
     pool = pool or Pool(jobs=args.jobs, out=os.path.join(store, 'runs.jsonl'))
-    for rec in pool.run(starts_tasks(envs()[args.game], todo, vanilla, last)):
+    # each campaign stops once the last chapter's start is saved: no cell plays past it
+    env = dict(envs()[args.game], last=[last], start_only=last)
+    crashed = 0
+    for rec in pool.run(campaign_tasks(env, todo, None, {'cell_starts': True}, vanilla, 'cs')):
         if rec.get('chapter') is not None:
             continue   # an attempt; the record with no chapter says how the campaign ended
         seed = rec['seed']
+        if rec.get('outcome') == 'crashed':
+            # the harness failing, never the bot (campaign.lua): left unpinned, so the next
+            # `starts` plays the seed again rather than spend it on a crash
+            crashed += 1
+            print('  cs-s%d: crashed, not pinned (%s; %s)' % (seed, rec.get('why'),
+                                                             rec.get('run_dir') or rec.get('log')),
+                  flush=True)
+            continue
         pins[seed] = pin_of(store, 'cs-s%d' % seed, seed, rec)
         write_pins(store, pins.values())
         print('  cs-s%d: %s (%s), %d chapter starts' % (seed, rec.get('outcome'),
                                                        rec.get('why'),
                                                        len(pins[seed]['chapters'])),
               flush=True)
-    for number, pair in sorted(campaign_env.cell_chapters().items()):
-        index = pair[1 if vanilla else 0]
-        n = sum(1 for c in pins.values() if str(index) in c['chapters'])
-        print('ch%02d (index %d): %d starts' % (number, index, n))
-    return 0
+    for number in sorted(index):
+        n = sum(1 for c in pins.values() if str(index[number]) in c['chapters'])
+        print('ch%02d (index %d): %d of %d pinned campaigns reached its start'
+              % (number, index[number], n, len(pins)))
+    if crashed:
+        print('%d campaigns crashed: run `starts` again to play them' % crashed)
+    return 1 if crashed else 0
 
 
 def kept_play(paths, instrument, rom_hashes):
@@ -2661,7 +2713,7 @@ def main(argv=None):
                    help="the pilot's choice, frozen before any confirmatory seed plays")
     c.add_argument('--cells', type=int, help="the frozen cell count N (default: the manifest's)")
     c.add_argument('--chapter', type=int,
-                   help='a chapter cell: our chapter number (its twin is its parity reference)')
+                   help='a chapter cell: the Manchego Stars chapter number (its twin is its parity reference)')
     c.add_argument('--starts', type=int, default=CELL_STARTS,
                    help='a chapter cell: the pinned campaigns an arm (default %(default)s)')
     c.add_argument('--ours', help="a campaign cell: ours' campaign env .json")
@@ -2672,7 +2724,7 @@ def main(argv=None):
     c.add_argument('--jobs', type=int, default=4)
     pi = sub.add_parser('pilot', help='the one-cell pilot on the 50 pilot seeds (FR-025)')
     pi.add_argument('--chapter', type=int, required=True,
-                    help='our chapter number (its twin is its parity reference)')
+                    help='the Manchego Stars chapter number (its twin is its parity reference)')
     pi.add_argument('--starts', type=int, default=CELL_STARTS,
                     help='the pinned campaigns an arm (default %(default)s)')
     pi.add_argument('--cells', type=int, help="the frozen cell count N (default: the manifest's)")

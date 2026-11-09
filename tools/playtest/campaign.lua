@@ -74,6 +74,8 @@
 --   claims(chapter)       that chapter's resolved claims (bot.lua's Claims)
 --   play(style, claims, attempt) -> botrun's record (it emits its own BOTRUN line)
 --   only                  OPTIONAL: the one attempt to play (see above)
+--   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
+--                         state is saved, unplayed (montecarlo.py `starts`: a cell loads only it)
 --   diag                  OPTIONAL, with only: that attempt is a diagnostic replay (botrun.lua's
 --                         api.diag). Its one DIAG line is all it writes: no CAMPAIGN line, so
 --                         no endpoint is recorded, and it hands no record back
@@ -228,6 +230,9 @@ function M.run(api)
                 end
                 local ok, swhy = api.save(ch, list)
                 if not ok then return "crashed", "save: " .. tostring(swhy) end
+                if api.startOnly == ch then
+                    return "done", string.format("chapter %d's start is saved", ch)
+                end
             end
             local claims = api.claims(ch) or {}
             local entry = { chapter = ch, attempts = 0, failures = {},
