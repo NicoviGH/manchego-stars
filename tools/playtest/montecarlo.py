@@ -35,7 +35,7 @@ analysis; `cell` then plays the confirmatory seeds with that choice.
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
 forecast and every blow.
 
-    python3 tools/playtest/montecarlo.py suite [--held-out | --freeze] [--kept] [--jobs 8]
+    python3 tools/playtest/montecarlo.py suite [--held-out | --freeze [--override WHY]] [--kept] [--jobs 8]
 
 `suite` plays the difficulty instrument's frozen suite (#510 step 9; matrix.yaml's
 `instrument:` section, ADR 0387): attempt 1 of each pinned chapter start, from its saved state,
@@ -44,7 +44,8 @@ The tuning seeds print each run and are judged on the frozen baseline (suite-fro
 ADR 0395): an invariant that held and fails, a new unexplained death or stall, an unlabelled
 fallback, and SC-003's calls more than 20% over the frozen count. --held-out plays the held-out
 seeds too, said only as counts, and gives the promotion result; --freeze does that and writes
-the frozen baseline when the candidate is promoted. --kept judges this instrument's kept runs
+the frozen baseline when the candidate is promoted (--override WHY freezes a refused one, on
+Nicolas's word, and keeps WHY in the file). --kept judges this instrument's kept runs
 again instead of playing them (after a replay witnessed a new death). It refuses a start that
 no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
 
@@ -258,6 +259,8 @@ def launch(task, tag, log_path):
         env['PT_DIAG'] = json.dumps(task['diag'])
     if task.get('pinned'):   # a snapshot's check (`suite`): one PINNED line, nothing played
         env['PT_PINNED'] = task['pinned']
+    if task.get('bench'):   # an experiment's benched units (`pilot --bench-vanilla`)
+        env['PT_BENCH'] = json.dumps(task['bench'])
     with open(log_path, 'w') as log:
         subprocess.run([RUN_SH, scenario], env=env, stdout=log, stderr=subprocess.STDOUT,
                        check=False)
@@ -959,16 +962,30 @@ def campaign_side(env, chapter, mode, store, stamp, vanilla):
             'kept': lambda: kept_runs(store, stamp)}
 
 
-def chapter_side(suite, envs, instrument, start_id, kind, store, rom_hash):
+def bench_instrument(instrument, bench):
+    """The instrument an experiment with `bench` (charIds) benched plays under: its own, so
+    its runs are never kept, read or judged as the instrument's."""
+    return instrument + ''.join('+bench%02x' % c for c in bench) if bench else instrument
+
+
+def chapter_side(suite, envs, instrument, start_id, kind, store, rom_hash, bench=None):
     """One arm of a chapter cell: attempt 1 of pinned start `start_id` under each seed of
     seed set `kind` (chapter_tasks), its records in `store` (the game's runs file); a kept
-    run counts when this instrument played it on the ROM built now (`rom_hash`)."""
+    run counts when this instrument played it on the ROM built now (`rom_hash`). `bench`
+    (charIds, an experiment's): each only waits where it stands, under bench_instrument's."""
     st = start_of(suite, start_id)
+    instrument = bench_instrument(instrument, bench)
     mine = suite_run_of(instrument, {st['game']: rom_hash})
+
+    def tasks(seeds):
+        out = chapter_tasks(suite, envs, instrument, {st['game']: store}, start_id, kind, seeds)
+        for t in out:
+            if bench:
+                t['bench'] = list(bench)
+        return out
     return {'chapter': st['chapter'], 'store': store, 'vanilla': st['game'] == 'vanilla',
             'start': st, 'pinned': True,
-            'tasks': lambda seeds: chapter_tasks(suite, envs, instrument, {st['game']: store},
-                                                 start_id, kind, seeds),
+            'tasks': tasks,
             'kept': lambda: kept([store], lambda r: mine(r)
                                  and r['suite'].get('start_id') == start_id
                                  and r['suite'].get('set') == kind
@@ -1002,10 +1019,11 @@ def frozen_cells(args, suite):
     return cells
 
 
-def chapter_sides(suite, simdirs, envs, inst, arms, kind):
+def chapter_sides(suite, simdirs, envs, inst, arms, kind, bench=None):
     """{arm: chapter_side} for `arms` ({'ours': start id, 'vanilla': start id}) on seed set
-    `kind`, each arm in its own game's store: ValueError when an arm names another game's
-    start (its records would be filed, and read, as the other arm's)."""
+    `kind`, each arm in its own game's store, `bench` ({arm: charIds}) benching an arm's
+    units: ValueError when an arm names another game's start (its records would be filed,
+    and read, as the other arm's)."""
     sides = {}
     for arm, sid in arms.items():
         st = start_of(suite, sid)
@@ -1013,7 +1031,7 @@ def chapter_sides(suite, simdirs, envs, inst, arms, kind):
             raise ValueError('montecarlo: --%s-start %s is a %s start' % (arm, sid, st['game']))
         sides[arm] = chapter_side(suite, envs, inst, sid, kind,
                                   os.path.join(simdirs[arm], 'runs.jsonl'),
-                                  os.path.basename(simdirs[arm]))
+                                  os.path.basename(simdirs[arm]), (bench or {}).get(arm))
     return sides
 
 
@@ -1103,7 +1121,8 @@ def pilot_main(args):
     inst = instrument_id()
     try:
         cells = frozen_cells(args, suite)
-        sides = chapter_sides(suite, simdirs, envs(), inst, arms, 'pilot')
+        sides = chapter_sides(suite, simdirs, envs(), inst, arms, 'pilot',
+                              {'vanilla': args.bench_vanilla} if args.bench_vanilla else None)
     except ValueError as err:
         print('refused: %s' % err)
         return 1
@@ -1802,22 +1821,30 @@ def store_explain(simdirs):
     return explain
 
 
-def freeze_record(result, instrument, version, today=None):
+def freeze_record(result, instrument, version, today=None, override=None):
     """What `suite --freeze` writes (FROZEN): the run's result stamped with its instrument,
-    the manifest's version and the day. None, with why, when the run may not be frozen."""
+    the manifest's version and the day. None, with why, when the run may not be frozen.
+    `override`, Nicolas's reason, freezes a candidate the promotion refused, and is kept in the
+    file whenever it is given, promoted or not, so a reason he gave is never dropped (ADR 0395):
+    a refusal can be his call to accept, an incomplete run or a broken snapshot never."""
     if not result:
         return None, 'not every run came back with a game result'
     if result['snapshots_failed']:
         return None, 'snapshot %s fails its invariant' % ', '.join(result['snapshots_failed'])
-    if not result['promoted']:
+    if not result['promoted'] and not override:
         return None, 'the candidate is not promoted'
     rec = {k: v for k, v in result.items() if k not in ('promoted', 'snapshots_failed')}
+    if override:
+        rec['override'] = override
     rec.update(instrument=instrument, manifest_version=version,
                frozen_on=today or time.strftime('%Y-%m-%d'))
     return rec, None
 
 
 def suite_main(args):
+    if args.override and not args.freeze:
+        print('--override only goes with --freeze')
+        return 2
     setup = suite_setup()
     if isinstance(setup, str):
         print(setup)
@@ -1839,14 +1866,16 @@ def suite_main(args):
     if any(line.startswith('refused') for line in lines):
         return 1
     if args.freeze:
-        rec, why = freeze_record(result, inst, suite['version'])
+        rec, why = freeze_record(result, inst, suite['version'], override=args.override)
         if rec is None:
             print('not frozen: %s' % why)
             return 1
         with open(FROZEN, 'w') as fh:
             json.dump(rec, fh, indent=1, sort_keys=True)
             fh.write('\n')
-        print('frozen: %s (instrument %s)' % (os.path.relpath(FROZEN, REPO), inst))
+        print('frozen: %s (instrument %s)%s' % (
+            os.path.relpath(FROZEN, REPO), inst,
+            ', override: %s' % rec['override'] if 'override' in rec else ''))
     return 0
 
 
@@ -2482,11 +2511,17 @@ def main(argv=None):
     pi.add_argument('--vanilla-start', required=True, help="the twin's pinned suite start")
     pi.add_argument('--cells', type=int, help="the frozen cell count N (default: the manifest's)")
     pi.add_argument('--jobs', type=int, default=8)
+    pi.add_argument('--bench-vanilla', type=lambda s: int(s, 0), action='append',
+                    help="an experiment: this charId of the twin's only waits where it stands "
+                         '(repeat it); its runs are filed under their own instrument')
     su = sub.add_parser('suite', help="the frozen suite's pinned starts, attempt 1 each")
     su.add_argument('--held-out', action='store_true',
                     help='the held-out seeds too, as counts only, and the promotion result')
     su.add_argument('--freeze', action='store_true',
                     help='as --held-out, then write the frozen baseline if promoted')
+    su.add_argument('--override', metavar='WHY',
+                    help='with --freeze: freeze a refused candidate, WHY kept in the file '
+                         '(Nicolas\'s call only, ADR 0395)')
     su.add_argument('--kept', action='store_true',
                     help="judge this instrument's kept runs instead of playing them again")
     su.add_argument('--jobs', type=int, default=8)

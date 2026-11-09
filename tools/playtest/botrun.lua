@@ -583,6 +583,7 @@ function M.run(api)
     end
     local style = Bot.applyClaims(api.claims or {}, api.style)
     style.villageGifts, style.houseGifts = api.villageGifts, api.houseGifts
+    style.bench = api.bench
     local unplayed = Bot.unplayed(api.claims or {})
     local skipped = {}
     for _, id in ipairs(unplayed) do skipped[id] = true end
@@ -592,7 +593,7 @@ function M.run(api)
     end
     local rec = { game = api.info.game, rom_hash = api.info.rom_hash, chapter = api.info.chapter,
                   mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
-                  attempt = api.info.attempt, style = api.style,
+                  attempt = api.info.attempt, style = api.style, bench = api.bench,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
@@ -907,7 +908,8 @@ function M.run(api)
         api.seed(api.info.seed)
         local sight = api.sight()
         -- the units whose death ends the game, as the game says (sight.objective.gameOver)
-        trace({ t = "start", info = api.info, style = api.style, claims_played = played,
+        trace({ t = "start", info = api.info, style = api.style, bench = api.bench,
+                claims_played = played,
                 claims_unplayed = unplayed,
                 game_over = sight.objective and sight.objective.gameOver })
         lords = Bot.gameOver(sight)
@@ -1112,11 +1114,20 @@ function M.run(api)
                             end
                         end
                         local replan = playing and why
+                        local opts = memo()
+                        if replan then
+                            -- the plan in hand, from the act it did not play: judged again on
+                            -- this board beside the new ones (Planner.plan's opts.rest)
+                            opts.rest = {}
+                            for i = nextAct, #playing.acts do
+                                opts.rest[#opts.rest + 1] = api.Planner.key(playing.acts[i])
+                            end
+                        end
                         local a, plan, cost
                         if pinNow() then
-                            a, plan, cost = pinDecision(board, memo())
+                            a, plan, cost = pinDecision(board, opts)
                         else
-                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, memo())
+                            a, plan, cost = api.Planner.plan(Bot, board, sight, style, opts)
                         end
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1

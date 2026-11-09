@@ -535,14 +535,26 @@ function M.rollChance(numbers, threshold)
 end
 
 -- An exchange's played outcomes (`leaves`: { p, dealt, back }, each the HP one side lost) as
--- two distributions { [hp lost] = probability }: the target's (dealt) and the actor's (back).
+-- two distributions { [hp lost] = probability }: the target's (dealt) and the actor's (back),
+-- and the two together (joint: { { p, dealt, back } }, one per pair that can happen, in
+-- dealt-then-back order): whether a counter lands depends on whether our blow killed first,
+-- and the planner plays the enemy phase on each pair (T100b).
 function M.exchangeOf(leaves)
-    local dealt, back = {}, {}
+    local dealt, back, pair = {}, {}, {}
     for _, l in ipairs(leaves) do
         dealt[l.dealt] = (dealt[l.dealt] or 0) + l.p
         back[l.back] = (back[l.back] or 0) + l.p
+        local k = l.dealt .. ":" .. l.back
+        pair[k] = pair[k] or { p = 0, dealt = l.dealt, back = l.back }
+        pair[k].p = pair[k].p + l.p
     end
-    return dealt, back
+    local joint = {}
+    for _, x in pairs(pair) do joint[#joint + 1] = x end
+    table.sort(joint, function(a, b)
+        if a.dealt ~= b.dealt then return a.dealt < b.dealt end
+        return a.back < b.back
+    end)
+    return dealt, back, joint
 end
 
 -- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
@@ -645,6 +657,7 @@ function M.attackOf(ours, eHp, uHp)
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
              killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
+             joint = ours.joint,
              kill = kill, die = (M.odds({ ours.back }, uHp)), sure = M.least(ours.dealt) >= eHp,
              expected = expected, counterWorst = M.worst(ours.back) }
 end
@@ -1254,7 +1267,7 @@ function M.new(outer)
             end)) }
             playedBy[key] = known
         end
-        side.dealt, side.back = known[1], known[2]
+        side.dealt, side.back, side.joint = known[1], known[2], known[3]
         return side
     end
 

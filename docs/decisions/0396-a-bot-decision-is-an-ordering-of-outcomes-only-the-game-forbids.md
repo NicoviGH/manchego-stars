@@ -68,17 +68,20 @@ players also reason in quantities: turns, threat ranges, who can strike whom.
   a quantity the rank reads. A turn-start heal the judge does not model is a gap in the model
   to close, not a reason to wait.
 - "Refuse every attack whose counter alone can kill (every style but greedy)." **Becomes:** an
-  attack's death chance includes its counter's, and the cap judges it. **Not yet changed:**
-  this one changes play (bold could then take a counter risk it never takes now), so it needs
-  Nicolas's call and a pilot first. See "Known breaks" below.
+  attack's death chance includes its counter's, and the cap judges it. **Changed for the
+  planner (Nicolas kept it, 2026-11-08, after a ch03 pilot):** `Bot.candidates` offers such an
+  attack (`attackOptions`' `priced`) and the cap counts the counter's death with the phase's
+  (`counterDie`). Witness: ours ch03 even turn 15, Rootis's blow on a boss at 2 HP (98% to win
+  the chapter) was never judged, because a miss let the counter kill him, and Baxby died; with
+  it, even lost no one in 10 runs. `Bot.decide` keeps the refusal (below).
 
 ## Known breaks (built before this record, each owned elsewhere)
 
 These go against the rules above. This record does not change them. Each changes the way the
 bot plays, so each is changed only with its own measure.
-- `bot.lua`'s counter refusal (`spent < u.hp` in `Bot.candidates`, mirrored in `M.explain`; ADR
-  0368's `GATES`, which ADRs 0384 and 0388 reason from). The cap never sees a risk that the
-  candidates already refused. It is the first lead of #510's careful-on-ch03 investigation.
+- `bot.lua`'s counter refusal (`spent < u.hp`, mirrored in `M.explain`; ADR 0368's `GATES`,
+  which ADRs 0384 and 0388 reason from) is left in `Bot.decide`'s own pass only; the planner's
+  proposals no longer have it (above).
 - `Sight.betweenMay` on the T100a-R branch inherits that refusal in the player phase the
   lookahead plays between its two enemy phases. It follows whatever the refusal becomes.
 - `M.waitBuys`'s list of act kinds and `M.commits`'s line at a certain death, on the T100a-R

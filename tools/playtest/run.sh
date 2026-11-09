@@ -71,6 +71,8 @@
 #                           PT_PINNED=<state .ss> (with PT_CAMPAIGN's attempt): load that kept
 #                           decision state and print one `PINNED <json>` line with its board,
 #                           playing nothing (`montecarlo.py suite`'s snapshots).
+#                           PT_BENCH (JSON charIds): an experiment's benched units, each only
+#                           waiting where it stands (`montecarlo.py pilot --bench-vanilla`).
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
@@ -315,6 +317,7 @@ PLAYTEST_CAMPAIGN = os.getenv("PT_CAMPAIGN") or ""
 PLAYTEST_INSTRUMENT = os.getenv("PT_INSTRUMENT") or ""
 PLAYTEST_DIAG = os.getenv("PT_DIAG") or ""
 PLAYTEST_PINNED = os.getenv("PT_PINNED") or ""
+PLAYTEST_BENCH = os.getenv("PT_BENCH") or ""
 PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"

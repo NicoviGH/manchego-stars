@@ -1,20 +1,20 @@
 {
  "calls": {
-  "held_out": 357368,
-  "tuning": 210261
+  "held_out": 1980355,
+  "tuning": 510426
  },
  "cpu_s": {
-  "held_out": 1730.1,
-  "tuning": 1356.5
+  "held_out": 4487.8,
+  "tuning": 2372.5
  },
- "frozen_on": "2026-11-07",
+ "frozen_on": "2026-11-09",
  "held_out_losses": [
   "39ef3ff2dfc1805e",
   "41716bbc9e6f8c03",
   "68f164b2935f7ddb",
   "6f1c8d09df958c72"
  ],
- "instrument": "e6fc3854f2a3+v2",
+ "instrument": "01d1ea0ad925+v2",
  "manifest_version": 2,
  "tuning": {
   "ours-ch00/1001": {
@@ -70,10 +70,7 @@
    "unlabelled": 0
   },
   "ours-ch03/1002": {
-   "deaths": [
-    3,
-    4
-   ],
+   "deaths": [],
    "invariant": true,
    "lost": false,
    "stalls": 2,
@@ -204,6 +201,7 @@
    "deaths": [
     6,
     8,
+    12,
     13,
     19
    ],
@@ -213,7 +211,9 @@
    "unlabelled": 0
   },
   "vanilla-ch5/1002": {
-   "deaths": [],
+   "deaths": [
+    13
+   ],
    "invariant": true,
    "lost": false,
    "stalls": 0,
@@ -235,7 +235,7 @@
   }
  },
  "wall_s": {
-  "held_out": 2419.9,
-  "tuning": 1993.6
+  "held_out": 5000.5,
+  "tuning": 2849.9
  }
 }

@@ -52,6 +52,12 @@ loses again is reproducible, and one that does not is reported as non-determinis
 first freeze has no baseline to regress from, but an unlabelled fallback or a missing result
 still refuses it: nothing a promotion would refuse is frozen as the reference.
 
+**A refused candidate is frozen only on Nicolas's word** (2026-11-09): `suite --freeze
+--override WHY` writes the baseline anyway and keeps WHY in the file as `override`, so the
+refusal and who accepted it stay on the record. A regression or the cost can be his call to
+accept; a run with no game result or a snapshot off its board never is, and `freeze_record`
+refuses those whatever the override says. The tool never decides this on its own.
+
 **A held-out failure becomes a fixture only after its seed is replaced** (AS 2): `load_suite`
 refuses a start or snapshot whose provenance seed is still some start's held-out seed, whatever
 its `set` label says, and one labelled `set: held_out` while `held_out_frozen_at` is unset.
@@ -100,3 +106,20 @@ the death it came from is not a regression.
   so its death lists leave out the non-escort greens; the only change is ours-ch02's two green
   deaths (0xC9, 0xCA). `suite --held-out --kept` against it: no regressions, SC-003 +0.0%,
   no new held-out loss, **PROMOTED**.
+- **Refrozen on an override, 2026-11-09 (#510, T100b and the replan's rest of the plan in
+  hand; instrument `4385f97ef0f3+v2`).** `suite --held-out` refused: vanilla-ch5/1001 Lute
+  (0x0C) dies, a fog death the bot read at 0.0% (`unrevealed_killer`; Eirika now lives there);
+  vanilla-ch5/1002 Natasha (0x0D) dies, honest risk the frozen bot survived on a 93% roll
+  (ADR 0384's over-cap order puts game over first); SC-003 2,487,135 calls against 681,154,
+  all T100b's counter branches, a cost Nicolas accepts because the suite is rarely re-run.
+  Held-out: 4 of 28 lost, none new. Tuning: 3 of 28 lost and 13 protected deaths, both as
+  frozen. Nicolas: "refreeze anyway"; written with `suite --freeze --kept --override`. The
+  new SC-003 baseline is 2,487,135 calls.
+- **Refrozen after PR #585's review, 2026-11-09 (instrument `01d1ea0ad925+v2`).** The review's
+  bot fixes (a counter death no later heal undoes, branched or averaged; a too-wide branch dim
+  no longer stops the narrower ones; the strike least likely to die by its counter offered
+  beside the best and the least exposed; decide holds a benched unit) made a new instrument.
+  `suite --held-out` on it: no regressions on `4385f97ef0f3+v2`, held-out 4 of 28 lost, none
+  new, SC-003 2,490,781 calls (+0.1%), **PROMOTED**; frozen with `suite --freeze --kept`, no
+  override (the file's `override` from the freeze above is gone with it, its reason kept
+  here).

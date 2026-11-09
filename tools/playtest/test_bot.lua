@@ -322,11 +322,25 @@ local function attackPlayed(f, uHp, tHp)
     local back = f.counters and Sight.damage(blowsOf(f.counterHit, f.counterDmg, f.counterHits,
                                                      f.counterCrit, 1 - kill), uHp)
         or { [0] = 1 }
+    -- the exchange's pairs: our blows, then the counter only where they left the target
+    -- standing (the fixtures' one-blow exchanges are played in that order)
+    local leaves = {}
+    local whole = f.counters and Sight.damage(blowsOf(f.counterHit, f.counterDmg, f.counterHits,
+                                                      f.counterCrit), uHp) or { [0] = 1 }
+    for d, pd in pairs(dealt) do
+        if d >= tHp then
+            leaves[#leaves + 1] = { p = pd, dealt = d, back = 0 }
+        else
+            for b, pb in pairs(whole) do leaves[#leaves + 1] = { p = pd * pb, dealt = d, back = b } end
+        end
+    end
+    local _, _, joint = Sight.exchangeOf(leaves)
     return Sight.attackOf({ hit = f.hit, dmg = f.dmg, crit = f.crit, hits = f.hits,
                             counter = { armed = f.counters, hit = f.counterHit,
                                         dmg = f.counterDmg, crit = f.counterCrit,
                                         hits = f.counterHits },
-                            killsTarget = f.killsTarget, dealt = dealt, back = back }, tHp, uHp)
+                            killsTarget = f.killsTarget, dealt = dealt, back = back,
+                            joint = joint }, tHp, uHp)
 end
 -- A fixture's enemy strike (sight.strike's, or one of sight.enemyPhase's), played on a unit
 -- at `hp`; one already carrying takenDist is left as it is.
@@ -2052,6 +2066,121 @@ do
     check(a and a.targetId, 0x81, "planner: the kill")
 end
 
+-- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, ours ch03 turn 11):
+-- A (12 HP) strikes E (9 HP): a hit kills it, a miss lets E's counter take 9. F's AI strikes A
+-- only when A is on 4 HP or less, and its blow kills him there. On A's mean HP after the
+-- counter, F passes him by and the attack reads safe; on the 3 HP the miss-and-counter leaves,
+-- F kills him. Careful's cap is 1%: it holds rather than strike, and the plan says why.
+local function counterWays()
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local E = red(0x81, 1, 0, { hp = 9 })
+    local F = red(0x82, 5, 5, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 60, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 9,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.hp <= 4 then
+                    return { { target = 0x01, enemy = 0x82, takenHit = 100, takenDmg = 4,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    return boardOf(A, E, F), sightOf(o)
+end
+do
+    local board, sight = counterWays()
+    local a, rec = Planner.plan(B, board, sight, style("careful"))
+    check(a and a.act, "wait", "counter ways: careful does not strike into the miss-and-counter death")
+    local risk
+    for _, c in ipairs(rec and rec.considered or {}) do
+        if c.rank.key:find(">attack@") then risk = c.rank.max_die end
+    end
+    local miss = 1 - Sight.rollChance(2, 60)
+    check(risk and math.abs(risk - miss) < 1e-9, true,
+          "counter ways: the attack reads the miss's chance, the way the counter kills by F")
+end
+
+-- test_a_counter_that_kills_is_not_undone_by_a_later_heal (PR #585 review): A (12 HP)
+-- strikes E (9 HP); a miss lets E's 12-damage counter kill A, then H's staff gives A 10. The
+-- heal comes after the death: the way the counter kills plays the phase without A, never with
+-- A standing on what the heal gives back.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 1, 0, { hp = 9 })
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["0,1"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 60, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 12,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then seen[#seen + 1] = b.hp end
+            end
+            return {}
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, H, E), sightOf(o), style("bold"))
+    local healed
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local k = table.concat(c.acts, " ")
+        if k:find("1>attack@") and k:find("2>staff@") then healed = true end
+    end
+    check(healed, true, "heal after a counter death: the attack-then-heal plan is judged")
+    local low = 12
+    for _, hp in ipairs(seen) do low = math.min(low, hp) end
+    check(low, 12,
+          "heal after a counter death: A never stands on the heal the counter's death denies")
+end
+-- the same with the counter left to the average (BRANCH = 0, PR #585 re-review): the phase
+-- strikes A for 6 wherever A stands. Only a miss lets the counter kill A, and that death is
+-- the counter's; the phase strikes only an A the counter left standing, healed, and kills
+-- none. A's death in the attack-then-heal plan is the miss's chance once, never the phase's
+-- again on an HP the heal gave a dead unit.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 1, 0, { hp = 9 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["0,1"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 60, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 12,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then
+                    return { { target = 0x01, takenHit = 100, takenDmg = 6, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local saved = Planner.BRANCH
+    Planner.BRANCH = 0
+    local ok, a, plan = pcall(Planner.plan, B, boardOf(A, H, E), sightOf(o), style("bold"))
+    Planner.BRANCH = saved
+    check(ok, true, "averaged counter: the plan is made" .. (ok and "" or (": " .. tostring(a))))
+    local die
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local k = table.concat(c.acts, " ")
+        if k:find("1>attack@") and k:find("2>staff@") then die = c.rank.max_die end
+    end
+    local miss = 1 - Sight.rollChance(2, 60)
+    check(die and math.abs(die - miss) < 1e-9, true,
+          "averaged counter: A dies on the miss alone (" .. tostring(die) .. " vs " .. miss .. ")")
+end
+
 -- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field toward a
 -- village worth 1000 gold, but the AI would strike A there for `dmg` of its 20 HP. A blow that
 -- cannot kill is under every cap, and progress comes before HP left (FR-011): every style takes
@@ -2564,6 +2693,99 @@ do
     local alone, aplan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
     check(aplan and aplan.kind, "beam", "assault: none with one striker")
     check(alone and alone.act ~= "attack", true, "assault: a lone strike is not made")
+end
+
+-- test_an_attack_whose_counter_can_kill_is_offered (ADR 0396's known break, the counter
+-- refusal; ours ch03 even, turn 15: Rootis, 10 HP, beside a boss on 2 HP whose counter hits for
+-- 11, and his blow, first, wins the chapter 98 times in 100 -- never offered, so never judged).
+-- A cannot get out of the boss's reach, and holding is a sure death; its blow kills the boss
+-- nine times in ten, and only a miss lets the 30-damage counter kill it. The attack is offered,
+-- its death chance is the counter's, and it is played over the sure death.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 1, 1, { isBoss = true, hp = 10 })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x81] = tiles({ 1, 1 }) },
+        danger = { ["0,0"] = 1, ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 90, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 30,
+                                                   counterHits = 1, takenHit = 100,
+                                                   takenDmg = 30, takenHits = 1 } } } },
+        enemyPhase = function(plan)
+            if plan.gone[0x81] then return {} end
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                out[#out + 1] = { target = b.unit.id, takenHit = 100, takenDmg = 30,
+                                  takenHits = 1, takenCrit = 0 }
+            end
+            return out
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    local blow
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.rank.key:find(">attack@1,0>") then blow = c.rank.max_die end
+    end
+    check(blow and math.abs(blow - (1 - Sight.rollChance(2, 90))) < 1e-9, true,
+          "counter refusal lifted: the blow is judged, at the counter's chance to kill")
+    check(a and a.act, "attack", "counter refusal lifted: the blow is played over a sure death")
+end
+
+-- test_the_strike_whose_counter_cannot_kill_is_offered (PR #585 review): from (0,0) A's blow
+-- kills E 80 times in 100 and E's counter kills A on a miss; from (1,1) A kills 40 times in 100
+-- and E cannot counter. Neither tile is in an enemy phase's reach, so the old "safest" (least
+-- exposed) tied and kept the first, the strike whose counter kills: (1,1) was never offered.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local E = red(0x81, 1, 0, { hp = 10 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 1 }) },
+        fc = { [0x01] = { [0x81] = {
+            ["0,0"] = fc { hit = 80, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                           counterDmg = 30, counterHits = 1 },
+            ["1,1"] = fc { hit = 40, dmg = 12, hits = 1 } } } },
+    }
+    local on = {}
+    for _, c in ipairs(B.candidates(boardOf(A, E), sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.act == "attack" then on[a.move.x .. "," .. a.move.y] = true end
+        end
+    end
+    check(on["0,0"], true, "safest strike: the likelier kill is offered")
+    check(on["1,1"], true, "safest strike: the strike whose counter cannot kill is offered too")
+end
+-- and the least exposed strike is still offered beside it (PR #585 re-review): from (0,0) the
+-- best kill; from (1,1) no counter can kill but the enemy phase reaches it; from (2,0) a
+-- counter can kill on a miss, and no enemy phase reaches it. All three are offered.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local E = red(0x81, 1, 0, { hp = 10 })
+    local F = red(0x82, 5, 5)
+    local o = {
+        -- F strikes (0,0) from (-1,0) and (1,1) from (1,2); (2,0) is out of its reach
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 1 }, { 2, 0 }),
+                  [0x82] = tiles({ -1, 0 }, { 1, 2 }) },
+        danger = { ["0,0"] = 1, ["1,1"] = 1 },
+        fc = { [0x01] = {
+            [0x81] = {
+                ["0,0"] = fc { hit = 90, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                               counterDmg = 30, counterHits = 1 },
+                ["1,1"] = fc { hit = 40, dmg = 12, hits = 1 },
+                ["2,0"] = fc { hit = 50, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                               counterDmg = 30, counterHits = 1 } },
+            [0x82] = {
+                ["0,0"] = fc { takenHit = 100, takenDmg = 15, takenHits = 1 },
+                ["1,1"] = fc { takenHit = 100, takenDmg = 15, takenHits = 1 } } } },
+    }
+    local on = {}
+    for _, c in ipairs(B.candidates(boardOf(A, E, F), sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.act == "attack" then on[a.move.x .. "," .. a.move.y] = true end
+        end
+    end
+    check(on["0,0"] and on["1,1"] and on["2,0"], true,
+          "safest strike: the best, the counter-safe and the least exposed are all offered")
 end
 
 -- test_planner_chains_the_counter: A (30 HP) strikes the boss for 20; the boss's counter (66,
@@ -3184,6 +3406,46 @@ do
         if c.kind == "advance" then adv = table.concat(c.acts, " ") end
     end
     check(adv, "1>wait@3,0>nil 2>wait@2,1>nil", "advance: the second unit takes its next tile")
+end
+
+-- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
+-- acts of the plan in hand not yet played (opts.rest). The beam (one plan wide) and the advance
+-- never build U2 holding at (1,1) with U1 marching to (3,0); handed those acts, the planner
+-- judges that plan too, kind "rest". An act this board no longer offers is dropped and its
+-- unit holds; a rest the other plans already hold is not judged twice. (Vanilla Ch6 seed 1001
+-- turn 4: the replan after a counter judged 4 plans, every one 30.8% or more to end the game,
+-- and the rest of the plan in hand, replayed, lost no lord.)
+do
+    local U1 = blue(0x01, 0, 0, 0, { minRange = false })
+    local U2 = blue(0x02, 1, 1, 1, { minRange = false, mov = 2 })
+    local Z = red(0x83, 14, 9, { minRange = false })
+    local sight = seizeSight({
+        reach = { [0x01] = tiles({ 0, 0 }, { 3, 0 }), [0x02] = tiles({ 1, 1 }, { 3, 0 }, { 2, 1 }) },
+    })
+    local function judged(rest)
+        local beam = Planner.BEAM
+        Planner.BEAM = 1
+        local _, plan = Planner.plan(B, boardOf(U1, U2, Z), sight, style("bold"), { rest = rest })
+        Planner.BEAM = beam
+        local out = {}
+        for _, c in ipairs(plan and plan.considered or {}) do
+            out[#out + 1] = c.kind .. ": " .. table.concat(c.acts, " ")
+        end
+        table.sort(out)
+        return table.concat(out, " | ")
+    end
+    local plain = judged(nil)
+    check(plain:find("1>wait@3,0>nil 2>wait@1,1>nil", 1, true)
+          or plain:find("2>wait@1,1>nil 1>wait@3,0>nil", 1, true), nil,
+          "rest: no other plan holds U2 at (1,1) with U1 marching")
+    check(judged({ "2>wait@1,1>nil", "1>wait@3,0>nil" }),
+          plain .. " | rest: 2>wait@1,1>nil 1>wait@3,0>nil",
+          "rest: the plan in hand is judged too, in its order")
+    check(judged({ "1>wait@5,5>nil", "2>wait@1,1>nil" }),
+          plain .. " | rest: 2>wait@1,1>nil 1>wait@0,0>nil",
+          "rest: an act no longer offered is dropped, and its unit holds")
+    check(judged({ "2>wait@3,0>nil", "1>wait@0,0>nil" }), plain,
+          "rest: a plan already judged is not judged twice")
 end
 
 -- test_a_visit_comes_before_the_win (SC-002, plan T047): the lord can Seize now, or Visit a
@@ -3951,6 +4213,37 @@ do
     check(math.abs(sum - 1) < 1e-9, true, "branches: the record's weights are normalized")
 end
 
+-- test_a_dim_too_wide_does_not_stop_the_narrower_ones (PR #585 review): A's exchange with E1
+-- (a 2RN-40 kill, a four-blow counter) goes six ways and is the most uncertain; C's 50% kill on
+-- E2 goes two. With BRANCH = 2 (four ways at most) A's six keep the average, and C's kill,
+-- which fits, is still played both ways.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20, maxhp = 20 })
+    local C = blue(0x02, 1, 0, 5, { hp = 20, maxhp = 20 })
+    local E1 = red(0x81, 1, 0, { hp = 9 })
+    local E2 = red(0x82, 1, 5, { hp = 9 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 5 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 40, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 50, counterDmg = 1,
+                                                   counterHits = 4 } } },
+               [0x02] = { [0x82] = { ["0,5"] = fc { hit = 50, dmg = 12, hits = 1 } } } },
+        enemyPhase = function() return {} end,
+    }
+    local saved = Planner.BRANCH
+    Planner.BRANCH = 2
+    local ok, a, plan = pcall(Planner.plan, B, boardOf(A, C, E1, E2), sightOf(o), style("bold"))
+    Planner.BRANCH = saved
+    check(ok, true, "wide dim: the plan is made" .. (ok and "" or (": " .. tostring(a))))
+    local attacks = 0
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.act == "attack" then attacks = attacks + 1 end
+    end
+    check(attacks, 2, "wide dim: both strike")
+    check(plan and plan.branched, 1, "wide dim: the narrower kill is still branched")
+    check(plan and plan.averaged, 1, "wide dim: only the wide exchange keeps the average")
+end
+
 -- test_a_game_over_is_counted_per_branch (PR #561 review): two lords, and X kills one or the
 -- other, each half the time. Each alone dies at 50%, but a game over comes in every branch:
 -- its chance is 1, never the 75% the two chances multiplied as if apart would give.
@@ -4387,6 +4680,103 @@ do
     a, plan = Planner.plan(B, board, sight, st,
                            { budget = { attempt = Planner.LOOK_ATTEMPT - 19 * Planner.FINAL } })
     check(plan.lookahead.extended, true, "lookahead: room left after ours-ch03's 19 triggers")
+end
+
+-- test_over_the_cap_this_phase_comes_first (#510 T100b, ours ch03 careful seed 3010 turn 18,
+-- replayed): every plan is over the cap. The march to (1,0) may die in the next enemy phase
+-- (70% shown); the hold at (0,0) is safe there, and dies only in the lookahead's second phase,
+-- which has it stand still for another round (the guess the records found far too high: 0 of
+-- 8 such readings came true). Over the cap the next phase's own chances rank first, the second
+-- phase's only break their ties: the hold is played. Before, the larger two-phase number
+-- decided, and the march (the smaller) was played and died.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local K = red(0x82, 2, 9, { isBoss = true, minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x82] = tiles({ 1, 1 }) },
+        field = function(t)
+            return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
+        end,
+        explorable = { { x = 9, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["9,0"] = "visit" } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { enemy = 0x82, target = b.unit.id, takenHit = 70, takenDmg = 99,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+        nextPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 0 then
+                    return { { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X, K), sightOf(o), gifted("careful", 1000))
+    check(plan.lookahead.extended, true, "over the cap: the boss trigger asked the second phase")
+    local hold, march
+    for _, c in ipairs(plan.considered) do
+        if c.extended and c.acts[1]:match("@0,0>") then hold = hold or c end
+        if c.extended and c.acts[1]:match("@1,0>") then march = march or c end
+    end
+    check(hold ~= nil and march ~= nil, true, "over the cap: both the hold and the march judged")
+    check(hold.rank.admitted or march.rank.admitted, false, "over the cap: neither is admitted")
+    -- the gap the order turns on, both ways: the two-phase numbers favour the march, the next
+    -- phase's favour the hold
+    check(march.rank.max_die < hold.rank.max_die - 0.1, true,
+          "over the cap: the march's two-phase chance is the smaller")
+    check(hold.rank.first_max_exceed, 0, "over the cap: the hold is safe in the next phase")
+    check(march.rank.first_max_exceed > 0.3, true, "over the cap: the march is not")
+    check(at(a), "0,0", "over the cap: the next phase's chance ranks first, the hold is played")
+    check(plan.protected[1].first, 0, "over the cap: the record keeps the next phase's chance")
+    check(plan.protected[1].die > 0.99, true, "over the cap: and the two-phase one")
+end
+
+-- test_a_benched_unit_only_waits (#510, the benched-twin experiment): a unit the style
+-- benches (style.bench, PT_BENCH) is offered one act, a wait on its own tile, and the plan
+-- leaves it there; unbenched, the same unit marches.
+do
+    local board, sight, st = looksAhead(nil)
+    local function actsOf(cands)
+        local out = {}
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.acts) do out[#out + 1] = a.act .. "@" .. a.move.x .. "," .. a.move.y end
+        end
+        return out
+    end
+    check(#actsOf(B.candidates(board, sight, st)) > 1, true, "bench: unbenched, A has acts")
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "bench: unbenched, A marches")
+    board, sight, st = looksAhead(nil)
+    st.bench = { 0x01 }
+    check(table.concat(actsOf(B.candidates(board, sight, st)), " "), "wait@0,0",
+          "bench: a benched unit is offered only a wait where it stands")
+    check(at(Planner.plan(B, board, sight, st)), "0,0", "bench: and the plan leaves it there")
+    -- decide (the greedy style's, and the planner's fallback) holds it too (PR #585 review)
+    -- (A beside an enemy its blow surely kills: unbenched, decide strikes it)
+    local function decided(aggression, bench)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 1, 0, { hp = 5 })
+        local s = sightOf({ reach = { [0x01] = tiles({ 0, 0 }) },
+                            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 12,
+                                                                       hits = 1 } } } } })
+        local sty = style(aggression)
+        sty.bench = bench
+        local a = B.decide(boardOf(A, E), s, sty)
+        return a and (a.act .. "@" .. a.move.x .. "," .. a.move.y)
+    end
+    for _, aggression in ipairs({ "greedy", "careful" }) do
+        check(decided(aggression, nil), "attack@0,0",
+              "bench: unbenched, " .. aggression .. "'s decide strikes")
+        check(decided(aggression, { 0x01 }), "wait@0,0",
+              "bench: benched, " .. aggression .. "'s decide holds A where it stands")
+    end
 end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board

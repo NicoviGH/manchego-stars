@@ -87,6 +87,14 @@ admission; for plans over the cap, the chance of a game over (amended below), la
 summed excess, largest death chance, then the admitted order; for admitted plans, `value` (the
 judged score), standing in for (4) until PR-D; then largest death chance, summed death chance,
 HP left, and the plan's acts as a key.
+**Amended 2026-11-08 (#510 T100b):** a counter that can leave our attacker on more than one HP
+is branched as an uncertain kill is, within the same `M.BRANCH`, and the enemy phase is played on
+the HP each way leaves. On its mean HP the AI chose targets from an HP that never happens: ours
+ch03, Wolfram missed, was countered to 3 HP, read 0% and died (careful turns 11 and 16). Where a
+unit's blow is the only one on its target, the exchange's own pairs (`sight`'s `joint`) are
+played, so a counter is played only where the blow did not kill first. Pilot: careful lost
+someone in 0 of 18 runs (was 19 of 19), at 2,879 CPU s (main ~3,089). Over the cap, plans are
+ranked on the next phase first (ADR 0389's amendment of the same day).
 A plan chosen with none under the cap carries `fallback = "FALLBACK_SACRIFICE"`, which botrun
 records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fallback plans,
 `max_die` the most any of them accepted).
@@ -222,6 +230,16 @@ win, whole turns behind, allied greens, progress, judged score, then FR-013's ti
   acts that gain ground within the cap, the one that gains the most, falling to the next when a
   tile is still taken. A unit refused every one is tried again once the others have moved. It
   is skipped when no unit gains ground or the beam already has the plan.
+- **The rest of the plan in hand, a search addition (2026-11-09, #510; Nicolas: "yes go
+  ahead").** A replan (botrun, when `M.surprise` finds the board off the plan) judges the acts
+  of the plan in hand not yet played (`opts.rest`, kind `rest`) beside the new plans, rebuilt
+  from this board's offers, an act no longer offered dropped and its unit holding. The witnessed
+  search miss: vanilla Ch6 (suite start `vanilla-ch5`) seed 1001 turn 4, a counter hit Eirika
+  (18 → 8 HP), and the replan judged 4 plans, every one 30.8% or more to end the game; she died
+  and the chapter was lost. A forced replay of the plan in hand on that board (DIAG
+  `6-s1001-a1-force-f1d311e4`) lost no lord. With the rest judged, the replan played it (0% game
+  over) and the chapter was won (instrument `4385f97ef0f3+v2`). One plan more a replan;
+  vanilla-ch5 seed 1002's calls 62,949 → 63,243.
 - **Seize skips (FR-015).** botrun justifies a skip while a ledger goal is `feasible`, or when
   every judged plan with the Seize was over the cap. It is a fault (`unjustified_seize_skip`)
   when a Seize under the cap was judged and nothing was left to get, or when no judged plan had

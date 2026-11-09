@@ -20,7 +20,8 @@
 --              0 = it cannot strike (x, y) this turn;
 --            attack(unit, target, x, y, slot) -> sight.lua's (Sight.attackOf): the window's
 --              numbers, and as the game plays it: kill, die, sure, expected, counterWorst,
---              dealt, counterDist | nil (out of range);
+--              dealt, counterDist, joint (the two together: { { p, dealt, back } }; a fake
+--              may leave it out) | nil (out of range);
 --            strike(unit, enemy, x, y) -> sight.lua's (Sight.strikeOf): the enemy's own strike
 --              on `unit` standing on (x, y), on its phase, as its AI makes it and the game
 --              plays it: takenDist, takenWorst; nothing taken when it does not strike there;
@@ -404,7 +405,7 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, exposures = {}, options = {}, breaches = {}, keyed = {}, talks = {},
+                  worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
                   talkTiles = {}, openers = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
@@ -739,9 +740,13 @@ local function healCredit(ctx, u, e, t)
 end
 
 -- Every attack the gate allows `u` this call, worked out once (decide's pass and a claim's
--- filtered pass read the same list).
-local function attackOptions(ctx, u, gate)
-    local opts = ctx.options[u]
+-- filtered pass read the same list). `priced` (the planner's proposals): an attack whose
+-- counter can kill is offered, its death chance (the forecast's `die`) judged against the
+-- cap like any other (ADR 0396: only the game forbids). Without it, decide's own refusal of
+-- every attack whose counter's worst case reaches the unit's HP (ADR 0368's gates).
+local function attackOptions(ctx, u, gate, priced)
+    local store = priced and ctx.priced or ctx.options
+    local opts = store[u]
     if opts then return opts end
     opts = {}
     local answers = claimsOn(ctx, "answers", u)
@@ -761,7 +766,7 @@ local function attackOptions(ctx, u, gate)
                 -- what the counter leaves before the enemy phase, a heal claim's heal counted
                 local left = f and math.max(u.hp - (u.maxhp or u.hp),
                                             spent - healCredit(ctx, u, e, t))
-                if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
+                if f and (priced or spent < u.hp) and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
                     opts[#opts + 1] = { tile = t, target = e, slot = w.slot, sure = sure,
                                         answered = answered, first = first, f = f,
                                         spent = spent, killChance = killChance(f),
@@ -770,7 +775,7 @@ local function attackOptions(ctx, u, gate)
             end
         end
     end
-    ctx.options[u] = opts
+    store[u] = opts
     return opts
 end
 
@@ -1257,6 +1262,17 @@ local function greedy(ctx, objective)
     return action(u, tile, "wait")
 end
 
+-- An experiment's benched unit (style.bench: a playthrough without it, botrun's api.bench)
+-- only waits where it stands, and is still in the enemy's reach there: its wait, else nil.
+-- Every way the bot acts reads it, the planner's candidates and decide alike, so a benched
+-- run never plays the unit (PR #585 review: decide, the greedy style's and the planner's
+-- fallback, played it).
+local function benchedWait(ctx, u)
+    if ctx.style and ctx.style.bench and listed(ctx.style.bench, u.charId) then
+        return action(u, u, "wait")
+    end
+end
+
 function M.decide(board, sight, style)
     local aggression = style and style.aggression
     local gate = GATES[aggression]
@@ -1270,6 +1286,10 @@ function M.decide(board, sight, style)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     if #ctx.actors == 0 then return nil end
+    for _, u in ipairs(ctx.actors) do
+        local held = benchedWait(ctx, u)
+        if held then return held end
+    end
     local objective = sight.objective
     local s = seize(ctx)
     if s then return s end
@@ -1482,9 +1502,29 @@ function M.explain(board, sight, style)
     return lines
 end
 
+-- `acts` of `u`, each told the ally its end tile asks to move (`vacate`) and what can strike
+-- it there next phase (`exposure`, each enemy's own strike: the planner's odds).
+local function exposed(ctx, u, acts)
+    for _, a in ipairs(acts) do
+        local friend = vacated(ctx, u, a.move.x, a.move.y)
+        a.vacate = friend and friend.id
+        a.exposure = {}
+        local held = a.act == "attack" and a.slot or nil
+        for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
+            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
+        end
+    end
+    return acts
+end
+
 -- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
 -- each is).
 local function proposeOne(ctx, u)
+    local held = benchedWait(ctx, u)
+    if held then
+        held.why = "hold"
+        return { unit = u, acts = exposed(ctx, u, { held }) }
+    end
     local sight, objective = ctx.sight, ctx.sight.objective
     local open = function() return true end
     local acts, seen = {}, {}
@@ -1503,12 +1543,21 @@ local function proposeOne(ctx, u)
             if t.x == s.x and t.y == s.y then add(action(u, t, "seize"), "seize") end
         end
     end
-    local best, safe = {}, {}
-    for _, c in ipairs(attackOptions(ctx, u, open)) do
+    -- per enemy, three strikes: the best, the least exposed to the enemy phase (`safe`), and
+    -- the least likely to die by its own counter (`guard`, exposure breaking its ties). These
+    -- attacks are `priced` (a counter that can kill is offered, ADR 0396), so either risk can
+    -- be the one that matters; the planner weighs both, and ranking one strike by both would
+    -- drop the other's best (PR #585 review and re-review).
+    local best, safe, guard = {}, {}, {}
+    for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         local e = c.target
         if not best[e] or betterAttack(c, best[e]) then best[e] = c end
         c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
         if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
+        local g = guard[e]
+        if not g or c.f.die < g.f.die or (c.f.die == g.f.die and c.worst < g.worst) then
+            guard[e] = c
+        end
     end
     local function offer(c)
         local a = strikeAct(u, c)
@@ -1516,14 +1565,14 @@ local function proposeOne(ctx, u)
         add(a, "attack")
     end
     for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
-        for _, list in ipairs({ best, safe }) do
+        for _, list in ipairs({ best, safe, guard }) do
             if list[e] then offer(list[e]) end
         end
     end
     -- the boss from every tile: the planner's assault seats several strikers around it,
     -- and two tiles per unit gave them all the same one (ours ch03's corner Mogall: three
     -- of six strikers dropped, the rest of its tiles empty)
-    for _, c in ipairs(attackOptions(ctx, u, open)) do
+    for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         if c.target.isBoss then offer(c) end
     end
     add(breach(ctx, u, open, objective), "breach")
@@ -1613,17 +1662,7 @@ local function proposeOne(ctx, u)
     -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
     -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
     for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
-    for _, a in ipairs(acts) do
-        local friend = vacated(ctx, u, a.move.x, a.move.y)
-        a.vacate = friend and friend.id
-        -- what can strike it there next phase, each enemy's own strike (the planner's odds)
-        a.exposure = {}
-        local held = a.act == "attack" and a.slot or nil
-        for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
-            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
-        end
-    end
-    return { unit = u, acts = acts }
+    return { unit = u, acts = exposed(ctx, u, acts) }
 end
 
 -- Every unit's acts (proposeOne). Given the last proposal `last` and the goals it was made for

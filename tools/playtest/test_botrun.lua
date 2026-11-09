@@ -508,6 +508,34 @@ do
     check(r.outcome, "stuck", "a board that comes round again after a stall is stuck")
 end
 
+-- test_a_replan_is_handed_the_rest_of_the_plan: the planner plans A's, B's and C's waits; the
+-- board is off after A's (a surprise), so the next ask carries B's and C's keys, in order, for
+-- the planner to judge again (opts.rest). A fresh ask, one no plan was playing for, has none.
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 5, 20),
+                                   unit(0x03, 2, "blue", 0, 7, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) } }
+    local rests = {}
+    g.api.Planner = {
+        key = Planner.key,
+        surprise = function(_, k) return k == 1 and "a blow missed" or nil end,
+        plan = function(_, board, _, _, opts)
+            rests[#rests + 1] = opts and opts.rest and table.concat(opts.rest, " ") or "none"
+            if #rests > 1 or board.turn > 1 then return nil, nil, { phases = 0, averaged = 0 } end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
+                           { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } },
+                           { unit = 0x03, unitId = 0x03, act = "wait", move = { x = 1, y = 7 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 }, { hp = 20 } },
+                              enemies = { [0x81] = true } }, { phases = 0, averaged = 0 }
+        end,
+    }
+    Botrun.run(g.api)
+    check(rests[1], "none", "rest: a fresh plan is handed no plan in hand")
+    check(rests[2], "2>wait@1,5>nil 3>wait@1,7>nil",
+          "rest: the replan is handed the acts not yet played, in order")
+end
+
 -- test_trace_tells_the_run: every act with the game's battle record, both phases, an arrival,
 -- and the BOTRUN record last.
 do
