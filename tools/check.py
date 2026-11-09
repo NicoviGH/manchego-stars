@@ -86,6 +86,11 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 T100c: an enemy act is one gProcScr_CpPerform (harness.lua
+    # watchEnemyActs), never a change of gActionData's subjectIndex, which a phase start's heal
+    # and status displays also write
+    r'\bsubjectIndex\s+(?:change[sd]?|changing)\b[^.\n]{0,40}\bact\b',
+    r'\bact\b[^.\n]{0,40}\bwhen\s+(?:the\s+)?subjectIndex\s+changes\b',
     # retired by #510 step 9 PR-H (ADR 0385, built): the verdict is exact Clopper-Pearson bounds on
     # any protected death at every look; exact McNemar, the Haybittle-Peto early bar and the
     # score intervals it reported with are gone, and a cell no longer counts clean clears

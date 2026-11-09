@@ -298,6 +298,7 @@ WANTED = [
     # A fallen unit's drop (bmmind.c BATTLE_HandleItemDrop, its popup's only caller).
     'NewPopup_GeneralItemGot',  # the item given to the blue unit that downed a dropper
     'sProcScr_CombatAction',    # the real battle's resolution, the drop included
+    'gProcScr_CpPerform',       # an AI unit's act (cp_perform.c): the enemy-phase recorder's act
     # An AI theft (cp_perform.c AiStartStealAction) and the rank its list gives the item.
     'AiStartStealAction',       # the steal itself: gAiDecision's target and item slot
     'AiGetItemStealRank',       # the item's place in gAiStealPriorityItemList (ADR 0379)

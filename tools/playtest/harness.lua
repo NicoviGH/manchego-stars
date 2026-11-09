@@ -3167,20 +3167,28 @@ INSPECT.watchThefts = function(cpu)
     return function() stop(); return thefts end
 end
 
--- Each act of an enemy (or green) phase, as the game records it, for the run's trace. Every
--- act the AI performs starts with UnitBeginAction (bmunit.c): gActionData +0C subjectIndex = the
--- unit, +11 unitActionType = 0, gActiveUnitMoveOrigin = its tile; CpPerform then sets the type
--- (AiStartCombatAction: COMBAT and +0D targetIndex; AiStaffAction: STAFF and +0D; AiPickAction:
--- PICK, the village or chest at +13/+14 xOther/yOther). A pillage and a steal are read off
--- gAiDecision instead (AiPillageAction sets nothing for a village, AiStartStealAction nothing),
--- and a chest by its tile: a thief opens one as USE_ITEM, by a pillage or by using its key. A frame watch follows that record. The act's battle is read once the
--- type is COMBAT and gBattleStats says REAL after the act began on a simulation: the AI simulates
--- every attack it weighs (AiComputeCombatScore) before it performs one, so a REAL flag seen
--- only after that is this act's own battle, never one left from an earlier phase.
+-- Each act of an enemy (or green) phase, as the game plays it, for the run's trace. An act is
+-- one gProcScr_CpPerform (cp_perform.c): CpDecide starts one for each unit that moves or acts,
+-- and none for a unit that stays put doing nothing, so a unit without one has no act. Its unit
+-- is gAiDecision +01, decided before the proc starts and kept while it plays. The act's `from`
+-- is that unit's tile on the proc's first frame, before CpPerform_BeginUnitMovement: a SLEEP
+-- comes first, and nothing moves the unit until then. gActionData +0C subjectIndex cannot
+-- mark an act: a phase start's heal and status displays (bmusailment.c MassEffectDisplay_Check,
+-- TrapDamageDisplay_Check) write each unit they show there, so an act keyed on it recorded a
+-- battle-less `wait` from the last player act's tile for every unit healed (#510 T100c).
+-- UnitBeginAction (bmunit.c) then clears +11 unitActionType, and CpPerform sets it (AiStartCombatAction:
+-- COMBAT and +0D targetIndex; AiStaffAction: STAFF and +0D; AiPickAction: PICK, the village or
+-- chest at +13/+14 xOther/yOther); the type is read only once it has been cleared, since
+-- before that it is the last act's. A pillage and a steal are read off gAiDecision instead
+-- (AiPillageAction sets nothing for a village, AiStartStealAction nothing), and a chest by its
+-- tile: a thief opens one as USE_ITEM, by a pillage or by using its key. The act closes when
+-- its proc ends. Its battle is read once the type is COMBAT and gBattleStats says REAL after
+-- the act began on a simulation: the AI simulates every attack it weighs
+-- (AiComputeCombatScore) before it performs one, so a REAL flag seen only after that is this
+-- act's own battle, never one left from an earlier phase.
 INSPECT.watchEnemyActs = function()
     local acts, cur = {}, nil
     local AD = SYM.gActionData
-    local prev = ru8(AD + 0x0C)
     local function real() return (ru16(SYM.gBattleStats) & BOARD.BATTLE_REAL) ~= 0 end
     local function close()
         if not cur then return end
@@ -3193,24 +3201,25 @@ INSPECT.watchEnemyActs = function()
         cur.dest = nil
         local addr = ru32(SYM.gUnitLookup + cur.id * 4)
         if addr ~= 0 then cur.to, cur.hp = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) }, ru8(addr + 0x13) end
-        cur.sim = nil
+        cur.sim, cur.begun = nil, nil
         acts[#acts + 1] = cur
         cur = nil
     end
     local id = callbacks:add("frame", function()
-        local uid = ru8(AD + 0x0C)
-        if uid ~= prev then
-            prev = uid
+        local uid = PROCS.find(SYM.gProcScr_CpPerform) and ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT)
+        if uid ~= (cur and cur.id) then
             close()
-            local addr = uid >= 0x40 and ru32(SYM.gUnitLookup + uid * 4) or 0
+            local addr = uid and uid >= 0x40 and ru32(SYM.gUnitLookup + uid * 4) or 0
             if addr ~= 0 and ru32(addr) ~= 0 then
                 cur = { id = uid, charId = ru8(ru32(addr) + 4), battles = {},
-                        from = { x = rs16(SYM.gActiveUnitMoveOrigin), y = rs16(SYM.gActiveUnitMoveOrigin + 2) },
+                        from = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) },
                         sim = not real() }
             end
         end
         if not cur then return end
         local kind = ru8(AD + 0x11)
+        cur.begun = cur.begun or kind == 0
+        if not cur.begun then kind = 0 end
         -- gAiDecision is this unit's while its act plays (CpDecide decides one unit, then
         -- CpPerform plays it)
         local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT) == cur.id
