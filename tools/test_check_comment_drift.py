@@ -100,6 +100,19 @@ class DeadConceptPatterns(unittest.TestCase):
                    'the bank holds 28 colours'):
             self.assertIsNone(DEAD_PAT.search(ok), ok)
 
+    def test_an_act_keyed_on_subjectIndex_is_caught_and_the_live_note_is_not(self):
+        """#510 T100c: an enemy act is one CpPerform; a phase start's heal display writes
+        subjectIndex too, so every claim that its change marks an act is dead."""
+        for dead in ('an act opens when subjectIndex changes',
+                     'opened an enemy act whenever gActionData.subjectIndex changed',
+                     'acts keyed on gActionData.subjectIndex',
+                     'subjectIndex changes open an act'):
+            self.assertIsNotNone(DEAD_PAT.search(dead), dead)
+        for live in ('-- mark an act: a phase start\'s heal and status displays',
+                     '# unitActionType and the act then sets it; +0C subjectIndex is no act\'s mark',
+                     'gActionData +0C subjectIndex cannot mark an act'):
+            self.assertIsNone(DEAD_PAT.search(live), live)
+
     def test_live_donor_vocabulary_is_not_flagged(self):
         for ok in ('growths copied verbatim from the growth donor',
                    'the donor personal bases',

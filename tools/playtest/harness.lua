@@ -1824,9 +1824,15 @@ end
 -- wait -- unit names and menus decode through the same function and overwrite it.
 INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
 
+-- struct ProcCmd (include/proc.h): opcode, dataImm, dataPtr at +04 -- 8 bytes a command
+INSPECT.PROC_CMD_SIZE = 8
+-- scrCur as an offset from the script head: the exact PROC_* command it sits on, -1 before it
+INSPECT.procStep = function(p)
+    return (p.scrCur >= p.script) and ((p.scrCur - p.script) // INSPECT.PROC_CMD_SIZE) or -1
+end
+
 local function procLine(i, p, prev)
-    -- scrCur as an offset from the script head: the exact PROC_* command it sits on.
-    local step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1
+    local step = INSPECT.procStep(p)
     local moved = ""
     if prev then
         moved = (prev.scrCur == p.scrCur and prev.sleep == p.sleep and prev.lock == p.lock)
@@ -1932,7 +1938,7 @@ INSPECT.snapshot = function(tag, explanation, sampled)
                 script_name = INSPECT.scriptName(p.script),
                 -- The decomp's PROC_NAME string: colour only, never identity.
                 proc_name = p.name,
-                step = (p.scrCur >= p.script) and ((p.scrCur - p.script) // 12) or -1,
+                step = INSPECT.procStep(p),
                 idle = string.format("0x%08X", codeAddr(p.idleCb)),
                 sleep = p.sleep, mark = p.mark, flags = p.flags, lock = p.lock,
                 frozen = prev ~= nil and prev.scrCur == p.scrCur and prev.sleep == p.sleep
@@ -3167,23 +3173,41 @@ INSPECT.watchThefts = function(cpu)
     return function() stop(); return thefts end
 end
 
--- Each act of an enemy (or green) phase, as the game records it, for the run's trace. Every
--- act the AI performs starts with UnitBeginAction (bmunit.c): gActionData +0C subjectIndex = the
--- unit, +11 unitActionType = 0, gActiveUnitMoveOrigin = its tile; CpPerform then sets the type
--- (AiStartCombatAction: COMBAT and +0D targetIndex; AiStaffAction: STAFF and +0D; AiPickAction:
--- PICK, the village or chest at +13/+14 xOther/yOther). A pillage and a steal are read off
+-- Each act of an enemy (or green) phase, as the game plays it, for the run's trace. An act is
+-- one run of gProcScr_CpPerform (cp_perform.c): CpDecide starts one for each unit that moves or
+-- acts, and none for a unit that stays put doing nothing, so a unit without one has no act. Its
+-- unit is gAiDecision +01, decided before the proc starts and kept while it plays. The act
+-- begins when the proc has run its CpPerform_BeginUnitMovement command (its proc_scrCur, +04,
+-- is past it: a SLEEP stops the proc on that command first, so a new run is always seen before
+-- it): UnitBeginAction (bmunit.c) has then set gActiveUnitMoveOrigin, the act's `from`, and
+-- cleared +11 unitActionType, which the same call may already have set to TRAPPED
+-- (UnitApplyWorkingMovementScript). gActionData +0C subjectIndex cannot mark an act: a phase
+-- start's heal and status displays (bmusailment.c MassEffectDisplay_Check,
+-- TrapDamageDisplay_Check) write each unit they show there, so an act keyed on it recorded a
+-- battle-less `wait` from the last player act's tile for every unit healed (#510 T100c).
+-- CpPerform then sets the type (AiStartCombatAction: COMBAT and +0D targetIndex; AiStaffAction:
+-- STAFF and +0D; AiPickAction: PICK, the village or chest at +13/+14 xOther/yOther); before the
+-- act begins the type is the last act's and is not read. A pillage and a steal are read off
 -- gAiDecision instead (AiPillageAction sets nothing for a village, AiStartStealAction nothing),
--- and a chest by its tile: a thief opens one as USE_ITEM, by a pillage or by using its key. A frame watch follows that record. The act's battle is read once the
--- type is COMBAT and gBattleStats says REAL after the act began on a simulation: the AI simulates
--- every attack it weighs (AiComputeCombatScore) before it performs one, so a REAL flag seen
--- only after that is this act's own battle, never one left from an earlier phase.
+-- and a chest by its tile: a thief opens one as USE_ITEM, by a pillage or by using its key. The
+-- act closes when its proc ends or a new run of it starts. Its battle is read once the type is
+-- COMBAT and gBattleStats says REAL after the act began on a simulation: the AI simulates every
+-- attack it weighs (AiComputeCombatScore) before it performs one, so a REAL flag seen only after
+-- that is this act's own battle, never one left from an earlier phase.
 INSPECT.watchEnemyActs = function()
     local acts, cur = {}, nil
     local AD = SYM.gActionData
-    local prev = ru8(AD + 0x0C)
+    -- the script command that calls CpPerform_BeginUnitMovement (a CALL's +04 is its function)
+    local beginCmd = SYM.gProcScr_CpPerform
+    while (ru32(beginCmd + 4) & ~1) ~= SYM.CpPerform_BeginUnitMovement do
+        beginCmd = beginCmd + INSPECT.PROC_CMD_SIZE
+        assert(beginCmd < SYM.gProcScr_CpPerform + INSPECT.PROC_CMD_SIZE * 32, "gProcScr_CpPerform calls no CpPerform_BeginUnitMovement")
+    end
     local function real() return (ru16(SYM.gBattleStats) & BOARD.BATTLE_REAL) ~= 0 end
     local function close()
         if not cur then return end
+        -- a run that never began moved and did nothing: no act
+        if not cur.begun then cur = nil return end
         -- a chest the act emptied, however the AI opened it (AiPillageAction, or its key used
         -- as an item: green Colm in vanilla Ch3): full when the act began, not now
         local d = cur.dest
@@ -3193,33 +3217,42 @@ INSPECT.watchEnemyActs = function()
         cur.dest = nil
         local addr = ru32(SYM.gUnitLookup + cur.id * 4)
         if addr ~= 0 then cur.to, cur.hp = { x = rs8(addr + 0x10), y = rs8(addr + 0x11) }, ru8(addr + 0x13) end
-        cur.sim = nil
+        cur.sim, cur.begun, cur.trapped = nil, nil, nil
         acts[#acts + 1] = cur
         cur = nil
     end
     local id = callbacks:add("frame", function()
-        local uid = ru8(AD + 0x0C)
-        if uid ~= prev then
-            prev = uid
-            close()
+        -- PROCS.find, not procActive: the run's script position is read off the proc
+        local proc = PROCS.find(SYM.gProcScr_CpPerform)
+        local past = proc and ru32(proc + 4) > beginCmd
+        if not proc or (cur and cur.begun and not past) then close() end
+        if proc and not cur then
+            local uid = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT)
             local addr = uid >= 0x40 and ru32(SYM.gUnitLookup + uid * 4) or 0
             if addr ~= 0 and ru32(addr) ~= 0 then
-                cur = { id = uid, charId = ru8(ru32(addr) + 4), battles = {},
-                        from = { x = rs16(SYM.gActiveUnitMoveOrigin), y = rs16(SYM.gActiveUnitMoveOrigin + 2) },
-                        sim = not real() }
+                cur = { id = uid, charId = ru8(ru32(addr) + 4), battles = {}, sim = not real() }
             end
         end
         if not cur then return end
-        local kind = ru8(AD + 0x11)
+        if past and not cur.begun then
+            cur.begun = true
+            cur.from = { x = rs16(SYM.gActiveUnitMoveOrigin), y = rs16(SYM.gActiveUnitMoveOrigin + 2) }
+        end
+        local kind = cur.begun and ru8(AD + 0x11) or 0
         -- gAiDecision is this unit's while its act plays (CpDecide decides one unit, then
-        -- CpPerform plays it)
-        local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.UNIT) == cur.id
-            and ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
-        if decided and not cur.dest then
+        -- CpPerform plays it): cur's unit was read off it
+        local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)
+        if not cur.dest then
             local x, y = ru8(SYM.gAiDecision + BOARD.AI_DEC.X), ru8(SYM.gAiDecision + BOARD.AI_DEC.Y)
             cur.dest = { x = x, y = y, chest = terrainAt(x, y) == INSPECT.Sight.TERRAIN_CHEST_FULL }
         end
-        if decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
+        if cur.trapped then
+            -- a trap that stopped the move ends the act: the game sets WAIT once it has gone
+            -- off (bmtrap.c), and a decided pillage never happens (AiDummyAction)
+        elseif kind == BOARD.ACTION_TRAPPED then
+            -- the pillage below may have named its village before the act began
+            cur.trapped, cur.act, cur.tile = true, BOARD.ACTIONS[kind], nil
+        elseif decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
             -- AiPillageAction on a village: the tile event above it, no action type set
             cur.act, cur.tile = "pillage", { x = cur.dest.x, y = cur.dest.y - 1 }
         elseif kind ~= 0 then

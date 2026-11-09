@@ -248,9 +248,11 @@ WANTED = [
     'gBattleHitArray',          # struct BattleHit[BATTLE_HIT_MAX]: each blow of the last battle,
                                 # as the game rolled it (board.lua Board.battle, the bot's trace).
     'gActionData',              # struct ActionData (include/bmunit.h): the action being played.
-                                # UnitBeginAction (bmunit.c) sets +0C subjectIndex and zeroes +11
-                                # unitActionType at each act's start; the act then sets the type.
-    'gActiveUnitMoveOrigin',    # struct Vec2: where that act's unit started (UnitBeginAction).
+                                # UnitBeginAction (bmunit.c) zeroes +11 unitActionType and the act
+                                # then sets it; +0C subjectIndex is no act's mark (a phase start's
+                                # heal display writes it too: harness.lua watchEnemyActs).
+    'gActiveUnitMoveOrigin',    # struct Vec2: the tile UnitBeginAction saw its unit on, an enemy
+                                # act's `from` once its CpPerform has begun it.
     'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
                                 # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
                                 # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.
@@ -298,6 +300,8 @@ WANTED = [
     # A fallen unit's drop (bmmind.c BATTLE_HandleItemDrop, its popup's only caller).
     'NewPopup_GeneralItemGot',  # the item given to the blue unit that downed a dropper
     'sProcScr_CombatAction',    # the real battle's resolution, the drop included
+    'gProcScr_CpPerform',       # an AI unit's act (cp_perform.c): the enemy-phase recorder's act
+    'CpPerform_BeginUnitMovement',  # the CpPerform command that begins the act (UnitBeginAction)
     # An AI theft (cp_perform.c AiStartStealAction) and the rank its list gives the item.
     'AiStartStealAction',       # the steal itself: gAiDecision's target and item slot
     'AiGetItemStealRank',       # the item's place in gAiStealPriorityItemList (ADR 0379)
