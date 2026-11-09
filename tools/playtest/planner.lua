@@ -1426,7 +1426,9 @@ function M.plan(Bot, board, sight, style, opts)
     -- (sight.nextPhase; the hold is the R-8 spike's intervening turn). All of them or none: the
     -- calls it needs, one a finalist, within the decision's and the attempt's budget, else the
     -- original horizon, tagged `skipped`. A protected unit's death chance becomes that of dying
-    -- in either phase, its branch-local first phase's kept, and the finalists are ranked again.
+    -- in either phase, its branch-local first phase's kept, and the finalists are ranked again;
+    -- then any plan past them that could still outrank the best asked is asked as well, while
+    -- the budget lasts (`asked_past` counts them).
     local look = { calls = 0 }
     if best and sight.nextPhase then
         local idx = {}
@@ -1453,7 +1455,7 @@ function M.plan(Bot, board, sight, style, opts)
                 cost.look.skipped_budget = 1
             else
                 local clock = os.clock()
-                for _, st in ipairs(fin) do
+                local function deepen(st)
                     local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
                                                 reds = st.phase.reds })
                     look.calls = look.calls + 1
@@ -1500,12 +1502,12 @@ function M.plan(Bot, board, sight, style, opts)
                     admit(st)
                     st.extended = true
                 end
+                for _, st in ipairs(fin) do deepen(st) end
                 cost.look.cpu_s = os.clock() - clock
                 cost.look.extended = 1
                 look.extended = true
                 -- every rank's `behind` from the one best progress, as pick() sets it, then
-                -- the best of the finalists alone: a plan outside them lost to each on the
-                -- first phase, and was never asked the second
+                -- the best of the plans asked the second phase
                 local ranks = {}
                 for i, j in ipairs(judgedPlans) do ranks[i] = j.st.rank end
                 M.rebase(ranks, function(k) return judgedPlans[k].ok end)
@@ -1513,6 +1515,27 @@ function M.plan(Bot, board, sight, style, opts)
                 for _, st in ipairs(fin) do
                     if M.outranks(st.rank, best.rank) then best = st end
                 end
+                -- a plan outside the finalists was never asked the second phase, and its first-
+                -- phase rank is the most it can reach: the second only adds (every key
+                -- M.outranks reads moves against it). While the best of them still outranks
+                -- the best asked, it is asked too, within the budget (ours ch03 careful turn 18:
+                -- the assault, the least over the cap once asked, ranked fifth on the first
+                -- phase, and a lone chip that lost Prof. R.B. Geenius was played instead)
+                local asked = {}
+                for _, st in ipairs(fin) do asked[st] = true end
+                while look.calls < room do
+                    local nxt
+                    for _, i in ipairs(idx) do
+                        if not asked[judgedPlans[i].st] then nxt = judgedPlans[i].st break end
+                    end
+                    if not nxt or not M.outranks(nxt.rank, best.rank) then break end
+                    deepen(nxt)
+                    asked[nxt] = true
+                    fin[#fin + 1] = nxt
+                    look.asked_past = (look.asked_past or 0) + 1
+                    if M.outranks(nxt.rank, best.rank) then best = nxt end
+                end
+                cost.look.cpu_s = os.clock() - clock
                 for _, c in ipairs(considered) do
                     for _, st in ipairs(fin) do
                         if c.rank == st.rank then c.extended = true end
