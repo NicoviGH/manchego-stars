@@ -4536,6 +4536,27 @@ do
     check(plan.protected[1].die > 0.99, true, "over the cap: and the two-phase one")
 end
 
+-- test_a_benched_unit_only_waits (#510, the benched-twin experiment): a unit the style
+-- benches (style.bench, PT_BENCH) is offered one act, a wait on its own tile, and the plan
+-- leaves it there; unbenched, the same unit marches.
+do
+    local board, sight, st = looksAhead(nil)
+    local function actsOf(cands)
+        local out = {}
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.acts) do out[#out + 1] = a.act .. "@" .. a.move.x .. "," .. a.move.y end
+        end
+        return out
+    end
+    check(#actsOf(B.candidates(board, sight, st)) > 1, true, "bench: unbenched, A has acts")
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "bench: unbenched, A marches")
+    board, sight, st = looksAhead(nil)
+    st.bench = { 0x01 }
+    check(table.concat(actsOf(B.candidates(board, sight, st)), " "), "wait@0,0",
+          "bench: a benched unit is offered only a wait where it stands")
+    check(at(Planner.plan(B, board, sight, st)), "0,0", "bench: and the plan leaves it there")
+end
+
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
 -- alone -- our units, the enemies gone, the enemies' HP -- and nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.

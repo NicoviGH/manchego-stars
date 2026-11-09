@@ -14,6 +14,7 @@
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
 --   PLAYTEST_PINNED   -- a pinned decision state to load and read (PT_PINNED; api.check_pinned)
+--   PLAYTEST_BENCH    -- an experiment's benched charIds (PT_BENCH, JSON; botApi's api.bench)
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -3292,6 +3293,9 @@ INSPECT.botApi = function(game)
                  instrument = PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil },
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
+        -- an experiment's benched units (PT_BENCH, JSON charIds; montecarlo.py `pilot
+        -- --bench-vanilla`): each only waits where it stands (Bot.candidates)
+        bench = decode(PLAYTEST_BENCH, nil),
         board = BOARD.read,
         -- the charIds the chapter's talks would bring over: each talk the game would run now
         -- (Sight talks), its target, once

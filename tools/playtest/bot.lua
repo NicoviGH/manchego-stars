@@ -1489,7 +1489,29 @@ end
 
 -- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
 -- each is).
+-- `acts` of `u`, each told the ally its end tile asks to move (`vacate`) and what can strike
+-- it there next phase (`exposure`, each enemy's own strike: the planner's odds).
+local function exposed(ctx, u, acts)
+    for _, a in ipairs(acts) do
+        local friend = vacated(ctx, u, a.move.x, a.move.y)
+        a.vacate = friend and friend.id
+        a.exposure = {}
+        local held = a.act == "attack" and a.slot or nil
+        for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
+            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
+        end
+    end
+    return acts
+end
+
 local function proposeOne(ctx, u)
+    -- an experiment's benched unit (style.bench: a playthrough without it, botrun's
+    -- api.bench) only waits where it stands, and is still in the enemy's reach there
+    if ctx.style and ctx.style.bench and listed(ctx.style.bench, u.charId) then
+        local a = action(u, u, "wait")
+        a.why = "hold"
+        return { unit = u, acts = exposed(ctx, u, { a }) }
+    end
     local sight, objective = ctx.sight, ctx.sight.objective
     local open = function() return true end
     local acts, seen = {}, {}
@@ -1618,17 +1640,7 @@ local function proposeOne(ctx, u)
     -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,
     -- parked beside the Mogall at an 81% chance to die while a safe tile stood free)
     for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
-    for _, a in ipairs(acts) do
-        local friend = vacated(ctx, u, a.move.x, a.move.y)
-        a.vacate = friend and friend.id
-        -- what can strike it there next phase, each enemy's own strike (the planner's odds)
-        a.exposure = {}
-        local held = a.act == "attack" and a.slot or nil
-        for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
-            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
-        end
-    end
-    return { unit = u, acts = acts }
+    return { unit = u, acts = exposed(ctx, u, acts) }
 end
 
 -- Every unit's acts (proposeOne). Given the last proposal `last` and the goals it was made for

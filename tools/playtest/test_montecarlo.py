@@ -995,6 +995,33 @@ class Suite(unittest.TestCase):
         self.assertEqual((side['chapter'], side['vanilla']), (3, True))
         self.assertEqual([t['seed'] for t in side['tasks']([3009])], [3009])
 
+    def test_a_benched_arm_plays_and_keeps_under_its_own_instrument(self):
+        # the benched-twin experiment: its runs are never read as the instrument's, nor its
+        # instrument's as its own, and each of its tasks carries the bench to run.sh
+        suite = self.load(self.suite())
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        d = os.path.join(top, 'h')   # the store is named by its ROM hash
+        os.makedirs(d)
+        store = os.path.join(d, 'runs.jsonl')
+        base = {'game': 'vanilla', 'rom_hash': 'h', 'chapter': 3, 'attempt': 1,
+                'outcome': 'won', 'suite': {'start_id': 'vanilla-ch3', 'set': 'pilot',
+                                            'version': 1}}
+        mc.append_record(store, dict(base, seed=3001, instrument='i'))
+        mc.append_record(store, dict(base, seed=3002, instrument='i+bench02'))
+        simdirs = {'vanilla': d, 'ours': '/s/ours/h2'}
+        sides = mc.chapter_sides(suite, simdirs, {'vanilla': {}, 'ours': {}}, 'i',
+                                 {'ours': 'ours-ch02', 'vanilla': 'vanilla-ch3'}, 'pilot',
+                                 {'vanilla': [0x02]})
+        self.assertEqual(sorted(sides['vanilla']['kept']()), [3002])
+        task = sides['vanilla']['tasks']([3009])[0]
+        self.assertEqual((task['instrument'], task['bench']), ('i+bench02', [0x02]))
+        self.assertNotIn('bench', sides['ours']['tasks']([3009])[0])
+        self.assertEqual(sides['ours']['tasks']([3009])[0]['instrument'], 'i')
+        plain = mc.chapter_side(suite, {'vanilla': {}, 'ours': {}}, 'i', 'vanilla-ch3',
+                                'pilot', store, 'h')
+        self.assertEqual(sorted(plain['kept']()), [3001])
+
     def test_an_arm_must_name_its_own_games_start(self):
         # review of #582: swapped flags would file the twin's runs as ours'
         suite = self.load(self.suite())
@@ -2213,6 +2240,11 @@ class Replay(unittest.TestCase):
             mc.launch({'seed': 1, 'instrument': 'i', 'diag': {'ref': 3}}, 'tag',
                       os.path.join(d, 'log'))
         self.assertEqual(json.loads(seen['PT_DIAG']), {'ref': 3})
+        seen.clear()
+        with mock.patch.object(mc.subprocess, 'run', run):
+            mc.launch({'seed': 1, 'instrument': 'i', 'bench': [2]}, 'tag',
+                      os.path.join(d, 'log'))
+        self.assertEqual(json.loads(seen['PT_BENCH']), [2])
 
     def test_only_diag_lines_are_kept_and_the_witness_trace_is_filed(self):
         base, root = tempfile.mkdtemp(), tempfile.mkdtemp()

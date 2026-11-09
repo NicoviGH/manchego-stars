@@ -1018,6 +1018,9 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE',
                      # A snapshot's check (#510 PR-G, ADR 0395): it loads a kept decision state
                      # and plays nothing, so it is no run of the start at all.
                      'PT_PINNED',
+                     # An experiment's benched units (montecarlo.py pilot --bench-vanilla): a
+                     # unit that only waits makes a different run from the same start.
+                     'PT_BENCH',
                      # The #345 watchdog knobs. Neither should change a verdict -- they bound
                      # how patient run.sh is, not what the scenario proves -- but the guard
                      # that keeps this list honest cannot tell, and a run killed early by a
