@@ -13,7 +13,8 @@ Refreshed 2026-11-09, late (Claude): **T100e merged (PR #587, fc120754)**, every
 finding fixed. A chapter cell now plays K starts an arm, each from its
 own New Game campaign (`montecarlo.py starts`, `cell`/`pilot --chapter N --starts K`). Refrozen
 on `ce1e3adb8c57+v2` (identical play). **The first starts found that no Manchego Stars campaign
-gets past ch02** (#510 comment 6751678084): Nicolas's call.
+gets past ch02** (#510 comment 6751678084); Nicolas decided it under #510 step 10.
+**PR #589** (standing rules out of memory, the "ours" prose gate) waits for his "merge".
 
 ## Where things stand
 
@@ -69,19 +70,13 @@ gets past ch02** (#510 comment 6751678084): Nicolas's call.
 ## Next
 
 1. **T100e is merged and ticked** on #510's plan comment 6563384310 (design bullet under it).
-2. **Nicolas's call: Manchego Stars ch02** (#510 comment 6751678084). All 10 starts campaigns
-   (120 attempts) won ch02 and lost both green chwinga, Rime Spark (0xC9) and Snow Mote (0xCA),
-   mostly by turn 3, so none cleared clean and Manchego Stars has no starts past ch02. Either
-   ch02 is too hard, or a green ally's death should not hold a campaign back. Vanilla stopped at
-   Ch5x in 7 of 10 (both chests at 4,8 and 5,8 never reached: a bot gap), so its Ch6-Ch7 twins
-   have no starts either. Cells today: ch00-ch02 only.
-3. **Next PR after #587: instructions out of memory.** Nicolas (2026-11-09): standing rules are
-   instructions, not memory. Move the 11 project rules still in auto memory (tooling speed, no
-   loose threads, no tidy design rules, notes on issues, one design comment, post-ch07 drafts,
-   story after Revel's End, proof runs, north star, subagents in the foreground, Manchego Stars
-   not "ours") into the project CLAUDE.md, delete those memories, and add a `check.py` check
-   that fails prose naming the game "ours" (about 460 lines in `tools/` and 39 in docs outside
-   the ADRs; quoted code ids allowed; ADRs and transcripts exempt, as the dead-concepts check).
+2. **The ch02 chwinga finding is decided and owned by #510 step 10** (its ch02 bullet in the
+   issue body; evidence in comment 6752603255).
+3. **PR #589 (closes #588) is open, waiting for Nicolas's "merge"**: standing rules moved into
+   `AGENTS.md`/`CLAUDE.md`, and `check.py check_prose_names_manchego_stars` fails prose that
+   names the game "ours". Reviewed and re-reviewed, every finding fixed. After it merges, delete
+   the ten moved memory files and the subagent one, and their `MEMORY.md` lines; keep
+   `merge-after-review.md`.
 4. **Then: `story` and reports name Manchego Stars units by their chapter.** `montecarlo._names`
    knows only PCs and guests, so a chapter unit on a reused vanilla slot prints the vanilla name
    (0xC9 printed "Klimt"; it is ch02's Rime Spark, `tools/inject/chapter_ids.py`). Until then,
