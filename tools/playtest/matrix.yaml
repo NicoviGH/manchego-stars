@@ -286,6 +286,9 @@ instrument:
   seed_sets:
     confirmatory: [1, 200]
     pilot: [3001, 3050]
+    # a chapter cell's starts (T100e): campaign s from New Game, the game seeded once with s
+    # (`montecarlo.py starts`); a cell plays the first K of them that reached its chapter
+    starts: [4001, 4100]
   # N, the frozen cell count every confirmatory bound is split over (ADR 0385, FR-026): ch00-ch07
   # in three modes. Adding cells widens every interval, so it changes only with the cells
   cells: 24

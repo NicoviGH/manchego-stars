@@ -140,3 +140,17 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
     distinct plays. The bounds still hold, because the draws are independent and the outcome
     is fixed once the style is drawn. But a chapter cell measures the style mix, not the
     game's RNG. Recorded on #510 for PR-I's validity work.
+- **Several starts a chapter cell (T100e, 2026-11-09).** That finding is why a chapter cell no
+  longer plays one pinned start. `montecarlo.py starts --game ours|vanilla` plays campaigns from
+  New Game on the `starts` seeds (4001-4100), each seeded once and never again (ADR 0370), and
+  pins every chapter-start state each left in its game's store (`cell-starts.json` beside
+  `runs.jsonl`). The pins live in the store and not in git because a store is one ROM: an ours
+  ROM change (a class, a stat, a line of text) is a new store with no starts until they are
+  remade. The vanilla starts are made once. `cell` and `pilot` take `--chapter N` (our chapter
+  number; the twin comes from `campaign_env.cell_chapters`) and `--starts K`. Each arm plays the
+  first K pinned campaigns, by seed, that reached the chapter's start. Seed s is dealt start
+  (s - the set's first seed) mod K, so a look plays the same deal whichever seeds it adds. K is
+  10 for a verdict to trust, and fewer (say 4) while a change is being tried. A cell refuses
+  when fewer campaigns reached the chapter, and names the command that makes more. Every line
+  that counts pairs says how many games they came from. A cell run costs the same as before.
+  `replay` still replays suite runs only.
