@@ -804,8 +804,8 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
                 [[1, 14], [5, 13], [8, 14]],
             ),
             'entoumbed': ('Entombed', [[13, 13]]),
-            # The pack's FOOTPRINT is what mirrors vanilla Ch4; the ORDER is ours, because
-            # positions[0] is the leader (Lupin) tile. He moved [0,0] -> [2,1]: at [0,0] he
+            # The pack's FOOTPRINT is what mirrors vanilla Ch4; the ORDER is Manchego Stars',
+            # because positions[0] is the leader (Lupin) tile. He moved [0,0] -> [2,1]: at [0,0] he
             # sat outside the party's fog vision and was never drawn in his own reveal.
             # Compared as a set below, with the leader pinned separately.
             'mauthedoog': (
@@ -825,7 +825,8 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
             unit = enemies[unit_id]
             self.assertEqual(name, unit['name'])
             if unit_id == 'mauthedoog':
-                # Footprint = vanilla's; order = ours (positions[0] is the leader's tile).
+                # Footprint = vanilla's; order = Manchego Stars' (positions[0] is the leader's
+                # tile).
                 self.assertCountEqual(positions, unit['positions'])
             else:
                 self.assertEqual(positions, unit['positions'])
@@ -1024,7 +1025,7 @@ class EveryRetilePlaysLikeItsDonor(unittest.TestCase):
                 cls.chapters.append((os.path.splitext(os.path.basename(mar))[0], data))
 
     def _compare(self, stem):
-        """(donor, width, ours, vanilla): both maps as terrain bytes, row-major."""
+        """`(donor, width, ours, vanilla)`: both maps as terrain bytes, row-major."""
         width, height, scored = self.donor.candidates(stem)
         donor = scored[0][1]
         with open(os.path.join(self.donor.MAPS, stem + '.json'), encoding='utf-8') as source:
@@ -1172,7 +1173,7 @@ class Ch03FlipsPlayLikeVanillaCh3(unittest.TestCase):
         for cell, terrain in flipped.items():
             with self.subTest(cell=cell):
                 self.assertEqual(terrain, vanilla.get(cell, terrain))
-        # ...and every vanilla flip that changes what a cell PLAYS as is one of ours.
+        # ...and every vanilla flip that changes what a cell PLAYS as is a Manchego Stars flip.
         _, _, cells, before = mt.vanilla_layout_data(os.path.join(REPO, 'fireemblem8u'), 'Ch3Map')
         missing = [cell for cell, terrain in vanilla.items()
                    if terrain != before[cells[cell[1] * 17 + cell[0]]] and cell not in flipped]

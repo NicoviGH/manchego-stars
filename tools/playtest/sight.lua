@@ -59,7 +59,7 @@
 --                            the logs. What it does is played (ADR 0377): the simulation run
 --                            once per way its rolls can go, each BattleRoll1RN/2RN caught and
 --                            forced (cpu.breakpoint): dealt / counterDist = { [HP lost] = p }
---                            for `e` / our unit, kill / die = the chance it kills `e` / ours,
+--                            for `e` / our unit, kill / die = the chance it kills `e` / our unit,
 --                            killsTarget = the plain simulation (every hit lands, nothing
 --                            procs) leaves `e` at 0. nil when (x, y) is out of our range.
 --   strike(u, e, x, y)       `e`'s own strike on `u` standing on (x, y), on its phase: the
@@ -645,7 +645,7 @@ end
 -- `ours.killsTarget` the game's own simulation (every hit lands, nothing procs) and
 -- `ours.dealt`/`ours.back` its played distributions. kill / die: the chance the exchange
 -- kills `e` (at eHp) / our unit (at uHp); sure: every way it goes kills `e`; expected: the
--- damage it is expected to deal; counterWorst: the most the counter can take off ours
+-- damage it is expected to deal; counterWorst: the most the counter can take off our unit
 -- (nothing when `e` cannot answer, or dies before it can). Pure, so test_sight.lua builds
 -- every case.
 function M.attackOf(ours, eHp, uHp)
@@ -764,7 +764,7 @@ end
 
 -- closings()' cache key: what its read depends on -- the turn, the horizon, each looter as it
 -- stands (id, tile, HP), the tiles our units block, the open tiles and each wave's units. A
--- looter killed or moved, one of ours moved, a tile taken, is a new key.
+-- looter killed or moved, a player unit moved, a tile taken, is a new key.
 function M.closingsKey(turn, k, waves, looters, open, blockers)
     local parts = {}
     for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
@@ -970,7 +970,7 @@ function M.new(outer)
     end
     -- On a Defeat Boss map, the boss is the unit whose death raises the goal's flag -- how the
     -- game itself ends the chapter (EVFLAG_DEFEAT_BOSS), not CA_BOSS, which a boss on a cloned
-    -- generic row (ours ch03's grell) does not carry.
+    -- generic row (Manchego Stars ch03's grell) does not carry.
     if goal.kind == "boss" then
         s.objective.boss = sandbox(function(call)
             for _, u in ipairs(api.board().units) do
@@ -1504,7 +1504,7 @@ function M.new(outer)
     -- FR-017; the hold is the R-8 spike's intervening player turn). plan as enemyPhase's. The
     -- next phase is played along its expected way, unbranched: each enemy goes where its own
     -- decision takes it (a strike's tile, or the move it decides without striking), a strike
-    -- takes its expected damage, a unit of ours left at 0 HP is off the map, and a striker our
+    -- takes its expected damage, a player unit left at 0 HP is off the map, and a striker our
     -- counter kills at even odds or better is gone. The turn then advances and the second phase
     -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
     -- sees decides, in both: an enemy hidden by fog does not act, and no arrival is placed (one
@@ -1542,7 +1542,7 @@ function M.new(outer)
                     end
                 end
             end
-            -- ours and the greens: a green whose death ends the game is protected too
+            -- player units and the greens: a green whose death ends the game is protected too
             local hp = {}
             for id, o in pairs(byId) do
                 if o.faction ~= "red" then
@@ -1565,8 +1565,8 @@ function M.new(outer)
     -- (default M.CLOSE_HORIZON).
     -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2)
     -- play k enemy phases forward with the game's own AI (aiDecide, as enemyPhase plays one),
-    -- in the game's turn order, every other unit held where it stands and ours hidden from the
-    -- AI (when it falls undefended): a looter's decision is
+    -- in the game's turn order, every other unit held where it stands and the player's hidden from
+    -- the AI (when it falls undefended): a looter's decision is
     -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
     -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
     -- calls (3,787 -> 11,086). Read again only when a looter or an open tile changed. A wave not
@@ -1602,7 +1602,7 @@ function M.new(outer)
         sandbox(function(call, proc)
             local byId = {}
             for _, o in ipairs(all) do byId[o.id] = o end
-            -- the question is when a tile falls if no one of ours defends it: our units are
+            -- the question is when a tile falls if no player unit defends it: our units are
             -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
             -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
             -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell)

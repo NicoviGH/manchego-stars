@@ -33,7 +33,7 @@ class Pickup:
     vehicle: str
     chapter: int
     to: tuple = ()              # named recipients (CHARACTER_*); empty = whoever takes it
-    projected: bool = False     # ours, borrowed from the twin until our data exists
+    projected: bool = False     # a Manchego Stars kit borrowed from the twin until our data exists
 
 
 # FE8's inventory is 5 slots; the model counts weapons only (a careful player leaves the
@@ -160,8 +160,9 @@ def _twin_worldmap_pickups():
 @functools.lru_cache(maxsize=None)
 def twin_pickups(through=None):
     """Every pickup the twin's chain hands out up to chain position `through` (all of it when
-    None), by the same vehicles as ours. A chapter's kit needs nothing past itself, so a read
-    never opens a twin chapter it has not reached. Read at HEAD, so cached; a shared tuple."""
+    None), by the same vehicles as Manchego Stars' kits. A chapter's kit needs nothing past itself,
+    so a read never opens a twin chapter it has not reached. Read at HEAD, so cached; a shared
+    tuple."""
     chain = difficulty.VANILLA_CHAIN[:None if through is None else through + 1]
     out = []
     for n, ref in enumerate(chain):

@@ -209,8 +209,8 @@ def declare_unit_table(symbol, rows, comment, redas=()):
       1. The symbol's NAME LIES. `UnitDef_088B61A8` holds ch05's sixteen tomb-guardians;
          nothing about the name says so, and the vanilla chapter it is named for is not
          even the vanilla chapter ch05 is a retile of. Reading the injector meant holding
-         two unrelated numbering offsets in your head -- ours (chapter N hosts on slot
-         N+1, because the prologue occupies a real slot) and FE8's own (it inserted Ch5X
+         two unrelated numbering offsets in your head -- Manchego Stars' offset (chapter N hosts on
+         slot N+1, because the prologue occupies a real slot) and FE8's own (it inserted Ch5X
          at slot 5, so from slot 6 on the slot index and the symbol name disagree in the
          BASE GAME: slot 6 ships Ch5EventData, slot 7 ships Ch6Events).
       2. It rations us to whatever the host slot happens to leave unreferenced. Slot 5
@@ -261,9 +261,9 @@ def unit_table_definition(udefs, symbol, rows, comment):
 
 
 # agbcc needs a declaration before the event script that names the table. The vanilla tables
-# declare theirs in eventcall.h, so ours sit with them rather than in a new header nothing
-# else includes. Anchored on the FIRST UnitDefinition extern -- appending after a "last"
-# extern found by scanning is what breaks when the block grows.
+# declare theirs in eventcall.h, so Manchego Stars' declarations sit with them rather than in a new
+# header nothing else includes. Anchored on the FIRST UnitDefinition extern -- appending after a
+# "last" extern found by scanning is what breaks when the block grows.
 _UDEF_EXTERN_ANCHOR = 'extern CONST_DATA struct UnitDefinition UnitDef_Event_PrologueAlly[];'
 
 

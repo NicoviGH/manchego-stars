@@ -10,7 +10,7 @@
 -- Goals.list(board, sight, style, ctx) -> { goal }, the goals still open:
 --   visit / chest  each tile sight.explorable() still offers that this run has not taken;
 --                  takers = our units the game lets use it (sight.canExplore).
---   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the units of ours that
+--   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the player units that
 --                  may Talk it over); its takers are those talkers.
 --   objective      each unit's own way to the objective (ctx.objectiveTile: the Seize tile,
 --                  the boss, or on Rout the nearest enemy -- where its march heads), the unit
@@ -50,7 +50,7 @@
 -- sight has no read of who may use it or when it closes (sight.canExplore, sight.closings);
 -- a reward is unknown when a goal it needs is. A goal no unit can reach this turn (a unit in
 -- the way) stays feasible: only a closure loses it. One with no chance at all is no goal of
--- ours: the game lets no unit of ours use it (a chest with no key in the army), none has a way
+-- the bot's: the game lets no player unit use it (a chest with no key in the army), none has a way
 -- there (sight.turnsTo reads the terrain, through a breach), or a looter takes it first. Kept,
 -- it would close with every win and so forbid the win for good. A reward needing one of those
 -- can never be had, and is no row either.

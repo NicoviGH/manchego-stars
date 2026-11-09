@@ -19,7 +19,8 @@ Stdlib only and a leaf: `inject.chapter_ids` imports it.
 import re
 import sys
 
-# The size of vanilla's message table (gMsgTable). Ids at or above this are ours, appended.
+# The size of vanilla's message table (gMsgTable). Ids at or above this are Manchego Stars',
+# appended.
 VANILLA_MESSAGE_COUNT = 0xD4C
 
 # {chapter: (message name, ...)}. Order within a chapter is the allocation order; the order of

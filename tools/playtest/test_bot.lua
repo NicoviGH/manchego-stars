@@ -1683,7 +1683,7 @@ end
 -- tile beside it both A and C reach. R, the heavier, strikes from 1 or 2 away and also
 -- reaches (1,1); M strikes only from beside it. The assault seats R on (1,1) and M on (1,0):
 -- both strike. Offering each unit two tiles and seating the heaviest first on its first
--- left M nothing (ours ch03: three of six strikers dropped).
+-- left M nothing (Manchego Stars ch03: three of six strikers dropped).
 do
     local R = blue(0x01, 0, 3, 0, { maxRange = 2 })
     local M = blue(0x02, 1, 3, 1)
@@ -1706,8 +1706,8 @@ end
 
 -- test_a_plan_moves_an_ally_off_the_tile_another_needs: B stands on (1,0), the one tile that
 -- brings A nearer the enemy; B can step on to (2,0). The plan moves B first, then A onto B's
--- old tile -- never A first, which the game would refuse (ours ch03: Braulo queued behind the
--- light hitters on the corner's safe tiles, and never reached the boss).
+-- old tile -- never A first, which the game would refuse (Manchego Stars ch03: Braulo queued behind
+-- the light hitters on the corner's safe tiles, and never reached the boss).
 do
     local A = blue(0x01, 0, 0, 0)
     local F = blue(0x02, 1, 1, 0)
@@ -1742,8 +1742,8 @@ end
 
 -- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
 -- (0,1) and (0,2) are safe, (0,1) the safest by board order. C marches onto (0,1). A must
--- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (ours ch03: Braulo
--- beside the Mogall at 81% to die while a safe tile stood free).
+-- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (Manchego Stars ch03:
+-- Braulo beside the Mogall at 81% to die while a safe tile stood free).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local C = blue(0x02, 1, 1, 1, { minRange = false })
@@ -2066,7 +2066,7 @@ do
     check(a and a.targetId, 0x81, "planner: the kill")
 end
 
--- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, ours ch03 turn 11):
+-- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, Manchego Stars ch03 turn 11):
 -- A (12 HP) strikes E (9 HP): a hit kills it, a miss lets E's counter take 9. F's AI strikes A
 -- only when A is on 4 HP or less, and its blow kills him there. On A's mean HP after the
 -- counter, F passes him by and the attack reads safe; on the 3 HP the miss-and-counter leaves,
@@ -2696,11 +2696,11 @@ do
 end
 
 -- test_an_attack_whose_counter_can_kill_is_offered (ADR 0396's known break, the counter
--- refusal; ours ch03 even, turn 15: Rootis, 10 HP, beside a boss on 2 HP whose counter hits for
--- 11, and his blow, first, wins the chapter 98 times in 100 -- never offered, so never judged).
--- A cannot get out of the boss's reach, and holding is a sure death; its blow kills the boss
--- nine times in ten, and only a miss lets the 30-damage counter kill it. The attack is offered,
--- its death chance is the counter's, and it is played over the sure death.
+-- refusal; Manchego Stars ch03 even, turn 15: Rootis, 10 HP, beside a boss on 2 HP whose counter
+-- hits for 11, and his blow, first, wins the chapter 98 times in 100 -- never offered, so never
+-- judged). A cannot get out of the boss's reach, and holding is a sure death; its blow kills the
+-- boss nine times in ten, and only a miss lets the 30-damage counter kill it. The attack is
+-- offered, its death chance is the counter's, and it is played over the sure death.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 20 })
     local X = red(0x81, 1, 1, { isBoss = true, hp = 10 })
@@ -2819,7 +2819,7 @@ end
 -- carries `die`, sight.odds on its counterDist at A's HP: zero here, as for every attack the
 -- planner is offered, since Bot.candidates refuses one whose counter alone can kill. A
 -- player-phase death after it is then a death the plan did not see (botrun's M.cause). The
--- judged phase names the striker of each of ours (`strikers`), not only of greens.
+-- judged phase names the striker of each player unit (`strikers`), not only of greens.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 20 })
     local X = red(0x81, 2, 0, { hp = 40 })
@@ -2965,7 +2965,7 @@ end
 
 -- test_planner_mends_a_plan_that_loses_a_green_unit: A's march to (0,1) is its best act by its
 -- own score, and the beam (BEAM = 1) keeps only that; X then kills green G. G has no menu of
--- its own, so the mend tries the acts of ours that could save it -- one ending beside it, or
+-- its own, so the mend tries the player acts that could save it -- one ending beside it, or
 -- striking one that strikes it -- and finds A's block at (1,0).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
@@ -3101,7 +3101,7 @@ do
 end
 
 -- test_planner_mends_a_plan_that_kills_a_recruit: as above with BEAM = 1, so the beam keeps only
--- A's march to (0,0). R strikes A there and dies; R has no menu of ours, so the mend tries the
+-- A's march to (0,0). R strikes A there and dies; R has no player menu, so the mend tries the
 -- acts of the unit it strikes, A, and finds (1,0).
 do
     local board, o = counterKillsRecruit()
@@ -3732,7 +3732,7 @@ do
 end
 
 -- test_boss_kill_taken_when_the_village_cannot_be_had: a looter closes it after this phase,
--- before A could get there; or the game lets no one of ours Visit it. Then the win costs
+-- before A could get there; or the game lets no player unit Visit it. Then the win costs
 -- nothing it could still get, and is taken.
 do
     local board, sight = bossAndVillage({ closings = { ["1,6"] = 1 } })
@@ -4434,8 +4434,8 @@ end
 -- test_a_step_toward_the_goal_beats_holding (AS 3): the House is worth a few points and the
 -- gate the lord's whole way to the win, so by the judged score each step north cost more of
 -- the gate than it gained of the House: here he walked east, off the goal he was sent to, and
--- in ours ch01, with no tile east on his menu, he held until the run stopped (attempts 1 and
--- 3). By the rank's progress, the step toward his goal comes first.
+-- in Manchego Stars ch01, with no tile east on his menu, he held until the run stopped (attempts 1
+-- and 3). By the rank's progress, the step toward his goal comes first.
 do
     local units, o = lordSentAway(tiles({ 12, 7 }, { 12, 2 }, { 15, 7 }))
     local board = boardOf(table.unpack(units))
@@ -4494,7 +4494,7 @@ do
 end
 
 -- test_a_block_on_a_recruit_lifts_beside_it (FR-016): A was found blocked from recruit T on an
--- earlier turn. T's tile is one no unit of ours ends on, so no tile is ever nearer it than the
+-- earlier turn. T's tile is one no player unit ends on, so no tile is ever nearer it than the
 -- tiles beside it: A, beside T now, has none nearer. It can end beside T, where the Talk is
 -- made, so the record lifts and A is still sent to T.
 do
@@ -4682,8 +4682,8 @@ do
     check(plan.lookahead.extended, true, "lookahead: room left after ours-ch03's 19 triggers")
 end
 
--- test_over_the_cap_this_phase_comes_first (#510 T100b, ours ch03 careful seed 3010 turn 18,
--- replayed): every plan is over the cap. The march to (1,0) may die in the next enemy phase
+-- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn
+-- 18, replayed): every plan is over the cap. The march to (1,0) may die in the next enemy phase
 -- (70% shown); the hold at (0,0) is safe there, and dies only in the lookahead's second phase,
 -- which has it stand still for another round (the guess the records found far too high: 0 of
 -- 8 such readings came true). Over the cap the next phase's own chances rank first, the second

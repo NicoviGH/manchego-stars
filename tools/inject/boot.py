@@ -17,7 +17,7 @@ TEST_CHAPTER_INDEX = 1
 # ONE permanent event flag per candidate (base + menu index). Permanent flags
 # (ids >= 101, eventinfo.c SetFlag) ride the save file and are zeroed on New Game
 # (ResetPermanentFlags, bmsave.c); vanilla scripts touch none above 0xE7, so the
-# 0xF0 block is ours. Engine hooks: _inject_lord_select_engine.
+# 0xF0 block is Manchego Stars'. Engine hooks: _inject_lord_select_engine.
 # Lord survivability floor (#45 3c) "applied" flag: one permanent flag, just above the
 # 0xF0..0xF9 candidate-pick block (LORDSEL_CONFIRM_MSGS caps the cast at 10), so the floor
 # bakes into the chosen lead's saved stats exactly once. Permanent flags span 101..300

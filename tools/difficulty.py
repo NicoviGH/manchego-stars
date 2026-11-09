@@ -727,7 +727,8 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
 # ── Vanilla enemy extraction (the #48 parity reference force) ─────────────────────
 # A chapter's `parity_reference` (e.g. "FE8 Ch1") names the vanilla chapter whose enemy
 # pressure sets its bar. We resolve that to the decomp UnitDefinition array(s) holding the
-# fightable red force and project each enemy off class base -- the same footing as ours.
+# fightable red force and project each enemy off class base -- the same footing as Manchego Stars'
+# force.
 
 # decomp item enum -> fe_combat weapon key: the ITEM_ENUM entries fe_combat models. Staves,
 # consumables and keys are absent on purpose (an enemy carrying only those resolves to no
@@ -1253,7 +1254,7 @@ def _ally_combatant(char_enum, class_enum, weapon, level=None):
     donor-base inheritance our cast uses, mirroring player_combatant). Allies aren't
     autoleveled: their CharacterData stats are already the join-level display. `level`, when
     it is above that join level, grows them on their OWN curve the way `player_combatant`
-    grows ours, so a leveled read compares like with like.
+    grows Manchego Stars' units, so a leveled read compares like with like.
     Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
     return _stats_to_combatant(_ally_name(char_enum),
                                _median_line(_ally_lines(char_enum, class_enum, level)),
@@ -1533,7 +1534,7 @@ def _boss_entries_over_donor_base_level(chap):
 
 
 def _our_takes_difficulty_shift(enemy_def):
-    """Does the engine shift THIS unit of ours? The `>= 0x3C` gate, our side.
+    """Does the engine shift THIS Manchego Stars unit? The `>= 0x3C` gate, our side.
 
     Resolved through the same donor lookup `unit_real_article` uses, because it answers the
     same question -- which character SLOT the unit rides. A cast member deployed hostile
@@ -1682,7 +1683,7 @@ def unmodeled_enemies(chap):
 # A body is (class, level) -- the unit, not just its class: an L9 fighter is not the twin's
 # L1 one. The intersection is a MULTISET, so doubling a body cannot score it twice, and the
 # denominator is the TWIN's body count, so fielding more than the twin never reads above
-# 100%. Both sides count every body: ours line + reinforcements, the twin every red
+# 100%. Both sides count every body: Manchego Stars' line + reinforcements, the twin every red
 # UnitDefinition in its curated arrays (reinforcement waves included). Nothing is dropped
 # for carrying no modeled weapon the way the pressure metric drops a staff-only healer --
 # this measures the force's SHAPE, and a healer the twin fields is a unit we did or did not
@@ -1707,7 +1708,7 @@ def _force_signature(chap):
 
 def mirror_share(chap):
     """Share of the twin's force this chapter reproduces exactly, as
-    {shared, ours, twin, pct}. None when the reference isn't curated (#48 registry).
+    {shared, `ours`, twin, pct}. None when the reference isn't curated (#48 registry).
 
     Takes no `mode`, and that is not an omission: a difficulty mode re-projects the SAME
     level through a chapter's malus/bonus (`mode_stats`), so it moves stats and never a
@@ -1882,8 +1883,9 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
     threat/slot = Σ damage_per_round(enemy -> yardstick) ÷ deploy_cap -- how much incoming
     damage each of our slots must weather. clear-load/slot = Σ metric_rounds_to_kill(enemy)
     ÷ deploy_cap -- how much killing each slot must do to clear the map. Both measured against
-    the fixed YARDSTICK so ours and the vanilla reference land on one scale; the metric is a
-    static proxy (no positioning/AI/terrain), read as a ratio within a tolerance band."""
+    the fixed YARDSTICK so Manchego Stars' chapter and the vanilla reference land on one scale; the
+    metric is a static proxy (no positioning/AI/terrain), read as a ratio within a tolerance
+    band."""
     cap = max(1, deploy_cap)
     threat = sum(fc.damage_per_round(e, yardstick) for e in enemies) / cap
     clearload = sum(metric_rounds_to_kill(e, yardstick) for e in enemies) / cap
@@ -2006,8 +2008,9 @@ def _map_order(careers, forced=()):
     """The arriving party in the order its units sit in the ROM's unit table, which is the
     order FE8's AI breaks a tie in: `SortPlayerUnitsForPrepScreen` (prepscreen.c) pushes the
     force-deployed units first, then everyone else, each in their existing order, which is the
-    order they joined (`careers` comes in join order: ours `inject.cast.load_order`, read off the
-    ROM by `ch07blueorder`; the twin's `vanilla_recruits`, from the decomp's LOADs and talks)."""
+    order they joined (`careers` comes in join order: Manchego Stars' `inject.cast.load_order`, read
+    off the ROM by `ch07blueorder`; the twin's `vanilla_recruits`, from the decomp's LOADs and
+    talks)."""
     return ([m for m in careers if m in forced]
             + [m for m in careers if m not in forced])
 
@@ -2403,7 +2406,7 @@ def report(campaign, ch, mode=None):
               'the dice, bad luck in brackets) ' % (num, deploy_limit) + '-' * 4)
         print('  vanilla (%s):' % '/'.join(u.name for u in van))
         _print_metrics('  ', van, vm, bosses)
-        print('  ours (best %d), average delta: thru %+.2f · dura(min) %s%s'
+        print('  MS (best %d), average delta: thru %+.2f · dura(min) %s%s'
               % (deploy_limit, m['throughput'][0] - vm['throughput'][0],
                  _fmt_dura_delta(m['min_durability'][0], vm['min_durability'][0]),
                  ' · carry %s' % _fmt_dura_delta(m['carry'][0], vm['carry'][0])
@@ -2436,7 +2439,7 @@ def _chapter_pressure(chap, band=0.25, mode=None, campaign='rime-of-the-frostmai
     party is not simulated.
 
     `mode` grades a DIFFICULTY MODE instead of the authored table (#303). Each side is
-    shifted by its own chapter's numbers -- ours from the YAML `difficulty:` block, the
+    shifted by its own chapter's numbers -- Manchego Stars' from the YAML `difficulty:` block, the
     reference's from vanilla chapter_settings -- so a mode read still compares two tuned
     tables. None (the default) is the authored table, which is what every parity verdict
     before #303 graded; the difference matters because a chapter whose normal malus is
@@ -2637,7 +2640,7 @@ def _print_pressure(p):
     print('\n-- ENEMY-PRESSURE PARITY (vs %s) ' % (p['reference'] or '?') + '-' * 30)
     _warn_dropped(p['dropped'])
     if p['vanilla'] is None:
-        print('  ours (%d enemies / %d slots): threat/slot %.1f · clear-load/slot %.1f'
+        print('  MS (%d enemies / %d slots): threat/slot %.1f · clear-load/slot %.1f'
               % (p['n_ours'], p['deploy_cap'], ot, ol))
         print('  (no curated vanilla force for %r yet -- parity delta skipped)'
               % p['reference'])
@@ -2653,7 +2656,7 @@ def _print_pressure(p):
               'clear')
         print('  vanilla %-11s (%2d enemies vs %s): threat %4.1f · clear-load %4.1f'
               % (p['reference'], p['n_vanilla'], '/'.join(van_field), vt, vl))
-        print('  ours    %-11s (%2d enemies vs %s): threat %4.1f (x%.2f %s) · '
+        print('  MS      %-11s (%2d enemies vs %s): threat %4.1f (x%.2f %s) · '
               'clear-load %4.1f (x%.2f %s)'
               % ('', p['n_ours'], '/'.join(ours_field), ot, v['threat_ratio'], v['threat'],
                  ol, v['load_ratio'], v['load']))
@@ -2667,7 +2670,7 @@ def _print_pressure(p):
     else:
         print('  vanilla %-11s (%2d enemies): threat/slot %4.1f · clear-load/slot %4.1f'
               % (p['reference'], p['n_vanilla'], vt, vl))
-        print('  ours    %-11s (%2d enemies): threat/slot %4.1f (x%.2f %s) · '
+        print('  MS      %-11s (%2d enemies): threat/slot %4.1f (x%.2f %s) · '
               'clear-load/slot %4.1f (x%.2f %s)'
               % ('', p['n_ours'], ot, v['threat_ratio'], v['threat'],
                  ol, v['load_ratio'], v['load']))
@@ -2978,9 +2981,9 @@ def role_findings(chap, parity_ref, campaign=None, mode=None):
     the chapter's real centre of gravity. Returns a list of strings (empty == clean).
 
     With a `campaign` and a twin the party model reaches, every arm reads both forces against
-    the party that meets ours (`_role_findings_vs_party`), each side loaded for `mode` (#510
-    step 2): a boss that holds on Normal can still fold on Tutorial. Otherwise it falls back to
-    the fixed YARDSTICK on the declared levels, as the aggregate does off VANILLA_CHAIN."""
+    the party that meets Manchego Stars' force (`_role_findings_vs_party`), each side loaded for
+    `mode` (#510 step 2): a boss that holds on Normal can still fold on Tutorial. Otherwise it falls
+    back to the fixed YARDSTICK on the declared levels, as the aggregate does off VANILLA_CHAIN."""
     if campaign and parity_ref in VANILLA_CHAIN:
         matchup = chapter_matchup(chap, campaign, mode=mode)
         if matchup is not None:
@@ -3106,12 +3109,13 @@ def _role_findings_vs_party(chap, parity_ref, matchup, mode=None):
     """The role check on instrument v2 (#430 step 6): our force and the twin's, BOTH met by our
     arriving party (the matchup's `cross` read), so each comparison isolates what authoring
     controls. Reading the twin against vanilla's own party would charge it for Lute's Res: the
-    same Shaman with the same Flux hits ours for 31.3 and vanilla's for 19.6.
+    same Shaman with the same Flux hits Manchego Stars' party for 31.3 and vanilla's for 19.6.
 
     Each arm asks the yardstick arm's question, relative to the twin rather than in absolute
     terms. A line unit out-hitting the boss is common in FE8 itself (Ch2's archer out-hits
-    Bone), so an inversion is flagged only when ours runs past the twin's own by the band. The
-    twin's boss is the body whose CHARACTER carries CA_BOSS, which is where FE8 records it."""
+    Bone), so an inversion is flagged only when Manchego Stars' unit runs past the twin's own by the
+    band. The twin's boss is the body whose CHARACTER carries CA_BOSS, which is where FE8 records
+    it."""
     import exp_curve                        # exp_curve imports this module
     band = 1.25
     entries = list(chapter_roster_entries(chap))
@@ -3525,7 +3529,7 @@ def vanilla_economy(parity_ref):
 def chapter_economy(chap):
     """Our chapter's declared economy from its YAML: explicit gold + item ids by vehicle.
     Campaign item ids aren't valued here (they aren't vanilla enums) -- the vanilla bar is the
-    gold target; ours is listed alongside for a same-glance compare.
+    gold target; Manchego Stars' total is listed alongside for a same-glance compare.
 
     Every DELIVERY VEHICLE we ship has to be listed here, not just the vanilla-shaped ones. ch06
     hands out FE8 Ch6's own two rewards -- an Antitoxin and the Orion's Bolt gated on keeping
@@ -3605,7 +3609,7 @@ def _print_economy(chap):
     for label in ('chests', 'gifts', 'drops', 'shops'):
         if ours[label]:
             parts.append('%s[%s]' % (label, ', '.join(map(str, ours[label]))))
-    print('  ours:   %s' % ' · '.join(parts))
+    print('  MS:     %s' % ' · '.join(parts))
     print('  (advisory target: match the twin\'s magnitude + delivery vehicle; not a hard gate)')
 
 
@@ -3976,9 +3980,9 @@ def gate_failures(campaign, modes=MODES):
 
 
 def curve_report(campaign, band=0.25, mode=None, only=None):
-    """Campaign-wide enemy-pressure curve: one row per authored chapter, ours vs its vanilla
-    reference, so spikes/sags across the arc are visible at a glance (#48). Returns the per-chapter
-    rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them.
+    """Campaign-wide enemy-pressure curve: one row per authored chapter, Manchego Stars vs its
+    vanilla reference, so spikes/sags across the arc are visible at a glance (#48). Returns the
+    per-chapter rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them.
 
     `mode` grades a difficulty mode on BOTH sides instead of the authored table (#303). The
     banner says which, because a verdict that does not name its configuration is the thing
@@ -3987,7 +3991,7 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
     paths = campaign_chapters.paths(campaign)
     bar = '=' * 86
     print(bar)
-    print('CAMPAIGN ENEMY-PRESSURE CURVE -- ours vs vanilla parity_reference   '
+    print('CAMPAIGN ENEMY-PRESSURE CURVE -- Manchego Stars vs vanilla parity_reference   '
           '[STATIC proxy]')
     print('  difficulty mode: %s'
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()

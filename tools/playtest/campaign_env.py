@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 """PT_CAMPAIGN for the `campaign` scenario (#510 step 9 PR E): where a campaign ends, the team
-caps (team_groups.py), which route or lead it plays, and, for ours, which world map shops are
-open before each chapter.
+caps (team_groups.py), which route or lead it plays, and, for Manchego Stars, which world map shops
+are open before each chapter.
 
     python3 tools/playtest/campaign_env.py vanilla --route 1
     python3 tools/playtest/campaign_env.py ours --store references/sim/vanilla/<hash>/states/<id> \
         [--lord <pc id>]
     ... [--id <campaign id> --from <chapter index>]
 
-The route (vanilla's Ch8 split, 1 = Eirika, 2 = Ephraim) and the lead (ours, ADR 0062's ch01
-menu) are campaign SETTINGS, never drawn (#510 plan comment, "Lords"). A lead is passed as its
+The route (vanilla's Ch8 split, 1 = Eirika, 2 = Ephraim) and the lead (Manchego Stars, ADR 0062's
+ch01 menu) are campaign SETTINGS, never drawn (#510 plan comment, "Lords"). A lead is passed as its
 row in the menu, the classed cast on the field at ch01 in PORTRAIT_MAP order -- the list the
 build makes the menu from; no --lord takes the highlighted lead.
 
 Vanilla ends after either route's last chapter (constants/chapters.h CHAPTER_E_21X /
-CHAPTER_I_21X); its world map is its own. Ours ends after its last WRITTEN chapter (ADR 0363:
-a `status: planned` chapter is never played) and has no world map yet, so before each chapter
+CHAPTER_I_21X); its world map is its own. Manchego Stars ends after its last WRITTEN chapter (ADR
+0363: a `status: planned` chapter is never played) and has no world map yet, so before each chapter
 it gets the twin's: the nodes the vanilla campaign found open at the twin's start, read from
 that campaign's `<chapter>.json` records (Nicolas, 2026-10-27). The twin of our chapter N is
 difficulty.VANILLA_CHAIN[N], the chain the kit model already reads (ADR 0365).
 
 Each env also carries `claims`: {chapter index: [claim]}, every Strategy claim of that chapter
-(ours: the chapter YAML's `strategy_claims`; vanilla: `twin_strategy.yaml`, the route's keys)
-RESOLVED to game ids for the bot, which maps no name (bot.lua, Claims): a unit to its
+(Manchego Stars: the chapter YAML's `strategy_claims`; vanilla: `twin_strategy.yaml`, the route's
+keys) RESOLVED to game ids for the bot, which maps no name (bot.lua, Claims): a unit to its
 character id, a class to its id and every reskin built on it (a reskin plays as its base, ADR
 0362), one of our enemy ids to its class's, a terrain name to its TERRAIN_ id. A name that
 resolves to nothing raises. A claim whose fields need a model the runner has not got
@@ -38,7 +38,7 @@ To play that one chapter alone, set `last: [N]` in the JSON too, and `attempt: k
 the k-th style drawn: without `attempt`, campaign.lua retries the chapter until it clears clean
 and plays on to the next. Then `PT_CAMPAIGN="$(cat env.json)" tools/playtest/run.sh campaign`
 (`PT_VANILLA=1` for retail), or many attempts at once with `montecarlo.py attempts --env
-env.json`. Regenerate an ours env with this script before measuring: an env kept in an old
+env.json`. Regenerate a Manchego Stars env with this script before measuring: an env kept in an old
 scratch dir predates `house_gifts`, and a House with no prior is worth 0 (that sent #556 the
 wrong way). To play from a copy of a store, point `PT_SIMDIR` at it. A run without `attempt`
 re-saves the starts it passes, so back the store up first.
@@ -103,8 +103,8 @@ def _terrains():
 
 
 def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
-    """A class token's ids on the board: the vanilla class, and for ours every reskin whose base
-    it is. None when `token` is no vanilla class."""
+    """A class token's ids on the board: the vanilla class, and for Manchego Stars every reskin
+    whose base it is. None when `token` is no vanilla class."""
     values = class_ids.vanilla_class_values()
     enum = class_ids.vanilla_class_enum(token)
     if enum not in values:
@@ -147,9 +147,9 @@ def _vs(v, game, chap, campaign):
 
 def resolve(claim, key, game, chap=None, campaign=campaign_chapters.CAMPAIGN, ref=None):
     """One claim as bot.lua takes it (its Claims section): id `key`, game ids for every name.
-    `chap` is our chapter (ours), `ref` the twin's parity reference (vanilla): a reinforcements
-    claim resolves to the waves that chapter loads (difficulty.arrival_waves), and goes
-    `unresolved` where they are not read (no chapter, or an uncurated twin)."""
+    `chap` is our chapter (Manchego Stars), `ref` the twin's parity reference (vanilla): a
+    reinforcements claim resolves to the waves that chapter loads (difficulty.arrival_waves), and
+    goes `unresolved` where they are not read (no chapter, or an uncurated twin)."""
     kind = claim['kind']
     out = {'id': key, 'kind': kind}
     if kind == 'reinforcements':
@@ -223,7 +223,7 @@ def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
 
 
 def cell_chapters(campaign=campaign_chapters.CAMPAIGN):
-    """{chapter number: (ours chapter index, the twin's chapter index)} for every written
+    """{chapter number: (Manchego Stars chapter index, the twin's chapter index)} for every written
     chapter: where each game's campaign stands at that chapter's start, so a chapter cell
     reads the same chapter in both (the host slot, ADR 0211; the twin, ADR 0330)."""
     written = {int(c['chapter_number']) for c in campaign_chapters.load_all(campaign)
@@ -276,18 +276,18 @@ def pinned_env(env, campaign_id, chapter):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('game', choices=('vanilla', 'ours'))
-    ap.add_argument('--store', help="the vanilla campaign's states directory (ours only)")
+    ap.add_argument('--store', help="the vanilla campaign's states directory (`ours` only)")
     ap.add_argument('--id', help='the campaign id (default: <mode>-s<seed>, set by the harness)')
     ap.add_argument('--route', type=int, choices=(1, 2), default=1,
                     help="vanilla: the Ch8 split's route (1 Eirika, 2 Ephraim)")
-    ap.add_argument('--lord', help='ours: the lead, a PC id (default: the highlighted lead)')
+    ap.add_argument('--lord', help='`ours`: the lead, a PC id (default: the highlighted lead)')
     ap.add_argument('--from', dest='start', type=int,
                     help='resume at this chapter index, from the start state --id saved')
     args = ap.parse_args(argv)
     if args.start is not None and not args.id:
         ap.error('--from needs --id: the states it resumes from are filed under the campaign id')
     if args.game == 'ours' and not args.store:
-        ap.error('ours needs --store: its shops are the vanilla campaign\'s')
+        ap.error('`ours` needs --store: its shops are the vanilla campaign\'s')
     env = vanilla_env(args.route) if args.game == 'vanilla' else ours_env(args.store, args.lord)
     if args.id:
         env['id'] = args.id

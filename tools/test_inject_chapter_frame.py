@@ -143,7 +143,7 @@ class NothingIsInheritedByDefault(unittest.TestCase):
         self.assertIn('extraTrapsInHard', str(caught.exception))
 
     def test_a_chapter_may_keep_its_donors_list_by_declaring_why(self):
-        reason = {'chNN': {'locationBasedEvents': 'the donor Seize is ours on purpose'}}
+        reason = {'chNN': {'locationBasedEvents': 'the donor Seize is kept on purpose'}}
         with mock.patch.dict(event_group.DECLARED_INHERITED_BY_CHAPTER, reason):
             out = self.frame(chapter='chNN')
         self.assertEqual(list_body(vanilla_info(), 'EventListScr_Ch7_Location'),

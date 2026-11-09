@@ -436,5 +436,149 @@ class VanillaReadsComeFromHEAD(unittest.TestCase):
         self.assertEqual([], fail)
 
 
+class ProseNamesManchegoStars(unittest.TestCase):
+    """#588: prose names the rom hack Manchego Stars; `ours` survives only as a code id."""
+
+    def _flagged(self, path, text):
+        return [n for n, line in check._prose_lines(path, text) if check._names_ours(line)]
+
+    def test_a_python_comment_and_docstring_are_prose_but_ids_are_code(self):
+        text = ('"""ours ch03 vs the twin."""\n'
+                "game = 'ours'          # the id\n"
+                'ours = load()          # a variable\n'
+                "start = 'ours-ch03'\n"
+                "print('played: %(ours)d' % v)\n"
+                '# the bot judges ours\n'
+                "msg = 'only ours lost someone'\n")
+        self.assertEqual(self._flagged('x.py', text), [1, 6, 7])
+
+    def test_a_usage_line_in_a_docstring_is_a_command(self):
+        self.assertEqual(self._flagged('x.py', '"""Usage:\n\n    python3 x.py ours --n 1\n"""\n'),
+                         [])
+
+    def test_yaml_dialogue_is_not_prose_but_its_comments_and_notes_are(self):
+        text = ('note: ours is the fight at the crossing\n'
+                'scenes:\n'
+                '  - script:            # ours rides the taunt\n'
+                '      - nerra: >-\n'
+                '          the fishermen were ours to take\n'
+                '  - why: the moose is ours\n')
+        self.assertEqual(self._flagged('x.yaml', text), [1, 3, 6])
+
+    def test_lua_code_is_not_prose_but_its_comment_is(self):
+        text = ('local ours = {}   -- one of ours\n'
+                'print("--ours")\n')
+        self.assertEqual(self._flagged('x.lua', text), [1])
+
+    def test_a_quoted_span_and_another_word_are_not_flagged(self):
+        self.assertEqual(self._flagged('x.md', 'Run `--game ours`. "Victory is ours." Yours.\n'
+                                                'ours.c and ours_only\n'), [])
+
+    def test_a_quoted_yaml_value_is_the_authors_prose(self):
+        self.assertEqual(self._flagged('x.yaml', 'note: "the sighting is ours. Positions set."\n'),
+                         [1])
+
+    def test_a_sibling_key_after_script_ends_the_dialogue(self):
+        text = '  - script:\n      - a: x\n    why: the moose is ours\n'
+        self.assertEqual(self._flagged('x.yaml', text), [3])
+
+    def test_game_text_keys_are_not_prose(self):
+        text = ('death_quote: "Victory was ours..."\n'
+                'vanilla_text: Victory is ours\n'
+                'help_text: >\n'
+                '  The day is ours.\n'
+                'note: the line is ours\n')
+        self.assertEqual(self._flagged('x.yaml', text), [5])
+
+    def test_yaml_data_naming_the_game_id_is_not_prose(self):
+        text = ('- {start_id: ours-ch00, game: ours, chapter: 1,\n'
+                '  state_path: references/sim/ours/fd3c/states/1.ss}\n')
+        self.assertEqual(self._flagged('x.yaml', text), [])
+
+    def test_c_code_is_not_a_comment_but_a_block_comment_is_read_whole(self):
+        text = ('x = a * ours;\n'
+                'struct Unit *ours;\n'
+                '/* the first line\n'
+                ' * and ours on the second\n'
+                ' */ int ours = 1; // ours\n')
+        self.assertEqual(self._flagged('x.c', text), [4, 5])
+
+    def test_a_patch_reads_its_message_and_its_added_comments(self):
+        text = ('Subject: ours ever clears BG1\n'
+                '---\n'
+                'diff --git a/src/x.c b/src/x.c\n'
+                '+/* added,\n'
+                '+ * ours */\n'
+                '-/* removed: ours */\n'
+                '+int ours = 0;\n')
+        self.assertEqual(self._flagged('x.patch', text), [1, 5])
+
+    def test_an_f_string_message_is_prose(self):
+        """A STRING token before Python 3.12, FSTRING_MIDDLE parts from 3.12 (CI's version)."""
+        self.assertEqual(self._flagged('x.py', "msg = f'only ours lost {n}'\n"), [1])
+
+    def test_title_and_text_are_game_text_only_in_a_chapter(self):
+        text = '- title: ours beats the twin\n  text: >-\n    and ours plays apart\n'
+        self.assertEqual(self._flagged('campaigns/x/campaign.yaml', text), [1, 3])
+        self.assertEqual(self._flagged('campaigns/x/chapters/ch01.yaml', text), [])
+
+    def test_only_a_game_value_is_the_game_id(self):
+        self.assertEqual(self._flagged('x.yaml', 'note: ours, unlike vanilla, keeps the boss\n'
+                                                 'why: ours # vs vanilla\n'
+                                                 '- {start_id: ours-ch00, game: ours}\n'), [1, 2])
+
+    def test_each_patch_hunk_is_read_on_its_own(self):
+        text = ('Subject: x\n'
+                'diff --git a/src/x.c b/src/x.c\n'
+                '@@ -1 +1 @@\n'
+                '+/* opened here and never closed in this hunk\n'
+                '@@ -9 +9 @@\n'
+                '+int ours = 0;\n'
+                '@@ -20 +20 @@\n'
+                '  * and ours, mid-comment\n'
+                '  */\n')
+        self.assertEqual(self._flagged('x.patch', text), [8])
+
+    def test_the_other_tests_prose_is_scanned_but_this_gates_fixtures_are_not(self):
+        names = {os.path.basename(p) for p in check._prose_test_files()}
+        self.assertIn('test_montecarlo.py', names)
+        self.assertIn('test_bot.lua', names)
+        self.assertNotIn('test_check_comment_drift.py', names)
+        self.assertNotIn('test_check_canaries.py', names)
+
+    def test_the_scan_covers_the_authored_campaign_prose(self):
+        """#588's review: lore, unit files, the chapter injectors and the wiki sources held live
+        "ours" lines while the gate was green, because no glob reached them."""
+        scanned = {os.path.relpath(p, check.REPO)
+                   for p in check._docs() + check._handwritten_sources()}
+        for rel in ('campaigns/rime-of-the-frostmaiden/lore/nerra.md',
+                    'campaigns/rime-of-the-frostmaiden/pcs/prof-rbg.yaml',
+                    'campaigns/rime-of-the-frostmaiden/onboarding-catalog.yaml',
+                    'tools/inject/chapters/ch05.py', 'tools/wiki/site.py',
+                    'tools/playtest/matrix.yaml'):
+            self.assertIn(rel, scanned)
+
+    def test_the_live_tree_is_clean(self):
+        fail = []
+        check.check_prose_names_manchego_stars(fail)
+        self.assertEqual([], fail)
+
+    def test_the_generated_scene_book_is_exempt_but_a_doc_is_not(self):
+        scenes = os.path.join(check.REPO, 'docs', 'scenes', 'x.md')
+        doc = os.path.join(check.REPO, 'docs', 'x.md')
+        orig_docs, orig_src = check._docs, check._handwritten_sources
+        check._docs = lambda: [scenes, doc]
+        check._handwritten_sources = lambda: []
+        check.open = lambda path, *a, **k: io.StringIO('ours to take\n')
+        try:
+            fail = []
+            check.check_prose_names_manchego_stars(fail)
+        finally:
+            check._docs, check._handwritten_sources = orig_docs, orig_src
+            del check.open
+        self.assertEqual(len(fail), 1, fail)
+        self.assertIn('docs/x.md:1', fail[0])
+
+
 if __name__ == '__main__':
     unittest.main()

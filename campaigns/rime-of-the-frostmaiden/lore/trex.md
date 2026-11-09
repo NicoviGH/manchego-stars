@@ -20,7 +20,7 @@ warren's survival.
 
 ## Book
 
-In ''Rime of the Frostmaiden'' (p. 98), Trex leads the kobolds in the Termalaine mine, "the one wearing the fake wings and doing the talking," and he is "possessed by a ghost." His kobolds put it their own way (p. 95): "Trex smart! He speaks like human who knows a lot." Ours drops the possession and the wings, so his eloquence is his own.
+In ''Rime of the Frostmaiden'' (p. 98), Trex leads the kobolds in the Termalaine mine, "the one wearing the fake wings and doing the talking," and he is "possessed by a ghost." His kobolds put it their own way (p. 95): "Trex smart! He speaks like human who knows a lot." Manchego Stars drops the possession and the wings, so his eloquence is his own.
 
 ## Concept
 

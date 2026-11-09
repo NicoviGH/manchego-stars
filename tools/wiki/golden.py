@@ -100,7 +100,7 @@ def diff(ours, theirs, limit=20, ctx=3):
     for op, i1, i2, j1, j2 in sm.get_opcodes():
         if op == 'equal':
             continue
-        out.append('%s after %r:\n  ours: %s\n  wiki: %s' % (
+        out.append('%s after %r:\n  page: %s\n  wiki: %s' % (
             op, ' '.join(ours[max(0, i1 - ctx):i1]), ' '.join(ours[i1:i2])[:300],
             ' '.join(theirs[j1:j2])[:300]))
         if len(out) >= limit:

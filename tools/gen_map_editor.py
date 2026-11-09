@@ -121,9 +121,10 @@ if not BLANK:
     EXPORT_META['vanilla_layout']=LAYOUT
 elif VANILLA_REF:
     # A blank canvas driven from --vanilla is still a RETILE: the cells stand where vanilla's
-    # stand and must keep vanilla's terrain (ch05's rule -- the tileset's terrain table is ours
-    # to author, the painted tiles are not ours to swap). Stamping the layout is what lets
-    # import_map_layout check that per cell; without it the check has nothing to compare to.
+    # stand and must keep vanilla's terrain (ch05's rule -- the tileset's terrain table is
+    # Manchego Stars' to author, the painted tiles are not its to swap). Stamping the layout is
+    # what lets import_map_layout check that per cell; without it the check has nothing to compare
+    # to.
     EXPORT_META['vanilla_layout']=VANILLA_REF
 PROTECTED_TARGETS={}
 if BLANK:

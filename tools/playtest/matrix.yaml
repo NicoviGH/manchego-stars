@@ -129,8 +129,8 @@ scenarios:
   # A MEASUREMENT of retail, not a gate: kind diagnostic, because the world-map interlude it
   # crosses is a state the controller does not classify, so it presses through it raw.
   vanillagold: {rom: any, manual: true, kind: diagnostic, deadline: 900}
-  # #510 step 9 PR D: the bot plays one chapter (ours ch01; PT_VANILLA=1 retail Ch1 after the
-  # Prologue) and emits a BOTRUN record; sightprobe prints what sight.lua reads, for a check
+  # #510 step 9 PR D: the bot plays one chapter (Manchego Stars ch01; PT_VANILLA=1 retail Ch1 after
+  # the Prologue) and emits a BOTRUN record; sightprobe prints what sight.lua reads, for a check
   # by eye. Both headless (memory only), both run by hand -- never in a suite. campaign (PR E)
   # plays chapter to chapter; a whole game is hours, hence its deadline.
   bot: {rom: any, manual: true, deadline: 1800}
@@ -270,10 +270,10 @@ suites:
 # so one manifest still owns what a playtest needs). Each start is a chapter-start state an
 # earlier campaign saved, played on attempt 1 from that state (montecarlo.py `suite`), never
 # re-saved: an attempt-mode run writes no state. A start's `chapter` is the game's chapter
-# index, the store's file name: vanilla 6 is Ch5 (CHAPTER_L_5); ours chapter N is hosted at
-# index N + 1 (inject.hosts), so ours ch00-ch03 are 1-4. A state is only good for the ROM that
-# saved it: `suite` refuses a start whose rom_hash is not the ROM built now, or whose file no
-# longer hashes to state_sha1. The states live under references/ (gitignored).
+# index, the store's file name: vanilla 6 is Ch5 (CHAPTER_L_5); a Manchego Stars chapter N is hosted
+# at index N + 1 (inject.hosts), so Manchego Stars ch00-ch03 are 1-4. A state is only good for the
+# ROM that saved it: `suite` refuses a start whose rom_hash is not the ROM built now, or whose file
+# no longer hashes to state_sha1. The states live under references/ (gitignored).
 instrument:
   version: 2                       # 2: PR-G added the fog start scout-ch6 (ADR 0395)
   # the commit that last froze the held-out seeds (PR-A set 2001/2002, never played in tuning
@@ -301,7 +301,7 @@ instrument:
     # the planner's budgets (planner.lua M.BEAM, M.FINAL, M.BRANCH, M.LOOK_DECISION,
     # M.LOOK_ATTEMPT; FR-018), equal to them (test_montecarlo's shipped-manifest test)
     budgets: {beam: 6, final: 4, branch: 8, lookahead_decision: 8, lookahead_attempt: 128}
-  # Ours has no world map of its own: before each chapter it takes its twin's open shops,
+  # Manchego Stars has no world map of its own: before each chapter it takes its twin's open shops,
   # read from these vanilla campaigns' start records (campaign_env.ours_env), first one first.
   shops_from:
     - references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3
@@ -359,7 +359,7 @@ instrument:
        state_path: references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/6.ss,
        state_sha1: 44aaa665737bb284914e8ddf7c986342b36cb1fa,
        provenance: {campaign: e1-vanilla-ch3, seed: 1, source: '#510 comment 6485521139'}}
-    # ours, New Game to ch03 (#510 comment 6478205562); the run's seed was not recorded
+    # Manchego Stars, New Game to ch03 (#510 comment 6478205562); the run's seed was not recorded
     - {start_id: ours-ch00, game: ours, chapter: 1, rom_hash: fd3cb9d8dca6, label: fixture,
        state_path: references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/1.ss,
        state_sha1: 2d2d9c87696e272428dd5798df72d2839afe4e4e,

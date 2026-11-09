@@ -20,8 +20,8 @@
 --
 -- WHAT BELONGS HERE: facts about ch05 that more than one scenario reads -- cast pids, the
 -- reliquary table, message ids a branch turns on. What does NOT: engine constants (terrain
--- ids, item ids that are FE8's rather than ours) and anything a single scenario uses once.
--- ch06 starts here by default rather than by exception.
+-- ids, item ids that are FE8's rather than Manchego Stars') and anything a single scenario uses
+-- once. ch06 starts here by default rather than by exception.
 return {
     -- Cast, by the vanilla character slot each unit occupies (CAMPAIGN is generated into
     -- symbols.lua from the injector's own constants).

@@ -16,3 +16,9 @@
 | Cross-cutting engine change (8+ files) | Opus with extended thinking |
 | Generate dialogue, YAML, item descriptions | Haiku |
 | ROM build smoke-test / mGBA memory reads | Script, no LLM |
+
+### Subagents
+
+- **A subagent runs long commands in the foreground** (a suite, a build, a matrix scenario): it is
+  never woken when its own background task ends, so it stalls. Say so in every brief that runs
+  one (#510 step 9).

@@ -248,9 +248,9 @@ class MessieOnTheIce(unittest.TestCase):
         self.assertTrue({xy for xy in bay if xy in island}, 'the bay cuts into the island')
 
     def test_the_donor_snag_stands_and_falls_into_a_crossing(self):
-        """Nicolas, 2026-10-09: vanilla Ch13's snag is real, so ours is. It is painted standing
-        over the river and falls as MapChange id 1 (the bay is id 0), across the river below,
-        on the same three painted tiles ch04's fall writes."""
+        """Nicolas, 2026-10-09: vanilla Ch13's snag is real, so Manchego Stars' is. It is painted
+        standing over the river and falls as MapChange id 1 (the bay is id 0), across the river
+        below, on the same three painted tiles ch04's fall writes."""
         ch06 = inject.chapters.ch06
         maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
         ids = inject.maps.terrain_ids()

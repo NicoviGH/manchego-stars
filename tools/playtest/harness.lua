@@ -245,7 +245,7 @@ local function anyMenuProc()
                     if up == lowest then return p.addr end
                     -- Only a slot of the proc pool (src/proc.c sProcArray) is a proc to step
                     -- up from. A root proc's parent is its tree index 0-7 (proc.c:
-                    -- `proc_parent = (ProcPtr) rootIndex`), and any other word is not ours
+                    -- `proc_parent = (ProcPtr) rootIndex`), and any other word is not the harness's
                     -- to dereference: either way, not a descendant.
                     local off = up - pool.base
                     if off < 0 or off >= pool.count * pool.stride or off % pool.stride ~= 0 then
@@ -2266,7 +2266,7 @@ end
 -- and after each chapter change. Measured 2026-10-15: 0 through the Prologue and Ch1, then
 -- 5,000 inside chapter 0x38 (Castle Frelia, the decomp's `lordsplit`), so Ch2 starts at 5,000. Prologue: Seth kills a 1-HP O'Neill (DefeatBoss). Ch1: Seth
 -- kills a 1-HP Breguet off the gate and Eirika seizes (2,2). Vanilla's own chapter indices,
--- Prologue 0, Ch1 1, Ch2 2 -- never our hosting slots (inject/hosts.py), which are ours.
+-- Prologue 0, Ch1 1, Ch2 2 -- never our hosting slots (inject/hosts.py), which are Manchego Stars'.
 -- Retail boots at text speed 1 (bmio.c:950); our build plays its scenes at max. Hold
 -- textSpeed 3 (no typewriter delay, GetTextDisplaySpeed) and gameSpeed fast, or the
 -- Prologue's narration outlasts TUNE.bootSteps. New Game rewrites the config, hence every step.
@@ -2836,7 +2836,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                     -- loop does (another unit, or endTurn) waits for the player map and meets
                     -- that menu as an unexpected state. Wait out the outcome the way winCh00
                     -- does -- chapter advanced -- or, on a Seize map, control coming back IN
-                    -- THIS PHASE (a later phase's idle map is not ours to act in).
+                    -- THIS PHASE (a later phase's idle map is not the harness's to act in).
                     if bossDownOrWon() then
                         waitFor(function()
                             return won() or not ourPhase()
@@ -3082,8 +3082,8 @@ INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(),
 -- than caught at UnitKill's entry: a breakpoint held through every act and phase cost 56% more
 -- CPU (Manchego Stars ch01, 20.4 CPU s against 13.1), and arming it per caller would have to
 -- list every proc that can kill.
--- -> stop() -> { id, charId, faction, killer, killerId, ours } per kill, and per slot the watch could not
--- read ({ fault = "replaced", id, charId, faction }: freed and reloaded within a frame).
+-- -> stop() -> `{ id, charId, faction, killer, killerId, ours }` per kill, and per slot the watch
+-- could not read ({ fault = "replaced", id, charId, faction }: freed and reloaded within a frame).
 INSPECT.watchDeaths = function()
     local alive, deaths = {}, {}
     for _, f in ipairs(BOARD.FACTIONS) do
@@ -3130,7 +3130,7 @@ INSPECT.breakWhile = function(cpu, addr, want, caught)
     end
 end
 
--- Every item the game gives one of ours off a unit that fell (a thief's chest, an enemy's
+-- Every item the game gives a player unit off a unit that fell (a thief's chest, an enemy's
 -- drop): NewPopup_GeneralItemGot, whose only caller is BATTLE_HandleItemDrop (bmmind.c), the
 -- game's own decision -- the fallen unit carries US_DROP_ITEM and an item, and a blue unit
 -- downed it -- caught at its entry: r0 the receiving unit, r1 the item. The fallen one is the
@@ -3369,7 +3369,7 @@ INSPECT.botApi = function(game)
         battle = BOARD.battle,
         -- every full-bag answer since the last call (INSPECT.answerFullBag's log)
         bag = function() return unread(INSPECT.bagLog) end,
-        -- every drop the game gave one of ours since the last call (INSPECT.watchDrops, kept
+        -- every drop the game gave a player unit since the last call (INSPECT.watchDrops, kept
         -- while an act or an enemy phase plays: the only times a battle resolves)
         drops = function() return unread(dropLog) end,
         -- every unit the game killed since the last call (INSPECT.watchDeaths, through each
@@ -3753,8 +3753,8 @@ INSPECT.campaignApi = function(game)
     local states, played, shops, menuPicked = {}, nil, nil, nil
     local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
 
-    -- The world map shops open now: vanilla's from its own world map; ours has none yet, so
-    -- the twin's at the same point, as the vanilla campaign recorded them (cfg.shops).
+    -- The world map shops open now: vanilla's from its own world map; Manchego Stars has none yet,
+    -- so the twin's at the same point, as the vanilla campaign recorded them (cfg.shops).
     local function openNodes(ch)
         if game == "vanilla" then return INSPECT.worldMap().open end
         return (cfg.shops or {})[tostring(ch)] or {}
@@ -4221,9 +4221,9 @@ INSPECT.campaignApi = function(game)
 end
 
 -- bot: the bot plays one chapter, seeded by PT_SEED, styled by PT_STYLE (JSON), following
--- PT_CLAIMS (JSON, resolved). Ours: ch01 (reached as clear_ch01 reaches it). PT_VANILLA=1:
--- retail Ch1, reached by the bot playing the Prologue first (its record is emitted too). The
--- verdict is PASS for any finished run (won, lost, stuck): the record IS the result.
+-- PT_CLAIMS (JSON, resolved). Manchego Stars: ch01 (reached as clear_ch01 reaches it).
+-- PT_VANILLA=1: retail Ch1, reached by the bot playing the Prologue first (its record is emitted
+-- too). The verdict is PASS for any finished run (won, lost, stuck): the record IS the result.
 scenarios.bot = function()
     local Botrun = dofile(PLAYTEST_DIR .. "/botrun.lua")
     local function play(game)
@@ -4251,10 +4251,10 @@ end
 -- campaign: the bot plays chapter to chapter (campaign.lua), from New Game, restarting a chapter
 -- from its start state until it clears with everyone alive. PT_SEED seeds the game's RNG once;
 -- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
--- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
--- record), claims = { [chapter] = resolved claims }, from = a chapter index to resume at, from
--- the start state this id saved, attempt = k: only the k-th attempt from `from`'s start (the
--- pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- shops = { [chapter] = {world map nodes} } (Manchego Stars: the twin's, from the vanilla
+-- campaign's record), claims = { [chapter] = resolved claims }, from = a chapter index to resume
+-- at, from the start state this id saved, attempt = k: only the k-th attempt from `from`'s start
+-- (the pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
 scenarios.campaign = function()
     local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")
@@ -4265,9 +4265,9 @@ end
 
 -- sightprobe: what the sight reads at the chapter's start, printed for a check by eye against
 -- the map (#510 step 9 PR D): the danger grid, the objective, the lead's reach, every enemy's
--- own strike on the lead (its AI's pick of weapon and tile), and one attack of ours in range.
--- Ours: ch01. PT_VANILLA=1: the retail Prologue, the first map New Game reaches (Ch1 is only
--- reached by playing it, which `bot` does).
+-- own strike on the lead (its AI's pick of weapon and tile), and one player attack in range.
+-- Manchego Stars: ch01. PT_VANILLA=1: the retail Prologue, the first map New Game reaches (Ch1 is
+-- only reached by playing it, which `bot` does).
 scenarios.sightprobe = function()
     if PLAYTEST_VANILLA == "1" then
         INSPECT.retailFastText()
@@ -4336,7 +4336,7 @@ scenarios.sightprobe = function()
     for k, p in pairs(sight.closings(INSPECT.Sight.CLOSE_HORIZON)) do closed[#closed + 1] = k .. "@" .. p end
     table.sort(closed)
     log("closings " .. table.concat(closed, " "))
-    -- One attack of ours where a weapon reaches, with the enemy's counter to it.
+    -- One player attack where a weapon reaches, with the enemy's counter to it.
     local weapons = sight.weapons(lead)
     for _, t in ipairs(reach) do
         if BOARD.weaponFor(weapons, t.x, t.y, foe.x, foe.y) then
@@ -6850,7 +6850,7 @@ scenarios.ch04moose = function()
     if moose() then return result("FAIL", "the moose is on the map at chapter start") end
     INSPECT.settle("event", 900, true)
 
-    -- 1. the negative half: idle a whole turn, monsters move, nobody of ours is in the clearing.
+    -- 1. the negative half: idle a whole turn, monsters move, no player unit is in the clearing.
     if runEnemyPhase() ~= "player" then
         shot("ch04moose-no-turn2")
         return result("FAIL", "turn 1 never handed control back")
@@ -7322,7 +7322,8 @@ scenarios.ch05recruit = function(opts)
     --    a Talk pointed at vanilla's 0x9CC recruits Sahnar just as well, and that is exactly the
     --    bug this chapter shipped with for months -- Hlin Trollbane's bust talking to vanilla
     --    Joshua, with every text decoder green. Box COUNT is the cheapest in-engine witness to
-    --    which message id the script actually showed: ours is 21 A-presses, vanilla's is 32.
+    --    which message id the script actually showed: Manchego Stars' scene is 21 A-presses,
+    --    vanilla's is 32.
     log(string.format("ch05recruit: the recruit scene ran %d boxes, message 0x%X",
         boxes, playedMsg or 0))
     if boxes ~= RECRUIT_BOXES then
@@ -8520,10 +8521,11 @@ end
 --
 -- Vanilla's Fighter carries {Iron Axe, Halberd} and drops his LAST item. The AI equips the
 -- weapon it swings (cp_perform.c), so once he attacks with the Halberd it moves to the front
--- and he drops the Iron Axe: rush him before he attacks. Ours is a Cavalier carrying
--- {Iron Lance, Horseslayer}. The AI scores a weapon by damage x hit (cp_battle.c), so against
--- a foot unit it swings the Iron Lance (equal Mt, +10 Hit) and the drop stays the Horseslayer;
--- against a mounted unit the Horseslayer's triple Mt wins and the drop flips. Two arms, one run:
+-- and he drops the Iron Axe: rush him before he attacks. Manchego Stars' boss is a Cavalier
+-- carrying {Iron Lance, Horseslayer}. The AI scores a weapon by damage x hit (cp_battle.c), so
+-- against a foot unit it swings the Iron Lance (equal Mt, +10 Hit) and the drop stays the
+-- Horseslayer; against a mounted unit the Horseslayer's triple Mt wins and the drop flips. Two
+-- arms, one run:
 --
 --   * FOOT: a foot unit stands beside him until he attacks it. His inventory is unchanged.
 --   * MOUNTED: a unit of a class on the Horseslayer's own effectiveness list (read from

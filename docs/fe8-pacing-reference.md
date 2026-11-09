@@ -204,8 +204,8 @@ nearly turned on it.
 This table is that floor, and it is **derived, not asserted**: FE8's own exp formulas
 (`GetUnitRoundExp` / `GetUnitPowerLevel` / `GetUnitKillExpBonus` / `GetBattleUnitExpGain`,
 `fireemblem8u/src/bmbattle.c`, transcribed in `tools/exp_curve.py` and unit-tested against
-hand-computed values) run over the real per-chapter rosters — ours and each chapter's vanilla
-twin — and the level curve falls out of the force the party eats. Regenerate with
+hand-computed values) run over the real per-chapter rosters — Manchego Stars' and each chapter's
+vanilla twin — and the level curve falls out of the force the party eats. Regenerate with
 `python3 tools/exp_curve.py --write`; `tools/test_exp_curve.py` fails while it is stale.
 
 
@@ -215,7 +215,7 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
      the next regen silently discards it, and tools/test_exp_curve.py fails the
      build while it is stale. -->
 
-| chapter | bar | field | exp ours/twin | benched | typical | fed | lowest |
+| chapter | bar | field | exp MS/twin | benched | typical | fed | lowest |
 |---|---|---|---|---|---|---|---|
 | ch00 † | FE8 Prologue | 2 | 147 / 147 (x1.00) | L1 | **L1** | L1 | -- |
 | ch01 | FE8 Ch1 | 4 | 378 / 378 (x1.00) | L2 | **L2** | L3 | -- |
@@ -231,7 +231,7 @@ L14 for one fed every kill, and **L2 for the lowest-level recruit on the field**
 A recruit starts at the level its own chapter PLACES it at:
 L1 for baxby, lupin and basil; L2 for trex; L5 for sahnar.
 
-The same cast fed each chapter's VANILLA twin instead of ours reaches **L7** over
+The same cast fed each chapter's VANILLA twin instead of Manchego Stars' reaches **L7** over
 the same span: the party lands where FE8's party lands, which is what makes the
 absolute number usable.
 
@@ -270,8 +270,8 @@ entering, grown to the median of simulated level-ups on its growth donor. FE8's 
 it: every vanilla recruit so far, run through the same exp model on vanilla's own force from
 its own join level, and grown the same way. The cast tables, the fielded party, the lord sweep and the
 vanilla delta all read that party (ADR 0310), and so does the parity ratio: each force is
-measured against the party that meets it, ours against ours and the twin's against vanilla's,
-with the threat landing where FE8's AI would send it (ADR 0316).
+measured against the party that meets it, Manchego Stars' force against its own party and the
+twin's against vanilla's, with the threat landing where FE8's AI would send it (ADR 0316).
 
 ⚠️ **The exp column is the only quantity in this repo that integrates across chapters**, which
 is why `tools/test_exp_curve.py` asserts every chapter within ±12% of its twin. A chapter that

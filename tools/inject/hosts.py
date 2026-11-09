@@ -73,7 +73,7 @@ CH06_EVENT_GROUP = 'Ch7EventData'
 CH07_HOST_INDEX = 8
 # Slot 8 SHIPS pointing at Ch7EventData -- ch06's group, one slot along again. ch07 takes the
 # group named for chapter 8 (gChapterDataAssetTable[42] is Ch8EventData), which slot 9 ships
-# and nothing of ours hosts.
+# and no Manchego Stars chapter hosts.
 CH07_EVENT_GROUP = 'Ch8EventData'
 
 # --- discovery -------------------------------------------------------------------------

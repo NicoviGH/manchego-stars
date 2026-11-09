@@ -294,7 +294,8 @@ class TheLiveBuildPassesTheInheritedGuardToo(unittest.TestCase):
         if not event_group.injected():
             self.skipTest('decomp is not injected -- the walk would read the donor, not us')
         # A debug-boot build (CH05BOOT=1, ...) rewires the openings on purpose, so the tree
-        # holds whatever config the matrix built LAST and this read the boot's wiring as ours.
+        # holds whatever config the matrix built LAST and this read the boot's wiring as Manchego
+        # Stars'.
         try:
             flags = json.load(open(paths.BUILD_STAMP))['flags']
         except (OSError, ValueError, KeyError):

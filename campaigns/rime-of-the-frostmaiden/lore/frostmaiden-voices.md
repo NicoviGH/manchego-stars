@@ -24,7 +24,7 @@ grounding. Per-town quest NPCs are pulled to canon **when we stage that chapter*
    [`.claude/skills/dialogue-pass/references/fe8-register.md`](../../../.claude/skills/dialogue-pass/references/fe8-register.md):
    direct address + insult-names, relish, dark irony ("You'll thank me later"), theatrical
    announcement — plus verbatim calibration quotes and an archetype table to check a new
-   villain against so ours don't collide.
+   villain against so Manchego Stars' villains don't collide.
 2. **Frostmaiden voice (the content).** Each NPC's canon diction, below. The book's read-aloud
    text sets the *narration/atmosphere* register; the appendix stat blocks
    (personality/ideal/bond/flaw) set *character*.

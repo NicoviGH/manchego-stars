@@ -389,6 +389,11 @@ def c_dead_concepts():
         return run(check.check_no_dead_concepts)
 
 
+def c_prose_names_manchego_stars():
+    with doctored({TOOL: append('\n# ours ch03 is harder than the twin\n')}):
+        return run(check.check_prose_names_manchego_stars)
+
+
 def c_generated_indexes():
     with doctored({'docs/CHAPTERS.md': append('\ncanary hand edit\n')}):
         return run(check.check_generated_indexes_fresh)
@@ -529,6 +534,7 @@ CANARIES = {
     'check_one_tileset_default': (c_one_tileset_default, 'map_donor.py', None),
     'check_campaign_declares_no_chapter_list': (c_no_chapter_list, 'campaign.yaml', None),
     'check_no_dead_concepts': (c_dead_concepts, 'build-campaign', None),
+    'check_prose_names_manchego_stars': (c_prose_names_manchego_stars, 'map_donor.py', None),
     'check_generated_indexes_fresh': (c_generated_indexes, 'CHAPTERS.md', None),
     'check_purple_bank_blankers_known': (c_purple_bank, 'PURPLE_BANK_BLANKERS', 'decomp'),
     'check_engine_campaign_agnostic': (c_engine_agnostic, '0001-', None),

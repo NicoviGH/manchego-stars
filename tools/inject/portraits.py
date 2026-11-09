@@ -47,8 +47,8 @@ def dressed_portrait_slots(campaign):
     This exists because dressing a slot and normalizing its mouth/eye geometry are two separate
     steps, and for a long time the second one only knew about the first two groups. A slot that
     is dressed but NOT normalized keeps the vanilla character's mouth window, so the engine
-    paints its blink/talk overlay at the old face's coordinates -- over ours. It does not fail
-    the build, it does not fail a scenario, and on a face whose mouth happens to sit near
+    paints its blink/talk overlay at the old face's coordinates -- over the new one. It does not
+    fail the build, it does not fail a scenario, and on a face whose mouth happens to sit near
     vanilla's it is invisible; on the other three ch05 residents it smeared a block of skull
     across the eye sockets and doubled the teeth (Nicolas spotted it, 2026-08-09). The ch02
     chwinga had been shipping the same defect unnoticed.

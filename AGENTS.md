@@ -121,6 +121,36 @@ id in engine sources; chapter numbers and plot events are a review call.
   desk ownership (`check_lane_ownership`) is advisory.
 - Never commit the `fireemblem8u` submodule pointer.
 
+## Standing rules (Nicolas)
+
+Where each came from: #588, comment 6752993507. Each is a correction he made: apply it, don't
+re-ask.
+
+- **Name the game Manchego Stars** (vs vanilla) in prose: chat, issues, commits, docs, comments.
+  `ours` is only the code's game id, in backticks (`check.py check_prose_names_manchego_stars`).
+- **Findings and an issue's status live on the GitHub issue**; HANDOFF only points at them. On
+  hold is the `on-hold` label plus ONE comment saying why and what reopens it.
+- **No design docs.** A design or plan is ONE comment on its issue, edited in place; the body
+  links to it, nothing copies it, and the PR records the settled call as an ADR. This overrides
+  the brainstorming skill's spec file.
+- **Never make tests, the parity read or CI slower** without fixing the cost in the same PR;
+  report before/after timings, base and branch timed back to back with `uptime` and CPU time.
+- **No loose threads.** Before a handoff, prove every "unproven" or "assumed" claim (decomp
+  citation, probe, test) or turn it into a guard that fails loudly; a docstring caveat is not
+  enough.
+- **Run the proof a change needs without asking.** The run-cost rule forbids pointless runs, not
+  proof; never ask for a run budget, nor for the obvious application of a standing rule.
+- **#510's north star is a trustworthy difficulty model.** Recommend and act; test each call by
+  whether it makes the bot's reading more trustworthy; say so before a rabbit hole if you
+  disagree.
+- **No tidy design rules.** Don't turn a pattern from a few drafts into a principle; test it
+  against vanilla's own units first, and frame design by the role a unit fills.
+- **The planned chapters after ch07 are drafts.** Cite their `joins_roles`, twins and chapter
+  count as "the current draft says", never as constraints.
+- **No table record past Revel's End (ch08).** The book and vanilla FE8 are both inspiration and
+  the best story wins: "the book doesn't have it" rules nothing out; say which parts are
+  invented.
+
 ## Design placement test
 
 Push each line to the desk that owns it; talk over interfaces; judge a boundary by the *named*

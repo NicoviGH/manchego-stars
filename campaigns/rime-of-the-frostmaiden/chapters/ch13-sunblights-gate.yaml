@@ -28,9 +28,9 @@ enemy_units: []
 events: []
 post_chapter: {}
 design_notes: >
-  Vanilla 13 is the fight outside Jehanna before 14 storms the hall; ours is the fight at
-  Sunblight's gate before ch14 storms the fortress. Renvall alone plays as a straight push to
-  seize; ch13 keeps Hamill's objective on Renvall's map: Durth holds the castle while patrols
+  Vanilla 13 is the fight outside Jehanna before 14 storms the hall; Manchego Stars' ch13 is the
+  fight at Sunblight's gate before ch14 storms the fortress. Renvall alone plays as a straight push
+  to seize; ch13 keeps Hamill's objective on Renvall's map: Durth holds the castle while patrols
   close in from behind. A map built with ballistae, so Pepperjack and Brie debut here.
 plan:
   story: >

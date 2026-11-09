@@ -41,11 +41,10 @@
 --      (its tile freed for the next), and once per way each uncertain kill can go, up to
 --      BRANCH of them (an enemy the average keeps may die, one it removes may live). Last, the
 --      best plan is mended: each unit it may lose tries its other acts (a green one, the acts
---      of ours that could save it; a recruit, the acts of the units it strikes), the rest of the
---      plan kept, and those are judged too.
---      At an irreversible transition (M.triggers: a door opened or a wall struck, a first step
---      into a seen boss's reach) the best M.FINAL plans
---      each meet a second enemy phase, our units holding between (sight.nextPhase): all of
+--      of the player units that could save it; a recruit, the acts of the units it strikes), the
+--      rest of the plan kept, and those are judged too. At an irreversible transition (M.triggers:
+--      a door opened or a wall struck, a first step into a seen boss's reach) the best M.FINAL
+--      plans each meet a second enemy phase, our units holding between (sight.nextPhase): all of
 --      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
 --      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
 --      that of dying in either phase, and those plans are ranked again among themselves.
@@ -66,12 +65,11 @@
 -- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
--- ours it strikes, sorted), kind =
--- "beam"|"assault"|"advance"|"unstall"|"mend"|"rest", considered = every plan judged, best first:
--- { judged, acts (its key list, M.keysOf), kind, rank, seizes, extended (it met the lookahead's
--- second phase), played (the one played), rejected (why not: "over_cap", "outranked", "stalled"),
--- weights (its judged phase's likeliest ways' chances) }, rank = what plans are compared by
--- (M.outranks): { admitted,
+-- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
+-- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
+-- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
+-- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
+-- rank = what plans are compared by (M.outranks): { admitted,
 -- forfeits (how many ledger goals it closes for good), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
@@ -161,7 +159,8 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 M.DUST = Goals.DUST
 -- the lookahead's budget (FR-018): extra judged calls (sight.nextPhase, one a finalist) per
 -- decision and per attempt. 128 an attempt, not 32: 32 ran out before the boss fight on
--- ours ch03 and two vanilla starts, so the decisive turns were judged one phase deep (#570)
+-- Manchego Stars ch03 and two vanilla starts, so the decisive turns were judged one phase deep
+-- (#570)
 M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
 function M.admits(d, cap) return d <= cap + M.DUST end
@@ -171,7 +170,7 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- among others, it ends the chapter (Nicolas, 2026-11-01); then the smallest largest excess,
 -- then summed excess, then largest death chance. Each of those is read on the next enemy
 -- phase first (`first_*`) and on both phases only to break its ties: the lookahead's second
--- phase has our units stand still another round, and over ours ch03's pilots its readings
+-- phase has our units stand still another round, and over Manchego Stars ch03's pilots its readings
 -- came true 0 of 8 times where the next phase's were about right, so ranking by both let a
 -- unit be sent to an 82% death to dodge another's second-phase 90% (ADR 0389, amended
 -- 2026-11-08; careful seed 3010 turn 18, replayed). Then the admitted order: fewer goals forfeited
@@ -557,7 +556,7 @@ function M.plan(Bot, board, sight, style, opts)
         return redsLeft(st) == 0 and 1 or 0
     end
     -- `alive` (the judge's): each unit's chance to live the phase; `felled`: each recruit's
-    -- chance our counter killed it; `fell`: the chance a counter of ours ended the chapter in
+    -- chance our counter killed it; `fell`: the chance a player counter ended the chapter in
     -- the phase (the boss, or a Rout's last enemy, striking and dying: vanilla Ch5 attempt 8's
     -- boss died so on turn 5 with (5,1) still open); `rows` (optional) gets each goal's { id,
     -- kind, gold, worth, before, after }, the plan record's goalWorth
@@ -851,9 +850,9 @@ function M.plan(Bot, board, sight, style, opts)
     -- its goal, of those whose standing chance to die is within the cap (the better by its own
     -- score on a tie: a Visit before a wait on the same tile). The beam orders partial plans by
     -- the judged score, where a House worth a few points never pays for the steps away from the
-    -- gate, so no plan it kept had the lord walk there (ours ch01: four plans judged, each with
-    -- him waiting, and the run stuck); the rank puts progress first, but picks only among the
-    -- plans judged. nil when no unit gains ground, or when the beam already has this plan.
+    -- gate, so no plan it kept had the lord walk there (Manchego Stars ch01: four plans judged,
+    -- each with him waiting, and the run stuck); the rank puts progress first, but picks only among
+    -- the plans judged. nil when no unit gains ground, or when the beam already has this plan.
     local function advance(have)
         local st, moved = start, false
         -- each unit's acts that gain ground, the most first: one a tile still taken refuses
@@ -910,7 +909,7 @@ function M.plan(Bot, board, sight, style, opts)
     local cost = { phases = 0, averaged = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0 } }
-    -- a green unit lost spoils the clear as one of ours does (botrun's clean clear: vanilla
+    -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
     -- meets the phase where it stands
@@ -987,7 +986,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- HP, played every way it goes: the average (an enemy gone at a kill >= 0.5, else
         -- standing at its mean HP; our attacker on its mean HP after the counter) hides the
         -- way the rolls go otherwise. Vanilla Ch5 turn 5: Eirika's attack killed an enemy the
-        -- plan kept standing, and Joshua's AI turned on her. Ours ch03 (T100b): Wolfram's
+        -- plan kept standing, and Joshua's AI turned on her. Manchego Stars ch03 (T100b): Wolfram's
         -- attack missed, the counter left him on 3 HP, and the AI that had passed him by at
         -- his mean HP killed him. A unit whose blow is the only one on its target plays the
         -- exchange's own pairs (sight's `joint`), so a counter is played only where our blow
@@ -1151,15 +1150,16 @@ function M.plan(Bot, board, sight, style, opts)
         -- the chance the game ends in the phase: per outcome, any unit whose death ends it
         -- dies there; deaths in one outcome may come together, never across outcomes
         local overAll = 0
-        local strikers = {}   -- per unit, ours and green, the enemies that strike it in any outcome
+        -- per unit, player and green, the enemies that strike it in any outcome
+        local strikers = {}
         for _, g in ipairs(greens) do strikers[g.id] = {} end
         for _, p in ipairs(planned) do strikers[p.unit.id] = {} end
         -- per recruit, its chance our counter kills it (the phase's own `felled`) and the units
-        -- of ours it strikes, whose other acts may save it (vanilla Ch5: Joshua, killed by
-        -- Seth's counter on turn 3, the planner paying nothing for it)
+        -- on the player's side it strikes, whose other acts may save it (vanilla Ch5: Joshua,
+        -- killed by Seth's counter on turn 3, the planner paying nothing for it)
         local felled, struckBy, fell, winStruck = {}, {}, 0, {}
-        -- the units the phase may strike: ours as the plan leaves them (its counter chained),
-        -- then the greens where they stand; kept for the lookahead's second phase
+        -- the units the phase may strike: the player's as the plan leaves them (its counter
+        -- chained), then the greens where they stand; kept for the lookahead's second phase
         local hit = {}
         for _, p in ipairs(planned) do
             local id = p.unit.id
@@ -1402,7 +1402,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- where it still fits. The beam ranks acts by their own score, so a plan where one unit
     -- steps elsewhere for its own sake can lose to that unit's best act in every slot (ch02
     -- turn 5: the four plans judged all left Marty to two Brigands). A green unit has no menu:
-    -- it tries instead the acts of ours that could save it, one ending beside it (a block) or
+    -- it tries instead the player acts that could save it, one ending beside it (a block) or
     -- striking an enemy that strikes it. A recruit our counter may kill tries the acts of the
     -- units it strikes.
     if best then
@@ -1414,7 +1414,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local function tries(p)
             if p.recruit then
-                -- a recruit has no menu of ours: the units it strikes try theirs (out of its
+                -- a recruit has no player menu: the units it strikes try theirs (out of its
                 -- reach, or holding no weapon that answers it)
                 local out = {}
                 for _, id in ipairs(p.struck) do
@@ -1438,7 +1438,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, p in ipairs(base.predict) do
             if p.die > 0 then risky[#risky + 1] = p end
         end
-        -- a unit of ours whose counter may end the chapter (the boss striking it and dying)
+        -- a player unit whose counter may end the chapter (the boss striking it and dying)
         -- tries its other acts too: the beam cannot see that counter, so every plan it kept
         -- had Seth strike the boss and stand beside it (vanilla Ch5 attempt 8, turn 5)
         local struckIds = {}

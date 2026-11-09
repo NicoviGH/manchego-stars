@@ -131,7 +131,7 @@ ROM="$REPO/build/fireemblem8u/fireemblem8.gba"   # the build tree (#408)
 if [ "${PT_VANILLA:-0}" = "1" ]; then
     ROM="$REPO/build/vanilla-fe8/fireemblem8.gba"
     export PT_ELF="$REPO/build/vanilla-fe8/fireemblem8.elf" MX_SKIP_ROM_CHECK=1
-    # its own symbol tables: a run of ours at the same time rewrites tools/playtest's (#510)
+    # its own symbol tables: a Manchego Stars run at the same time rewrites tools/playtest's (#510)
     export PT_SYMDIR="$HERE/vanilla-symbols"
 fi
 # Where this game's runs and chapter-start states live for a ROM hash: references/sim/<game>/

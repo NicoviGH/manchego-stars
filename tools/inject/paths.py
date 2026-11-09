@@ -209,7 +209,7 @@ CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 # ── ch05 "The Elven Tomb" (#25) ─────────────────────────────────────────────────
 # THE TWO OFFSETS, stated once, here, so no other line in inject_ch05 has to know them.
 #
-#   OURS:     chapter N is hosted on slot N+1. The prologue occupies a real chapter slot
+#   MS:       chapter N is hosted on slot N+1. The prologue occupies a real chapter slot
 #             (slot 0 has special engine paths that break a stripped chapter -- see
 #             inject/hosts.py) and is not numbered, so every chapter sits one slot right of
 #             its number. It cannot be renumbered away; it is a consequence of having a
@@ -218,7 +218,8 @@ CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 #
 #   FE8'S:    vanilla inserted chapter 5X at slot 5, so from slot 6 on the slot INDEX and the
 #             vanilla symbol NAME disagree in the BASE GAME -- slot 6 ships Ch5EventData,
-#             slot 7 ships Ch6Events. This is the one that reads like a bug and is not ours.
+#             slot 7 ships Ch6Events. This is the one that reads like a bug and is not
+#             Manchego Stars'.
 #
 # ch05 is a 1:1 retile of vanilla Ch5 and mines Ch5 for everything that is CONTENT -- the
 # geometry, the terrain, all sixteen line placements (Ch5's REDA destinations), the nine
@@ -227,7 +228,8 @@ CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 # it. What it takes from the HOST SLOT is storage and nothing else, and since #25 our rosters
 # no longer squat on the slot's vanilla tables at all (declare_unit_table) -- so the only
 # vanilla names left below are the event lists chapter_settings.json points at structurally.
-# CH05_HOST_INDEX (6) / CH05_EVENT_GROUP ('Ch6Events' -- FE8's offset, not ours): inject/hosts.py.
+# CH05_HOST_INDEX (6) / CH05_EVENT_GROUP ('Ch6Events' -- FE8's offset, not Manchego Stars'):
+# inject/hosts.py.
 CH05_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch6-eventinfo.h')
 
 CH05_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch6-eventscript.h')

@@ -37,7 +37,7 @@ from inject.decomp import DECOMP, enum_values, vanilla_decomp_text  # noqa: E402
 ELF = os.environ.get('PT_ELF') or os.path.join(DECOMP, 'fireemblem8.elf')   # PT_VANILLA (run.sh)
 HERE = os.path.dirname(os.path.abspath(__file__))
 # PT_SYMDIR: where the tables go. run.sh gives retail FE8 its own (PT_VANILLA): one shared
-# set let an ours run started beside a vanilla one overwrite vanilla's addresses before its
+# set let a Manchego Stars run started beside a vanilla one overwrite vanilla's addresses before its
 # emulator loaded them, and the vanilla run hung in our IsCharacterForceDeployed (2026-10-29).
 OUT_DIR = os.environ.get('PT_SYMDIR') or HERE
 OUT = os.path.join(OUT_DIR, 'symbols.lua')
@@ -550,9 +550,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     return {
         'CAST': cast,
         # The help text R on a unit's name must read, by pid: the message and its first line
-        # (the words tell ours from vanilla's where the id is vanilla's own). A classed cast
-        # member's is its slot's descTextId, which the names pass writes (ADR 0346); a raw
-        # pid's is RAW_PID_HELP's (a chapter's generics, #493). `casthelp` and the declared
+        # (the words tell Manchego Stars' text from vanilla's where the id is vanilla's own). A
+        # classed cast member's is its slot's descTextId, which the names pass writes (ADR 0346); a
+        # raw pid's is RAW_PID_HELP's (a chapter's generics, #493). `casthelp` and the declared
         # `help:` step both read it.
         'HELP': {**{char(slot): help_row(slot_desc_text_id(slot),
                                          load_unit(campaign, uid)['help_text'])

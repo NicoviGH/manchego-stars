@@ -166,7 +166,7 @@ def fingerprint(started, ignored_before):
     """{relpath: sha1} for every decomp file THIS injection wrote, plus deletion markers.
 
     `started` is the clock reading from immediately before the injection ran; an ignored file
-    is counted as ours when its mtime is at or after it. Tracked files are judged by CONTENT
+    is counted as this build's when its mtime is at or after it. Tracked files are judged by CONTENT
     (git status), which is stronger, so mtime never gets a say in those.
     """
     manifest = {}

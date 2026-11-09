@@ -125,7 +125,7 @@
 --           battle records (Board.battle: the forecast's numbers, every blow) and who fell
 --   event   a change on the board no act names: a unit arriving, a recruit, items gained/lost
 --   bag     a full inventory answered: the new item, the one that went, why
---   drop    the game gave one of ours a fallen unit's item: from, to (charIds), item
+--   drop    the game gave a player unit a fallen unit's item: from, to (charIds), item
 --   end     the BOTRUN record, last
 -- Every number in it is read from the game; nothing is re-derived.
 
@@ -276,7 +276,7 @@ end
 
 -- Units on the field before and gone after, with the fighter that downed them. A player-phase
 -- action has one fight: the actor and its target are each other's killer. A unit that left its
--- side for ours (a Talk recruit: the game moves it to a blue slot) did not fall.
+-- side for the player's (a Talk recruit: the game moves it to a blue slot) did not fall.
 local function fallen(before, after, action)
     local now, out, blue = byId(after), {}, {}
     for _, u in ipairs(after.units) do
@@ -320,20 +320,20 @@ end
 --                      a door went unopened in every attempt, silently, as "unreached"
 --   closedBy(x, y, charId, loot)  an act of another side's unit named the tile (a pick:
 --                      a pillage, or a thief's chest), and the item it gained doing so
---   dropped(d)         the game gave one of ours a fallen unit's item (api.drops: its own
+--   dropped(d)         the game gave a player unit a fallen unit's item (api.drops: its own
 --                      BATTLE_HandleItemDrop), d = { from, to, item }
---   fell(charId)       a unit of another side fell to one of ours
+--   fell(charId)       a unit of another side fell to a player unit
 --   joined(party)      the game's party at the end, by charId: a chest whose thief is in it
 --                      came to us with the thief (vanilla Ch3's Colm; Nicolas, 2026-10-30)
 --   dropMissed()       the drop watch's faults: each chest a thief emptied whose thief then
---                      fell to one of ours with no drop of that item caught. popup.c marks the
+--                      fell to a player unit with no drop of that item caught. popup.c marks the
 --                      thief US_DROP_ITEM, so the game gave it: the watch missed it.
 --                      { kind = "drop_missed", x, y, thief, item }; the record's
 --                      `watch_faults` adds the death watch's, { kind = "death_unread", why,
 --                      charId, faction, turn, phase }
 --   missing()          the clean clear's rewards part: each tile not taken, { x, y, kind,
 --                      why = its status, closed_by }. Taken = visited, or a chest whose
---                      thief the game then made drop that chest's item to one of ours
+--                      thief the game then made drop that chest's item to a player unit
 --                      (popup.c sets US_DROP_ITEM on the thief), or whose thief joined us
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
@@ -654,7 +654,7 @@ function M.run(api)
         end
         if api.trace then api.trace(ev) end
     end
-    -- each full-bag answer the harness gave, and each drop the game gave one of ours, since
+    -- each full-bag answer the harness gave, and each drop the game gave a player unit, since
     -- the last look (api.bag, api.drops)
     local function bagged()
         for _, b in ipairs(api.bag and api.bag() or {}) do

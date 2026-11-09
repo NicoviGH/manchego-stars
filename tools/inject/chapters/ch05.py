@@ -188,10 +188,10 @@ CH05_WAVE_TABLES = {2: 'MS_Ch05Wave2', 6: 'MS_Ch05Wave6', 8: 'MS_Ch05Wave8'}
 # ── The two-stage ch05 recruit (#25): Basil joins in the OPENING, then Talks Sahnar ──────
 # Vanilla Ch5's Character list is exactly ONE entry -- CHAR(EVFLAG_TMP(7), ..., NATASHA, JOSHUA)
 # -- because its escort is already a party member (Natasha is BLUE in UnitDef_Event_Ch5Ally) and
-# only the DUELIST needs talking down. Ours is the same single entry, and Basil reaches the same
-# state by a different road: she is recruited IN this chapter, so she cannot ride the prep
-# roster (_classed_cast(available_at=5) excludes her). She is LOADed GREEN instead and CUSA'd
-# BLUE by the opening's own join beat -- basil.md Q3, and the locked 0x9C2 ("...I wonder.
+# only the DUELIST needs talking down. Manchego Stars' list is the same single entry, and Basil
+# reaches the same state by a different road: she is recruited IN this chapter, so she cannot ride
+# the prep roster (_classed_cast(available_at=5) excludes her). She is LOADed GREEN instead and
+# CUSA'd BLUE by the opening's own join beat -- basil.md Q3, and the locked 0x9C2 ("...I wonder.
 # Sahnar. ...She needs me. Take me to her?"), whose trigger is chapter_start, NOT a Talk.
 # So: no CHAR entry for Basil. One CHAR entry, Basil -> Sahnar, exactly like the twin.
 CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mouth. NOT one of
@@ -209,7 +209,8 @@ CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mo
 # would have played Pinky and Marty discussing supper. Reading an UNWRITTEN vanilla id as a
 # placeholder is fine and we do it (the reliquary visits, and the Talk below); reading one another
 # chapter WRITES is not -- that distinction is the whole reason the registry exists.
-CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'   # ours (declare_event_script), not a squatted
+# Manchego Stars' own (declare_event_script), not a squatted vanilla script
+CH05_SAHNAR_TALK_SCRIPT = 'MS_Ch05SahnarTalk'
 CH05_SAHNAR_TALK_FLAG = 'EVFLAG_TMP(7)'   # vanilla Ch5's own Natasha->Joshua CHAR flag, free
                                           # here: ch05's villages use 9..12, and Misc uses 13
                                           # for the arena tutorial.
@@ -705,7 +706,8 @@ def assert_green_recruit_placement(chap, maps_dir, stem, pos, mov_table, who, mu
 
 
 #  The character id AI_A_07 refuses to attack, and the vanilla list it lives in. Vanilla names
-#  the constant for its one and only occupant; ours is the same shape with our escort in it.
+#  the constant for its one and only occupant; Manchego Stars' list is the same
+#  shape with our escort in it.
 ESCORT_SAFE_AI_LIST = 'gUnknown_085A8A00'
 ESCORT_SAFE_AI_INDEX = 0x7          # gAi1ScriptTable[AI_A_07] = gAiScript_ActionInRange_ExceptNatasha
 
@@ -797,10 +799,10 @@ def ch05_eruption_message(chap):
 def ch05_ravisin_taunt_message(chap):
     """Ravisin's one locked battle taunt -- the line she says when the fight starts.
 
-    The ``vanilla 0x9C7`` label cites Saar's own taunt, which ours is the twin of with one word
-    swapped (empire -> Frostmaiden); ch05 writes the body into its own Ch6 host block. Vanilla
-    seats Saar on [OpenMidLeft] for 9C7, and a battle quote draws over the combat screen with
-    nobody opposite her, so the mined seat carries over unchanged.
+    The ``vanilla 0x9C7`` label cites Saar's own taunt, which Manchego Stars' taunt is the twin of
+    with one word swapped (empire -> Frostmaiden); ch05 writes the body into its own Ch6 host block.
+    Vanilla seats Saar on [OpenMidLeft] for 9C7, and a battle quote draws over the combat screen
+    with nobody opposite her, so the mined seat carries over unchanged.
     """
     return boss_quote_message(chap, 'boss_battle', 'ravisin', GUEST_PORTRAIT_MAP['ravisin'],
                               CH05_RAVISIN_TAUNT_MSG, 1)
@@ -820,10 +822,10 @@ def ch05_sahnar_talk_messages(chap):
     """Render the locked Basil->Sahnar Talk recruit -- the chapter's payoff -- from the YAML.
 
     The event's ``vanilla 0x9CC`` label cites the scene we MINE (vanilla's own Natasha->Joshua
-    recruit, which ours is the twin of). It is not the destination: the caller stores this at
-    CH05_SAHNAR_TALK_MSG in ch05's Ch6 host block. Until this landed the id WAS 0x9CC, and the
-    placeholder read as a bug rather than as prose -- our two speakers wear the Artur and Marisa
-    slots, so vanilla's scene played its own faces and its own words at them.
+    recruit, which Manchego Stars' scene is the twin of). It is not the destination: the caller
+    stores this at CH05_SAHNAR_TALK_MSG in ch05's Ch6 host block. Until this landed the id WAS
+    0x9CC, and the placeholder read as a bug rather than as prose -- our two speakers wear the Artur
+    and Marisa slots, so vanilla's scene played its own faces and its own words at them.
 
     STAGING is the two-shot ch04's parley already uses, and for the same reason: the RECRUITER
     holds mid-left (the party's side) and the unit being turned holds mid-right, so the exchange
@@ -990,8 +992,8 @@ def ch05_sahnar_alone_message(chap):
 
     Rendered at the talk bubble's budget. That is the twin's channel
     taken whole: vanilla plays its 0x9C3 as a bare `TEXTSHOW` over the map with Joshua standing
-    on this same tile. Until 2026-08-14 ours could not, because Sahnar did not exist on the
-    field until the turn-2 eruption; the scene-3 summon is what put her there.
+    on this same tile. Until 2026-08-14 Manchego Stars could not, because Sahnar did not exist on
+    the field until the turn-2 eruption; the scene-3 summon is what put her there.
     """
     slot, msg, boxes, what = CH05_SAHNAR_ALONE_SLOT
     _script, body = _ch05_opening_scene(
@@ -1090,17 +1092,17 @@ def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position, station):
     No `FADU` of its own -- scene 5 already brought the screen up after the prep prologue's
     fade to black, and this beat follows it in the same event list without going dark between.
 
-    This is also where `arrives_turn: 2` stopped being ours (#25, Nicolas 2026-08-14): Sahnar
-    is on the map from turn 1, exactly as vanilla's Joshua is, and the eruption keeps its six
-    reinforcements without her.
+    This is also where `arrives_turn: 2` stopped being a Manchego Stars divergence (#25, Nicolas
+    2026-08-14): Sahnar is on the map from turn 1, exactly as vanilla's Joshua is, and the eruption
+    keeps its six reinforcements without her.
 
     THE `CAMERA` IS NOT DECORATION AND WAS MISSING UNTIL 2026-08-14. `CUMO_AT` draws a cursor
     and nothing else -- `EventDisplayCursor_Loop` calls `PutMapCursor` and returns -- so this
     beat was framed by whatever `LOMA` happened to leave, which is the map's north-west and
     happens to hold the arena. It looked right on film and was resting on an accident: anything
     that moved the reload origin would have played the scene off-screen with no error anywhere.
-    Vanilla pairs the two here too (`CAMERA(0, 0)` ahead of its own `CUMO_AT(12, 6)`), and ours
-    now names the tile it actually wants rather than inheriting a corner.
+    Vanilla pairs the two here too (`CAMERA(0, 0)` ahead of its own `CUMO_AT(12, 6)`), and
+    Manchego Stars' scene now names the tile it actually wants rather than inheriting a corner.
     """
     _slot, msg, _boxes, what = CH05_SAHNAR_ALONE_SLOT
     (x, y), (gx, gy) = station
@@ -1332,11 +1334,11 @@ def ch05_basil_join_block(basil_char):
 
     Vanilla puts this beat's twin (0x9C2) BEFORE its prep CALL and we cannot, which is the one
     place ch05's inherited channel had to be overruled. Vanilla LOAD1s Eirika's group onto the
-    street first, so its street scenes have a party to play to; ours arrives through Pick Units
-    (the ally table is never LOADed on a prep chapter -- decisions.md "How the deploy cap + prep
-    screen are actually wired"), so before the CALL the field holds sixteen risen dead, Ravisin,
-    and a green shrub addressing an empty pocket. After it, the nine the player chose are
-    standing at the stair-foot and Basil is at the pocket's mouth two tiles above them.
+    street first, so its street scenes have a party to play to; the Manchego Stars party arrives
+    through Pick Units (the ally table is never LOADed on a prep chapter -- decisions.md "How the
+    deploy cap + prep screen are actually wired"), so before the CALL the field holds sixteen risen
+    dead, Ravisin, and a green shrub addressing an empty pocket. After it, the nine the player chose
+    are standing at the stair-foot and Basil is at the pocket's mouth two tiles above them.
 
     The shape is then vanilla's own after-prep block, which is what its 0x9C3/0x9C4 are:
     `FADU(16)` -- the shared prep prologue fades to black and leaves it there, so anything
@@ -1472,7 +1474,7 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
             '    MUSC(SONG_TENSION)\n'
             + lupin_load
             # The BACKDROP half (#25): scenes 1-4, before the party arrives and before there is
-            # any map of ours to stand on. Vanilla Ch5 opens the same way.
+            # any Manchego Stars map to stand on. Vanilla Ch5 opens the same way.
             + ch05_opening_backdrop_block() +
             '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
             '    LOMA(0x%X) /* RestartBattleMap -- build the ch05 map fresh */\n'
@@ -1797,7 +1799,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         chap, next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')))
     repoint_escort_safe_ai_list(basil_char, 'Basil (ch05 escort)')
 
-    # 3. Wire ours into the host slot's event group; every list not named here is written empty.
+    # 3. Wire the Manchego Stars lists into the host slot's event group; every list not named here
+    # is written empty.
     turn_rows = ''.join(
         '    TurnEventPlayer(0, %s, %d) /* eruption wave: %d */\n'
         % (CH05_WAVE_SCRIPTS[turn], turn, wave_counts[turn])

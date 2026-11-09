@@ -44,7 +44,8 @@ PROLOGUE_GUEST_SPRITES = [
 # can bind on them. ch01/ch02/ch03 keep the ids their donors already gave them (measured by running
 # the injector -- HEAD and the working tree both lie about post-injection goal ids); only ch04 had
 # to move, because its donor IS ch02's host slot.
-CH01_GOAL_WINDOW_MSG = 0x19F     # vanilla slot 1's seize window ("Seize camp" is ours)
+# vanilla slot 1's seize window ("Seize camp" is Manchego Stars' text)
+CH01_GOAL_WINDOW_MSG = 0x19F
 CH01_GOAL_STATUS_MSG = 0x1A3
 CH01_BOSS_SLOT = 'BREGUET'   # vanilla Ch1's boss slot: CA_BOSS + hand-authored
 # Scenic BG the lord-select menu plays over (NOT the battle map). A standalone "choose
@@ -193,7 +194,8 @@ CH04_MOOSE_PID = '0xce'                         # its own pid (DISA targets it, 
 # The Marty->Lupin parley took the recruit village's JOB, so for the whole slice (1,11) stood on
 # visitable terrain with no Location entry -- FE8 offers Visit off the location event, so the
 # player saw a cottage they could not enter (#24). Vanilla's own text there is pure Lute recruit
-# dialogue (9B2/9B3/9B4, zero lore), so there was nothing to copy and the line is ours.
+# dialogue (9B2/9B3/9B4, zero lore), so there was nothing to copy and the line is Manchego Stars'
+# own.
 #
 # Each village needs its OWN script and message slot -- two doors sharing one script show the
 # same line at both and run the give-item tail twice. Keyed by the YAML's village `id`, so a
@@ -233,12 +235,12 @@ CH05_SAHNAR_TALK_MSG = 0x9E8     # the TALK-RECRUIT scene, the chapter's payoff.
                                  # vanilla 0x9CC and into ch05's OWN host block (2026-08-13,
                                  # dialogue-pass), which is what the placeholder note there always
                                  # said to do. 0x9CC held vanilla's Natasha->Joshua recruit -- the
-                                 # exact scene ours is the twin of, so it read as a legitimate
-                                 # placeholder on paper and as a BUG on screen: Basil wears the
-                                 # Artur slot and Sahnar the Marisa slot, while 0x9CC loads
-                                 # Natasha's and Joshua's faces and speaks their words. What the
-                                 # player actually saw was Hlin Trollbane's bust (dressed onto the
-                                 # Natasha slot) talking to vanilla Joshua. First free id in the
+                                 # exact scene the Manchego Stars one is the twin of, so it read as
+                                 # a legitimate placeholder on paper and as a BUG on screen: Basil
+                                 # wears the Artur slot and Sahnar the Marisa slot, while 0x9CC
+                                 # loads Natasha's and Joshua's faces and speaks their words. What
+                                 # the player actually saw was Hlin Trollbane's bust (dressed onto
+                                 # the Natasha slot) talking to vanilla Joshua. First free id in the
                                  # block; 0x9E9..0x9F3 remain for the opening and endings.
 # ...and the no-Lupin arm's id. 0x9D1 is vanilla Ch5's TUTORIAL text (EventScr_089F231C),
 # reachable only from EventListScr_Ch5_Tutorial -- which inject_ch04 zeroes along with the other
@@ -252,8 +254,8 @@ CH05_SAHNAR_TALK_NO_LUPIN_MSG = 0x9D1
 # (HOSTED_CHAPTER_MESSAGE_IDS). ch05's authored dialogue skips this range exactly (it runs
 # 0x9BE..0x9CC then jumps to 0x9D5), so nothing collides.
 #
-# WRITTEN 2026-08-08 (dialogue-pass): the four bodies are ours now, at these same ids, and the
-# ids are CLAIMED in HOSTED_CHAPTER_MESSAGE_IDS. Writing outside ch05's own host block is
+# WRITTEN 2026-08-08 (dialogue-pass): the four bodies are Manchego Stars' now, at these same ids,
+# and the ids are CLAIMED in HOSTED_CHAPTER_MESSAGE_IDS. Writing outside ch05's own host block is
 # deliberate and safe, which is worth stating because the registry's whole point is that it
 # usually is NOT: 0x9CD..0x9D0 are vanilla Ch5's village lines, and the only scripts that ever
 # displayed them are `EventScr_089F2170` (which inject_ch04 REPLACES for its forest cottage) and
@@ -334,13 +336,13 @@ CH05_ARRIVAL_NO_LUPIN_MSG = 0x9ED
 # ── Scene 5 (#25): Basil trundles up, cracks the tourist joke, and JOINS ─────────────────────
 # The opening's FIRST on-map beat, so it wraps at the talk bubble's budget
 # -- and the one scene whose PLACEMENT does not inherit from the twin. Vanilla plays its 0x9C2
-# BEFORE the prep CALL, but it can: it LOAD1s its speaking party onto the street first. Ours is
-# placed BY prep (the ally table is never LOADed on a prep chapter -- decisions.md "How the deploy
-# cap + prep screen are actually wired"), so before the CALL the field holds the risen line,
-# Ravisin, and a green shrub with nobody to be talking to. The beat therefore plays AFTER prep, in
-# vanilla's own after-prep shape (FADU(16) -> CUMO -> STAL -> CURE -> TEXTSTART, which is exactly
-# what its 0x9C3/0x9C4 do) -- and it lands adjacent to the CUSA that was already there, so the ask
-# and the flip are one beat rather than two across a screen.
+# BEFORE the prep CALL, but it can: it LOAD1s its speaking party onto the street first.
+# Manchego Stars' party is placed BY prep (the ally table is never LOADed on a prep chapter --
+# decisions.md "How the deploy cap + prep screen are actually wired"), so before the CALL the field
+# holds the risen line, Ravisin, and a green shrub with nobody to be talking to. The beat therefore
+# plays AFTER prep, in vanilla's own after-prep shape (FADU(16) -> CUMO -> STAL -> CURE ->
+# TEXTSTART, which is exactly what its 0x9C3/0x9C4 do) -- and it lands adjacent to the CUSA that was
+# already there, so the ask and the flip are one beat rather than two across a screen.
 CH05_BASIL_JOIN_SLOT = ('vanilla 0x9C2', 0x9EE, 3,
                         'Basil trundles up, cracks the tourist joke, joins')
 CH05_BASIL_JOIN_NO_LUPIN_MSG = 0x9EF
@@ -428,11 +430,12 @@ CH05_ENDING_MSGS = {                       # was Sahnar recruited? -> message id
 # when she was recruited (the YAML's "NOT NESTED" note), and there is no Lupin axis, so this
 # scene has nothing left to branch on at all.
 CH05_ENDING_LOST_MSG = 0x9F3               # the host block's last free id
-                                                 # 6 and 7 are both ours now (ch03 and ch05 took
-                                                 # them); 0 is the prologue's and read-only. There
-                                                 # is no convention to follow here -- the donor is
-                                                 # storage, and any clean slot of the right
-                                                 # windowDataType does (Nicolas, 2026-09-03).
+                                                 # 6 and 7 are both Manchego Stars' now (ch03 and
+                                                 # ch05 took them); 0 is the prologue's and
+                                                 # read-only. There is no convention to follow here
+                                                 # -- the donor is storage, and any clean slot of
+                                                 # the right windowDataType does (Nicolas,
+                                                 # 2026-09-03).
 # ch06's message block is vanilla Ch7's own dead ids (HOSTED_CHAPTER_MESSAGE_BLOCKS), which
 # fall dead the moment the event lists and the beginning scene below are rewritten. The goal
 # pair takes the block's LAST two ids, as ch05's does. New scenes take no block id at all: they
@@ -462,8 +465,8 @@ CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'
                        'boat-west': appended_message_id('ch06', 'boat-west-name')}
 # The boarding pass (#26): any party member Talks a hull, one Talk entry per (PC x boat) and every
 # entry for a boat sharing that boat's ONE flag, so the first boarding shuts the rest. Flags 9/10:
-# slot 7's lists are all ours, and the Turn list's wave rides flag 0. The scenes are our own `MS_`
-# scripts and their messages are appended (inject/message_alloc.py).
+# slot 7's lists are all Manchego Stars', and the Turn list's wave rides flag 0. The scenes are our
+# own `MS_` scripts and their messages are appended (inject/message_alloc.py).
 CH06_BOAT_TALK_FLAGS = {'boat-east': 'EVFLAG_TMP(9)', 'boat-west': 'EVFLAG_TMP(10)'}
 # Which hull came home, set by the ending for ch07's docks opening to fork on (Grynsk, Tali,
 # both or neither). PERMANENT flags (ids >= 101 ride the save across the chapter break), next to
