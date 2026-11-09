@@ -9,10 +9,11 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, night (Claude): **T100c merged (PR #586, f5207a52)**, every review
-finding fixed. Same
-play as frozen; the recorder drops 86 phantom enemy acts, keeps `trapped` acts, fixes one stale
-`from`; refrozen without an override (`986bb37beebe+v2`). Next: T100e.
+Refreshed 2026-11-09, late (Claude): **T100e is PR #587**, every review finding fixed, CI green,
+ready; **waiting on Nicolas's "merge"**. A chapter cell now plays K starts an arm, each from its
+own New Game campaign (`montecarlo.py starts`, `cell`/`pilot --chapter N --starts K`). Refrozen
+on `ce1e3adb8c57+v2` (identical play). **The first starts found that no Manchego Stars campaign
+gets past ch02** (#510 comment 6751678084): Nicolas's call.
 
 ## Where things stand
 
@@ -40,7 +41,7 @@ play as frozen; the recorder drops 86 phantom enemy acts, keeps `trapped` acts, 
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
-  - **Frozen suite** (instrument `01d1ea0ad925+v2`, PR #585's head): 14 starts, 56 runs, 25 min
+  - **Frozen suite** (instrument `ce1e3adb8c57+v2`, PR #587's head; same play as #585's): 14 starts, 56 runs, 25 min
     wall on 8 workers, 2,490,781 `AiDecideMain` calls (SC-003's baseline; the jump from 567,629
     is T100b's counter branches, accepted by Nicolas); every run has a game result; 4 of 28
     held-out runs lost. A bot change makes a new instrument: run `suite --held-out` and read its
@@ -67,25 +68,36 @@ play as frozen; the recorder drops 86 phantom enemy acts, keeps `trapped` acts, 
 
 ## Next
 
-1. **T100b is merged** (PR #585). Known, do not re-derive: vanilla-ch5/1001's Lute (0x0C)
-   death is a fog death (`unrevealed_killer`, read 0.0%); vanilla-ch5/1002's Natasha (0x0D) is
-   honest risk the old bot survived on a 93% roll. Both are in the frozen baseline now.
-2. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
-   held-out counts, the pilot's ours-vs-twin numbers), crashes, stalls and cost. Proposed, not
-   decided: make a tuning-seed death flip a thing to read, not a promotion gate (ADR 0395); log
-   the over-cap order question (game over strictly first) on #510 as open, not blocking.
-3. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
-   #547 on #547). Ours ch03's boss: 36 HP vs Bazba's 25, hits our army for a mean 14 (up to 16)
-   vs Bazba's 8.6 on vanilla's, same throne heal. Stop chasing ch03 deaths in the bot.
-4. Then, on #510's plan comment 6563384310 (T100c done; PR #586 holds its evidence): T100e
-   (several starts per chapter cell, each its own campaign), then T100-T108 and PR-J, then #510
-   step 10.
-5. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
+1. **Merge PR #587 (T100e) on Nicolas's word**, then tick T100e on #510's plan comment
+   6563384310 (its design bullet sits under it).
+2. **Nicolas's call: Manchego Stars ch02** (#510 comment 6751678084). All 10 starts campaigns
+   (120 attempts) won ch02 and lost both green chwinga, Rime Spark (0xC9) and Snow Mote (0xCA),
+   mostly by turn 3, so none cleared clean and Manchego Stars has no starts past ch02. Either
+   ch02 is too hard, or a green ally's death should not hold a campaign back. Vanilla stopped at
+   Ch5x in 7 of 10 (both chests at 4,8 and 5,8 never reached: a bot gap), so its Ch6-Ch7 twins
+   have no starts either. Cells today: ch00-ch02 only.
+3. **Next PR after #587: instructions out of memory.** Nicolas (2026-11-09): standing rules are
+   instructions, not memory. Move the 11 project rules still in auto memory (tooling speed, no
+   loose threads, no tidy design rules, notes on issues, one design comment, post-ch07 drafts,
+   story after Revel's End, proof runs, north star, subagents in the foreground, Manchego Stars
+   not "ours") into the project CLAUDE.md, delete those memories, and add a `check.py` check
+   that fails prose naming the game "ours" (about 460 lines in `tools/` and 39 in docs outside
+   the ADRs; quoted code ids allowed; ADRs and transcripts exempt, as the dead-concepts check).
+4. **Then: `story` and reports name Manchego Stars units by their chapter.** `montecarlo._names`
+   knows only PCs and guests, so a chapter unit on a reused vanilla slot prints the vanilla name
+   (0xC9 printed "Klimt"; it is ch02's Rime Spark, `tools/inject/chapter_ids.py`). Until then,
+   name a Manchego Stars ID from `chapter_ids.py` and the chapter YAML, never `characters.h`.
+5. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
+   held-out counts, the pilot's Manchego Stars-vs-twin numbers), crashes, stalls and cost.
+   Proposed, not decided: make a tuning-seed death flip a thing to read, not a promotion gate
+   (ADR 0395); log the over-cap order question (game over strictly first) on #510 as open.
+6. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
+   #547 on #547). Stop chasing ch03 deaths in the bot.
+7. Then, on #510's plan comment: T100-T108 and PR-J, then #510 step 10.
+8. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
    `considered[].dies`, is worth porting), `feat/510-t100a-r`, `feat/510-lookahead-between-turn`
    (honest turn-between: right numbers, 4.6x cost), `park/510-t100a-pullback`.
-6. Tell Nicolas where step 9 stands in plain words at the start of a session. **When a log
-   gives a character ID, name it from `fireemblem8u/include/constants/characters.h` and add
-   nothing you have not read** (this session called Lute a Pegasus Knight from memory).
+9. Tell Nicolas where step 9 stands in plain words at the start of a session.
 
 ## Parked or owed elsewhere
 
