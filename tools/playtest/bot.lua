@@ -20,7 +20,8 @@
 --              0 = it cannot strike (x, y) this turn;
 --            attack(unit, target, x, y, slot) -> sight.lua's (Sight.attackOf): the window's
 --              numbers, and as the game plays it: kill, die, sure, expected, counterWorst,
---              dealt, counterDist | nil (out of range);
+--              dealt, counterDist, joint (the two together: { { p, dealt, back } }; a fake
+--              may leave it out) | nil (out of range);
 --            strike(unit, enemy, x, y) -> sight.lua's (Sight.strikeOf): the enemy's own strike
 --              on `unit` standing on (x, y), on its phase, as its AI makes it and the game
 --              plays it: takenDist, takenWorst; nothing taken when it does not strike there;

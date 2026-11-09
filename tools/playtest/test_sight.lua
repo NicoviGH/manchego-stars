@@ -107,6 +107,11 @@ do
     check(math.abs(d[5] - hit * (1 - crit)) < 1e-12, true, "played: the plain hit's")
     check(math.abs(d[0] - (1 - hit)) < 1e-12, true, "played: the miss's")
     check(math.abs(b[3] - 1) < 1e-12, true, "played: the sure counter in every outcome")
+    local _, _, joint = Sight.exchangeOf(leaves)
+    local pairsSeen = {}
+    for _, x in ipairs(joint) do pairsSeen[#pairsSeen + 1] = x.dealt .. ":" .. x.back end
+    check(table.concat(pairsSeen, " "), "0:3 5:3 15:3", "played: the joint pairs, dealt then back")
+    check(math.abs(joint[1].p - (1 - hit)) < 1e-12, true, "played: a pair's chance is its leaf's")
     check(at[S.BattleRoll1RN] == nil and at[S.BattleRoll2RN] == nil, true,
           "played: the breakpoints are cleared")
 end

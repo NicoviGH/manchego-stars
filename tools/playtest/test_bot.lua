@@ -322,11 +322,25 @@ local function attackPlayed(f, uHp, tHp)
     local back = f.counters and Sight.damage(blowsOf(f.counterHit, f.counterDmg, f.counterHits,
                                                      f.counterCrit, 1 - kill), uHp)
         or { [0] = 1 }
+    -- the exchange's pairs: our blows, then the counter only where they left the target
+    -- standing (the fixtures' one-blow exchanges are played in that order)
+    local leaves = {}
+    local whole = f.counters and Sight.damage(blowsOf(f.counterHit, f.counterDmg, f.counterHits,
+                                                      f.counterCrit), uHp) or { [0] = 1 }
+    for d, pd in pairs(dealt) do
+        if d >= tHp then
+            leaves[#leaves + 1] = { p = pd, dealt = d, back = 0 }
+        else
+            for b, pb in pairs(whole) do leaves[#leaves + 1] = { p = pd * pb, dealt = d, back = b } end
+        end
+    end
+    local _, _, joint = Sight.exchangeOf(leaves)
     return Sight.attackOf({ hit = f.hit, dmg = f.dmg, crit = f.crit, hits = f.hits,
                             counter = { armed = f.counters, hit = f.counterHit,
                                         dmg = f.counterDmg, crit = f.counterCrit,
                                         hits = f.counterHits },
-                            killsTarget = f.killsTarget, dealt = dealt, back = back }, tHp, uHp)
+                            killsTarget = f.killsTarget, dealt = dealt, back = back,
+                            joint = joint }, tHp, uHp)
 end
 -- A fixture's enemy strike (sight.strike's, or one of sight.enemyPhase's), played on a unit
 -- at `hp`; one already carrying takenDist is left as it is.
@@ -2050,6 +2064,45 @@ do
     }
     local a = Planner.plan(B, boardOf(A, E1, E2), sight, style("careful"))
     check(a and a.targetId, 0x81, "planner: the kill")
+end
+
+-- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, ours ch03 turn 11):
+-- A (12 HP) strikes E (9 HP): a hit kills it, a miss lets E's counter take 9. F's AI strikes A
+-- only when A is on 4 HP or less, and its blow kills him there. On A's mean HP after the
+-- counter, F passes him by and the attack reads safe; on the 3 HP the miss-and-counter leaves,
+-- F kills him. Careful's cap is 1%: it holds rather than strike, and the plan says why.
+local function counterWays()
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local E = red(0x81, 1, 0, { hp = 9 })
+    local F = red(0x82, 5, 5, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 60, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 9,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.hp <= 4 then
+                    return { { target = 0x01, enemy = 0x82, takenHit = 100, takenDmg = 4,
+                               takenHits = 1, takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    return boardOf(A, E, F), sightOf(o)
+end
+do
+    local board, sight = counterWays()
+    local a, rec = Planner.plan(B, board, sight, style("careful"))
+    check(a and a.act, "wait", "counter ways: careful does not strike into the miss-and-counter death")
+    local risk
+    for _, c in ipairs(rec and rec.considered or {}) do
+        if c.rank.key:find(">attack@") then risk = c.rank.max_die end
+    end
+    local miss = 1 - Sight.rollChance(2, 60)
+    check(risk and math.abs(risk - miss) < 1e-9, true,
+          "counter ways: the attack reads the miss's chance, the way the counter kills by F")
 end
 
 -- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field toward a
