@@ -164,3 +164,10 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
     killed earlier play cannot leave it a start it never reached.
   - `replay` finds a cell run's start by its id (`cs-s<seed>/<chapter>`), as it finds a
     suite run's.
+  - **The first starts (2026-11-09, #510 comment 6751678084).** Ten campaigns a game on seeds
+    4001-4010: ch00-ch02 have 10 starts in both games; ch03-ch05 have 0 Manchego Stars starts
+    and 8, 7, 7 vanilla ones; ch06-ch07 have none. Every Manchego Stars campaign stopped at
+    ch02: all 120 attempts won and lost both green chwinga. Seven vanilla campaigns stopped at
+    Ch5x, every attempt missing its two chests. Making them took 27 and 63 minutes wall on 4
+    workers each. The stop at the last start made a new instrument (`ce1e3adb8c57+v2`); the
+    suite played it identically (2,490,781 calls, no regressions) and it was refrozen.
