@@ -2137,7 +2137,48 @@ do
     check(healed, true, "heal after a counter death: the attack-then-heal plan is judged")
     local low = 12
     for _, hp in ipairs(seen) do low = math.min(low, hp) end
-    check(low, 12, "heal after a counter death: A never stands on the heal the counter's death denies")
+    check(low, 12,
+          "heal after a counter death: A never stands on the heal the counter's death denies")
+end
+-- the same with the counter left to the average (BRANCH = 0, PR #585 re-review): the phase
+-- strikes A for 6 wherever A stands. Only a miss lets the counter kill A, and that death is
+-- the counter's; the phase strikes only an A the counter left standing, healed, and kills
+-- none. A's death in the attack-then-heal plan is the miss's chance once, never the phase's
+-- again on an HP the heal gave a dead unit.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 1, 0, { hp = 9 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["0,1"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 60, dmg = 12, hits = 1, counters = true,
+                                                   counterHit = 100, counterDmg = 12,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then
+                    return { { target = 0x01, takenHit = 100, takenDmg = 6, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local saved = Planner.BRANCH
+    Planner.BRANCH = 0
+    local ok, a, plan = pcall(Planner.plan, B, boardOf(A, H, E), sightOf(o), style("bold"))
+    Planner.BRANCH = saved
+    check(ok, true, "averaged counter: the plan is made" .. (ok and "" or (": " .. tostring(a))))
+    local die
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local k = table.concat(c.acts, " ")
+        if k:find("1>attack@") and k:find("2>staff@") then die = c.rank.max_die end
+    end
+    local miss = 1 - Sight.rollChance(2, 60)
+    check(die and math.abs(die - miss) < 1e-9, true,
+          "averaged counter: A dies on the miss alone (" .. tostring(die) .. " vs " .. miss .. ")")
 end
 
 -- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field toward a
@@ -2713,6 +2754,38 @@ do
     end
     check(on["0,0"], true, "safest strike: the likelier kill is offered")
     check(on["1,1"], true, "safest strike: the strike whose counter cannot kill is offered too")
+end
+-- and the least exposed strike is still offered beside it (PR #585 re-review): from (0,0) the
+-- best kill; from (1,1) no counter can kill but the enemy phase reaches it; from (2,0) a
+-- counter can kill on a miss, and no enemy phase reaches it. All three are offered.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local E = red(0x81, 1, 0, { hp = 10 })
+    local F = red(0x82, 5, 5)
+    local o = {
+        -- F strikes (0,0) from (-1,0) and (1,1) from (1,2); (2,0) is out of its reach
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 1 }, { 2, 0 }),
+                  [0x82] = tiles({ -1, 0 }, { 1, 2 }) },
+        danger = { ["0,0"] = 1, ["1,1"] = 1 },
+        fc = { [0x01] = {
+            [0x81] = {
+                ["0,0"] = fc { hit = 90, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                               counterDmg = 30, counterHits = 1 },
+                ["1,1"] = fc { hit = 40, dmg = 12, hits = 1 },
+                ["2,0"] = fc { hit = 50, dmg = 12, hits = 1, counters = true, counterHit = 100,
+                               counterDmg = 30, counterHits = 1 } },
+            [0x82] = {
+                ["0,0"] = fc { takenHit = 100, takenDmg = 15, takenHits = 1 },
+                ["1,1"] = fc { takenHit = 100, takenDmg = 15, takenHits = 1 } } } },
+    }
+    local on = {}
+    for _, c in ipairs(B.candidates(boardOf(A, E, F), sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.act == "attack" then on[a.move.x .. "," .. a.move.y] = true end
+        end
+    end
+    check(on["0,0"] and on["1,1"] and on["2,0"], true,
+          "safest strike: the best, the counter-safe and the least exposed are all offered")
 end
 
 -- test_planner_chains_the_counter: A (30 HP) strikes the boss for 20; the boss's counter (66,

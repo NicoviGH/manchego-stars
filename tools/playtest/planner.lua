@@ -940,12 +940,14 @@ function M.plan(Bot, board, sight, style, opts)
         end
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
-    -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, hp0? }):
-    -- per id { d (its chance to die), t (HP taken), sh (HP short at the end, when maxhp is
-    -- given), n (strikes) }, and the chance no unit whose death ends the game dies. A unit with
-    -- `back` (our counter's blows on it, from the plan's attack) takes them and the phase as one
-    -- chain on hp0, the HP it had: the phase's share of the death is the chain's less the
-    -- counter's own, which score() already paid.
+    -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, fought?,
+    -- heal? }): per id { d (its chance to die), t (HP taken), sh (HP short at the end, when
+    -- maxhp is given), n (strikes) }, and the chance no unit whose death ends the game dies. A
+    -- unit with `back` (our counter's blows on it, from the plan's attack, left to the average)
+    -- plays each way the counter goes: on `fought`, the HP it struck at, a counter that kills
+    -- it is score()'s death and never the phase's; one that leaves it standing leaves it on
+    -- that HP plus `heal`, what the plan heals it by after, and the phase strikes it there
+    -- (PR #585 re-review: a heal after the counter is no heal for a unit the counter killed).
     local function struckIn(strikes, units)
         local onUnit, res, none = blowsOn(strikes), {}, 1
         for _, u in ipairs(units) do
@@ -953,12 +955,17 @@ function M.plan(Bot, board, sight, style, opts)
             local d, t = odds(phase, u.hp)
             local sh = u.maxhp and (u.maxhp - u.hp) + t
             if u.back then
-                local chain = {}
-                for _, x in ipairs(u.back) do chain[#chain + 1] = x end
-                for _, x in ipairs(phase) do chain[#chain + 1] = x end
-                local all, lost = odds(chain, u.hp0)
-                d = math.max(0, all - (odds(u.back, u.hp0)))
-                sh = (u.maxhp - u.hp0) + lost
+                d, sh = 0, 0
+                for b, pb in pairs(u.back[1]) do
+                    if pb > 0 and b >= u.fought then
+                        sh = sh + pb * u.maxhp
+                    elseif pb > 0 then
+                        local left = math.min(u.maxhp, u.fought - b + u.heal)
+                        local pd, pt = odds(phase, left)
+                        d = d + pb * pd
+                        sh = sh + pb * ((u.maxhp - left) + pt)
+                    end
+                end
             end
             res[u.id] = { d = d, t = t, sh = sh, n = #phase }
             if gameOver[u.charId] then none = none * (1 - d) end
@@ -1073,7 +1080,7 @@ function M.plan(Bot, board, sight, style, opts)
                             -- the HP the counter leaves, on the HP the unit fought at (score's
                             -- act.unitHp, the board's): a counter that kills it there kills it,
                             -- whatever the plan heals it by after; a unit that lives gets the
-                            -- heal (the chain's hp0), never past its max
+                            -- heal (struckIn's `heal`), never past its max
                             local u = byId[o.uid]
                             if u.hp - o.back <= 0 then
                                 n.dead = copy(w.dead)
@@ -1156,16 +1163,19 @@ function M.plan(Bot, board, sight, style, opts)
         local hit = {}
         for _, p in ipairs(planned) do
             local id = p.unit.id
+            local fought = st.fought[id]
             hit[#hit + 1] = { id = id, charId = p.unit.charId, hp = p.hp,
-                              maxhp = p.unit.maxhp or p.hp, back = st.fought[id] and st.fought[id].back,
-                              hp0 = p.unit.hp + (st.healed[id] or 0) }
+                              maxhp = p.unit.maxhp or p.hp, back = fought and fought.back,
+                              fought = p.unit.hp, heal = st.healed[id] or 0 }
         end
         for _, g in ipairs(greens) do hit[#hit + 1] = { id = g.id, charId = g.charId, hp = g.hp } end
         st.phase.hit = hit
         -- per way: a counter it plays struck on the HP it left (no chain: the counter is
         -- already in that HP), a unit the counter killed out of the phase
         local hitOf = {}
-        for i, w in ipairs(ways) do hitOf[i] = inWay(hit, w, function(u) return u.id end, "back") end
+        for i, w in ipairs(ways) do
+            hitOf[i] = inWay(hit, w, function(u) return u.id end, "back")
+        end
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             for _, u in ipairs(hitOf[o.way]) do

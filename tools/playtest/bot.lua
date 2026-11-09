@@ -1543,18 +1543,20 @@ local function proposeOne(ctx, u)
             if t.x == s.x and t.y == s.y then add(action(u, t, "seize"), "seize") end
         end
     end
-    -- per enemy, the best strike and the safest: the safest is the least likely to die, by
-    -- its own counter first (these attacks are `priced`: a counter that can kill is offered,
-    -- ADR 0396), then the enemy phase's worst case. Exposure alone could leave out the one
-    -- strike whose counter cannot kill, so the planner never had it to choose (PR #585 review).
-    local best, safe = {}, {}
+    -- per enemy, three strikes: the best, the least exposed to the enemy phase (`safe`), and
+    -- the least likely to die by its own counter (`guard`, exposure breaking its ties). These
+    -- attacks are `priced` (a counter that can kill is offered, ADR 0396), so either risk can
+    -- be the one that matters; the planner weighs both, and ranking one strike by both would
+    -- drop the other's best (PR #585 review and re-review).
+    local best, safe, guard = {}, {}, {}
     for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         local e = c.target
         if not best[e] or betterAttack(c, best[e]) then best[e] = c end
         c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
-        local s = safe[e]
-        if not s or c.f.die < s.f.die or (c.f.die == s.f.die and c.worst < s.worst) then
-            safe[e] = c
+        if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
+        local g = guard[e]
+        if not g or c.f.die < g.f.die or (c.f.die == g.f.die and c.worst < g.worst) then
+            guard[e] = c
         end
     end
     local function offer(c)
@@ -1563,7 +1565,7 @@ local function proposeOne(ctx, u)
         add(a, "attack")
     end
     for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
-        for _, list in ipairs({ best, safe }) do
+        for _, list in ipairs({ best, safe, guard }) do
             if list[e] then offer(list[e]) end
         end
     end
