@@ -4,8 +4,8 @@
   "tuning": 510426
  },
  "cpu_s": {
-  "held_out": 3744.8,
-  "tuning": 1822.6
+  "held_out": 4077.0,
+  "tuning": 2047.1
  },
  "frozen_on": "2026-11-09",
  "held_out_losses": [
@@ -14,7 +14,7 @@
   "68f164b2935f7ddb",
   "6f1c8d09df958c72"
  ],
- "instrument": "c7088b7a1c1d+v2",
+ "instrument": "eebb8a7ae7c7+v2",
  "manifest_version": 2,
  "tuning": {
   "ours-ch00/1001": {
@@ -235,7 +235,7 @@
   }
  },
  "wall_s": {
-  "held_out": 4328.2,
-  "tuning": 2394.9
+  "held_out": 4473.2,
+  "tuning": 2413.9
  }
 }

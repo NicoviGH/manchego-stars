@@ -388,7 +388,7 @@ Board.HIT_CRIT, Board.HIT_MISS = 1 << 0, 1 << 1
 Board.HIT_FINISHES, Board.HIT_RETALIATION, Board.HIT_END = 1 << 1, 1 << 3, 1 << 4
 
 -- include/types.h UNIT_ACTION_*: what gActionData +11 says an act was, named for the trace.
-Board.ACTION_COMBAT, Board.ACTION_STAFF, Board.ACTION_PICK = 0x02, 0x03, 0x15
+Board.ACTION_COMBAT, Board.ACTION_STAFF, Board.ACTION_PICK, Board.ACTION_TRAPPED = 0x02, 0x03, 0x15, 0x1E
 Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] = "dance",
                   [0x06] = "steal", [0x07] = "summon", [0x08] = "summon", [0x09] = "rescue",
                   [0x0A] = "drop", [0x0B] = "take", [0x0C] = "give", [0x0E] = "talk",
@@ -517,7 +517,7 @@ function Board.bind(mem, SYM)
         ITEM_COUNT = Board.ITEM_COUNT,
         BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
         ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
-        ACTION_PICK = Board.ACTION_PICK,
+        ACTION_PICK = Board.ACTION_PICK, ACTION_TRAPPED = Board.ACTION_TRAPPED,
         AI_DEC = Board.AI_DEC, AI_ACTION_COMBAT = Board.AI_ACTION_COMBAT,
         fate = function(addr, was) return Board.fate(mem, SYM, addr, was) end,
         killer = function(uid, fighting) return Board.killer(mem, SYM, uid, fighting) end,

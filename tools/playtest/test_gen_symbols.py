@@ -58,7 +58,8 @@ SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNS
          'GetROMChapterStruct', 'InitRN', 'RefreshEntityBmMaps', 'AiDecideMain',
          'AiUpdateNoMoveFlag', 'AiInitDangerMap', 'AiClearDecision', 'gAiState', 'gAiDecision',
          'BattleGenerateBallistaSimulation', 'gActiveUnit', 'gActiveUnitId',
-         'NewPopup_GeneralItemGot', 'sProcScr_CombatAction', 'gProcScr_CpPerform', 'EvCheck03_CHAR',
+         'NewPopup_GeneralItemGot', 'sProcScr_CombatAction', 'gProcScr_CpPerform',
+         'CpPerform_BeginUnitMovement', 'EvCheck03_CHAR',
          'EvCheck04_CHARASM', 'CheckForCharacterEvents', 'GetUnitKeyItemSlotForTerrain',
          'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
          'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon']

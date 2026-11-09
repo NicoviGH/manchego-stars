@@ -89,8 +89,9 @@ DEAD_CONCEPTS = [
     # retired by #510 T100c: an enemy act is one gProcScr_CpPerform (harness.lua
     # watchEnemyActs), never a change of gActionData's subjectIndex, which a phase start's heal
     # and status displays also write
-    r'\bsubjectIndex\s+(?:change[sd]?|changing)\b[^.\n]{0,40}\bact\b',
-    r'\bact\b[^.\n]{0,40}\bwhen\s+(?:the\s+)?subjectIndex\s+changes\b',
+    r'\bsubjectIndex\b[^.\n]{0,20}\bchang(?:e[sd]?|ing)\b[^.\n]{0,40}\bacts?\b',
+    r'\bacts?\b[^.\n]{0,60}\bwhen(?:ever)?\b[^\n]{0,30}\bsubjectIndex\b[^.\n]{0,10}\bchang',
+    r'\bacts?\b[^.\n]{0,20}\bkeyed\s+on\b[^\n]{0,20}\bsubjectIndex\b',
     # retired by #510 step 9 PR-H (ADR 0385, built): the verdict is exact Clopper-Pearson bounds on
     # any protected death at every look; exact McNemar, the Haybittle-Peto early bar and the
     # score intervals it reported with are gone, and a cell no longer counts clean clears
