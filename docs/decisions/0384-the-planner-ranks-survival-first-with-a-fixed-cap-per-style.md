@@ -87,6 +87,14 @@ admission; for plans over the cap, the chance of a game over (amended below), la
 summed excess, largest death chance, then the admitted order; for admitted plans, `value` (the
 judged score), standing in for (4) until PR-D; then largest death chance, summed death chance,
 HP left, and the plan's acts as a key.
+**Amended 2026-11-08 (#510 T100b):** a counter that can leave our attacker on more than one HP
+is branched as an uncertain kill is, within the same `M.BRANCH`, and the enemy phase is played on
+the HP each way leaves. On its mean HP the AI chose targets from an HP that never happens: ours
+ch03, Wolfram missed, was countered to 3 HP, read 0% and died (careful turns 11 and 16). Where a
+unit's blow is the only one on its target, the exchange's own pairs (`sight`'s `joint`) are
+played, so a counter is played only where the blow did not kill first. Pilot: careful lost
+someone in 0 of 18 runs (was 19 of 19), at 2,879 CPU s (main ~3,089). Over the cap, plans are
+ranked on the next phase first (ADR 0389's amendment of the same day).
 A plan chosen with none under the cap carries `fallback = "FALLBACK_SACRIFICE"`, which botrun
 records as one `fallback_sacrifice` anomaly a turn (`plans` counts the turn's fallback plans,
 `max_die` the most any of them accepted).

@@ -133,3 +133,23 @@ it nor the 32-call cap, so every change below is the two together.
     labelled fallback. The unlabelled ones, which the earlier measures' "over the cap at 0"
     counted, stay at 0.
   - `fallback_sacrifice` labels rise from 22 to 29.
+
+**Amended 2026-11-08 (Nicolas kept it, #510 T100b): over the cap, the next phase ranks first.**
+The second phase's chances were checked against what happened over every ours-ch03 pilot trace
+(#510 plan comment 6563384310, under T100b): the next phase's were about right (20.4 deaths
+expected, 18 seen), but a unit read safe on the next phase and 70-94% on both died 0 of 8
+times, where about 7 were expected. The hold has it stand where the plan leaves it another
+round, and the bot never plays that hold. Ranked on both phases, careful seed 3010 turn 18 sent
+Prof. R.B. Geenius to an 82% death to avoid another unit's second-phase 90%; the replay with
+him holding (`replay --mode force`) lost no one. So, when no plan is under the cap,
+`M.outranks` reads the chance of a game over, the largest and the summed excess on the next
+phase first (`first_*`, kept by the first `admit`; a protected unit's `first`), and the
+two-phase ones only to break their ties. Admission still reads both phases: the second phase
+keeps the cap from admitting a plan it sees go wrong.
+- **Pilot (ours ch03 vs vanilla Ch3, 50 pairs):** Geenius lives in both games he died in, and
+  ours still loses someone in 21 of 50. Every death left is a next-phase reading of 80%+ on a
+  turn where every judged plan read 65%+ on the next phase: the boss fight, not the order. CPU
+  3,085 s (main ~3,089).
+- **Not done:** an honest turn between the phases (this planner's own plan on the board the
+  first phase leaves) made the numbers right but cost 4.6x and played worse (the plan comment).
+  The hold stays, as decided above.
