@@ -9,10 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, early (Claude): **the ch03 question is answered** (Nicolas: "we have our
-answer"). Ours ch03 is harder than vanilla Ch3 because of its boss, not the bot and not a missing
-Seth. Three bot fixes are kept on a local branch, but the frozen suite refuses them: 4.6x the
-AI calls, and 5 regressions. Next: find which commit costs the calls.
+Refreshed 2026-11-09, midday (Claude): **ship the T100b branch** (Nicolas: "push it and move
+on"). T100b's counter branches cost the 4.6x calls (Nicolas accepts the cost: the suite is rarely
+re-run). A new fix, the replan judges the rest of the plan in hand, cleared 3 of the 4 death
+regressions. Next: one suite run, refreeze on this bot with Nicolas's OK, PR, review, merge.
 
 ## Where things stand
 
@@ -66,22 +66,34 @@ AI calls, and 5 regressions. Next: find which commit costs the calls.
 
 ## Next
 
-1. **Branch `feat/510-t100b-counter-branch`** (local, not pushed, no PR; off main 09c350aa).
-   Kept by Nicolas 2026-11-08: 33538ed1 (T100b: the enemy phase played on each way a counter
-   leaves its attacker), d754facd (the planner offered attacks whose counter can kill; ADR 0396's
-   break lifted for the planner), 5a936ef4 (over the cap, the next phase's chances rank first;
-   ADR 0389 amended), bb3d7820 (the ADRs). Also 5af47bb5, `pilot --bench-vanilla` (a twin's unit
-   only waits; its own instrument). 1c350f2e (ask past the finalists) is reverted (b1109b94).
-2. **The suite refuses the promotion** (`build/pilot/suite-t100b.txt`; #510 plan comment
-   6563384310, the last bullets under T100b): SC-003 over, 2.60M `AiDecideMain` calls vs a
-   681K budget (scout-ch10 8.3x, vanilla-ch4 6.2x), and 5 regressions: vanilla-ch5 (vanilla Ch6,
-   fog) seed 1001 Eirika dies, seed 1002 0x0D dies, ours-ch03/1002 two deaths. **Find which commit
-   costs the calls** (one suite start, vanilla-ch4, per commit), then read the vanilla-ch5 deaths
-   from records and replay one. No PR until the suite promotes. Never run the full suite to guess.
+1. **Ship branch `feat/510-t100b-counter-branch`** (local, not pushed, no PR; off main 09c350aa,
+   now several commits behind: rebase on `origin/main` first). Holds 33538ed1 (T100b: the enemy
+   phase on each way a counter leaves its attacker), d754facd (counter-kill attacks offered),
+   5a936ef4 (over the cap, the next phase ranks first), bb3d7820 (ADRs 0384/0389/0396),
+   5af47bb5 (`pilot --bench-vanilla`), and **59b44c66 (new, 2026-11-09): a replan judges the
+   rest of the plan in hand** (`opts.rest`, kind `rest`; ADR 0384's bullet beside the advance;
+   tests in `test_bot.lua` and `test_botrun.lua`, both fail without it). 1c350f2e is reverted.
+   The findings and numbers are on #510's plan comment 6563384310, last bullets under T100b.
+   Steps, in order:
+   1. Rebase; `make test` green.
+   2. One `suite --held-out` run (~25 min). Tell Nicolas the death rates in plain words (held-out
+      lost N of 28, vs 4 of 28 frozen), not each death.
+   3. It will refuse promotion (cost, and vanilla-ch5/1002's death). **Ask Nicolas for "refreeze
+      anyway"**; on his yes, write the new baseline (`suite --freeze` writes only when promoted,
+      so the override must be explicit and recorded in ADR 0395 with why) in the same PR.
+   4. PR, `/code-review <PR> medium` by a separate reviewer (subagent), fix every finding, CI on
+      the head sha, merge (step 9 PRs merge after review + CI).
+   **What is already known (do not re-derive):** the cost is all 33538ed1 (5.3x enemy phases
+   judged, same decisions); vanilla-ch5/1002 Natasha's death is honest risk plus ADR 0384's
+   over-cap order (game over ranks first: a 6.85% lord risk lost to a 62% Lute risk); ours-ch03/
+   1002 now wins t23 with no deaths; vanilla-ch5/1001 wins (Lute dies to a fogged killer).
+2. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
+   held-out counts, the pilot's ours-vs-twin numbers), crashes, stalls and cost. Proposed, not
+   decided: make a tuning-seed death flip a thing to read, not a promotion gate (ADR 0395); log
+   the over-cap order question (game over strictly first) on #510 as open, not blocking.
 3. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
    #547 on #547). Ours ch03's boss: 36 HP vs Bazba's 25, hits our army for a mean 14 (up to 16)
-   vs Bazba's 8.6 on vanilla's, same throne heal. With Seth benched vanilla Ch3 still loses no one
-   in 50 (wins turn 17-19, not 10-11). Stop chasing ch03 deaths in the bot.
+   vs Bazba's 8.6 on vanilla's, same throne heal. Stop chasing ch03 deaths in the bot.
 4. Then T100c, T100d (**still unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then
    #510 step 10.
 5. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
