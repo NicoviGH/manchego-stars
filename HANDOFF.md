@@ -9,10 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-08, night (Claude): the careful-on-ch03 investigation found four causes (on
-#510 plan comment 6563384310, under T100b); a tile fix was piloted and not kept as is. Nicolas:
-"we're chasing this in circles". Next: check whether the bot's death numbers near the boss are
-right, from records only, before any more fixes.
+Refreshed 2026-11-09, early (Claude): **the ch03 question is answered** (Nicolas: "we have our
+answer"). Ours ch03 is harder than vanilla Ch3 because of its boss, not the bot and not a missing
+Seth. Three bot fixes are kept on a local branch, but the frozen suite refuses them: 4.6x the
+AI calls, and 5 regressions. Next: find which commit costs the calls.
 
 ## Where things stand
 
@@ -66,30 +66,27 @@ right, from records only, before any more fixes.
 
 ## Next
 
-1. **Break the circle: check the bot's death numbers against what happened (records only, no
-   runs).** Three changes (pull-back, T100a-R, the reseat) each fixed one ch03 death and exposed
-   another, all by changing which plans are offered, while every plan near the boss reads 80-95%
-   death. The exact check, its inputs and how its answer decides the next step: #510 plan comment
-   6563384310, the last bullets under **T100b** ("Next, decided with Nicolas"). Report it to
-   Nicolas in plain words before building anything.
-   - Findings so far (same place): the turn-11 heal lost its one tile; a unit left out of a plan
-     for want of a tile; no judged plan ever pulls everyone out of the boss's reach; the second
-     phase's hold. **Cause 1 (counters averaged) was wrong and is withdrawn**: `judge` chains the
-     counter on real HP (`struckIn`). Read the code before saying what it does.
-   - The Mogall attacks only from 14,1, range 1-2 (319 of 319 attacks over 60 traces); the
-     recorder's moving `from` is T100c's stale `from`.
-2. **Branch `feat/510-t100b-counter-outcomes`** (local, not pushed, no PR): b0c5a099 seats a hold
-   or heal on its next free tile (`Bot.reseat`); piloted 21 of 50 lost (main 18): careful game B
-   saved, careful game A stalls out of reach (6 of 6 `stuck`), bold 13 of 22 lose Baxby on turn
-   13 (witnessed: the boss fight's, not a misplaced seat). 162aa67c records each judged plan's
-   units at risk (`considered[].dies`), no play change, keep either way. Waits on step 1.
-3. **The T100a-R branch** (`feat/510-t100a-r`, 62d0c023, local): shelved, no effect.
-4. Then T100b as written (the AI's target choice on real boards), T100c, T100d (**still
-   unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then #510 step 10.
-5. **Tried and dropped 2026-11-08** (so nobody retries it): ranking "chance to end the chapter"
-   right after "game over" among plans over the cap. ch03 pilot: 40 of 50 runs lost someone (bold
-   lost the lord on turn 14 in 13 of 22), careful unchanged. Reverted, never committed. Output:
-   `build/pilot/ch03-pilot-complete.txt`.
+1. **Branch `feat/510-t100b-counter-branch`** (local, not pushed, no PR; off main 09c350aa).
+   Kept by Nicolas 2026-11-08: 33538ed1 (T100b: the enemy phase played on each way a counter
+   leaves its attacker), d754facd (the planner offered attacks whose counter can kill; ADR 0396's
+   break lifted for the planner), 5a936ef4 (over the cap, the next phase's chances rank first;
+   ADR 0389 amended), bb3d7820 (the ADRs). Also 5af47bb5, `pilot --bench-vanilla` (a twin's unit
+   only waits; its own instrument). 1c350f2e (ask past the finalists) is reverted (b1109b94).
+2. **The suite refuses the promotion** (`build/pilot/suite-t100b.txt`; #510 plan comment
+   6563384310, the last bullets under T100b): SC-003 over, 2.60M `AiDecideMain` calls vs a
+   681K budget (scout-ch10 8.3x, vanilla-ch4 6.2x), and 5 regressions: vanilla-ch5 (vanilla Ch6,
+   fog) seed 1001 Eirika dies, seed 1002 0x0D dies, ours-ch03/1002 two deaths. **Find which commit
+   costs the calls** (one suite start, vanilla-ch4, per commit), then read the vanilla-ch5 deaths
+   from records and replay one. No PR until the suite promotes. Never run the full suite to guess.
+3. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
+   #547 on #547). Ours ch03's boss: 36 HP vs Bazba's 25, hits our army for a mean 14 (up to 16)
+   vs Bazba's 8.6 on vanilla's, same throne heal. With Seth benched vanilla Ch3 still loses no one
+   in 50 (wins turn 17-19, not 10-11). Stop chasing ch03 deaths in the bot.
+4. Then T100c, T100d (**still unanswered**: ask Nicolas), T100e, then T100-T108 and PR-J, then
+   #510 step 10.
+5. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
+   `considered[].dies`, is worth porting), `feat/510-t100a-r`, `feat/510-lookahead-between-turn`
+   (honest turn-between: right numbers, 4.6x cost), `park/510-t100a-pullback`.
 6. Tell Nicolas where step 9 stands in plain words at the start of a session.
 
 ## Parked or owed elsewhere
