@@ -3,9 +3,9 @@
 into claims the parity model checks.
 
 A Strategy section is the best record we have of how a chapter is actually PLAYED: the
-twin's is the Fire Emblem Wiki's (vendored under `tools/wiki/vendor/twins/`), Manchego Stars' is the
-chapter YAML's `strategy:`. Each claim cites the line it comes from, verbatim (wiki markup
-stripped), and a claim whose citation is not in its section raises -- a claim nobody can
+twin's is the Fire Emblem Wiki's (vendored under `tools/wiki/vendor/twins/`), Manchego Stars'
+section is the chapter YAML's `strategy:`. Each claim cites the line it comes from, verbatim (wiki
+markup stripped), and a claim whose citation is not in its section raises -- a claim nobody can
 point at is the model's opinion, not the strategy's.
 
 Kinds (each side's claims are read against that side's OWN party and force):

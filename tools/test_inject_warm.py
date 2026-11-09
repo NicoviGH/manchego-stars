@@ -284,7 +284,7 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         self.assertIn(header, inject.warm.load_compiled())
 
     def test_a_checkout_that_reverts_a_compile_output_is_undone(self):
-        # msg.h is textprocess's SIDE output, and ours differs from HEAD. A `git checkout
+        # msg.h is textprocess's SIDE output, and Manchego Stars' differs from HEAD. A `git checkout
         # HEAD -- .` reverts it; the rewind then (rightly) keeps texts.txt older than
         # msg_data.c, so make never reruns textprocess and 16 files compile against the
         # VANILLA header. The rewind must put back what the compile wrote.

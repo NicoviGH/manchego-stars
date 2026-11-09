@@ -242,8 +242,8 @@ class TwinRoute(unittest.TestCase):
             [('ch00', 'FE8 Prologue'), ('ch07', 'FE8 Ch7'), ('ch08', 'FE8 Ch13')]))
 
     def test_the_twin_party_fights_a_reused_twin_once(self):
-        """Canary: ch06 doctored to reuse ch05's twin. Ours still banks the chapter, the
-        twin party banks nothing, and the route rule names it."""
+        """Canary: ch06 doctored to reuse ch05's twin. The Manchego Stars party still banks the
+        chapter, the twin party banks nothing, and the route rule names it."""
         real = ec.inject.hosting._load_chapter_yaml
 
         def doctored(campaign, filename):
@@ -367,7 +367,7 @@ class Simulation(unittest.TestCase):
         self.assertEqual([], off)
 
     def test_the_party_never_runs_ahead_of_vanillas_curve(self):
-        """#430 step 2: exp to date, ours against FE8's route walked once per twin, never
+        """#430 step 2: exp to date, Manchego Stars' against FE8's route walked once per twin, never
         more than 12% ahead. ch00's twin pay is handed to the founding party (ADR 0320)."""
         ahead = ['%s %.2fx' % (r['id'], r['exp_to_date'] / r['twin_exp_to_date'])
                  for r in self.rows
@@ -380,12 +380,13 @@ class Simulation(unittest.TestCase):
 
     def test_the_party_lands_where_the_vanilla_partys_lands(self):
         """The cross-check that makes the absolute number trustworthy: feed the same party
-        the TWIN's rosters instead of ours and it must reach the same level, within one."""
+        the TWIN's rosters instead of Manchego Stars' and it must reach the same level, within
+        one."""
         for r in self.rows:
             if r['twin_level_after'] is None:
                 continue
             self.assertLessEqual(abs(r['level_after'] - r['twin_level_after']), 1,
-                                 '%s: ours L%s vs twin L%s'
+                                 '%s: Manchego Stars L%s vs twin L%s'
                                  % (r['id'], r['level_after'], r['twin_level_after']))
 
 

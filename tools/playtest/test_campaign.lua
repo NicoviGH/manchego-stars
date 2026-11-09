@@ -274,7 +274,7 @@ end
 test_a_won_attempt_that_spoiled_a_part_is_retried()
 
 -- vanilla is beaten clean by strong players, so no clean clear there is the bot's fault
--- (#510 step 9 design, decision 2); ours keeps "infeasible"
+-- (#510 step 9 design, decision 2); Manchego Stars keeps "infeasible"
 local function noCleanClear(game)
     local saved = Campaign.MAX_ATTEMPTS
     Campaign.MAX_ATTEMPTS = 2

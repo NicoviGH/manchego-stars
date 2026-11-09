@@ -256,9 +256,9 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertTrue(village.get('visit_text'), 'the village needs a line to show')
 
     def test_the_moose_sighting_area_does_not_cover_a_village_doorstep(self):
-        """Vanilla's AREA was (0,9)-(14,14) and touched neither village; ours is authored, and
-        its first draft started exactly on the axe village's tile -- so stepping up to visit
-        would have fired the sighting cutscene instead."""
+        """Vanilla's AREA was (0,9)-(14,14) and touched neither village; Manchego Stars' is
+        authored, and its first draft started exactly on the axe village's tile -- so stepping up to
+        visit would have fired the sighting cutscene instead."""
         x1, y1, x2, y2 = inject.chapters.ch04.CH04_MOOSE_AREA
         for village in self._chap()['villages']:
             vx, vy = village['tile']
@@ -411,8 +411,8 @@ class Ch04RuntimeHost(unittest.TestCase):
 
     def test_the_axe_villages_boxes_match_vanillas_own_four(self):
         """Vanilla's MSG_9B5 is FOUR boxes, each broken on a sentence. Flowed as one scalar
-        ours reflowed to THREE and buttoned mid-sentence ("a handy bridge if / you could knock
-        it over") -- 1:1 in words but not on screen, which is not what 1:1 was asked for."""
+        Manchego Stars' reflowed to THREE and buttoned mid-sentence ("a handy bridge if / you could
+        knock it over") -- 1:1 in words but not on screen, which is not what 1:1 was asked for."""
         boxes = [line for _who, line in
                  inject.villages.village_boxes(self._chap()['villages'][0])]
         self.assertEqual(4, len(boxes))

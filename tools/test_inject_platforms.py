@@ -37,8 +37,8 @@ class BattlePlatformTerrain(unittest.TestCase):
 
     def test_road_gets_the_snow_path_on_both_tilesets(self):
         """TERRAIN_ROAD has its own slot in the 66-entry array -- vanilla's own tables use it
-        (slot 6 puts `michi1` there, which is what ch05 was standing on). Ours had been
-        collapsing it into "everything else"; it now names the vendored snowy path, and it does
+        (slot 6 puts `michi1` there, which is what ch05 was standing on). Manchego Stars' ch05 had
+        been collapsing it into "everything else"; it now names the vendored snowy path, and it does
         so on BOTH tilesets, because a road is a road whether the open ground beside it reads
         as drift or as rock."""
         path = inject.platforms._ground_value(self.BASE + 3)       # -> table[118] = ms_snowpath
@@ -77,7 +77,8 @@ class BattlePlatformTerrain(unittest.TestCase):
             for terrain in ('PLAINS', 'ROAD', 'MOUNTAIN', 'CLIFF', 'LAKE', 'RIVER'):
                 value = inject.platforms._terrain_snow_ground(terrain, inject.platforms.PLATFORM_BASE_INDEX, rough_open)
                 self.assertIn(value - 1, ours,
-                              '%s -> value %d selects table[%d], which is not one of ours'
+                              '%s -> value %d selects table[%d], which is not a Manchego Stars '
+                              'table'
                               % (terrain, value, value - 1))
 
 

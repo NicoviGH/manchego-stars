@@ -180,7 +180,7 @@ local function recordOf(g)
     return Json.decode(line:sub(#Botrun.PREFIX + 1))
 end
 
--- test_explore_log: what became of each village and chest the run saw open -- ours, someone
+-- test_explore_log: what became of each village and chest the run saw open -- the player's, someone
 -- else's (a pillage), offered and never played (with the lowest chance it was offered at),
 -- never offered.
 do
@@ -772,7 +772,7 @@ do
     check(type(e) == "table" and e.outcome_dependent, true, "unread slot: outcome-dependent")
 end
 
--- test_a_failed_act_still_records_its_deaths: the act killed one of ours, then the harness
+-- test_a_failed_act_still_records_its_deaths: the act killed a player unit, then the harness
 -- failed: the run crashes with the death recorded.
 do
     local g = fakeGame { units = rout() }

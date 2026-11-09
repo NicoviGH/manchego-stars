@@ -258,9 +258,9 @@ class Ch05SahnarTalkRecruit(unittest.TestCase):
     """The chapter's payoff: Basil chaperoned across turns the risen Sahnar (#25).
 
     This scene shipped WIRED and UNWRITTEN for months, pointed at vanilla 0x9CC -- the
-    Natasha->Joshua recruit ours is the twin of. On paper that is the legitimate placeholder
-    pattern; on screen it was a bug, because our speakers wear the Artur and Marisa slots
-    while 0x9CC loads Natasha's and Joshua's. What the player saw was Hlin Trollbane's bust
+    Natasha->Joshua recruit the Manchego Stars scene is the twin of. On paper that is the legitimate
+    placeholder pattern; on screen it was a bug, because our speakers wear the Artur and Marisa
+    slots while 0x9CC loads Natasha's and Joshua's. What the player saw was Hlin Trollbane's bust
     (dressed onto the Natasha slot) talking to vanilla Joshua. So the face assertions below
     are the regression, not decoration: a decoder is green either way.
     """
@@ -377,7 +377,8 @@ class Ch05SahnarTalkNoLupinFallback(unittest.TestCase):
     may never have handed the player. The substitute makes the proof BASIL instead: not
     "someone else already walked free" but "the two of us could".
 
-    Shape is vanilla's, not ours. `ch14a-eventscript.h` branches on CHECK_ALIVE(CHARACTER_JOSHUA)
+    Shape is vanilla's, not a Manchego Stars choice. `ch14a-eventscript.h` branches on
+    CHECK_ALIVE(CHARACTER_JOSHUA)
     -- Sahnar's own donor, and vanilla Ch5's optional Talk recruit -- and picks a WHOLE message
     per arm before converging on a shared LABEL (`TEXTSHOW(0xa93)` / `TEXTSHOW(0xa95)` ->
     `LABEL(0xb)`). Everything below asserts that shape rather than a second mechanism.
@@ -972,8 +973,8 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
 
     The opening's FIRST on-map beat, and the first place the inherited channel had to be
     overruled. Vanilla plays its twin (0x9C2) BEFORE the prep CALL, because vanilla stages
-    its speaking party with explicit LOAD1s; ours is placed BY prep, so before the CALL the
-    field holds the risen line, Ravisin and a green shrub and nobody the shrub could be
+    its speaking party with explicit LOAD1s; the Manchego Stars party is placed BY prep, so before
+    the CALL the field holds the risen line, Ravisin and a green shrub and nobody the shrub could be
     talking to. So the beat goes after `CALL(prep)` -- vanilla's own after-prep shape
     (`FADU(16)` -> `CUMO_*` -> `STAL` -> `CURE` -> `TEXTSTART`), which is exactly what its
     0x9C3/0x9C4 do -- and it lands adjacent to the CUSA that was already there, so the line
@@ -1082,8 +1083,8 @@ class Ch05BasilJoinsAfterPrep(unittest.TestCase):
     # ── placement in the beginning script ──────────────────────────────────────
     def test_the_join_plays_AFTER_prep_because_the_party_is_PLACED_by_prep(self):
         """The one place scene 5 does not inherit its twin's channel. Vanilla LOAD1s its
-        speaking party before the prep CALL; ours arrives through Pick Units, so a beat
-        placed there would have Basil addressing an empty pocket."""
+        speaking party before the prep CALL; the Manchego Stars party arrives through Pick Units, so
+        a beat placed there would have Basil addressing an empty pocket."""
         script = self._script()
         prep = script.index('CALL(%s)' % inject.chapters.ch05.CH05_PREP_SCRIPT)
         text = script.index('TEXTSHOW(0x%X)' % inject.chapter_ids.CH05_BASIL_JOIN_SLOT[1])
@@ -1881,8 +1882,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertEqual(block.count('CAMERA'), block.count('CUMO_AT'))
 
     def test_the_map_comes_up_on_the_PARTY_for_turn_1(self):
-        """Vanilla's 0x9C4 ends framed on the deploy pocket and so does ours. It is also what
-        hides the snap back: the moose's pen is off the bottom of that view."""
+        """Vanilla's 0x9C4 ends framed on the deploy pocket and so does Manchego Stars'. It is also
+        what hides the snap back: the moose's pen is off the bottom of that view."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
                                            inject.chapters.ch05.CH05_PARTY_CAMERA)
@@ -1903,9 +1904,9 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertIn('CUMO_AT(%d, %d)' % start, head)
 
     def test_the_party_framing_is_asserted_against_the_real_deploy_slots(self):
-        """Vanilla's own `CAMERA(5, 18)` for this beat, and ours because the retile lifts Ch5's
-        nine start tiles 1:1. A re-paint that moved the pocket would leave the last shot before
-        turn 1 holding on an empty corner, silently."""
+        """Vanilla's own `CAMERA(5, 18)` for this beat, and Manchego Stars' because the retile lifts
+        Ch5's nine start tiles 1:1. A re-paint that moved the pocket would leave the last shot
+        before turn 1 holding on an empty corner, silently."""
         chap = self._chap()
         frame = inject.chapters.ch05.CH05_PARTY_CAMERA
         self.assertEqual((5, 18), inject.scenes.party_camera_tile(chap, frame))
@@ -2187,8 +2188,8 @@ class Ch05VillageRaidRace(unittest.TestCase):
 
     def test_every_eruption_wave_races_the_sites(self):
         """Vanilla Ch5 sends ALL SIX of its reinforcements in on AI_B_04 -- three pairs, turns
-        2/6/8, every one a pillager. Ours spawn on those same three tile-pairs, so 'we do what
-        vanilla does' (Nicolas, 2026-08-09) means all three waves raid. Without a pillage AI on
+        2/6/8, every one a pillager. Manchego Stars' spawn on those same three tile-pairs, so 'we do
+        what vanilla does' (Nicolas, 2026-08-09) means all three waves raid. Without a pillage AI on
         the board nothing on the map can reach a reliquary and the race is prose."""
         waves = [e for e in self._chap()['enemy_units'] if e.get('arrives_turn')
                  and e['id'] != 'sahnar']

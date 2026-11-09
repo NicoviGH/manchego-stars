@@ -459,7 +459,8 @@ class Verdict(unittest.TestCase):
         self.assertEqual(mc.label(0.01, 0.30), 'HARDER')
         self.assertEqual(mc.label(-0.30, -0.01), 'EASIER')
         self.assertEqual(mc.label(-0.12, 0.12), 'INCONCLUSIVE')
-        # a large gap is called at the first look: ours loses someone on 30 of 50, the twin never
+        # a large gap is called at the first look: Manchego Stars loses someone on 30 of 50, the
+        # twin never
         v = mc.paired_verdict([(True, False)] * 30 + [(False, False)] * 20, self.N, 'paired')
         self.assertEqual((v['look'], v['verdict'], v['settled']), (50, 'HARDER', True))
         self.assertAlmostEqual(v['diff'], 0.6)
@@ -512,7 +513,7 @@ class Verdict(unittest.TestCase):
         self.assertEqual(v['verdict'], 'HARDER')
 
     def test_the_pilot_reports_its_table_and_picks_its_analysis(self):
-        # T093, FR-025: 5 both, 3 only ours, 2 only the twin, 40 neither
+        # T093, FR-025: 5 both, 3 only Manchego Stars, 2 only the twin, 40 neither
         pairs = [(True, True)] * 5 + [(True, False)] * 3 + [(False, True)] * 2 + \
             [(False, False)] * 40 + [(None, True)]
         s = mc.pilot_summary(pairs, self.N, cpu_s=3600.0, reach={'ours': {'reached': 51}})
@@ -635,7 +636,7 @@ class Cell(unittest.TestCase):
             self.assertEqual(r['died'], want, d)
 
     def test_a_crash_is_retried_once_on_its_own_seed_then_bounded(self):
-        # T091: ours seed 3 crashes twice; it stays in the pairs as unresolved
+        # T091: Manchego Stars seed 3 crashes twice; it stays in the pairs as unresolved
         def fate(n, s, ch):
             if (n, s) == ('ours', 3):
                 return [{'chapter': ch, 'attempt': 1, 'outcome': 'crashed', 'run_dir': '/tmp/r3',
@@ -885,7 +886,7 @@ class Suite(unittest.TestCase):
 
     def test_the_shipped_manifest_loads(self):
         got = mc.load_suite()
-        # FR-021: vanilla 6, ours 4, scout 4 (Ch6, the fog map, PR-G; Ch10, Ch13, Ch14)
+        # FR-021: vanilla 6, Manchego Stars 4, scout 4 (Ch6, the fog map, PR-G; Ch10, Ch13, Ch14)
         self.assertEqual(len(got['starts']), 14)
         self.assertEqual(sum(len(s['seeds']['tuning']) + len(s['seeds']['held_out'])
                              for s in got['starts']), 56)   # SC-001, amended by PR-G
@@ -1138,7 +1139,7 @@ class Suite(unittest.TestCase):
                              ((1, 1), (1, 1)))
             self.assertIn('needs a start an arm', mc.cell_setup(3, 0))
             self.assertIn('not a written chapter', mc.cell_setup(99, 1))
-            self.assertIn('1 ours campaigns', mc.cell_setup(3, 2))
+            self.assertIn('1 %s campaigns' % 'ours', mc.cell_setup(3, 2))   # the game id
             check.return_value = ['cs-s4001/3: its state is gone']
             self.assertIn('its state is gone', mc.cell_setup(3, 1))
 
@@ -1364,7 +1365,7 @@ class Suite(unittest.TestCase):
         text = '\n'.join(self.suite_lines(play, frozen=frozen_fixture(30, 30)))
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs, 26 AiDecideMain calls, '
                       '8.0 CPU s and 46.0 wall s in all, 6.5 calls and 2.0 CPU s a run', text)
-        self.assertIn('ours-ch02 (ours chapter 3, fixture): 4 runs', text)
+        self.assertIn('ours-ch02 (%s chapter 3, fixture): 4 runs' % 'ours', text)   # the game id
         # SC-003's measure (ADR 0384): the AI's decisions only, never another game call
         self.assertIn('the suite: 8 runs, 68 AiDecideMain calls, 16.0 CPU s', text)
         self.assertIn('SC-003 (tuning and held-out seeds): 68 AiDecideMain calls against a '
@@ -1531,7 +1532,7 @@ class Suite(unittest.TestCase):
                               {'vanilla': os.path.join(d, 'vanilla', ''),
                                'ours': os.path.join(d, 'ours', '')}, emulator_sha1='e' * 40)
         self.assertIn('no vanilla ROM is built', why[-2])
-        self.assertIn('no ours ROM is built', why[-1])
+        self.assertIn('no %s ROM is built' % 'ours', why[-1])   # the game id
 
     def test_the_estimate_keeps_only_this_instruments_results(self):
         d = tempfile.mkdtemp()

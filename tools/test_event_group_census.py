@@ -245,10 +245,10 @@ class TheEdgeSetIsCODEAndNotPROSE(unittest.TestCase):
 
     def test_the_walk_follows_our_OWN_scenes_which_are_named_MS(self):
         """Every scene this campaign DEFINES is `MS_*`. An `EventScr_`-only token set walks
-        the donor's scenes and stops dead at ours -- ch05 reaches 40 scripts, not the 26 the
-        first cut reported. The undercount is the small half: a vanilla scene reachable ONLY
-        through one of ours is then invisible here AND to the writer-side guard, which is the
-        gap #398 exists to close."""
+        the donor's scenes and stops dead at Manchego Stars' -- ch05 reaches 40 scripts, not the 26
+        the first cut reported. The undercount is the small half: a vanilla scene reachable ONLY
+        through a Manchego Stars scene is then invisible here AND to the writer-side guard, which is
+        the gap #398 exists to close."""
         bodies = {'L': ('f.h', '{ MS_Ch05Talk }'),
                   'MS_Ch05Talk': ('f.h', '{ CALL(EventScr_Leftover) }'),
                   'EventScr_Leftover': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}

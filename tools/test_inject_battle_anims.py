@@ -389,7 +389,8 @@ class TestRawPidBattleAnim(unittest.TestCase):
         self.assertGreater(inject.chapter_ids.CH05_MOOSE_NAME_MSG, 0xD4B)
 
     def test_a_donor_slot_and_an_owned_id_both_resolve(self):
-        self.assertEqual(inject.text.raw_pid_name_text_id(0xD4C), 0xD4C)      # ours, verbatim
+        # a Manchego Stars raw pid, verbatim
+        self.assertEqual(inject.text.raw_pid_name_text_id(0xD4C), 0xD4C)
         self.assertEqual(inject.text.raw_pid_name_text_id('Riev'), 0x246)     # donor, scanned
 
     def test_a_raw_pid_can_be_named_without_being_dressed(self):

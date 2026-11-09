@@ -1884,8 +1884,8 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
     damage each of our slots must weather. clear-load/slot = Σ metric_rounds_to_kill(enemy)
     ÷ deploy_cap -- how much killing each slot must do to clear the map. Both measured against
     the fixed YARDSTICK so Manchego Stars' chapter and the vanilla reference land on one scale; the
-    metric
-    is a static proxy (no positioning/AI/terrain), read as a ratio within a tolerance band."""
+    metric is a static proxy (no positioning/AI/terrain), read as a ratio within a tolerance
+    band."""
     cap = max(1, deploy_cap)
     threat = sum(fc.damage_per_round(e, yardstick) for e in enemies) / cap
     clearload = sum(metric_rounds_to_kill(e, yardstick) for e in enemies) / cap
@@ -3114,8 +3114,8 @@ def _role_findings_vs_party(chap, parity_ref, matchup, mode=None):
     Each arm asks the yardstick arm's question, relative to the twin rather than in absolute
     terms. A line unit out-hitting the boss is common in FE8 itself (Ch2's archer out-hits
     Bone), so an inversion is flagged only when Manchego Stars' unit runs past the twin's own by the
-    band. The
-    twin's boss is the body whose CHARACTER carries CA_BOSS, which is where FE8 records it."""
+    band. The twin's boss is the body whose CHARACTER carries CA_BOSS, which is where FE8 records
+    it."""
     import exp_curve                        # exp_curve imports this module
     band = 1.25
     entries = list(chapter_roster_entries(chap))

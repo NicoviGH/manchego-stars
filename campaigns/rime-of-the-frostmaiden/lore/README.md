@@ -25,8 +25,8 @@ A **`## Trivia`** list, when a character has one, names the real things they are
 
 A character from *Rime of the Frostmaiden* also gets a **`## Book`** section right after the
 Profile: what the book says of them, with the printed page and its own words quoted, and where
-Manchego Stars departs. The wiki prints it as a Trivia line. The book's illustration of them, when it has
-one, is cropped into [`book-art/`](book-art) with its page and the book's caption in
+Manchego Stars departs. The wiki prints it as a Trivia line. The book's illustration of them, when
+it has one, is cropped into [`book-art/`](book-art) with its page and the book's caption in
 `book-art/index.yaml` (credited in `CREDITS.md`). Book art only: the busts made as sprite sources
 stay in References.
 

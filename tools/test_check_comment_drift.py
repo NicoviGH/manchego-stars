@@ -513,13 +513,38 @@ class ProseNamesManchegoStars(unittest.TestCase):
                 '+int ours = 0;\n')
         self.assertEqual(self._flagged('x.patch', text), [1, 5])
 
-    @unittest.skipUnless(hasattr(__import__('tokenize'), 'FSTRING_MIDDLE'),
-                         'f-strings tokenize whole before Python 3.12 and are read as STRING')
-    def test_an_f_string_message_is_prose_on_312(self):
-        self.assertEqual(self._flagged('x.py', "print(f'only ours lost {n}')\n"), [1])
-
     def test_an_f_string_message_is_prose(self):
+        """A STRING token before Python 3.12, FSTRING_MIDDLE parts from 3.12 (CI's version)."""
         self.assertEqual(self._flagged('x.py', "msg = f'only ours lost {n}'\n"), [1])
+
+    def test_title_and_text_are_game_text_only_in_a_chapter(self):
+        text = '- title: ours beats the twin\n  text: >-\n    and ours plays apart\n'
+        self.assertEqual(self._flagged('campaigns/x/campaign.yaml', text), [1, 3])
+        self.assertEqual(self._flagged('campaigns/x/chapters/ch01.yaml', text), [])
+
+    def test_only_a_game_value_is_the_game_id(self):
+        self.assertEqual(self._flagged('x.yaml', 'note: ours, unlike vanilla, keeps the boss\n'
+                                                 'why: ours # vs vanilla\n'
+                                                 '- {start_id: ours-ch00, game: ours}\n'), [1, 2])
+
+    def test_each_patch_hunk_is_read_on_its_own(self):
+        text = ('Subject: x\n'
+                'diff --git a/src/x.c b/src/x.c\n'
+                '@@ -1 +1 @@\n'
+                '+/* opened here and never closed in this hunk\n'
+                '@@ -9 +9 @@\n'
+                '+int ours = 0;\n'
+                '@@ -20 +20 @@\n'
+                '  * and ours, mid-comment\n'
+                '  */\n')
+        self.assertEqual(self._flagged('x.patch', text), [8])
+
+    def test_the_other_tests_prose_is_scanned_but_this_gates_fixtures_are_not(self):
+        names = {os.path.basename(p) for p in check._prose_test_files()}
+        self.assertIn('test_montecarlo.py', names)
+        self.assertIn('test_bot.lua', names)
+        self.assertNotIn('test_check_comment_drift.py', names)
+        self.assertNotIn('test_check_canaries.py', names)
 
     def test_the_scan_covers_the_authored_campaign_prose(self):
         """#588's review: lore, unit files, the chapter injectors and the wiki sources held live

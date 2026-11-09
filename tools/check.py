@@ -2674,6 +2674,8 @@ def _testimony_files(extra_exempt=()):
 # held, not the meaning: a plain possessive is rephrased too, because no pattern can tell
 # "one of ours" (the player's) from "ours" (the game), and both read the same to a stranger.
 # Not part of a longer name: `ours_only`, `ours-ch03`, 'ours', ours.c, a path's `sim/ours/`.
+# The `/` exclusion also passes prose like "the ours/vanilla split"; none is written, and a path
+# segment cannot be told from it by pattern.
 OURS = re.compile(r"(?<![\w'`\-/])ours(?![\w'`\-/]|\.\w)", re.I)
 # A quoted span is not the author's prose: a code id in backticks, or a line of dialogue or the
 # book in double quotes ("She said the fishermen were ours to take.").
@@ -2688,12 +2690,18 @@ ID_LITERAL = re.compile(r'^[\w\-./:@+]*$')
 # quoted as vanilla shipped it: written in the story's voice, where "ours" is a word, never a
 # name for the rom hack. Their comments are still prose.
 GAME_TEXT_KEYS = ('script', 'death_quote', 'defeat_quote', 'taunt', 'help_text', 'visit_text',
-                  'text', 'vanilla_text', 'title')
-GAME_TEXT_KEY = re.compile(r'^(\s*(?:- )?)(?:%s):(.*)$' % '|'.join(GAME_TEXT_KEYS))
+                  'vanilla_text')
+# `title` and `text` are game text in a CHAPTER (its name, a scene's boxes); campaign.yaml's
+# `gameplay:` entries use the same keys for wiki prose about how the game differs.
+CHAPTER_TEXT_KEYS = GAME_TEXT_KEYS + ('title', 'text')
+
+
+def _game_text_key(keys):
+    return re.compile(r'^(\s*(?:- )?)(?:%s):(.*)$' % '|'.join(keys))
 # A YAML `key: "value"` line: the quotes delimit the author's own value, not a quotation.
 YAML_QUOTED_VALUE = re.compile(r'^(\s*(?:- )?[\w-]+:\s*)"(.*)"(\s*(?:#.*)?)$')
-# A YAML value that is the game id itself (`game: ours,` in a flow map) is data.
-YAML_ID_VALUE = re.compile(r'(:\s*)ours(?=\s*(?:[,}\]]|#|$))')
+# A YAML `game:` value is the game id itself (`game: ours,` in a flow map): data.
+YAML_ID_VALUE = re.compile(r'(\bgame:\s*)ours\b')
 
 
 def _names_ours(line):
@@ -2751,10 +2759,11 @@ def _python_prose(text):
         return   # check_python_compiles owns a file that does not parse
 
 
-def _yaml_prose(lines):
-    """Every line but GAME text (GAME_TEXT_KEYS: a value on the key's line, and every line
-    nested under the key), whose comments are still prose. A double-quoted value is the
-    author's own, so its quotes come off."""
+def _yaml_prose(lines, keys=GAME_TEXT_KEYS):
+    """Every line but GAME text (`keys`: a value on the key's line, and every line nested
+    under the key), whose comments are still prose. A double-quoted value is the author's
+    own, so its quotes come off."""
+    game_text_key = _game_text_key(keys)
     game = None
     for i, line in enumerate(lines, 1):
         indent = len(line) - len(line.lstrip())
@@ -2763,7 +2772,7 @@ def _yaml_prose(lines):
         if game is not None:
             yield i, _comment_part(line, ('#',))
             continue
-        m = GAME_TEXT_KEY.match(line)
+        m = game_text_key.match(line)
         if m:
             # The KEY's column, past a list item's `- `: a sibling key of the same item
             # (`  - script:` then `    why:`) ends the block.
@@ -2801,16 +2810,31 @@ def _c_prose(lines):
 def _patch_prose(lines):
     """An engine patch: its message (everything before the first `diff --git`) whole, then
     the C comments of the lines it adds or keeps (a removed `-` line is the old code)."""
-    body = []
+    hunk = None
     for i, line in enumerate(lines, 1):
-        if body or line.startswith('diff --git'):
-            body.append((i, line))
-        else:
+        if hunk is None and not line.startswith('diff --git'):
             yield i, line
-    code = [(i, line[1:]) for i, line in body
-            if line[:1] in ('+', ' ') and not line.startswith('+++')]
-    for k, text in _c_prose([t for _, t in code]):
-        yield code[k - 1][0], text
+        elif line.startswith(('@@', 'diff --git')):
+            # A hunk is read on its own: comment state never carries across a gap.
+            for item in _patch_hunk_prose(hunk or []):
+                yield item
+            hunk = []
+        elif line[:1] in ('+', ' ') and not line.startswith('+++'):
+            hunk.append((i, line[1:]))
+    for item in _patch_hunk_prose(hunk or []):
+        yield item
+
+
+def _patch_hunk_prose(hunk):
+    """One hunk's C comments; a hunk that opens inside a block comment (a ` * ...` line
+    first) is read as one."""
+    if not hunk:
+        return
+    texts = [t for _, t in hunk]
+    if texts[0].lstrip().startswith('*') and not texts[0].lstrip().startswith('*/'):
+        texts[0] = '/*' + texts[0]
+    for k, text in _c_prose(texts):
+        yield hunk[k - 1][0], text
 
 
 def _prose_lines(path, text):
@@ -2824,7 +2848,8 @@ def _prose_lines(path, text):
     if ext == '.md':
         return enumerate(lines, 1)
     if ext == '.yaml':
-        return _yaml_prose(lines)
+        chapter = os.sep + 'chapters' + os.sep in path
+        return _yaml_prose(lines, CHAPTER_TEXT_KEYS if chapter else GAME_TEXT_KEYS)
     if ext in ('.c', '.h'):
         return _c_prose(lines)
     if ext == '.patch':
@@ -2833,13 +2858,29 @@ def _prose_lines(path, text):
     return ((i, _comment_part(line, marks)) for i, line in enumerate(lines, 1))
 
 
+# The gate's own tests and canaries plant "ours" on purpose; every other test's comments and
+# docstrings are prose like any source's.
+PROSE_GATE_FIXTURES = ('test_check_comment_drift.py', 'test_check_canaries.py')
+
+
+def _prose_test_files():
+    """The `test_*` files `_handwritten_sources` leaves out (they quote dead concepts as
+    fixtures), less this gate's own fixtures."""
+    out = []
+    for g in CODE_GLOBS:
+        out += glob.glob(os.path.join(REPO, g), recursive=True)
+    return sorted(p for p in out if os.path.isfile(p)
+                  and os.path.basename(p).startswith('test_')
+                  and os.path.basename(p) not in PROSE_GATE_FIXTURES)
+
+
 def check_prose_names_manchego_stars(fail):
     """Prose names the rom hack Manchego Stars, never "ours" (#588).
 
     `ours` stays the code's game id: a quoted id (`ours`, 'ours') and a variable are code, not
     prose. The scene book (docs/scenes/) is exempt as GENERATED from the chapter YAML's
     dialogue, which this gate already skips at its source."""
-    for d in _testimony_files(extra_exempt=(('docs', 'scenes'),)):
+    for d in _testimony_files(extra_exempt=(('docs', 'scenes'),)) + _prose_test_files():
         with open(d, encoding='utf-8') as fh:
             text = fh.read()
         for i, line in _prose_lines(d, text):

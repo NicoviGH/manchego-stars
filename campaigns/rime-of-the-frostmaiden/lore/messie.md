@@ -31,8 +31,8 @@ In ''Rime of the Frostmaiden'' (p. 28), the lake monster of Maer Dualdon is "an 
 ## Who he is (Manchego Stars)
 
 - **He has talked with the merfolk all along**, and he protests quietly: he rams Bremen's boats
-  so the crews turn home before they reach merfolk water. He has never drowned anyone (Manchego Stars' invention; the
-  book's Pronged Goat crew did drown, p.29). ADR 0332.
+  so the crews turn home before they reach merfolk water. He has never drowned anyone
+  (Manchego Stars' invention; the book's Pronged Goat crew did drown, p.29). ADR 0332.
 - He hides the protest behind obedience, because he fears Ravisin will take his mind back.
 - ch06 ends with him going back to Bremen with the party to make peace. The Speaker idea comes
   out of ch07's argument with Dorbulgruf, and his first decree is a fish tax.

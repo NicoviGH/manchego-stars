@@ -104,8 +104,7 @@ def _terrains():
 
 def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
     """A class token's ids on the board: the vanilla class, and for Manchego Stars every reskin
-    whose base
-    it is. None when `token` is no vanilla class."""
+    whose base it is. None when `token` is no vanilla class."""
     values = class_ids.vanilla_class_values()
     enum = class_ids.vanilla_class_enum(token)
     if enum not in values:

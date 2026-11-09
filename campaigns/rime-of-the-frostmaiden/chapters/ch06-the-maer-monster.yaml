@@ -267,7 +267,11 @@ deployment:
     - [6, 1]
     - [10, 0]
   note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar
-  (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting does the same). Braulo (Pirate, river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
+  (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene,
+  so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages
+  cutscene characters exactly this way -- ch04's moose sighting does the same). Braulo (Pirate,
+  river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who
+  cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same level,
 # same donor and AI, and (but for five) the same class and inventory -- re-dressed as merfolk.

@@ -161,8 +161,8 @@ def _twin_worldmap_pickups():
 def twin_pickups(through=None):
     """Every pickup the twin's chain hands out up to chain position `through` (all of it when
     None), by the same vehicles as Manchego Stars' kits. A chapter's kit needs nothing past itself,
-    so a
-    read never opens a twin chapter it has not reached. Read at HEAD, so cached; a shared tuple."""
+    so a read never opens a twin chapter it has not reached. Read at HEAD, so cached; a shared
+    tuple."""
     chain = difficulty.VANILLA_CHAIN[:None if through is None else through + 1]
     out = []
     for n, ref in enumerate(chain):

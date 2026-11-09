@@ -1379,15 +1379,14 @@ events:
       Ravisin appraises her as exactly that.
       TWIN = EventScr_089F22A4, 3 boxes; Manchego Stars' scene is 4 after adding the race warning.
       Its structural rule is that the ARRIVING FORCE speaks while the party never reacts (vanilla
-      gives Eirika and Seth no lines). Both twins
-      agree the SPECTACLE lives in the event macros, never in the prose.
-      THE RACE IS NAMED HERE, and that is what the second box buys (Nicolas, 2026-08-09). Vanilla
-      spends its equivalent box on the raiders' intent — "steal our way through this pathetic
-      town" — which is the only warning the player gets that the reward-sites are at stake.
-      Manchego Stars' scene said nothing about them, so the race (now actually wired, #25) would have
-      announced itself with the engine's "The village was destroyed." popup, after a site was
-      already gone. REVISED 2026-08-09 (Nicolas): all four boxes are Ravisin's, and Sahnar's "The
-      tomb is closed. Turn back." is CUT. That box used to be the setup 0x9CC breaks from — she
+      gives Eirika and Seth no lines). Both twins agree the SPECTACLE lives in the event macros,
+      never in the prose. THE RACE IS NAMED HERE, and that is what the second box buys (Nicolas,
+      2026-08-09). Vanilla spends its equivalent box on the raiders' intent — "steal our way through
+      this pathetic town" — which is the only warning the player gets that the reward-sites are at
+      stake. Manchego Stars' scene said nothing about them, so the race (now actually wired, #25)
+      would have announced itself with the engine's "The village was destroyed." popup, after a site
+      was already gone. REVISED 2026-08-09 (Nicolas): all four boxes are Ravisin's, and Sahnar's
+      "The tomb is closed. Turn back." is CUT. That box used to be the setup 0x9CC breaks from — she
       starts the same rote line at the recruit and stops at "Far enough. The tomb is--" because she
       has seen Basil. ACCEPTED as-is (Nicolas, 2026-08-09) after being raised: 0x9CC simply opens on
       the rote line cold. Recorded so a later pass does not "restore" a box that was cut on purpose.
@@ -1425,8 +1424,7 @@ events:
     description: >
       THE CHAPTER'S PAYOFF. Basil chaperoned safely to Sahnar → she turns and joins. The
       escort-recruit (Ch5's Joshua beat, twin `EventScr_089F2270`, 32 boxes; Manchego Stars' scene
-      is 16 —
-      the relationship was already built in 9BB, so this scene only has to turn her).
+      is 16 — the relationship was already built in 9BB, so this scene only has to turn her).
       The turn is NOT an argument won and NOT a rescue. Its mechanism, beat for beat off the
       twin: RECOGNITION → duty stated flatly → the other pleads → the recruit turns on
       something of their OWN (Joshua's coin comes up tails; Sahnar's 9C3 line "I was given a
@@ -1502,9 +1500,8 @@ events:
   # invitation to write one (Nicolas, 2026-08-16). Vanilla fills it for Natasha because the
   # escort a chapter is built around should be mourned in that chapter's own words, and Basil
   # holds exactly that role here — but Manchego Stars' quote said the same thing as her universal
-  # line in
-  # the same shape (an interrupted apology holding an undelivered berry), so the second box bought a
-  # mechanism and no line. The berry quote MOVED to her universal one (npcs/basil.yaml) and
+  # line in the same shape (an interrupted apology holding an undelivered berry), so the second box
+  # bought a mechanism and no line. The berry quote MOVED to her universal one (npcs/basil.yaml) and
   # fires wherever she falls; the constraints it was written against still hold there. It must
   # not duplicate her LAST WORDS in 0x9CA, which are also about the berry: this is her still
   # holding it, 0x9CA is her handing the errand on ("Tell her I had one for her"). Same object,
@@ -1694,8 +1691,7 @@ events:
           to mark what was lost — "If she had lived, we might have learned more, but...." — and
           the closing box repeated word for word.
       Manchego Stars' scene does the same, at the same discount: 13 boxes against 0x9C9's 18, and
-      the
-      closing run is 0x9C9's own, with Braulo's final box carrying the one changed clause.
+      the closing run is 0x9C9's own, with Braulo's final box carrying the one changed clause.
       THE CONCEIT IS INHERITED WHOLESALE. Natasha's map death is deferred to the cutscene — she
       is mortally wounded there, whenever she actually fell. Basil is a broken shrub in the snow
       still talking, whether she went down on turn 2 or turn 12. It reads better for a plant than
@@ -1771,9 +1767,7 @@ events:
   #       The hollow is the only place she has ever been; that line is the whole coda in one box.
   #   (2) the resident's own future           -> the repot. Vanilla's townsman apologises that he
   #       can do nothing and stays behind to wait; Manchego Stars' resident can do something, and
-  #       comes
-  #       along. The
-  #       coda INVERTED is the strongest use of it available to us.
+  #       comes along. The coda INVERTED is the strongest use of it available to us.
   #   (3) a second resident, if earned        -> the conditional Sahnar block. Her home, her tomb,
   #       her purpose handed back to her one scene earlier — and it is where the berry finally
   #       gets eaten. Gated on the recruit, so the coda's warmth is something the player wins.
@@ -1830,10 +1824,10 @@ economy:
 # LORE RIDES UNDER CHARACTER, not over it: vanilla spends its village budget on somebody's small
 # private business (a packing list, an old man's vanity, a dancer's over-tipping), so each of
 # Manchego Stars' sites is interrupted mid-task and the tomb's history arrives only where the task
-# produces it.
-# Orem/the amphitheatre come from lore/sahnar.md §Source canon; Corellon, Arvandor and Ostoria
-# stay OFF the page as before -- named as events ("a god took him up alive"), never as proper
-# nouns the story cannot pay off. Ravisin is never named: they were asleep, they don't know it.
+# produces it. Orem/the amphitheatre come from lore/sahnar.md §Source canon; Corellon, Arvandor and
+# Ostoria stay OFF the page as before -- named as events ("a god took him up alive"), never as
+# proper nouns the story cannot pay off. Ravisin is never named: they were asleep, they don't know
+# it.
 villages:
   - id: reliquary-north            # vanilla Ch5 village (5,1)
     tile: [5, 1]
@@ -1886,10 +1880,9 @@ villages:
     # woke up and went straight back to counting stock. Register twin is vanilla's own Armorslayer
     # village (MSG_9CD), the one site that is plainly useful: it states what the weapon does in
     # flat words ("It'll cut through even the strongest armor") and sends you off. Manchego Stars'
-    # visit
-    # does the
-    # same. A draft ended on "It remembers bigger things" -- cut 2026-08-08 (Nicolas: "sounds
-    # silly"); it was mood-narration in a quartermaster's mouth, which the craft check calls dead.
+    # visit does the same. A draft ended on "It remembers bigger things" -- cut 2026-08-08 (Nicolas:
+    # "sounds silly"); it was mood-narration in a quartermaster's mouth, which the craft check calls
+    # dead.
     visit_text:
       - "Weapon check. Hold it up. ...Mm. That'll do for people."
       - "We came north out of the giants' camps, the lot of us. Carried this rack with us."
@@ -1934,15 +1927,14 @@ villages:
       - "Orem's shield-plate. It's been on a stand since before I was bones. Take it."
       - "Go on. ...I'd like you to win. I'd like very much for you to win."
 # WHICH GIFT SITS ON WHICH TILE IS VANILLA'S, NOT MANCHEGO STARS' (corrected 2026-08-07,
-# decomp-verified via
-# each village script's SVAL(EVT_SLOT_3, <item id>)). booster-def and torch were swapped, which read
-# as harmless -- same four items, same total, and the parity gate counts the SET, not the tiles --
-# but it inverts the chapter's risk/reward. (12,19) is the SOUTH-EAST site, and the turn-2 eruption
-# pair spawns at (14,16)/(14,15), right beside it: vanilla puts its RICHEST gift (Dracoshield,
-# 8000g) on the site the first raiders reach, and its cheapest (Torch, 500g) at (5,1), which sits
-# behind the whole enemy line and is the safest on the map. Swapping them pays the most for the
-# safest errand, which is exactly backwards for a chapter whose structure IS the race for the
-# reward-sites. The placement is vanilla's, like every other placement on this retile.
+# decomp-verified via each village script's SVAL(EVT_SLOT_3, <item id>)). booster-def and torch were
+# swapped, which read as harmless -- same four items, same total, and the parity gate counts the
+# SET, not the tiles -- but it inverts the chapter's risk/reward. (12,19) is the SOUTH-EAST site,
+# and the turn-2 eruption pair spawns at (14,16)/(14,15), right beside it: vanilla puts its RICHEST
+# gift (Dracoshield, 8000g) on the site the first raiders reach, and its cheapest (Torch, 500g) at
+# (5,1), which sits behind the whole enemy line and is the safest on the map. Swapping them pays the
+# most for the safest errand, which is exactly backwards for a chapter whose structure IS the race
+# for the reward-sites. The placement is vanilla's, like every other placement on this retile.
 # THE RACE (#25). Each site carries an event id -- CH05_VILLAGE_FLAGS, EVFLAG_TMP(9..12) -- and
 # that one number is the whole mechanism. `Village(eid, ..)` puts it on BOTH the visit and the
 # destruction LOCA one tile north, so reaching a site first both banks the gift and disarms the

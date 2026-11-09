@@ -532,7 +532,8 @@ class EnemyAiBytes(unittest.TestCase):
         # tile; there is no single donor to point at, so the override IS the declaration.
         chap = {'parity_reference': 'FE8 Ch4'}
         enemy = self._enemy(ai_override={'ai': '{AttackInRangeAI, 0xC, 0x0}',
-                                         'why': 'the pack is ours, not a vanilla unit'})
+                                         'why': 'the pack is Manchego Stars\' own, '
+                                                'not a vanilla unit'})
         self.assertEqual(df.enemy_ai_bytes(chap, enemy), (0x00, 0x03, 0x0C, 0x00))
 
     def test_an_enemy_with_neither_is_an_error_not_a_default(self):
@@ -607,7 +608,7 @@ class DonorGroupResolution(unittest.TestCase):
 
     def test_a_class_spec_resolves_a_whole_group_that_shares_one_ai(self):
         # vanilla Ch3's five L3 brigands are all AttackInRangeAI -- one behaviour, so "the
-        # L3 brigands" is a well-formed donor for a group of ours.
+        # L3 brigands" is a well-formed donor for a Manchego Stars group.
         self.assertEqual(
             df.resolve_donor('FE8 Ch3', {'class': 'CLASS_BRIGAND', 'level': 3})['ai'],
             (0x00, 0x03, 0x09, 0x00))
@@ -2523,8 +2524,8 @@ class PersonalBossLine(unittest.TestCase):
 
     def test_the_aggregate_force_carries_personal_lines(self):
         """#285: the aggregate reads the REAL ARTICLE on our side. Measuring a boss off class
-        base understated every named unit, and it understated them asymmetrically -- ours by
-        `personal:`, the twin's by its own character lines."""
+        base understated every named unit, and it understated them asymmetrically -- Manchego Stars'
+        by `personal:`, the twin's by its own character lines."""
         chap = {'enemy_units': [{'id': 'b', 'class': 'druid', 'level': 7, 'count': 1,
                                  'personal': {'baseHP': 15, 'baseDef': 5},
                                  'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}]}
@@ -2590,9 +2591,9 @@ class PersonalBossLine(unittest.TestCase):
 
 class RoleCheckAgainstTheParty(unittest.TestCase):
     """#430 step 6: on a twin the party model reaches, the role check reads both forces against
-    the party that meets ours, the footing ADR 0316 gave the aggregate. The fixed swordsman
-    read the triangle from a sword's side only, so a lance line 'out-threatened' a sword boss
-    who hits the real party three times as hard (ch00's guards and Sephek)."""
+    the party that meets Manchego Stars' force, the footing ADR 0316 gave the aggregate. The fixed
+    swordsman read the triangle from a sword's side only, so a lance line 'out-threatened' a sword
+    boss who hits the real party three times as hard (ch00's guards and Sephek)."""
 
     def _ch(self, chid):
         return df.load_field(CAMPAIGN, chid)[0]
@@ -3178,7 +3179,7 @@ class BossesAreImmuneToTheMalus(unittest.TestCase):
 
     `UnitAutolevelPenalty` fires only `if (level > pCharacterData->baseLevel)`. Every
     vanilla named boss ships baseLevel >= deploy level (Saar 8/8, Breguet 4/4, Bazba 6/6),
-    and after RAW_PID_LEVEL_SOURCES so does every one of ours. So on Tutorial and Normal a
+    and after RAW_PID_LEVEL_SOURCES so does every Manchego Stars unit. So on Tutorial and Normal a
     boss keeps its authored line on BOTH sides.
 
     The model defaulted `base_level` to 1 and no caller passed anything, so it applied the

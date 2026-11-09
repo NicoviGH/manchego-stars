@@ -76,10 +76,10 @@ The corpus deliberately varies them — use this to keep Manchego Stars' villain
 | gruff careerist | Caellach | complains, ambitious, mercenary, "Bah!" |
 | serene executioner | (Manchego Stars: Sephek) | calm, liturgical, pitying — *never* raises voice |
 
-Manchego Stars' villains already occupy some of these: **Sephek** = serene executioner (his own
-bible),
-**Izobai** = mocking bandit-warlord. So a new villain should be checked against this table for
-collision before drafting — that check is the villain half of SKILL.md's cover-the-name test.
+Manchego Stars' villains already occupy some of these: **Sephek** = serene executioner (his
+own bible), **Izobai** = mocking bandit-warlord. So a new villain should be checked against this
+table for collision before drafting — that check is the villain half of SKILL.md's
+cover-the-name test.
 
 ## Non-villain notes
 

@@ -42,10 +42,9 @@
 --      BRANCH of them (an enemy the average keeps may die, one it removes may live). Last, the
 --      best plan is mended: each unit it may lose tries its other acts (a green one, the acts
 --      of the player units that could save it; a recruit, the acts of the units it strikes), the
---      rest of the plan kept, and those are judged too.
---      At an irreversible transition (M.triggers: a door opened or a wall struck, a first step
---      into a seen boss's reach) the best M.FINAL plans
---      each meet a second enemy phase, our units holding between (sight.nextPhase): all of
+--      rest of the plan kept, and those are judged too. At an irreversible transition (M.triggers:
+--      a door opened or a wall struck, a first step into a seen boss's reach) the best M.FINAL
+--      plans each meet a second enemy phase, our units holding between (sight.nextPhase): all of
 --      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
 --      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
 --      that of dying in either phase, and those plans are ranked again among themselves.
@@ -66,12 +65,11 @@
 -- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
--- player units it strikes, sorted), kind =
--- "beam"|"assault"|"advance"|"unstall"|"mend"|"rest", considered = every plan judged, best first:
--- { judged, acts (its key list, M.keysOf), kind, rank, seizes, extended (it met the lookahead's
--- second phase), played (the one played), rejected (why not: "over_cap", "outranked", "stalled"),
--- weights (its judged phase's likeliest ways' chances) }, rank = what plans are compared by
--- (M.outranks): { admitted,
+-- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
+-- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
+-- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
+-- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
+-- rank = what plans are compared by (M.outranks): { admitted,
 -- forfeits (how many ledger goals it closes for good), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death

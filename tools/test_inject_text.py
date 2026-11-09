@@ -220,9 +220,9 @@ class SilentPresenceDirective(unittest.TestCase):
             [{'present': 'c'}, {'a': 'one'}, {'a': 'two'}]))
 
     def test_the_face_is_PRELOADED_before_any_text(self):
-        """The engine's rule, not ours. `TalkPrepNextChar` reopens the talk bubble whenever the
-        active face differs from the speaking one, so a silent face loaded mid-message opens a
-        bubble of its own and the scene plays with two stacked bubbles -- filmed 2026-08-14.
+        """The engine's rule, not Manchego Stars'. `TalkPrepNextChar` reopens the talk bubble
+        whenever the active face differs from the speaking one, so a silent face loaded mid-message
+        opens a bubble of its own and the scene plays with two stacked bubbles -- filmed 2026-08-14.
         Vanilla's silent loads are all preloads (MSG_0954, 095D, 095E); it never loads a face
         mid-message without having it speak next (MSG_904, 092C, 095A)."""
         out = self._msg([{'a': 'one'}, {'present': 'c'}, {'a': 'two'}])

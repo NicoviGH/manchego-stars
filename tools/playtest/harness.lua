@@ -3753,7 +3753,7 @@ INSPECT.campaignApi = function(game)
     local states, played, shops, menuPicked = {}, nil, nil, nil
     local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
 
-    -- The world map shops open now: vanilla's from its own world map; Manchego Stars' has none yet,
+    -- The world map shops open now: vanilla's from its own world map; Manchego Stars has none yet,
     -- so the twin's at the same point, as the vanilla campaign recorded them (cfg.shops).
     local function openNodes(ch)
         if game == "vanilla" then return INSPECT.worldMap().open end
@@ -7323,8 +7323,7 @@ scenarios.ch05recruit = function(opts)
     --    bug this chapter shipped with for months -- Hlin Trollbane's bust talking to vanilla
     --    Joshua, with every text decoder green. Box COUNT is the cheapest in-engine witness to
     --    which message id the script actually showed: Manchego Stars' scene is 21 A-presses,
-    --    vanilla's is
-    --    32.
+    --    vanilla's is 32.
     log(string.format("ch05recruit: the recruit scene ran %d boxes, message 0x%X",
         boxes, playedMsg or 0))
     if boxes ~= RECRUIT_BOXES then

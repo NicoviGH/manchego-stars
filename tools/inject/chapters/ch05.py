@@ -993,8 +993,7 @@ def ch05_sahnar_alone_message(chap):
     Rendered at the talk bubble's budget. That is the twin's channel
     taken whole: vanilla plays its 0x9C3 as a bare `TEXTSHOW` over the map with Joshua standing
     on this same tile. Until 2026-08-14 Manchego Stars could not, because Sahnar did not exist on
-    the
-    field until the turn-2 eruption; the scene-3 summon is what put her there.
+    the field until the turn-2 eruption; the scene-3 summon is what put her there.
     """
     slot, msg, boxes, what = CH05_SAHNAR_ALONE_SLOT
     _script, body = _ch05_opening_scene(
@@ -1093,10 +1092,9 @@ def ch05_sahnar_alone_block(sahnar_table, sahnar_char, position, station):
     No `FADU` of its own -- scene 5 already brought the screen up after the prep prologue's
     fade to black, and this beat follows it in the same event list without going dark between.
 
-    This is also where `arrives_turn: 2` stopped being a Manchego Stars
-    divergence (#25, Nicolas 2026-08-14): Sahnar
-    is on the map from turn 1, exactly as vanilla's Joshua is, and the eruption keeps its six
-    reinforcements without her.
+    This is also where `arrives_turn: 2` stopped being a Manchego Stars divergence (#25, Nicolas
+    2026-08-14): Sahnar is on the map from turn 1, exactly as vanilla's Joshua is, and the eruption
+    keeps its six reinforcements without her.
 
     THE `CAMERA` IS NOT DECORATION AND WAS MISSING UNTIL 2026-08-14. `CUMO_AT` draws a cursor
     and nothing else -- `EventDisplayCursor_Loop` calls `PutMapCursor` and returns -- so this
@@ -1337,11 +1335,10 @@ def ch05_basil_join_block(basil_char):
     Vanilla puts this beat's twin (0x9C2) BEFORE its prep CALL and we cannot, which is the one
     place ch05's inherited channel had to be overruled. Vanilla LOAD1s Eirika's group onto the
     street first, so its street scenes have a party to play to; the Manchego Stars party arrives
-    through Pick Units
-    (the ally table is never LOADed on a prep chapter -- decisions.md "How the deploy cap + prep
-    screen are actually wired"), so before the CALL the field holds sixteen risen dead, Ravisin,
-    and a green shrub addressing an empty pocket. After it, the nine the player chose are
-    standing at the stair-foot and Basil is at the pocket's mouth two tiles above them.
+    through Pick Units (the ally table is never LOADed on a prep chapter -- decisions.md "How the
+    deploy cap + prep screen are actually wired"), so before the CALL the field holds sixteen risen
+    dead, Ravisin, and a green shrub addressing an empty pocket. After it, the nine the player chose
+    are standing at the stair-foot and Basil is at the pocket's mouth two tiles above them.
 
     The shape is then vanilla's own after-prep block, which is what its 0x9C3/0x9C4 are:
     `FADU(16)` -- the shared prep prologue fades to black and leaves it there, so anything

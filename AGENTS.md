@@ -123,7 +123,8 @@ id in engine sources; chapter numbers and plot events are a review call.
 
 ## Standing rules (Nicolas)
 
-Where each came from: #588, comment 6752993507. Each is a correction he made; apply it, don't re-ask.
+Where each came from: #588, comment 6752993507. Each is a correction he made: apply it, don't
+re-ask.
 
 - **Name the game Manchego Stars** (vs vanilla) in prose: chat, issues, commits, docs, comments.
   `ours` is only the code's game id, in backticks (`check.py check_prose_names_manchego_stars`).

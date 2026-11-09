@@ -3,7 +3,7 @@
 
 `difficulty.py`'s parity ratio answers *is this chapter at parity with its vanilla twin*, and
 since ADR 0316 it answers it against the party this module says arrives: Manchego Stars' force
-against its party own, the twin's against vanilla's.
+against its own party, the twin's against vanilla's.
 
 Every ABSOLUTE question -- *can this unit survive that trip, is this fuse long enough for
 a real party, is this objective a coin flip* -- needs the party's level, and had none. During
@@ -623,8 +623,7 @@ def _simulated(campaign):
 def founding_grant(campaign='rime-of-the-frostmaiden'):
     """{uid: exp} the founding party is handed before it first deploys: what the twin pays
     each founding career for the fixed-roster chapter the Manchego Stars party banks nothing from
-    (ch00, ADR
-    0320).
+    (ch00, ADR 0320).
 
     The engine applies it once, at ch01's first prep (`FoundingExp_ApplyOnce`), so it must
     come from exactly one chapter that precedes every chapter the party fights, and stay

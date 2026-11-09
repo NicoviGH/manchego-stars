@@ -10,8 +10,8 @@ trigger: these teardowns only ever run on a crit round.
 
 The die is PROC-LESS: registered once, then the vanilla effect lifecycle owns
 BG1 -- a successor effect (brave second hit, magic counter's spell background)
-simply draws over it, and the battle-scene exit resets the layer. Nothing of
-Manchego Stars' code ever clears BG1 later, so no lingering proc can blank a newcomer's
+simply draws over it, and the battle-scene exit resets the layer. Nothing in
+this patch ever clears BG1 later, so no lingering proc can blank a newcomer's
 tilemap mid-display (the clobber class a timed teardown would create). It is
 a centered HUD overlay copied through the non-mirrored tilemap path, so the
 "20" never mirrors with attacker side. Asset symbols (Img/Pal/Tsa_MsD20Crit)

@@ -161,7 +161,7 @@ class Claims(unittest.TestCase):
                          {(brigand, 4)})
 
     def test_our_reinforcements_resolve_from_the_chapter(self):
-        # ours ch05: the eruption's waves on turns 2, 6 and 8, on vanilla's spawn tiles
+        # Manchego Stars ch05: the eruption's waves on turns 2, 6 and 8, on vanilla's spawn tiles
         chap = next(ch for ch in campaign_chapters.load_all() if ch['id'] == 'ch05-the-elven-tomb')
         c = ce.resolve({'kind': 'reinforcements'}, 'ch05#3', 'ours', chap)
         self.assertEqual(c['turns'], [2, 6, 8])
