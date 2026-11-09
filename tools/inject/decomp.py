@@ -195,6 +195,13 @@ def flag_number(token):
         return word
 
 
+def block_field(block, name, default=None):
+    """The int a `.name = <int>` field holds in one data-table entry (`_find_brace_block`'s
+    slice), else `default`. The one reader of a decomp row's field."""
+    m = re.search(r'\.%s\s*=\s*(-?(?:0x[0-9a-fA-F]+|\d+))\b' % name, block)
+    return int(m.group(1), 0) if m else default
+
+
 def enum_values(text, prefix):
     """{NAME: int} for every `PREFIX..., = <int>` or `= (1 << N)` enumerator in a C header's
     `text` (bmunit.h's state bits are the second form). An alias (`CLASS_OBSTACLE =
@@ -246,25 +253,35 @@ def vanilla_decomp_text(relpath):
                                    encoding='utf-8', env=env)
 
 
-@functools.lru_cache(maxsize=None)
 def rom_text(rel):
     """A decomp source as the ROM is built from it: the build tree's copy, which holds every
-    injection, when it exists; the pristine submodule otherwise. Memoised like
-    `vanilla_decomp_text`: a reader (the wiki, a run's story) reads one build."""
+    injection, when it exists; the pristine submodule otherwise. Memoised on the file's size and
+    mtime, not its name: the injector writes these files, so a read taken before a step writes
+    one must not outlive the write."""
     path = os.path.join(DECOMP, rel)
-    if os.path.isfile(path):
-        with open(path, encoding='utf-8') as f:
-            return f.read()
-    return vanilla_decomp_text(rel)
+    try:
+        st = os.stat(path)
+    except OSError:
+        return vanilla_decomp_text(rel)
+    return _read_built(path, st.st_size, st.st_mtime_ns)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.lru_cache(maxsize=64)
+def _read_built(path, _size, _mtime_ns):
+    with open(path, encoding='utf-8') as f:
+        return f.read()
+
+
 def rom_block(rel, token):
     """One `[token - 1] = {...}` entry of a data table (characters, classes) as the ROM is
     built from it, or ''."""
     if not token:
         return ''
-    text = rom_text(rel)
+    return _rom_block(rom_text(rel), rel, token)
+
+
+@functools.lru_cache(maxsize=None)
+def _rom_block(text, rel, token):
     try:
         s, e = _find_brace_block(text, '[%s - 1]' % token, rel)
     except (Exception, SystemExit):

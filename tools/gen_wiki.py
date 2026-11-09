@@ -762,9 +762,7 @@ def enemy_token(chap, ed):
     return inject.chapter_ids.GENERIC_PID_DONORS.get(pid, pid)
 
 
-def _field(block, name):
-    m = re.search(r'\.%s\s*=\s*(0x[0-9a-fA-F]+|\d+)' % name, block)
-    return int(m.group(1), 0) if m else 0
+_field = unit_load._field
 
 
 def rom_unit_name(chap, ed):

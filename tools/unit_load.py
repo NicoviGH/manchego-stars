@@ -123,8 +123,7 @@ def can_use_weapon(item_enum, class_enum, char_block='', attributes=frozenset(),
 
 
 def _field(block, name):
-    m = re.search(r'\.%s\s*=\s*(-?(?:0x[0-9a-fA-F]+|\d+))' % name, block)
-    return int(m.group(1), 0) if m else 0
+    return inject.decomp.block_field(block, name, 0)
 
 
 def class_line(class_enum):
