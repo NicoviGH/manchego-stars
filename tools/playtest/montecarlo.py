@@ -48,8 +48,9 @@ it, and stops there. Each `pilot` and `cell` appends its record to references/si
     python3 tools/playtest/montecarlo.py report [cells.jsonl] [--decision party|enemy|chapter \
         [--components a,b]] [--post]
 
-`report` says one instrument's cells in sentences (FR-031): the header, one sentence a cell, the anomalies with their `story` commands, the validity failures and the descriptive
-data, each beside the twin; `--decision` reads only that decision's components (FR-032);
+`report` says one instrument's cells in sentences (FR-031): the header, one sentence a cell,
+the anomalies with their `story` commands, the validity failures and the descriptive data,
+each beside the twin; `--decision` reads only that decision's components (FR-032);
 `--post` writes it under build/ and prints the `gh issue comment 510` command, never running it.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
@@ -1296,10 +1297,10 @@ def pilot_main(args):
 # ---- read validity and the report (#510 step 9 PR-I; FR-029, FR-031, FR-032) ----
 # A verdict is only as good as the attempts behind it. Before a cell gets one, both arms'
 # first attempts pass FR-029's invariants, or the cell is NOT READABLE with each failed one
-# named. There are no human playtests (ADR 0385, amended 2026-11-09): vanilla is the proxy for
-# playtesters, so the bot is checked against vanilla alone: the same bot plays both arms, and
-# the validity bars. There is no canary either: no record shows vanilla's chapters ordered by
-# how often players lose units (ADR 0385, amended 2026-11-09).
+# named. There are no human playtests: vanilla is the proxy for playtesters, so the bot is
+# checked against vanilla alone, by playing both arms and passing the validity bars. Nothing
+# orders vanilla's chapters by how often players lose units, so there is no canary either (ADR
+# 0385, amended twice on 2026-11-09).
 # `report` says it all in sentences, one per cell (FR-031), and reads a decision's own
 # components only (FR-032).
 
@@ -1564,16 +1565,11 @@ def vanilla_rows():
     return inject.chapter_settings.twin_rows()
 
 
-def vanilla_name(row):
-    """A twin_rows name ('FE8 Ch3') as a reader says it ('vanilla Ch3'): the one formatter."""
-    return 'vanilla ' + row.split()[-1]
-
-
 def twin_name(index):
     """Vanilla chapter index `index` as a reader says it ('vanilla Ch3')."""
     for name, i in vanilla_rows().items():
         if i == index:
-            return vanilla_name(name)
+            return 'vanilla ' + name.split()[-1]   # twin_rows' 'FE8 Ch3'
     return 'vanilla chapter %d' % index
 
 
