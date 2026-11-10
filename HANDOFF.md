@@ -43,7 +43,8 @@ was built or run in the emulator this session.
   every replan). `suite --held-out` has NOT run on it. The earlier Ch6 witness (4001 and 4007,
   12 attempts each) is on #510 comment 6776176601.
 - **How to work it cheaply** (agreed with Nicolas): a fresh session a PR, started from the plan
-  comment; Opus for the building, Fable only to read PR A's calibration table and PR B's
+  comment; Opus for the building; Fable comes back for two reads only (the comment's
+  "Where Fable comes back in"): PR A's stepping-back witness on the Ch5 starts, and PR B's
   campaign rerun; never read the five bot files whole (435 KB: use the comment's file map and
   `sed -n`); scripts read the runs, not a model; unit tests on the fake board before any
   emulator run; while working, only the starts a change can touch (Ch5 starts, the Ch6 fog
