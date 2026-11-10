@@ -10,11 +10,12 @@ here should still be true in a month. Before a context rollover, warn Nicolas, r
 and start a fresh instance; don't rely on auto-compaction.
 
 Refreshed 2026-11-09, late night (Claude): **PR-I merged as #593** (validity / NOT READABLE,
-`report`, T107a). **Then Nicolas retired the human check** (ADR 0385 amended 2026-11-09): there
-are no human playtests, vanilla is the playtesters' proxy. Branch `feat/510-drop-human-check`
-removes the `human` subcommand, its form, the gate on human sessions and the humans' canary pair; the
-retired phrases are in `DEAD_CONCEPTS`. T107 stays open only for posting the report (Nicolas's
-go-ahead).
+`report`, T107a). **Then Nicolas retired the human check and the canary** (ADR 0385, two
+amendments 2026-11-09): there are no human playtests, vanilla is the playtesters' proxy, and no
+research record orders vanilla's chapters by unit losses (a Sonnet read of `docs/research/`; the
+only "hardest maps" are Ephraim's Ch11 and Ch14). **PR #594** (`feat/510-drop-human-check`)
+removes both; reviewed, every finding fixed; it waits on CI and Nicolas's "merge". T107 stays
+open only for posting the report (Nicolas's go-ahead).
 
 ## Where things stand
 
@@ -78,10 +79,6 @@ go-ahead).
      The report is in `build/report-9d0b15b542e2-v2.md`; **post it to #510 only on Nicolas's
      go-ahead** (T107). Clean clears in that pilot: Manchego Stars 0 of 50 (two chwinga die and
      the village at (12,3) is closed in every play), vanilla 35 of 50.
-   - **The canary can't be read yet**: no vanilla Ch1/Ch5/Ch6 first attempts exist under the
-     current instrument. Needs vanilla runs of those chapters (Nicolas's call on the cost).
-     Its expected order (Ch1 below Ch5, Ch2 below Ch6) is a spec assumption: no research
-     record ranks vanilla's chapters by how often players lose units (a grep, not a search).
    - **Bot hash drift**: main's bot hash is `9d0b15b542e2`, the frozen suite's `ce1e3adb8c57`;
      #589's comment-only edits to the Lua moved it. Play is unchanged; a `suite --held-out`
      would refreeze it under the new hash.
