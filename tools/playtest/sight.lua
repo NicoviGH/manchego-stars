@@ -76,6 +76,9 @@
 --                            (the window's), takenSlot, takenTile, takenDist (what it takes off
 --                            `u`), counterDist (what `u`'s counter takes off `e`). All 0 (slot/
 --                            tile nil, takenDist nothing) when the AI does not strike `u` there.
+--   fogStrike(u, e, x, y, fx, fy)  as strike(), `e` first stood on (fx, fy): the strike an enemy
+--                            seen before would make from the fog's edge (the planner's fog
+--                            rule, #510 PR A); `u` holds the weapon it holds.
 --   batch(fn)                fn's reads in one save/load: one decision's worth of questions
 --                            cost one state round trip, not one each.
 --   fullInfo(fn)             batch(), the fog off (M.fullInfo): fn(board), the board read with
@@ -1462,6 +1465,20 @@ function M.new(outer)
             M.equip(api, call, S, u, slot)
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
+            local target, side = aiDecide(call, proc, e, function() onlyTarget(u, all) end)
+            if target ~= u.id then return nil end
+            return side
+        end)
+        return M.strikeOf(t)
+    end
+
+    -- strike()'s decision with `e` first stood on (fx, fy), a tile the fog hides: what an enemy
+    -- seen before could do from there (Planner's fog rule, #510 PR A). Only the sandbox moves it.
+    function s.fogStrike(u, e, x, y, fx, fy)
+        local all = units()
+        local t = sandbox(function(call, proc)
+            standOn(u, x, y)
+            standOn(e, fx, fy)
             local target, side = aiDecide(call, proc, e, function() onlyTarget(u, all) end)
             if target ~= u.id then return nil end
             return side

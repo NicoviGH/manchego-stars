@@ -23,7 +23,8 @@
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
 --      for each unit's chance to die there (a green one's too: it spoils the clear; a recruit
 --      our counter fells loses its goal; a unit whose death ends the game costs the chapter), its
---      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
+--      expected damage, and for a unit left beside ground it cannot see, one strike from the
+--      strongest enemy seen so far, stood at the fog's edge, in its chance to die.
 --      The plans are then ranked, not summed (ADR 0384): one whose protected units (every
 --      blue, and any unit whose death ends the game) each die at no more than the style's cap
 --      (M.CAPS) outranks any that does not. With none under it, the one least likely to end
@@ -102,6 +103,8 @@
 -- uncertain kills left to the average past BRANCH), look = { decisions, triggered, extended,
 -- skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
 -- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
+-- opts.seen = unit slot -> charId, every red a board showed out of fog this attempt (optional,
+-- botrun's): the fog rule's strongest enemy is one of these; without it, one in sight.
 -- opts.rest = the act keys (M.key) of the plan in hand not yet played (optional; botrun's on a
 -- replan): judged as one more plan, kind "rest", its acts as this board still offers them.
 -- opts.diag = "deep" (a diagnostic replay's, FR-019): every decision's finalists meet the
@@ -143,7 +146,7 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
--- whose death ends it (a lord's); fog: a fragile unit beside the unseen; gold: points per gold
+-- whose death ends it (a lord's); gold: points per gold
 -- a goal is worth (goals.lua: under careful no item outweighs a life, under bold a good one
 -- does). What each further turn to a goal leaves of its chance is goals.lua's GAMMA.
 -- Ground toward a goal, a Visit, a Talk recruit and the win itself: the goals' term (goalTerm
@@ -152,11 +155,11 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 -- win is the same win, so it waits while what it would close is worth more than the waiting.
 M.WEIGHTS = {
     careful = { death = 1000, taken = 2, dealt = 1, kill = 30, heal = 1.5, breach = 25,
-                win = 100000, fog = 40, gold = 0.04 },
+                win = 100000, gold = 0.04 },
     even = { death = 300, taken = 1, dealt = 1, kill = 30, heal = 1, breach = 25,
-             win = 100000, fog = 15, gold = 0.08 },
+             win = 100000, gold = 0.08 },
     bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, heal = 0.5, breach = 25,
-             win = 100000, fog = 0, gold = 0.15 },
+             win = 100000, gold = 0.15 },
 }
 
 -- The most predicted death chance a style accepts for any protected unit in a plan (ADR 0384,
@@ -982,6 +985,50 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
+    -- The fog (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
+    -- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit
+    -- ending within FOG_REACH of an unseen tile meets one strike from the strongest enemy seen
+    -- so far, stood on the nearest unseen tile (sight.fogStrike: the game's AI choosing from
+    -- there, the unit its one target); the strike's chance to kill joins its chance to die.
+    -- Seen so far is opts.seen (unit slot -> charId, botrun's: every red a board showed out of
+    -- fog this attempt), else the enemies in sight; one of each class and kit is asked.
+    local fogReps, fogStrikes = {}, {}
+    if #unseen > 0 and sight.fogStrike then
+        local seen, kits = opts and opts.seen, {}
+        for _, u in ipairs(board.units) do
+            local ok = u.faction == "red" and u.onField and not u.dead
+            if ok then
+                if seen then ok = seen[u.id] == u.charId else ok = not u.fogged end
+            end
+            local kit = ok and (tostring(u.classId) .. ":" .. table.concat(u.items or {}, ","))
+            if kit and not kits[kit] then
+                kits[kit] = true
+                fogReps[#fogReps + 1] = u
+            end
+        end
+    end
+    -- unit `u` ending on (x, y) with `hp` left after the judged phase: its chance to die to the
+    -- fog's strongest strike, 0 with no unseen tile within FOG_REACH
+    local function fogDie(u, x, y, hp)
+        if #fogReps == 0 or hp <= 0 then return 0 end
+        local edge, near
+        for _, t in ipairs(unseen) do
+            local d = math.abs(t.x - x) + math.abs(t.y - y)
+            if d <= M.FOG_REACH and (not near or d < near) then edge, near = t, d end
+        end
+        if not edge then return 0 end
+        local worst = 0
+        for _, e in ipairs(fogReps) do
+            local k = u.id .. "@" .. x .. "," .. y .. "/" .. e.id
+            local f = fogStrikes[k]
+            if not f then
+                f = sight.fogStrike(u, e, x, y, edge.x, edge.y)
+                fogStrikes[k] = f
+            end
+            worst = math.max(worst, (odds({ f.takenDist }, hp)))
+        end
+        return worst
+    end
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0,
@@ -1293,6 +1340,23 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
         end
+        -- the fog's strike, after the phase: on the HP the phase is expected to leave
+        local fogOf = {}
+        for _, p in ipairs(planned) do
+            local id = p.unit.id
+            local f = fogDie(p.unit, p.x, p.y, p.hp - (taken[id] or 0))
+            if f > 0 then
+                fogOf[id] = f
+                local d = die[id] or 0
+                die[id] = d + (1 - d) * f
+                -- each way's share: the fog strikes where that way left the unit alive
+                for i = 1, #ways do
+                    local b = (byWay[id] or {})[i] or 0
+                    byWay[id] = byWay[id] or {}
+                    byWay[id][i] = b + ((wayP[i] or 0) - b) * f
+                end
+            end
+        end
         st.predict = {}
         for _, g in ipairs(greens) do
             judged = judged - loss(W, st, g.charId) * die[g.id]
@@ -1324,17 +1388,9 @@ function M.plan(Bot, board, sight, style, opts)
             table.sort(by)
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
                                             y = p.y, hp = p.hp, die = die[id], taken = taken[id],
-                                            strikes = struck[id], strikers = by }
+                                            strikes = struck[id], strikers = by, fog = fogOf[id] }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
             judged = judged - loss(W, st, p.unit.charId) * die[id] - W.taken * short[id]
-            if W.fog > 0 then
-                for _, t in ipairs(unseen) do
-                    if math.abs(t.x - p.x) + math.abs(t.y - p.y) <= M.FOG_REACH then
-                        judged = judged - W.fog * 10 / math.max(p.hp, 1)
-                        break
-                    end
-                end
-            end
         end
         -- the goals, as the phase leaves them: who lives to take each, and each recruit our
         -- counter may have felled (its goal lost)
@@ -1771,6 +1827,36 @@ function M.plan(Bot, board, sight, style, opts)
         best.ledger[#best.ledger + 1] = { id = r.id, kind = r.kind, closes_on = r.closes_on,
                                           needs = r.needs,
                                           status = shut[r.id] and "closed" or r.status }
+    end
+    -- Sturdy first, fragile last (#510 PR A's fog rule): the acts of units the fog's strike
+    -- threatens (predict's `fog`) are played after the others', the most threatened last, so a
+    -- unit that shows what the fog hid moves before them and botrun's replan (M.surprise: a
+    -- newly seen enemy) plans them around it. Kept only when the plan rebuilt in that order
+    -- expects every act to end as judged (extend's expect: HP, a kill, the target's HP).
+    local fogBy, any = {}, false
+    for _, p in ipairs(best.predict or {}) do
+        if p.fog then fogBy[p.id], any = p.fog, true end
+    end
+    if any then
+        local order = {}
+        for i, a in ipairs(best.acts) do order[i] = { a = a, i = i, f = fogBy[a.unitId] or 0 } end
+        table.sort(order, function(x, y)
+            if x.f ~= y.f then return x.f < y.f end
+            return x.i < y.i
+        end)
+        local st = start
+        for _, o in ipairs(order) do
+            st = st and extend(st, o.a, o.a.unitId)
+        end
+        local was, same = {}, st ~= nil
+        for i, a in ipairs(best.acts) do was[key(a)] = best.expect[i] end
+        for i, a in ipairs(st and st.acts or {}) do
+            local x, y = was[key(a)], st.expect[i]
+            if not x or x.hp ~= y.hp or x.gone ~= y.gone or x.targetHp ~= y.targetHp then
+                same = false
+            end
+        end
+        if same then best.acts, best.expect = st.acts, st.expect end
     end
     return best.acts[1], best, cost
 end

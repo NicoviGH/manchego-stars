@@ -675,6 +675,9 @@ function M.run(api)
         end
     end
     local lastBoard, actedIn
+    -- every red unit a board showed out of fog this attempt, slot -> charId: the planner's
+    -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A)
+    local seenReds = {}
     local function changes(after)
         if api.recruits and not owed then
             local party = {}
@@ -700,6 +703,11 @@ function M.run(api)
                                                                   x = e.x, y = e.y,
                                                                   charId = e.charId }
                 end
+            end
+        end
+        for _, u in ipairs(after.units or {}) do
+            if u.faction == "red" and u.onField and not u.dead and not u.fogged then
+                seenReds[u.id] = u.charId
             end
         end
         lastBoard, actedIn = after, nil
@@ -1083,7 +1091,7 @@ function M.run(api)
                         local function memo()
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
-                                     budget = { attempt = lookLeft() } }
+                                     budget = { attempt = lookLeft() }, seen = seenReds }
                         end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board

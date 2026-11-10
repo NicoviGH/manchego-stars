@@ -1373,6 +1373,31 @@ do
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
 end
 
+-- test_the_planner_is_told_every_enemy_seen (#510 PR A, the fog rule): opts.seen holds every
+-- red a board showed out of fog this attempt, slot -> charId, and never one only ever fogged.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10),
+                                   unit(0x82, 1, "red", 9, 9, 10) } }
+    for _, u in ipairs(g.units) do
+        if u.id == 0x82 then u.fogged = true end
+    end
+    local got
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board, _, _, opts)
+            got = got or opts.seen
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true } }
+        end,
+    }
+    Botrun.run(g.api)
+    check(got and got[0x81], 0x81, "seen: a red in sight, by slot, its charId")
+    check(got and got[0x82], nil, "seen: not one only ever fogged")
+end
+
 -- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
 -- graded by the plan that moved it, not by a later replan that found it over the cap; a unit
 -- no plan moved this turn falls back to the phase's last plan.
