@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 T107a (ADR 0395, amended): a tuning-seed death the frozen run did not
+    # have is said and never blocks promotion, explained or not
+    r'\bunexplained (new )?death(s)? blocks?\b', r'\bnew unexplained death or stall\b',
+    r'\bwitnessed new death is said and does not block\b',
     # retired by #510 T100e (ADR 0385): a chapter cell plays K pinned campaigns an arm, named by
     # `--chapter N`; it no longer takes one suite start an arm
     r'--ours-start\b', r'--vanilla-start\b', r'\btwo pinned starts\b',

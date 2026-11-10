@@ -39,6 +39,23 @@ first K pinned (by seed) that reached the chapter. `starts` plays and pins those
 runs.jsonl): the store is the ROM's, so a Manchego Stars ROM change means
 `starts --game ours` again.
 
+Before a cell or pilot is read, both arms' first attempts pass FR-029's invariants
+(`validity`): environment-clean at 90% or more, no sandbox-fault death, blindspot and
+unclassified attempts under 10%, no unlabelled over-cap death, no unjustified seize skip, and
+the twin losing someone under 85% of the time. A cell that fails one is NOT READABLE, naming
+it, and stops there. Each `pilot` and `cell` appends its record to references/sim/cells.jsonl.
+
+    python3 tools/playtest/montecarlo.py report [cells.jsonl] [--decision party|enemy|chapter \
+        [--components a,b]] [--post]
+    python3 tools/playtest/montecarlo.py human [--form]
+
+`report` says one instrument's cells in sentences (FR-031): the header, the canary, one sentence
+a cell, the human calibration, the anomalies with their `story` commands, the validity failures
+and the descriptive data, each beside the twin; `--decision` reads only that decision's
+components (FR-032); `--post` writes it under build/ and prints the `gh issue comment 510`
+command, never running it. `human --form` prints the one-page calibration form; `human` reads
+the coded sessions (references/sim/human/*.jsonl) against the bot's leading causes (FR-030).
+
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
@@ -50,12 +67,14 @@ forecast and every blow.
 `instrument:` section, ADR 0387): attempt 1 of each pinned chapter start, from its saved state,
 under each of its seeds, and checks each failing-decision snapshot still loads to its board.
 The tuning seeds print each run and are judged on the frozen baseline (suite-frozen.json,
-ADR 0395): an invariant that held and fails, a new unexplained death or stall, an unlabelled
-fallback, and SC-003's calls more than 20% over the frozen count. --held-out plays the held-out
+ADR 0395): an invariant that held and fails, a new stall, an unlabelled fallback, and SC-003's
+calls more than 20% over the frozen count; a death the frozen run did not have is said, a
+signal that never blocks (T107a). --held-out plays the held-out
 seeds too, said only as counts, and gives the promotion result; --freeze does that and writes
 the frozen baseline when the candidate is promoted (--override WHY freezes a refused one, on
 Nicolas's word, and keeps WHY in the file). --kept judges this instrument's kept runs
-again instead of playing them (after a replay witnessed a new death). It refuses a start that
+again instead of playing them (after a replay witnessed a new death, so the suite says its
+label). It refuses a start that
 no longer matches its pin, and any job over 8 wall-hours (SC-007), before anything runs.
 
     python3 tools/playtest/montecarlo.py audit <runs .jsonl> --diag <log> [--diag <log> ...]
@@ -110,6 +129,7 @@ import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUN_SH = os.path.join(HERE, 'run.sh')
+REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
 BOTRUN, CAMPAIGN = 'BOTRUN', 'CAMPAIGN'
@@ -439,7 +459,25 @@ def botrun_names(path=os.path.join(HERE, 'botrun.lua')):
             dict(re.findall(r'(\w+) = "(\w+)"', details.group(1))))
 
 
-def death(d, who=lambda c: '0x%02X' % c):
+def hex_id(c):
+    """A character id as the records hold it, when no name is at hand: the one fallback every
+    sentence that names a unit uses."""
+    return '0x%02X' % c if isinstance(c, int) else str(c)
+
+
+def namer(names):
+    """`who` for a sentence from name table `names` ({id: name}): a unit's name, or its id
+    (hex_id) when the table has none, or an empty one."""
+    return lambda c: names.get(c) or hex_id(c)
+
+
+def plural(n, word, many=None):
+    """'1 death', '2 deaths': `n` and `word`, plural unless n is 1 (`many` when the plural is
+    not word + 's')."""
+    return '%d %s' % (n, word if n == 1 else (many or word + 's'))
+
+
+def death(d, who=hex_id):
     """One blue or green death, in words: who, when, to whom, and from a graded record (#510
     step 9, FR-005) its cause, the chance the committing plan gave it and its flags."""
     out = 'lost %s (%s, turn %s, to %s)' % (who(d['charId']), d.get('faction'), d.get('turn'),
@@ -463,13 +501,13 @@ def death(d, who=lambda c: '0x%02X' % c):
     return out + ''.join(', %s' % f for f in flags)
 
 
-def theft(t, who=lambda c: '0x%02X' % c):
+def theft(t, who=hex_id):
     """One theft of a record's `thefts` (ADR 0379), in words."""
     return '%s stole item 0x%02X from %s (turn %s)' % (who(t['thief']), t['item'], who(t['from']),
                                                        t.get('turn'))
 
 
-def spoiled(r, who=lambda c: '0x%02X' % c):
+def spoiled(r, who=hex_id):
     """What kept record `r` from a clean clear (#510 step 9 design, part A), in words: each unit
     lost, each owed recruit missed, each village or chest not taken, each theft ranked above the
     stat boosters (ADR 0379); '' when nothing did."""
@@ -946,6 +984,7 @@ def cell_pairs(sides, play, seeds, have=None):
 def run_cell(sides, play, cells, analysis, seeds=None, looks=LOOKS):
     """Play a cell to its verdict (ADR 0385): the confirmatory seeds (`seeds`, 1..the last
     look by default) look by look, cell_pairs' pairs judged by paired_verdict at each look,
+    then by validity (FR-029: NOT READABLE or an outcome-dependent fault settles it),
     stopping at the first settled one. An arm's unresolved reachability (a campaign that
     crashed before the chapter, after its retry) withholds the comparison, and the cell
     stops there, each such run named with what it said."""
@@ -964,12 +1003,17 @@ def run_cell(sides, play, cells, analysis, seeds=None, looks=LOOKS):
                        'verdict': 'WITHHELD',
                        'reason': 'withheld at %d replicates: an arm crashed before the chapter, '
                        'so whether it reaches it is unknown' % look}
+            verdict = judged(verdict, validity(cell_results(got['results'], seeds[:look])))
             break
         verdict = paired_verdict(got['pairs'], cells, analysis, looks, look=look)
+        # FR-029: both arms' first attempts at this look pass every invariant, or the cell is
+        # NOT READABLE and stops: more pairs from an instrument that failed one read nothing
+        verdict = judged(verdict, validity(cell_results(got['results'], seeds[:look])))
         if verdict['settled']:
             break
     return dict(verdict, played=played, reach=got['reach'], problems=got['problems'],
-                cpu_s=got['cpu_s'], paired=got['paired'])
+                cpu_s=got['cpu_s'], paired=got['paired'], results=got['results'],
+                seeds=seeds[:look])
 
 
 def campaign_side(env, chapter, mode, store, stamp, vanilla):
@@ -1098,12 +1142,24 @@ def cell_main(args):
             return 1
         lo, hi = suite['seed_sets']['confirmatory']
         seeds = range(lo, hi + 1)
+        number, twin = args.chapter, starts['vanilla'][0]['chapter']
     else:
         try:
             cells = frozen_cells(args, load_suite())
         except ValueError as err:
             print('refused: %s' % err)
             return 1
+        import campaign_env
+        # the cell's sentence names our chapter by its number; an index no hosted chapter
+        # stands at has none, and a sentence must never print an index as a chapter
+        number = next((k for k, (host, _) in campaign_env.cell_chapters().items()
+                       if host == args.ours_chapter), None)
+        if number is None:
+            print('refused: --ours-chapter %d is no written chapter\'s index (%s)' % (
+                args.ours_chapter, ', '.join('ch%02d at %d' % (k, h) for k, (h, _)
+                                             in sorted(campaign_env.cell_chapters().items()))))
+            return 1
+        twin = args.vanilla_chapter
         bot, sides, seeds = bot_hash(), {}, None
         for name, path, chapter in (('ours', args.ours, args.ours_chapter),
                                     ('vanilla', args.vanilla, args.vanilla_chapter)):
@@ -1114,6 +1170,7 @@ def cell_main(args):
                                         os.path.join(simdir(vanilla), 'runs.jsonl'),
                                         cell_stamp(env, args.mode, bot), vanilla)
     v = run_cell(sides, pool_play(args.jobs), cells, args.analysis, seeds)
+    stores = {n: sides[n]['store'] for n in ('ours', 'vanilla')}
     print(v['reason'] + (' (%d pairs %s)' % (v['n'], games_line(sides, v['paired']))
                          if chapter_cell else ''))
     for line in problem_lines(v['problems']):
@@ -1126,8 +1183,14 @@ def cell_main(args):
                   100 * v['ours'], 100 * v['vanilla'], b, c, a, d, v['analysis'], cells))
     for n in ('ours', 'vanilla'):
         print('%s: %d replicates reached the chapter, %d did not, %d unknown' % (
-            n, v['reach'][n]['reached'], v['reach'][n]['unreached'], v['reach'][n]['unresolved']))
+            GAME_NAMES[n], v['reach'][n]['reached'], v['reach'][n]['unreached'],
+            v['reach'][n]['unresolved']))
     print('played now: Manchego Stars %(ours)d, vanilla %(vanilla)d' % v['played'])
+    print('\n'.join(validity_lines(v['validity'])))
+    append_record(CELLS_FILE, cell_record(
+        'chapter' if chapter_cell else 'campaign', number, twin, v, v['results'], v['paired'],
+        stores, instrument_id(), games_line(sides, v['paired']) if chapter_cell else None))
+    print('cell record: %s (`montecarlo.py report` reads it)' % CELLS_FILE)
     return 0
 
 
@@ -1152,7 +1215,7 @@ def pilot_lines(s, chapter, games):
                    'can be reached' if s['reachable'] else 'cannot be reached')]
     for n, r in sorted(s['reach'].items()):
         out.append('  %s: %d replicates reached the chapter, %d did not, %d unknown' % (
-            n, r['reached'], r['unreached'], r['unresolved']))
+            GAME_NAMES.get(n, n), r['reached'], r['unreached'], r['unresolved']))
     out.append('  %.0f CPU s in all (%.2f CPU-hours)' % (s['cpu_s'], s['cpu_s'] / 3600))
     return out
 
@@ -1198,9 +1261,29 @@ def pilot_main(args):
         print('\n'.join(problem_lines(got['problems'])))
         return 1
     s = pilot_summary(got['pairs'], cells, got['cpu_s'], got['reach'])
-    for line in pilot_lines(s, args.chapter, games_line(sides, got['paired'])) + \
+    games = games_line(sides, got['paired'])
+    # FR-029 on the pilot too: a pilot whose attempts fail an invariant is NOT READABLE, and
+    # the analysis it chose must not be handed to `cell`, so it says so first and fails
+    v = judged({'verdict': None, 'n': s['n'], 'diff': s['diff'], 'table': s['table'],
+                'analysis': s['analysis'], 'cpu_s': s['cpu_s']},
+               validity(cell_results(got['results'], seeds)))
+    unreadable = v['verdict'] == NOT_READABLE
+    if unreadable:
+        print('NOT READABLE (%s): this pilot\'s analysis choice cannot be used for a cell'
+              % ', '.join(v['failed_invariants']))
+    for line in pilot_lines(s, args.chapter, games) + validity_lines(v['validity']) + \
             problem_lines(got['problems']):
         print(line)
+    if args.bench_vanilla:
+        # an experiment's runs are filed under their own instrument (bench_instrument); its
+        # record would stand in for the instrument's real pilot in `report`
+        print('no cell record: a benched experiment is not the instrument\'s pilot')
+    else:
+        append_record(CELLS_FILE, cell_record('pilot', args.chapter, sides['vanilla']['chapter'],
+                                              v, got['results'], got['paired'],
+                                              {n: sides[n]['store'] for n in sides}, inst,
+                                              games))
+        print('cell record: %s (`montecarlo.py report` reads it)' % CELLS_FILE)
     print('discordant pairs (story <trace> reads each):')
     for seed in seeds:
         res = got['results'][seed]
@@ -1208,9 +1291,744 @@ def pilot_main(args):
         if None not in pair and pair[0] != pair[1]:
             print('  seed %d (%s), only %s lost someone: Manchego Stars %s, vanilla %s' % (
                 seed, ', '.join(res[n]['rec']['suite']['start_id'] for n in ('ours', 'vanilla')),
-                'ours' if pair[0] else 'the twin',
+                'Manchego Stars' if pair[0] else 'the twin',
                 *(os.path.join(simdirs[n], res[n]['rec'].get('trace') or '?')
                   for n in ('ours', 'vanilla'))))
+    return 1 if unreadable else 0
+
+
+# ---- read validity, human calibration and the report (#510 step 9 PR-I; FR-029 to FR-033) ----
+# A verdict is only as good as the attempts behind it. Before a cell gets one, both arms'
+# first attempts pass FR-029's invariants, or the cell is NOT READABLE with each failed one
+# named. Once humans have played the four calibration maps, a result gates a decision only
+# when the bot's leading cause of a first-attempt death matches the humans' leading reset
+# reason on three of the four (FR-030); else it is UNVALIDATED_HUMAN. `report` says it all in
+# sentences, one per cell (FR-031), and reads a decision's own components only (FR-032).
+
+ENV_CLEAN_MIN = 0.90       # FR-029: an arm's environment-clean share of its first attempts
+BLIND_MAX = 0.10           # FR-029: blindspot plus unclassified attempts, under this
+VANILLA_DEATH_MAX = 0.85   # FR-029: the twin losing someone this often reads nothing
+VALIDITY = ('environment_clean', 'sandbox_fault', 'blindspot', 'unlabelled_over_cap',
+            'unjustified_seize_skip', 'vanilla_deaths')
+NOT_READABLE = 'NOT_READABLE'
+
+
+def first_death(rec):
+    """Record `rec`'s first protected death, or None: the earliest by turn, a death with no
+    turn after every one with a turn, and same-turn deaths in the order the watch saw them."""
+    deaths = protected_deaths(rec)
+    if not deaths:
+        return None
+    return min(enumerate(deaths), key=lambda i_d: (i_d[1].get('turn') is None,
+                                                   i_d[1].get('turn') or 0, i_d[0]))[1]
+
+
+def death_rate(recs):
+    """(attempts that lost a protected unit, attempts): the endpoint, counted."""
+    return sum(1 for r in recs if protected_deaths(r)), len(recs)
+
+
+def blind_or_unclassified(d):
+    """Whether graded death `d` is one the plan could not see coming (botrun.lua's `blindspot`
+    family) or one no cause in botrun.lua names its family (unclassified): an "other" death
+    with no detail or an unknown one, or a death with no cause at all."""
+    causes, details = botrun_names()
+    cause = d.get('cause')
+    if cause is None or cause not in causes:
+        return True
+    return cause == 'other' and details.get(d.get('detail')) in (None, 'blindspot')
+
+
+def validity(results):
+    """FR-029 on a cell's first attempts, `results` {arm: [chapter_result]} (the seeds of the
+    look; a seed an arm never reached is left out). Returns {'failed': [(invariant, sentence)],
+    'withheld': [sentence]}: a failed invariant makes the cell NOT READABLE, each named
+    (VALIDITY); a played attempt whose environment did not hold, with play begun (an
+    outcome-dependent fault), withholds the verdict, since which runs fail then can follow what
+    happened in them. An attempt with no game result stays in the clean share's denominator;
+    FR-027 already bounds its endpoint. The clean share is over every attempt that reached
+    the chapter; every other rate is over the arm's played attempts. An arm with no attempt
+    at all is listed in `unread`, never passed:
+      - environment_clean: under ENV_CLEAN_MIN of the arm's attempts (played or not) clean;
+      - sandbox_fault: any protected death the plan's own reads failed (botrun.lua's family);
+      - blindspot: BLIND_MAX or more of the attempts with a blindspot or unclassified death;
+      - unlabelled_over_cap: any death over the cap no fallback names (run_outcome's);
+      - unjustified_seize_skip: any win put off with nothing left it would close;
+      - vanilla_deaths: the twin lost someone in VANILLA_DEATH_MAX or more of its attempts."""
+    failed, withheld, unread = [], [], []
+    for arm in ('ours', 'vanilla'):
+        name = GAME_NAMES[arm]
+        got = [r for r in results.get(arm) or [] if r['status'] in ('played', 'unresolved')]
+        if not got:
+            unread.append(arm)
+            continue
+        clean = sum(1 for r in got if r['rec'].get('env_status') == 'clean')
+        if clean < ENV_CLEAN_MIN * len(got):
+            failed.append(('environment_clean', '%s: %d of %d attempts environment-clean '
+                           '(%.0f%%), the bar is %.0f%%' % (name, clean, len(got),
+                                                             100.0 * clean / len(got),
+                                                             100 * ENV_CLEAN_MIN)))
+        played = [r['rec'] for r in got if r['status'] == 'played']
+        dep = [x for x in played if isinstance(x.get('env_status'), dict)
+               and x['env_status'].get('outcome_dependent')]
+        if dep:
+            withheld.append('%s: %s with an outcome-dependent environment fault (%s)' % (
+                name, plural(len(dep), 'played attempt'),
+                ', '.join(sorted({x['env_status'].get('fault') or '?' for x in dep}))))
+        if not played:
+            continue
+        deaths = [d for x in played for d in protected_deaths(x)]
+        sandbox = [d for d in deaths if d.get('cause') == 'other'
+                   and botrun_names()[1].get(d.get('detail')) == 'sandbox_fault']
+        if sandbox:
+            failed.append(('sandbox_fault', '%s: %s (%s)' % (
+                name, plural(len(sandbox), 'sandbox-fault death'),
+                ', '.join(sorted({d['detail'] for d in sandbox})))))
+        blind = sum(1 for x in played if any(blind_or_unclassified(d)
+                                             for d in protected_deaths(x)))
+        if blind >= BLIND_MAX * len(played):
+            failed.append(('blindspot', '%s: %d of %d attempts (%.0f%%) lost someone to a '
+                           'blindspot or an unclassified death, the bar is under %.0f%%' % (
+                               name, blind, len(played), 100.0 * blind / len(played),
+                               100 * BLIND_MAX)))
+        unlabelled = sum(run_outcome(x)['unlabelled'] for x in played)
+        if unlabelled:
+            failed.append(('unlabelled_over_cap', '%s: %s over the cap no fallback names' % (
+                name, plural(unlabelled, 'death'))))
+        skips = sum(1 for x in played for k in x.get('seize_skips') or []
+                    if not k.get('justified'))
+        if skips:
+            failed.append(('unjustified_seize_skip', '%s: %s put off with nothing left to '
+                           'close' % (name, plural(skips, 'win'))))
+        if arm == 'vanilla':
+            died = death_rate(played)[0]
+            if died >= VANILLA_DEATH_MAX * len(played):
+                failed.append(('vanilla_deaths', 'vanilla: lost someone in %d of %d attempts '
+                               '(%.0f%%), the bar is under %.0f%%' % (
+                                   died, len(played), 100.0 * died / len(played),
+                                   100 * VANILLA_DEATH_MAX)))
+    return {'failed': failed, 'withheld': withheld, 'unread': unread}
+
+
+def validity_lines(valid):
+    """validity's result in sentences: each failed invariant, by name, each withholding, and
+    an arm with no attempt to read, which never reads as holding."""
+    unread = valid.get('unread') or []
+    if not valid['failed'] and not valid['withheld'] and not unread:
+        return ['validity (FR-029): every invariant holds in both arms']
+    if valid['failed']:
+        out = ['validity (FR-029): NOT READABLE, %s' % ', '.join(n for n, _ in valid['failed'])]
+    elif unread:
+        out = ['validity (FR-029): not read, %s' % ', '.join(GAME_NAMES[a] for a in unread)]
+    else:
+        out = ['validity (FR-029): withheld']
+    out += ['  %s: not read, no attempt reached the chapter' % GAME_NAMES[a] for a in unread]
+    out += ['  %s: %s' % (n, said) for n, said in valid['failed']]
+    out += ['  withheld: %s' % said for said in valid['withheld']]
+    return out
+
+
+def judged(verdict, valid):
+    """paired_verdict's `verdict` with `valid` (validity's) applied: NOT READABLE, settled,
+    naming every failed invariant, when one failed; else WITHHELD, settled, when an
+    outcome-dependent fault withholds it, whatever it read (a pilot, verdict None, has nothing
+    to withhold); else unchanged. Both settle the cell: the attempts behind the fault stay in
+    every later look, so more pairs could never clear it. The interval stays on the record,
+    for the report's descriptive line, never as a verdict."""
+    out = dict(verdict, validity=valid)
+    at = ' at %s' % verdict['look'] if verdict.get('look') is not None else ''
+    if valid['failed']:
+        names = [n for n, _ in valid['failed']]
+        out.update(verdict=NOT_READABLE, settled=True, failed_invariants=names,
+                   reason='NOT READABLE%s: %s' % (at, '; '.join(s for _, s in valid['failed'])))
+    elif valid['withheld'] and verdict.get('verdict') is not None:
+        faults = '; '.join(valid['withheld'])
+        # a verdict already withheld (an arm's reach unknown) keeps its own reason too
+        reason = '%s; %s' % (verdict['reason'], faults) \
+            if verdict['verdict'] == 'WITHHELD' and verdict.get('reason') \
+            else 'withheld%s: %s' % (at, faults)
+        out.update(verdict='WITHHELD', settled=True, reason=reason)
+    return out
+
+
+# ---- human calibration (FR-030, FR-033; plan R-12) ----
+# The designer and one blind friend play four maps on Normal, resetting on a player death, and
+# code each attempt on the one-page form (a #510 comment). Each coded attempt is one line of
+# references/sim/human/*.jsonl: {"player": "designer"|"friend", "map": <suite start id>,
+# "attempt": n, "reset": true|false, "cause": <HUMAN_CAUSES> when reset, "ignored_loot": n}.
+
+HUMAN_MAPS = ('vanilla-ch3', 'vanilla-ch5', 'ours-ch02', 'ours-ch03')   # FR-033's four
+HUMAN_PLAYERS = ('designer', 'friend')
+HUMAN_MATCH = 3            # of the four maps, for a result to gate (FR-030)
+HUMAN_DIR = os.path.join(REPO, 'references', 'sim', 'human')
+VALIDATED, UNVALIDATED = 'validated', 'UNVALIDATED_HUMAN'
+
+
+def map_name(m):
+    """A calibration map's suite id as a reader says it: 'vanilla Ch3', 'Manchego Stars ch02'."""
+    game, chapter = m.split('-', 1)
+    if game == 'vanilla':
+        return vanilla_name('FE8 Ch' + chapter[2:])
+    return '%s %s' % (GAME_NAMES[game], chapter)
+
+
+def human_causes():
+    """What a human reset is coded as: the bot's own causes (botrun.lua's, read there) plus a
+    misplay and ignored loot (FR-033)."""
+    return botrun_names()[0] + ('misplay', 'ignored_loot')
+
+
+def load_human(paths):
+    """The coded attempts in `paths` (.jsonl files), each line checked against the form:
+    ValueError naming the file and line of the first that is not."""
+    out, causes = [], human_causes()
+    for path in paths:
+        with open(path) as fh:
+            for i, line in enumerate(fh, 1):
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                where = '%s:%d' % (path, i)
+                if row.get('player') not in HUMAN_PLAYERS:
+                    raise ValueError('%s: player %r is not one of %s' % (
+                        where, row.get('player'), ', '.join(HUMAN_PLAYERS)))
+                if row.get('map') not in HUMAN_MAPS:
+                    raise ValueError('%s: map %r is not one of %s' % (
+                        where, row.get('map'), ', '.join(HUMAN_MAPS)))
+                attempt = row.get('attempt')
+                if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+                    raise ValueError('%s: `attempt` must be a whole number from 1, not %r'
+                                     % (where, attempt))
+                if not isinstance(row.get('reset'), bool):
+                    raise ValueError('%s: `reset` must be true or false' % where)
+                if row['reset'] and row.get('cause') not in causes:
+                    raise ValueError('%s: a reset is coded with one of %s, not %r' % (
+                        where, ', '.join(causes), row.get('cause')))
+                out.append(row)
+    return out
+
+
+def human_files(where=HUMAN_DIR):
+    """The coded sessions' files, [] before any exist."""
+    if not os.path.isdir(where):
+        return []
+    return sorted(os.path.join(where, n) for n in os.listdir(where) if n.endswith('.jsonl'))
+
+
+def leading(counts):
+    """The most frequent key of Counter `counts`, None on none or a tie for the lead: a tie
+    leads with nothing, so it can match nothing."""
+    top = counts.most_common(2)
+    if not top or (len(top) > 1 and top[0][1] == top[1][1]):
+        return None
+    return top[0][0]
+
+
+def bot_leading_cause(recs):
+    """The bot's leading first-attempt cause on one map: over its played attempt-1 records,
+    the cause of each attempt's FIRST protected death (a human resets on the first death, so
+    that is the death a reset reason is about)."""
+    counts = collections.Counter()
+    for r in recs:
+        d = first_death(r)
+        if d is not None:   # a death no cause names leads as itself, never as no lead
+            counts[d.get('cause') or 'unclassified'] += 1
+    return leading(counts), counts
+
+
+def calibration(human, bot_by_map):
+    """FR-030 from the coded attempts `human` and {map: [played attempt-1 record]}: {'status':
+    VALIDATED, UNVALIDATED or 'none' (no human data: nothing to gate on yet), 'maps': {map:
+    {'human', 'bot', 'match'}}, 'matched'}. By failure mode, never by rate: the humans' most
+    frequent reset reason against the bot's most frequent first-death cause. A map either side
+    has no lead on (no data, or a tie) is no match."""
+    if not human:
+        return {'status': 'none', 'maps': {}, 'matched': 0}
+    maps, matched = {}, 0
+    for m in HUMAN_MAPS:
+        h = leading(collections.Counter(r['cause'] for r in human
+                                        if r['map'] == m and r['reset']))
+        b = bot_leading_cause(bot_by_map.get(m) or [])[0]
+        ok = h is not None and h == b
+        matched += ok
+        maps[m] = {'human': h, 'bot': b, 'match': ok}
+    return {'status': VALIDATED if matched >= HUMAN_MATCH else UNVALIDATED, 'maps': maps,
+            'matched': matched}
+
+
+def calibration_lines(cal):
+    """calibration's result in sentences."""
+    if cal['status'] == 'none':
+        return ['human calibration: no coded sessions yet (references/sim/human/*.jsonl), so '
+                'nothing is marked UNVALIDATED_HUMAN']
+    out = ['human calibration: the bot\'s leading cause matches the humans\' leading reset '
+           'reason on %d of %d maps: %s' % (
+               cal['matched'], len(HUMAN_MAPS),
+               'results may gate decisions' if cal['status'] == VALIDATED else
+               'UNVALIDATED_HUMAN, no result gates a decision')]
+    for m, v in cal['maps'].items():
+        out.append('  %s: humans %s, bot %s%s' % (m, v['human'] or 'no lead', v['bot'] or
+                                                  'no lead', '' if v['match'] else ' (differ)'))
+    return out
+
+
+def first_attempts(paths, instrument):
+    """{(game, chapter): [played attempt-1 record]} of `instrument` in runs files `paths`,
+    never a held-out run (those stay unseen until the verdict, FR-025)."""
+    return kept(paths, lambda r: is_bot(r) and r.get('instrument') == instrument
+                and r.get('attempt') == 1 and r.get('outcome') not in UNUSABLE
+                and (r.get('suite') or {}).get('set') != 'held_out',
+                lambda r: (r.get('game'), r.get('chapter')))
+
+
+def map_records(suite, paths, instrument):
+    """{human map: [played attempt-1 record]} of `instrument`: the records of each map's game
+    at its chapter, the map named by its suite start (HUMAN_MAPS)."""
+    got = first_attempts(paths, instrument)
+    out = {}
+    for m in HUMAN_MAPS:
+        st = start_of(suite, m)
+        out[m] = got.get((st['game'], st['chapter']), [])
+    return out
+
+
+# ---- the canary (spec assumptions): on Normal, vanilla's first-attempt death rates order
+# Ch1 below Ch5 and Ch2 below Ch6, and Ch3 against Ch5 as the humans found. An inversion is a
+# banner and an audit, never a verdict.
+CANARY = (('FE8 Ch1', 'FE8 Ch5'), ('FE8 Ch2', 'FE8 Ch6'))
+
+
+def canary(vanilla, human=()):
+    """The canary's lines and whether it inverted, from {chapter index: [vanilla played
+    attempt-1 record]} and the coded human attempts. An order is read only when both
+    chapters have attempts; one that cannot be read says so, never passes."""
+    rows = vanilla_rows()
+    pairs = [(lo, hi, 'expected') for lo, hi in CANARY]
+    if human:
+        # the humans' first attempts, a reset over a death only: the same endpoint the bot's
+        # vanilla rates are, never a reset over loot or a later attempt's
+        rate = {}
+        for m in ('vanilla-ch3', 'vanilla-ch5'):
+            rows_m = [r for r in human if r['map'] == m and r.get('attempt') == 1]
+            rate[m] = (sum(1 for r in rows_m if r['reset'] and r.get('cause') != 'ignored_loot')
+                       / len(rows_m)) if rows_m else None
+        if None not in rate.values() and rate['vanilla-ch3'] != rate['vanilla-ch5']:
+            easy = 'vanilla-ch3' if rate['vanilla-ch3'] < rate['vanilla-ch5'] else 'vanilla-ch5'
+            hard = 'vanilla-ch5' if easy == 'vanilla-ch3' else 'vanilla-ch3'
+            pairs.append(('FE8 Ch%s' % easy[-1], 'FE8 Ch%s' % hard[-1], 'as the humans found'))
+    lines, inverted = [], False
+    for lo, hi, why in pairs:
+        (k1, n1), (k2, n2) = (death_rate(vanilla.get(rows[c]) or []) for c in (lo, hi))
+        if not n1 or not n2:
+            empty = [vanilla_name(c) for c, n in ((lo, n1), (hi, n2)) if not n]
+            lines.append('canary %s below %s (%s): not read, %s %s no first attempts under '
+                         'this instrument' % (vanilla_name(lo), vanilla_name(hi), why,
+                                              ' and '.join(empty),
+                                              'have' if len(empty) > 1 else 'has'))
+            continue
+        bad = k1 / n1 > k2 / n2
+        inverted = inverted or bad
+        lines.append('canary %s below %s (%s): %s %d of %d, %s %d of %d: %s' % (
+            vanilla_name(lo), vanilla_name(hi), why, vanilla_name(lo), k1, n1, vanilla_name(hi),
+            k2, n2,
+            'INVERTED' if bad else 'holds'))
+    if inverted:
+        lines.insert(0, '!!! CANARY INVERSION: vanilla\'s own chapters read out of order; '
+                        'audit the instrument (`montecarlo.py audit`) before reading any cell')
+    return lines, inverted
+
+
+# ---- the descriptive data (FR-031) and what each decision reads (FR-032) ----
+SURVIVAL_TURNS = (1, 3, 5, 10, 15, 20)
+COMPONENTS = ('survival', 'turn5', 'nonluck', 'causes', 'boss_causes', 'by_unit', 'rng_tail',
+              'greens', 'missed', 'stalls', 'winner_turns')
+DECISIONS = {'party': ('causes', 'by_unit'),
+             'enemy': ('boss_causes', 'rng_tail', 'winner_turns')}
+
+
+def describe(recs):
+    """One arm's descriptive data from its played attempt-1 records, by component (COMPONENTS):
+    the share alive by each turn, turn-5 deaths, deaths not down to a lost roll, deaths by
+    cause (with the boss flag), the boss's deaths by cause leaving out over-cap ones (an enemy
+    level decision's), deaths by unit, rng_tail deaths, greens lost, rewards and recruits
+    missed, stalls and the turns the wins took. Counts are attempts' or deaths' as named."""
+    n = len(recs)
+    firsts = [first_death(r) for r in recs]
+    first = [(d.get('turn') or 0) if d else None for d in firsts]
+    deaths = [d for r in recs for d in protected_deaths(r)]
+    causes = collections.Counter('%s%s' % (d.get('cause'), ', boss' if (d.get('flags') or {})
+                                           .get('boss') else '') for d in deaths)
+    boss = collections.Counter(d.get('cause') for d in deaths
+                               if (d.get('flags') or {}).get('boss')
+                               and d.get('cause') != 'over_cap')
+    greens = [d for r in recs for d in r.get('deaths') or [] if d.get('faction') == 'green']
+    missed = collections.Counter(t.get('reason') or '?' for r in recs
+                                 for t in r.get('missed_rewards') or [])
+    missed['recruits'] = sum(len(r.get('missed_recruits') or []) for r in recs)
+    return {'n': n, 'died': death_rate(recs)[0],
+            'survival': [(t, sum(1 for f in first if f is None or f > t)) for t in SURVIVAL_TURNS],
+            'turn5': sum(1 for f in first if f is not None and f <= 5),
+            'nonluck': sum(1 for d in deaths if d.get('cause') != 'rng_tail'),
+            'causes': causes, 'boss_causes': boss,
+            'by_unit': collections.Counter(d.get('charId') for d in deaths),
+            'rng_tail': sum(1 for d in deaths if d.get('cause') == 'rng_tail'),
+            'greens': (len(greens), sum(1 for d in greens if d.get('escort'))),
+            'missed': +missed,
+            'stalls': sum(len(r.get('stall_events') or []) for r in recs),
+            'winner_turns': sorted(r['turns_to_win'] for r in recs
+                                   if r.get('outcome') == 'won' and r.get('turns_to_win'))}
+
+
+def component_line(comp, arms, who=None):
+    """One component's line, the two arms side by side (FR-032: every result beside its twin);
+    `arms` is {arm: describe()}, `who` {arm: charId -> name} (hex ids when None)."""
+    who = who or {}
+    def counts(c, fmt=str):
+        order = lambda kv: (-kv[1], (0, kv[0], '') if isinstance(kv[0], int) else (1, 0,
+                                                                               str(kv[0])))
+        return ', '.join('%s %d' % (fmt(k), v) for k, v in sorted(c.items(), key=order)) \
+            or 'none'
+
+    def one(arm):
+        d = arms[arm]
+        n = d['n']
+        if not n:
+            return 'no attempts'
+        if comp == 'survival':
+            return ', '.join('t%d %.0f%%' % (t, 100.0 * k / n) for t, k in d['survival'])
+        if comp == 'turn5':
+            return '%d of %d attempts' % (d['turn5'], n)
+        if comp in ('nonluck', 'rng_tail', 'stalls'):
+            return '%d' % d[comp]
+        if comp in ('causes', 'boss_causes', 'missed'):
+            return counts(d[comp])
+        if comp == 'by_unit':
+            return counts(d['by_unit'], who.get(arm) or hex_id)
+        if comp == 'greens':
+            return '%d lost, %d of them escorts' % d['greens']
+        if comp == 'winner_turns':
+            w = d['winner_turns']
+            return ('%d wins, turns %d to %d, median %d' % (len(w), w[0], w[-1],
+                                                            w[len(w) // 2])) if w else 'no wins'
+        raise ValueError('montecarlo: no component %r (%s)' % (comp, ', '.join(COMPONENTS)))
+    words = {'survival': 'no protected death by turn', 'turn5': 'a protected death by turn 5',
+             'nonluck': 'protected deaths not down to a lost roll',
+             'causes': 'protected deaths by cause', 'boss_causes':
+             'boss-flagged deaths by cause, over-cap left out', 'by_unit':
+             'protected deaths by unit', 'rng_tail': 'rng_tail deaths', 'greens': 'greens',
+             'missed': 'goals missed (rewards by reason, recruits)', 'stalls': 'stalls',
+             'winner_turns': 'turns to win'}[comp]
+    return '  %s: Manchego Stars %s; twin %s' % (words, one('ours'), one('vanilla'))
+
+
+def drivers(arms, diff):
+    """The components that drive a cell's difference, in words (FR-031): the two causes (boss
+    flag kept) whose deaths an attempt differ most between the arms in the difference's
+    direction, then escort greens when Manchego Stars lost more. [] when nothing differs."""
+    o, v = arms['ours'], arms['vanilla']
+    sign = 1 if (diff or 0) >= 0 else -1
+    rate = lambda d, k: d['causes'].get(k, 0) / d['n'] if d['n'] else 0.0
+    gaps = sorted((-sign * (rate(o, k) - rate(v, k)), k) for k in set(o['causes']) |
+                  set(v['causes']))
+    out = ['%s deaths (Manchego Stars %.2f an attempt, twin %.2f)' % (k, rate(o, k),
+                                                                         rate(v, k))
+           for g, k in gaps[:2] if g < 0]
+    if o['greens'][1] > v['greens'][1] and sign > 0:
+        out.append('%s (twin %d)' % (plural(o['greens'][1], 'escort-green death'),
+                                     v['greens'][1]))
+    return out
+
+
+VERDICT_WORDS = {'EQUIVALENT': 'equivalent within the +-10 margin',
+                 'HARDER': 'harder', 'EASIER': 'easier', 'INCONCLUSIVE': 'inconclusive',
+                 'WITHHELD': 'withheld', NOT_READABLE: 'NOT READABLE'}
+
+
+@functools.lru_cache(maxsize=None)
+def vanilla_rows():
+    """{'FE8 Prologue': 0, ..., 'FE8 Ch5': 6, ...}: each vanilla chapter's index, from
+    inject.chapter_settings.twin_rows, the one owner of that mapping."""
+    sys.path.insert(0, os.path.dirname(HERE))
+    import inject.chapter_settings
+    return inject.chapter_settings.twin_rows()
+
+
+def vanilla_name(row):
+    """A twin_rows name ('FE8 Ch3') as a reader says it ('vanilla Ch3'): the one formatter."""
+    return 'vanilla ' + row.split()[-1]
+
+
+def twin_name(index):
+    """Vanilla chapter index `index` as a reader says it ('vanilla Ch3')."""
+    for name, i in vanilla_rows().items():
+        if i == index:
+            return vanilla_name(name)
+    return 'vanilla chapter %d' % index
+
+
+def cell_sentence(cell, arms, human_status='none'):
+    """A cell in one plain sentence (FR-031): which chapters, how many pairs over how many
+    games, its verdict with its uncertainty or NOT READABLE with the failed invariants, the two
+    arms' death rates, what drives the difference, and whether it may gate (FR-030)."""
+    o, v = arms['ours'], arms['vanilla']
+    head = '%s ch%02d vs %s, %d pairs%s: ' % (
+        GAME_NAMES['ours'], cell['chapter'], twin_name(cell['twin_index']), cell['pairs'],
+        ' ' + cell['games'] if cell.get('games') else '')
+    verdict = cell.get('verdict')
+    if verdict == NOT_READABLE:
+        what = 'NOT READABLE (%s)' % ', '.join(cell['failed_invariants'])
+    elif verdict is None:
+        what = 'a pilot, no verdict'
+    elif verdict == 'WITHHELD':
+        what = 'withheld (%s)' % cell.get('reason')
+    else:
+        what = '%s, %+.1f to %+.1f points' % (VERDICT_WORDS[verdict], 100 * cell['lo'],
+                                             100 * cell['hi'])
+    rates = 'a protected unit died in Manchego Stars %d of %d, the twin %d of %d' % (
+        o['died'], o['n'], v['died'], v['n'])
+    why = drivers(arms, cell.get('diff'))
+    gate = '' if human_status != UNVALIDATED else '; UNVALIDATED_HUMAN, it gates nothing'
+    return head + what + ' on any protected death; ' + rates + (
+        ', driven by ' + ' and '.join(why) if why else '') + gate
+
+
+# ---- cell records (plan: "Cell records"): what `pilot` and `cell` decided, one line a run
+# of either, beside the stores; `report` reads them and the runs they name.
+CELLS_FILE = os.path.join(REPO, 'references', 'sim', 'cells.jsonl')
+
+
+def cell_record(kind, chapter, twin_index, verdict, results, seeds, stores, instrument,
+                games=None):
+    """The `kind: cell` record of one pilot or cell run: its verdict fields (None for a
+    pilot), validity, its pairs, and each arm's played attempt-1 runs (run_ref) with the
+    store's runs file, so `report` reads the very records judged. `seeds` are the seeds that
+    made a pair (cell_pairs' `paired`), so the descriptive data counts what the verdict does."""
+    runs = {arm: [run_ref(results[s][arm]['rec']) for s in seeds
+                  if results[s][arm]['status'] == 'played'] for arm in ('ours', 'vanilla')}
+    return {'kind': 'cell', 'cell_kind': kind, 'chapter': chapter, 'twin_index': twin_index,
+            'instrument': instrument, 'verdict': verdict.get('verdict'),
+            'reason': verdict.get('reason'), 'lo': verdict.get('lo'), 'hi': verdict.get('hi'),
+            'look': verdict.get('look'), 'analysis': verdict.get('analysis'),
+            'table': verdict.get('table'), 'diff': verdict.get('diff'),
+            'pairs': verdict.get('n', len(seeds)), 'games': games,
+            'failed_invariants': verdict.get('failed_invariants') or [],
+            'validity': verdict.get('validity'), 'cpu_s': verdict.get('cpu_s') or 0.0,
+            'stores': stores, 'runs': runs}
+
+
+def cell_results(results, seeds):
+    """{arm: [chapter_result]} of `seeds`, validity's input, from cell_pairs' `results`."""
+    return {arm: [results[s][arm] for s in seeds if s in results]
+            for arm in ('ours', 'vanilla')}
+
+
+def report_cells(path, instrument=None):
+    """The cell records in `path` of `instrument` (the newest in the file when None): one job's
+    cells, the last record of each (kind, chapter) kept."""
+    if not os.path.exists(path):
+        return []
+    with open(path) as fh:
+        recs = [json.loads(line) for line in fh if line.strip()]
+    recs = [r for r in recs if r.get('kind') == 'cell']
+    if not recs:
+        return []
+    instrument = instrument or recs[-1]['instrument']
+    last = {}
+    for r in recs:
+        if r['instrument'] == instrument:
+            last[(r['cell_kind'], r['chapter'])] = r
+    return [last[k] for k in sorted(last, key=lambda k: (k[1], k[0]))]
+
+
+def run_ref(rec):
+    """A played run as a cell record names it: its name, its filed trace and its instrument.
+    The trace alone is not enough: keep_trace drops it when the file is gone, and every
+    trace-less record in a store would then share the one key None."""
+    return [run_name(rec), run_key(rec), rec.get('instrument')]
+
+
+def cell_arms(cell):
+    """{arm: [played attempt-1 record]} a cell record names (run_ref), read from its stores,
+    the newest record of each name. ValueError naming a run the store no longer holds."""
+    out = {}
+    for arm in ('ours', 'vanilla'):
+        if any(not isinstance(w, (list, tuple)) for w in cell['runs'][arm]):
+            raise ValueError('montecarlo: the ch%02d cell record predates run_ref (it names %s '
+                             'runs by trace alone): rerun the pilot' % (cell['chapter'],
+                                                                     GAME_NAMES[arm]))
+        want = [tuple(w) for w in cell['runs'][arm]]
+        wanted = set(want)
+        have = kept([cell['stores'][arm]],
+                    lambda r: is_bot(r) and tuple(run_ref(r)) in wanted,
+                    lambda r: tuple(run_ref(r)))
+        lost = [w for w in want if w not in have]
+        if lost:
+            raise ValueError('montecarlo: %s no longer holds %s of the ch%02d cell (first: %s)'
+                             % (cell['stores'][arm], plural(len(lost), 'run'),
+                                cell['chapter'], '/'.join(str(x) for x in lost[0])))
+        out[arm] = [have[w][-1] for w in want]
+    return out
+
+
+def report(cells, arms_of, cal, canary_out, decision=None, components=None, who=None):
+    """FR-031's report, in order, as lines (it is not a table): the header (instrument,
+    CPU-hours, pairs and the label counts), the canary with its banner, one sentence a cell,
+    the human calibration, the anomalies with their `story` commands, the validity failures
+    and the descriptive data. `decision` ('party', 'enemy' or 'chapter' with `components`)
+    reads only that decision's components (FR-032), each beside the twin; None reads all.
+    `arms_of(cell)` is {arm: [played attempt-1 record]} (cell_arms), `who` component_line's."""
+    if decision is None:
+        comps = COMPONENTS
+    elif decision == 'chapter':
+        if not components:
+            raise ValueError('a chapter-change decision names the components it affected '
+                             '(--components, of %s)' % ', '.join(COMPONENTS))
+        comps = tuple(components)
+    elif decision in DECISIONS:
+        comps = DECISIONS[decision]
+    else:
+        raise ValueError('montecarlo: no decision %r (party, enemy, chapter)' % (decision,))
+    for c in comps:
+        if c not in COMPONENTS:
+            raise ValueError('montecarlo: no component %r (%s)' % (c, ', '.join(COMPONENTS)))
+    labels = collections.Counter(c['verdict'] or 'pilot' for c in cells)
+    cpu = sum(c.get('cpu_s') or 0.0 for c in cells)
+    lines = ['instrument %s: %s, %d pairs, %.2f CPU-hours; %s' % (
+        cells[0]['instrument'] if cells else '?', plural(len(cells), 'cell'),
+        sum(c['pairs'] for c in cells), cpu / 3600,
+        ', '.join('%s %d' % (k, v) for k, v in sorted(labels.items())) or 'no cells')]
+    lines += canary_out[0]
+    described = []
+    for c in cells:
+        recs = arms_of(c)
+        arms = {a: describe(recs[a]) for a in ('ours', 'vanilla')}
+        described.append((c, recs, arms))
+        lines.append(cell_sentence(c, arms, cal['status']))
+    lines += calibration_lines(cal)
+    # one line a run, its anomalies by kind with their turns, and the story command at the
+    # first one's turn: a cell of 100 runs can carry a hundred anomalies
+    runs = [(c, arm, r) for c, recs, _ in described for arm in ('ours', 'vanilla')
+            for r in recs[arm] if r.get('anomalies')]
+    lines.append('anomalies: %d in %d runs' % (sum(len(r['anomalies']) for _, _, r in runs),
+                                               len(runs)))
+    for c, arm, r in runs:
+        kinds = collections.OrderedDict()
+        for a in r['anomalies']:
+            kinds.setdefault(a.get('kind'), []).append(str(a.get('turn')))
+        cmd = next((a['narrate'] for a in r['anomalies'] if a.get('narrate')), None)
+        lines.append('  ch%02d %s seed %s: %s%s' % (
+            c['chapter'], GAME_NAMES[arm], r.get('seed'),
+            '; '.join('%s turn %s' % (k, ', '.join(t)) for k, t in kinds.items()),
+            ' -> ' + cmd if cmd else ' (no trace kept)'))
+    failures = [(c, s) for c in cells for _, s in (c.get('validity') or {}).get('failed', [])]
+    lines.append('validity failures: %s' % (len(failures) or 'none'))
+    lines += ['  ch%02d %s' % (c['chapter'], s) for c, s in failures]
+    for c, _, arms in described:
+        lines.append('ch%02d, %s:' % (c['chapter'], 'the components a %s decision reads'
+                                      % decision if decision else 'descriptive data'))
+        lines += [component_line(k, arms, who) for k in comps]
+    return lines
+
+
+HUMAN_CAUSE_WORDS = {
+    'over_cap': 'I took a risk I knew was risky',
+    'reinforcement': 'an enemy that arrived after I moved killed them',
+    'fog': 'an enemy I could not see (fog) killed them',
+    'rng_tail': 'I saw the chance and lost the roll',
+    'other': 'I did not see it coming (nothing on screen warned me)',
+    'misplay': 'a slip: wrong unit, wrong tile, a menu mistake',
+    'ignored_loot': 'I reset over loot I let go (a village, a chest, a thief), not a death'}
+
+
+def human_form():
+    """The one-page form (FR-033, R-12), the words a player codes each attempt in; posted as
+    one #510 comment on Nicolas's go-ahead, never by this tool. Each cause is the bot's own
+    (botrun.lua) or FR-033's two more, so the form and the comparison cannot drift apart."""
+    causes = human_causes()
+    missing = [c for c in causes if c not in HUMAN_CAUSE_WORDS]
+    if missing:
+        raise ValueError('montecarlo: the form has no words for %s' % ', '.join(missing))
+    out = ['**Calibration form, one per map (#510, FR-033).** Play on Normal from the map\'s '
+           'start. Reset when any of your units dies, and when you would reset anyway. Write one '
+           'line per attempt, until you clear the map.',
+           '',
+           'Maps: %s. Player: `designer` or `friend` (the friend plays blind: no notes, no '
+           'spoilers).' % ', '.join('%s (`%s`)' % (map_name(m), m) for m in HUMAN_MAPS),
+           '',
+           'Each line: `{"player": "...", "map": "...", "attempt": 1, "reset": true, '
+           '"cause": "...", "ignored_loot": 0}`. `cause` only when `reset` is true; '
+           '`ignored_loot` counts the villages, chests and thieves you let go that attempt.',
+           '',
+           'Why you reset (pick the one that fits best):']
+    out += ['- `%s`: %s' % (c, HUMAN_CAUSE_WORDS[c]) for c in causes]
+    out += ['', 'The lines go in `references/sim/human/<player>-<map>.jsonl`; '
+            '`montecarlo.py human` reads them.']
+    return out
+
+
+def human_calibration(where, paths, inst):
+    """(coded attempts, {map: [bot record]}, calibration) from the coded sessions in `where`
+    and `inst`'s records in runs files `paths`: what `human` and `report` both read.
+    ValueError on a coded line off the form."""
+    rows = load_human(human_files(where))
+    by_map = map_records(load_suite(), paths, inst)
+    return rows, by_map, calibration(rows, by_map)
+
+
+def human_main(args):
+    """`human`: the form, or the coded sessions against the bot's leading causes (FR-030)."""
+    if args.form:
+        print('\n'.join(human_form()))
+        return 0
+    inst = args.instrument or instrument_id()
+    try:
+        rows, by_map, cal = human_calibration(
+            args.dir, [os.path.join(simdir(v), 'runs.jsonl') for v in (False, True)], inst)
+    except ValueError as err:
+        print('refused: %s' % err)
+        return 1
+    print('instrument %s; %d coded attempts in %s' % (inst, len(rows), args.dir))
+    for m in HUMAN_MAPS:
+        lead, counts = bot_leading_cause(by_map[m])
+        print('%s: the bot\'s first deaths by cause over %d attempts: %s' % (
+            m, len(by_map[m]), ', '.join('%s %d' % kv for kv in counts.most_common()) or 'none'))
+    print('\n'.join(calibration_lines(cal)))
+    return 0
+
+
+def report_main(args):
+    """`report`: FR-031's report of one instrument's cells, printed; with --post, written to a
+    file and the `gh issue comment` that would post it printed, never run (T107)."""
+    cells = report_cells(args.cells, args.instrument)
+    if not cells:
+        print('refused: no cell records in %s%s; `pilot` and `cell` write them' % (
+            args.cells, ' for %s' % args.instrument if args.instrument else ''))
+        return 1
+    inst = cells[0]['instrument']
+    paths = sorted({p for c in cells for p in c['stores'].values()})
+    try:
+        rows, _, cal = human_calibration(args.human_dir, paths, inst)
+    except ValueError as err:
+        print('refused: %s' % err)
+        return 1
+    vanilla = {ch: recs for (game, ch), recs in first_attempts(paths, inst).items()
+               if game == 'vanilla'}
+    names = {g: _names(g) for g in ('ours', 'vanilla')}
+    try:
+        lines = report(cells, cell_arms, cal, canary(vanilla, rows), args.decision,
+                       args.components.split(',') if args.components else None,
+                       {g: namer(names[g]) for g in names})
+    except ValueError as err:
+        print('refused: %s' % err)
+        return 1
+    print('\n'.join(lines))
+    if args.post:
+        out = os.path.join(REPO, 'build', 'report-%s.md' % inst.replace('+', '-'))
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        with open(out, 'w') as fh:
+            fh.write('\n'.join(lines) + '\n')
+        print('\nto post it (only on Nicolas\'s go-ahead):\n  gh issue comment 510 '
+              '--body-file %s' % os.path.relpath(out, REPO))
     return 0
 
 
@@ -1343,7 +2161,6 @@ def load_suite(path=None):
     return dict(inst, starts=starts, snapshots=snaps)
 
 
-REPO = os.path.dirname(os.path.dirname(HERE))
 MAX_WALL_H = 8    # SC-007: a planned job longer than this is split or narrowed, never run
 # The frozen baseline (#510 step 9 PR-G, ADR 0395): what the instrument did when it was frozen,
 # the comparator every later change is judged on. SC-003 / FR-022: a suite's AiDecideMain calls
@@ -1529,11 +2346,13 @@ def run_outcome(rec):
 def regressions(frozen, now, explained=lambda key, char: None):
     """FR-022's regressions of the tuning runs `now` ({'<start>/<seed>': run_outcome}) on the
     frozen baseline's runs, as (sentence, blocking): an invariant that held when frozen and
-    fails now; a death of a unit the frozen run kept alive that no witnessed replay explains
-    (`explained(key, charId)`: the audit's primary label, or None); more stalls than it had.
-    An explained death is said and does not block. A stall always blocks: a replay witnesses
-    a death, and nothing witnesses a stall. A run the baseline lacks (a start
-    added since) has nothing to regress from, and says so."""
+    fails now, and more stalls than it had, each blocking; a death of a unit the frozen run
+    kept alive, said with the witnessed replay's label when one explains it
+    (`explained(key, charId)`: the audit's primary label, or None) and never blocking,
+    explained or not (T107a, ADR 0395): one seed's death is a signal, and a bot change is
+    judged by rates, crashes, stalls and cost. A stall always blocks: nothing witnesses a
+    stall. A run the baseline lacks (a start added since) has nothing to regress from, and
+    says so."""
     out = []
     for key in sorted(now):
         got, was = now[key], frozen.get(key)
@@ -1546,11 +2365,12 @@ def regressions(frozen, now, explained=lambda key, char: None):
         for c in got['deaths']:
             if c not in was['deaths']:
                 label = explained(key, c)
-                out.append(('%s: 0x%02X dies, and lived when frozen; %s' % (
-                    key, c, 'witnessed: %s' % label if label else 'unexplained'), not label))
+                out.append(('%s: %s dies, and lived when frozen; %s (a signal, not a '
+                            'blocker)' % (key, hex_id(c), 'witnessed: %s' % label if label
+                                          else 'unexplained'), False))
         if got['stalls'] > was['stalls']:
-            out.append(('%s: %d stall%s, %d when frozen' % (
-                key, got['stalls'], '' if got['stalls'] == 1 else 's', was['stalls']), True))
+            out.append(('%s: %s, %d when frozen' % (key, plural(got['stalls'], 'stall'),
+                                                    was['stalls']), True))
     return out
 
 
@@ -1565,8 +2385,7 @@ def promotion(regs, unlabelled, reproducible, complete):
     for n, what in ((blocking, 'deterministic regression'), (unlabelled, 'unlabelled fallback'),
                     (reproducible, 'reproducible held-out loss')):
         if n:
-            why.append('%d %s%s' % (n, what, '' if n == 1 else ('es' if what.endswith('s')
-                                                               else 's')))
+            why.append(plural(n, what, what + 'es' if what.endswith('s') else None))
     return not why, why
 
 
@@ -1679,13 +2498,11 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
                            lambda key, char: explain(named[key], char) if explain else None)
     for key in sorted(tuning):
         if tuning[key]['unlabelled']:
-            lines.append('%s: %d unlabelled fallback%s (a death over the cap no fallback names)'
-                         % (key, tuning[key]['unlabelled'],
-                            '' if tuning[key]['unlabelled'] == 1 else 's'))
+            lines.append('%s: %s (a death over the cap no fallback names)'
+                         % (key, plural(tuning[key]['unlabelled'], 'unlabelled fallback')))
     held = sum(o['unlabelled'] for kind, o in outcome.values() if kind == 'held_out')
     if held:
-        lines.append('the held-out runs: %d unlabelled fallback%s' % (held, '' if held == 1
-                                                                       else 's'))
+        lines.append('the held-out runs: %s' % plural(held, 'unlabelled fallback'))
     # SC-003 on the seeds played: a run that never came back or played to no result would read
     # as a saving, so the calls are judged only on a whole set
     calls = sum(by_set[k]['calls'] for k in sets)
@@ -1695,8 +2512,8 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
     elif missing or total['n'] != len(tasks):
         lines.append('SC-003: not judged, %d of %d runs came back' % (total['n'], len(tasks)))
     elif total['unread']:
-        lines.append('SC-003: not judged, %d run%s without a game result' % (
-            total['unread'], '' if total['unread'] == 1 else 's'))
+        lines.append('SC-003: not judged, %s without a game result'
+                     % plural(total['unread'], 'run'))
     else:
         base = sum(frozen['calls'][k] for k in sets)
         budget = int(base * (1 + FROZEN_MARGIN))
@@ -1851,7 +2668,7 @@ def unplayable(suite, simdirs, starts):
 # change is a new store with no starts until they are remade, and the cell says how.
 STARTS_FILE = 'cell-starts.json'
 STARTS_PREFIX = 'cs'   # a starts campaign is cs-s<seed> in its game's store
-GAME_NAMES = {'ours': 'MS', 'vanilla': 'vanilla'}   # how a sentence names a game
+GAME_NAMES = {'ours': 'Manchego Stars', 'vanilla': 'vanilla'}   # how a sentence names a game
 CELL_STARTS = 10   # starts an arm for a verdict to trust; a cell being tried may ask fewer
 
 
@@ -2021,8 +2838,10 @@ def starts_main(args, pool=None):
 
 def kept_play(paths, instrument, rom_hashes):
     """A `play` that plays nothing: each task's newest kept suite run of this instrument on
-    these ROMs ({game: hash}), so a suite is judged again once a replay has witnessed why a
-    new death happened (its DIAG lines name that run's trace, and a fresh run's trace is new)."""
+    these ROMs ({game: hash}), so a suite is judged again without playing it: after a replay
+    witnessed why a new death happened, to say its label (its DIAG lines name that run's
+    trace, and a fresh run's trace is new; the death never blocks either way, T107a), or to
+    freeze the runs already judged."""
     runs = kept(paths, suite_run_of(instrument, rom_hashes),
                 lambda r: (r['suite']['start_id'], r['suite']['set'], r.get('seed')))
 
@@ -2186,7 +3005,7 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
                          % (rec.get('instrument'), instrument))
     deaths = [d for d in rec.get('deaths') or [] if char is None or d.get('charId') == char]
     if not deaths:
-        raise ValueError('no death of 0x%02X in that run' % char if char is not None
+        raise ValueError('no death of %s in that run' % hex_id(char) if char is not None
                          else 'that run has no death')
     if len(deaths) > 1:
         raise ValueError('%d deaths in that run: name one with --char' % len(deaths))
@@ -2203,8 +3022,8 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
     if ref is None:
         ref, ref_from = d.get('plan_ref'), 'plan_ref'
     if ref is None:   # a greedy phase's death: no plan committed to it, none moved the unit
-        raise ValueError('no decision to pin: no plan moved 0x%02X or committed to its death'
-                         % d['charId'])
+        raise ValueError('no decision to pin: no plan moved %s or committed to its death'
+                         % hex_id(d['charId']))
     return {'ref': ref, 'ref_from': ref_from, 'mode': mode,
             'force': list(force) if force else None,
             'failure': {'charId': d['charId'], 'turn': d.get('turn')},
@@ -2420,7 +3239,7 @@ def story(events, names=None, items=None, classes=None):
         c = cls.get(cid)
         if c is not None:
             return 'the %s' % classes.get(c, 'class 0x%02X' % c)
-        return 'unit 0x%02X' % cid
+        return 'unit %s' % hex_id(cid)
 
     def item(iid):
         return items.get(iid) or ('item 0x%02X' % iid)
@@ -2588,7 +3407,7 @@ def witness_label(diag, plan):
     if diag.get('traded'):
         # the unit lived and another protected unit died in its place (harness.lua's `traded`):
         # the failure moved, it was not avoided
-        return None, '%s: traded it for %s' % (mode, ', '.join('0x%02X' % c
+        return None, '%s: traded it for %s' % (mode, ', '.join(hex_id(c)
                                                               for c in diag['traded']))
     if not diag.get('avoided'):
         return None, '%s: did not avoid it' % mode
@@ -2650,7 +3469,7 @@ def audit(records, diags, events_of):
     return findings
 
 
-def audit_lines(findings, who=lambda c: '0x%02X' % c):
+def audit_lines(findings, who=hex_id):
     """The findings in words. An unclassified failure shows the run's own grading of the death
     as proposed only (AS 2): it is what the bot thought, never a witnessed label."""
     lines = []
@@ -2730,7 +3549,7 @@ def audit_main(args):
     note = names_note(game, [r.get('rom_hash') for r in mine])
     if note:
         print(note)
-    for line in audit_lines(findings, lambda c: names.get(c) or '0x%02X' % c):
+    for line in audit_lines(findings, namer(names)):
         print(line)
     for g in lost:
         print('orphan (no record matches its run): %s, failure %s, %s at decision %s' % (
@@ -2799,6 +3618,22 @@ def main(argv=None):
     sa.add_argument('--count', type=int, default=CELL_STARTS,
                     help='campaigns pinned in all, on the first seeds of the starts set')
     sa.add_argument('--jobs', type=int, default=8)
+    hu = sub.add_parser('human', help="the humans' reset reasons against the bot's leading "
+                        'causes (FR-030)')
+    hu.add_argument('--form', action='store_true', help='print the one-page form, nothing else')
+    hu.add_argument('--dir', default=HUMAN_DIR, help='the coded sessions (default %(default)s)')
+    hu.add_argument('--instrument', help="the bot's instrument (default: the code's now)")
+    rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
+    rr.add_argument('cells', nargs='?', default=CELLS_FILE,
+                    help='the cell records (default %(default)s)')
+    rr.add_argument('--instrument', help="whose cells (default: the newest cell's)")
+    rr.add_argument('--decision', choices=('party', 'enemy', 'chapter'),
+                    help="read only this decision's components (FR-032)")
+    rr.add_argument('--components', help='a chapter decision: the components it affected, '
+                    'comma-separated (%s)' % ', '.join(COMPONENTS))
+    rr.add_argument('--human-dir', default=HUMAN_DIR, help='the coded human sessions')
+    rr.add_argument('--post', action='store_true', help='write it to build/ and print the '
+                    '`gh issue comment 510` command; never runs it')
     su = sub.add_parser('suite', help="the frozen suite's pinned starts, attempt 1 each")
     su.add_argument('--held-out', action='store_true',
                     help='the held-out seeds too, as counts only, and the promotion result')
@@ -2828,6 +3663,10 @@ def main(argv=None):
         return replay_main(args)
     if args.cmd == 'audit':
         return audit_main(args)
+    if args.cmd == 'human':
+        return human_main(args)
+    if args.cmd == 'report':
+        return report_main(args)
     if args.cmd == 'story':
         events = read_trace(args.trace)
         if args.turn is not None:

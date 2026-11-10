@@ -171,3 +171,61 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
     Ch5x, every attempt missing its two chests. Making them took 27 and 63 minutes wall on 4
     workers each. The stop at the last start made a new instrument (`ce1e3adb8c57+v2`); the
     suite played it identically (2,490,781 calls, no regressions) and it was refrozen.
+
+**Built (PR-I, 2026-11-09).** Points 4 and 5 and the report (FR-029 to FR-033), in
+`montecarlo.py`:
+- **Validity** (`validity`, point 4) is checked on both arms' first attempts at every look,
+  and a pilot is checked too. A cell that fails a check is **NOT READABLE**, names each check
+  it failed (`environment_clean`, `sandbox_fault`, `blindspot`, `unlabelled_over_cap`,
+  `unjustified_seize_skip`, `vanilla_deaths`) and stops: more pairs from an instrument that
+  failed one would read nothing. How each check reads a record:
+  - the clean share counts every attempt that reached the chapter, played or not, by its
+    `env_status`. An attempt with no game result stays in the denominator, and FR-027 already
+    bounds its endpoint;
+  - "faults that depend on the outcome" are those in a **played** attempt (a game result,
+    but the watch misread something after play began). They withhold the verdict (WITHHELD)
+    and settle the cell: the faulted attempt is in every later look, so more pairs could
+    never clear it. A crash is not one of them: FR-027's bounding covers crashes;
+  - a sandbox fault, a blind spot and "unclassified" use botrun.lua's own families
+    (`M.DETAILS`). Unclassified means a death with no cause, or an `other` death whose detail
+    has no family. The 10% counts attempts, not deaths;
+  - an unlabelled over-cap death is `run_outcome`'s (ADR 0395), and an unjustified seize skip
+    is a `seize_skips` entry with `justified` false;
+  - an arm with no attempt that reached the chapter is "not read", never "holds". A NOT
+    READABLE pilot says so first and exits non-zero: its analysis choice must not reach `cell`.
+- **Human calibration** (point 5): `human --form` prints the one-page form. Its causes are
+  botrun.lua's plus `misplay` and `ignored_loot`, so the form and the comparison cannot
+  drift. It is posted as one #510 comment on Nicolas's go-ahead. Coded attempts go in
+  `references/sim/human/*.jsonl`, one line each, checked against the form. Maps are named by
+  their suite start (`vanilla-ch3`, `vanilla-ch5`, `ours-ch02`, `ours-ch03`). The bot's cause
+  on a map is the cause of each attempt's **first** protected death (a human resets on the
+  first death), and the leading cause is the most frequent one. A tie, or a map with no data,
+  has no leader and matches nothing. With no coded data, nothing is marked: FR-030 gates only
+  once human data exists.
+- **The report** (`report`, FR-031): `pilot` and `cell` each append a `kind: cell` record to
+  `references/sim/cells.jsonl`, naming each paired run by its name, trace and instrument,
+  and `report` reads one instrument's cells from it. A pilot with a benched arm is an
+  experiment and writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6, plus the humans'
+  Ch3/Ch5 order once they have played both. It reads the vanilla first attempts in the cells'
+  stores under that instrument, never a held-out run. A chapter with no attempts is "not
+  read", never "holds". An inversion prints a banner first. The humans' order counts their
+  first attempts reset over a death, never a reset over loot. The anomalies are listed one line
+  per run, each kind with its turns, and one `story` command at the first one's turn (a cell of
+  100 runs can carry a hundred anomalies; a story read from that turn reaches the rest). A
+  cell's sentence names its two largest cause differences an attempt (boss flag kept), plus
+  escort greens. `--decision party`
+  reads deaths by cause and by unit; `enemy` reads boss-flagged deaths by cause (over-cap left
+  out), rng_tail deaths and turns to win; `chapter --components` reads what it names. Every
+  line is beside the twin. `--post` writes the report under `build/` and prints the
+  `gh issue comment 510` command; it never runs it.
+- **The pilot cell's measured validity (2026-11-09, instrument `9d0b15b542e2+v2`).** ch03 could
+  not be piloted: no Manchego Stars campaign reaches it (every one stops at ch02, the chwinga
+  finding #510 step 10 owns). So the pilot is ch02 against vanilla Ch2, seeds 3001-3050 over 10
+  games an arm, 0.63 CPU-hours, 7.5 minutes wall on 8 workers.
+  - Every check holds in both arms: 100% environment-clean, no sandbox fault, every over-cap
+    death labelled, no unjustified seize skip. Blind spots: Manchego Stars 0 of 50 attempts,
+    the twin 2 of 50 (4%, both `unrevealed_killer` deaths to the boss).
+  - Manchego Stars lost someone in 10 of 50 runs and the twin in 3 of 50 (+14 points;
+    marginal analysis; ±17.4 at 200 pairs, so the ±10 margin cannot be reached).
+  - The canary was not read: no vanilla Ch1, Ch5 or Ch6 first attempt exists under this
+    instrument.
