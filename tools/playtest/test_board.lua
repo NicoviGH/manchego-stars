@@ -203,6 +203,29 @@ do
     check(Board.unit(b, "blue", 6).onField, true, "having acted does not leave the field")
 end
 
+-- The Rescue pair (bmunit.c UnitRescue): the carrier has US_RESCUING, the carried US_RESCUED,
+-- each +1B the other's index. The full read names both ends.
+do
+    local m = fakeMem()
+    defineItems(m)
+    putUnit(m, SYM.gUnitArrayBlue, 4, { charId = 6, x = 9, y = 5, state = 0x10 })
+    putUnit(m, SYM.gUnitArrayGreen, 0, { charId = 7, x = 9, y = 5, state = 0x21 })
+    m.w8(SYM.gUnitArrayBlue + 4 * 0x48 + 0x0B, 0x05)
+    m.w8(SYM.gUnitArrayBlue + 4 * 0x48 + 0x1B, 0x41)
+    m.w8(SYM.gUnitArrayGreen + 0x0B, 0x41)
+    m.w8(SYM.gUnitArrayGreen + 0x1B, 0x05)
+    local carrier = Board.unitAt(m, SYM, SYM.gUnitArrayBlue, 4)
+    local carried = Board.unitAt(m, SYM, SYM.gUnitArrayGreen, 0)
+    check(carrier.carrying, 0x41, "a carrier names the unit it carries")
+    check(carrier.carriedBy, nil, "and is carried by no one")
+    check(carried.carriedBy, 0x05, "a carried unit names its carrier")
+    check(carried.onField, false, "and is off the field")
+    check(carried.dead, false, "but alive")
+    local plain = Board.unitAt(m, SYM, SYM.gUnitArrayBlue, 0)
+    check(plain == nil or (plain.carrying == nil and plain.carriedBy == nil), true,
+          "an empty slot or a plain unit is neither")
+end
+
 -- The lean read: position/hp/state, and NOT the item/boss reads (which it must never touch).
 do
     local m = fakeMem()

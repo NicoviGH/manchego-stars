@@ -45,6 +45,9 @@
 --                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
 --   reach(unit, friends)     tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
 --                            less those another unit stands on (gBmMapUnit). Either faction.
+--   cantoTiles(unit, act)    where a Canto unit may move on to after `act` (TryMakeCantoUnit,
+--                            GenerateUnitMovementMapExt from the act's tile); empty for any
+--                            other. See s.cantoTiles.
 --   weapons(unit)            the weapons the Attack command's Weapon Select lists, in item
 --                            order: per item CanUnitUseWeaponNow allows (AttackCommandUsability's
 --                            loop), { slot, min, max } with GetItemMinRange/GetItemMaxRange's
@@ -225,6 +228,21 @@ M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL = 0x69, 0x6B, 0x04
+-- include/bmunit.h CA_CANTO: a second move after an act (playerphase.c TryMakeCantoUnit),
+-- read off the character's and the class's attributes ORed (UNIT_CATTRIBUTES)
+M.CA_CANTO = 1 << 1
+-- The acts that hand a Canto unit its second move: any but Wait, Combat or Staff
+-- (TryMakeCantoUnit's switch) of those the bot plays and drives one through (harness
+-- awaitActed's `canto`).
+M.CANTO_ACTS = { rescue = true, drop = true, visit = true, chest = true, talk = true }
+
+-- What act `a` of unit `uid` leaves carried, in stageCarry's shape (the planner's st.carry):
+-- a Rescue's target carried by `uid`, a Drop's set on its tile; nil for any other act.
+function M.carryOf(a, uid)
+    if a.act == "rescue" then return { [a.targetId] = { by = uid } } end
+    if a.act == "drop" then return { [a.targetId] = { x = a.dropAt.x, y = a.dropAt.y } } end
+    return nil
+end
 M.CLOSE_HORIZON = 8   -- enemy phases closings() plays forward
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
@@ -273,7 +291,8 @@ local CHAPTER_TALKS = 0x04
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
--- struct ClassData +28 attributes (CA_*); struct Unit +42 ai1, +44 ai2 (the AI script indices)
+-- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
+-- AI script indices)
 local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
@@ -983,6 +1002,9 @@ function M.fullInfo(sandbox, open, api, S, isolate, fn)
     return a, b
 end
 
+-- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
+function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
+
 function M.new(outer)
     local sandbox, api, open = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
@@ -1251,24 +1273,32 @@ function M.new(outer)
         return function(x, y) return g[y] and g[y][x] or 0 end
     end
 
-    function s.reach(u, friends)
-        return sandbox(function(call)
-            call(S.GenerateUnitMovementMap, { u.addr })
-            local out = {}
-            for y = 0, h - 1 do
-                for x = 0, w - 1 do
-                    local by = grid(mem, S.gBmMapUnit, x, y)
-                    local own = x == u.x and y == u.y
-                    if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT then
-                        if own or by == 0 then
-                            out[#out + 1] = { x = x, y = y }
-                        elseif friends and (by & M.FACTION_MASK) == (u.id & M.FACTION_MASK) then
-                            out[#out + 1] = { x = x, y = y, by = by }
-                        end
+    -- Inside a sandbox, after a movement map for `u` standing on (ux, uy): the tiles it
+    -- reaches (gBmMapMovement < MOVE_LIMIT), less those another unit stands on (gBmMapUnit),
+    -- its own left in; with `friends`, an ally's tile too, marked `by`. reach's and
+    -- cantoTiles' one reader.
+    local function movementTiles(u, ux, uy, friends)
+        local out = {}
+        for y = 0, h - 1 do
+            for x = 0, w - 1 do
+                local by = grid(mem, S.gBmMapUnit, x, y)
+                local own = x == ux and y == uy
+                if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT then
+                    if own or by == 0 then
+                        out[#out + 1] = { x = x, y = y }
+                    elseif friends and (by & M.FACTION_MASK) == (u.id & M.FACTION_MASK) then
+                        out[#out + 1] = { x = x, y = y, by = by }
                     end
                 end
             end
-            return out
+        end
+        return out
+    end
+
+    function s.reach(u, friends)
+        return sandbox(function(call)
+            call(S.GenerateUnitMovementMap, { u.addr })
+            return movementTiles(u, u.x, u.y, friends)
         end)
     end
 
@@ -1344,9 +1374,10 @@ function M.new(outer)
     -- it (AttackMapSelect_SwitchIn: the wall's place and HP in gActionData, then
     -- InitObstacleBattleUnit and BattleGenerateSimulation with no target unit) -> what the
     -- strike takes off the wall in the game's own simulation. Kept by the unit's facts and the
-    -- wall: the blow reads the attacker's might against the wall's class.
+    -- wall, its HP too: the blow reads the attacker's might against the wall's class.
     function s.strikeWall(u, o, x, y, slot)
-        return mine("wall@" .. o.x .. "," .. o.y .. "/" .. tostring(slot), u,
+        -- the wall's HP is in the key: the read is HP lost, which the wall's HP caps
+        return mine("wall@" .. o.x .. "," .. o.y .. "/" .. tostring(slot) .. "#" .. o.hp, u,
                     function() return sandbox(function(call, proc)
             api.write8(S.gActionData + ACTION_X_OTHER, o.x)
             api.write8(S.gActionData + ACTION_Y_OTHER, o.y)
@@ -1457,6 +1488,41 @@ function M.new(outer)
         return x, y
     end
 
+    -- The plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
+    -- UnitDrop), inside an open sandbox: a carried unit off gBmMapUnit and hidden, so the AI
+    -- never targets it (cp_battle.c skips US_RESCUED); its carrier US_RESCUING, so
+    -- GetUnitSkill and GetUnitSpeed halve its stats in every forecast; a dropped one on its
+    -- tile. `carry` is the planner's: [id] = { by = carrier } or { x, y } once dropped.
+    -- `byId` is units() by id.
+    local function stageCarry(byId, carry)
+        local CARRY = Board.US_RESCUED | US_HIDDEN
+        for id, c in pairs(carry or {}) do
+            local t = byId[id]
+            local r = t and byId[c.by or mem.u8(t.addr + Board.UNIT_RESCUE)]
+            if t and c.by and r then
+                local tx, ty = mem.u8(t.addr + UNIT_X), mem.u8(t.addr + UNIT_Y)
+                if mem.u8(cell(mem, S.gBmMapUnit, tx, ty)) == t.id then
+                    api.write8(cell(mem, S.gBmMapUnit, tx, ty), 0)
+                end
+                api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) | CARRY)
+                api.write32(r.addr + UNIT_STATE, mem.u32(r.addr + UNIT_STATE) | Board.US_RESCUING)
+                api.write8(t.addr + Board.UNIT_RESCUE, r.id)
+                api.write8(r.addr + Board.UNIT_RESCUE, t.id)
+                api.write8(t.addr + UNIT_X, mem.u8(r.addr + UNIT_X))
+                api.write8(t.addr + UNIT_Y, mem.u8(r.addr + UNIT_Y))
+            elseif t and c.x then
+                api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) & ~CARRY)
+                api.write8(t.addr + Board.UNIT_RESCUE, 0)
+                if r then
+                    api.write32(r.addr + UNIT_STATE,
+                                mem.u32(r.addr + UNIT_STATE) & ~Board.US_RESCUING)
+                    api.write8(r.addr + Board.UNIT_RESCUE, 0)
+                end
+                standOn(t, c.x, c.y)
+            end
+        end
+    end
+
     -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
     -- our units stood and their HP set, the reds' HP, the gone off the map
     local function stagePhase(call, plan)
@@ -1470,6 +1536,7 @@ function M.new(outer)
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
         end
+        stageCarry(byId, plan.carry)
         local function remove(e, x, y)
             if mem.u8(cell(mem, S.gBmMapUnit, x, y)) == e.id then
                 api.write8(cell(mem, S.gBmMapUnit, x, y), 0)
@@ -1840,8 +1907,11 @@ function M.new(outer)
                 for _, c in ipairs(commands) do
                     local kind = (c.cmd == M.TILE_COMMAND_VISIT and "visit")
                         or (c.cmd == M.TILE_COMMAND_CHEST and "chest")
+                    -- a chest another side has emptied keeps its tile command (a green unit
+                    -- opened ours-ch03's (6,3)): only a full chest's terrain is one to open
                     if kind and call(S.GetAvailableTileEventCommand, { c.x, c.y }) == c.cmd
-                        and (kind ~= "visit" or visitShown(c.x, c.y)) then
+                        and (kind ~= "visit" or visitShown(c.x, c.y))
+                        and (kind ~= "chest" or s.terrain(c.x, c.y) == M.TERRAIN_CHEST_FULL) then
                         out[#out + 1] = { x = c.x, y = c.y, kind = kind,
                                           house = kind == "visit" and isHouse(call, info, c.x, c.y)
                                               or nil }
@@ -1854,9 +1924,12 @@ function M.new(outer)
     end
 
     -- Usability reads the unit and the tile it stands on, never where anyone else is, and is
-    -- only asked of a tile explorable() still offers: kept by the unit's facts and the tile.
+    -- only asked of a tile explorable() still offers: kept by the unit's facts, the tile and its
+    -- terrain. The terrain is in the key because Usability reads it (ChestCommandUsability: a
+    -- full chest), and another side may change it: a green unit opened ours-ch03's (6,3) and
+    -- the kept yes sent unit 3 to an empty chest (held-out seed 2001, 2026-11-10).
     function s.canExplore(u, x, y, kind)
-        return mine(kind .. "@" .. x .. "," .. y, u, function() return sandbox(function(call)
+        return mine(M.exploreKey(kind, x, y, s.terrain(x, y)), u, function() return sandbox(function(call)
             asActive(u, x, y)
             local check = kind == "visit" and S.VisitCommandUsability or S.ChestCommandUsability
             return call(check, { 0, 0 }) == M.MENU_ENABLED
@@ -1866,7 +1939,8 @@ function M.new(outer)
     -- the unit menu's own check for each act it has one for (bmmenu.c)
     local MENU_CHECK = { talk = "TalkCommandUsability", door = "DoorCommandUsability",
                          visit = "VisitCommandUsability", chest = "ChestCommandUsability",
-                         seize = "UnitActionMenu_CanSeize" }
+                         seize = "UnitActionMenu_CanSeize", rescue = "RescueUsability",
+                         drop = "DropUsability" }
 
     -- whether the last target list built holds unit `id`, or the tile `at` with uid `uid` (a
     -- wall's is 0, a door's TERRAIN_DOOR: TryAddClosedDoorToTargetList)
@@ -1904,6 +1978,69 @@ function M.new(outer)
         end)
     end
 
+    -- Where `u` may move on to after its act `a` on a.move (Canto, playerphase.c
+    -- TryMakeCantoUnit): nothing for an act not in M.CANTO_ACTS, nor unless its character or class carries CA_CANTO, it has not
+    -- already had its second move (US_HAS_MOVED) and the move to the act's tile left it Mov
+    -- (moveCount, the movement map's cost of that tile). Then the game's own map from the
+    -- act's tile with what is left (GenerateUnitMovementMapExt(unit, MOV - moveCount)), on the
+    -- board as the act leaves it and as the game refreshes it before the second move
+    -- (PlayerPhase_FinishAction: RefreshEntityBmMaps, so a Rescue's target is off the map and a
+    -- Drop's on its tile), less every tile another unit stands on -> { {x, y} }, the act's tile
+    -- among them. Kept for the board, per unit, tile and carry.
+    function s.cantoTiles(u, a)
+        if not M.CANTO_ACTS[a.act] then return {} end
+        local x, y = a.move.x, a.move.y
+        local carry = M.carryOf(a, u.id)
+        local k = u.id .. "@" .. x .. "," .. y .. "/" .. (a.act == "rescue" and ("r" .. a.targetId)
+            or a.act == "drop" and ("d" .. a.dropAt.x .. "," .. a.dropAt.y) or "-")
+        seen.canto = seen.canto or {}
+        if seen.canto[k] then return seen.canto[k] end
+        local out = {}
+        -- a unit with no character or class is no unit to move (and movOf reads the class)
+        local chptr, clptr = mem.u32(u.addr), mem.u32(u.addr + UNIT_CLASS)
+        local attrs = chptr ~= 0 and clptr ~= 0
+            and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
+        if (attrs & M.CA_CANTO) ~= 0
+                and (mem.u32(u.addr + UNIT_STATE) & Board.US_HAS_MOVED) == 0 then
+            local mov = movOf(u)
+            out = sandbox(function(call)
+                call(S.GenerateUnitMovementMap, { u.addr })
+                local spent = grid(mem, S.gBmMapMovement, x, y)
+                if spent >= mov then return {} end
+                local byId = {}
+                for _, o in ipairs(units()) do byId[o.id] = o end
+                standOn(u, x, y)
+                stageCarry(byId, carry)
+                call(S.RefreshEntityBmMaps, {})
+                call(S.GenerateUnitMovementMapExt, { u.addr, mov - spent })
+                return movementTiles(u, x, y)
+            end)
+        end
+        seen.canto[k] = out
+        return out
+    end
+
+    -- Each tile of `tiles` from which `u`, carrying a unit, may Drop it, and where: the game's
+    -- own list (DropUsability builds it, bmtarget.c MakeDropTargetList: an empty adjacent tile
+    -- the carried unit can stand on) -> { { x, y, drops = { {x, y} } } }
+    function s.drops(u, tiles)
+        return sandbox(function(call)
+            local out = {}
+            for _, t in ipairs(tiles) do
+                asActive(u, t.x, t.y)
+                if call(S[MENU_CHECK.drop], { 0, 0 }) == M.MENU_ENABLED then
+                    local at = {}
+                    for k = 0, call(S.GetSelectTargetCount, {}) - 1 do
+                        local p = call(S.GetTarget, { k })
+                        at[#at + 1] = { x = mem.u8(p), y = mem.u8(p + 1) }
+                    end
+                    if #at > 0 then out[#out + 1] = { x = t.x, y = t.y, drops = at } end
+                end
+            end
+            return out
+        end)
+    end
+
     function s.legal(a, u)
         local x, y = a.move.x, a.move.y
         local reached = false
@@ -1935,11 +2072,21 @@ function M.new(outer)
             elseif a.act == "item" then
                 local it = u.items[a.slot + 1]
                 return it ~= nil and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0
+            elseif a.act == "drop" then
+                return call(S[MENU_CHECK.drop], { 0, 0 }) == M.MENU_ENABLED
+                    and listed(call, nil, a.dropAt)   -- a drop tile's uid is 0 (TryAddToDropTargetList)
             elseif MENU_CHECK[a.act] then
-                return menuOffers(call, a.act, a.act == "talk" and { id = a.targetId } or nil)
+                local target = (a.act == "talk" or a.act == "rescue") and { id = a.targetId } or nil
+                return menuOffers(call, a.act, target)
             end
             return true
         end)
+        if ok and a.canto then
+            for _, t in ipairs(s.cantoTiles(u, a)) do
+                if t.x == a.canto.x and t.y == a.canto.y then return nil end
+            end
+            return "the game offers no Canto move to that tile"
+        end
         if ok then return nil end
         return "the game offers no " .. (a.obstacle and "strike on that wall" or a.act)
     end
@@ -2024,6 +2171,22 @@ function M.new(outer)
             end
             return nil
         end) end)
+    end
+
+    -- The map as a phase can change it: the terrain of every tile with a command (a door
+    -- opened, a chest emptied, a village razed) and every wall's HP. Read once per board. A
+    -- read kept across a board (bot.lua's phase memos of attacks and strikes) keys on it: an
+    -- enemy's path runs through what the plan opened.
+    function s.mapKey()
+        if not seen.mapKey then
+            local parts = {}
+            for _, c in ipairs(commands) do parts[#parts + 1] = s.terrain(c.x, c.y) end
+            for _, o in ipairs(s.obstacles()) do
+                parts[#parts + 1] = o.x .. "," .. o.y .. "=" .. o.hp .. "/" .. s.terrain(o.x, o.y)
+            end
+            seen.mapKey = table.concat(parts, ";")
+        end
+        return seen.mapKey
     end
 
     function s.obstacles()

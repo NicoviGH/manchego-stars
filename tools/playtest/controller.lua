@@ -14,6 +14,8 @@ local MENU_SEIZE = 0x4E
 local MENU_ATTACK = 0x4F
 local MENU_BALLISTA_ATTACK = 0x50
 local MENU_TALK = 0x5A
+local MENU_RESCUE = 0x63   -- menu_def.c: Rescue and Drop, after Arena
+local MENU_DROP = 0x64
 local MENU_VISIT = 0x5C
 local MENU_CHEST = 0x5D
 local MENU_DOOR = 0x5E
@@ -71,6 +73,7 @@ local function menuKinds(observation)
         if item.override_id == MENU_SEIZE or item.override_id == MENU_ATTACK
             or item.override_id == MENU_BALLISTA_ATTACK
             or item.override_id == MENU_TALK or item.override_id == MENU_CHEST
+            or item.override_id == MENU_RESCUE or item.override_id == MENU_DROP
             or item.override_id == MENU_DOOR or item.override_id == MENU_ARENA
             or item.override_id == MENU_ITEM or item.override_id == MENU_STAFF
             or item.override_id == MENU_SUPPLY or item.override_id == MENU_WAIT then unit = true end
@@ -216,7 +219,8 @@ local RULES = {
                 return matched("transition", "target_selection is blocked on its camera scroll")
             end
             local kind = observation.target.kind
-            if kind ~= "attack" and kind ~= "talk" and kind ~= "heal" then
+            if kind ~= "attack" and kind ~= "talk" and kind ~= "heal" and kind ~= "rescue"
+                    and kind ~= "drop" then
                 return unsupported("unsupported target selection kind")
             end
             return matched("target_selection", "target_selection in its input loop")
@@ -762,6 +766,8 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_ATTACK, "attack")
         addMenuCommand(actions, observation, MENU_BALLISTA_ATTACK, "attack")
         addMenuCommand(actions, observation, MENU_TALK, "talk")
+        addMenuCommand(actions, observation, MENU_RESCUE, "rescue")
+        addMenuCommand(actions, observation, MENU_DROP, "drop")
         addMenuCommand(actions, observation, MENU_VISIT, "visit")
         -- The map-interaction and inventory commands. Each of these used to be reached by
         -- pressing A on a row the scenario ASSUMED was top ("Door (row 0)"), which holds only

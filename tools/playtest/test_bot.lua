@@ -280,6 +280,7 @@ local function unit(o)
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
         mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
+        carrying = o.carrying, carriedBy = o.carriedBy,   -- a Rescue pair (board.lua)
     }
 end
 local function blue(id, slot, x, y, o)
@@ -435,6 +436,8 @@ local function sightOf(o)
         end
     end
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
+    -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
+    s.mapKey = function() return o.mapKey or "-" end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
     -- what each unit holds no key for ("x,y" -> the lock), and who drops one (lock -> enemies)
@@ -443,15 +446,32 @@ local function sightOf(o)
         s.keySources = function(_, lock) return (o.keySources or {})[lock] or {} end
     end
     -- the unit menu's check: Door lists a door beside an opener (TryAddClosedDoorToTargetList),
-    -- Talk a talkable unit beside the talker (MakeTalkTargetList)
+    -- Talk a talkable unit beside the talker (MakeTalkTargetList), Rescue a unit o.rescue lets
+    -- `u` carry beside it (MakeRescueTargetList)
     s.offers = function(u, tiles, act, target)
         local may = act == "door" and (o.openers or {})[u.id] == true
             or act == "talk" and s.canTalk ~= nil and s.canTalk(u, target)
+            or act == "rescue" and ((o.rescue or {})[u.id] or {})[target.id] == true
         local out = {}
         for _, t in ipairs(tiles) do
             if may and Board.distance(t.x, t.y, target.x, target.y) == 1 then out[#out + 1] = t end
         end
         return out
+    end
+    -- the Drop list (MakeDropTargetList): from each tile, its neighbours o.dropOn holds ("x,y")
+    if o.dropOn then
+        s.drops = function(_, tiles)
+            local out = {}
+            for _, t in ipairs(tiles) do
+                local at = {}
+                for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                    local x, y = t.x + d[1], t.y + d[2]
+                    if o.dropOn[x .. "," .. y] then at[#at + 1] = { x = x, y = y } end
+                end
+                if #at > 0 then out[#out + 1] = { x = t.x, y = t.y, drops = at } end
+            end
+            return out
+        end
     end
     -- when a looter takes each open tile (sight.closings: "x,y" -> the enemy phase); the game
     -- always has the read where it has villages and chests (none: no looter)
@@ -1031,6 +1051,14 @@ do
     local before = sight.attacks()
     B.decide(boardOf(spent, moved, hurt), sight, style("careful"))
     check(sight.attacks(), before + 1, "a spent weapon use is a new attack")
+    -- a door opened or a wall broken mid-phase (sight.mapKey): the enemy's path, so both again
+    o.mapKey = "closed"
+    B.decide(boardOf(A, moved, hurt), sight, style("careful"))
+    local a0, s0 = sight.attacks(), sight.strikes()
+    o.mapKey = "opened"
+    B.decide(boardOf(A, moved, hurt), sight, style("careful"))
+    check(sight.attacks() .. "/" .. sight.strikes(), (a0 + 1) .. "/" .. (s0 + 1),
+          "a map the phase changed is a new attack and a new strike")
     local bare = sightOf { danger = o.danger, reach = o.reach, fc = o.fc }
     B.decide(boardOf(A, Bu, E), bare, style("careful"))
     B.decide(boardOf(A, Bu, E), bare, style("careful"))
@@ -4027,7 +4055,8 @@ for _, gold in ipairs({ 1500, 3000 }) do
           "goals: a green recruit's death is a forfeit, at " .. gold)
     check(greenRecruitPlay(gold, false), "0,1", "goals: an allied green's is not, at " .. gold)
 end
--- and a recruit's death is counted once, as the forfeit: never in the allied greens' share
+-- and a recruit's death is the forfeit, and its chance is in the allied greens' share too: the
+-- forfeit is yes/no, so the share is what tells a plan risking it less from one risking it more
 do
     local function marchRank(talk)
         local _, plan = greenRecruitPlay(1500, talk)
@@ -4036,10 +4065,191 @@ do
         end
     end
     local r, g = marchRank(true), marchRank(false)
-    check(r and r.forfeits .. " " .. r.green_die, "1 0", "goals: a recruit's death, the forfeit only")
+    check(r and r.forfeits == 1 and r.green_die, 1, "goals: a recruit's death, the forfeit and its share")
     check(g and g.forfeits == 0 and g.green_die, 1, "goals: an allied green's, its share only")
 end
 
+-- test_a_rescue_saves_a_green_the_phase_would_kill (vanilla Ch2's Ross, #510): X kills G
+-- where it stands unless G is carried (the game's AI skips a rescued unit, cp_battle.c). A may
+-- Rescue G from (2,0), beside it, or wait there. The judged phase is asked with the plan's
+-- carry, and the plan that carries G ranks first (green_die). Without Rescue, both plans
+-- lose G.
+local function rescuePlay(canRescue)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 0, { faction = "green", hp = 5, minRange = false })
+    local X = red(0x81, 9, 0, { minRange = false })
+    local asked
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        rescue = canRescue and { [0x01] = { [0x30] = true } } or nil,
+        enemyPhase = function(plan)
+            asked = asked or plan.carry
+            if plan.carry and plan.carry[0x30] and plan.carry[0x30].by == 0x01 then return {} end
+            return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 5 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("bold"))
+    return a, plan, asked
+end
+do
+    local a, plan = rescuePlay(true)
+    check(a and a.act .. ">" .. tostring(a.targetId) .. "@" .. at(a), "rescue>48@2,0",
+          "rescue: A carries G out of the phase that kills it")
+    local g
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x30 then g = p.die end
+    end
+    check(g, 0, "rescue: the carried green meets no strike")
+    local b = rescuePlay(false)
+    check(b and b.act ~= "rescue", true, "rescue: none where the game offers none")
+end
+
+-- test_a_carried_recruit_is_dropped_beside_its_talker: A carries G, a recruit E may Talk over
+-- once G is set down (TalkCommandUsability lists units on the map). Carried, G's goal waits a
+-- turn at A's tile (goalTerm); dropped beside E it does not, so A drops G there. The key
+-- carries the drop tile, and reads back.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, carrying = 0x30 })
+    local E = blue(0x02, 1, 5, 0, { minRange = false })
+    local G = blue(0x30, 5, 0, 0, { faction = "green", hp = 5, onField = false, carriedBy = 0x01 })
+    local X = red(0x81, 14, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }),
+                  [0x02] = tiles({ 5, 0 }) },
+        talk = { [0x02] = { [0x30] = true } },
+        dropOn = { ["4,0"] = true, ["1,0"] = true, ["0,1"] = true },
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, E, G, X), sightOf(o), style("bold"))
+    local drop
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.act == "drop" then drop = x end
+    end
+    check(drop and (drop.move.x .. "," .. drop.move.y .. "/" .. drop.dropAt.x .. ","
+                    .. drop.dropAt.y), "3,0/4,0", "drop: G set down beside its talker")
+    local k = drop and Planner.key(drop)
+    check(k, "1>drop@3,0>48/4,0", "drop: the key names the drop tile")
+    local back = k and Planner.unkey(k)
+    check(back and back.dropAt and (back.dropAt.x .. "," .. back.dropAt.y), "4,0",
+          "drop: the key reads back")
+end
+
+
+-- test_a_canto_unit_moves_on_after_its_rescue (vanilla Ch2's Vanessa, #510): A, a Canto unit,
+-- may Rescue G from (2,0), beside it. X kills G where it stands unless G is carried, and kills A
+-- if A ends on (2,0). The game offers A a second move from (2,0) (sight.cantoTiles); the plan
+-- rescues and moves on, so no one dies, and the judged phase is asked with A where it ends.
+-- Without Canto every plan loses one of them. The key names the Canto tile and reads back.
+local function cantoPlay(canto)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 0, { faction = "green", hp = 5, minRange = false })
+    local X = red(0x81, 9, 0, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        rescue = { [0x01] = { [0x30] = true } },
+        enemyPhase = function(plan)
+            local ends
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then ends = b.x .. "," .. b.y end
+            end
+            local carried = plan.carry and plan.carry[0x30] and plan.carry[0x30].by == 0x01
+            if not carried then
+                return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 5 } }
+            end
+            if ends == "2,0" then
+                return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = A.hp } }
+            end
+            return {}
+        end,
+    }
+    local s = sightOf(o)
+    if canto then
+        s.cantoTiles = function(_, a)
+            if a.act ~= "rescue" then return {} end
+            return tiles({ 2, 0 }, { 1, 0 }, { 0, 0 })
+        end
+    end
+    return Planner.plan(B, boardOf(A, G, X), s, style("bold"))
+end
+do
+    local function deaths(plan)
+        local n = 0
+        for _, p in ipairs(plan and plan.predict or {}) do
+            if (p.die or 0) > 0 then n = n + 1 end
+        end
+        return n
+    end
+    local a, plan = cantoPlay(true)
+    check(a and a.act .. "@" .. at(a) .. "~" .. tostring(a.canto and (a.canto.x .. "," .. a.canto.y)),
+          "rescue@2,0~1,0", "canto: A rescues G and moves on")
+    check(deaths(plan), 0, "canto: no one dies when A moves on")
+    local _, still = cantoPlay(false)
+    check(deaths(still) > 0, true, "canto: without it, a plan loses one")
+    local k = a and Planner.key(a)
+    check(k, "1>rescue@2,0>48~1,0", "canto: the key names the Canto tile")
+    local back = k and Planner.unkey(k)
+    check(back and back.canto and (back.canto.x .. "," .. back.canto.y) .. "/" .. back.targetId,
+          "1,0/48", "canto: the key reads back")
+    local d = Planner.unkey("1>drop@3,0>48/4,0~2,0")
+    check(d.dropAt.x .. "," .. d.dropAt.y .. "~" .. d.canto.x .. "," .. d.canto.y, "4,0~2,0",
+          "canto: a Drop's key reads back with both tiles")
+end
+
+-- test_an_avoid_claim_holds_on_a_canto_tile: P, a Canto unit, may Rescue G from (1,0) and move
+-- on to (0,0) or (2,0). (2,0) is in the archer's reach and an avoid claim keeps P out of it,
+-- so no Canto move ends there; (0,0) is still offered.
+do
+    local P = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 1, 1, { faction = "green", hp = 5, minRange = false })
+    local X = red(0x81, 4, 0, { classId = CLS_A, minRange = 2, maxRange = 2 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+                rescue = { [0x01] = { [0x30] = true } } }
+    local s = sightOf(o)
+    s.cantoTiles = function(_, a)
+        if a.act ~= "rescue" then return {} end
+        return tiles({ 1, 0 }, { 0, 0 }, { 2, 0 })
+    end
+    local function cantos(st)
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(P, G, X), s, st)) do
+            for _, a in ipairs(c.acts) do
+                if a.canto then out[#out + 1] = a.canto.x .. "," .. a.canto.y end
+            end
+        end
+        table.sort(out)
+        return table.concat(out, " ")
+    end
+    check(cantos(style("bold")), "0,0 2,0", "canto: with no claim, both tiles")
+    local st = claimed("bold", { id = "v", kind = "avoid", unit = { 0x01 }, vs = { CLS_A } })
+    check(cantos(st), "0,0", "canto: an avoid claim keeps the second move out of reach")
+    -- every move in reach, the act's tile clear: staying keeps the claim, so no move is offered
+    s.cantoTiles = function(_, a)
+        if a.act ~= "rescue" then return {} end
+        return tiles({ 1, 0 }, { 2, 0 })
+    end
+    check(cantos(st), "", "canto: no move into reach when staying is clear")
+end
+
+-- test_surprise_reads_the_canto_tile: a unit that moved on to its Canto tile ended its move as
+-- planned; one still on the act's tile ended short.
+do
+    local a = { unitId = 0x01, unit = 0x01, act = "visit", move = { x = 2, y = 0 },
+                canto = { x = 0, y = 0 } }
+    local plan = { acts = { a, { unitId = 0x02, act = "wait", move = { x = 5, y = 0 } } },
+                   expect = { { hp = 20 } }, enemies = {} }
+    local function board(x)
+        return { units = { blue(0x01, 0, x, 0, { hp = 20 }), blue(0x02, 1, 5, 0) } }
+    end
+    check(Planner.surprise(plan, 1, board(0), board(0)), nil, "canto: the Canto tile is the plan's end")
+    check(Planner.surprise(plan, 1, board(0), board(2)), "the move ended short",
+          "canto: stopping on the act's tile is short")
+end
 
 -- test_a_march_toward_a_goal_survives_the_menu_cut: A has four small attacks (each worth a
 -- point of damage) and a march to (2,0) toward T, a recruit only A can Talk over, worth one
@@ -4881,7 +5091,8 @@ do
 end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
--- alone -- our units, the enemies gone, the enemies' HP, the doors and walls it opens -- and
+-- alone -- our units, the enemies gone, the enemies' HP, the doors and walls it opens, the
+-- units it carries (Rescue) -- and
 -- nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.
 do
@@ -4890,7 +5101,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,gone,opened,reds", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,opened,reds", "lookahead: the staged board, nothing more")
 end
 
 -- test_lookahead_counts_a_green_and_ranks_the_list_once (review of #568): an allied green the

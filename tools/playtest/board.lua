@@ -27,7 +27,7 @@
 -- Offsets, from the decomp headers:
 --   include/bmunit.h struct Unit (0x48 bytes): +00 pCharacterData, +04 pClassData,
 --     +08 s8 level, +0B s8 index, +0C u32 state, +10/+11 s8 xPos/yPos, +12 maxHP, +13 curHP,
---     +14 pow, +17 def, +1E u16 items[5] (low byte id, high byte uses)
+--     +14 pow, +17 def, +1B u8 rescue (the Rescue partner's index), +1E u16 items[5] (low byte id, high byte uses)
 --   CharacterData +04 number, +28 attributes; ClassData +04 number
 --   include/bmitem.h struct ItemData (stride 0x24): +08 attributes, +19 encodedRange
 --   include/types.h struct PlaySt: +0F faction (0x00/0x40/0x80), +10 u16 turn
@@ -41,7 +41,9 @@ Board.US_HIDDEN = 1 << 0
 Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
 Board.US_DEAD = 1 << 2
 Board.US_NOT_DEPLOYED = 1 << 3
-Board.US_RESCUED = 1 << 5
+Board.US_RESCUING = 1 << 4    -- it carries the unit its +1B `rescue` names (bmunit.c UnitRescue)
+Board.US_RESCUED = 1 << 5     -- it is carried by the unit its +1B names: hidden, off the map
+Board.UNIT_RESCUE = 0x1B
 Board.US_HAS_MOVED = 1 << 6   -- Canto: Visit and Chest are not shown (bmmenu.c)
 Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 -- "hidden by fog?": RefreshUnitsOnBmMap sets it on a red or purple unit on a fogged tile, in
@@ -95,6 +97,11 @@ end
 function Board.distance(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
+
+-- Where a planned act leaves its unit (bot.lua's act shape): the tile a Canto unit moves on
+-- to after it (`canto`, playerphase.c TryMakeCantoUnit), else the act's own (`move`). The one
+-- owner of it: the bot's exposure and the planner's board both read it.
+function Board.endTile(a) return a.canto or a.move end
 
 -- Of `weapons` (sight.weapons: { slot, min, max } in item order), the first that strikes (bx, by)
 -- from (ax, ay) -- only item `slot`'s when one is given -- or nil. It is MakeTargetListForWeapon's
@@ -170,6 +177,12 @@ function Board.unitAt(mem, SYM, base, slot)
     local clptr = mem.u32(a + 0x04)
     local items = Board.items(mem, a)
     u.id = mem.u8(a + 0x0B)
+    -- the Rescue pair (bmunit.c UnitRescue): `carrying` the id it carries, `carriedBy` the id
+    -- that carries it. A carried unit is off the field (onField) but alive, at its carrier's
+    -- tile (UnitRescue writes it there; a carrier's move takes it along)
+    local partner = mem.u8(a + Board.UNIT_RESCUE)
+    u.carrying = (u.state & Board.US_RESCUING) ~= 0 and partner or nil
+    u.carriedBy = (u.state & Board.US_RESCUED) ~= 0 and partner or nil
     u.classId = clptr ~= 0 and mem.u8(clptr + 0x04) or nil
     u.items = items
     u.isBoss = Board.isBoss(mem, a)
@@ -513,6 +526,7 @@ function Board.bind(mem, SYM)
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
         US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
+        US_RESCUING = Board.US_RESCUING, US_RESCUED = Board.US_RESCUED, UNIT_RESCUE = Board.UNIT_RESCUE,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE, UNIT_ITEMS = Board.UNIT_ITEMS,
         ITEM_COUNT = Board.ITEM_COUNT,
         BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,

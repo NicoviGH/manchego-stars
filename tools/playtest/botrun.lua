@@ -271,7 +271,7 @@ end
 
 local function actOf(a)
     return { unit = a.unit, act = a.act, x = a.move.x, y = a.move.y, target = a.target,
-             why = a.why }
+             why = a.why, canto = a.canto }
 end
 
 -- Units on the field before and gone after, with the fighter that downed them. A player-phase
@@ -1245,7 +1245,8 @@ function M.run(api)
                 if action.act == "visit" or action.act == "chest" then
                     explore.visited(action, turn)
                 end
-                if action.act == "visit" or action.act == "chest" or action.act == "talk" then
+                if action.act == "visit" or action.act == "chest" or action.act == "talk"
+                        or action.act == "rescue" or action.act == "drop" then
                     progressed = true
                 end
                 local battle = action.act == "attack" and api.battle and api.battle() or nil
@@ -1262,7 +1263,7 @@ function M.run(api)
                 record(fell, "player", playing, action)
                 trace({ t = "act", phase = "player", unit = action.unit, id = action.unitId,
                         from = from and { x = from.x, y = from.y }, to = action.move,
-                        act = action.act, target = action.target, battles = { battle },
+                        canto = action.canto, act = action.act, target = action.target, battles = { battle },
                         fell = fell })
                 changes(after)
                 if done == "noseize" then

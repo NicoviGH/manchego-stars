@@ -621,6 +621,8 @@ local function observeTarget(observation)
     local kind
     if routines == SYM.gSelectInfo_Attack then kind = "attack"
     elseif routines == SYM.gSelectInfo_Talk then kind = "talk"
+    elseif routines == SYM.gSelectInfo_Rescue then kind = "rescue"
+    elseif routines == SYM.gSelectInfo_Drop then kind = "drop"
     elseif routines == SYM.gSelectInfo_Heal then kind = "heal"
     else kind = string.format("0x%08X", routines) end
     observation.target = {
@@ -1247,7 +1249,10 @@ end
 -- once the phase leaves blue, so the caller's enemy-phase watch sees that phase. Waiting on
 -- through it instead (Manchego Stars ch03, 2026-10-30) returned on the next player phase, and
 -- the bot then ended THAT turn unplayed.
-INSPECT.awaitActed = function(actorAddr, stopWhen)
+-- `canto` (optional, the planner's a.canto): the tile a Canto unit moves on to after the act
+-- (playerphase.c TryMakeCantoUnit hands it a second move, then only Wait). Without one, the
+-- second move is spent where the unit stands.
+INSPECT.awaitActed = function(actorAddr, stopWhen, canto)
     local function acted()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
             or faction() ~= 0
@@ -1257,9 +1262,17 @@ INSPECT.awaitActed = function(actorAddr, stopWhen)
         return acted() or controllerState() == "unit_selected"
     end, TUNE.combatFrames, true)
     if done and not acted() then
-        if not guardedInput("confirm_move", "A", "Canto ends where the unit stands", function(after)
+        if canto and not cursorTo(canto.x, canto.y) then return false end
+        if not guardedInput("confirm_move", "A", canto
+                and string.format("Canto moves the unit to (%d,%d)", canto.x, canto.y)
+                or "Canto ends where the unit stands", function(after)
             return controllerState(after) ~= "unit_selected"
         end, 120) then return false end
+        -- a Canto move walks to its tile first: the menu (only Wait, TryMakeCantoUnit) comes
+        -- after the walk, so wait for it rather than look once (vanilla Ch2 seed 4008: the
+        -- look found "unit_moving" and the open menu then timed the act out)
+        waitFor(function() return acted() or controllerState() == "unit_command_menu" end,
+            TUNE.combatFrames, true)
         if controllerState() == "unit_command_menu" and not chooseWait() then return false end
         done = waitFor(acted, TUNE.combatFrames, true)
     end
@@ -3430,7 +3443,7 @@ INSPECT.botApi = function(game)
     end
     -- A failed act returns false and, where the driver knows it, why (the crash record says it).
     -- One action of Bot.decide's or the planner's: move, then attack the chosen enemy, wait,
-    -- Talk, open a door, heal, use an item, Visit, open a chest, or Seize.
+    -- Talk, Rescue or Drop, open a door, heal, use an item, Visit, open a chest, or Seize.
     api.act = function(a)
         local u = BOARD.find("blue", a.unit)
         if not u then return false, "the unit is not on the board" end
@@ -3463,7 +3476,24 @@ INSPECT.botApi = function(game)
             return true
         elseif a.act == "talk" then
             if not chooseTalk(a.targetId) then return false end
-            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
+        elseif a.act == "rescue" or a.act == "drop" then
+            -- the command's own selector (RescueEffect, DropEffect), stepped to the unit or the
+            -- tile, then A; the act's animation plays, and Canto (playerphase.c) moves the unit
+            -- to a.canto or is spent in place (awaitActed)
+            if not selectSemantic(a.act, "the " .. a.act .. " command opens its selector",
+                function(after)
+                    return controllerState(after) == "target_selection"
+                        and after.target and after.target.kind == a.act
+                end, 300) then return false end
+            local tile = a.act == "drop" and a.dropAt or nil
+            if not INSPECT.stepTarget(a.act == "rescue" and a.targetId or nil, tile) then
+                return false
+            end
+            if not guardedInput("confirm_target", "A", "the " .. a.act .. " is chosen", function(after)
+                return controllerState(after) ~= "target_selection"
+            end, 120) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
         elseif a.act == "door" then
             if not selectSemantic("open_door", "the Door command opens the door", function(after)
                 return after.menu == nil
@@ -3476,7 +3506,7 @@ INSPECT.botApi = function(game)
             local cmd = a.act == "visit" and "visit" or "open_chest"
             if not selectSemantic(cmd, "the " .. a.act .. " command starts the tile's event",
                 function(after) return after.menu == nil end, 120) then return false end
-            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
         elseif a.act == "staff" then
             return INSPECT.chooseStaff(u.addr, a.slot, a.targetId, function() return won() or lost() end)
         elseif a.act == "item" then
