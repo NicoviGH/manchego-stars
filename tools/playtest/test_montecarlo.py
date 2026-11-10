@@ -2772,16 +2772,16 @@ class Report(unittest.TestCase):
                                    rows['FE8 Ch2']: safe, rows['FE8 Ch6']: lost})
         self.assertTrue(inverted)
         self.assertTrue(out[0].startswith('!!! CANARY INVERSION'))
-        self.assertIn('canary vanilla Ch1 below vanilla Ch5 (expected): vanilla Ch1 3 of 3, '
+        self.assertIn('canary vanilla Ch1 below vanilla Ch5: vanilla Ch1 3 of 3, '
                       'vanilla Ch5 0 of 3: INVERTED', out)
-        self.assertIn('canary vanilla Ch2 below vanilla Ch6 (expected): vanilla Ch2 0 of 3, '
+        self.assertIn('canary vanilla Ch2 below vanilla Ch6: vanilla Ch2 0 of 3, '
                       'vanilla Ch6 3 of 3: holds', out)
         lines = self.lines(canary=(out, inverted))
         self.assertEqual(lines[1], out[0])
         # in order: no banner; a chapter with no attempts is never read as holding
         out, inverted = mc.canary({rows['FE8 Ch1']: safe, rows['FE8 Ch5']: lost})
         self.assertFalse(inverted)
-        self.assertIn('canary vanilla Ch2 below vanilla Ch6 (expected): not read, vanilla Ch2 '
+        self.assertIn('canary vanilla Ch2 below vanilla Ch6: not read, vanilla Ch2 '
                       'and vanilla Ch6 have no first attempts under this instrument', out)
 
     def test_anomalies_carry_their_story_commands(self):

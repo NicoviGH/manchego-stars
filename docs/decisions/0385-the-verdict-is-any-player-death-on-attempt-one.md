@@ -79,12 +79,13 @@ the endpoint.
   the true answer when ours is easy too. Only EASIER cannot be shown there, and it means
   nothing below zero deaths.
 
-**5. Human calibration (retired 2026-11-09, see the amendment above).** The designer and one blind friend play vanilla Ch3 and Ch5 and
-Manchego Stars ch02 and ch03 on Normal, resetting on a player death, and code each reset on a
-frozen one-page form per map with the bot's causes plus misplay and ignored loot. Once that data
-exists, a result may gate a decision only if the bot's leading first-attempt cause matches the
-humans' leading reset reason on at least three of the four maps. Otherwise it is marked
-UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
+**5. Human calibration (retired 2026-11-09, see the amendment above).** As decided on
+2026-11-01: the designer and one blind friend were to play vanilla Ch3 and Ch5 and Manchego
+Stars ch02 and ch03 on Normal, resetting on a player death, and code each reset on a frozen
+one-page form per map with the bot's causes plus misplay and ignored loot. Once that data
+existed, a result could gate a decision only if the bot's leading first-attempt cause matched
+the humans' leading reset reason on at least three of the four maps; otherwise it was marked
+UNVALIDATED_HUMAN. No human session was ever played, and none will be.
 
 **What this changes in ADR 0376:**
 - The verdict no longer counts clean clears (point 1).
@@ -203,30 +204,26 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
     is a `seize_skips` entry with `justified` false;
   - an arm with no attempt that reached the chapter is "not read", never "holds". A NOT
     READABLE pilot says so first and exits non-zero: its analysis choice must not reach `cell`.
-- **Human calibration** (point 5; built here, removed by the 2026-11-09 amendment): `human
-  --form` printed the one-page form. Its causes were botrun.lua's plus `misplay` and `ignored_loot`, so the form and the comparison cannot
-  drift. It is posted as one #510 comment on Nicolas's go-ahead. Coded attempts go in
-  `references/sim/human/*.jsonl`, one line each, checked against the form. Maps are named by
-  their suite start (`vanilla-ch3`, `vanilla-ch5`, `ours-ch02`, `ours-ch03`). The bot's cause
-  on a map is the cause of each attempt's **first** protected death (a human resets on the
-  first death), and the leading cause is the most frequent one. A tie, or a map with no data,
-  has no leader and matches nothing. With no coded data, nothing is marked: FR-030 gates only
-  once human data exists.
+- **Human calibration** (point 5; built here and removed by the 2026-11-09 amendment, PR #594).
+  PR-I built `human --form`, which printed the one-page form (botrun.lua's causes plus `misplay`
+  and `ignored_loot`), and `human`, which read coded attempts from
+  `references/sim/human/*.jsonl` and compared, on each of the four maps, the humans' leading
+  reset reason with the cause of the bot's first protected death on each attempt. With no coded
+  data it marked nothing. None of it remains.
 - **The report** (`report`, FR-031): `pilot` and `cell` each append a `kind: cell` record to
-  `references/sim/cells.jsonl`, naming each paired run by its name, trace and instrument,
-  and `report` reads one instrument's cells from it. A pilot with a benched arm is an
-  experiment and writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6 (and, until the
-  2026-11-09 amendment, the humans' Ch3/Ch5 order once they had played both). It reads the
-  vanilla first attempts in the cells' stores under that instrument, never a held-out run. A chapter with no attempts is "not
-  read", never "holds". An inversion prints a banner first. The anomalies are listed one line
-  per run, each kind with its turns, and one `story` command at the first one's turn (a cell of
-  100 runs can carry a hundred anomalies; a story read from that turn reaches the rest). A
-  cell's sentence names its two largest cause differences an attempt (boss flag kept), plus
-  escort greens. `--decision party`
-  reads deaths by cause and by unit; `enemy` reads boss-flagged deaths by cause (over-cap left
-  out), rng_tail deaths and turns to win; `chapter --components` reads what it names. Every
-  line is beside the twin. `--post` writes the report under `build/` and prints the
-  `gh issue comment 510` command; it never runs it.
+  `references/sim/cells.jsonl`, naming each paired run by its name, trace and instrument, and
+  `report` reads one instrument's cells from it. A pilot with a benched arm is an experiment and
+  writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6 (PR-I also built a third pair,
+  the humans' Ch3/Ch5 order, removed by the 2026-11-09 amendment). It reads the vanilla first
+  attempts in the cells' stores under that instrument, never a held-out run. A chapter with no
+  attempts is "not read", never "holds". An inversion prints a banner first. The anomalies are
+  listed one line per run, each kind with its turns, and one `story` command at the first one's
+  turn (a cell of 100 runs can carry a hundred anomalies; a story read from that turn reaches
+  the rest). A cell's sentence names its two largest cause differences an attempt (boss flag
+  kept), plus escort greens. `--decision party` reads deaths by cause and by unit; `enemy` reads
+  boss-flagged deaths by cause (over-cap left out), rng_tail deaths and turns to win; `chapter
+  --components` reads what it names. Every line is beside the twin. `--post` writes the report
+  under `build/` and prints the `gh issue comment 510` command; it never runs it.
 - **The pilot cell's measured validity (2026-11-09, instrument `9d0b15b542e2+v2`).** ch03 could
   not be piloted: no Manchego Stars campaign reaches it (every one stops at ch02, the chwinga
   finding #510 step 10 owns). So the pilot is ch02 against vanilla Ch2, seeds 3001-3050 over 10

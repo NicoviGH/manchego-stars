@@ -1298,8 +1298,9 @@ def pilot_main(args):
 # A verdict is only as good as the attempts behind it. Before a cell gets one, both arms'
 # first attempts pass FR-029's invariants, or the cell is NOT READABLE with each failed one
 # named. There are no human playtests (ADR 0385, amended 2026-11-09): vanilla is the proxy for
-# playtesters, so the bot is checked against vanilla (the validity bars and the canary) alone. `report` says it all in sentences, one per cell (FR-031), and
-# reads a decision's own components only (FR-032).
+# playtesters, so the bot is checked against vanilla (the validity bars and the canary) alone.
+# `report` says it all in sentences, one per cell (FR-031), and reads a decision's own
+# components only (FR-032).
 
 ENV_CLEAN_MIN = 0.90       # FR-029: an arm's environment-clean share of its first attempts
 BLIND_MAX = 0.10           # FR-029: blindspot plus unclassified attempts, under this
@@ -1466,23 +1467,21 @@ def canary(vanilla):
     attempt-1 record]}. An order is read only when both chapters have attempts; one that
     cannot be read says so, never passes."""
     rows = vanilla_rows()
-    pairs = [(lo, hi, 'expected') for lo, hi in CANARY]
     lines, inverted = [], False
-    for lo, hi, why in pairs:
+    for lo, hi in CANARY:
         (k1, n1), (k2, n2) = (death_rate(vanilla.get(rows[c]) or []) for c in (lo, hi))
         if not n1 or not n2:
             empty = [vanilla_name(c) for c, n in ((lo, n1), (hi, n2)) if not n]
-            lines.append('canary %s below %s (%s): not read, %s %s no first attempts under '
-                         'this instrument' % (vanilla_name(lo), vanilla_name(hi), why,
+            lines.append('canary %s below %s: not read, %s %s no first attempts under '
+                         'this instrument' % (vanilla_name(lo), vanilla_name(hi),
                                               ' and '.join(empty),
                                               'have' if len(empty) > 1 else 'has'))
             continue
         bad = k1 / n1 > k2 / n2
         inverted = inverted or bad
-        lines.append('canary %s below %s (%s): %s %d of %d, %s %d of %d: %s' % (
-            vanilla_name(lo), vanilla_name(hi), why, vanilla_name(lo), k1, n1, vanilla_name(hi),
-            k2, n2,
-            'INVERTED' if bad else 'holds'))
+        lines.append('canary %s below %s: %s %d of %d, %s %d of %d: %s' % (
+            vanilla_name(lo), vanilla_name(hi), vanilla_name(lo), k1, n1, vanilla_name(hi),
+            k2, n2, 'INVERTED' if bad else 'holds'))
     if inverted:
         lines.insert(0, '!!! CANARY INVERSION: vanilla\'s own chapters read out of order; '
                         'audit the instrument (`montecarlo.py audit`) before reading any cell')
@@ -1724,8 +1723,8 @@ def report(cells, arms_of, canary_out, decision=None, components=None, who=None)
     """FR-031's report, in order, as lines (it is not a table): the header (instrument,
     CPU-hours, pairs and the label counts), the canary with its banner, one sentence a cell,
     the anomalies with their `story` commands, the validity failures and the descriptive
-    data. `decision` ('party', 'enemy' or 'chapter' with `components`)
-    reads only that decision's components (FR-032), each beside the twin; None reads all.
+    data. `decision` ('party', 'enemy' or 'chapter' with `components`) reads only that
+    decision's components (FR-032), each beside the twin; None reads all.
     `arms_of(cell)` is {arm: [played attempt-1 record]} (cell_arms), `who` component_line's."""
     if decision is None:
         comps = COMPONENTS
