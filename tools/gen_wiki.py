@@ -136,10 +136,10 @@ def _vanilla_item_names():
         items = inject.decomp.vanilla_decomp_text('src/data_items.c')
         msgs = inject.text.messages(inject.decomp.vanilla_decomp_text('texts/texts.txt'))
         _ITEM_NAMES = {}
-        for m in re.finditer(r'\[(ITEM_\w+)\]\s*=\s*\{(.*?)\n\s*\},', items, re.S):
-            n = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(2))
-            if n and int(n.group(1), 0) in msgs:
-                _ITEM_NAMES[m.group(1)] = msgs[int(n.group(1), 0)]
+        for enum in re.findall(r'^\s*\[(ITEM_\w+)\]\s*=\s*\{', items, re.M):
+            n = inject.decomp.block_field(inject.decomp.item_block(items, enum), 'nameTextId')
+            if n in msgs:
+                _ITEM_NAMES[enum] = msgs[n]
     return _ITEM_NAMES
 
 

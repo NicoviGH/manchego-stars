@@ -8,7 +8,7 @@ import sys
 
 from yaml_loader import yaml_load
 from inject.arena import _bgr555
-from inject.decomp import DECOMP, REPO
+from inject.decomp import DECOMP, REPO, block_field, item_block
 from inject.paths import CONST_MAPS_S, ITEMS_C
 
 
@@ -18,11 +18,10 @@ def item_icon_id(item_enum):
     above it) -- harmless while the build only re-icons consumables, wrong for any other reader."""
     with open(ITEMS_C, encoding='utf-8') as f:
         text = f.read()
-    m = re.search(r'\[%s\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(item_enum), text, re.S)
-    icon = re.search(r'\.iconId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(1)) if m else None
-    if not icon:
+    icon = block_field(item_block(text, item_enum), 'iconId')
+    if icon is None:
         sys.exit('ERROR: could not find iconId for %s in %s' % (item_enum, ITEMS_C))
-    return int(icon.group(1), 0)
+    return icon
 
 
 def item_icon_png_path(icon_id):

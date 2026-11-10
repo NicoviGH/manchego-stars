@@ -1,13 +1,12 @@
 """Name plates: the cast's names and the campaign's item names.
 """
 import os
-import re
 import sys
 
 from yaml_loader import yaml_load
 from inject.cast import (
     class_enum_for, load_unit, PORTRAIT_MAP, RAW_PID_HELP, RAW_PID_PORTRAITS)
-from inject.decomp import REPO
+from inject.decomp import REPO, block_field, item_block
 from inject.paths import ITEMS_C, TEXTS_TXT
 from inject.text import (
     display_name, help_text_body, name_message_body, raw_pid_name_text_id, set_message_body,
@@ -51,15 +50,10 @@ def item_name_text_id(item_enum):
     """nameTextId of a vanilla item, scanned from data_items.c. FE8 stores one name
     message per item id (gItemData[].nameTextId), so renaming it retitles every copy
     of that item in-game -- read the id from the decomp, never hardcode."""
-    marker = '[%s] = {' % item_enum
     with open(ITEMS_C, encoding='utf-8') as f:
-        lines = f.read().splitlines()
-    for i, line in enumerate(lines):
-        if marker in line:
-            for probe in lines[i:i + 12]:
-                m = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', probe)
-                if m:
-                    return int(m.group(1), 0)
+        nid = block_field(item_block(f.read(), item_enum), 'nameTextId')
+    if nid is not None:
+        return nid
     sys.exit('ERROR: could not find nameTextId for %s in %s' % (item_enum, ITEMS_C))
 
 

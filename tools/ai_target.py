@@ -54,8 +54,7 @@ def coefficient_tables():
         index, fields, bonuses = int(m.group(1)), m.group(2), m.group(3)
         if index != len(tables):
             raise ValueError('%s: table [%d] out of order' % (CP_DATA, index))
-        row = {f: int(re.search(r'\.%s\s*=\s*(\d+)' % f, fields).group(1))
-               if re.search(r'\.%s\s*=' % f, fields) else 0 for f in COEFF_FIELDS}
+        row = {f: inject.decomp.block_field(fields, f, 0) for f in COEFF_FIELDS}
         row['bonuses'] = [0] * CLASS_RANKS
         for k, v in re.findall(r'\[(\d+)\]\s*=\s*(\d+)', bonuses):
             row['bonuses'][int(k)] = int(v)

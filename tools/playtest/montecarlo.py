@@ -2341,19 +2341,32 @@ def _names(game):
 
 def names_note(game, rom_hashes):
     """The line a story or audit prints when its Manchego Stars names may not be the run's: they
-    come from the build tree (`_names`), and the run played the ROM its record names. None when
-    every run played the ROM built now."""
+    come from the build tree's sources (`_names`), and the run played the ROM its record names.
+    None only when every run names the ROM built now and the sources the names come from are no
+    newer than it (an injection rewrites them before the ROM is rebuilt, and `git checkout`
+    resets them to vanilla). A run with no `rom_hash` cannot be matched, so it counts as another."""
     if game != 'ours':
         return None
     import matrix
-    built = sha1_file(matrix.ROM_PATH) if os.path.isfile(matrix.ROM_PATH) else None
-    others = sorted(h for h in set(rom_hashes) if h and not (built or '').startswith(h))
-    if built and not others:
+    rom = matrix.ROM_PATH
+    built = sha1_file(rom) if os.path.isfile(rom) else None
+    others = sorted({h or 'unrecorded' for h in rom_hashes
+                     if not (built and h and built.startswith(h))})
+    sources = [os.path.join(os.path.dirname(rom), rel) for rel in NAME_SOURCES]
+    stale = built is not None and any(
+        os.path.isfile(p) and os.path.getmtime(p) > os.path.getmtime(rom) for p in sources)
+    if built and not others and not stale:
         return None
+    where = ('vanilla (no ROM is built)' if not built else
+             'the build tree, changed since its ROM %s was built' % built[:12] if stale else
+             'the build tree (ROM %s)' % built[:12])
     return ('note: chapter-unit names are read from %s; the run played ROM %s, so a name may '
             'not be the one that ROM showed (build that ROM to read its names)'
-            % ('the build tree (ROM %s)' % built[:12] if built else 'vanilla (no ROM is built)',
-               ', '.join(others) or 'unknown'))
+            % (where, ', '.join(others) or built[:12]))
+
+
+# The build-tree files `_names` reads through `inject.text.character_names`.
+NAME_SOURCES = ('src/data_characters.c', 'texts/texts.txt', 'include/constants/characters.h')
 
 
 @functools.lru_cache(maxsize=None)

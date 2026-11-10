@@ -280,7 +280,23 @@ def rom_block(rel, token):
     return _rom_block(rom_text(rel), rel, token)
 
 
-@functools.lru_cache(maxsize=None)
+def rom_block_of(text, rel, token):
+    """`rom_block` on a text the caller already holds (vanilla's at HEAD, say)."""
+    return _rom_block(text, rel, token)
+
+
+def item_block(text, item_enum):
+    """One `[ITEM_X] = {...}` entry of data_items.c's text (its rows have no `- 1`), or ''."""
+    try:
+        s, e = _find_brace_block(text, '[%s] = {' % item_enum, 'src/data_items.c')
+    except SystemExit:
+        return ''
+    return text[s:e]
+
+
+# Bounded: keyed on a whole file's text, so each rewrite of the build tree in one process adds a
+# copy, as `_read_built`'s are.
+@functools.lru_cache(maxsize=1024)
 def _rom_block(text, rel, token):
     try:
         s, e = _find_brace_block(text, '[%s - 1]' % token, rel)

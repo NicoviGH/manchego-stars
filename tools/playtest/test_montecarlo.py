@@ -2048,6 +2048,17 @@ class Story(unittest.TestCase):
                 self.assertIsNone(mc.names_note('ours', [built[:12]]))
                 self.assertIsNone(mc.names_note('vanilla', ['abc']))
                 self.assertIn('abc', mc.names_note('ours', [built[:12], 'abc']))
+                # a run that recorded no ROM cannot be matched (#591 review)
+                self.assertIn('unrecorded', mc.names_note('ours', [built[:12], None]))
+                # the names' sources rewritten after the ROM was built (an injection in flight,
+                # or a `git checkout` back to vanilla): the ROM's hash still matches
+                src = os.path.join(d, 'src')
+                os.makedirs(src)
+                chars = os.path.join(src, 'data_characters.c')
+                with open(chars, 'w') as fh:
+                    fh.write('')
+                os.utime(chars, (os.path.getmtime(rom) + 10,) * 2)
+                self.assertIn('changed since', mc.names_note('ours', [built[:12]]))
             with mock.patch.object(matrix, 'ROM_PATH', os.path.join(d, 'none.gba')):
                 self.assertIn('no ROM is built', mc.names_note('ours', [built[:12]]))
 
