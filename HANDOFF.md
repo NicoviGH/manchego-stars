@@ -9,35 +9,33 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10, evening (Claude): **PR 1 (retries that learn) is built and witnessed on
-branch `feat/510-retry-memory` (commit 73948dd6, local, not pushed, no PR). It is waiting on
-Nicolas's call about a different retry rule.** Everything is in ONE comment, #510 comment
-6776176601 (edited in place; its last two sections are this session's). Read it first.
-- **Built on the branch** (ADR 0399 drafted; unit tests added, each checked to fail without
-  its fix): `style.memory` (enemies seen + killers, by slot and character; every death), a
-  remembered enemy plays in the judged phases in fog (`Sight.plays`, `plan.known`, `Bot.known`),
-  a green lost before is a guard goal (`Goals.guarded`, `Goals.PULLS`) with a march in
-  `exploring`, `MAX_ATTEMPTS = 12` with styles redrawn, and `montecarlo.py resume` (carry
-  campaigns on under `<tag>-<campaign>`, records in `resume-runs.jsonl`).
-- **Harness fix found by the witness:** FE8's fog ambush (bmidoten.c: a move onto a hidden unit
-  halts, `UNIT_ACTION_TRAPPED`, no command menu; the last unit's ends the phase). Before this
-  fix the harness crashed with "the move failed". Now `moveUnit(..., haltOk)` returns
-  `"trapped"` for the bot's `api.act` only, and botrun takes it as the act's end. This is very
-  likely 4008's Ch8 attempt 5 crash too (not re-run). Proven on 4007: 6 halts, no crash.
-- **Witness (Ch6, 4001 and 4007, 12 attempts each, in sequence):** attempt 1 is unchanged.
-  The fog deaths every old retry repeated are gone (H1 holds), but over-cap deaths replace
-  them. **The Civilian (unit 65) dies on turn 8 in all 17 won retries**: the guard goal is in
-  the plans and a unit is sent, but the march is never taken (why is untested). **Retries
-  become reruns** once the memory stops growing (the bot is deterministic): 4001 attempts 5 to
-  12 are three games repeated. 4007's `careful` style got `stuck` (50 turns) twice, cause
-  untested. Both campaigns: no clean clear, `bot_fault`.
-- **Open for Nicolas (asked; not answered):** he asked why the bot doesn't "try different
-  things" like a player. Proposal on the comment: **a retry changes the decision behind the
-  earliest death of the last attempt** (plays another plan the planner judged there; every
-  earlier turn the same), in place of redrawing a style; `montecarlo.py replay` (PR-F)
-  already swaps one decision. Build it in PR 1, or land PR 1 as built first?
-- **`suite --held-out` has NOT run** on the branch: the first run was stopped when the harness
-  changed under it (it may have left partial records). Run it once the code is final.
+Refreshed 2026-11-10, night (Claude, Fable session): **the Fable review is done and its plan is
+locked by Nicolas: two PRs, one suite run. The plan is ONE comment, #510 comment 6779357154
+(edited in place; it has the findings, both PRs' steps and a file map). Read it first.** Nothing
+was built or run in the emulator this session.
+- **What the review found** (detail and witnesses on the comment): fog is read as empty ground
+  by every danger estimate and by admission; the bot has no way to pull back together and makes
+  no further plan when none is under the cap; the predicted enemy phase differs from the played
+  one (how far is unmeasured); an enemy-phase death is graded by the phase's last plan, so fog
+  deaths read `over_cap`; retries are reruns.
+- **Nicolas confirmed the goal:** winning clean is his proxy for "the bot is capable", as a
+  human is after retries and learning. Clean clears stay the campaign's carry-on rule.
+- **Three calls are proposed on the comment and NOT yet his yes** (ask at PR A's start): the
+  fog rule (a unit beside unseen ground is judged against one strike from the strongest enemy
+  seen so far), the regrade (a death graded by the plan that moved its unit), and a cheap proof
+  in place of a suite run for the retries-only PR.
+- **`feat/510-retry-memory`** (commit 73948dd6, local, not pushed, no PR; ADR 0399 drafted) is
+  kept as the source for both PRs: its fog-ambush harness fix (`moveUnit(..., haltOk)` returns
+  `"trapped"`) goes into PR A, its retry memory into PR B. Its guard march is reworked in PR B
+  (the guard targets the green's tile, is barred as stuck once adjacent, and is re-picked at
+  every replan). `suite --held-out` has NOT run on it. The earlier Ch6 witness (4001 and 4007,
+  12 attempts each) is on #510 comment 6776176601.
+- **How to work it cheaply** (agreed with Nicolas): a fresh session a PR, started from the plan
+  comment; Opus for the building, Fable only to read PR A's calibration table and PR B's
+  campaign rerun; never read the five bot files whole (435 KB: use the comment's file map and
+  `sed -n`); scripts read the runs, not a model; unit tests on the fake board before any
+  emulator run; while working, only the starts a change can touch (Ch5 starts, the Ch6 fog
+  start); the full suite once, on PR A's final code.
 - **Lessons:**
   - The pool prints a campaign's attempts only when its worker ends; `resume` of one campaign
     to the cap takes about 1 h (Ch6, 12 attempts).
@@ -45,7 +43,9 @@ Nicolas's call about a different retry rule.** Everything is in ONE comment, #51
     first.
   - HANDOFF is refreshed on main only; the branch's pre-commit refuses it.
   - Earlier lessons still hold: `starts` skips pinned seeds; trace numbers are game chapter ids
-    (5 = Ch5x, 6 = Ch5); vanilla Eirika ids 9 = Ch8, 10-21 `E_9`..`E_21`, 22 `E_21X`.
+    (5 = Ch5x, 6 = Ch5, 7 = Ch6); vanilla Eirika ids 9 = Ch8, 10-21 `E_9`..`E_21`, 22 `E_21X`.
+  - The "25 min" suite wall below is not reconciled with `suite-frozen.json`'s `wall_s`
+    (2,296 s tuning, 4,313 s held-out; perhaps summed over workers). Unchecked.
 - **The campaigns' saved starts** are untouched (resume copies them first): the 9 stopped
   ones at `states/cs-s<seed>/7.ss` (4003's `5.ss`), 4008 at `states/full-s4008/9.ss`. The
   witness's state copies were deleted; its traces and records are kept.
@@ -104,31 +104,16 @@ Nicolas's call about a different retry rule.** Everything is in ONE comment, #51
 
 ## Next
 
-0. **Fable review first (Nicolas asked, 2026-11-10; there are Fable credits).** Before building
-   more, start a Fable session (`claude-fable-5-2`) and give it a GOAL, not our questions (so
-   it isn't anchored on our framing):
-   - **Goal:** #510's north star, a trustworthy difficulty model. A bot plays the real ROM, both
-     games, so Manchego Stars' chapters can be judged against vanilla FE8's. On vanilla, which
-     strong players clear clean, the bot must clear every chapter of Eirika's route clean
-     (ADR 0376). A chapter it can't clear is the bot's fault, never the chapter's. Today it
-     stops at Ch6 in 8 of 10 campaigns. Ask what Fable would change to get there, and what in
-     the approach so far it would keep, drop or rethink.
-   - **Context to point it at:** the #510 issue body and plan comments 6563384018 (spec),
-     6563384310 (step 9 plan) and 6776176601 (this week: the findings, the witness, the open
-     retry proposal); `docs/decisions.md` (ADRs 0376 and 0384 to 0399 are #510's);
-     `tools/playtest/{campaign,botrun,planner,goals,bot,sight}.lua`; the branch
-     `feat/510-retry-memory`; `AGENTS.md`.
-   - **Constraints to state:** the bot knows only what a player sees (never a dice result);
-     attempt 1 is the measured one (ADR 0385); playtest runs are expensive (AGENTS.md);
-     Nicolas's standing rules in AGENTS.md.
-   - **What comes back:** a short written recommendation for Nicolas. Bring it to him; don't
-     build on it unasked.
-1. **#510: PR 1, retries that learn** (above): get Nicolas's answer on the retry rule; build
-   it, or not; find why the guard march to the Civilian is never taken (one instrumented run on
-   4001 Ch6); then `suite --held-out`, a PR, `/code-review <PR> medium`, and
-   `resume --game vanilla --tag <t>` to carry the 10 campaigns on. Then PR 2 (tries to the first
-   clean clear; its method goes to Nicolas as an ADR 0385 amendment first). **#510 step 10**
-   after.
+0. **#510 PR A, first attempts** (plan comment 6779357154): get Nicolas's yes on the fog rule
+   and the regrade; then, in commit order, the harness fix, the regrade and calibration script
+   (no emulator), stepping back (witness: Ch5 starts), fog in the chance to die (witness: the
+   Ch6 fog start), the enemy phase's prediction only if the calibration is off; `suite
+   --held-out` once on the final code; `/code-review <PR> medium`.
+1. **#510 PR B, retries** (same comment): retry memory rebased from `feat/510-retry-memory`,
+   deadlines from a remembered green death, the guard's bugs; carry the 10 vanilla campaigns on
+   before the merge (`resume --game vanilla --tag <t>`); retries that differ only if they still
+   stop on reruns. Then tries to the first clean clear (its method goes to Nicolas as an ADR
+   0385 amendment first). **#510 step 10** after.
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
