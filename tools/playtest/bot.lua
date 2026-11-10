@@ -461,46 +461,6 @@ function M.fogRead(board, sight, seen)
     return { die = die, unseen = unseen }
 end
 
--- Who leads into the fog (#510 PR A step 4, "the sturdy lead, the fragile follow"): each blue
--- unit's fog read standing at the fog's edge nearest it, on a seen tile beside the unseen one
--- its march would head to (its own tile when none is seen). A unit that read cannot kill
--- leads; with none such, the least threatened do (no tank rule: who leads falls out of each
--- unit's own read). -> lead[id] = true, and each unit's nearest unseen tile.
-local function fogLead(ctx)
-    if ctx.fogLeads then return ctx.fogLeads, ctx.fogTargets end
-    local fog = ctx.fogRead()
-    local unseen = fog.unseen
-    local hidden = {}
-    for _, t in ipairs(unseen) do hidden[tileKey(t.x, t.y)] = true end
-    local threat, least, targets = {}, nil, {}
-    for _, u in ipairs(ctx.blues) do
-        local best, bestD
-        for _, t in ipairs(unseen) do
-            local d = manhattan(u.x, u.y, t.x, t.y)
-            if not bestD or d < bestD then best, bestD = t, d end
-        end
-        targets[u.id] = best
-        local fx, fy = u.x, u.y
-        if best then
-            for _, s in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                local x, y = best.x + s[1], best.y + s[2]
-                if not hidden[tileKey(x, y)] and (fx == u.x and fy == u.y
-                        or manhattan(u.x, u.y, x, y) < manhattan(u.x, u.y, fx, fy)) then
-                    fx, fy = x, y
-                end
-            end
-        end
-        threat[u.id] = fog.die(u, fx, fy, u.hp)
-        if not least or threat[u.id] < least then least = threat[u.id] end
-    end
-    local lead = {}
-    for _, u in ipairs(ctx.blues) do
-        if threat[u.id] <= (least or 0) + 1e-9 then lead[u.id] = true end
-    end
-    ctx.fogLeads, ctx.fogTargets = lead, targets
-    return lead, targets
-end
-
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
@@ -906,8 +866,7 @@ end
 -- else its way to the objective (objectiveTile); nil = hold.
 -- objectiveTile: the objective's tile, the boss, or the nearest enemy; nil on a Survive map.
 -- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
--- than the fog shows, so it pushes the fog back -- the sturdy lead, the fragile follow the
--- nearest lead (fogLead, #510 PR A).
+-- than the fog shows, so it pushes the fog back.
 local objectiveTile
 local function goalFor(ctx, u, objective)
     local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
@@ -919,16 +878,12 @@ objectiveTile = function(ctx, u, objective)
     if objective and objective.tile then return objective.tile end
     if kind == "survive" then return nil end
     if #ctx.enemies == 0 and ctx.sight.unseen then
-        -- only a unit the fog's strike cannot kill heads into it (fogLead); the rest follow
-        -- the nearest of those that do, so the front is behind it
-        local lead, targets = fogLead(ctx)
-        if lead[u.id] then return targets[u.id] end
         local best, bestD
-        for _, o in ipairs(ctx.blues) do
-            local d = manhattan(u.x, u.y, o.x, o.y)
-            if lead[o.id] and (not bestD or d < bestD) then best, bestD = o, d end
+        for _, t in ipairs(ctx.fogRead().unseen) do
+            local d = manhattan(u.x, u.y, t.x, t.y)
+            if not bestD or d < bestD then best, bestD = t, d end
         end
-        return best and { x = best.x, y = best.y } or targets[u.id]
+        return best
     end
     local best, bestD
     for _, e in ipairs(ctx.enemies) do

@@ -3659,34 +3659,6 @@ do
           "fog key: over the cap, after the seen excess")
 end
 
--- test_the_sturdy_lead_the_fragile_follow (#510 PR A step 4): with no enemy in sight, only a
--- unit the fog's strike cannot kill marches to its nearest unseen tile; F, whom it kills,
--- follows the nearest lead (S). With no unit it cannot kill, the least threatened lead.
-do
-    local S = blue(0x01, 0, 0, 0, { minRange = false })
-    local F = blue(0x02, 1, 0, 5, { minRange = false })
-    local X = red(0x81, 9, 9, { minRange = false, fogged = true })
-    local kills = { [0x01] = 0, [0x02] = 0.6 }
-    local o = {
-        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 5 }) },
-        unseen = { { x = 0, y = 2 }, { x = 0, y = 9 } },
-        fogStrike = function(u)
-            local k = kills[u.id]
-            return { takenDist = { [0] = 1 - k, [99] = k } }
-        end,
-    }
-    local _, ctx = B.candidates(boardOf(S, F, X), sightOf(o), style("bold"),
-                                { seen = { [0x81] = 0x81 } })
-    local t = ctx.objectiveTile(F)
-    check(t and (t.x .. "," .. t.y), "0,0", "fog lead: the fragile follow the sturdy lead")
-    t = ctx.objectiveTile(S)
-    check(t and (t.x .. "," .. t.y), "0,2", "fog lead: the sturdy head into the unseen")
-    kills[0x01] = 0.9
-    _, ctx = B.candidates(boardOf(S, F, X), sightOf(o), style("bold"), { seen = { [0x81] = 0x81 } })
-    t = ctx.objectiveTile(F)
-    check(t and (t.x .. "," .. t.y), "0,2", "fog lead: with none sturdy, the least threatened lead")
-end
-
 -- test_under_fog_the_threatened_move_last (#510 PR A's fog rule): A ends beside the fog and
 -- its strike may kill it; U ends far from it. U's act is played first, so what U shows of the
 -- fog is seen before A moves (botrun replans on a newly seen enemy).
