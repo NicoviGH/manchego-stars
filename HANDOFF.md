@@ -48,7 +48,7 @@ Nicolas's call about a different retry rule.** Everything is in ONE comment, #51
     (5 = Ch5x, 6 = Ch5); vanilla Eirika ids 9 = Ch8, 10-21 `E_9`..`E_21`, 22 `E_21X`.
 - **The campaigns' saved starts** are untouched (resume copies them first): the 9 stopped
   ones at `states/cs-s<seed>/7.ss` (4003's `5.ss`), 4008 at `states/full-s4008/9.ss`. The
-  witness copies are `mem1-`, `mem2-` and `mem3-` (deletable).
+  witness's state copies were deleted; its traces and records are kept.
 
 ## Where things stand
 
