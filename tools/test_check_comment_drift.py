@@ -92,6 +92,25 @@ class DeadConceptPatterns(unittest.TestCase):
                    'the judged score breaks a progress tie'):
             self.assertIsNone(DEAD_PAT.search(ok), ok)
 
+    def test_adr_0384s_three_retired_claims_are_caught_and_their_retirements_are_not(self):
+        """ADR 0384 says what it changes in 0381-0383: a green death is no longer priced as a
+        player unit's, the planner no longer pays what the clean clear counts, and worth x
+        chance no longer decides between complete plans. The claim is dead in every tense; the
+        sentence retiring it is current fact."""
+        for dead in ("a green unit's death is priced as one of ours",
+                     "green units' deaths are priced as ours",
+                     'green deaths were priced as a lost player unit',
+                     'the planner pays what the clean clear counts',
+                     'the planner paid what the clean clear counts',
+                     'worth x chance decides between complete plans',
+                     'worth × chance decided between plans'):
+            self.assertIsNotNone(DEAD_PAT.search(dead), dead)
+        for ok in ("a green unit's death is no longer priced as one of ours",
+                   'the planner no longer pays what the clean clear counts',
+                   'worth x chance no longer decides between complete plans',
+                   'worth x chance orders the candidates in the beam'):
+            self.assertIsNone(DEAD_PAT.search(ok), ok)
+
     def test_a_COLOUR_count_is_not_a_wrap_width(self):
         """`col\\w*` reaches "colours", and a palette depth that happens to end in 28 is not a
         line width. The registry is read by people fixing real drift; a guard that cries wolf

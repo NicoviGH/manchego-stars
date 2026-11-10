@@ -141,9 +141,9 @@ DEAD_CONCEPTS = [
     # retired by ADR 0384 (2026-11-01), which says what it changes in 0381-0383: a green unit's
     # death is a forfeit or a tie-break, never priced as a player unit's; no planner decision
     # reads the clean clear; worth x chance only orders the beam's candidates
-    r'\bgreen(?: unit)?(?:\'s)? death is priced as\b',
-    r'\bplanner (?:pays|prices) what the clean clear counts\b',
-    r'\bworth\s*(?:x|×)\s*chance decides? between (?:complete )?plans\b',
+    r"\bgreen(?: units?)?(?:'s|s'|s)? deaths? (?:is|are|was|were) priced as\b",
+    r'\bplanner (?:pays|paid|prices|priced) what the clean clear counts\b',
+    r'\bworth\s*(?:x|×)\s*chance (?:decides?|decided|deciding) between (?:complete )?plans\b',
     # retired by #510 step 9's goal worth (ADR 0383): the planner weighs what is still left to
     # get (goals.lua), never a flat step of ground or a recruit's fixed credit
     r'\bW\.progress\b', r'\bW\.recruit\b', r'\ba\.progress\b',
