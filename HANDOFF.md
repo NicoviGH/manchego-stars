@@ -12,9 +12,8 @@ and start a fresh instance; don't rely on auto-compaction.
 Refreshed 2026-11-09, late night (Claude): **PR-I is open as #593** (`feat/510-pr-i-validity`,
 2 commits): validity (NOT READABLE), `human`/`human --form`, `report`, and T107a (a tuning-seed
 death flip never blocks; ADR 0395 amended). `/code-review 593 medium` found 25 findings, every
-one fixed in 55e30c16. **A scoped re-review of 55e30c16 alone was running when the session
-ended: its result is lost, so run it again** (fresh reviewer, `git show 55e30c16`, verdict each
-of the 25 + new breakage), fix what it returns, then wait for CI on the head sha and merge
+one fixed in 55e30c16. The scoped re-review of 55e30c16 came back: all 25 ADDRESSED, plus **8 small new findings
+(A-H) in a comment on #593: fix every one first** (no second re-review), then wait for CI on the head sha and merge
 (#510 step 9 PRs may merge after review + CI).
 
 ## Where things stand
