@@ -9,7 +9,10 @@
 --
 -- Goals.list(board, sight, style, ctx) -> { goal }, the goals still open:
 --   visit / chest  each tile sight.explorable() still offers that this run has not taken;
---                  takers = our units the game lets use it (sight.canExplore).
+--                  takers = our units the game lets use it (sight.canExplore), and for a
+--                  chest the units with no key for it while an enemy whose fall gives them
+--                  one stands (sight.locked, sight.keySources): its turns run by way of that
+--                  enemy (Bot's turnsTo).
 --   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the player units that
 --                  may Talk it over); its takers are those talkers.
 --   objective      each unit's own way to the objective (ctx.objectiveTile: the Seize tile,
@@ -50,7 +53,8 @@
 -- sight has no read of who may use it or when it closes (sight.canExplore, sight.closings);
 -- a reward is unknown when a goal it needs is. A goal no unit can reach this turn (a unit in
 -- the way) stays feasible: only a closure loses it. One with no chance at all is no goal of
--- the bot's: the game lets no player unit use it (a chest with no key in the army), none has a way
+-- the bot's: the game lets no player unit use it (a chest with no key in the army and none on
+-- an enemy that drops it), none has a way
 -- there (sight.turnsTo reads the terrain, through a breach), or a looter takes it first. Kept,
 -- it would close with every win and so forbid the win for good. A reward needing one of those
 -- can never be had, and is no row either.
@@ -155,7 +159,13 @@ function M.list(board, sight, style, ctx)
     end
     for _, g in ipairs(M.openTiles(sight, style, ctx)) do
         g.takerUnits = takers(function(u)
-            return sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind)
+            if sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind) then
+                return true
+            end
+            -- a chest whose key an enemy drops (sight.keySources): its turns run by way of
+            -- that enemy (Bot's turnsTo), so its chance says whether that way is worth it
+            local lock = g.kind == "chest" and sight.locked and sight.locked(u, g.tile.x, g.tile.y)
+            return lock and sight.keySources ~= nil and #sight.keySources(u, lock) > 0 or false
         end)
         goals[#goals + 1] = g
     end

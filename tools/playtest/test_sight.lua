@@ -225,6 +225,54 @@ do
     check(open(), false, "open: closed after the outermost returns")
 end
 
+-- test_open_map_does_not_leak_into_the_next_read: the plan's door at (2,1) is opened on the
+-- judged phase's board (Sight.openMap: the change's tile and its terrain), and the next judged
+-- plan in the same batch finds it shut. TriggerMapChanges' own writes were journaled by no one,
+-- so one plan's open door stood open in every later plan's phase (PR #596 review).
+do
+    local cpu = fakeCpu(1)
+    local bytes = {}
+    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                       u16 = function(a) return bytes[a] or 0 end,
+                                       u32 = function(a) return bytes[a] or 0 end },
+                    write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end }
+    local sandbox, api = Sight.batching(outer)
+    local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10,
+                gBmMapBaseTiles = 0x20, gBmMapTerrain = 0x30 }
+    -- row pointers (one row each for y = 0..1), the lookup table, the change: 1x1 at (2,1)
+    bytes[0x20], bytes[0x30], bytes[0x10] = 0x100, 0x200, 0x400
+    bytes[0x104], bytes[0x204] = 0x140, 0x240     -- row 1 of each grid
+    bytes[0x140 + 4], bytes[0x240 + 2] = 0x50, 0x1E  -- the door's tile and TERRAIN_DOOR
+    bytes[0x400 + (0x88 >> 2)] = 0x01               -- the open tile's terrain: plains
+    local mc = 0x500
+    bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 1, 1, 0x600
+    bytes[0x600] = 0x88
+    local function call(fn, args)
+        if fn == S.GetMapChangeIdAt then
+            return (args[1] == 2 and args[2] == 1) and 3 or 0xFFFFFFFF
+        end
+        check(args[1], 3, "openMap: asks for the change at the tile")
+        return mc
+    end
+    local seen = {}
+    sandbox(function()
+        sandbox(function()
+            Sight.openMap(api, call, S, 2, 1)
+            seen[1] = bytes[0x242] .. "/" .. bytes[0x144]
+        end)
+        sandbox(function() seen[2] = bytes[0x242] .. "/" .. bytes[0x144] end)
+        sandbox(function()
+            Sight.openMap(api, call, S, 5, 0)
+            seen[3] = bytes[0x242]
+        end)
+    end)
+    check(seen[1], "1/136", "openMap: the door's terrain and tile are the change's")
+    check(seen[2], "30/80", "openMap: the next plan finds the door shut")
+    check(seen[3], 30, "openMap: a tile with no change changes nothing")
+end
+
 -- test_equip_does_not_leak_into_the_next_read: EquipUnitItemSlot (bmitem.c) moves the item to
 -- the front of the bag, a write the game makes and no journal sees. Two judged plans in one
 -- batch: the first equips slot 2, and the second must find the bag as it was, its slot 0 still

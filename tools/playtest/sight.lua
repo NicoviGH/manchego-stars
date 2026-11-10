@@ -81,7 +81,9 @@
 --   enemyPhase(plan)         the enemy phase the AI would play against a planned board, in
 --                            one batch. plan = { blues = { { unit, x, y, hp } }, gone =
 --                            { [enemy id] = true } }: our units stand where the plan leaves
---                            them with its HP, the gone are off the map, the game builds its
+--                            them with its HP, the gone are off the map, plan.opened =
+--                            { ["x,y"] = true } the doors it opens and walls it breaks, each
+--                            map change applied (M.openMap), the game builds its
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
 --                            in it the player can see makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
@@ -127,6 +129,13 @@
 --                            GetUnitKeyItemSlotForTerrain, a key or a thief's lockpick.
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
+--   locked(u, x, y)          the terrain at (x, y) when it is a door or a full chest `u` holds
+--                            nothing to open (opens()), else nil.
+--   keySources(u, terrain)   the enemies whose fall gives `u` what opens `terrain`: red (a
+--                            green ally is never struck, ADR 0384), on the field, seen (no US_BIT9), marked US_DROP_ITEM -- the game gives
+--                            a downed unit's last item to the blue unit that downs it
+--                            (bmmind.c, GetUnitLastItem) -- and `u` holding that item passes
+--                            GetUnitKeyItemSlotForTerrain (a lockpick only for a thief).
 --   explorable()             the villages and chests still open now: { x, y, kind =
 --                            "visit"|"chest", house (a Visit whose entry has flag 0) } per tile whose Visit or Chest command (read with
 --                            the Seize tile) GetAvailableTileEventCommand still returns -- a
@@ -893,6 +902,56 @@ end
 -- left in front, his counter judged unable to kill Joshua, who then died to it).
 -- It moves items 0..slot only (bmitem.c), so those are kept. api = M.batching's (its
 -- Board bound: api.Board), call = the sandbox's. Every equip goes through here.
+-- Whether the game takes `value` (id | uses << 8) for a key of the unit at `unitAddr` to
+-- `terrain`: the item put alone in its bag, GetUnitKeyItemSlotForTerrain (bmunit.c) asked, the
+-- bag put back. A Lockpick is a key only to a thief. io = { read16, write16 }, `call` the
+-- sandbox's, B = board.lua's Board. The one owner: sight.keySources and harness's
+-- INSPECT.isKey (Bot.fullBag).
+function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
+    local bag = {}
+    for k = 0, B.ITEM_COUNT - 1 do
+        local at = unitAddr + B.UNIT_ITEMS + k * 2
+        bag[k] = io.read16(at)
+        io.write16(at, k == 0 and value or 0)
+    end
+    local key = call(S.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
+    for k = 0, B.ITEM_COUNT - 1 do io.write16(unitAddr + B.UNIT_ITEMS + k * 2, bag[k]) end
+    return key
+end
+
+-- Inside a sandbox: the map change at (x, y) applied as the game applies it, every write
+-- journaled through `api` so the next judged plan finds the map as it was. A door's event
+-- (EvtListDOOR: script 1, the map change alone) and a broken wall (UpdateObstacleFromBattle)
+-- both run ApplyMapChangesById then RefreshTerrainBmMap: each non-zero tile of the change's
+-- rectangle (struct MapChange: +01 x, +02 y, +03 w, +04 h, +08 data) into gBmMapBaseTiles, and
+-- its terrain gTilesetTerrainLookup[tile >> 2] into gBmMapTerrain. Done by hand, not by
+-- TriggerMapChanges, whose own writes no journal sees: one plan's open door leaked into every
+-- later plan's board (PR #596 review). What it leaves out: the change's enabled bit and a
+-- wall's trap (read by no enemy's move), and a roof the change removes (UpdateRoofedUnits;
+-- a door or wall is no roof). No change at the tile: nothing.
+function M.openMap(api, call, S, x, y)
+    local mem = api.mem
+    local id = call(S.GetMapChangeIdAt, { x, y })
+    if id >= 0x80000000 then return end
+    local mc = call(S.GetMapChange, { id })
+    if mc == 0 then return end
+    local x0, y0, w, h = mem.u8(mc + 1), mem.u8(mc + 2), mem.u8(mc + 3), mem.u8(mc + 4)
+    local data, lookup = mem.u32(mc + 8), mem.u32(S.gTilesetTerrainLookup)
+    local k = 0
+    for iy = 0, h - 1 do
+        for ix = 0, w - 1 do
+            local tile = mem.u16(data + 2 * k)
+            k = k + 1
+            if tile ~= 0 then
+                local bx, by = x0 + ix, y0 + iy
+                -- a u16 grid: `cell`'s row, two bytes a tile
+                api.write16(cell(mem, S.gBmMapBaseTiles, 0, by) + bx * 2, tile)
+                api.write8(cell(mem, S.gBmMapTerrain, bx, by), mem.u8(lookup + (tile >> 2)))
+            end
+        end
+    end
+end
+
 function M.equip(api, call, S, u, slot)
     if not slot or slot <= 0 then return end
     api.keep16(u.addr + api.Board.UNIT_ITEMS, slot + 1)
@@ -1422,6 +1481,13 @@ function M.new(outer)
             gone[id] = true
             if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
         end
+        -- the doors the plan opens and the walls it breaks (M.openMap): the enemies behind
+        -- them reach through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed
+        -- him at 0%)
+        for at in pairs(plan.opened or {}) do
+            local x, y = at:match("^(%d+),(%d+)$")
+            M.openMap(api, call, S, tonumber(x), tonumber(y))
+        end
         local function order() return aiOrder(call) end
         -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog)
         local function decides(id)
@@ -1687,6 +1753,40 @@ function M.new(outer)
         return mine("opens" .. terrain, u, function() return sandbox(function(call)
             return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
         end) end) or false
+    end
+
+    -- Whether `u` holding `item` would open `terrain` (M.keyItemOpens): the game's check reads
+    -- UNIT_CATTRIBUTES, the character's and the class's (a thief's lockpick), and the item, so
+    -- it is kept by all three.
+    local wouldOpen = {}
+    local function opensWith(u, item, terrain)
+        local k = u.charId .. ":" .. u.classId .. ":" .. item .. ":" .. terrain
+        if wouldOpen[k] == nil then
+            wouldOpen[k] = sandbox(function(call)
+                return M.keyItemOpens({ read16 = mem.u16, write16 = api.write16 }, call, S,
+                                      Board, u.addr, item | (1 << 8), terrain)
+            end)
+        end
+        return wouldOpen[k]
+    end
+    function s.keySources(u, terrain)
+        local out = {}
+        for _, e in ipairs(units()) do
+            local last = e.items and e.items[#e.items]
+            local st = e.state or 0
+            if e.faction == "red" and e.onField and not e.dead and last
+                and st & Board.US_DROP_ITEM ~= 0 and st & Board.US_BIT9 == 0
+                and opensWith(u, last.id, terrain) then
+                out[#out + 1] = e
+            end
+        end
+        return out
+    end
+
+    function s.locked(u, x, y)
+        local t = s.terrain(x, y)
+        if (t == M.TERRAIN_DOOR or t == M.TERRAIN_CHEST_FULL) and not s.opens(u, t) then return t end
+        return nil
     end
 
     function s.opensDoor(u) return s.opens(u, M.TERRAIN_DOOR) end

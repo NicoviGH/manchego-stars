@@ -316,6 +316,10 @@ WANTED = [
     'GetUnitEquippedWeapon',    # the weapon BU_ISLOT_AUTO strikes with: first usable (bmitem.c)
     # Bot.team's demands (#510 step 9 PR E): what each unit answers, by the game's own checks.
     'GetUnitKeyItemSlotForTerrain',  # a key or lockpick for a chest/door (Chest/DoorCommandUsability)
+    # A door the plan opens or a wall it breaks, on the judged enemy phase's map (bmtrick.c).
+    'GetMapChangeIdAt',         # the map change a door or wall tile belongs to (-1: none)
+    'GetMapChange',             # its struct MapChange: the rectangle and its tiles (bmtrick.c)
+    'gTilesetTerrainLookup',    # u8*: a metatile's terrain, RefreshTerrainBmMap's table (bmmap.c)
     'GetUnitFogViewRange',      # how far a unit sees in fog: a thief's +5, a torch (bmunit.c)
     'CanUnitUseStaff',          # whether a unit can use a staff it holds (bmitem.c)
     # The bot's heals (#510 step 9 PR E): what a staff or a Vulnerary would do, by the game.

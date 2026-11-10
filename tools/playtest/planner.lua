@@ -343,8 +343,10 @@ local function score(act, st, W, style, odds)
         v = v + W.breach
         fx.wall = { at = at, hp = hp - act.obstacle.blow.dealt }
         fx.blocked = hp <= 0
+        if fx.wall.hp <= 0 then fx.opened = at end
     elseif act.obstacle or act.act == "door" then
         v = v + W.breach
+        if act.door then fx.opened = act.door.x .. "," .. act.door.y end
     elseif act.act == "seize" then
         fx.win = 1   -- the win, scored as the boss's death is (goalTerm)
     end
@@ -459,7 +461,7 @@ function M.plan(Bot, board, sight, style, opts)
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     fought = {}, healed = {},
-                    walls = {}, objective = objective, recruits = ctx.recruits or {},
+                    walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {} }
 
     -- Whether `id` ends an earlier act of the plan off the tile it stands on now. The game
@@ -677,7 +679,7 @@ function M.plan(Bot, board, sight, style, opts)
                     enemyHp = copy(st.enemyHp), hp = copy(st.hp), took = copy(st.took),
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
-                    objective = objective, recruits = st.recruits, gameOver = st.gameOver,
+                    opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill) }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
@@ -710,6 +712,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         if fx.win then n.win = math.max(n.win, fx.win) end
         if fx.wall then n.walls[fx.wall.at] = fx.wall.hp end
+        if fx.opened then n.opened[fx.opened] = true end
         -- every moved unit's exposure, again: a later kill or heal in the plan changes an
         -- earlier unit's
         n.score = n.base + goalTerm(n)
@@ -1054,7 +1057,7 @@ function M.plan(Bot, board, sight, style, opts)
             return x.key < y.key
         end)
         -- the phase as the average leaves it: what the lookahead plays on (nextPhase)
-        st.phase = { blues = planned, gone = gone, reds = reds }
+        st.phase = { blues = planned, gone = gone, reds = reds, opened = st.opened }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
         st.branched = 0
         for _, d in ipairs(dims) do
@@ -1124,7 +1127,8 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             if sight.enemyPhase then cost.phases = cost.phases + 1 end
             local s = sight.enemyPhase and sight.enemyPhase({ blues = bluesIn(w), gone = w.gone,
-                                                              reds = w.reds }) or {}
+                                                              reds = w.reds,
+                                                              opened = st.opened }) or {}
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
                 outcomes[#outcomes + 1] = { p = w.p * o.p, strikes = o.strikes, way = i }
                 total = total + w.p * o.p
@@ -1504,7 +1508,7 @@ function M.plan(Bot, board, sight, style, opts)
                 local clock = os.clock()
                 for _, st in ipairs(fin) do
                     local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                                reds = st.phase.reds })
+                                                reds = st.phase.reds, opened = st.phase.opened })
                     look.calls = look.calls + 1
                     -- every unit the first phase may strike, alive at its start: its HP then
                     local live = {}

@@ -192,7 +192,8 @@ win, whole turns behind, allied greens, progress, judged score, then FR-013's ti
 - **The ledger.** `goals.lua` `Goals.ledger` snapshots every open visit, chest and recruit with
   any chance from the decision's board (`Goals.chance`, the planner's `before`), plus each
   declared reward with the goals it needs. A goal with no chance at all is not on it: the game
-  lets no unit of ours use it (a chest with no key in the army), none has a way there
+  lets no unit of ours use it (a chest with no key in the army; since ADR 0397, and none on an
+  enemy that drops it), none has a way there
   (`sight.turnsTo` reads the terrain alone, through a breach), or a looter takes it first. Kept,
   it would close with every win and forbid the win for good. A unit in the way leaves the
   chance as it was, so such a goal stays `feasible`. A reward needing a goal that is not on the
