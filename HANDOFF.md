@@ -9,12 +9,12 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, late (Claude): **T100e merged (PR #587, fc120754)**, every review
-finding fixed. A chapter cell now plays K starts an arm, each from its
-own New Game campaign (`montecarlo.py starts`, `cell`/`pilot --chapter N --starts K`). Refrozen
-on `ce1e3adb8c57+v2` (identical play). **The first starts found that no Manchego Stars campaign
-gets past ch02** (#510 comment 6751678084); Nicolas decided it under #510 step 10.
-**PR #589** (standing rules out of memory, the "ours" prose gate) waits for his "merge".
+Refreshed 2026-11-09, night (Claude): **#589 merged** (standing rules now live in `AGENTS.md`
+"Standing rules (Nicolas)" and `CLAUDE.md`; `check.py check_prose_names_manchego_stars`; the
+moved memories are deleted) and **#591 merged** (closes #590: `montecarlo` `story`/`audit` name
+every Manchego Stars unit by the name the ROM prints; `inject.decomp.block_field` is the one
+decomp row-field reader). The ch02 chwinga finding is decided under #510 step 10. **Next: PR-I,
+in a fresh session.**
 
 ## Where things stand
 
@@ -69,29 +69,24 @@ gets past ch02** (#510 comment 6751678084); Nicolas decided it under #510 step 1
 
 ## Next
 
-1. **T100e is merged and ticked** on #510's plan comment 6563384310 (design bullet under it).
-2. **The ch02 chwinga finding is decided and owned by #510 step 10** (its ch02 bullet in the
-   issue body; evidence in comment 6752603255).
-3. **PR #589 (closes #588) is open, waiting for Nicolas's "merge"**: standing rules moved into
-   `AGENTS.md`/`CLAUDE.md`, and `check.py check_prose_names_manchego_stars` fails prose that
-   names the game "ours". Reviewed and re-reviewed, every finding fixed. After it merges, delete
-   the ten moved memory files and the subagent one, and their `MEMORY.md` lines; keep
-   `merge-after-review.md`.
-4. **Then: `story` and reports name Manchego Stars units by their chapter.** `montecarlo._names`
-   knows only PCs and guests, so a chapter unit on a reused vanilla slot prints the vanilla name
-   (0xC9 printed "Klimt"; it is ch02's Rime Spark, `tools/inject/chapter_ids.py`). Until then,
-   name a Manchego Stars ID from `chapter_ids.py` and the chapter YAML, never `characters.h`.
+1. **PR-I (T100-T108) on #510's plan comment 6563384310**, in a fresh session (Nicolas,
+   2026-11-09): each chapter cell is readable with its uncertainty or NOT READABLE naming the
+   invariant it failed, plus the plain-sentence `report`. Then PR-J, then #510 step 10.
+2. **Chapter findings the bot made are owned by #510 step 10** (ch02's green chwinga, ch03's
+   boss: bullets in the issue body; evidence in comment 6752603255 and on #547). Stop chasing
+   them in the bot.
+3. **#592** (found by #591): the ROM names ch03's grell boss (0xBF) and Icewind Brute (0xB6)
+   "Monster"; the build writes no "Grell" text. Not checked in the emulator.
+4. **Names in a story:** `montecarlo.py story`/`audit` read them from the build tree and print a
+   note when the run played another ROM; build that ROM to read its names.
 5. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
    held-out counts, the pilot's Manchego Stars-vs-twin numbers), crashes, stalls and cost.
    Proposed, not decided: make a tuning-seed death flip a thing to read, not a promotion gate
    (ADR 0395); log the over-cap order question (game over strictly first) on #510 as open.
-6. **The ch03 finding is owned by #510 step 10** (its ch03 bullet in the issue body; evidence for
-   #547 on #547). Stop chasing ch03 deaths in the bot.
-7. Then, on #510's plan comment: T100-T108 and PR-J, then #510 step 10.
-8. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
+6. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
    `considered[].dies`, is worth porting), `feat/510-t100a-r`, `feat/510-lookahead-between-turn`
    (honest turn-between: right numbers, 4.6x cost), `park/510-t100a-pullback`.
-9. Tell Nicolas where step 9 stands in plain words at the start of a session.
+7. Tell Nicolas where step 9 stands in plain words at the start of a session.
 
 ## Parked or owed elsewhere
 
