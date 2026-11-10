@@ -1700,6 +1700,25 @@ do
           "keys: the key's way through the wall strikes the wall")
 end
 
+-- test_a_door_no_one_can_walk_to_ends: A is cut off from the boss by the wall at (2,0); a
+-- locked door stands at (6,0) that neither A nor the Door Key's holder K can walk to. Asking
+-- whether that door opens asked for the same breach again without end (a stack overflow, PR
+-- #596 re-review); A strikes the wall.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local K = red(0x82, 0, 5, { minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL,
+                           ["0,5"] = { ["0,5"] = 0, ["0,0"] = 5 }, ["6,0"] = { ["6,0"] = 0 } },
+        obstacles = { { x = 2, y = 0, hp = 20 } }, doors = { { x = 6, y = 0 } },
+        locked = { [0x01] = { ["6,0"] = "door" } }, keySources = { door = { K } },
+    }
+    local ok, a = pcall(B.decide, boardOf(A, E, K), sightOf(o), style("careful"))
+    check(ok and a and a.act, "attack", "keys: an unreachable door's question ends; the wall")
+end
+
 -- test_a_plan_strikes_a_wall_only_while_it_stands: A and C are both cut off by the wall at
 -- (2,0). A blow that breaks it leaves C nothing to strike, so the plan holds one strike, not
 -- two (vanilla Ch3 planned two, and the second crashed); a wall one blow leaves standing is

@@ -944,8 +944,9 @@ function M.openMap(api, call, S, x, y)
             k = k + 1
             if tile ~= 0 then
                 local bx, by = x0 + ix, y0 + iy
-                api.write16(mem.u32(mem.u32(S.gBmMapBaseTiles) + by * 4) + bx * 2, tile)
-                api.write8(mem.u32(mem.u32(S.gBmMapTerrain) + by * 4) + bx, mem.u8(lookup + (tile >> 2)))
+                -- a u16 grid: `cell`'s row, two bytes a tile
+                api.write16(cell(mem, S.gBmMapBaseTiles, 0, by) + bx * 2, tile)
+                api.write8(cell(mem, S.gBmMapTerrain, bx, by), mem.u8(lookup + (tile >> 2)))
             end
         end
     end

@@ -891,7 +891,9 @@ local function breachFor(ctx, u, goal, seeking)
     local k = goalKey(u.id, goal) .. "|" .. lockSig(seeking)
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
-    b = false
+    -- one still being worked out reads as none: a door's key way can ask for this same breach
+    -- again (the key's holder cut off from the door), and that way would never end
+    b, ctx.breaches[k] = false, false
     local field = fieldFor(ctx, goal)
     if field and not (field[u.y] and field[u.y][u.x]) then
         -- a unit that can open a door takes it first: opening costs one act, a wall its HP
@@ -973,6 +975,12 @@ end
 
 -- Where `u` marches for `tile`: the enemy holding the key it lacks (keyWay), else the obstacle
 -- that opens the way (breachFor), else the tile; a door it has no key for, through its key.
+-- turnsFor in moves, as marchLength counts a march (cost, not turns); nil = no way
+local function movesFor(ctx, u, tile)
+    local n = turnsFor(ctx, u, tile)
+    return n and n * ctx.sight.mov(u)
+end
+
 local function stepFor(ctx, u, tile, seeking)
     local lock = tile and lockAt(ctx, u, tile.x, tile.y)
     if lock then
@@ -1051,9 +1059,8 @@ local function marchLength(ctx, u, t)
         -- the way through the breach: the path to it, one step through, the path beyond
         local b = breachFor(ctx, u, t)
         if b and b.door and lockAt(ctx, u, b.x, b.y) then
-            -- its key first, as turnsFor counts the way (keyWay), in moves
-            local n = turnsFor(ctx, u, t)
-            return n and n * ctx.sight.mov(u)
+            -- its key first, as turnsFor counts the way (keyWay)
+            return movesFor(ctx, u, t)
         end
         local of = b and fieldFor(ctx, b)
         local toB, beyond = of and of[u.y] and of[u.y][u.x], nil
@@ -1468,10 +1475,8 @@ local function exploring(ctx, sent, barred)
     local taken = {}
     local function reaches(u, t)
         if u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind) then return marchLength(ctx, u, t) end
-        -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor),
-        -- in moves as marchLength counts them
-        local n = lockAt(ctx, u, t.x, t.y) and ctx.turnsTo(u, t)
-        return n and n * ctx.sight.mov(u)
+        -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
+        return lockAt(ctx, u, t.x, t.y) and movesFor(ctx, u, t) or nil
     end
     -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
     local function assign(pairs_, key)
