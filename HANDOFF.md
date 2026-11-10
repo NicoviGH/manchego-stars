@@ -9,33 +9,38 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10, late (Claude): **the vanilla route (#510): Ch5x and Ch3 are merged, Ch2 is
-in progress.** The plan is #510 comment 6758779876; the results so far are comment 6770045525.
-- **#596 merged** (squash 3533ffaf, ADR 0397): an enemy's dropped key is a way to a chest or
-  door (Ch5x); the judged enemy phase plays on the map the plan opens (Ch3).
-- **Ch2 (Ross) is in progress** on `feat/510-ch2-recruit-green-die`, commit c972d155, pushed,
-  **no PR yet**. The plan, the status and the next step are all on #510 comment 6771845566
-  (edited in place). In short:
-  - **Built (ADR 0398):**
-    - a recruit's death chance breaks ties after the forfeit;
-    - the bot rescues a green unit and drops it, through the game's own menus, with the carry
-      staged in the judged phase;
-    - four stale cached reads fixed (chest terrain, emptied chests, wall HP, the map in the
-      phase memos).
-  - **Witness:** Ch2 seed 4008 went from 0 of 4 clean to 2 of 4, Ross recruited.
-  - **Owed before the PR:**
-    1. **Canto as a decision** (Nicolas: not hard-coded). The design is on the comment.
-    2. Ch2 seed 4008 witness again.
-    3. `suite --held-out`. The last one refused promotion on one crash, seed 2001, now fixed
-       but not proven by a run.
-    4. The PR, `/code-review <PR> medium`, then merge on Nicolas's "merge".
+Refreshed 2026-11-10, night (Claude): **the vanilla route (#510): Ch5x, Ch3 and Ch2 are
+merged; the vanilla playthrough is next, and Nicolas runs it next session.** The plan is #510
+comment 6758779876; the results so far are comment 6770045525; Ch2's plan and status are
+comment 6771845566.
+- **#597 merged** (squash a0852fa2, ADR 0398), on Nicolas's "merge when it comes back green":
+  - a recruit's death chance breaks ties after the forfeit;
+  - the bot Rescues a green unit and Drops it, through the game's own menus, the carry staged
+    in the judged phase;
+  - **Canto is a decision** (ADR 0398 section 3): after a Rescue, Drop, Visit, Chest or Talk, a
+    Canto unit may move on to a tile the game offers (`sight.cantoTiles`), or stay; the planner
+    picks. `Board.endTile` is where a unit ends. An avoid claim holds on the second move;
+  - four stale cached reads fixed (chest terrain, emptied chests, wall HP, the map in the phase
+    memos).
+- **Witness, Ch2 seed 4008, attempts 1..4:** 3 of 4 clean, Ross recruited (0 of 4 before the
+  branch). Vanessa rescues Ross from (9,5) and flies on to (8,4) in every attempt. Attempt 3
+  lost Ross on turn 5 (53.3%) after his drop, and still won.
+- **`suite --held-out` on the merged code: PROMOTED.** 0 regressions, held-out 4 of 28 lost
+  (none new), 2,460,811 `AiDecideMain` calls (-1.2% on 2,490,781), 23 min wall on 8 workers.
+  Seven tuning-seed death flips, signals only (T107a). Not refrozen: the frozen suite is still
+  `ce1e3adb8c57+v2`.
 - **Witness recipe:** build an env with `campaign_env.pinned_env(campaign_env.vanilla_env(1),
   'cs-s<seed>', <chapter index>)` (drop `attempt`), then run `montecarlo.py attempts --env <it>
   --attempts 4 --jobs 4 --vanilla --seed <seed>`. Ch2 is index 2. The kept starts are in
   `references/sim/vanilla/c25b145e3745`. A record's trace is the one its `--out` runs file
   names; never the newest file in `traces/`.
-- **After Ch2:** re-run `starts --count 10 --game vanilla` (about 1 h), and report where the
-  campaigns stop next.
+- **Lessons this session:**
+  - A Canto move walks first; the Wait menu comes after the walk. Look for it with a wait,
+    never once (the first witness crashed all four attempts on that).
+  - `tools/callsites.py` parses Python only; for a Lua signature use `rg -n "<fn>\("`.
+  - A suite loads the Lua per run: never edit `tools/playtest/*.lua` while one runs.
+- **Next (Nicolas, next session):** `starts --count 10 --game vanilla` (about 1 h), then report
+  where the campaigns stop next.
 
 ## Where things stand
 
@@ -91,7 +96,7 @@ in progress.** The plan is #510 comment 6758779876; the results so far are comme
 
 ## Next
 
-1. **#510 step 10**, after the vanilla route above (Ch2 next, then `starts --game vanilla`).
+1. **#510 step 10**, after the vanilla route above (`starts --game vanilla` next).
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
