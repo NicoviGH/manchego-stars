@@ -275,5 +275,24 @@ do
           "forfeits: an unknown goal is neither kept nor lost")
 end
 
+-- TestKeyOnAnEnemyMakesTheChestAGoal: no player unit holds a Chest Key, but an enemy whose
+-- fall gives one stands (sight.keySources), so the chest is a goal and its taker is the unit
+-- without the key; with no such enemy it is none (vanilla Ch5x: both chests were never a goal).
+do
+    local sight = fakeSight({ open = { { x = 2, y = 0, kind = "chest" } } })
+    function sight.canExplore() return false end
+    function sight.locked() return "chest" end
+    local holder = { id = 0x81, x = 3, y = 0, faction = "red", onField = true, items = {} }
+    local sources = { holder }
+    function sight.keySources() return sources end
+    local board = { units = { blue(1, 0, 0), holder }, turn = 1 }
+    local goals = Goals.list(board, sight, {}, {})
+    local g = find(goals, "chest:2,0")
+    check(g and #g.takerUnits, 1, "keys: a chest whose key an enemy drops has a taker")
+    sources = {}
+    g = find(Goals.list(board, sight, {}, {}), "chest:2,0")
+    check(g and #g.takerUnits, 0, "keys: no key on the board, no taker")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

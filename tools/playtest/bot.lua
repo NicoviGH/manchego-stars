@@ -47,7 +47,10 @@
 --              it that claim is a no-op.
 --            explorable() -> {{x, y, kind = "visit"|"chest"}...}, canExplore(unit, x, y, kind)
 --              -> bool, OPTIONAL (sight.lua's): the open villages and chests, and the unit
---              menu's own check; without them nothing is explored. }
+--              menu's own check; without them nothing is explored.
+--            locked(unit, x, y) -> terrain|nil, keySources(unit, terrain) -> {enemy}, OPTIONAL
+--              (sight.lua's): a chest or door the unit holds no key for, and the enemies
+--              whose fall gives it one; without them no way runs through a key. }
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, slot = n|nil }.
@@ -825,8 +828,8 @@ end
 -- The obstacle that opens `u`'s way to `goal` when no walk reaches it: sight.field(goal) is
 -- known and leaves u's tile unreached. Of the obstacles the Attack command can strike
 -- (sight.obstacles), one beside a tile the goal's field reaches, and whose own field reaches u,
--- the nearest u by that field. nil when u is not cut off, or nothing opens the way -- a door
--- wants a key, which no rule here spends (#510).
+-- the nearest u by that field. nil when u is not cut off, or nothing opens the way. A door is
+-- one when u can open it, now or with a key it can take on the way (doorOpens).
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
 -- `u` holds a key or lockpick for doors (sight.opens, the Door command's own check).
@@ -841,9 +844,44 @@ end
 -- record of the goals units are blocked from.
 local function goalKey(id, t) return id .. ">" .. tileKey(t.x, t.y) end
 
-local function breachFor(ctx, u, goal)
+-- What `u` lacks to use the tile (x, y): the chest's or door's terrain when the game says it
+-- holds nothing that opens it (sight.locked), else nil.
+local function lockAt(ctx, u, x, y)
+    return ctx.sight.locked and ctx.sight.locked(u, x, y) or nil
+end
+
+-- A key on the way (#510, vanilla Ch5x: two chests in a room behind a door, both keys on
+-- enemies): `held` = the terrains a key u takes on the way opens from there on, `seeking` =
+-- the ones it is fetching a key for, so a key behind its own door is no way.
+local function withKey(set, lock)
+    local out = { [lock] = true }
+    for k in pairs(set or {}) do out[k] = true end
+    return out
+end
+
+-- Whether `u` can open the door at (x, y): it holds a key, takes one on the way (`held`), or
+-- an enemy whose fall gives it one stands (sight.keySources) and that key is not the one
+-- being fetched.
+local function doorOpens(ctx, u, d, held, seeking)
+    local lock = lockAt(ctx, u, d.x, d.y)
+    if not lock or (held and held[lock]) then return true end
+    return not (seeking and seeking[lock]) and ctx.sight.keySources ~= nil
+        and #ctx.sight.keySources(u, lock) > 0
+end
+
+local function breachFor(ctx, u, goal, held, seeking)
     if not (goal and ctx.sight.obstacles) then return nil end
-    local k = goalKey(u.id, goal)
+    local doors = {}
+    if ctx.sight.doors then
+        for _, d in ipairs(ctx.sight.doors()) do
+            if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, held, seeking)) then
+                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
+            end
+        end
+    end
+    local open = {}
+    for _, d in ipairs(doors) do open[#open + 1] = tileKey(d.x, d.y) end
+    local k = goalKey(u.id, goal) .. "|" .. table.concat(open, ";")
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
     b = false
@@ -851,13 +889,7 @@ local function breachFor(ctx, u, goal)
     if field and not (field[u.y] and field[u.y][u.x]) then
         -- a unit that can open doors takes a door first: opening costs one act, a wall its HP
         local lists = { ctx.sight.obstacles() }
-        if opener(ctx, u) and ctx.sight.doors then
-            local doors = {}
-            for _, d in ipairs(ctx.sight.doors()) do
-                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
-            end
-            table.insert(lists, 1, doors)
-        end
+        if #doors > 0 then table.insert(lists, 1, doors) end
         for _, list in ipairs(lists) do
             local bestD
             for _, o in ipairs(list) do
@@ -882,13 +914,22 @@ end
 -- through the obstacle that opens the way (breachFor) as the march goes -- its moves to the
 -- obstacle, one step through, the field beyond. Without the breach, vanilla Ch3's throne (behind
 -- walls) was unreachable for every unit, so nothing pulled the army and a run took 22 turns.
-local function turnsFor(ctx, u, tile, from)
+-- A chest or door `u` has no key for is reached by way of the enemy whose fall gives it one
+-- (keyWay): the walk to that enemy, then on from its tile with the key.
+local keyWay
+local function turnsFor(ctx, u, tile, from, held, seeking)
     from = from or u
     local s = ctx.sight
+    local lock = lockAt(ctx, u, tile.x, tile.y)
+    if lock and not (held and held[lock]) then
+        local _, n = keyWay(ctx, u, tile, from, lock, held, seeking)
+        return n
+    end
     local n = s.turnsTo and s.turnsTo(u, tile, from)
     if n or not s.turnsTo then return n end
-    local b = breachFor(ctx, u, tile)
-    local toB = b and s.turnsTo(u, b, from)
+    local b = breachFor(ctx, u, tile, held, seeking)
+    local toB = b and (b.door and turnsFor(ctx, u, b, from, held, seeking)
+                       or s.turnsTo(u, b, from))
     local field = toB and fieldFor(ctx, tile)
     local beyond
     for _, side in ipairs(field and SIDES or {}) do
@@ -899,10 +940,35 @@ local function turnsFor(ctx, u, tile, from)
     return beyond and toB + (1 + beyond) / s.mov(u) or nil
 end
 
--- Where `u` marches: its goal, or the obstacle that opens the way to it.
+-- The enemy whose fall gives `u` what opens `lock` at `tile` (sight.keySources), the one on the
+-- fewest turns there and on (turnsFor), and those turns; nil when none has a way.
+keyWay = function(ctx, u, tile, from, lock, held, seeking)
+    if (seeking and seeking[lock]) or not ctx.sight.keySources then return nil end
+    local fetching, best, bestN = withKey(seeking, lock), nil, nil
+    for _, e in ipairs(ctx.sight.keySources(u, lock)) do
+        local a = turnsFor(ctx, u, e, from, held, fetching)
+        local b = a and turnsFor(ctx, u, tile, e, withKey(held, lock), seeking)
+        if b and (not bestN or a + b < bestN) then best, bestN = e, a + b end
+    end
+    return best, bestN
+end
+
+-- Where `u` marches for `tile`: the enemy holding the key it lacks (keyWay), else the obstacle
+-- that opens the way (breachFor), else the tile; a door it has no key for, through its key.
+local function stepFor(ctx, u, tile, seeking)
+    local lock = tile and lockAt(ctx, u, tile.x, tile.y)
+    if lock then
+        local e = keyWay(ctx, u, tile, u, lock, nil, seeking)
+        return e and stepFor(ctx, u, e, withKey(seeking, lock)) or tile
+    end
+    local b = breachFor(ctx, u, tile, nil, seeking)
+    if b and b.door and lockAt(ctx, u, b.x, b.y) then return stepFor(ctx, u, b, seeking) end
+    return b or tile
+end
+
+-- Where `u` marches: its goal, or what opens the way to it (stepFor).
 local function marchGoal(ctx, u, objective)
-    local goal = goalFor(ctx, u, objective)
-    return breachFor(ctx, u, goal) or goal
+    return stepFor(ctx, u, goalFor(ctx, u, objective))
 end
 
 -- A cut-off unit's strike on its breach, from the wait tile the gate allows nearest it; nil
@@ -919,7 +985,12 @@ local function breach(ctx, u, gate, objective)
     for _, t in ipairs(tiles) do
         local can = b.door or Board.weaponFor(weapons, t.x, t.y, b.x, b.y)
         if can and gate(ctx, u, t.x, t.y, nil) then
-            if b.door then return action(u, t, "door", nil) end
+            if b.door then
+                -- the door it opens: the judged enemy phase plays with it open (planner.lua)
+                local a = action(u, t, "door", nil)
+                a.door = { x = b.x, y = b.y }
+                return a
+            end
             local a = action(u, t, "attack", nil, can.slot)
             -- its HP and the strike's blow (the game's forecast): the planner tracks the wall
             a.obstacle = { x = b.x, y = b.y, hp = b.hp, blow = ctx.sight.strikeWall
@@ -1371,8 +1442,11 @@ local function exploring(ctx, sent, barred)
     barred = barred or {}
     local taken = {}
     local function reaches(u, t)
-        local d = marchLength(ctx, u, t)
-        return d and (u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)) and d
+        if u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind) then return marchLength(ctx, u, t) end
+        -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor),
+        -- in moves as marchLength counts them
+        local n = lockAt(ctx, u, t.x, t.y) and ctx.turnsTo(u, t)
+        return n and n * ctx.sight.mov(u)
     end
     -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
     local function assign(pairs_, key)

@@ -437,6 +437,11 @@ local function sightOf(o)
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
+    -- what each unit holds no key for ("x,y" -> the lock), and who drops one (lock -> enemies)
+    if o.locked then
+        s.locked = function(u, x, y) return (o.locked[u.id] or {})[x .. "," .. y] end
+        s.keySources = function(_, lock) return (o.keySources or {})[lock] or {} end
+    end
     -- the unit menu's check: Door lists a door beside an opener (TryAddClosedDoorToTargetList),
     -- Talk a talkable unit beside the talker (MakeTalkTargetList)
     s.offers = function(u, tiles, act, target)
@@ -1649,6 +1654,28 @@ do
           "door: no key, the wall")
 end
 
+-- test_the_judged_phase_plays_with_the_door_open: A opens the door at (2,0); the enemy phase
+-- judging that plan is staged with the door open (plan.opened), so the enemies behind it can
+-- reach A. Vanilla Ch3: Colm opened (6,9), the phase was judged with it shut, and the Brigand
+-- behind it killed him at a predicted 0%.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local seen = {}
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+        enemyPhase = function(plan)
+            for k in pairs(plan.opened or {}) do seen[k] = true end
+            return {}
+        end,
+    }
+    local a = Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"))
+    check(a and a.act, "door", "opened: the plan opens the door")
+    check(seen["2,0"], true, "opened: its enemy phase is judged with the door open")
+end
+
 -- test_a_plan_strikes_a_wall_only_while_it_stands: A and C are both cut off by the wall at
 -- (2,0). A blow that breaks it leaves C nothing to strike, so the plan holds one strike, not
 -- two (vanilla Ch3 planned two, and the second crashed); a wall one blow leaves standing is
@@ -1843,6 +1870,37 @@ do
     local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
     local t = ctx.turnsTo(A, { x = 4, y = 0 })
     check(t ~= nil and t > 0, true, "breach: the goals' turns go through the door")
+end
+
+-- test_goal_turns_go_through_the_keys_enemies_drop: the chest at (4,0) sits in a room behind
+-- the door at (2,0), A holds no key, and both keys are drops: C, in the room at (3,0), drops a
+-- Chest Key, D, outside at (1,1), a Door Key. The way runs A -> D (0.4), D -> the door (0.4),
+-- one step in (0.2), the chest from C's tile (0.2). Vanilla Ch5x: no way through a key, so both
+-- chests were no goal and every attempt missed them.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = red(0x81, 3, 0, { minRange = false })
+    local D = red(0x82, 1, 1, { minRange = false })
+    local door = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1, ["4,0"] = 2, ["1,1"] = 2 }
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = door,
+                           ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 },
+                           ["1,1"] = { ["0,0"] = 2, ["1,0"] = 1, ["1,1"] = 0 } },
+        doors = { { x = 2, y = 0 } }, obstacles = {},
+        locked = { [0x01] = { ["4,0"] = "chest", ["2,0"] = "door" } },
+        keySources = { chest = { C }, door = { D } },
+    }
+    local _, ctx = B.candidates(boardOf(A, C, D), sightOf(o), style("careful"))
+    local t = ctx.turnsTo(A, { x = 4, y = 0 })
+    check(t ~= nil and math.abs(t - 1.2) < 1e-9, true,
+          "keys: the turns run through the Door Key, the door and the Chest Key")
+    o.keySources = { chest = { C } }
+    _, ctx = B.candidates(boardOf(A, C, D), sightOf(o), style("careful"))
+    check(ctx.turnsTo(A, { x = 4, y = 0 }), nil, "keys: no Door Key to take, no way in")
+    o.keySources = { door = { D } }
+    _, ctx = B.candidates(boardOf(A, C, D), sightOf(o), style("careful"))
+    check(ctx.turnsTo(A, { x = 4, y = 0 }), nil, "keys: no Chest Key to take, no way to the chest")
 end
 
 -- test_goal_turns_are_read_once_per_decision: the planner asks the same unit, tile and start
@@ -4780,7 +4838,8 @@ do
 end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
--- alone -- our units, the enemies gone, the enemies' HP -- and nothing about a turn to come:
+-- alone -- our units, the enemies gone, the enemies' HP, the doors and walls it opens -- and
+-- nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.
 do
     local board, sight, st = looksAhead(true)
@@ -4788,7 +4847,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,gone,reds", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,gone,opened,reds", "lookahead: the staged board, nothing more")
 end
 
 -- test_lookahead_counts_a_green_and_ranks_the_list_once (review of #568): an allied green the

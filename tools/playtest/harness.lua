@@ -3634,22 +3634,14 @@ end
 -- is a key only to a thief), a passive item (each one the engine tests by id),
 -- a heal (GetUnitItemHealAmount > 0), money (no use effect at all: gems, gold), else other
 -- (seals, boosters, Pure Water...).
--- Whether the game takes `value` (id | uses << 8) for a key of the unit's: in the sandbox `call`
--- runs in, the item is put alone in the unit's bag and GetUnitKeyItemSlotForTerrain asked for
--- each key terrain; the bag is put back.
+-- Whether the game takes `value` (id | uses << 8) for a key of the unit's, to a door or a chest
+-- (Sight.keyItemOpens, in the sandbox `call` runs in).
 INSPECT.isKey = function(call, unitAddr, value)
-    local bag = {}
-    for k = 0, BOARD.ITEM_COUNT - 1 do
-        local at = unitAddr + BOARD.UNIT_ITEMS + k * 2
-        bag[k] = ru16(at)
-        emu:write16(at, k == 0 and value or 0)
-    end
-    local key = false
+    local io = { read16 = ru16, write16 = function(at, v) emu:write16(at, v) end }
     for _, terrain in ipairs({ INSPECT.Sight.TERRAIN_DOOR, INSPECT.Sight.TERRAIN_CHEST_FULL }) do
-        key = key or call(SYM.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
+        if INSPECT.Sight.keyItemOpens(io, call, SYM, BOARD, unitAddr, value, terrain) then return true end
     end
-    for k = 0, BOARD.ITEM_COUNT - 1 do emu:write16(unitAddr + BOARD.UNIT_ITEMS + k * 2, bag[k]) end
-    return key
+    return false
 end
 
 INSPECT.unitItemFacts = function(call, unitAddr, item)
