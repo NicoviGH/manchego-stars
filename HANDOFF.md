@@ -9,14 +9,15 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, late night (Claude): **PR-I merged as #593** (validity / NOT READABLE,
-`report`, T107a). **#594 merged** (Nicolas's "merge"): the human check and the canary are
-retired (ADR 0385, two amendments 2026-11-09). There are no human playtests, vanilla is the
-playtesters' proxy; and no research record orders vanilla's chapters by unit losses (a Sonnet
-read of `docs/research/`; the only "hardest maps" are Ephraim's Ch11 and Ch14), so the canary's
-Ch1<Ch5, Ch2<Ch6 order was an unbacked assumption. The bot is judged by playing both games and
-the validity bars. T100-T108a are ticked on #510's plan; T107 stays open only for posting the
-report. **Next: PR-J.**
+Refreshed 2026-11-10 (Claude): **PR-J is PR #595** (T109-T112: ADR 0384's three retired
+claims in `DEAD_CONCEPTS` with a test, `montecarlo.py` in AGENTS.md's tools table, the series'
+suite cost in the PR body). Reviewed twice by fresh subagents, every finding fixed; **it merges
+on green CI for its head** (Nicolas's standing OK for step-9 PRs), then tick T109-T112 on the plan
+comment. The suite was not re-run: the bot's Lua is comment-only since #587. **Next, in session
+`vanilla-route`** (started 2026-11-10): make the bot clear vanilla's route clean before any
+Manchego Stars chapter change (Nicolas's preference, not a gate; ADR 0385 keeps it a milestone).
+Known stops: Ch5x's two chests never reached (7 of 10 campaigns), Ross dies on Ch2 (2), Colm on
+Ch3 (1); #510 comment 6751678084. Its plan is one comment on #510.
 
 ## Where things stand
 
@@ -72,11 +73,8 @@ report. **Next: PR-J.**
 
 ## Next
 
-1. **PR-J next**, the polish PR (#510's plan comment 6563384310, T109-T112): sweep
-   `DEAD_CONCEPTS` and the docs for retired terms (T109); point AGENTS.md's tools table at
-   `montecarlo.py`'s subcommands and ADRs (T110); compare the suite's CPU across the whole
-   series with T085's frozen baseline, in the PR body (T111, SC-003); `make check` and the Lua
-   tests green (T112). Then #510 step 10. Still owed from PR-I:
+1. **PR-J (#595) merges on green CI**, then #510 step 10, after the vanilla route above.
+   Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
      validity check holds; Manchego Stars lost someone 10 of 50, the twin 3 of 50; 0.63 CPU-h.
