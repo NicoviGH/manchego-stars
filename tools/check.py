@@ -97,6 +97,9 @@ DEAD_CONCEPTS = [
     r'\bUNVALIDATED_HUMAN\b', r'\bhuman calibration\b', r'\bmontecarlo\.py human\b',
     r'\bhuman --form\b', r'\bblind friend\b', r'\bfour calibration maps\b',
     r'\bas the humans found\b', r'references/sim/human\b', r'--human-dir\b',
+    # retired by the same day's second amendment: no evidence orders vanilla's chapters by unit
+    # losses, so the canary (Ch1 below Ch5, Ch2 below Ch6) and its banner are gone
+    r'\bCANARY INVERSION\b', r'\bCh1 below (?:vanilla )?Ch5\b', r'\bCh2 below (?:vanilla )?Ch6\b',
     # retired by #510 T107a (ADR 0395, amended): a tuning-seed death the frozen run did not
     # have is said and never blocks promotion, explained or not
     r'\bunexplained (new )?death(s)? blocks?\b', r'\bnew unexplained death or stall\b',

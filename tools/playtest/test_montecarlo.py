@@ -2711,7 +2711,7 @@ class Validity(unittest.TestCase):
 
 
 class Report(unittest.TestCase):
-    """PR-I, T102 (FR-031, FR-032): the report in sentences, the canary, the anomalies' story
+    """PR-I, T102 (FR-031, FR-032): the report in sentences, the anomalies' story
     commands, and each decision reading only its own components beside the twin."""
 
     def cell(self, verdict='HARDER', **kw):
@@ -2736,9 +2736,8 @@ class Report(unittest.TestCase):
                 played([dict(boss, flags={})], turns_to_win=14)['rec']]
         return {'ours': ours, 'vanilla': twin}
 
-    def lines(self, cells=None, decision=None, components=None, canary=([], False)):
-        return mc.report(cells or [self.cell()], lambda c: self.arms(), canary, decision,
-                         components)
+    def lines(self, cells=None, decision=None, components=None):
+        return mc.report(cells or [self.cell()], lambda c: self.arms(), decision, components)
 
     def test_the_report_is_plain_sentences_one_a_cell_naming_what_drives_it(self):
         lines = self.lines([self.cell(), self.cell('NOT_READABLE', chapter=2, twin_index=2,
@@ -2763,26 +2762,6 @@ class Report(unittest.TestCase):
                                                 'games and 10 vanilla games: NOT READABLE '
                                                 '(blindspot)'))
         self.assertFalse(any('|' in l for l in lines), 'it is not a table')
-
-    def test_a_canary_inversion_prints_a_banner_first(self):
-        rows = mc.vanilla_rows()
-        lost = [played([{'cause': 'rng_tail', 'charId': 1}])['rec']] * 3
-        safe = [played()['rec']] * 3
-        out, inverted = mc.canary({rows['FE8 Ch1']: lost, rows['FE8 Ch5']: safe,
-                                   rows['FE8 Ch2']: safe, rows['FE8 Ch6']: lost})
-        self.assertTrue(inverted)
-        self.assertTrue(out[0].startswith('!!! CANARY INVERSION'))
-        self.assertIn('canary vanilla Ch1 below vanilla Ch5: vanilla Ch1 3 of 3, '
-                      'vanilla Ch5 0 of 3: INVERTED', out)
-        self.assertIn('canary vanilla Ch2 below vanilla Ch6: vanilla Ch2 0 of 3, '
-                      'vanilla Ch6 3 of 3: holds', out)
-        lines = self.lines(canary=(out, inverted))
-        self.assertEqual(lines[1], out[0])
-        # in order: no banner; a chapter with no attempts is never read as holding
-        out, inverted = mc.canary({rows['FE8 Ch1']: safe, rows['FE8 Ch5']: lost})
-        self.assertFalse(inverted)
-        self.assertIn('canary vanilla Ch2 below vanilla Ch6: not read, vanilla Ch2 '
-                      'and vanilla Ch6 have no first attempts under this instrument', out)
 
     def test_anomalies_carry_their_story_commands(self):
         text = '\n'.join(self.lines())

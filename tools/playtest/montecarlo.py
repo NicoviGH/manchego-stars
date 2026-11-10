@@ -48,8 +48,7 @@ it, and stops there. Each `pilot` and `cell` appends its record to references/si
     python3 tools/playtest/montecarlo.py report [cells.jsonl] [--decision party|enemy|chapter \
         [--components a,b]] [--post]
 
-`report` says one instrument's cells in sentences (FR-031): the header, the canary, one sentence
-a cell, the anomalies with their `story` commands, the validity failures and the descriptive
+`report` says one instrument's cells in sentences (FR-031): the header, one sentence a cell, the anomalies with their `story` commands, the validity failures and the descriptive
 data, each beside the twin; `--decision` reads only that decision's components (FR-032);
 `--post` writes it under build/ and prints the `gh issue comment 510` command, never running it.
 
@@ -1298,7 +1297,9 @@ def pilot_main(args):
 # A verdict is only as good as the attempts behind it. Before a cell gets one, both arms'
 # first attempts pass FR-029's invariants, or the cell is NOT READABLE with each failed one
 # named. There are no human playtests (ADR 0385, amended 2026-11-09): vanilla is the proxy for
-# playtesters, so the bot is checked against vanilla (the validity bars and the canary) alone.
+# playtesters, so the bot is checked against vanilla alone: the same bot plays both arms, and
+# the validity bars. There is no canary either: no record shows vanilla's chapters ordered by
+# how often players lose units (ADR 0385, amended 2026-11-09).
 # `report` says it all in sentences, one per cell (FR-031), and reads a decision's own
 # components only (FR-032).
 
@@ -1446,46 +1447,6 @@ def judged(verdict, valid):
             else 'withheld%s: %s' % (at, faults)
         out.update(verdict='WITHHELD', settled=True, reason=reason)
     return out
-
-
-def first_attempts(paths, instrument):
-    """{(game, chapter): [played attempt-1 record]} of `instrument` in runs files `paths`,
-    never a held-out run (those stay unseen until the verdict, FR-025)."""
-    return kept(paths, lambda r: is_bot(r) and r.get('instrument') == instrument
-                and r.get('attempt') == 1 and r.get('outcome') not in UNUSABLE
-                and (r.get('suite') or {}).get('set') != 'held_out',
-                lambda r: (r.get('game'), r.get('chapter')))
-
-
-# ---- the canary (spec assumptions): on Normal, vanilla's first-attempt death rates order
-# Ch1 below Ch5 and Ch2 below Ch6. An inversion is a banner and an audit, never a verdict.
-CANARY = (('FE8 Ch1', 'FE8 Ch5'), ('FE8 Ch2', 'FE8 Ch6'))
-
-
-def canary(vanilla):
-    """The canary's lines and whether it inverted, from {chapter index: [vanilla played
-    attempt-1 record]}. An order is read only when both chapters have attempts; one that
-    cannot be read says so, never passes."""
-    rows = vanilla_rows()
-    lines, inverted = [], False
-    for lo, hi in CANARY:
-        (k1, n1), (k2, n2) = (death_rate(vanilla.get(rows[c]) or []) for c in (lo, hi))
-        if not n1 or not n2:
-            empty = [vanilla_name(c) for c, n in ((lo, n1), (hi, n2)) if not n]
-            lines.append('canary %s below %s: not read, %s %s no first attempts under '
-                         'this instrument' % (vanilla_name(lo), vanilla_name(hi),
-                                              ' and '.join(empty),
-                                              'have' if len(empty) > 1 else 'has'))
-            continue
-        bad = k1 / n1 > k2 / n2
-        inverted = inverted or bad
-        lines.append('canary %s below %s: %s %d of %d, %s %d of %d: %s' % (
-            vanilla_name(lo), vanilla_name(hi), vanilla_name(lo), k1, n1, vanilla_name(hi),
-            k2, n2, 'INVERTED' if bad else 'holds'))
-    if inverted:
-        lines.insert(0, '!!! CANARY INVERSION: vanilla\'s own chapters read out of order; '
-                        'audit the instrument (`montecarlo.py audit`) before reading any cell')
-    return lines, inverted
 
 
 # ---- the descriptive data (FR-031) and what each decision reads (FR-032) ----
@@ -1719,12 +1680,12 @@ def cell_arms(cell):
     return out
 
 
-def report(cells, arms_of, canary_out, decision=None, components=None, who=None):
+def report(cells, arms_of, decision=None, components=None, who=None):
     """FR-031's report, in order, as lines (it is not a table): the header (instrument,
-    CPU-hours, pairs and the label counts), the canary with its banner, one sentence a cell,
-    the anomalies with their `story` commands, the validity failures and the descriptive
-    data. `decision` ('party', 'enemy' or 'chapter' with `components`) reads only that
-    decision's components (FR-032), each beside the twin; None reads all.
+    CPU-hours, pairs and the label counts), one sentence a cell, the anomalies with their
+    `story` commands, the validity failures and the descriptive data. `decision` ('party',
+    'enemy' or 'chapter' with `components`) reads only that decision's components (FR-032),
+    each beside the twin; None reads all.
     `arms_of(cell)` is {arm: [played attempt-1 record]} (cell_arms), `who` component_line's."""
     if decision is None:
         comps = COMPONENTS
@@ -1746,7 +1707,6 @@ def report(cells, arms_of, canary_out, decision=None, components=None, who=None)
         cells[0]['instrument'] if cells else '?', plural(len(cells), 'cell'),
         sum(c['pairs'] for c in cells), cpu / 3600,
         ', '.join('%s %d' % (k, v) for k, v in sorted(labels.items())) or 'no cells')]
-    lines += canary_out[0]
     described = []
     for c in cells:
         recs = arms_of(c)
@@ -1787,12 +1747,9 @@ def report_main(args):
             args.cells, ' for %s' % args.instrument if args.instrument else ''))
         return 1
     inst = cells[0]['instrument']
-    paths = sorted({p for c in cells for p in c['stores'].values()})
-    vanilla = {ch: recs for (game, ch), recs in first_attempts(paths, inst).items()
-               if game == 'vanilla'}
     names = {g: _names(g) for g in ('ours', 'vanilla')}
     try:
-        lines = report(cells, cell_arms, canary(vanilla), args.decision,
+        lines = report(cells, cell_arms, args.decision,
                        args.components.split(',') if args.components else None,
                        {g: namer(names[g]) for g in names})
     except ValueError as err:

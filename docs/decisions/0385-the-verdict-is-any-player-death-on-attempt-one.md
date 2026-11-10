@@ -20,9 +20,19 @@ Manchego Stars can be designed against vanilla without manual sessions; the anec
 how people play vanilla is `docs/research/`. The panel (research record 0023) recommended
 calibrating against humans, and PR-I built it (`human`, its form, UNVALIDATED_HUMAN, the
 humans' canary pair); this removes all of it. Whether the bot measures rather than fails is
-read from vanilla alone: the same bot plays both arms, point 4's validity bars, and the
-canary's vanilla order. FR-030, FR-033, User Story 7's second scenario and SC-006's last
-sentence no longer apply; the spec comment says so.
+read from vanilla alone: the same bot plays both arms, and point 4's validity bars. FR-030,
+FR-033, User Story 7's second scenario and SC-006's last sentence no longer apply; the spec
+comment says so.
+
+**Amended 2026-11-09 (Nicolas): the canary is retired too.** It expected the bot to lose
+units less often on vanilla Ch1 than Ch5, and on Ch2 than Ch6, and printed a banner when it
+did not. That order was a spec assumption: no research record compares how often players lose
+units on those chapters (a read of `docs/research/` found none), and the only chapters the
+sources call hard are Ephraim's Ch11 and Ch14 (records 0008 and 0016), which fits difficulty
+spiking by map design rather than rising chapter by chapter. A warning resting on an unchecked
+order could fire on a working bot, and it was never read (no vanilla Ch1, Ch5 or Ch6 first
+attempt under the current instrument). `canary`, its banner and its report lines are removed.
+A canary may come back if evidence orders some vanilla chapters by unit losses.
 
 **Why.** A clean clear mixes two things: how dangerous a map is, and how well the bot collects
 everything. A Manchego Stars chapter can fail clean clears more often than its twin only because
@@ -213,10 +223,8 @@ UNVALIDATED_HUMAN. No human session was ever played, and none will be.
 - **The report** (`report`, FR-031): `pilot` and `cell` each append a `kind: cell` record to
   `references/sim/cells.jsonl`, naming each paired run by its name, trace and instrument, and
   `report` reads one instrument's cells from it. A pilot with a benched arm is an experiment and
-  writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6 (PR-I also built a third pair,
-  the humans' Ch3/Ch5 order, removed by the 2026-11-09 amendment). It reads the vanilla first
-  attempts in the cells' stores under that instrument, never a held-out run. A chapter with no
-  attempts is "not read", never "holds". An inversion prints a banner first. The anomalies are
+  writes no record. PR-I also built a canary (vanilla Ch1/Ch5 and Ch2/Ch6, plus the humans'
+  Ch3/Ch5 pair), removed by the 2026-11-09 amendments. The anomalies are
   listed one line per run, each kind with its turns, and one `story` command at the first one's
   turn (a cell of 100 runs can carry a hundred anomalies; a story read from that turn reaches
   the rest). A cell's sentence names its two largest cause differences an attempt (boss flag
@@ -233,5 +241,5 @@ UNVALIDATED_HUMAN. No human session was ever played, and none will be.
     the twin 2 of 50 (4%, both `unrevealed_killer` deaths to the boss).
   - Manchego Stars lost someone in 10 of 50 runs and the twin in 3 of 50 (+14 points;
     marginal analysis; ±17.4 at 200 pairs, so the ±10 margin cannot be reached).
-  - The canary was not read: no vanilla Ch1, Ch5 or Ch6 first attempt exists under this
-    instrument.
+  - The canary (since retired) was not read: no vanilla Ch1, Ch5 or Ch6 first attempt exists
+    under this instrument.
