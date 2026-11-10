@@ -11,10 +11,9 @@ and start a fresh instance; don't rely on auto-compaction.
 
 Refreshed 2026-11-10 (Claude): **PR-J is PR #595** (T109-T112: ADR 0384's three retired
 claims in `DEAD_CONCEPTS` with a test, `montecarlo.py` in AGENTS.md's tools table, the series'
-suite cost in the PR body). Reviewed twice by fresh subagents, every finding fixed; **it merges
-on green CI for its head** (Nicolas's standing OK for step-9 PRs), then tick T109-T112 on the plan
-comment. The suite was not re-run: the bot's Lua is comment-only since #587. **Next, in session
-`vanilla-route`** (started 2026-11-10): make the bot clear vanilla's route clean before any
+suite cost in the PR body). Reviewed by a fresh subagent, every finding fixed; **merged 2026-11-10**
+(squash cd9bb060), T109-T112 ticked: **step 9 is closed.** The suite was not re-run: the bot's Lua is comment-only since #587. **Next, in session
+`vanilla-route`** (started 2026-11-10; it hit the usage limit before its first step, so re-run its brief): make the bot clear vanilla's route clean before any
 Manchego Stars chapter change (Nicolas's preference, not a gate; ADR 0385 keeps it a milestone).
 Known stops: Ch5x's two chests never reached (7 of 10 campaigns), Ross dies on Ch2 (2), Colm on
 Ch3 (1); #510 comment 6751678084. Its plan is one comment on #510.
@@ -73,7 +72,7 @@ Ch3 (1); #510 comment 6751678084. Its plan is one comment on #510.
 
 ## Next
 
-1. **PR-J (#595) merges on green CI**, then #510 step 10, after the vanilla route above.
+1. **#510 step 10**, after the vanilla route above.
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
