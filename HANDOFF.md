@@ -9,12 +9,13 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, night (Claude): **#589 merged** (standing rules now live in `AGENTS.md`
-"Standing rules (Nicolas)" and `CLAUDE.md`; `check.py check_prose_names_manchego_stars`; the
-moved memories are deleted) and **#591 merged** (closes #590: `montecarlo` `story`/`audit` name
-every Manchego Stars unit by the name the ROM prints; `inject.decomp.block_field` is the one
-decomp row-field reader). The ch02 chwinga finding is decided under #510 step 10. **Next: PR-I,
-in a fresh session.**
+Refreshed 2026-11-09, late night (Claude): **PR-I is open as #593** (`feat/510-pr-i-validity`,
+2 commits): validity (NOT READABLE), `human`/`human --form`, `report`, and T107a (a tuning-seed
+death flip never blocks; ADR 0395 amended). `/code-review 593 medium` found 25 findings, every
+one fixed in 55e30c16. **A scoped re-review of 55e30c16 alone was running when the session
+ended: its result is lost, so run it again** (fresh reviewer, `git show 55e30c16`, verdict each
+of the 25 + new breakage), fix what it returns, then wait for CI on the head sha and merge
+(#510 step 9 PRs may merge after review + CI).
 
 ## Where things stand
 
@@ -69,9 +70,18 @@ in a fresh session.**
 
 ## Next
 
-1. **PR-I (T100-T108) on #510's plan comment 6563384310**, in a fresh session (Nicolas,
-   2026-11-09): each chapter cell is readable with its uncertainty or NOT READABLE naming the
-   invariant it failed, plus the plain-sentence `report`. Then PR-J, then #510 step 10.
+1. **Finish PR-I (#593)** as above, then tick T100-T108 and T107a on #510's plan comment
+   6563384310. Then PR-J, then #510 step 10.
+   - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
+     ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
+     validity check holds; Manchego Stars lost someone 10 of 50, the twin 3 of 50; 0.63 CPU-h.
+     The report is in `build/report-9d0b15b542e2-v2.md`; **post it to #510 only on Nicolas's
+     go-ahead** (T107), and the form (`human --form`) likewise.
+   - **The canary can't be read yet**: no vanilla Ch1/Ch5/Ch6 first attempts exist under the
+     current instrument. Needs vanilla runs of those chapters (Nicolas's call on the cost).
+   - **Bot hash drift**: main's bot hash is `9d0b15b542e2`, the frozen suite's `ce1e3adb8c57`;
+     #589's comment-only edits to the Lua moved it. Play is unchanged; a `suite --held-out`
+     would refreeze it under the new hash.
 2. **Chapter findings the bot made are owned by #510 step 10** (ch02's green chwinga, ch03's
    boss: bullets in the issue body; evidence in comment 6752603255 and on #547). Stop chasing
    them in the bot.
