@@ -3604,6 +3604,9 @@ end
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
+    X.items = { { id = 0x01, uses = 40 } }   -- board.lua's item shape: one class and kit is asked once
+    local X2 = red(0x83, 9, 7, { minRange = false })
+    X2.items = { { id = 0x01, uses = 12 } }
     local Y = red(0x82, 9, 8, { minRange = false, fogged = true })
     local asked = {}
     local o = {
@@ -3615,8 +3618,8 @@ do
         end,
         enemyPhase = function() return {} end,
     }
-    local a, plan = Planner.plan(B, boardOf(A, X, Y), sightOf(o), style("careful"),
-                                 { seen = { [0x81] = 0x81 } })
+    local a, plan = Planner.plan(B, boardOf(A, X, Y, X2), sightOf(o), style("careful"),
+                                 { seen = { [0x81] = 0x81, [0x83] = 0x83 } })
     check(at(a), "0,9", "fog: careful steps away from the unseen")
     local fogAt
     for _, c in ipairs(plan and plan.considered or {}) do

@@ -1000,7 +1000,12 @@ function M.plan(Bot, board, sight, style, opts)
             if ok then
                 if seen then ok = seen[u.id] == u.charId else ok = not u.fogged end
             end
-            local kit = ok and (tostring(u.classId) .. ":" .. table.concat(u.items or {}, ","))
+            local kit
+            if ok then
+                local ids = {}   -- board.lua's items: { id, uses }
+                for _, it in ipairs(u.items or {}) do ids[#ids + 1] = it.id end
+                kit = tostring(u.classId) .. ":" .. table.concat(ids, ",")
+            end
             if kit and not kits[kit] then
                 kits[kit] = true
                 fogReps[#fogReps + 1] = u
