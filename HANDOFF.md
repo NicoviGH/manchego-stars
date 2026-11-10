@@ -9,6 +9,11 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
+**Update, same session:** step 4 (fog) is built and its Ch6 witness is worse: the fog's chance
+puts 68 of 87 fallback decisions over the cap (#510 comment 6780781911; recommendation there:
+rank fog exposure as its own key after admission, not inside the cap). Fable's look-ahead design
+for Ch5 is #510 comment 6780629895. Both wait on Nicolas.
+
 Refreshed 2026-11-10, late night (Claude, PR A session): **PR A stopped after step 3: the
 stepping-back witness on the Ch5 starts is refuted by the plan's own test (15 of 39 fallback
 decisions gained a plan under the cap, 38%).** Witness and the Ch5 blind-spot breakdown: #510
