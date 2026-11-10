@@ -10,9 +10,11 @@ here should still be true in a month. Before a context rollover, warn Nicolas, r
 and start a fresh instance; don't rely on auto-compaction.
 
 Refreshed 2026-11-09, late night (Claude): **PR-I merged as #593** (validity / NOT READABLE,
-`human`/`human --form`, `report`, T107a). Review: 25 findings, then the re-review's 8 (A-H),
-every one fixed; CI green on the head sha. T100-T108 and T107a are ticked on #510's plan comment
-6563384310; T107 stays open only for posting the report, which waits on Nicolas.
+`report`, T107a). **Then Nicolas retired the human check** (ADR 0385 amended 2026-11-09): there
+are no human playtests, vanilla is the playtesters' proxy. Branch `feat/510-drop-human-check`
+removes the `human` subcommand, its form, the gate on human sessions and the humans' canary pair; the
+retired phrases are in `DEAD_CONCEPTS`. T107 stays open only for posting the report (Nicolas's
+go-ahead).
 
 ## Where things stand
 
@@ -37,7 +39,7 @@ every one fixed; CI green on the head sha. T100-T108 and T107a are ticked on #51
     50 first attempts, the twin on 0 of 50. Every death was a careful-style run; 6 of 50 (12%) were blind-spot
     deaths, over PR-I's 10% validity bar; and a seed only draws the style, so 50 seeds made 30
     distinct plays an arm. **PR-I #593** (ADR 0385, "Built (PR-I)") weighs both: a cell is
-    NOT READABLE when a validity invariant fails; the human calibration gates at 3 of 4 maps.
+    NOT READABLE when a validity invariant fails.
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
@@ -74,9 +76,12 @@ every one fixed; CI green on the head sha. T100-T108 and T107a are ticked on #51
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
      validity check holds; Manchego Stars lost someone 10 of 50, the twin 3 of 50; 0.63 CPU-h.
      The report is in `build/report-9d0b15b542e2-v2.md`; **post it to #510 only on Nicolas's
-     go-ahead** (T107), and the form (`human --form`) likewise.
+     go-ahead** (T107). Clean clears in that pilot: Manchego Stars 0 of 50 (two chwinga die and
+     the village at (12,3) is closed in every play), vanilla 35 of 50.
    - **The canary can't be read yet**: no vanilla Ch1/Ch5/Ch6 first attempts exist under the
      current instrument. Needs vanilla runs of those chapters (Nicolas's call on the cost).
+     Its expected order (Ch1 below Ch5, Ch2 below Ch6) is a spec assumption: no research
+     record ranks vanilla's chapters by how often players lose units (a grep, not a search).
    - **Bot hash drift**: main's bot hash is `9d0b15b542e2`, the frozen suite's `ce1e3adb8c57`;
      #589's comment-only edits to the Lua moved it. Play is unchanged; a `suite --held-out`
      would refreeze it under the new hash.
