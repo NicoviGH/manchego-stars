@@ -105,15 +105,24 @@ Nicolas's call about a different retry rule.** Everything is in ONE comment, #51
 ## Next
 
 0. **Fable review first (Nicolas asked, 2026-11-10; there are Fable credits).** Before building
-   more, have a Fable session (`claude-fable-5-2`) look over #510 so far and the current
-   challenge, and suggest anything. Give it: the #510 body and its plan comments (6563384310 the
-   step 9 plan, 6563384018 its spec, 6776176601 this week's findings and the open retry
-   question), the ADRs 0376, 0384 to 0399, `tools/playtest/{campaign,botrun,planner,goals,
-   sight}.lua`, and the branch `feat/510-retry-memory`. The question to put to it: why the bot
-   does not "try different things" between retries the way a player does (send a tank to take
-   the hit, swap targets), whether "change the decision behind the first death" is the right
-   rule, and why the guard march to Ch6's Civilian is never taken. Its suggestions are input:
-   bring them to Nicolas, don't build on them unasked.
+   more, start a Fable session (`claude-fable-5-2`) and give it a GOAL, not our questions (so
+   it isn't anchored on our framing):
+   - **Goal:** #510's north star, a trustworthy difficulty model. A bot plays the real ROM, both
+     games, so Manchego Stars' chapters can be judged against vanilla FE8's. On vanilla, which
+     strong players clear clean, the bot must clear every chapter of Eirika's route clean
+     (ADR 0376). A chapter it can't clear is the bot's fault, never the chapter's. Today it
+     stops at Ch6 in 8 of 10 campaigns. Ask what Fable would change to get there, and what in
+     the approach so far it would keep, drop or rethink.
+   - **Context to point it at:** the #510 issue body and plan comments 6563384018 (spec),
+     6563384310 (step 9 plan) and 6776176601 (this week: the findings, the witness, the open
+     retry proposal); `docs/decisions.md` (ADRs 0376 and 0384 to 0399 are #510's);
+     `tools/playtest/{campaign,botrun,planner,goals,bot,sight}.lua`; the branch
+     `feat/510-retry-memory`; `AGENTS.md`.
+   - **Constraints to state:** the bot knows only what a player sees (never a dice result);
+     attempt 1 is the measured one (ADR 0385); playtest runs are expensive (AGENTS.md);
+     Nicolas's standing rules in AGENTS.md.
+   - **What comes back:** a short written recommendation for Nicolas. Bring it to him; don't
+     build on it unasked.
 1. **#510: PR 1, retries that learn** (above): get Nicolas's answer on the retry rule; build
    it, or not; find why the guard march to the Civilian is never taken (one instrumented run on
    4001 Ch6); then `suite --held-out`, a PR, `/code-review <PR> medium`, and
