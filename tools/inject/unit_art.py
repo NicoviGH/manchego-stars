@@ -327,14 +327,12 @@ def unit_bust(campaign, uid):
 def vanilla_slot_bust(slot):
     """The vanilla face a character slot shows when no bust dresses it (Halvar wears Bazba's).
     Read from the pristine submodule, or None for a faceless slot."""
-    from inject.decomp import _find_brace_block, vanilla_decomp_text
+    from inject.decomp import _find_brace_block, block_field, vanilla_decomp_text
     chars = vanilla_decomp_text('src/data_characters.c')
     s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper().replace('CHARACTER_', ''),
                              'src/data_characters.c')
-    m = re.search(r'\.portraitId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
-    if not m or int(m.group(1), 0) == 0:
-        return None
-    return portrait_bust(int(m.group(1), 0))
+    pid = block_field(chars[s:e], 'portraitId')
+    return portrait_bust(pid) if pid else None
 
 
 @functools.lru_cache(maxsize=None)
@@ -440,13 +438,12 @@ def idle_frame(campaign, sprite, faction):
 def vanilla_wait_donor(class_enum):
     """The <Name> of the wait sheet a vanilla class's SMSId points at (vanilla decomp at HEAD,
     so it needs no build), or None for a class with no row."""
-    from inject.decomp import vanilla_decomp_text
-    block = re.search(r'\[%s - 1\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(class_enum),
-                      vanilla_decomp_text('src/data_classes.c'), re.S)
-    sms = re.search(r'\.SMSId\s*=\s*(0x[0-9a-fA-F]+|\d+)', block.group(1)) if block else None
-    if not sms:
+    from inject.decomp import block_field, rom_block_of, vanilla_decomp_text
+    sms = block_field(rom_block_of(vanilla_decomp_text('src/data_classes.c'),
+                                   'src/data_classes.c', class_enum), 'SMSId')
+    if sms is None:
         return None
-    row = re.search(r'unit_icon_wait_(\w+)_sheet\}.*//\s*%d\s*$' % int(sms.group(1), 0),
+    row = re.search(r'unit_icon_wait_(\w+)_sheet\}.*//\s*%d\s*$' % sms,
                     vanilla_decomp_text('src/unit_icon_wait_data.c'), re.M)
     return row.group(1) if row else None
 

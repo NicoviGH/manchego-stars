@@ -2316,18 +2316,57 @@ def replay_main(args):
 
 @functools.lru_cache(maxsize=None)
 def _names(game):
-    """{character id: name}: ours' cast by its PCs' and guests' names, then every character
-    the decomp names (vanilla's cast and the generic enemies both games share)."""
+    """{character id: name}: every character by its decomp enum (vanilla's cast and the generic
+    enemies); for Manchego Stars, then every pid the build renamed by the name the ROM prints for
+    it (`inject.text.character_names` on the build tree: a chapter unit on a reused vanilla slot,
+    which printed the vanilla name before; ch02's Rime Spark rode KLIMT and read "Klimt", #590);
+    then the cast by its PCs' and guests' names, last, because a scene-only guest's slot keeps
+    its vanilla nameplate (Duvessa rides SELENA) and the cast lookup is the one claims use."""
     sys.path.insert(0, os.path.dirname(HERE))
     import inject.decomp
+    import inject.text
     from inject.scene_actors import cast_pids
     text = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
     out = {v: k[len('CHARACTER_'):].replace('_', ' ').title()
            for k, v in inject.decomp.enum_values(text, 'CHARACTER_').items()}
     if game == 'ours':
+        vanilla = inject.text.character_names(inject.decomp.vanilla_decomp_text)
+        out.update((pid, name) for pid, name
+                   in inject.text.character_names(inject.decomp.rom_text).items()
+                   if name != vanilla.get(pid))
         for name, pid in cast_pids().items():
             out[pid] = name.replace('-', ' ').title()
     return out
+
+
+def names_note(game, rom_hashes):
+    """The line a story or audit prints when its Manchego Stars names may not be the run's: they
+    come from the build tree's sources (`_names`), and the run played the ROM its record names.
+    None only when every run names the ROM built now and the sources the names come from are no
+    newer than it (an injection rewrites them before the ROM is rebuilt, and `git checkout`
+    resets them to vanilla). A run with no `rom_hash` cannot be matched, so it counts as another."""
+    if game != 'ours':
+        return None
+    import matrix
+    rom = matrix.ROM_PATH
+    built = sha1_file(rom) if os.path.isfile(rom) else None
+    others = sorted({h or 'unrecorded' for h in rom_hashes
+                     if not (built and h and built.startswith(h))})
+    sources = [os.path.join(os.path.dirname(rom), rel) for rel in NAME_SOURCES]
+    stale = built is not None and any(
+        os.path.isfile(p) and os.path.getmtime(p) > os.path.getmtime(rom) for p in sources)
+    if built and not others and not stale:
+        return None
+    where = ('vanilla (no ROM is built)' if not built else
+             'the build tree, changed since its ROM %s was built' % built[:12] if stale else
+             'the build tree (ROM %s)' % built[:12])
+    return ('note: chapter-unit names are read from %s; the run played ROM %s, so a name may '
+            'not be the one that ROM showed (build that ROM to read its names)'
+            % (where, ', '.join(others) or built[:12]))
+
+
+# The build-tree files `_names` reads through `inject.text.character_names`.
+NAME_SOURCES = ('src/data_characters.c', 'texts/texts.txt', 'include/constants/characters.h')
 
 
 @functools.lru_cache(maxsize=None)
@@ -2688,6 +2727,9 @@ def audit_main(args):
     lost = orphans(mine, diags)
     game = next((r.get('game') for r in mine if r.get('game')), None) or 'vanilla'
     names = _names(game)
+    note = names_note(game, [r.get('rom_hash') for r in mine])
+    if note:
+        print(note)
     for line in audit_lines(findings, lambda c: names.get(c) or '0x%02X' % c):
         print(line)
     for g in lost:
@@ -2791,7 +2833,11 @@ def main(argv=None):
         if args.turn is not None:
             events = [e for e in events if e.get('t') in ('start', 'end')
                       or args.turn - 1 <= (e.get('turn') or 0) <= args.turn]
-        game = ((events[0].get('info') or {}).get('game') if events else None) or 'vanilla'
+        info = (events[0].get('info') or {}) if events else {}
+        game = info.get('game') or 'vanilla'
+        note = names_note(game, [info.get('rom_hash')])
+        if note:
+            print(note)
         print('\n'.join(story(events, _names(game), _items(), _classes(game))))
         return 0
     with open(args.env) as fh:

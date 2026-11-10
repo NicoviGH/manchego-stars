@@ -39,18 +39,16 @@ def display_name(unit):
 
 
 def vanilla_name_text_id(slot):
-    """nameTextId of vanilla CHARACTER_<slot>, scanned from data_characters.c."""
-    marker = '[CHARACTER_%s - 1]' % slot.upper()
+    """nameTextId of vanilla CHARACTER_<slot>, read from data_characters.c."""
+    from inject.decomp import _find_brace_block, block_field
     with open(CHARACTERS_C, encoding='utf-8') as f:
-        lines = f.read().splitlines()
-    for i, line in enumerate(lines):
-        if marker in line:
-            for probe in lines[i:i + 12]:
-                m = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', probe)
-                if m:
-                    return int(m.group(1), 0)
-    sys.exit('ERROR: could not find nameTextId for %s in %s' % (marker, CHARACTERS_C))
-
+        text = f.read()
+    marker = '[CHARACTER_%s - 1]' % slot.upper()
+    s, e = _find_brace_block(text, marker, CHARACTERS_C)
+    nid = block_field(text[s:e], 'nameTextId')
+    if nid is None:
+        sys.exit('ERROR: could not find nameTextId for %s in %s' % (marker, CHARACTERS_C))
+    return nid
 
 
 def write_nameplate(lines, slot, unit, on_map=True):
@@ -69,11 +67,10 @@ def write_nameplate(lines, slot, unit, on_map=True):
 
 def slot_desc_text_id(slot):
     """descTextId of vanilla CHARACTER_<slot>: the message its help text (R on its name) reads."""
-    from inject.decomp import _find_brace_block, vanilla_decomp_text
+    from inject.decomp import _find_brace_block, block_field, vanilla_decomp_text
     chars = vanilla_decomp_text('src/data_characters.c')
     s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper(), CHARACTERS_C)
-    m = re.search(r'\.descTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
-    return int(m.group(1), 0) if m else None
+    return block_field(chars[s:e], 'descTextId')
 
 
 def help_text_body(text):
@@ -155,6 +152,42 @@ def message_bodies(texts):
 def messages(texts):
     """{message id: plain text} for every `## MSG_` in a texts.txt's contents."""
     return types.MappingProxyType({i: plain_message(b) for i, b in message_bodies(texts).items()})
+
+
+def character_row_names(source):
+    """{row key: name} for every row of a character table, by its `.nameTextId`: the name the
+    unit window and the map hover box print (player_interface.c, unitinfowindow.c). A row's key
+    is what its `[key - 1]` index names: a CHARACTER_ enum or, for a raw pid, its number as
+    written. `source(rel)` reads a decomp file: `inject.decomp.rom_text` for the ROM as built,
+    `vanilla_decomp_text` for vanilla's."""
+    return _row_names(source('src/data_characters.c'), source('texts/texts.txt'))
+
+
+@functools.lru_cache(maxsize=8)
+def _row_names(chars, texts):
+    from inject.decomp import _find_brace_block, block_field
+    text = messages(texts)
+    out = {}
+    for key in re.findall(r'^\s*\[\s*(\w+)\s*-\s*1\s*\]\s*=', chars, re.M):
+        s, e = _find_brace_block(chars, '[%s - 1]' % key, CHARACTERS_C)
+        name = text.get(block_field(chars[s:e], 'nameTextId'))
+        if name:
+            out[key] = name
+    return types.MappingProxyType(out)
+
+
+def character_names(source):
+    """{pid: name}: `character_row_names` keyed by the pid each row is."""
+    from inject.decomp import enum_values
+    enum = enum_values(source('include/constants/characters.h'), 'CHARACTER_')
+    out = {}
+    for key, name in character_row_names(source).items():
+        pid = enum.get(key)
+        if pid is None and re.fullmatch(r'0x[0-9a-fA-F]+|\d+', key):
+            pid = int(key, 0)
+        if pid is not None:
+            out[pid] = name
+    return out
 
 
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'

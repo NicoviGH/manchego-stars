@@ -2001,13 +2001,14 @@ class Story(unittest.TestCase):
         self.assertIn('goal visit:5,1 (worth 120): chance 0.61 -> 0.52', text)
         self.assertNotIn('objective:7', text)
 
-    def test_names_come_from_the_decomp_and_our_cast(self):
+    def test_names_items_and_classes_come_from_the_decomp(self):
         self.assertEqual(mc._names('vanilla')[0x01], 'Eirika')
         self.assertTrue(mc._items())
         self.assertEqual(mc._classes()[0x01], 'Lord')
 
-    def test_ours_names_and_claims_share_one_cast_lookup(self):
-        # a run's id names the cast member a claim with that name resolves to
+    def test_manchego_stars_names_and_claims_share_one_cast_lookup(self):
+        # a run's id names the cast member a claim with that name resolves to, a scene-only
+        # guest whose slot keeps its vanilla nameplate included (Duvessa rides SELENA)
         import campaign_env as ce
         from inject.scene_actors import cast_pids
         names = mc._names('ours')
@@ -2015,6 +2016,51 @@ class Story(unittest.TestCase):
             self.assertEqual(ce._unit_id(name, 'ours', None), pid)
             self.assertEqual(names[pid], name.replace('-', ' ').title())
 
+    def test_a_renamed_chapter_unit_reads_the_name_the_rom_prints(self):
+        # #590: ch02's Rime Spark rides KLIMT (0xC9) and a story printed "Klimt". Every pid the
+        # build renamed reads the ROM's name, a name two rows share included (Ravisin rides both
+        # of Riev's rows), and a pid it did not rename keeps the decomp's enum name
+        import inject.decomp
+        import inject.text
+        vanilla = {0xC9: 'Klimt', 0x28: 'Riev', 0x57: 'Riev', 0x95: 'Enemy', 0x83: 'Soldier'}
+        rom = {0xC9: 'Rime', 0x28: 'Ravisin', 0x57: 'Ravisin', 0x95: 'Raider', 0x83: 'Soldier'}
+        tables = {inject.decomp.vanilla_decomp_text: vanilla, inject.decomp.rom_text: rom}
+        mc._names.cache_clear()
+        try:
+            with mock.patch.object(inject.text, 'character_names', tables.__getitem__), \
+                    mock.patch('inject.scene_actors.cast_pids', dict):
+                names = mc._names('ours')
+                vanilla_game = mc._names('vanilla')
+        finally:
+            mc._names.cache_clear()
+        self.assertEqual((names[0xC9], names[0x28], names[0x57]), ('Rime', 'Ravisin', 'Ravisin'))
+        self.assertEqual(names[0x95], 'Raider')
+        self.assertEqual(names[0x83], 'Soldier 83')
+        self.assertEqual(vanilla_game[0xC9], 'Klimt')
+
+    def test_names_say_when_they_come_from_another_build(self):
+        with tempfile.TemporaryDirectory() as d:
+            rom = os.path.join(d, 'fireemblem8.gba')
+            with open(rom, 'wb') as fh:
+                fh.write(b'rom')
+            built = mc.sha1_file(rom)
+            with mock.patch.object(matrix, 'ROM_PATH', rom):
+                self.assertIsNone(mc.names_note('ours', [built[:12]]))
+                self.assertIsNone(mc.names_note('vanilla', ['abc']))
+                self.assertIn('abc', mc.names_note('ours', [built[:12], 'abc']))
+                # a run that recorded no ROM cannot be matched (#591 review)
+                self.assertIn('unrecorded', mc.names_note('ours', [built[:12], None]))
+                # the names' sources rewritten after the ROM was built (an injection in flight,
+                # or a `git checkout` back to vanilla): the ROM's hash still matches
+                src = os.path.join(d, 'src')
+                os.makedirs(src)
+                chars = os.path.join(src, 'data_characters.c')
+                with open(chars, 'w') as fh:
+                    fh.write('')
+                os.utime(chars, (os.path.getmtime(rom) + 10,) * 2)
+                self.assertIn('changed since', mc.names_note('ours', [built[:12]]))
+            with mock.patch.object(matrix, 'ROM_PATH', os.path.join(d, 'none.gba')):
+                self.assertIn('no ROM is built', mc.names_note('ours', [built[:12]]))
 
 # ---- the failure audit (#510 step 9 PR-F, FR-019/FR-020, SC-004) ----
 

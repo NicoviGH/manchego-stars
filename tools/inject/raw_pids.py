@@ -11,7 +11,7 @@ from inject.cast import ENEMY_BASE_SLOT, RAW_PID_PORTRAITS
 from inject.chapter_ids import (
     CH03_BOSS_PID, CH03_BRUTE_MINIBOSS_PID, CH03_CHAPTER_YAML, CH05_BOSS_PID, CH05_CHAPTER_YAML,
     CH05_MOOSE_PID, CH06_BOAT_PIDS, CH06_CHAPTER_YAML, CH07_CHAPTER_YAML)
-from inject.decomp import _find_brace_block
+from inject.decomp import _find_brace_block, block_field
 from inject.hosting import _load_chapter_yaml, chapter_yaml_for
 from inject.hosts import hosted_chapters
 from inject.paths import CHARACTERS_C
@@ -89,8 +89,7 @@ ENEMY_STUB_PLATE = 0x267   # "Enemy": vanilla's unused rows (0x92-0xa6, 0xbf, 0x
 def _row_field(text, pid, field):
     """An int field of raw pid `pid`'s gCharacterData row in `text`, or None."""
     s, e = _find_brace_block(text, '[%s - 1]' % pid, CHARACTERS_C)
-    m = re.search(r'\.%s\s*=\s*(0x[0-9a-fA-F]+|\d+)' % field, text[s:e])
-    return int(m.group(1), 0) if m else None
+    return block_field(text[s:e], field)
 
 
 def clone_generic_rows(text):
