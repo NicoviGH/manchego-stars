@@ -9,33 +9,33 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10, evening (Claude): **the vanilla route work (#510) is under way.** Step 9 is
-closed (PR-J merged as #595, squash cd9bb060). The plan is #510 comment 6758779876; the results so
-far are comment 6770045525. Known stops from `starts --game vanilla` (seeds 4001-4010, comment
-6751678084): Ch5x's two chests (7 of 10 campaigns), Ross on Ch2 (2), Colm on Ch3 (1).
-- **PR #596 is open and ready for Nicolas's "merge"** (branch `feat/510-vanilla-keys-doors`,
-  ADR 0397). It fixes Ch5x and Ch3:
-  - **Ch5x:** a key an enemy drops (`sight.keySources`) is a way to a chest or through a door.
-  - **Ch3:** the judged enemy phase plays on the map the plan opens (`Sight.openMap`, journaled).
-  - **Witnesses:** Ch5x seed 4003 cleared clean in 3 of 4 attempts (the fourth lost Kyle to a
-    0.1% roll; before, 0 of 12). Ch3 seed 4005 cleared clean in 4 of 4 (before, 0 of 48).
-  - **Suite** (`suite --held-out`): **PROMOTED**, no regressions, held-out 4 of 28 lost (as at the
-    freeze), +0.4% calls.
-  - **Review:** both reviews' findings are fixed. CI was green on 87646ac3; the last commit
-    (8fcc88ba, docs only) re-runs it: check `gh run list --branch feat/510-vanilla-keys-doors`
-    before merging.
-- **Ch2 (Ross) is next, not started.** H3b is confirmed by the code: a green recruit's death
-  reaches the rank only as a yes/no forfeit, and `green_die` skips recruits (`planner.lua`, the
-  `greenDie` loop). With Ross at 37% in every turn-1 plan, all of them tie, so a plan lowering his
-  chance ranks no higher. The fix to try: count a recruit green's death chance in `green_die` (a
-  tiebreak after forfeits). Then witness on seed 4008's Ch2 start. H3a (whether any act the bot
-  has saves Ross without the game's Rescue command, which the bot lacks) is untested until then.
+Refreshed 2026-11-10, late (Claude): **the vanilla route (#510): Ch5x and Ch3 are merged, Ch2 is
+in progress.** The plan is #510 comment 6758779876; the results so far are comment 6770045525.
+- **#596 merged** (squash 3533ffaf, ADR 0397): an enemy's dropped key is a way to a chest or
+  door (Ch5x); the judged enemy phase plays on the map the plan opens (Ch3).
+- **Ch2 (Ross) is in progress** on `feat/510-ch2-recruit-green-die`, commit c972d155, pushed,
+  **no PR yet**. The plan, the status and the next step are all on #510 comment 6771845566
+  (edited in place). In short:
+  - **Built (ADR 0398):**
+    - a recruit's death chance breaks ties after the forfeit;
+    - the bot rescues a green unit and drops it, through the game's own menus, with the carry
+      staged in the judged phase;
+    - four stale cached reads fixed (chest terrain, emptied chests, wall HP, the map in the
+      phase memos).
+  - **Witness:** Ch2 seed 4008 went from 0 of 4 clean to 2 of 4, Ross recruited.
+  - **Owed before the PR:**
+    1. **Canto as a decision** (Nicolas: not hard-coded). The design is on the comment.
+    2. Ch2 seed 4008 witness again.
+    3. `suite --held-out`. The last one refused promotion on one crash, seed 2001, now fixed
+       but not proven by a run.
+    4. The PR, `/code-review <PR> medium`, then merge on Nicolas's "merge".
 - **Witness recipe:** build an env with `campaign_env.pinned_env(campaign_env.vanilla_env(1),
   'cs-s<seed>', <chapter index>)` (drop `attempt`), then run `montecarlo.py attempts --env <it>
-  --attempts 4 --jobs 4 --vanilla --seed <seed>`. Ch5x is index 5, Ch3 index 3, Ch2 index 2. The
-  kept starts are in `references/sim/vanilla/c25b145e3745`.
-- **After Ch2:** re-run `starts --count 10 --game vanilla` (about 1 h) once the witnesses are
-  clean, and report where the campaigns stop next.
+  --attempts 4 --jobs 4 --vanilla --seed <seed>`. Ch2 is index 2. The kept starts are in
+  `references/sim/vanilla/c25b145e3745`. A record's trace is the one its `--out` runs file
+  names; never the newest file in `traces/`.
+- **After Ch2:** re-run `starts --count 10 --game vanilla` (about 1 h), and report where the
+  campaigns stop next.
 
 ## Where things stand
 
