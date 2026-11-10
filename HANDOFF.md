@@ -81,8 +81,9 @@ in a fresh session.**
    note when the run played another ROM; build that ROM to read its names.
 5. **Nicolas's stance (2026-11-09): stop chasing single deaths.** Judge a bot change by rates (the
    held-out counts, the pilot's Manchego Stars-vs-twin numbers), crashes, stalls and cost.
-   Proposed, not decided: make a tuning-seed death flip a thing to read, not a promotion gate
-   (ADR 0395); log the over-cap order question (game over strictly first) on #510 as open.
+   **Decided:** a tuning-seed death flip is a signal, not a promotion blocker (T107a on the plan
+   comment, built in PR-I with ADR 0395's amendment). Still to log on #510 as open: the over-cap
+   order question (game over strictly first).
 6. **Shelved, local:** `feat/510-t100b-counter-outcomes` (the reseat; its 162aa67c,
    `considered[].dies`, is worth porting), `feat/510-t100a-r`, `feat/510-lookahead-between-turn`
    (honest turn-between: right numbers, 4.6x cost), `park/510-t100a-pullback`.
