@@ -9,14 +9,33 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10 (Claude): **PR-J is PR #595** (T109-T112: ADR 0384's three retired
-claims in `DEAD_CONCEPTS` with a test, `montecarlo.py` in AGENTS.md's tools table, the series'
-suite cost in the PR body). Reviewed by a fresh subagent, every finding fixed; **merged 2026-11-10**
-(squash cd9bb060), T109-T112 ticked: **step 9 is closed.** The suite was not re-run: the bot's Lua is comment-only since #587. **Next, in session
-`vanilla-route`** (started 2026-11-10; it hit the usage limit before its first step, so re-run its brief): make the bot clear vanilla's route clean before any
-Manchego Stars chapter change (Nicolas's preference, not a gate; ADR 0385 keeps it a milestone).
-Known stops: Ch5x's two chests never reached (7 of 10 campaigns), Ross dies on Ch2 (2), Colm on
-Ch3 (1); #510 comment 6751678084. Its plan is one comment on #510.
+Refreshed 2026-11-10, evening (Claude): **the vanilla route work (#510) is under way.** Step 9 is
+closed (PR-J merged as #595, squash cd9bb060). The plan is #510 comment 6758779876; the results so
+far are comment 6770045525. Known stops from `starts --game vanilla` (seeds 4001-4010, comment
+6751678084): Ch5x's two chests (7 of 10 campaigns), Ross on Ch2 (2), Colm on Ch3 (1).
+- **PR #596 is open and ready for Nicolas's "merge"** (branch `feat/510-vanilla-keys-doors`,
+  ADR 0397). It fixes Ch5x and Ch3:
+  - **Ch5x:** a key an enemy drops (`sight.keySources`) is a way to a chest or through a door.
+  - **Ch3:** the judged enemy phase plays on the map the plan opens (`Sight.openMap`, journaled).
+  - **Witnesses:** Ch5x seed 4003 cleared clean in 3 of 4 attempts (the fourth lost Kyle to a
+    0.1% roll; before, 0 of 12). Ch3 seed 4005 cleared clean in 4 of 4 (before, 0 of 48).
+  - **Suite** (`suite --held-out`): **PROMOTED**, no regressions, held-out 4 of 28 lost (as at the
+    freeze), +0.4% calls.
+  - **Review:** both reviews' findings are fixed. CI was green on 87646ac3; the last commit
+    (8fcc88ba, docs only) re-runs it: check `gh run list --branch feat/510-vanilla-keys-doors`
+    before merging.
+- **Ch2 (Ross) is next, not started.** H3b is confirmed by the code: a green recruit's death
+  reaches the rank only as a yes/no forfeit, and `green_die` skips recruits (`planner.lua`, the
+  `greenDie` loop). With Ross at 37% in every turn-1 plan, all of them tie, so a plan lowering his
+  chance ranks no higher. The fix to try: count a recruit green's death chance in `green_die` (a
+  tiebreak after forfeits). Then witness on seed 4008's Ch2 start. H3a (whether any act the bot
+  has saves Ross without the game's Rescue command, which the bot lacks) is untested until then.
+- **Witness recipe:** build an env with `campaign_env.pinned_env(campaign_env.vanilla_env(1),
+  'cs-s<seed>', <chapter index>)` (drop `attempt`), then run `montecarlo.py attempts --env <it>
+  --attempts 4 --jobs 4 --vanilla --seed <seed>`. Ch5x is index 5, Ch3 index 3, Ch2 index 2. The
+  kept starts are in `references/sim/vanilla/c25b145e3745`.
+- **After Ch2:** re-run `starts --count 10 --game vanilla` (about 1 h) once the witnesses are
+  clean, and report where the campaigns stop next.
 
 ## Where things stand
 
@@ -72,7 +91,7 @@ Ch3 (1); #510 comment 6751678084. Its plan is one comment on #510.
 
 ## Next
 
-1. **#510 step 10**, after the vanilla route above.
+1. **#510 step 10**, after the vanilla route above (Ch2 next, then `starts --game vanilla`).
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
