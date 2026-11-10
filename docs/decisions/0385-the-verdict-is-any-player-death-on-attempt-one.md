@@ -14,6 +14,16 @@ FR-033), which an advisory panel drafted (research record 0023): spec #510 comme
 bar, research record 0022's reading). **Built in PR-H** (points 1 to 3, see "Built (PR-H)" at
 the end); point 4's validity bar and point 5 are PR-I's.
 
+**Amended 2026-11-09 (Nicolas): point 5, human calibration, is retired.** There will be no
+human playtests. The whole point of the bot is that vanilla stands in for playtesters, so
+Manchego Stars can be designed against vanilla without manual sessions; the anecdotal record of
+how people play vanilla is `docs/research/`. The panel (research record 0023) recommended
+calibrating against humans, and PR-I built it (`human`, its form, UNVALIDATED_HUMAN, the
+humans' canary pair); this removes all of it. Whether the bot measures rather than fails is
+read from vanilla alone: the same bot plays both arms, point 4's validity bars, and the
+canary's vanilla order. FR-030, FR-033, User Story 7's second scenario and SC-006's last
+sentence no longer apply; the spec comment says so.
+
 **Why.** A clean clear mixes two things: how dangerous a map is, and how well the bot collects
 everything. A Manchego Stars chapter can fail clean clears more often than its twin only because
 the bot misses one village, and that says nothing about difficulty. A player death is what
@@ -69,7 +79,7 @@ the endpoint.
   the true answer when ours is easy too. Only EASIER cannot be shown there, and it means
   nothing below zero deaths.
 
-**5. Human calibration.** The designer and one blind friend play vanilla Ch3 and Ch5 and
+**5. Human calibration (retired 2026-11-09, see the amendment above).** The designer and one blind friend play vanilla Ch3 and Ch5 and
 Manchego Stars ch02 and ch03 on Normal, resetting on a player death, and code each reset on a
 frozen one-page form per map with the bot's causes plus misplay and ignored loot. Once that data
 exists, a result may gate a decision only if the bot's leading first-attempt cause matches the
@@ -193,8 +203,8 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
     is a `seize_skips` entry with `justified` false;
   - an arm with no attempt that reached the chapter is "not read", never "holds". A NOT
     READABLE pilot says so first and exits non-zero: its analysis choice must not reach `cell`.
-- **Human calibration** (point 5): `human --form` prints the one-page form. Its causes are
-  botrun.lua's plus `misplay` and `ignored_loot`, so the form and the comparison cannot
+- **Human calibration** (point 5; built here, removed by the 2026-11-09 amendment): `human
+  --form` printed the one-page form. Its causes were botrun.lua's plus `misplay` and `ignored_loot`, so the form and the comparison cannot
   drift. It is posted as one #510 comment on Nicolas's go-ahead. Coded attempts go in
   `references/sim/human/*.jsonl`, one line each, checked against the form. Maps are named by
   their suite start (`vanilla-ch3`, `vanilla-ch5`, `ours-ch02`, `ours-ch03`). The bot's cause
@@ -205,11 +215,10 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
 - **The report** (`report`, FR-031): `pilot` and `cell` each append a `kind: cell` record to
   `references/sim/cells.jsonl`, naming each paired run by its name, trace and instrument,
   and `report` reads one instrument's cells from it. A pilot with a benched arm is an
-  experiment and writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6, plus the humans'
-  Ch3/Ch5 order once they have played both. It reads the vanilla first attempts in the cells'
-  stores under that instrument, never a held-out run. A chapter with no attempts is "not
-  read", never "holds". An inversion prints a banner first. The humans' order counts their
-  first attempts reset over a death, never a reset over loot. The anomalies are listed one line
+  experiment and writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6 (and, until the
+  2026-11-09 amendment, the humans' Ch3/Ch5 order once they had played both). It reads the
+  vanilla first attempts in the cells' stores under that instrument, never a held-out run. A chapter with no attempts is "not
+  read", never "holds". An inversion prints a banner first. The anomalies are listed one line
   per run, each kind with its turns, and one `story` command at the first one's turn (a cell of
   100 runs can carry a hundred anomalies; a story read from that turn reaches the rest). A
   cell's sentence names its two largest cause differences an attempt (boss flag kept), plus

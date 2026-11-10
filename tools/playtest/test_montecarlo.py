@@ -2687,6 +2687,14 @@ class Validity(unittest.TestCase):
         v = mc.judged({'verdict': None}, {'failed': [('blindspot', 'x')], 'withheld': []})
         self.assertEqual(v['reason'], 'NOT READABLE: x')
 
+    def test_the_first_death_is_the_earliest(self):
+        rec = played([{'cause': 'fog', 'charId': 1, 'turn': None},
+                      {'cause': 'rng_tail', 'charId': 2, 'turn': 4},
+                      {'cause': 'over_cap', 'charId': 3, 'turn': 4}])['rec']
+        # no turn sorts last; a same-turn tie keeps the watch's order
+        self.assertEqual(mc.first_death(rec)['charId'], 2)
+        self.assertIsNone(mc.first_death(played()['rec']))
+
     def test_a_cell_that_fails_one_stops_at_that_look(self):
         def fate(name, seed, chapter):
             deaths = [{'charId': 1, 'faction': 'blue', 'cause': 'other', 'turn': 2,
@@ -2700,107 +2708,6 @@ class Validity(unittest.TestCase):
         self.assertEqual(len(log), 100, 'no seed past the first look plays')
         self.assertEqual(mc.validity_lines(v['validity'])[0],
                          'validity (FR-029): NOT READABLE, sandbox_fault')
-
-
-class Human(unittest.TestCase):
-    """PR-I, T101 (FR-030, AS 2): the bot's leading cause against the humans' leading reset
-    reason, map by map; fewer than three of four matching is UNVALIDATED_HUMAN."""
-
-    @staticmethod
-    def coded(causes):
-        """Coded attempts: {map: [cause or None]} (None: an attempt that did not reset)."""
-        return [{'player': 'designer', 'map': m, 'attempt': i + 1, 'reset': c is not None,
-                 'cause': c} for m, cs in causes.items() for i, c in enumerate(cs)]
-
-    @staticmethod
-    def bot(causes):
-        """{map: [played record]}, each record's first death of the given cause."""
-        return {m: [played([{'cause': c, 'charId': 1, 'turn': 2},
-                            {'cause': 'rng_tail', 'charId': 2, 'turn': 9}])['rec']
-                    for c in cs] for m, cs in causes.items()}
-
-    BOT = {'vanilla-ch3': ['rng_tail'] * 3, 'vanilla-ch5': ['over_cap'] * 2,
-           'ours-ch02': ['fog', 'fog', 'rng_tail'], 'ours-ch03': ['over_cap'] * 4}
-
-    def test_two_maps_differing_is_unvalidated_and_three_matching_is_validated(self):
-        human = {'vanilla-ch3': ['rng_tail'], 'vanilla-ch5': ['over_cap'],
-                 'ours-ch02': ['misplay'], 'ours-ch03': ['rng_tail']}
-        cal = mc.calibration(self.coded(human), self.bot(self.BOT))
-        self.assertEqual((cal['status'], cal['matched']), ('UNVALIDATED_HUMAN', 2))
-        self.assertEqual(cal['maps']['ours-ch02'], {'human': 'misplay', 'bot': 'fog',
-                                                    'match': False})
-        human['ours-ch03'] = ['over_cap']
-        cal = mc.calibration(self.coded(human), self.bot(self.BOT))
-        self.assertEqual((cal['status'], cal['matched']), ('validated', 3))
-
-    def test_the_comparison_is_by_failure_mode_never_by_rate(self):
-        # the humans reset on 1 attempt in 10 of vanilla Ch3, the bot lost someone in every
-        # one: the same leading mode is a match all the same
-        human = {'vanilla-ch3': ['rng_tail'] + [None] * 9, 'vanilla-ch5': ['over_cap'],
-                 'ours-ch02': ['fog'], 'ours-ch03': ['over_cap']}
-        cal = mc.calibration(self.coded(human), self.bot(self.BOT))
-        self.assertEqual((cal['status'], cal['matched']), ('validated', 4))
-        # the cause of the bot's FIRST death is what a reset is compared with, not any death
-        self.assertEqual(mc.bot_leading_cause(self.bot(self.BOT)['ours-ch02'])[0], 'fog')
-
-    def test_the_first_death_is_the_earliest_and_an_unnamed_cause_still_leads(self):
-        rec = played([{'cause': 'fog', 'charId': 1, 'turn': None},
-                      {'cause': 'rng_tail', 'charId': 2, 'turn': 4},
-                      {'cause': 'over_cap', 'charId': 3, 'turn': 4}])['rec']
-        # no turn sorts last; a same-turn tie keeps the watch's order
-        self.assertEqual(mc.first_death(rec)['charId'], 2)
-        self.assertIsNone(mc.first_death(played()['rec']))
-        recs = [played([{'charId': 1, 'turn': 2}])['rec']] * 2 + \
-            [played([{'cause': 'fog', 'charId': 1, 'turn': 2}])['rec']]
-        self.assertEqual(mc.bot_leading_cause(recs)[0], 'unclassified')
-
-    def test_a_map_with_no_lead_matches_nothing(self):
-        human = {'vanilla-ch3': ['rng_tail', 'fog'], 'vanilla-ch5': ['over_cap'],
-                 'ours-ch02': ['fog']}   # a tie on Ch3, nothing coded on ch03
-        cal = mc.calibration(self.coded(human), self.bot(self.BOT))
-        self.assertEqual((cal['status'], cal['matched']), ('UNVALIDATED_HUMAN', 2))
-        self.assertIsNone(cal['maps']['vanilla-ch3']['human'])
-        self.assertIsNone(cal['maps']['ours-ch03']['human'])
-
-    def test_no_human_data_marks_nothing(self):
-        cal = mc.calibration([], self.bot(self.BOT))
-        self.assertEqual(cal['status'], 'none')
-        self.assertIn('nothing is marked UNVALIDATED_HUMAN', mc.calibration_lines(cal)[0])
-
-    def test_a_coded_line_off_the_form_is_refused_with_its_place(self):
-        d = tempfile.mkdtemp()
-        path = os.path.join(d, 'friend-ch3.jsonl')
-        good = {'player': 'friend', 'map': 'vanilla-ch3', 'attempt': 1, 'reset': True,
-                'cause': 'misplay'}
-        for bad, said in ((dict(good, cause='bored'), 'not \'bored\''),
-                          (dict(good, map='vanilla-ch9'), 'map'),
-                          (dict(good, player='stranger'), 'player'),
-                          (dict(good, reset='yes'), 'reset'),
-                          (dict(good, attempt=0), 'attempt'),
-                          (dict(good, attempt='1'), 'attempt'),
-                          (dict(good, attempt=True), 'attempt'),
-                          ({k: v for k, v in good.items() if k != 'attempt'}, 'attempt')):
-            with open(path, 'w') as fh:
-                fh.write(json.dumps(good) + '\n' + json.dumps(bad) + '\n')
-            with self.assertRaises(ValueError) as err:
-                mc.load_human([path])
-            self.assertIn(path + ':2', str(err.exception))
-            self.assertIn(said, str(err.exception))
-        with open(path, 'w') as fh:
-            fh.write(json.dumps(good) + '\n\n' + json.dumps(dict(good, reset=False,
-                                                                cause=None)) + '\n')
-        self.assertEqual(len(mc.load_human([path])), 2)
-        self.assertEqual(mc.human_files(d), [path])
-        self.assertEqual(mc.human_files(os.path.join(d, 'none')), [])
-
-    def test_the_form_words_every_cause_the_comparison_reads(self):
-        form = '\n'.join(mc.human_form())
-        for c in mc.human_causes():
-            self.assertIn('`%s`' % c, form)
-        self.assertEqual(mc.human_causes()[:len(mc.botrun_names()[0])], mc.botrun_names()[0])
-        for m in mc.HUMAN_MAPS:
-            self.assertIn('(`%s`)' % m, form)
-        self.assertIn('Manchego Stars ch02', form)
 
 
 class Report(unittest.TestCase):
@@ -2829,9 +2736,8 @@ class Report(unittest.TestCase):
                 played([dict(boss, flags={})], turns_to_win=14)['rec']]
         return {'ours': ours, 'vanilla': twin}
 
-    def lines(self, cells=None, decision=None, components=None, cal=None, canary=([], False)):
-        cal = cal or {'status': 'none', 'maps': {}, 'matched': 0}
-        return mc.report(cells or [self.cell()], lambda c: self.arms(), cal, canary, decision,
+    def lines(self, cells=None, decision=None, components=None, canary=([], False)):
+        return mc.report(cells or [self.cell()], lambda c: self.arms(), canary, decision,
                          components)
 
     def test_the_report_is_plain_sentences_one_a_cell_naming_what_drives_it(self):
@@ -2858,15 +2764,6 @@ class Report(unittest.TestCase):
                                                 '(blindspot)'))
         self.assertFalse(any('|' in l for l in lines), 'it is not a table')
 
-    def test_an_unvalidated_human_calibration_marks_every_cell(self):
-        cal = {'status': 'UNVALIDATED_HUMAN', 'matched': 2, 'maps': {
-            m: {'human': 'misplay', 'bot': 'fog', 'match': False} for m in mc.HUMAN_MAPS}}
-        lines = self.lines(cal=cal)
-        self.assertTrue([l for l in lines if ' vs vanilla ' in l][0].endswith(
-            '; UNVALIDATED_HUMAN, it gates nothing'))
-        self.assertIn('UNVALIDATED_HUMAN, no result gates a decision',
-                      '\n'.join(lines))
-
     def test_a_canary_inversion_prints_a_banner_first(self):
         rows = mc.vanilla_rows()
         lost = [played([{'cause': 'rng_tail', 'charId': 1}])['rec']] * 3
@@ -2886,19 +2783,6 @@ class Report(unittest.TestCase):
         self.assertFalse(inverted)
         self.assertIn('canary vanilla Ch2 below vanilla Ch6 (expected): not read, vanilla Ch2 '
                       'and vanilla Ch6 have no first attempts under this instrument', out)
-        # the humans' Ch3/Ch5 order is a third pair once they have played both
-        # the humans' first attempts reset over a death only: Ch3 0 of 2 (a loot reset and a
-        # later attempt's death never count), Ch5 1 of 2, so Ch3 is the easier
-        human = [{'player': p, 'map': m, 'attempt': a, 'reset': c is not None, 'cause': c}
-                 for p, m, a, c in (('designer', 'vanilla-ch3', 1, 'ignored_loot'),
-                                    ('designer', 'vanilla-ch3', 2, 'fog'),
-                                    ('friend', 'vanilla-ch3', 1, None),
-                                    ('designer', 'vanilla-ch5', 1, 'fog'),
-                                    ('friend', 'vanilla-ch5', 1, None))]
-        out, inverted = mc.canary({rows['FE8 Ch5']: safe, rows['FE8 Ch3']: lost}, human)
-        self.assertTrue(inverted)
-        self.assertIn('canary vanilla Ch3 below vanilla Ch5 (as the humans found): vanilla Ch3 '
-                      '3 of 3, vanilla Ch5 0 of 3: INVERTED', out)
 
     def test_anomalies_carry_their_story_commands(self):
         text = '\n'.join(self.lines())
