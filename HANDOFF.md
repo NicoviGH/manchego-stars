@@ -10,12 +10,13 @@ here should still be true in a month. Before a context rollover, warn Nicolas, r
 and start a fresh instance; don't rely on auto-compaction.
 
 Refreshed 2026-11-09, late night (Claude): **PR-I merged as #593** (validity / NOT READABLE,
-`report`, T107a). **Then Nicolas retired the human check and the canary** (ADR 0385, two
-amendments 2026-11-09): there are no human playtests, vanilla is the playtesters' proxy, and no
-research record orders vanilla's chapters by unit losses (a Sonnet read of `docs/research/`; the
-only "hardest maps" are Ephraim's Ch11 and Ch14). **PR #594** (`feat/510-drop-human-check`)
-removes both; reviewed, every finding fixed; it waits on CI and Nicolas's "merge". T107 stays
-open only for posting the report (Nicolas's go-ahead).
+`report`, T107a). **#594 merged** (Nicolas's "merge"): the human check and the canary are
+retired (ADR 0385, two amendments 2026-11-09). There are no human playtests, vanilla is the
+playtesters' proxy; and no research record orders vanilla's chapters by unit losses (a Sonnet
+read of `docs/research/`; the only "hardest maps" are Ephraim's Ch11 and Ch14), so the canary's
+Ch1<Ch5, Ch2<Ch6 order was an unbacked assumption. The bot is judged by playing both games and
+the validity bars. T100-T108a are ticked on #510's plan; T107 stays open only for posting the
+report. **Next: PR-J.**
 
 ## Where things stand
 
@@ -71,13 +72,17 @@ open only for posting the report (Nicolas's go-ahead).
 
 ## Next
 
-1. **PR-J next** (#510's plan comment 6563384310 lists its tasks), then #510 step 10. Still owed
-   from PR-I:
+1. **PR-J next**, the polish PR (#510's plan comment 6563384310, T109-T112): sweep
+   `DEAD_CONCEPTS` and the docs for retired terms (T109); point AGENTS.md's tools table at
+   `montecarlo.py`'s subcommands and ADRs (T110); compare the suite's CPU across the whole
+   series with T085's frozen baseline, in the PR body (T111, SC-003); `make check` and the Lua
+   tests green (T112). Then #510 step 10. Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
      validity check holds; Manchego Stars lost someone 10 of 50, the twin 3 of 50; 0.63 CPU-h.
-     The report is in `build/report-9d0b15b542e2-v2.md`; **post it to #510 only on Nicolas's
-     go-ahead** (T107). Clean clears in that pilot: Manchego Stars 0 of 50 (two chwinga die and
+     `build/report-9d0b15b542e2-v2.md` predates #594 (it still prints the canary and human
+     lines): regenerate it with `montecarlo.py report --post`, and **post it to #510 only on
+     Nicolas's go-ahead** (T107). Clean clears in that pilot: Manchego Stars 0 of 50 (two chwinga die and
      the village at (12,3) is closed in every play), vanilla 35 of 50.
    - **Bot hash drift**: main's bot hash is `9d0b15b542e2`, the frozen suite's `ce1e3adb8c57`;
      #589's comment-only edits to the Lua moved it. Play is unchanged; a `suite --held-out`
