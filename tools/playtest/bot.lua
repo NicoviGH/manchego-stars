@@ -57,8 +57,9 @@
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
 --   `slot` is the item an attack strikes with (one of sight.weapons), a heal's staff or a used
 --   item; nil = the first the Weapon Select menu lists.
---   "talk" and "staff" are acts the claim behaviours add; "visit" and "chest" only the
---   planner's proposals (Bot.candidates) make.
+--   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue" and
+--   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) only the planner's
+--   proposals (Bot.candidates) make.
 --
 -- Worst case on an end tile = the sum, over every enemy that reaches it, of the most that
 -- enemy's strike can take as the game plays it (takenWorst). An enemy "reaches" the
@@ -409,11 +410,15 @@ local function context(board, sight)
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
-                  talkTiles = {}, openers = {} }
+                  talkTiles = {}, openers = {}, rescueTiles = {}, carried = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
+    -- the map the phase memos are kept on (sight.mapKey): a door or wall the phase opened
+    ctx.mapKey = sight.mapKey and sight.mapKey() or "-"
     ctx.enemies = M.enemiesOf(board, sight)
     for _, u in ipairs(board.units) do
+        -- a carried unit (Rescue): off the field, at its carrier's tile, by its id
+        if u.carriedBy and not u.dead then ctx.carried[u.id] = u end
         if u.onField then
             ctx.onField[#ctx.onField + 1] = u
             ctx.standing[tileKey(u.x, u.y)] = u
@@ -428,10 +433,11 @@ local function context(board, sight)
 end
 
 -- An attack's key: what FE8's simulation reads for it -- both fighters (unitKey), our tile, the
--- enemy's tile, and every other unit within support range of either fighter (support bonuses
--- move with them). An action elsewhere leaves it standing.
+-- enemy's tile, the map (ctx.mapKey: the phase memo outlives a door the phase opens), and every
+-- other unit within support range of either fighter (support bonuses move with them). An
+-- action elsewhere leaves it standing.
 local function attackKey(ctx, u, e, x, y, slot)
-    local parts = { unitKey(u), slot or "-", x, y, unitKey(e), e.x, e.y, "near" }
+    local parts = { unitKey(u), slot or "-", x, y, unitKey(e), e.x, e.y, ctx.mapKey, "near" }
     for _, o in ipairs(ctx.onField) do
         if o ~= u and o ~= e and (manhattan(o.x, o.y, x, y) <= SUPPORT_RANGE
                 or manhattan(o.x, o.y, e.x, e.y) <= SUPPORT_RANGE) then
@@ -441,10 +447,10 @@ local function attackKey(ctx, u, e, x, y, slot)
     return table.concat(parts, ";")
 end
 
--- A strike's key: the exchange and the WHOLE board. The strike is the enemy AI's own pick of
+-- A strike's key: the exchange and the WHOLE board, its map too (ctx.mapKey). The strike is the enemy AI's own pick of
 -- weapon and tile (sight.lua), and any unit anywhere can block or open its path.
 local function strikeKey(ctx, u, e, x, y, slot)
-    local parts = { unitKey(u), x, y, slot or "-", unitKey(e), e.x, e.y, "board" }
+    local parts = { unitKey(u), x, y, slot or "-", unitKey(e), e.x, e.y, ctx.mapKey, "board" }
     for _, o in ipairs(ctx.onField) do
         parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
     end
@@ -1038,6 +1044,64 @@ local function talks(ctx, u, t)
     return ctx.talks[k]
 end
 
+-- The Rescues `u` may make: of each green unit on the field (an ally, bmphase.c
+-- AreUnitsAllied), from each wait tile beside it the gate allows where the game's Rescue
+-- command lists it (sight.offers: RescueUsability, CanUnitRescue's Aid against Con). Which one,
+-- if any, is the planner's: what it saves is the judged phase's to read (ADR 0396). A blue
+-- unit is not offered as a target: one carried cannot act, and the guides' Rescue is of a
+-- green in danger (vanilla Ch2's Ross; docs/research/0014).
+local function rescues(ctx, u, gate)
+    local out = {}
+    if not ctx.sight.offers or u.carrying then return out end
+    for _, t in ipairs(ctx.onField) do
+        if t.faction == "green" and not t.fogged then
+            local k = u.id .. ">" .. t.id
+            if not ctx.rescueTiles[k] then
+                local beside = {}
+                for _, tile in ipairs(waitTiles(ctx, u)) do
+                    if manhattan(tile.x, tile.y, t.x, t.y) == 1 then beside[#beside + 1] = tile end
+                end
+                ctx.rescueTiles[k] = #beside > 0 and ctx.sight.offers(u, beside, "rescue", t) or {}
+            end
+            for _, tile in ipairs(ctx.rescueTiles[k]) do
+                if gate(ctx, u, tile.x, tile.y, nil) then out[#out + 1] = action(u, tile, "rescue", t) end
+            end
+        end
+    end
+    return out
+end
+
+-- The Drops `u` may make of the unit it carries (board's `carrying`): from its own tile and
+-- from each wait tile beside a unit that may Talk it over (recruitsOf: a carried recruit is
+-- talked to once set down), onto each tile the game's drop list holds (sight.drops). Which is
+-- the planner's to rank.
+local function drops(ctx, u, gate)
+    local out = {}
+    local t = u.carrying and ctx.carried[u.carrying]
+    if not t or not ctx.sight.drops then return out end
+    local near, from = {}, {}
+    for _, id in ipairs(ctx.recruitTalkers and ctx.recruitTalkers[t.id] or {}) do
+        for _, b in ipairs(ctx.blues) do
+            if b.id == id and b ~= u then near[#near + 1] = b end
+        end
+    end
+    for _, tile in ipairs(waitTiles(ctx, u)) do
+        local keep = tile.x == u.x and tile.y == u.y
+        for _, b in ipairs(near) do
+            if manhattan(tile.x, tile.y, b.x, b.y) <= 2 then keep = true end
+        end
+        if keep and gate(ctx, u, tile.x, tile.y, nil) then from[#from + 1] = tile end
+    end
+    for _, d in ipairs(#from > 0 and ctx.sight.drops(u, from) or {}) do
+        for _, at in ipairs(d.drops) do
+            local a = action(u, d, "drop", t)
+            a.dropAt = { x = at.x, y = at.y }
+            out[#out + 1] = a
+        end
+    end
+    return out
+end
+
 -- A Talk from a wait tile the gate allows where the Talk command offers `t` (sight.offers);
 -- nil when `u` cannot reach one. The tiles are asked once per pair per decide.
 local function talkFrom(ctx, u, t, gate)
@@ -1100,7 +1164,14 @@ end
 -- takers).
 local function recruitsOf(ctx)
     local out, talkers = {}, {}
-    for _, t in ipairs(ctx.onField) do
+    -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to
+    local units = {}
+    for _, t in ipairs(ctx.onField) do units[#units + 1] = t end
+    local carried = {}
+    for id in pairs(ctx.carried or {}) do carried[#carried + 1] = id end
+    table.sort(carried)
+    for _, id in ipairs(carried) do units[#units + 1] = ctx.carried[id] end
+    for _, t in ipairs(units) do
         for _, u in ipairs(ctx.blues) do
             if mayTalkOver(ctx, u, t) then
                 out[t.id] = true
@@ -1637,6 +1708,7 @@ local function proposeOne(ctx, u)
         if not a then return end
         local k = a.act .. "@" .. a.move.x .. "," .. a.move.y .. ">" .. tostring(a.targetId)
             .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
+            .. (a.dropAt and ("/" .. a.dropAt.x .. "," .. a.dropAt.y) or "")
         if seen[k] then return end
         seen[k] = true
         a.why = why
@@ -1684,6 +1756,8 @@ local function proposeOne(ctx, u)
     for _, t in ipairs(ctx.onField) do
         if t.faction ~= "blue" then add(talkFrom(ctx, u, t, open), "talk") end
     end
+    for _, a in ipairs(rescues(ctx, u, open)) do add(a, "rescue") end
+    for _, a in ipairs(drops(ctx, u, open)) do add(a, "drop") end
     add(staffHeal(ctx, open, u), "heal")
     -- a heal the plan may need after its blows land: per ally the game would let `u`
     -- heal were it hurt, from the safest tile that reaches it
@@ -1811,7 +1885,8 @@ end
 -- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
 -- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
 -- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
--- every Talk the game offers, its best heal, a Vulnerary, a Visit or Chest on each open tile
+-- every Talk the game offers, each Rescue of a green unit and each Drop of the unit it carries
+-- the game offers (rescues, drops), its best heal, a Vulnerary, a Visit or Chest on each open tile
 -- it reaches (sight.canExplore), the march (to its exploring tile when it was sent to one), the
 -- hold, the retreat and a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
 -- that can strike it there next phase); an attack its forecast (`f`) and counter worst case

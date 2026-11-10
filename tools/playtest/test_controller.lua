@@ -566,6 +566,17 @@ check(a and a.key, "B", "a live target selector can be backed out of")
 a = action(attackTarget, "next_target")
 check(a and a.key, "RIGHT", "a live target selector steps to its next target")
 
+-- Rescue's unit selector and Drop's tile selector (bmmenu.c RescueEffect, DropEffect) are
+-- driven as Talk's is: confirm, back out, step
+for _, kind in ipairs({ "rescue", "drop" }) do
+    local sel = {
+        procs = proc("target_selection", "target_selection_input"),
+        target = { kind = kind, x = 10, y = 5, uid = kind == "rescue" and 0x41 or 0, frozen = false },
+    }
+    classify(sel, "target_selection", "the " .. kind .. " selector is live")
+    check((action(sel, "confirm_target") or {}).key, "A", "the " .. kind .. " selector confirms")
+end
+
 local frozenTarget = {
     procs = proc("target_selection", "target_selection_input"),
     target = { kind = "talk", x = 7, y = 5, uid = 0x41, frozen = true },

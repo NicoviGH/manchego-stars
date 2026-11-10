@@ -180,6 +180,8 @@ WANTED = [
     'gSelectInfo_Attack',       # distinguishes attack targets from other selectors
     'gSelectInfo_Talk',         # distinguishes Talk targets from other selectors
     'gSelectInfo_Heal',         # distinguishes a healing staff's targets (bmitemuse.c)
+    'gSelectInfo_Rescue',       # the Rescue command's unit selector (bmmenu.c RescueEffect)
+    'gSelectInfo_Drop',         # the Drop command's tile selector (bmmenu.c DropEffect)
     'gProcScr_BKSEL',           # passive battle-forecast panel owner; SelectTargetProc, not
                                 # this display proc, owns the target-confirmation input
     'BattleForecast_LoopDisplay', # exact stable forecast display callback (still no legal input)
@@ -336,6 +338,8 @@ WANTED = [
     'TalkCommandUsability',     # Talk: MakeTalkTargetList finds a partner, not Silenced (bmmenu.c)
     'DoorCommandUsability',     # Door: a key and a door beside the unit (bmmenu.c)
     'UnitActionMenu_CanSeize',  # Seize: CanUnitSeize on the Seize tile (bmmenu.c)
+    'RescueUsability',          # Rescue: an adjacent ally CanUnitRescue carries (bmmenu.c)
+    'DropUsability',            # Drop: a carried unit and a tile beside it to set it on (bmmenu.c)
     # The planner's goals (#510 step 9): what an item is worth, a class's costs and AI scripts.
     'GetItemCost',              # price per use x uses: the party's worth sums it (bmitem.c)
     'GetItemMaxUses',           # an item's full uses (bmitem.c)

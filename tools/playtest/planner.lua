@@ -6,8 +6,9 @@
 --
 -- One call plans the phase from the board as it stands (botrun calls it again after every act:
 -- a receding horizon, so a miss, a kill or a newly seen enemy is planned around at once):
---   1. Propose: Bot.candidates -- per unit its attacks, breach, Talks, heal, Vulnerary, march,
---      hold, retreat, Seize, each read from the game, each with its end tile's exposure.
+--   1. Propose: Bot.candidates -- per unit its attacks, breach, Talks, Rescues and Drops, heal,
+--      Vulnerary, march, hold, retreat, Seize, each read from the game, each with its end
+--      tile's exposure.
 --   2. Search: a beam over which unit acts next and how. A partial plan is scored by expected
 --      values from the game's forecasts: damage dealt, the chance to kill, the counter's chance
 --      to kill our unit, HP healed, and what the plan does to every goal still open (goals.lua:
@@ -309,6 +310,14 @@ local function score(act, st, W, style, odds)
         -- judged phase, as a kill is; its goal is taken (the goals' term)
         fx.gone = act.targetId
         fx.took = "recruit:" .. act.targetId
+    elseif act.act == "rescue" then
+        -- the target is carried (bmunit.c UnitRescue): off the map, never the AI's target, and
+        -- dropped alive if its carrier dies (DropRescueOnDeath). What that saves it is the
+        -- judged phase's to read; a carried recruit's Talk waits on a Drop (goalTerm)
+        fx.carry = { id = act.targetId, by = act.unitId }
+    elseif act.act == "drop" then
+        -- the carried unit is set down on act.dropAt (bmunit.c UnitDrop)
+        fx.drop = { id = act.targetId, x = act.dropAt.x, y = act.dropAt.y }
     elseif act.act == "visit" or act.act == "chest" then
         -- the goal is taken; what it is worth against the risk there is the goals' term
         -- against the unit's exposure, by style
@@ -354,8 +363,11 @@ local function score(act, st, W, style, odds)
 end
 
 local function key(act)
-    return string.format("%d>%s@%d,%d>%s", act.unitId, act.act, act.move.x, act.move.y,
+    local k = string.format("%d>%s@%d,%d>%s", act.unitId, act.act, act.move.x, act.move.y,
         tostring(act.targetId or (act.obstacle and (act.obstacle.x .. "," .. act.obstacle.y))))
+    -- a Drop is told apart by where it sets the unit down
+    if act.dropAt then k = k .. "/" .. act.dropAt.x .. "," .. act.dropAt.y end
+    return k
 end
 
 -- a plan's acts as keys, in order: what tells two plans apart
@@ -365,12 +377,16 @@ local function keysOf(st)
     return out
 end
 
--- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle } read back,
+-- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt } read back,
 -- for a forced replay's act no candidate offered (botrun). It raises on a string no key gave.
 local function unkey(k)
     local id, act, x, y, tgt = k:match("^(%-?%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")
     if not id then error("planner.lua: not an act key: " .. k) end
     local a = { unitId = tonumber(id), act = act, move = { x = tonumber(x), y = tonumber(y) } }
+    local rest, dx, dy = tgt:match("^(.-)/(%-?%d+),(%-?%d+)$")
+    if rest then
+        tgt, a.dropAt = rest, { x = tonumber(dx), y = tonumber(dy) }
+    end
     local ox, oy = tgt:match("^(%-?%d+),(%-?%d+)$")
     if ox then
         a.obstacle = { x = tonumber(ox), y = tonumber(oy) }
@@ -462,7 +478,12 @@ function M.plan(Bot, board, sight, style, opts)
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     fought = {}, healed = {},
                     walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
-                    gameOver = gameOver, kill = {} }
+                    gameOver = gameOver, kill = {}, carry = {} }
+    -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
+    -- { x, y } once dropped (score's fx.carry, fx.drop); the board's carries to start
+    for _, u in ipairs(board.units) do
+        if u.carriedBy and not u.dead then start.carry[u.id] = { by = u.carriedBy } end
+    end
 
     -- Whether `id` ends an earlier act of the plan off the tile it stands on now. The game
     -- was asked which heals reach whom with every unit where it stands (sight.heals), so a
@@ -494,10 +515,25 @@ function M.plan(Bot, board, sight, style, opts)
         end
         return pos
     end
+    -- a goal's chance on the board a plan leaves. A carried recruit is talked to only once set
+    -- down (TalkCommandUsability lists units on the map), so its goal is at its carrier's tile
+    -- and a turn later (GAMMA) while carried; at the drop tile once dropped
+    local function chanceOf(st, g, pos)
+        local c = g.kind == "recruit" and (st.carry or {})[g.unitId]
+        if not c then return Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
+        local at, late = c, 1
+        if c.by then
+            at, late = pos[c.by] or byId[c.by] or g.tile, Goals.GAMMA
+        end
+        local moved = {}
+        for k, v in pairs(g) do moved[k] = v end
+        moved.tile = { x = at.x, y = at.y }
+        return Goals.chance(moved, pos, Goals.GAMMA, turnsTo) * late
+    end
     local before = {}
     do
         local pos = positions(start)
-        for _, g in ipairs(goals) do before[g.id] = Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
+        for _, g in ipairs(goals) do before[g.id] = chanceOf(start, g, pos) end
     end
     -- the completion ledger (FR-014): what is still to get at this decision, for the rank's
     -- forfeits and botrun's seize skips
@@ -573,7 +609,7 @@ function M.plan(Bot, board, sight, style, opts)
             elseif g.kind == "objective" then
                 c = pWin + (1 - pWin) * Goals.chance(g, pos, Goals.GAMMA, turnsTo)
             else
-                c = Goals.chance(g, pos, Goals.GAMMA, turnsTo) * (1 - pWin)
+                c = chanceOf(st, g, pos) * (1 - pWin)
                 if g.kind == "recruit" then
                     c = c * (1 - (st.recruitHit[g.unitId] or 0))
                         * (1 - (felled and felled[g.unitId] or 0))
@@ -654,7 +690,10 @@ function M.plan(Bot, board, sight, style, opts)
         local menu = {}
         for i, x in ipairs(scored) do
             if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
-                    or x.a.why == "hold" or x.a.why == "retreat" then
+                    or x.a.why == "hold" or x.a.why == "retreat"
+                    -- what a Rescue or Drop saves or opens is the judged phase's to read, and
+                    -- its own score never sees the phase
+                    or x.a.act == "rescue" or x.a.act == "drop" then
                 menu[#menu + 1] = x.a
             end
         end
@@ -669,7 +708,13 @@ function M.plan(Bot, board, sight, style, opts)
         if st.used[uid] or st.tiles[tile] or (a.targetId and st.gone[a.targetId])
                 or (a.act == "staff" and moved(st, a.targetId))
                 -- an ally's tile, until the plan has moved that ally off it
-                or (a.vacate and not st.used[a.vacate]) then
+                or (a.vacate and not st.used[a.vacate])
+                -- a Rescue of a unit already carried; a Drop of one this unit does not carry,
+                -- or onto a tile the plan has filled
+                or (a.act == "rescue" and st.carry[a.targetId])
+                or (a.act == "drop" and (not st.carry[a.targetId]
+                    or st.carry[a.targetId].by ~= uid
+                    or st.tiles[a.dropAt.x .. "," .. a.dropAt.y])) then
             return nil
         end
         local v, fx = score(a, st, W, style, odds)
@@ -680,7 +725,7 @@ function M.plan(Bot, board, sight, style, opts)
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
                     opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
-                    kill = copy(st.kill) }
+                    kill = copy(st.kill), carry = copy(st.carry) }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
@@ -713,6 +758,11 @@ function M.plan(Bot, board, sight, style, opts)
         if fx.win then n.win = math.max(n.win, fx.win) end
         if fx.wall then n.walls[fx.wall.at] = fx.wall.hp end
         if fx.opened then n.opened[fx.opened] = true end
+        if fx.carry then n.carry[fx.carry.id] = { by = fx.carry.by } end
+        if fx.drop then
+            n.carry[fx.drop.id] = { x = fx.drop.x, y = fx.drop.y }
+            n.tiles[fx.drop.x .. "," .. fx.drop.y] = true
+        end
         -- every moved unit's exposure, again: a later kill or heal in the plan changes an
         -- earlier unit's
         n.score = n.base + goalTerm(n)
@@ -917,8 +967,12 @@ function M.plan(Bot, board, sight, style, opts)
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
     -- meets the phase where it stands
     local greens = {}
-    for _, u in ipairs(ctx.onField) do
-        if u.faction == "green" and not u.dead then greens[#greens + 1] = u end
+    -- A carried green is one too (board's carriedBy): carried it meets no strike, and a plan
+    -- that drops it meets the phase on its drop tile
+    for _, u in ipairs(board.units) do
+        if u.faction == "green" and not u.dead and (u.onField or u.carriedBy) then
+            greens[#greens + 1] = u
+        end
     end
     -- the rank's admission (FR-009 to FR-011) from each protected unit's death chance against
     -- the cap: set once the phase is judged, and again when the lookahead adds a second phase
@@ -1057,7 +1111,7 @@ function M.plan(Bot, board, sight, style, opts)
             return x.key < y.key
         end)
         -- the phase as the average leaves it: what the lookahead plays on (nextPhase)
-        st.phase = { blues = planned, gone = gone, reds = reds, opened = st.opened }
+        st.phase = { blues = planned, gone = gone, reds = reds, opened = st.opened, carry = st.carry }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
         st.branched = 0
         for _, d in ipairs(dims) do
@@ -1128,7 +1182,8 @@ function M.plan(Bot, board, sight, style, opts)
             if sight.enemyPhase then cost.phases = cost.phases + 1 end
             local s = sight.enemyPhase and sight.enemyPhase({ blues = bluesIn(w), gone = w.gone,
                                                               reds = w.reds,
-                                                              opened = st.opened }) or {}
+                                                              opened = st.opened,
+                                                              carry = st.carry }) or {}
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
                 outcomes[#outcomes + 1] = { p = w.p * o.p, strikes = o.strikes, way = i }
                 total = total + w.p * o.p
@@ -1281,8 +1336,12 @@ function M.plan(Bot, board, sight, style, opts)
         local gain = progress(st)
         local greenDie = 0
         for _, g in ipairs(greens) do
-            -- a game-over green is admission's, a recruit's death a forfeit: neither again here
-            if not gameOver[g.charId] and not st.recruits[g.id] then
+            -- a game-over green is admission's, not here. A recruit's death is a forfeit too, and
+            -- counted here as well: the forfeit is yes/no (any chance past Goals.DUST), so
+            -- without its chance every plan that risks the recruit at all ties, and one that
+            -- lowers it ranks no higher (vanilla Ch2's Ross, 37% in every turn-1 plan, #510).
+            -- The forfeit ranks first, so this only breaks ties among plans that forfeit alike
+            if not gameOver[g.charId] then
                 greenDie = greenDie + (die[g.id] or 0)
             end
         end
@@ -1508,7 +1567,8 @@ function M.plan(Bot, board, sight, style, opts)
                 local clock = os.clock()
                 for _, st in ipairs(fin) do
                     local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                                reds = st.phase.reds, opened = st.phase.opened })
+                                                reds = st.phase.reds, opened = st.phase.opened,
+                                                carry = st.phase.carry })
                     look.calls = look.calls + 1
                     -- every unit the first phase may strike, alive at its start: its HP then
                     local live = {}
@@ -1545,7 +1605,7 @@ function M.plan(Bot, board, sight, style, opts)
                         local more = (1 - was) * (second[u.id] or 0)
                         rank.value = rank.value - loss(W, st, u.charId) * more
                         if u.maxhp then rank.value = rank.value - W.taken * (lost[u.id] or 0) end
-                        if f and f.green and not protected[u.id] and not st.recruits[u.id] then
+                        if f and f.green and not protected[u.id] then
                             rank.green_die = rank.green_die + more
                         end
                     end

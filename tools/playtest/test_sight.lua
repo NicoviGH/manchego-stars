@@ -801,5 +801,13 @@ do
     check(refused, true, "fullInfo: refused inside an open sandbox")
 end
 
+-- canExplore's memo is keyed on the tile's terrain: a chest another side opened (full ->
+-- empty) is asked again, never answered from the kept yes
+check(Sight.exploreKey("chest", 6, 3, Sight.TERRAIN_CHEST_FULL)
+      ~= Sight.exploreKey("chest", 6, 3, Sight.TERRAIN_CHEST_EMPTY), true,
+      "an opened chest is a new canExplore question")
+check(Sight.exploreKey("chest", 6, 3, 0x21), Sight.exploreKey("chest", 6, 3, 0x21),
+      "the same tile and terrain is the same question")
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

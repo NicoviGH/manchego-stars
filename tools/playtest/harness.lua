@@ -621,6 +621,8 @@ local function observeTarget(observation)
     local kind
     if routines == SYM.gSelectInfo_Attack then kind = "attack"
     elseif routines == SYM.gSelectInfo_Talk then kind = "talk"
+    elseif routines == SYM.gSelectInfo_Rescue then kind = "rescue"
+    elseif routines == SYM.gSelectInfo_Drop then kind = "drop"
     elseif routines == SYM.gSelectInfo_Heal then kind = "heal"
     else kind = string.format("0x%08X", routines) end
     observation.target = {
@@ -3430,7 +3432,7 @@ INSPECT.botApi = function(game)
     end
     -- A failed act returns false and, where the driver knows it, why (the crash record says it).
     -- One action of Bot.decide's or the planner's: move, then attack the chosen enemy, wait,
-    -- Talk, open a door, heal, use an item, Visit, open a chest, or Seize.
+    -- Talk, Rescue or Drop, open a door, heal, use an item, Visit, open a chest, or Seize.
     api.act = function(a)
         local u = BOARD.find("blue", a.unit)
         if not u then return false, "the unit is not on the board" end
@@ -3463,6 +3465,23 @@ INSPECT.botApi = function(game)
             return true
         elseif a.act == "talk" then
             if not chooseTalk(a.targetId) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+        elseif a.act == "rescue" or a.act == "drop" then
+            -- the command's own selector (RescueEffect, DropEffect), stepped to the unit or the
+            -- tile, then A; the act's animation plays, and Canto (playerphase.c) is spent in
+            -- place as awaitActed spends it
+            if not selectSemantic(a.act, "the " .. a.act .. " command opens its selector",
+                function(after)
+                    return controllerState(after) == "target_selection"
+                        and after.target and after.target.kind == a.act
+                end, 300) then return false end
+            local tile = a.act == "drop" and a.dropAt or nil
+            if not INSPECT.stepTarget(a.act == "rescue" and a.targetId or nil, tile) then
+                return false
+            end
+            if not guardedInput("confirm_target", "A", "the " .. a.act .. " is chosen", function(after)
+                return controllerState(after) ~= "target_selection"
+            end, 120) then return false end
             return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
         elseif a.act == "door" then
             if not selectSemantic("open_door", "the Door command opens the door", function(after)

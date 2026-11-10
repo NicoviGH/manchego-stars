@@ -1245,7 +1245,8 @@ function M.run(api)
                 if action.act == "visit" or action.act == "chest" then
                     explore.visited(action, turn)
                 end
-                if action.act == "visit" or action.act == "chest" or action.act == "talk" then
+                if action.act == "visit" or action.act == "chest" or action.act == "talk"
+                        or action.act == "rescue" or action.act == "drop" then
                     progressed = true
                 end
                 local battle = action.act == "attack" and api.battle and api.battle() or nil
