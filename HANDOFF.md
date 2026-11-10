@@ -9,57 +9,46 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10, afternoon (Claude): **the vanilla playthrough ran; Ch6 is the wall. Next
-is PR 1 of "retries that learn" (Nicolas approved it all, retry cap 12).** The plan and the
-findings are ONE comment, #510 comment 6776176601 (edited in place); read it first. Earlier:
-the vanilla route plan 6758779876, its results 6770045525.
-- **`starts --count 10 --game vanilla` on main** (Normal, instrument `7a0822786e03+v2`, 62 min
-  on 8 workers). The 2026-11-09 pins were deleted first (Nicolas's call), since `starts` only
-  plays unpinned seeds. Every campaign reached Ch5; **8 of 10 stop at Ch6** (index 7), 4003 at
-  Ch5x (index 5), **4008 reached Ch7** (index 8). All `bot_fault`.
-- **Ch6, why** (38 attempts): the bot WINS 31 of 38, clean 1. A Bael walks from (27,4) in fog
-  down column 26 and kills a Civilian at (26,11) on turn 8: every win of 8+ turns lost it (24
-  of 24), none of 7 turns or fewer did (0 of 8). 33 of 55 blue deaths are `fog`-labelled.
-  Retries replay the same deaths (they only re-roll the style). H2 (the planner weighs a
-  green's death only one enemy phase ahead) holds on one trace: `green_die` 0 on turns 1-7, 0.835
-  on turn 8 (4001 Ch6 attempt 3).
-- **4008 carried on past Ch7** as campaign `full-s4008` (its Ch7 start copied in; records in
-  `references/sim/vanilla/c25b145e3745/full-runs.jsonl`, apart from `runs.jsonl`): Ch7 clean on
-  attempt 1; Ch8 (index 9) won 4 times, never clean (chests (1,3) and (2,3) `unreached` every
-  time, why untested; a thief stole in attempts 3 and 4); attempt 5 crashed in the harness
-  ("the move failed" on an attack). Its Ch8 start is saved at `states/full-s4008/9.ss`.
-- **Decided by Nicolas today** (record each in the PR's ADR):
-  1. A retry learns what earlier attempts showed on screen (reverses ADR 0386's narrowing, back
-     to ADR 0376 decision 3): every red unit seen un-fogged, and every death (who, turn,
-     killer). Never a dice result.
-  2. A retry cap of **12 a chapter start** replaces "every style tried, stop" (styles are drawn
-     again once used up; memory makes a repeat play differently).
-  3. A second measured number beside the first-try death rate (ADR 0385 stays): **tries until
-     the first clean clear**, both arms. That is PR 2; its method goes to Nicolas as an ADR 0385
-     amendment before it is built.
-- **Keep the campaigns' progress (Nicolas asked; don't replay from New Game).** Every chapter
-  start is saved: the 9 stopped campaigns' last starts are `states/cs-s<seed>/7.ss` (Ch6; 4003's
-  is `5.ss`, Ch5x) and 4008's is `states/full-s<seed>/9.ss` (Ch8). After PR 1, carry each on from
-  there: `campaign_env.vanilla_env(1)` with `id` and `from` (no `attempt`, `last` left at the
-  game's end), copied first under a NEW id, because resuming re-saves the start it loads and
-  `cell-starts.json` pins `cs-s<seed>`'s by sha1. Last session's one-off driver did exactly this
-  through `montecarlo.Pool` (it was in the session scratchpad, gone now); PR 1 should make it a
-  `starts --resume` (or similar) so it is not a scratch script again.
-- **Where PR 1's code goes** (read, not changed): `campaign.lua` lines 246-318 (the attempt loop:
-  `remembered`, `drawStyle`, `MAX_ATTEMPTS = 300`, `noClean`); `botrun.lua` `arrivals_seen` (line
-  ~690) is the model for recording what was seen; the planner's fog: `planner.lua` 1745-1771
-  (`plan.enemies`, `fogged`), `FOG_REACH`/`W.fog`; `sight.fullInfo` (sight.lua 980-1011) lifts
-  the fog for judging only ("knowledge, not powers", botrun.lua ~975), the model for treating a
-  remembered enemy as seen. `test_campaign.lua` must keep attempt 1 memory-free.
-- **Witness recipe:** `campaign_env.pinned_env(campaign_env.vanilla_env(1), 'cs-s<seed>',
-  <chapter index>)` (drop `attempt`) as `montecarlo.py attempts --env <it> --attempts N --jobs N
-  --vanilla --seed <seed>`. Its attempts run side by side WITHOUT memory (ADR 0386 "one
-  consequence"): PR 1's witness needs them in sequence. Ch6 is index 7.
-- **Lessons this session:**
-  - `starts` skips a seed already pinned, whatever bot pinned it: to replay, clear its pins.
-  - A trace file (`trace-vanilla-<id>-a<n>.jsonl`) is written when its attempt ends, and its
-    number is the game's chapter id: 5 is Ch5x, 6 is Ch5 (Ch5 is played first).
-  - Vanilla chapter ids on Eirika's route: 9 Ch8, 10-21 `CHAPTER_E_9`..`E_21`, 22 `E_21X`.
+Refreshed 2026-11-10, evening (Claude): **PR 1 (retries that learn) is built and witnessed on
+branch `feat/510-retry-memory` (commit 73948dd6, local, not pushed, no PR). It is waiting on
+Nicolas's call about a different retry rule.** Everything is in ONE comment, #510 comment
+6776176601 (edited in place; its last two sections are this session's). Read it first.
+- **Built on the branch** (ADR 0399 drafted; unit tests added, each checked to fail without
+  its fix): `style.memory` (enemies seen + killers, by slot and character; every death), a
+  remembered enemy plays in the judged phases in fog (`Sight.plays`, `plan.known`, `Bot.known`),
+  a green lost before is a guard goal (`Goals.guarded`, `Goals.PULLS`) with a march in
+  `exploring`, `MAX_ATTEMPTS = 12` with styles redrawn, and `montecarlo.py resume` (carry
+  campaigns on under `<tag>-<campaign>`, records in `resume-runs.jsonl`).
+- **Harness fix found by the witness:** FE8's fog ambush (bmidoten.c: a move onto a hidden unit
+  halts, `UNIT_ACTION_TRAPPED`, no command menu; the last unit's ends the phase). Before this
+  fix the harness crashed with "the move failed". Now `moveUnit(..., haltOk)` returns
+  `"trapped"` for the bot's `api.act` only, and botrun takes it as the act's end. This is very
+  likely 4008's Ch8 attempt 5 crash too (not re-run). Proven on 4007: 6 halts, no crash.
+- **Witness (Ch6, 4001 and 4007, 12 attempts each, in sequence):** attempt 1 is unchanged.
+  The fog deaths every old retry repeated are gone (H1 holds), but over-cap deaths replace
+  them. **The Civilian (unit 65) dies on turn 8 in all 17 won retries**: the guard goal is in
+  the plans and a unit is sent, but the march is never taken (why is untested). **Retries
+  become reruns** once the memory stops growing (the bot is deterministic): 4001 attempts 5 to
+  12 are three games repeated. 4007's `careful` style got `stuck` (50 turns) twice, cause
+  untested. Both campaigns: no clean clear, `bot_fault`.
+- **Open for Nicolas (asked; not answered):** he asked why the bot doesn't "try different
+  things" like a player. Proposal on the comment: **a retry changes the decision behind the
+  earliest death of the last attempt** (plays another plan the planner judged there; every
+  earlier turn the same), in place of redrawing a style; `montecarlo.py replay` (PR-F)
+  already swaps one decision. Build it in PR 1, or land PR 1 as built first?
+- **`suite --held-out` has NOT run** on the branch: the first run was stopped when the harness
+  changed under it (it may have left partial records). Run it once the code is final.
+- **Lessons:**
+  - The pool prints a campaign's attempts only when its worker ends; `resume` of one campaign
+    to the cap takes about 1 h (Ch6, 12 attempts).
+  - A worker reads harness/botrun at launch: editing them mid-run mixes versions. Stop the run
+    first.
+  - HANDOFF is refreshed on main only; the branch's pre-commit refuses it.
+  - Earlier lessons still hold: `starts` skips pinned seeds; trace numbers are game chapter ids
+    (5 = Ch5x, 6 = Ch5); vanilla Eirika ids 9 = Ch8, 10-21 `E_9`..`E_21`, 22 `E_21X`.
+- **The campaigns' saved starts** are untouched (resume copies them first): the 9 stopped
+  ones at `states/cs-s<seed>/7.ss` (4003's `5.ss`), 4008 at `states/full-s4008/9.ss`. The
+  witness copies are `mem1-`, `mem2-` and `mem3-` (deletable).
 
 ## Where things stand
 
@@ -115,10 +104,12 @@ the vanilla route plan 6758779876, its results 6770045525.
 
 ## Next
 
-1. **#510: PR 1, retries that learn** (above; branch `feat/510-retry-memory` from `origin/main`),
-   witness on Ch6 starts 4001 and 4007 (attempts in sequence so memory carries), `suite
-   --held-out`, then carry the campaigns on from their saved starts. Then PR 2 (tries to the
-   first clean clear). **#510 step 10** after.
+1. **#510: PR 1, retries that learn** (above): get Nicolas's answer on the retry rule; build
+   it, or not; find why the guard march to the Civilian is never taken (one instrumented run on
+   4001 Ch6); then `suite --held-out`, a PR, `/code-review <PR> medium`, and
+   `resume --game vanilla --tag <t>` to carry the 10 campaigns on. Then PR 2 (tries to the first
+   clean clear; its method goes to Nicolas as an ADR 0385 amendment first). **#510 step 10**
+   after.
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
