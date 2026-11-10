@@ -271,7 +271,7 @@ end
 
 local function actOf(a)
     return { unit = a.unit, act = a.act, x = a.move.x, y = a.move.y, target = a.target,
-             why = a.why }
+             why = a.why, canto = a.canto }
 end
 
 -- Units on the field before and gone after, with the fighter that downed them. A player-phase
@@ -1263,7 +1263,7 @@ function M.run(api)
                 record(fell, "player", playing, action)
                 trace({ t = "act", phase = "player", unit = action.unit, id = action.unitId,
                         from = from and { x = from.x, y = from.y }, to = action.move,
-                        act = action.act, target = action.target, battles = { battle },
+                        canto = action.canto, act = action.act, target = action.target, battles = { battle },
                         fell = fell })
                 changes(after)
                 if done == "noseize" then

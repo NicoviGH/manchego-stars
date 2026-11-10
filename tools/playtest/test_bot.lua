@@ -4138,6 +4138,84 @@ do
 end
 
 
+-- test_a_canto_unit_moves_on_after_its_rescue (vanilla Ch2's Vanessa, #510): A, a Canto unit,
+-- may Rescue G from (2,0), beside it. X kills G where it stands unless G is carried, and kills A
+-- if A ends on (2,0). The game offers A a second move from (2,0) (sight.cantoTiles); the plan
+-- rescues and moves on, so no one dies, and the judged phase is asked with A where it ends.
+-- Without Canto every plan loses one of them. The key names the Canto tile and reads back.
+local function cantoPlay(canto)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 3, 0, { faction = "green", hp = 5, minRange = false })
+    local X = red(0x81, 9, 0, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+        rescue = { [0x01] = { [0x30] = true } },
+        enemyPhase = function(plan)
+            local ends
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then ends = b.x .. "," .. b.y end
+            end
+            local carried = plan.carry and plan.carry[0x30] and plan.carry[0x30].by == 0x01
+            if not carried then
+                return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 5 } }
+            end
+            if ends == "2,0" then
+                return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = A.hp } }
+            end
+            return {}
+        end,
+    }
+    local s = sightOf(o)
+    if canto then
+        s.cantoTiles = function(_, a)
+            if a.act ~= "rescue" then return {} end
+            return tiles({ 2, 0 }, { 1, 0 }, { 0, 0 })
+        end
+    end
+    return Planner.plan(B, boardOf(A, G, X), s, style("bold"))
+end
+do
+    local function deaths(plan)
+        local n = 0
+        for _, p in ipairs(plan and plan.predict or {}) do
+            if (p.die or 0) > 0 then n = n + 1 end
+        end
+        return n
+    end
+    local a, plan = cantoPlay(true)
+    check(a and a.act .. "@" .. at(a) .. "~" .. tostring(a.canto and (a.canto.x .. "," .. a.canto.y)),
+          "rescue@2,0~1,0", "canto: A rescues G and moves on")
+    check(deaths(plan), 0, "canto: no one dies when A moves on")
+    local _, still = cantoPlay(false)
+    check(deaths(still) > 0, true, "canto: without it, a plan loses one")
+    local k = a and Planner.key(a)
+    check(k, "1>rescue@2,0>48~1,0", "canto: the key names the Canto tile")
+    local back = k and Planner.unkey(k)
+    check(back and back.canto and (back.canto.x .. "," .. back.canto.y) .. "/" .. back.targetId,
+          "1,0/48", "canto: the key reads back")
+    local d = Planner.unkey("1>drop@3,0>48/4,0~2,0")
+    check(d.dropAt.x .. "," .. d.dropAt.y .. "~" .. d.canto.x .. "," .. d.canto.y, "4,0~2,0",
+          "canto: a Drop's key reads back with both tiles")
+end
+
+-- test_surprise_reads_the_canto_tile: a unit that moved on to its Canto tile ended its move as
+-- planned; one still on the act's tile ended short.
+do
+    local a = { unitId = 0x01, unit = 0x01, act = "visit", move = { x = 2, y = 0 },
+                canto = { x = 0, y = 0 } }
+    local plan = { acts = { a, { unitId = 0x02, act = "wait", move = { x = 5, y = 0 } } },
+                   expect = { { hp = 20 } }, enemies = {} }
+    local function board(x)
+        return { units = { blue(0x01, 0, x, 0, { hp = 20 }), blue(0x02, 1, 5, 0) } }
+    end
+    check(Planner.surprise(plan, 1, board(0), board(0)), nil, "canto: the Canto tile is the plan's end")
+    check(Planner.surprise(plan, 1, board(0), board(2)), "the move ended short",
+          "canto: stopping on the act's tile is short")
+end
+
 -- test_a_march_toward_a_goal_survives_the_menu_cut: A has four small attacks (each worth a
 -- point of damage) and a march to (2,0) toward T, a recruit only A can Talk over, worth one
 -- death, east like the throne; (2,0) costs 2 HP of exposure to X. Ranked by its own score the march (-4) fell under

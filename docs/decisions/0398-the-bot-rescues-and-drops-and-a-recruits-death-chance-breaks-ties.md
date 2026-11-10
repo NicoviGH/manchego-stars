@@ -57,15 +57,38 @@ record `docs/research/0014` lines 26-32 already said so. The bot had no Rescue a
   bits and both `rescue` bytes. The game's AI and its forecasts then see the hidden unit and
   the halved stats.
 - **The rest.** `board.lua` reads `carrying` and `carriedBy`. The controller and harness drive
-  Rescue and Drop through the unit menu (0x63, 0x64) and their selectors. Canto is spent in
-  place, as for a Visit.
+  Rescue and Drop through the unit menu (0x63, 0x64) and their selectors. Canto is section 3.
 
 **Not built:**
 - **Rescue of a blue unit.** A carried blue cannot act, and the guides' Rescue is of a green in
   danger.
 - **Take and Give.**
-- **A Canto move after the Rescue** (the guides fly Vanessa back). The witness below never lost
-  her where she rescued, so the PR did not need it.
+
+## 3. Canto is a decision
+
+**Why.** Nicolas (2026-11-10): Canto is a choice the player makes, not a rule hard-coded either
+way. Spent in place, it left Vanessa where she rescued; the guides fly her back.
+
+**The game's rule** (`TryMakeCantoUnit`, playerphase.c:800): a unit whose character or class
+carries `CA_CANTO` gets a second move after any act but Wait, Combat or Staff, unless it has
+already had one (`US_HAS_MOVED`) or its move used all its Mov (`moveCount`, the movement map's
+cost of the act's tile). The map is refreshed first (`RefreshEntityBmMaps` in
+`PlayerPhase_FinishAction`: a rescued unit is off it, a dropped one on it), then
+`GenerateUnitMovementMapExt(unit, MOV - moveCount)` from the act's tile. After it, only Wait.
+
+**The build:**
+- **The read.** `sight.cantoTiles(u, act)` asks the game: the act's board staged (the unit on
+  the act's tile, the carry as `stageCarry` writes it for the judged phase), the map refreshed,
+  the game's own movement map with what Mov is left. The bot plays it after a Rescue, Drop,
+  Visit, Chest or Talk (`sight.CANTO_ACTS`).
+- **The offers.** Per such act, `bot.lua` (`cantoMoves`) adds variants with `canto` set: the
+  `M.HOLDS` safest tiles of the game's map and the one that gains the most ground. Staying is
+  the plain act. The rank chooses (ADR 0396).
+- **The plan.** `Board.endTile(a)` (the canto tile, else the act's) is where the unit ends, for
+  the plan's positions, occupancy, the judged phase's blues, its exposure, the boss trigger and
+  `surprise`. The act's key carries the tile (`~x,y`) and reads back.
+- **Driving it.** `sight.legal` checks the tile against the live board; `harness.lua`
+  `awaitActed` moves the cursor there instead of confirming in place.
 
 ## Witness
 
@@ -77,5 +100,11 @@ Vanilla Ch2, seed 4008, attempts 1..4 (`montecarlo.py attempts`):
   Brigand's 37.4%. Every plan judged that kept him safe put a blue over the cap. The plan the bot
   did not judge, keeping him carried and backing off, is a search-coverage gap, not a Rescue
   rule.
+- **With Canto (section 3):** 3 of 4 clean, Ross recruited. In all four, Vanessa rescues Ross
+  from (9,5) and moves on to (8,4); each Drop moves on too. Attempt 3 lost Ross on turn 5 to an
+  enemy's 53.3% after his drop, and still won.
+- **The driver's first try crashed all four** on the Canto move: the Wait menu comes after the
+  walk, and `awaitActed` looked for it once, while the unit was still walking. It now waits for
+  the menu.
 
 Suite: see the PR.

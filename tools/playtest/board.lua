@@ -98,6 +98,11 @@ function Board.distance(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
 
+-- Where a planned act leaves its unit (bot.lua's act shape): the tile a Canto unit moves on
+-- to after it (`canto`, playerphase.c TryMakeCantoUnit), else the act's own (`move`). The one
+-- owner of it: the bot's exposure and the planner's board both read it.
+function Board.endTile(a) return a.canto or a.move end
+
 -- Of `weapons` (sight.weapons: { slot, min, max } in item order), the first that strikes (bx, by)
 -- from (ax, ay) -- only item `slot`'s when one is given -- or nil. It is MakeTargetListForWeapon's
 -- range test: MapAddInBoundedRange marks the tiles min..max away by RECT_DISTANCE, and a unit

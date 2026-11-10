@@ -115,6 +115,10 @@ local M = {}
 
 -- goals.lua, beside this file: the goals still open and their chance from a board
 local Goals = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "goals.lua")
+-- board.lua, as bot.lua loads it: Board.endTile, where an act leaves its unit (a Canto move)
+local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
+local endTile = Board.endTile
 
 M.BEAM = 6         -- partial plans kept at each depth
 M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam tries (and its
@@ -365,8 +369,9 @@ end
 local function key(act)
     local k = string.format("%d>%s@%d,%d>%s", act.unitId, act.act, act.move.x, act.move.y,
         tostring(act.targetId or (act.obstacle and (act.obstacle.x .. "," .. act.obstacle.y))))
-    -- a Drop is told apart by where it sets the unit down
+    -- a Drop is told apart by where it sets the unit down, a Canto move by where it ends
     if act.dropAt then k = k .. "/" .. act.dropAt.x .. "," .. act.dropAt.y end
+    if act.canto then k = k .. "~" .. act.canto.x .. "," .. act.canto.y end
     return k
 end
 
@@ -377,13 +382,17 @@ local function keysOf(st)
     return out
 end
 
--- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt } read back,
+-- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt, canto } read back,
 -- for a forced replay's act no candidate offered (botrun). It raises on a string no key gave.
 local function unkey(k)
     local id, act, x, y, tgt = k:match("^(%-?%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")
     if not id then error("planner.lua: not an act key: " .. k) end
     local a = { unitId = tonumber(id), act = act, move = { x = tonumber(x), y = tonumber(y) } }
-    local rest, dx, dy = tgt:match("^(.-)/(%-?%d+),(%-?%d+)$")
+    local rest, dx, dy = tgt:match("^(.-)~(%-?%d+),(%-?%d+)$")
+    if rest then
+        tgt, a.canto = rest, { x = tonumber(dx), y = tonumber(dy) }
+    end
+    rest, dx, dy = tgt:match("^(.-)/(%-?%d+),(%-?%d+)$")
     if rest then
         tgt, a.dropAt = rest, { x = tonumber(dx), y = tonumber(dy) }
     end
@@ -442,7 +451,8 @@ function M.triggers(fin, byId, enemies, sight)
             if a.act == "door" or a.obstacle then hit.breach = true end
             local u = byId[a.unitId]
             for _, reach in ipairs(u and bosses or {}) do
-                if reach(a.move.x, a.move.y) > 0 and reach(u.x, u.y) == 0 then hit.boss = true end
+                local at = endTile(a)
+                if reach(at.x, at.y) > 0 and reach(u.x, u.y) == 0 then hit.boss = true end
             end
         end
     end
@@ -492,7 +502,10 @@ function M.plan(Bot, board, sight, style, opts)
     local function moved(st, id)
         local u = byId[id]
         for _, x in ipairs(st.acts) do
-            if x.unitId == id then return not u or x.move.x ~= u.x or x.move.y ~= u.y end
+            if x.unitId == id then
+                local at = endTile(x)
+                return not u or at.x ~= u.x or at.y ~= u.y
+            end
         end
         return false
     end
@@ -511,7 +524,10 @@ function M.plan(Bot, board, sight, style, opts)
         end
         for _, a in ipairs(st.acts) do
             local p = pos[a.unitId]
-            if p then p.x, p.y, p.acted = a.move.x, a.move.y, true end
+            if p then
+                local at = endTile(a)
+                p.x, p.y, p.acted = at.x, at.y, true
+            end
         end
         return pos
     end
@@ -704,8 +720,12 @@ function M.plan(Bot, board, sight, style, opts)
     -- act cannot follow the plan (its tile taken, its target gone, a heal on a moved unit or
     -- on no one hurt)
     local function extend(st, a, uid)
-        local tile = a.move.x .. "," .. a.move.y
-        if st.used[uid] or st.tiles[tile] or (a.targetId and st.gone[a.targetId])
+        -- the tile it ends on (a Canto move's), which the plan then holds; the act's own tile
+        -- must be free too, when it moves on from it
+        local at = endTile(a)
+        local tile = at.x .. "," .. at.y
+        if st.used[uid] or st.tiles[tile] or st.tiles[a.move.x .. "," .. a.move.y]
+                or (a.targetId and st.gone[a.targetId])
                 or (a.act == "staff" and moved(st, a.targetId))
                 -- an ally's tile, until the plan has moved that ally off it
                 or (a.vacate and not st.used[a.vacate])
@@ -729,7 +749,7 @@ function M.plan(Bot, board, sight, style, opts)
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
-        n.expect[#n.acts] = { hp = fx.hp, gone = fx.gone,
+        n.expect[#n.acts] = { hp = fx.hp, gone = fx.gone, at = endTile(a),
                               targetHp = fx.enemyHp and fx.enemyHp.hp, heals = fx.heals }
         n.used[uid], n.tiles[tile] = true, true
         n.hp[uid] = fx.hp
@@ -915,7 +935,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, c in ipairs(cands) do
             local goal, ranked = goalOf[c.unit.id], {}
             for _, a in ipairs(goal and c.acts or {}) do
-                local t = turnsTo(c.unit, goal.tile, a.move)
+                local t = turnsTo(c.unit, goal.tile, endTile(a))
                 if t and goal.turns - t > M.DUST
                     and M.admits((exposed(a, a.unitHp, {}, odds)), cap) then
                     ranked[#ranked + 1] = { a = a, g = goal.turns - t }
@@ -1033,7 +1053,8 @@ function M.plan(Bot, board, sight, style, opts)
         for _, a in ipairs(st.acts) do at[a.unitId] = a end
         for _, u in ipairs(ctx.blues) do
             local a = at[u.id]
-            planned[#planned + 1] = { unit = u, x = a and a.move.x or u.x, y = a and a.move.y or u.y,
+            local at = a and endTile(a)
+            planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
                                       slot = a and a.act == "attack" and a.slot or nil }
         end
@@ -1738,7 +1759,8 @@ function M.surprise(plan, k, before, after, legal)
         end
     end
     local actor = now[a.unitId]
-    if actor and (actor.x ~= a.move.x or actor.y ~= a.move.y) then return "the move ended short" end
+    local at = endTile(a)
+    if actor and (actor.x ~= at.x or actor.y ~= at.y) then return "the move ended short" end
     if actor and x.hp and actor.hp < x.hp then return "the counter took more than expected" end
     -- the enemy side: the plan's enemies, less every kill and Talk it expected by now
     local gone = {}

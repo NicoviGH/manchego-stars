@@ -45,6 +45,9 @@
 --                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
 --   reach(unit, friends)     tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
 --                            less those another unit stands on (gBmMapUnit). Either faction.
+--   cantoTiles(unit, act)    where a Canto unit may move on to after `act` (TryMakeCantoUnit,
+--                            GenerateUnitMovementMapExt from the act's tile); empty for any
+--                            other. See s.cantoTiles.
 --   weapons(unit)            the weapons the Attack command's Weapon Select lists, in item
 --                            order: per item CanUnitUseWeaponNow allows (AttackCommandUsability's
 --                            loop), { slot, min, max } with GetItemMinRange/GetItemMaxRange's
@@ -225,6 +228,23 @@ M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL = 0x69, 0x6B, 0x04
+-- include/bmunit.h CA_CANTO: a second move after an act (playerphase.c TryMakeCantoUnit).
+-- struct Unit +1D movBonus; struct ClassData +12 baseMov; CharacterData and ClassData +28
+-- attributes (UNIT_MOV, UNIT_CATTRIBUTES: the two ORed)
+M.CA_CANTO = 1 << 1
+local UNIT_MOV_BONUS, CLASS_BASE_MOV, DATA_ATTRIBUTES = 0x1D, 0x12, 0x28
+-- The acts that hand a Canto unit its second move: any but Wait, Combat or Staff
+-- (TryMakeCantoUnit's switch) of those the bot plays and drives one through (harness
+-- awaitActed's `canto`).
+M.CANTO_ACTS = { rescue = true, drop = true, visit = true, chest = true, talk = true }
+
+-- What act `a` of unit `uid` leaves carried, in stageCarry's shape (the planner's st.carry):
+-- a Rescue's target carried by `uid`, a Drop's set on its tile; nil for any other act.
+function M.carryOf(a, uid)
+    if a.act == "rescue" then return { [a.targetId] = { by = uid } } end
+    if a.act == "drop" then return { [a.targetId] = { x = a.dropAt.x, y = a.dropAt.y } } end
+    return nil
+end
 M.CLOSE_HORIZON = 8   -- enemy phases closings() plays forward
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
@@ -1461,26 +1481,15 @@ function M.new(outer)
         return x, y
     end
 
-    -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
-    -- our units stood and their HP set, the reds' HP, the gone off the map
-    local function stagePhase(call, plan)
-        local byId = {}
-        for _, o in ipairs(units()) do byId[o.id] = o end
-        for _, b in ipairs(plan.blues) do
-            standOn(b.unit, b.x, b.y)
-            api.write8(b.unit.addr + UNIT_HP, b.hp)
-            M.equip(api, call, S, b.unit, b.slot)
-        end
-        for id, hp in pairs(plan.reds or {}) do
-            if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
-        end
-        -- the plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
-        -- UnitDrop): a carried unit off gBmMapUnit and hidden, so the AI never targets it
-        -- (cp_battle.c skips US_RESCUED); its carrier US_RESCUING, so GetUnitSkill and
-        -- GetUnitSpeed halve its stats in every forecast; a dropped one on its tile.
-        -- plan.carry is the planner's: [id] = { by = carrier } or { x, y } once dropped
+    -- The plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
+    -- UnitDrop), inside an open sandbox: a carried unit off gBmMapUnit and hidden, so the AI
+    -- never targets it (cp_battle.c skips US_RESCUED); its carrier US_RESCUING, so
+    -- GetUnitSkill and GetUnitSpeed halve its stats in every forecast; a dropped one on its
+    -- tile. `carry` is the planner's: [id] = { by = carrier } or { x, y } once dropped.
+    -- `byId` is units() by id.
+    local function stageCarry(byId, carry)
         local CARRY = Board.US_RESCUED | US_HIDDEN
-        for id, c in pairs(plan.carry or {}) do
+        for id, c in pairs(carry or {}) do
             local t = byId[id]
             local r = t and byId[c.by or mem.u8(t.addr + Board.UNIT_RESCUE)]
             if t and c.by and r then
@@ -1505,6 +1514,22 @@ function M.new(outer)
                 standOn(t, c.x, c.y)
             end
         end
+    end
+
+    -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
+    -- our units stood and their HP set, the reds' HP, the gone off the map
+    local function stagePhase(call, plan)
+        local byId = {}
+        for _, o in ipairs(units()) do byId[o.id] = o end
+        for _, b in ipairs(plan.blues) do
+            standOn(b.unit, b.x, b.y)
+            api.write8(b.unit.addr + UNIT_HP, b.hp)
+            M.equip(api, call, S, b.unit, b.slot)
+        end
+        for id, hp in pairs(plan.reds or {}) do
+            if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
+        end
+        stageCarry(byId, plan.carry)
         local function remove(e, x, y)
             if mem.u8(cell(mem, S.gBmMapUnit, x, y)) == e.id then
                 api.write8(cell(mem, S.gBmMapUnit, x, y), 0)
@@ -1946,6 +1971,57 @@ function M.new(outer)
         end)
     end
 
+    -- Where `u` may move on to after its act `a` on a.move (Canto, playerphase.c
+    -- TryMakeCantoUnit): nothing for an act not in M.CANTO_ACTS, nor unless its character or class carries CA_CANTO, it has not
+    -- already had its second move (US_HAS_MOVED) and the move to the act's tile left it Mov
+    -- (moveCount, the movement map's cost of that tile). Then the game's own map from the
+    -- act's tile with what is left (GenerateUnitMovementMapExt(unit, MOV - moveCount)), on the
+    -- board as the act leaves it and as the game refreshes it before the second move
+    -- (PlayerPhase_FinishAction: RefreshEntityBmMaps, so a Rescue's target is off the map and a
+    -- Drop's on its tile), less every tile another unit stands on -> { {x, y} }, the act's tile
+    -- among them. Kept for the board, per unit, tile and carry.
+    function s.cantoTiles(u, a)
+        if not M.CANTO_ACTS[a.act] then return {} end
+        local x, y = a.move.x, a.move.y
+        local carry = M.carryOf(a, u.id)
+        local k = u.id .. "@" .. x .. "," .. y .. "/" .. (a.act == "rescue" and ("r" .. a.targetId)
+            or a.act == "drop" and ("d" .. a.dropAt.x .. "," .. a.dropAt.y) or "-")
+        seen.canto = seen.canto or {}
+        if seen.canto[k] then return seen.canto[k] end
+        local out = {}
+        local chptr, clptr = mem.u32(u.addr), mem.u32(u.addr + 0x04)
+        local attrs = (chptr ~= 0 and mem.u32(chptr + DATA_ATTRIBUTES) or 0)
+            | (clptr ~= 0 and mem.u32(clptr + DATA_ATTRIBUTES) or 0)
+        if (attrs & M.CA_CANTO) ~= 0
+                and (mem.u32(u.addr + UNIT_STATE) & Board.US_HAS_MOVED) == 0 then
+            local mov = mem.s8(u.addr + UNIT_MOV_BONUS) + mem.s8(clptr + CLASS_BASE_MOV)
+            out = sandbox(function(call)
+                call(S.GenerateUnitMovementMap, { u.addr })
+                local spent = grid(mem, S.gBmMapMovement, x, y)
+                local tiles = {}
+                if spent >= mov then return tiles end
+                local byId = {}
+                for _, o in ipairs(units()) do byId[o.id] = o end
+                standOn(u, x, y)
+                stageCarry(byId, carry)
+                call(S.RefreshEntityBmMaps, {})
+                call(S.GenerateUnitMovementMapExt, { u.addr, mov - spent })
+                for ty = 0, h - 1 do
+                    for tx = 0, w - 1 do
+                        local by = grid(mem, S.gBmMapUnit, tx, ty)
+                        if grid(mem, S.gBmMapMovement, tx, ty) < M.MOVE_LIMIT
+                                and (by == 0 or by == u.id) then
+                            tiles[#tiles + 1] = { x = tx, y = ty }
+                        end
+                    end
+                end
+                return tiles
+            end)
+        end
+        seen.canto[k] = out
+        return out
+    end
+
     -- Each tile of `tiles` from which `u`, carrying a unit, may Drop it, and where: the game's
     -- own list (DropUsability builds it, bmtarget.c MakeDropTargetList: an empty adjacent tile
     -- the carried unit can stand on) -> { { x, y, drops = { {x, y} } } }
@@ -2007,6 +2083,12 @@ function M.new(outer)
             end
             return true
         end)
+        if ok and a.canto then
+            for _, t in ipairs(s.cantoTiles(u, a)) do
+                if t.x == a.canto.x and t.y == a.canto.y then return nil end
+            end
+            return "the game offers no Canto move to that tile"
+        end
         if ok then return nil end
         return "the game offers no " .. (a.obstacle and "strike on that wall" or a.act)
     end

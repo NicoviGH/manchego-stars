@@ -278,6 +278,7 @@ WANTED = [
     'InitBattleForecastBattleStats', # the forecast window's hit counts (bksel.c)
     'GenerateDangerZoneRange',  # the player phase's danger zone (bmidoten.c, playerphase.c)
     'GenerateUnitMovementMap',  # a unit's reach into gBmMapMovement (bmidoten.c)
+    'GenerateUnitMovementMapExt',  # a unit's reach on a given Mov: Canto's second move (playerphase.c)
     'GetUnitMovementCost',      # a unit's terrain cost table, -1 = impassable (bmunit.c)
     'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
     'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D

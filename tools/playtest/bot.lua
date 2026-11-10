@@ -59,7 +59,8 @@
 --   item; nil = the first the Weapon Select menu lists.
 --   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue" and
 --   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) only the planner's
---   proposals (Bot.candidates) make.
+--   proposals (Bot.candidates) make. `canto` (optional, the proposals'): the tile a Canto
+--   unit moves on to after the act (cantoMoves); the unit ends there (Board.endTile).
 --
 -- Worst case on an end tile = the sum, over every enemy that reaches it, of the most that
 -- enemy's strike can take as the game plays it (takenWorst). An enemy "reaches" the
@@ -1678,15 +1679,56 @@ function M.explain(board, sight, style)
     return lines
 end
 
--- `acts` of `u`, each told the ally its end tile asks to move (`vacate`) and what can strike
--- it there next phase (`exposure`, each enemy's own strike: the planner's odds).
+-- Canto (playerphase.c TryMakeCantoUnit): per act in `acts` after which the game hands `u` a
+-- second move (sight.cantoTiles: a Canto unit's Rescue, Drop, Visit, Chest or Talk with Mov
+-- left), variants that move on (`canto`, the tile): the M.HOLDS safest tiles the game's map
+-- offers from the act's tile and the one that gains the most ground (`gain`, the march's),
+-- the safest of those on a tie. Staying is the plain act. Which is played is the planner's:
+-- the judged phase reads what each leaves (ADR 0396). Nicolas (#510): Canto is a decision,
+-- not a rule that always flies back.
+local function cantoMoves(ctx, u, acts, gain)
+    local out = {}
+    if not ctx.sight.cantoTiles then return out end
+    local s = ctx.seizeTile
+    local barred = s and not canSeize(ctx, u)
+    for _, a in ipairs(acts) do
+        local tiles = {}
+        for _, t in ipairs(ctx.sight.cantoTiles(u, a)) do
+            if not (t.x == a.move.x and t.y == a.move.y)
+                    and not (barred and t.x == s.x and t.y == s.y) then
+                tiles[#tiles + 1] = t
+            end
+        end
+        local ranked = bySafety(ctx, u, tiles)
+        local pick = {}
+        for i = 1, math.min(M.HOLDS, #ranked) do pick[#pick + 1] = ranked[i] end
+        local front, fg
+        for _, t in ipairs(ranked) do
+            local g = gain(t.x, t.y)
+            if g > 0 and (not fg or g > fg) then front, fg = t, g end
+        end
+        if front then pick[#pick + 1] = front end
+        for _, t in ipairs(pick) do
+            local v = {}
+            for k, x in pairs(a) do v[k] = x end
+            v.canto = { x = t.x, y = t.y }
+            out[#out + 1] = v
+        end
+    end
+    return out
+end
+
+-- `acts` of `u`, each told the ally its act's tile asks to move (`vacate`) and what can strike
+-- it where it ends (Board.endTile: a Canto move's tile) next phase (`exposure`, each enemy's own
+-- strike: the planner's odds).
 local function exposed(ctx, u, acts)
     for _, a in ipairs(acts) do
         local friend = vacated(ctx, u, a.move.x, a.move.y)
         a.vacate = friend and friend.id
         a.exposure = {}
         local held = a.act == "attack" and a.slot or nil
-        for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y, held)) do
+        local at = Board.endTile(a)
+        for _, s in ipairs(exposure(ctx, u, at.x, at.y, held)) do
             a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
         end
     end
@@ -1709,6 +1751,7 @@ local function proposeOne(ctx, u)
         local k = a.act .. "@" .. a.move.x .. "," .. a.move.y .. ">" .. tostring(a.targetId)
             .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
             .. (a.dropAt and ("/" .. a.dropAt.x .. "," .. a.dropAt.y) or "")
+            .. (a.canto and ("~" .. a.canto.x .. "," .. a.canto.y) or "")
         if seen[k] then return end
         seen[k] = true
         a.why = why
@@ -1841,6 +1884,7 @@ local function proposeOne(ctx, u)
     -- and with one hold the unit had only exposed tiles left (Manchego Stars ch03: Braulo, at 16
     -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)
     for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
+    for _, a in ipairs(cantoMoves(ctx, u, acts, gain)) do add(a, a.why) end
     return { unit = u, acts = exposed(ctx, u, acts) }
 end
 
