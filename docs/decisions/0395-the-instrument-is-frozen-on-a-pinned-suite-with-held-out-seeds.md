@@ -27,10 +27,11 @@ baseline's differ, so a start added or a seed moved is a refreeze, never a silen
 
 **A regression** (FR-022, judged on the tuning runs) is any of:
 - an invariant that held when frozen and fails now;
-- a death of a unit the frozen run kept alive (blue, or an escort green), unless a replay
-  witnessed why (`audit`'s primary label, from the store's `diag.jsonl`). A witnessed new
-  death is said and does not block. A fresh run has a new trace, so a witness counts only
-  through `suite --kept`, which judges the runs already played instead of playing them again;
+- a death of a unit the frozen run kept alive (blue, or an escort green) is **said, and never
+  blocks** (amended 2026-11-09, T107a, below), with the replay's label when one witnessed why
+  (`audit`'s primary label, from the store's `diag.jsonl`). A fresh run has a new trace, so a
+  witness counts only through `suite --kept`, which judges the runs already played instead of
+  playing them again;
 - more stalls than the frozen run had. A stall always blocks: a replay witnesses a death, and
   nothing witnesses a stall, so "unexplained" is all a new stall can be;
 - SC-003: the AiDecideMain calls of the seed sets played more than 20% over the frozen calls
@@ -42,6 +43,14 @@ An **unlabelled fallback** is a death over the cap of a unit the bot protects (b
 escort green) on a turn no `fallback_sacrifice` anomaly names. A green the bot does not escort
 is not its to keep alive: in the stores every over-cap blue death carries the label, and every
 unlabelled over-cap death is a non-escort green (counted 2026-11-07).
+
+**Amended 2026-11-09 (Nicolas, #510 T107a, built in PR-I): a tuning-seed death flip is a
+signal, not a blocker.** Until then an unexplained new death blocked promotion. Two refreezes
+in a row needed an override for one seed's death (Lute and Natasha, below), each the bot
+seeing a real risk or losing a roll, and chasing single deaths was costing more than it told.
+A bot change is judged by rates (the held-out counts, the pilot's Manchego Stars-vs-twin
+numbers), crashes, stalls and cost; one seed's death is printed beside the regressions so it
+is still read. Stalls, invariant failures, SC-003 and the snapshots still block.
 
 **Promotion** (`suite --held-out`) needs every run back with a game result, no blocking
 regression (each is deterministic: a seed plays the same every time), no unlabelled fallback
