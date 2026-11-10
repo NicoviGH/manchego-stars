@@ -4228,6 +4228,12 @@ do
     check(cantos(style("bold")), "0,0 2,0", "canto: with no claim, both tiles")
     local st = claimed("bold", { id = "v", kind = "avoid", unit = { 0x01 }, vs = { CLS_A } })
     check(cantos(st), "0,0", "canto: an avoid claim keeps the second move out of reach")
+    -- every move in reach, the act's tile clear: staying keeps the claim, so no move is offered
+    s.cantoTiles = function(_, a)
+        if a.act ~= "rescue" then return {} end
+        return tiles({ 1, 0 }, { 2, 0 })
+    end
+    check(cantos(st), "", "canto: no move into reach when staying is clear")
 end
 
 -- test_surprise_reads_the_canto_tile: a unit that moved on to its Canto tile ended its move as

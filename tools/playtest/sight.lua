@@ -2006,8 +2006,7 @@ function M.new(outer)
             out = sandbox(function(call)
                 call(S.GenerateUnitMovementMap, { u.addr })
                 local spent = grid(mem, S.gBmMapMovement, x, y)
-                local tiles = {}
-                if spent >= mov then return tiles end
+                if spent >= mov then return {} end
                 local byId = {}
                 for _, o in ipairs(units()) do byId[o.id] = o end
                 standOn(u, x, y)

@@ -1692,7 +1692,10 @@ local function cantoMoves(ctx, u, acts, gain)
     local s = ctx.seizeTile
     local barred = s and not canSeize(ctx, u)
     for _, a in ipairs(acts) do
-        local tiles = {}
+        -- the act's own tile is in the set an avoid claim is asked about, then left out:
+        -- staying is the plain act, so where it is clear, no move into reach is offered
+        -- (outOfReach gives every tile back only when none is clear)
+        local tiles = { { x = a.move.x, y = a.move.y } }
         for _, t in ipairs(ctx.sight.cantoTiles(u, a)) do
             if not (t.x == a.move.x and t.y == a.move.y)
                     and not (barred and t.x == s.x and t.y == s.y) then
@@ -1701,7 +1704,11 @@ local function cantoMoves(ctx, u, acts, gain)
         end
         -- an avoid claim holds here as on every end tile (outOfReach, waitTiles' first rule):
         -- the second move is a move like the first
-        local ranked = bySafety(ctx, u, outOfReach(ctx, u, tiles))
+        local moves = {}
+        for _, t in ipairs(#tiles > 1 and outOfReach(ctx, u, tiles) or {}) do
+            if not (t.x == a.move.x and t.y == a.move.y) then moves[#moves + 1] = t end
+        end
+        local ranked = bySafety(ctx, u, moves)
         local pick = {}
         for i = 1, math.min(M.HOLDS, #ranked) do pick[#pick + 1] = ranked[i] end
         local front, fg
