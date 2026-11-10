@@ -72,6 +72,19 @@ def _chapter_enum():
         inject.decomp.vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_')
 
 
+def chapter_name(index):
+    """A vanilla chapter index as the game names it (constants/chapters.h): 6 is `Ch5`, 5 `Ch5x`,
+    10 `E_9`; a trace's `chapter` is this index, never the number in the name."""
+    for k, v in _chapter_enum().items():
+        if v == index:
+            tail = k[len('CHAPTER_'):]
+            if tail.startswith('L_'):
+                tail = tail[2:]
+                return tail.title() if tail == 'PROLOGUE' else 'Ch' + tail.replace('X', 'x')
+            return tail
+    return 'chapter %s' % index
+
+
 def twin_index(ref, route):
     """The vanilla chapter a twin_strategy key names on `route` (1 Eirika, 2 Ephraim), or None
     when that key belongs to the other route. Up to Ch8 the routes share chapters

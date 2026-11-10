@@ -53,6 +53,13 @@ the anomalies with their `story` commands, the validity failures and the descrip
 each beside the twin; `--decision` reads only that decision's components (FR-032);
 `--post` writes it under build/ and prints the `gh issue comment 510` command, never running it.
 
+    python3 tools/playtest/montecarlo.py calibration <trace or dir> [...] [--instrument I]
+
+`calibration` reads kept traces, each play once, and prints two tables (#510 PR A): each blue
+unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; and
+each chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against
+its style's cap. Every change to the bot's first attempts is read by it the same way.
+
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
@@ -2954,6 +2961,164 @@ def read_trace(path):
         return [json.loads(line) for line in fh if line.strip()]
 
 
+@functools.lru_cache(maxsize=None)
+def style_caps():
+    """Each style's risk cap and the admission's slack, read from their one owner (planner.lua's
+    M.CAPS, goals.lua's M.DUST): {aggression: cap}, dust."""
+    def src(name):
+        with open(os.path.join(HERE, name)) as fh:
+            return fh.read()
+    caps = re.search(r'^M\.CAPS = \{([^}]*)\}', src('planner.lua'), re.M).group(1)
+    dust = re.search(r'^M\.DUST = ([0-9.e-]+)', src('goals.lua'), re.M).group(1)
+    return {k: float(v) for k, v in re.findall(r'(\w+) = ([0-9.]+)', caps)}, float(dust)
+
+
+# a predicted chance's bins (upper bounds, inclusive), the calibration table's rows
+CALIBRATION_BINS = ((0.0, '0'), (0.01, 'up to 1%'), (0.05, '1 to 5%'), (0.15, '5 to 15%'),
+                    (0.5, '15 to 50%'), (1.0, 'over 50%'))
+# what the plan that moved a dead unit said of it (#510 PR A): the death-table's columns
+MOVER_KINDS = ('moved over the cap', 'moved under, over by the phase end',
+               'under: dice', 'under: fog', 'under: arrival', 'under: blind spot',
+               'no cap', 'no prediction')
+
+
+def trace_key(events):
+    """A trace's play, move for move (its game, chapter and every act, each blow's rolls with
+    it): two traces with one key are one game played twice."""
+    info = next((e.get('info') or {} for e in events if e.get('t') == 'start'), {})
+    acts = tuple(json.dumps(e, sort_keys=True) for e in events if e.get('t') == 'act')
+    return info.get('game'), info.get('chapter'), acts
+
+
+def calibration(traces):
+    """The judged enemy phase against the played one, from kept traces (#510 PR A step 2).
+    `traces`: event lists (read_trace). Repeats of one play (trace_key) count once.
+
+    Each blue unit at each enemy phase is binned by the chance the phase's last plan gave it
+    (`bins`: label -> [unit-phases, died, summed prediction]). Each blue enemy-phase death is
+    put in one MOVER_KINDS column by the plan that last moved its unit that turn (the phase's
+    last plan if none did) against its style's cap (`deaths`: chapter -> Counter). Under the
+    cap with a prediction of 0, the record's own flags say fog or arrival; a record graded
+    before #510 PR A took those flags from the phase's last plan. Returns
+    {'traces', 'distinct', 'bins', 'deaths'}."""
+    caps, dust = style_caps()
+    bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
+    deaths = collections.defaultdict(collections.Counter)
+    seen = set()
+    for events in traces:
+        key = trace_key(events)
+        if key in seen:
+            continue
+        seen.add(key)
+        start = next((e for e in events if e.get('t') == 'start'), {})
+        info = start.get('info') or {}
+        cap = caps.get((start.get('style') or {}).get('aggression'))
+        end = next((e.get('record') or {} for e in events if e.get('t') == 'end'), {})
+        phases = {}   # turn -> (the phase's last plan, {unit slot: its mover}, slots on the field)
+        plan, movers = None, {}
+        for e in events:
+            t = e.get('t')
+            if t == 'phase' and e.get('phase') == 'player':
+                plan, movers = None, {}
+            elif t == 'plan' and e.get('ref') is not None:
+                plan = e
+            elif t == 'act' and e.get('phase') == 'player' and plan is not None:
+                movers[e.get('id')] = plan
+            elif t == 'phase' and e.get('phase') == 'enemy':
+                phases[e.get('turn')] = (plan, movers, {u.get('id'): u.get('charId')
+                                                        for u in e.get('units') or []
+                                                        if u.get('faction') == 'blue'})
+        # a record from before deaths carried their slot names the character only
+        died = {}
+        for d in end.get('deaths') or []:
+            if d.get('faction') != 'blue' or d.get('phase') != 'enemy':
+                continue
+            uid = d.get('id')
+            if uid is None:
+                field = (phases.get(d.get('turn')) or (None, None, {}))[2]
+                uid = next((i for i, ch in field.items() if ch == d.get('charId')), None)
+            died[(d.get('turn'), uid)] = d
+        for turn, (last, moved, field) in phases.items():
+            # only a unit on the field in the phase: a carried or already dead one is no
+            # unit-phase, whatever the plan said of it
+            for p in [p for p in (last or {}).get('predict') or [] if p.get('id') in field]:
+                die = p.get('die') or 0
+                label = next(lb for hi, lb in CALIBRATION_BINS if die <= hi)
+                row = bins[label]
+                row[0] += 1
+                row[1] += (turn, p.get('id')) in died
+                row[2] += die
+        name = chapter_label(info)
+        for (turn, uid), d in died.items():
+            last, moved, _ = phases.get(turn, (None, {}, {}))
+            mover = moved.get(uid) or last
+
+            def die_of(pl):
+                return next((p.get('die') for p in (pl or {}).get('predict') or []
+                             if p.get('id') == uid), None)
+            said, lastSaid = die_of(mover), die_of(last)
+            flags = d.get('flags') or {}
+            if said is None:
+                kind = 'no prediction'
+            elif cap is None:
+                kind = 'no cap'
+            elif said > cap + dust:
+                kind = 'moved over the cap'
+            elif lastSaid is not None and lastSaid > cap + dust:
+                kind = 'moved under, over by the phase end'
+            elif said > 0:
+                kind = 'under: dice'
+            elif flags.get('fog'):
+                kind = 'under: fog'
+            elif flags.get('reinforcement'):
+                kind = 'under: arrival'
+            else:
+                kind = 'under: blind spot'
+            deaths[name][kind] += 1
+    return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'deaths': deaths}
+
+
+def chapter_label(info):
+    """A trace's chapter as its game names it: vanilla's by its index (campaign_env), ours' as
+    chNN."""
+    chapter = info.get('chapter')
+    if info.get('game') == 'ours':
+        return 'ch%02d' % chapter if isinstance(chapter, int) else str(chapter)
+    import campaign_env
+    return campaign_env.chapter_name(chapter)
+
+
+def calibration_lines(c):
+    """calibration()'s two tables, as markdown."""
+    out = ['%d traces, %d distinct plays.' % (c['traces'], c['distinct']), '',
+           '| Predicted | Unit-phases | Died | Actual | Mean predicted |', '|---|---|---|---|---|']
+    for label, (n, dead, total) in c['bins'].items():
+        out.append('| %s | %d | %d | %s | %s |' % (
+            label, n, dead, '%.1f%%' % (100.0 * dead / n) if n else '-',
+            '%.1f%%' % (100.0 * total / n) if n else '-'))
+    kinds = [k for k in MOVER_KINDS if any(c['deaths'][ch][k] for ch in c['deaths'])]
+    out += ['', '| Chapter | Deaths | %s |' % ' | '.join(kinds),
+            '|---|---|%s' % ('---|' * len(kinds))]
+    for ch in sorted(c['deaths']):
+        row = c['deaths'][ch]
+        out.append('| %s | %d | %s |' % (ch, sum(row.values()),
+                                         ' | '.join(str(row[k]) for k in kinds)))
+    return out
+
+
+def trace_files(paths):
+    """Every kept trace under `paths` (files or directories), sorted."""
+    found = []
+    for p in paths:
+        if os.path.isdir(p):
+            for root, _, files in os.walk(p):
+                found += [os.path.join(root, f) for f in files
+                          if f.endswith('.jsonl') or f.endswith('.jsonl.gz')]
+        else:
+            found.append(p)
+    return sorted(found)
+
+
 def story(events, names=None, items=None, classes=None):
     """One run's trace as plain lines. `names`/`items`/`classes`: {id: name}. A unit without a
     name of its own is named by its class (from the phase snapshots and battles), then by id."""
@@ -3298,6 +3463,10 @@ def main(argv=None):
     a.add_argument('--out', default='runs.jsonl')
     a.add_argument('--seed', type=int, default=1)
     a.add_argument('--vanilla', action='store_true')
+    ca = sub.add_parser('calibration', help="the judged enemy phase against the played one, "
+                        'from kept traces (#510 PR A)')
+    ca.add_argument('paths', nargs='+', help='trace files or directories of them')
+    ca.add_argument('--instrument', help='only traces of this instrument')
     st = sub.add_parser('story', help="one run's trace as plain text")
     st.add_argument('trace', help='a trace .jsonl or .jsonl.gz')
     st.add_argument('--turn', type=int, help="only this turn and the one before (an anomaly's)")
@@ -3389,6 +3558,14 @@ def main(argv=None):
         return audit_main(args)
     if args.cmd == 'report':
         return report_main(args)
+    if args.cmd == 'calibration':
+        traces = [read_trace(f) for f in trace_files(args.paths)]
+        if args.instrument:
+            traces = [ev for ev in traces if any(
+                (e.get('info') or {}).get('instrument') == args.instrument
+                for e in ev if e.get('t') == 'start')]
+        print('\n'.join(calibration_lines(calibration(traces))))
+        return 0
     if args.cmd == 'story':
         events = read_trace(args.trace)
         if args.turn is not None:

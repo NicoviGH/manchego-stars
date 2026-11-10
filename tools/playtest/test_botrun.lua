@@ -1373,6 +1373,53 @@ do
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
 end
 
+-- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
+-- graded by the plan that moved it, not by a later replan that found it over the cap; a unit
+-- no plan moved this turn falls back to the phase's last plan.
+do
+    local function run(moveFirst)
+        local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                       unit(0x03, 2, "blue", 0, 3, 20), unit(0x81, 0, "red", 0, 1, 10) },
+                             enemy = function(g, find)
+                                 local u = find(0x01)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                                 g.killNow = true
+                                 return {}
+                             end }
+        g.api.killed = function()
+            if not g.killNow or g.told then return {} end
+            g.told = true
+            return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                       phase = "enemy" } }
+        end
+        g.api.Planner = {
+            surprise = function() return "the plan is played out" end,
+            plan = function(_, board)
+                local left, n = {}, 0
+                for _, u in ipairs(board.units) do
+                    if u.faction == "blue" and u.onField and not u.acted then left[u.id], n = u, n + 1 end
+                end
+                local id = (moveFirst and left[0x01]) and 0x01 or (left[0x02] and 0x02)
+                    or (left[0x03] and 0x03) or nil
+                if not id then return nil end
+                -- the first plan read 0x01 at 30%; every replan after it, at 90%
+                local die = n == 3 and 0.3 or 0.9
+                local a = { unit = id, unitId = id, act = "wait", move = { x = left[id].x, y = left[id].y } }
+                return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                            predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = die,
+                                          taken = 6, strikes = 1, strikers = { 0x81 } } } }
+            end,
+        }
+        Botrun.run(g.api)
+        return recordOf(g).deaths[1]
+    end
+    local d = run(true)
+    check(d and d.predicted, 0.3, "moved by the first plan: its 30%, not the replan's 90%")
+    check(d and d.plan_ref, 1, "and its plan_ref is the mover's (the first plan made)")
+    d = run(false)
+    check(d and d.predicted, 0.9, "moved by no plan: the phase's last plan")
+end
+
 -- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose
 -- death ends the game; an allied green's death is graded with no cap, so never over it.
 do

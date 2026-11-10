@@ -501,8 +501,8 @@ end
 
 -- Grade blue or green death `d` (its id, charId, faction, killer, killerId, phase) against
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
--- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
--- phase's last plan (its `predict`). `plan.snapshot` is the board when that plan was made,
+-- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the plan
+-- that last moved the unit, else the phase's last (its `predict`; the caller picks, record). `plan.snapshot` is the board when that plan was made,
 -- `cap` the style's risk cap (nil for greedy, which plays no plan; kept only on a protected
 -- unit's death), `lords` the set (charId -> true) of the units whose death ends the game,
 -- `admits` the planner's own test of a chance against the cap (Planner.admits: required
@@ -711,9 +711,12 @@ function M.run(api)
     -- falls, gives the red kills and a killer where the watch saw no fight. A slot the watch
     -- could not read is a watch fault, never a guess.
     -- Each blue or green death is graded against the plan that committed to its board (plan,
-    -- and for a player-phase death the action that struck: M.grade).
+    -- and for a player-phase death the action that struck: M.grade). An enemy-phase death is
+    -- graded by the plan that last moved its unit this turn (`movers`, unit slot -> plan): what
+    -- that plan knew when it put the unit there, not what a later replan found (#510 PR A); a
+    -- unit no plan moved (a green, one carried) falls back to `plan`, the phase's last.
     local deathFaults = {}
-    local function record(list, phase, plan, action)
+    local function record(list, phase, plan, action, movers)
         local seen = {}
         for _, d in ipairs(list) do seen[d.id] = d end
         for _, k in ipairs(api.killed()) do
@@ -726,7 +729,8 @@ function M.run(api)
                 local g = M.grade({ id = k.id, charId = k.charId, faction = k.faction,
                                     turn = k.turn or turn, killer = k.killer or d.killer,
                                     killerId = k.killerId or d.killerId,
-                                    phase = k.phase or phase }, plan, action, cap, lords,
+                                    phase = k.phase or phase },
+                                  movers and movers[k.id] or plan, action, cap, lords,
                                   lastBoard, diedAt, admits)
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
@@ -916,6 +920,9 @@ function M.run(api)
         local seen, waitUntil = {}, nil
         -- the plan that committed to the enemy phase: this phase's last (FR-003)
         local commit
+        -- the plan that last moved each blue unit this turn (unit slot -> plan): an enemy-phase
+        -- death's grader (record)
+        local movers = {}
         -- each red unit's tile at every phase start, for a bait loop; the turn of the last
         -- seize skip recorded (one a turn)
         local tiles, baited, skipTurn = {}, {}, nil
@@ -1036,7 +1043,7 @@ function M.run(api)
             end
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
-            commit = nil
+            commit, movers = nil, {}
             for _, u in ipairs(board.units) do
                 if u.onField and u.faction == "green" then
                     greenSeen[u.id] = greenSeen[u.id] or turn
@@ -1245,6 +1252,7 @@ function M.run(api)
                 -- "trapped": the game halted the move on a unit the fog hid (FE8's ambush,
                 -- harness api.act); the unit's turn is over where it stopped, its act not made
                 local trapped = done == "trapped"
+                if playing then movers[action.unitId] = playing end
                 if not trapped and (action.act == "visit" or action.act == "chest") then
                     explore.visited(action, turn)
                 end
@@ -1330,7 +1338,7 @@ function M.run(api)
             for _, d in ipairs(fallen(before, api.board(), nil)) do
                 if not counted[d.id] then all[#all + 1] = d end
             end
-            record(all, "enemy", commit, nil)
+            record(all, "enemy", commit, nil, movers)
             if phase == "gameover" then return "lost", "game over in the enemy phase" end
             if phase == "ended" then
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end

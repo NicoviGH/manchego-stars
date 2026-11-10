@@ -34,6 +34,12 @@ class VanillaIndex(unittest.TestCase):
         self.assertEqual(ce.vanilla_env()['groups'][str(0x05)], 'mounted')
 
 
+class ChapterName(unittest.TestCase):
+    def test_a_trace_index_is_named_as_the_game_names_it(self):
+        self.assertEqual([ce.chapter_name(i) for i in (0, 5, 6, 7, 10, 999)],
+                         ['Prologue', 'Ch5x', 'Ch5', 'Ch6', 'E_9', 'chapter 999'])
+
+
 class CellChapters(unittest.TestCase):
     def test_each_written_chapter_is_its_host_and_its_twin(self):
         # review of #587: the one owner of "our chapter N -> each game's index at its start"

@@ -2875,5 +2875,56 @@ class Report(unittest.TestCase):
         self.assertIn(': a pilot, no verdict on any protected death', line)
 
 
+
+class Calibration(unittest.TestCase):
+    """`calibration` (#510 PR A): unit-phases binned by the phase's last plan; a death read by
+    the plan that moved its unit; a play kept twice counts once."""
+
+    @staticmethod
+    def trace(style='careful', moved_die=0.3, last_die=0.9, chapter=6, dies=True, carried=False):
+        blue = [{'id': 1, 'charId': 1, 'faction': 'blue'}, {'id': 2, 'charId': 2, 'faction': 'blue'}]
+        if carried:
+            blue = blue[1:]
+        dead = [{'faction': 'blue', 'phase': 'enemy', 'turn': 1, 'id': 1, 'charId': 1,
+                 'flags': {}}] if dies else []
+        return [
+            {'t': 'start', 'info': {'game': 'vanilla', 'chapter': chapter, 'instrument': 'i'},
+             'style': {'aggression': style}},
+            {'t': 'phase', 'phase': 'player', 'turn': 1},
+            {'t': 'plan', 'ref': 1, 'predict': [{'id': 1, 'die': moved_die}, {'id': 2, 'die': 0}]},
+            {'t': 'act', 'phase': 'player', 'turn': 1, 'id': 1, 'act': 'wait', 'to': {'x': 0}},
+            {'t': 'plan', 'ref': 2, 'predict': [{'id': 1, 'die': last_die}, {'id': 2, 'die': 0}]},
+            {'t': 'act', 'phase': 'player', 'turn': 1, 'id': 2, 'act': 'wait', 'to': {'x': 1}},
+            {'t': 'phase', 'phase': 'enemy', 'turn': 1, 'units': blue},
+            {'t': 'end', 'record': {'deaths': dead}},
+        ]
+
+    def test_tables(self):
+        t = self.trace
+        c = mc.calibration([t(), t(),                                # one play, kept twice
+                            t(moved_die=0.0, last_die=0.0, dies=False, chapter=7)])
+        self.assertEqual((c['traces'], c['distinct']), (3, 2))
+        self.assertEqual(c['bins']['over 50%'][:2], [1, 1], "binned by the phase's last plan")
+        self.assertEqual(c['bins']['0'][:2], [3, 0])
+        self.assertEqual(dict(c['deaths']['Ch5']), {'moved over the cap': 1},
+                         'careful caps at 1%: its mover said 30%')
+        kinds = [next(iter(mc.calibration([x])['deaths']['Ch5'])) for x in (
+            t(style='bold', moved_die=0.1),                      # mover under 15%, last 90%
+            t(style='bold', moved_die=0.1, last_die=0.1),
+            t(style='bold', moved_die=0.0, last_die=0.0),
+            t(style='greedy'))]
+        self.assertEqual(kinds, ['moved under, over by the phase end', 'under: dice',
+                                 'under: blind spot', 'no cap'])
+        c = mc.calibration([t(carried=True, dies=False)])
+        self.assertEqual(sum(n for n, _, _ in c['bins'].values()), 1,
+                         'a unit off the field in the phase is no unit-phase')
+        self.assertIn('| Ch5 | 1 | 1 |', '\n'.join(mc.calibration_lines(mc.calibration([t()]))))
+
+    def test_caps_are_the_planners(self):
+        caps, dust = mc.style_caps()
+        self.assertEqual(caps, {'careful': 0.01, 'even': 0.05, 'bold': 0.15})
+        self.assertLess(dust, 1e-6)
+
+
 if __name__ == '__main__':
     unittest.main()
