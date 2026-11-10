@@ -187,11 +187,7 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- phase has our units stand still another round, and over Manchego Stars ch03's pilots its readings
 -- came true 0 of 8 times where the next phase's were about right, so ranking by both let a
 -- unit be sent to an 82% death to dodge another's second-phase 90% (ADR 0389, amended
--- 2026-11-08; careful seed 3010 turn 18, replayed). Then the fog (#510 PR A step 4): the summed
--- chance the fog's strike kills a unit, on the ways the plan does not end the chapter (Bot.
--- fogRead); less first, so among plans alike in admission the one the fog threatens least is
--- played, and the cap stays the enemies in sight's. Over the cap it comes after the seen
--- excess: a death the judged phase plays outranks one the fog may hide. Then the admitted order: fewer goals forfeited
+-- 2026-11-08; careful seed 3010 turn 18, replayed). Then the admitted order: fewer goals forfeited
 -- (the completion ledger's), the likelier win, more progress. Allied greens' summed death
 -- chance breaks ties among the plans within a turn of the most progress judged (FR-012: only
 -- there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
@@ -204,19 +200,24 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- the rank would see). The score after the progress, so a unit chips, heals or kills only
 -- from as forward a tile as its march: the advisory panel's decision, on Nicolas's
 -- instruction (ADR 0384's amendment of 2026-11-02, research record 0024, which has the
--- numbers; why the reverse order lost more units is open, #565). Last the largest death
--- chance, the summed one, more HP left, and the acts as a stable key.
+-- numbers; why the reverse order lost more units is open, #565). Then the fog (#510 PR A step
+-- 4): the summed chance the fog's strike kills a unit, on the ways the plan does not end the
+-- chapter (Bot.fogRead), less first. A tie-breaker only: inside the cap it froze the bot on
+-- Ch6, and ranked right after admission it held the army back from the fog until the Bael
+-- reached the Civilians (#510 comments 6780781911, 6781704202); a first attempt cannot know
+-- what the fog hides, a retry can (PR B). Last the largest death chance, the summed one, more
+-- HP left, and the acts as a stable key.
 local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
                    { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
-    local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }
+    local order = { { "fog", 1 }, { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 },
+                    { "key", 1 } }
     local lead = {}
     if not a.admitted then
         lead = { { "first_game_over", 1 }, { "first_max_exceed", 1 }, { "first_sum_exceed", 1 },
                  { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 } }
     end
-    lead[#lead + 1] = { "fog", 1 }
     for _, o in ipairs(ADMITTED) do lead[#lead + 1] = o end
     for i = #lead, 1, -1 do table.insert(order, 1, lead[i]) end
     -- `behind` says nothing until M.rebase has set it over the plans compared: one rank with it

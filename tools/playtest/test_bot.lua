@@ -3635,9 +3635,9 @@ do
     check(asked[1] and asked[1]:match("<(.*)$"), "3,0", "fog: from the nearest unseen tile")
 end
 
--- test_the_fog_key_ranks_after_admission: under the cap the fog comes before the goals, the
--- win and the progress; over it, after the seen excess (a death the judged phase plays
--- outranks one the fog may hide).
+-- test_the_fog_key_breaks_ties_only (#510 PR A step 4, Nicolas 2026-11-10): the fog read
+-- orders plans only after everything else the rank reads (goals, the win, progress, value),
+-- under the cap and over it.
 do
     local function r(t)
         local base = { admitted = true, forfeits = 0, complete = 0, behind = 0, green_die = 0,
@@ -3648,10 +3648,12 @@ do
         for k, v in pairs(t) do base[k] = v end
         return base
     end
-    check(Planner.outranks(r { fog = 0.1, progress = 0 }, r { fog = 0.3, progress = 5, key = "b" }),
-          true, "fog key: less fog outranks more progress")
-    check(Planner.outranks(r { fog = 0.1, forfeits = 1 }, r { fog = 0.3, key = "b" }), true,
-          "fog key: before the forfeits")
+    check(Planner.outranks(r { fog = 0.3, progress = 5, key = "b" }, r { fog = 0.1, progress = 0 }),
+          true, "fog key: more progress outranks less fog")
+    check(Planner.outranks(r { fog = 0.3, value = 5, key = "b" }, r { fog = 0.1 }), true,
+          "fog key: after the value")
+    check(Planner.outranks(r { fog = 0.1, key = "b" }, r { fog = 0.3 }), true,
+          "fog key: alike otherwise, less fog first")
     check(Planner.outranks(r { admitted = false, fog = 0.9, first_max_exceed = 0.1,
                                max_exceed = 0.1 },
                            r { admitted = false, fog = 0, first_max_exceed = 0.2,
