@@ -9,7 +9,17 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10, night (Claude, Fable session): **the Fable review is done and its plan is
+Refreshed 2026-11-10, late night (Claude, PR A session): **PR A stopped after step 3: the
+stepping-back witness on the Ch5 starts is refuted by the plan's own test (15 of 39 fallback
+decisions gained a plan under the cap, 38%).** Witness and the Ch5 blind-spot breakdown: #510
+comment 6780145312. Branch `feat/510-pr-a-first-attempts` (pushed, no PR) has steps 1-3 (fog-ambush
+fix; a death graded by its unit's mover plus `montecarlo.py calibration`; the step back and mend
+rounds). Step 4 (fog) not started; no suite run. **Waiting on Nicolas:** Fable's read (the plan's
+"Where Fable comes back in", point 1: the next thing is a look one more turn ahead), and whether
+step 4 goes on meanwhile. The witness's traces are in that session's scratchpad only; its runs
+are attempt 1 of `cs-s4001..4010/6` and `vanilla-ch5` 1001/1002, instrument `276414dc550f+v2`.
+
+Earlier the same night (Claude, Fable session): **the Fable review is done and its plan is
 locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
 The plan is ONE comment, #510 comment 6779357154
 (edited in place; it has the findings, both PRs' steps and a file map). Read it first.** Nothing
@@ -117,7 +127,7 @@ was built or run in the emulator this session.
 
 ## Next
 
-0. **#510 PR A, first attempts** (plan comment 6779357154): its calls are approved;
+0. **#510 PR A, first attempts** (plan comment 6779357154; stopped after step 3, see the top and comment 6780145312): its calls are approved;
    in commit order, the harness fix, the regrade and calibration script
    (no emulator), stepping back (witness: Ch5 starts), fog in the chance to die (witness: the
    Ch6 fog start); `suite --held-out` once on the final code; `/code-review <PR> medium`.
