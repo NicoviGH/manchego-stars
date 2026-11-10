@@ -47,14 +47,11 @@ it, and stops there. Each `pilot` and `cell` appends its record to references/si
 
     python3 tools/playtest/montecarlo.py report [cells.jsonl] [--decision party|enemy|chapter \
         [--components a,b]] [--post]
-    python3 tools/playtest/montecarlo.py human [--form]
 
-`report` says one instrument's cells in sentences (FR-031): the header, the canary, one sentence
-a cell, the human calibration, the anomalies with their `story` commands, the validity failures
-and the descriptive data, each beside the twin; `--decision` reads only that decision's
-components (FR-032); `--post` writes it under build/ and prints the `gh issue comment 510`
-command, never running it. `human --form` prints the one-page calibration form; `human` reads
-the coded sessions (references/sim/human/*.jsonl) against the bot's leading causes (FR-030).
+`report` says one instrument's cells in sentences (FR-031): the header, one sentence a cell,
+the anomalies with their `story` commands, the validity failures and the descriptive data,
+each beside the twin; `--decision` reads only that decision's components (FR-032);
+`--post` writes it under build/ and prints the `gh issue comment 510` command, never running it.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
@@ -1297,13 +1294,15 @@ def pilot_main(args):
     return 1 if unreadable else 0
 
 
-# ---- read validity, human calibration and the report (#510 step 9 PR-I; FR-029 to FR-033) ----
+# ---- read validity and the report (#510 step 9 PR-I; FR-029, FR-031, FR-032) ----
 # A verdict is only as good as the attempts behind it. Before a cell gets one, both arms'
 # first attempts pass FR-029's invariants, or the cell is NOT READABLE with each failed one
-# named. Once humans have played the four calibration maps, a result gates a decision only
-# when the bot's leading cause of a first-attempt death matches the humans' leading reset
-# reason on three of the four (FR-030); else it is UNVALIDATED_HUMAN. `report` says it all in
-# sentences, one per cell (FR-031), and reads a decision's own components only (FR-032).
+# named. There are no human playtests: vanilla is the proxy for playtesters, so the bot is
+# checked against vanilla alone, by playing both arms and passing the validity bars. Nothing
+# orders vanilla's chapters by how often players lose units, so there is no canary either (ADR
+# 0385, amended twice on 2026-11-09).
+# `report` says it all in sentences, one per cell (FR-031), and reads a decision's own
+# components only (FR-032).
 
 ENV_CLEAN_MIN = 0.90       # FR-029: an arm's environment-clean share of its first attempts
 BLIND_MAX = 0.10           # FR-029: blindspot plus unclassified attempts, under this
@@ -1451,193 +1450,6 @@ def judged(verdict, valid):
     return out
 
 
-# ---- human calibration (FR-030, FR-033; plan R-12) ----
-# The designer and one blind friend play four maps on Normal, resetting on a player death, and
-# code each attempt on the one-page form (a #510 comment). Each coded attempt is one line of
-# references/sim/human/*.jsonl: {"player": "designer"|"friend", "map": <suite start id>,
-# "attempt": n, "reset": true|false, "cause": <HUMAN_CAUSES> when reset, "ignored_loot": n}.
-
-HUMAN_MAPS = ('vanilla-ch3', 'vanilla-ch5', 'ours-ch02', 'ours-ch03')   # FR-033's four
-HUMAN_PLAYERS = ('designer', 'friend')
-HUMAN_MATCH = 3            # of the four maps, for a result to gate (FR-030)
-HUMAN_DIR = os.path.join(REPO, 'references', 'sim', 'human')
-VALIDATED, UNVALIDATED = 'validated', 'UNVALIDATED_HUMAN'
-
-
-def map_name(m):
-    """A calibration map's suite id as a reader says it: 'vanilla Ch3', 'Manchego Stars ch02'."""
-    game, chapter = m.split('-', 1)
-    if game == 'vanilla':
-        return vanilla_name('FE8 Ch' + chapter[2:])
-    return '%s %s' % (GAME_NAMES[game], chapter)
-
-
-def human_causes():
-    """What a human reset is coded as: the bot's own causes (botrun.lua's, read there) plus a
-    misplay and ignored loot (FR-033)."""
-    return botrun_names()[0] + ('misplay', 'ignored_loot')
-
-
-def load_human(paths):
-    """The coded attempts in `paths` (.jsonl files), each line checked against the form:
-    ValueError naming the file and line of the first that is not."""
-    out, causes = [], human_causes()
-    for path in paths:
-        with open(path) as fh:
-            for i, line in enumerate(fh, 1):
-                if not line.strip():
-                    continue
-                row = json.loads(line)
-                where = '%s:%d' % (path, i)
-                if row.get('player') not in HUMAN_PLAYERS:
-                    raise ValueError('%s: player %r is not one of %s' % (
-                        where, row.get('player'), ', '.join(HUMAN_PLAYERS)))
-                if row.get('map') not in HUMAN_MAPS:
-                    raise ValueError('%s: map %r is not one of %s' % (
-                        where, row.get('map'), ', '.join(HUMAN_MAPS)))
-                attempt = row.get('attempt')
-                if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
-                    raise ValueError('%s: `attempt` must be a whole number from 1, not %r'
-                                     % (where, attempt))
-                if not isinstance(row.get('reset'), bool):
-                    raise ValueError('%s: `reset` must be true or false' % where)
-                if row['reset'] and row.get('cause') not in causes:
-                    raise ValueError('%s: a reset is coded with one of %s, not %r' % (
-                        where, ', '.join(causes), row.get('cause')))
-                out.append(row)
-    return out
-
-
-def human_files(where=HUMAN_DIR):
-    """The coded sessions' files, [] before any exist."""
-    if not os.path.isdir(where):
-        return []
-    return sorted(os.path.join(where, n) for n in os.listdir(where) if n.endswith('.jsonl'))
-
-
-def leading(counts):
-    """The most frequent key of Counter `counts`, None on none or a tie for the lead: a tie
-    leads with nothing, so it can match nothing."""
-    top = counts.most_common(2)
-    if not top or (len(top) > 1 and top[0][1] == top[1][1]):
-        return None
-    return top[0][0]
-
-
-def bot_leading_cause(recs):
-    """The bot's leading first-attempt cause on one map: over its played attempt-1 records,
-    the cause of each attempt's FIRST protected death (a human resets on the first death, so
-    that is the death a reset reason is about)."""
-    counts = collections.Counter()
-    for r in recs:
-        d = first_death(r)
-        if d is not None:   # a death no cause names leads as itself, never as no lead
-            counts[d.get('cause') or 'unclassified'] += 1
-    return leading(counts), counts
-
-
-def calibration(human, bot_by_map):
-    """FR-030 from the coded attempts `human` and {map: [played attempt-1 record]}: {'status':
-    VALIDATED, UNVALIDATED or 'none' (no human data: nothing to gate on yet), 'maps': {map:
-    {'human', 'bot', 'match'}}, 'matched'}. By failure mode, never by rate: the humans' most
-    frequent reset reason against the bot's most frequent first-death cause. A map either side
-    has no lead on (no data, or a tie) is no match."""
-    if not human:
-        return {'status': 'none', 'maps': {}, 'matched': 0}
-    maps, matched = {}, 0
-    for m in HUMAN_MAPS:
-        h = leading(collections.Counter(r['cause'] for r in human
-                                        if r['map'] == m and r['reset']))
-        b = bot_leading_cause(bot_by_map.get(m) or [])[0]
-        ok = h is not None and h == b
-        matched += ok
-        maps[m] = {'human': h, 'bot': b, 'match': ok}
-    return {'status': VALIDATED if matched >= HUMAN_MATCH else UNVALIDATED, 'maps': maps,
-            'matched': matched}
-
-
-def calibration_lines(cal):
-    """calibration's result in sentences."""
-    if cal['status'] == 'none':
-        return ['human calibration: no coded sessions yet (references/sim/human/*.jsonl), so '
-                'nothing is marked UNVALIDATED_HUMAN']
-    out = ['human calibration: the bot\'s leading cause matches the humans\' leading reset '
-           'reason on %d of %d maps: %s' % (
-               cal['matched'], len(HUMAN_MAPS),
-               'results may gate decisions' if cal['status'] == VALIDATED else
-               'UNVALIDATED_HUMAN, no result gates a decision')]
-    for m, v in cal['maps'].items():
-        out.append('  %s: humans %s, bot %s%s' % (m, v['human'] or 'no lead', v['bot'] or
-                                                  'no lead', '' if v['match'] else ' (differ)'))
-    return out
-
-
-def first_attempts(paths, instrument):
-    """{(game, chapter): [played attempt-1 record]} of `instrument` in runs files `paths`,
-    never a held-out run (those stay unseen until the verdict, FR-025)."""
-    return kept(paths, lambda r: is_bot(r) and r.get('instrument') == instrument
-                and r.get('attempt') == 1 and r.get('outcome') not in UNUSABLE
-                and (r.get('suite') or {}).get('set') != 'held_out',
-                lambda r: (r.get('game'), r.get('chapter')))
-
-
-def map_records(suite, paths, instrument):
-    """{human map: [played attempt-1 record]} of `instrument`: the records of each map's game
-    at its chapter, the map named by its suite start (HUMAN_MAPS)."""
-    got = first_attempts(paths, instrument)
-    out = {}
-    for m in HUMAN_MAPS:
-        st = start_of(suite, m)
-        out[m] = got.get((st['game'], st['chapter']), [])
-    return out
-
-
-# ---- the canary (spec assumptions): on Normal, vanilla's first-attempt death rates order
-# Ch1 below Ch5 and Ch2 below Ch6, and Ch3 against Ch5 as the humans found. An inversion is a
-# banner and an audit, never a verdict.
-CANARY = (('FE8 Ch1', 'FE8 Ch5'), ('FE8 Ch2', 'FE8 Ch6'))
-
-
-def canary(vanilla, human=()):
-    """The canary's lines and whether it inverted, from {chapter index: [vanilla played
-    attempt-1 record]} and the coded human attempts. An order is read only when both
-    chapters have attempts; one that cannot be read says so, never passes."""
-    rows = vanilla_rows()
-    pairs = [(lo, hi, 'expected') for lo, hi in CANARY]
-    if human:
-        # the humans' first attempts, a reset over a death only: the same endpoint the bot's
-        # vanilla rates are, never a reset over loot or a later attempt's
-        rate = {}
-        for m in ('vanilla-ch3', 'vanilla-ch5'):
-            rows_m = [r for r in human if r['map'] == m and r.get('attempt') == 1]
-            rate[m] = (sum(1 for r in rows_m if r['reset'] and r.get('cause') != 'ignored_loot')
-                       / len(rows_m)) if rows_m else None
-        if None not in rate.values() and rate['vanilla-ch3'] != rate['vanilla-ch5']:
-            easy = 'vanilla-ch3' if rate['vanilla-ch3'] < rate['vanilla-ch5'] else 'vanilla-ch5'
-            hard = 'vanilla-ch5' if easy == 'vanilla-ch3' else 'vanilla-ch3'
-            pairs.append(('FE8 Ch%s' % easy[-1], 'FE8 Ch%s' % hard[-1], 'as the humans found'))
-    lines, inverted = [], False
-    for lo, hi, why in pairs:
-        (k1, n1), (k2, n2) = (death_rate(vanilla.get(rows[c]) or []) for c in (lo, hi))
-        if not n1 or not n2:
-            empty = [vanilla_name(c) for c, n in ((lo, n1), (hi, n2)) if not n]
-            lines.append('canary %s below %s (%s): not read, %s %s no first attempts under '
-                         'this instrument' % (vanilla_name(lo), vanilla_name(hi), why,
-                                              ' and '.join(empty),
-                                              'have' if len(empty) > 1 else 'has'))
-            continue
-        bad = k1 / n1 > k2 / n2
-        inverted = inverted or bad
-        lines.append('canary %s below %s (%s): %s %d of %d, %s %d of %d: %s' % (
-            vanilla_name(lo), vanilla_name(hi), why, vanilla_name(lo), k1, n1, vanilla_name(hi),
-            k2, n2,
-            'INVERTED' if bad else 'holds'))
-    if inverted:
-        lines.insert(0, '!!! CANARY INVERSION: vanilla\'s own chapters read out of order; '
-                        'audit the instrument (`montecarlo.py audit`) before reading any cell')
-    return lines, inverted
-
-
 # ---- the descriptive data (FR-031) and what each decision reads (FR-032) ----
 SURVIVAL_TURNS = (1, 3, 5, 10, 15, 20)
 COMPONENTS = ('survival', 'turn5', 'nonluck', 'causes', 'boss_causes', 'by_unit', 'rng_tail',
@@ -1753,23 +1565,18 @@ def vanilla_rows():
     return inject.chapter_settings.twin_rows()
 
 
-def vanilla_name(row):
-    """A twin_rows name ('FE8 Ch3') as a reader says it ('vanilla Ch3'): the one formatter."""
-    return 'vanilla ' + row.split()[-1]
-
-
 def twin_name(index):
     """Vanilla chapter index `index` as a reader says it ('vanilla Ch3')."""
     for name, i in vanilla_rows().items():
         if i == index:
-            return vanilla_name(name)
+            return 'vanilla ' + name.split()[-1]   # twin_rows' 'FE8 Ch3'
     return 'vanilla chapter %d' % index
 
 
-def cell_sentence(cell, arms, human_status='none'):
+def cell_sentence(cell, arms):
     """A cell in one plain sentence (FR-031): which chapters, how many pairs over how many
     games, its verdict with its uncertainty or NOT READABLE with the failed invariants, the two
-    arms' death rates, what drives the difference, and whether it may gate (FR-030)."""
+    arms' death rates and what drives the difference."""
     o, v = arms['ours'], arms['vanilla']
     head = '%s ch%02d vs %s, %d pairs%s: ' % (
         GAME_NAMES['ours'], cell['chapter'], twin_name(cell['twin_index']), cell['pairs'],
@@ -1787,9 +1594,8 @@ def cell_sentence(cell, arms, human_status='none'):
     rates = 'a protected unit died in Manchego Stars %d of %d, the twin %d of %d' % (
         o['died'], o['n'], v['died'], v['n'])
     why = drivers(arms, cell.get('diff'))
-    gate = '' if human_status != UNVALIDATED else '; UNVALIDATED_HUMAN, it gates nothing'
     return head + what + ' on any protected death; ' + rates + (
-        ', driven by ' + ' and '.join(why) if why else '') + gate
+        ', driven by ' + ' and '.join(why) if why else '')
 
 
 # ---- cell records (plan: "Cell records"): what `pilot` and `cell` decided, one line a run
@@ -1870,12 +1676,12 @@ def cell_arms(cell):
     return out
 
 
-def report(cells, arms_of, cal, canary_out, decision=None, components=None, who=None):
+def report(cells, arms_of, decision=None, components=None, who=None):
     """FR-031's report, in order, as lines (it is not a table): the header (instrument,
-    CPU-hours, pairs and the label counts), the canary with its banner, one sentence a cell,
-    the human calibration, the anomalies with their `story` commands, the validity failures
-    and the descriptive data. `decision` ('party', 'enemy' or 'chapter' with `components`)
-    reads only that decision's components (FR-032), each beside the twin; None reads all.
+    CPU-hours, pairs and the label counts), one sentence a cell, the anomalies with their
+    `story` commands, the validity failures and the descriptive data. `decision` ('party',
+    'enemy' or 'chapter' with `components`) reads only that decision's components (FR-032),
+    each beside the twin; None reads all.
     `arms_of(cell)` is {arm: [played attempt-1 record]} (cell_arms), `who` component_line's."""
     if decision is None:
         comps = COMPONENTS
@@ -1897,14 +1703,12 @@ def report(cells, arms_of, cal, canary_out, decision=None, components=None, who=
         cells[0]['instrument'] if cells else '?', plural(len(cells), 'cell'),
         sum(c['pairs'] for c in cells), cpu / 3600,
         ', '.join('%s %d' % (k, v) for k, v in sorted(labels.items())) or 'no cells')]
-    lines += canary_out[0]
     described = []
     for c in cells:
         recs = arms_of(c)
         arms = {a: describe(recs[a]) for a in ('ours', 'vanilla')}
         described.append((c, recs, arms))
-        lines.append(cell_sentence(c, arms, cal['status']))
-    lines += calibration_lines(cal)
+        lines.append(cell_sentence(c, arms))
     # one line a run, its anomalies by kind with their turns, and the story command at the
     # first one's turn: a cell of 100 runs can carry a hundred anomalies
     runs = [(c, arm, r) for c, recs, _ in described for arm in ('ours', 'vanilla')
@@ -1930,72 +1734,6 @@ def report(cells, arms_of, cal, canary_out, decision=None, components=None, who=
     return lines
 
 
-HUMAN_CAUSE_WORDS = {
-    'over_cap': 'I took a risk I knew was risky',
-    'reinforcement': 'an enemy that arrived after I moved killed them',
-    'fog': 'an enemy I could not see (fog) killed them',
-    'rng_tail': 'I saw the chance and lost the roll',
-    'other': 'I did not see it coming (nothing on screen warned me)',
-    'misplay': 'a slip: wrong unit, wrong tile, a menu mistake',
-    'ignored_loot': 'I reset over loot I let go (a village, a chest, a thief), not a death'}
-
-
-def human_form():
-    """The one-page form (FR-033, R-12), the words a player codes each attempt in; posted as
-    one #510 comment on Nicolas's go-ahead, never by this tool. Each cause is the bot's own
-    (botrun.lua) or FR-033's two more, so the form and the comparison cannot drift apart."""
-    causes = human_causes()
-    missing = [c for c in causes if c not in HUMAN_CAUSE_WORDS]
-    if missing:
-        raise ValueError('montecarlo: the form has no words for %s' % ', '.join(missing))
-    out = ['**Calibration form, one per map (#510, FR-033).** Play on Normal from the map\'s '
-           'start. Reset when any of your units dies, and when you would reset anyway. Write one '
-           'line per attempt, until you clear the map.',
-           '',
-           'Maps: %s. Player: `designer` or `friend` (the friend plays blind: no notes, no '
-           'spoilers).' % ', '.join('%s (`%s`)' % (map_name(m), m) for m in HUMAN_MAPS),
-           '',
-           'Each line: `{"player": "...", "map": "...", "attempt": 1, "reset": true, '
-           '"cause": "...", "ignored_loot": 0}`. `cause` only when `reset` is true; '
-           '`ignored_loot` counts the villages, chests and thieves you let go that attempt.',
-           '',
-           'Why you reset (pick the one that fits best):']
-    out += ['- `%s`: %s' % (c, HUMAN_CAUSE_WORDS[c]) for c in causes]
-    out += ['', 'The lines go in `references/sim/human/<player>-<map>.jsonl`; '
-            '`montecarlo.py human` reads them.']
-    return out
-
-
-def human_calibration(where, paths, inst):
-    """(coded attempts, {map: [bot record]}, calibration) from the coded sessions in `where`
-    and `inst`'s records in runs files `paths`: what `human` and `report` both read.
-    ValueError on a coded line off the form."""
-    rows = load_human(human_files(where))
-    by_map = map_records(load_suite(), paths, inst)
-    return rows, by_map, calibration(rows, by_map)
-
-
-def human_main(args):
-    """`human`: the form, or the coded sessions against the bot's leading causes (FR-030)."""
-    if args.form:
-        print('\n'.join(human_form()))
-        return 0
-    inst = args.instrument or instrument_id()
-    try:
-        rows, by_map, cal = human_calibration(
-            args.dir, [os.path.join(simdir(v), 'runs.jsonl') for v in (False, True)], inst)
-    except ValueError as err:
-        print('refused: %s' % err)
-        return 1
-    print('instrument %s; %d coded attempts in %s' % (inst, len(rows), args.dir))
-    for m in HUMAN_MAPS:
-        lead, counts = bot_leading_cause(by_map[m])
-        print('%s: the bot\'s first deaths by cause over %d attempts: %s' % (
-            m, len(by_map[m]), ', '.join('%s %d' % kv for kv in counts.most_common()) or 'none'))
-    print('\n'.join(calibration_lines(cal)))
-    return 0
-
-
 def report_main(args):
     """`report`: FR-031's report of one instrument's cells, printed; with --post, written to a
     file and the `gh issue comment` that would post it printed, never run (T107)."""
@@ -2005,17 +1743,9 @@ def report_main(args):
             args.cells, ' for %s' % args.instrument if args.instrument else ''))
         return 1
     inst = cells[0]['instrument']
-    paths = sorted({p for c in cells for p in c['stores'].values()})
-    try:
-        rows, _, cal = human_calibration(args.human_dir, paths, inst)
-    except ValueError as err:
-        print('refused: %s' % err)
-        return 1
-    vanilla = {ch: recs for (game, ch), recs in first_attempts(paths, inst).items()
-               if game == 'vanilla'}
     names = {g: _names(g) for g in ('ours', 'vanilla')}
     try:
-        lines = report(cells, cell_arms, cal, canary(vanilla, rows), args.decision,
+        lines = report(cells, cell_arms, args.decision,
                        args.components.split(',') if args.components else None,
                        {g: namer(names[g]) for g in names})
     except ValueError as err:
@@ -3618,11 +3348,6 @@ def main(argv=None):
     sa.add_argument('--count', type=int, default=CELL_STARTS,
                     help='campaigns pinned in all, on the first seeds of the starts set')
     sa.add_argument('--jobs', type=int, default=8)
-    hu = sub.add_parser('human', help="the humans' reset reasons against the bot's leading "
-                        'causes (FR-030)')
-    hu.add_argument('--form', action='store_true', help='print the one-page form, nothing else')
-    hu.add_argument('--dir', default=HUMAN_DIR, help='the coded sessions (default %(default)s)')
-    hu.add_argument('--instrument', help="the bot's instrument (default: the code's now)")
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,
                     help='the cell records (default %(default)s)')
@@ -3631,7 +3356,6 @@ def main(argv=None):
                     help="read only this decision's components (FR-032)")
     rr.add_argument('--components', help='a chapter decision: the components it affected, '
                     'comma-separated (%s)' % ', '.join(COMPONENTS))
-    rr.add_argument('--human-dir', default=HUMAN_DIR, help='the coded human sessions')
     rr.add_argument('--post', action='store_true', help='write it to build/ and print the '
                     '`gh issue comment 510` command; never runs it')
     su = sub.add_parser('suite', help="the frozen suite's pinned starts, attempt 1 each")
@@ -3663,8 +3387,6 @@ def main(argv=None):
         return replay_main(args)
     if args.cmd == 'audit':
         return audit_main(args)
-    if args.cmd == 'human':
-        return human_main(args)
     if args.cmd == 'report':
         return report_main(args)
     if args.cmd == 'story':
