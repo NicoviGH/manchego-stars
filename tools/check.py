@@ -138,6 +138,21 @@ DEAD_CONCEPTS = [
     # retired by #510 step 9 (ADR 0388): a board seen again is a `board_repeats` count; a stall
     # is FR-007's (`stall_events`: an unjustified seize skip, or three idle player phases)
     r'\brec\.stalls\b', r"record's `stalls`",
+    # retired by ADR 0384 (2026-11-01), which says what it changes in 0381-0383: a green unit's
+    # death is a game over (escort) or a forfeit (recruit) or a tie-break, never priced as a
+    # player unit's; no planner decision reads the clean clear; worth x chance only orders the
+    # beam's candidates. Each is held on the retired OBJECT ("as one of ours", "what the clean
+    # clear counts", "between plans"), so the current prices ("priced as the chapter") pass, and
+    # a gap holding "no longer"/"never"/"not"/"only" is the retirement itself, not the claim
+    r"\bgreen\b(?:(?!\b(?:no longer|never|not)\b)[^.\n]){0,30}\b(?:priced|paid)\s+as\s+"
+    r"(?:one of ours|ours|a player unit)",
+    r"\b(?:pays?|paid|paying|prices?|priced|pricing)\s+(?:an?\s+|the\s+)?green\b[^.\n]{0,25}"
+    r"\bdeaths?\s+as\s+(?:one of ours|ours|a player unit)",
+    r"\bplanners?\b(?:(?!\b(?:no longer|never|not)\b)[^.\n]){0,20}\b(?:pays?|paid|paying|prices?"
+    r"|priced|pricing)\s+what the clean clear counts\b",
+    r"\bworth\s*(?:x|\*|×)\s*(?:the\s+)?chance\b(?:(?!\b(?:no longer|never|not|only)\b)"
+    r"[^.\n]){0,20}\b(?:decides?|decided|deciding|picks?|picked|chooses?|chose)\s+"
+    r"(?:between|among|which)\b",
     # retired by #510 step 9's goal worth (ADR 0383): the planner weighs what is still left to
     # get (goals.lua), never a flat step of ground or a recruit's fixed credit
     r'\bW\.progress\b', r'\bW\.recruit\b', r'\ba\.progress\b',

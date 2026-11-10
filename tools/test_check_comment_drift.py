@@ -92,6 +92,40 @@ class DeadConceptPatterns(unittest.TestCase):
                    'the judged score breaks a progress tie'):
             self.assertIsNone(DEAD_PAT.search(ok), ok)
 
+    def test_adr_0384s_three_retired_claims_are_caught_and_their_retirements_are_not(self):
+        """ADR 0384 says what it changes in 0381-0383: a green death is no longer priced as a
+        player unit's, the planner no longer pays what the clean clear counts, and worth x
+        chance no longer decides between complete plans. The claim is dead in every tense and in
+        the retired records' own title wording; the sentence retiring it, and the prices 0384
+        set in its place, are current fact."""
+        for dead in ("a green unit's death is priced as one of ours",
+                     "green units' deaths are priced as ours",
+                     "green deaths are still priced as ours",
+                     "green deaths will be priced as ours",
+                     "green deaths were priced as a player unit's",
+                     "a green death is paid as a player unit's",
+                     "the planner pays a green unit's death as one of ours",
+                     "the planner prices a green unit's death as one of ours",
+                     'the planner pays what the clean clear counts',
+                     'the planner paid what the clean clear counts',
+                     'the planner will pay what the clean clear counts',
+                     'planners pay what the clean clear counts',
+                     'worth x chance decides between complete plans',
+                     'worth \u00d7 chance decided between plans',
+                     'worth x the chance decides between plans',
+                     'worth * chance decides between plans',
+                     'worth \u00d7 chance decides which complete plan wins'):
+            self.assertIsNotNone(DEAD_PAT.search(dead), dead)
+        for ok in ("a green unit's death is no longer priced as one of ours",
+                   "an escort green's death is priced as the chapter",
+                   "a green unit's death is priced as a forfeit",
+                   "an allied green unit's death is priced as a tie-break only",
+                   'the planner no longer pays what the clean clear counts',
+                   'worth x chance no longer decides between complete plans',
+                   'worth x chance only orders the candidates in the beam',
+                   'worth x chance orders the candidates in the beam'):
+            self.assertIsNone(DEAD_PAT.search(ok), ok)
+
     def test_a_COLOUR_count_is_not_a_wrap_width(self):
         """`col\\w*` reaches "colours", and a palette depth that happens to end in 28 is not a
         line width. The registry is read by people fixing real drift; a guard that cries wolf
