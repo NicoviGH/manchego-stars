@@ -95,7 +95,7 @@ DEAD_CONCEPTS = [
     # retired by ADR 0385's 2026-11-09 amendment (Nicolas): there are no human playtests;
     # vanilla is the playtesters' proxy, so no result is gated on coded human sessions
     r'\bUNVALIDATED_HUMAN\b', r'\bhuman calibration\b', r'\bmontecarlo\.py human\b',
-    r'\bhuman --form\b', r'\bblind friend\b', r'\bcalibration maps?\b',
+    r'\bhuman --form\b', r'\bblind friend\b', r'\bfour calibration maps\b',
     r'\bas the humans found\b', r'references/sim/human\b', r'--human-dir\b',
     # retired by #510 T107a (ADR 0395, amended): a tuning-seed death the frozen run did not
     # have is said and never blocks promotion, explained or not
