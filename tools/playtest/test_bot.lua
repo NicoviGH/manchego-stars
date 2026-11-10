@@ -4201,6 +4201,35 @@ do
           "canto: a Drop's key reads back with both tiles")
 end
 
+-- test_an_avoid_claim_holds_on_a_canto_tile: P, a Canto unit, may Rescue G from (1,0) and move
+-- on to (0,0) or (2,0). (2,0) is in the archer's reach and an avoid claim keeps P out of it,
+-- so no Canto move ends there; (0,0) is still offered.
+do
+    local P = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x30, 5, 1, 1, { faction = "green", hp = 5, minRange = false })
+    local X = red(0x81, 4, 0, { classId = CLS_A, minRange = 2, maxRange = 2 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+                rescue = { [0x01] = { [0x30] = true } } }
+    local s = sightOf(o)
+    s.cantoTiles = function(_, a)
+        if a.act ~= "rescue" then return {} end
+        return tiles({ 1, 0 }, { 0, 0 }, { 2, 0 })
+    end
+    local function cantos(st)
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(P, G, X), s, st)) do
+            for _, a in ipairs(c.acts) do
+                if a.canto then out[#out + 1] = a.canto.x .. "," .. a.canto.y end
+            end
+        end
+        table.sort(out)
+        return table.concat(out, " ")
+    end
+    check(cantos(style("bold")), "0,0 2,0", "canto: with no claim, both tiles")
+    local st = claimed("bold", { id = "v", kind = "avoid", unit = { 0x01 }, vs = { CLS_A } })
+    check(cantos(st), "0,0", "canto: an avoid claim keeps the second move out of reach")
+end
+
 -- test_surprise_reads_the_canto_tile: a unit that moved on to its Canto tile ended its move as
 -- planned; one still on the act's tile ended short.
 do

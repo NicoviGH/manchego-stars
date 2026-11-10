@@ -1699,7 +1699,9 @@ local function cantoMoves(ctx, u, acts, gain)
                 tiles[#tiles + 1] = t
             end
         end
-        local ranked = bySafety(ctx, u, tiles)
+        -- an avoid claim holds here as on every end tile (outOfReach, waitTiles' first rule):
+        -- the second move is a move like the first
+        local ranked = bySafety(ctx, u, outOfReach(ctx, u, tiles))
         local pick = {}
         for i = 1, math.min(M.HOLDS, #ranked) do pick[#pick + 1] = ranked[i] end
         local front, fg

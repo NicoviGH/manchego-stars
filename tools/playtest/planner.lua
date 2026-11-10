@@ -749,7 +749,7 @@ function M.plan(Bot, board, sight, style, opts)
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
-        n.expect[#n.acts] = { hp = fx.hp, gone = fx.gone, at = endTile(a),
+        n.expect[#n.acts] = { hp = fx.hp, gone = fx.gone,
                               targetHp = fx.enemyHp and fx.enemyHp.hp, heals = fx.heals }
         n.used[uid], n.tiles[tile] = true, true
         n.hp[uid] = fx.hp

@@ -228,11 +228,9 @@ M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL = 0x69, 0x6B, 0x04
--- include/bmunit.h CA_CANTO: a second move after an act (playerphase.c TryMakeCantoUnit).
--- struct Unit +1D movBonus; struct ClassData +12 baseMov; CharacterData and ClassData +28
--- attributes (UNIT_MOV, UNIT_CATTRIBUTES: the two ORed)
+-- include/bmunit.h CA_CANTO: a second move after an act (playerphase.c TryMakeCantoUnit),
+-- read off the character's and the class's attributes ORed (UNIT_CATTRIBUTES)
 M.CA_CANTO = 1 << 1
-local UNIT_MOV_BONUS, CLASS_BASE_MOV, DATA_ATTRIBUTES = 0x1D, 0x12, 0x28
 -- The acts that hand a Canto unit its second move: any but Wait, Combat or Staff
 -- (TryMakeCantoUnit's switch) of those the bot plays and drives one through (harness
 -- awaitActed's `canto`).
@@ -293,7 +291,8 @@ local CHAPTER_TALKS = 0x04
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
--- struct ClassData +28 attributes (CA_*); struct Unit +42 ai1, +44 ai2 (the AI script indices)
+-- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
+-- AI script indices)
 local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
@@ -1274,24 +1273,32 @@ function M.new(outer)
         return function(x, y) return g[y] and g[y][x] or 0 end
     end
 
-    function s.reach(u, friends)
-        return sandbox(function(call)
-            call(S.GenerateUnitMovementMap, { u.addr })
-            local out = {}
-            for y = 0, h - 1 do
-                for x = 0, w - 1 do
-                    local by = grid(mem, S.gBmMapUnit, x, y)
-                    local own = x == u.x and y == u.y
-                    if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT then
-                        if own or by == 0 then
-                            out[#out + 1] = { x = x, y = y }
-                        elseif friends and (by & M.FACTION_MASK) == (u.id & M.FACTION_MASK) then
-                            out[#out + 1] = { x = x, y = y, by = by }
-                        end
+    -- Inside a sandbox, after a movement map for `u` standing on (ux, uy): the tiles it
+    -- reaches (gBmMapMovement < MOVE_LIMIT), less those another unit stands on (gBmMapUnit),
+    -- its own left in; with `friends`, an ally's tile too, marked `by`. reach's and
+    -- cantoTiles' one reader.
+    local function movementTiles(u, ux, uy, friends)
+        local out = {}
+        for y = 0, h - 1 do
+            for x = 0, w - 1 do
+                local by = grid(mem, S.gBmMapUnit, x, y)
+                local own = x == ux and y == uy
+                if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT then
+                    if own or by == 0 then
+                        out[#out + 1] = { x = x, y = y }
+                    elseif friends and (by & M.FACTION_MASK) == (u.id & M.FACTION_MASK) then
+                        out[#out + 1] = { x = x, y = y, by = by }
                     end
                 end
             end
-            return out
+        end
+        return out
+    end
+
+    function s.reach(u, friends)
+        return sandbox(function(call)
+            call(S.GenerateUnitMovementMap, { u.addr })
+            return movementTiles(u, u.x, u.y, friends)
         end)
     end
 
@@ -1989,12 +1996,13 @@ function M.new(outer)
         seen.canto = seen.canto or {}
         if seen.canto[k] then return seen.canto[k] end
         local out = {}
-        local chptr, clptr = mem.u32(u.addr), mem.u32(u.addr + 0x04)
-        local attrs = (chptr ~= 0 and mem.u32(chptr + DATA_ATTRIBUTES) or 0)
-            | (clptr ~= 0 and mem.u32(clptr + DATA_ATTRIBUTES) or 0)
+        -- a unit with no character or class is no unit to move (and movOf reads the class)
+        local chptr, clptr = mem.u32(u.addr), mem.u32(u.addr + UNIT_CLASS)
+        local attrs = chptr ~= 0 and clptr ~= 0
+            and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
         if (attrs & M.CA_CANTO) ~= 0
                 and (mem.u32(u.addr + UNIT_STATE) & Board.US_HAS_MOVED) == 0 then
-            local mov = mem.s8(u.addr + UNIT_MOV_BONUS) + mem.s8(clptr + CLASS_BASE_MOV)
+            local mov = movOf(u)
             out = sandbox(function(call)
                 call(S.GenerateUnitMovementMap, { u.addr })
                 local spent = grid(mem, S.gBmMapMovement, x, y)
@@ -2006,16 +2014,7 @@ function M.new(outer)
                 stageCarry(byId, carry)
                 call(S.RefreshEntityBmMaps, {})
                 call(S.GenerateUnitMovementMapExt, { u.addr, mov - spent })
-                for ty = 0, h - 1 do
-                    for tx = 0, w - 1 do
-                        local by = grid(mem, S.gBmMapUnit, tx, ty)
-                        if grid(mem, S.gBmMapMovement, tx, ty) < M.MOVE_LIMIT
-                                and (by == 0 or by == u.id) then
-                            tiles[#tiles + 1] = { x = tx, y = ty }
-                        end
-                    end
-                end
-                return tiles
+                return movementTiles(u, x, y)
             end)
         end
         seen.canto[k] = out
