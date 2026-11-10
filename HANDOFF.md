@@ -9,21 +9,20 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-10, end of the PR A session).** The plan comment
-6779357154 is amended at its top and in PR A step 4: read those two parts first.
-- **Do: PR A step 4 rework** on `feat/510-pr-a-first-attempts` (pushed; 6 commits, steps 1-4
-  built). The fog read (`fogDie` in planner.lua's judge, `sight.fogStrike`) moves OUT of the
-  chance to die: it becomes its own rank key right after admission (`M.outranks`), and only a
-  unit the fog's strike cannot kill marches into unseen ground (bot.lua `objectiveTile`); the
-  rest follow behind the front. Keep the "threatened units move last" reorder and `opts.seen`.
-  Witness: the 9 campaigns' Ch6 starts and `scout-ch6`, attempt 1, against comment 6780781911.
-  Then `suite --held-out` once, ADRs, the PR, `/code-review <PR> medium`. Then PR B.
-- **Waiting on Nicolas:** Fable's look one turn ahead for Ch5 (comment 6780629895).
+**Next session starts here (2026-11-10, after the step 4 rework's witness).** PR A step 4 was
+reworked as the amended plan says (commit fbc03270 on `feat/510-pr-a-first-attempts`, pushed, no
+PR): the fog read is a rank key, and the sturdy lead the march into fog. **Its Ch6 witness (#510
+comment 6781405996): fallbacks 57 to 7 (no freeze), but fog deaths unchanged (11 of 14 blue),
+green deaths 14 to 22, one loss.** The fog read is blind before first contact and too weak when
+a stronger enemy is still unseen; where it reads a likely death, a rank key does not refuse it.
+- **Waiting on Nicolas:** what to do with step 4 (the recommendation is in this session's reply
+  and on the comment's thread), and Fable's look one turn ahead for Ch5 (comment 6780629895).
+- **Then:** `suite --held-out` once on PR A's final code, ADRs, the PR, `/code-review <PR> medium`.
 - **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
-  6780145312), on a fresh Ch5 run of the final code (`replay` refuses another instrument's run).
-- **How the witnesses were played:** a scratch driver around `montecarlo.pinned_setup` +
-  `chapter_tasks(..., 'starts', seeds=[campaign seed])` (suite starts: `'tuning'`), writing to
-  its own runs file. Not kept; rebuild it (15 lines) or add a `montecarlo.py` command.
+  6780145312), on a fresh Ch5 run of the final code.
+- **How the witness was played:** a scratch driver (`montecarlo.pinned_setup` +
+  `chapter_tasks(..., 'starts', seeds=[campaign seed])`, `'tuning'` for `scout-ch6`), its own
+  runs file. Not kept. Ch6 runs take 90 to 520 s each; 11 in about 9 minutes on 8 workers.
 
 Refreshed 2026-11-10, late night (Claude, PR A session): **PR A stopped after step 3: the
 stepping-back witness on the Ch5 starts is refuted by the plan's own test (15 of 39 fallback
