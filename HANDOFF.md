@@ -104,6 +104,16 @@ Nicolas's call about a different retry rule.** Everything is in ONE comment, #51
 
 ## Next
 
+0. **Fable review first (Nicolas asked, 2026-11-10; there are Fable credits).** Before building
+   more, have a Fable session (`claude-fable-5-2`) look over #510 so far and the current
+   challenge, and suggest anything. Give it: the #510 body and its plan comments (6563384310 the
+   step 9 plan, 6563384018 its spec, 6776176601 this week's findings and the open retry
+   question), the ADRs 0376, 0384 to 0399, `tools/playtest/{campaign,botrun,planner,goals,
+   sight}.lua`, and the branch `feat/510-retry-memory`. The question to put to it: why the bot
+   does not "try different things" between retries the way a player does (send a tank to take
+   the hit, swap targets), whether "change the decision behind the first death" is the right
+   rule, and why the guard march to Ch6's Civilian is never taken. Its suggestions are input:
+   bring them to Nicolas, don't build on them unasked.
 1. **#510: PR 1, retries that learn** (above): get Nicolas's answer on the retry rule; build
    it, or not; find why the guard march to the Civilian is never taken (one instrumented run on
    4001 Ch6); then `suite --held-out`, a PR, `/code-review <PR> medium`, and
