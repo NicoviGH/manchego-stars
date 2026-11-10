@@ -9,10 +9,21 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Update, same session:** step 4 (fog) is built and its Ch6 witness is worse: the fog's chance
-puts 68 of 87 fallback decisions over the cap (#510 comment 6780781911; recommendation there:
-rank fog exposure as its own key after admission, not inside the cap). Fable's look-ahead design
-for Ch5 is #510 comment 6780629895. Both wait on Nicolas.
+**Next session starts here (2026-11-10, end of the PR A session).** The plan comment
+6779357154 is amended at its top and in PR A step 4: read those two parts first.
+- **Do: PR A step 4 rework** on `feat/510-pr-a-first-attempts` (pushed; 6 commits, steps 1-4
+  built). The fog read (`fogDie` in planner.lua's judge, `sight.fogStrike`) moves OUT of the
+  chance to die: it becomes its own rank key right after admission (`M.outranks`), and only a
+  unit the fog's strike cannot kill marches into unseen ground (bot.lua `objectiveTile`); the
+  rest follow behind the front. Keep the "threatened units move last" reorder and `opts.seen`.
+  Witness: the 9 campaigns' Ch6 starts and `scout-ch6`, attempt 1, against comment 6780781911.
+  Then `suite --held-out` once, ADRs, the PR, `/code-review <PR> medium`. Then PR B.
+- **Waiting on Nicolas:** Fable's look one turn ahead for Ch5 (comment 6780629895).
+- **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
+  6780145312), on a fresh Ch5 run of the final code (`replay` refuses another instrument's run).
+- **How the witnesses were played:** a scratch driver around `montecarlo.pinned_setup` +
+  `chapter_tasks(..., 'starts', seeds=[campaign seed])` (suite starts: `'tuning'`), writing to
+  its own runs file. Not kept; rebuild it (15 lines) or add a `montecarlo.py` command.
 
 Refreshed 2026-11-10, late night (Claude, PR A session): **PR A stopped after step 3: the
 stepping-back witness on the Ch5 starts is refuted by the plan's own test (15 of 39 fallback
