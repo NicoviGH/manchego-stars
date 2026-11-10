@@ -465,6 +465,12 @@ def hex_id(c):
     return '0x%02X' % c if isinstance(c, int) else str(c)
 
 
+def namer(names):
+    """`who` for a sentence from name table `names` ({id: name}): a unit's name, or its id
+    (hex_id) when the table has none, or an empty one."""
+    return lambda c: names.get(c) or hex_id(c)
+
+
 def plural(n, word, many=None):
     """'1 death', '2 deaths': `n` and `word`, plural unless n is 1 (`many` when the plural is
     not word + 's')."""
@@ -1410,8 +1416,12 @@ def validity_lines(valid):
     unread = valid.get('unread') or []
     if not valid['failed'] and not valid['withheld'] and not unread:
         return ['validity (FR-029): every invariant holds in both arms']
-    out = ['validity (FR-029): NOT READABLE, %s' % ', '.join(n for n, _ in valid['failed'])] \
-        if valid['failed'] else []
+    if valid['failed']:
+        out = ['validity (FR-029): NOT READABLE, %s' % ', '.join(n for n, _ in valid['failed'])]
+    elif unread:
+        out = ['validity (FR-029): not read, %s' % ', '.join(GAME_NAMES[a] for a in unread)]
+    else:
+        out = ['validity (FR-029): withheld']
     out += ['  %s: not read, no attempt reached the chapter' % GAME_NAMES[a] for a in unread]
     out += ['  %s: %s' % (n, said) for n, said in valid['failed']]
     out += ['  withheld: %s' % said for said in valid['withheld']]
@@ -1432,8 +1442,12 @@ def judged(verdict, valid):
         out.update(verdict=NOT_READABLE, settled=True, failed_invariants=names,
                    reason='NOT READABLE%s: %s' % (at, '; '.join(s for _, s in valid['failed'])))
     elif valid['withheld'] and verdict.get('verdict') is not None:
-        out.update(verdict='WITHHELD', settled=True,
-                   reason='withheld%s: %s' % (at, '; '.join(valid['withheld'])))
+        faults = '; '.join(valid['withheld'])
+        # a verdict already withheld (an arm's reach unknown) keeps its own reason too
+        reason = '%s; %s' % (verdict['reason'], faults) \
+            if verdict['verdict'] == 'WITHHELD' and verdict.get('reason') \
+            else 'withheld%s: %s' % (at, faults)
+        out.update(verdict='WITHHELD', settled=True, reason=reason)
     return out
 
 
@@ -1481,6 +1495,10 @@ def load_human(paths):
                 if row.get('map') not in HUMAN_MAPS:
                     raise ValueError('%s: map %r is not one of %s' % (
                         where, row.get('map'), ', '.join(HUMAN_MAPS)))
+                attempt = row.get('attempt')
+                if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+                    raise ValueError('%s: `attempt` must be a whole number from 1, not %r'
+                                     % (where, attempt))
                 if not isinstance(row.get('reset'), bool):
                     raise ValueError('%s: `reset` must be true or false' % where)
                 if row['reset'] and row.get('cause') not in causes:
@@ -1834,6 +1852,10 @@ def cell_arms(cell):
     the newest record of each name. ValueError naming a run the store no longer holds."""
     out = {}
     for arm in ('ours', 'vanilla'):
+        if any(not isinstance(w, (list, tuple)) for w in cell['runs'][arm]):
+            raise ValueError('montecarlo: the ch%02d cell record predates run_ref (it names %s '
+                             'runs by trace alone): rerun the pilot' % (cell['chapter'],
+                                                                     GAME_NAMES[arm]))
         want = [tuple(w) for w in cell['runs'][arm]]
         wanted = set(want)
         have = kept([cell['stores'][arm]],
@@ -1995,8 +2017,7 @@ def report_main(args):
     try:
         lines = report(cells, cell_arms, cal, canary(vanilla, rows), args.decision,
                        args.components.split(',') if args.components else None,
-                       {g: (lambda n: lambda c: n.get(c) or hex_id(c))(names[g])
-                        for g in names})
+                       {g: namer(names[g]) for g in names})
     except ValueError as err:
         print('refused: %s' % err)
         return 1
@@ -2344,8 +2365,8 @@ def regressions(frozen, now, explained=lambda key, char: None):
         for c in got['deaths']:
             if c not in was['deaths']:
                 label = explained(key, c)
-                out.append(('%s: 0x%02X dies, and lived when frozen; %s (a signal, not a '
-                            'blocker)' % (key, c, 'witnessed: %s' % label if label
+                out.append(('%s: %s dies, and lived when frozen; %s (a signal, not a '
+                            'blocker)' % (key, hex_id(c), 'witnessed: %s' % label if label
                                           else 'unexplained'), False))
         if got['stalls'] > was['stalls']:
             out.append(('%s: %s, %d when frozen' % (key, plural(got['stalls'], 'stall'),
@@ -2984,7 +3005,7 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
                          % (rec.get('instrument'), instrument))
     deaths = [d for d in rec.get('deaths') or [] if char is None or d.get('charId') == char]
     if not deaths:
-        raise ValueError('no death of 0x%02X in that run' % char if char is not None
+        raise ValueError('no death of %s in that run' % hex_id(char) if char is not None
                          else 'that run has no death')
     if len(deaths) > 1:
         raise ValueError('%d deaths in that run: name one with --char' % len(deaths))
@@ -3001,8 +3022,8 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
     if ref is None:
         ref, ref_from = d.get('plan_ref'), 'plan_ref'
     if ref is None:   # a greedy phase's death: no plan committed to it, none moved the unit
-        raise ValueError('no decision to pin: no plan moved 0x%02X or committed to its death'
-                         % d['charId'])
+        raise ValueError('no decision to pin: no plan moved %s or committed to its death'
+                         % hex_id(d['charId']))
     return {'ref': ref, 'ref_from': ref_from, 'mode': mode,
             'force': list(force) if force else None,
             'failure': {'charId': d['charId'], 'turn': d.get('turn')},
@@ -3218,7 +3239,7 @@ def story(events, names=None, items=None, classes=None):
         c = cls.get(cid)
         if c is not None:
             return 'the %s' % classes.get(c, 'class 0x%02X' % c)
-        return 'unit 0x%02X' % cid
+        return 'unit %s' % hex_id(cid)
 
     def item(iid):
         return items.get(iid) or ('item 0x%02X' % iid)
@@ -3528,7 +3549,7 @@ def audit_main(args):
     note = names_note(game, [r.get('rom_hash') for r in mine])
     if note:
         print(note)
-    for line in audit_lines(findings, lambda c: names.get(c) or hex_id(c)):
+    for line in audit_lines(findings, namer(names)):
         print(line)
     for g in lost:
         print('orphan (no record matches its run): %s, failure %s, %s at decision %s' % (

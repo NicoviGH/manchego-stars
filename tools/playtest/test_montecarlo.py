@@ -2668,12 +2668,21 @@ class Validity(unittest.TestCase):
         self.assertEqual((v['verdict'], v['settled']), ('WITHHELD', True))
         # a pilot has no verdict to withhold
         self.assertIsNone(mc.judged({'verdict': None}, valid)['verdict'])
+        # a verdict already withheld keeps its own reason, the fault appended
+        v = mc.judged({'verdict': 'WITHHELD', 'look': 50, 'settled': False,
+                       'reason': 'withheld at 50 replicates: reach unknown'}, valid)
+        self.assertEqual((v['verdict'], v['settled']), ('WITHHELD', True))
+        self.assertTrue(v['reason'].startswith('withheld at 50 replicates: reach unknown; '))
+        self.assertIn('outcome-dependent', v['reason'])
 
     def test_an_arm_with_no_attempt_is_not_read_never_passed(self):
         valid = mc.validity({'ours': [played()] * 5, 'vanilla': [{'status': 'unreached'}]})
         self.assertEqual(valid, {'failed': [], 'withheld': [], 'unread': ['vanilla']})
         self.assertEqual(mc.validity_lines(valid),
-                         ['  vanilla: not read, no attempt reached the chapter'])
+                         ['validity (FR-029): not read, vanilla',
+                          '  vanilla: not read, no attempt reached the chapter'])
+        self.assertEqual(mc.validity_lines({'failed': [], 'withheld': ['w'], 'unread': []}),
+                         ['validity (FR-029): withheld', '  withheld: w'])
         # a pilot's NOT READABLE reason has no look to name
         v = mc.judged({'verdict': None}, {'failed': [('blindspot', 'x')], 'withheld': []})
         self.assertEqual(v['reason'], 'NOT READABLE: x')
@@ -2766,7 +2775,11 @@ class Human(unittest.TestCase):
         for bad, said in ((dict(good, cause='bored'), 'not \'bored\''),
                           (dict(good, map='vanilla-ch9'), 'map'),
                           (dict(good, player='stranger'), 'player'),
-                          (dict(good, reset='yes'), 'reset')):
+                          (dict(good, reset='yes'), 'reset'),
+                          (dict(good, attempt=0), 'attempt'),
+                          (dict(good, attempt='1'), 'attempt'),
+                          (dict(good, attempt=True), 'attempt'),
+                          ({k: v for k, v in good.items() if k != 'attempt'}, 'attempt')):
             with open(path, 'w') as fh:
                 fh.write(json.dumps(good) + '\n' + json.dumps(bad) + '\n')
             with self.assertRaises(ValueError) as err:
@@ -2934,12 +2947,15 @@ class Report(unittest.TestCase):
 
     def test_a_unit_no_name_table_knows_prints_its_id(self):
         arms = {a: mc.describe(r) for a, r in self.arms().items()}
-        line = mc.component_line('by_unit', arms, {'ours': lambda c: {2: 'Pinky'}.get(c)
-                                                   or mc.hex_id(c)})
+        line = mc.component_line('by_unit', arms, {'ours': mc.namer({2: 'Pinky'})})
         self.assertEqual(line, '  protected deaths by unit: Manchego Stars Pinky 1, 0x03 1, '
                                '0xC9 1; twin 0x02 1')
         self.assertEqual((mc.plural(1, 'run'), mc.plural(2, 'run'), mc.plural(2, 'loss', 'losses')),
                          ('1 run', '2 runs', '2 losses'))
+
+    def test_namer_falls_back_to_the_id_on_a_missing_or_empty_name(self):
+        who = mc.namer({2: 'Pinky', 3: ''})
+        self.assertEqual((who(2), who(3), who(0xC9)), ('Pinky', '0x03', '0xC9'))
 
     def test_the_descriptive_data(self):
         d = mc.describe(self.arms()['ours'])
@@ -2985,6 +3001,12 @@ class Report(unittest.TestCase):
         with self.assertRaises(ValueError) as err:
             mc.cell_arms(cell)
         self.assertIn('t/gone', str(err.exception))
+        # a record from before run_ref named its runs by trace alone
+        old = dict(cell, runs={'ours': ['t/ours-0'], 'vanilla': cell['runs']['vanilla']})
+        with self.assertRaises(ValueError) as err:
+            mc.cell_arms(old)
+        self.assertIn('predates run_ref', str(err.exception))
+        self.assertIn('rerun the pilot', str(err.exception))
         # a pilot's sentence says it has no verdict
         line = mc.cell_sentence(cell, {a: mc.describe(r) for a, r in self.arms().items()})
         self.assertIn(': a pilot, no verdict on any protected death', line)

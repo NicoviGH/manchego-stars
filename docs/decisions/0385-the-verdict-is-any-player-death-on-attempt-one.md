@@ -211,8 +211,9 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   read", never "holds". An inversion prints a banner first. The humans' order counts their
   first attempts reset over a death, never a reset over loot. The anomalies are listed one line
   per run, each kind with its turns, and one `story` command at the first one's turn (a cell of
-  100 runs can carry a hundred anomalies; a story read from that turn reaches the rest). A cell's sentence names its two
-  largest cause differences an attempt (boss flag kept), plus escort greens. `--decision party`
+  100 runs can carry a hundred anomalies; a story read from that turn reaches the rest). A
+  cell's sentence names its two largest cause differences an attempt (boss flag kept), plus
+  escort greens. `--decision party`
   reads deaths by cause and by unit; `enemy` reads boss-flagged deaths by cause (over-cap left
   out), rng_tail deaths and turns to win; `chapter --components` reads what it names. Every
   line is beside the twin. `--post` writes the report under `build/` and prints the
