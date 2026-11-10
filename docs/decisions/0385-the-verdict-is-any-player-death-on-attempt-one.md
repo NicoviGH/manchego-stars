@@ -183,13 +183,16 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
     `env_status`. An attempt with no game result stays in the denominator, and FR-027 already
     bounds its endpoint;
   - "faults that depend on the outcome" are those in a **played** attempt (a game result,
-    but the watch misread something after play began). They withhold the verdict (WITHHELD).
-    A crash is not one of them: FR-027's bounding covers crashes;
+    but the watch misread something after play began). They withhold the verdict (WITHHELD)
+    and settle the cell: the faulted attempt is in every later look, so more pairs could
+    never clear it. A crash is not one of them: FR-027's bounding covers crashes;
   - a sandbox fault, a blind spot and "unclassified" use botrun.lua's own families
     (`M.DETAILS`). Unclassified means a death with no cause, or an `other` death whose detail
     has no family. The 10% counts attempts, not deaths;
   - an unlabelled over-cap death is `run_outcome`'s (ADR 0395), and an unjustified seize skip
-    is a `seize_skips` entry with `justified` false.
+    is a `seize_skips` entry with `justified` false;
+  - an arm with no attempt that reached the chapter is "not read", never "holds". A NOT
+    READABLE pilot says so first and exits non-zero: its analysis choice must not reach `cell`.
 - **Human calibration** (point 5): `human --form` prints the one-page form. Its causes are
   botrun.lua's plus `misplay` and `ignored_loot`, so the form and the comparison cannot
   drift. It is posted as one #510 comment on Nicolas's go-ahead. Coded attempts go in
@@ -200,11 +203,15 @@ UNVALIDATED_HUMAN. They are compared by failure mode, not by rate.
   has no leader and matches nothing. With no coded data, nothing is marked: FR-030 gates only
   once human data exists.
 - **The report** (`report`, FR-031): `pilot` and `cell` each append a `kind: cell` record to
-  `references/sim/cells.jsonl`, naming the runs judged by their traces, and `report` reads one
-  instrument's cells from it. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6, plus the humans'
+  `references/sim/cells.jsonl`, naming each paired run by its name, trace and instrument,
+  and `report` reads one instrument's cells from it. A pilot with a benched arm is an
+  experiment and writes no record. The canary pairs vanilla Ch1/Ch5 and Ch2/Ch6, plus the humans'
   Ch3/Ch5 order once they have played both. It reads the vanilla first attempts in the cells'
   stores under that instrument, never a held-out run. A chapter with no attempts is "not
-  read", never "holds". An inversion prints a banner first. A cell's sentence names its two
+  read", never "holds". An inversion prints a banner first. The humans' order counts their
+  first attempts reset over a death, never a reset over loot. The anomalies are listed one line
+  per run, each kind with its turns, and one `story` command at the first one's turn (a cell of
+  100 runs can carry a hundred anomalies; a story read from that turn reaches the rest). A cell's sentence names its two
   largest cause differences an attempt (boss flag kept), plus escort greens. `--decision party`
   reads deaths by cause and by unit; `enemy` reads boss-flagged deaths by cause (over-cap left
   out), rng_tail deaths and turns to win; `chapter --components` reads what it names. Every

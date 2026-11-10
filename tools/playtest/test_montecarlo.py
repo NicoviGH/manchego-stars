@@ -1047,7 +1047,8 @@ class Suite(unittest.TestCase):
         self.assertEqual(sorted(plain['kept']()), [3001])
         sides['ours']['reached'], sides['vanilla']['reached'] = (1, 3), (1, 1)
         self.assertEqual(mc.games_line(sides, [3001, 3002]),
-                         'over 1 MS games (1 of 3 pinned campaigns reached the chapter) and '
+                         'over 1 Manchego Stars games (1 of 3 pinned campaigns reached the '
+                         'chapter) and '
                          '1 vanilla games (1 of 1 pinned campaigns reached the chapter)')
 
     def test_the_games_line_counts_only_the_starts_the_seeds_were_dealt(self):
@@ -1059,7 +1060,7 @@ class Suite(unittest.TestCase):
                  for n in ('ours', 'vanilla')}
         for side in sides.values():
             side['reached'] = (60, 60)
-        self.assertIn('over 50 MS games', mc.games_line(sides, range(3001, 3051)))
+        self.assertIn('over 50 Manchego Stars games', mc.games_line(sides, range(3001, 3051)))
         self.assertIn('and 2 vanilla games', mc.games_line(sides, [3001, 3002, 3061]))
 
     def pins(self, store, campaigns):
@@ -1296,6 +1297,63 @@ class Suite(unittest.TestCase):
             cell = json.loads(fh.read())
         self.assertEqual((cell['kind'], cell['cell_kind'], cell['verdict'], cell['twin_index']),
                          ('cell', 'campaign', 'WITHHELD', 3))
+
+    def test_a_campaign_cell_at_no_written_chapter_is_refused_before_it_plays(self):
+        d = tempfile.mkdtemp()
+        out = io.StringIO()
+        with mock.patch.object(mc, 'load_suite', return_value={'cells': 24}), \
+                mock.patch.object(mc, 'run_cell') as run, contextlib.redirect_stdout(out):
+            self.assertEqual(mc.main(['cell', '--analysis', 'paired', '--ours', d, '--vanilla',
+                                      d, '--ours-chapter', '99', '--vanilla-chapter', '3']), 1)
+        run.assert_not_called()
+        self.assertIn("refused: --ours-chapter 99 is no written chapter's index", out.getvalue())
+
+    def pilot(self, results, bench=()):
+        """`pilot --chapter 2` over fake sides and pairs: (exit code, printed, cell records)."""
+        d = tempfile.mkdtemp()
+        side = {'kept': dict, 'tasks': lambda seeds: [], 'chapter': 2, 'pinned': True,
+                'store': os.path.join(d, 'runs.jsonl')}
+        got = {'pairs': [(r['ours']['died'], r['vanilla']['died']) for r in results.values()],
+               'paired': list(results), 'results': results, 'cpu_s': 1.0, 'problems': [],
+               'reach': {}}
+        suite = {'cells': 24, 'seed_sets': {'pilot': [1, len(results)]}, 'starts': []}
+        out, cells = io.StringIO(), os.path.join(d, 'cells.jsonl')
+        argv = ['pilot', '--chapter', '2'] + [x for c in bench for x in ('--bench-vanilla', c)]
+        with mock.patch.object(mc, 'cell_setup', return_value=(
+                    suite, {'ours': d, 'vanilla': d}, dict, {'ours': [], 'vanilla': []})), \
+                mock.patch.object(mc, 'chapter_sides', return_value={'ours': side,
+                                                                     'vanilla': side}), \
+                mock.patch.object(mc, 'instrument_id', return_value='i+v2'), \
+                mock.patch.object(mc, 'suite_estimate', return_value=0.1), \
+                mock.patch.object(mc, 'kept_walls', return_value={}), \
+                mock.patch.object(mc, 'cell_pairs', return_value=got), \
+                mock.patch.object(mc, 'games_line', return_value='over 1 game'), \
+                mock.patch.object(mc, 'CELLS_FILE', cells), contextlib.redirect_stdout(out):
+            code = mc.main(argv)
+        recs = mc.report_cells(cells)
+        return code, out.getvalue(), recs
+
+    def test_a_pilot_files_its_cell_record_and_a_not_readable_one_fails(self):
+        def res(died, detail=None):
+            deaths = [{'cause': 'other' if detail else 'rng_tail', 'charId': 1,
+                       'detail': detail}] if died else []
+            return dict(played(deaths), rec=dict(played(deaths)['rec'], trace='t', seed=1,
+                                                 suite={'start_id': 'cs-s4001/2'}))
+        ok = {s: {'ours': res(s % 3 == 0), 'vanilla': res(s % 5 == 0)} for s in range(1, 21)}
+        code, out, recs = self.pilot(ok)
+        self.assertEqual(code, 0)
+        self.assertEqual([(r['cell_kind'], r['verdict']) for r in recs], [('pilot', None)])
+        # an experiment with a benched unit is not the instrument's pilot: no record
+        code, out, recs = self.pilot(ok, bench=['5'])
+        self.assertEqual(recs, [])
+        self.assertIn('no cell record: a benched experiment', out)
+        bad = dict(ok)
+        bad[1] = {'ours': res(True, 'missing_prediction'), 'vanilla': res(False)}
+        code, out, recs = self.pilot(bad)
+        self.assertEqual(code, 1)
+        self.assertTrue(out.splitlines()[1].startswith('NOT READABLE (sandbox_fault): this '
+                                                       "pilot's analysis choice cannot be used"))
+        self.assertEqual(recs[0]['verdict'], 'NOT_READABLE')
 
     def test_the_pilot_and_confirmatory_seeds_never_meet(self):
         # T092, FR-025 (the tuning and held-out seeds' clash is test_a_seed_in_two_sets_raises)
@@ -2553,7 +2611,8 @@ class Validity(unittest.TestCase):
     def test_a_valid_cell_keeps_its_verdict(self):
         v = self.verdict(self.results())
         self.assertEqual(v['verdict'], 'EQUIVALENT')
-        self.assertEqual(mc.validity(self.results()), {'failed': [], 'withheld': []})
+        self.assertEqual(mc.validity(self.results()), {'failed': [], 'withheld': [],
+                                                       'unread': []})
 
     def test_each_invariant_failed_alone_is_not_readable_and_named(self):
         unresolved = {'status': 'unresolved', 'rec': {'outcome': 'crashed', 'env_status': {
@@ -2588,7 +2647,7 @@ class Validity(unittest.TestCase):
         self.assertEqual(mc.validity(self.results(
             ours=[{'status': 'unresolved', 'rec': {'env_status': {'fault': 'crash'}}}] * 2,
             vanilla=[played([{'cause': 'other', 'charId': 2, 'detail': 'noncombat'}])]
-            + [played([self.TAIL])] * 14)), {'failed': [], 'withheld': []})
+            + [played([self.TAIL])] * 14)), {'failed': [], 'withheld': [], 'unread': []})
 
     def test_an_over_cap_death_a_fallback_names_is_no_failure(self):
         ok = played([{'cause': 'over_cap', 'charId': 2, 'over_cap': True}],
@@ -2605,9 +2664,19 @@ class Validity(unittest.TestCase):
         self.assertEqual(len(valid['withheld']), 1)
         self.assertIn('outcome-dependent', valid['withheld'][0])
         v = mc.judged({'verdict': 'HARDER', 'look': 50, 'settled': True}, valid)
-        self.assertEqual((v['verdict'], v['settled']), ('WITHHELD', False))
+        # settled: the faulted attempt is in every later look, so more pairs never clear it
+        self.assertEqual((v['verdict'], v['settled']), ('WITHHELD', True))
         # a pilot has no verdict to withhold
         self.assertIsNone(mc.judged({'verdict': None}, valid)['verdict'])
+
+    def test_an_arm_with_no_attempt_is_not_read_never_passed(self):
+        valid = mc.validity({'ours': [played()] * 5, 'vanilla': [{'status': 'unreached'}]})
+        self.assertEqual(valid, {'failed': [], 'withheld': [], 'unread': ['vanilla']})
+        self.assertEqual(mc.validity_lines(valid),
+                         ['  vanilla: not read, no attempt reached the chapter'])
+        # a pilot's NOT READABLE reason has no look to name
+        v = mc.judged({'verdict': None}, {'failed': [('blindspot', 'x')], 'withheld': []})
+        self.assertEqual(v['reason'], 'NOT READABLE: x')
 
     def test_a_cell_that_fails_one_stops_at_that_look(self):
         def fate(name, seed, chapter):
@@ -2665,6 +2734,17 @@ class Human(unittest.TestCase):
         # the cause of the bot's FIRST death is what a reset is compared with, not any death
         self.assertEqual(mc.bot_leading_cause(self.bot(self.BOT)['ours-ch02'])[0], 'fog')
 
+    def test_the_first_death_is_the_earliest_and_an_unnamed_cause_still_leads(self):
+        rec = played([{'cause': 'fog', 'charId': 1, 'turn': None},
+                      {'cause': 'rng_tail', 'charId': 2, 'turn': 4},
+                      {'cause': 'over_cap', 'charId': 3, 'turn': 4}])['rec']
+        # no turn sorts last; a same-turn tie keeps the watch's order
+        self.assertEqual(mc.first_death(rec)['charId'], 2)
+        self.assertIsNone(mc.first_death(played()['rec']))
+        recs = [played([{'charId': 1, 'turn': 2}])['rec']] * 2 + \
+            [played([{'cause': 'fog', 'charId': 1, 'turn': 2}])['rec']]
+        self.assertEqual(mc.bot_leading_cause(recs)[0], 'unclassified')
+
     def test_a_map_with_no_lead_matches_nothing(self):
         human = {'vanilla-ch3': ['rng_tail', 'fog'], 'vanilla-ch5': ['over_cap'],
                  'ours-ch02': ['fog']}   # a tie on Ch3, nothing coded on ch03
@@ -2717,7 +2797,8 @@ class Report(unittest.TestCase):
     def cell(self, verdict='HARDER', **kw):
         return dict({'kind': 'cell', 'cell_kind': 'chapter', 'chapter': 3, 'twin_index': 3,
                      'instrument': 'i+v2', 'verdict': verdict, 'lo': 0.04, 'hi': 0.19,
-                     'diff': 0.12, 'pairs': 100, 'games': 'over 10 MS games and 10 vanilla games',
+                     'diff': 0.12, 'pairs': 100, 'games': 'over 10 Manchego Stars games and 10 '
+                     'vanilla games',
                      'failed_invariants': [], 'validity': {'failed': [], 'withheld': []},
                      'cpu_s': 7200.0}, **kw)
 
@@ -2748,14 +2829,18 @@ class Report(unittest.TestCase):
         sentences = [l for l in lines if ' vs vanilla ' in l]
         self.assertEqual(len(sentences), 2)
         self.assertEqual(sentences[0],
-                         'MS ch03 vs vanilla Ch3, 100 pairs over 10 MS games and 10 vanilla '
+                         'Manchego Stars ch03 vs vanilla Ch3, 100 pairs over 10 Manchego Stars '
+                         'games and 10 vanilla '
                          'games: harder, +4.0 to +19.0 points on any protected death; a '
-                         'protected unit died in MS 2 of 3, the twin 1 of 3, driven by '
-                         'other deaths (MS 0.33 an attempt, twin 0.00) and over_cap, boss '
-                         'deaths (MS 0.33 an attempt, twin 0.00) and 1 escort-green death '
+                         'protected unit died in Manchego Stars 2 of 3, the twin 1 of 3, driven by '
+                         'other deaths (Manchego Stars 0.33 an attempt, twin 0.00) and '
+                         'over_cap, boss '
+                         'deaths (Manchego Stars 0.33 an attempt, twin 0.00) and 1 escort-green '
+                         'death '
                          '(twin 0)')
         # three causes tie at 0.33 an attempt: the first two by name, so the sentence is stable
-        self.assertTrue(sentences[1].startswith('MS ch02 vs vanilla Ch2, 100 pairs over 10 MS '
+        self.assertTrue(sentences[1].startswith('Manchego Stars ch02 vs vanilla Ch2, 100 pairs '
+                                                'over 10 Manchego Stars '
                                                 'games and 10 vanilla games: NOT READABLE '
                                                 '(blindspot)'))
         self.assertFalse(any('|' in l for l in lines), 'it is not a table')
@@ -2789,7 +2874,14 @@ class Report(unittest.TestCase):
         self.assertIn('canary vanilla Ch2 below vanilla Ch6 (expected): not read, vanilla Ch2 '
                       'and vanilla Ch6 have no first attempts under this instrument', out)
         # the humans' Ch3/Ch5 order is a third pair once they have played both
-        human = Human.coded({'vanilla-ch3': ['fog', None, None], 'vanilla-ch5': ['fog', 'fog']})
+        # the humans' first attempts reset over a death only: Ch3 0 of 2 (a loot reset and a
+        # later attempt's death never count), Ch5 1 of 2, so Ch3 is the easier
+        human = [{'player': p, 'map': m, 'attempt': a, 'reset': c is not None, 'cause': c}
+                 for p, m, a, c in (('designer', 'vanilla-ch3', 1, 'ignored_loot'),
+                                    ('designer', 'vanilla-ch3', 2, 'fog'),
+                                    ('friend', 'vanilla-ch3', 1, None),
+                                    ('designer', 'vanilla-ch5', 1, 'fog'),
+                                    ('friend', 'vanilla-ch5', 1, None))]
         out, inverted = mc.canary({rows['FE8 Ch5']: safe, rows['FE8 Ch3']: lost}, human)
         self.assertTrue(inverted)
         self.assertIn('canary vanilla Ch3 below vanilla Ch5 (as the humans found): vanilla Ch3 '
@@ -2797,41 +2889,57 @@ class Report(unittest.TestCase):
 
     def test_anomalies_carry_their_story_commands(self):
         text = '\n'.join(self.lines())
-        self.assertIn('anomalies: 1 in 1 runs\n  ch03 MS seed None: fallback_sacrifice turn 4 '
+        self.assertIn('anomalies: 1 in 1 runs\n  ch03 Manchego Stars seed None: '
+                      'fallback_sacrifice turn 4 '
                       '-> python3 tools/playtest/montecarlo.py story t.jsonl.gz --turn 4', text)
         self.assertIn('validity failures: none', text)
         text = '\n'.join(self.lines([self.cell('NOT_READABLE', validity={'failed': [
-            ('blindspot', 'MS: 2 of 3 attempts ...')], 'withheld': []})]))
-        self.assertIn('validity failures: 1\n  ch03 MS: 2 of 3 attempts ...', text)
+            ('blindspot', 'Manchego Stars: 2 of 3 attempts ...')], 'withheld': []})]))
+        self.assertIn('validity failures: 1\n  ch03 Manchego Stars: 2 of 3 attempts ...', text)
 
     def test_each_decision_reads_only_its_own_components_beside_the_twin(self):
         def block(lines):
-            return [l for l in lines if l.startswith('  ') and ': MS ' in l]
+            return [l for l in lines if l.startswith('  ') and ': Manchego Stars ' in l]
         every = block(self.lines())
         self.assertEqual(len(every), len(mc.COMPONENTS))
         self.assertTrue(all('; twin ' in l for l in every), 'every result beside its twin')
         party = block(self.lines(decision='party'))
         # the escort green's death is the bot's to answer for, so it is a party death too
-        self.assertEqual(party, ['  protected deaths by cause: MS other 1, over_cap, boss 1, '
+        self.assertEqual(party, ['  protected deaths by cause: Manchego Stars other 1, '
+                                 'over_cap, boss 1, '
                                  'rng_tail, boss 1; twin rng_tail 1',
-                                 '  protected deaths by unit: MS 0x02 1, 0x03 1, 0xC9 1; twin '
+                                 '  protected deaths by unit: Manchego Stars 0x02 1, 0x03 1, '
+                                 '0xC9 1; twin '
                                  '0x02 1'])
         enemy = block(self.lines(decision='enemy'))
         # boss-flagged deaths leave the over-cap one out; the twin's death is not the boss's
-        self.assertEqual(enemy, ['  boss-flagged deaths by cause, over-cap left out: MS '
+        self.assertEqual(enemy, ['  boss-flagged deaths by cause, over-cap left out: Manchego '
+                                 'Stars '
                                  'rng_tail 1; twin none',
-                                 '  rng_tail deaths: MS 1; twin 1',
-                                 '  turns to win: MS 2 wins, turns 12 to 15, median 15; twin 3 '
+                                 '  rng_tail deaths: Manchego Stars 1; twin 1',
+                                 '  turns to win: Manchego Stars 2 wins, turns 12 to 15, median '
+                                 '15; twin 3 '
                                  'wins, turns 10 to 14, median 11'])
         chapter = block(self.lines(decision='chapter', components=['greens', 'missed']))
-        self.assertEqual(chapter, ['  greens: MS 1 lost, 1 of them escorts; twin 0 lost, 0 of '
+        self.assertEqual(chapter, ['  greens: Manchego Stars 1 lost, 1 of them escorts; twin 0 '
+                                   'lost, 0 of '
                                    'them escorts',
-                                   '  goals missed (rewards by reason, recruits): MS skipped 1; '
+                                   '  goals missed (rewards by reason, recruits): Manchego '
+                                   'Stars skipped 1; '
                                    'twin none'])
         with self.assertRaises(ValueError):
             self.lines(decision='chapter')
         with self.assertRaises(ValueError):
             self.lines(decision='chapter', components=['luck'])
+
+    def test_a_unit_no_name_table_knows_prints_its_id(self):
+        arms = {a: mc.describe(r) for a, r in self.arms().items()}
+        line = mc.component_line('by_unit', arms, {'ours': lambda c: {2: 'Pinky'}.get(c)
+                                                   or mc.hex_id(c)})
+        self.assertEqual(line, '  protected deaths by unit: Manchego Stars Pinky 1, 0x03 1, '
+                               '0xC9 1; twin 0x02 1')
+        self.assertEqual((mc.plural(1, 'run'), mc.plural(2, 'run'), mc.plural(2, 'loss', 'losses')),
+                         ('1 run', '2 runs', '2 losses'))
 
     def test_the_descriptive_data(self):
         d = mc.describe(self.arms()['ours'])
@@ -2843,14 +2951,26 @@ class Report(unittest.TestCase):
     def test_report_reads_the_runs_a_cell_record_names(self):
         d = tempfile.mkdtemp()
         stores = {a: os.path.join(d, a + '.jsonl') for a in ('ours', 'vanilla')}
+        def named(r, a, i):
+            # the vanilla seed-1 run lost its trace (keep_trace drops a missing file)
+            return dict(r, campaign='cs-s400%d' % i, seed=3000 + i, attempt=1, instrument='i+v2',
+                        trace=None if (a, i) == ('vanilla', 1) else 't/%s-%d' % (a, i))
+        results = {}
         for a, recs in self.arms().items():
             for i, r in enumerate(recs):
-                mc.append_record(stores[a], dict(r, trace='t/%s-%d' % (a, i)))
-        results = {s: {a: {'status': 'played', 'rec': {'trace': 't/%s-%d' % (a, s)}}
-                       for a in stores} for s in range(3)}
+                mc.append_record(stores[a], named(r, a, i))
+                results.setdefault(i, {})[a] = {'status': 'played', 'rec': named(r, a, i)}
+            # another instrument's trace-less run of another seed, filed later, is never read
+            mc.append_record(stores[a], dict(recs[0], campaign='x', seed=9, attempt=1,
+                                             instrument='old+v2', trace=None, turns_to_win=99))
+        results[3] = {'ours': {'status': 'played', 'rec': {'trace': 't/unpaired'}},
+                      'vanilla': {'status': 'unreached'}}
         cell = mc.cell_record('pilot', 3, 3, {'verdict': None, 'n': 3}, results, [0, 1, 2],
                               stores, 'i+v2')
-        self.assertEqual(cell['runs']['ours'], ['t/ours-0', 't/ours-1', 't/ours-2'])
+        # only the paired seeds are named: an unpaired run never enters the descriptive data
+        self.assertEqual(cell['runs']['ours'][0], ['cs-s4000/3000/4/1', 't/ours-0', 'i+v2'])
+        self.assertEqual(cell['runs']['vanilla'][1], ['cs-s4001/3001/4/1', None, 'i+v2'])
+        self.assertEqual(len(cell['runs']['ours']), 3)
         arms = mc.cell_arms(cell)
         self.assertEqual([r['turns_to_win'] for r in arms['vanilla']], [10, 11, 14])
         path = os.path.join(d, 'cells.jsonl')
@@ -2861,7 +2981,7 @@ class Report(unittest.TestCase):
         self.assertEqual([(c['instrument'], c['pairs']) for c in got], [('i+v2', 50)])
         self.assertEqual(len(mc.report_cells(path, 'old+v2')), 1)
         self.assertEqual(mc.report_cells(os.path.join(d, 'none')), [])
-        cell['runs']['ours'].append('t/gone')
+        cell['runs']['ours'].append(['gone/1/4/1', 't/gone', 'i+v2'])
         with self.assertRaises(ValueError) as err:
             mc.cell_arms(cell)
         self.assertIn('t/gone', str(err.exception))
