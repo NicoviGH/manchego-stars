@@ -31,8 +31,8 @@ was built or run in the emulator this session.
   interval since `EQUIVALENT` at +/-10 will rarely be reached.
 - **Nicolas confirmed the goal:** winning clean is his proxy for "the bot is capable", as a
   human is after retries and learning. Clean clears stay the campaign's carry-on rule.
-- **Calls proposed on the comment and NOT yet his yes** (ask at PR A's start; PR C's three
-  before PR C): the
+- **Nicolas approved every call the comment proposes** (2026-11-10, "yes I approve all";
+  each PR records its own as an ADR): the
   fog rule (a unit beside unseen ground is judged against one strike from the strongest enemy
   seen so far), the regrade (a death graded by the plan that moved its unit), and a cheap proof
   in place of a suite run for the retries-only PR.
@@ -116,8 +116,8 @@ was built or run in the emulator this session.
 
 ## Next
 
-0. **#510 PR A, first attempts** (plan comment 6779357154): get Nicolas's yes on the fog rule
-   and the regrade; then, in commit order, the harness fix, the regrade and calibration script
+0. **#510 PR A, first attempts** (plan comment 6779357154): its calls are approved;
+   in commit order, the harness fix, the regrade and calibration script
    (no emulator), stepping back (witness: Ch5 starts), fog in the chance to die (witness: the
    Ch6 fog start); `suite --held-out` once on the final code; `/code-review <PR> medium`.
    Stepping back is the largest piece (Ch5's 81 of 110).
