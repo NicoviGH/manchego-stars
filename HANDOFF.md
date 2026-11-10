@@ -10,17 +10,29 @@ here should still be true in a month. Before a context rollover, warn Nicolas, r
 and start a fresh instance; don't rely on auto-compaction.
 
 Refreshed 2026-11-10, night (Claude, Fable session): **the Fable review is done and its plan is
-locked by Nicolas: two PRs, one suite run. The plan is ONE comment, #510 comment 6779357154
+locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
+The plan is ONE comment, #510 comment 6779357154
 (edited in place; it has the findings, both PRs' steps and a file map). Read it first.** Nothing
 was built or run in the emulator this session.
 - **What the review found** (detail and witnesses on the comment): fog is read as empty ground
   by every danger estimate and by admission; the bot has no way to pull back together and makes
-  no further plan when none is under the cap; the predicted enemy phase differs from the played
-  one (how far is unmeasured); an enemy-phase death is graded by the phase's last plan, so fog
-  deaths read `over_cap`; retries are reruns.
+  no further plan when none is under the cap; an enemy-phase death is graded by the phase's
+  last plan, so some fog deaths read `over_cap`; retries are reruns.
+- **Read from the kept runs the same night** (offline; tables on the comment): 2,750 kept
+  vanilla traces are 490 distinct games. The bot's death chances are about right where it gives
+  one (37% predicted, 34% died; 70%, 73%), so the enemy phase's prediction gets no fix. Ch5's
+  wall is plans the bot knows are over the cap (81 of 110 blue deaths); Ch6's is fog (21 of 42,
+  plus 5 exposed after they moved). Ch5's 18 deaths at a predicted 0 with the killer in sight
+  have no named cause yet.
+- **The verdict method was reviewed too** (PR C on the comment): a chapter cell's seed draws
+  only the style, the dice are the start state's (`b.seed` is a no-op in campaign mode), so a
+  cell's pairs are far fewer distinct games than they count; proposed: seed a cell
+  replicate's dice, report expected losses beside the any-death rate, read a cell by its
+  interval since `EQUIVALENT` at +/-10 will rarely be reached.
 - **Nicolas confirmed the goal:** winning clean is his proxy for "the bot is capable", as a
   human is after retries and learning. Clean clears stay the campaign's carry-on rule.
-- **Three calls are proposed on the comment and NOT yet his yes** (ask at PR A's start): the
+- **Calls proposed on the comment and NOT yet his yes** (ask at PR A's start; PR C's three
+  before PR C): the
   fog rule (a unit beside unseen ground is judged against one strike from the strongest enemy
   seen so far), the regrade (a death graded by the plan that moved its unit), and a cheap proof
   in place of a suite run for the retries-only PR.
@@ -107,13 +119,14 @@ was built or run in the emulator this session.
 0. **#510 PR A, first attempts** (plan comment 6779357154): get Nicolas's yes on the fog rule
    and the regrade; then, in commit order, the harness fix, the regrade and calibration script
    (no emulator), stepping back (witness: Ch5 starts), fog in the chance to die (witness: the
-   Ch6 fog start), the enemy phase's prediction only if the calibration is off; `suite
-   --held-out` once on the final code; `/code-review <PR> medium`.
+   Ch6 fog start); `suite --held-out` once on the final code; `/code-review <PR> medium`.
+   Stepping back is the largest piece (Ch5's 81 of 110).
 1. **#510 PR B, retries** (same comment): retry memory rebased from `feat/510-retry-memory`,
    deadlines from a remembered green death, the guard's bugs; carry the 10 vanilla campaigns on
    before the merge (`resume --game vanilla --tag <t>`); retries that differ only if they still
    stop on reruns. Then tries to the first clean clear (its method goes to Nicolas as an ADR
-   0385 amendment first). **#510 step 10** after.
+   0385 amendment first). Then **PR C** (same comment: a cell's dice, expected losses; small,
+   no suite run), before any cell verdict. **#510 step 10** after.
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
