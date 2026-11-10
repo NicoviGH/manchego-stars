@@ -336,6 +336,36 @@ do
     check(recordOf(g).outcome, "crashed", "it is recorded as crashed")
 end
 
+-- A move the game halted on a unit the fog hid (FE8's ambush: api.act says "trapped") is no
+-- crash: the unit's turn is over one step short, the trace says where it stopped, and the run
+-- plays on.
+do
+    local g = fakeGame { units = rout() }
+    local act, trapped = g.api.act, 0
+    g.api.act = function(a)
+        if trapped == 0 then
+            trapped = trapped + 1
+            for _, u in ipairs(g.units) do
+                if u.id == a.unitId then u.acted = true end
+            end
+            return "trapped"
+        end
+        return act(a)
+    end
+    local events = {}
+    g.api.trace = function(ev) events[#events + 1] = ev end
+    Botrun.run(g.api)
+    check(trapped, 1, "trapped: one move was halted")
+    check(recordOf(g).outcome ~= "crashed", true, "trapped: the run is no crash")
+    local said
+    for _, e in ipairs(events) do
+        if e.t == "act" and e.trapped then said = e end
+    end
+    check(said ~= nil, true, "trapped: the trace marks the act")
+    check(said and said.to and said.from and said.to.x == said.from.x and said.to.y == said.from.y,
+          true, "trapped: and says it ended where the unit stopped, not where it was sent")
+end
+
 -- An action that leaves its unit able to act would be asked for again forever.
 do
     local g = fakeGame { units = rout() }

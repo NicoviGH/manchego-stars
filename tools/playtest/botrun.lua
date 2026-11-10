@@ -1242,29 +1242,33 @@ function M.run(api)
                     return "crashed", "the harness could not perform " .. action.act
                         .. (why and (": " .. why) or "")
                 end
-                if action.act == "visit" or action.act == "chest" then
+                -- "trapped": the game halted the move on a unit the fog hid (FE8's ambush,
+                -- harness api.act); the unit's turn is over where it stopped, its act not made
+                local trapped = done == "trapped"
+                if not trapped and (action.act == "visit" or action.act == "chest") then
                     explore.visited(action, turn)
                 end
-                if action.act == "visit" or action.act == "chest" or action.act == "talk"
-                        or action.act == "rescue" or action.act == "drop" then
+                if not trapped and (action.act == "visit" or action.act == "chest"
+                        or action.act == "talk" or action.act == "rescue" or action.act == "drop") then
                     progressed = true
                 end
-                local battle = action.act == "attack" and api.battle and api.battle() or nil
+                local battle = not trapped and action.act == "attack" and api.battle and api.battle() or nil
                 local after = api.board()
                 sight.refresh()
                 before = board
                 local actor = byId(after)[action.unitId]
                 local from = byId(board)[action.unitId]
                 local fell = fallen(board, after, action)
-                if lords[action.unit] and from
-                    and (from.x ~= action.move.x or from.y ~= action.move.y) then
+                local to = trapped and actor or action.move
+                if lords[action.unit] and from and (from.x ~= to.x or from.y ~= to.y) then
                     progressed = true
                 end
                 record(fell, "player", playing, action)
                 trace({ t = "act", phase = "player", unit = action.unit, id = action.unitId,
-                        from = from and { x = from.x, y = from.y }, to = action.move,
+                        from = from and { x = from.x, y = from.y },
+                        to = trapped and actor and { x = actor.x, y = actor.y } or action.move,
                         canto = action.canto, act = action.act, target = action.target, battles = { battle },
-                        fell = fell })
+                        fell = fell, trapped = trapped or nil })
                 changes(after)
                 if done == "noseize" then
                     -- The bot seizes only with a unit the game's CanUnitSeize allows, on the tile

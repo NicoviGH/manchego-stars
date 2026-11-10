@@ -1156,7 +1156,9 @@ end
 -- correctly -- offers no confirm on an unreachable tile, so each attempt logged
 -- `confirm_move: fail:not-legal` and the sticky fault failed a run that went on to WIN (#335).
 -- The movement map is already on screen once the unit is selected, so ask it before pressing.
-local function moveUnit(fx, fy, tx, ty)
+-- haltOk: the caller takes the fog's halt ("trapped", below) as the move's end; any other
+-- caller wants the command menu, and a halt is false to it as before.
+local function moveUnit(fx, fy, tx, ty, haltOk)
     if not awaitControllerState("player_map_idle", 300) then return false end
     if not cursorTo(fx, fy) then return false end
     if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
@@ -1170,9 +1172,28 @@ local function moveUnit(fx, fy, tx, ty)
         return false
     end
     if not cursorTo(tx, ty) then return false end
-    return guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
-        return controllerState(after) == "unit_command_menu"
-    end, 180)
+    -- FE8's fog ambush (bmidoten.c): a path step onto a tile the fog hides a unit on (or, for a
+    -- unit that is no thief or flier, a hidden trap) bumps and halts there, sets gActionData +11
+    -- to UNIT_ACTION_TRAPPED, and ends the unit's turn with no command menu
+    -- (playerphase.c PlayerPhase_ApplyUnitMovement); the last unit's ends the phase too. Selecting
+    -- the unit cleared that byte (bmunit.c UnitBeginAction), so TRAPPED is this move's own.
+    local function trapped() return ru8(SYM.gActionData + 0x11) == BOARD.ACTION_TRAPPED end
+    if not guardedInput("confirm_move", "A", "live unit command menu opens, or the game halts the move",
+            function(after)
+                return controllerState(after) == "unit_command_menu" or (haltOk and trapped())
+            end, 180) then
+        return false
+    end
+    if not (haltOk and trapped()) then return true end
+    -- the halt's bump plays out: back on the player's map, or on into the enemy phase
+    for _ = 1, 900 do
+        local now = observeController()
+        if controllerState(now) == "player_map_idle" or (now.world and now.world.faction ~= 0) then
+            return "trapped"
+        end
+        yield()
+    end
+    return false
 end
 
 local function chooseWait()
@@ -3447,7 +3468,15 @@ INSPECT.botApi = function(game)
     api.act = function(a)
         local u = BOARD.find("blue", a.unit)
         if not u then return false, "the unit is not on the board" end
-        if not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false, "the move failed" end
+        local moved = moveUnit(u.x, u.y, a.move.x, a.move.y, true)
+        if not moved then return false, "the move failed" end
+        if moved == "trapped" then
+            -- the game's own rule (moveUnit): the act is over short of its tile, never failed;
+            -- botrun reads where it ended ("the move ended short") and plans again
+            log(string.format("act: 0x%02X halted by the fog on its way to %d,%d", a.unit,
+                a.move.x, a.move.y))
+            return "trapped"
+        end
         if a.act == "attack" then
             -- The actor can die in its own attack: a dead unit is never greyed out, so its
             -- death is an exit of the combat wait too. So is the event engine taking over: a
