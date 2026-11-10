@@ -2402,9 +2402,9 @@ do
         end,
     }
     local beam = Planner.BEAM
-    Planner.BEAM = 1
+    Planner.BEAM, Planner.STEP_BACK = 1, false   -- the step back would hold A at (0,0) too
     local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
-    Planner.BEAM = beam
+    Planner.BEAM, Planner.STEP_BACK = beam, true
     check(at(a) .. " " .. tostring(plan and plan.kind), "0,0 mend",
           "planner: the mend keeps A out of the strike")
 end
@@ -3235,9 +3235,9 @@ end
 do
     local board, o = counterKillsRecruit()
     local beam = Planner.BEAM
-    Planner.BEAM = 1
+    Planner.BEAM, Planner.STEP_BACK = 1, false   -- the step back would hold A at (1,0) too
     local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
-    Planner.BEAM = beam
+    Planner.BEAM, Planner.STEP_BACK = beam, true
     check(at(a) .. " " .. tostring(plan and plan.kind), "1,0 mend",
           "planner: the mend keeps A out of the recruit's reach")
 end
@@ -3535,6 +3535,64 @@ do
         if c.kind == "advance" then adv = table.concat(c.acts, " ") end
     end
     check(adv, "1>wait@3,0>nil 2>wait@2,1>nil", "advance: the second unit takes its next tile")
+end
+
+-- test_the_step_back_is_always_judged (#510 PR A): every unit on its safest hold tile is one
+-- plan the judge always meets, as the advance is, kind "back": the beam (one plan wide here)
+-- keeps only the marches, and Ch5's wall was plans known to be over the cap with no way back
+-- judged (#510 plan comment 6779357154).
+do
+    local U1 = blue(0x01, 0, 0, 0, { minRange = false })
+    local U2 = blue(0x02, 1, 1, 1, { minRange = false, mov = 2 })
+    local Z = red(0x83, 14, 9, { minRange = false })
+    local sight = seizeSight({
+        reach = { [0x01] = tiles({ 0, 0 }, { 3, 0 }), [0x02] = tiles({ 1, 1 }, { 3, 0 }, { 2, 1 }) },
+    })
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local _, plan = Planner.plan(B, boardOf(U1, U2, Z), sight, style("bold"))
+    Planner.BEAM = beam
+    local back, n = nil, 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "back" then back, n = table.concat(c.acts, " "), n + 1 end
+    end
+    check(back, "1>wait@0,0>nil 2>wait@1,1>nil", "step back: every unit on its safest hold")
+    check(n, 1, "step back: judged once")
+end
+
+-- test_with_none_under_the_cap_the_mend_changes_more_than_one_unit (#510 PR A): X kills A
+-- unless A stands at (1,0) and B unless B stands at (1,4). Every plan the beam, the advance and
+-- the step back build has both at home; one mend saves one of them; only a second round, from
+-- the mended plan, saves both, and that plan is under the cap.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local Bu = blue(0x02, 1, 0, 4, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 4 }, { 1, 4 }) },
+        enemyPhase = function(plan)
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                if b.x ~= 1 then
+                    out[#out + 1] = { target = b.unit.id, takenHit = 80, takenDmg = 99,
+                                      takenHits = 1, takenCrit = 0 }
+                end
+            end
+            return out
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, Bu, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    local acts = {}
+    for _, x in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = x.unitId .. "@" .. at(x) end
+    table.sort(acts)
+    check(table.concat(acts, " "), "1@1,0 2@1,4", "mend rounds: both units moved to safety")
+    check(plan and plan.fallback, nil, "mend rounds: under the cap, no fallback")
+    local sb = plan and plan.audit and plan.audit.step_back or {}
+    check(tostring(sb.before) .. " " .. tostring(sb.now), "false true",
+          "mend rounds: the audit says the planner before had none under the cap")
 end
 
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
