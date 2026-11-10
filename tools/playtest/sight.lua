@@ -83,7 +83,7 @@
 --                            { [enemy id] = true } }: our units stand where the plan leaves
 --                            them with its HP, the gone are off the map, plan.opened =
 --                            { ["x,y"] = true } the doors it opens and walls it breaks, each
---                            map change applied (TriggerMapChanges), the game builds its
+--                            map change applied (M.openMap), the game builds its
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
 --                            in it the player can see makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
@@ -131,8 +131,8 @@
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
 --   locked(u, x, y)          the terrain at (x, y) when it is a door or a full chest `u` holds
 --                            nothing to open (opens()), else nil.
---   keySources(u, terrain)   the enemies whose fall gives `u` what opens `terrain`: not blue, on
---                            the field, seen (no US_BIT9), marked US_DROP_ITEM -- the game gives
+--   keySources(u, terrain)   the enemies whose fall gives `u` what opens `terrain`: red (a
+--                            green ally is never struck, ADR 0384), on the field, seen (no US_BIT9), marked US_DROP_ITEM -- the game gives
 --                            a downed unit's last item to the blue unit that downs it
 --                            (bmmind.c, GetUnitLastItem) -- and `u` holding that item passes
 --                            GetUnitKeyItemSlotForTerrain (a lockpick only for a thief).
@@ -919,6 +919,38 @@ function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
     return key
 end
 
+-- Inside a sandbox: the map change at (x, y) applied as the game applies it, every write
+-- journaled through `api` so the next judged plan finds the map as it was. A door's event
+-- (EvtListDOOR: script 1, the map change alone) and a broken wall (UpdateObstacleFromBattle)
+-- both run ApplyMapChangesById then RefreshTerrainBmMap: each non-zero tile of the change's
+-- rectangle (struct MapChange: +01 x, +02 y, +03 w, +04 h, +08 data) into gBmMapBaseTiles, and
+-- its terrain gTilesetTerrainLookup[tile >> 2] into gBmMapTerrain. Done by hand, not by
+-- TriggerMapChanges, whose own writes no journal sees: one plan's open door leaked into every
+-- later plan's board (PR #596 review). What it leaves out: the change's enabled bit and a
+-- wall's trap (read by no enemy's move), and a roof the change removes (UpdateRoofedUnits;
+-- a door or wall is no roof). No change at the tile: nothing.
+function M.openMap(api, call, S, x, y)
+    local mem = api.mem
+    local id = call(S.GetMapChangeIdAt, { x, y })
+    if id >= 0x80000000 then return end
+    local mc = call(S.GetMapChange, { id })
+    if mc == 0 then return end
+    local x0, y0, w, h = mem.u8(mc + 1), mem.u8(mc + 2), mem.u8(mc + 3), mem.u8(mc + 4)
+    local data, lookup = mem.u32(mc + 8), mem.u32(S.gTilesetTerrainLookup)
+    local k = 0
+    for iy = 0, h - 1 do
+        for ix = 0, w - 1 do
+            local tile = mem.u16(data + 2 * k)
+            k = k + 1
+            if tile ~= 0 then
+                local bx, by = x0 + ix, y0 + iy
+                api.write16(mem.u32(mem.u32(S.gBmMapBaseTiles) + by * 4) + bx * 2, tile)
+                api.write8(mem.u32(mem.u32(S.gBmMapTerrain) + by * 4) + bx, mem.u8(lookup + (tile >> 2)))
+            end
+        end
+    end
+end
+
 function M.equip(api, call, S, u, slot)
     if not slot or slot <= 0 then return end
     api.keep16(u.addr + api.Board.UNIT_ITEMS, slot + 1)
@@ -1448,14 +1480,12 @@ function M.new(outer)
             gone[id] = true
             if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
         end
-        -- the doors the plan opens and the walls it breaks, by the game's own map change (a
-        -- door's TILE_COMMAND_DOOR event and a wall's UpdateObstacleFromBattle both apply
-        -- GetMapChangeIdAt's change and refresh the terrain): the enemies behind them reach
-        -- through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed him at 0%)
+        -- the doors the plan opens and the walls it breaks (M.openMap): the enemies behind
+        -- them reach through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed
+        -- him at 0%)
         for at in pairs(plan.opened or {}) do
             local x, y = at:match("^(%d+),(%d+)$")
-            local id = s32(call(S.GetMapChangeIdAt, { tonumber(x), tonumber(y) }))
-            if id >= 0 then call(S.TriggerMapChanges, { id, 0, 0 }) end
+            M.openMap(api, call, S, tonumber(x), tonumber(y))
         end
         local function order() return aiOrder(call) end
         -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog)
@@ -1725,10 +1755,11 @@ function M.new(outer)
     end
 
     -- Whether `u` holding `item` would open `terrain` (M.keyItemOpens): the game's check reads
-    -- the class (a thief's lockpick) and the item, so it is kept by both.
+    -- UNIT_CATTRIBUTES, the character's and the class's (a thief's lockpick), and the item, so
+    -- it is kept by all three.
     local wouldOpen = {}
     local function opensWith(u, item, terrain)
-        local k = u.classId .. ":" .. item .. ":" .. terrain
+        local k = u.charId .. ":" .. u.classId .. ":" .. item .. ":" .. terrain
         if wouldOpen[k] == nil then
             wouldOpen[k] = sandbox(function(call)
                 return M.keyItemOpens({ read16 = mem.u16, write16 = api.write16 }, call, S,
@@ -1742,7 +1773,7 @@ function M.new(outer)
         for _, e in ipairs(units()) do
             local last = e.items and e.items[#e.items]
             local st = e.state or 0
-            if e.faction ~= "blue" and e.onField and not e.dead and last
+            if e.faction == "red" and e.onField and not e.dead and last
                 and st & Board.US_DROP_ITEM ~= 0 and st & Board.US_BIT9 == 0
                 and opensWith(u, last.id, terrain) then
                 out[#out + 1] = e

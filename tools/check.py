@@ -92,6 +92,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0397 (#510): a key an enemy drops is a way to a chest or through a door,
+    # so a door is no longer a breach only for a unit already holding a key
+    r'\bwhich no rule here spends\b',
     # retired by ADR 0385's 2026-11-09 amendment (Nicolas): there are no human playtests;
     # vanilla is the playtesters' proxy, so no result is gated on coded human sessions
     r'\bUNVALIDATED_HUMAN\b', r'\bhuman calibration\b', r'\bmontecarlo\.py human\b',

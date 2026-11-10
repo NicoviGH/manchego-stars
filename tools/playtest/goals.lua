@@ -165,7 +165,7 @@ function M.list(board, sight, style, ctx)
             -- a chest whose key an enemy drops (sight.keySources): its turns run by way of
             -- that enemy (Bot's turnsTo), so its chance says whether that way is worth it
             local lock = g.kind == "chest" and sight.locked and sight.locked(u, g.tile.x, g.tile.y)
-            return lock and #sight.keySources(u, lock) > 0 or false
+            return lock and sight.keySources ~= nil and #sight.keySources(u, lock) > 0 or false
         end)
         goals[#goals + 1] = g
     end

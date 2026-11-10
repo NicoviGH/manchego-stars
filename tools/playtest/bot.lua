@@ -851,43 +851,56 @@ local function lockAt(ctx, u, x, y)
 end
 
 -- A key on the way (#510, vanilla Ch5x: two chests in a room behind a door, both keys on
--- enemies): `held` = the terrains a key u takes on the way opens from there on, `seeking` =
--- the ones it is fetching a key for, so a key behind its own door is no way.
-local function withKey(set, lock)
+-- enemies). `seeking` = the locks a way is fetching a key for, so a key behind its own lock is
+-- no way. A key taken on the way opens the one lock it was fetched for (`keyed`: the tile's
+-- own), never a second: a Door Key or Chest Key is one use (FE8's item data).
+local function withLock(set, lock)
     local out = { [lock] = true }
     for k in pairs(set or {}) do out[k] = true end
     return out
 end
-
--- Whether `u` can open the door at (x, y): it holds a key, takes one on the way (`held`), or
--- an enemy whose fall gives it one stands (sight.keySources) and that key is not the one
--- being fetched.
-local function doorOpens(ctx, u, d, held, seeking)
-    local lock = lockAt(ctx, u, d.x, d.y)
-    if not lock or (held and held[lock]) then return true end
-    return not (seeking and seeking[lock]) and ctx.sight.keySources ~= nil
-        and #ctx.sight.keySources(u, lock) > 0
+local function lockSig(set)
+    local out = {}
+    for k in pairs(set or {}) do out[#out + 1] = tostring(k) end
+    table.sort(out)
+    return table.concat(out, ",")
 end
 
-local function breachFor(ctx, u, goal, held, seeking)
+-- The enemies whose fall gives `u` what opens `lock` (sight.keySources), read once a decision.
+local function keySources(ctx, u, lock)
+    if not ctx.sight.keySources then return {} end
+    ctx.keySrc = ctx.keySrc or {}
+    local k = u.id .. ":" .. tostring(lock)
+    if ctx.keySrc[k] == nil then ctx.keySrc[k] = ctx.sight.keySources(u, lock) end
+    return ctx.keySrc[k]
+end
+
+local keyWay
+
+-- Whether `u` can open the door `d`: it holds a key, or it has a way to an enemy whose fall
+-- gives it one and from there to the door (keyWay). A key no one can reach opens nothing, so a
+-- wall the unit can strike is still its way through.
+local function doorOpens(ctx, u, d, seeking)
+    local lock = lockAt(ctx, u, d.x, d.y)
+    if not lock then return true end
+    return keyWay(ctx, u, d, u, lock, seeking) ~= nil
+end
+
+local function breachFor(ctx, u, goal, seeking)
     if not (goal and ctx.sight.obstacles) then return nil end
-    local doors = {}
-    if ctx.sight.doors then
-        for _, d in ipairs(ctx.sight.doors()) do
-            if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, held, seeking)) then
-                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
-            end
-        end
-    end
-    local open = {}
-    for _, d in ipairs(doors) do open[#open + 1] = tileKey(d.x, d.y) end
-    local k = goalKey(u.id, goal) .. "|" .. table.concat(open, ";")
+    local k = goalKey(u.id, goal) .. "|" .. lockSig(seeking)
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
     b = false
     local field = fieldFor(ctx, goal)
     if field and not (field[u.y] and field[u.y][u.x]) then
-        -- a unit that can open doors takes a door first: opening costs one act, a wall its HP
+        -- a unit that can open a door takes it first: opening costs one act, a wall its HP
+        local doors = {}
+        for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
+            if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, seeking)) then
+                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
+            end
+        end
         local lists = { ctx.sight.obstacles() }
         if #doors > 0 then table.insert(lists, 1, doors) end
         for _, list in ipairs(lists) do
@@ -915,39 +928,44 @@ end
 -- obstacle, one step through, the field beyond. Without the breach, vanilla Ch3's throne (behind
 -- walls) was unreachable for every unit, so nothing pulled the army and a run took 22 turns.
 -- A chest or door `u` has no key for is reached by way of the enemy whose fall gives it one
--- (keyWay): the walk to that enemy, then on from its tile with the key.
-local keyWay
-local function turnsFor(ctx, u, tile, from, held, seeking)
+-- (keyWay): the walk to that enemy, then on from its tile with the key (`keyed`). Memoised
+-- for the decision (ctx.keyTurns): the goals ask it per goal, taker and partial plan.
+local function turnsFor(ctx, u, tile, from, seeking, keyed)
     from = from or u
-    local s = ctx.sight
-    local lock = lockAt(ctx, u, tile.x, tile.y)
-    if lock and not (held and held[lock]) then
-        local _, n = keyWay(ctx, u, tile, from, lock, held, seeking)
-        return n
+    ctx.keyTurns = ctx.keyTurns or {}
+    local mk = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y .. "|"
+        .. lockSig(seeking) .. (keyed and "+" or "")
+    local hit = ctx.keyTurns[mk]
+    if hit ~= nil then return hit or nil end
+    local s, n = ctx.sight, nil
+    local lock = not keyed and lockAt(ctx, u, tile.x, tile.y)
+    if lock then
+        n = select(2, keyWay(ctx, u, tile, from, lock, seeking))
+    else
+        n = s.turnsTo and s.turnsTo(u, tile, from)
+        local b = not n and s.turnsTo and breachFor(ctx, u, tile, seeking)
+        local toB = b and (b.door and turnsFor(ctx, u, b, from, seeking) or s.turnsTo(u, b, from))
+        local field = toB and fieldFor(ctx, tile)
+        local beyond
+        for _, side in ipairs(field and SIDES or {}) do
+            local row = field[b.y + side[2]]
+            local v = row and row[b.x + side[1]]
+            if v and (not beyond or v < beyond) then beyond = v end
+        end
+        if beyond then n = toB + (1 + beyond) / s.mov(u) end
     end
-    local n = s.turnsTo and s.turnsTo(u, tile, from)
-    if n or not s.turnsTo then return n end
-    local b = breachFor(ctx, u, tile, held, seeking)
-    local toB = b and (b.door and turnsFor(ctx, u, b, from, held, seeking)
-                       or s.turnsTo(u, b, from))
-    local field = toB and fieldFor(ctx, tile)
-    local beyond
-    for _, side in ipairs(field and SIDES or {}) do
-        local row = field[b.y + side[2]]
-        local v = row and row[b.x + side[1]]
-        if v and (not beyond or v < beyond) then beyond = v end
-    end
-    return beyond and toB + (1 + beyond) / s.mov(u) or nil
+    ctx.keyTurns[mk] = n or false
+    return n
 end
 
--- The enemy whose fall gives `u` what opens `lock` at `tile` (sight.keySources), the one on the
+-- The enemy whose fall gives `u` what opens `lock` at `tile` (keySources), the one on the
 -- fewest turns there and on (turnsFor), and those turns; nil when none has a way.
-keyWay = function(ctx, u, tile, from, lock, held, seeking)
-    if (seeking and seeking[lock]) or not ctx.sight.keySources then return nil end
-    local fetching, best, bestN = withKey(seeking, lock), nil, nil
-    for _, e in ipairs(ctx.sight.keySources(u, lock)) do
-        local a = turnsFor(ctx, u, e, from, held, fetching)
-        local b = a and turnsFor(ctx, u, tile, e, withKey(held, lock), seeking)
+keyWay = function(ctx, u, tile, from, lock, seeking)
+    if seeking and seeking[lock] then return nil end
+    local fetching, best, bestN = withLock(seeking, lock), nil, nil
+    for _, e in ipairs(keySources(ctx, u, lock)) do
+        local a = turnsFor(ctx, u, e, from, fetching)
+        local b = a and turnsFor(ctx, u, tile, e, seeking, true)
         if b and (not bestN or a + b < bestN) then best, bestN = e, a + b end
     end
     return best, bestN
@@ -958,10 +976,10 @@ end
 local function stepFor(ctx, u, tile, seeking)
     local lock = tile and lockAt(ctx, u, tile.x, tile.y)
     if lock then
-        local e = keyWay(ctx, u, tile, u, lock, nil, seeking)
-        return e and stepFor(ctx, u, e, withKey(seeking, lock)) or tile
+        local e = keyWay(ctx, u, tile, u, lock, seeking)
+        return e and stepFor(ctx, u, e, withLock(seeking, lock)) or tile
     end
-    local b = breachFor(ctx, u, tile, nil, seeking)
+    local b = breachFor(ctx, u, tile, seeking)
     if b and b.door and lockAt(ctx, u, b.x, b.y) then return stepFor(ctx, u, b, seeking) end
     return b or tile
 end
@@ -974,8 +992,10 @@ end
 -- A cut-off unit's strike on its breach, from the wait tile the gate allows nearest it; nil
 -- when it has no weapon or no such tile is in range this turn.
 local function breach(ctx, u, gate, objective)
-    local b = breachFor(ctx, u, goalFor(ctx, u, objective))
-    if not b then return nil end
+    -- the obstacle the march is stepping to (stepFor): a locked door's way may be a wall in
+    -- front of its key's holder, and that wall is the one to strike now
+    local b = stepFor(ctx, u, goalFor(ctx, u, objective))
+    if not (b and (b.door or (b.hp ~= nil and b.id == nil))) then return nil end
     -- a door opens where the Door command offers it (sight.offers); a wall is struck by a
     -- weapon that reaches it
     local weapons = not b.door and ctx.sight.weapons(u)
@@ -1030,6 +1050,11 @@ local function marchLength(ctx, u, t)
     if field and not d then
         -- the way through the breach: the path to it, one step through, the path beyond
         local b = breachFor(ctx, u, t)
+        if b and b.door and lockAt(ctx, u, b.x, b.y) then
+            -- its key first, as turnsFor counts the way (keyWay), in moves
+            local n = turnsFor(ctx, u, t)
+            return n and n * ctx.sight.mov(u)
+        end
         local of = b and fieldFor(ctx, b)
         local toB, beyond = of and of[u.y] and of[u.y][u.x], nil
         for _, side in ipairs(b and SIDES or {}) do
@@ -1800,19 +1825,10 @@ function M.candidates(board, sight, style, opts)
     ctx.explored = opts and opts.explored or {}
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
-    -- memoised for the decision: the planner asks it per goal, taker and partial plan, and a
-    -- unit cut off goes through breachFor and the field again each time
-    local turnsMemo = {}
-    ctx.turnsTo = function(u, tile, from)
-        from = from or u
-        local k = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y
-        local v = turnsMemo[k]
-        if v == nil then
-            v = turnsFor(ctx, u, tile, from) or false
-            turnsMemo[k] = v
-        end
-        return v or nil
-    end
+    -- memoised for the decision (turnsFor's ctx.keyTurns): the planner asks it per goal, taker
+    -- and partial plan, and a unit cut off goes through breachFor and the field again each time
+    ctx.keyTurns = {}
+    ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
     ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end

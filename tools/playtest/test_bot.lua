@@ -1676,6 +1676,30 @@ do
     check(seen["2,0"], true, "opened: its enemy phase is judged with the door open")
 end
 
+-- test_a_key_no_one_can_reach_opens_nothing: the same cut, A holds no key, and the one Door
+-- Key is on D, inside behind the door it opens. That door is no way, so A still strikes the
+-- wall (PR #596 review: the door was listed whenever any holder stood, and A marched to a door
+-- it could never open).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local D = red(0x82, 3, 1, { minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL, ["3,1"] = { ["3,1"] = 0 } },
+        obstacles = { { x = 2, y = 0, hp = 20 } }, doors = { { x = 2, y = 0 } },
+        locked = { [0x01] = { ["2,0"] = "door" } }, keySources = { door = { D } },
+    }
+    check(B.decide(boardOf(A, E, D), sightOf(o), style("careful")).act, "attack",
+          "keys: a Door Key no one can reach leaves the wall the way")
+    -- D reachable only through the wall: the door's way runs through it, so the wall is struck
+    D.y = 0
+    o.field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL,
+                         ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 } }
+    check(B.decide(boardOf(A, E, D), sightOf(o), style("careful")).act, "attack",
+          "keys: the key's way through the wall strikes the wall")
+end
+
 -- test_a_plan_strikes_a_wall_only_while_it_stands: A and C are both cut off by the wall at
 -- (2,0). A blow that breaks it leaves C nothing to strike, so the plan holds one strike, not
 -- two (vanilla Ch3 planned two, and the second crashed); a wall one blow leaves standing is

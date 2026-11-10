@@ -36,8 +36,15 @@ key, and a door's key is fetched the same way on the way. The march heads for th
 (`stepFor`).
 
 The quantity is the goals' own turns and chance (worth x gamma^turns). There is no new
-ordering and no ban, and no chapter or unit is named. A key behind its own door is no way (the
-`seeking` set): the game gives no way in.
+ordering and no ban, and no chapter or unit is named. Each part follows the game:
+- A key behind its own lock is no way (the `seeking` set).
+- A door counts as a breach only when its key's holder can be reached (`doorOpens` asks
+  `keyWay`), so a wall the unit can strike stays its way through.
+- A key opens the one lock it was fetched for (`keyed`), since a Door Key and a Chest Key are
+  one use each.
+- Only a red unit is a source: a green ally is never struck (ADR 0384).
+- A cut-off unit strikes whatever its march steps to (`stepFor`), which can be a wall in front
+  of the key's holder.
 
 ## 2. The judged enemy phase plays on the map the plan opens
 
@@ -51,9 +58,15 @@ fix 1 alone, vanilla Ch5x seed 4003 did the same: Forde opened (4,10) on turn 4 
 Fighter and Mage inside killed him at a predicted 0% (`sandbox_fault: forecast_desync`).
 
 **The fix.** The planner keeps the tiles a plan opens (a door act's door, a wall whose HP the
-plan takes to 0) and hands them to both phases as `plan.opened`. The sight applies each one by
-the game's own map change before the phase is played: `TriggerMapChanges(GetMapChangeIdAt(x,
-y))`, which is what a door's tile event and `UpdateObstacleFromBattle` both apply.
+plan takes to 0) and hands them to both phases as `plan.opened`. The sight applies each change
+before the phase is played (`Sight.openMap`), doing what a door's tile event (`EvtListDOOR`,
+script 1: the map change alone) and `UpdateObstacleFromBattle` both do. That is
+`ApplyMapChangesById` then `RefreshTerrainBmMap` on the change's rectangle: each base tile, and
+its terrain from `gTilesetTerrainLookup`. It writes these through the journal itself rather than
+calling `TriggerMapChanges`, because a game function's own writes are not journaled, and one
+plan's open door then stood open in every later plan's phase (PR #596 review). It leaves out
+the change's enabled bit and a wall's trap (no enemy's move reads them), and roofs (a door or
+wall is none).
 
 ## Measured
 
