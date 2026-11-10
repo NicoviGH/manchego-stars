@@ -70,5 +70,12 @@ wall is none).
 
 ## Measured
 
-Filled in by the PR (#510): the witnesses on Ch5x seed 4003 and Ch3 seed 4005, and the frozen
-suite's promotion line (`suite --held-out`, ADR 0395).
+- **Witnesses** (`montecarlo.py attempts`, the kept starts of `starts --game vanilla`):
+  - Vanilla Ch5x seed 4003: attempts 2-4 won clean, both chests taken. Attempt 1 lost Kyle on
+    turn 19 at a predicted 0.1% (`rng_tail`). Before: 0 of 12 clean.
+  - Vanilla Ch3 seed 4005: 4 of 4 won clean. Before: 0 of 48.
+- **Frozen suite** (`suite --held-out --jobs 8`, ADR 0395, 2026-11-10, 21 min wall on 8
+  workers): **PROMOTED.** No regressions on the frozen baseline (`ce1e3adb8c57+v2`), and
+  all 56 runs have a game result. The held-out runs lost 4 of 28, none new since the freeze.
+  Cost: 2,500,413 `AiDecideMain` calls against SC-003's budget of 2,988,937 (+0.4% on the
+  frozen 2,490,781); 5,565 CPU s.
