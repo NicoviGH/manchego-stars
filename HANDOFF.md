@@ -9,12 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-09, late night (Claude): **PR-I is open as #593** (`feat/510-pr-i-validity`,
-2 commits): validity (NOT READABLE), `human`/`human --form`, `report`, and T107a (a tuning-seed
-death flip never blocks; ADR 0395 amended). `/code-review 593 medium` found 25 findings, every
-one fixed in 55e30c16. The scoped re-review of 55e30c16 came back: all 25 ADDRESSED, plus **8 small new findings
-(A-H) in a comment on #593: fix every one first** (no second re-review), then wait for CI on the head sha and merge
-(#510 step 9 PRs may merge after review + CI).
+Refreshed 2026-11-09, late night (Claude): **PR-I merged as #593** (validity / NOT READABLE,
+`human`/`human --form`, `report`, T107a). Review: 25 findings, then the re-review's 8 (A-H),
+every one fixed; CI green on the head sha. T100-T108 and T107a are ticked on #510's plan comment
+6563384310; T107 stays open only for posting the report, which waits on Nicolas.
 
 ## Where things stand
 
@@ -38,7 +36,8 @@ one fixed in 55e30c16. The scoped re-review of 55e30c16 came back: all 25 ADDRES
     (Manchego Stars ch03 vs vanilla Ch3, Nicolas's pick): Manchego Stars lost someone on 18 of
     50 first attempts, the twin on 0 of 50. Every death was a careful-style run; 6 of 50 (12%) were blind-spot
     deaths, over PR-I's 10% validity bar; and a seed only draws the style, so 50 seeds made 30
-    distinct plays an arm. PR-I has to weigh both.
+    distinct plays an arm. **PR-I #593** (ADR 0385, "Built (PR-I)") weighs both: a cell is
+    NOT READABLE when a validity invariant fails; the human calibration gates at 3 of 4 maps.
   - **PR-E's open items are decided** (Nicolas, 2026-11-04; ADR 0389): the hold stays, the
     budget was raised instead of narrowing the boss trigger, the breach's "first crossing" is
     not built.
@@ -69,8 +68,8 @@ one fixed in 55e30c16. The scoped re-review of 55e30c16 came back: all 25 ADDRES
 
 ## Next
 
-1. **Finish PR-I (#593)** as above, then tick T100-T108 and T107a on #510's plan comment
-   6563384310. Then PR-J, then #510 step 10.
+1. **PR-J next** (#510's plan comment 6563384310 lists its tasks), then #510 step 10. Still owed
+   from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
      validity check holds; Manchego Stars lost someone 10 of 50, the twin 3 of 50; 0.63 CPU-h.
