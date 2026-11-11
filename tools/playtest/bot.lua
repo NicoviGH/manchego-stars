@@ -895,6 +895,8 @@ end
 -- than the fog shows, so it pushes the fog back. Only the enemies in sight are aimed at: a boss
 -- the fog hides is no goal (Bot.enemiesOf), so on a fogged Defeat Boss map each unit marches on
 -- its nearest enemy in sight (#510 W1, Ch6 4001 attempt 2).
+-- ctx.aimBoss (Bot.candidates' opts.aim = "boss": the look's boss alternative, #510 W1, shadow
+-- only) makes a boss in fog that a retry remembers (ctx.threats, sight.knows) the goal too.
 -- objectiveGoal is the same choice with where it came from, for Bot.explain: the tile, then
 -- "objective" (the objective's own tile), "unseen", "boss" or "enemy", and the enemy's id.
 local objectiveTile
@@ -902,6 +904,11 @@ local function objectiveGoal(ctx, u, objective)
     local kind = objective and objective.kind
     if objective and objective.tile then return objective.tile, "objective" end
     if kind == "survive" then return nil end
+    if kind == "boss" and ctx.aimBoss then
+        for _, e in ipairs(ctx.threats) do
+            if e.isBoss then return e, "boss", e.id end
+        end
+    end
     if #ctx.enemies == 0 and ctx.sight.unseen then
         local best, bestD
         for _, t in ipairs(ctx.fogRead().unseen) do
@@ -2123,7 +2130,8 @@ end
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
 -- claim gives way); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
 -- each goal a unit was found with no step toward, and the turn it was first found so); `guard`,
--- the look's walker's units sent to a strike's tile (exploring).
+-- the look's walker's units sent to a strike's tile (exploring); `aim` = "boss", the look's boss
+-- alternative: a remembered boss in fog is a march goal (objectiveGoal).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
 -- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
@@ -2133,6 +2141,7 @@ function M.candidates(board, sight, style, opts)
     ctx.seen = opts and opts.seen
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
+    ctx.aimBoss = opts and opts.aim == "boss" or nil
     -- memoised for the decision (turnsFor's ctx.keyTurns): the planner asks it per goal, taker
     -- and partial plan, and a unit cut off goes through breachFor and the field again each time
     ctx.keyTurns = {}

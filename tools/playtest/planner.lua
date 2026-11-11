@@ -1822,6 +1822,13 @@ function M.plan(Bot, board, sight, style, opts)
     -- (opts.guard), from this turn on: the beam's best with it, unjudged, then the turns
     -- between with it. Recorded as look.walker, each look's chances over every looked phase
     -- (this turn's along its expected way too: the alternatives' is not judged).
+    -- The boss alternative (Ch6 4001 attempt 2: the boss stood in fog, remembered, and no march
+    -- ever aimed at it, Bot.enemiesOf): on a Defeat Boss map whose boss a retry remembers in
+    -- fog, one more look as deep, every unit not sent elsewhere marching on the boss's tile
+    -- (opts.aim = "boss") from this turn on. Recorded as look.boss, its chances as the walker's
+    -- alternatives' and whether a turn between ended the chapter (`ended`), beside the best
+    -- plan's look read the same way (`best`), for the shadow run to set against the others by
+    -- the game's outcomes. A Seize map's march has its tile already.
     -- It costs at most opts.look.room AiDecideMain calls (botrun's allowance: a quarter of the
     -- attempt's others so far), guessed before it runs as the looked phases times the last
     -- look's calls a phase (opts.look.last), else the enemies on the field; one the room
@@ -1851,26 +1858,32 @@ function M.plan(Bot, board, sight, style, opts)
             end)
             for k = #guards, M.WALKER_UNITS + 1, -1 do guards[k] = nil end
         end
+        local inSight, boss = {}, nil
+        for _, e in ipairs(ctx.enemies) do inSight[e.id] = true end
+        for _, e in ipairs(objective == "boss" and ctx.threats or {}) do
+            if e.isBoss and not inSight[e.id] then boss = e end
+        end
         local reds = 0
         for _, u in ipairs(board.units) do
             if u.faction == "red" and u.onField and not u.dead then reds = reds + 1 end
         end
         local lo = opts and opts.look or {}
-        rec.phases = depth * (1 + #guards)
+        rec.phases = depth * (1 + #guards + (boss and 1 or 0))
         rec.estimate = math.ceil((lo.last or reds) * rec.phases)
         if rec.estimate > (lo.room or 0) then
             rec.skipped = true
         else
             local between = 0
-            -- our turn between: the beam's best, unjudged, `guard` its walker's unit sent (or
-            -- nil). `tiles` keeps where it leaves our units ({ ["id"] = { x, y } } a turn), for
+            -- our turn between: the beam's best, unjudged, `with` an alternative's opts (the
+            -- walker's `guard`, the boss's `aim`; nil for none). `tiles` keeps where it leaves our units ({ ["id"] = { x, y } } a turn), for
             -- the shadow run to read against the turn then played (montecarlo.py look); a turn
             -- the beam has nothing to play (nil) holds them where the board has them. `why`
             -- keeps its Bot.explain record a turn (false for a turn with nothing to play).
-            local function turnOf(b, guard, tiles, why)
+            local function turnOf(b, with, tiles, why)
                 local c0 = sight.aiCalls()
-                local ph = M.plan(Bot, b, sight, style,
-                                  { unjudged = true, seen = opts and opts.seen, guard = guard })
+                with = with or {}
+                local ph = M.plan(Bot, b, sight, style, { unjudged = true, seen = opts and opts.seen,
+                                                          guard = with.guard, aim = with.aim })
                 between = between + sight.aiCalls() - c0
                 if tiles then
                     local at = {}
@@ -1909,26 +1922,35 @@ function M.plan(Bot, board, sight, style, opts)
             end
             rec.die = rounded(die)
             rec.run, rec.ended = true, r.ended
+            -- an alternative's look (`with` its opts) into `alt`: its own turn and each turn
+            -- between, where they leave our units and why; each unit's chance over every looked
+            -- phase; `looked`, the phases played before the last, fewer than depth - 1 when a
+            -- turn between ended the chapter (`ended`)
+            local function alternative(with, alt)
+                alt.between, alt.why = {}, {}
+                local own = turnOf(board, with, alt.between, alt.why)
+                if own then
+                    local ra = sight.look(own, depth, function(b)
+                        return turnOf(b, with, alt.between, alt.why)
+                    end)
+                    alt.die, alt.ended = rounded((lookDeaths(ra, best.phase.hit, 1))), ra.ended
+                    alt.looked = #(ra.phases or {})
+                end
+                return alt
+            end
+            -- the best plan's look read as the alternatives are, over every looked phase
+            local along = rounded((lookDeaths(r, best.phase.hit, 1)))
             if walk then
                 rec.walker = { enemy = walk.enemy, target = walk.target, phase = walk.phase,
-                               x = walk.x, y = walk.y,
-                               die = rounded((lookDeaths(r, best.phase.hit, 1))), alts = {} }
+                               x = walk.x, y = walk.y, die = along, alts = {} }
                 for _, g in ipairs(guards) do
-                    local guard = { g }
-                    -- its own turn and each turn between, where they leave our units (the
-                    -- sent unit's way to the tile); `looked`, the phases played before the
-                    -- last, fewer than depth - 1 when a turn between ended the chapter
-                    local alt = { unit = g.id, turns = g.turns, between = {}, why = {} }
-                    local own = turnOf(board, guard, alt.between, alt.why)
-                    if own then
-                        local ra = sight.look(own, depth, function(b)
-                            return turnOf(b, guard, alt.between, alt.why)
-                        end)
-                        alt.die, alt.ended = rounded((lookDeaths(ra, best.phase.hit, 1))), ra.ended
-                        alt.looked = #(ra.phases or {})
-                    end
-                    rec.walker.alts[#rec.walker.alts + 1] = alt
+                    rec.walker.alts[#rec.walker.alts + 1] =
+                        alternative({ guard = { g } }, { unit = g.id, turns = g.turns })
                 end
+            end
+            if boss then
+                rec.boss = alternative({ aim = "boss" },
+                                       { id = boss.id, x = boss.x, y = boss.y, best = along })
             end
             rec.calls = sight.aiCalls() - calls0
             rec.between_calls = between

@@ -3056,6 +3056,26 @@ class Look(unittest.TestCase):
                       '\n'.join(mc.look_lines(t)))
         self.assertEqual(mc.look_table([self.trace()])['walker'], [], 'no walker, no row')
 
+    def test_boss_march(self):
+        # the boss alternative at turn 1 (#510 W1): the best plan's look has green 9 at 90%, the
+        # boss march ends the chapter with green 9 at 10% and unit 1 at 60%; the game played
+        # on, green 9 died on turn 3
+        tr = self.trace(die_turn=3)
+        tr[-1]['record']['deaths'] = [{'faction': 'green', 'phase': 'enemy', 'turn': 3,
+                                       'id': 9, 'charId': 9}]
+        tr[2]['look']['depth'] = 3
+        tr[2]['look']['walker'] = {'enemy': 0x81, 'target': 9, 'phase': 3, 'x': 5, 'y': 0,
+                                   'die': {'9': 0.9}, 'alts': []}
+        tr[2]['look']['boss'] = {'id': 0x92, 'x': 19, 'y': 6, 'ended': 'win',
+                                 'best': {'9': 0.9, '1': 0.1}, 'die': {'9': 0.1, '1': 0.6}}
+        t = mc.look_table([tr])
+        b = t['boss'][0]
+        self.assertEqual((b['turn'], b['best'], b['march'], b['ended'], b['said'], b['alt'],
+                          b['fell']), (1, [9], [1], 'win', 0.9, 0.1, [9]))
+        self.assertIn('| 1 | Ch5 | 1 | 3 | 9 | 1 | yes | 9: 90% / 10% | - | 9 |',
+                      '\n'.join(mc.look_lines(t)))
+        self.assertEqual(mc.look_table([self.trace()])['boss'], [], 'no boss march, no row')
+
 
 class Calibration(unittest.TestCase):
     """`calibration` (#510 PR A): unit-phases binned by the phase's last plan; a death read by

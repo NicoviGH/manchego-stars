@@ -3220,11 +3220,16 @@ def look_table(traces):
     a walker (`look.walker`) is a row of 'walker': the turn its strike lands, its target's
     chance in the best plan's look, the unit sent whose look gives the target the least, that
     chance and whether every green stays under 50% there, and whether the target died by the
-    strike's turn. Returns {'traces', 'distinct', 'bins', 'cost', 'walker'}: bins as
-    calibration's; cost: chapter -> Counter; walker: a list of rows (dicts)."""
+    strike's turn. Each look with the boss alternative (`look.boss`: the army marching on a boss
+    remembered in fog) is a row of 'boss': the blue and green units at 50% or more in the best
+    plan's look and in the boss march's (both read over every looked phase), whether a turn
+    between of the march ended the chapter, the walker's target's chance in each when there is
+    one, and the game's own outcome: the turn the chapter ended, and our units that died within
+    the looked phases. Returns {'traces', 'distinct', 'bins', 'cost', 'walker', 'boss'}: bins
+    as calibration's; cost: chapter -> Counter; walker, boss: lists of rows (dicts)."""
     bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
     cost = collections.defaultdict(collections.Counter)
-    seen, walker = set(), []
+    seen, walker, bosses = set(), [], []
     for events in traces:
         key = trace_key(events)
         if key in seen:
@@ -3292,6 +3297,25 @@ def look_table(traces):
                 'fell': any(t is not None and turn <= t <= turn + w['phase'] - 1
                             for t, _ in died.get(w['target'], []))
                 or (None if turn + w['phase'] - 1 not in enemy_turns else False)})
+        for turn in sorted(looks):
+            bo, w = looks[turn].get('boss'), looks[turn].get('walker')
+            if not bo or not isinstance(bo.get('die'), dict):
+                continue
+            last = turn + (looks[turn].get('depth') or 1) - 1
+
+            def sure(die):
+                return sorted(int(u) for u, p in (die or {}).items() if p >= 0.5)
+            bosses.append({
+                'play': len(seen), 'chapter': name, 'turn': turn,
+                'depth': looks[turn].get('depth'), 'best': sure(bo.get('best')),
+                'march': sure(bo['die']), 'ended': bo.get('ended'),
+                'target': w and w['target'],
+                'said': w and (bo.get('best') or {}).get(str(w['target']), 0),
+                'alt': w and bo['die'].get(str(w['target']), 0),
+                'game_ended': end.get('turns') if end.get('turns') is not None
+                and end['turns'] <= last else None,
+                'fell': sorted(u for u, ds in died.items()
+                               if any(t is not None and turn <= t <= last for t, _ in ds))})
         for turn, lk in looks.items():
             for k, tiles in enumerate(lk.get('between') or [], 1):
                 now = played.get(turn + k)
@@ -3312,7 +3336,7 @@ def look_table(traces):
         c['ai_calls'] += (costs.get('game_calls') or {}).get('AiDecideMain') or 0
         c['cpu_s'] += costs.get('cpu_s') or 0
     return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'cost': cost,
-            'walker': walker}
+            'walker': walker, 'boss': bosses}
 
 
 def look_lines(t):
@@ -3356,6 +3380,20 @@ def look_lines(t):
                 '-' if w['alt'] is None else '%.0f%%' % (100 * w['alt']),
                 'yes' if w['greens_safe'] else 'no',
                 {True: 'yes', False: 'no', None: 'not played'}[w['fell']]))
+    if t.get('boss'):
+        def ids(xs):
+            return ' '.join(str(x) for x in xs) or 'none'
+        out += ['', '| Play | Chapter | Turn | Depth | At 50%+, best plan | At 50%+, boss march '
+                '| Boss march ends the chapter | Walker\'s target: best plan / boss march '
+                '| Game ended on turn | Died in the looked phases |',
+                '|---|---|---|---|---|---|---|---|---|---|']
+        for b in t['boss']:
+            out.append('| %d | %s | %d | %s | %s | %s | %s | %s | %s | %s |' % (
+                b['play'], b['chapter'], b['turn'], b['depth'], ids(b['best']), ids(b['march']),
+                'yes' if b['ended'] else 'no',
+                '-' if b['target'] is None else '%d: %.0f%% / %.0f%%' % (
+                    b['target'], 100 * b['said'], 100 * b['alt']),
+                '-' if b['game_ended'] is None else b['game_ended'], ids(b['fell'])))
     return out
 
 
@@ -3511,6 +3549,11 @@ def story(events, names=None, items=None, classes=None, why=False):
                 for k, rec in enumerate(look.get('why') or [], 1):
                     if rec:
                         lines.append("  why, the look's turn between %d:" % k)
+                        lines.extend(explained(rec, '    '))
+                for k, rec in enumerate((look.get('boss') or {}).get('why') or []):
+                    if rec:
+                        lines.append("  why, the look marching on the boss, %s:" % (
+                            'its own turn' if k == 0 else 'turn between %d' % k))
                         lines.extend(explained(rec, '    '))
                 for alt in (look.get('walker') or {}).get('alts') or []:
                     for k, rec in enumerate(alt.get('why') or []):

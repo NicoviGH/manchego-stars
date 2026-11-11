@@ -5837,6 +5837,51 @@ do
     check(sent and sent.goal and (sent.goal.x .. "," .. sent.goal.y), "5,0", "explain: to the strike's tile")
 end
 
+-- test_boss_alternative_marches_on_a_remembered_boss (#510 W1; Ch6 4001 attempt 2): on a Defeat
+-- Boss map whose boss a retry remembers in fog, the look runs one more alternative, every unit
+-- marching on the boss's tile from this turn on (its turns' records say "boss"); none when the
+-- boss is in sight (the march aims at it already) or the fog hides one no attempt showed
+do
+    local function bossLook(fogged, remembered)
+        local A, X = blue(0x01, 0, 0, 0), red(0x81, 3, 0)
+        local Y = red(0x82, 9, 0, { fogged = fogged })
+        local s2 = sightOf({ objective = { kind = "boss", boss = 0x82 },
+            enemyPhase = function() return {} end, lookCalls = 10,
+            look = function(plan, depth, between)
+                between(boardOf(A, X, Y))
+                local phases = {}
+                for k = 1, depth - 1 do phases[k] = { strikes = {} } end
+                return { phases = phases }
+            end })
+        s2.watching = function() return { X } end
+        if remembered then s2.knows = function(u) return u.id == 0x82 end end
+        local _, plan = Planner.plan(B, boardOf(A, X, Y), s2, gifted("careful", 1000),
+                                     { look = { room = 1e6 } })
+        return plan and plan.look or {}, s2
+    end
+    local lk, s2 = bossLook(true, true)
+    local bo = lk.boss or {}
+    check(bo.id and (bo.id .. "@" .. bo.x .. "," .. bo.y), "130@9,0", "boss alternative: the remembered boss")
+    check(s2.looked and #s2.looked, 2, "boss alternative: one look more")
+    check(lk.phases, 2 * Planner.LOOK_DEPTH, "boss alternative: its phases in the allowance")
+    local a
+    for _, r in ipairs(((bo.why or {})[1] or {}).units or {}) do
+        if r.id == 0x01 then a = r end
+    end
+    check(a and a.source, "boss", "boss alternative: the unit marches on the boss")
+    check(a and a.goal and (a.goal.x .. "," .. a.goal.y), "9,0", "boss alternative: on its tile")
+    check(#(bo.why or {}), 2, "boss alternative: its own turn and its turn between")
+    check(type(bo.die), "table", "boss alternative: its chances")
+    check(type(bo.best), "table", "boss alternative: beside the best plan's look's")
+    local mine
+    for _, r in ipairs((lk.why or {})[1] and lk.why[1].units or {}) do
+        if r.id == 0x01 then mine = r end
+    end
+    check(mine and mine.source, "enemy", "boss alternative: the best plan's look still marches on X")
+    check(bossLook(false, false).boss, nil, "boss alternative: none with the boss in sight")
+    check(bossLook(true, false).boss, nil, "boss alternative: none for a boss no attempt showed")
+end
+
 -- test_turn_between_ranks_progress_first: on the board where the beam's best by its score
 -- holds A on (0,0) and the decision marches it to (1,0), toward the village (the rank puts
 -- progress first), the turn between marches too
