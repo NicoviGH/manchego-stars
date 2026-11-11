@@ -9,137 +9,49 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, W1 started).** Build **#510 PR W1** (the look in
-shadow) on branch `feat/510-w1-look-shadow` (pushed, no PR). The design, its approved calls and
-W1's build map are ONE comment, #510 comment 6786548233 (edited in place): read it first.
-- **Nicolas approved all six calls** (2026-11-11, "Makes sense. Proceed"): a retry may send a
-  unit to a remembered killer's strike tile; retries only; a retry remembers each
-  reinforcement's tile and unit; a plan lost in the look counts over the cap only after the
-  shadow run proves the look; a quarter of a retry's AI calls is the allowance; the refutation
-  bars as written.
-- **Done on the branch:** `sight.staged` + `strictly` (`728c0938`): the planner runs inside an
-  open sandbox on a staged board. Probe on the three suite snapshots: plans exactly as at depth
-  0. Under the journal alone vanilla Ch6's fog maps leaked between judged plans; a whole
-  save/load a nested read fixes it at about the same CPU. Test fails without the fix.
-- **Next:** the build map's remaining bullets (`sight.look`, `planner` `phaseOf` / `unjudged` /
-  the shared death composition, the watched set, the allowance, records, `montecarlo.py`
-  tables), fake-board tests first, `scout-ch6` attempt 1 trace for trace, then the shadow runs
-  (Ch6 attempt 2 of 4001/4002/4010, Ch5 retries, `scout-ch10`) brought to Nicolas with numbers.
-- **Probe recipe** (reusable): a temporary `PT_PROBE` branch in `botrun.lua`'s `check_pinned`
-  path, launched per snapshot with `montecarlo.start_task` + `launch_tagged` (pinned = the
-  snapshot's `state_path`), its line read with `parse_lines`. Not kept.
-
-- **Tried and dropped:** a second `M.machine` nested inside the open one (its halt loop never
-  returned: "call 0x08023040 did not return in 600 frames"); the fix keeps the outer machine
-  and wraps each nested read in `api.cpu.save()` / `load()`. A probe's first round also read a
-  false mismatch because `staged` returned two of the planner's three values (now `table.pack`).
-- **Key files:** `tools/playtest/sight.lua` (`M.batching`'s `strictly`, `s.staged`,
-  `stagePhase` / `playPhase` / `nextPhase` around line 1580), `tools/playtest/planner.lua`
-  (`judge` ~1072, the lookahead block ~1590), `tools/playtest/test_sight.lua`
-  (`test_strictly_undoes_the_games_own_writes`), `tools/playtest/botrun.lua` (`check_pinned`,
-  where a probe hooks in).
-
-Earlier the same day: **#510 PR B merged as #599** (squash `2dd4f835`, ADR 0399). Read #510
-comments 6786147872 (the campaign rerun) and 6786005697 (late-game deaths).
-- **What #599 does:** a retry remembers every enemy earlier attempts showed and every killer
-  (by slot, character and class, `Board.memoryKey`); `sight.remember`/`knows` and
-  `Board.playsAsSeen` are the one owner of "counts as seen" (judged phases, danger maps lifted,
-  exposure via `ctx.threats`, keySources, closings, the lookahead's boss trigger, `plan.enemies`).
-  12 tries a chapter start; a try already played (same style, same memory) is never spent
-  again. `montecarlo.py resume`. Guard goal and deadline dropped (Nicolas). The fog read's
-  enemies seen stay this attempt's.
-- **Proof:** each new test fails without its fix; all 130 test files pass; attempt 1 plays
-  event for event as PR A on `scout-ch6`, `vanilla-ch5`, `ours-ch02` (seeds 1001, 1002) on
-  `ba1db30b`; the scoped re-review found all 10 findings addressed (both on #599); CI green on
-  the head `88b13e75`.
-- **The rerun (`prb2`, before the review fixes):** all 10 vanilla campaigns stop at the cap.
-  Ch6: memory ends the fog ambush (6 blue deaths in 78 retries vs 9 in 8 first attempts), but
-  the villagers die on every retry (the Bael, turns 8-12; the horizon). Ch5x (4003): 4 of 12
-  `stuck` on turn 33. Ch8 (4008, 4009): the chests at (1,3) and (2,3) unreached in every
-  deathless win. Step 4 ("retries that differ") is not needed as a rule.
-- **Next after #599 (Nicolas, 2026-11-11): ask Fable to EXPAND its design to scale** (comment
-  6786548233: a retry watches the enemy that killed and plays the loss forward; retries only;
-  a shadow run that can refute it). As designed it covers only Ch6's kind of loss, an unseen
-  walker onto someone we must protect. What it does not scale to (comment 6786005697 and this
-  session's read): **(1) over-cap trades the bot measured**, most late-game deaths (Ch5 28 of
-  40, Ch10 8 of 8, Ch13 21 of 25): a retry should learn "that attack was a mistake", not only
-  "who killed"; **(2) reinforcements**: a wave's killer cannot be watched until it is on the
-  map (the look-ahead places no arrival; a retry knows the wave's turn, ADR 0386, not its
-  route); **(3) cost on big maps**: the look plays every known enemy several phases deep, so
-  its cost grows with units x depth (the +15 to 23% estimate is Ch6's only). Goal in his words:
-  "emulate human players learning from their mistakes and losses". Give Fable the comment, the
-  late-game table and these three gaps; Fable designs, Opus builds. His two open calls on the
-  comment (the assignment; retries only) wait for the expanded design.
-- **New, untracked:** vanilla `scout-ch14` ends `stuck` on turn 19 in all 16 kept runs (no
-  deaths). Not checked against existing issues beyond #510's comments.
-- **How the witnesses were played:** `montecarlo.py resume --game vanilla --tag <t>` (one tag a
-  run; a taken tag is refused). Six-start attempt-1 check: a 25-line scratch driver around
-  `pinned_setup` + `chapter_tasks(..., 'tuning')` + `Pool`, its traces compared on act, event
-  and death lines with PR A's kept traces (`84d8eba48d70+v2`). Not kept.
+**Next session starts here (2026-11-11, W1's look built).** Carry on with **#510 PR W1** (the
+look in shadow) on branch `feat/510-w1-look-shadow` (pushed, no PR). The design, its approved
+calls and W1's build map (what is done, what is left) are ONE comment, #510 comment 6786548233,
+edited in place: read it first. Tell Nicolas where W1 stands in plain words at the start.
+- **Done on the branch** (`728c0938`, `093a84a4`, `1ca06eab`): `sight.staged`; `sight.look`
+  (N enemy phases, our turn between them played by the beam's best plan unjudged; `nextPhase`
+  is `look(plan, 2)`); the planner's shadow look (`plan.look`, never ranked) while a watched
+  enemy is on the field; botrun marks a killer `killed`, campaign.lua keeps the mark; the
+  allowance (a quarter of the attempt's other `AiDecideMain` calls); `montecarlo.py look`
+  (calibration and cost tables) and `resume --attempts N` (outcome `capped`). Every new test
+  fails without its fix; all Lua tests and `test_montecarlo.py` pass.
+- **Proof so far:** `scout-ch6` attempt 1 (seeds 1001, 1002) plays act for act as PR A's kept
+  traces. Ch6 campaign 4001, attempts 1-2 (`resume --tag w1a..w1d --attempts 2`, about 2 min):
+  play identical with and without every look run; a look costs ~600 calls, an attempt's looks
+  ~6% of its others; 3 of 5 looks run under the allowance (the 2 skipped: the attempt's first
+  two decisions, 137 and 399 calls made so far). Only one campaign's looks read so far.
+- **Next:** the build map's "Left in W1" (record our units' tiles after the turn between; the
+  walker; mends judged by the look), then the shadow runs (Ch6 attempt 2 of 4001/4002/4010,
+  Ch5 retries, `scout-ch10`) read with `montecarlo.py look`, brought to Nicolas with numbers
+  against the approved bars. `make test` timed before and after (owed, not done).
+- **Tried and dropped:** recommending a cheaper turn between (danger zone instead of each
+  enemy's strike) before finding the cost's cause. Nicolas: measure the root cause first. The
+  cost was a bug (below), and that "fix" would have made the bot play worse.
 - **Lessons:**
-  - A function board.lua adds must also go in `Board.bind`: the emulator hands sight the bound
-    table (the first rerun, `prb`, crashed on every attempt 2 for this).
-  - Most enemies share one generic character id (0x80 is no named `CHARACTER_`): slot +
-    character does not identify a unit; class too.
-  - `tools/callsites.py` reads Python only; for Lua, sweep callers with `rg`.
-  - `/code-review` must run in a fresh subagent (review-to-clean): the author's own inline pass
-    missed 10 findings the independent one found.
-  - A playtest run reads the working tree's Lua: never switch branches while one runs (this
-    HANDOFF was committed to main by plumbing for that reason).
-
-Earlier the same night (Claude, Fable session): **the Fable review is done and its plan is
-locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
-The plan is ONE comment, #510 comment 6779357154
-(edited in place; it has the findings, both PRs' steps and a file map). Read it first.** Nothing
-was built or run in the emulator this session.
-- **What the review found** (detail and witnesses on the comment): fog is read as empty ground
-  by every danger estimate and by admission; the bot has no way to pull back together and makes
-  no further plan when none is under the cap; an enemy-phase death is graded by the phase's
-  last plan, so some fog deaths read `over_cap`; retries are reruns.
-- **Read from the kept runs the same night** (offline; tables on the comment): 2,750 kept
-  vanilla traces are 490 distinct games. The bot's death chances are about right where it gives
-  one (37% predicted, 34% died; 70%, 73%), so the enemy phase's prediction gets no fix. Ch5's
-  wall is plans the bot knows are over the cap (81 of 110 blue deaths); Ch6's is fog (21 of 42,
-  plus 5 exposed after they moved). Ch5's 18 deaths at a predicted 0 with the killer in sight
-  have no named cause yet.
-- **The verdict method was reviewed too** (PR C on the comment): a chapter cell's seed draws
-  only the style, the dice are the start state's (`b.seed` is a no-op in campaign mode), so a
-  cell's pairs are far fewer distinct games than they count; proposed: seed a cell
-  replicate's dice, report expected losses beside the any-death rate, read a cell by its
-  interval since `EQUIVALENT` at +/-10 will rarely be reached.
-- **Nicolas confirmed the goal:** winning clean is his proxy for "the bot is capable", as a
-  human is after retries and learning. Clean clears stay the campaign's carry-on rule.
-- **Nicolas approved every call the comment proposes** (2026-11-10, "yes I approve all";
-  each PR records its own as an ADR): the
-  fog rule (a unit beside unseen ground is judged against one strike from the strongest enemy
-  seen so far), the regrade (a death graded by the plan that moved its unit), and a cheap proof
-  in place of a suite run for the retries-only PR.
-- **`feat/510-retry-memory`** (commit 73948dd6, local, not pushed, no PR; ADR 0399 drafted) is
-  kept as the source for both PRs: its fog-ambush harness fix (`moveUnit(..., haltOk)` returns
-  `"trapped"`) goes into PR A, its retry memory into PR B. Its guard march is reworked in PR B
-  (the guard targets the green's tile, is barred as stuck once adjacent, and is re-picked at
-  every replan). `suite --held-out` has NOT run on it. The earlier Ch6 witness (4001 and 4007,
-  12 attempts each) is on #510 comment 6776176601.
-- **How to work it cheaply** (agreed with Nicolas): a fresh session a PR, started from the plan
-  comment; Opus for the building; Fable comes back for two reads only (the comment's
-  "Where Fable comes back in"): PR A's stepping-back witness on the Ch5 starts, and PR B's
-  campaign rerun; never read the five bot files whole (435 KB: use the comment's file map and
-  `sed -n`); scripts read the runs, not a model; unit tests on the fake board before any
-  emulator run; while working, only the starts a change can touch (Ch5 starts, the Ch6 fog
-  start); the full suite once, on PR A's final code.
-- **Lessons:**
-  - The pool prints a campaign's attempts only when its worker ends; `resume` of one campaign
-    to the cap takes about 1 h (Ch6, 12 attempts).
-  - A worker reads harness/botrun at launch: editing them mid-run mixes versions. Stop the run
-    first.
-  - HANDOFF is refreshed on main only; the branch's pre-commit refuses it.
-  - Earlier lessons still hold: `starts` skips pinned seeds; trace numbers are game chapter ids
-    (5 = Ch5x, 6 = Ch5, 7 = Ch6); vanilla Eirika ids 9 = Ch8, 10-21 `E_9`..`E_21`, 22 `E_21X`.
-  - The "25 min" suite wall below is not reconciled with `suite-frozen.json`'s `wall_s`
-    (2,296 s tuning, 4,313 s held-out; perhaps summed over workers). Unchecked.
-- **The campaigns' saved starts** are untouched (resume copies them first): the 9 stopped
-  ones at `states/cs-s<seed>/7.ss` (4003's `5.ss`), 4008 at `states/full-s4008/9.ss`. The
-  witness's state copies were deleted; its traces and records are kept.
+  - **The look's enemy phase leaves red the active faction** (`aiOrder`). Anything that reads
+    the board after it as our phase must set `PLAY_FACTION` back to blue:
+    `GenerateDangerZoneRange` draws the faction NOT active (bmidoten.c:780). Left red, every
+    reach check asked a strike (100% vs 12-20% live), 10x the calls.
+  - **Probe recipe for cost:** wrap every sight function in the planner, credit each
+    `AiDecideMain` call to the outermost read (`sight.aiCalls()` deltas), for the live decision
+    and for the turn between; open the allowance (`lookRoom` returns `math.huge`) so every look
+    runs. Not kept; the shadow look changes no play, so it is safe.
+  - A function or constant board.lua adds must go in `Board.bind` too (`US_UNSELECTABLE` was
+    missing; added with `US_HAS_MOVED_AI`).
+  - `sight.staged` isolates `seen`, `s.cache`, answer()'s village race and closings()'
+    replays: a staged read must never be kept for the live board.
+  - Prose check: write "one of our units", never "one of ours" (it reads as the code id).
+  - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
+    runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
+- **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
+  16 kept runs (no deaths), untracked; Ch5x (4003) stalls on turn 33; Ch8's chests at (1,3)
+  and (2,3) are never reached. None are deaths, so W1-W3 do not cover them (the design's "Not
+  covered"). The campaigns' saved starts are untouched (`resume` copies them first).
 
 ## Where things stand
 
@@ -196,9 +108,8 @@ was built or run in the emulator this session.
 ## Next
 
 0. **#510 PR A, first attempts**: merged (PR #598, ADR 0400).
-1. **#510 PR B, retries: PR #599** (above). Finish the owed checks, merge. Then **Fable expands
-   its design to scale** (above: over-cap trades, reinforcements, cost), then it is built as its
-   own PR after Nicolas's calls. Then tries to the first
+1. **#510 PR B merged (#599).** **W1, W2, W3** (the look: comment 6786548233) are being built
+   (above). Then tries to the first
    clean clear (its method goes to Nicolas as an ADR 0385 amendment first), **PR C** (a cell's
    dice, expected losses; small, no suite run) before any cell verdict, **#510 step 10** after.
    Still owed from PR-I:
