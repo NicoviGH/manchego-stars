@@ -16,9 +16,10 @@
 -- MAX_ATTEMPTS times (the retry cap, ADR 0399). The team follows from the claims a style
 -- follows (a carry claim's units); once every style has been tried they are drawn again, each
 -- one only if it was not yet played with what is remembered now (a style and a memory already
--- played replay that try exactly); with none left the chapter stops. The game's RNG is never re-seeded on a restart: FE8 seeds it once at
--- power-on and a suspend save stores it, so a restart differs from the last only by the bot's
--- style, its memory, and the game's RNG following from that different play (the amendment, #510).
+-- played replay that try exactly); with none left the chapter stops. The game's RNG is never
+-- re-seeded on a restart: FE8 seeds it once at power-on and a suspend save stores it, so a
+-- restart differs from the last only by the bot's style, its memory, and the game's RNG
+-- following from that different play (the amendment, #510).
 -- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
