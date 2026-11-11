@@ -3511,6 +3511,15 @@ def story(events, names=None, items=None, classes=None, why=False):
             if r.get('offered') is not None:
                 line += ', forward steps %d, %d within the cap' % (r['offered'], r['admitted'])
             out.append(line)
+        # a turn between that showed an enemy the fog hid was planned again from there
+        # (planner.lua's widened replan, the look only)
+        again = rec.get('replan')
+        if again:
+            out.append('%safter act %s, %s came into sight; the rest planned again:' % (
+                indent, again['after'],
+                ', '.join(who(char[i]) if i in char else 'enemy %s' % i
+                          for i in again.get('shown') or [])))
+            out.extend(explained(again.get('why') or {}, indent + '  '))
         return out
 
     lines = []

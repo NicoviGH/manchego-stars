@@ -126,6 +126,11 @@
 --   walkers(k)               each watched enemy played alone k enemy phases forward, everyone
 --                            else standing (closings' routine): its first strike on one of our
 --                            units or a green -> { { enemy, target, phase, x, y } } (#510 W1).
+--   reveals(steps)           inside a sandbox: the first of a turn's acts ({ unit, x, y } each,
+--                            in play order) that shows an enemy the fog hid -> { k, shown } | nil.
+--   after(phase, acted, fn)  inside a sandbox: fn(board) on the board `phase` leaves, the units
+--                            in `acted` marked as having acted, the fog refreshed (the look's
+--                            widened replan, #510 W1). See s.reveals, s.after.
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
 --                            boss = on a Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
@@ -1876,6 +1881,63 @@ function M.new(outer)
     -- FR-017; the hold is the R-8 spike's intervening player turn): the look two phases deep
     -- with no turn between. -> as look's.
     function s.nextPhase(plan) return s.look(plan, 2) end
+
+    -- The widened replan's sight (#510 W1, the look's turn between only; Nicolas, 2026-11-11):
+    -- inside an open sandbox, which act of a turn first shows an enemy the fog hid. steps =
+    -- { { unit, x, y } }, where each act leaves its unit, in the order they are played. Each
+    -- unit is stood on its tile in turn and the fog refreshed as the game refreshes it
+    -- (RefreshEntityBmMaps: RefreshUnitsOnBmMap draws our units' and greens' sight, and clears
+    -- US_BIT9 on a red there while red is not the active faction, bmmap.c). An enemy fogged
+    -- when the turn begins and seen after a step is shown by it, remembered or not.
+    -- -> { k = the first step that shows one, shown = their ids, sorted }, nil when none does.
+    function s.reveals(steps)
+        if not open() then error("sight.lua: reveals() reads a staged board: open a sandbox first", 0) end
+        -- the fog bit itself, remembered or not: the one read besides playsAsSeen's
+        local function inFog(o) return (mem.u32(o.addr + UNIT_STATE) & Board.US_BIT9) ~= 0 end
+        return sandbox(function(call)
+            local fogged, any = {}, false
+            for _, o in ipairs(api.board().units) do
+                if o.faction == "red" and o.onField and not o.dead and inFog(o) then
+                    fogged[o.id], any = o, true
+                end
+            end
+            if not any then return nil end
+            for k, st in ipairs(steps) do
+                standOn(st.unit, st.x, st.y)
+                call(S.RefreshEntityBmMaps, {})
+                local shown = {}
+                for id, o in pairs(fogged) do
+                    if not inFog(o) then shown[#shown + 1] = id end
+                end
+                if #shown > 0 then
+                    table.sort(shown)
+                    return { k = k, shown = shown }
+                end
+            end
+            return nil
+        end)
+    end
+
+    -- fn(board) on the board a part of a turn leaves (#510 W1, the widened replan), inside an
+    -- open sandbox: `phase` (a phase table as enemyPhase's) staged in a nested one, the units
+    -- in `acted` ({ [id] = true }) marked as having acted this phase (US_UNSELECTABLE and
+    -- US_HAS_MOVED, as an act leaves them), the fog refreshed (RefreshEntityBmMaps), then fn
+    -- read on it as s.staged reads one. -> fn's result; the outer board as it was.
+    function s.after(phase, acted, fn)
+        if not open() then error("sight.lua: after() reads a staged board: open a sandbox first", 0) end
+        return sandbox(function(call)
+            local byId = stagePhase(call, phase)
+            for id in pairs(acted) do
+                local o = byId[id]
+                if o then
+                    api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE)
+                        | Board.US_UNSELECTABLE | Board.US_HAS_MOVED)
+                end
+            end
+            call(S.RefreshEntityBmMaps, {})
+            return s.staged(fn)
+        end)
+    end
 
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
     -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`

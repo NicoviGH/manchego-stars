@@ -482,6 +482,32 @@ function M.triggers(fin, byId, enemies, sight)
     return #out > 0 and out or nil
 end
 
+-- The turn a widened replan plays (#510 W1, the look's turn between): `pre`, the phase table
+-- the acts before the reveal leave, then `rest`, the one planned on that board for the units
+-- still to act (`acted` = { [id] = true }, the units pre moved). -> one phase table: each unit
+-- where rest leaves it, a unit in `acted` as pre has it (its attack's weapon slot is pre's);
+-- gone and opened, every one either names; reds and carry, pre's, then rest's over them.
+function M.joinTurn(pre, rest, acted)
+    local mine, blues, seen = {}, {}, {}
+    for _, p in ipairs(pre.blues) do mine[p.unit.id] = p end
+    for _, p in ipairs(rest.blues) do
+        local id = p.unit.id
+        blues[#blues + 1] = acted[id] and mine[id] or p
+        seen[id] = true
+    end
+    for _, p in ipairs(pre.blues) do
+        if not seen[p.unit.id] then blues[#blues + 1] = p end
+    end
+    local function union(a, b)
+        local out = {}
+        for k, v in pairs(a or {}) do out[k] = v end
+        for k, v in pairs(b or {}) do out[k] = v end
+        return out
+    end
+    return { blues = blues, gone = union(pre.gone, rest.gone), reds = union(pre.reds, rest.reds),
+             opened = union(pre.opened, rest.opened), carry = union(pre.carry, rest.carry) }
+end
+
 function M.plan(Bot, board, sight, style, opts)
     local W = M.WEIGHTS[style.aggression]
     if not W then error("planner.lua: no weights for style " .. tostring(style.aggression)) end
@@ -1093,6 +1119,42 @@ function M.plan(Bot, board, sight, style, opts)
         local st = plans[1].st
         local ph = phaseOf(st)
         ph.win, ph.explain = winChance(st), explain(st)
+        -- The widened replan (Nicolas, 2026-11-11; the look only): an enemy fogged before an
+        -- act and seen after it is a surprise, remembered or not. Live play's (M.surprise)
+        -- replans only for an enemy not in plan.enemies, and a retry lists the remembered
+        -- fogged ones there (ctx.threats, ADR 0399), so the turn between that walked beside
+        -- remembered boss Novala never struck her: her tile in fog cannot be targeted
+        -- (Ch6 4001 attempt 2, `w1p`). The acts are played in order (sight.reveals); after the
+        -- first that shows one, the board it leaves (sight.after: those units acted, the fog
+        -- refreshed) is planned again, unjudged, for the units still to act, and the turn is
+        -- those acts then that plan (which replans again the same way).
+        local steps = {}
+        for _, a in ipairs(st.acts) do
+            local at = endTile(a)
+            steps[#steps + 1] = { unit = byId[a.unitId], x = at.x, y = at.y }
+        end
+        local shown = #steps > 0 and sight.reveals and sight.reveals(steps)
+        local pre, acted, waiting = start, {}, false
+        for i = 1, shown and shown.k or 0 do
+            pre = pre and extend(pre, st.acts[i], st.acts[i].unitId)
+            acted[st.acts[i].unitId] = true
+        end
+        -- a unit still to act: one with a later act, or one the plan holds (it has none)
+        for _, u in ipairs(shown and ctx.actors or {}) do
+            if not acted[u.id] then waiting = true end
+        end
+        if waiting then
+            local left = pre and (phaseOf(pre))
+            local rest = left and sight.after(left, acted, function(b)
+                return M.plan(Bot, b, sight, style, opts)
+            end)
+            if rest then
+                ph = M.joinTurn(left, rest, acted)
+                ph.win = math.max(winChance(pre), rest.win or 0)
+                ph.explain = explain(pre)
+                ph.explain.replan = { after = shown.k, shown = shown.shown, why = rest.explain }
+            end
+        end
         return ph
     end
 

@@ -438,7 +438,9 @@ do
     local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
     check(lifts, 2, "knows: danger and threat lift the remembered out of the fog")
     local _, fogTests = src:gsub("& Board%.US_BIT9%)", "")
-    check(fogTests, 1, "the fog bit is read in playsAsSeen alone")
+    -- and in reveals (the look's widened replan, #510 W1): an act that shows an enemy the fog
+    -- hid is a surprise, remembered or not, so it reads the bit itself
+    check(fogTests, 2, "the fog bit is read in playsAsSeen and reveals alone")
 end
 
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the

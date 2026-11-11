@@ -5928,6 +5928,78 @@ do
     check(ph.win, 1, "between: the Rout's last enemy gone ends the chapter")
 end
 
+-- test_turn_between_replans_when_an_act_shows_a_fogged_enemy (#510 W1, the widened replan):
+-- B stands beside X at (6,0), which the fog hides, so the turn between plans no strike on it.
+-- The fake sight says A's act shows X (sight.reveals); on the board A's act leaves
+-- (sight.after: A acted, X in sight), B is planned again and kills X. The turn is A's act,
+-- then B's kill: X gone, and the record says after which act X came into sight.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local Bu = blue(0x02, 1, 5, 0, { minRange = 1, maxRange = 1 })
+    local X = red(0x83, 6, 0, { hp = 10, fogged = true })
+    local E = red(0x81, 14, 9)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 5, 0 }) },
+        fc = { [0x02] = { [0x83] = { ["5,0"] = fc({ hit = 100, dmg = 20, hits = 1 }) } } },
+        enemyPhase = function() error("unjudged: no enemy phase is judged") end,
+    }
+    local board, sight = boardOf(A, Bu, X, E), sightOf(o)
+    local asked = {}
+    sight.reveals = function(steps)
+        for k, s in ipairs(steps) do
+            if s.unit.id == 0x01 then return { k = k, shown = { 0x83 } } end
+        end
+    end
+    sight.after = function(phase, acted, fn)
+        asked[#asked + 1] = acted
+        local at, units = {}, {}
+        for _, p in ipairs(phase.blues) do at[p.unit.id] = p end
+        for _, u in ipairs(board.units) do
+            local c = {}
+            for k, v in pairs(u) do c[k] = v end
+            if at[u.id] then c.x, c.y = at[u.id].x, at[u.id].y end
+            if acted[u.id] then c.acted = true end
+            if u.id == 0x83 then c.fogged = false end
+            units[#units + 1] = c
+        end
+        return fn(setmetatable({ units = units }, { __index = board }))
+    end
+    local ok, ph = pcall(Planner.plan, B, board, sight, style("bold"), { unjudged = true })
+    if not ok then check(ph, nil, "replan: no error") end
+    ph = ok and type(ph) == "table" and ph or { blues = {}, gone = {} }
+    check(#asked, 1, "replan: the board A's act leaves is planned again")
+    check(asked[1] and asked[1][0x01], true, "replan: A has acted there")
+    check(ph.gone and ph.gone[0x83], true, "replan: B kills X once A's act shows it")
+    local tiles2 = {}
+    for _, p in ipairs(ph.blues or {}) do tiles2[p.unit.id] = p.x .. "," .. p.y end
+    check(tiles2[0x02], "5,0", "replan: B strikes from its tile")
+    check(tiles2[0x01] ~= nil, true, "replan: A is in the turn")
+    local r = ph.explain and ph.explain.replan or {}
+    check(r.after ~= nil, true, "replan: the record says after which act")
+    check(r.shown and r.shown[1], 0x83, "replan: and which enemy came into sight")
+    -- no reveal: the turn as before, X untouched in the fog
+    sight.reveals = function() return nil end
+    local ph2 = Planner.plan(B, board, sight, style("bold"), { unjudged = true }) or { gone = {} }
+    check(ph2.gone[0x83], nil, "replan: with nothing shown, X stays in the fog untouched")
+end
+
+-- Planner.joinTurn: the acts before a reveal, then the replan's
+do
+    local A, Bu = { id = 1 }, { id = 2 }
+    local pre = { blues = { { unit = A, x = 1, y = 0, slot = 2 }, { unit = Bu, x = 5, y = 0 } },
+                  gone = { [0x81] = true }, reds = { [0x82] = 4, [0x83] = 9 }, opened = { ["3,3"] = true },
+                  carry = {} }
+    local rest = { blues = { { unit = A, x = 1, y = 0 }, { unit = Bu, x = 6, y = 1, slot = 0 } },
+                   gone = { [0x83] = true }, reds = { [0x83] = 1 }, opened = {}, carry = { [5] = { by = 2 } } }
+    local j = Planner.joinTurn(pre, rest, { [1] = true })
+    check(j.blues[1].slot, 2, "joinTurn: an acted unit keeps the first plan's entry")
+    check(j.blues[2].x .. "," .. j.blues[2].y, "6,1", "joinTurn: the rest where the replan leaves them")
+    check(j.gone[0x81] and j.gone[0x83], true, "joinTurn: every kill either names")
+    check(j.reds[0x82] .. "/" .. j.reds[0x83], "4/1", "joinTurn: reds, the replan's over the first's")
+    check(j.opened["3,3"], true, "joinTurn: the doors the first opened")
+    check(j.carry[5] and j.carry[5].by, 2, "joinTurn: the replan's carries")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
