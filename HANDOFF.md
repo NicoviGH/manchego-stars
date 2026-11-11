@@ -13,11 +13,11 @@ and start a fresh instance; don't rely on auto-compaction.
 built and its one suite run refused promotion on **two new stalls in Manchego Stars ch03**
 (#510 comment 6782740420). Branch `feat/510-pr-a-first-attempts` (pushed, no PR; head
 1e1977f0, ADR 0400 on it with the suite result).
-- **Do first: name the ch03 stalls' cause, with ONE instrumented run.** `ours-ch03` seed 1002
-  (and/or 1001) on a8cf3fe8^ and on a8cf3fe8 (step 3, the step back + mend rounds), reading the
-  played plan's `kind` on the stalled turns. Hypotheses and their refutations are on the
-  comment; the fog tie-breaker is already refuted (ch03 is `fog: none`). Bring the cause and a
-  fix to Nicolas before building: it may mean changing an approved step.
+- **The ch03 stalls' cause is named** (#510 comment 6782827664, from the suite's traces): step 3's
+  always-judged `back` plan. Every forward plan is over the cap, so the bot alternates `back`
+  (the only plan under the cap) and `unstall` for 40+ turns. **Waiting on Nicolas:** the
+  recommendation is to take the `back` plan out of PR A and keep the mend rounds; confirm on
+  `ours-ch03` 1001/1002 (about 3 minutes).
 - **Then:** rerun `suite --held-out` (about 1.2 wall-hours, 56 runs on 8 workers), the PR,
   `/code-review <PR> medium`, every finding fixed (`review-to-clean`). Then PR B.
 - **Step 4 is settled (Nicolas):** the fog read breaks ties only, after everything else the rank
@@ -27,12 +27,12 @@ built and its one suite run refused promotion on **two new stalls in Manchego St
   lead, fragile follow" march was dropped. No version moved Ch6's fog deaths (12, 11, 11, 10,
   11). As a tie-breaker: greens 12, turns 7-16, no stall; `scout-ch6` loses both seeds on turn
   2 again, as on main.
-- **PR B carries Ch6 now** (Nicolas: "make sure this reaches PR B"): plan comment 6779357154,
-  PR B step 2 holds the lessons: a player learns from a loss where the fog hid enemies AND the
-  Bael's clock (it reaches the Civilians about turn 7-8; seven guides send Vanessa east;
-  going fast is contested in research 0020); the one clean Ch6 clear on record is campaign
-  4008 attempt 2 (won turn 7, healer kept back, partly luck). Unchecked: whether the bot ever
-  sends a flier east.
+- **PR B's retry memory is the screen's whole record, not a list of lessons** (Nicolas: naming
+  "two things a player learns" is the hardcoding to avoid). Plan comment 6779357154, PR B step 2:
+  a retry knows what earlier attempts saw (ADR 0376 decision 3, 0399's draft); PR B checks the
+  memory covers what the screen showed and says what it leaves out; nothing may name Ch6 or the
+  Bael. Ch6 is the witness: the Bael reaches the Civilians about turn 7-8, greens die on turns
+  8, 9, 11; the one clean Ch6 clear on record is campaign 4008 attempt 2 (partly luck).
 - **Suite signals, not blockers:** 5 deaths that lived when frozen (listed on the comment).
 - **Waiting on Nicolas:** Fable's look one turn ahead for Ch5 (comment 6780629895).
 - **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
