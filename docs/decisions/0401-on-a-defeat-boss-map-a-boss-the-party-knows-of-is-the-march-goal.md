@@ -35,7 +35,8 @@ faster.
 once the party knows where it stands: in sight, or in fog and remembered (`ctx.threats`). The
 boss is the unit the objective names (`sight.objective.boss`, whose death ends the chapter):
 another `CA_BOSS` unit is no goal beside it, in sight or remembered; with none named, the
-first `CA_BOSS` unit known, as before. A boss no attempt showed is no goal: the march heads for the nearest enemy in sight, or pushes
+first `CA_BOSS` unit known, as before. A boss no attempt showed is no goal: the march heads for
+the nearest enemy in sight, or pushes
 the fog back, as before. A Rout map is unchanged. A unit sent to a recruit, village or chest
 still goes there first (`goalFor`), a plan that ends the chapter with a goal open still pays
 its worth (`goalTerm`), and a clear with a reward untaken is still not clean.

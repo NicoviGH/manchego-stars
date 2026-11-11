@@ -2860,13 +2860,15 @@ end
 -- goal (the march heads for the nearest enemy in sight), and on a Rout map a remembered CA_BOSS
 -- unit changes nothing: the win condition says what the march is for.
 do
-    -- X in sight at (3,0); Y the named boss at (9,0); D another CA_BOSS unit at (6,0)
+    -- X in sight at (3,0); Y the named boss at (9,0); D another CA_BOSS unit at (6,0), ahead of
+    -- Y on the board, so "the first CA_BOSS unit" is D
     local function goal(objective, y, known, decoy)
         local A, X = blue(0x01, 0, 0, 0), red(0x81, 3, 0)
         y.charId, y.isBoss = 0x40, true
         local Y = red(0x82, 9, 0, y)
         local D = decoy and red(0x83, 6, 0, { charId = 0x41, isBoss = true, fogged = true })
-        local _, ctx = B.candidates(boardOf(A, X, Y, D),
+        local board = decoy and boardOf(A, X, D, Y) or boardOf(A, X, Y)
+        local _, ctx = B.candidates(board,
                                     sightOf({ objective = objective, known = known }),
                                     style("careful"))
         local t = ctx.objectiveTile(A)
@@ -2881,7 +2883,7 @@ do
           "boss goal: the boss the objective names, past a nearer remembered CA_BOSS unit")
     check(goal(boss, { fogged = true }, { [0x83] = true }, true), "3,0",
           "boss goal: a remembered CA_BOSS unit the objective does not name is none")
-    check(goal({ kind = "boss" }, { fogged = true }, both, true), "9,0",
+    check(goal({ kind = "boss" }, { fogged = true }, both, true), "6,0",
           "boss goal: with none named, the first CA_BOSS unit known")
     check(goal(boss, { fogged = true, onField = false }, { [0x82] = true }), "3,0",
           "boss goal: none for a boss off the field")
