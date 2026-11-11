@@ -14,8 +14,9 @@
 -- joined, every village and chest taken) moves on and its team is CARRIED into the next
 -- chapter's pick; anything else loads the chapter-start state back and attempts again, at most
 -- MAX_ATTEMPTS times (the retry cap, ADR 0399). The team follows from the claims a style
--- follows (a carry claim's units); once every style has been tried they are drawn again, the
--- memory now different. The game's RNG is never re-seeded on a restart: FE8 seeds it once at
+-- follows (a carry claim's units); once every style has been tried they are drawn again, each
+-- one only if it was not yet played with what is remembered now (a style and a memory already
+-- played replay that try exactly); with none left the chapter stops. The game's RNG is never re-seeded on a restart: FE8 seeds it once at
 -- power-on and a suspend save stores it, so a restart differs from the last only by the bot's
 -- style, its memory, and the game's RNG following from that different play (the amendment, #510).
 -- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
@@ -100,7 +101,8 @@ local function pick(random, list) return list[math.floor(random() * #list) + 1] 
 -- route. A claim Bot.unplayed names plays the same followed or not, so it is no part of a style
 -- (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is the keys drawn so
 -- far. Returns the style and the claims followed, or nil when every style has been tried (the
--- loop then empties `tried` and draws again; one attempt alone says no_style).
+-- loop then empties `tried` and draws again, skipping a try already played; one attempt alone
+-- says no_style).
 local function styleKey(aggression, ids) return aggression .. "|" .. table.concat(ids, ",") end
 
 function M.drawStyle(Bot, random, claims, route, tried)
@@ -252,12 +254,28 @@ function M.run(api)
             local tried, remembered, known = {}, {}, {}
             -- a retry's memory of the enemy (ADR 0399): style.memory
             local memory, memoryKeys = { enemies = {} }, {}
-            local function rememberEnemy(id, charId)
-                local k = Bot.memoryKey(id, charId)
+            local function rememberEnemy(id, charId, classId)
+                local k = Bot.memoryKey(id, charId, classId)
                 if not memoryKeys[k] then
                     memoryKeys[k] = true
-                    memory.enemies[#memory.enemies + 1] = { id = id, charId = charId }
+                    memory.enemies[#memory.enemies + 1] = { id = id, charId = charId,
+                                                            classId = classId }
                 end
+            end
+            -- the tries made, by style and what was remembered then: the start state restores
+            -- the game's RNG, so the same style with the same memory replays that try move for
+            -- move, and is never spent again. Both lists only grow, so their sizes say which
+            local played = {}
+            local function tryKey(style)
+                return styleKey(style.aggression, style.claims) .. "#" .. #memory.enemies .. "/"
+                    .. #remembered
+            end
+            -- from a draw on, the first style not yet played with this memory (nil: none left)
+            local function unplayed(style, followed)
+                while style and played[tryKey(style)] do
+                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                end
+                return style, followed
             end
             while true do
                 local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
@@ -272,11 +290,17 @@ function M.run(api)
                     return "no_style", string.format("chapter %d has %d styles, not %d", ch,
                         entry.attempts, api.only)
                 end
+                style, followed = unplayed(style, followed)
                 if not style then
-                    -- every style tried: draw them again, the memory now different (ADR 0399)
+                    -- every style tried: draw them again, each one not yet played with what is
+                    -- remembered now (ADR 0399); none left, and a retry could only replay a try
                     tried = {}
-                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                    style, followed = unplayed(M.drawStyle(Bot, api.random, claims, route, tried))
+                    if not style then
+                        return noClean(entry, "%d attempts, every style played with what it remembers")
+                    end
                 end
+                played[tryKey(style)] = true
                 entry.attempts = entry.attempts + 1
                 local team, bwhy = between(api, style, followed, need, carried)
                 if not team then
@@ -332,10 +356,12 @@ function M.run(api)
                     end
                 end
                 table.sort(remembered)
-                for _, e in ipairs(rec.enemies_seen or {}) do rememberEnemy(e.id, e.charId) end
+                for _, e in ipairs(rec.enemies_seen or {}) do
+                    rememberEnemy(e.id, e.charId, e.classId)
+                end
                 -- a killer struck on screen: the fight showed it, fog or not
                 for _, d in ipairs(rec.deaths or {}) do
-                    if d.killerId and d.killer then rememberEnemy(d.killerId, d.killer) end
+                    if d.killerId and d.killer then rememberEnemy(d.killerId, d.killer, d.killerClass) end
                 end
                 if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
                 local lok, lwhy = api.load(ch)

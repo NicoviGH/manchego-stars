@@ -5058,8 +5058,8 @@ end
 
 -- ── The lookahead (PR-E: FR-017, FR-018) ──────────────────────────────────────────────────
 
--- test_lookahead_triggers (T057): a door opened or a wall struck, and a step into a seen boss's
--- reach from outside it; nothing else (no arrival trigger: ADR 0389).
+-- test_lookahead_triggers (T057): a door opened or a wall struck, and a step into the reach of a
+-- boss in sight or remembered, from outside it; nothing else (no arrival trigger: ADR 0389).
 do
     local A = blue(0x01, 0, 0, 0)
     local K = red(0x81, 5, 0, { isBoss = true, minRange = 1, maxRange = 1 })
@@ -5084,8 +5084,10 @@ do
     A.x = 4
     check(why({ plan(act(4)) }, { K }), "none", "lookahead: already in its reach is no first entry")
     A.x = 0
+    -- which bosses count is the caller's list (ctx.threats: in sight, or remembered, ADR 0399);
+    -- a fogged boss given is one a retry remembers, so it triggers
     K.fogged = true
-    check(why({ plan(act(4)) }, { K }), "none", "lookahead: a boss the fog hides is not seen")
+    check(why({ plan(act(4)) }, { K }), "boss", "lookahead: a remembered boss in fog is a boss")
     K.fogged = nil
 end
 
@@ -5115,6 +5117,26 @@ local function looksAhead(boss)
         end,
     }
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
+end
+
+-- test_lookahead_triggers_on_a_remembered_boss (ADR 0399): a boss in fog that a retry remembers
+-- (sight.knows) is a boss whose reach a step enters, so the lookahead is triggered as for one in
+-- sight; one the fog hides and no attempt showed triggers nothing.
+do
+    local function fogged(remembered)
+        local board, sight, st = looksAhead(true)
+        for _, u in ipairs(board.units) do
+            if u.id == 0x82 then u.fogged = true end
+        end
+        if remembered then sight.knows = function(u) return u.id == 0x82 end end
+        return board, sight, st
+    end
+    local board, sight, st = fogged(true)
+    local a, plan = Planner.plan(B, board, sight, st)
+    check(at(a), "0,0", "remembered boss: the second phase's sure death keeps A back")
+    check(plan.lookahead.extended, true, "remembered boss: the step into its reach triggers the lookahead")
+    board, sight, st = fogged(false)
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "unseen boss: no trigger, the march goes")
 end
 
 -- test_lookahead_extends_all_finalists_or_none (T058, AS 1 and AS 2): with room, every

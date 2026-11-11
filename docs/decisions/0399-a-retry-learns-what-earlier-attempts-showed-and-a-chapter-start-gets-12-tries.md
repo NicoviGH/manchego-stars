@@ -24,9 +24,11 @@ comment 6776176601). A player who restarts knows where the ambush came from.
 From attempt 2 on, at the same chapter start, every earlier failed attempt adds to
 `style.memory.enemies` (`campaign.lua`): every red unit a board showed out of fog (botrun's
 `enemies_seen`), and every killer a death showed (its `killerId` and `killer`: a fight is on
-screen, fog or not). Each is kept once by slot and character (`Board.memoryKey`). Every attempt
-loads the same start, so a unit keeps its slot; an arrival can take a slot another unit died
-out of, so the character must match too. The reinforcement arrival turns (ADR 0386) are still
+screen, fog or not; its class is read from the board before the death, `killerClass`). Each is
+kept once by slot, character and class (`Board.memoryKey`). Every attempt loads the same start,
+so a unit keeps its slot; an arrival can take a slot another unit died out of, so the character
+and class must match too. The character alone is not enough: most enemies share one generic
+character id. The reinforcement arrival turns (ADR 0386) are still
 kept and used as before. A dice result is never remembered.
 
 ## 2. How the bot uses it
@@ -40,7 +42,11 @@ unit counts as seen everywhere the fog alone would hide it:
 - **the candidates' exposure** (`Bot.enemiesOf`'s second list, `ctx.threats`). It is never a
   target: the game refuses to target a unit on a fogged tile (`bmtarget.c`), so attack options
   stay with the enemies in sight;
-- **a key it drops** (`keySources`, ADR 0397);
+- **a key it drops** (`keySources`, ADR 0397), and **a village or chest it loots**
+  (`closings`' looters, ADR 0383). These and the judged phases ask one helper,
+  `Sight.playsAsSeen`;
+- **the lookahead's boss trigger** (`Planner.triggers`, given `ctx.threats`): a step into a
+  remembered boss's reach in fog extends the plan a second phase, as for a boss in sight;
 - **the fog read's strongest enemy seen so far** (botrun's `seenReds`, PR A, ADR 0400) starts
   from the memory;
 - **the plan's enemies** (`plan.enemies`), so a death by a remembered unit is never graded `fog`.
@@ -60,7 +66,7 @@ rule's. So a death reaches the next attempt only through its killer.
 
 | What the screen shows | Remembered? |
 |---|---|
-| Each enemy: where, class, weapons and items | Yes, by slot and character. The start is the same, so its class, items and stats are the live unit's. |
+| Each enemy: where, class, weapons and items | Yes, by slot, character and class. The start is the same, so its class, items and stats are the live unit's. |
 | The map the fog opened | Nothing to remember. FE8's fog hides units only (`RefreshUnitsOnBmMap` sets `US_BIT9` on a unit on a fogged tile); the terrain is always drawn. |
 | Reinforcements | Their arrival turns (ADR 0386). Once loaded, an arrival is a remembered unit like any other. |
 | Who died, where, and to what | The killer, as a remembered enemy. Where our unit stood is the play's, not the game's. |
@@ -77,8 +83,12 @@ rule's. So a death reaches the next attempt only through its killer.
 
 `MAX_ATTEMPTS` is **12 a chapter start**. It replaces "stop once every style has been tried"
 (Nicolas's call, a tuning weight). When the styles run out, they are drawn again, since memory
-makes a repeated style play differently. A chapter with no clean clear in 12 attempts stops: a
-`bot_fault` on vanilla, `infeasible` on Manchego Stars. An attempt played alone (`api.only`,
+makes a repeated style play differently. **A try already played is never spent again:** the
+start state restores the game's RNG, so a style played with the same memory replays that try
+move for move (9 of 22 Ch6 retries did, in PR B's first rerun). A try is keyed by its style and
+the sizes of the two remembered lists, which only grow. When every style has been played with
+what is remembered now, the chapter stops there. A chapter with no clean clear in 12 attempts,
+or with no try left, stops: a `bot_fault` on vanilla, `infeasible` on Manchego Stars. An attempt played alone (`api.only`,
 the pool) still says `no_style` past the style count: with no memory, a repeat would be a
 duplicate.
 

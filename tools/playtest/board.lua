@@ -100,9 +100,12 @@ end
 
 -- One unit across attempts at the same chapter start (a retry's memory, ADR 0399): every attempt
 -- loads the same start, so a unit keeps its slot (`id`); an arrival can take a slot another unit
--- died out of, so the character must match too. The one owner of the key: campaign.lua's memory,
--- botrun's enemies seen and sight's knows() all build it here.
-function Board.memoryKey(id, charId) return tostring(id) .. ":" .. tostring(charId) end
+-- died out of, so the character and class must match too (most enemies share one generic
+-- character id, so the character alone does not tell two soldiers apart). The one owner of the
+-- key: campaign.lua's memory and sight's knows() both build it here.
+function Board.memoryKey(id, charId, classId)
+    return tostring(id) .. ":" .. tostring(charId) .. ":" .. tostring(classId)
+end
 
 -- Where a planned act leaves its unit (bot.lua's act shape): the tile a Canto unit moves on
 -- to after it (`canto`, playerphase.c TryMakeCantoUnit), else the act's own (`move`). The one

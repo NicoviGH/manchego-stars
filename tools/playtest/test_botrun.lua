@@ -675,11 +675,11 @@ do
     Botrun.run(g.api)
     local r = recordOf(g)
     local seen, red = {}, 0
-    for _, e in ipairs(r.enemies_seen) do seen[Bot.memoryKey(e.id, e.charId)] = (seen[Bot.memoryKey(e.id, e.charId)] or 0) + 1 end
+    for _, e in ipairs(r.enemies_seen) do seen[Bot.memoryKey(e.id, e.charId, e.classId)] = (seen[Bot.memoryKey(e.id, e.charId, e.classId)] or 0) + 1 end
     for _, u in ipairs(rout()) do
         if u.faction == "red" then
             red = red + 1
-            check(seen[Bot.memoryKey(u.id, u.charId)], 1, "a red in sight is listed once")
+            check(seen[Bot.memoryKey(u.id, u.charId, u.classId)], 1, "a red in sight is listed once")
         end
     end
     check(red > 0, true, "the board has reds in sight")
@@ -703,7 +703,7 @@ do
         Botrun.run(g.api)
         local r = recordOf(g)
         local keys = {}
-        for _, e in ipairs(r.enemies_seen) do keys[Bot.memoryKey(e.id, e.charId)] = true end
+        for _, e in ipairs(r.enemies_seen) do keys[Bot.memoryKey(e.id, e.charId, e.classId)] = true end
         return told, keys
     end
     local mem = { enemies = { { id = 0x9A, charId = 0x77 } } }
@@ -1395,8 +1395,9 @@ end
 -- A, then dies on B's counter. The game lists the deaths in that order, so A's grade still
 -- finds X on the plan's board: no reinforcement.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
-                                   unit(0x81, 0, "red", 0, 1, 10) },
+    local X = unit(0x81, 0, "red", 0, 1, 10)
+    X.classId = 0x0E
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20), X },
                          enemy = function(g, find)
                              for _, id in ipairs({ 0x01, 0x81 }) do
                                  local u = find(id)
@@ -1429,6 +1430,8 @@ do
     local d = r.deaths[1]
     check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
+    -- the killer's class, read from the board before the death (what a retry keys it by, ADR 0399)
+    check(d and d.killerClass, 0x0E, "same phase: the killer's class is recorded")
 end
 
 -- test_the_planner_is_told_every_enemy_seen (#510 PR A, the fog rule): opts.seen holds every

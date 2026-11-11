@@ -37,11 +37,11 @@
 --   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId } }, every
 --                            red unit earlier attempts at this start showed on screen (nil or
 --                            {} on attempt 1). From then on a remembered unit counts as seen
---                            wherever the fog alone would hide it: danger, threat, keySources
---                            and both judged phases.
+--                            wherever the fog alone would hide it: danger, threat, keySources,
+--                            closings' looters and both judged phases (M.playsAsSeen).
 --   knows(u)                 whether red unit `u` is one remember() named (Board.memoryKey: its
---                            slot and character; an arrival can take a slot another unit died
---                            out of).
+--                            slot, character and class; an arrival can take a slot another unit
+--                            died out of).
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
 --                            the game shows them, a remembered unit's tile lifted out of the
 --                            fog for the call: 0 when no enemy reaches (x, y), else its
@@ -1017,7 +1017,14 @@ end
 
 -- Whether red unit `u` is one a retry remembers: `keys` = { [Board.memoryKey] = true } (s.knows).
 function M.knows(Board, keys, u)
-    return keys ~= nil and u ~= nil and keys[Board.memoryKey(u.id, u.charId)] == true
+    return keys ~= nil and u ~= nil and keys[Board.memoryKey(u.id, u.charId, u.classId)] == true
+end
+
+-- Whether an enemy with unit state `state` counts as seen: not hidden by fog (the game's US_BIT9),
+-- or one a retry remembers (`knows`, ADR 0399). Every read the fog alone would hide a unit from
+-- asks this: both judged phases' decides, closings' looters, keySources.
+function M.playsAsSeen(Board, state, knows)
+    return (state & Board.US_BIT9) == 0 or knows == true
 end
 
 -- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
@@ -1026,7 +1033,7 @@ function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .
 function M.new(outer)
     local sandbox, api, open = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
-    local US_HIDDEN, US_UNDER_A_ROOF, US_BIT9 = Board.US_HIDDEN, Board.US_UNDER_A_ROOF, Board.US_BIT9
+    local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
     local s = { cache = {}, odds = M.odds }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
@@ -1269,7 +1276,7 @@ function M.new(outer)
         remembered = nil
         for _, e in ipairs(enemies or {}) do
             remembered = remembered or {}
-            remembered[Board.memoryKey(e.id, e.charId)] = true
+            remembered[Board.memoryKey(e.id, e.charId, e.classId)] = true
         end
         seen = { threats = {}, grids = {} }
     end
@@ -1603,7 +1610,7 @@ function M.new(outer)
         local function decides(id)
             local e = byId[id]
             if not e or gone[id] then return false end
-            return ((mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 or s.knows(e)) and e
+            return M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) and e
         end
         -- e strikes as it decided: stood on its tile, its expected damage off the target
         local function strike(e, id, target, side, done)
@@ -1793,7 +1800,7 @@ function M.new(outer)
                 api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
                 for _, id in ipairs(aiOrder(call)) do
                     local e = looter[id] and byId[id]
-                    if e and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 then
+                    if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
                         aiDecide(call, proc, e)
                         local x, y = followMove(e)
                         if x then
@@ -1886,7 +1893,7 @@ function M.new(outer)
             local last = e.items and e.items[#e.items]
             local st = e.state or 0
             if e.faction == "red" and e.onField and not e.dead and last
-                and st & Board.US_DROP_ITEM ~= 0 and (st & Board.US_BIT9 == 0 or s.knows(e))
+                and st & Board.US_DROP_ITEM ~= 0 and M.playsAsSeen(Board, st, s.knows(e))
                 and opensWith(u, last.id, terrain) then
                 out[#out + 1] = e
             end

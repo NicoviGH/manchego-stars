@@ -87,7 +87,7 @@ local function fakeGame(o)
             local deaths = {}
             if out == "dead" or out == "lost" then
                 deaths = { { id = 2, charId = 0x02, faction = "blue", turn = 3, killer = 0x40,
-                             killerId = 0x90, phase = "enemy" } }
+                             killerId = 0x90, killerClass = 0x0C, phase = "enemy" } }
             end
             local won = out == "won" or out == "dead" or out == "spoiled"
             return { outcome = won and "won" or out, clean = out == "won", turns = 4,
@@ -503,17 +503,17 @@ test_a_retry_remembers_the_arrivals_it_saw()
 -- showed out of fog (enemies_seen) and every killer a death showed, each once by slot and
 -- character; attempt 1 and an attempt alone (api.only) remember nothing.
 local function test_a_retry_remembers_the_enemies_it_saw()
-    local enemies = { [1] = { { id = 0x81, charId = 0x50 }, { id = 0x82, charId = 0x51 } },
-                      [2] = { { id = 0x81, charId = 0x50 }, { id = 0x81, charId = 0x52 } } }
+    local enemies = { [1] = { { id = 0x81, charId = 0x50, classId = 1 }, { id = 0x82, charId = 0x51, classId = 1 } },
+                      [2] = { { id = 0x81, charId = 0x50, classId = 1 }, { id = 0x81, charId = 0x52, classId = 1 } } }
     local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
                                         enemies = enemies } } }
     Campaign.run(g.api)
     check(g.plays[1].style.memory, nil, "attempt 1 remembers nothing")
     local m2 = g.plays[2].style.memory
     local ids = {}
-    for _, e in ipairs(m2.enemies) do ids[#ids + 1] = string.format("%x:%x", e.id, e.charId) end
-    check(table.concat(ids, ","), "81:50,82:51,90:40",
-          "attempt 2: attempt 1's enemies in sight, then the killer the fight showed")
+    for _, e in ipairs(m2.enemies) do ids[#ids + 1] = string.format("%x:%x:%x", e.id, e.charId, e.classId) end
+    check(table.concat(ids, ","), "81:50:1,82:51:1,90:40:c",
+          "attempt 2: attempt 1's enemies in sight, then the killer the fight showed, with its class")
     check(m2.deaths, nil, "a death is remembered through its killer alone")
     local m3 = g.plays[3].style.memory
     ids = {}
@@ -530,12 +530,15 @@ end
 test_a_retry_remembers_the_enemies_it_saw()
 
 -- The retry cap (ADR 0399): every style tried, the styles are drawn again, up to MAX_ATTEMPTS
--- attempts a chapter start; then the chapter stops.
+-- attempts a chapter start, while what is remembered keeps growing; then the chapter stops.
 local function test_styles_are_drawn_again_up_to_the_cap()
     check(Campaign.MAX_ATTEMPTS, 12, "the cap is 12 a chapter start (Nicolas, 2026-11-10)")
-    local outcomes = {}
-    for i = 1, 12 do outcomes[i] = "lost" end
-    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    local outcomes, enemies = {}, {}
+    for i = 1, 12 do
+        outcomes[i] = "lost"
+        enemies[i] = { { id = 0x80 + i, charId = 0x50, classId = 1 } }   -- something new each try
+    end
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes, enemies = enemies } } })
     local ok, why = Campaign.run(g.api)
     check(ok, false, "no clean clear in the cap stops the campaign")
     check(#g.plays, 12, "all 12 attempts are played, past the 3 styles (no claims)")
@@ -548,6 +551,23 @@ local function test_styles_are_drawn_again_up_to_the_cap()
     check(lines(g)[1].outcome, "bot_fault", "a vanilla chapter so stopped is a bot fault")
 end
 test_styles_are_drawn_again_up_to_the_cap()
+
+-- A try already played is never spent again (ADR 0399): the start state restores the game's RNG,
+-- so a style with the memory it was played with replays that try exactly. Memory grows once
+-- (attempt 1's killer) and then not: attempts 2 and 3 play the other two styles, attempt 4 the
+-- first style again with the new memory, and then every style has been played with it.
+local function test_a_try_already_played_is_not_spent_again()
+    local outcomes = {}
+    for i = 1, 12 do outcomes[i] = "lost" end
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "the chapter stops")
+    check(#g.plays, 4, "3 styles, then the first again with the memory it was not played with")
+    check(g.plays[4].style.aggression, g.plays[1].style.aggression, "attempt 4 is attempt 1's style")
+    check(why:find("every style played with what it remembers") ~= nil, true, "and it says why")
+    check(lines(g)[1].outcome, "bot_fault", "a bot fault on vanilla")
+end
+test_a_try_already_played_is_not_spent_again()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)

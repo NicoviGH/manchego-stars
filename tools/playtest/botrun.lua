@@ -680,8 +680,10 @@ function M.run(api)
     -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A), and
     -- what a retry may remember (rec.enemies_seen, ADR 0399). A retry starts from what earlier
     -- attempts at this start showed (style.memory.enemies); attempt 1 from nothing
-    local seenReds = {}
-    for _, e in ipairs(style.memory and style.memory.enemies or {}) do seenReds[e.id] = e.charId end
+    local seenReds, seenClass = {}, {}   -- slot -> charId (the fog read's), slot -> classId
+    for _, e in ipairs(style.memory and style.memory.enemies or {}) do
+        seenReds[e.id], seenClass[e.id] = e.charId, e.classId
+    end
     local function changes(after)
         if api.recruits and not owed then
             local party = {}
@@ -711,7 +713,7 @@ function M.run(api)
         end
         for _, u in ipairs(after.units or {}) do
             if u.faction == "red" and u.onField and not u.dead and not u.fogged then
-                seenReds[u.id] = u.charId
+                seenReds[u.id], seenClass[u.id] = u.charId, u.classId
             end
         end
         lastBoard, actedIn = after, nil
@@ -744,6 +746,11 @@ function M.run(api)
                                     phase = k.phase or phase },
                                   movers and movers[k.id] or plan, action, cap, lords,
                                   lastBoard, diedAt, admits)
+                -- the killer's class, from the board before the death: with its slot and
+                -- character, what a retry remembers it by (Board.memoryKey, ADR 0399)
+                for _, u in ipairs(g.killerId and lastBoard and lastBoard.units or {}) do
+                    if u.id == g.killerId and u.charId == g.killer then g.killerClass = u.classId end
+                end
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
                     -- a green lost on the turn it was first seen: the plan had one player
@@ -917,7 +924,8 @@ function M.run(api)
         end
         -- every red a board showed (seenReds), by slot: campaign.lua's memory for the next retry
         for id, charId in pairs(seenReds) do
-            rec.enemies_seen[#rec.enemies_seen + 1] = { id = id, charId = charId }
+            rec.enemies_seen[#rec.enemies_seen + 1] = { id = id, charId = charId,
+                                                        classId = seenClass[id] }
         end
         table.sort(rec.enemies_seen, function(a, b) return a.id < b.id end)
         api.emit(M.PREFIX .. Json.encode(rec))
