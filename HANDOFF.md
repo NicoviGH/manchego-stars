@@ -15,12 +15,16 @@ micromanaging from me." **You own W1's direction.** Bring him outcomes and the f
 that are truly his (AGENTS.md "Decisions that are mine": a measurement's meaning, a tuning
 weight, stopping a line of work); decide the rest yourself, and say what you decided.
 
-**The goal** (#510's north star): a trustworthy difficulty model. W1-W3's part: a retry learns
-from what beat it, as a human player does ("emulate human players learning from their
-mistakes and losses"), so retries, and the cells built on them, play like people. The
-design, its six approved calls and its **refutation bars** are #510 comment 6786548233 (read
-"Proof, and what refutes each part" first, then the W1 build map). Judge every step by
-whether it moves a bar, not by whether it fixes a case.
+**The goal** (#510's north star): a trustworthy difficulty model. W1-W3 were one way to serve
+it: a retry learns from what beat it, as a human player does ("emulate human players
+learning from their mistakes and losses"). The design, its six approved calls and its
+refutation bars are #510 comment 6786548233, with W1's build map in it.
+
+**Nothing below is settled for you** (Nicolas, 2026-11-11: "Let it question the bars too. Let
+it question our whole approach"). Question the bars, the look, W1-W3, and whether this is the
+right road to the goal at all. If you find a better one, say so and why, with evidence, and
+bring it to Nicolas before building it: a change of approach is his to approve. Settled ADRs
+still stand until he reopens one.
 
 **Measured so far, against the design's bars** (facts only; draw your own conclusions):
 - The look runs on the ROM in shadow, play unchanged act for act. Ch6 shadow runs (`w1q`,
@@ -64,7 +68,7 @@ Shadow runs kept in `references/sim/vanilla/c25b145e3745/traces/`: `w1q-cs-s4001
   - Prose check: "one of our units", never "one of ours"; "our units", never "ours".
   - In the turn between, a unit the plan holds has NO act in `st.acts`: "units still to act"
     is `ctx.actors` minus the acted, never "acts left".
-  - Check a shadow step's result against its refutation bar before building the next step.
+  - Check a shadow step's result against what would refute it before building the next step.
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
