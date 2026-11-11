@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-398 decisions. Read this index, then open the two or three you need — the whole
+399 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -243,6 +243,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0396` | [A bot decision is an ordering of the game's outcomes; only the game forbids](decisions/0396-a-bot-decision-is-an-ordering-of-outcomes-only-the-game-forbids.md) | 2026-11-08 | #510 |
 | `0397` | [A key an enemy drops is a way to a chest or through a door, and the judged enemy phase plays on the map the plan opens](decisions/0397-a-key-an-enemy-drops-is-a-way-and-the-judged-phase-plays-on-the-opened-map.md) | 2026-11-10 | #510 |
 | `0398` | [The bot rescues and drops a green unit, and a recruit's death chance breaks ties after the forfeit](decisions/0398-the-bot-rescues-and-drops-and-a-recruits-death-chance-breaks-ties.md) | 2026-11-10 | #510 |
+| `0400` | [First attempts: a death is graded by the plan that moved its unit, the step back is always judged, and the fog read...](decisions/0400-first-attempts-a-death-is-graded-by-its-mover-the-step-back-is-judged-and-fog-breaks-ties.md) | 2026-11-10 | #510 |
 
 ---
 
