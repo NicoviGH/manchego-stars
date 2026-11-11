@@ -34,7 +34,7 @@
 --   refresh()                drop every board answer; recount the objective's turns left.
 --   newPhase()               refresh(), and a fresh `cache` for the phase: an AI a turn event
 --                            rewrote between phases is in no cache key.
---   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId } }, every
+--   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId, classId } }, every
 --                            red unit earlier attempts at this start showed on screen (nil or
 --                            {} on attempt 1). From then on a remembered unit counts as seen
 --                            wherever the fog alone would hide it: danger, threat, keySources,
@@ -1020,11 +1020,10 @@ function M.knows(Board, keys, u)
     return keys ~= nil and u ~= nil and keys[Board.memoryKey(u.id, u.charId, u.classId)] == true
 end
 
--- Whether an enemy with unit state `state` counts as seen: not hidden by fog (the game's US_BIT9),
--- or one a retry remembers (`knows`, ADR 0399). Every read the fog alone would hide a unit from
--- asks this: both judged phases' decides, closings' looters, keySources.
+-- Whether an enemy with unit state `state` counts as seen (Board.playsAsSeen, the game's US_BIT9
+-- its fog): what both judged phases' decides, closings' looters and keySources ask.
 function M.playsAsSeen(Board, state, knows)
-    return (state & Board.US_BIT9) == 0 or knows == true
+    return Board.playsAsSeen((state & Board.US_BIT9) ~= 0, knows)
 end
 
 -- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
@@ -1278,7 +1277,8 @@ function M.new(outer)
             remembered = remembered or {}
             remembered[Board.memoryKey(e.id, e.charId, e.classId)] = true
         end
-        seen = { threats = {}, grids = {} }
+        -- every answer read before is without the memory; attempt 1 (none) keeps them
+        if remembered then s.refresh() end
     end
     function s.knows(u) return M.knows(Board, remembered, u) end
     -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
@@ -1286,7 +1286,9 @@ function M.new(outer)
     local function liftRemembered()
         if not remembered then return end
         for _, o in ipairs(units()) do
-            if o.faction == "red" and o.onField and not o.dead and o.fogged and s.knows(o) then
+            -- in fog, yet counts as seen (Board.playsAsSeen): remembered
+            if o.faction == "red" and o.onField and not o.dead and o.fogged
+                and Board.playsAsSeen(o.fogged, s.knows(o)) then
                 api.write8(cell(mem, S.gBmMapFog, o.x, o.y), 1)
             end
         end

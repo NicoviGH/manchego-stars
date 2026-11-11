@@ -404,10 +404,8 @@ function M.enemiesOf(board, sight)
     for _, u in ipairs(board.units) do
         if o and o.boss and u.faction == "red" and u.charId == o.boss then u.isBoss = true end
         if u.onField and u.faction == "red" then
-            if not u.fogged then
-                out[#out + 1] = u
-                threats[#threats + 1] = u
-            elseif sight.knows and sight.knows(u) then
+            if not u.fogged then out[#out + 1] = u end
+            if Board.playsAsSeen(u.fogged, u.fogged and sight.knows and sight.knows(u)) then
                 threats[#threats + 1] = u
             end
         end

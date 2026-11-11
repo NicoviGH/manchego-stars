@@ -677,12 +677,14 @@ function M.run(api)
     end
     local lastBoard, actedIn
     -- every red unit a board showed out of fog this attempt, slot -> charId: the planner's
-    -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A), and
-    -- what a retry may remember (rec.enemies_seen, ADR 0399). A retry starts from what earlier
-    -- attempts at this start showed (style.memory.enemies); attempt 1 from nothing
-    local seenReds, seenClass = {}, {}   -- slot -> charId (the fog read's), slot -> classId
-    for _, e in ipairs(style.memory and style.memory.enemies or {}) do
-        seenReds[e.id], seenClass[e.id] = e.charId, e.classId
+    -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A): the
+    -- slot's current unit. What a retry may remember (rec.enemies_seen, ADR 0399) is every unit a
+    -- board showed, kept by its whole key (Board.memoryKey): a unit killed and a reinforcement
+    -- later loaded into its slot are both remembered
+    local seenReds, enemiesSeen = {}, {}
+    local function sawEnemy(id, charId, classId)
+        enemiesSeen[Bot.memoryKey(id, charId, classId)] = { id = id, charId = charId,
+                                                               classId = classId }
     end
     local function changes(after)
         if api.recruits and not owed then
@@ -713,7 +715,8 @@ function M.run(api)
         end
         for _, u in ipairs(after.units or {}) do
             if u.faction == "red" and u.onField and not u.dead and not u.fogged then
-                seenReds[u.id], seenClass[u.id] = u.charId, u.classId
+                seenReds[u.id] = u.charId
+                sawEnemy(u.id, u.charId, u.classId)
             end
         end
         lastBoard, actedIn = after, nil
@@ -730,7 +733,9 @@ function M.run(api)
     -- that plan knew when it put the unit there, not what a later replan found (#510 PR A); a
     -- unit no plan moved (a green, one carried) falls back to `plan`, the phase's last.
     local deathFaults = {}
-    local function record(list, phase, plan, action, movers)
+    -- `now` (optional): the board read after the deaths, where a killer that arrived during the
+    -- phase stands (lastBoard, from before it, does not hold one)
+    local function record(list, phase, plan, action, movers, now)
         local seen = {}
         for _, d in ipairs(list) do seen[d.id] = d end
         for _, k in ipairs(api.killed()) do
@@ -746,11 +751,18 @@ function M.run(api)
                                     phase = k.phase or phase },
                                   movers and movers[k.id] or plan, action, cap, lords,
                                   lastBoard, diedAt, admits)
-                -- the killer's class, from the board before the death: with its slot and
-                -- character, what a retry remembers it by (Board.memoryKey, ADR 0399)
-                for _, u in ipairs(g.killerId and lastBoard and lastBoard.units or {}) do
-                    if u.id == g.killerId and u.charId == g.killer then g.killerClass = u.classId end
+                -- the killer's class: with its slot and character, what a retry remembers it by
+                -- (Board.memoryKey, ADR 0399). The board after the deaths first (an arrival that
+                -- struck in this phase), then the one before (a killer that fell on the counter)
+                for _, b in ipairs(g.killerId and { now or {}, lastBoard or {} } or {}) do
+                    for _, u in ipairs(not g.killerClass and b.units or {}) do
+                        if u.id == g.killerId and u.charId == g.killer and u.faction == "red" then
+                            g.killerClass = u.classId
+                        end
+                    end
                 end
+                -- a fight is on screen, fog or not: the killer is an enemy seen
+                if g.killerClass then sawEnemy(g.killerId, g.killer, g.killerClass) end
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
                     -- a green lost on the turn it was first seen: the plan had one player
@@ -922,12 +934,11 @@ function M.run(api)
                 diag.ref, outcome, why))
             return false, why, nil
         end
-        -- every red a board showed (seenReds), by slot: campaign.lua's memory for the next retry
-        for id, charId in pairs(seenReds) do
-            rec.enemies_seen[#rec.enemies_seen + 1] = { id = id, charId = charId,
-                                                        classId = seenClass[id] }
-        end
-        table.sort(rec.enemies_seen, function(a, b) return a.id < b.id end)
+        -- every red a board or a fight showed: campaign.lua's memory for the next retry
+        for _, e in pairs(enemiesSeen) do rec.enemies_seen[#rec.enemies_seen + 1] = e end
+        table.sort(rec.enemies_seen, function(a, b)
+            return Bot.memoryKey(a.id, a.charId, a.classId) < Bot.memoryKey(b.id, b.charId, b.classId)
+        end)
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
         return outcome == "won" or outcome == "lost" or outcome == "stuck", why, rec
@@ -1298,7 +1309,7 @@ function M.run(api)
                 if lords[action.unit] and from and (from.x ~= to.x or from.y ~= to.y) then
                     progressed = true
                 end
-                record(fell, "player", playing, action)
+                record(fell, "player", playing, action, nil, after)
                 trace({ t = "act", phase = "player", unit = action.unit, id = action.unitId,
                         from = from and { x = from.x, y = from.y },
                         to = trapped and actor and { x = actor.x, y = actor.y } or action.move,
@@ -1362,10 +1373,11 @@ function M.run(api)
             -- carries every death; record keeps the blue and green ones the game killed
             local all, counted = {}, {}
             for _, d in ipairs(deaths or {}) do all[#all + 1] = d; counted[d.id] = true end
-            for _, d in ipairs(fallen(before, api.board(), nil)) do
+            local now = api.board()
+            for _, d in ipairs(fallen(before, now, nil)) do
                 if not counted[d.id] then all[#all + 1] = d end
             end
-            record(all, "enemy", commit, nil, movers)
+            record(all, "enemy", commit, nil, movers, now)
             if phase == "gameover" then return "lost", "game over in the enemy phase" end
             if phase == "ended" then
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end

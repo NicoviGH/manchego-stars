@@ -385,8 +385,8 @@ do
     check(asks, 3, "playsAsSeen: decides, closings' looters and keySources ask it")
     local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
     check(lifts, 2, "knows: danger and threat lift the remembered out of the fog")
-    local _, fogTests = src:gsub("US_BIT9%) == 0", "")
-    check(fogTests, 1, "the fog test lives in playsAsSeen alone")
+    local _, fogTests = src:gsub("& Board%.US_BIT9%)", "")
+    check(fogTests, 1, "the fog bit is read in playsAsSeen alone")
 end
 
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the

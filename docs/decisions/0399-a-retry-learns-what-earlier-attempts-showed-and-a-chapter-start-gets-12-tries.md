@@ -24,7 +24,10 @@ comment 6776176601). A player who restarts knows where the ambush came from.
 From attempt 2 on, at the same chapter start, every earlier failed attempt adds to
 `style.memory.enemies` (`campaign.lua`): every red unit a board showed out of fog (botrun's
 `enemies_seen`), and every killer a death showed (its `killerId` and `killer`: a fight is on
-screen, fog or not; its class is read from the board before the death, `killerClass`). Each is
+screen, fog or not; its class is read from the board after the deaths, where an arrival that
+struck in the phase stands, else the one before, `killerClass`). A unit killed and a later
+arrival in its slot are both kept: botrun keeps what it saw by the whole key. A unit whose class
+was not read is not kept: its key would match nothing. Each is
 kept once by slot, character and class (`Board.memoryKey`). Every attempt loads the same start,
 so a unit keeps its slot; an arrival can take a slot another unit died out of, so the character
 and class must match too. The character alone is not enough: most enemies share one generic
@@ -47,11 +50,13 @@ unit counts as seen everywhere the fog alone would hide it:
   `Sight.playsAsSeen`;
 - **the lookahead's boss trigger** (`Planner.triggers`, given `ctx.threats`): a step into a
   remembered boss's reach in fog extends the plan a second phase, as for a boss in sight;
-- **the fog read's strongest enemy seen so far** (botrun's `seenReds`, PR A, ADR 0400) starts
-  from the memory;
 - **the plan's enemies** (`plan.enemies`), so a death by a remembered unit is never graded `fog`.
 
-The fog read (ADR 0400) is unchanged: it covers what no attempt has seen.
+The fog read (ADR 0400) is unchanged: its strongest enemy seen so far is this attempt's alone,
+as PR A built it, so a remembered unit is not also its stand-in for what the fog may hide. The
+rule "counts as seen" has one owner, `Board.playsAsSeen`: `Bot.enemiesOf` asks it from the
+board's `fogged`, sight's reads from the unit's state, and the danger maps lift exactly the
+fogged units it counts.
 
 **No deadline and no guard goal** (Nicolas, 2026-11-10: "fix that", then "drop it"). Both were
 checked against ADR 0396's test and fail it. A remembered green death made a deadline ("its
@@ -90,7 +95,9 @@ the sizes of the two remembered lists, which only grow. When every style has bee
 what is remembered now, the chapter stops there. A chapter with no clean clear in 12 attempts,
 or with no try left, stops: a `bot_fault` on vanilla, `infeasible` on Manchego Stars. An attempt played alone (`api.only`,
 the pool) still says `no_style` past the style count: with no memory, a repeat would be a
-duplicate.
+duplicate. So an attempt alone is an independent attempt, never the campaign's k-th try: its
+attempts 2 and up have no memory (ADR 0386 already made them differ by the arrival turns), and
+`montecarlo.py attempts` says so.
 
 ## 5. What it never touches
 

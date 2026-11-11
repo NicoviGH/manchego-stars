@@ -1249,6 +1249,20 @@ class Suite(unittest.TestCase):
             mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem4')
         self.assertFalse(os.path.exists(os.path.join(store, 'states', 'mem3-cs-s4001')),
                          'a refusal copies nothing')
+        # a copy that fails part way removes every copy the call made (the tag stays free)
+        real, calls = shutil.copytree, []
+
+        def flaky(src, dst):
+            calls.append(dst)
+            if len(calls) == 2:
+                os.makedirs(dst)
+                raise OSError('disk full')
+            return real(src, dst)
+        with mock.patch.object(mc.shutil, 'copytree', flaky):
+            with self.assertRaises(OSError):
+                mc.resume_tasks(store, env, ['cs-s4001', 'full-s4008'], {}, 'mem5', vanilla=True)
+        self.assertEqual([n for n in os.listdir(os.path.join(store, 'states')) if n.startswith('mem5')],
+                         [], 'no copy is left behind')
 
     def test_pinned_setup_checks_only_the_named_starts_and_refuses_the_rest(self):
         suite = self.load(self.suite())

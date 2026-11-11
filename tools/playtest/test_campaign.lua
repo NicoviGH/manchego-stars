@@ -486,8 +486,8 @@ local function test_a_retry_remembers_the_arrivals_it_saw()
     local keys = {}
     for k in pairs(g.plays[3].style) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "aggression,arrivals,claims,memory",
-          "the arrival turns, beside the memory of ADR 0399")
+    check(table.concat(keys, ","), "aggression,arrivals,claims",
+          "the arrival turns; no enemy was shown, so no memory (ADR 0399)")
     local alone = fakeGame { chapters = { { id = 1, seen = seen } } }
     alone.api.only = 1
     Campaign.run(alone.api)
@@ -512,16 +512,21 @@ local function test_a_retry_remembers_the_enemies_it_saw()
     local m2 = g.plays[2].style.memory
     local ids = {}
     for _, e in ipairs(m2.enemies) do ids[#ids + 1] = string.format("%x:%x:%x", e.id, e.charId, e.classId) end
-    check(table.concat(ids, ","), "81:50:1,82:51:1,90:40:c",
-          "attempt 2: attempt 1's enemies in sight, then the killer the fight showed, with its class")
+    check(table.concat(ids, ","), "81:50:1,82:51:1",
+          "attempt 2: attempt 1's enemies seen (a killer is among them: botrun's enemies_seen)")
     check(m2.deaths, nil, "a death is remembered through its killer alone")
     local m3 = g.plays[3].style.memory
     ids = {}
     for _, e in ipairs(m3.enemies) do ids[#ids + 1] = string.format("%x:%x", e.id, e.charId) end
-    check(table.concat(ids, ","), "81:50,82:51,90:40,81:52",
+    check(table.concat(ids, ","), "81:50,82:51,81:52",
           "attempt 3: the union, each enemy once; a slot another unit took is another enemy")
     m2.enemies[1] = nil
-    check(#g.plays[3].style.memory.enemies, 4, "each attempt gets its own copy")
+    check(#g.plays[3].style.memory.enemies, 3, "each attempt gets its own copy")
+    -- a unit whose class was not read is not kept: its key would match nothing
+    local noClass = fakeGame { chapters = { { id = 1, outcomes = { "lost", "won" },
+                                              enemies = { [1] = { { id = 0x81, charId = 0x50 } } } } } }
+    Campaign.run(noClass.api)
+    check(noClass.plays[2].style.memory, nil, "a unit with no class read is not remembered")
     local alone = fakeGame { chapters = { { id = 1, enemies = enemies } } }
     alone.api.only = 2
     Campaign.run(alone.api)
@@ -554,12 +559,13 @@ test_styles_are_drawn_again_up_to_the_cap()
 
 -- A try already played is never spent again (ADR 0399): the start state restores the game's RNG,
 -- so a style with the memory it was played with replays that try exactly. Memory grows once
--- (attempt 1's killer) and then not: attempts 2 and 3 play the other two styles, attempt 4 the
+-- (attempt 1's one enemy) and then not: attempts 2 and 3 play the other two styles, attempt 4 the
 -- first style again with the new memory, and then every style has been played with it.
 local function test_a_try_already_played_is_not_spent_again()
     local outcomes = {}
     for i = 1, 12 do outcomes[i] = "lost" end
-    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes,
+        enemies = { [1] = { { id = 0x90, charId = 0x40, classId = 0x0C } } } } } })
     local ok, why = Campaign.run(g.api)
     check(ok, false, "the chapter stops")
     check(#g.plays, 4, "3 styles, then the first again with the memory it was not played with")

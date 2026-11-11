@@ -22,11 +22,13 @@
 -- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
--- { enemies }: every red unit a board showed out of fog (`enemies_seen`) and every killer a
--- fight showed, by slot and character (Board.memoryKey). A death is remembered through its
+-- { enemies }: every red unit a board showed out of fog and every killer a fight showed
+-- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is remembered through its
 -- killer: where our units stood is the play's, not the game's. Never a dice result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
--- this chapter start would draw is played, and nothing else. Every attempt loads the same
+-- this chapter start would draw is played, and nothing else. It is an independent attempt, not
+-- the campaign's k-th try: it has no memory (the pool's workers share no results, ADR 0386) and
+-- ends at the style count, where the loop draws the styles again with memory (ADR 0399). Every attempt loads the same
 -- start state, the game's RNG in it; the style draws restart at each chapter start (api.seed)
 -- and never read a result; and the start carries the team the campaign carried in (api.save,
 -- arrive). So attempt k plays the style and team it would after k - 1 failures, but WITHOUT the
@@ -254,9 +256,11 @@ function M.run(api)
             local tried, remembered, known = {}, {}, {}
             -- a retry's memory of the enemy (ADR 0399): style.memory
             local memory, memoryKeys = { enemies = {} }, {}
+            -- a unit whose class was not read cannot be told from another in its slot (its key
+            -- would match nothing, and grow the memory with nothing learned): not kept
             local function rememberEnemy(id, charId, classId)
                 local k = Bot.memoryKey(id, charId, classId)
-                if not memoryKeys[k] then
+                if classId ~= nil and not memoryKeys[k] then
                     memoryKeys[k] = true
                     memory.enemies[#memory.enemies + 1] = { id = id, charId = charId,
                                                             classId = classId }
@@ -315,7 +319,11 @@ function M.run(api)
                 if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
                 -- and every enemy they showed (ADR 0399), from attempt 2
                 if #memory.enemies > 0 then
-                    style.memory = Json.decode(Json.encode(memory))
+                    local copy = {}   -- each attempt its own copy
+                    for i, e in ipairs(memory.enemies) do
+                        copy[i] = { id = e.id, charId = e.charId, classId = e.classId }
+                    end
+                    style.memory = { enemies = copy }
                 end
                 local rec = api.play(style, followed, entry.attempts)
                 if api.diag then
@@ -358,10 +366,6 @@ function M.run(api)
                 table.sort(remembered)
                 for _, e in ipairs(rec.enemies_seen or {}) do
                     rememberEnemy(e.id, e.charId, e.classId)
-                end
-                -- a killer struck on screen: the fight showed it, fog or not
-                for _, d in ipairs(rec.deaths or {}) do
-                    if d.killerId and d.killer then rememberEnemy(d.killerId, d.killer, d.killerClass) end
                 end
                 if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
                 local lok, lwhy = api.load(ch)

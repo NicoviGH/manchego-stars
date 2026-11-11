@@ -7,9 +7,10 @@
 
 `attempts` plays attempts 1..N of the chapter at the env's `from` start side by side (env
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
-That is what the campaign's own loop finds: every attempt loads the same start state, the
-game's RNG in it, and the styles are drawn without reading a result, so attempt k plays the
-same alone as after k - 1 failures.
+Each is an independent attempt: every attempt loads the same start state, the game's RNG in it,
+and the styles are drawn without reading a result, so attempt k alone plays the k-th style with
+no memory. The campaign's own loop is not that: its retries remember what earlier attempts
+showed (ADRs 0386, 0399), so its attempt k can differ, and it goes past the style count.
 
 A worker is `run.sh <scenario>` with PT_RUN_TAG, so copies of one scenario share no run dir,
 leftover kill or save (run.sh). Its records are read from the emulator's own stdout
@@ -2609,7 +2610,7 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     (campaign.lua's api.seed), and each chapter is retried with memory up to the cap (ADR
     0399), on to `last` (the env's, the game's end, unless given). ValueError, before any copy,
     when a campaign has no such start, its pinned start was rewritten, its seed is unknown, or
-    the new id is taken."""
+    the new id is taken; a copy that fails removes every copy this call made, then raises."""
     plan = []
     for name in names:
         src = os.path.join(store, 'states', name)
@@ -2630,9 +2631,16 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
         if os.path.exists(os.path.join(store, 'states', new)):
             raise ValueError('%s already exists: pick another --tag' % new)
         plan.append((name, new, at, seed))
-    tasks = []
+    tasks, copied = [], []
     for name, new, at, seed in plan:
-        shutil.copytree(os.path.join(store, 'states', name), os.path.join(store, 'states', new))
+        try:
+            shutil.copytree(os.path.join(store, 'states', name), os.path.join(store, 'states', new))
+        except OSError:
+            # a copy that fails leaves none behind: the tag stays free to try again
+            for path in copied + [os.path.join(store, 'states', new)]:
+                shutil.rmtree(path, ignore_errors=True)
+            raise
+        copied.append(os.path.join(store, 'states', new))
         camp = dict(env, id=new, **{'from': at})
         if last is not None:
             camp['last'] = [last]

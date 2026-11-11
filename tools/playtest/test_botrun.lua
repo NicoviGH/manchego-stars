@@ -687,8 +687,8 @@ do
 end
 
 -- test_a_retry_starts_from_its_memory (ADR 0399): style.memory reaches the attempt's sight
--- (remember: what plays as seen) and seeds the enemies seen, so a remembered red never seen this
--- attempt is still handed on; attempt 1 (no memory) remembers nothing.
+-- (remember: what plays as seen); it is not handed back as seen this attempt (campaign.lua keeps
+-- the union) nor given to the fog read's enemies seen; attempt 1 (no memory) tells nothing.
 do
     local function played(memory)
         local g = fakeGame { units = rout() }
@@ -709,10 +709,74 @@ do
     local mem = { enemies = { { id = 0x9A, charId = 0x77 } } }
     local told, keys = played(mem)
     check(told, mem.enemies, "memory: the sight is told what plays as seen")
-    check(keys[Bot.memoryKey(0x9A, 0x77)], true, "memory: a remembered red is handed on")
+    check(keys[Bot.memoryKey(0x9A, 0x77)], nil, "memory: a remembered red never shown is not seen")
     told, keys = played(nil)
     check(told, nil, "attempt 1: the sight is told nothing")
     check(keys[Bot.memoryKey(0x9A, 0x77)], nil, "attempt 1: nothing remembered")
+end
+
+-- test_a_killer_that_arrived_in_the_phase_has_its_class (review of #599): a reinforcement loads
+-- in the enemy phase, in fog, and kills A. The board before the phase does not hold it, so its
+-- class is read from the board after the deaths, and it is among the enemies seen.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) },
+                         enemy = function(g, find)
+                             if g.turn == 1 and not g.came then
+                                 g.came = true
+                                 local W = unit(0x85, 4, "red", 1, 0, 10)
+                                 W.classId, W.fogged = 0x22, true
+                                 g.units[#g.units + 1] = W
+                                 local u = find(0x01)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                             end
+                             return {}
+                         end }
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x85, killerId = 0x85,
+                   phase = "enemy" } }
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local d = r.deaths[1]
+    check(d and d.killerClass, 0x22, "arrival: the killer's class, from the board after the phase")
+    local shown = false
+    for _, e in ipairs(r.enemies_seen) do
+        if e.id == 0x85 and e.classId == 0x22 then shown = true end
+    end
+    check(shown, true, "arrival: the killer in fog is among the enemies seen (the fight showed it)")
+end
+
+-- test_enemies_seen_keep_a_reused_slot (ADR 0399): a red seen, then killed, and a reinforcement
+-- later loaded into its slot: both are among the enemies seen (kept by slot, character and
+-- class), so a retry remembers the first, alive again at the start.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g, find)
+            if g.turn == 1 then
+                for _, u in ipairs(g.units) do
+                    if u.faction == "red" then
+                        g.slot, g.char = u.id, u.charId
+                        u.hp, u.dead, u.onField = 0, true, false
+                        break
+                    end
+                end
+                local n = unit(g.slot, 9, "red", 9, 8, 10)
+                n.charId, n.classId = g.char, 0x33
+                g.units[#g.units + 1] = n
+            end
+            return {}
+        end,
+    }
+    Botrun.run(g.api)
+    local r, n = recordOf(g), 0
+    for _, e in ipairs(r.enemies_seen) do
+        if e.id == g.slot then n = n + 1 end
+    end
+    check(n, 2, "reused slot: the unit killed and the arrival are both seen")
 end
 
 -- Botrun.events: a recruit is a unit whose character was on another side; items are diffed.
@@ -1430,8 +1494,14 @@ do
     local d = r.deaths[1]
     check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
-    -- the killer's class, read from the board before the death (what a retry keys it by, ADR 0399)
+    -- the killer's class, read from the board before the death (it fell on the counter, so the
+    -- board after has none): what a retry keys it by, ADR 0399; and the fight showed it
     check(d and d.killerClass, 0x0E, "same phase: the killer's class is recorded")
+    local shown = false
+    for _, e in ipairs(r.enemies_seen) do
+        if e.id == 0x81 and e.classId == 0x0E then shown = true end
+    end
+    check(shown, true, "same phase: the killer is among the enemies seen")
 end
 
 -- test_the_planner_is_told_every_enemy_seen (#510 PR A, the fog rule): opts.seen holds every
@@ -1457,6 +1527,15 @@ do
     Botrun.run(g.api)
     check(got and got[0x81], 0x81, "seen: a red in sight, by slot, its charId")
     check(got and got[0x82], nil, "seen: not one only ever fogged")
+    -- nor one a retry remembers (ADR 0399): the fog read's enemies seen are this attempt's alone,
+    -- so a remembered unit is not also its stand-in for what the fog may hide
+    local g2 = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x82, 1, "red", 9, 9, 10) } }
+    g2.units[2].fogged = true
+    g2.api.style.memory = { enemies = { { id = 0x82, charId = 0x82, classId = 1 } } }
+    got = nil
+    g2.api.Planner = g.api.Planner
+    Botrun.run(g2.api)
+    check(got and got[0x82], nil, "seen: not one only remembered")
 end
 
 -- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
