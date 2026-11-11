@@ -3399,9 +3399,12 @@ def trace_files(paths):
     return sorted(found)
 
 
-def story(events, names=None, items=None, classes=None):
+def story(events, names=None, items=None, classes=None, why=False):
     """One run's trace as plain lines. `names`/`items`/`classes`: {id: name}. A unit without a
-    name of its own is named by its class (from the phase snapshots and battles), then by id."""
+    name of its own is named by its class (from the phase snapshots and battles), then by id.
+    `why`: each plan's Bot.explain record too (#510 W1): per unit its march goal and why, its
+    act, the turns it gains, its forward steps offered and within the cap, and the boss's fog
+    state; then the same for each of the look's turns between."""
     names, items, classes = names or {}, items or {}, classes or {}
     cls = {}   # character id -> class id, as the trace saw it
     char = {}  # unit index -> character id, from the phase snapshots
@@ -3444,6 +3447,34 @@ def story(events, names=None, items=None, classes=None):
                 out.append("    %s's weapon breaks" % who(s['charId']))
         return out
 
+    sources = {'enemy': 'nearest enemy in sight', 'boss': 'the boss', 'unseen': 'the fog',
+               'objective': "the objective's tile", 'guard': "sent by the look's walker"}
+
+    def explained(rec, indent):
+        out, b = [], rec.get('boss')
+        if b:
+            out.append('%sthe boss %s at %s,%s%s' % (
+                indent, who(b['charId']), b['x'], b['y'],
+                (', in fog, remembered' if b.get('known') else ', in fog, not remembered')
+                if b.get('fogged') else ', in sight'))
+        for r in rec.get('units') or []:
+            g = r.get('goal')
+            src = sources.get(r.get('source'), r.get('source') or 'none')
+            if r.get('by') is not None and r.get('source') == 'enemy':
+                src += ' ' + who(char.get(r['by']))
+            line = '%s%s at %s,%s: goal %s (%s)' % (
+                indent, who(r['charId']), r['x'], r['y'],
+                '%s,%s' % (g['x'], g['y']) if g else 'none', src)
+            if r.get('act'):
+                line += '; %s to %s,%s (%s)' % (r['act'], r['to']['x'], r['to']['y'],
+                                               r.get('why') or '-')
+            if r.get('progress') is not None:
+                line += ', gains %.2f turns' % r['progress']
+            if r.get('offered') is not None:
+                line += ', forward steps %d, %d within the cap' % (r['offered'], r['admitted'])
+            out.append(line)
+        return out
+
     lines = []
     for e in events:
         t = e.get('t')
@@ -3464,7 +3495,7 @@ def story(events, names=None, items=None, classes=None):
                             len(e.get('claims_played') or [])))
         elif t == 'phase':
             lines.append('Turn %s, %s phase.' % (e.get('turn'), e.get('phase')))
-        elif t == 'plan' and (e.get('replan') or e.get('worth')):
+        elif t == 'plan' and (e.get('replan') or e.get('worth') or (why and e.get('why'))):
             if e.get('replan'):
                 lines.append('  (the board was not what the plan expected: %s; a new plan)'
                              % e['replan'])
@@ -3473,6 +3504,21 @@ def story(events, names=None, items=None, classes=None):
                 if abs(g['after'] - g['before']) >= 0.005:
                     lines.append('  goal %s (worth %.0f): chance %.2f -> %.2f'
                                  % (g['id'], g['worth'], g['before'], g['after']))
+            if why and e.get('why'):
+                lines.append('  why, the plan played:')
+                lines.extend(explained(e['why'], '    '))
+                look = e.get('look') or {}
+                for k, rec in enumerate(look.get('why') or [], 1):
+                    if rec:
+                        lines.append("  why, the look's turn between %d:" % k)
+                        lines.extend(explained(rec, '    '))
+                for alt in (look.get('walker') or {}).get('alts') or []:
+                    for k, rec in enumerate(alt.get('why') or []):
+                        if rec:
+                            lines.append("  why, the look with unit %s sent, %s:" % (
+                                alt.get('unit'), 'its own turn' if k == 0
+                                else 'turn between %d' % k))
+                            lines.extend(explained(rec, '    '))
         elif t == 'act':
             act = e.get('act') or ('attacks' if e.get('battles') else 'moves')
             act = VERBS.get(act, act)
@@ -3753,6 +3799,8 @@ def main(argv=None):
     st = sub.add_parser('story', help="one run's trace as plain text")
     st.add_argument('trace', help='a trace .jsonl or .jsonl.gz')
     st.add_argument('--turn', type=int, help="only this turn and the one before (an anomaly's)")
+    st.add_argument('--why', action='store_true', help="each plan's goals, acts and forward "
+                    'steps per unit, and the look\'s turns between (#510 W1)')
     au = sub.add_parser('audit', help="each failure's witnessed labels, from DIAG replays")
     au.add_argument('runs', help='a runs .jsonl (its records name their kept traces)')
     au.add_argument('--instrument', help="the instrument whose runs to audit (default: the "
@@ -3877,7 +3925,7 @@ def main(argv=None):
         note = names_note(game, [info.get('rom_hash')])
         if note:
             print(note)
-        print('\n'.join(story(events, _names(game), _items(), _classes(game))))
+        print('\n'.join(story(events, _names(game), _items(), _classes(game), why=args.why)))
         return 0
     with open(args.env) as fh:
         env = json.load(fh)

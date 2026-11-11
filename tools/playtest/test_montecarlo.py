@@ -2130,6 +2130,31 @@ class Story(unittest.TestCase):
         self.assertIn('goal visit:5,1 (worth 120): chance 0.61 -> 0.52', text)
         self.assertNotIn('objective:7', text)
 
+    def test_story_why_prints_each_units_goal_and_the_bosss_fog(self):
+        # #510 W1: --why prints each plan's Bot.explain record (the boss in fog, a unit
+        # marching on its nearest enemy in sight) and each of the look's turns between; without
+        # it, nothing
+        unit = {'id': 3, 'charId': 0x02, 'x': 11, 'y': 3, 'source': 'enemy', 'by': 0x81,
+                'goal': {'x': 6, 'y': 2}, 'act': 'wait', 'to': {'x': 10, 'y': 3},
+                'why': 'march', 'progress': 0.5, 'offered': 4, 'admitted': 1}
+        rec = {'turn': 4, 'boss': {'id': 0x92, 'charId': 0x4B, 'x': 19, 'y': 6, 'hp': 28,
+                                   'fogged': True, 'known': True}, 'units': [unit]}
+        events = [
+            {'t': 'start', 'turn': 0, 'info': {'game': 'vanilla', 'chapter': 6}, 'style': {}},
+            {'t': 'phase', 'turn': 4, 'phase': 'blue',
+             'units': [{'id': 0x81, 'charId': 0x50, 'classId': 0x3C}]},
+            {'t': 'plan', 'turn': 4, 'why': rec,
+             'look': {'why': [dict(rec, units=[dict(unit, source='guard', by=None)]), False]}}]
+        names = {0x02: 'Seth', 0x4B: 'the boss name'}
+        text = '\n'.join(mc.story(events, names, {}, {0x3C: 'Fighter'}, why=True))
+        self.assertIn('the boss the boss name at 19,6, in fog, remembered', text)
+        self.assertIn('Seth at 11,3: goal 6,2 (nearest enemy in sight the Fighter); wait to '
+                      '10,3 (march), gains 0.50 turns, forward steps 4, 1 within the cap', text)
+        self.assertIn("why, the look's turn between 1:", text)
+        self.assertIn("(sent by the look's walker)", text)
+        self.assertNotIn("turn between 2", text)
+        self.assertNotIn('why,', '\n'.join(mc.story(events, names, {}, {})))
+
     def test_names_items_and_classes_come_from_the_decomp(self):
         self.assertEqual(mc._names('vanilla')[0x01], 'Eirika')
         self.assertTrue(mc._items())

@@ -1087,7 +1087,7 @@ function M.run(api)
                     -- the first repeat is a stall: the planner must change the board (its
                     -- opts.stalled); a board that comes round again after that is stuck
                     if seen[h] == "stalled" or not planned then
-                        for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
+                        for _, l in ipairs(Bot.explain(board, sight, style).lines) do api.log("stuck: " .. l) end
                         return "stuck", "a player phase began on a board seen before, and no turn "
                             .. "event is left to change it"
                     end
@@ -1291,7 +1291,7 @@ function M.run(api)
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
                                 lookahead = plan and plan.lookahead,
-                                look = plan and plan.look,
+                                look = plan and plan.look, why = plan and plan.explain,
                                 win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then

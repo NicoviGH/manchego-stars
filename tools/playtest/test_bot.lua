@@ -5769,6 +5769,74 @@ do
     check(ctx.exploreGoal[0x01], nil, "guard: none without it")
 end
 
+-- test_explain_says_why_each_unit_goes (#510 W1; the probe that explained Ch6 4001, kept): every
+-- plan's record says per unit its march goal and why, its act, the turns it gains and its
+-- forward steps offered and within the cap; and the boss as the board has it. On a Defeat Boss
+-- map whose boss the fog hides, a unit marches on its nearest enemy in sight (Bot.enemiesOf
+-- lists none in fog), and the record says so; once the boss is in sight, the boss.
+do
+    local function explained(fogged, knows)
+        local A, Bu = blue(0x01, 0, 0, 0), blue(0x02, 1, 0, 4)
+        local E = red(0x81, 3, 0)
+        local X = red(0x82, 9, 9, { fogged = fogged })
+        local o = { objective = { kind = "boss", boss = 0x82 } }
+        local sight = sightOf(o)
+        if knows then sight.knows = function(u) return u.id == 0x82 end end
+        local _, plan = Planner.plan(B, boardOf(A, Bu, E, X), sight, style("careful"))
+        local by = {}
+        for _, r in ipairs(plan and plan.explain and plan.explain.units or {}) do by[r.id] = r end
+        return plan, by
+    end
+    local plan, by = explained(true, true)
+    local ex = plan.explain or {}
+    local b = ex.boss or {}
+    check(b.id and (b.id .. "@" .. b.x .. "," .. b.y), "130@9,9", "explain: the boss's tile, as the board has it")
+    check(b.fogged, true, "explain: the boss in fog")
+    check(b.known, true, "explain: and remembered")
+    local a = by[0x01] or {}
+    check(a.source, "enemy", "explain: a fogged boss is no goal; the nearest enemy in sight is")
+    check(a.by, 0x81, "explain: which enemy")
+    check(a.goal and (a.goal.x .. "," .. a.goal.y), "3,0", "explain: its tile")
+    local mine
+    for _, x in ipairs(plan.acts) do
+        if x.unitId == 0x01 then mine = x end
+    end
+    check(a.act, mine and mine.act, "explain: the act the plan plays")
+    check(a.to and mine and (a.to.x .. "," .. a.to.y) == (mine.move.x .. "," .. mine.move.y), true,
+          "explain: where it ends")
+    check(type(a.progress), "number", "explain: the turns it gains")
+    check(type(a.offered) == "number" and a.admitted ~= nil and a.admitted <= a.offered, true,
+          "explain: forward steps offered, and those within the cap")
+    _, by = explained(true, false)
+    check(((by[0x01] or {}).source), "enemy", "explain: an unremembered fogged boss, the same")
+    plan, by = explained(false, false)
+    check((plan.explain.boss or {}).fogged, false, "explain: a boss in sight")
+    check((by[0x01] or {}).source, "boss", "explain: in sight, the boss is the goal")
+    check((by[0x01] or {}).by, 0x82, "explain: the boss's id")
+    -- botrun's stuck log: no plan, the same record with log lines
+    local A, E = blue(0x01, 0, 0, 0), red(0x81, 3, 0)
+    local rec = B.explain(boardOf(A, E), sightOf({}), style("careful"))
+    check(rec.units[1] and rec.units[1].source, "enemy", "explain: with no plan, the goals")
+    check(rec.lines and rec.lines[1]:match("^objective") ~= nil, true, "explain: and the stuck log's lines")
+end
+
+-- test_explain_in_the_turns_between: the look keeps each turn between's record, and the
+-- walker's sent unit says it was sent ("guard")
+do
+    local Bot, board, s2 = walkerBoard()
+    local _, plan = Planner.plan(Bot, board, s2, gifted("careful", 1000), { look = { room = 1e6 } })
+    local lk = plan and plan.look or {}
+    check(#(lk.why or {}), #(lk.between or {}), "explain: one record a turn between")
+    check(type(lk.why and lk.why[1]), "table", "explain: the best plan's turn between")
+    local alt = ((lk.walker or {}).alts or {})[2] or {}
+    local sent
+    for _, r in ipairs((alt.why or {})[1] and alt.why[1].units or {}) do
+        if r.id == 0x02 then sent = r end
+    end
+    check(sent and sent.source, "guard", "explain: the walker's unit, sent")
+    check(sent and sent.goal and (sent.goal.x .. "," .. sent.goal.y), "5,0", "explain: to the strike's tile")
+end
+
 -- test_turn_between_ranks_progress_first: on the board where the beam's best by its score
 -- holds A on (0,0) and the decision marches it to (1,0), toward the village (the rank puts
 -- progress first), the turn between marches too

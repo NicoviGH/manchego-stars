@@ -892,16 +892,15 @@ end
 -- else its way to the objective (objectiveTile); nil = hold.
 -- objectiveTile: the objective's tile, the boss, or the nearest enemy; nil on a Survive map.
 -- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
--- than the fog shows, so it pushes the fog back.
+-- than the fog shows, so it pushes the fog back. Only the enemies in sight are aimed at: a boss
+-- the fog hides is no goal (Bot.enemiesOf), so on a fogged Defeat Boss map each unit marches on
+-- its nearest enemy in sight (#510 W1, Ch6 4001 attempt 2).
+-- objectiveGoal is the same choice with where it came from, for Bot.explain: the tile, then
+-- "objective" (the objective's own tile), "unseen", "boss" or "enemy", and the enemy's id.
 local objectiveTile
-local function goalFor(ctx, u, objective)
-    local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
-    if explore then return explore end
-    return objectiveTile(ctx, u, objective)
-end
-objectiveTile = function(ctx, u, objective)
+local function objectiveGoal(ctx, u, objective)
     local kind = objective and objective.kind
-    if objective and objective.tile then return objective.tile end
+    if objective and objective.tile then return objective.tile, "objective" end
     if kind == "survive" then return nil end
     if #ctx.enemies == 0 and ctx.sight.unseen then
         local best, bestD
@@ -909,16 +908,22 @@ objectiveTile = function(ctx, u, objective)
             local d = manhattan(u.x, u.y, t.x, t.y)
             if not bestD or d < bestD then best, bestD = t, d end
         end
-        return best
+        return best, best and "unseen"
     end
     local best, bestD
     for _, e in ipairs(ctx.enemies) do
         local d = manhattan(u.x, u.y, e.x, e.y)
-        if kind == "boss" and e.isBoss then return e end
+        if kind == "boss" and e.isBoss then return e, "boss", e.id end
         if not bestD or d < bestD then best, bestD = e, d end
     end
-    return best
+    return best, best and "enemy", best and best.id
 end
+local function goalFor(ctx, u, objective)
+    local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
+    if explore then return explore end
+    return objectiveTile(ctx, u, objective)
+end
+objectiveTile = function(ctx, u, objective) return (objectiveGoal(ctx, u, objective)) end
 
 -- The obstacle that opens `u`'s way to `goal` when no walk reaches it: sight.field(goal) is
 -- known and leaves u's tile unreached. Of the obstacles the Attack command can strike
@@ -1594,11 +1599,6 @@ function M.decide(board, sight, style)
         or action(u, march(ctx, u, gate, objective), "wait")
 end
 
--- Why decide holds, as log lines, for a run that ends `stuck`: the objective, every enemy, and
--- per blue unit what decide weighs -- its wait tiles and how many the style's gate allows, the
--- march goal, the obstacle that opens the way to it when it is cut off, and the field distance
--- from the goal (where it stands, the best wait tile, the best allowed one), and per enemy it can strike, the tiles in range, how many the gate allows, and
--- the best (largest-margin) exchange: our hit/damage and its counter against our HP.
 -- Exploring (#510 step 9; Nicolas: a new player does not know the rewards, so it visits
 -- every village and opens every chest it can): each village or chest still open
 -- (sight.explorable) sends one unit the game lets use it (sight.canExplore) marching to it, the
@@ -1630,7 +1630,9 @@ local function sendWorth(ctx, u, t)
 end
 
 local function exploring(ctx, sent, barred, guard)
-    ctx.exploreGoal = {}
+    -- ctx.goalWhy[unit id]: why it was sent (Bot.explain): "guard" (the walker's), "recruit",
+    -- or the open tile's kind
+    ctx.exploreGoal, ctx.goalWhy = {}, {}
     barred = barred or {}
     local taken = {}
     -- `guard` (the look's walker, #510 W1; only the shadow look passes it): { {id, x, y} },
@@ -1640,6 +1642,7 @@ local function exploring(ctx, sent, barred, guard)
         for _, u in ipairs(ctx.blues) do
             if u.id == g.id and not ctx.exploreGoal[u.id] then
                 taken[tileKey(g.x, g.y)], ctx.exploreGoal[u.id] = true, { x = g.x, y = g.y }
+                ctx.goalWhy[u.id] = "guard"
             end
         end
     end
@@ -1648,8 +1651,9 @@ local function exploring(ctx, sent, barred, guard)
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
         return lockAt(ctx, u, t.x, t.y) and movesFor(ctx, u, t) or nil
     end
-    -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
-    local function assign(pairs_, key)
+    -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal,
+    -- `why` says what it is
+    local function assign(pairs_, key, why)
         table.sort(pairs_, function(a, b)
             if (a.v or 0) ~= (b.v or 0) then return (a.v or 0) > (b.v or 0) end
             if a.d ~= b.d then return a.d < b.d end
@@ -1662,6 +1666,7 @@ local function exploring(ctx, sent, barred, guard)
             if not taken[k] and not ctx.exploreGoal[p.u.id]
                 and not barred[goalKey(p.u.id, p.t)] then
                 taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
+                ctx.goalWhy[p.u.id] = why(p.t)
             end
         end
     end
@@ -1683,7 +1688,7 @@ local function exploring(ctx, sent, barred, guard)
             talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
         end
     end
-    assign(talkPairs, function(t) return "talk>" .. t.id end)
+    assign(talkPairs, function(t) return "talk>" .. t.id end, function() return "recruit" end)
     if not ctx.sight.explorable then return end
     local pairs_ = {}
     local open, blues = {}, {}
@@ -1695,6 +1700,7 @@ local function exploring(ctx, sent, barred, guard)
             and not barred[goalKey(u.id, t)]
             and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
+            ctx.goalWhy[u.id] = t.kind
         end
     end
     -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
@@ -1708,17 +1714,86 @@ local function exploring(ctx, sent, barred, guard)
             end
         end
     end
-    assign(pairs_, function(t) return tileKey(t.x, t.y) end)
+    assign(pairs_, function(t) return tileKey(t.x, t.y) end, function(t) return t.kind end)
 end
 
-function M.explain(board, sight, style)
-    local ctx = context(board, sight)
-    ctx.style, ctx.turn = style, board.turn
-    local gate = GATES[style.aggression] or GATES.bold
-    local o = sight.objective or {}
+-- Bot.explain's record as log lines (botrun's `stuck` log): the objective, the boss and its fog
+-- state, and per unit its goal and why; montecarlo.py story prints the plans' records.
+function M.explainLines(rec)
     local function at(t) return t and tileKey(t.x, t.y) or "-" end
+    local o, b = rec.objective or {}, rec.boss
     local lines = { string.format("objective %s tile %s, turn %s", tostring(o.kind), at(o.tile),
-                                  tostring(board.turn)) }
+                                  tostring(rec.turn)) }
+    if b then
+        lines[#lines + 1] = string.format("  boss id %d char 0x%02X @%s hp %d%s", b.id, b.charId,
+            at(b), b.hp, b.fogged and (b.known and " in fog, remembered" or " in fog") or "")
+    end
+    for _, r in ipairs(rec.units) do
+        lines[#lines + 1] = string.format("  unit %d char 0x%02X @%s: goal %s (%s%s)", r.id,
+            r.charId, at(r), at(r.goal), tostring(r.source), r.by and (" " .. r.by) or "")
+    end
+    return lines
+end
+
+-- Why each unit goes where it goes (#510 W1; Nicolas, 2026-11-11: the probe that explained Ch6,
+-- kept). -> { turn, objective = { kind, tile }, boss = the Defeat Boss map's boss as the board
+-- has it: { id, charId, x, y, hp, fogged (the game hides it), known (a retry remembers it,
+-- sight.knows) } | nil, units = per blue unit on the field { id, charId, x, y, hp, acted,
+-- goal = its march's tile, source = why that tile: "guard" (the look's walker sent it),
+-- "recruit", a village or chest's kind, "objective" (the objective's own tile), "boss",
+-- "enemy" (its nearest in sight), "unseen" (the fog's nearest tile), nil for none; by = the
+-- enemy's id for "boss" and "enemy" } }.
+-- `view` (the planner's, for a plan's record): { ctx = Bot.candidates' ctx, acts = the plan's,
+-- progress = unit id -> the turns the plan cuts from its way to its goal, forward = fn(unit)
+-- -> its forward steps (acts nearer its goal) offered, and those within the style's cap }; each
+-- unit then also says its act, why and end tile (`to`), `progress`, `offered`, `admitted`.
+-- With no view (a run that ends `stuck`, botrun's log), `lines` adds what decide weighs per
+-- blue unit: its wait tiles and how many the style's gate allows, the march goal, the obstacle
+-- that opens the way to it when it is cut off, and the field distance from the goal (where it
+-- stands, the best wait tile, the best allowed one), and per enemy it can strike, the tiles in
+-- range, how many the gate allows, and the best (largest-margin) exchange: our hit/damage and
+-- its counter against our HP.
+function M.explain(board, sight, style, view)
+    local ctx = view and view.ctx or context(board, sight)
+    if not view then ctx.style, ctx.turn = style, board.turn end
+    local o = sight.objective or {}
+    local rec = { turn = board.turn, units = {},
+                  objective = { kind = o.kind, tile = o.tile and { x = o.tile.x, y = o.tile.y } } }
+    for _, u in ipairs(board.units) do
+        if o.boss and u.faction == "red" and u.charId == o.boss and u.onField and not u.dead then
+            rec.boss = { id = u.id, charId = u.charId, x = u.x, y = u.y, hp = u.hp,
+                         fogged = u.fogged == true,
+                         known = (u.fogged and sight.knows and sight.knows(u)) == true }
+        end
+    end
+    local acts = {}
+    for _, a in ipairs(view and view.acts or {}) do acts[a.unitId] = a end
+    for _, u in ipairs(ctx.blues) do
+        local goal, source, by
+        if ctx.exploreGoal and ctx.exploreGoal[u.id] then
+            goal, source = ctx.exploreGoal[u.id], ctx.goalWhy and ctx.goalWhy[u.id]
+        else
+            goal, source, by = objectiveGoal(ctx, u, o)
+        end
+        local r = { id = u.id, charId = u.charId, x = u.x, y = u.y, hp = u.hp,
+                    acted = u.acted and true or nil, source = source, by = by,
+                    goal = goal and { x = goal.x, y = goal.y } }
+        local a = acts[u.id]
+        if a then
+            local t = Board.endTile(a)
+            r.act, r.why, r.to = a.act, a.why, { x = t.x, y = t.y }
+        end
+        if view then
+            r.progress = view.progress[u.id]
+            r.offered, r.admitted = view.forward(u)
+        end
+        rec.units[#rec.units + 1] = r
+    end
+    if view then return rec end
+    rec.lines = M.explainLines(rec)
+    local gate = GATES[style.aggression] or GATES.bold
+    local function at(t) return t and tileKey(t.x, t.y) or "-" end
+    local lines = rec.lines
     for _, e in ipairs(ctx.enemies) do
         lines[#lines + 1] = string.format("  red id %d char 0x%02X class 0x%02X @%s hp %d%s",
             e.id, e.charId, e.classId or 0, at(e), e.hp, e.isBoss and " BOSS" or "")
@@ -1774,7 +1849,7 @@ function M.explain(board, sight, style)
             end
         end
     end
-    return lines
+    return rec
 end
 
 -- Canto (playerphase.c TryMakeCantoUnit): per act in `acts` after which the game hands `u` a

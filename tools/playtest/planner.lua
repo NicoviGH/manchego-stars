@@ -587,13 +587,17 @@ function M.plan(Bot, board, sight, style, opts)
             goalOf[u.id] = assigned[#assigned]
         end
     end
+    -- the turns a plan cuts from each unit's way: the sum, and by unit id (Bot.explain's view)
     local function progress(st)
-        local pos, out = positions(st), 0
+        local pos, out, by = positions(st), 0, {}
         for _, a in ipairs(assigned) do
             local t = turnsTo(a.u, a.tile, pos[a.u.id])
-            if t then out = out + (a.turns - t) end
+            if t then
+                out = out + (a.turns - t)
+                by[a.u.id] = a.turns - t
+            end
         end
-        return out
+        return out, by
     end
     -- how much the win is wanted now: its worth now (one death x (1 - GAMMA), goalTerm's)
     -- against that and everything else still open, worth x chance (score's boss credit)
@@ -977,6 +981,34 @@ function M.plan(Bot, board, sight, style, opts)
     -- gate, so no plan it kept had the lord walk there (Manchego Stars ch01: four plans judged,
     -- each with him waiting, and the run stuck); the rank puts progress first, but picks only among
     -- the plans judged. nil when no unit gains ground, or when the beam already has this plan.
+    -- candidate c's forward steps: the acts that cut its turns to its goal, those within the
+    -- cap ({ a, g = the turns cut }), and how many there were before the cap
+    local function forward(c)
+        local goal, ranked, offered = goalOf[c.unit.id], {}, 0
+        for _, a in ipairs(goal and c.acts or {}) do
+            local t = turnsTo(c.unit, goal.tile, endTile(a))
+            if t and goal.turns - t > M.DUST then
+                offered = offered + 1
+                if M.admits((exposed(a, a.unitHp, {}, odds)), cap) then
+                    ranked[#ranked + 1] = { a = a, g = goal.turns - t }
+                end
+            end
+        end
+        return ranked, offered
+    end
+    -- why each unit goes where it goes in plan `st` (Bot.explain, #510 W1)
+    local candOf = {}
+    for _, c in ipairs(cands) do candOf[c.unit.id] = c end
+    local function explain(st)
+        return Bot.explain(board, sight, style, { ctx = ctx, acts = st.acts,
+            progress = select(2, progress(st)),
+            forward = function(u)
+                local c = candOf[u.id]
+                if not c then return nil end
+                local ranked, offered = forward(c)
+                return offered, #ranked
+            end })
+    end
     local function advance(have)
         local st, moved = start, false
         -- each unit's acts that gain ground, the most first: one a tile still taken refuses
@@ -984,14 +1016,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- others have moved: the tile it wants may be one they vacate
         local waiting = {}
         for _, c in ipairs(cands) do
-            local goal, ranked = goalOf[c.unit.id], {}
-            for _, a in ipairs(goal and c.acts or {}) do
-                local t = turnsTo(c.unit, goal.tile, endTile(a))
-                if t and goal.turns - t > M.DUST
-                    and M.admits((exposed(a, a.unitHp, {}, odds)), cap) then
-                    ranked[#ranked + 1] = { a = a, g = goal.turns - t }
-                end
-            end
+            local ranked = forward(c)
             table.sort(ranked, function(x, y)
                 if math.abs(x.g - y.g) > M.DUST then return x.g > y.g end
                 if (x.a.own or 0) ~= (y.a.own or 0) then return (x.a.own or 0) > (y.a.own or 0) end
@@ -1067,7 +1092,7 @@ function M.plan(Bot, board, sight, style, opts)
         end)
         local st = plans[1].st
         local ph = phaseOf(st)
-        ph.win = winChance(st)
+        ph.win, ph.explain = winChance(st), explain(st)
         return ph
     end
 
@@ -1840,8 +1865,9 @@ function M.plan(Bot, board, sight, style, opts)
             -- our turn between: the beam's best, unjudged, `guard` its walker's unit sent (or
             -- nil). `tiles` keeps where it leaves our units ({ ["id"] = { x, y } } a turn), for
             -- the shadow run to read against the turn then played (montecarlo.py look); a turn
-            -- the beam has nothing to play (nil) holds them where the board has them.
-            local function turnOf(b, guard, tiles)
+            -- the beam has nothing to play (nil) holds them where the board has them. `why`
+            -- keeps its Bot.explain record a turn (false for a turn with nothing to play).
+            local function turnOf(b, guard, tiles, why)
                 local c0 = sight.aiCalls()
                 local ph = M.plan(Bot, b, sight, style,
                                   { unjudged = true, seen = opts and opts.seen, guard = guard })
@@ -1859,6 +1885,7 @@ function M.plan(Bot, board, sight, style, opts)
                     end
                     tiles[#tiles + 1] = at
                 end
+                if why then why[#why + 1] = ph and ph.explain or false end
                 return ph
             end
             local function rounded(die)
@@ -1866,11 +1893,11 @@ function M.plan(Bot, board, sight, style, opts)
                 for id, d in pairs(die) do out[tostring(id)] = math.floor(d * 1e4 + 0.5) / 1e4 end
                 return out
             end
-            rec.between = {}
+            rec.between, rec.why = {}, {}
             local r = sight.look({ blues = best.phase.blues, gone = best.phase.gone,
                                    reds = best.phase.reds, opened = best.phase.opened,
                                    carry = best.phase.carry }, depth, function(b)
-                return turnOf(b, nil, rec.between)
+                return turnOf(b, nil, rec.between, rec.why)
             end)
             -- each unit's chance to die in any looked phase: the judged one's, then the look's
             local later = lookDeaths(r, best.phase.hit)
@@ -1891,11 +1918,11 @@ function M.plan(Bot, board, sight, style, opts)
                     -- its own turn and each turn between, where they leave our units (the
                     -- sent unit's way to the tile); `looked`, the phases played before the
                     -- last, fewer than depth - 1 when a turn between ended the chapter
-                    local alt = { unit = g.id, turns = g.turns, between = {} }
-                    local own = turnOf(board, guard, alt.between)
+                    local alt = { unit = g.id, turns = g.turns, between = {}, why = {} }
+                    local own = turnOf(board, guard, alt.between, alt.why)
                     if own then
                         local ra = sight.look(own, depth, function(b)
-                            return turnOf(b, guard, alt.between)
+                            return turnOf(b, guard, alt.between, alt.why)
                         end)
                         alt.die, alt.ended = rounded((lookDeaths(ra, best.phase.hit, 1))), ra.ended
                         alt.looked = #(ra.phases or {})
@@ -1969,6 +1996,7 @@ function M.plan(Bot, board, sight, style, opts)
         best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
+    best.explain = explain(best)
     -- the enemies the plan was made against: in sight, and those a retry remembers (ctx.threats,
     -- ADR 0399), so a death by a remembered one is never graded `fog` (botrun.grade)
     best.enemies = {}
