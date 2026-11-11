@@ -28,9 +28,12 @@ place: read it first. Tell Nicolas where W1 stands in plain words at the start.
   checkable look came true (4010 turn 4: villager 83% by turn 8, died turn 8 to walker 145),
   but `montecarlo.py look`'s calibration table is empty: it reads each enemy phase's LAST
   plan, and a later replan whose look was skipped hides the one that ran.
-- **Next:** Nicolas's call (asked 2026-11-11): may the table count a turn's look that ran
-  when a later replan's was skipped? Then where the turn between's calls go, before touching
-  the allowance (call 5). Then mends judged by the look, `make test` timed.
+- **Done:** `07abd46d` the table counts a turn's look that ran (Nicolas: "Yes"). Reread: 26
+  unit-looks, the 83% one died, none of 25 at <=5% did; the turns between left 3 of 50
+  units on the tile then played (6%).
+- **Next:** where the turn between's calls go (95% of the look's), before touching the
+  allowance (call 5); and why the turn between matches our played turn so rarely. Then
+  mends judged by the look, `make test` timed.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
