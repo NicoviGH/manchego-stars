@@ -3206,8 +3206,8 @@ def calibration(traces):
 
 def look_table(traces):
     """The look in shadow against the game played (#510 W1, comment 6786548233), from kept
-    traces; repeats of one play (trace_key) count once. Each enemy phase's last plan whose look
-    ran (`look.run`) puts each of its units in a CALIBRATION_BINS row by the look's chance
+    traces; repeats of one play (trace_key) count once. Each player phase's last plan whose look
+    ran (`look.run`; a later replan whose look was skipped does not hide it) puts each of its units in a CALIBRATION_BINS row by the look's chance
     (`look.die`), beside whether it died within the looked phases: from that turn's enemy
     phase through the `depth`-th, our turns between included; a look whose last phase the
     game never played (it ended first) bins no unit and counts as `cut_short`. Each attempt's
@@ -3249,14 +3249,15 @@ def look_table(traces):
             if e.get('t') == 'phase' and e.get('phase') == 'enemy' and e.get('units'):
                 played[e.get('turn')] = {u['id']: (u.get('x'), u.get('y'))
                                          for u in e['units'] if u.get('faction') == 'blue'}
+            # the turn's last plan whose look ran (Nicolas, 2026-11-11): a later replan whose
+            # look was skipped no longer hides it (Ch6 `w1r`: both looks run were hidden so)
             if e.get('t') == 'phase' and e.get('phase') == 'player':
                 plan = None
-            elif e.get('t') == 'plan' and e.get('ref') is not None:
+            elif (e.get('t') == 'plan' and e.get('ref') is not None
+                  and (e.get('look') or {}).get('run')):
                 plan = e
             elif e.get('t') == 'phase' and e.get('phase') == 'enemy' and plan is not None:
-                lk = plan.get('look') or {}
-                if lk.get('run'):
-                    looks[e.get('turn')] = lk
+                looks[e.get('turn')] = plan['look']
         name = chapter_label(info)
         c = cost[name]
         enemy_turns = {e.get('turn') for e in events

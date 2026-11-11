@@ -3002,6 +3002,15 @@ class Look(unittest.TestCase):
         # a look not run judges no unit
         self.assertEqual(mc.look_table([self.trace(run=False)])['bins']['over 50%'][0], 0)
 
+    def test_a_later_replan_whose_look_was_skipped_hides_no_look(self):
+        # turn 1's look ran; a replan that turn had its look skipped: the look that ran is
+        # binned (Ch6 `w1r`: both looks run were hidden so)
+        tr = self.trace()
+        tr.insert(4, {'t': 'plan', 'ref': 2, 'look': {'asked': True, 'skipped': True}})
+        t = mc.look_table([tr])
+        self.assertEqual(t['bins']['over 50%'][:2], [1, 1])
+        self.assertEqual(t['bins']['0'][:2], [1, 0])
+
     def test_a_look_the_game_never_reached_is_cut_short(self):
         # the look at turn 1 runs to turn 2's enemy phase; the game ended in turn 1's: its
         # units are not binned (unplayed phases are no survival), and the look is counted cut
