@@ -31,9 +31,13 @@ place: read it first. Tell Nicolas where W1 stands in plain words at the start.
 - **Done:** `07abd46d` the table counts a turn's look that ran (Nicolas: "Yes"). Reread: 26
   unit-looks, the 83% one died, none of 25 at <=5% did; the turns between left 3 of 50
   units on the tile then played (6%).
-- **Next:** where the turn between's calls go (95% of the look's), before touching the
-  allowance (call 5); and why the turn between matches our played turn so rarely. Then
-  mends judged by the look, `make test` timed.
+- **Measured (probe `w1s`, not kept):** 97% of the look's AI calls are `sight.strike` (the
+  cap's tile checks) in its 24 planned turns; a third from the widened replans. The best
+  plan's look (the one calibrated) is ~1/6 of the cost; the boss march and 3 walker
+  alternatives are the rest.
+- **Next:** Nicolas's call (asked 2026-11-11): run the best plan's look first and the
+  alternatives only with the allowance's room left? Then mends judged by the look,
+  `make test` timed.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
