@@ -1572,12 +1572,24 @@ def vanilla_rows():
     return inject.chapter_settings.twin_rows()
 
 
-def twin_name(index):
-    """Vanilla chapter index `index` as a reader says it ('vanilla Ch3')."""
+def vanilla_label(index):
+    """Vanilla chapter index `index` as the game names it: a shared-route chapter by its twin
+    row (vanilla_rows: 6 is 'Ch5', 5 'Ch5x', 0 'Prologue'), a route chapter by its
+    constants/chapters.h name ('E_9'), else 'chapter <index>'. A trace's chapter is this index,
+    never the number in the name."""
     for name, i in vanilla_rows().items():
         if i == index:
-            return 'vanilla ' + name.split()[-1]   # twin_rows' 'FE8 Ch3'
-    return 'vanilla chapter %d' % index
+            return name.split()[-1]   # twin_rows' 'FE8 Ch3'
+    import campaign_env
+    for k, v in campaign_env._chapter_enum().items():
+        if v == index:
+            return k[len('CHAPTER_'):]
+    return 'chapter %s' % index
+
+
+def twin_name(index):
+    """Vanilla chapter index `index` as a reader says it ('vanilla Ch3')."""
+    return 'vanilla ' + vanilla_label(index)
 
 
 def cell_sentence(cell, arms):
@@ -3062,6 +3074,8 @@ def calibration(traces):
                 kind = 'no prediction'
             elif cap is None:
                 kind = 'no cap'
+            # Planner.admits's test (planner.lua), restated: kept traces graded before #510
+            # PR A name the phase's last plan, not the mover, so their records cannot say it
             elif said > cap + dust:
                 kind = 'moved over the cap'
             elif lastSaid is not None and lastSaid > cap + dust:
@@ -3084,8 +3098,7 @@ def chapter_label(info):
     chapter = info.get('chapter')
     if info.get('game') == 'ours':
         return 'ch%02d' % chapter if isinstance(chapter, int) else str(chapter)
-    import campaign_env
-    return campaign_env.chapter_name(chapter)
+    return vanilla_label(chapter)
 
 
 def calibration_lines(c):

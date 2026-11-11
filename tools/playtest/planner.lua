@@ -1311,20 +1311,10 @@ function M.plan(Bot, board, sight, style, opts)
         -- number, never the unit's chance to die (the cap's). Read here, not when the rank
         -- first reaches it: M.outranks runs inside table.sort, and a sandbox call there yields
         -- across a C call (every scout-ch6 run crashed so, review of #598)
-        local fogAt = {}
+        st.fogBy, st.fogSum = {}, 0
         for _, p in ipairs(planned) do
-            fogAt[#fogAt + 1] = { u = p.unit, x = p.x, y = p.y, hp = p.hp - (taken[p.unit.id] or 0) }
-        end
-        st.fogOf = function()
-            if not st.fogMemo then
-                local by, sum = {}, 0
-                for _, q in ipairs(fogAt) do
-                    local f = fogDie(q.u, q.x, q.y, q.hp)
-                    if f > 0 then by[q.u.id], sum = f, sum + f end
-                end
-                st.fogMemo = { by = by, sum = sum }
-            end
-            return st.fogMemo
+            local f = fogDie(p.unit, p.x, p.y, p.hp - (taken[p.unit.id] or 0))
+            if f > 0 then st.fogBy[p.unit.id], st.fogSum = f, st.fogSum + f end
         end
         st.predict = {}
         for _, g in ipairs(greens) do
@@ -1402,7 +1392,7 @@ function M.plan(Bot, board, sight, style, opts)
                        max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0,
                        key = table.concat(st.keys, " ") }
         -- `fog`, on the ways the plan does not end the chapter
-        rank.fog = st.fogOf().sum * (1 - won)
+        rank.fog = st.fogSum * (1 - won)
         st.protected = {}
         -- a unit's death in the plan: its counter's (score's fx.die, the chance the exchange
         -- kills it) and the phase's after it. The cap reads both: a counter that can kill is
@@ -1790,7 +1780,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- unit that shows what the fog hid moves before them and botrun's replan (M.surprise: a
     -- newly seen enemy) plans them around it. Kept only when the plan rebuilt in that order
     -- expects every act to end as judged (extend's expect: HP, a kill, the target's HP).
-    local fogBy, any = best.fogOf and best.fogOf().by or {}, false
+    local fogBy, any = best.fogBy or {}, false
     for _, p in ipairs(best.predict or {}) do
         if fogBy[p.id] then p.fog, any = fogBy[p.id], true end
     end
@@ -1819,6 +1809,8 @@ function M.plan(Bot, board, sight, style, opts)
             -- replay reads the plan in the order it is played
             local keys = keysOf(best)
             for i = 1, #keys do best.keys[i] = keys[i] end
+            -- and the rank's key: every comparison is done, so it only names the plan again
+            best.rank.key = table.concat(best.keys, " ")
         end
     end
     return best.acts[1], best, cost

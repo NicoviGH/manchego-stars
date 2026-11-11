@@ -410,9 +410,9 @@ M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strik
 -- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
 -- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit on
 -- (x, y) within FOG_REACH of an unseen tile meets one strike from the strongest enemy seen so
--- far, stood on the nearest unseen tile no unit stands on (sight.fogStrike: the game's AI
--- choosing from there, the unit its one target; a tile a hidden unit holds would put two units
--- on one cell of the map). Seen so far is `seen` (unit slot -> charId, botrun's: every red a
+-- far, stood on the nearest unseen tile no other unit stands on (sight.strike's `from`: the
+-- game's AI choosing from there, the unit its one target; a tile another hidden unit holds would
+-- put two units on one cell of the map, while the enemy's own tile is where it stands). Seen so far is `seen` (unit slot -> charId, botrun's: every red a
 -- board showed out of fog this attempt), else the enemies in sight; of each class and kit the
 -- highest level is asked. -> { die(u, x, y, hp): the chance that strike kills `u` at `hp`, 0
 -- with no free unseen tile in reach or no enemy seen; unseen: every tile the fog hides }. Its
@@ -420,7 +420,7 @@ M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strik
 function M.fogRead(board, sight, seen)
     local unseen = sight.unseen and sight.unseen() or {}
     local reps, kits, memo = {}, {}, {}
-    if #unseen > 0 and sight.fogStrike then
+    if #unseen > 0 and sight.strike then
         for _, u in ipairs(board.units) do
             local ok = u.faction == "red" and u.onField and not u.dead
             if ok then
@@ -441,31 +441,34 @@ function M.fogRead(board, sight, seen)
             end
         end
     end
-    -- the tiles a unit stands on, hidden ones too (board.lua reads every unit's tile)
+    -- the unit on each tile, hidden ones too (board.lua reads every unit's tile)
     local held = {}
     for _, u in ipairs(board.units) do
-        if u.onField and not u.dead then held[tileKey(u.x, u.y)] = true end
+        if u.onField and not u.dead then held[tileKey(u.x, u.y)] = u.id end
     end
     local odds = sight.odds or function() return 0 end
     local function die(u, x, y, hp)
         if #reps == 0 or hp <= 0 then return 0 end
-        local edge, near
-        for _, t in ipairs(unseen) do
-            local d = manhattan(t.x, t.y, x, y)
-            if d <= M.FOG_REACH and not held[tileKey(t.x, t.y)] and (not near or d < near) then
-                edge, near = t, d
-            end
-        end
-        if not edge then return 0 end
         local worst = 0
         for _, e in ipairs(reps) do
-            local k = u.id .. "@" .. x .. "," .. y .. "/" .. e.id
-            local f = memo[k]
-            if not f then
-                f = sight.fogStrike(u, e, x, y, edge.x, edge.y)
-                memo[k] = f
+            -- the nearest unseen tile in reach that no unit but `e` itself holds
+            local edge, near
+            for _, t in ipairs(unseen) do
+                local d = manhattan(t.x, t.y, x, y)
+                local by = held[tileKey(t.x, t.y)]
+                if d <= M.FOG_REACH and (not by or by == e.id) and (not near or d < near) then
+                    edge, near = t, d
+                end
             end
-            worst = math.max(worst, (odds({ f.takenDist }, hp)))
+            if edge then
+                local k = u.id .. "@" .. x .. "," .. y .. "/" .. e.id
+                local f = memo[k]
+                if not f then
+                    f = sight.strike(u, e, x, y, nil, edge)
+                    memo[k] = f
+                end
+                worst = math.max(worst, (odds({ f.takenDist }, hp)))
+            end
         end
         return worst
     end

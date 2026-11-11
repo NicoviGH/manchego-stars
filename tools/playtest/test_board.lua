@@ -465,5 +465,17 @@ do
     check(ours, true, "killer: a blue index is ours")
 end
 
+-- test_bind_exposes_every_action_constant (review of #598): the harness reads Board through
+-- bind, so a constant board.lua adds and bind leaves out is nil there (every scout-ch6 run
+-- crashed on ACTION_KIND so)
+do
+    local bound = Board.bind({}, {})
+    for k, v in pairs(Board) do
+        if type(k) == "string" and k:match("^ACTION_") and type(v) == "number" then
+            check(bound[k], v, "bind: " .. k)
+        end
+    end
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

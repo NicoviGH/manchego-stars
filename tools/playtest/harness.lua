@@ -1177,7 +1177,7 @@ local function moveUnit(fx, fy, tx, ty, haltOk)
     -- to UNIT_ACTION_TRAPPED, and ends the unit's turn with no command menu
     -- (playerphase.c PlayerPhase_ApplyUnitMovement); the last unit's ends the phase too. Selecting
     -- the unit cleared that byte (bmunit.c UnitBeginAction), so TRAPPED is this move's own.
-    local function trapped() return ru8(SYM.gActionData + 0x11) == BOARD.ACTION_TRAPPED end
+    local function trapped() return ru8(SYM.gActionData + BOARD.ACTION_KIND) == BOARD.ACTION_TRAPPED end
     if not guardedInput("confirm_move", "A", "live unit command menu opens, or the game halts the move",
             function(after)
                 return controllerState(after) == "unit_command_menu" or (haltOk and trapped())
@@ -3272,7 +3272,7 @@ INSPECT.watchEnemyActs = function()
             cur.begun = true
             cur.from = { x = rs16(SYM.gActiveUnitMoveOrigin), y = rs16(SYM.gActiveUnitMoveOrigin + 2) }
         end
-        local kind = cur.begun and ru8(AD + 0x11) or 0
+        local kind = cur.begun and ru8(AD + BOARD.ACTION_KIND) or 0
         -- gAiDecision is this unit's while its act plays (CpDecide decides one unit, then
         -- CpPerform plays it): cur's unit was read off it
         local decided = ru8(SYM.gAiDecision + BOARD.AI_DEC.ACTION)

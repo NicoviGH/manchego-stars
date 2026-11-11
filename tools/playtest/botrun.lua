@@ -502,7 +502,8 @@ end
 -- Grade blue or green death `d` (its id, charId, faction, killer, killerId, phase) against
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
 -- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the plan
--- that last moved the unit, else the phase's last (its `predict`; the caller picks, record). `plan.snapshot` is the board when that plan was made,
+-- that last moved the unit, else the phase's last (its `predict`; the caller picks, record).
+-- `plan.snapshot` is the board when that plan was made,
 -- `cap` the style's risk cap (nil for greedy, which plays no plan; kept only on a protected
 -- unit's death), `lords` the set (charId -> true) of the units whose death ends the game,
 -- `admits` the planner's own test of a chance against the cap (Planner.admits: required

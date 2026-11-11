@@ -2920,6 +2920,12 @@ class Calibration(unittest.TestCase):
                          'a unit off the field in the phase is no unit-phase')
         self.assertIn('| Ch5 | 1 | 1 |', '\n'.join(mc.calibration_lines(mc.calibration([t()]))))
 
+    def test_a_trace_index_is_named_as_the_game_names_it(self):
+        # one owner of the name: the twin rows, then the route chapters' constants
+        self.assertEqual([mc.vanilla_label(i) for i in (0, 5, 6, 7, 10, 999)],
+                         ['Prologue', 'Ch5x', 'Ch5', 'Ch6', 'E_9', 'chapter 999'])
+        self.assertEqual(mc.twin_name(6), 'vanilla Ch5')
+
     def test_caps_are_the_planners(self):
         caps, dust = mc.style_caps()
         self.assertEqual(caps, {'careful': 0.01, 'even': 0.05, 'bold': 0.15})

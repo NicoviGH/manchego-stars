@@ -430,7 +430,15 @@ local function sightOf(o)
     if o.staves then s.staves = function(u) return o.staves[u.id] or {} end end
     if o.heals then s.heals = function(u, x, y) return (o.heals[u.id] or {})[x .. "," .. y] or {} end end
     if o.mend then s.mend = function(u) return o.mend[u.id] end end
-    if o.fogStrike then s.fogStrike = o.fogStrike end
+    -- the fog read's strike (sight.strike with `from`, the fog's edge): o.fogStrike(u, e, x, y,
+    -- fx, fy) answers it; a strike with no `from` is the fake's own
+    if o.fogStrike then
+        local own = s.strike
+        s.strike = function(u, e, x, y, slot, from)
+            if from then return o.fogStrike(u, e, x, y, from.x, from.y) end
+            return own and own(u, e, x, y, slot)
+        end
+    end
     if o.maxHp then
         s.maxHps = function(units)
             for _, u in ipairs(units) do u.maxhp = o.maxHp[u.id] or u.maxhp end
@@ -3661,6 +3669,8 @@ do
     end
     check(played and played[#played] and played[#played]:match("^(%d+)>"), "1",
           "fog order: the record's keys are in the order played")
+    check(plan and plan.rank.key, table.concat(played or {}, " "),
+          "fog order: the rank's key names the plan as played")
 end
 
 -- test_the_fog_read_asks_a_free_tile_and_the_highest_level (#510 PR A, review of #598): the
@@ -3681,6 +3691,12 @@ do
     })
     B.fogRead(boardOf(A, X, Y, H), s, { [0x81] = 0x81, [0x82] = 0x82 }).die(A, 0, 0, 20)
     check(table.concat(asked, " "), "82<3,0", "fog read: the free tile, the higher level")
+    -- the seen enemy itself hidden on the nearest unseen tile: asked from its own tile
+    asked = {}
+    local Z = red(0x84, 2, 0, { minRange = false, fogged = true, level = 20, classId = 5 })
+    B.fogRead(boardOf(A, X, Z), s, { [0x81] = 0x81, [0x84] = 0x84 }).die(A, 0, 0, 20)
+    table.sort(asked)
+    check(table.concat(asked, " "), "81<3,0 84<2,0", "fog read: an enemy's own tile is free to it")
 end
 
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
