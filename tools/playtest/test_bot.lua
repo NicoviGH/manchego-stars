@@ -2853,6 +2853,29 @@ do
     check(alone and alone.act ~= "attack", true, "assault: a lone strike is not made")
 end
 
+-- test_a_remembered_boss_is_the_march_goal (#510, ADR 0401; vanilla Ch6 retries): on a Defeat
+-- Boss map the boss is the march goal once the party knows where it stands -- in sight, or
+-- in fog and remembered by a retry (sight.knows, ADR 0399). A boss in fog no attempt showed is
+-- no goal (the march heads for the nearest enemy in sight), and on a Rout map a remembered
+-- boss-class enemy changes nothing: the win condition says what the march is for.
+do
+    local function goal(objective, fogged, known)
+        local A, X = blue(0x01, 0, 0, 0), red(0x81, 3, 0)
+        local Y = red(0x82, 9, 0, { fogged = fogged })
+        local _, ctx = B.candidates(boardOf(A, X, Y),
+                                    sightOf({ objective = objective, known = known }),
+                                    style("careful"))
+        local t = ctx.objectiveTile(A)
+        return t and (t.x .. "," .. t.y)
+    end
+    local boss = { kind = "boss", boss = 0x82 }
+    check(goal(boss, false), "9,0", "boss goal: a boss in sight")
+    check(goal(boss, true, { [0x82] = true }), "9,0", "boss goal: a boss in fog a retry remembers")
+    check(goal(boss, true), "3,0", "boss goal: none for a boss no attempt showed")
+    check(goal({ kind = "rout" }, true, { [0x82] = true }), "3,0",
+          "boss goal: a Rout map marches on its nearest enemy in sight")
+end
+
 -- test_an_attack_whose_counter_can_kill_is_offered (ADR 0396's known break, the counter
 -- refusal; Manchego Stars ch03 even, turn 15: Rootis, 10 HP, beside a boss on 2 HP whose counter
 -- hits for 11, and his blow, first, wins the chapter 98 times in 100 -- never offered, so never
