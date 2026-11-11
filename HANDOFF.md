@@ -23,8 +23,14 @@ place: read it first. Tell Nicolas where W1 stands in plain words at the start.
   kill. Villager 83% unchanged. Eirika 0% (was 97%), Joshua 92%, Franz 88%. The look cost
   +46% AI calls (8,518 -> 12,427), CPU 47 -> 86 s. So the same rule for live play is not
   supported by this start (Nicolas's call; recommend not).
-- **Next:** what Nicolas picks from the end of the 2026-11-11 session. Otherwise the build
-  map's "Left in W1": Ch6 4002/4010 shadow runs, mends judged by the look, `make test` timed.
+- **Ch6 4002/4010 shadow run `w1r`** (Nicolas agreed: replan stays look-only, move on): the
+  allowance starves the look (2 of 23 ran; turns between are 95% of its calls). The one
+  checkable look came true (4010 turn 4: villager 83% by turn 8, died turn 8 to walker 145),
+  but `montecarlo.py look`'s calibration table is empty: it reads each enemy phase's LAST
+  plan, and a later replan whose look was skipped hides the one that ran.
+- **Next:** Nicolas's call (asked 2026-11-11): may the table count a turn's look that ran
+  when a later replan's was skipped? Then where the turn between's calls go, before touching
+  the allowance (call 5). Then mends judged by the look, `make test` timed.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
