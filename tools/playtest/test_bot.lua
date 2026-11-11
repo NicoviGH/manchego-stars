@@ -3601,7 +3601,8 @@ do
     for _, c in ipairs(plan and plan.considered or {}) do
         if c.acts[1] == "1>wait@0,0>nil" then rank = c.rank end
     end
-    check(rank and rank.fog, 0.5, "fog: beside it, the strike's chance to kill is the fog key")
+    check(rank and rawget(rank, "fog"), 0.5,
+          "fog: beside it, the strike's chance to kill is the fog key, read before any sort")
     check(rank and rank.max_die, 0, "fog: not the unit's chance to die")
     check(rank and rank.admitted, true, "fog: the cap reads the enemies in sight only")
     local others = {}

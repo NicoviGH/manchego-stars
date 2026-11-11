@@ -1308,8 +1308,9 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         -- the fog's strike, after the phase: on the HP the phase is expected to leave. Its own
-        -- number, never the unit's chance to die (the cap's), and read only when asked (the
-        -- rank's `fog`, a tie-breaker; the best plan's order): each strike is a sandbox call
+        -- number, never the unit's chance to die (the cap's). Read here, not when the rank
+        -- first reaches it: M.outranks runs inside table.sort, and a sandbox call there yields
+        -- across a C call (every scout-ch6 run crashed so, review of #598)
         local fogAt = {}
         for _, p in ipairs(planned) do
             fogAt[#fogAt + 1] = { u = p.unit, x = p.x, y = p.y, hp = p.hp - (taken[p.unit.id] or 0) }
@@ -1400,14 +1401,8 @@ function M.plan(Bot, board, sight, style, opts)
                        progress = gain, green_die = greenDie, value = judged, game_over = 0,
                        max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0,
                        key = table.concat(st.keys, " ") }
-        -- `fog`, on the ways the plan does not end the chapter: computed the first time
-        -- M.outranks reaches it (a tie through `value`) or a record reads it
-        setmetatable(rank, { __index = function(t, k)
-            if k ~= "fog" then return nil end
-            local v = st.fogOf().sum * (1 - won)
-            rawset(t, "fog", v)
-            return v
-        end })
+        -- `fog`, on the ways the plan does not end the chapter
+        rank.fog = st.fogOf().sum * (1 - won)
         st.protected = {}
         -- a unit's death in the plan: its counter's (score's fx.die, the chance the exchange
         -- kills it) and the phase's after it. The cap reads both: a counter that can kill is
