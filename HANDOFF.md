@@ -9,9 +9,10 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, PR B in review).** **#510 PR B is PR #599**
-(branch `feat/510-pr-b-retry-memory`, ADR 0399; not merged). Read #599 and #510 comments
-6786147872 (the campaign rerun), 6786005697 (late-game deaths) and 6786548233 (Fable's design).
+**Next session starts here (2026-11-11, PR B merged).** **#510 PR B merged as #599**
+(squash `2dd4f835`, ADR 0399). Read #510 comments 6786147872 (the campaign rerun),
+6786005697 (late-game deaths) and 6786548233 (Fable's design). Next: Fable expands its design
+(below).
 - **What #599 does:** a retry remembers every enemy earlier attempts showed and every killer
   (by slot, character and class, `Board.memoryKey`); `sight.remember`/`knows` and
   `Board.playsAsSeen` are the one owner of "counts as seen" (judged phases, danger maps lifted,
@@ -19,14 +20,10 @@ and start a fresh instance; don't rely on auto-compaction.
   12 tries a chapter start; a try already played (same style, same memory) is never spent
   again. `montecarlo.py resume`. Guard goal and deadline dropped (Nicolas). The fog read's
   enemies seen stay this attempt's.
-- **Proof so far:** each new test fails without its fix; all 130 test files pass; attempt 1
-  played event for event as main on `scout-ch6`, `vanilla-ch5`, `ours-ch02` (seeds 1001, 1002)
-  after the first fix round. **Still owed when this session ended:** (a) the same six-start
-  check on head `ba1db30b` (it was running: driver at the scratch path below; rerun it if its
-  result is not on #599), (b) a scoped re-review of `ba1db30b` (a fresh subagent was running;
-  its 10 verdicts are not recorded anywhere: run `/code-review 599 medium` on the fix commit
-  again if unsure), (c) CI on the head, then merge (step 9 PRs merge after review + CI, his
-  standing permission).
+- **Proof:** each new test fails without its fix; all 130 test files pass; attempt 1 plays
+  event for event as PR A on `scout-ch6`, `vanilla-ch5`, `ours-ch02` (seeds 1001, 1002) on
+  `ba1db30b`; the scoped re-review found all 10 findings addressed (both on #599); CI green on
+  the head `88b13e75`.
 - **The rerun (`prb2`, before the review fixes):** all 10 vanilla campaigns stop at the cap.
   Ch6: memory ends the fog ambush (6 blue deaths in 78 retries vs 9 in 8 first attempts), but
   the villagers die on every retry (the Bael, turns 8-12; the horizon). Ch5x (4003): 4 of 12
