@@ -9,35 +9,58 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-10 night, PR A merged).** **#510 PR A merged as PR #598**
-(squash 9ef47c5e, ADR 0400; CI green on its head; `suite --held-out` promoted it, instrument
-`84d8eba48d70+v2`, before the review fixes, which change fog-map play only and were checked on
-`scout-ch6`'s four seeds). **Next is PR B** (below). The suite's frozen baseline is still
-`ce1e3adb8c57+v2`: refreezing on PR A's code is not done (`suite --freeze`), and is Nicolas's call.
-- **What PR A ended up as:** the fog-ambush harness fix; an enemy-phase death graded by the plan
-  that moved its unit (+ `montecarlo.py calibration`); the mend's extra rounds; the fog read as a
-  tie-breaker after everything else the rank reads. **Taken out:** the always-judged step back
-  (it stalled Manchego Stars ch03 40+ turns; comment 6782827664). **Dropped by Nicolas:** the
-  march where only units the fog cannot kill lead, and Fable's look one turn ahead (too narrow
-  and careful: a human's next turn attacks and heals; comment 6783348074). The planner still
-  reads one enemy phase deep; that stays open without a design.
-- **After the promoted suite, the review fixes changed fog-map play only** (the fog strike's tile
-  and enemy, the reorder's keys); `scout-ch6`'s four seeds were rerun and play as promoted.
-- **Then PR B** (plan comment 6779357154, PR B, amended): retry memory only, the screen's whole
-  record (ADR 0376 decision 3, 0399's draft), checked for what it leaves out. No deadline step
-  (failed ADR 0396's tests). **Waiting on Nicolas:** drop 0399's guard goal too (recommended;
-  it fails the same tests). Step 4 (retries that differ) needs a 0396 check before it is built.
-  Ch6 is the witness only: the Bael reaches the Civilians about turn 7-8.
-- **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
-  6780145312), on a fresh Ch5 run of PR A's code.
-- **How the witnesses were played:** scratch drivers around `montecarlo.pinned_setup` +
-  `chapter_tasks(...)` with their own runs file; not kept (15 lines each). Ch6 runs take 90 to
-  520 s; the suite takes about 1.2 wall-hours on 8 workers.
-- **Lessons:** read the ADRs on a topic before writing design text for it (the retry "lessons"
-  contradicted ADR 0376, Nicolas caught it). An untracked ADR draft in `docs/decisions/` fails
-  the pre-commit drift check. `M.outranks` runs inside `table.sort`: nothing it reads may make a
-  sandbox call. A constant board.lua adds must also go in `Board.bind`. Research 0020's guide
-  abbreviations: SH is GameFAQs Shaneth21, KE GameFAQs katieelizabeth.
+**Next session starts here (2026-11-11, PR B in review).** **#510 PR B is PR #599**
+(branch `feat/510-pr-b-retry-memory`, ADR 0399; not merged). Read #599 and #510 comments
+6786147872 (the campaign rerun), 6786005697 (late-game deaths) and 6786548233 (Fable's design).
+- **What #599 does:** a retry remembers every enemy earlier attempts showed and every killer
+  (by slot, character and class, `Board.memoryKey`); `sight.remember`/`knows` and
+  `Board.playsAsSeen` are the one owner of "counts as seen" (judged phases, danger maps lifted,
+  exposure via `ctx.threats`, keySources, closings, the lookahead's boss trigger, `plan.enemies`).
+  12 tries a chapter start; a try already played (same style, same memory) is never spent
+  again. `montecarlo.py resume`. Guard goal and deadline dropped (Nicolas). The fog read's
+  enemies seen stay this attempt's.
+- **Proof so far:** each new test fails without its fix; all 130 test files pass; attempt 1
+  played event for event as main on `scout-ch6`, `vanilla-ch5`, `ours-ch02` (seeds 1001, 1002)
+  after the first fix round. **Still owed when this session ended:** (a) the same six-start
+  check on head `ba1db30b` (it was running: driver at the scratch path below; rerun it if its
+  result is not on #599), (b) a scoped re-review of `ba1db30b` (a fresh subagent was running;
+  its 10 verdicts are not recorded anywhere: run `/code-review 599 medium` on the fix commit
+  again if unsure), (c) CI on the head, then merge (step 9 PRs merge after review + CI, his
+  standing permission).
+- **The rerun (`prb2`, before the review fixes):** all 10 vanilla campaigns stop at the cap.
+  Ch6: memory ends the fog ambush (6 blue deaths in 78 retries vs 9 in 8 first attempts), but
+  the villagers die on every retry (the Bael, turns 8-12; the horizon). Ch5x (4003): 4 of 12
+  `stuck` on turn 33. Ch8 (4008, 4009): the chests at (1,3) and (2,3) unreached in every
+  deathless win. Step 4 ("retries that differ") is not needed as a rule.
+- **Next after #599 (Nicolas, 2026-11-11): ask Fable to EXPAND its design to scale** (comment
+  6786548233: a retry watches the enemy that killed and plays the loss forward; retries only;
+  a shadow run that can refute it). As designed it covers only Ch6's kind of loss, an unseen
+  walker onto someone we must protect. What it does not scale to (comment 6786005697 and this
+  session's read): **(1) over-cap trades the bot measured**, most late-game deaths (Ch5 28 of
+  40, Ch10 8 of 8, Ch13 21 of 25): a retry should learn "that attack was a mistake", not only
+  "who killed"; **(2) reinforcements**: a wave's killer cannot be watched until it is on the
+  map (the look-ahead places no arrival; a retry knows the wave's turn, ADR 0386, not its
+  route); **(3) cost on big maps**: the look plays every known enemy several phases deep, so
+  its cost grows with units x depth (the +15 to 23% estimate is Ch6's only). Goal in his words:
+  "emulate human players learning from their mistakes and losses". Give Fable the comment, the
+  late-game table and these three gaps; Fable designs, Opus builds. His two open calls on the
+  comment (the assignment; retries only) wait for the expanded design.
+- **New, untracked:** vanilla `scout-ch14` ends `stuck` on turn 19 in all 16 kept runs (no
+  deaths). Not checked against existing issues beyond #510's comments.
+- **How the witnesses were played:** `montecarlo.py resume --game vanilla --tag <t>` (one tag a
+  run; a taken tag is refused). Six-start attempt-1 check: a 25-line scratch driver around
+  `pinned_setup` + `chapter_tasks(..., 'tuning')` + `Pool`, its traces compared on act, event
+  and death lines with PR A's kept traces (`84d8eba48d70+v2`). Not kept.
+- **Lessons:**
+  - A function board.lua adds must also go in `Board.bind`: the emulator hands sight the bound
+    table (the first rerun, `prb`, crashed on every attempt 2 for this).
+  - Most enemies share one generic character id (0x80 is no named `CHARACTER_`): slot +
+    character does not identify a unit; class too.
+  - `tools/callsites.py` reads Python only; for Lua, sweep callers with `rg`.
+  - `/code-review` must run in a fresh subagent (review-to-clean): the author's own inline pass
+    missed 10 findings the independent one found.
+  - A playtest run reads the working tree's Lua: never switch branches while one runs (this
+    HANDOFF was committed to main by plumbing for that reason).
 
 Earlier the same night (Claude, Fable session): **the Fable review is done and its plan is
 locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
@@ -148,14 +171,11 @@ was built or run in the emulator this session.
 ## Next
 
 0. **#510 PR A, first attempts**: merged (PR #598, ADR 0400).
-1. **#510 PR B, retries** (same comment, step 2 amended 2026-11-10): retry memory rebased from
-   `feat/510-retry-memory`, checked to be the screen's whole record; **no deadline**, and 0399's
-   guard goal recommended dropped (Nicolas's call): both fail ADR 0396's test, and the gap they
-   patched is the lookahead's horizon; carry the 10 vanilla campaigns on before the merge
-   (`resume --game vanilla --tag <t>`); retries that differ only if they still stop on reruns,
-   and only after a 0396 check. Then tries to the first clean clear (its method goes to Nicolas as an ADR
-   0385 amendment first). Then **PR C** (same comment: a cell's dice, expected losses; small,
-   no suite run), before any cell verdict. **#510 step 10** after.
+1. **#510 PR B, retries: PR #599** (above). Finish the owed checks, merge. Then **Fable expands
+   its design to scale** (above: over-cap trades, reinforcements, cost), then it is built as its
+   own PR after Nicolas's calls. Then tries to the first
+   clean clear (its method goes to Nicolas as an ADR 0385 amendment first), **PR C** (a cell's
+   dice, expected losses; small, no suite run) before any cell verdict, **#510 step 10** after.
    Still owed from PR-I:
    - **The pilot is ch02, not ch03**: no Manchego Stars campaign reaches ch03 (every one stops at
      ch02 on the chwinga finding), so `pilot --chapter 3` is refused. ch02 vs vanilla Ch2: every
