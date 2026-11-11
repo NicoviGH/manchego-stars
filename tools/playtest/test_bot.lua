@@ -5769,6 +5769,33 @@ do
     check(ctx.exploreGoal[0x01], nil, "guard: none without it")
 end
 
+-- test_turn_between_ranks_progress_first: on the board where the beam's best by its score
+-- holds A on (0,0) and the decision marches it to (1,0), toward the village (the rank puts
+-- progress first), the turn between marches too
+do
+    local board, sight, st = shadowed()
+    local a = Planner.plan(B, board, sight, st, {})
+    check(at(a), "1,0", "progress first: the decision marches")
+    local ph = Planner.plan(B, board, sight, st, { unjudged = true }) or { blues = { {} } }
+    check(ph.blues[1].x .. "," .. ph.blues[1].y, "1,0", "progress first: the turn between marches too")
+end
+
+-- test_turn_between_sends_the_guard: a unit the walker sends (opts.guard) heads for the strike's
+-- tile in the turn between, west, though its way to the objective (the enemy) is east
+do
+    local A = blue(0x01, 0, 5, 5)
+    local E = red(0x81, 9, 5)
+    local o = { reach = { [0x01] = tiles({ 5, 5 }, { 4, 5 }, { 6, 5 }) },
+                enemyPhase = function() return {} end }
+    local board, sight = boardOf(A, E), sightOf(o)
+    local function tile(ph) return ph and ph.blues[1].x .. "," .. ph.blues[1].y end
+    check(tile(Planner.plan(B, board, sight, style("bold"), { unjudged = true })), "6,5",
+          "guard: without it, toward the enemy")
+    check(tile(Planner.plan(B, board, sight, style("bold"),
+                            { unjudged = true, guard = { { id = 0x01, x = 0, y = 5 } } })), "4,5",
+          "guard: sent, toward the strike's tile")
+end
+
 -- test_look_turn_between_is_the_beams_best: opts.unjudged gives the beam's best plan, every
 -- other unit holding, as the phase table it leaves -- our turn between attacks: A's sure kill
 -- of an adjacent enemy is in it, the enemy gone, and no enemy phase was judged

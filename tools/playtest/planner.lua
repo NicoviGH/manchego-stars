@@ -900,16 +900,6 @@ function M.plan(Bot, board, sight, style, opts)
         return { blues = planned, gone = gone, reds = reds, opened = st.opened, carry = st.carry },
             kills
     end
-    -- opts.unjudged (the look's turn between, #510 W1): the beam's best plan, every unit it
-    -- does not move holding, unjudged, as the phase table it leaves (phaseOf), .win its chance
-    -- to end the chapter. No enemy phase is judged, no plan mended, no record made.
-    if opts and opts.unjudged then
-        local st = complete(beam[1])
-        local ph = phaseOf(st)
-        ph.win = winChance(st)
-        return ph
-    end
-
     -- The assault (Nicolas, 2026-10-28): on a Defeat Boss map, every unit that can strike the
     -- boss this phase does, the heaviest expected blow first, until the plan counts it dead.
     -- One unit's strike alone rarely beats holding -- the counter, then the boss's own phase
@@ -1034,6 +1024,51 @@ function M.plan(Bot, board, sight, style, opts)
             if a.act ~= "wait" or not u or a.move.x ~= u.x or a.move.y ~= u.y then return true end
         end
         return false
+    end
+
+    -- opts.unjudged (the look's turn between, #510 W1): the plan the decision would play,
+    -- with no enemy phase judged. The same plans as the live pick (the beam's M.FINAL best,
+    -- the assault, the advance; every unit a plan does not move holding), ranked as ADMITTED
+    -- ranks them without the judge's parts: forfeits (those the plan alone closes), its
+    -- chance to end the chapter, whole turns behind the most progress, progress, the score.
+    -- Progress first matters: the beam's score gives a march no credit for ground gained
+    -- (only a goal's worth pulls one), so the beam's best alone held where the bot marched,
+    -- and a unit the walker sends (opts.guard) never went (#510 W1, Ch6 4001 attempt 2).
+    -- -> the phase table it leaves (phaseOf), .win its chance to end the chapter. No plan
+    -- mended, no record made.
+    if opts and opts.unjudged then
+        local plans, have = {}, {}
+        local function add(st)
+            st = st and complete(st)
+            local k = st and table.concat(keysOf(st), " ")
+            if k and not have[k] then
+                have[k] = true
+                local win = winChance(st)
+                plans[#plans + 1] = { st = st, key = k, win = win, gain = progress(st),
+                    forfeits = #Goals.forfeited(ledger, goals, { win = win, took = st.took,
+                                                                 lost = st.recruitHit }) }
+            end
+        end
+        for i = 1, math.min(M.FINAL, #beam) do add(beam[i]) end
+        add(assault())
+        add(advance(have))
+        local top
+        for _, p in ipairs(plans) do
+            if not top or p.gain > top then top = p.gain end
+        end
+        for _, p in ipairs(plans) do p.behind = math.floor(top - p.gain + M.DUST) end
+        table.sort(plans, function(x, y)
+            if x.forfeits ~= y.forfeits then return x.forfeits < y.forfeits end
+            if x.win ~= y.win then return x.win > y.win end
+            if x.behind ~= y.behind then return x.behind < y.behind end
+            if math.abs(x.gain - y.gain) > M.DUST then return x.gain > y.gain end
+            if x.st.score ~= y.st.score then return x.st.score > y.st.score end
+            return x.key < y.key
+        end)
+        local st = plans[1].st
+        local ph = phaseOf(st)
+        ph.win = winChance(st)
+        return ph
     end
 
     -- judge one complete plan against the enemy phase the AI would play
