@@ -65,7 +65,8 @@
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts
 -- (an attack act carries `die`: its counter's chance to kill the attacker),
--- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
+-- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, `fog`
+-- the fog read's chance to kill a blue one, on the played plan only (Bot.fogRead); and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
@@ -990,10 +991,10 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     -- The fog read (Bot.fogRead, #510 PR A step 4): each unit's chance to die to one strike
-    -- from the strongest enemy seen so far, stood at the fog's edge. It ranks, it does not
-    -- gate: the cap reads the enemies in sight only (a map covered in fog cannot be avoided,
-    -- and priced inside the cap it froze the bot: #510 comment 6780781911), and among plans
-    -- alike in admission the one the fog threatens less comes first (M.outranks' `fog`).
+    -- from the strongest enemy seen so far, stood at the fog's edge. It never enters the cap,
+    -- which reads the enemies in sight only (priced inside it, it froze the bot on Ch6: #510
+    -- comment 6780781911); it breaks ties after everything else the rank reads (M.outranks'
+    -- `fog`) and orders the best plan's acts (below).
     local fogDie = (offer and Bot.fogRead(board, sight, opts and opts.seen) or ctx.fogRead()).die
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the average past BRANCH (never silent)
@@ -1306,15 +1307,24 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
         end
-        -- the fog's strike, after the phase: on the HP the phase is expected to leave. Its
-        -- own number, never the unit's chance to die (the cap's)
-        local fogOf, fogSum = {}, 0
+        -- the fog's strike, after the phase: on the HP the phase is expected to leave. Its own
+        -- number, never the unit's chance to die (the cap's), and read only when asked (the
+        -- rank's `fog`, a tie-breaker; the best plan's order): each strike is a sandbox call
+        local fogAt = {}
         for _, p in ipairs(planned) do
-            local id = p.unit.id
-            local f = fogDie(p.unit, p.x, p.y, p.hp - (taken[id] or 0))
-            if f > 0 then fogOf[id], fogSum = f, fogSum + f end
+            fogAt[#fogAt + 1] = { u = p.unit, x = p.x, y = p.y, hp = p.hp - (taken[p.unit.id] or 0) }
         end
-        st.fog = fogSum
+        st.fogOf = function()
+            if not st.fogMemo then
+                local by, sum = {}, 0
+                for _, q in ipairs(fogAt) do
+                    local f = fogDie(q.u, q.x, q.y, q.hp)
+                    if f > 0 then by[q.u.id], sum = f, sum + f end
+                end
+                st.fogMemo = { by = by, sum = sum }
+            end
+            return st.fogMemo
+        end
         st.predict = {}
         for _, g in ipairs(greens) do
             judged = judged - loss(W, st, g.charId) * die[g.id]
@@ -1346,7 +1356,7 @@ function M.plan(Bot, board, sight, style, opts)
             table.sort(by)
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
                                             y = p.y, hp = p.hp, die = die[id], taken = taken[id],
-                                            strikes = struck[id], strikers = by, fog = fogOf[id] }
+                                            strikes = struck[id], strikers = by }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
             judged = judged - loss(W, st, p.unit.charId) * die[id] - W.taken * short[id]
         end
@@ -1389,7 +1399,15 @@ function M.plan(Bot, board, sight, style, opts)
         local rank = { admitted = true, forfeits = #st.forfeited, complete = won,
                        progress = gain, green_die = greenDie, value = judged, game_over = 0,
                        max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0,
-                       fog = (st.fog or 0) * (1 - won), key = table.concat(st.keys, " ") }
+                       key = table.concat(st.keys, " ") }
+        -- `fog`, on the ways the plan does not end the chapter: computed the first time
+        -- M.outranks reaches it (a tie through `value`) or a record reads it
+        setmetatable(rank, { __index = function(t, k)
+            if k ~= "fog" then return nil end
+            local v = st.fogOf().sum * (1 - won)
+            rawset(t, "fog", v)
+            return v
+        end })
         st.protected = {}
         -- a unit's death in the plan: its counter's (score's fx.die, the chance the exchange
         -- kills it) and the phase's after it. The cap reads both: a counter that can kill is
@@ -1777,9 +1795,9 @@ function M.plan(Bot, board, sight, style, opts)
     -- unit that shows what the fog hid moves before them and botrun's replan (M.surprise: a
     -- newly seen enemy) plans them around it. Kept only when the plan rebuilt in that order
     -- expects every act to end as judged (extend's expect: HP, a kill, the target's HP).
-    local fogBy, any = {}, false
+    local fogBy, any = best.fogOf and best.fogOf().by or {}, false
     for _, p in ipairs(best.predict or {}) do
-        if p.fog then fogBy[p.id], any = p.fog, true end
+        if fogBy[p.id] then p.fog, any = fogBy[p.id], true end
     end
     if any then
         local order = {}
@@ -1800,7 +1818,13 @@ function M.plan(Bot, board, sight, style, opts)
                 same = false
             end
         end
-        if same then best.acts, best.expect = st.acts, st.expect end
+        if same then
+            best.acts, best.expect = st.acts, st.expect
+            -- the key list in place: the considered record's `acts` is this same table, and a
+            -- replay reads the plan in the order it is played
+            local keys = keysOf(best)
+            for i = 1, #keys do best.keys[i] = keys[i] end
+        end
     end
     return best.acts[1], best, cost
 end

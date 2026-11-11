@@ -92,9 +92,13 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
-    # retired by #510 PR A (the fog rule): the flat fog penalty in the judged score gave way to
-    # one strike from the strongest enemy seen, from the fog's edge, in the chance to die
+    # retired by #510 PR A (ADR 0400): the flat fog penalty in the judged score gave way to one
+    # strike from the strongest enemy seen, from the fog's edge, as a tie-breaker; the versions
+    # refuted on the way (that strike inside the chance to die, the sturdy units leading into
+    # the fog) and step 3's always-judged step back are retired with it
     r'\bW\.fog\b', r'\bfog risk for a fragile unit\b',
+    r'\bfog counts in the chance to die\b', r'\bsturdy lead\b', r'\bfragile follow\b',
+    r'\bstep back is always judged\b',
     # retired by ADR 0397 (#510): a key an enemy drops is a way to a chest or through a door,
     # so a door is no longer a breach only for a unit already holding a key
     r'\bwhich no rule here spends\b',

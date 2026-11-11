@@ -278,7 +278,7 @@ local function unit(o)
         fogged = o.fogged or false,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
-        isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
+        isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons, level = o.level,
         mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
         carrying = o.carrying, carriedBy = o.carriedBy,   -- a Rescue pair (board.lua)
     }
@@ -3654,6 +3654,32 @@ do
     local a, plan = Planner.plan(B, boardOf(A, U, X), sightOf(o), style("bold"))
     check(a and a.unitId, 0x02, "fog order: the unit far from the fog acts first")
     check(plan and plan.acts[#plan.acts].unitId, 0x01, "fog order: the threatened one last")
+    local played
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.played then played = c.acts end
+    end
+    check(played and played[#played] and played[#played]:match("^(%d+)>"), "1",
+          "fog order: the record's keys are in the order played")
+end
+
+-- test_the_fog_read_asks_a_free_tile_and_the_highest_level (#510 PR A, review of #598): the
+-- strike comes from the nearest unseen tile no unit holds (a hidden unit's tile would put two
+-- units on one cell), and of two seen enemies with one class and kit the higher level is asked.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false, level = 3 })
+    local Y = red(0x82, 9, 8, { minRange = false, level = 9 })
+    local H = red(0x83, 2, 0, { minRange = false, fogged = true, classId = 99 })
+    local asked = {}
+    local s = sightOf({
+        unseen = { { x = 2, y = 0 }, { x = 3, y = 0 } },
+        fogStrike = function(u, e, x, y, fx, fy)
+            asked[#asked + 1] = string.format("%X<%d,%d", e.id, fx, fy)
+            return { takenDist = { [0] = 1 } }
+        end,
+    })
+    B.fogRead(boardOf(A, X, Y, H), s, { [0x81] = 0x81, [0x82] = 0x82 }).die(A, 0, 0, 20)
+    check(table.concat(asked, " "), "82<3,0", "fog read: the free tile, the higher level")
 end
 
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
