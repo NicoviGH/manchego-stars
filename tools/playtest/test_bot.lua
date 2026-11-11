@@ -2855,25 +2855,50 @@ end
 
 -- test_a_remembered_boss_is_the_march_goal (#510, ADR 0401; vanilla Ch6 retries): on a Defeat
 -- Boss map the boss is the march goal once the party knows where it stands -- in sight, or
--- in fog and remembered by a retry (sight.knows, ADR 0399). A boss in fog no attempt showed is
--- no goal (the march heads for the nearest enemy in sight), and on a Rout map a remembered
--- boss-class enemy changes nothing: the win condition says what the march is for.
+-- in fog and remembered by a retry (sight.knows, ADR 0399) -- and it is the unit the objective
+-- names, not another CA_BOSS unit. A boss in fog no attempt showed, or one off the field, is no
+-- goal (the march heads for the nearest enemy in sight), and on a Rout map a remembered CA_BOSS
+-- unit changes nothing: the win condition says what the march is for.
 do
-    local function goal(objective, fogged, known)
+    -- X in sight at (3,0); Y the named boss at (9,0); D another CA_BOSS unit at (6,0)
+    local function goal(objective, y, known, decoy)
         local A, X = blue(0x01, 0, 0, 0), red(0x81, 3, 0)
-        local Y = red(0x82, 9, 0, { fogged = fogged })
-        local _, ctx = B.candidates(boardOf(A, X, Y),
+        y.charId, y.isBoss = 0x40, true
+        local Y = red(0x82, 9, 0, y)
+        local D = decoy and red(0x83, 6, 0, { charId = 0x41, isBoss = true, fogged = true })
+        local _, ctx = B.candidates(boardOf(A, X, Y, D),
                                     sightOf({ objective = objective, known = known }),
                                     style("careful"))
         local t = ctx.objectiveTile(A)
         return t and (t.x .. "," .. t.y)
     end
-    local boss = { kind = "boss", boss = 0x82 }
-    check(goal(boss, false), "9,0", "boss goal: a boss in sight")
-    check(goal(boss, true, { [0x82] = true }), "9,0", "boss goal: a boss in fog a retry remembers")
-    check(goal(boss, true), "3,0", "boss goal: none for a boss no attempt showed")
-    check(goal({ kind = "rout" }, true, { [0x82] = true }), "3,0",
+    local boss, both = { kind = "boss", boss = 0x40 }, { [0x82] = true, [0x83] = true }
+    check(goal(boss, {}), "9,0", "boss goal: a boss in sight")
+    check(goal(boss, { fogged = true }, { [0x82] = true }), "9,0",
+          "boss goal: a boss in fog a retry remembers")
+    check(goal(boss, { fogged = true }), "3,0", "boss goal: none for a boss no attempt showed")
+    check(goal(boss, { fogged = true }, both, true), "9,0",
+          "boss goal: the boss the objective names, past a nearer remembered CA_BOSS unit")
+    check(goal(boss, { fogged = true }, { [0x83] = true }, true), "3,0",
+          "boss goal: a remembered CA_BOSS unit the objective does not name is none")
+    check(goal({ kind = "boss" }, { fogged = true }, both, true), "9,0",
+          "boss goal: with none named, the first CA_BOSS unit known")
+    check(goal(boss, { fogged = true, onField = false }, { [0x82] = true }), "3,0",
+          "boss goal: none for a boss off the field")
+    check(goal({ kind = "rout" }, { fogged = true }, { [0x82] = true }), "3,0",
           "boss goal: a Rout map marches on its nearest enemy in sight")
+    -- and the unit walks there: with no enemy in sight the fog would pull A to the unseen tile
+    -- at (0,3); the remembered boss at (5,0) pulls it to (1,0)
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x82, 5, 0, { charId = 0x40, isBoss = true, fogged = true })
+    local o = { objective = boss, known = { [0x82] = true },
+                reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 1, 0 }) },
+                unseen = { { x = 0, y = 3 } } }
+    check(at(B.decide(boardOf(A, E), sightOf(o), style("bold"))), "1,0",
+          "boss goal: the march steps toward the remembered boss, not the unseen")
+    o.known = nil
+    check(at(B.decide(boardOf(A, E), sightOf(o), style("bold"))), "0,1",
+          "boss goal: with no memory it pushes the fog back")
 end
 
 -- test_an_attack_whose_counter_can_kill_is_offered (ADR 0396's known break, the counter
