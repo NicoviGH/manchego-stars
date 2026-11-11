@@ -23,10 +23,22 @@ place: read it first. Tell Nicolas where W1 stands in plain words at the start.
   turn begins, the boss still in fog, and nothing replans when a move shows it (live play
   does, `Planner.surprise`). It puts Eirika at 97% to die over the 5 looked phases (Franz 92%,
   Lute 67%); the villager stays at 83%.
-- **Next (to bring to Nicolas first, a recommendation):** the look's turn between replans when
-  an act brings a fogged enemy into sight, as live play does, so it is the turn then played;
-  then rerun `w1p` and read whether Seth's sure kill on turn 8 comes before the strike, and at
-  what cost to Eirika. Then Ch6 4002/4010, mends judged by the look, `make test` timed.
+- **Next (Nicolas, 2026-11-11: "Ok but next session"): the widened replan, in the look only.**
+  Found before building: copying live play's replan into the turn between would change
+  nothing here. `Planner.surprise` replans on "an enemy came into sight" only for a red NOT in
+  `plan.enemies` (planner.lua:2120), and on a retry that list holds the remembered fogged ones
+  (ctx.threats, ADR 0399), so stepping beside remembered Novala replans nothing and she cannot
+  be targeted that turn (fogged tile). Checked in the code, not watched in a run. The approved
+  rule: an enemy fogged before an act and seen after it is a surprise, remembered or not
+  (attempt 1 unchanged: such an enemy is never in its list). Build it in the look's turn
+  between only: play the turn's acts in order, and after the first act that shows a fogged
+  enemy (a new sight primitive: stagePhase the partial plan in a nested sandbox, mark those
+  units acted, `RefreshEntityBmMaps` -- bmmap.c:644 recomputes the fog -- then `s.staged`),
+  replan the rest unjudged and join them. Rerun `w1p`'s start (`resume --game vanilla
+  --campaigns cs-s4001 --chapter 7 --last 7 --attempts 2`, a new tag) and read whether Seth's
+  sure kill on turn 8 comes before the villager's strike, at what cost to Eirika. If it does,
+  the same rule for live play on retries is Nicolas's call. Then Ch6 4002/4010, mends judged
+  by the look, `make test` timed.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
