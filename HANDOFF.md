@@ -29,6 +29,16 @@ W1's build map are ONE comment, #510 comment 6786548233 (edited in place): read 
   path, launched per snapshot with `montecarlo.start_task` + `launch_tagged` (pinned = the
   snapshot's `state_path`), its line read with `parse_lines`. Not kept.
 
+- **Tried and dropped:** a second `M.machine` nested inside the open one (its halt loop never
+  returned: "call 0x08023040 did not return in 600 frames"); the fix keeps the outer machine
+  and wraps each nested read in `api.cpu.save()` / `load()`. A probe's first round also read a
+  false mismatch because `staged` returned two of the planner's three values (now `table.pack`).
+- **Key files:** `tools/playtest/sight.lua` (`M.batching`'s `strictly`, `s.staged`,
+  `stagePhase` / `playPhase` / `nextPhase` around line 1580), `tools/playtest/planner.lua`
+  (`judge` ~1072, the lookahead block ~1590), `tools/playtest/test_sight.lua`
+  (`test_strictly_undoes_the_games_own_writes`), `tools/playtest/botrun.lua` (`check_pinned`,
+  where a probe hooks in).
+
 Earlier the same day: **#510 PR B merged as #599** (squash `2dd4f835`, ADR 0399). Read #510
 comments 6786147872 (the campaign rerun) and 6786005697 (late-game deaths).
 - **What #599 does:** a retry remembers every enemy earlier attempts showed and every killer
