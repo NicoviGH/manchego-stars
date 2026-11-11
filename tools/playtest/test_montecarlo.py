@@ -1210,6 +1210,46 @@ class Suite(unittest.TestCase):
         self.assertIn('ch01 (index 1): 3 of 3 pinned campaigns reached its start\n'
                       'ch02 (index 2): 2 of 3', out.getvalue())
 
+    def test_resume_carries_a_campaign_on_under_a_new_id_from_its_saved_start(self):
+        """`resume` (ADR 0399): a copy of the campaign's states under `<tag>-<campaign>`, so the
+        pinned file is never re-saved; from its latest start unless told; its own seed; and a
+        refusal before any copy for a rewritten pin, a missing start or a taken id."""
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        store = os.path.join(top, 'h')
+        for name, chs in (('cs-s4001', (6, 7)), ('full-s4008', (9,))):
+            d = os.path.join(store, 'states', name)
+            os.makedirs(d)
+            for c in chs:
+                with open(os.path.join(d, '%d.ss' % c), 'wb') as fh:
+                    fh.write(b'%s-%d' % (name.encode(), c))
+        mc.write_pins(store, [{'campaign': 'cs-s4001', 'seed': 4001, 'outcome': 'bot_fault',
+                               'why': None, 'chapters': {
+                                   str(c): mc.sha1_file(os.path.join(store, 'states', 'cs-s4001',
+                                                                     '%d.ss' % c))
+                                   for c in (6, 7)}}])
+        pins = {c['campaign']: c for c in mc.cell_pins(store)}
+        env = {'last': [22], 'route': 1}
+        tasks = mc.resume_tasks(store, env, ['cs-s4001', 'full-s4008'], pins, 'mem1', vanilla=True)
+        self.assertEqual([(t['campaign']['id'], t['campaign']['from'], t['seed'],
+                           t['campaign']['last']) for t in tasks],
+                         [('mem1-cs-s4001', 7, 4001, [22]), ('mem1-full-s4008', 9, 4008, [22])])
+        self.assertNotIn('attempt', tasks[0]['campaign'], 'every attempt, in sequence')
+        self.assertEqual(tasks[0]['stamp'], {'resumed_from': 'cs-s4001/7'})
+        self.assertTrue(os.path.exists(os.path.join(store, 'states', 'mem1-cs-s4001', '7.ss')))
+        one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7)
+        self.assertEqual((one[0]['campaign']['from'], one[0]['campaign']['last']), (6, [7]))
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem1')
+        with self.assertRaisesRegex(ValueError, 'no saved start at chapter index 3'):
+            mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem3', chapter=3)
+        with open(os.path.join(store, 'states', 'cs-s4001', '7.ss'), 'wb') as fh:
+            fh.write(b're-saved')
+        with self.assertRaisesRegex(ValueError, 'not the start cell-starts.json pins'):
+            mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem4')
+        self.assertFalse(os.path.exists(os.path.join(store, 'states', 'mem3-cs-s4001')),
+                         'a refusal copies nothing')
+
     def test_pinned_setup_checks_only_the_named_starts_and_refuses_the_rest(self):
         suite = self.load(self.suite())
         suite['snapshots'] = [{'snapshot_id': 'x', 'start_id': 'vanilla-ch3'}]

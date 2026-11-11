@@ -396,14 +396,27 @@ end
 -- fog (US_BIT9, board.lua), the Defeat Boss map's boss marked as the game names it
 -- (sight.objective.boss), CA_BOSS or not. The planner asks it again for a board it judges on
 -- that is not the one its acts were read on (a full-information replay's, opts.offer).
+-- -> those in sight, and the threats: those plus every fogged one a retry remembers
+-- (sight.knows, ADR 0399), which can strike a tile but not be targeted (bmtarget.c refuses a
+-- unit on a fogged tile), so only the danger reads take them (exposure).
 function M.enemiesOf(board, sight)
-    local o, out = sight.objective, {}
+    local o, out, threats = sight.objective, {}, {}
     for _, u in ipairs(board.units) do
         if o and o.boss and u.faction == "red" and u.charId == o.boss then u.isBoss = true end
-        if u.onField and u.faction == "red" and not u.fogged then out[#out + 1] = u end
+        if u.onField and u.faction == "red" then
+            if not u.fogged then
+                out[#out + 1] = u
+                threats[#threats + 1] = u
+            elseif sight.knows and sight.knows(u) then
+                threats[#threats + 1] = u
+            end
+        end
     end
-    return out
+    return out, threats
 end
+
+-- One unit across a chapter start's attempts (Board's, ADR 0399): campaign.lua holds Bot only
+M.memoryKey = Board.memoryKey
 
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 
@@ -486,7 +499,7 @@ local function context(board, sight)
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     -- the map the phase memos are kept on (sight.mapKey): a door or wall the phase opened
     ctx.mapKey = sight.mapKey and sight.mapKey() or "-"
-    ctx.enemies = M.enemiesOf(board, sight)
+    ctx.enemies, ctx.threats = M.enemiesOf(board, sight)
     -- the fog read (M.fogRead), built when first asked: ctx.seen is M.candidates' opts.seen
     local fog
     ctx.fogRead = function()
@@ -697,7 +710,8 @@ local function claimsOn(ctx, field, u)
     return out
 end
 
--- What can strike `u` next enemy phase if it ends on (x, y): per visible enemy that reaches
+-- What can strike `u` next enemy phase if it ends on (x, y): per enemy seen or remembered
+-- (ctx.threats) that reaches
 -- the tile, that enemy (`by`) and its own strike there (sight.strike: the AI's weapon), `u`
 -- holding the weapon in `slot` when it struck with that one.
 local function exposure(ctx, u, x, y, slot)
@@ -706,7 +720,7 @@ local function exposure(ctx, u, x, y, slot)
     if list then return list end
     list = {}
     if ctx.sight.danger(x, y) > 0 then
-        for _, e in ipairs(ctx.enemies) do
+        for _, e in ipairs(ctx.threats) do
             if reaches(ctx, e, x, y) then
                 list[#list + 1] = { by = e, f = strike(ctx, u, e, x, y, slot) }
             end

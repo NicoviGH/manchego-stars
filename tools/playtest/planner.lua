@@ -488,7 +488,8 @@ function M.plan(Bot, board, sight, style, opts)
     local offer = opts and opts.offer
     local cands, ctx
     if offer then
-        cands, ctx = offer.cands, setmetatable({ enemies = Bot.enemiesOf(board, sight) },
+        local enemies, threats = Bot.enemiesOf(board, sight)
+        cands, ctx = offer.cands, setmetatable({ enemies = enemies, threats = threats },
                                                { __index = offer.ctx })
     else
         cands, ctx = Bot.candidates(board, sight, style, opts)
@@ -1749,8 +1750,10 @@ function M.plan(Bot, board, sight, style, opts)
         best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
+    -- the enemies the plan was made against: in sight, and those a retry remembers (ctx.threats,
+    -- ADR 0399), so a death by a remembered one is never graded `fog` (botrun.grade)
     best.enemies = {}
-    for _, e in ipairs(ctx.enemies) do best.enemies[e.id] = true end
+    for _, e in ipairs(ctx.threats) do best.enemies[e.id] = true end
     best.talks = {}
     for c in pairs(talks) do best.talks[#best.talks + 1] = c end
     table.sort(best.talks)

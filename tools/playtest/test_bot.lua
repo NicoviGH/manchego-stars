@@ -448,6 +448,8 @@ local function sightOf(o)
     -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
     s.mapKey = function() return o.mapKey or "-" end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
+    -- a retry's memory (sight.knows, ADR 0399): the red unit ids it remembers
+    if o.known then s.knows = function(u) return o.known[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
     -- what each unit holds no key for ("x,y" -> the lock), and who drops one (lock -> enemies)
     if o.locked then
@@ -2728,6 +2730,24 @@ do
         check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 8,
               "exploring: the unit that gets there in time is sent")
         check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
+    end
+
+    -- test_threats_are_the_seen_and_the_remembered (ADR 0399): enemiesOf's first list is the
+    -- reds in sight (what can be targeted); its second adds every fogged red sight.knows, which
+    -- can strike; a fogged one not remembered is in neither. Attempt 1 (no knows) adds none.
+    do
+        local hid = red(0x82, 3, 3, { fogged = true, charId = 0x50 })
+        local other = red(0x83, 4, 4, { fogged = true, charId = 0x51 })
+        local function ids(list)
+            local out = {}
+            for _, u in ipairs(list) do out[#out + 1] = string.format("%x", u.id) end
+            return table.concat(out, ",")
+        end
+        local seen, threats = B.enemiesOf(boardOf(A, X, hid, other), sightOf({ known = { [0x82] = true } }))
+        check(ids(seen), string.format("%x", X.id), "enemiesOf: in sight only")
+        check(ids(threats), string.format("%x,82", X.id), "enemiesOf: the threats add the remembered")
+        local _, plain = B.enemiesOf(boardOf(A, X, hid, other), sightOf({}))
+        check(ids(plain), string.format("%x", X.id), "enemiesOf: no memory, no fogged threat")
     end
 
     -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A
@@ -5264,6 +5284,35 @@ do
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
     check(table.concat(keys, ","), "blues,carry,gone,opened,reds", "lookahead: the staged board, nothing more")
+end
+
+-- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers
+-- (sight.knows) is in the exposure a candidate is judged by, and among the enemies the plan was
+-- made against, so a death by it is never graded `fog`. Attempt 1 (no memory): neither.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local F = red(0x83, 2, 0, { fogged = true, charId = 0x50 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x83] = tiles({ 2, 0 }, { 1, 0 }, { 0, 0 }) },
+                danger = { ["0,0"] = 1, ["1,0"] = 1 }, enemyPhase = function() return {} end }
+    -- whose strike on A the candidates' exposure asks for (sight.strike, without `from`)
+    local function strikers(sight)
+        local asked, strike = {}, sight.strike
+        sight.strike = function(u, e, x, y, slot, from)
+            if not from and u.id == A.id then asked[e.id] = true end
+            return strike(u, e, x, y, slot, from)
+        end
+        B.candidates(boardOf(A, X, F), sight, style("careful"))
+        return asked[0x83] and tostring(0x83) or ""
+    end
+    o.known = { [0x83] = true }
+    check(strikers(sightOf(o)), tostring(0x83), "remembered: its strike is in the exposure")
+    local _, plan = Planner.plan(B, boardOf(A, X, F), sightOf(o), style("careful"))
+    check(plan.enemies[0x83], true, "remembered: the plan was made against it")
+    o.known = nil
+    check(strikers(sightOf(o)), "", "no memory: the fogged red strikes nothing")
+    local _, plain = Planner.plan(B, boardOf(A, X, F), sightOf(o), style("careful"))
+    check(plain.enemies[0x83], nil, "no memory: the fogged red is not among the plan's enemies")
 end
 
 -- test_lookahead_counts_a_green_and_ranks_the_list_once (review of #568): an allied green the

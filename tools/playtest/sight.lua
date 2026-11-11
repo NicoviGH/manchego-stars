@@ -34,15 +34,25 @@
 --   refresh()                drop every board answer; recount the objective's turns left.
 --   newPhase()               refresh(), and a fresh `cache` for the phase: an AI a turn event
 --                            rewrote between phases is in no cache key.
+--   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId } }, every
+--                            red unit earlier attempts at this start showed on screen (nil or
+--                            {} on attempt 1). From then on a remembered unit counts as seen
+--                            wherever the fog alone would hide it: danger, threat, keySources
+--                            and both judged phases.
+--   knows(u)                 whether red unit `u` is one remember() named (Board.memoryKey: its
+--                            slot and character; an arrival can take a slot another unit died
+--                            out of).
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
---                            the game shows them: 0 when no enemy reaches (x, y), else its
+--                            the game shows them, a remembered unit's tile lifted out of the
+--                            fog for the call: 0 when no enemy reaches (x, y), else its
 --                            COVERAGE -- GenerateUnitCompleteAttackRange adds 1 for every tile
 --                            an enemy could strike it from, so it is not an enemy count.
 --   threat(e) -> function(x, y) -> coverage: GenerateDangerZoneRange itself, every other enemy
 --                            marked US_UNDER_A_ROOF for the call -- the one state its loop skips
 --                            a unit for and nothing else reads -- so it walks `e` alone while
 --                            the others stay valid units: they block it on gBmMapUnit and a
---                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
+--                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's,
+--                            a remembered unit's tile lifted as danger's.
 --   reach(unit, friends)     tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
 --                            less those another unit stands on (gBmMapUnit). Either faction.
 --   cantoTiles(unit, act)    where a Canto unit may move on to after `act` (TryMakeCantoUnit,
@@ -91,7 +101,7 @@
 --                            { ["x,y"] = true } the doors it opens and walls it breaks, each
 --                            map change applied (M.openMap), the game builds its
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
---                            in it the player can see makes its own decision (the setup
+--                            in it the player can see or knows() makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and takes its expected damage off the target before the
 --                            next decides. plan.reds = { [enemy id] = hp } (optional): the HP
@@ -138,7 +148,7 @@
 --   locked(u, x, y)          the terrain at (x, y) when it is a door or a full chest `u` holds
 --                            nothing to open (opens()), else nil.
 --   keySources(u, terrain)   the enemies whose fall gives `u` what opens `terrain`: red (a
---                            green ally is never struck, ADR 0384), on the field, seen (no US_BIT9), marked US_DROP_ITEM -- the game gives
+--                            green ally is never struck, ADR 0384), on the field, seen (no US_BIT9) or knows(), marked US_DROP_ITEM -- the game gives
 --                            a downed unit's last item to the blue unit that downs it
 --                            (bmmind.c, GetUnitLastItem) -- and `u` holding that item passes
 --                            GetUnitKeyItemSlotForTerrain (a lockpick only for a thief).
@@ -1005,6 +1015,11 @@ function M.fullInfo(sandbox, open, api, S, isolate, fn)
     return a, b
 end
 
+-- Whether red unit `u` is one a retry remembers: `keys` = { [Board.memoryKey] = true } (s.knows).
+function M.knows(Board, keys, u)
+    return keys ~= nil and u ~= nil and keys[Board.memoryKey(u.id, u.charId)] == true
+end
+
 -- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
@@ -1017,6 +1032,7 @@ function M.new(outer)
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
+    local remembered   -- remember()'s keys: { [Board.memoryKey] = true }, nil on attempt 1
 
     -- The board's units, read once per board like every other answer: kept only from a read
     -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
@@ -1249,9 +1265,30 @@ function M.new(outer)
         end, fn)
     end
 
+    function s.remember(enemies)
+        remembered = nil
+        for _, e in ipairs(enemies or {}) do
+            remembered = remembered or {}
+            remembered[Board.memoryKey(e.id, e.charId)] = true
+        end
+        seen = { threats = {}, grids = {} }
+    end
+    function s.knows(u) return M.knows(Board, remembered, u) end
+    -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
+    -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen
+    local function liftRemembered()
+        if not remembered then return end
+        for _, o in ipairs(units()) do
+            if o.faction == "red" and o.onField and not o.dead and o.fogged and s.knows(o) then
+                api.write8(cell(mem, S.gBmMapFog, o.x, o.y), 1)
+            end
+        end
+    end
+
     function s.danger(x, y)
         if not seen.danger then
             seen.danger = sandbox(function(call)
+                liftRemembered()
                 call(S.GenerateDangerZoneRange, { 0 })
                 return readGrid(mem, S.gBmMapRange, w, h)
             end)
@@ -1268,6 +1305,7 @@ function M.new(outer)
                         api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
                     end
                 end
+                liftRemembered()
                 call(S.GenerateDangerZoneRange, { 0 })
                 return readGrid(mem, S.gBmMapRange, w, h)
             end)
@@ -1560,10 +1598,12 @@ function M.new(outer)
             M.openMap(api, call, S, tonumber(x), tonumber(y))
         end
         local function order() return aiOrder(call) end
-        -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog)
+        -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog) or
+        -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399)
         local function decides(id)
             local e = byId[id]
-            return e and not gone[id] and (mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 and e
+            if not e or gone[id] then return false end
+            return ((mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 or s.knows(e)) and e
         end
         -- e strikes as it decided: stood on its tile, its expected damage off the target
         local function strike(e, id, target, side, done)
@@ -1644,8 +1684,8 @@ function M.new(outer)
     -- takes its expected damage, a player unit left at 0 HP is off the map, and a striker our
     -- counter kills at even odds or better is gone. The turn then advances and the second phase
     -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
-    -- sees decides, in both: an enemy hidden by fog does not act, and no arrival is placed (one
-    -- the screen has not shown is not known; ADR 0386 remembers turns, never units).
+    -- sees decides, in both: an enemy hidden by fog does not act unless a retry remembers it
+    -- (knows(), ADR 0399), and no arrival is placed (one not yet loaded is no unit to play).
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
     -- and .moved = the enemies the first phase moved, { { id, x, y } }.
@@ -1846,7 +1886,7 @@ function M.new(outer)
             local last = e.items and e.items[#e.items]
             local st = e.state or 0
             if e.faction == "red" and e.onField and not e.dead and last
-                and st & Board.US_DROP_ITEM ~= 0 and st & Board.US_BIT9 == 0
+                and st & Board.US_DROP_ITEM ~= 0 and (st & Board.US_BIT9 == 0 or s.knows(e))
                 and opensWith(u, last.id, terrain) then
                 out[#out + 1] = e
             end

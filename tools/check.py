@@ -99,6 +99,11 @@ DEAD_CONCEPTS = [
     r'\bW\.fog\b', r'\bfog risk for a fragile unit\b',
     r'\bfog counts in the chance to die\b', r'\bsturdy lead\b', r'\bfragile follow\b',
     r'\bstep back is always judged\b',
+    # retired by ADR 0399 (#510, Nicolas 2026-11-10): a retry remembers every enemy earlier
+    # attempts showed, not only arrival turns; and a chapter start stops at the retry cap
+    # (styles drawn again), never once every style has been tried
+    r'\bremembers only the (?:reinforcement )?arrival', r'\bremembers one thing\b',
+    r'\bno tile, unit or outcome\b', r'\bno clean clear in all \d+ styles\b',
     # retired by ADR 0397 (#510): a key an enemy drops is a way to a chest or through a door,
     # so a door is no longer a breach only for a unit already holding a key
     r'\bwhich no rule here spends\b',

@@ -86,12 +86,14 @@ local function fakeGame(o)
                                       attempt = attempt }
             local deaths = {}
             if out == "dead" or out == "lost" then
-                deaths = { { charId = 0x02, turn = 3, killer = 0x40, phase = "enemy" } }
+                deaths = { { id = 2, charId = 0x02, faction = "blue", turn = 3, killer = 0x40,
+                             killerId = 0x90, phase = "enemy" } }
             end
             local won = out == "won" or out == "dead" or out == "spoiled"
             return { outcome = won and "won" or out, clean = out == "won", turns = 4,
                      deaths = deaths, trace = "t" .. g.attempt,
                      arrivals_seen = (ch.seen or {})[g.attempt] or {},
+                     enemies_seen = (ch.enemies or {})[g.attempt] or {},
                      clear = { won = won, lost = deaths,
                                recruits_missing = out == "spoiled" and { 0x30 } or {},
                                rewards_missing = {} } }
@@ -150,7 +152,12 @@ local function test_one_attempt_alone_is_the_loops_kth()
     local ok, why = Campaign.run(alone.api)
     check(ok, true, "one attempt played is a finished run")
     check(#alone.plays, 1, "only the one attempt is played")
-    check(Json.encode(alone.plays[1].style), Json.encode(seq.plays[3].style),
+    -- the loop's attempt 3 also carries its memory (ADR 0399); the style drawn is the same
+    local drawn = {}
+    for k, v in pairs(seq.plays[3].style) do
+        if k ~= "memory" and k ~= "arrivals" then drawn[k] = v end
+    end
+    check(Json.encode(alone.plays[1].style), Json.encode(drawn),
           "attempt 3 alone plays the loop's third style")
     check(alone.plays[1].attempt, 3, "and is numbered 3")
     check(#alone.saved, 0, "it writes no chapter-start state")
@@ -461,11 +468,10 @@ local function test_resume_without_a_carried_team_says_so()
 end
 test_resume_without_a_carried_team_says_so()
 
--- A retry remembers only the arrivals it saw (ADR 0386, T061): attempt k >= 2 is given, in
--- style.arrivals, the turns of every earlier failed attempt's arrivals_seen at this start, and
--- nothing else from them; attempt 1 none; one attempt alone (api.only) none either: the pool's
--- workers share no results.
-local function test_a_retry_remembers_only_the_arrivals_it_saw()
+-- A retry remembers the arrivals it saw (ADR 0386, T061): attempt k >= 2 is given, in
+-- style.arrivals, the turns of every earlier failed attempt's arrivals_seen at this start;
+-- attempt 1 none; one attempt alone (api.only) none either: the pool's workers share no results.
+local function test_a_retry_remembers_the_arrivals_it_saw()
     local seen = { [1] = { { turn = 4, x = 9, y = 9, charId = 0x82 } },
                    [2] = { { turn = 4, x = 8, y = 9, charId = 0x83 },
                            { turn = 6, x = 9, y = 0, charId = 0x84 } } }
@@ -480,8 +486,8 @@ local function test_a_retry_remembers_only_the_arrivals_it_saw()
     local keys = {}
     for k in pairs(g.plays[3].style) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "aggression,arrivals,claims",
-          "no tile, unit or outcome rides along")
+    check(table.concat(keys, ","), "aggression,arrivals,claims,memory",
+          "the arrival turns, beside the memory of ADR 0399")
     local alone = fakeGame { chapters = { { id = 1, seen = seen } } }
     alone.api.only = 1
     Campaign.run(alone.api)
@@ -491,7 +497,57 @@ local function test_a_retry_remembers_only_the_arrivals_it_saw()
     Campaign.run(third.api)
     check(third.plays[1].style.arrivals, nil, "a pool attempt k has no earlier result to remember")
 end
-test_a_retry_remembers_only_the_arrivals_it_saw()
+test_a_retry_remembers_the_arrivals_it_saw()
+
+-- A retry remembers what earlier attempts showed on screen (ADR 0399): every enemy a board
+-- showed out of fog (enemies_seen) and every killer a death showed, each once by slot and
+-- character; attempt 1 and an attempt alone (api.only) remember nothing.
+local function test_a_retry_remembers_the_enemies_it_saw()
+    local enemies = { [1] = { { id = 0x81, charId = 0x50 }, { id = 0x82, charId = 0x51 } },
+                      [2] = { { id = 0x81, charId = 0x50 }, { id = 0x81, charId = 0x52 } } }
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
+                                        enemies = enemies } } }
+    Campaign.run(g.api)
+    check(g.plays[1].style.memory, nil, "attempt 1 remembers nothing")
+    local m2 = g.plays[2].style.memory
+    local ids = {}
+    for _, e in ipairs(m2.enemies) do ids[#ids + 1] = string.format("%x:%x", e.id, e.charId) end
+    check(table.concat(ids, ","), "81:50,82:51,90:40",
+          "attempt 2: attempt 1's enemies in sight, then the killer the fight showed")
+    check(m2.deaths, nil, "a death is remembered through its killer alone")
+    local m3 = g.plays[3].style.memory
+    ids = {}
+    for _, e in ipairs(m3.enemies) do ids[#ids + 1] = string.format("%x:%x", e.id, e.charId) end
+    check(table.concat(ids, ","), "81:50,82:51,90:40,81:52",
+          "attempt 3: the union, each enemy once; a slot another unit took is another enemy")
+    m2.enemies[1] = nil
+    check(#g.plays[3].style.memory.enemies, 4, "each attempt gets its own copy")
+    local alone = fakeGame { chapters = { { id = 1, enemies = enemies } } }
+    alone.api.only = 2
+    Campaign.run(alone.api)
+    check(alone.plays[1].style.memory, nil, "a pool attempt has no earlier result to remember")
+end
+test_a_retry_remembers_the_enemies_it_saw()
+
+-- The retry cap (ADR 0399): every style tried, the styles are drawn again, up to MAX_ATTEMPTS
+-- attempts a chapter start; then the chapter stops.
+local function test_styles_are_drawn_again_up_to_the_cap()
+    check(Campaign.MAX_ATTEMPTS, 12, "the cap is 12 a chapter start (Nicolas, 2026-11-10)")
+    local outcomes = {}
+    for i = 1, 12 do outcomes[i] = "lost" end
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "no clean clear in the cap stops the campaign")
+    check(#g.plays, 12, "all 12 attempts are played, past the 3 styles (no claims)")
+    check(why:find("12 attempts") ~= nil, true, "and it says the cap stopped it")
+    local seen = {}
+    for i = 1, 3 do seen[g.plays[i].style.aggression] = true end
+    local n = 0
+    for _ in pairs(seen) do n = n + 1 end
+    check(n, 3, "every style is tried before one is drawn again")
+    check(lines(g)[1].outcome, "bot_fault", "a vanilla chapter so stopped is a bot fault")
+end
+test_styles_are_drawn_again_up_to_the_cap()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)

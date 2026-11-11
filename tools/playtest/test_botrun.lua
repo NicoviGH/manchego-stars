@@ -657,6 +657,64 @@ do
     check(b.turn, 1, "one that acted in the enemy phase it landed in: that phase's turn")
 end
 
+-- test_enemies_seen_lists_every_red_out_of_fog (ADR 0399): what a retry may remember of the
+-- enemy -- every red unit a board showed out of fog, once, by slot and character; a fogged one
+-- is not listed until a board shows it.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                local hid = unit(0x83, 2, "red", 9, 8, 10)
+                hid.fogged = true
+                g.units[#g.units + 1] = hid
+            end
+            return {}
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local seen, red = {}, 0
+    for _, e in ipairs(r.enemies_seen) do seen[Bot.memoryKey(e.id, e.charId)] = (seen[Bot.memoryKey(e.id, e.charId)] or 0) + 1 end
+    for _, u in ipairs(rout()) do
+        if u.faction == "red" then
+            red = red + 1
+            check(seen[Bot.memoryKey(u.id, u.charId)], 1, "a red in sight is listed once")
+        end
+    end
+    check(red > 0, true, "the board has reds in sight")
+    check(seen[Bot.memoryKey(0x83, 2)], nil, "one only ever fogged is not")
+end
+
+-- test_a_retry_starts_from_its_memory (ADR 0399): style.memory reaches the attempt's sight
+-- (remember: what plays as seen) and seeds the enemies seen, so a remembered red never seen this
+-- attempt is still handed on; attempt 1 (no memory) remembers nothing.
+do
+    local function played(memory)
+        local g = fakeGame { units = rout() }
+        g.api.style.memory = memory
+        local told = "never"
+        local make = g.api.sight
+        g.api.sight = function()
+            local s = make()
+            s.remember = function(enemies) told = enemies end
+            return s
+        end
+        Botrun.run(g.api)
+        local r = recordOf(g)
+        local keys = {}
+        for _, e in ipairs(r.enemies_seen) do keys[Bot.memoryKey(e.id, e.charId)] = true end
+        return told, keys
+    end
+    local mem = { enemies = { { id = 0x9A, charId = 0x77 } } }
+    local told, keys = played(mem)
+    check(told, mem.enemies, "memory: the sight is told what plays as seen")
+    check(keys[Bot.memoryKey(0x9A, 0x77)], true, "memory: a remembered red is handed on")
+    told, keys = played(nil)
+    check(told, nil, "attempt 1: the sight is told nothing")
+    check(keys[Bot.memoryKey(0x9A, 0x77)], nil, "attempt 1: nothing remembered")
+end
+
 -- Botrun.events: a recruit is a unit whose character was on another side; items are diffed.
 do
     local b = { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 3, 3, 15) } }

@@ -598,7 +598,7 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
-                  board_repeats = 0, arrivals_seen = {},
+                  board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
                   lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
@@ -677,8 +677,11 @@ function M.run(api)
     end
     local lastBoard, actedIn
     -- every red unit a board showed out of fog this attempt, slot -> charId: the planner's
-    -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A)
+    -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A), and
+    -- what a retry may remember (rec.enemies_seen, ADR 0399). A retry starts from what earlier
+    -- attempts at this start showed (style.memory.enemies); attempt 1 from nothing
     local seenReds = {}
+    for _, e in ipairs(style.memory and style.memory.enemies or {}) do seenReds[e.id] = e.charId end
     local function changes(after)
         if api.recruits and not owed then
             local party = {}
@@ -912,6 +915,11 @@ function M.run(api)
                 diag.ref, outcome, why))
             return false, why, nil
         end
+        -- every red a board showed (seenReds), by slot: campaign.lua's memory for the next retry
+        for id, charId in pairs(seenReds) do
+            rec.enemies_seen[#rec.enemies_seen + 1] = { id = id, charId = charId }
+        end
+        table.sort(rec.enemies_seen, function(a, b) return a.id < b.id end)
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
         return outcome == "won" or outcome == "lost" or outcome == "stuck", why, rec
@@ -920,6 +928,8 @@ function M.run(api)
     local function play()
         api.seed(api.info.seed)
         local sight = api.sight()
+        -- a retry's memory (ADR 0399): what earlier attempts at this start showed plays as seen
+        if sight.remember then sight.remember(style.memory and style.memory.enemies) end
         -- the units whose death ends the game, as the game says (sight.objective.gameOver)
         trace({ t = "start", info = api.info, style = api.style, bench = api.bench,
                 claims_played = played,

@@ -13,15 +13,17 @@
 -- clean clear (the record's `clean`: won, no blue or green unit lost, every owed recruit
 -- joined, every village and chest taken) moves on and its team is CARRIED into the next
 -- chapter's pick; anything else loads the chapter-start state back and attempts again, at most
--- MAX_ATTEMPTS times. The team follows from the claims a style follows (a carry claim's units),
--- so two attempts differ by the style alone; when every style has been tried, the chapter
--- stops. The game's RNG is never re-seeded on a restart: FE8 seeds it once at power-on and a
--- suspend save stores it, so a restart differs from the last only by the bot's new style and
--- the game's RNG follows from that different play (the amendment, #510).
--- A retry remembers one thing (ADR 0386): from attempt 2 on, the turns on which any earlier
--- failed attempt at this start saw a reinforcement arrive on screen (botrun's
--- `arrivals_seen`), handed to the play as one more list in style.arrivals, where a
--- reinforcements claim's turns go. No tile, unit or outcome is passed on.
+-- MAX_ATTEMPTS times (the retry cap, ADR 0399). The team follows from the claims a style
+-- follows (a carry claim's units); once every style has been tried they are drawn again, the
+-- memory now different. The game's RNG is never re-seeded on a restart: FE8 seeds it once at
+-- power-on and a suspend save stores it, so a restart differs from the last only by the bot's
+-- style, its memory, and the game's RNG following from that different play (the amendment, #510).
+-- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
+-- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
+-- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
+-- { enemies }: every red unit a board showed out of fog (`enemies_seen`) and every killer a
+-- fight showed, by slot and character (Board.memoryKey). A death is remembered through its
+-- killer: where our units stood is the play's, not the game's. Never a dice result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
 -- start state, the game's RNG in it; the style draws restart at each chapter start (api.seed)
@@ -34,8 +36,8 @@
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)
 --   no_style    api.only: this chapter start has fewer than k styles
---   infeasible  Manchego Stars: a chapter used MAX_ATTEMPTS, or every style, without a clean
---               clear: no later chapter is reached by a clean run, so none is played
+--   infeasible  Manchego Stars: a chapter used MAX_ATTEMPTS without a clean clear: no later
+--               chapter is reached by a clean run, so none is played
 --   bot_fault   the same on vanilla, which strong players clear clean: the bot is what failed,
 --               never the chapter (#510 step 9 design, decision 2). The chapter line's failures
 --               carry what spoiled each attempt and its trace
@@ -86,15 +88,19 @@
 local M = {}
 
 M.PREFIX = "CAMPAIGN "
-M.MAX_ATTEMPTS = 300
+-- the retry cap a chapter start (Nicolas, 2026-11-10; ADR 0399): late chapters need many
+-- restarts, and memory makes a repeated style play differently, so styles are drawn again once
+-- every one has been tried
+M.MAX_ATTEMPTS = 12
 
 local function pick(random, list) return list[math.floor(random() * #list) + 1] end
 
--- A style for one attempt, never one already tried at this chapter start: the aggression
+-- A style for one attempt, never one already tried since `tried` was last emptied: the aggression
 -- uniform over Bot.STYLES, each claim the bot can play followed with p = 0.5, the campaign's
 -- route. A claim Bot.unplayed names plays the same followed or not, so it is no part of a style
 -- (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is the keys drawn so
--- far. Returns the style and the claims followed, or nil when every style has been tried.
+-- far. Returns the style and the claims followed, or nil when every style has been tried (the
+-- loop then empties `tried` and draws again; one attempt alone says no_style).
 local function styleKey(aggression, ids) return aggression .. "|" .. table.concat(ids, ",") end
 
 function M.drawStyle(Bot, random, claims, route, tried)
@@ -244,6 +250,15 @@ function M.run(api)
             local need = cap and api.needs(api.roster()) or nil
             entry.demands = need and need.demands or nil
             local tried, remembered, known = {}, {}, {}
+            -- a retry's memory of the enemy (ADR 0399): style.memory
+            local memory, memoryKeys = { enemies = {} }, {}
+            local function rememberEnemy(id, charId)
+                local k = Bot.memoryKey(id, charId)
+                if not memoryKeys[k] then
+                    memoryKeys[k] = true
+                    memory.enemies[#memory.enemies + 1] = { id = id, charId = charId }
+                end
+            end
             while true do
                 local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
                 -- one attempt alone: the styles before it are drawn, never played
@@ -257,7 +272,11 @@ function M.run(api)
                     return "no_style", string.format("chapter %d has %d styles, not %d", ch,
                         entry.attempts, api.only)
                 end
-                if not style then return noClean(entry, "all %d styles") end
+                if not style then
+                    -- every style tried: draw them again, the memory now different (ADR 0399)
+                    tried = {}
+                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                end
                 entry.attempts = entry.attempts + 1
                 local team, bwhy = between(api, style, followed, need, carried)
                 if not team then
@@ -270,6 +289,10 @@ function M.run(api)
                 -- reinforcement arrive on screen, read where a reinforcements claim's are
                 -- (style.arrivals); attempt 1, and any attempt alone, has none
                 if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
+                -- and every enemy they showed (ADR 0399), from attempt 2
+                if #memory.enemies > 0 then
+                    style.memory = Json.decode(Json.encode(memory))
+                end
                 local rec = api.play(style, followed, entry.attempts)
                 if api.diag then
                     return "played", string.format("chapter %d attempt %d: diagnostic replayed", ch,
@@ -309,6 +332,11 @@ function M.run(api)
                     end
                 end
                 table.sort(remembered)
+                for _, e in ipairs(rec.enemies_seen or {}) do rememberEnemy(e.id, e.charId) end
+                -- a killer struck on screen: the fight showed it, fog or not
+                for _, d in ipairs(rec.deaths or {}) do
+                    if d.killerId and d.killer then rememberEnemy(d.killerId, d.killer) end
+                end
                 if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
                 local lok, lwhy = api.load(ch)
                 if not lok then

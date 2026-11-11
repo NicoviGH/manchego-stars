@@ -354,6 +354,26 @@ do
     end
 end
 
+-- Sight.knows (ADR 0399): a red unit is remembered by slot and character (Board.memoryKey); a
+-- slot another character holds now is not; no memory, none. And every read the fog alone would
+-- hide a unit from asks it: both judged phases' decides, the danger maps (the remembered tile
+-- lifted out of the fog), and keySources.
+do
+    local keys = { [Board.memoryKey(0x81, 0x50)] = true }
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x50 }), true, "knows: slot and character")
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x51 }), false, "knows: another in the slot")
+    check(Sight.knows(Board, nil, { id = 0x81, charId = 0x50 }), false, "knows: no memory")
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    check(src:find("(mem.u32(e.addr + UNIT_STATE) & US_BIT9) == 0 or s.knows(e)", 1, true) ~= nil,
+          true, "knows: the judged phases' decides asks it")
+    local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
+    check(lifts, 2, "knows: danger and threat lift the remembered out of the fog")
+    check(src:find("st & Board.US_BIT9 == 0 or s.knows(e)", 1, true) ~= nil, true,
+          "knows: keySources asks it")
+end
+
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
 -- return loop, wherever LIST_STUB_AT puts the stub (the fake CPU never runs the stub, so the
 -- call is let fail and the words it wrote are read).
