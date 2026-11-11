@@ -1769,12 +1769,29 @@ function M.plan(Bot, board, sight, style, opts)
             rec.skipped = true
         else
             local calls0, clock, between = sight.aiCalls(), os.clock(), 0
+            -- where each turn between leaves our units ({ ["id"] = { x, y } } a turn): the
+            -- shadow run reads it against the turn then played (montecarlo.py look). A turn
+            -- the beam has nothing to play (nil) holds them where the board has them.
+            rec.between = {}
             local r = sight.look({ blues = best.phase.blues, gone = best.phase.gone,
                                    reds = best.phase.reds, opened = best.phase.opened,
                                    carry = best.phase.carry }, depth, function(b)
                 local c0 = sight.aiCalls()
                 local ph = M.plan(Bot, b, sight, style, { unjudged = true, seen = opts and opts.seen })
                 between = between + sight.aiCalls() - c0
+                local tiles = {}
+                if ph then
+                    for _, p in ipairs(ph.blues) do
+                        tiles[tostring(p.unit.id)] = { x = p.x, y = p.y }
+                    end
+                else
+                    for _, u in ipairs(b.units) do
+                        if u.faction == "blue" and u.onField and not u.dead then
+                            tiles[tostring(u.id)] = { x = u.x, y = u.y }
+                        end
+                    end
+                end
+                rec.between[#rec.between + 1] = tiles
                 return ph
             end)
             -- each unit's chance to die in any looked phase: the judged one's, then the look's

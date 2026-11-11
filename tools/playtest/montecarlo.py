@@ -69,8 +69,9 @@ its style's cap. Every change to the bot's first attempts is read by it the same
 
 `look` reads kept traces of retries, each play once, and prints the look in shadow against the
 game played (#510 W1): each unit the look judged, by the chance it gave, beside how many died
-within the looked phases; and each chapter's looks asked, run and skipped, their AiDecideMain
-calls (the turns between's among them) against the attempts' own, and CPU.
+within the looked phases; each chapter's looks asked, run and skipped, their AiDecideMain
+calls (the turns between's among them) against the attempts' own, and CPU; and how often the
+look's turn between left our units where the turn then played did.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
@@ -3209,8 +3210,11 @@ def look_table(traces):
     (`look.die`), beside whether it died within the looked phases: from that turn's enemy
     phase through the `depth`-th, our turns between included. Each attempt's cost goes to its
     chapter: looks asked, run and skipped; the look's AiDecideMain calls and its turns
-    between's, against the attempt's own; and CPU. Returns {'traces', 'distinct', 'bins',
-    'cost'}: bins as calibration's; cost: chapter -> Counter."""
+    between's, against the attempt's own; and CPU. Each turn between (`look.between`, our
+    units' tiles as it leaves them, the k-th after the look's turn T) is set against turn T+k
+    as played (the units' tiles at that turn's enemy phase): the units on the same tile, and
+    the turns with every unit so, over the units in both (`between_*` in cost). Returns
+    {'traces', 'distinct', 'bins', 'cost'}: bins as calibration's; cost: chapter -> Counter."""
     bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
     cost = collections.defaultdict(collections.Counter)
     seen = set()
@@ -3225,8 +3229,11 @@ def look_table(traces):
         for d in end.get('deaths') or []:
             if d.get('faction') in ('blue', 'green') and d.get('id') is not None:
                 died[d['id']].append((d.get('turn'), d.get('phase')))
-        plan, looks = None, {}
+        plan, looks, played = None, {}, {}   # played: turn -> {unit id: (x, y)}, blue units only
         for e in events:
+            if e.get('t') == 'phase' and e.get('phase') == 'enemy' and e.get('units'):
+                played[e.get('turn')] = {u['id']: (u.get('x'), u.get('y'))
+                                         for u in e['units'] if u.get('faction') == 'blue'}
             if e.get('t') == 'phase' and e.get('phase') == 'player':
                 plan = None
             elif e.get('t') == 'plan' and e.get('ref') is not None:
@@ -3249,6 +3256,19 @@ def look_table(traces):
         name = chapter_label(info)
         c = cost[name]
         c['attempts'] += 1
+        for turn, lk in looks.items():
+            for k, tiles in enumerate(lk.get('between') or [], 1):
+                now = played.get(turn + k)
+                if now is None or not isinstance(tiles, dict):
+                    continue     # the game ended first, or a turn between with none of our units
+                same = [(t.get('x'), t.get('y')) == now[int(uid)]
+                        for uid, t in tiles.items() if int(uid) in now]
+                if not same:
+                    continue
+                c['between_turns'] += 1
+                c['between_turns_same'] += all(same)
+                c['between_units'] += len(same)
+                c['between_units_same'] += sum(same)
         for k in ('asked', 'run', 'skipped', 'calls', 'between_calls'):
             c[k] += (end.get('look') or {}).get(k) or 0
         c['look_cpu_s'] += (end.get('look') or {}).get('cpu_s') or 0
@@ -3259,8 +3279,9 @@ def look_table(traces):
 
 
 def look_lines(t):
-    """look_table()'s two tables, as markdown, and the refutation bars' numbers (the units the
-    look put at 50% or more that died; those at 0)."""
+    """look_table()'s three tables, as markdown: the refutation bars' numbers (the units the
+    look put at 50% or more that died; those at 0), the cost, and how often the turn between
+    is the turn then played."""
     out = ['%d traces, %d distinct plays.' % (t['traces'], t['distinct']), '',
            '| Look said | Unit-looks | Died in the looked phases | Actual | Mean said |',
            '|---|---|---|---|---|']
@@ -3279,6 +3300,14 @@ def look_lines(t):
             c['between_calls'], c['ai_calls'],
             '%.1f%%' % (100.0 * c['calls'] / others) if others else '-',
             c['look_cpu_s'], c['cpu_s']))
+    out += ['', '| Chapter | Turns between | Every unit as then played | Units | On the tile then '
+            'played | Share |', '|---|---|---|---|---|---|']
+    for ch in sorted(t['cost']):
+        c = t['cost'][ch]
+        n = c['between_units']
+        out.append('| %s | %d | %d | %d | %d | %s |' % (
+            ch, c['between_turns'], c['between_turns_same'], n, c['between_units_same'],
+            '%.1f%%' % (100.0 * c['between_units_same'] / n) if n else '-'))
     return out
 
 

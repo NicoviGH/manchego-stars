@@ -2974,6 +2974,24 @@ class Look(unittest.TestCase):
         # a look not run judges no unit
         self.assertEqual(mc.look_table([self.trace(run=False)])['bins']['over 50%'][0], 0)
 
+    def test_turn_between_against_the_turn_played(self):
+        # the look at turn 1 put unit 1 on (1,0) and unit 2 on (2,0) after its turn between;
+        # turn 2 was then played: unit 1 there, unit 2 on (3,0); unit 3, not in the turn
+        # between, and a red are not compared. The game ends before a second turn between's.
+        tr = self.trace(die_turn=9)
+        tr[2]['look']['between'] = [{'1': {'x': 1, 'y': 0}, '2': {'x': 2, 'y': 0}},
+                                    {'1': {'x': 1, 'y': 0}}]
+        units = [{'id': 1, 'faction': 'blue', 'x': 1, 'y': 0},
+                 {'id': 2, 'faction': 'blue', 'x': 3, 'y': 0},
+                 {'id': 3, 'faction': 'blue', 'x': 5, 'y': 0},
+                 {'id': 0x81, 'faction': 'red', 'x': 2, 'y': 0}]
+        tr[-1:-1] = [{'t': 'phase', 'phase': 'player', 'turn': 2},
+                     {'t': 'phase', 'phase': 'enemy', 'turn': 2, 'units': units}]
+        c = mc.look_table([tr])['cost']['Ch5']
+        self.assertEqual((c['between_turns'], c['between_turns_same']), (1, 0))
+        self.assertEqual((c['between_units'], c['between_units_same']), (2, 1))
+        self.assertIn('| Ch5 | 1 | 0 | 2 | 1 | 50.0% |', '\n'.join(mc.look_lines(mc.look_table([tr]))))
+
 
 class Calibration(unittest.TestCase):
     """`calibration` (#510 PR A): unit-phases binned by the phase's last plan; a death read by

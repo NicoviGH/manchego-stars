@@ -5646,6 +5646,41 @@ do
     check(plan.look.die["1"], 1, "look: the middle phase's expected strike counts")
 end
 
+-- test_look_records_where_the_turn_between_leaves_us: the look's record keeps each turn
+-- between's tiles for our units, so the shadow run can read how often the turn between is the
+-- turn then played. The first turn between is the beam's own best on the fixture board (A's
+-- tile as opts.unjudged gives it); in the second A stands on (1,0) and has acted, the beam has
+-- nothing to play (nil), and A holds where that board has it.
+do
+    local board, sight, st, s2
+    board, sight, st, s2 = shadowed({ look = function(plan, depth, between)
+        between(board)
+        local held = {}
+        for _, u in ipairs(board.units) do
+            local c = {}
+            for k, v in pairs(u) do c[k] = v end
+            if u.faction == "blue" then c.acted = true end
+            if u.id == 0x01 then c.x, c.y = 1, 0 end
+            held[#held + 1] = c
+        end
+        between(setmetatable({ units = held }, { __index = board }))
+        return { phases = { { strikes = {} }, { strikes = {} } } }
+    end })
+    local own = Planner.plan(B, board, sight, st, { unjudged = true })
+    local want = own and own.blues[1].x .. "," .. own.blues[1].y
+    sight.watching = function() return { unitOn(board, 0x81) } end
+    local depth = Planner.LOOK_DEPTH
+    Planner.LOOK_DEPTH = 3
+    local _, plan = Planner.plan(B, board, sight, st, { look = { room = 1000 } })
+    Planner.LOOK_DEPTH = depth
+    local bt = (plan.look or {}).between or {}
+    check(#bt, 2, "look: one record a turn between")
+    check(bt[1] and bt[1]["1"] and (bt[1]["1"].x .. "," .. bt[1]["1"].y), want,
+          "look: the first turn between, where the beam's best leaves A")
+    check(bt[2] and bt[2]["1"] and (bt[2]["1"].x .. "," .. bt[2]["1"].y), "1,0",
+          "look: a turn between with nothing to play holds A where it stands")
+end
+
 -- test_look_turn_between_is_the_beams_best: opts.unjudged gives the beam's best plan, every
 -- other unit holding, as the phase table it leaves -- our turn between attacks: A's sure kill
 -- of an adjacent enemy is in it, the enemy gone, and no enemy phase was judged
