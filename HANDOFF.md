@@ -37,11 +37,17 @@ first. Tell Nicolas where W1 stands in plain words at the start.
   the game's outcomes (villager dies vs the chapter ends first, our deaths). First check that
   attempt 2's memory holds the boss's tile (`sight.knows`), and whether a capped march reaches
   it by turn 8 (the old run's turns between ignored the cap). Then Ch6 4001/4002/4010.
-- **Open question from Nicolas:** "what's this shadow business? a feature branch solves it."
-  Shadow (recorded, never played) exists to calibrate the look: whether its chances come true
-  needs the game to play what the look assumed. Making it live on the branch and comparing
-  outcomes with main's runs is the faster experiment; approved call 4 had live wait for the
-  shadow calibration, so going live first is his call to change. Answer that before building.
+- **Decided (Nicolas, 2026-11-11):** (1) **keep the probe** that explained Ch6, as an
+  extension of `Bot.explain` (`bot.lua:1714`, its one owner; today it reads the old gate and
+  only botrun's stuck log calls it), not a second explainer: per unit, structured, on every
+  plan record (live decisions and the look's turns between): goal tile and its source (boss,
+  nearest visible enemy, village, sent tile), act and why, own progress, forward steps offered
+  and admitted by the cap; the boss's fog state. `montecarlo.py story` prints it. No game
+  calls, but traces grow: time it and size it, base vs branch back to back. Build it first.
+  (2) **The boss alternative in shadow first** (it answers whether a capped march reaches the
+  boss before the strike, every alternative on one board); **live on the branch only if one
+  does**, compared with main's runs of the same starts. Shadow is not faster: it predicts,
+  live shows what happens.
 - Still owed: mends judged by the look; `make test` timed before and after.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
