@@ -23,18 +23,18 @@
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
 -- { enemies }: every red unit a board showed out of fog and every killer a fight showed
--- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is remembered through its
--- killer: where our units stood is the play's, not the game's. Never a dice result.
+-- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is
+-- remembered through its killer: where our units stood is the play's, not the game's. Never a
+-- dice result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
--- this chapter start would draw is played, and nothing else. It is an independent attempt, not
--- the campaign's k-th try: it has no memory (the pool's workers share no results, ADR 0386) and
--- ends at the style count, where the loop draws the styles again with memory (ADR 0399). Every attempt loads the same
+-- this chapter start would draw is played, and nothing else. Every attempt loads the same
 -- start state, the game's RNG in it; the style draws restart at each chapter start (api.seed)
 -- and never read a result; and the start carries the team the campaign carried in (api.save,
--- arrive). So attempt k plays the style and team it would after k - 1 failures, but WITHOUT the
--- retry's memory: the workers side by side share no results. Attempt 1, every measured cell
--- (ADR 0385), is the same either way. It saves no state (the workers share the start's files)
--- and moves on to no chapter.
+-- arrive). So attempt k plays the style and team it would after k - 1 failures, but it is an
+-- independent attempt, not the campaign's k-th try: it has no memory (the workers side by side
+-- share no results, ADR 0386), and it ends at the style count, where the loop draws the styles
+-- again with memory (ADR 0399). Attempt 1, every measured cell (ADR 0385), is the same either
+-- way. It saves no state (the workers share the start's files) and moves on to no chapter.
 -- A campaign stops when:
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)
