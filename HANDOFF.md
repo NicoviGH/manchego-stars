@@ -9,30 +9,41 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-10, after the step 4 rework's witness).** PR A step 4 was
-reworked as the amended plan says (commit fbc03270 on `feat/510-pr-a-first-attempts`, pushed, no
-PR): the fog read is a rank key, and the sturdy lead the march into fog. **Its Ch6 witness (#510
-comment 6781405996): fallbacks 57 to 7 (no freeze), but fog deaths unchanged (11 of 14 blue),
-green deaths 14 to 22, one loss.** The fog read is blind before first contact and too weak when
-a stronger enemy is still unseen; where it reads a likely death, a rank key does not refuse it.
-- **Waiting on Nicolas:** what to do with step 4 (the recommendation is in this session's reply
-  and on the comment's thread), and Fable's look one turn ahead for Ch5 (comment 6780629895).
-- **Then:** `suite --held-out` once on PR A's final code, ADRs, the PR, `/code-review <PR> medium`.
+**Next session starts here (2026-11-10 night, end of the PR A step 4 session).** PR A is
+built and its one suite run refused promotion on **two new stalls in Manchego Stars ch03**
+(#510 comment 6782740420). Branch `feat/510-pr-a-first-attempts` (pushed, no PR; head
+1e1977f0, ADR 0400 on it with the suite result).
+- **Do first: name the ch03 stalls' cause, with ONE instrumented run.** `ours-ch03` seed 1002
+  (and/or 1001) on a8cf3fe8^ and on a8cf3fe8 (step 3, the step back + mend rounds), reading the
+  played plan's `kind` on the stalled turns. Hypotheses and their refutations are on the
+  comment; the fog tie-breaker is already refuted (ch03 is `fog: none`). Bring the cause and a
+  fix to Nicolas before building: it may mean changing an approved step.
+- **Then:** rerun `suite --held-out` (about 1.2 wall-hours, 56 runs on 8 workers), the PR,
+  `/code-review <PR> medium`, every finding fixed (`review-to-clean`). Then PR B.
+- **Step 4 is settled (Nicolas):** the fog read breaks ties only, after everything else the rank
+  reads. Four Ch6 witnesses got there (comments 6780781911, 6781405996, 6781704202,
+  6782312560): in the cap it froze the bot; ranked after admission it held the army back until
+  the Bael reached the Civilians (green deaths 22 against 14) and stalled a start; the "sturdy
+  lead, fragile follow" march was dropped. No version moved Ch6's fog deaths (12, 11, 11, 10,
+  11). As a tie-breaker: greens 12, turns 7-16, no stall; `scout-ch6` loses both seeds on turn
+  2 again, as on main.
+- **PR B carries Ch6 now** (Nicolas: "make sure this reaches PR B"): plan comment 6779357154,
+  PR B step 2 holds the lessons: a player learns from a loss where the fog hid enemies AND the
+  Bael's clock (it reaches the Civilians about turn 7-8; seven guides send Vanessa east;
+  going fast is contested in research 0020); the one clean Ch6 clear on record is campaign
+  4008 attempt 2 (won turn 7, healer kept back, partly luck). Unchecked: whether the bot ever
+  sends a flier east.
+- **Suite signals, not blockers:** 5 deaths that lived when frozen (listed on the comment).
+- **Waiting on Nicolas:** Fable's look one turn ahead for Ch5 (comment 6780629895).
 - **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
   6780145312), on a fresh Ch5 run of the final code.
-- **How the witness was played:** a scratch driver (`montecarlo.pinned_setup` +
+- **How the witnesses were played:** a scratch driver (`montecarlo.pinned_setup` +
   `chapter_tasks(..., 'starts', seeds=[campaign seed])`, `'tuning'` for `scout-ch6`), its own
-  runs file. Not kept. Ch6 runs take 90 to 520 s each; 11 in about 9 minutes on 8 workers.
-
-Refreshed 2026-11-10, late night (Claude, PR A session): **PR A stopped after step 3: the
-stepping-back witness on the Ch5 starts is refuted by the plan's own test (15 of 39 fallback
-decisions gained a plan under the cap, 38%).** Witness and the Ch5 blind-spot breakdown: #510
-comment 6780145312. Branch `feat/510-pr-a-first-attempts` (pushed, no PR) has steps 1-3 (fog-ambush
-fix; a death graded by its unit's mover plus `montecarlo.py calibration`; the step back and mend
-rounds). Step 4 (fog) not started; no suite run. **Waiting on Nicolas:** Fable's read (the plan's
-"Where Fable comes back in", point 1: the next thing is a look one more turn ahead), and whether
-step 4 goes on meanwhile. The witness's traces are in that session's scratchpad only; its runs
-are attempt 1 of `cs-s4001..4010/6` and `vanilla-ch5` 1001/1002, instrument `276414dc550f+v2`.
+  runs file; not kept (15 lines). Ch6 runs take 90 to 520 s; 11 take about 9 minutes.
+- **Lessons:** an untracked ADR file under `docs/decisions/` fails the pre-commit drift check
+  (`gen_decisions_index.py`): park a draft outside the tree. Guide sources in research 0020 are
+  abbreviations: SH is GameFAQs Shaneth21, KE GameFAQs katieelizabeth (check the source table
+  before naming one).
 
 Earlier the same night (Claude, Fable session): **the Fable review is done and its plan is
 locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
@@ -142,11 +153,9 @@ was built or run in the emulator this session.
 
 ## Next
 
-0. **#510 PR A, first attempts** (plan comment 6779357154; stopped after step 3, see the top and comment 6780145312): its calls are approved;
-   in commit order, the harness fix, the regrade and calibration script
-   (no emulator), stepping back (witness: Ch5 starts), fog in the chance to die (witness: the
-   Ch6 fog start); `suite --held-out` once on the final code; `/code-review <PR> medium`.
-   Stepping back is the largest piece (Ch5's 81 of 110).
+0. **#510 PR A, first attempts** (plan comment 6779357154; built, ADR 0400): name the ch03
+   stalls' cause (see the top, comment 6782740420), fix, `suite --held-out` again, the PR,
+   `/code-review <PR> medium`.
 1. **#510 PR B, retries** (same comment): retry memory rebased from `feat/510-retry-memory`,
    deadlines from a remembered green death, the guard's bugs; carry the 10 vanilla campaigns on
    before the merge (`resume --game vanilla --tag <t>`); retries that differ only if they still
