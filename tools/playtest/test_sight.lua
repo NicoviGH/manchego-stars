@@ -392,6 +392,12 @@ do
     local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
     check(body ~= nil and body:find("stagePhase(call, ph, prior)", 1, true) ~= nil, true,
           "equip: look's turn between stages through stagePhase")
+    -- the turn between is our phase: the faction set back to blue before between() reads the
+    -- board, after the enemy phase's aiOrder made it red (the danger maps draw the other side)
+    local fac = body and body:find("api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[1])", 1, true)
+    local ask = body and body:find("s.staged(between)", 1, true)
+    check(fac ~= nil and ask ~= nil and fac < ask, true,
+          "look: our faction is active again before the turn between")
     for _, name in ipairs({ "s.strike", "stagePhase" }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))

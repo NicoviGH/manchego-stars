@@ -1838,6 +1838,11 @@ function M.new(outer)
                 -- enemy that walked out of it is seen, one that walked into it is not
                 call(S.RefreshEntityBmMaps, {})
                 if between then
+                    -- our phase again: aiOrder made red the active faction, and the danger
+                    -- maps our turn reads draw the faction NOT active (GenerateDangerZoneRange,
+                    -- bmidoten.c GetNonActiveFaction): left red, every tile near our units read
+                    -- as in an enemy's reach (W1's probe: every reach check asked a strike)
+                    api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[1])
                     -- our units ready again: the end of our phase clears what acting set
                     -- (ClearActiveFactionGrayedStates, bmunit.c)
                     for _, o in pairs(byId) do
