@@ -2939,7 +2939,7 @@ class Look(unittest.TestCase):
     included); each chapter's look cost; a play kept twice counts once."""
 
     @staticmethod
-    def trace(die_turn=2, die_phase='enemy', chapter=6, run=True):
+    def trace(die_turn=2, die_phase='enemy', chapter=6, run=True, turns=2):
         look = {'asked': True, 'run': run, 'depth': 2, 'die': {'1': 0.8, '2': 0.0},
                 'calls': 40, 'between_calls': 10, 'cpu_s': 0.5}
         dead = [{'faction': 'blue', 'phase': die_phase, 'turn': die_turn, 'id': 1, 'charId': 1}]
@@ -2949,6 +2949,9 @@ class Look(unittest.TestCase):
             {'t': 'plan', 'ref': 1, 'look': look},
             {'t': 'act', 'phase': 'player', 'turn': 1, 'id': 1, 'act': 'wait', 'to': {'x': die_turn}},
             {'t': 'phase', 'phase': 'enemy', 'turn': 1},
+        ] + [e for k in range(2, turns + 1) for e in (
+            {'t': 'phase', 'phase': 'player', 'turn': k},
+            {'t': 'phase', 'phase': 'enemy', 'turn': k})] + [
             {'t': 'end', 'record': {'deaths': dead,
                                     'look': {'asked': 1, 'run': int(run), 'skipped': int(not run),
                                              'calls': 40 if run else 0, 'between_calls': 10,
@@ -2969,16 +2972,29 @@ class Look(unittest.TestCase):
         self.assertEqual(t['bins']['over 50%'][:2], [2, 1])
         c = t['cost']['Ch5']
         self.assertEqual((c['attempts'], c['run'], c['calls'], c['ai_calls']), (1, 1, 40, 440))
-        self.assertIn('| Ch5 | 1 | 1 | 1 | 0 | 40 | 10 | 440 | 10.0% |',
+        self.assertIn('| Ch5 | 1 | 1 | 1 | 0 | 0 | 40 | 10 | 440 | 10.0% |',
                       '\n'.join(mc.look_lines(t)))
         # a look not run judges no unit
         self.assertEqual(mc.look_table([self.trace(run=False)])['bins']['over 50%'][0], 0)
+
+    def test_a_look_the_game_never_reached_is_cut_short(self):
+        # the look at turn 1 runs to turn 2's enemy phase; the game ended in turn 1's: its
+        # units are not binned (unplayed phases are no survival), and the look is counted cut
+        tr = self.trace(die_turn=9, turns=1)
+        t = mc.look_table([tr])
+        self.assertEqual(t['bins']['over 50%'][0], 0, 'turn 2 never played')
+        self.assertEqual(t['cost']['Ch5']['cut_short'], 1)
+        tr[-1:-1] = [{'t': 'phase', 'phase': 'player', 'turn': 2},
+                     {'t': 'phase', 'phase': 'enemy', 'turn': 2}]
+        t = mc.look_table([tr])
+        self.assertEqual(t['bins']['over 50%'][:2], [1, 0], 'played through: binned')
+        self.assertEqual(t['cost']['Ch5']['cut_short'], 0)
 
     def test_turn_between_against_the_turn_played(self):
         # the look at turn 1 put unit 1 on (1,0) and unit 2 on (2,0) after its turn between;
         # turn 2 was then played: unit 1 there, unit 2 on (3,0); unit 3, not in the turn
         # between, and a red are not compared. The game ends before a second turn between's.
-        tr = self.trace(die_turn=9)
+        tr = self.trace(die_turn=9, turns=1)
         tr[2]['look']['between'] = [{'1': {'x': 1, 'y': 0}, '2': {'x': 2, 'y': 0}},
                                     {'1': {'x': 1, 'y': 0}}]
         units = [{'id': 1, 'faction': 'blue', 'x': 1, 'y': 0},

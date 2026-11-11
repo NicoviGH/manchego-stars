@@ -3209,7 +3209,9 @@ def look_table(traces):
     traces; repeats of one play (trace_key) count once. Each enemy phase's last plan whose look
     ran (`look.run`) puts each of its units in a CALIBRATION_BINS row by the look's chance
     (`look.die`), beside whether it died within the looked phases: from that turn's enemy
-    phase through the `depth`-th, our turns between included. Each attempt's cost goes to its
+    phase through the `depth`-th, our turns between included; a look whose last phase the
+    game never played (it ended first) bins no unit and counts as `cut_short`. Each attempt's
+    cost goes to its
     chapter: looks asked, run and skipped; the look's AiDecideMain calls and its turns
     between's, against the attempt's own; and CPU. Each turn between (`look.between`, our
     units' tiles as it leaves them, the k-th after the look's turn T) is set against turn T+k
@@ -3250,8 +3252,17 @@ def look_table(traces):
                 lk = plan.get('look') or {}
                 if lk.get('run'):
                     looks[e.get('turn')] = lk
+        name = chapter_label(info)
+        c = cost[name]
+        enemy_turns = {e.get('turn') for e in events
+                       if e.get('t') == 'phase' and e.get('phase') == 'enemy'}
         for turn, lk in looks.items():
             last = turn + (lk.get('depth') or 1) - 1
+            if last not in enemy_turns:
+                # the game ended before the look's last phase: what was not played is no
+                # survival, so none of its units is binned
+                c['cut_short'] += 1
+                continue
             for uid, p in (lk.get('die') or {}).items():
                 fell = any((ph == 'enemy' and turn <= t <= last)
                            or (ph == 'player' and turn < t <= last)
@@ -3261,8 +3272,6 @@ def look_table(traces):
                 row[0] += 1
                 row[1] += fell
                 row[2] += p
-        name = chapter_label(info)
-        c = cost[name]
         c['attempts'] += 1
         for turn in sorted(looks):
             w = looks[turn].get('walker')
@@ -3281,7 +3290,8 @@ def look_table(traces):
                 'greens_safe': best is not None and all(
                     p < 0.5 for uid, p in best['die'].items() if int(uid) in greens),
                 'fell': any(t is not None and turn <= t <= turn + w['phase'] - 1
-                            for t, _ in died.get(w['target'], []))})
+                            for t, _ in died.get(w['target'], []))
+                or (None if turn + w['phase'] - 1 not in enemy_turns else False)})
         for turn, lk in looks.items():
             for k, tiles in enumerate(lk.get('between') or [], 1):
                 now = played.get(turn + k)
@@ -3316,14 +3326,14 @@ def look_lines(t):
         out.append('| %s | %d | %d | %s | %s |' % (
             label, n, dead, '%.1f%%' % (100.0 * dead / n) if n else '-',
             '%.1f%%' % (100.0 * total / n) if n else '-'))
-    out += ['', '| Chapter | Attempts | Looks asked | Run | Skipped | Look AI calls | Of them, turns '
-            'between | Attempt AI calls | Look share | Look CPU s | Attempt CPU s |',
-            '|---|---|---|---|---|---|---|---|---|---|---|']
+    out += ['', '| Chapter | Attempts | Looks asked | Run | Skipped | Cut short by the game\'s end '
+            '| Look AI calls | Of them, turns between | Attempt AI calls | Look share | Look CPU s '
+            '| Attempt CPU s |', '|---|---|---|---|---|---|---|---|---|---|---|---|']
     for ch in sorted(t['cost']):
         c = t['cost'][ch]
         others = c['ai_calls'] - c['calls']
-        out.append('| %s | %d | %d | %d | %d | %d | %d | %d | %s | %.1f | %.1f |' % (
-            ch, c['attempts'], c['asked'], c['run'], c['skipped'], c['calls'],
+        out.append('| %s | %d | %d | %d | %d | %d | %d | %d | %d | %s | %.1f | %.1f |' % (
+            ch, c['attempts'], c['asked'], c['run'], c['skipped'], c['cut_short'], c['calls'],
             c['between_calls'], c['ai_calls'],
             '%.1f%%' % (100.0 * c['calls'] / others) if others else '-',
             c['look_cpu_s'], c['cpu_s']))
@@ -3344,7 +3354,8 @@ def look_lines(t):
                 w['play'], w['chapter'], w['turn'], w['enemy'], w['target'], w['strikes'],
                 100 * w['said'], '-' if w['unit'] is None else w['unit'],
                 '-' if w['alt'] is None else '%.0f%%' % (100 * w['alt']),
-                'yes' if w['greens_safe'] else 'no', 'yes' if w['fell'] else 'no'))
+                'yes' if w['greens_safe'] else 'no',
+                {True: 'yes', False: 'no', None: 'not played'}[w['fell']]))
     return out
 
 

@@ -5731,6 +5731,12 @@ do
     check(w.die and w.die["1"], 1, "walker: the best plan's chances over every looked phase")
     check(w.alts[1].die and w.alts[1].die["1"], 1, "walker: each alternative's chances")
     check(lk.phases, 3 * 4, "walker: the looked phases, the allowance's count")
+    -- each alternative keeps where its own turn and its turn between leave our units, and the
+    -- phases its look played before the last
+    check(#(w.alts[2].between or {}), 2, "walker: an alternative's own turn and its turn between")
+    check(w.alts[2].between[1] and w.alts[2].between[1]["2"] ~= nil, true,
+          "walker: the sent unit's tile in each")
+    check(w.alts[2].looked, 2, "walker: the phases its look played before the last")
     -- every guard passed to the beam: B's own turn and its turn between both send it
     local sentB = 0
     for _, g in pairs(guards) do

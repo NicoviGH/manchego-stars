@@ -1853,11 +1853,17 @@ function M.plan(Bot, board, sight, style, opts)
                                die = rounded((lookDeaths(r, best.phase.hit, 1))), alts = {} }
                 for _, g in ipairs(guards) do
                     local guard = { g }
-                    local own = turnOf(board, guard)
-                    local alt = { unit = g.id, turns = g.turns }
+                    -- its own turn and each turn between, where they leave our units (the
+                    -- sent unit's way to the tile); `looked`, the phases played before the
+                    -- last, fewer than depth - 1 when a turn between ended the chapter
+                    local alt = { unit = g.id, turns = g.turns, between = {} }
+                    local own = turnOf(board, guard, alt.between)
                     if own then
-                        local ra = sight.look(own, depth, function(b) return turnOf(b, guard) end)
+                        local ra = sight.look(own, depth, function(b)
+                            return turnOf(b, guard, alt.between)
+                        end)
                         alt.die, alt.ended = rounded((lookDeaths(ra, best.phase.hit, 1))), ra.ended
+                        alt.looked = #(ra.phases or {})
                     end
                     rec.walker.alts[#rec.walker.alts + 1] = alt
                 end
