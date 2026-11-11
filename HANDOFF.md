@@ -9,42 +9,35 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-10 night, end of the PR A step 4 session).** PR A is
-built and its one suite run refused promotion on **two new stalls in Manchego Stars ch03**
-(#510 comment 6782740420). Branch `feat/510-pr-a-first-attempts` (pushed, no PR; head
-1e1977f0, ADR 0400 on it with the suite result).
-- **The ch03 stalls' cause is named** (#510 comment 6782827664, from the suite's traces): step 3's
-  always-judged `back` plan. Every forward plan is over the cap, so the bot alternates `back`
-  (the only plan under the cap) and `unstall` for 40+ turns. **Waiting on Nicolas:** the
-  recommendation is to take the `back` plan out of PR A and keep the mend rounds; confirm on
-  `ours-ch03` 1001/1002 (about 3 minutes).
-- **Then:** rerun `suite --held-out` (about 1.2 wall-hours, 56 runs on 8 workers), the PR,
-  `/code-review <PR> medium`, every finding fixed (`review-to-clean`). Then PR B.
-- **Step 4 is settled (Nicolas):** the fog read breaks ties only, after everything else the rank
-  reads. Four Ch6 witnesses got there (comments 6780781911, 6781405996, 6781704202,
-  6782312560): in the cap it froze the bot; ranked after admission it held the army back until
-  the Bael reached the Civilians (green deaths 22 against 14) and stalled a start; the "sturdy
-  lead, fragile follow" march was dropped. No version moved Ch6's fog deaths (12, 11, 11, 10,
-  11). As a tie-breaker: greens 12, turns 7-16, no stall; `scout-ch6` loses both seeds on turn
-  2 again, as on main.
-- **PR B's retry memory is the screen's whole record, not a list of lessons** (Nicolas: naming
-  "two things a player learns" is the hardcoding to avoid). Plan comment 6779357154, PR B step 2:
-  a retry knows what earlier attempts saw (ADR 0376 decision 3, 0399's draft); PR B checks the
-  memory covers what the screen showed and says what it leaves out. The deadline step is gone
-  (it failed ADR 0396's tests 1, 3 and 4); 0399's guard goal fails the same way, recommended
-  dropped, **waiting on Nicolas**. Ch6 is the witness: the Bael reaches the Civilians about turn 7-8, greens die on turns
-  8, 9, 11; the one clean Ch6 clear on record is campaign 4008 attempt 2 (partly luck).
-- **Suite signals, not blockers:** 5 deaths that lived when frozen (listed on the comment).
-- **Waiting on Nicolas:** Fable's look one turn ahead for Ch5 (comment 6780629895).
+**Next session starts here (2026-11-10 night, after PR A's review).** **#510 PR A is PR #598**
+(`feat/510-pr-a-first-attempts`, ADR 0400): built, `suite --held-out` **PROMOTED** (0
+regressions, instrument `84d8eba48d70+v2`), `/code-review 598 medium` and one scoped re-review
+done, every finding fixed (outcomes on the PR body). **Waiting on Nicolas: "merge"** (this PR is
+not under the step 9 merge-after-review standing rule). Check CI on the head sha first.
+- **What PR A ended up as:** the fog-ambush harness fix; an enemy-phase death graded by the plan
+  that moved its unit (+ `montecarlo.py calibration`); the mend's extra rounds; the fog read as a
+  tie-breaker after everything else the rank reads. **Taken out:** the always-judged step back
+  (it stalled Manchego Stars ch03 40+ turns; comment 6782827664). **Dropped by Nicolas:** the
+  march where only units the fog cannot kill lead, and Fable's look one turn ahead (too narrow
+  and careful: a human's next turn attacks and heals; comment 6783348074). The planner still
+  reads one enemy phase deep; that stays open without a design.
+- **After the promoted suite, the review fixes changed fog-map play only** (the fog strike's tile
+  and enemy, the reorder's keys); `scout-ch6`'s four seeds were rerun and play as promoted.
+- **Then PR B** (plan comment 6779357154, PR B, amended): retry memory only, the screen's whole
+  record (ADR 0376 decision 3, 0399's draft), checked for what it leaves out. No deadline step
+  (failed ADR 0396's tests). **Waiting on Nicolas:** drop 0399's guard goal too (recommended;
+  it fails the same tests). Step 4 (retries that differ) needs a 0396 check before it is built.
+  Ch6 is the witness only: the Bael reaches the Civilians about turn 7-8.
 - **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
-  6780145312), on a fresh Ch5 run of the final code.
-- **How the witnesses were played:** a scratch driver (`montecarlo.pinned_setup` +
-  `chapter_tasks(..., 'starts', seeds=[campaign seed])`, `'tuning'` for `scout-ch6`), its own
-  runs file; not kept (15 lines). Ch6 runs take 90 to 520 s; 11 take about 9 minutes.
-- **Lessons:** an untracked ADR file under `docs/decisions/` fails the pre-commit drift check
-  (`gen_decisions_index.py`): park a draft outside the tree. Guide sources in research 0020 are
-  abbreviations: SH is GameFAQs Shaneth21, KE GameFAQs katieelizabeth (check the source table
-  before naming one).
+  6780145312), on a fresh Ch5 run of PR A's code.
+- **How the witnesses were played:** scratch drivers around `montecarlo.pinned_setup` +
+  `chapter_tasks(...)` with their own runs file; not kept (15 lines each). Ch6 runs take 90 to
+  520 s; the suite takes about 1.2 wall-hours on 8 workers.
+- **Lessons:** read the ADRs on a topic before writing design text for it (the retry "lessons"
+  contradicted ADR 0376, Nicolas caught it). An untracked ADR draft in `docs/decisions/` fails
+  the pre-commit drift check. `M.outranks` runs inside `table.sort`: nothing it reads may make a
+  sandbox call. A constant board.lua adds must also go in `Board.bind`. Research 0020's guide
+  abbreviations: SH is GameFAQs Shaneth21, KE GameFAQs katieelizabeth.
 
 Earlier the same night (Claude, Fable session): **the Fable review is done and its plan is
 locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
@@ -154,9 +147,7 @@ was built or run in the emulator this session.
 
 ## Next
 
-0. **#510 PR A, first attempts** (plan comment 6779357154; built, ADR 0400): name the ch03
-   stalls' cause (see the top, comment 6782740420), fix, `suite --held-out` again, the PR,
-   `/code-review <PR> medium`.
+0. **#510 PR A, first attempts** = PR #598: promoted and reviewed; merge on Nicolas's word.
 1. **#510 PR B, retries** (same comment, step 2 amended 2026-11-10): retry memory rebased from
    `feat/510-retry-memory`, checked to be the screen's whole record; **no deadline**, and 0399's
    guard goal recommended dropped (Nicolas's call): both fail ADR 0396's test, and the gap they
