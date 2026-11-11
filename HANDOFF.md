@@ -9,11 +9,11 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-10 night, after PR A's review).** **#510 PR A is PR #598**
-(`feat/510-pr-a-first-attempts`, ADR 0400): built, `suite --held-out` **PROMOTED** (0
-regressions, instrument `84d8eba48d70+v2`), `/code-review 598 medium` and one scoped re-review
-done, every finding fixed (outcomes on the PR body). **Waiting on Nicolas: "merge"** (this PR is
-not under the step 9 merge-after-review standing rule). Check CI on the head sha first.
+**Next session starts here (2026-11-10 night, PR A merged).** **#510 PR A merged as PR #598**
+(squash 9ef47c5e, ADR 0400; CI green on its head; `suite --held-out` promoted it, instrument
+`84d8eba48d70+v2`, before the review fixes, which change fog-map play only and were checked on
+`scout-ch6`'s four seeds). **Next is PR B** (below). The suite's frozen baseline is still
+`ce1e3adb8c57+v2`: refreezing on PR A's code is not done (`suite --freeze`), and is Nicolas's call.
 - **What PR A ended up as:** the fog-ambush harness fix; an enemy-phase death graded by the plan
   that moved its unit (+ `montecarlo.py calibration`); the mend's extra rounds; the fog read as a
   tie-breaker after everything else the rank reads. **Taken out:** the always-judged step back
@@ -147,7 +147,7 @@ was built or run in the emulator this session.
 
 ## Next
 
-0. **#510 PR A, first attempts** = PR #598: promoted and reviewed; merge on Nicolas's word.
+0. **#510 PR A, first attempts**: merged (PR #598, ADR 0400).
 1. **#510 PR B, retries** (same comment, step 2 amended 2026-11-10): retry memory rebased from
    `feat/510-retry-memory`, checked to be the screen's whole record; **no deadline**, and 0399's
    guard goal recommended dropped (Nicolas's call): both fail ADR 0396's test, and the gap they
