@@ -398,7 +398,8 @@ end
 -- that is not the one its acts were read on (a full-information replay's, opts.offer).
 -- -> those in sight, and the threats: those plus every fogged one a retry remembers
 -- (sight.knows, ADR 0399), which can strike a tile but not be targeted (bmtarget.c refuses a
--- unit on a fogged tile), so only the danger reads take them (exposure).
+-- unit on a fogged tile): the danger reads take them (exposure), and on a Defeat Boss map the
+-- march's goal when one is the boss (objectiveTile, ADR 0401).
 function M.enemiesOf(board, sight)
     local o, out, threats = sight.objective, {}, {}
     for _, u in ipairs(board.units) do
@@ -891,8 +892,13 @@ end
 -- Where the march heads: the recruit, village or chest the unit is sent to (exploring, below),
 -- else its way to the objective (objectiveTile); nil = hold.
 -- objectiveTile: the objective's tile, the boss, or the nearest enemy; nil on a Survive map.
--- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
--- than the fog shows, so it pushes the fog back.
+-- The win condition says what the march is for: on a Defeat Boss map it is the boss once the
+-- party knows where it stands -- in sight, or in fog and remembered by a retry (ctx.threats,
+-- ADR 0399) -- and on a Rout map the nearest enemy in sight. A retry that marched on its
+-- nearest remembered enemy instead reached vanilla Ch6's boss turns late (ADR 0401). A
+-- remembered boss is aimed at where it stands now, as every remembered unit is read (ADR 0399).
+-- With no enemy in sight (fog) and no boss known, the nearest tile the party cannot see: a
+-- player knows no more than the fog shows, so it pushes the fog back.
 local objectiveTile
 local function goalFor(ctx, u, objective)
     local explore = ctx.exploreGoal and ctx.exploreGoal[u.id]
@@ -903,6 +909,14 @@ objectiveTile = function(ctx, u, objective)
     local kind = objective and objective.kind
     if objective and objective.tile then return objective.tile end
     if kind == "survive" then return nil end
+    if kind == "boss" then
+        -- the unit the objective names, whose death ends the chapter (sight.objective.boss):
+        -- another CA_BOSS unit the party knows of is no goal beside it. With none named, the
+        -- first CA_BOSS unit known.
+        for _, e in ipairs(ctx.threats) do
+            if e.isBoss and (not objective.boss or e.charId == objective.boss) then return e end
+        end
+    end
     if #ctx.enemies == 0 and ctx.sight.unseen then
         local best, bestD
         for _, t in ipairs(ctx.fogRead().unseen) do
@@ -914,7 +928,6 @@ objectiveTile = function(ctx, u, objective)
     local best, bestD
     for _, e in ipairs(ctx.enemies) do
         local d = manhattan(u.x, u.y, e.x, e.y)
-        if kind == "boss" and e.isBoss then return e end
         if not bestD or d < bestD then best, bestD = e, d end
     end
     return best
