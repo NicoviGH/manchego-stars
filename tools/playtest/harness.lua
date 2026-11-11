@@ -3875,6 +3875,11 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: max_attempts must be an integer >= 1")
     end
     api.maxAttempts = cfg.max_attempts
+    -- cfg.every_look: a shadow run runs every look, whatever the allowance (montecarlo.py
+    -- `resume --every-look`); api.play hands it to each attempt's bot (botrun.lua's lookRoom)
+    if cfg.every_look ~= nil and cfg.every_look ~= true then
+        error("PT_CAMPAIGN: every_look must be true or absent")
+    end
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
     -- a pinned state's check (PT_PINNED) is one too: it hands no record back, writes no line
     api.diag = ((PLAYTEST_DIAG or "") ~= "" or (PLAYTEST_PINNED or "") ~= "") or nil
@@ -4267,6 +4272,7 @@ INSPECT.campaignApi = function(game)
         -- what every vanilla village and House gives (goals.lua's priors)
         b.villageGifts, b.houseGifts = cfg.village_gifts, cfg.house_gifts
         b.info.campaign, b.info.attempt = id, attempt
+        b.everyLook = cfg.every_look
         b.seed = function() end   -- seeded once, at the first chapter: FE8 never re-seeds
         pokeFastConfig()
         INSPECT.settle("phase", 6000, true)
@@ -4311,7 +4317,8 @@ end
 -- shops = { [chapter] = {world map nodes} } (Manchego Stars: the twin's, from the vanilla
 -- campaign's record), claims = { [chapter] = resolved claims }, from = a chapter index to resume
 -- at, from the start state this id saved, attempt = k: only the k-th attempt from `from`'s start
--- (the pool, campaign.lua), max_attempts = n: a chapter stops after n attempts (`capped`) }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- (the pool, campaign.lua), max_attempts = n: a chapter stops after n attempts (`capped`),
+-- every_look = true: the look runs whatever its allowance (a shadow run) }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
 scenarios.campaign = function()
     local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")

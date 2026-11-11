@@ -1242,6 +1242,9 @@ class Suite(unittest.TestCase):
         self.assertNotIn('max_attempts', one[0]['campaign'], 'the retry cap, unless told')
         cut = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'cut1', attempts=2)
         self.assertEqual(cut[0]['campaign']['max_attempts'], 2, '--attempts: a chapter stops there')
+        self.assertNotIn('every_look', cut[0]['campaign'], 'the look keeps its allowance, unless told')
+        lift = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'lift1', every_look=True)
+        self.assertIs(lift[0]['campaign']['every_look'], True, '--every-look: no allowance')
         with self.assertRaisesRegex(ValueError, 'already exists'):
             mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem1')
         with self.assertRaisesRegex(ValueError, 'no saved start at chapter index 3'):

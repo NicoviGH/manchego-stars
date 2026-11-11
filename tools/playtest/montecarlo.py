@@ -2612,7 +2612,7 @@ def resume_seed(name, pins):
 
 
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
-                 attempts=None):
+                 attempts=None, every_look=False):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
@@ -2657,6 +2657,10 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['last'] = [last]
         if attempts is not None:
             camp['max_attempts'] = attempts
+        if every_look:
+            # a shadow run's calibration wants every look; the allowance is a cost limit for
+            # live play, and under it Ch6 ran 2 looks of 23 (`w1r`)
+            camp['every_look'] = True
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
     return tasks
@@ -2676,7 +2680,8 @@ def resume_main(args, pool=None):
     names = args.campaigns.split(',') if args.campaigns else sorted(pins)
     try:
         tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
-                             args.last, vanilla, getattr(args, 'attempts', None))
+                             args.last, vanilla, getattr(args, 'attempts', None),
+                             getattr(args, 'every_look', False))
     except ValueError as err:
         print('refused: %s' % err)
         return 1
@@ -3913,6 +3918,9 @@ def main(argv=None):
                     help="the chapter index to stop after (default: the game's end)")
     ru.add_argument('--attempts', type=int,
                     help='stop a chapter after this many attempts (default: the retry cap)')
+    ru.add_argument('--every-look', action='store_true',
+                    help="a shadow run: run every look, whatever the allowance (the record's "
+                    "look.every says so; its cost is the look's unbounded cost)")
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,

@@ -1828,6 +1828,37 @@ do
     check(told[2].last, 10, "look: the last look's calls a looked phase are the next one's guess")
 end
 
+-- test_every_look_lifts_the_allowance (#510 W1): a shadow run told to run every look
+-- (api.everyLook, montecarlo.py `resume --every-look`) hands the planner endless room from the
+-- attempt's first decision, where the allowance has none, and the record says it was lifted.
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = rout() }
+    local sight = g.api.sight
+    g.api.sight = function()
+        local s = sight()
+        s.aiCalls = function() return 1000 end
+        return s
+    end
+    g.api.everyLook = true
+    local told = {}
+    g.api.Planner = {
+        surprise = Planner.surprise, LOOK_ATTEMPT = Planner.LOOK_ATTEMPT,
+        plan = function(_, board, _, _, opts)
+            told[#told + 1] = opts.look.room
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil, nil, {} end
+            end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                             targetId = 0x81, move = { x = 0, y = 0 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 } }, enemies = { [0x81] = true } }, {}
+        end,
+    }
+    Botrun.run(g.api)
+    check(told[1], math.huge, "every look: endless room on the first decision")
+    check(recordOf(g).look.every, true, "every look: the record says the allowance was lifted")
+end
+
 -- test_an_exhausted_lookahead_is_an_anomaly (#570): a decision the attempt's budget left one
 -- phase deep is visible in the record -- one lookahead_budget anomaly an attempt, on the first
 -- such turn, counting every decision skipped -- not only as a sum in rec.lookahead.

@@ -620,7 +620,11 @@ function M.run(api)
     -- one's guess.
     -- aiAt0 is the count when the attempt's play began (play() sets it)
     local aiAt0, lastLook
+    -- A shadow run told to run every look (api.everyLook) has endless room: the allowance
+    -- bounds live play's cost, and a look it skips is one the calibration never reads.
+    rec.look.every = api.everyLook or nil
     local function lookRoom(sight)
+        if api.everyLook then return math.huge end
         if not (sight.aiCalls and aiAt0) then return 0 end
         local others = sight.aiCalls() - aiAt0 - rec.look.calls
         return math.floor(others / 4) - rec.look.calls
