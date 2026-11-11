@@ -58,3 +58,9 @@ attempts, and measured attempts here do not either.
   ch01 6, ch02 4, the rest none. The suite plays attempt 1 only, so none was remembered and its play
   and CPU are untouched (ADR 0389 has the suite's cost). A remembered arrival is used only on a
   campaign's retry, which no suite run makes.
+
+## Superseded in part (2026-11-10)
+
+ADR 0399 (Nicolas) reverses the narrowing: a retry also remembers every enemy that earlier
+attempts showed on screen (a death through its killer), and a chapter start gets 12 tries in place of "every
+style once". The arrival turns described above are still kept and used as before.

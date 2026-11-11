@@ -354,6 +354,41 @@ do
     end
 end
 
+-- Sight.knows (ADR 0399): a red unit is remembered by slot and character (Board.memoryKey); a
+-- slot another character holds now is not; no memory, none. And every read the fog alone would
+-- hide a unit from asks it: both judged phases' decides, the danger maps (the remembered tile
+-- lifted out of the fog), and keySources.
+do
+    local keys = { [Board.memoryKey(0x81, 0x80, 0x0A)] = true }
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x80, classId = 0x0A }), true,
+          "knows: slot, character and class")
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x51, classId = 0x0A }), false,
+          "knows: another character in the slot")
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x80, classId = 0x0B }), false,
+          "knows: another generic soldier (one character id, another class) in the slot")
+    check(Sight.knows(Board, nil, { id = 0x81, charId = 0x80, classId = 0x0A }), false, "knows: no memory")
+    -- the emulator hands sight Board.bind's table, not board.lua itself (harness api.Board)
+    local bound = Board.bind({}, {})
+    check(Sight.knows(bound, keys, { id = 0x81, charId = 0x80, classId = 0x0A }), true,
+          "knows: the bound Board keys it too")
+    -- playsAsSeen: in sight always; in fog only when remembered
+    local FOG = Board.US_BIT9
+    check(Sight.playsAsSeen(bound, 0, false), true, "playsAsSeen: in sight")
+    check(Sight.playsAsSeen(bound, FOG | 1, false), false, "playsAsSeen: in fog, not remembered")
+    check(Sight.playsAsSeen(bound, FOG, true), true, "playsAsSeen: in fog, remembered")
+    -- and the emulator-bound reads that the fog alone would hide a unit from all ask it (the
+    -- sandboxed game calls cannot run here; the campaign rerun is their proof, ADR 0399)
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    local _, asks = src:gsub("M%.playsAsSeen%(Board, [^\n]-, s%.knows%(e%)%)", "")
+    check(asks, 3, "playsAsSeen: decides, closings' looters and keySources ask it")
+    local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
+    check(lifts, 2, "knows: danger and threat lift the remembered out of the fog")
+    local _, fogTests = src:gsub("& Board%.US_BIT9%)", "")
+    check(fogTests, 1, "the fog bit is read in playsAsSeen alone")
+end
+
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
 -- return loop, wherever LIST_STUB_AT puts the stub (the fake CPU never runs the stub, so the
 -- call is let fail and the words it wrote are read).

@@ -448,6 +448,8 @@ local function sightOf(o)
     -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
     s.mapKey = function() return o.mapKey or "-" end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
+    -- a retry's memory (sight.knows, ADR 0399): the red unit ids it remembers
+    if o.known then s.knows = function(u) return o.known[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
     -- what each unit holds no key for ("x,y" -> the lock), and who drops one (lock -> enemies)
     if o.locked then
@@ -2728,6 +2730,24 @@ do
         check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 8,
               "exploring: the unit that gets there in time is sent")
         check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
+    end
+
+    -- test_threats_are_the_seen_and_the_remembered (ADR 0399): enemiesOf's first list is the
+    -- reds in sight (what can be targeted); its second adds every fogged red sight.knows, which
+    -- can strike; a fogged one not remembered is in neither. Attempt 1 (no knows) adds none.
+    do
+        local hid = red(0x82, 3, 3, { fogged = true, charId = 0x50 })
+        local other = red(0x83, 4, 4, { fogged = true, charId = 0x51 })
+        local function ids(list)
+            local out = {}
+            for _, u in ipairs(list) do out[#out + 1] = string.format("%x", u.id) end
+            return table.concat(out, ",")
+        end
+        local seen, threats = B.enemiesOf(boardOf(A, X, hid, other), sightOf({ known = { [0x82] = true } }))
+        check(ids(seen), string.format("%x", X.id), "enemiesOf: in sight only")
+        check(ids(threats), string.format("%x,82", X.id), "enemiesOf: the threats add the remembered")
+        local _, plain = B.enemiesOf(boardOf(A, X, hid, other), sightOf({}))
+        check(ids(plain), string.format("%x", X.id), "enemiesOf: no memory, no fogged threat")
     end
 
     -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A
@@ -5038,8 +5058,8 @@ end
 
 -- ── The lookahead (PR-E: FR-017, FR-018) ──────────────────────────────────────────────────
 
--- test_lookahead_triggers (T057): a door opened or a wall struck, and a step into a seen boss's
--- reach from outside it; nothing else (no arrival trigger: ADR 0389).
+-- test_lookahead_triggers (T057): a door opened or a wall struck, and a step into the reach of a
+-- boss in sight or remembered, from outside it; nothing else (no arrival trigger: ADR 0389).
 do
     local A = blue(0x01, 0, 0, 0)
     local K = red(0x81, 5, 0, { isBoss = true, minRange = 1, maxRange = 1 })
@@ -5064,8 +5084,10 @@ do
     A.x = 4
     check(why({ plan(act(4)) }, { K }), "none", "lookahead: already in its reach is no first entry")
     A.x = 0
+    -- which bosses count is the caller's list (ctx.threats: in sight, or remembered, ADR 0399);
+    -- a fogged boss given is one a retry remembers, so it triggers
     K.fogged = true
-    check(why({ plan(act(4)) }, { K }), "none", "lookahead: a boss the fog hides is not seen")
+    check(why({ plan(act(4)) }, { K }), "boss", "lookahead: a remembered boss in fog is a boss")
     K.fogged = nil
 end
 
@@ -5095,6 +5117,26 @@ local function looksAhead(boss)
         end,
     }
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
+end
+
+-- test_lookahead_triggers_on_a_remembered_boss (ADR 0399): a boss in fog that a retry remembers
+-- (sight.knows) is a boss whose reach a step enters, so the lookahead is triggered as for one in
+-- sight; one the fog hides and no attempt showed triggers nothing.
+do
+    local function fogged(remembered)
+        local board, sight, st = looksAhead(true)
+        for _, u in ipairs(board.units) do
+            if u.id == 0x82 then u.fogged = true end
+        end
+        if remembered then sight.knows = function(u) return u.id == 0x82 end end
+        return board, sight, st
+    end
+    local board, sight, st = fogged(true)
+    local a, plan = Planner.plan(B, board, sight, st)
+    check(at(a), "0,0", "remembered boss: the second phase's sure death keeps A back")
+    check(plan.lookahead.extended, true, "remembered boss: the step into its reach triggers the lookahead")
+    board, sight, st = fogged(false)
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "unseen boss: no trigger, the march goes")
 end
 
 -- test_lookahead_extends_all_finalists_or_none (T058, AS 1 and AS 2): with room, every
@@ -5264,6 +5306,35 @@ do
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
     check(table.concat(keys, ","), "blues,carry,gone,opened,reds", "lookahead: the staged board, nothing more")
+end
+
+-- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers
+-- (sight.knows) is in the exposure a candidate is judged by, and among the enemies the plan was
+-- made against, so a death by it is never graded `fog`. Attempt 1 (no memory): neither.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local F = red(0x83, 2, 0, { fogged = true, charId = 0x50 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x83] = tiles({ 2, 0 }, { 1, 0 }, { 0, 0 }) },
+                danger = { ["0,0"] = 1, ["1,0"] = 1 }, enemyPhase = function() return {} end }
+    -- whose strike on A the candidates' exposure asks for (sight.strike, without `from`)
+    local function strikers(sight)
+        local asked, strike = {}, sight.strike
+        sight.strike = function(u, e, x, y, slot, from)
+            if not from and u.id == A.id then asked[e.id] = true end
+            return strike(u, e, x, y, slot, from)
+        end
+        B.candidates(boardOf(A, X, F), sight, style("careful"))
+        return asked[0x83] and tostring(0x83) or ""
+    end
+    o.known = { [0x83] = true }
+    check(strikers(sightOf(o)), tostring(0x83), "remembered: its strike is in the exposure")
+    local _, plan = Planner.plan(B, boardOf(A, X, F), sightOf(o), style("careful"))
+    check(plan.enemies[0x83], true, "remembered: the plan was made against it")
+    o.known = nil
+    check(strikers(sightOf(o)), "", "no memory: the fogged red strikes nothing")
+    local _, plain = Planner.plan(B, boardOf(A, X, F), sightOf(o), style("careful"))
+    check(plain.enemies[0x83], nil, "no memory: the fogged red is not among the plan's enemies")
 end
 
 -- test_lookahead_counts_a_green_and_ranks_the_list_once (review of #568): an allied green the

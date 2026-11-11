@@ -449,16 +449,17 @@ end
 
 -- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
 -- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
--- struck ("breach"); a unit stepping into a visible boss's reach from outside it ("boss": its
+-- struck ("breach"); a unit stepping into a boss's reach from outside it ("boss": its
 -- end tile under sight.threat, its start tile not). No arrival trigger: the second phase
 -- cannot place the wave yet, so it would learn nothing about it (ADR 0389, Nicolas
--- 2026-11-03). `enemies` are the ones in sight (Bot.candidates' ctx.enemies).
+-- 2026-11-03). `enemies` are the ones in sight and those a retry remembers (Bot.candidates'
+-- ctx.threats, ADR 0399): a remembered boss in fog is a boss whose reach a unit steps into.
 -- -> the kinds, sorted, or nil.
 function M.triggers(fin, byId, enemies, sight)
     local hit = {}
     local bosses = {}
     for _, e in ipairs(enemies or {}) do
-        if e.isBoss and not e.fogged and sight.threat then bosses[#bosses + 1] = sight.threat(e) end
+        if e.isBoss and sight.threat then bosses[#bosses + 1] = sight.threat(e) end
     end
     for _, st in ipairs(fin) do
         for _, a in ipairs(st.acts) do
@@ -488,7 +489,8 @@ function M.plan(Bot, board, sight, style, opts)
     local offer = opts and opts.offer
     local cands, ctx
     if offer then
-        cands, ctx = offer.cands, setmetatable({ enemies = Bot.enemiesOf(board, sight) },
+        local enemies, threats = Bot.enemiesOf(board, sight)
+        cands, ctx = offer.cands, setmetatable({ enemies = enemies, threats = threats },
                                                { __index = offer.ctx })
     else
         cands, ctx = Bot.candidates(board, sight, style, opts)
@@ -1602,7 +1604,7 @@ function M.plan(Bot, board, sight, style, opts)
         end)
         local fin = {}
         for i = 1, math.min(M.FINAL, #idx) do fin[i] = judgedPlans[idx[i]].st end
-        look.trigger = M.triggers(fin, byId, ctx.enemies, sight)
+        look.trigger = M.triggers(fin, byId, ctx.threats, sight)
         -- the deep diagnostic (FR-019): this same second phase on every decision, whatever
         -- the board and the budget, so a replay can ask whether one more cycle saw the death
         local deep = opts and opts.diag == "deep"
@@ -1749,8 +1751,10 @@ function M.plan(Bot, board, sight, style, opts)
         best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
+    -- the enemies the plan was made against: in sight, and those a retry remembers (ctx.threats,
+    -- ADR 0399), so a death by a remembered one is never graded `fog` (botrun.grade)
     best.enemies = {}
-    for _, e in ipairs(ctx.enemies) do best.enemies[e.id] = true end
+    for _, e in ipairs(ctx.threats) do best.enemies[e.id] = true end
     best.talks = {}
     for c in pairs(talks) do best.talks[#best.talks + 1] = c end
     table.sort(best.talks)

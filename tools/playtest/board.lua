@@ -98,6 +98,21 @@ function Board.distance(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
 
+-- One unit across attempts at the same chapter start (a retry's memory, ADR 0399): every attempt
+-- loads the same start, so a unit keeps its slot (`id`); an arrival can take a slot another unit
+-- died out of, so the character and class must match too (most enemies share one generic
+-- character id, so the character alone does not tell two soldiers apart). The one owner of the
+-- key: campaign.lua's memory and sight's knows() both build it here.
+function Board.memoryKey(id, charId, classId)
+    return tostring(id) .. ":" .. tostring(charId) .. ":" .. tostring(classId)
+end
+
+-- Whether an enemy counts as seen (ADR 0399): not hidden by fog, or one a retry remembers
+-- (`knows`, sight.knows). The one owner of the rule: sight's judged phases, closings' looters
+-- and keySources (from the unit's state, US_BIT9) and Bot.enemiesOf (from the board's `fogged`)
+-- all ask it.
+function Board.playsAsSeen(fogged, knows) return not fogged or knows == true end
+
 -- Where a planned act leaves its unit (bot.lua's act shape): the tile a Canto unit moves on
 -- to after it (`canto`, playerphase.c TryMakeCantoUnit), else the act's own (`move`). The one
 -- owner of it: the bot's exposure and the planner's board both read it.
@@ -523,7 +538,7 @@ function Board.bind(mem, SYM)
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
-        freeBeside = Board.freeBeside,
+        freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,

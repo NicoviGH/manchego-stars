@@ -7,9 +7,10 @@
 
 `attempts` plays attempts 1..N of the chapter at the env's `from` start side by side (env
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
-That is what the campaign's own loop finds: every attempt loads the same start state, the
-game's RNG in it, and the styles are drawn without reading a result, so attempt k plays the
-same alone as after k - 1 failures.
+Each is an independent attempt: every attempt loads the same start state, the game's RNG in it,
+and the styles are drawn without reading a result, so attempt k alone plays the k-th style with
+no memory. The campaign's own loop is not that: its retries remember what earlier attempts
+showed (ADRs 0386, 0399), so its attempt k can differ, and it goes past the style count.
 
 A worker is `run.sh <scenario>` with PT_RUN_TAG, so copies of one scenario share no run dir,
 leftover kill or save (run.sh). Its records are read from the emulator's own stdout
@@ -26,6 +27,8 @@ cell count, and labelled EQUIVALENT (inside +-10 points), HARDER, EASIER or INCO
 analysis; `cell` then plays the confirmatory seeds with that choice.
 
     python3 tools/playtest/montecarlo.py starts --game ours|vanilla [--count 10] [--jobs 8]
+    python3 tools/playtest/montecarlo.py resume --game vanilla --tag <tag> \
+        [--campaigns cs-s4001,...] [--chapter <i>] [--last <i>] [--jobs 8]
     python3 tools/playtest/montecarlo.py pilot --chapter 3 [--starts 10]
     python3 tools/playtest/montecarlo.py cell --analysis paired \
         (--chapter <n> [--starts 10] | --ours <env .json> --vanilla <env .json> \
@@ -37,7 +40,9 @@ from its own New Game campaign with its own seed, so each start carries its own 
 first K pinned (by seed) that reached the chapter. `starts` plays and pins those campaigns
 (the `starts` seed set, campaign `cs-s<seed>`) in each game's store (cell-starts.json beside
 runs.jsonl): the store is the ROM's, so a Manchego Stars ROM change means
-`starts --game ours` again.
+`starts --game ours` again. `resume` carries campaigns on from a start they saved, each under a
+new id `<tag>-<campaign>` (its states copied first, so the pinned starts stay as pinned), every
+chapter retried with memory up to the cap (ADR 0399); its records go to resume-runs.jsonl.
 
 Before a cell or pilot is read, both arms' first attempts pass FR-029's invariants
 (`validity`): environment-clean at 90% or more, no sandbox-fault death, blindspot and
@@ -2585,6 +2590,100 @@ def starts_main(args, pool=None):
     return 1 if crashed else 0
 
 
+RESUME_RUNS = 'resume-runs.jsonl'   # a resumed campaign's records, apart from runs.jsonl
+
+
+def resume_seed(name, pins):
+    """The seed campaign `name` was played with: its pin's, else its id's `-s<seed>` (a
+    campaign carried on under another id, as `full-s4008`). None when neither says."""
+    if name in pins:
+        return pins[name]['seed']
+    m = re.search(r'-s(\d+)$', name)
+    return int(m.group(1)) if m else None
+
+
+def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False):
+    """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
+    else its latest) under the new id `<tag>-<name>`, its start states copied there first.
+    Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
+    the copy leaves the pinned file alone. The campaign's own seed draws its styles again
+    (campaign.lua's api.seed), and each chapter is retried with memory up to the cap (ADR
+    0399), on to `last` (the env's, the game's end, unless given). ValueError, before any copy,
+    when a campaign has no such start, its pinned start was rewritten, its seed is unknown, or
+    the new id is taken; a copy that fails removes every copy this call made, then raises."""
+    plan = []
+    for name in names:
+        src = os.path.join(store, 'states', name)
+        saved = sorted(int(n[:-3]) for n in (os.listdir(src) if os.path.isdir(src) else [])
+                       if n.endswith('.ss') and n[:-3].isdigit())
+        at = chapter if chapter is not None else (saved[-1] if saved else None)
+        if at is None or at not in saved:
+            raise ValueError('%s has no saved start at chapter index %s (it has %s)'
+                             % (name, at, saved or 'none'))
+        pinned = (pins.get(name) or {}).get('chapters', {}).get(str(at))
+        if pinned and sha1_file(os.path.join(src, '%d.ss' % at)) != pinned:
+            raise ValueError('%s/%d.ss is not the start cell-starts.json pins (a resume re-saved '
+                             'it?)' % (name, at))
+        seed = resume_seed(name, pins)
+        if seed is None:
+            raise ValueError('%s: no pin and no -s<seed> in its id, so its seed is unknown' % name)
+        new = '%s-%s' % (tag, name)
+        if os.path.exists(os.path.join(store, 'states', new)):
+            raise ValueError('%s already exists: pick another --tag' % new)
+        plan.append((name, new, at, seed))
+    tasks, copied = [], []
+    for name, new, at, seed in plan:
+        try:
+            shutil.copytree(os.path.join(store, 'states', name), os.path.join(store, 'states', new))
+        except OSError:
+            # a copy that fails leaves none behind: the tag stays free to try again
+            for path in copied + [os.path.join(store, 'states', new)]:
+                shutil.rmtree(path, ignore_errors=True)
+            raise
+        copied.append(os.path.join(store, 'states', new))
+        camp = dict(env, id=new, **{'from': at})
+        if last is not None:
+            camp['last'] = [last]
+        tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
+                      'stamp': {'resumed_from': '%s/%d' % (name, at)}})
+    return tasks
+
+
+def resume_main(args, pool=None):
+    """`resume`: carry campaigns on from a chapter start they saved (#510, ADR 0399), each under
+    a new id, its records in the store's resume-runs.jsonl. Prints each attempt as it ends and
+    each campaign's end."""
+    setup = suite_setup()
+    if isinstance(setup, str):
+        print(setup)
+        return 1
+    _suite, simdirs, envs = setup
+    store, vanilla = simdirs[args.game], args.game == 'vanilla'
+    pins = {c['campaign']: c for c in cell_pins(store)}
+    names = args.campaigns.split(',') if args.campaigns else sorted(pins)
+    try:
+        tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
+                             args.last, vanilla)
+    except ValueError as err:
+        print('refused: %s' % err)
+        return 1
+    print('%d %s campaigns carried on, as %s-<campaign>, on %d workers'
+          % (len(tasks), args.game, args.tag, args.jobs), flush=True)
+    pool = pool or Pool(jobs=args.jobs, out=os.path.join(store, RESUME_RUNS))
+    crashed = 0
+    for rec in pool.run(tasks):
+        if rec.get('chapter') is not None:
+            print('  %s chapter %s attempt %s: %s%s, %s turns, %d deaths'
+                  % (rec.get('campaign'), rec.get('chapter'), rec.get('attempt'),
+                     rec.get('outcome'), ' clean' if rec.get('clean') else '', rec.get('turns'),
+                     len(rec.get('deaths') or [])), flush=True)
+            continue
+        crashed += rec.get('outcome') == 'crashed'
+        print('%s (from %s): %s (%s)' % (rec.get('campaign'), rec.get('resumed_from'),
+                                         rec.get('outcome'), rec.get('why')), flush=True)
+    return 1 if crashed else 0
+
+
 def kept_play(paths, instrument, rom_hashes):
     """A `play` that plays nothing: each task's newest kept suite run of this instrument on
     these ROMs ({game: hash}), so a suite is judged again without playing it: after a replay
@@ -3530,6 +3629,17 @@ def main(argv=None):
     sa.add_argument('--count', type=int, default=CELL_STARTS,
                     help='campaigns pinned in all, on the first seeds of the starts set')
     sa.add_argument('--jobs', type=int, default=8)
+    ru = sub.add_parser('resume', help='carry campaigns on from a chapter start they saved, '
+                        'each under a new id (ADR 0399)')
+    ru.add_argument('--game', required=True, choices=('ours', 'vanilla'))
+    ru.add_argument('--tag', required=True,
+                    help='the new ids\' prefix: <tag>-<campaign> (its states are copied there)')
+    ru.add_argument('--campaigns', help='comma-separated campaign ids (default: every pinned one)')
+    ru.add_argument('--chapter', type=int,
+                    help="the chapter index to resume at (default: each campaign's latest start)")
+    ru.add_argument('--last', type=int,
+                    help="the chapter index to stop after (default: the game's end)")
+    ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,
                     help='the cell records (default %(default)s)')
@@ -3565,6 +3675,8 @@ def main(argv=None):
         return suite_main(args)
     if args.cmd == 'starts':
         return starts_main(args)
+    if args.cmd == 'resume':
+        return resume_main(args)
     if args.cmd == 'replay':
         return replay_main(args)
     if args.cmd == 'audit':
