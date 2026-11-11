@@ -176,6 +176,8 @@ M.DUST = Goals.DUST
 -- (#570)
 M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
+-- the look's enemy phases (#510 W1, a trade's: the next one, our turn, the one after)
+M.LOOK_DEPTH = 2
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
@@ -865,6 +867,46 @@ function M.plan(Bot, board, sight, style, opts)
         return st
     end
 
+    -- The board plan `st` leaves, as sight stages a phase (enemyPhase, look): each player unit
+    -- on its end tile at the HP the plan leaves it (its attack's weapon equipped), the reds'
+    -- HP, the doors opened, the carries, and gone = each enemy the plan's blows together kill
+    -- at even odds or better. -> that phase table, and kills = { [id] = { p, mean } }: each
+    -- struck enemy's composed chance to die and its mean damage, at its own HP
+    local function phaseOf(st)
+        local planned, at = {}, {}
+        for _, a in ipairs(st.acts) do at[a.unitId] = a end
+        for _, u in ipairs(ctx.blues) do
+            local a = at[u.id]
+            local at = a and endTile(a)
+            planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
+                                      hp = st.hp[u.id] or u.hp,
+                                      slot = a and a.act == "attack" and a.slot or nil }
+        end
+        local reds = {}
+        for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
+        -- the plan's blows on it together, at its own HP: each blow alone was scored at the
+        -- HP the earlier ones leave on average, which can call a sure kill short. Gone or
+        -- standing by that composed chance (the damage is capped at its HP, so the dead
+        -- share is hp * p)
+        local gone, kills = copy(st.gone), {}
+        for id, blows in pairs(st.kill) do
+            local p, mean = odds(blows, byId[id].hp)
+            gone[id] = p >= 0.5 or nil
+            kills[id] = { p = p, mean = mean }
+        end
+        return { blues = planned, gone = gone, reds = reds, opened = st.opened, carry = st.carry },
+            kills
+    end
+    -- opts.unjudged (the look's turn between, #510 W1): the beam's best plan, every unit it
+    -- does not move holding, unjudged, as the phase table it leaves (phaseOf), .win its chance
+    -- to end the chapter. No enemy phase is judged, no plan mended, no record made.
+    if opts and opts.unjudged then
+        local st = complete(beam[1])
+        local ph = phaseOf(st)
+        ph.win = winChance(st)
+        return ph
+    end
+
     -- The assault (Nicolas, 2026-10-28): on a Defeat Boss map, every unit that can strike the
     -- boss this phase does, the heaviest expected blow first, until the plan counts it dead.
     -- One unit's strike alone rarely beats holding -- the counter, then the boss's own phase
@@ -1069,18 +1111,48 @@ function M.plan(Bot, board, sight, style, opts)
         end
         return res, none
     end
-    local function judge(st)
-        local planned, at = {}, {}
-        for _, a in ipairs(st.acts) do at[a.unitId] = a end
-        for _, u in ipairs(ctx.blues) do
-            local a = at[u.id]
-            local at = a and endTile(a)
-            planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
-                                      hp = st.hp[u.id] or u.hp,
-                                      slot = a and a.act == "attack" and a.slot or nil }
+    -- What the phases a look played after the judged one (sight.look's result `r`) do to
+    -- `hit`, the units the judged phase may strike (st.phase.hit): each one's chance to die in
+    -- any of them, the HP each loses, and the chance a unit whose death ends the game dies in
+    -- one. A unit is struck in a phase at the HP it began it with, and only if it lives then.
+    -- The last phase is read over every way it went; one before it (r.phases past the first,
+    -- the judged one's own) along its expected way.
+    local function lookDeaths(r, hit)
+        local function inPhase(hp, outcomes)
+            local live = {}
+            for _, u in ipairs(hit) do
+                local h = hp and hp[u.id] or 0
+                if h > 0 then live[#live + 1] = { id = u.id, charId = u.charId, hp = h } end
+            end
+            local die, lost, over = {}, {}, 0
+            for _, o in ipairs(outcomes) do
+                local res, none = struckIn(o.strikes, live)
+                for _, u in ipairs(live) do
+                    die[u.id] = (die[u.id] or 0) + o.p * res[u.id].d
+                    lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
+                end
+                over = over + o.p * (1 - none)
+            end
+            return die, lost, over
         end
-        local reds = {}
-        for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
+        local die, lost, over = {}, {}, 0
+        if not r.ended then
+            die, lost, over = inPhase(r.hp, r.outcomes or { { p = 1, strikes = r } })
+        end
+        -- the phases between, folded in only where a look has them: a two-phase look's
+        -- numbers stay the lookahead's own to the last bit
+        for k = 2, #(r.phases or {}) do
+            local ph = r.phases[k]
+            local d, l, o = inPhase(ph.hp, { { p = 1, strikes = ph.strikes } })
+            for id, x in pairs(d) do die[id] = 1 - (1 - (die[id] or 0)) * (1 - x) end
+            for id, x in pairs(l) do lost[id] = (lost[id] or 0) + x end
+            over = 1 - (1 - over) * (1 - o)
+        end
+        return die, lost, over
+    end
+    local function judge(st)
+        local phase, kills = phaseOf(st)
+        local planned, reds = phase.blues, phase.reds
         -- each uncertain kill, and each counter that can leave its attacker on more than one
         -- HP, played every way it goes: the average (an enemy gone at a kill >= 0.5, else
         -- standing at its mean HP; our attacker on its mean HP after the counter) hides the
@@ -1093,7 +1165,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- are played first, BRANCH of them at most; one that would take the ways past
         -- 2^BRANCH keeps the average and a narrower one after it is still played. Each left to
         -- the average is counted (`averaged`) so it is never silent.
-        local dims, gone = {}, copy(st.gone)
+        local dims, gone = {}, phase.gone
         local only = {}   -- target id -> the unit whose blow is the plan's only one on it
         for uid, x in pairs(st.fought) do
             if x.exchange and #(st.kill[x.exchange.target] or {}) == 1 then
@@ -1101,14 +1173,11 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         local joined = {}
-        for id, blows in pairs(st.kill) do
-            -- the plan's blows on it together, at its own HP: each blow alone was scored at the
-            -- HP the earlier ones leave on average, which can call a sure kill short. Gone or
-            -- standing by that composed chance; `left`, the HP it keeps when it lives (the
-            -- damage is capped at its HP, so the dead share is hp * p)
+        for id, k in pairs(kills) do
+            -- each uncertain kill played both ways (phaseOf composed it); `left`, the HP it
+            -- keeps when it lives
             local hp = byId[id].hp
-            local p, mean = odds(blows, hp)
-            gone[id] = p >= 0.5 or nil
+            local p, mean = k.p, k.mean
             local uid = only[id]
             if p > 0 and p < 1 and uid then
                 local pairsOf, list = {}, {}
@@ -1153,7 +1222,7 @@ function M.plan(Bot, board, sight, style, opts)
             return x.key < y.key
         end)
         -- the phase as the average leaves it: what the lookahead plays on (nextPhase)
-        st.phase = { blues = planned, gone = gone, reds = reds, opened = st.opened, carry = st.carry }
+        st.phase = phase
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
         st.branched = 0
         for _, d in ipairs(dims) do
@@ -1624,21 +1693,7 @@ function M.plan(Bot, board, sight, style, opts)
                                                 reds = st.phase.reds, opened = st.phase.opened,
                                                 carry = st.phase.carry })
                     look.calls = look.calls + 1
-                    -- every unit the first phase may strike, alive at its start: its HP then
-                    local live = {}
-                    for _, u in ipairs(st.phase.hit) do
-                        local hp = r.hp and r.hp[u.id] or 0
-                        if hp > 0 then live[#live + 1] = { id = u.id, charId = u.charId, hp = hp } end
-                    end
-                    local second, lost, over = {}, {}, 0
-                    for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
-                        local res, none = struckIn(o.strikes, live)
-                        for _, u in ipairs(live) do
-                            second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
-                            lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
-                        end
-                        over = over + o.p * (1 - none)
-                    end
+                    local second, lost, over = lookDeaths(r, st.phase.hit)
                     -- each unit's death in either phase, and what the rank reads of it: the
                     -- protected units' admission, the greens' summed death, the HP left, and
                     -- the judged score's price for each death and for the HP lost. Only the
@@ -1691,6 +1746,53 @@ function M.plan(Bot, board, sight, style, opts)
     end
     if not best or #best.acts == 0 then return nil, nil, cost end
     best.lookahead = look
+    -- The look, in shadow (#510 W1, comment 6786548233): on a retry, while an enemy an earlier
+    -- attempt saw kill one of our units or a green is on the field (sight.watching), the best plan's
+    -- board is played M.LOOK_DEPTH enemy phases forward, our turn between each two the beam's
+    -- own best plan, unjudged (opts.unjudged). Recorded on the plan (best.look), never ranked:
+    -- play is PR B's until a shadow run proves the look. It costs at most opts.look.room
+    -- AiDecideMain calls (botrun's allowance: a quarter of the attempt's others so far), the
+    -- cost guessed before it runs by the last look's (opts.look.last), else the depth times
+    -- the enemies on the field; one the room cannot pay is not run, and says so (`skipped`).
+    local watching = sight.look and sight.watching and sight.watching() or {}
+    if #watching > 0 then
+        local depth = M.LOOK_DEPTH
+        local rec = { asked = true, depth = depth, watched = {} }
+        for i, e in ipairs(watching) do rec.watched[i] = e.id end
+        local reds = 0
+        for _, u in ipairs(board.units) do
+            if u.faction == "red" and u.onField and not u.dead then reds = reds + 1 end
+        end
+        local lo = opts and opts.look or {}
+        rec.estimate = lo.last or depth * reds
+        if rec.estimate > (lo.room or 0) then
+            rec.skipped = true
+        else
+            local calls0, clock, between = sight.aiCalls(), os.clock(), 0
+            local r = sight.look({ blues = best.phase.blues, gone = best.phase.gone,
+                                   reds = best.phase.reds, opened = best.phase.opened,
+                                   carry = best.phase.carry }, depth, function(b)
+                local c0 = sight.aiCalls()
+                local ph = M.plan(Bot, b, sight, style, { unjudged = true, seen = opts and opts.seen })
+                between = between + sight.aiCalls() - c0
+                return ph
+            end)
+            -- each unit's chance to die in any looked phase: the judged one's, then the look's
+            local later = lookDeaths(r, best.phase.hit)
+            local first = {}
+            for _, p in ipairs(best.predict or {}) do first[p.id] = p.die end
+            rec.die = {}
+            for _, u in ipairs(best.phase.hit) do
+                local d = 1 - (1 - (first[u.id] or 0)) * (1 - (later[u.id] or 0))
+                rec.die[tostring(u.id)] = math.floor(d * 1e4 + 0.5) / 1e4
+            end
+            rec.run, rec.ended = true, r.ended
+            rec.calls = sight.aiCalls() - calls0
+            rec.between_calls = between
+            rec.cpu_s = os.clock() - clock
+        end
+        best.look = rec
+    end
     -- best first; after a lookahead the finalists before the rest, whose ranks were never asked
     -- the second phase (the played plan heads the list either way)
     table.sort(considered, function(x, y)

@@ -3869,6 +3869,12 @@ INSPECT.campaignApi = function(game)
     api.only = cfg.attempt
     -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
     api.startOnly = cfg.start_only
+    -- cfg.max_attempts: stop a chapter after that many attempts, below the retry cap
+    -- (montecarlo.py `resume --attempts`; campaign.lua's `capped`)
+    if cfg.max_attempts ~= nil and not (math.type(cfg.max_attempts) == "integer" and cfg.max_attempts >= 1) then
+        error("PT_CAMPAIGN: max_attempts must be an integer >= 1")
+    end
+    api.maxAttempts = cfg.max_attempts
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
     -- a pinned state's check (PT_PINNED) is one too: it hands no record back, writes no line
     api.diag = ((PLAYTEST_DIAG or "") ~= "" or (PLAYTEST_PINNED or "") ~= "") or nil
@@ -4305,7 +4311,7 @@ end
 -- shops = { [chapter] = {world map nodes} } (Manchego Stars: the twin's, from the vanilla
 -- campaign's record), claims = { [chapter] = resolved claims }, from = a chapter index to resume
 -- at, from the start state this id saved, attempt = k: only the k-th attempt from `from`'s start
--- (the pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- (the pool, campaign.lua), max_attempts = n: a chapter stops after n attempts (`capped`) }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
 scenarios.campaign = function()
     local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")

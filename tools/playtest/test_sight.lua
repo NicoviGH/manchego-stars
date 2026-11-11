@@ -381,12 +381,17 @@ do
     f:close()
     local _, direct = src:gsub("S%.EquipUnitItemSlot", "")
     check(direct, 1, "equip: EquipUnitItemSlot is called from Sight.equip alone")
-    for _, name in ipairs({ "s.enemyPhase", "s.nextPhase" }) do
+    for _, name in ipairs({ "s.enemyPhase", "s.look" }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
         check(body ~= nil and body:find("stagePhase(call, plan)", 1, true) ~= nil, true,
               "equip: " .. name .. " stages through stagePhase")
     end
+    -- and the look's turn between stages its phase table through it too
+    local at = src:find("function s.look(", 1, true)
+    local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
+    check(body ~= nil and body:find("stagePhase(call, ph, prior)", 1, true) ~= nil, true,
+          "equip: look's turn between stages through stagePhase")
     for _, name in ipairs({ "s.strike", "stagePhase" }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))

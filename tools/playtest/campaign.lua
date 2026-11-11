@@ -24,7 +24,9 @@
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
 -- { enemies }: every red unit a board showed out of fog and every killer a fight showed
--- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is
+-- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey), each one marked
+-- `killed` once an attempt saw it kill one of our units or a green (#510 W1: the look watches
+-- those; a new mark alone is no new memory for tryKey, as W1's look changes no play). A death is
 -- remembered through its killer: where our units stood is the play's, not the game's. Never a
 -- dice result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
@@ -45,6 +47,8 @@
 --   bot_fault   the same on vanilla, which strong players clear clean: the bot is what failed,
 --               never the chapter (#510 step 9 design, decision 2). The chapter line's failures
 --               carry what spoiled each attempt and its trace
+--   capped      api.maxAttempts: a chapter used that many attempts without a clean clear (a
+--               measurement the caller cut short, montecarlo.py `resume --attempts`; no verdict)
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -205,7 +209,8 @@ function M.run(api)
         line({ outcome = outcome, why = why, route = route, chapters = #chapters })
         api.log(string.format("campaign: %s after %d chapters (%s)", outcome, #chapters,
             tostring(why)))
-        return outcome == "done" or outcome == "played" or outcome == "no_style", why, chapters
+        return outcome == "done" or outcome == "played" or outcome == "no_style"
+            or outcome == "capped", why, chapters
     end
 
     -- a chapter with no clean clear left to try: on vanilla the bot's fault, on
@@ -259,13 +264,15 @@ function M.run(api)
             local memory, memoryKeys = { enemies = {} }, {}
             -- a unit whose class was not read cannot be told from another in its slot (its key
             -- would match nothing, and grow the memory with nothing learned): not kept
-            local function rememberEnemy(id, charId, classId)
+            -- `killed`: some attempt saw it kill one of our units or a green (#510 W1's watched
+            -- set), kept once any did
+            local function rememberEnemy(id, charId, classId, killed)
                 local k = Bot.memoryKey(id, charId, classId)
                 if classId ~= nil and not memoryKeys[k] then
-                    memoryKeys[k] = true
-                    memory.enemies[#memory.enemies + 1] = { id = id, charId = charId,
-                                                            classId = classId }
+                    memoryKeys[k] = { id = id, charId = charId, classId = classId }
+                    memory.enemies[#memory.enemies + 1] = memoryKeys[k]
                 end
+                if classId ~= nil and killed then memoryKeys[k].killed = true end
             end
             -- the tries made, by style and what was remembered then: the start state restores
             -- the game's RNG, so the same style with the same memory replays that try move for
@@ -322,7 +329,8 @@ function M.run(api)
                 if #memory.enemies > 0 then
                     local copy = {}   -- each attempt its own copy
                     for i, e in ipairs(memory.enemies) do
-                        copy[i] = { id = e.id, charId = e.charId, classId = e.classId }
+                        copy[i] = { id = e.id, charId = e.charId, classId = e.classId,
+                                    killed = e.killed }
                     end
                     style.memory = { enemies = copy }
                 end
@@ -366,9 +374,16 @@ function M.run(api)
                 end
                 table.sort(remembered)
                 for _, e in ipairs(rec.enemies_seen or {}) do
-                    rememberEnemy(e.id, e.charId, e.classId)
+                    rememberEnemy(e.id, e.charId, e.classId, e.killed)
                 end
                 if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
+                -- the caller's own cut (api.maxAttempts): a measurement stopped short, no verdict
+                if api.maxAttempts and entry.attempts >= api.maxAttempts then
+                    entry.outcome = "capped"
+                    line(entry)
+                    return "capped", string.format("chapter %d: stopped after %d attempts (max_attempts)",
+                        ch, entry.attempts)
+                end
                 local lok, lwhy = api.load(ch)
                 if not lok then
                     entry.outcome = "crashed"

@@ -65,6 +65,13 @@ unit at each enemy phase by the chance the phase's last plan gave it, beside how
 each chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against
 its style's cap. Every change to the bot's first attempts is read by it the same way.
 
+    python3 tools/playtest/montecarlo.py look <trace or dir> [...]
+
+`look` reads kept traces of retries, each play once, and prints the look in shadow against the
+game played (#510 W1): each unit the look judged, by the chance it gave, beside how many died
+within the looked phases; and each chapter's looks asked, run and skipped, their AiDecideMain
+calls (the turns between's among them) against the attempts' own, and CPU.
+
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
 `story` reads one run's trace (botrun.lua) as plain text, turn by turn, with the game's own
@@ -248,7 +255,7 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
 PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
 # a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts (campaign.lua
 # noClean), and kept as FAILED they would crowd real crashes out of KEEP_FAILED
-PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible')
+PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible', 'capped')
 
 
 def passing(recs):
@@ -2602,13 +2609,15 @@ def resume_seed(name, pins):
     return int(m.group(1)) if m else None
 
 
-def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False):
+def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
+                 attempts=None):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
     the copy leaves the pinned file alone. The campaign's own seed draws its styles again
     (campaign.lua's api.seed), and each chapter is retried with memory up to the cap (ADR
-    0399), on to `last` (the env's, the game's end, unless given). ValueError, before any copy,
+    0399), on to `last` (the env's, the game's end, unless given); `attempts` stops a chapter
+    after that many (campaign.lua's `capped`: a shadow run's attempt 2). ValueError, before any copy,
     when a campaign has no such start, its pinned start was rewritten, its seed is unknown, or
     the new id is taken; a copy that fails removes every copy this call made, then raises."""
     plan = []
@@ -2644,6 +2653,8 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
         camp = dict(env, id=new, **{'from': at})
         if last is not None:
             camp['last'] = [last]
+        if attempts is not None:
+            camp['max_attempts'] = attempts
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
     return tasks
@@ -2663,7 +2674,7 @@ def resume_main(args, pool=None):
     names = args.campaigns.split(',') if args.campaigns else sorted(pins)
     try:
         tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
-                             args.last, vanilla)
+                             args.last, vanilla, getattr(args, 'attempts', None))
     except ValueError as err:
         print('refused: %s' % err)
         return 1
@@ -3191,6 +3202,86 @@ def calibration(traces):
     return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'deaths': deaths}
 
 
+def look_table(traces):
+    """The look in shadow against the game played (#510 W1, comment 6786548233), from kept
+    traces; repeats of one play (trace_key) count once. Each enemy phase's last plan whose look
+    ran (`look.run`) puts each of its units in a CALIBRATION_BINS row by the look's chance
+    (`look.die`), beside whether it died within the looked phases: from that turn's enemy
+    phase through the `depth`-th, our turns between included. Each attempt's cost goes to its
+    chapter: looks asked, run and skipped; the look's AiDecideMain calls and its turns
+    between's, against the attempt's own; and CPU. Returns {'traces', 'distinct', 'bins',
+    'cost'}: bins as calibration's; cost: chapter -> Counter."""
+    bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
+    cost = collections.defaultdict(collections.Counter)
+    seen = set()
+    for events in traces:
+        key = trace_key(events)
+        if key in seen:
+            continue
+        seen.add(key)
+        info = next((e.get('info') or {} for e in events if e.get('t') == 'start'), {})
+        end = next((e.get('record') or {} for e in events if e.get('t') == 'end'), {})
+        died = collections.defaultdict(list)   # unit id -> [(turn, phase)]
+        for d in end.get('deaths') or []:
+            if d.get('faction') in ('blue', 'green') and d.get('id') is not None:
+                died[d['id']].append((d.get('turn'), d.get('phase')))
+        plan, looks = None, {}
+        for e in events:
+            if e.get('t') == 'phase' and e.get('phase') == 'player':
+                plan = None
+            elif e.get('t') == 'plan' and e.get('ref') is not None:
+                plan = e
+            elif e.get('t') == 'phase' and e.get('phase') == 'enemy' and plan is not None:
+                lk = plan.get('look') or {}
+                if lk.get('run'):
+                    looks[e.get('turn')] = lk
+        for turn, lk in looks.items():
+            last = turn + (lk.get('depth') or 1) - 1
+            for uid, p in (lk.get('die') or {}).items():
+                fell = any((ph == 'enemy' and turn <= t <= last)
+                           or (ph == 'player' and turn < t <= last)
+                           for t, ph in died.get(int(uid), []))
+                label = next(lb for hi, lb in CALIBRATION_BINS if p <= hi)
+                row = bins[label]
+                row[0] += 1
+                row[1] += fell
+                row[2] += p
+        name = chapter_label(info)
+        c = cost[name]
+        c['attempts'] += 1
+        for k in ('asked', 'run', 'skipped', 'calls', 'between_calls'):
+            c[k] += (end.get('look') or {}).get(k) or 0
+        c['look_cpu_s'] += (end.get('look') or {}).get('cpu_s') or 0
+        costs = end.get('costs') or {}
+        c['ai_calls'] += (costs.get('game_calls') or {}).get('AiDecideMain') or 0
+        c['cpu_s'] += costs.get('cpu_s') or 0
+    return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'cost': cost}
+
+
+def look_lines(t):
+    """look_table()'s two tables, as markdown, and the refutation bars' numbers (the units the
+    look put at 50% or more that died; those at 0)."""
+    out = ['%d traces, %d distinct plays.' % (t['traces'], t['distinct']), '',
+           '| Look said | Unit-looks | Died in the looked phases | Actual | Mean said |',
+           '|---|---|---|---|---|']
+    for label, (n, dead, total) in t['bins'].items():
+        out.append('| %s | %d | %d | %s | %s |' % (
+            label, n, dead, '%.1f%%' % (100.0 * dead / n) if n else '-',
+            '%.1f%%' % (100.0 * total / n) if n else '-'))
+    out += ['', '| Chapter | Attempts | Looks asked | Run | Skipped | Look AI calls | Of them, turns '
+            'between | Attempt AI calls | Look share | Look CPU s | Attempt CPU s |',
+            '|---|---|---|---|---|---|---|---|---|---|---|']
+    for ch in sorted(t['cost']):
+        c = t['cost'][ch]
+        others = c['ai_calls'] - c['calls']
+        out.append('| %s | %d | %d | %d | %d | %d | %d | %d | %s | %.1f | %.1f |' % (
+            ch, c['attempts'], c['asked'], c['run'], c['skipped'], c['calls'],
+            c['between_calls'], c['ai_calls'],
+            '%.1f%%' % (100.0 * c['calls'] / others) if others else '-',
+            c['look_cpu_s'], c['cpu_s']))
+    return out
+
+
 def chapter_label(info):
     """A trace's chapter as its game names it: vanilla's by its index (campaign_env), ours' as
     chNN."""
@@ -3579,6 +3670,9 @@ def main(argv=None):
                         'from kept traces (#510 PR A)')
     ca.add_argument('paths', nargs='+', help='trace files or directories of them')
     ca.add_argument('--instrument', help='only traces of this instrument')
+    lo = sub.add_parser('look', help="the look in shadow against the game played, and its "
+                        'cost by chapter, from kept traces (#510 W1)')
+    lo.add_argument('paths', nargs='+', help='trace files or directories of them')
     st = sub.add_parser('story', help="one run's trace as plain text")
     st.add_argument('trace', help='a trace .jsonl or .jsonl.gz')
     st.add_argument('--turn', type=int, help="only this turn and the one before (an anomaly's)")
@@ -3639,6 +3733,8 @@ def main(argv=None):
                     help="the chapter index to resume at (default: each campaign's latest start)")
     ru.add_argument('--last', type=int,
                     help="the chapter index to stop after (default: the game's end)")
+    ru.add_argument('--attempts', type=int,
+                    help='stop a chapter after this many attempts (default: the retry cap)')
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,
@@ -3690,6 +3786,9 @@ def main(argv=None):
                 (e.get('info') or {}).get('instrument') == args.instrument
                 for e in ev if e.get('t') == 'start')]
         print('\n'.join(calibration_lines(calibration(traces))))
+        return 0
+    if args.cmd == 'look':
+        print('\n'.join(look_lines(look_table([read_trace(f) for f in trace_files(args.paths)]))))
         return 0
     if args.cmd == 'story':
         events = read_trace(args.trace)

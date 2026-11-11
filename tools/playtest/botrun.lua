@@ -603,6 +603,11 @@ function M.run(api)
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
                   lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
                                 calls = 0, cpu_s = 0 },
+                  -- the look in shadow (#510 W1), summed over the attempt: looks asked, run
+                  -- and skipped for the allowance; their AiDecideMain calls, those of the turns
+                  -- between, and CPU
+                  look = { asked = 0, run = 0, skipped = 0, calls = 0, between_calls = 0,
+                           cpu_s = 0 },
                   seize_skips = {}, stall_events = {}, anomalies = {} }
     local explore = M.exploreLog()
     -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
@@ -610,6 +615,15 @@ function M.run(api)
     local diag = api.diag
     local watch = diag and M.matcher(diag.original, diag.ref, Json)
     local pin, halt
+    -- the look's allowance (#510 W1): a quarter of the attempt's AiDecideMain calls outside
+    -- it so far, less what it spent; and the last look's cost, the next one's guess.
+    -- aiAt0 is the count when the attempt's play began (play() sets it)
+    local aiAt0, lastLook
+    local function lookRoom(sight)
+        if not (sight.aiCalls and aiAt0) then return 0 end
+        local others = sight.aiCalls() - aiAt0 - rec.look.calls
+        return math.floor(others / 4) - rec.look.calls
+    end
     -- the lookahead's calls left this attempt (Planner.LOOK_ATTEMPT, FR-018)
     local function lookLeft()
         return (api.Planner and api.Planner.LOOK_ATTEMPT or 0) - rec.lookahead.calls
@@ -682,9 +696,12 @@ function M.run(api)
     -- board showed, kept by its whole key (Board.memoryKey): a unit killed and a reinforcement
     -- later loaded into its slot are both remembered
     local seenReds, enemiesSeen = {}, {}
-    local function sawEnemy(id, charId, classId)
-        enemiesSeen[Bot.memoryKey(id, charId, classId)] = { id = id, charId = charId,
-                                                               classId = classId }
+    -- `killed`: it killed one of our units or a green (the look watches it, #510 W1), kept once set
+    local function sawEnemy(id, charId, classId, killed)
+        local k = Bot.memoryKey(id, charId, classId)
+        local e = enemiesSeen[k] or { id = id, charId = charId, classId = classId }
+        e.killed = e.killed or killed or nil
+        enemiesSeen[k] = e
     end
     local function changes(after)
         if api.recruits and not owed then
@@ -761,8 +778,9 @@ function M.run(api)
                         end
                     end
                 end
-                -- a fight is on screen, fog or not: the killer is an enemy seen
-                if g.killerClass then sawEnemy(g.killerId, g.killer, g.killerClass) end
+                -- a fight is on screen, fog or not: the killer is an enemy seen, and one
+                -- that killed
+                if g.killerClass then sawEnemy(g.killerId, g.killer, g.killerClass, true) end
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
                     -- a green lost on the turn it was first seen: the plan had one player
@@ -894,6 +912,12 @@ function M.run(api)
             or "clean"
         rec.instrument = api.info.instrument   -- the bot and suite version (montecarlo.py)
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
+        -- every red a board or a fight showed: campaign.lua's memory for the next retry (before
+        -- the trace's copy of the record, which otherwise said none)
+        for _, e in pairs(enemiesSeen) do rec.enemies_seen[#rec.enemies_seen + 1] = e end
+        table.sort(rec.enemies_seen, function(a, b)
+            return Bot.memoryKey(a.id, a.charId, a.classId) < Bot.memoryKey(b.id, b.charId, b.classId)
+        end)
         trace({ t = "end", record = rec })
         if diag then
             -- the replay's one line: never the record, which production reads
@@ -934,11 +958,6 @@ function M.run(api)
                 diag.ref, outcome, why))
             return false, why, nil
         end
-        -- every red a board or a fight showed: campaign.lua's memory for the next retry
-        for _, e in pairs(enemiesSeen) do rec.enemies_seen[#rec.enemies_seen + 1] = e end
-        table.sort(rec.enemies_seen, function(a, b)
-            return Bot.memoryKey(a.id, a.charId, a.classId) < Bot.memoryKey(b.id, b.charId, b.classId)
-        end)
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
         return outcome == "won" or outcome == "lost" or outcome == "stuck", why, rec
@@ -949,6 +968,7 @@ function M.run(api)
         local sight = api.sight()
         -- a retry's memory (ADR 0399): what earlier attempts at this start showed plays as seen
         if sight.remember then sight.remember(style.memory and style.memory.enemies) end
+        aiAt0 = sight.aiCalls and sight.aiCalls() or nil
         -- the units whose death ends the game, as the game says (sight.objective.gameOver)
         trace({ t = "start", info = api.info, style = api.style, bench = api.bench,
                 claims_played = played,
@@ -1121,7 +1141,8 @@ function M.run(api)
                         local function memo()
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
-                                     budget = { attempt = lookLeft() }, seen = seenReds }
+                                     budget = { attempt = lookLeft() }, seen = seenReds,
+                                     look = { room = lookRoom(sight), last = lastLook } }
                         end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board
@@ -1190,6 +1211,18 @@ function M.run(api)
                                 anomaly(lookOut)
                             end
                         end
+                        local lk = plan and plan.look
+                        if lk then
+                            rec.look.asked = rec.look.asked + 1
+                            if lk.skipped then rec.look.skipped = rec.look.skipped + 1 end
+                            if lk.run then
+                                rec.look.run = rec.look.run + 1
+                                rec.look.calls = rec.look.calls + lk.calls
+                                rec.look.between_calls = rec.look.between_calls + lk.between_calls
+                                rec.look.cpu_s = rec.look.cpu_s + lk.cpu_s
+                                lastLook = lk.calls
+                            end
+                        end
                         if plan then
                             sent, stuck = plan.goals, plan.stuck
                             -- the board this plan committed to, and its decision index (a
@@ -1255,6 +1288,7 @@ function M.run(api)
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
                                 lookahead = plan and plan.lookahead,
+                                look = plan and plan.look,
                                 win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
                         if plan and a then

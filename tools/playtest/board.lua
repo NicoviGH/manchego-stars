@@ -46,6 +46,7 @@ Board.US_RESCUED = 1 << 5     -- it is carried by the unit its +1B names: hidden
 Board.UNIT_RESCUE = 0x1B
 Board.US_HAS_MOVED = 1 << 6   -- Canto: Visit and Chest are not shown (bmmenu.c)
 Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
+Board.US_HAS_MOVED_AI = 1 << 10  -- set by an AI unit's act; cleared with US_UNSELECTABLE at a phase's end
 -- "hidden by fog?": RefreshUnitsOnBmMap sets it on a red or purple unit on a fogged tile, in
 -- the same refresh that rebuilds gBmMapFog (bmmap.c), so it is the game's own word on which
 -- enemies the player sees. Never set without fog.
@@ -541,8 +542,8 @@ function Board.bind(mem, SYM)
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
-        US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
-        US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
+        US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_UNSELECTABLE = Board.US_UNSELECTABLE, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
+        US_HAS_MOVED = Board.US_HAS_MOVED, US_HAS_MOVED_AI = Board.US_HAS_MOVED_AI, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
         US_RESCUING = Board.US_RESCUING, US_RESCUED = Board.US_RESCUED, UNIT_RESCUE = Board.UNIT_RESCUE,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE, UNIT_ITEMS = Board.UNIT_ITEMS,
         ITEM_COUNT = Board.ITEM_COUNT,

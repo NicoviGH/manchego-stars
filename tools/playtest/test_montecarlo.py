@@ -1239,6 +1239,9 @@ class Suite(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(store, 'states', 'mem1-cs-s4001', '7.ss')))
         one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7)
         self.assertEqual((one[0]['campaign']['from'], one[0]['campaign']['last']), (6, [7]))
+        self.assertNotIn('max_attempts', one[0]['campaign'], 'the retry cap, unless told')
+        cut = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'cut1', attempts=2)
+        self.assertEqual(cut[0]['campaign']['max_attempts'], 2, '--attempts: a chapter stops there')
         with self.assertRaisesRegex(ValueError, 'already exists'):
             mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem1')
         with self.assertRaisesRegex(ValueError, 'no saved start at chapter index 3'):
@@ -2928,6 +2931,48 @@ class Report(unittest.TestCase):
         line = mc.cell_sentence(cell, {a: mc.describe(r) for a, r in self.arms().items()})
         self.assertIn(': a pilot, no verdict on any protected death', line)
 
+
+
+class Look(unittest.TestCase):
+    """`look` (#510 W1): each unit the look judged, binned by its chance, beside whether it died
+    within the looked phases (that turn's enemy phase through the depth-th, our turns between
+    included); each chapter's look cost; a play kept twice counts once."""
+
+    @staticmethod
+    def trace(die_turn=2, die_phase='enemy', chapter=6, run=True):
+        look = {'asked': True, 'run': run, 'depth': 2, 'die': {'1': 0.8, '2': 0.0},
+                'calls': 40, 'between_calls': 10, 'cpu_s': 0.5}
+        dead = [{'faction': 'blue', 'phase': die_phase, 'turn': die_turn, 'id': 1, 'charId': 1}]
+        return [
+            {'t': 'start', 'info': {'game': 'vanilla', 'chapter': chapter}},
+            {'t': 'phase', 'phase': 'player', 'turn': 1},
+            {'t': 'plan', 'ref': 1, 'look': look},
+            {'t': 'act', 'phase': 'player', 'turn': 1, 'id': 1, 'act': 'wait', 'to': {'x': die_turn}},
+            {'t': 'phase', 'phase': 'enemy', 'turn': 1},
+            {'t': 'end', 'record': {'deaths': dead,
+                                    'look': {'asked': 1, 'run': int(run), 'skipped': int(not run),
+                                             'calls': 40 if run else 0, 'between_calls': 10,
+                                             'cpu_s': 0.5},
+                                    'costs': {'cpu_s': 5, 'game_calls': {'AiDecideMain': 440}}}},
+        ]
+
+    def test_tables(self):
+        t = mc.look_table([self.trace(), self.trace(),            # one play, kept twice
+                           self.trace(die_turn=3)])               # died after the looked phases
+        self.assertEqual((t['traces'], t['distinct']), (3, 2))
+        self.assertEqual(t['bins']['over 50%'][:2], [2, 1], 'the second phase, not the third')
+        self.assertEqual(t['bins']['0'][:2], [2, 0])
+        # a death in our turn between counts; one in the looked turn's own player phase is
+        # before the look
+        t = mc.look_table([self.trace(die_turn=2, die_phase='player'),
+                           self.trace(die_turn=1, die_phase='player', chapter=7)])
+        self.assertEqual(t['bins']['over 50%'][:2], [2, 1])
+        c = t['cost']['Ch5']
+        self.assertEqual((c['attempts'], c['run'], c['calls'], c['ai_calls']), (1, 1, 40, 440))
+        self.assertIn('| Ch5 | 1 | 1 | 1 | 0 | 40 | 10 | 440 | 10.0% |',
+                      '\n'.join(mc.look_lines(t)))
+        # a look not run judges no unit
+        self.assertEqual(mc.look_table([self.trace(run=False)])['bins']['over 50%'][0], 0)
 
 
 class Calibration(unittest.TestCase):

@@ -113,12 +113,16 @@
 --                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went.
---   nextPhase(plan)          the enemy phase AFTER the next, our units holding between (the
---                            planner's lookahead, FR-017): plan as enemyPhase's; the next phase
---                            played along its expected way, every enemy moving, then the turn
---                            advanced, the fog refreshed and the second played as enemyPhase
---                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
---                            HP when it begins, 0 if dead) and .moved. See s.nextPhase.
+--   look(plan, depth, between)  `depth` enemy phases from the board plan leaves (#510 W1):
+--                            plan as enemyPhase's; each phase but the last played along its
+--                            expected way, every enemy moving; between two, the turn advanced,
+--                            our units ready, the fog refreshed and between(board) (optional)
+--                            asked our turn as a phase table (nil: hold); the last played as
+--                            enemyPhase plays one. -> as enemyPhase, plus .hp (each blue and
+--                            green unit's HP when the last begins, 0 if dead), .moved and
+--                            .phases (the earlier phases' expected strikes). See s.look.
+--   nextPhase(plan)          look(plan, 2): the enemy phase AFTER the next, our units holding
+--                            between (the planner's lookahead, FR-017).
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
 --                            boss = on a Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
@@ -1061,6 +1065,7 @@ function M.new(outer)
     function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
     local remembered   -- remember()'s keys: { [Board.memoryKey] = true }, nil on attempt 1
+    local watched      -- the keys of those that killed (#510 W1), nil when none did
 
     -- The board's units, read once per board like every other answer: kept only from a read
     -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
@@ -1286,10 +1291,15 @@ function M.new(outer)
     -- The board's answers and the phase's cache swapped for fresh ones -> their restore: a
     -- read on another board than the live one (the fog off, or a staged board) is never kept
     -- for the live one, nor reads one of its answers.
+    -- The chapter-long caches whose reads depend on where units stand go too: answer()'s
+    -- village race and closings()' replays.
+    local closingsAt = {}
     local function isolate()
-        local keptSeen, keptCache = seen, s.cache
-        seen, s.cache = { threats = {}, grids = {} }, {}
-        return function() seen, s.cache = keptSeen, keptCache end
+        local keptSeen, keptCache, keptRaced, keptClosings = seen, s.cache, raced, closingsAt
+        seen, s.cache, raced, closingsAt = { threats = {}, grids = {} }, {}, {}, {}
+        return function()
+            seen, s.cache, raced, closingsAt = keptSeen, keptCache, keptRaced, keptClosings
+        end
     end
 
     -- fn(board) with the fog off (M.fullInfo), on fresh answers (isolate)
@@ -1309,15 +1319,37 @@ function M.new(outer)
     end
 
     function s.remember(enemies)
-        remembered = nil
+        remembered, watched = nil, nil
         for _, e in ipairs(enemies or {}) do
+            local k = Board.memoryKey(e.id, e.charId, e.classId)
             remembered = remembered or {}
-            remembered[Board.memoryKey(e.id, e.charId, e.classId)] = true
+            remembered[k] = true
+            -- one that killed one of our units or a green (#510 W1): the look watches it
+            if e.killed then
+                watched = watched or {}
+                watched[k] = true
+            end
         end
         -- every answer read before is without the memory; attempt 1 (none) keeps them
         if remembered then s.refresh() end
     end
     function s.knows(u) return M.knows(Board, remembered, u) end
+    -- the watched enemies on the field (#510 W1): each one an earlier attempt saw kill one of
+    -- our units or a green, alive and counting as seen (in sight, or remembered: it is) -> units()'
+    -- entries, by id; {} on attempt 1 and on a retry whose memory holds no killer
+    function s.watching()
+        local out = {}
+        if not watched then return out end
+        for _, o in ipairs(units()) do
+            if o.faction == "red" and o.onField and not o.dead and M.knows(Board, watched, o) then
+                out[#out + 1] = o
+            end
+        end
+        table.sort(out, function(a, b) return a.id < b.id end)
+        return out
+    end
+    -- the game's AiDecideMain calls so far, every sight's (the look's allowance counts them)
+    function s.aiCalls() return M.calls[S.AiDecideMain] or 0 end
     -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
     -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen
     local function liftRemembered()
@@ -1611,11 +1643,16 @@ function M.new(outer)
         end
     end
 
-    -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
-    -- our units stood and their HP set, the reds' HP, the gone off the map
-    local function stagePhase(call, plan)
-        local byId = {}
-        for _, o in ipairs(units()) do byId[o.id] = o end
+    -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, look):
+    -- our units stood and their HP set, the reds' HP, the gone off the map. `prior` (optional,
+    -- look's later phases): the earlier stage's { byId, gone }, so a plan staged on a board an
+    -- enemy phase moved keeps every enemy gone before, and each gone one leaves the tile it
+    -- stands on now
+    local function stagePhase(call, plan, prior)
+        local byId = prior and prior.byId or {}
+        if not prior then
+            for _, o in ipairs(units()) do byId[o.id] = o end
+        end
         for _, b in ipairs(plan.blues) do
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
@@ -1631,10 +1668,13 @@ function M.new(outer)
             end
             api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN)
         end
-        local gone = {}
+        local gone = prior and prior.gone or {}
         for id in pairs(plan.gone or {}) do
+            local e = byId[id]
+            if e and not gone[id] then
+                remove(e, mem.u8(e.addr + UNIT_X), mem.u8(e.addr + UNIT_Y))
+            end
             gone[id] = true
-            if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
         end
         -- the doors the plan opens and the walls it breaks (M.openMap): the enemies behind
         -- them reach through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed
@@ -1723,65 +1763,111 @@ function M.new(outer)
         end)
     end
 
-    -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
-    -- FR-017; the hold is the R-8 spike's intervening player turn). plan as enemyPhase's. The
-    -- next phase is played along its expected way, unbranched: each enemy goes where its own
-    -- decision takes it (a strike's tile, or the move it decides without striking), a strike
-    -- takes its expected damage, a player unit left at 0 HP is off the map, and a striker our
-    -- counter kills at even odds or better is gone. The turn then advances and the second phase
-    -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
-    -- sees decides, in both: an enemy hidden by fog does not act unless a retry remembers it
-    -- (knows(), ADR 0399), and no arrival is placed (one not yet loaded is no unit to play).
-    -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
-    -- begins, 0 when the first left it dead }
-    -- and .moved = the enemies the first phase moved, { { id, x, y } }.
-    function s.nextPhase(plan)
+    -- The look (#510 W1, comment 6786548233): `depth` enemy phases from the board `plan` leaves,
+    -- our turn between each two. plan as enemyPhase's. Every phase but the last is played along
+    -- its expected way, unbranched (playExpected); the last as enemyPhase plays one, every way a
+    -- counter may kill. Between two phases the turn advances, our units are ready again (as
+    -- ClearActiveFactionGrayedStates leaves them, bmunit.c), the fog is refreshed, and
+    -- between(board) (optional; nil: our units hold where they stand) is asked our turn on that
+    -- board (s.staged): a phase table as plan's, staged as plan was, or nil to hold. A phase
+    -- table with .win at 0.5 or more ends the chapter: the look stops there (.ended = "win",
+    -- and no further phase is played). Only what the player sees decides, in every phase: an
+    -- enemy hidden by fog does not act unless a retry remembers it (knows(), ADR 0399), and no
+    -- arrival is placed (one not yet loaded is no unit to play).
+    -- -> the last phase as enemyPhase gives it, plus .hp = { [blue or green unit id] = its HP
+    -- when the last phase begins, 0 when an earlier one left it dead }, .moved = the enemies the
+    -- first phase moved, { { id, x, y } }, and .phases = { { strikes, hp } } for each phase
+    -- before the last: its expected strikes (as enemyPhase's) and each blue and green unit's HP
+    -- when it began (0 if dead). With .ended, the result has no last phase: .hp and .phases only.
+    function s.look(plan, depth, between)
         return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove = stagePhase(call, plan)
-            local moved = {}
-            for _, id in ipairs(order()) do
-                local e = decides(id)
-                if e then
-                    local target, side = aiDecide(call, proc, e)
-                    if target then
-                        local t, _, addr = strike(e, id, target, side, {})
-                        moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
-                        if mem.u8(addr + UNIT_HP) == 0 then
-                            local u = byId[target]
-                            if u then remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)) end
-                        end
-                        if t.felled >= 0.5 then
-                            remove(e, side.tile.x, side.tile.y)
+            local byId, order, decides, strike, remove, gone = stagePhase(call, plan)
+            local function hpNow()
+                local hp = {}
+                for id, o in pairs(byId) do
+                    if o.faction ~= "red" then
+                        local hidden = (mem.u32(o.addr + UNIT_STATE) & US_HIDDEN) ~= 0
+                        hp[id] = hidden and 0 or mem.u8(o.addr + UNIT_HP)
+                    end
+                end
+                return hp
+            end
+            -- one phase along its expected way: each enemy goes where its own decision takes it
+            -- (a strike's tile, or the move it decides without striking), a strike takes its
+            -- expected damage, a player unit left at 0 HP is off the map, and a striker our
+            -- counter kills at even odds or better is gone -> its strikes, the moves
+            local function playExpected()
+                local moved, strikes = {}, {}
+                for _, id in ipairs(order()) do
+                    local e = decides(id)
+                    if e then
+                        local target, side = aiDecide(call, proc, e)
+                        if target then
+                            local t, _, addr = strike(e, id, target, side, {})
+                            strikes[#strikes + 1] = t
+                            moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
+                            if mem.u8(addr + UNIT_HP) == 0 then
+                                local u = byId[target]
+                                if u then remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)) end
+                            end
+                            if t.felled >= 0.5 then
+                                remove(e, side.tile.x, side.tile.y)
+                            else
+                                -- it lives: our counter's expected damage stays on it, as a
+                                -- strike's stays on its target
+                                local _, back = M.odds({ t.counterDist }, t.strikerHp)
+                                api.write8(e.addr + UNIT_HP,
+                                    math.max(1, t.strikerHp - math.floor(back + 0.5)))
+                            end
                         else
-                            -- it lives: our counter's expected damage stays on it, as a
-                            -- strike's stays on its target
-                            local _, back = M.odds({ t.counterDist }, t.strikerHp)
-                            api.write8(e.addr + UNIT_HP,
-                                math.max(1, t.strikerHp - math.floor(back + 0.5)))
+                            local x, y = followMove(e)
+                            if x then moved[#moved + 1] = { id = id, x = x, y = y } end
                         end
-                    else
-                        local x, y = followMove(e)
-                        if x then moved[#moved + 1] = { id = id, x = x, y = y } end
+                    end
+                end
+                return strikes, moved
+            end
+            local phases, firstMoved = {}, nil
+            for k = 1, depth - 1 do
+                local hp = hpNow()
+                local strikes, moved = playExpected()
+                phases[k] = { strikes = strikes, hp = hp }
+                firstMoved = firstMoved or moved
+                api.write16(S.gPlaySt + PLAY_TURN, mem.u16(S.gPlaySt + PLAY_TURN) + 1)
+                -- the fog as the phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
+                -- enemy that walked out of it is seen, one that walked into it is not
+                call(S.RefreshEntityBmMaps, {})
+                if between then
+                    -- our units ready again: the end of our phase clears what acting set
+                    -- (ClearActiveFactionGrayedStates, bmunit.c)
+                    for _, o in pairs(byId) do
+                        if o.faction == "blue" then
+                            api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE)
+                                & ~(Board.US_UNSELECTABLE | Board.US_HAS_MOVED | Board.US_HAS_MOVED_AI))
+                        end
+                    end
+                    local ph = s.staged(between)
+                    if ph and (ph.win or 0) >= 0.5 then
+                        return { hp = hpNow(), moved = firstMoved, phases = phases, ended = "win" }
+                    end
+                    if ph then
+                        local prior = { byId = byId, gone = gone }
+                        _, order, decides, strike, remove, gone = stagePhase(call, ph, prior)
+                        call(S.RefreshEntityBmMaps, {})
                     end
                 end
             end
-            -- player units and the greens: a green whose death ends the game is protected too
-            local hp = {}
-            for id, o in pairs(byId) do
-                if o.faction ~= "red" then
-                    local hidden = (mem.u32(o.addr + UNIT_STATE) & US_HIDDEN) ~= 0
-                    hp[id] = hidden and 0 or mem.u8(o.addr + UNIT_HP)
-                end
-            end
-            api.write16(S.gPlaySt + PLAY_TURN, mem.u16(S.gPlaySt + PLAY_TURN) + 1)
-            -- the fog as the first phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
-            -- enemy that walked out of it is seen, one that walked into it is not
-            call(S.RefreshEntityBmMaps, {})
+            local hp = hpNow()
             local out = playPhase(call, proc, order(), decides, strike, remove)
-            out.hp, out.moved = hp, moved
+            out.hp, out.moved, out.phases = hp, firstMoved or {}, phases
             return out
         end)
     end
+
+    -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
+    -- FR-017; the hold is the R-8 spike's intervening player turn): the look two phases deep
+    -- with no turn between. -> as look's.
+    function s.nextPhase(plan) return s.look(plan, 2) end
 
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
     -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`
@@ -1799,7 +1885,7 @@ function M.new(outer)
     -- as its moves reach the tile (M.waveCloses). Read once per board.
     -- closings() by what it reads: the turn, k, the waves, and each looter as it stands (a
     -- looter our act kills or moves is a new read). newPhase() runs before every decision.
-    local closingsAt = {}
+    -- (closingsAt is declared above isolate(), which swaps it.)
     function s.closings(k, waves)
         k = k or M.CLOSE_HORIZON
         local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)

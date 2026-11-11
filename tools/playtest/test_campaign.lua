@@ -248,6 +248,21 @@ end
 test_arrive_failure_is_a_crash()
 
 local function test_infeasible_after_max_attempts()
+
+-- api.maxAttempts (montecarlo.py `resume --attempts`): the chapter stops after that many
+-- attempts, `capped`, no verdict, and the campaign ends there as passed
+local function test_capped_after_the_callers_attempts()
+    local g = fakeGame({ chapters = { { id = 5, outcomes = { "lost", "lost", "lost" } }, { id = 6 } } })
+    g.api.maxAttempts = 2
+    local ok, why = Campaign.run(g.api)
+    check(#g.plays, 2, "capped: exactly the caller's attempts")
+    check(ok, true, "capped: a measurement cut short is no failure")
+    check(why:find("stopped after 2 attempts") ~= nil, true, "capped: says why")
+    local ls = lines(g)
+    check(ls[1].outcome, "capped", "capped: the chapter line says so")
+    check(ls[2].outcome, "capped", "capped: and the campaign line")
+end
+test_capped_after_the_callers_attempts()
     local saved = Campaign.MAX_ATTEMPTS
     Campaign.MAX_ATTEMPTS = 4
     -- One claim: 3 aggressions x 2 = 6 styles, so the allowance (4) is what stops it.
@@ -503,6 +518,26 @@ test_a_retry_remembers_the_arrivals_it_saw()
 -- showed out of fog (enemies_seen) and every killer a death showed, each once by slot and
 -- character; attempt 1 and an attempt alone (api.only) remember nothing.
 local function test_a_retry_remembers_the_enemies_it_saw()
+
+-- #510 W1: an enemy some attempt saw kill one of our units or a green (botrun marks it `killed`) is
+-- remembered so on every later retry, whether or not a later attempt saw it kill again
+local function test_a_retry_remembers_which_enemies_killed()
+    local enemies = { [1] = { { id = 0x81, charId = 0x50, classId = 1, killed = true },
+                              { id = 0x82, charId = 0x51, classId = 1 } },
+                      [2] = { { id = 0x81, charId = 0x50, classId = 1 },
+                              { id = 0x82, charId = 0x51, classId = 1, killed = true } } }
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
+                                        enemies = enemies } } }
+    Campaign.run(g.api)
+    local function marks(m)
+        local out = {}
+        for _, e in ipairs(m.enemies) do out[#out + 1] = string.format("%x:%s", e.id, tostring(e.killed)) end
+        return table.concat(out, ",")
+    end
+    check(marks(g.plays[2].style.memory), "81:true,82:nil", "attempt 2: attempt 1's killer marked")
+    check(marks(g.plays[3].style.memory), "81:true,82:true", "attempt 3: each killer kept marked")
+end
+test_a_retry_remembers_which_enemies_killed()
     local enemies = { [1] = { { id = 0x81, charId = 0x50, classId = 1 }, { id = 0x82, charId = 0x51, classId = 1 } },
                       [2] = { { id = 0x81, charId = 0x50, classId = 1 }, { id = 0x81, charId = 0x52, classId = 1 } } }
     local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },

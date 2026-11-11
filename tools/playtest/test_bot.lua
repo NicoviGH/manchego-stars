@@ -531,6 +531,31 @@ local function sightOf(o)
             return next(plan)
         end
     end
+    -- the look (#510 W1): o.look(plan, depth, between) gives its last phase's strikes and
+    -- .phases (each { strikes, hp? }), played here as the phases are; s.looked records each
+    -- call; o.lookCalls is the AiDecideMain calls a look spends (s.aiCalls counts them)
+    s.ai = 0
+    s.aiCalls = function() return s.ai end
+    if o.watching then s.watching = function() return o.watching end end
+    if o.look then
+        s.look = function(plan, depth, between)
+            s.looked = s.looked or {}
+            s.looked[#s.looked + 1] = { plan = plan, depth = depth }
+            s.ai = s.ai + (o.lookCalls or 0)
+            local hp = {}
+            for _, b in ipairs(plan.blues) do hp[b.unit.id] = b.hp end
+            local out = o.look(plan, depth, between)
+            out.hp = out.hp or hp
+            for i, t in ipairs(out) do out[i] = strikePlayed(t, t.targetHp or out.hp[t.target]) end
+            for _, ph in ipairs(out.phases or {}) do
+                ph.hp = ph.hp or hp
+                for i, t in ipairs(ph.strikes) do
+                    ph.strikes[i] = strikePlayed(t, t.targetHp or ph.hp[t.target])
+                end
+            end
+            return out
+        end
+    end
     s.attacks = function() return attacks end
     s.strikes = function() return strikes end
     s.calls = function() return attacks + strikes end
@@ -5516,6 +5541,128 @@ do
           "offer: the boss the fog hid is seen by the trigger")
     check(at(a), "0,0", "offer: and its second phase keeps A back")
     check(plan.enemies[0x82], true, "offer: the plan's enemies hold the boss")
+end
+
+-- #510 W1, the look in shadow (comment 6786548233). A at (0,0) marches to (1,0) toward a
+-- village; the next enemy phase leaves it alone (looksAhead, no boss: no lookahead trigger).
+-- o.look's last phase kills a unit standing at (1,0).
+local function shadowed(o2)
+    local board, sight, st = looksAhead(nil)
+    local o = { look = function(plan, depth, between)
+        local out = {}
+        for _, b in ipairs(plan.blues) do
+            if b.x == 1 then
+                out[1] = { enemy = 0x81, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0 }
+            end
+        end
+        out.phases = { { strikes = {} } }
+        return out
+    end, lookCalls = 30 }
+    for k, v in pairs(o2 or {}) do o[k] = v end
+    local s2 = sightOf(o)
+    for k, v in pairs(s2) do
+        if k == "look" or k == "watching" or k == "aiCalls" or k == "ai" then sight[k] = v end
+    end
+    -- the fixture's aiCalls reads its own table's count: point it at this sight's
+    sight.aiCalls = function() return s2.ai end
+    return board, sight, st, s2
+end
+local function unitOn(board, id)
+    for _, u in ipairs(board.units) do if u.id == id then return u end end
+end
+
+-- test_look_no_memory_no_look: attempt 1 has no watched enemy, so no look is asked, and the
+-- plan is the one a sight without the look plays
+do
+    local board, sight, st, s2 = shadowed()
+    local a, plan = Planner.plan(B, board, sight, st, { look = { room = 1000 } })
+    check(at(a), "1,0", "look: no watched enemy, the march goes")
+    check(s2.looked, nil, "look: no watched enemy asks no look")
+    check(plan.look, nil, "look: and records none")
+end
+
+-- test_look_is_recorded_never_ranked: a watched enemy on the field, room to pay: the look runs
+-- two phases deep, its death on the march is recorded (the judged phase's 0, then the look's
+-- sure kill), its calls counted, and the plan played is the one played without it (W1: the
+-- look feeds no rank)
+do
+    local board, sight, st, s2 = shadowed()
+    s2.ai = 0
+    local X = unitOn(board, 0x81)
+    sight.watching = function() return { X } end
+    local a, plan = Planner.plan(B, board, sight, st, { look = { room = 1000 } })
+    local lk = plan.look or { die = {}, watched = {} }
+    check(at(a), "1,0", "look: recorded, never ranked: the march is still played")
+    check(s2.looked and #s2.looked, 1, "look: one look a decision")
+    check(s2.looked and s2.looked[1].depth, Planner.LOOK_DEPTH, "look: as deep as LOOK_DEPTH")
+    check(Planner.LOOK_DEPTH, 2, "look: a trade's two phases")
+    check(lk.run, true, "look: run")
+    check(lk.die["1"], 1, "look: the march's death in the look's last phase")
+    check(lk.calls, 30, "look: its AiDecideMain calls")
+    check(lk.watched[1], 0x81, "look: the watched enemy named")
+    check(plan.protected[1].die, 0, "look: the protected unit's judged chance is untouched")
+end
+
+-- test_look_allowance_spent_is_skipped: the guess (the last look's calls) is past the room:
+-- not run, and the record says so
+do
+    local board, sight, st, s2 = shadowed()
+    sight.watching = function() return { unitOn(board, 0x81) } end
+    local a, plan = Planner.plan(B, board, sight, st, { look = { room = 29, last = 30 } })
+    plan.look = plan.look or {}
+    check(s2.looked, nil, "look: an allowance it cannot pay runs no look")
+    check(plan.look.skipped, true, "look: skipped")
+    check(plan.look.run, nil, "look: not run")
+    -- the first look's guess is the depth times the enemies on the field (one here)
+    board, sight, st, s2 = shadowed()
+    sight.watching = function() return { unitOn(board, 0x81) } end
+    a, plan = Planner.plan(B, board, sight, st, { look = { room = 1 } })
+    plan.look = plan.look or {}
+    check(plan.look.estimate, Planner.LOOK_DEPTH * 1, "look: first guess, depth x enemies")
+    check(plan.look.skipped, true, "look: a room below it skips")
+end
+
+-- test_look_folds_the_phases_between: a three-phase look whose middle phase kills the
+-- marcher along its expected way: its death is in the record though the last phase strikes no one
+do
+    local board, sight, st, s2 = shadowed({ look = function(plan)
+        local mid = {}
+        for _, b in ipairs(plan.blues) do
+            if b.x == 1 then
+                mid[1] = { enemy = 0x81, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0 }
+            end
+        end
+        return { phases = { { strikes = {} }, { strikes = mid } } }
+    end })
+    sight.watching = function() return { unitOn(board, 0x81) } end
+    local depth = Planner.LOOK_DEPTH
+    Planner.LOOK_DEPTH = 3
+    local _, plan = Planner.plan(B, board, sight, st, { look = { room = 1000 } })
+    Planner.LOOK_DEPTH = depth
+    plan.look = plan.look or { die = {} }
+    check(plan.look.depth, 3, "look: three phases")
+    check(plan.look.die["1"], 1, "look: the middle phase's expected strike counts")
+end
+
+-- test_look_turn_between_is_the_beams_best: opts.unjudged gives the beam's best plan, every
+-- other unit holding, as the phase table it leaves -- our turn between attacks: A's sure kill
+-- of an adjacent enemy is in it, the enemy gone, and no enemy phase was judged
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local E = red(0x81, 1, 0, { hp = 10, minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc({ hit = 100, dmg = 20, hits = 1 }) } } },
+        enemyPhase = function() error("unjudged: no enemy phase is judged") end,
+    }
+    local board, sight = boardOf(A, E), sightOf(o)
+    local ok, ph = pcall(Planner.plan, B, board, sight, style("careful"), { unjudged = true })
+    ph = ok and type(ph) == "table" and ph.blues and ph or { blues = { { unit = {} } }, gone = {} }
+    check(ph.blues[1].unit.id, 0x01, "between: our unit in the table")
+    check(ph.gone[0x81], true, "between: its sure kill leaves the enemy gone")
+    check(ph.win, 1, "between: the Rout's last enemy gone ends the chapter")
 end
 
 if fails > 0 then

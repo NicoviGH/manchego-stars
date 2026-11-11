@@ -738,8 +738,13 @@ do
         return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x85, killerId = 0x85,
                    phase = "enemy" } }
     end
+    local ended
+    g.api.trace = function(ev)
+        if ev.t == "end" then ended = #ev.record.enemies_seen end
+    end
     Botrun.run(g.api)
     local r = recordOf(g)
+    check(ended, #r.enemies_seen, "arrival: the trace's copy of the record lists the enemies seen too")
     local d = r.deaths[1]
     check(d and d.killerClass, 0x22, "arrival: the killer's class, from the board after the phase")
     local shown = false
@@ -747,6 +752,14 @@ do
         if e.id == 0x85 and e.classId == 0x22 then shown = true end
     end
     check(shown, true, "arrival: the killer in fog is among the enemies seen (the fight showed it)")
+    -- #510 W1: the killer is marked `killed` (the look watches it); a red that killed no one is not
+    local killed, other = nil, nil
+    for _, e in ipairs(r.enemies_seen) do
+        if e.id == 0x85 then killed = e.killed end
+        if e.id == 0x81 then other = e.killed end
+    end
+    check(killed, true, "watched: the killer is marked killed")
+    check(other, nil, "watched: a red that killed no one is not")
 end
 
 -- test_enemies_seen_keep_a_reused_slot (ADR 0399): a red seen, then killed, and a reinforcement
@@ -1758,6 +1771,59 @@ do
     check(r.lookahead.cpu_s, 0.5 * n, "and their CPU")
     check(left[1], Planner.LOOK_ATTEMPT, "the first is told the whole attempt budget")
     check(left[2], Planner.LOOK_ATTEMPT - 3, "the next what the first left")
+end
+
+-- test_the_record_sums_the_look (#510 W1): each plan's look (asked, run, skipped, its calls,
+-- the turns between's, CPU) is summed into rec.look and traced on the plan; the planner is told
+-- the look's room, a quarter of the attempt's AiDecideMain calls outside the look so far less
+-- what the look spent, and the last look's cost as the next one's guess.
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = rout() }
+    local sight = g.api.sight
+    local ai = 1000   -- the game's count before the attempt: not the attempt's
+    g.api.sight = function()
+        local s = sight()
+        s.aiCalls = function() return ai end
+        return s
+    end
+    local told = {}
+    g.api.Planner = {
+        surprise = Planner.surprise, LOOK_ATTEMPT = Planner.LOOK_ATTEMPT,
+        plan = function(_, board, _, _, opts)
+            told[#told + 1] = { room = opts.look.room, last = opts.look.last }
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil, nil, {} end
+            end
+            -- the decision's own calls, then the look's 40 (10 of them its turn between)
+            ai = ai + 400
+            local look = { asked = true, run = true, calls = 40, between_calls = 10, cpu_s = 0.25 }
+            if #told > 1 then look = { asked = true, skipped = true } end
+            ai = ai + (look.calls or 0)
+            local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                             targetId = 0x81, move = { x = 0, y = 0 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                              look = look }, {}
+        end,
+    }
+    local traced = {}
+    g.api.trace = function(ev)
+        if ev.t == "plan" and ev.look then traced[#traced + 1] = ev.look end
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(#traced >= 2, true, "look: each plan's look traced")
+    check(r.look.asked, #traced, "look: every look asked counted")
+    check(r.look.run, 1, "look: run once")
+    check(r.look.skipped, #traced - 1, "look: the rest skipped")
+    check(r.look.calls, 40, "look: its calls summed")
+    check(r.look.between_calls, 10, "look: the turns between's")
+    check(r.look.cpu_s, 0.25, "look: and its CPU")
+    check(told[1].room, 0, "look: no call made yet, no room")
+    check(told[1].last, nil, "look: no look yet, no guess")
+    -- after the first: 440 calls in the attempt, 40 of them the look's: (440 - 40) / 4 - 40
+    check(told[2].room, 60, "look: a quarter of the others, less what the look spent")
+    check(told[2].last, 40, "look: the last look's cost is the next one's guess")
 end
 
 -- test_an_exhausted_lookahead_is_an_anomaly (#570): a decision the attempt's budget left one
