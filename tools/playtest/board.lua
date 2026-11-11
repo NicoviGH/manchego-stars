@@ -529,7 +529,7 @@ function Board.bind(mem, SYM)
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
-        freeBeside = Board.freeBeside,
+        freeBeside = Board.freeBeside, memoryKey = Board.memoryKey,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
