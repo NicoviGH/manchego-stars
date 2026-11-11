@@ -9,36 +9,22 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, W1: the probe kept; the boss alternative in shadow).**
+**Next session starts here (2026-11-11, W1: the widened replan built; the boss still not killed).**
 Carry on with **#510 PR W1** on branch `feat/510-w1-look-shadow` (pushed, no PR). The design,
 its approved calls and W1's build map are ONE comment, #510 comment 6786548233, edited in
 place: read it first. Tell Nicolas where W1 stands in plain words at the start.
-- **Done this session:** `a7d48aed` the probe kept as `Bot.explain` (every plan's trace event
-  carries `why`, the look one a turn between; `montecarlo.py story --why` prints them; play and
-  AI calls unchanged, time unchanged, traces +14%/+30% gzipped). `555382ac` the boss
-  alternative in shadow (`look.boss`, `opts.aim = "boss"`; `montecarlo.py look` has its table).
-- **Ch6 4001 attempt 2, shadow run `w1p` (findings on the build map):** the retry remembers
-  boss Novala on (19,6) in fog. The capped march on it reaches the boss by turn 8 (Seth,
-  Vanessa, Garcia beside it) but **never strikes**: a turn between plans on the board as its
-  turn begins, the boss still in fog, and nothing replans when a move shows it (live play
-  does, `Planner.surprise`). It puts Eirika at 97% to die over the 5 looked phases (Franz 92%,
-  Lute 67%); the villager stays at 83%.
-- **Next (Nicolas, 2026-11-11: "Ok but next session"): the widened replan, in the look only.**
-  Found before building: copying live play's replan into the turn between would change
-  nothing here. `Planner.surprise` replans on "an enemy came into sight" only for a red NOT in
-  `plan.enemies` (planner.lua:2120), and on a retry that list holds the remembered fogged ones
-  (ctx.threats, ADR 0399), so stepping beside remembered Novala replans nothing and she cannot
-  be targeted that turn (fogged tile). Checked in the code, not watched in a run. The approved
-  rule: an enemy fogged before an act and seen after it is a surprise, remembered or not
-  (attempt 1 unchanged: such an enemy is never in its list). Build it in the look's turn
-  between only: play the turn's acts in order, and after the first act that shows a fogged
-  enemy (a new sight primitive: stagePhase the partial plan in a nested sandbox, mark those
-  units acted, `RefreshEntityBmMaps` -- bmmap.c:644 recomputes the fog -- then `s.staged`),
-  replan the rest unjudged and join them. Rerun `w1p`'s start (`resume --game vanilla
-  --campaigns cs-s4001 --chapter 7 --last 7 --attempts 2`, a new tag) and read whether Seth's
-  sure kill on turn 8 comes before the villager's strike, at what cost to Eirika. If it does,
-  the same rule for live play on retries is Nicolas's call. Then Ch6 4002/4010, mends judged
-  by the look, `make test` timed.
+- **Done this session:** `bda5624f` the widened replan in the look's turn between only (an
+  enemy fogged before an act and seen after it is a surprise, remembered or not):
+  `sight.reveals`, `sight.after`, `Planner.joinTurn`; `story --why` prints each replan.
+- **Ch6 4001 attempts 1-2, shadow run `w1q`** (play act for act as `w1p`): the boss is NOT
+  killed. The rule fires on most turns between in fog; the replans fight what each move
+  shows, so the boss march is a turn slower. On turn 8 Novala comes into sight after
+  Gilliam's step, Seth has already moved out of reach, the replan sends Joshua (1 HP): no
+  kill. Villager 83% unchanged. Eirika 0% (was 97%), Joshua 92%, Franz 88%. The look cost
+  +46% AI calls (8,518 -> 12,427), CPU 47 -> 86 s. So the same rule for live play is not
+  supported by this start (Nicolas's call; recommend not).
+- **Next:** what Nicolas picks from the end of the 2026-11-11 session. Otherwise the build
+  map's "Left in W1": Ch6 4002/4010 shadow runs, mends judged by the look, `make test` timed.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
