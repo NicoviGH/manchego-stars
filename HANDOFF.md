@@ -15,13 +15,13 @@ the direction ("this project is yours too, so take ownership and be proactive");
 subagents to check source, ADRs and research before claiming or building.
 
 **What changed today.**
-- **PR #600 (`feat/510-known-boss-goal`, ADR 0401), open, reviewed, CI on its head commit
-  pending when this was written:** on a Defeat Boss map a boss the party knows of is the march
+- **PR #600 merged (`786c4127`, ADR 0401; Nicolas: "Yes I think we can merge it"):** on a Defeat Boss map a boss the party knows of is the march
   goal, in sight or remembered by a retry; the boss is the unit the objective names. Witness
   (`resume --tag kb1`, `kb2`): **the eight vanilla campaigns stopped at Ch6 all clear it clean**
   (seven on attempt 2, one on attempt 3, 4 to 6 turns; none did in 6 styles before). Suite
   `--held-out`: promoted, 0 regressions, every number as ADR 0400's. No first attempt changes.
-  The merge waits on Nicolas: the call in ADR 0401 is Fable's and he has not read it yet.
+  The ADR says the principle is Nicolas's and the call Fable's. Reviewed by /code-review and an
+  independent reviewer, one scoped re-review; every finding fixed.
 - **Why Ch6 stopped the campaigns** (findings: #510 comment 6786548233, the two Fable entries):
   its Civilians die from turn 8 unless the boss falls first (192 wins read), and retry memory
   had made retries slower (median 12 to 13.5 turns against 10), because a retry marched on its
@@ -35,13 +35,25 @@ subagents to check source, ADRs and research before claiming or building.
   Ch1 0 of 50, validity held; in `cells.jsonl`, not posted). `pilot --chapter 0` was stopped
   partway. Manchego Stars' ch02 stop is parked for step 10 and is not a blocker to raise.
 
-**Next step.** Once #600 is merged: carry the vanilla campaigns on from Ch6 (`montecarlo.py
-starts` or `resume` with no `--last`) and read where they stop next. Known walls ahead, from
-the scout starts: Ch8's chests at (1,3) and (2,3) never reached; `scout-ch13` loses 108 of 161
-(mostly over the cap, the killer in sight); `scout-ch14` ends `stuck` on turn 19 every run;
-Ch5x (4003) stalls on turn 33. Find each wall's cause in the records and traces before
-building anything: Ch6's was not the one the design assumed.
+**In flight when this was written (2026-11-11, 16:09 on): run `fwd1`.** The eight vanilla
+campaigns that were stopped at Ch6 play on from it through chapter index 10 (`montecarlo.py
+resume --game vanilla --campaigns cs-s4001,cs-s4002,cs-s4004,cs-s4005,cs-s4006,cs-s4007,
+cs-s4009,cs-s4010 --chapter 7 --last 10 --tag fwd1 --jobs 8`, on main at `786c4127`). **Before
+anything else: `pgrep -fl mgba`.** If workers are still running, do not edit Lua, switch
+branches or start a run. Its records are the `fwd1-*` lines of
+`references/sim/vanilla/c25b145e3745/resume-runs.jsonl` (a campaign's last line says why it
+stopped); its traces are under `traces/fwd1-cs-s40*/`. If it was cut short (the session ended),
+the records it wrote stand; rerun the campaigns that have no closing line under a new tag.
 
+**Next step.** Read `fwd1`: how many campaigns clear Ch6 again, whether Ch7 is clean, and
+where each stops and why (send a cheaper subagent over the records and traces). The bot cannot
+beat the game yet. Known walls ahead, from the scout starts (which carry earlier losses, so
+their parties are weaker than a clean campaign's): Ch8's chests at (1,3) and (2,3) never
+reached; `scout-ch13` loses 108 of 161 (mostly over the cap, the killer in sight);
+`scout-ch14` ends `stuck` on turn 19 every run; Ch5x (4003) stalls on turn 33. Nothing past
+Ch14 has been played. For each wall: read the records and traces, name the cause, then build
+the smallest thing. Ch6's cause was not the one the design assumed, and one existing option
+fixed it. Write the findings on #510 (comment 6786548233 holds today's).
 
 **Key files:** `tools/playtest/sight.lua` (`s.look`, `s.walkers`, `s.reveals`, `s.after`,
 `s.staged`), `tools/playtest/planner.lua` (the look block after "The look, in shadow";
