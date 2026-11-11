@@ -65,7 +65,7 @@
 --                            for `e` / our unit, kill / die = the chance it kills `e` / our unit,
 --                            killsTarget = the plain simulation (every hit lands, nothing
 --                            procs) leaves `e` at 0. nil when (x, y) is out of our range.
---   strike(u, e, x, y)       `e`'s own strike on `u` standing on (x, y), on its phase: the
+--   strike(u, e, x, y, slot, from)  `e`'s own strike on `u` standing on (x, y), on its phase: the
 --                            enemy phase's per-unit step (cp_decide.c CpDecide_Main: the maps
 --                            rebuilt, AiUpdateNoMoveFlag, the combat weight table,
 --                            AiInitDangerMap, AiClearDecision), then AiDecideMain itself -- the
@@ -76,6 +76,9 @@
 --                            (the window's), takenSlot, takenTile, takenDist (what it takes off
 --                            `u`), counterDist (what `u`'s counter takes off `e`). All 0 (slot/
 --                            tile nil, takenDist nothing) when the AI does not strike `u` there.
+--                            `from` ({ x, y }, optional): `e` is first stood there, in the
+--                            sandbox only -- the strike an enemy seen before would make from
+--                            the fog's edge (Bot.fogRead, #510 PR A).
 --   batch(fn)                fn's reads in one save/load: one decision's worth of questions
 --                            cost one state round trip, not one each.
 --   fullInfo(fn)             batch(), the fog off (M.fullInfo): fn(board), the board read with
@@ -1455,10 +1458,11 @@ function M.new(outer)
         return target, side
     end
 
-    function s.strike(u, e, x, y, slot)
+    function s.strike(u, e, x, y, slot, from)
         local all = units()
         local t = sandbox(function(call, proc)
             standOn(u, x, y)
+            if from then standOn(e, from.x, from.y) end
             M.equip(api, call, S, u, slot)
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.

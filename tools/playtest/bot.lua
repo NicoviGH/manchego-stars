@@ -405,6 +405,76 @@ function M.enemiesOf(board, sight)
     return out
 end
 
+M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
+
+-- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
+-- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit on
+-- (x, y) within FOG_REACH of an unseen tile meets one strike from the strongest enemy seen so
+-- far, stood on the nearest unseen tile no other unit stands on (sight.strike's `from`: the
+-- game's AI choosing from there, the unit its one target; a tile another hidden unit holds would
+-- put two units on one cell of the map, while the enemy's own tile is where it stands). Seen so far is `seen` (unit slot -> charId, botrun's: every red a
+-- board showed out of fog this attempt), else the enemies in sight; of each class and kit the
+-- highest level is asked. -> { die(u, x, y, hp): the chance that strike kills `u` at `hp`, 0
+-- with no free unseen tile in reach or no enemy seen; unseen: every tile the fog hides }. Its
+-- strikes are memoised for the decision.
+function M.fogRead(board, sight, seen)
+    local unseen = sight.unseen and sight.unseen() or {}
+    local reps, kits, memo = {}, {}, {}
+    if #unseen > 0 and sight.strike then
+        for _, u in ipairs(board.units) do
+            local ok = u.faction == "red" and u.onField and not u.dead
+            if ok then
+                if seen then ok = seen[u.id] == u.charId else ok = not u.fogged end
+            end
+            local kit
+            if ok then
+                local ids = {}   -- board.lua's items: { id, uses }
+                for _, it in ipairs(u.items or {}) do ids[#ids + 1] = it.id end
+                kit = tostring(u.classId) .. ":" .. table.concat(ids, ",")
+            end
+            local had = kit and kits[kit]
+            if kit and not had then
+                kits[kit] = #reps + 1
+                reps[#reps + 1] = u
+            elseif had and (u.level or 0) > (reps[had].level or 0) then
+                reps[had] = u
+            end
+        end
+    end
+    -- the unit on each tile, hidden ones too (board.lua reads every unit's tile)
+    local held = {}
+    for _, u in ipairs(board.units) do
+        if u.onField and not u.dead then held[tileKey(u.x, u.y)] = u.id end
+    end
+    local odds = sight.odds or function() return 0 end
+    local function die(u, x, y, hp)
+        if #reps == 0 or hp <= 0 then return 0 end
+        local worst = 0
+        for _, e in ipairs(reps) do
+            -- the nearest unseen tile in reach that no unit but `e` itself holds
+            local edge, near
+            for _, t in ipairs(unseen) do
+                local d = manhattan(t.x, t.y, x, y)
+                local by = held[tileKey(t.x, t.y)]
+                if d <= M.FOG_REACH and (not by or by == e.id) and (not near or d < near) then
+                    edge, near = t, d
+                end
+            end
+            if edge then
+                local k = u.id .. "@" .. x .. "," .. y .. "/" .. e.id
+                local f = memo[k]
+                if not f then
+                    f = sight.strike(u, e, x, y, nil, edge)
+                    memo[k] = f
+                end
+                worst = math.max(worst, (odds({ f.takenDist }, hp)))
+            end
+        end
+        return worst
+    end
+    return { die = die, unseen = unseen }
+end
+
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
@@ -417,6 +487,12 @@ local function context(board, sight)
     -- the map the phase memos are kept on (sight.mapKey): a door or wall the phase opened
     ctx.mapKey = sight.mapKey and sight.mapKey() or "-"
     ctx.enemies = M.enemiesOf(board, sight)
+    -- the fog read (M.fogRead), built when first asked: ctx.seen is M.candidates' opts.seen
+    local fog
+    ctx.fogRead = function()
+        fog = fog or M.fogRead(board, sight, ctx.seen)
+        return fog
+    end
     for _, u in ipairs(board.units) do
         -- a carried unit (Rescue): off the field, at its carrier's tile, by its id
         if u.carriedBy and not u.dead then ctx.carried[u.id] = u end
@@ -817,7 +893,7 @@ objectiveTile = function(ctx, u, objective)
     if kind == "survive" then return nil end
     if #ctx.enemies == 0 and ctx.sight.unseen then
         local best, bestD
-        for _, t in ipairs(ctx.sight.unseen()) do
+        for _, t in ipairs(ctx.fogRead().unseen) do
             local d = manhattan(u.x, u.y, t.x, t.y)
             if not bestD or d < bestD then best, bestD = t, d end
         end
@@ -1956,6 +2032,7 @@ function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     ctx.explored = opts and opts.explored or {}
+    ctx.seen = opts and opts.seen
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
     -- memoised for the decision (turnsFor's ctx.keyTurns): the planner asks it per goal, taker

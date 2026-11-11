@@ -336,6 +336,36 @@ do
     check(recordOf(g).outcome, "crashed", "it is recorded as crashed")
 end
 
+-- A move the game halted on a unit the fog hid (FE8's ambush: api.act says "trapped") is no
+-- crash: the unit's turn is over one step short, the trace says where it stopped, and the run
+-- plays on.
+do
+    local g = fakeGame { units = rout() }
+    local act, trapped = g.api.act, 0
+    g.api.act = function(a)
+        if trapped == 0 then
+            trapped = trapped + 1
+            for _, u in ipairs(g.units) do
+                if u.id == a.unitId then u.acted = true end
+            end
+            return "trapped"
+        end
+        return act(a)
+    end
+    local events = {}
+    g.api.trace = function(ev) events[#events + 1] = ev end
+    Botrun.run(g.api)
+    check(trapped, 1, "trapped: one move was halted")
+    check(recordOf(g).outcome ~= "crashed", true, "trapped: the run is no crash")
+    local said
+    for _, e in ipairs(events) do
+        if e.t == "act" and e.trapped then said = e end
+    end
+    check(said ~= nil, true, "trapped: the trace marks the act")
+    check(said and said.to and said.from and said.to.x == said.from.x and said.to.y == said.from.y,
+          true, "trapped: and says it ended where the unit stopped, not where it was sent")
+end
+
 -- An action that leaves its unit able to act would be asked for again forever.
 do
     local g = fakeGame { units = rout() }
@@ -1341,6 +1371,78 @@ do
     local d = r.deaths[1]
     check(d and d.flags.reinforcement, false, "same phase: the killer fell after its kill")
     check(d and d.cause, "rng_tail", "same phase: the plan's 30% was the roll")
+end
+
+-- test_the_planner_is_told_every_enemy_seen (#510 PR A, the fog rule): opts.seen holds every
+-- red a board showed out of fog this attempt, slot -> charId, and never one only ever fogged.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10),
+                                   unit(0x82, 1, "red", 9, 9, 10) } }
+    for _, u in ipairs(g.units) do
+        if u.id == 0x82 then u.fogged = true end
+    end
+    local got
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board, _, _, opts)
+            got = got or opts.seen
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true } }
+        end,
+    }
+    Botrun.run(g.api)
+    check(got and got[0x81], 0x81, "seen: a red in sight, by slot, its charId")
+    check(got and got[0x82], nil, "seen: not one only ever fogged")
+end
+
+-- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
+-- graded by the plan that moved it, not by a later replan that found it over the cap; a unit
+-- no plan moved this turn falls back to the phase's last plan.
+do
+    local function run(moveFirst)
+        local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                       unit(0x03, 2, "blue", 0, 3, 20), unit(0x81, 0, "red", 0, 1, 10) },
+                             enemy = function(g, find)
+                                 local u = find(0x01)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                                 g.killNow = true
+                                 return {}
+                             end }
+        g.api.killed = function()
+            if not g.killNow or g.told then return {} end
+            g.told = true
+            return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                       phase = "enemy" } }
+        end
+        g.api.Planner = {
+            surprise = function() return "the plan is played out" end,
+            plan = function(_, board)
+                local left, n = {}, 0
+                for _, u in ipairs(board.units) do
+                    if u.faction == "blue" and u.onField and not u.acted then left[u.id], n = u, n + 1 end
+                end
+                local id = (moveFirst and left[0x01]) and 0x01 or (left[0x02] and 0x02)
+                    or (left[0x03] and 0x03) or nil
+                if not id then return nil end
+                -- the first plan read 0x01 at 30%; every replan after it, at 90%
+                local die = n == 3 and 0.3 or 0.9
+                local a = { unit = id, unitId = id, act = "wait", move = { x = left[id].x, y = left[id].y } }
+                return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                            predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = die,
+                                          taken = 6, strikes = 1, strikers = { 0x81 } } } }
+            end,
+        }
+        Botrun.run(g.api)
+        return recordOf(g).deaths[1]
+    end
+    local d = run(true)
+    check(d and d.predicted, 0.3, "moved by the first plan: its 30%, not the replan's 90%")
+    check(d and d.plan_ref, 1, "and its plan_ref is the mover's (the first plan made)")
+    d = run(false)
+    check(d and d.predicted, 0.9, "moved by no plan: the phase's last plan")
 end
 
 -- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose

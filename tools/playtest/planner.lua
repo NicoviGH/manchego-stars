@@ -23,7 +23,9 @@
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
 --      for each unit's chance to die there (a green one's too: it spoils the clear; a recruit
 --      our counter fells loses its goal; a unit whose death ends the game costs the chapter), its
---      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
+--      expected damage. A unit left beside ground it cannot see also meets one strike from the
+--      strongest enemy seen so far, stood at the fog's edge: its own rank key, not its chance
+--      to die (M.outranks' `fog`).
 --      The plans are then ranked, not summed (ADR 0384): one whose protected units (every
 --      blue, and any unit whose death ends the game) each die at no more than the style's cap
 --      (M.CAPS) outranks any that does not. With none under it, the one least likely to end
@@ -63,7 +65,8 @@
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts
 -- (an attack act carries `die`: its counter's chance to kill the attacker),
--- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
+-- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, `fog`
+-- the fog read's chance to kill a blue one, on the played plan only (Bot.fogRead); and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
@@ -75,7 +78,8 @@
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
 -- chance), value (the judged score), game_over (the chance a unit whose death ends the game
--- dies), max_exceed, sum_exceed, max_die, sum_die, hp_left, key }, forfeited = the ids it
+-- dies), max_exceed, sum_exceed, max_die, sum_die, hp_left, fog (the fog read's summed
+-- chance to kill, where the chapter goes on), key }, forfeited = the ids it
 -- closes, ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
 -- seizeJudged / seizeAdmitted = whether any plan judged took the Seize, and one within the
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
@@ -83,7 +87,9 @@
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
--- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, visibility =
+-- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, mend_rounds =
+-- { before, now } (whether a plan judged without the mend's later rounds was under the cap,
+-- and whether the played one is: #510 PR A), visibility =
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
@@ -100,6 +106,8 @@
 -- uncertain kills left to the average past BRANCH), look = { decisions, triggered, extended,
 -- skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
 -- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
+-- opts.seen = unit slot -> charId, every red a board showed out of fog this attempt (optional,
+-- botrun's): the fog rule's strongest enemy is one of these; without it, one in sight.
 -- opts.rest = the act keys (M.key) of the plan in hand not yet played (optional; botrun's on a
 -- replan): judged as one more plan, kind "rest", its acts as this board still offers them.
 -- opts.diag = "deep" (a diagnostic replay's, FR-019): every decision's finalists meet the
@@ -124,6 +132,7 @@ M.BEAM = 6         -- partial plans kept at each depth
 M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam tries (and its
                    -- hold and retreat, always: the way out survives the cut)
 M.FINAL = 4        -- complete plans judged against the enemy phase
+M.MEND_ROUNDS = 3  -- the mend's rounds; past the first, only while no plan is under the cap
 -- the uncertain kills the judge plays both ways (2^n enemy phases), so a protected unit's death
 -- chance is a sum over the ways the phase can go, never read off an average that keeps a
 -- likely kill gone (FR-009). Even an enemy that reaches no one is played both ways: its death
@@ -133,12 +142,11 @@ M.FINAL = 4        -- complete plans judged against the enemy phase
 -- (`averaged`). ADR 0384 has the cost.
 M.BRANCH = 8
 M.AUDIT_WAYS = 4  -- the judged phase's ways whose chances a plan's audit record keeps
-M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
 
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
--- whose death ends it (a lord's); fog: a fragile unit beside the unseen; gold: points per gold
+-- whose death ends it (a lord's); gold: points per gold
 -- a goal is worth (goals.lua: under careful no item outweighs a life, under bold a good one
 -- does). What each further turn to a goal leaves of its chance is goals.lua's GAMMA.
 -- Ground toward a goal, a Visit, a Talk recruit and the win itself: the goals' term (goalTerm
@@ -147,11 +155,11 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 -- win is the same win, so it waits while what it would close is worth more than the waiting.
 M.WEIGHTS = {
     careful = { death = 1000, taken = 2, dealt = 1, kill = 30, heal = 1.5, breach = 25,
-                win = 100000, fog = 40, gold = 0.04 },
+                win = 100000, gold = 0.04 },
     even = { death = 300, taken = 1, dealt = 1, kill = 30, heal = 1, breach = 25,
-             win = 100000, fog = 15, gold = 0.08 },
+             win = 100000, gold = 0.08 },
     bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, heal = 0.5, breach = 25,
-             win = 100000, fog = 0, gold = 0.15 },
+             win = 100000, gold = 0.15 },
 }
 
 -- The most predicted death chance a style accepts for any protected unit in a plan (ADR 0384,
@@ -191,13 +199,19 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- the rank would see). The score after the progress, so a unit chips, heals or kills only
 -- from as forward a tile as its march: the advisory panel's decision, on Nicolas's
 -- instruction (ADR 0384's amendment of 2026-11-02, research record 0024, which has the
--- numbers; why the reverse order lost more units is open, #565). Last the largest death
--- chance, the summed one, more HP left, and the acts as a stable key.
+-- numbers; why the reverse order lost more units is open, #565). Then the fog (#510 PR A step
+-- 4): the summed chance the fog's strike kills a unit, on the ways the plan does not end the
+-- chapter (Bot.fogRead), less first. A tie-breaker only: inside the cap it froze the bot on
+-- Ch6, and ranked right after admission it held the army back from the fog until the Bael
+-- reached the Civilians (#510 comments 6780781911, 6781704202); a first attempt cannot know
+-- what the fog hides, a retry can (PR B). Last the largest death chance, the summed one, more
+-- HP left, and the acts as a stable key.
 local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
                    { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
-    local order = { { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 }, { "key", 1 } }
+    local order = { { "fog", 1 }, { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 },
+                    { "key", 1 } }
     local lead = {}
     if not a.admitted then
         lead = { { "first_game_over", 1 }, { "first_max_exceed", 1 }, { "first_sum_exceed", 1 },
@@ -976,7 +990,12 @@ function M.plan(Bot, board, sight, style, opts)
     end
 
     -- judge one complete plan against the enemy phase the AI would play
-    local unseen = sight.unseen and sight.unseen() or {}
+    -- The fog read (Bot.fogRead, #510 PR A step 4): each unit's chance to die to one strike
+    -- from the strongest enemy seen so far, stood at the fog's edge. It never enters the cap,
+    -- which reads the enemies in sight only (priced inside it, it froze the bot on Ch6: #510
+    -- comment 6780781911); it breaks ties after everything else the rank reads (M.outranks'
+    -- `fog`) and orders the best plan's acts (below).
+    local fogDie = (offer and Bot.fogRead(board, sight, opts and opts.seen) or ctx.fogRead()).die
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0,
@@ -1288,6 +1307,15 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
         end
+        -- the fog's strike, after the phase: on the HP the phase is expected to leave. Its own
+        -- number, never the unit's chance to die (the cap's). Read here, not when the rank
+        -- first reaches it: M.outranks runs inside table.sort, and a sandbox call there yields
+        -- across a C call (every scout-ch6 run crashed so, review of #598)
+        st.fogBy, st.fogSum = {}, 0
+        for _, p in ipairs(planned) do
+            local f = fogDie(p.unit, p.x, p.y, p.hp - (taken[p.unit.id] or 0))
+            if f > 0 then st.fogBy[p.unit.id], st.fogSum = f, st.fogSum + f end
+        end
         st.predict = {}
         for _, g in ipairs(greens) do
             judged = judged - loss(W, st, g.charId) * die[g.id]
@@ -1322,14 +1350,6 @@ function M.plan(Bot, board, sight, style, opts)
                                             strikes = struck[id], strikers = by }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
             judged = judged - loss(W, st, p.unit.charId) * die[id] - W.taken * short[id]
-            if W.fog > 0 then
-                for _, t in ipairs(unseen) do
-                    if math.abs(t.x - p.x) + math.abs(t.y - p.y) <= M.FOG_REACH then
-                        judged = judged - W.fog * 10 / math.max(p.hp, 1)
-                        break
-                    end
-                end
-            end
         end
         -- the goals, as the phase leaves them: who lives to take each, and each recruit our
         -- counter may have felled (its goal lost)
@@ -1366,10 +1386,13 @@ function M.plan(Bot, board, sight, style, opts)
                 greenDie = greenDie + (die[g.id] or 0)
             end
         end
-        local rank = { admitted = true, forfeits = #st.forfeited, complete = winOf(st, fell),
+        local won = winOf(st, fell)
+        local rank = { admitted = true, forfeits = #st.forfeited, complete = won,
                        progress = gain, green_die = greenDie, value = judged, game_over = 0,
                        max_exceed = 0, sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0,
                        key = table.concat(st.keys, " ") }
+        -- `fog`, on the ways the plan does not end the chapter
+        rank.fog = st.fogSum * (1 - won)
         st.protected = {}
         -- a unit's death in the plan: its counter's (score's fx.die, the chance the exchange
         -- kills it) and the phase's after it. The cap reads both: a counter that can kill is
@@ -1489,7 +1512,11 @@ function M.plan(Bot, board, sight, style, opts)
     -- it tries instead the player acts that could save it, one ending beside it (a block) or
     -- striking an enemy that strikes it. A recruit our counter may kill tries the acts of the
     -- units it strikes.
-    if best then
+    -- With no plan under the cap the mend goes again from the plan it found, up to
+    -- M.MEND_ROUNDS rounds, so more than one unit may change (#510 PR A): one round changed one
+    -- unit, and two units each over the cap where they stood stayed a fallback.
+    for round = 1, M.MEND_ROUNDS do
+        if not best or (round > 1 and best.rank.admitted) then break end
         local base, menuOf, risky = best, {}, {}
         for _, m in ipairs(menus) do
             local mine = {}
@@ -1548,11 +1575,15 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, x in ipairs(base.acts) do
                         if x.unitId ~= t.uid then st = extend(st, x, x.unitId) or st end
                     end
-                    consider(complete(st), "mend")
+                    st = complete(st)
+                    -- a later round: new with #510 PR A
+                    st.newer = round > 1 or base.newer or nil
+                    consider(st, "mend")
                 end
             end
         end
         pick()
+        if best == base then break end   -- no mend outranked the plan it started from
     end
     -- The lookahead (FR-017, FR-018): at an irreversible transition, the finalists (the best
     -- M.FINAL plans judged, by rank) each meet a second enemy phase, our units holding between
@@ -1687,8 +1718,15 @@ function M.plan(Bot, board, sight, style, opts)
             if u.fogged then fogged = fogged + 1 else seen = seen + 1 end
         end
     end
+    -- mend_rounds (#510 PR A): whether a plan the planner judged before the mend's later rounds
+    -- (st.newer) was under the cap, beside whether the played one is
+    local oldUnder = false
+    for _, j in ipairs(judgedPlans) do
+        if j.ok and not j.st.newer and j.st.rank.admitted then oldUnder = true end
+    end
     best.audit = { offered_n = offeredN, visibility = { seen = seen, fogged = fogged },
-                   budget = { exhausted = look.skipped == true, averaged = best.averaged or 0 } }
+                   budget = { exhausted = look.skipped == true, averaged = best.averaged or 0 },
+                   mend_rounds = { before = oldUnder, now = best.rank.admitted == true } }
     -- no plan under the cap: the least likely to end the game, then the least over it, is
     -- played, and says so (FR-011, ADR 0384 amended)
     best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil
@@ -1736,6 +1774,44 @@ function M.plan(Bot, board, sight, style, opts)
         best.ledger[#best.ledger + 1] = { id = r.id, kind = r.kind, closes_on = r.closes_on,
                                           needs = r.needs,
                                           status = shut[r.id] and "closed" or r.status }
+    end
+    -- Sturdy first, fragile last (#510 PR A's fog rule): the acts of units the fog's strike
+    -- threatens (predict's `fog`) are played after the others', the most threatened last, so a
+    -- unit that shows what the fog hid moves before them and botrun's replan (M.surprise: a
+    -- newly seen enemy) plans them around it. Kept only when the plan rebuilt in that order
+    -- expects every act to end as judged (extend's expect: HP, a kill, the target's HP).
+    local fogBy, any = best.fogBy or {}, false
+    for _, p in ipairs(best.predict or {}) do
+        if fogBy[p.id] then p.fog, any = fogBy[p.id], true end
+    end
+    if any then
+        local order = {}
+        for i, a in ipairs(best.acts) do order[i] = { a = a, i = i, f = fogBy[a.unitId] or 0 } end
+        table.sort(order, function(x, y)
+            if x.f ~= y.f then return x.f < y.f end
+            return x.i < y.i
+        end)
+        local st = start
+        for _, o in ipairs(order) do
+            st = st and extend(st, o.a, o.a.unitId)
+        end
+        local was, same = {}, st ~= nil
+        for i, a in ipairs(best.acts) do was[key(a)] = best.expect[i] end
+        for i, a in ipairs(st and st.acts or {}) do
+            local x, y = was[key(a)], st.expect[i]
+            if not x or x.hp ~= y.hp or x.gone ~= y.gone or x.targetHp ~= y.targetHp then
+                same = false
+            end
+        end
+        if same then
+            best.acts, best.expect = st.acts, st.expect
+            -- the key list in place: the considered record's `acts` is this same table, and a
+            -- replay reads the plan in the order it is played
+            local keys = keysOf(best)
+            for i = 1, #keys do best.keys[i] = keys[i] end
+            -- and the rank's key: every comparison is done, so it only names the plan again
+            best.rank.key = table.concat(best.keys, " ")
+        end
     end
     return best.acts[1], best, cost
 end

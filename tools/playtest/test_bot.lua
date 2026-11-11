@@ -278,7 +278,7 @@ local function unit(o)
         fogged = o.fogged or false,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
-        isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons,
+        isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons, level = o.level,
         mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
         carrying = o.carrying, carriedBy = o.carriedBy,   -- a Rescue pair (board.lua)
     }
@@ -430,6 +430,15 @@ local function sightOf(o)
     if o.staves then s.staves = function(u) return o.staves[u.id] or {} end end
     if o.heals then s.heals = function(u, x, y) return (o.heals[u.id] or {})[x .. "," .. y] or {} end end
     if o.mend then s.mend = function(u) return o.mend[u.id] end end
+    -- the fog read's strike (sight.strike with `from`, the fog's edge): o.fogStrike(u, e, x, y,
+    -- fx, fy) answers it; a strike with no `from` is the fake's own
+    if o.fogStrike then
+        local own = s.strike
+        s.strike = function(u, e, x, y, slot, from)
+            if from then return o.fogStrike(u, e, x, y, from.x, from.y) end
+            return own and own(u, e, x, y, slot)
+        end
+    end
     if o.maxHp then
         s.maxHps = function(units)
             for _, u in ipairs(units) do u.maxhp = o.maxHp[u.id] or u.maxhp end
@@ -3535,6 +3544,159 @@ do
         if c.kind == "advance" then adv = table.concat(c.acts, " ") end
     end
     check(adv, "1>wait@3,0>nil 2>wait@2,1>nil", "advance: the second unit takes its next tile")
+end
+
+-- test_with_none_under_the_cap_the_mend_changes_more_than_one_unit (#510 PR A): X kills A
+-- unless A stands at (1,0) and B unless B stands at (1,4). Every plan the beam and the advance
+-- build has both at home; one mend saves one of them; only a second round, from
+-- the mended plan, saves both, and that plan is under the cap.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local Bu = blue(0x02, 1, 0, 4, { minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 4 }, { 1, 4 }) },
+        enemyPhase = function(plan)
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                if b.x ~= 1 then
+                    out[#out + 1] = { target = b.unit.id, takenHit = 80, takenDmg = 99,
+                                      takenHits = 1, takenCrit = 0 }
+                end
+            end
+            return out
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, Bu, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    local acts = {}
+    for _, x in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = x.unitId .. "@" .. at(x) end
+    table.sort(acts)
+    check(table.concat(acts, " "), "1@1,0 2@1,4", "mend rounds: both units moved to safety")
+    check(plan and plan.fallback, nil, "mend rounds: under the cap, no fallback")
+    local sb = plan and plan.audit and plan.audit.mend_rounds or {}
+    check(tostring(sb.before) .. " " .. tostring(sb.now), "false true",
+          "mend rounds: the audit says the planner before had none under the cap")
+end
+
+-- test_fog_ranks_and_does_not_gate (#510 PR A step 4, as reworked: comment 6780781911): a
+-- unit ending beside unseen ground meets one strike from the strongest enemy seen so far, stood
+-- on the nearest unseen tile (sight.fogStrike). Here that strike kills A half the time from
+-- (0,0), three tiles from the fog; (0,9) is out of FOG_REACH. The strike is its own rank key
+-- (`fog`), never A's chance to die: the plan beside the fog is still under the cap, and careful
+-- walks away from the fog only because the fog key ranks it after (0,9). An enemy never seen
+-- (opts.seen) is no one's strongest.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local Y = red(0x82, 9, 8, { minRange = false, fogged = true })
+    local asked = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 9 }) },
+        unseen = { { x = 3, y = 0 }, { x = 14, y = 0 } },
+        fogStrike = function(u, e, x, y, fx, fy)
+            asked[#asked + 1] = string.format("%X@%d,%d<%d,%d", e.id, x, y, fx, fy)
+            return { takenDist = { [0] = 0.5, [99] = 0.5 } }
+        end,
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, X, Y), sightOf(o), style("careful"),
+                                 { seen = { [0x81] = 0x81 } })
+    check(at(a), "0,9", "fog: careful steps away from the unseen")
+    local rank
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.acts[1] == "1>wait@0,0>nil" then rank = c.rank end
+    end
+    check(rank and rawget(rank, "fog"), 0.5,
+          "fog: beside it, the strike's chance to kill is the fog key, read before any sort")
+    check(rank and rank.max_die, 0, "fog: not the unit's chance to die")
+    check(rank and rank.admitted, true, "fog: the cap reads the enemies in sight only")
+    local others = {}
+    for _, q in ipairs(asked) do
+        if not q:find("^81@") then others[#others + 1] = q end
+    end
+    check(#asked > 0 and #others, 0, "fog: only the enemy seen so far is asked")
+    check(asked[1] and asked[1]:match("<(.*)$"), "3,0", "fog: from the nearest unseen tile")
+end
+
+-- test_the_fog_key_breaks_ties_only (#510 PR A step 4, Nicolas 2026-11-10): the fog read
+-- orders plans only after everything else the rank reads (goals, the win, progress, value),
+-- under the cap and over it.
+do
+    local function r(t)
+        local base = { admitted = true, forfeits = 0, complete = 0, behind = 0, green_die = 0,
+                       progress = 0, value = 0, game_over = 0, first_game_over = 0,
+                       max_exceed = 0, sum_exceed = 0, first_max_exceed = 0,
+                       first_sum_exceed = 0, max_die = 0, sum_die = 0, hp_left = 0, fog = 0,
+                       key = "a" }
+        for k, v in pairs(t) do base[k] = v end
+        return base
+    end
+    check(Planner.outranks(r { fog = 0.3, progress = 5, key = "b" }, r { fog = 0.1, progress = 0 }),
+          true, "fog key: more progress outranks less fog")
+    check(Planner.outranks(r { fog = 0.3, value = 5, key = "b" }, r { fog = 0.1 }), true,
+          "fog key: after the value")
+    check(Planner.outranks(r { fog = 0.1, key = "b" }, r { fog = 0.3 }), true,
+          "fog key: alike otherwise, less fog first")
+    check(Planner.outranks(r { admitted = false, fog = 0.9, first_max_exceed = 0.1,
+                               max_exceed = 0.1 },
+                           r { admitted = false, fog = 0, first_max_exceed = 0.2,
+                               max_exceed = 0.2, key = "b" }), true,
+          "fog key: over the cap, after the seen excess")
+end
+
+-- test_under_fog_the_threatened_move_last (#510 PR A's fog rule): A ends beside the fog and
+-- its strike may kill it; U ends far from it. U's act is played first, so what U shows of the
+-- fog is seen before A moves (botrun replans on a newly seen enemy).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local U = blue(0x02, 1, 0, 9, { minRange = false })
+    local X = red(0x81, 14, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }), [0x02] = tiles({ 0, 9 }, { 1, 9 }) },
+        unseen = { { x = 2, y = 0 } },
+        fogStrike = function(u) return { takenDist = { [0] = 0.99, [99] = 0.01 } } end,
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, U, X), sightOf(o), style("bold"))
+    check(a and a.unitId, 0x02, "fog order: the unit far from the fog acts first")
+    check(plan and plan.acts[#plan.acts].unitId, 0x01, "fog order: the threatened one last")
+    local played
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.played then played = c.acts end
+    end
+    check(played and played[#played] and played[#played]:match("^(%d+)>"), "1",
+          "fog order: the record's keys are in the order played")
+    check(plan and plan.rank.key, table.concat(played or {}, " "),
+          "fog order: the rank's key names the plan as played")
+end
+
+-- test_the_fog_read_asks_a_free_tile_and_the_highest_level (#510 PR A, review of #598): the
+-- strike comes from the nearest unseen tile no unit holds (a hidden unit's tile would put two
+-- units on one cell), and of two seen enemies with one class and kit the higher level is asked.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false, level = 3 })
+    local Y = red(0x82, 9, 8, { minRange = false, level = 9 })
+    local H = red(0x83, 2, 0, { minRange = false, fogged = true, classId = 99 })
+    local asked = {}
+    local s = sightOf({
+        unseen = { { x = 2, y = 0 }, { x = 3, y = 0 } },
+        fogStrike = function(u, e, x, y, fx, fy)
+            asked[#asked + 1] = string.format("%X<%d,%d", e.id, fx, fy)
+            return { takenDist = { [0] = 1 } }
+        end,
+    })
+    B.fogRead(boardOf(A, X, Y, H), s, { [0x81] = 0x81, [0x82] = 0x82 }).die(A, 0, 0, 20)
+    check(table.concat(asked, " "), "82<3,0", "fog read: the free tile, the higher level")
+    -- the seen enemy itself hidden on the nearest unseen tile: asked from its own tile
+    asked = {}
+    local Z = red(0x84, 2, 0, { minRange = false, fogged = true, level = 20, classId = 5 })
+    B.fogRead(boardOf(A, X, Z), s, { [0x81] = 0x81, [0x84] = 0x84 }).die(A, 0, 0, 20)
+    table.sort(asked)
+    check(table.concat(asked, " "), "81<3,0 84<2,0", "fog read: an enemy's own tile is free to it")
 end
 
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
