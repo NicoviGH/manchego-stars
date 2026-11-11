@@ -9,46 +9,24 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, W1's walker built; Ch6 explained).** Carry on with
-**#510 PR W1** on branch `feat/510-w1-look-shadow` (pushed, no PR). The design, its approved
-calls and W1's build map are ONE comment, #510 comment 6786548233, edited in place: read it
-first. Tell Nicolas where W1 stands in plain words at the start.
-- **Done on the branch** (also `6800ffa6`, `ed768888`, `7315c397`, `076f48e4` this session):
-  the look records each turn between's tiles for our units, and `montecarlo.py look` sets them
-  against the turn played; the walker (`sight.walkers`: a watched enemy played alone to its
-  first strike on one of our units or a green; the look that deep; up to 3 units sent to the
-  strike tile via `opts.guard`, recorded as `look.walker`); the allowance's guess per looked
-  phase; `look` leaves out looks the game never reached (`cut_short`); **the turn between picks
-  progress first** (Nicolas: "progress first"): among the live pick's plans (beam's `M.FINAL`,
-  assault, advance), ranked as `ADMITTED` minus the judge. Every new test fails without its
-  fix; all Lua tests and `test_montecarlo.py` pass. Ch6 4001 attempt 2 plays act for act as
-  `w1d` in every run (`w1e`..`w1m`).
-- **Ch6 4001 attempt 2, explained by probe runs (findings on the build map):** the walker finds
-  enemy 145 killing villager 65 on turn 8 (look: 83%). No sent unit can block it: unit 7 is 4
-  tiles late, units 6 and 10 would cross 22-77% to die a step (bold cap 0.15). The boss 146
-  stands in fog on (19,6), and `Bot.enemiesOf` lists only visible enemies, so **no march ever
-  aims at the boss** (live play too): each unit's goal is its nearest visible enemy. In the old
-  score-only turn between the army drifted east by chance, the boss came into sight, and Seth's
-  sure kill (hit 100, 18 x2 vs 28 HP) ended the chapter on turn 8 before the strike. The
-  guides agree a swift boss kill is the play on this map.
-- **Next (Nicolas, 2026-11-11: "let's experiment and try it out"):** the walker's second
-  alternative, retries only: on a Defeat Boss or Seize map, a look with the army's march goal
-  the boss's remembered tile (or the Seize tile), as deep as the walker's strike, compared by
-  the game's outcomes (villager dies vs the chapter ends first, our deaths). First check that
-  attempt 2's memory holds the boss's tile (`sight.knows`), and whether a capped march reaches
-  it by turn 8 (the old run's turns between ignored the cap). Then Ch6 4001/4002/4010.
-- **Decided (Nicolas, 2026-11-11):** (1) **keep the probe** that explained Ch6, as an
-  extension of `Bot.explain` (`bot.lua:1714`, its one owner; today it reads the old gate and
-  only botrun's stuck log calls it), not a second explainer: per unit, structured, on every
-  plan record (live decisions and the look's turns between): goal tile and its source (boss,
-  nearest visible enemy, village, sent tile), act and why, own progress, forward steps offered
-  and admitted by the cap; the boss's fog state. `montecarlo.py story` prints it. No game
-  calls, but traces grow: time it and size it, base vs branch back to back. Build it first.
-  (2) **The boss alternative in shadow first** (it answers whether a capped march reaches the
-  boss before the strike, every alternative on one board); **live on the branch only if one
-  does**, compared with main's runs of the same starts. Shadow is not faster: it predicts,
-  live shows what happens.
-- Still owed: mends judged by the look; `make test` timed before and after.
+**Next session starts here (2026-11-11, W1: the probe kept; the boss alternative in shadow).**
+Carry on with **#510 PR W1** on branch `feat/510-w1-look-shadow` (pushed, no PR). The design,
+its approved calls and W1's build map are ONE comment, #510 comment 6786548233, edited in
+place: read it first. Tell Nicolas where W1 stands in plain words at the start.
+- **Done this session:** `a7d48aed` the probe kept as `Bot.explain` (every plan's trace event
+  carries `why`, the look one a turn between; `montecarlo.py story --why` prints them; play and
+  AI calls unchanged, time unchanged, traces +14%/+30% gzipped). `555382ac` the boss
+  alternative in shadow (`look.boss`, `opts.aim = "boss"`; `montecarlo.py look` has its table).
+- **Ch6 4001 attempt 2, shadow run `w1p` (findings on the build map):** the retry remembers
+  boss Novala on (19,6) in fog. The capped march on it reaches the boss by turn 8 (Seth,
+  Vanessa, Garcia beside it) but **never strikes**: a turn between plans on the board as its
+  turn begins, the boss still in fog, and nothing replans when a move shows it (live play
+  does, `Planner.surprise`). It puts Eirika at 97% to die over the 5 looked phases (Franz 92%,
+  Lute 67%); the villager stays at 83%.
+- **Next (to bring to Nicolas first, a recommendation):** the look's turn between replans when
+  an act brings a fogged enemy into sight, as live play does, so it is the turn then played;
+  then rerun `w1p` and read whether Seth's sure kill on turn 8 comes before the strike, and at
+  what cost to Eirika. Then Ch6 4002/4010, mends judged by the look, `make test` timed.
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
@@ -59,6 +37,8 @@ first. Tell Nicolas where W1 stands in plain words at the start.
   - A function or constant board.lua adds must go in `Board.bind` too.
   - `sight.staged` isolates `seen`, `s.cache`, answer()'s village race and closings()' replays.
   - Prose check: "one of our units", never "one of ours"; "our units", never "ours".
+  - `montecarlo.py look` reads each enemy phase's last plan: a replan whose look was skipped
+    hides the turn's earlier look (Ch6 4001 turn 4). Read the trace's plan events directly.
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
