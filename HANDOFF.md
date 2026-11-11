@@ -9,7 +9,37 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-Refreshed 2026-11-10, night (Claude, Fable session): **the Fable review is done and its plan is
+**Next session starts here (2026-11-10 night, after PR A's review).** **#510 PR A is PR #598**
+(`feat/510-pr-a-first-attempts`, ADR 0400): built, `suite --held-out` **PROMOTED** (0
+regressions, instrument `84d8eba48d70+v2`), `/code-review 598 medium` and one scoped re-review
+done, every finding fixed (outcomes on the PR body). **Waiting on Nicolas: "merge"** (this PR is
+not under the step 9 merge-after-review standing rule). Check CI on the head sha first.
+- **What PR A ended up as:** the fog-ambush harness fix; an enemy-phase death graded by the plan
+  that moved its unit (+ `montecarlo.py calibration`); the mend's extra rounds; the fog read as a
+  tie-breaker after everything else the rank reads. **Taken out:** the always-judged step back
+  (it stalled Manchego Stars ch03 40+ turns; comment 6782827664). **Dropped by Nicolas:** the
+  march where only units the fog cannot kill lead, and Fable's look one turn ahead (too narrow
+  and careful: a human's next turn attacks and heals; comment 6783348074). The planner still
+  reads one enemy phase deep; that stays open without a design.
+- **After the promoted suite, the review fixes changed fog-map play only** (the fog strike's tile
+  and enemy, the reorder's keys); `scout-ch6`'s four seeds were rerun and play as promoted.
+- **Then PR B** (plan comment 6779357154, PR B, amended): retry memory only, the screen's whole
+  record (ADR 0376 decision 3, 0399's draft), checked for what it leaves out. No deadline step
+  (failed ADR 0396's tests). **Waiting on Nicolas:** drop 0399's guard goal too (recommended;
+  it fails the same tests). Step 4 (retries that differ) needs a 0396 check before it is built.
+  Ch6 is the witness only: the Bael reaches the Civilians about turn 7-8.
+- **Owed:** one `replay` of a Ch5 death the plan judged at 0 from a lone killer (comment
+  6780145312), on a fresh Ch5 run of PR A's code.
+- **How the witnesses were played:** scratch drivers around `montecarlo.pinned_setup` +
+  `chapter_tasks(...)` with their own runs file; not kept (15 lines each). Ch6 runs take 90 to
+  520 s; the suite takes about 1.2 wall-hours on 8 workers.
+- **Lessons:** read the ADRs on a topic before writing design text for it (the retry "lessons"
+  contradicted ADR 0376, Nicolas caught it). An untracked ADR draft in `docs/decisions/` fails
+  the pre-commit drift check. `M.outranks` runs inside `table.sort`: nothing it reads may make a
+  sandbox call. A constant board.lua adds must also go in `Board.bind`. Research 0020's guide
+  abbreviations: SH is GameFAQs Shaneth21, KE GameFAQs katieelizabeth.
+
+Earlier the same night (Claude, Fable session): **the Fable review is done and its plan is
 locked by Nicolas: two PRs and one suite run, then a small third PR before any cell verdict.
 The plan is ONE comment, #510 comment 6779357154
 (edited in place; it has the findings, both PRs' steps and a file map). Read it first.** Nothing
@@ -117,15 +147,13 @@ was built or run in the emulator this session.
 
 ## Next
 
-0. **#510 PR A, first attempts** (plan comment 6779357154): its calls are approved;
-   in commit order, the harness fix, the regrade and calibration script
-   (no emulator), stepping back (witness: Ch5 starts), fog in the chance to die (witness: the
-   Ch6 fog start); `suite --held-out` once on the final code; `/code-review <PR> medium`.
-   Stepping back is the largest piece (Ch5's 81 of 110).
-1. **#510 PR B, retries** (same comment): retry memory rebased from `feat/510-retry-memory`,
-   deadlines from a remembered green death, the guard's bugs; carry the 10 vanilla campaigns on
-   before the merge (`resume --game vanilla --tag <t>`); retries that differ only if they still
-   stop on reruns. Then tries to the first clean clear (its method goes to Nicolas as an ADR
+0. **#510 PR A, first attempts** = PR #598: promoted and reviewed; merge on Nicolas's word.
+1. **#510 PR B, retries** (same comment, step 2 amended 2026-11-10): retry memory rebased from
+   `feat/510-retry-memory`, checked to be the screen's whole record; **no deadline**, and 0399's
+   guard goal recommended dropped (Nicolas's call): both fail ADR 0396's test, and the gap they
+   patched is the lookahead's horizon; carry the 10 vanilla campaigns on before the merge
+   (`resume --game vanilla --tag <t>`); retries that differ only if they still stop on reruns,
+   and only after a 0396 check. Then tries to the first clean clear (its method goes to Nicolas as an ADR
    0385 amendment first). Then **PR C** (same comment: a cell's dice, expected losses; small,
    no suite run), before any cell verdict. **#510 step 10** after.
    Still owed from PR-I:
