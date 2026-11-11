@@ -30,8 +30,9 @@ built and its one suite run refused promotion on **two new stalls in Manchego St
 - **PR B's retry memory is the screen's whole record, not a list of lessons** (Nicolas: naming
   "two things a player learns" is the hardcoding to avoid). Plan comment 6779357154, PR B step 2:
   a retry knows what earlier attempts saw (ADR 0376 decision 3, 0399's draft); PR B checks the
-  memory covers what the screen showed and says what it leaves out; nothing may name Ch6 or the
-  Bael. Ch6 is the witness: the Bael reaches the Civilians about turn 7-8, greens die on turns
+  memory covers what the screen showed and says what it leaves out. The deadline step is gone
+  (it failed ADR 0396's tests 1, 3 and 4); 0399's guard goal fails the same way, recommended
+  dropped, **waiting on Nicolas**. Ch6 is the witness: the Bael reaches the Civilians about turn 7-8, greens die on turns
   8, 9, 11; the one clean Ch6 clear on record is campaign 4008 attempt 2 (partly luck).
 - **Suite signals, not blockers:** 5 deaths that lived when frozen (listed on the comment).
 - **Waiting on Nicolas:** Fable's look one turn ahead for Ch5 (comment 6780629895).
@@ -156,10 +157,12 @@ was built or run in the emulator this session.
 0. **#510 PR A, first attempts** (plan comment 6779357154; built, ADR 0400): name the ch03
    stalls' cause (see the top, comment 6782740420), fix, `suite --held-out` again, the PR,
    `/code-review <PR> medium`.
-1. **#510 PR B, retries** (same comment): retry memory rebased from `feat/510-retry-memory`,
-   deadlines from a remembered green death, the guard's bugs; carry the 10 vanilla campaigns on
-   before the merge (`resume --game vanilla --tag <t>`); retries that differ only if they still
-   stop on reruns. Then tries to the first clean clear (its method goes to Nicolas as an ADR
+1. **#510 PR B, retries** (same comment, step 2 amended 2026-11-10): retry memory rebased from
+   `feat/510-retry-memory`, checked to be the screen's whole record; **no deadline**, and 0399's
+   guard goal recommended dropped (Nicolas's call): both fail ADR 0396's test, and the gap they
+   patched is the lookahead's horizon; carry the 10 vanilla campaigns on before the merge
+   (`resume --game vanilla --tag <t>`); retries that differ only if they still stop on reruns,
+   and only after a 0396 check. Then tries to the first clean clear (its method goes to Nicolas as an ADR
    0385 amendment first). Then **PR C** (same comment: a cell's dice, expected losses; small,
    no suite run), before any cell verdict. **#510 step 10** after.
    Still owed from PR-I:
