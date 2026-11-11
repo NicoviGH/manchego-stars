@@ -22,29 +22,20 @@ design, its six approved calls and its **refutation bars** are #510 comment 6786
 "Proof, and what refutes each part" first, then the W1 build map). Judge every step by
 whether it moves a bar, not by whether it fixes a case.
 
-**Honest state, against the design's own bars** (Opus's read, 2026-11-11, not yet acted on):
-- **Works:** the look runs on the ROM in shadow (play unchanged act for act); its one
-  checkable prediction came true (Ch6 4010: villager 83% by turn 8, died turn 8 to walker
-  145); none of 25 unit-looks at <=5% died. Far too few looks to calibrate.
-- **Walker part: fails its bar.** "No alternative keeps the villagers alive ... in at least 2
-  of 3 starts": the villager stays at 83% in every alternative in every Ch6 start (4002 had
-  no walker at all).
-- **The look is starved:** 25 of 28 looks skipped (bar: half -> stop and report). The design
-  guessed the enemy phases were the cost and named a fix for that; measured (probe `w1s`,
-  not kept): 97% of the look's AI calls are `sight.strike` (the cap's tile checks) while
-  planning our 24 turns a look; the enemy phases are 2.5%. The best plan's look, the one
-  calibrated, is ~1/6; the boss march and 3 walker alternatives the rest.
-- **Drift:** the boss alternative (`555382ac`) and the widened replan (`bda5624f`) were not in
-  the design; both chased one Ch6 case (Nicolas 2026-11-09: stop chasing single deaths).
-  The replan did not give the boss kill (`w1q`: Seth moved before Novala showed) and costs
-  a third of the look; it does make the turn between react to fog as live play does.
-- **Untested:** the trades part (about half of over-cap deaths, 30 of 57, came one turn after
-  a plan under the cap: a horizon error) and the waves part (`scout-ch13`). That is where
-  most of the deaths the look exists for are.
-- **Opus's recommendation, not yet put to Nicolas as a decision:** drop the walker
-  alternatives and the boss march from W1 (frees ~5/6 of the look's cost, ending the
-  starvation without a new rule), keep the widened replan look-only, then the trades test
-  on the Ch5 retries and `scout-ch10` (mends judged by the look). Yours to take or replace.
+**Measured so far, against the design's bars** (facts only; draw your own conclusions):
+- The look runs on the ROM in shadow, play unchanged act for act. Ch6 shadow runs (`w1q`,
+  `w1r`): 3 looks ran, 26 unit-looks; the one at 83% died (the villager, Ch6 4010, turn 8,
+  to walker 145); none of 25 at <=5% died.
+- Walker bar ("an alternative keeps the villagers alive ... in at least 2 of 3 starts"): in
+  4001 and 4010 every alternative leaves the villager at 83%; 4002's look had no walker.
+- Starvation bar (more than half skipped): 25 of 28 looks skipped. Probe `w1s` (not kept):
+  97% of the look's AI calls are `sight.strike` while planning our turns between (24 turns
+  in one Ch6 look: the best plan's 4, the boss march's 5, each of 3 walker alternatives' 5);
+  its enemy phases 2.5%.
+- Added on 2026-11-11 beyond the design: the boss alternative (`555382ac`) and the widened
+  replan (`bda5624f`, a third of the look's calls; in `w1q` it did not give the boss kill).
+- Not yet run: the trades part (Ch5 retries, `scout-ch10`) and the waves part
+  (`scout-ch13`).
 
 **Done 2026-11-11 (branch `feat/510-w1-look-shadow`, pushed, no PR):** `bda5624f` the widened
 replan in the look's turn between (`sight.reveals`, `sight.after`, `Planner.joinTurn`;
@@ -73,8 +64,7 @@ Shadow runs kept in `references/sim/vanilla/c25b145e3745/traces/`: `w1q-cs-s4001
   - Prose check: "one of our units", never "one of ours"; "our units", never "ours".
   - In the turn between, a unit the plan holds has NO act in `st.acts`: "units still to act"
     is `ctx.actors` minus the acted, never "acts left".
-  - Write a shadow step's refutation bar down before running it, and stop at it: W1 ran four
-    steps past "starved" and "walker refuted" chasing one Ch6 boss.
+  - Check a shadow step's result against its refutation bar before building the next step.
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
