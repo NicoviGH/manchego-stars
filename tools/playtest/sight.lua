@@ -896,7 +896,7 @@ function M.batching(outer)
         end,
     }, { __index = outer })
     local machine = M.machine(api.cpu)
-    local depth, outerCall, outerScratch = 0, nil, nil
+    local depth, outerCall, outerScratch, strict = 0, nil, nil, 0
     local function sandbox(fn)
         if depth == 0 then
             depth, journal = 1, {}
@@ -910,20 +910,42 @@ function M.batching(outer)
         end
         local mark = #journal
         depth = depth + 1
-        local ok, a, b = pcall(fn, outerCall, outerScratch)
-        depth = depth - 1
-        for k = #journal, mark + 1, -1 do
-            local e = journal[k]
-            e[3](e[1], e[2])
-            journal[k] = nil
+        local ok, a, b
+        if strict > 0 then
+            -- a whole save and load, so the game's own writes are undone too: on a staged
+            -- board the next read must see that board, not this one's leftovers. The outer
+            -- machine's call and return loop stay (a second machine inside it never returned)
+            local state = api.cpu.save()
+            ok, a, b = pcall(fn, outerCall, outerScratch)
+            api.cpu.load(state)
+            for k = #journal, mark + 1, -1 do journal[k] = nil end   -- the load put them back
+        else
+            ok, a, b = pcall(fn, outerCall, outerScratch)
+            for k = #journal, mark + 1, -1 do
+                local e = journal[k]
+                e[3](e[1], e[2])
+                journal[k] = nil
+            end
         end
+        depth = depth - 1
         if not ok then error(a, 0) end
         return a, b
     end
     -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
     -- (a call's EquipUnitItemSlot reorders a bag; only M.equip keeps it, so call that)
     local function open() return depth > 0 end
-    return sandbox, api, open
+    -- fn() with every sandbox nested in it a whole save and load: the journal undoes only
+    -- `api`'s writes, and a staged board (sight.staged) is read by many sandboxes in a row,
+    -- each of which must start from it (W1's probe: vanilla Ch6's fog maps leaked between
+    -- judged plans under the journal alone)
+    local function strictly(fn)
+        strict = strict + 1
+        local r = table.pack(pcall(fn))
+        strict = strict - 1
+        if not r[1] then error(r[2], 0) end
+        return table.unpack(r, 2, r.n)
+    end
+    return sandbox, api, open, strictly
 end
 
 -- Inside a sandbox: `u` holds the weapon in item `slot` as it does after striking with it
@@ -1030,7 +1052,7 @@ end
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
 function M.new(outer)
-    local sandbox, api, open = M.batching(outer)
+    local sandbox, api, open, strictly = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
@@ -1261,14 +1283,29 @@ function M.new(outer)
         s.cache = {}
     end
 
-    -- fn(board) with the fog off (M.fullInfo): the board's answers and the phase's cache are
-    -- fresh for the call and the fogged ones come back after it
+    -- The board's answers and the phase's cache swapped for fresh ones -> their restore: a
+    -- read on another board than the live one (the fog off, or a staged board) is never kept
+    -- for the live one, nor reads one of its answers.
+    local function isolate()
+        local keptSeen, keptCache = seen, s.cache
+        seen, s.cache = { threats = {}, grids = {} }, {}
+        return function() seen, s.cache = keptSeen, keptCache end
+    end
+
+    -- fn(board) with the fog off (M.fullInfo), on fresh answers (isolate)
     function s.fullInfo(fn)
-        return M.fullInfo(sandbox, open, api, S, function()
-            local keptSeen, keptCache = seen, s.cache
-            seen, s.cache = { threats = {}, grids = {} }, {}
-            return function() seen, s.cache = keptSeen, keptCache end
-        end, fn)
+        return M.fullInfo(sandbox, open, api, S, isolate, fn)
+    end
+
+    -- fn(board) inside an open sandbox, on the board as it is staged there, on fresh answers
+    -- (isolate), the live ones back however fn ends
+    function s.staged(fn)
+        if not open() then error("sight.lua: staged() reads a staged board: open a sandbox first", 0) end
+        local restore = isolate()
+        local r = table.pack(pcall(strictly, function() return fn(api.board()) end))
+        restore()
+        if not r[1] then error(r[2], 0) end
+        return table.unpack(r, 2, r.n)
     end
 
     function s.remember(enemies)

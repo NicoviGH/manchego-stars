@@ -273,6 +273,47 @@ do
     check(seen[3], 30, "openMap: a tile with no change changes nothing")
 end
 
+-- test_strictly_undoes_the_games_own_writes: on a staged board (sight.staged) every nested
+-- read is a whole save and load, so a write the game makes itself, which no journal sees, is
+-- gone before the next read; outside strictly() the journal alone leaves it (W1's probe:
+-- vanilla Ch6's fog maps leaked from one judged plan into the next, under the journal alone).
+do
+    local base = fakeCpu(1)
+    local bytes = {}
+    local cpu = setmetatable({
+        save = function()
+            local kept = {}
+            for k, v in pairs(bytes) do kept[k] = v end
+            return { base = base.save(), bytes = kept }
+        end,
+        load = function(st)
+            base.load(st.base)
+            for k in pairs(bytes) do bytes[k] = nil end
+            for k, v in pairs(st.bytes) do bytes[k] = v end
+        end,
+    }, { __index = base })
+    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                       u16 = function(a) return bytes[a] or 0 end,
+                                       u32 = function(a) return bytes[a] or 0 end },
+                    write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end }
+    local sandbox, api, _, strictly = Sight.batching(outer)
+    local seen = {}
+    sandbox(function()
+        api.write8(0x800, 5)                       -- the staging, journaled
+        strictly(function()
+            sandbox(function() bytes[0x900] = 7 end)   -- the game's own write
+            seen.strict, seen.staged = bytes[0x900] or 0, bytes[0x800]
+        end)
+        sandbox(function() bytes[0x901] = 7 end)
+        seen.journal = bytes[0x901] or 0
+    end)
+    check(seen.strict, 0, "strictly: the game's own write is undone before the next read")
+    check(seen.staged, 5, "strictly: the staged board is still there after the read")
+    check(seen.journal, 7, "journal alone: the game's own write stays (why strictly exists)")
+end
+
 -- test_equip_does_not_leak_into_the_next_read: EquipUnitItemSlot (bmitem.c) moves the item to
 -- the front of the bag, a write the game makes and no journal sees. Two judged plans in one
 -- batch: the first equips slot 2, and the second must find the bag as it was, its slot 0 still
