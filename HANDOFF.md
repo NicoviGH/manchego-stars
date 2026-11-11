@@ -9,44 +9,39 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11 evening): W1 handed to Fable, to own.**
-Nicolas (2026-11-11): "pass this back to Fable. Give it a shot at achieving our goal with less
-micromanaging from me." **You own W1's direction.** Bring him outcomes and the few calls
-that are truly his (AGENTS.md "Decisions that are mine": a measurement's meaning, a tuning
-weight, stopping a line of work); decide the rest yourself, and say what you decided.
+**Next session starts here (2026-11-11 night): the bot plays vanilla; Ch6 is through.**
+Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
+the direction ("this project is yours too, so take ownership and be proactive"); use cheaper
+subagents to check source, ADRs and research before claiming or building.
 
-**The goal** (#510's north star): a trustworthy difficulty model. W1-W3 were one way to serve
-it: a retry learns from what beat it, as a human player does ("emulate human players
-learning from their mistakes and losses"). The design, its six approved calls and its
-refutation bars are #510 comment 6786548233, with W1's build map in it.
+**What changed today.**
+- **PR #600 (`feat/510-known-boss-goal`, ADR 0401), open, reviewed, CI on its head commit
+  pending when this was written:** on a Defeat Boss map a boss the party knows of is the march
+  goal, in sight or remembered by a retry; the boss is the unit the objective names. Witness
+  (`resume --tag kb1`, `kb2`): **the eight vanilla campaigns stopped at Ch6 all clear it clean**
+  (seven on attempt 2, one on attempt 3, 4 to 6 turns; none did in 6 styles before). Suite
+  `--held-out`: promoted, 0 regressions, every number as ADR 0400's. No first attempt changes.
+  The merge waits on Nicolas: the call in ADR 0401 is Fable's and he has not read it yet.
+- **Why Ch6 stopped the campaigns** (findings: #510 comment 6786548233, the two Fable entries):
+  its Civilians die from turn 8 unless the boss falls first (192 wins read), and retry memory
+  had made retries slower (median 12 to 13.5 turns against 10), because a retry marched on its
+  nearest remembered enemy and a remembered boss in fog was no goal.
+- **The look (W1) is parked**, on `feat/510-w1-look-shadow` (pushed, no PR, shadow only). Ch6
+  did not need it. With every look run (`resume --every-look`, commit `932e60f3`, run `w1u`)
+  it was right on start 4010 (both Civilian deaths called), blind on 4002 (none of three), and
+  cost 249% of the attempts' other AI calls. W2 and W3 are not started. Whether to drop it or
+  keep its two-phase "trade" part for Ch10/Ch13 is open: decide from the next wall, not now.
+- A detour, kept for the record: `pilot --chapter 1` ran (Manchego Stars ch01 3 of 50, vanilla
+  Ch1 0 of 50, validity held; in `cells.jsonl`, not posted). `pilot --chapter 0` was stopped
+  partway. Manchego Stars' ch02 stop is parked for step 10 and is not a blocker to raise.
 
-**Nothing below is settled for you** (Nicolas, 2026-11-11: "Let it question the bars too. Let
-it question our whole approach"). Question the bars, the look, W1-W3, and whether this is the
-right road to the goal at all. If you find a better one, say so and why, with evidence, and
-bring it to Nicolas before building it: a change of approach is his to approve. Settled ADRs
-still stand until he reopens one.
+**Next step.** Once #600 is merged: carry the vanilla campaigns on from Ch6 (`montecarlo.py
+starts` or `resume` with no `--last`) and read where they stop next. Known walls ahead, from
+the scout starts: Ch8's chests at (1,3) and (2,3) never reached; `scout-ch13` loses 108 of 161
+(mostly over the cap, the killer in sight); `scout-ch14` ends `stuck` on turn 19 every run;
+Ch5x (4003) stalls on turn 33. Find each wall's cause in the records and traces before
+building anything: Ch6's was not the one the design assumed.
 
-**Measured so far, against the design's bars** (facts only; draw your own conclusions):
-- The look runs on the ROM in shadow, play unchanged act for act. Ch6 shadow runs (`w1q`,
-  `w1r`): 3 looks ran, 26 unit-looks; the one at 83% died (the villager, Ch6 4010, turn 8,
-  to walker 145); none of 25 at <=5% died.
-- Walker bar ("an alternative keeps the villagers alive ... in at least 2 of 3 starts"): in
-  4001 and 4010 every alternative leaves the villager at 83%; 4002's look had no walker.
-- Starvation bar (more than half skipped): 25 of 28 looks skipped. Probe `w1s` (not kept):
-  97% of the look's AI calls are `sight.strike` while planning our turns between (24 turns
-  in one Ch6 look: the best plan's 4, the boss march's 5, each of 3 walker alternatives' 5);
-  its enemy phases 2.5%.
-- Added on 2026-11-11 beyond the design: the boss alternative (`555382ac`) and the widened
-  replan (`bda5624f`, a third of the look's calls; in `w1q` it did not give the boss kill).
-- Not yet run: the trades part (Ch5 retries, `scout-ch10`) and the waves part
-  (`scout-ch13`).
-
-**Done 2026-11-11 (branch `feat/510-w1-look-shadow`, pushed, no PR):** `bda5624f` the widened
-replan in the look's turn between (`sight.reveals`, `sight.after`, `Planner.joinTurn`;
-`story --why` prints it); `07abd46d` `montecarlo.py look` counts a turn's look that ran even
-when a later replan's was skipped (Nicolas: "Yes"; before, both run looks were hidden).
-Shadow runs kept in `references/sim/vanilla/c25b145e3745/traces/`: `w1q-cs-s4001`,
-`w1r-cs-s4002`, `w1r-cs-s4010`. Each step's numbers are on the build map.
 
 **Key files:** `tools/playtest/sight.lua` (`s.look`, `s.walkers`, `s.reveals`, `s.after`,
 `s.staged`), `tools/playtest/planner.lua` (the look block after "The look, in shadow";
@@ -69,6 +64,10 @@ Shadow runs kept in `references/sim/vanilla/c25b145e3745/traces/`: `w1q-cs-s4001
   - In the turn between, a unit the plan holds has NO act in `st.acts`: "units still to act"
     is `ctx.actors` minus the acted, never "acts left".
   - Check a shadow step's result against what would refute it before building the next step.
+  - A campaign builds a fresh bot for each attempt (`campaignApi`'s `api.play`): a switch set
+    on the campaign's api never reaches botrun. Check a new switch's mark in the run's record.
+  - A stopped `montecarlo.py` leaves its `run.sh` and `mgba-headless` workers running: kill
+    those too, and check with `pgrep -fl mgba`.
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
@@ -131,8 +130,8 @@ Shadow runs kept in `references/sim/vanilla/c25b145e3745/traces/`: `w1q-cs-s4001
 ## Next
 
 0. **#510 PR A, first attempts**: merged (PR #598, ADR 0400).
-1. **#510 PR B merged (#599).** **W1, W2, W3** (the look: comment 6786548233) are being built
-   (above). Then tries to the first
+1. **#510 PR B merged (#599).** **PR #600** (the boss goal, above) is open; **the look
+   (W1-W3: comment 6786548233) is parked**. The bot plays vanilla forward first (above). Then tries to the first
    clean clear (its method goes to Nicolas as an ADR 0385 amendment first), **PR C** (a cell's
    dice, expected losses; small, no suite run) before any cell verdict, **#510 step 10** after.
    Still owed from PR-I:
