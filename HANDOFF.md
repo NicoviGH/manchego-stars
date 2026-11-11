@@ -49,9 +49,10 @@ with what is confirmed and what is not: **#510 comment 6810177817**.
   the chapter's turn-12 event (the record wrongly says `killed_before_talk`); the lord never
   reaches her. The village at (11,15) is destroyed on turn 5.
 
-**Next step.** Ch8 is the wall most campaigns hit. Start with why the team pick leaves the
-thief out (`Bot.team`, bot.lua:2253 on; not read yet), then the chest goal that only the thief
-serves. Open from the findings: why no plan attacks the nearer mage on Ch7, why 4007's lord
+**Next step.** Ch8 is the wall most campaigns hit. The team pick leaves the
+thief out when a style's claims fill the cap first (a lead, in the findings comment: the chest
+demand is one among a dozen enemy-class demands). Then the chest goal that only the thief
+serves, and the seize that waits on it with no bound. Open from the findings: why no plan attacks the nearer mage on Ch7, why 4007's lord
 never marches to the seize tile on Ch7, why the army goes west in the three Ch8 attempts that
 got the west chests. Older scout walls still stand: `scout-ch13` loses 108 of 161, `scout-ch14`
 ends `stuck` on turn 19, Ch5x (4003) stalls on turn 33. For each wall: read the records and
