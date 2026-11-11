@@ -68,7 +68,7 @@
 -- expect, enemies, judged, predict (each blue and green unit's phase; `green` marks one, and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
--- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"back"|"unstall"|"mend"|"rest",
+-- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -86,9 +86,9 @@
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
--- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, step_back =
--- { before, now } (whether a plan judged without the step back and the mend's later rounds was
--- under the cap, and whether the played one is: #510 PR A's witness), visibility =
+-- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, mend_rounds =
+-- { before, now } (whether a plan judged without the mend's later rounds was under the cap,
+-- and whether the played one is: #510 PR A), visibility =
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
@@ -132,8 +132,6 @@ M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam trie
                    -- hold and retreat, always: the way out survives the cut)
 M.FINAL = 4        -- complete plans judged against the enemy phase
 M.MEND_ROUNDS = 3  -- the mend's rounds; past the first, only while no plan is under the cap
-M.STEP_BACK = true -- judge the step back (every unit on its safest hold); a test of the mend
-                   -- alone turns it off
 -- the uncertain kills the judge plays both ways (2^n enemy phases), so a protected unit's death
 -- chance is a sum over the ways the phase can go, never read off an average that keeps a
 -- likely kill gone (FR-009). Even an enemy that reaches no one is played both ways: its death
@@ -1442,22 +1440,7 @@ function M.plan(Bot, board, sight, style, opts)
     local have = {}
     for _, f in ipairs(finals) do have[table.concat(keysOf(f.st), " ")] = true end
     local adv = advance(have)
-    if adv then
-        finals[#finals + 1] = { st = adv, kind = "advance" }
-        have[table.concat(keysOf(adv), " ")] = true
-    end
-    -- The step back (#510 PR A): every unit on its safest hold tile (Bot.candidates' first
-    -- hold, its least worst case), judged always as the advance is. The beam keeps what scores
-    -- well act by act and can cut this plan at any depth, so a board where everyone should pull
-    -- back together had no such plan judged (vanilla Ch5: 81 of 110 blue deaths were to plans
-    -- known to be over the cap).
-    local back = complete(start)
-    local backKey = table.concat(keysOf(back), " ")
-    if M.STEP_BACK and #back.acts > 0 and not have[backKey] then
-        have[backKey] = true
-        back.newer = true   -- the audit's step_back: a plan the planner before #510 PR A never judged
-        finals[#finals + 1] = { st = back, kind = "back" }
-    end
+    if adv then finals[#finals + 1] = { st = adv, kind = "advance" } end
     -- the rest of the plan in hand (opts.rest, botrun's on a replan): its acts as this board
     -- still offers them, in order, kept where they still fit as the mend keeps a plan, the
     -- units it leaves holding. The beam keeps only what scores well act by act, so a replan
@@ -1590,7 +1573,7 @@ function M.plan(Bot, board, sight, style, opts)
                         if x.unitId ~= t.uid then st = extend(st, x, x.unitId) or st end
                     end
                     st = complete(st)
-                    -- a later round, or one mended from the step back: new with #510 PR A
+                    -- a later round: new with #510 PR A
                     st.newer = round > 1 or base.newer or nil
                     consider(st, "mend")
                 end
@@ -1732,15 +1715,15 @@ function M.plan(Bot, board, sight, style, opts)
             if u.fogged then fogged = fogged + 1 else seen = seen + 1 end
         end
     end
-    -- step_back (#510 PR A's witness): whether a plan the planner judged before the step back
-    -- and the mend's later rounds (st.newer) was under the cap, beside whether the played one is
+    -- mend_rounds (#510 PR A): whether a plan the planner judged before the mend's later rounds
+    -- (st.newer) was under the cap, beside whether the played one is
     local oldUnder = false
     for _, j in ipairs(judgedPlans) do
         if j.ok and not j.st.newer and j.st.rank.admitted then oldUnder = true end
     end
     best.audit = { offered_n = offeredN, visibility = { seen = seen, fogged = fogged },
                    budget = { exhausted = look.skipped == true, averaged = best.averaged or 0 },
-                   step_back = { before = oldUnder, now = best.rank.admitted == true } }
+                   mend_rounds = { before = oldUnder, now = best.rank.admitted == true } }
     -- no plan under the cap: the least likely to end the game, then the least over it, is
     -- played, and says so (FR-011, ADR 0384 amended)
     best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil
