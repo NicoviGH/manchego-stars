@@ -1,12 +1,12 @@
 ---
 id: 400
-title: "First attempts: a death is graded by the plan that moved its unit, the step back is always judged, and the fog read breaks ties only"
+title: "First attempts: a death is graded by the plan that moved its unit, the mend goes on with no plan under the cap, and the fog read breaks ties only"
 date: "2026-11-10"
 section: "Combat System"
 issues: [510]
 ---
 
-# First attempts: a death is graded by the plan that moved its unit, the step back is always judged, and the fog read breaks ties only
+# First attempts: a death is graded by the plan that moved its unit, the mend goes on with no plan under the cap, and the fog read breaks ties only
 
 **Decided (Nicolas, 2026-11-10, "yes I approve all", then the step 4 amendment and its
 follow-up the same night), #510 PR A.** The plan is #510 comment 6779357154; each step's witness
@@ -23,20 +23,27 @@ death by it; the phase's last plan when none did (a green, a carried unit). `mon
 calibration` prints, from kept traces with each play once, the judged phase against the played
 one and each chapter's deaths by what the moving plan said, so each change is read the same way.
 
-## 2. The step back is always judged; with no plan under the cap the mend goes on
+## 2. With no plan under the cap the mend goes on; the step back is not always judged
 
-**The error.** Pulling back together was not guaranteed to reach the judge (the beam could cut
-it at any depth), and with no plan under the cap the mend changed one unit, one round.
+**The error.** With no plan under the cap the mend changed one unit, one round, so two units
+each over the cap where they stood stayed a fallback.
 
-**The call.** Every unit on its safest hold tile is one plan the judge always meets (kind
-`back`), as the advance is. With none under the cap the mend runs again from the plan it found,
-up to `MEND_ROUNDS` (3). The audit records `step_back = { before, now }`.
+**The call.** With none under the cap the mend runs again from the plan it found, up to
+`MEND_ROUNDS` (3), so more than one unit may change. The audit records
+`mend_rounds = { before, now }`.
 
-**What it did not do** (comment 6780145312): on the Ch5 starts, 15 of 39 decisions with no plan
-under the cap gained one (38%, under the plan's half), so it is not Ch5's fix: the board was
-lost a turn earlier. It stays because it costs nothing where it does not help and halved the
-fallback decisions (37 to 19). The look one more turn ahead waits on Nicolas (comment
-6780629895).
+**Built and taken out: the step back always judged** (every unit on its safest hold tile, kind
+`back`, a plan the judge always met). On the Ch5 starts only 15 of 39 decisions with no plan
+under the cap gained one (38%, under the plan's half; comment 6780145312): the board was lost a
+turn earlier. On Manchego Stars ch03 it stalled the suite: with every forward plan over the cap
+(66% to 98%), `back` was the only plan under it, so the bot alternated `back` and `unstall` for
+40+ turns, and seed 1001 lost (comment 6782827664). Without it, both seeds won in 14 turns
+with no stall. A plan under the cap that gains nothing should not beat the only way forward
+forever (ADR 0396 rule 4: waiting is judged by what the board after it gains). A hold plan always on
+offer is not how to decide when to hold and when to push (Nicolas, 2026-11-10). The look one
+more turn ahead proposed for it (comment 6780629895) is dropped too: it modelled our next turn
+as every unit stepping to safety, where a player attacks, heals and pushes (comment
+6783348074). The planner still reads one enemy phase deep; that stays open without a design.
 
 ## 3. The fog read breaks ties only
 
@@ -77,11 +84,12 @@ progress, value), before the death-chance tail. The cap reads enemies in sight o
 clock (it reaches the Civilians about turn 7-8; seven guides send Vanessa east, research 0014).
 Both are PR B's (retry memory and deadlines; plan comment 6779357154, PR B step 2).
 
-## The suite (`suite --held-out`, instrument `7a55592bc493+v2`, 2026-11-10)
+## The suite (`suite --held-out`, 2026-11-10)
 
-**Promotion refused: 2 deterministic regressions**, both new stalls on Manchego Stars ch03
-(seed 1001: 11 stalls, 1 when frozen, lost on turn 47; seed 1002: 13, 2 when frozen, won clean
-on turn 54), `idle_3` every three turns from turn 11 or 15 on. Their cause is untested; the PR
-waits on it (#510 comment on the suite run). Also: 5 deaths that lived when frozen,
-unexplained (signals, not blockers); held-out 3 of 28 lost, none new; SC-003 2,641,665
-`AiDecideMain` calls against the budget 2,988,937 (+6.1% on the frozen 2,490,781): within.
+- **First run, with the step back** (instrument `7a55592bc493+v2`): promotion refused, 2
+  deterministic regressions, both new stalls on Manchego Stars ch03 (section 2).
+- **Final run** (instrument `84d8eba48d70+v2`): **promoted, 0 regressions.** Five deaths that lived when
+  frozen, unexplained (signals, not blockers): `ours-ch02/1001` 0x01, `ours-ch03/1001` 0x06
+  and 0x10, `vanilla-ch5/1002` 0x06 and 0x08. Held-out 4 of 28 lost, none new since the
+  freeze. SC-003: 2,685,802 `AiDecideMain` calls against the budget 2,988,937 (+7.8% on the
+  frozen 2,490,781): within. `scout-ch6` lost both seeds on turn 2 to fog, as on main.

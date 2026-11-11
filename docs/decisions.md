@@ -243,7 +243,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0396` | [A bot decision is an ordering of the game's outcomes; only the game forbids](decisions/0396-a-bot-decision-is-an-ordering-of-outcomes-only-the-game-forbids.md) | 2026-11-08 | #510 |
 | `0397` | [A key an enemy drops is a way to a chest or through a door, and the judged enemy phase plays on the map the plan opens](decisions/0397-a-key-an-enemy-drops-is-a-way-and-the-judged-phase-plays-on-the-opened-map.md) | 2026-11-10 | #510 |
 | `0398` | [The bot rescues and drops a green unit, and a recruit's death chance breaks ties after the forfeit](decisions/0398-the-bot-rescues-and-drops-and-a-recruits-death-chance-breaks-ties.md) | 2026-11-10 | #510 |
-| `0400` | [First attempts: a death is graded by the plan that moved its unit, the step back is always judged, and the fog read...](decisions/0400-first-attempts-a-death-is-graded-by-its-mover-the-step-back-is-judged-and-fog-breaks-ties.md) | 2026-11-10 | #510 |
+| `0400` | [First attempts: a death is graded by the plan that moved its unit, the mend goes on with no plan under the cap, and the...](decisions/0400-first-attempts-a-death-is-graded-by-its-mover-the-mend-goes-on-and-fog-breaks-ties.md) | 2026-11-10 | #510 |
 
 ---
 
