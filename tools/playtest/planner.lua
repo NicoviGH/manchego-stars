@@ -178,6 +178,9 @@ M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
 -- the look's enemy phases (#510 W1, a trade's: the next one, our turn, the one after)
 M.LOOK_DEPTH = 2
+-- the units a walker's look sends, each in a look of its own, to the tile a watched enemy
+-- strikes from (#510 W1: "up to 3 units that can reach the strike's tile in time")
+M.WALKER_UNITS = 3
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
@@ -1116,8 +1119,9 @@ function M.plan(Bot, board, sight, style, opts)
     -- any of them, the HP each loses, and the chance a unit whose death ends the game dies in
     -- one. A unit is struck in a phase at the HP it began it with, and only if it lives then.
     -- The last phase is read over every way it went; one before it (r.phases past the first,
-    -- the judged one's own) along its expected way.
-    local function lookDeaths(r, hit)
+    -- the judged one's own; from `from`, default 2, when the first was not judged) along its
+    -- expected way.
+    local function lookDeaths(r, hit, from)
         local function inPhase(hp, outcomes)
             local live = {}
             for _, u in ipairs(hit) do
@@ -1141,7 +1145,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         -- the phases between, folded in only where a look has them: a two-phase look's
         -- numbers stay the lookahead's own to the last bit
-        for k = 2, #(r.phases or {}) do
+        for k = from or 2, #(r.phases or {}) do
             local ph = r.phases[k]
             local d, l, o = inPhase(ph.hp, { { p = 1, strikes = ph.strikes } })
             for id, x in pairs(d) do die[id] = 1 - (1 - (die[id] or 0)) * (1 - x) end
@@ -1747,63 +1751,117 @@ function M.plan(Bot, board, sight, style, opts)
     if not best or #best.acts == 0 then return nil, nil, cost end
     best.lookahead = look
     -- The look, in shadow (#510 W1, comment 6786548233): on a retry, while an enemy an earlier
-    -- attempt saw kill one of our units or a green is on the field (sight.watching), the best plan's
-    -- board is played M.LOOK_DEPTH enemy phases forward, our turn between each two the beam's
-    -- own best plan, unjudged (opts.unjudged). Recorded on the plan (best.look), never ranked:
-    -- play is PR B's until a shadow run proves the look. It costs at most opts.look.room
-    -- AiDecideMain calls (botrun's allowance: a quarter of the attempt's others so far), the
-    -- cost guessed before it runs by the last look's (opts.look.last), else the depth times
-    -- the enemies on the field; one the room cannot pay is not run, and says so (`skipped`).
+    -- attempt saw kill one of our units or a green is on the field (sight.watching), the best
+    -- plan's board is played M.LOOK_DEPTH enemy phases forward, our turn between each two the
+    -- beam's own best plan, unjudged (opts.unjudged). Recorded on the plan (best.look), never
+    -- ranked: play is PR B's until a shadow run proves the look.
+    -- The walker (Ch6's Bael): a watched enemy that, played alone forward (sight.walkers),
+    -- strikes one of our units or a green 2 or more phases out makes the look that deep, and
+    -- up to M.WALKER_UNITS units that can reach the strike's tile in time (ctx.turnsTo: within
+    -- that many of our turns) each get a look of their own with that unit sent there
+    -- (opts.guard), from this turn on: the beam's best with it, unjudged, then the turns
+    -- between with it. Recorded as look.walker, each look's chances over every looked phase
+    -- (this turn's along its expected way too: the alternatives' is not judged).
+    -- It costs at most opts.look.room AiDecideMain calls (botrun's allowance: a quarter of the
+    -- attempt's others so far), guessed before it runs as the looked phases times the last
+    -- look's calls a phase (opts.look.last), else the enemies on the field; one the room
+    -- cannot pay is not run, and says so (`skipped`).
     local watching = sight.look and sight.watching and sight.watching() or {}
     if #watching > 0 then
-        local depth = M.LOOK_DEPTH
+        local calls0, clock = sight.aiCalls(), os.clock()
+        local walk
+        for _, w in ipairs(sight.walkers and sight.walkers() or {}) do
+            if w.phase >= 2 and (not walk or w.phase < walk.phase) then walk = w end
+        end
+        local depth = walk and math.max(M.LOOK_DEPTH, walk.phase) or M.LOOK_DEPTH
         local rec = { asked = true, depth = depth, watched = {} }
         for i, e in ipairs(watching) do rec.watched[i] = e.id end
+        local guards = {}
+        if walk then
+            local tile = { x = walk.x, y = walk.y }
+            for _, u in ipairs(ctx.blues) do
+                local t = ctx.turnsTo(u, tile)
+                if t and math.max(math.ceil(t), 1) <= walk.phase then
+                    guards[#guards + 1] = { id = u.id, x = walk.x, y = walk.y, turns = t }
+                end
+            end
+            table.sort(guards, function(a, b)
+                if a.turns ~= b.turns then return a.turns < b.turns end
+                return a.id < b.id
+            end)
+            for k = #guards, M.WALKER_UNITS + 1, -1 do guards[k] = nil end
+        end
         local reds = 0
         for _, u in ipairs(board.units) do
             if u.faction == "red" and u.onField and not u.dead then reds = reds + 1 end
         end
         local lo = opts and opts.look or {}
-        rec.estimate = lo.last or depth * reds
+        rec.phases = depth * (1 + #guards)
+        rec.estimate = math.ceil((lo.last or reds) * rec.phases)
         if rec.estimate > (lo.room or 0) then
             rec.skipped = true
         else
-            local calls0, clock, between = sight.aiCalls(), os.clock(), 0
-            -- where each turn between leaves our units ({ ["id"] = { x, y } } a turn): the
-            -- shadow run reads it against the turn then played (montecarlo.py look). A turn
+            local between = 0
+            -- our turn between: the beam's best, unjudged, `guard` its walker's unit sent (or
+            -- nil). `tiles` keeps where it leaves our units ({ ["id"] = { x, y } } a turn), for
+            -- the shadow run to read against the turn then played (montecarlo.py look); a turn
             -- the beam has nothing to play (nil) holds them where the board has them.
+            local function turnOf(b, guard, tiles)
+                local c0 = sight.aiCalls()
+                local ph = M.plan(Bot, b, sight, style,
+                                  { unjudged = true, seen = opts and opts.seen, guard = guard })
+                between = between + sight.aiCalls() - c0
+                if tiles then
+                    local at = {}
+                    if ph then
+                        for _, p in ipairs(ph.blues) do at[tostring(p.unit.id)] = { x = p.x, y = p.y } end
+                    else
+                        for _, u in ipairs(b.units) do
+                            if u.faction == "blue" and u.onField and not u.dead then
+                                at[tostring(u.id)] = { x = u.x, y = u.y }
+                            end
+                        end
+                    end
+                    tiles[#tiles + 1] = at
+                end
+                return ph
+            end
+            local function rounded(die)
+                local out = {}
+                for id, d in pairs(die) do out[tostring(id)] = math.floor(d * 1e4 + 0.5) / 1e4 end
+                return out
+            end
             rec.between = {}
             local r = sight.look({ blues = best.phase.blues, gone = best.phase.gone,
                                    reds = best.phase.reds, opened = best.phase.opened,
                                    carry = best.phase.carry }, depth, function(b)
-                local c0 = sight.aiCalls()
-                local ph = M.plan(Bot, b, sight, style, { unjudged = true, seen = opts and opts.seen })
-                between = between + sight.aiCalls() - c0
-                local tiles = {}
-                if ph then
-                    for _, p in ipairs(ph.blues) do
-                        tiles[tostring(p.unit.id)] = { x = p.x, y = p.y }
-                    end
-                else
-                    for _, u in ipairs(b.units) do
-                        if u.faction == "blue" and u.onField and not u.dead then
-                            tiles[tostring(u.id)] = { x = u.x, y = u.y }
-                        end
-                    end
-                end
-                rec.between[#rec.between + 1] = tiles
-                return ph
+                return turnOf(b, nil, rec.between)
             end)
             -- each unit's chance to die in any looked phase: the judged one's, then the look's
             local later = lookDeaths(r, best.phase.hit)
             local first = {}
             for _, p in ipairs(best.predict or {}) do first[p.id] = p.die end
-            rec.die = {}
+            local die = {}
             for _, u in ipairs(best.phase.hit) do
-                local d = 1 - (1 - (first[u.id] or 0)) * (1 - (later[u.id] or 0))
-                rec.die[tostring(u.id)] = math.floor(d * 1e4 + 0.5) / 1e4
+                die[u.id] = 1 - (1 - (first[u.id] or 0)) * (1 - (later[u.id] or 0))
             end
+            rec.die = rounded(die)
             rec.run, rec.ended = true, r.ended
+            if walk then
+                rec.walker = { enemy = walk.enemy, target = walk.target, phase = walk.phase,
+                               x = walk.x, y = walk.y,
+                               die = rounded((lookDeaths(r, best.phase.hit, 1))), alts = {} }
+                for _, g in ipairs(guards) do
+                    local guard = { g }
+                    local own = turnOf(board, guard)
+                    local alt = { unit = g.id, turns = g.turns }
+                    if own then
+                        local ra = sight.look(own, depth, function(b) return turnOf(b, guard) end)
+                        alt.die, alt.ended = rounded((lookDeaths(ra, best.phase.hit, 1))), ra.ended
+                    end
+                    rec.walker.alts[#rec.walker.alts + 1] = alt
+                end
+            end
             rec.calls = sight.aiCalls() - calls0
             rec.between_calls = between
             rec.cpu_s = os.clock() - clock

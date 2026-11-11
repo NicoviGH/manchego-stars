@@ -1629,10 +1629,20 @@ local function sendWorth(ctx, u, t)
     return t.gold * c, c
 end
 
-local function exploring(ctx, sent, barred)
+local function exploring(ctx, sent, barred, guard)
     ctx.exploreGoal = {}
     barred = barred or {}
     local taken = {}
+    -- `guard` (the look's walker, #510 W1; only the shadow look passes it): { {id, x, y} },
+    -- a unit sent to the tile a watched enemy strikes from, before anything else. What it
+    -- does there is the beam's choice.
+    for _, g in ipairs(guard or {}) do
+        for _, u in ipairs(ctx.blues) do
+            if u.id == g.id and not ctx.exploreGoal[u.id] then
+                taken[tileKey(g.x, g.y)], ctx.exploreGoal[u.id] = true, { x = g.x, y = g.y }
+            end
+        end
+    end
     local function reaches(u, t)
         if u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind) then return marchLength(ctx, u, t) end
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
@@ -2037,7 +2047,8 @@ end
 -- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
 -- claim gives way); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
--- each goal a unit was found with no step toward, and the turn it was first found so).
+-- each goal a unit was found with no step toward, and the turn it was first found so); `guard`,
+-- the look's walker's units sent to a strike's tile (exploring).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
 -- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
@@ -2077,7 +2088,7 @@ function M.candidates(board, sight, style, opts)
             if e.since < turn then barred[k] = true end
         end
         local before = ctx.exploreGoal
-        exploring(ctx, opts and opts.sent, barred)
+        exploring(ctx, opts and opts.sent, barred, opts and opts.guard)
         out = propose(ctx, out, before)
         local more = false
         for _, c in ipairs(out) do

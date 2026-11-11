@@ -71,7 +71,8 @@ its style's cap. Every change to the bot's first attempts is read by it the same
 game played (#510 W1): each unit the look judged, by the chance it gave, beside how many died
 within the looked phases; each chapter's looks asked, run and skipped, their AiDecideMain
 calls (the turns between's among them) against the attempts' own, and CPU; and how often the
-look's turn between left our units where the turn then played did.
+look's turn between left our units where the turn then played did; and each walker's
+strike, its target's chance, and the best unit sent's.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
@@ -3213,11 +3214,15 @@ def look_table(traces):
     between's, against the attempt's own; and CPU. Each turn between (`look.between`, our
     units' tiles as it leaves them, the k-th after the look's turn T) is set against turn T+k
     as played (the units' tiles at that turn's enemy phase): the units on the same tile, and
-    the turns with every unit so, over the units in both (`between_*` in cost). Returns
-    {'traces', 'distinct', 'bins', 'cost'}: bins as calibration's; cost: chapter -> Counter."""
+    the turns with every unit so, over the units in both (`between_*` in cost). Each look with
+    a walker (`look.walker`) is a row of 'walker': the turn its strike lands, its target's
+    chance in the best plan's look, the unit sent whose look gives the target the least, that
+    chance and whether every green stays under 50% there, and whether the target died by the
+    strike's turn. Returns {'traces', 'distinct', 'bins', 'cost', 'walker'}: bins as
+    calibration's; cost: chapter -> Counter; walker: a list of rows (dicts)."""
     bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
     cost = collections.defaultdict(collections.Counter)
-    seen = set()
+    seen, walker = set(), []
     for events in traces:
         key = trace_key(events)
         if key in seen:
@@ -3230,7 +3235,10 @@ def look_table(traces):
             if d.get('faction') in ('blue', 'green') and d.get('id') is not None:
                 died[d['id']].append((d.get('turn'), d.get('phase')))
         plan, looks, played = None, {}, {}   # played: turn -> {unit id: (x, y)}, blue units only
+        greens = set()
         for e in events:
+            if e.get('t') == 'phase':
+                greens |= {u['id'] for u in e.get('units') or [] if u.get('faction') == 'green'}
             if e.get('t') == 'phase' and e.get('phase') == 'enemy' and e.get('units'):
                 played[e.get('turn')] = {u['id']: (u.get('x'), u.get('y'))
                                          for u in e['units'] if u.get('faction') == 'blue'}
@@ -3256,6 +3264,24 @@ def look_table(traces):
         name = chapter_label(info)
         c = cost[name]
         c['attempts'] += 1
+        for turn in sorted(looks):
+            w = looks[turn].get('walker')
+            if not w:
+                continue
+            alts = [a for a in w.get('alts') or [] if isinstance(a.get('die'), dict)]
+            best = min(alts, key=lambda a: (a['die'].get(str(w['target']), 0), a['unit']),
+                       default=None)
+            walker.append({
+                'play': len(seen), 'chapter': name,
+                'turn': turn, 'enemy': w['enemy'], 'target': w['target'],
+                'strikes': turn + w['phase'] - 1,
+                'said': (w.get('die') or {}).get(str(w['target']), 0),
+                'unit': best and best['unit'],
+                'alt': best and best['die'].get(str(w['target']), 0),
+                'greens_safe': best is not None and all(
+                    p < 0.5 for uid, p in best['die'].items() if int(uid) in greens),
+                'fell': any(t is not None and turn <= t <= turn + w['phase'] - 1
+                            for t, _ in died.get(w['target'], []))})
         for turn, lk in looks.items():
             for k, tiles in enumerate(lk.get('between') or [], 1):
                 now = played.get(turn + k)
@@ -3275,7 +3301,8 @@ def look_table(traces):
         costs = end.get('costs') or {}
         c['ai_calls'] += (costs.get('game_calls') or {}).get('AiDecideMain') or 0
         c['cpu_s'] += costs.get('cpu_s') or 0
-    return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'cost': cost}
+    return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'cost': cost,
+            'walker': walker}
 
 
 def look_lines(t):
@@ -3308,6 +3335,16 @@ def look_lines(t):
         out.append('| %s | %d | %d | %d | %d | %s |' % (
             ch, c['between_turns'], c['between_turns_same'], n, c['between_units_same'],
             '%.1f%%' % (100.0 * c['between_units_same'] / n) if n else '-'))
+    if t.get('walker'):
+        out += ['', '| Play | Chapter | Turn | Walker | Its target | Strikes on turn | Target\'s '
+                'chance, best plan | Best unit sent | Target\'s chance then | Every green '
+                'under 50% then | Target died by then |', '|---|---|---|---|---|---|---|---|---|---|---|']
+        for w in t['walker']:
+            out.append('| %d | %s | %d | %d | %d | %d | %.0f%% | %s | %s | %s | %s |' % (
+                w['play'], w['chapter'], w['turn'], w['enemy'], w['target'], w['strikes'],
+                100 * w['said'], '-' if w['unit'] is None else w['unit'],
+                '-' if w['alt'] is None else '%.0f%%' % (100 * w['alt']),
+                'yes' if w['greens_safe'] else 'no', 'yes' if w['fell'] else 'no'))
     return out
 
 

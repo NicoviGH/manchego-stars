@@ -1776,7 +1776,8 @@ end
 -- test_the_record_sums_the_look (#510 W1): each plan's look (asked, run, skipped, its calls,
 -- the turns between's, CPU) is summed into rec.look and traced on the plan; the planner is told
 -- the look's room, a quarter of the attempt's AiDecideMain calls outside the look so far less
--- what the look spent, and the last look's cost as the next one's guess.
+-- what the look spent, and the last look's calls a looked phase (its `phases`: a walker's
+-- runs deeper, once per unit it sends) as the next one's guess.
 do
     local Planner = dofile(here .. "planner.lua")
     local g = fakeGame { units = rout() }
@@ -1797,7 +1798,8 @@ do
             end
             -- the decision's own calls, then the look's 40 (10 of them its turn between)
             ai = ai + 400
-            local look = { asked = true, run = true, calls = 40, between_calls = 10, cpu_s = 0.25 }
+            local look = { asked = true, run = true, calls = 40, between_calls = 10, cpu_s = 0.25,
+                           phases = 4 }
             if #told > 1 then look = { asked = true, skipped = true } end
             ai = ai + (look.calls or 0)
             local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
@@ -1823,7 +1825,7 @@ do
     check(told[1].last, nil, "look: no look yet, no guess")
     -- after the first: 440 calls in the attempt, 40 of them the look's: (440 - 40) / 4 - 40
     check(told[2].room, 60, "look: a quarter of the others, less what the look spent")
-    check(told[2].last, 40, "look: the last look's cost is the next one's guess")
+    check(told[2].last, 10, "look: the last look's calls a looked phase are the next one's guess")
 end
 
 -- test_an_exhausted_lookahead_is_an_anomaly (#570): a decision the attempt's budget left one

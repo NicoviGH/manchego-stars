@@ -2992,6 +2992,29 @@ class Look(unittest.TestCase):
         self.assertEqual((c['between_units'], c['between_units_same']), (2, 1))
         self.assertIn('| Ch5 | 1 | 0 | 2 | 1 | 50.0% |', '\n'.join(mc.look_lines(mc.look_table([tr]))))
 
+    def test_walker(self):
+        # a walker at turn 1 strikes green 9 on phase 3 (turn 3); sending unit 2 brings it to
+        # 10% and keeps the other green under 50%, unit 1 to 40%; green 9 died on turn 3
+        tr = self.trace(die_turn=3)
+        tr[-1]['record']['deaths'] = [{'faction': 'green', 'phase': 'enemy', 'turn': 3,
+                                       'id': 9, 'charId': 9}]
+        tr[1]['units'] = [{'id': 9, 'faction': 'green'}, {'id': 10, 'faction': 'green'},
+                          {'id': 1, 'faction': 'blue'}]
+        tr[2]['look']['walker'] = {
+            'enemy': 0x81, 'target': 9, 'phase': 3, 'x': 5, 'y': 0, 'die': {'9': 0.9},
+            'alts': [{'unit': 1, 'turns': 1, 'die': {'9': 0.4, '10': 0}},
+                     {'unit': 2, 'turns': 2, 'die': {'9': 0.1, '10': 0.2, '1': 0.7}},
+                     {'unit': 3, 'turns': 2}]}           # no turn to play: no chances
+        t = mc.look_table([tr])
+        w = t['walker'][0]
+        self.assertEqual((w['turn'], w['strikes'], w['said'], w['unit'], w['alt']),
+                         (1, 3, 0.9, 2, 0.1))
+        self.assertTrue(w['greens_safe'], 'only the greens: our unit 1 at 70% is not one')
+        self.assertTrue(w['fell'])
+        self.assertIn('| 1 | Ch5 | 1 | 129 | 9 | 3 | 90% | 2 | 10% | yes | yes |',
+                      '\n'.join(mc.look_lines(t)))
+        self.assertEqual(mc.look_table([self.trace()])['walker'], [], 'no walker, no row')
+
 
 class Calibration(unittest.TestCase):
     """`calibration` (#510 PR A): unit-phases binned by the phase's last plan; a death read by

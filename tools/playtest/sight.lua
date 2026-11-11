@@ -123,6 +123,9 @@
 --                            .phases (the earlier phases' expected strikes). See s.look.
 --   nextPhase(plan)          look(plan, 2): the enemy phase AFTER the next, our units holding
 --                            between (the planner's lookahead, FR-017).
+--   walkers(k)               each watched enemy played alone k enemy phases forward, everyone
+--                            else standing (closings' routine): its first strike on one of our
+--                            units or a green -> { { enemy, target, phase, x, y } } (#510 W1).
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
 --                            boss = on a Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
@@ -1975,6 +1978,52 @@ function M.new(outer)
             end
         end)
         closingsAt[ck] = out
+        return out
+    end
+
+    -- The walkers (#510 W1, comment 6786548233; Ch6's Bael): each watched enemy (s.watching)
+    -- played alone `k` enemy phases forward (default M.CLOSE_HORIZON) with the game's own AI,
+    -- in the game's turn order, as closings() plays its looters: every other unit standing
+    -- where it is now, our units and the greens seen by the AI. Its first strike on one of our units
+    -- or a green ends its walk. Only the watched decide: every enemy for 8 phases is the cost
+    -- closings measured. -> { { enemy, target (ids), phase (the next enemy phase is 1), x, y
+    -- (the tile it strikes from) } }, by enemy id: one for each watched enemy that strikes
+    -- within k. Read once per decision (seen).
+    function s.walkers(k)
+        k = k or M.CLOSE_HORIZON
+        seen.walkers = seen.walkers or {}
+        if seen.walkers[k] then return seen.walkers[k] end
+        local watched, left = {}, 0
+        for _, o in ipairs(s.watching()) do watched[o.id], left = true, left + 1 end
+        local out = {}
+        if left > 0 then
+            local all = units()
+            local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
+            sandbox(function(call, proc)
+                local byId = {}
+                for _, o in ipairs(all) do byId[o.id] = o end
+                for phase = 1, k do
+                    if left == 0 then break end
+                    api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
+                    for _, id in ipairs(aiOrder(call)) do
+                        local e = watched[id] and byId[id]
+                        if e then
+                            local target, side = aiDecide(call, proc, e)
+                            local t = target and byId[target]
+                            if t and t.faction ~= "red" then
+                                out[#out + 1] = { enemy = id, target = target, phase = phase,
+                                                  x = side.tile.x, y = side.tile.y }
+                                watched[id], left = nil, left - 1
+                            else
+                                followMove(e)
+                            end
+                        end
+                    end
+                end
+            end)
+            table.sort(out, function(a, b) return a.enemy < b.enemy end)
+        end
+        seen.walkers[k] = out
         return out
     end
 

@@ -616,7 +616,8 @@ function M.run(api)
     local watch = diag and M.matcher(diag.original, diag.ref, Json)
     local pin, halt
     -- the look's allowance (#510 W1): a quarter of the attempt's AiDecideMain calls outside
-    -- it so far, less what it spent; and the last look's cost, the next one's guess.
+    -- it so far, less what it spent; and the last look's calls a looked phase, the next
+    -- one's guess.
     -- aiAt0 is the count when the attempt's play began (play() sets it)
     local aiAt0, lastLook
     local function lookRoom(sight)
@@ -1220,7 +1221,9 @@ function M.run(api)
                                 rec.look.calls = rec.look.calls + lk.calls
                                 rec.look.between_calls = rec.look.between_calls + lk.between_calls
                                 rec.look.cpu_s = rec.look.cpu_s + lk.cpu_s
-                                lastLook = lk.calls
+                                -- the next look's guess is per looked phase: a walker's is
+                                -- deeper, and runs once per unit it sends
+                                lastLook = lk.calls / math.max(lk.phases or 1, 1)
                             end
                         end
                         if plan then

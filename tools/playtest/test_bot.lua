@@ -5681,6 +5681,88 @@ do
           "look: a turn between with nothing to play holds A where it stands")
 end
 
+-- The walker (#510 W1): a watched enemy X that, played alone (sight.walkers), strikes A from
+-- (5,0) on the third enemy phase. Our units reach (5,0) in 1 (A), 1.8 (B), 2.6 (C) and 2.8 (D)
+-- turns, E in 8. o.walk overrides the walk; Bot records each candidates call's opts.guard.
+local function walkerBoard(walk)
+    local A, Bu = blue(0x01, 0, 0, 0), blue(0x02, 1, 0, 4)
+    local C, D, E = blue(0x03, 2, 0, 8), blue(0x04, 3, 0, 9), blue(0x05, 4, 0, 40)
+    local X = red(0x81, 9, 9, { minRange = 1, maxRange = 1 })
+    local s2 = sightOf({ enemyPhase = function() return {} end, lookCalls = 10,
+        look = function(plan, depth, between)
+            between(boardOf(A, Bu, C, D, E, X))
+            local phases = {}
+            for k = 1, depth - 1 do phases[k] = { strikes = {} } end
+            local out = { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99,
+                            takenHits = 1, takenCrit = 0 } }
+            out.phases = phases
+            return out
+        end })
+    local board = boardOf(A, Bu, C, D, E, X)
+    s2.watching = function() return { X } end
+    s2.walkers = function()
+        return walk or { { enemy = 0x81, target = 0x01, phase = 3, x = 5, y = 0 } }
+    end
+    local guards = {}
+    local Bot = setmetatable({ candidates = function(b, sight, st, opts)
+        guards[#guards + 1] = opts and opts.guard
+        return B.candidates(b, sight, st, opts)
+    end }, { __index = B })
+    return Bot, board, s2, guards
+end
+
+-- test_walker_sends_the_nearest_in_time: the look runs as deep as the walker's strike; the
+-- three nearest units that reach the strike's tile in time (D, a fourth, is cut by
+-- WALKER_UNITS; E is too far) each get a look of their own, sent there from this turn and in
+-- every turn between; each alternative's chances are recorded beside the best plan's
+do
+    local Bot, board, s2, guards = walkerBoard()
+    local _, plan = Planner.plan(Bot, board, s2, gifted("careful", 1000), { look = { room = 1e6 } })
+    local lk = plan and plan.look or {}
+    local w = lk.walker or { alts = {} }
+    check(lk.depth, 3, "walker: the look as deep as the strike")
+    check(s2.looked and #s2.looked, 4, "walker: the best plan's look and one for each unit sent")
+    check(s2.looked and s2.looked[2].depth, 3, "walker: an alternative's look as deep")
+    check((w.alts[1] or {}).unit, 0x01, "walker: the nearest first")
+    check((w.alts[2] or {}).unit, 0x02, "walker: then the next")
+    check((w.alts[3] or {}).unit, 0x03, "walker: then the third")
+    check(#w.alts, Planner.WALKER_UNITS, "walker: at most WALKER_UNITS units")
+    check(w.enemy .. ">" .. w.target .. "@" .. w.phase, "129>1@3", "walker: the strike recorded")
+    check(w.die and w.die["1"], 1, "walker: the best plan's chances over every looked phase")
+    check(w.alts[1].die and w.alts[1].die["1"], 1, "walker: each alternative's chances")
+    check(lk.phases, 3 * 4, "walker: the looked phases, the allowance's count")
+    -- every guard passed to the beam: B's own turn and its turn between both send it
+    local sentB = 0
+    for _, g in pairs(guards) do
+        if g and g[1] and g[1].id == 0x02 and g[1].x == 5 and g[1].y == 0 then sentB = sentB + 1 end
+    end
+    check(sentB, 2, "walker: the unit sent in its own turn and in the turn between")
+end
+
+-- test_walker_next_phase_is_no_walker: a strike on the next enemy phase is the judge's own
+-- (the trade's look): no walker, no unit sent, the look two phases deep
+do
+    local Bot, board, s2 = walkerBoard({ { enemy = 0x81, target = 0x01, phase = 1, x = 5, y = 0 } })
+    local _, plan = Planner.plan(Bot, board, s2, gifted("careful", 1000), { look = { room = 1e6 } })
+    local lk = plan and plan.look or {}
+    check(lk.depth, Planner.LOOK_DEPTH, "walker: a next-phase strike leaves the trade's depth")
+    check(lk.walker, nil, "walker: and no walker")
+    check(s2.looked and #s2.looked, 1, "walker: one look")
+end
+
+-- test_guard_sends_the_unit_to_the_tile: opts.guard (the walker's) makes the tile the unit's
+-- march goal before any other (exploring)
+do
+    local A = blue(0x01, 0, 0, 0)
+    local X = red(0x81, 9, 9)
+    local board, sight = boardOf(A, X), sightOf({})
+    local _, ctx = B.candidates(board, sight, style("careful"), { guard = { { id = 0x01, x = 5, y = 0 } } })
+    local g = ctx.exploreGoal[0x01]
+    check(g and (g.x .. "," .. g.y), "5,0", "guard: the strike's tile is the unit's goal")
+    _, ctx = B.candidates(board, sight, style("careful"), {})
+    check(ctx.exploreGoal[0x01], nil, "guard: none without it")
+end
+
 -- test_look_turn_between_is_the_beams_best: opts.unjudged gives the beam's best plan, every
 -- other unit holding, as the phase table it leaves -- our turn between attacks: A's sure kill
 -- of an adjacent enemy is in it, the enemy gone, and no enemy phase was judged
