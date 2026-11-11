@@ -9,35 +9,58 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, W1: the widened replan built; the boss still not killed).**
-Carry on with **#510 PR W1** on branch `feat/510-w1-look-shadow` (pushed, no PR). The design,
-its approved calls and W1's build map are ONE comment, #510 comment 6786548233, edited in
-place: read it first. Tell Nicolas where W1 stands in plain words at the start.
-- **Done this session:** `bda5624f` the widened replan in the look's turn between only (an
-  enemy fogged before an act and seen after it is a surprise, remembered or not):
-  `sight.reveals`, `sight.after`, `Planner.joinTurn`; `story --why` prints each replan.
-- **Ch6 4001 attempts 1-2, shadow run `w1q`** (play act for act as `w1p`): the boss is NOT
-  killed. The rule fires on most turns between in fog; the replans fight what each move
-  shows, so the boss march is a turn slower. On turn 8 Novala comes into sight after
-  Gilliam's step, Seth has already moved out of reach, the replan sends Joshua (1 HP): no
-  kill. Villager 83% unchanged. Eirika 0% (was 97%), Joshua 92%, Franz 88%. The look cost
-  +46% AI calls (8,518 -> 12,427), CPU 47 -> 86 s. So the same rule for live play is not
-  supported by this start (Nicolas's call; recommend not).
-- **Ch6 4002/4010 shadow run `w1r`** (Nicolas agreed: replan stays look-only, move on): the
-  allowance starves the look (2 of 23 ran; turns between are 95% of its calls). The one
-  checkable look came true (4010 turn 4: villager 83% by turn 8, died turn 8 to walker 145),
-  but `montecarlo.py look`'s calibration table is empty: it reads each enemy phase's LAST
-  plan, and a later replan whose look was skipped hides the one that ran.
-- **Done:** `07abd46d` the table counts a turn's look that ran (Nicolas: "Yes"). Reread: 26
-  unit-looks, the 83% one died, none of 25 at <=5% did; the turns between left 3 of 50
-  units on the tile then played (6%).
-- **Measured (probe `w1s`, not kept):** 97% of the look's AI calls are `sight.strike` (the
-  cap's tile checks) in its 24 planned turns; a third from the widened replans. The best
-  plan's look (the one calibrated) is ~1/6 of the cost; the boss march and 3 walker
-  alternatives are the rest.
-- **Next:** Nicolas's call (asked 2026-11-11): run the best plan's look first and the
-  alternatives only with the allowance's room left? Then mends judged by the look,
-  `make test` timed.
+**Next session starts here (2026-11-11 evening): W1 handed to Fable, to own.**
+Nicolas (2026-11-11): "pass this back to Fable. Give it a shot at achieving our goal with less
+micromanaging from me." **You own W1's direction.** Bring him outcomes and the few calls
+that are truly his (AGENTS.md "Decisions that are mine": a measurement's meaning, a tuning
+weight, stopping a line of work); decide the rest yourself, and say what you decided.
+
+**The goal** (#510's north star): a trustworthy difficulty model. W1-W3's part: a retry learns
+from what beat it, as a human player does ("emulate human players learning from their
+mistakes and losses"), so retries, and the cells built on them, play like people. The
+design, its six approved calls and its **refutation bars** are #510 comment 6786548233 (read
+"Proof, and what refutes each part" first, then the W1 build map). Judge every step by
+whether it moves a bar, not by whether it fixes a case.
+
+**Honest state, against the design's own bars** (Opus's read, 2026-11-11, not yet acted on):
+- **Works:** the look runs on the ROM in shadow (play unchanged act for act); its one
+  checkable prediction came true (Ch6 4010: villager 83% by turn 8, died turn 8 to walker
+  145); none of 25 unit-looks at <=5% died. Far too few looks to calibrate.
+- **Walker part: fails its bar.** "No alternative keeps the villagers alive ... in at least 2
+  of 3 starts": the villager stays at 83% in every alternative in every Ch6 start (4002 had
+  no walker at all).
+- **The look is starved:** 25 of 28 looks skipped (bar: half -> stop and report). The design
+  guessed the enemy phases were the cost and named a fix for that; measured (probe `w1s`,
+  not kept): 97% of the look's AI calls are `sight.strike` (the cap's tile checks) while
+  planning our 24 turns a look; the enemy phases are 2.5%. The best plan's look, the one
+  calibrated, is ~1/6; the boss march and 3 walker alternatives the rest.
+- **Drift:** the boss alternative (`555382ac`) and the widened replan (`bda5624f`) were not in
+  the design; both chased one Ch6 case (Nicolas 2026-11-09: stop chasing single deaths).
+  The replan did not give the boss kill (`w1q`: Seth moved before Novala showed) and costs
+  a third of the look; it does make the turn between react to fog as live play does.
+- **Untested:** the trades part (about half of over-cap deaths, 30 of 57, came one turn after
+  a plan under the cap: a horizon error) and the waves part (`scout-ch13`). That is where
+  most of the deaths the look exists for are.
+- **Opus's recommendation, not yet put to Nicolas as a decision:** drop the walker
+  alternatives and the boss march from W1 (frees ~5/6 of the look's cost, ending the
+  starvation without a new rule), keep the widened replan look-only, then the trades test
+  on the Ch5 retries and `scout-ch10` (mends judged by the look). Yours to take or replace.
+
+**Done 2026-11-11 (branch `feat/510-w1-look-shadow`, pushed, no PR):** `bda5624f` the widened
+replan in the look's turn between (`sight.reveals`, `sight.after`, `Planner.joinTurn`;
+`story --why` prints it); `07abd46d` `montecarlo.py look` counts a turn's look that ran even
+when a later replan's was skipped (Nicolas: "Yes"; before, both run looks were hidden).
+Shadow runs kept in `references/sim/vanilla/c25b145e3745/traces/`: `w1q-cs-s4001`,
+`w1r-cs-s4002`, `w1r-cs-s4010`. Each step's numbers are on the build map.
+
+**Key files:** `tools/playtest/sight.lua` (`s.look`, `s.walkers`, `s.reveals`, `s.after`,
+`s.staged`), `tools/playtest/planner.lua` (the look block after "The look, in shadow";
+`opts.unjudged`; `M.joinTurn`), `tools/playtest/bot.lua` (`M.explain`),
+`tools/playtest/montecarlo.py` (`look_table`, `resume`, `story --why`), tests in
+`test_bot.lua`, `test_sight.lua`, `test_montecarlo.py`. A Ch6 retry pair:
+`montecarlo.py resume --game vanilla --tag <new> --campaigns cs-s4001 --chapter 7 --last 7
+--attempts 2` (~3.5 min); `montecarlo.py look <trace dirs>` reads it.
+
 - **Lessons:**
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
@@ -48,8 +71,10 @@ place: read it first. Tell Nicolas where W1 stands in plain words at the start.
   - A function or constant board.lua adds must go in `Board.bind` too.
   - `sight.staged` isolates `seen`, `s.cache`, answer()'s village race and closings()' replays.
   - Prose check: "one of our units", never "one of ours"; "our units", never "ours".
-  - `montecarlo.py look` reads each enemy phase's last plan: a replan whose look was skipped
-    hides the turn's earlier look (Ch6 4001 turn 4). Read the trace's plan events directly.
+  - In the turn between, a unit the plan holds has NO act in `st.acts`: "units still to act"
+    is `ctx.actors` minus the acted, never "acts left".
+  - Write a shadow step's refutation bar down before running it, and stop at it: W1 ran four
+    steps past "starved" and "walker refuted" chasing one Ch6 boss.
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
