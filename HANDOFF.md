@@ -9,10 +9,28 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, PR B merged).** **#510 PR B merged as #599**
-(squash `2dd4f835`, ADR 0399). Read #510 comments 6786147872 (the campaign rerun),
-6786005697 (late-game deaths) and 6786548233 (Fable's design). Next: Fable expands its design
-(below).
+**Next session starts here (2026-11-11, W1 started).** Build **#510 PR W1** (the look in
+shadow) on branch `feat/510-w1-look-shadow` (pushed, no PR). The design, its approved calls and
+W1's build map are ONE comment, #510 comment 6786548233 (edited in place): read it first.
+- **Nicolas approved all six calls** (2026-11-11, "Makes sense. Proceed"): a retry may send a
+  unit to a remembered killer's strike tile; retries only; a retry remembers each
+  reinforcement's tile and unit; a plan lost in the look counts over the cap only after the
+  shadow run proves the look; a quarter of a retry's AI calls is the allowance; the refutation
+  bars as written.
+- **Done on the branch:** `sight.staged` + `strictly` (`728c0938`): the planner runs inside an
+  open sandbox on a staged board. Probe on the three suite snapshots: plans exactly as at depth
+  0. Under the journal alone vanilla Ch6's fog maps leaked between judged plans; a whole
+  save/load a nested read fixes it at about the same CPU. Test fails without the fix.
+- **Next:** the build map's remaining bullets (`sight.look`, `planner` `phaseOf` / `unjudged` /
+  the shared death composition, the watched set, the allowance, records, `montecarlo.py`
+  tables), fake-board tests first, `scout-ch6` attempt 1 trace for trace, then the shadow runs
+  (Ch6 attempt 2 of 4001/4002/4010, Ch5 retries, `scout-ch10`) brought to Nicolas with numbers.
+- **Probe recipe** (reusable): a temporary `PT_PROBE` branch in `botrun.lua`'s `check_pinned`
+  path, launched per snapshot with `montecarlo.start_task` + `launch_tagged` (pinned = the
+  snapshot's `state_path`), its line read with `parse_lines`. Not kept.
+
+Earlier the same day: **#510 PR B merged as #599** (squash `2dd4f835`, ADR 0399). Read #510
+comments 6786147872 (the campaign rerun) and 6786005697 (late-game deaths).
 - **What #599 does:** a retry remembers every enemy earlier attempts showed and every killer
   (by slot, character and class, `Board.memoryKey`); `sight.remember`/`knows` and
   `Board.playsAsSeen` are the one owner of "counts as seen" (judged phases, danger maps lifted,
