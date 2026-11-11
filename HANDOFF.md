@@ -9,7 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11 night): the bot plays vanilla; Ch6 is through.**
+**Next session starts here (2026-11-11 night): the bot plays vanilla; Ch6 is through, Ch8 is the wall.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction ("this project is yours too, so take ownership and be proactive"); use cheaper
 subagents to check source, ADRs and research before claiming or building.
@@ -35,25 +35,27 @@ subagents to check source, ADRs and research before claiming or building.
   Ch1 0 of 50, validity held; in `cells.jsonl`, not posted). `pilot --chapter 0` was stopped
   partway. Manchego Stars' ch02 stop is parked for step 10 and is not a blocker to raise.
 
-**In flight when this was written (2026-11-11, 16:09 on): run `fwd1`.** The eight vanilla
-campaigns that were stopped at Ch6 play on from it through chapter index 10 (`montecarlo.py
-resume --game vanilla --campaigns cs-s4001,cs-s4002,cs-s4004,cs-s4005,cs-s4006,cs-s4007,
-cs-s4009,cs-s4010 --chapter 7 --last 10 --tag fwd1 --jobs 8`, on main at `786c4127`). **Before
-anything else: `pgrep -fl mgba`.** If workers are still running, do not edit Lua, switch
-branches or start a run. Its records are the `fwd1-*` lines of
-`references/sim/vanilla/c25b145e3745/resume-runs.jsonl` (a campaign's last line says why it
-stopped); its traces are under `traces/fwd1-cs-s40*/`. If it was cut short (the session ended),
-the records it wrote stand; rerun the campaigns that have no closing line under a new tag.
+**Run `fwd1` is done (2026-11-11, 17:50; nothing in flight).** The eight vanilla campaigns
+played on from Ch6: all eight clear Ch6 clean again, none gets past chapter index 10. Findings,
+with what is confirmed and what is not: **#510 comment 6810177817**.
+- **Ch7 (index 8) stops 4005 and 4010:** the lord dies on turn 4 in all 7 attempts. On turn 3
+  the bot plays a plan it rates at 0.7% death that leaves her at half HP in reach of two Thunder
+  mages. The 7 attempts are 3 games (one per style); retry memory changes nothing.
+- **Ch8 (index 9) stops 4001, 4004, 4007, 4009 (4002 crashed on attempt 10, not looked into):**
+  1 clean clear in 68 attempts. The thief (charId 9, the only unit that can open a chest) is
+  left out of 30 of 68 parties; when deployed, the chest goal is the thief's alone and nobody
+  clears the door guards; the seize is then skipped for hundreds of turns (one attempt ran 999).
+- **Ch9 (index 10) stops 4006:** won 8 of 8, clean 0 of 8. The recruit (charId 18) leaves by
+  the chapter's turn-12 event (the record wrongly says `killed_before_talk`); the lord never
+  reaches her. The village at (11,15) is destroyed on turn 5.
 
-**Next step.** Read `fwd1`: how many campaigns clear Ch6 again, whether Ch7 is clean, and
-where each stops and why (send a cheaper subagent over the records and traces). The bot cannot
-beat the game yet. Known walls ahead, from the scout starts (which carry earlier losses, so
-their parties are weaker than a clean campaign's): Ch8's chests at (1,3) and (2,3) never
-reached; `scout-ch13` loses 108 of 161 (mostly over the cap, the killer in sight);
-`scout-ch14` ends `stuck` on turn 19 every run; Ch5x (4003) stalls on turn 33. Nothing past
-Ch14 has been played. For each wall: read the records and traces, name the cause, then build
-the smallest thing. Ch6's cause was not the one the design assumed, and one existing option
-fixed it. Write the findings on #510 (comment 6786548233 holds today's).
+**Next step.** Ch8 is the wall most campaigns hit. Start with why the team pick leaves the
+thief out (`Bot.team`, bot.lua:2253 on; not read yet), then the chest goal that only the thief
+serves. Open from the findings: why no plan attacks the nearer mage on Ch7, why 4007's lord
+never marches to the seize tile on Ch7, why the army goes west in the three Ch8 attempts that
+got the west chests. Older scout walls still stand: `scout-ch13` loses 108 of 161, `scout-ch14`
+ends `stuck` on turn 19, Ch5x (4003) stalls on turn 33. For each wall: read the records and
+traces, name the cause, then build the smallest thing.
 
 **Key files:** `tools/playtest/sight.lua` (`s.look`, `s.walkers`, `s.reveals`, `s.after`,
 `s.staged`), `tools/playtest/planner.lua` (the look block after "The look, in shadow";
