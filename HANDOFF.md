@@ -9,43 +9,50 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, W1's look built).** Carry on with **#510 PR W1** (the
-look in shadow) on branch `feat/510-w1-look-shadow` (pushed, no PR). The design, its approved
-calls and W1's build map (what is done, what is left) are ONE comment, #510 comment 6786548233,
-edited in place: read it first. Tell Nicolas where W1 stands in plain words at the start.
-- **Done on the branch** (`728c0938`, `093a84a4`, `1ca06eab`): `sight.staged`; `sight.look`
-  (N enemy phases, our turn between them played by the beam's best plan unjudged; `nextPhase`
-  is `look(plan, 2)`); the planner's shadow look (`plan.look`, never ranked) while a watched
-  enemy is on the field; botrun marks a killer `killed`, campaign.lua keeps the mark; the
-  allowance (a quarter of the attempt's other `AiDecideMain` calls); `montecarlo.py look`
-  (calibration and cost tables) and `resume --attempts N` (outcome `capped`). Every new test
-  fails without its fix; all Lua tests and `test_montecarlo.py` pass.
-- **Proof so far:** `scout-ch6` attempt 1 (seeds 1001, 1002) plays act for act as PR A's kept
-  traces. Ch6 campaign 4001, attempts 1-2 (`resume --tag w1a..w1d --attempts 2`, about 2 min):
-  play identical with and without every look run; a look costs ~600 calls, an attempt's looks
-  ~6% of its others; 3 of 5 looks run under the allowance (the 2 skipped: the attempt's first
-  two decisions, 137 and 399 calls made so far). Only one campaign's looks read so far.
-- **Next:** the build map's "Left in W1" (record our units' tiles after the turn between; the
-  walker; mends judged by the look), then the shadow runs (Ch6 attempt 2 of 4001/4002/4010,
-  Ch5 retries, `scout-ch10`) read with `montecarlo.py look`, brought to Nicolas with numbers
-  against the approved bars. `make test` timed before and after (owed, not done).
-- **Tried and dropped:** recommending a cheaper turn between (danger zone instead of each
-  enemy's strike) before finding the cost's cause. Nicolas: measure the root cause first. The
-  cost was a bug (below), and that "fix" would have made the bot play worse.
+**Next session starts here (2026-11-11, W1's walker built; Ch6 explained).** Carry on with
+**#510 PR W1** on branch `feat/510-w1-look-shadow` (pushed, no PR). The design, its approved
+calls and W1's build map are ONE comment, #510 comment 6786548233, edited in place: read it
+first. Tell Nicolas where W1 stands in plain words at the start.
+- **Done on the branch** (also `6800ffa6`, `ed768888`, `7315c397`, `076f48e4` this session):
+  the look records each turn between's tiles for our units, and `montecarlo.py look` sets them
+  against the turn played; the walker (`sight.walkers`: a watched enemy played alone to its
+  first strike on one of our units or a green; the look that deep; up to 3 units sent to the
+  strike tile via `opts.guard`, recorded as `look.walker`); the allowance's guess per looked
+  phase; `look` leaves out looks the game never reached (`cut_short`); **the turn between picks
+  progress first** (Nicolas: "progress first"): among the live pick's plans (beam's `M.FINAL`,
+  assault, advance), ranked as `ADMITTED` minus the judge. Every new test fails without its
+  fix; all Lua tests and `test_montecarlo.py` pass. Ch6 4001 attempt 2 plays act for act as
+  `w1d` in every run (`w1e`..`w1m`).
+- **Ch6 4001 attempt 2, explained by probe runs (findings on the build map):** the walker finds
+  enemy 145 killing villager 65 on turn 8 (look: 83%). No sent unit can block it: unit 7 is 4
+  tiles late, units 6 and 10 would cross 22-77% to die a step (bold cap 0.15). The boss 146
+  stands in fog on (19,6), and `Bot.enemiesOf` lists only visible enemies, so **no march ever
+  aims at the boss** (live play too): each unit's goal is its nearest visible enemy. In the old
+  score-only turn between the army drifted east by chance, the boss came into sight, and Seth's
+  sure kill (hit 100, 18 x2 vs 28 HP) ended the chapter on turn 8 before the strike. The
+  guides agree a swift boss kill is the play on this map.
+- **Next (Nicolas, 2026-11-11: "let's experiment and try it out"):** the walker's second
+  alternative, retries only: on a Defeat Boss or Seize map, a look with the army's march goal
+  the boss's remembered tile (or the Seize tile), as deep as the walker's strike, compared by
+  the game's outcomes (villager dies vs the chapter ends first, our deaths). First check that
+  attempt 2's memory holds the boss's tile (`sight.knows`), and whether a capped march reaches
+  it by turn 8 (the old run's turns between ignored the cap). Then Ch6 4001/4002/4010.
+- **Open question from Nicolas:** "what's this shadow business? a feature branch solves it."
+  Shadow (recorded, never played) exists to calibrate the look: whether its chances come true
+  needs the game to play what the look assumed. Making it live on the branch and comparing
+  outcomes with main's runs is the faster experiment; approved call 4 had live wait for the
+  shadow calibration, so going live first is his call to change. Answer that before building.
+- Still owed: mends judged by the look; `make test` timed before and after.
 - **Lessons:**
-  - **The look's enemy phase leaves red the active faction** (`aiOrder`). Anything that reads
-    the board after it as our phase must set `PLAY_FACTION` back to blue:
-    `GenerateDangerZoneRange` draws the faction NOT active (bmidoten.c:780). Left red, every
-    reach check asked a strike (100% vs 12-20% live), 10x the calls.
-  - **Probe recipe for cost:** wrap every sight function in the planner, credit each
-    `AiDecideMain` call to the outermost read (`sight.aiCalls()` deltas), for the live decision
-    and for the turn between; open the allowance (`lookRoom` returns `math.huge`) so every look
-    runs. Not kept; the shadow look changes no play, so it is safe.
-  - A function or constant board.lua adds must go in `Board.bind` too (`US_UNSELECTABLE` was
-    missing; added with `US_HAS_MOVED_AI`).
-  - `sight.staged` isolates `seen`, `s.cache`, answer()'s village race and closings()'
-    replays: a staged read must never be kept for the live board.
-  - Prose check: write "one of our units", never "one of ours" (it reads as the code id).
+  - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
+    string keys lost: keep a probe's lists under a named key.
+  - The beam's score gives a march no credit for ground gained: anything that picks "the
+    beam's best" without the rank holds where the bot marches.
+  - The look's enemy phase leaves red the active faction (`aiOrder`); set `PLAY_FACTION` back
+    to blue before reading the board as our phase (bmidoten.c:780).
+  - A function or constant board.lua adds must go in `Board.bind` too.
+  - `sight.staged` isolates `seen`, `s.cache`, answer()'s village race and closings()' replays.
+  - Prose check: "one of our units", never "one of ours"; "our units", never "ours".
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
