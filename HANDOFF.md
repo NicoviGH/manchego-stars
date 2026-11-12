@@ -9,59 +9,62 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): items A and B of the fwd1 plan are merged; item C is next, redesigned to record first.**
+**Next session starts here (2026-11-12): fwd1 item C is PR #603, proven and waiting only for the merge.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
-the direction; **use cheaper subagents** (Nicolas asked again on 2026-11-12) to check source,
-ADRs and research and to do offline reads. The plan is **#510 comment 6810567866** (six items A
-to F, six calls, all approved); its findings are comment 6810177817; item C's measurement and
-the Ch8 chest facts are **comment 6828202335**.
+the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
+precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
+calls, all approved); its findings are comment 6810177817.
 
-**Merged on 2026-11-12 (Nicolas: "Merge both"), no open PR of this work.**
-- **PR #601, item A:** the attempt's record says what happened (no change of play).
-- **PR #602, item B:** the team pick covers the scarcest demand first (ADR 0402).
-  `suite --held-out` PROMOTED, 0 regressions, held-out 4 of 28 lost, none new. The review's
-  one open idea, "another kind before an enemy class whatever the counts", is not built (same
-  units on all 9 distinct kept picks); the pick's record lists `uncovered`, so the first real
-  case shows. The frozen suite was not refrozen.
+**PR #603 (item C, ADR 0403), branch `feat/510-fwd1-c-progress-shadow`, head `2436da0f`.**
+- **Merge it first.** CI is green on the head commit, `/code-review` (high) and one scoped
+  re-review are applied, `suite --held-out` says PROMOTED. The session's merge command was
+  refused by the permission check, so either Nicolas merges it or he says "merge" again:
+  `gh pr merge 603 --squash --delete-branch`.
+- What it does: a progress record per player phase (a kill made in the player phase, a Visit,
+  a Talk, a chest, a door or wall opened, the Seize, or a new low in turns for the objective's
+  nearest unit or an open ledger goal's best taker); a ledger goal nobody nears over three
+  WAITING player phases has a `stalled` row that no longer holds the win; sixteen player
+  phases in a row with no progress end the attempt `stuck` (N = 16: Nicolas left the number to
+  Fable); the Seize is always judged when the game offers it.
+- Evidence (the PR body has the tables): vanilla Ch8, 24 attempts, went from 13 won and 10
+  stuck to 20 won and 3 stuck, with half the emulated frames; no offered Seize is skipped
+  without a reason. The frozen suite was not refrozen.
+- **Nicolas has not confirmed one narrowing:** call 3 said "three phases"; the rule counts only
+  waiting phases (no event, nobody nearer to anything), because counting every phase cost
+  vanilla Ch4 seed 1001 its clean clear in the first suite run. He was told; no answer yet.
 
-**Nicolas's answers (2026-11-12).**
-- **Item C records first:** build the progress signal as a recording only (it ends nothing),
-  run one resumed vanilla Ch8 attempt set, then propose N to him from that table. N is his.
-- **The Talk demand stays dropped** (call 4's second half; ADR 0402). Item D's instrumented
-  run says whether any fielded unit can reach the Ch9 recruit before turn 12.
-
-**Item C's offline step is done, and it could not give N** (comment 6828202335).
-- Kept traces record acts and positions, not `sight.turnsTo`, the objective or a goal's best
-  taker: only the events half of the progress definition is measurable offline.
-- On events alone the longest quiet stretch in a kept win is 31 player phases (vanilla Ch8;
-  a third of its 66 wins run 18 or more) and 74 (Manchego Stars chapter index 4, one game
-  replayed 12 times). Everywhere else it is 15 or less.
-- The long Ch8 wins look like the party waiting by the throne: the wait C exists to end, not
-  a reason to raise N (a subagent's reading of positions, not verified).
-- **So C starts by building the progress signal in shadow** (recorded per player phase, ending
-  nothing), then one resumed Ch8 run gives the table N is proposed from. N is still Nicolas's.
-
-**Vanilla Ch8's chests at (1,3) and (2,3) are behind the door at (1,5)** (decomp, read by a
-subagent; lines in the comment). The door opens to the thief's Lockpick or to the Door Key the
-armor knight at (20,10) drops; no Chest Key is on the map, so the chests need the thief. The
-team pick only counts units that open a chest now, never an enemy that drops a key
-(`s.keySources` is used in play only): right on Ch8, a gap on a map with a Chest Key drop.
-Why a fielded thief is `never_offered` those chests is for item D or E: read the door first.
-
-**What the new records already show.**
-- Campaign 4006's Ch9 start: its 8 attempts are 4 games (`acts_hash`). Call 1 is not built.
-- Ch8 with the thief fielded: still no clean clear in 6 attempts; two end `stuck`.
+**What item C does NOT fix: no vanilla Ch8 attempt is a clean clear** (0 of 24, four runs).
+- Every win misses the chests at (1,3) and (2,3), behind the door at (1,5): `never_offered`
+  to any unit, or `stalled`. The door opens to the thief's Lockpick or to the Door Key the
+  armor knight at (20,10) drops; no Chest Key is on the map (decomp, read by a subagent; lines
+  in #510 comment 6828202335). Read the door first.
+- 12 of the 13 wins that were already wins lose a unit, most often charId 9 late (turn 17 to
+  23) on a plan over the cap, and charId 10 on turn 10 or 11.
+- Three attempts still end `stuck` with the boss alive (campaign 4001 attempts 7 and 10,
+  campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order.**
-1. **Item C, redesigned.** Cut `feat/510-fwd1-c-<slug>` from `origin/main`. First PR: the
-   progress signal in shadow, one definition (a kill, a visit, a Talk, a chest, a door or wall
-   opened, or a new low in `sight.turnsTo` for the objective or a ledger goal's best taker),
-   recorded per player phase in the trace and the attempt's record. Then one
-   `resume --game vanilla --campaigns fwd1-cs-s4001,fwd1-cs-s4004 --chapter 9 --last 9` set
-   gives the longest quiet stretch per win and per `stuck`; put the table on #510 and ask
-   Nicolas for N. Only then the rule (amends FR-015, so an ADR; calls 2 and 3).
-2. **Call 1** (retries get different dice), then **item D** (one instrumented run on each of
-   two starts; add the Ch8 door question), then E and F as the plan sizes them.
+1. Merge #603 (above).
+2. **One PR: call 1 (retries get different dice) and an `--attempts` cap on `resume`.** In the
+   Ch8 set, attempts 2 and 3 of campaign 4001 are one game act for act, and so are 9 and 12;
+   `resume` always plays 12 attempts and its help lists no cap.
+3. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
+   charId 9 deaths added. Then E and F as the plan sizes them.
+
+**Three calls waiting for Nicolas (none blocks the merge).**
+- Put one vanilla Ch8 start in the frozen suite, so a change to the wait rules needs one run,
+  not two. Recommended. It changes what the suite measures.
+- Fold the `idle_3` stall event into the new definition of progress (it still counts the
+  lord's moves). Recommended, as its own PR: it changes what the suite's stall count means.
+- The narrowing of call 3 above.
+
+**Found while running, not looked into.**
+- The suite's promotion check does not block a lost clean clear: the Ch4 village was found only
+  by comparing `acts_hash` and `missed_rewards` with main's kept run of the same seed.
+- A replay of a trace kept from before #603 can differ from its original under the new rules
+  and then reports `matched = false` (read from the replay code by a subagent, not run).
+- The five "dies, and lived when frozen" signals in the suite (`ours-ch02/1001`, `ours-ch03/1001`
+  twice, `vanilla-ch5/1002` twice) are the same games as on main (`acts_hash` equal), not #603's.
 
 **Not looked into.**
 - The replay of campaign 4006's Ch9 start on #601 plays the same acts as run `fwd1`'s (four
@@ -80,12 +83,25 @@ turn 19, Ch5x (4003) stalls on turn 33.
 **Key files:** `tools/playtest/sight.lua` (`s.look`, `s.walkers`, `s.reveals`, `s.after`,
 `s.staged`), `tools/playtest/planner.lua` (the look block after "The look, in shadow";
 `opts.unjudged`; `M.joinTurn`), `tools/playtest/bot.lua` (`M.explain`),
-`tools/playtest/montecarlo.py` (`look_table`, `resume`, `story --why`), tests in
+`tools/playtest/montecarlo.py` (`look_table`, `resume`, `story --why`), `tools/playtest/botrun.lua`
+(`readNearest`, `closePhase`, `M.QUIET_BOUND`, `M.GOAL_QUIET`), `tools/playtest/goals.lua`
+(`M.ledger`'s `stalled` rows), tests in
 `test_bot.lua`, `test_sight.lua`, `test_montecarlo.py`. A Ch6 retry pair:
-`montecarlo.py resume --game vanilla --tag <new> --campaigns cs-s4001 --chapter 7 --last 7
---attempts 2` (~3.5 min); `montecarlo.py look <trace dirs>` reads it.
+`montecarlo.py resume --game vanilla --tag <new> --campaigns cs-s4001 --chapter 7 --last 7`
+(no attempts cap on main: next step 2); `montecarlo.py look <trace dirs>` reads it.
 
 - **Lessons:**
+  - Start a `resume` and the suite at the same time: each works in its own `/tmp` folders and
+    the suite's budget is counted in calls, not seconds (done once on 2026-11-12, no run without
+    a game result). On a bot change run the suite FIRST: it is the shorter one (22 to 37
+    minutes against 46 or more for the Ch8 set) and it caught what the Ch8 runs could not.
+  - After a suite run, compare each tuning run's `acts_hash` and `missed_rewards` with main's
+    kept run of that seed (`references/sim/<game>/<rom>/runs.jsonl`, the same `campaign`,
+    `chapter`, `seed`, the older `instrument`): PROMOTED does not mean no clean clear was lost.
+  - A subagent's test can pass on a hand-written row the real code never produces (#603: a
+    ledger row with `unitId`): have the re-review check each fake's shape against its producer.
+  - The Ch8 `resume` set is `--campaigns fwd1-cs-s4001,fwd1-cs-s4004 --chapter 9 --last 9`;
+    its four kept runs are tags `fwd1c` to `fwd1c4` in `resume-runs.jsonl`.
   - A campaign's resumable start lives under the campaign that reached it: Ch8 and Ch9 starts
     are `fwd1-cs-s<seed>`, not `cs-s<seed>` (`resume` refuses and lists the indexes it has).
   - While a `resume` runs, a worker's live output is `/tmp/playtest-campaign@pool-*/`
