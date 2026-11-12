@@ -483,12 +483,12 @@ M.REWARD_REASONS = { skipped = "skipped", unreached = "never_offered", closed = 
 M.LOST_IN_PLAYER_PHASE = "game over in the player phase"
 
 -- A run's player acts as one number, folded act by act (FNV-1a, 32 bits): who, what, where,
--- on whom. Equal on two attempts of one start means the same game was played twice. `h` is the
+-- on whom (the target's unit slot too: generic enemies share a charId). Equal on two attempts of one start means the same game was played twice. `h` is the
 -- hash so far (nil at the start) -> the hash with `a` added.
 function M.actsHash(h, a)
     h = h or 0x811C9DC5
-    local s = string.format("%s:%s:%d,%d:%s;", tostring(a.unit), tostring(a.act), a.move.x,
-                            a.move.y, tostring(a.target))
+    local s = string.format("%s:%s:%d,%d:%s/%s;", tostring(a.unit), tostring(a.act), a.move.x,
+                            a.move.y, tostring(a.target), tostring(a.targetId))
     for i = 1, #s do h = ((h ~ s:byte(i)) * 0x01000193) & 0xFFFFFFFF end
     return h
 end
@@ -759,10 +759,13 @@ function M.run(api)
     -- `now` (optional): the board read after the deaths, where a killer that arrived during the
     -- phase stands (lastBoard, from before it, does not hold one)
     local function record(list, phase, plan, action, movers, now)
-        local seen, killed = {}, {}
+        -- killed: the unit slots the game killed in this record; unread: those the watch
+        -- could not read, which neither fell nor left as far as anyone can say
+        local seen, killed, unread = {}, {}, {}
         for _, d in ipairs(list) do seen[d.id] = d end
         for _, k in ipairs(api.killed()) do
             if k.fault then
+                unread[k.id] = true
                 deathFaults[#deathFaults + 1] = { kind = "death_unread", why = k.fault,
                                                   charId = k.charId, faction = k.faction,
                                                   turn = turn, phase = phase }
@@ -801,15 +804,18 @@ function M.run(api)
                 -- player phases), never an enemy walking onto a counter
                 progressed = progressed or (k.phase or phase) == "player"
             end
-            if k.faction == "blue" and not k.fault and lords[k.charId] then lordFell = true end
+            -- of any side: a chapter can end on a green unit's death
+            if not k.fault and lords[k.charId] then lordFell = true end
         end
         for _, d in ipairs(list) do
             if d.faction ~= "blue" and d.faction ~= "green" then
                 -- gone from the field and not killed: a script unloaded it or it escaped
                 -- (Board.fate), as for a blue or green one. It did not fall
+                -- its slot is free either way: an arrival loaded there is another unit
+                diedAt[d.id] = diedAt[d.id] or rec.plans.made
                 if killed[d.id] then
                     progressed = progressed or phase == "player"
-                else
+                elseif not unread[d.id] then
                     leftMap[d.charId] = true
                 end
             end
@@ -1418,7 +1424,10 @@ function M.run(api)
                 if not counted[d.id] then all[#all + 1] = d end
             end
             record(all, "enemy", commit, nil, movers, now)
-            if phase == "gameover" then return "lost", "game over in the enemy phase" end
+            -- lordFell: the game killed a unit it ends on, whatever the phase came back as
+            if phase == "gameover" or lordFell then
+                return "lost", "game over in the enemy phase"
+            end
             if phase == "ended" then
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end
                 return "lost", "the chapter ended without advancing"
