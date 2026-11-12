@@ -311,7 +311,7 @@ local function test_between_deploys_shops_promotes()
     -- priced per buyer, as the harness does (every roster unit pays the same here)
     local stock = { { item = 0x6C, price = { 300, 300, 300, 300 }, kind = "vulnerary" },
                     { item = 0x10, price = { 500, 500, 500, 500 }, type = "sword" } }
-    local needs = { demands = { { id = "sustain", need = 1 } },
+    local needs = { demands = { { id = "sustain", kind = "sustain", need = 1 } },
                     answers = { [0x03] = { sustain = true } }, strength = {} }
     local g = fakeGame({ cap = 2, gold = 10000, stock = stock, random = cycle({ 0.1 }),
                          chapters = { { id = 1, needs = needs } } })
@@ -345,8 +345,25 @@ local function test_between_deploys_shops_promotes()
     check(by[3] and table.concat(by[3].covers, ","), "sustain", "the pick: what it covered")
     check(by[2] and by[2].why, "benched", "the pick: a unit left out is in it")
     check(by[2] and #by[2].answers, 0, "the pick: and answers nothing")
+    check(pick and #pick.uncovered, 0, "the pick: every demand with an answerer has one fielded")
 end
 test_between_deploys_shops_promotes()
+
+-- ADR 0402's rule passes a demand of another kind when an enemy class has fewer answerers: no
+-- kept pick has shown it, so the record names the demand the day one does.
+local function test_the_pick_names_a_demand_left_without_its_unit()
+    local needs = { demands = { { id = "enemy:9", kind = "enemy", need = 1 },
+                                { id = "chests", kind = "chests", need = 1 },
+                                { id = "doors", kind = "doors", need = 1 } },
+                    answers = { [0x02] = { ["enemy:9"] = true }, [0x03] = { chests = true },
+                                [0x04] = { chests = true } }, strength = {} }
+    local g = fakeGame({ cap = 2, chapters = { { id = 1, needs = needs } } })
+    Campaign.run(g.api)
+    check(table.concat(g.deployed[1], ","), "1,2", "the class's one answerer takes the last slot")
+    check(table.concat(g.plays[1].pick.uncovered, ","), "chests",
+          "the chests have two answerers, both benched; doors nobody answers are not listed")
+end
+test_the_pick_names_a_demand_left_without_its_unit()
 
 local function test_no_prep_screen_picks_nothing()
     local g = fakeGame({ chapters = { { id = 1 } } })
@@ -401,9 +418,9 @@ test_draw_style_never_repeats_and_runs_out()
 local function test_cleared_team_is_carried()
     -- Units 2 and 4 both answer chapter 2's demand; 4 is carried from chapter 1, so it wins
     -- over the earlier joiner.
-    local ch1 = { demands = { { id = "d1", need = 1 } }, answers = { [0x04] = { d1 = true } },
+    local ch1 = { demands = { { id = "d1", kind = "fog", need = 1 } }, answers = { [0x04] = { d1 = true } },
                   strength = {} }
-    local ch2 = { demands = { { id = "d2", need = 1 } },
+    local ch2 = { demands = { { id = "d2", kind = "fog", need = 1 } },
                   answers = { [0x02] = { d2 = true }, [0x04] = { d2 = true } }, strength = {} }
     local g = fakeGame({ cap = 2, chapters = { { id = 1, needs = ch1 }, { id = 2, needs = ch2 } } })
     Campaign.run(g.api)
@@ -447,9 +464,9 @@ local function test_resume_plays_as_the_campaign()
         return function() at = at + 1; return values[(at - 1) % #values + 1] end,
                function(ch) at = ch end
     end
-    local ch1 = { demands = { { id = "d1", need = 1 } }, answers = { [0x04] = { d1 = true } },
+    local ch1 = { demands = { { id = "d1", kind = "fog", need = 1 } }, answers = { [0x04] = { d1 = true } },
                   strength = {} }
-    local ch2 = { demands = { { id = "d2", need = 1 } },
+    local ch2 = { demands = { { id = "d2", kind = "fog", need = 1 } },
                   answers = { [0x02] = { d2 = true }, [0x04] = { d2 = true } }, strength = {} }
     local r1, s1 = seeded()
     local full = fakeGame({ cap = 2, random = r1, seed = s1, chapters = {

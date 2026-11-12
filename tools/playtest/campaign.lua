@@ -147,8 +147,11 @@ end
 -- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team. Returns
 -- the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
 -- the attempt's record, { cap, demands, units = { { charId, group, forced, carried, answers =
--- the demand ids it answers, why ("benched" for one left out), covers } } }, so a pick can be
--- read without the worker's log) or nil, why when the harness could not do a step.
+-- the demand ids it answers, why ("benched" for one left out), covers } }, uncovered = the
+-- ids of the demands of another kind than an enemy class that a roster unit answers and no
+-- fielded unit does (ADR 0402: the case its rule does not cover, so it shows when it happens)
+-- }, so a pick can be read without the worker's log) or nil, why when the harness could not do
+-- a step.
 local function between(api, style, followed, need, carried)
     local Bot = api.Bot
     local roster = api.roster()
@@ -162,13 +165,17 @@ local function between(api, style, followed, need, carried)
         team = Bot.team({ roster = roster, cap = cap, maxima = maxima, demands = need.demands,
                           answers = need.answers, strength = need.strength, carried = carried,
                           style = Bot.applyClaims(followed, { deploy = {} }) })
-        local said = {}
+        local said, answered, fielded = {}, {}, {}
         team.pick = { cap = cap, demands = need.demands, units = {} }
         for _, u in ipairs(roster) do
             local r = team.reasons[u.charId]
             local answers = {}
             for _, d in ipairs(need.demands) do
-                if (need.answers[u.charId] or {})[d.id] then answers[#answers + 1] = d.id end
+                if (need.answers[u.charId] or {})[d.id] then
+                    answers[#answers + 1] = d.id
+                    answered[d.id] = true
+                    fielded[d.id] = fielded[d.id] or r ~= nil
+                end
             end
             local p = { charId = u.charId, group = u.group, forced = u.forced or nil,
                         carried = carried[u.charId] or nil, answers = answers,
@@ -177,7 +184,15 @@ local function between(api, style, followed, need, carried)
             said[#said + 1] = string.format("0x%02X %s%s%s=%s", p.charId, tostring(p.group),
                 p.forced and " forced" or "", p.carried and " carried" or "", p.why)
         end
-        api.log("campaign: team (cap " .. cap .. "): " .. table.concat(said, ", "))
+        team.pick.uncovered = {}
+        for _, d in ipairs(need.demands) do
+            if d.kind ~= "enemy" and answered[d.id] and not fielded[d.id] then
+                team.pick.uncovered[#team.pick.uncovered + 1] = d.id
+            end
+        end
+        api.log("campaign: team (cap " .. cap .. "): " .. table.concat(said, ", ")
+            .. (#team.pick.uncovered > 0
+                and ("; uncovered: " .. table.concat(team.pick.uncovered, ", ")) or ""))
         local ok, why = api.deploy(team.deploy)
         if not ok then return nil, "deploy: " .. tostring(why) end
         local by = byCharId(roster)
