@@ -1446,6 +1446,47 @@ local function test_team_covers_the_most_demand_first()
 end
 test_team_covers_the_most_demand_first()
 
+-- fwd1 B: a demand few can answer is covered before the ones many can. Three fighters answer
+-- three enemy classes each and the thief answers two demands, so "the most demands" alone
+-- benched the only unit that can open a chest (vanilla Ch8, 30 of 68 parties).
+local function test_team_covers_the_scarcest_demand_first()
+    local roster = { teamUnit(1, 0x01, "foot"), teamUnit(2, 0x02, "foot"),
+                     teamUnit(3, 0x03, "foot"), teamUnit(4, 0x04, "thief") }
+    local demands = { { id = "enemy:1", need = 9 }, { id = "enemy:2", need = 9 },
+                      { id = "enemy:3", need = 9 }, { id = "chests", need = 1 } }
+    local fighter = { ["enemy:1"] = true, ["enemy:2"] = true, ["enemy:3"] = true }
+    local answers = { [0x01] = fighter, [0x02] = fighter, [0x03] = fighter,
+                      [0x04] = { chests = true, ["enemy:1"] = true } }
+    local p = team({ roster = roster, cap = 2, demands = demands, answers = answers })
+    check(csv(p.deploy), "4,1", "the chest's one answerer first, then the fighter covering most")
+    check(table.concat(p.reasons[0x04].demands, ","), "enemy:1,chests", "and it covers all it answers")
+    -- a Door Key's holder settles the doors the same way
+    answers[0x04] = { doors = true }
+    demands[4] = { id = "doors", need = 1 }
+    p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
+    check(csv(p.deploy), "4", "one slot: the door's one answerer")
+    -- among a scarce demand's answerers, the one covering the most open demands
+    answers = { [0x01] = { chests = true }, [0x02] = { chests = true, fog = true },
+                [0x03] = { fog = true } }
+    demands = { { id = "chests", need = 1 }, { id = "fog", need = 1 } }
+    p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
+    check(csv(p.deploy), "2", "two can open the chest: the one who also answers the fog")
+    -- equally scarce, an enemy class waits: one fighter alone answers enemy:3, one thief alone
+    -- the chest, and there is one slot (vanilla Ch8, campaign 4001: claims left three slots
+    -- and three such classes were listed before the chest)
+    demands = { { id = "enemy:3", kind = "enemy", need = 2 }, { id = "chests", kind = "chests", need = 1 } }
+    answers = { [0x01] = { ["enemy:3"] = true }, [0x04] = { chests = true } }
+    p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
+    check(csv(p.deploy), "4", "equally scarce: the chest before the enemy class")
+    answers = { [0x01] = { chests = true }, [0x02] = { chests = true, fog = true },
+                [0x03] = { fog = true } }
+    -- a demand nobody who fits can answer is passed over, never a stop
+    demands = { { id = "sustain", need = 1 }, { id = "fog", need = 1 } }
+    p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
+    check(csv(p.deploy), "2", "an unanswerable demand does not end the covering")
+end
+test_team_covers_the_scarcest_demand_first()
+
 local function test_team_ties_carried_then_earlier_joiner()
     local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "magic"),
                      teamUnit(3, 0x03, "magic") }
@@ -1500,7 +1541,8 @@ local function test_team_fill_is_the_best_answer_to_the_biggest_class()
     local strength = { [0x03] = { ["enemy:9"] = 2 }, [0x04] = { ["enemy:9"] = 5 } }
     local p = team({ roster = roster, cap = 4, demands = demands, answers = answers,
                      strength = strength })
-    check(csv(p.deploy), "1,2,4,3", "covered by the first answerers, then fill: highest strength first")
+    check(csv(p.deploy), "2,1,4,3",
+          "covered scarcest first (one unit answers enemy:7), then fill: highest strength first")
     check(p.reasons[0x04].why, "fill", "reason: fill")
 end
 test_team_fill_is_the_best_answer_to_the_biggest_class()

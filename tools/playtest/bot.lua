@@ -144,8 +144,11 @@
 --   A demand is what the map asks (an enemy class, chests, fog...), `need` how many answerers
 --   cover it; `answers` and `strength` are measured by the caller in the game. In order:
 --   forced units (slot order, past every ceiling); then style.deploy, a followed claim's units;
---   then, while a demand still needs answerers, the unit answering the most of them (ties: a
---   carried unit, then the earlier joiner = slot order); then fill: the highest strength on
+--   then, while a demand still needs answerers, the scarcest one first (ADR 0402): the open
+--   demand the fewest units still fitting can answer (ties: a demand of another kind before
+--   an enemy class, which any fighter still answers in part; then the first listed) gets, of
+--   those units, the one answering the most open demands (ties: a carried unit, then the earlier
+--   joiner = slot order). A demand nobody fitting answers is passed over. Then fill: the highest strength on
 --   the biggest demand (largest need, first listed), same ties. Everything after the forced units
 --   obeys `maxima`: a full group benches the later joiner, even if a slot stays empty.
 --   reason = { why = "forced"|"claim"|"covers"|"fill", demands = {ids} (covers),
@@ -2308,9 +2311,24 @@ function M.team(t)
         end
     end
     while true do
-        local u = best(function(c)
+        -- the scarcest open demand: counting "the most demands answered" alone benched the one
+        -- unit that could open a chest behind fighters answering three enemy classes each
+        local scarce, fewest
+        for _, d in ipairs(t.demands) do
             local n = 0
-            for _, d in ipairs(t.demands) do
+            for _, c in ipairs(left[d.id] > 0 and roster or {}) do
+                if fits(c) and answers(c, d.id) then n = n + 1 end
+            end
+            -- equally scarce: a chest, a door or a village goes unanswered without its unit,
+            -- an enemy class is still fought by the rest
+            if n > 0 and (not fewest or n < fewest
+                    or (n == fewest and scarce.kind == "enemy" and d.kind ~= "enemy")) then
+                scarce, fewest = d, n
+            end
+        end
+        local u = scarce and best(function(c)
+            local n = 0
+            for _, d in ipairs(answers(c, scarce.id) and t.demands or {}) do
                 if left[d.id] > 0 and answers(c, d.id) then n = n + 1 end
             end
             return n
