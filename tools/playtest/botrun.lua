@@ -490,7 +490,7 @@ M.DETAILS = {
 -- unit and never taken; never offered; closed by another side first (a pillage, a thief); or
 -- tried and the harness could not drive it (the run crashed there).
 -- `stalled` is set by `finish`, not by the log: the tile's goal row was a stalled ROW (goals.lua:
--- no unit neared it for M.GOAL_QUIET player phases) in the last plan made, so the win did not wait
+-- no unit neared it over M.GOAL_QUIET waiting player phases) in the last plan made, so the win did not wait
 -- for it (ADR 0403). It overrides the log's word for that tile. A missed recruit's reason is
 -- `stalled` the same way (its `recruit:` row), after left_map and before talk_skipped.
 M.REWARD_REASONS = { skipped = "skipped", unreached = "never_offered", closed = "closed",
@@ -754,11 +754,19 @@ function M.run(api)
         local near, here = {}, {}
         for _, n in ipairs(plan.nearest) do
             local low = lows[n.id]
-            local lower = low and n.turns < low - 1e-9
-            if lower then near[#near + 1] = n.id end
+            if low and n.turns < low - 1e-9 then near[#near + 1] = n.id end
             lows[n.id] = low and math.min(low, n.turns) or n.turns
+        end
+        -- whether the phase before this reading was a wait: no event in it and no new low
+        -- anywhere. A goal's run grows only over waits: an army that is fighting has not given
+        -- a goal up (vanilla Ch4, suite seed 1001: the village at (1,11) drifted from 0.43 to
+        -- 1.43 turns over four phases of kills, was stalled, and the win was taken a turn before
+        -- the unit sent back would have visited it)
+        local waited = prevPhase ~= nil and next(prevPhase.events) == nil and #near == 0
+        for _, n in ipairs(plan.nearest) do
             -- a ledger goal's own run: 0 on its first reading, or when it is strictly below
-            -- EVERY one of its last M.GOAL_QUIET readings, else one more. Not the all-time low:
+            -- EVERY one of its last M.GOAL_QUIET readings, else one more after a wait and
+            -- unchanged after a phase that made progress. Not the all-time low:
             -- a taker that walked away and is walking back would count as quiet until it passed
             -- its old best (a chest missed while a unit walked to it). Against the window, a
             -- shuffle between two or three tiles (period <= M.GOAL_QUIET) can never beat it, and
@@ -775,7 +783,7 @@ function M.run(api)
                 if win == nil then win = {}; goalReads[n.id] = win end
                 win[#win + 1] = n.turns
                 if #win > M.GOAL_QUIET then table.remove(win, 1) end
-                goalQuiet[n.id] = neared and 0 or goalQuiet[n.id] + 1
+                goalQuiet[n.id] = neared and 0 or (goalQuiet[n.id] or 0) + (waited and 1 or 0)
             end
         end
         for id in pairs(goalQuiet) do

@@ -2463,6 +2463,15 @@ do
           "quiet goals: rising readings stall the row; one that beats the previous three clears it")
     check(listed({ 5, 6, 5, 6, 5, 6, 5 }), "- - - - q q q q",
           "quiet goals: a shuffle between two tiles becomes quiet and stays so")
+    -- a goal's run grows only over waits: with a Visit made every phase (elsewhere) the same
+    -- flat readings never stall the row, and the run starts counting once the visits stop
+    local busy = {}
+    for t = 1, 9 do busy[t] = { act = t <= 5 and "visit" or nil, nearest = v(5).nearest } end
+    local _, _, _, gw = shadow(10, busy)
+    local outw = {}
+    for t = 1, 10 do outw[t] = gw.quietAt[t] == "" and "-" or "q" end
+    check(table.concat(outw, " "), "- - - - - - - - - q",
+          "quiet goals: phases that made progress do not count against a goal")
 
     -- (rule 2) player phases in a row with no progress end the attempt `stuck`. The count lags
     -- a phase, so the run ends at the top of phase 18 with 16 closed quiet phases; one

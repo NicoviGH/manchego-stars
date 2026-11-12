@@ -2054,7 +2054,7 @@ end
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
 -- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
--- claim gives way); `quietGoals`, the ledger goal ids no unit has neared for GOAL_QUIET player
+-- claim gives way); `quietGoals`, the ledger goal ids no unit has neared over GOAL_QUIET waiting player
 -- phases (goals.lua's ledger marks their rows stalled); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
 -- each goal a unit was found with no step toward, and the turn it was first found so).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's

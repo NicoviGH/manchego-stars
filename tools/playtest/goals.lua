@@ -51,7 +51,7 @@
 -- row = { id, kind (visit, chest, recruit, reward), status, closes_on, needs (a reward's: the
 -- ids of the goals it needs) }. status: `feasible`; `unknown` for a village or chest when the
 -- sight has no read of who may use it or when it closes (sight.canExplore, sight.closings);
--- `stalled` for a goal whose id is in ctx.quietGoals (no unit has neared it for GOAL_QUIET player
+-- `stalled` for a goal whose id is in ctx.quietGoals (no unit has neared it over GOAL_QUIET waiting player
 -- phases, botrun's reading; #510 call 3, amending FR-015): a stalled ROW no longer holds the
 -- win, since forfeited counts feasible rows only, but the goal stays a goal units may walk to,
 -- and one new low makes its row feasible again. A reward is unknown when a goal it needs is,

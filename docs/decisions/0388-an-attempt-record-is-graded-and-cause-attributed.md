@@ -155,6 +155,6 @@ Two things are added to an attempt's record:
 - `progress` (#510 fwd1 item C, ADR 0403): `{ quiet_max, quiet_last, events_quiet_max,
   phases }`, the player phases in a row that made no progress (an event, or a new low in
   turns-to-goal), and the same counting events only; one `progress` trace line a phase says what
-  it made. Two rules read it (ADR 0403): a goal's row stalls after three readings without a new low, and
+  it made. Two rules read it (ADR 0403): a goal's row stalls after three waiting phases in which no unit neared it, and
   sixteen quiet phases end the attempt `stuck`. Its definition and limit are in `botrun.lua`'s
   progress-state comment.

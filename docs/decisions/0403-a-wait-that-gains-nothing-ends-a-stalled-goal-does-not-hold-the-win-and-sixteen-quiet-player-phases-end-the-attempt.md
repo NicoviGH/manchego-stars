@@ -24,8 +24,8 @@ new low in turns-to-goal: the objective's nearest unit, or a ledger goal's best 
 nearer than at any earlier reading of that id. The planner reads the turns (`plan.nearest`);
 botrun counts the phases (`rec.progress`, the `progress` trace lines).
 
-**Rule 1: a ledger goal nobody has neared for three player phases stops holding the win.** Per
-goal id, botrun counts the readings in a row in which the goal was not neared
+**Rule 1: a ledger goal nobody has neared over three waiting player phases stops holding the
+win.** Per goal id, botrun counts the readings after a wait in which the goal was not neared
 (`M.GOAL_QUIET` = 3, FR-007's number). A goal is neared at a reading when its turns are strictly
 below every one of its last three readings (fewer when it has fewer; its first reading is run
 0). It is not measured against the goal's all-time low: a taker that walked away and is walking
@@ -42,6 +42,13 @@ missing reward's row, or missing recruit's row, was stalled in the last plan rep
 `stalled` in `missed_rewards` / `missed_recruits` (a recruit's reason comes after
 `died_after_joining`, `killed_before_talk` and `left_map`, before `talk_skipped` and
 `not_reached`).
+
+Only waits count against a goal: its run grows after a player phase with no event and no new low
+anywhere, and stands still after one that made progress. The first frozen-suite run of this
+change counted every phase, and vanilla Ch4 (suite seed 1001) lost a clean clear to it: the
+village at (1,11) drifted from 0.43 to 1.43 turns over four phases of kills, its row was stalled,
+and the win was taken on turn 7, a turn before the unit sent back visited it on main. An army
+that is fighting has not given a goal up; one that is waiting has.
 
 **Rule 2: sixteen player phases in a row with no progress end the attempt `stuck`**
 (`M.QUIET_BOUND` = 16). Every kept vanilla win outside the old Ch8 waits has at most 15 such
