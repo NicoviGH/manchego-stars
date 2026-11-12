@@ -165,13 +165,17 @@ local function between(api, style, followed, need, carried)
         team = Bot.team({ roster = roster, cap = cap, maxima = maxima, demands = need.demands,
                           answers = need.answers, strength = need.strength, carried = carried,
                           style = Bot.applyClaims(followed, { deploy = {} }) })
-        local said = {}
+        local said, answered, fielded = {}, {}, {}
         team.pick = { cap = cap, demands = need.demands, units = {} }
         for _, u in ipairs(roster) do
             local r = team.reasons[u.charId]
             local answers = {}
             for _, d in ipairs(need.demands) do
-                if (need.answers[u.charId] or {})[d.id] then answers[#answers + 1] = d.id end
+                if (need.answers[u.charId] or {})[d.id] then
+                    answers[#answers + 1] = d.id
+                    answered[d.id] = true
+                    fielded[d.id] = fielded[d.id] or r ~= nil
+                end
             end
             local p = { charId = u.charId, group = u.group, forced = u.forced or nil,
                         carried = carried[u.charId] or nil, answers = answers,
@@ -182,14 +186,7 @@ local function between(api, style, followed, need, carried)
         end
         team.pick.uncovered = {}
         for _, d in ipairs(need.demands) do
-            local some, fielded = false, false
-            for _, p in ipairs(team.pick.units) do
-                if (need.answers[p.charId] or {})[d.id] then
-                    some = true
-                    fielded = fielded or p.why ~= "benched"
-                end
-            end
-            if d.kind ~= "enemy" and some and not fielded then
+            if d.kind ~= "enemy" and answered[d.id] and not fielded[d.id] then
                 team.pick.uncovered[#team.pick.uncovered + 1] = d.id
             end
         end
