@@ -3917,6 +3917,19 @@ do
           "visit:4,2 stalled", "stalled goal: the ledger names a stalled row")
     check(plan and plan.nearest[2] and plan.nearest[2].id, "visit:4,2",
           "stalled goal: its turns are still read (a new low makes it feasible again)")
+    -- none of the beam's plans is judged (FINAL = 0: the beam kept no Seize, as on vanilla Ch8):
+    -- the Seize is judged all the same, and the rank plays it
+    local final = Planner.FINAL
+    Planner.FINAL = 0
+    local a1, p1 = Planner.plan(B, boardOf(L, Z), sightOf(o), gifted("bold", 100),
+                                { quietGoals = { ["visit:4,2"] = true } })
+    Planner.FINAL = final
+    local kind
+    for _, c in ipairs(p1 and p1.considered or {}) do
+        if c.seizes then kind = c.kind end
+    end
+    check((a1 and a1.act) .. " " .. tostring(kind), "seize seize",
+          "stalled goal: the Seize is judged though the beam cut it")
 end
 
 -- test_the_plan_names_how_near_each_goal_is (#510 fwd1 item C, the progress record's near half):

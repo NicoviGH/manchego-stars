@@ -36,7 +36,8 @@
 --      More are judged beside them: on a Defeat Boss map the assault (every unit that
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
 --      never tries), the advance (each unit's act that gains the most ground toward its goal,
---      which the beam's judged score can cut while the rank puts it first), and on a stalled
+--      which the beam's judged score can cut while the rank puts it first), the Seize when
+--      the game offers it (the rest holding: the beam must not hide the win from the rank), and on a stalled
 --      board (opts.stalled) each unit's best act that
 --      changes the board, of which the best is played: a careful player that has stopped
 --      making progress takes the least it must.
@@ -69,7 +70,7 @@
 -- the fog read's chance to kill a blue one, on the played plan only (Bot.fogRead); and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
--- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
+-- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"seize"|"unstall"|"mend"|"rest",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -1506,6 +1507,26 @@ function M.plan(Bot, board, sight, style, opts)
             if not have[k] then
                 have[k] = true
                 finals[#finals + 1] = { st = st, kind = "rest" }
+            end
+        end
+    end
+    -- the Seize, whenever the game offers it, the rest holding (#510 fwd1 item C, ADR 0403): the
+    -- beam keeps what scores well act by act and can cut the one plan the rank puts first once
+    -- the goals' rows are stalled (vanilla Ch8, run fwd1c2, campaign 4004 attempt 10: the Seize
+    -- offered for 11 player phases, the four beam plans judged all waits over the cap, and the
+    -- win taken only when the lord was the last unit left to act; another attempt never took
+    -- it). Whether to take it is the rank's call (forfeits first); the beam only decides what
+    -- the rank gets to see
+    for _, c in ipairs(cands) do
+        for _, x in ipairs(c.acts) do
+            local n = x.act == "seize" and extend(start, x, c.unit.id)
+            if n then
+                local st = complete(n)
+                local k = table.concat(keysOf(st), " ")
+                if not have[k] then
+                    have[k] = true
+                    finals[#finals + 1] = { st = st, kind = "seize" }
+                end
             end
         end
     end

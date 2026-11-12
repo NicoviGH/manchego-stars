@@ -43,6 +43,15 @@ board) and not while a Survive objective counts turns down, whose wait is the pl
 lags one phase (a phase closes at the next phase's first plan), and the bound never resets it:
 the record stays the plain count.
 
+**The Seize is always judged when the game offers it.** The first run with rules 1 and 2 (run
+`fwd1c2`, the same 24 attempts) turned 5 of the 10 `stuck` attempts into wins, but late: with
+every row stalled the Seize was offered and no plan with it was judged for 7 to 14 player phases
+in a row, and one attempt never took it. The beam keeps what scores well act by act and had cut
+it (campaign 4004 attempt 10, turn 20: the four beam plans judged were all waits over the cap).
+The planner now judges the Seize, the rest holding, beside the beam's plans (`kind = "seize"`),
+as it does the assault and the advance. Whether to take it stays the rank's call: a Seize that
+forfeits a feasible goal is still outranked.
+
 **Not changed.** `idle_3` and FR-007's stall still count the lord's moves; they are not this
 signal, and changing what a stall event means is a separate call. There is no rule for a boss
 nobody can kill under the cap: the bound ends that attempt.
