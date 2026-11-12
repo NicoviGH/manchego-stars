@@ -9,17 +9,15 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): fwd1 item C is PR #603, proven and waiting only for the merge.**
+**Next session starts here (2026-11-12): fwd1 item C is merged (PR #603, ADR 0403); next is one PR for call 1 and an attempts cap.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
 calls, all approved); its findings are comment 6810177817.
 
-**PR #603 (item C, ADR 0403), branch `feat/510-fwd1-c-progress-shadow`, head `2436da0f`.**
-- **Merge it first.** CI is green on the head commit, `/code-review` (high) and one scoped
-  re-review are applied, `suite --held-out` says PROMOTED. The session's merge command was
-  refused by the permission check, so either Nicolas merges it or he says "merge" again:
-  `gh pr merge 603 --squash --delete-branch`.
+**PR #603 (item C, ADR 0403) is merged** (Nicolas: "merge", 2026-11-12), no open PR of this work.
+- CI green on its head, `/code-review` (high) and one scoped re-review applied,
+  `suite --held-out` PROMOTED with 0 regressions.
 - What it does: a progress record per player phase (a kill made in the player phase, a Visit,
   a Talk, a chest, a door or wall opened, the Seize, or a new low in turns for the objective's
   nearest unit or an open ledger goal's best taker); a ledger goal nobody nears over three
@@ -44,14 +42,13 @@ calls, all approved); its findings are comment 6810177817.
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order.**
-1. Merge #603 (above).
-2. **One PR: call 1 (retries get different dice) and an `--attempts` cap on `resume`.** In the
+1. **One PR: call 1 (retries get different dice) and an `--attempts` cap on `resume`.** In the
    Ch8 set, attempts 2 and 3 of campaign 4001 are one game act for act, and so are 9 and 12;
    `resume` always plays 12 attempts and its help lists no cap.
-3. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
+2. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
    charId 9 deaths added. Then E and F as the plan sizes them.
 
-**Three calls waiting for Nicolas (none blocks the merge).**
+**Three calls waiting for Nicolas.**
 - Put one vanilla Ch8 start in the frozen suite, so a change to the wait rules needs one run,
   not two. Recommended. It changes what the suite measures.
 - Fold the `idle_3` stall event into the new definition of progress (it still counts the
