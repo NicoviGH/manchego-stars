@@ -55,8 +55,8 @@ decision, and the bound only ends a run. Rule 1 stays on in a replay, because it
 plans, and a replay holds each plan to the original trace (a plan that differs is `matched =
 false`, never a witness). So a replay of a kept run made before this change can differ from
 its trace under rule 1 and under the always-judged Seize, and then reports `matched = false`.
-The count lags one phase (a phase closes at the next phase's first plan), and the bound never resets it:
-the record stays the plain count.
+The count lags one phase (a phase closes at the next phase's first plan), and the bound never
+resets it: the record stays the plain count.
 
 **The Seize is always judged when the game offers it.** The first run with rules 1 and 2 (run
 `fwd1c2`, the same 24 attempts) turned 5 of the 10 `stuck` attempts into wins, but late: with

@@ -2536,7 +2536,7 @@ do
         us[#us + 1] = gu
         return us
     end
-    local row = { { id = "recruit:80", kind = "recruit", unitId = 0x50, status = "stalled" } }
+    local row = { { id = "recruit:80", kind = "recruit", status = "stalled" } }
     r = shadow(3, {}, withRecruit(), { recruits = { 0x31 }, ledger = { [3] = row } })
     check(r.missed_recruits[1] and r.missed_recruits[1].reason, "stalled",
           "missed recruit: a stalled recruit row says so")

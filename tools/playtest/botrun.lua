@@ -1395,8 +1395,13 @@ function M.run(api)
                                         and g.id:match("^%a+:(%-?%d+,%-?%d+)$")
                                     if at then
                                         stalledRows[at] = true
-                                    elseif g.kind == "recruit" and charOf[g.unitId] then
-                                        stalledRows["recruit:" .. charOf[g.unitId]] = true
+                                    else
+                                        -- a recruit row carries its unit only in its id
+                                        -- (goals.lua: "recruit:<unit id>"); the planner copies
+                                        -- no unitId onto a ledger row
+                                        local c = g.kind == "recruit"
+                                            and charOf[tonumber(g.id:match("^recruit:(%d+)$"))]
+                                        if c then stalledRows["recruit:" .. c] = true end
                                     end
                                 end
                             end
