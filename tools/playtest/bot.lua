@@ -2054,7 +2054,8 @@ end
 -- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
 -- has visited or opened (never offered again); `lost`, the "x,y" tiles closed before we took
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
--- claim gives way); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
+-- claim gives way); `quietGoals`, the ledger goal ids no unit has neared for GOAL_QUIET player
+-- phases (goals.lua's ledger marks their rows stalled); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
 -- each goal a unit was found with no step toward, and the turn it was first found so).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
 -- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
@@ -2065,6 +2066,7 @@ function M.candidates(board, sight, style, opts)
     ctx.seen = opts and opts.seen
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
+    ctx.quietGoals = opts and opts.quietGoals or {}
     -- memoised for the decision (turnsFor's ctx.keyTurns): the planner asks it per goal, taker
     -- and partial plan, and a unit cut off goes through breachFor and the field again each time
     ctx.keyTurns = {}

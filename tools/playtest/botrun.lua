@@ -21,12 +21,16 @@
 --            objective's turns left, and the turns until the next arrival a reinforcements claim cites --
 --            everything Bot.decide reads -- and the game's own turn-event check
 --            (sight.nextTurnEvent) finds no event still to fire. A repeat with an event ahead
---            waits for that turn.
+--            waits for that turn. Also `stuck`: M.QUIET_BOUND player phases in a row with no progress
+--            (an event, or a new low in turns-to-goal: see the progress state in M.run), once the
+--            same turn-event check finds nothing to wait for and no Survive turns are counting down
+--            (#510 fwd1 item C, ADR 0403).
 --   crashed  anything the run could not do: an action or enemy phase the harness could not
 --            drive, an action that left its unit able to act, a Seize the menu refused though
 --            the game's CanUnitSeize allowed it, or any Lua error (a sight call that never
 --            returned, a policy fault). The record is still emitted.
--- There is no turn cap: a board that cannot change any more is the only "no progress" rule.
+-- There is no turn cap. The "no progress" rules are the two `stuck` ones: a board that cannot
+-- change any more, and M.QUIET_BOUND player phases that gained nothing.
 --
 -- api (harness.lua builds it; test_botrun.lua fakes it):
 --   Bot, Json          bot.lua and json.lua, loaded by the caller
@@ -129,6 +133,12 @@
 --   event   a change on the board no act names: a unit arriving, a recruit, items gained/lost
 --   bag     a full inventory answered: the new item, the one that went, why
 --   drop    the game gave a player unit a fallen unit's item: from, to (charIds), item
+--   progress  a player phase's progress, in the planner's styles only (#510 fwd1 item C, a
+--           shadow: nothing reads it): `events` (the kinds this player phase made: kill, visit,
+--           chest, talk, door, wall, seize), `near` (the goal ids at a new low in turns-to-goal at
+--           the next phase's first plan; "objective" or a ledger row's id), `quiet` (the player
+--           phases in a row without either, this one included). The record's `progress` sums
+--           it: { quiet_max, quiet_last, events_quiet_max (events only), phases }
 --   end     the BOTRUN record, last
 -- Every number in it is read from the game; nothing is re-derived.
 
@@ -477,10 +487,25 @@ M.DETAILS = {
 -- A missed reward's reason, from the explore log's status (exploreLog.summary): offered to a
 -- unit and never taken; never offered; closed by another side first (a pillage, a thief); or
 -- tried and the harness could not drive it (the run crashed there).
+-- `stalled` is set by `finish`, not by the log: the tile's goal row was a stalled ROW (goals.lua:
+-- no unit neared it for M.GOAL_QUIET player phases) in the last plan made, so the win did not wait
+-- for it (ADR 0403). It overrides the log's word for that tile.
 M.REWARD_REASONS = { skipped = "skipped", unreached = "never_offered", closed = "closed",
                      failed = "failed" }
 
 M.LOST_IN_PLAYER_PHASE = "game over in the player phase"
+
+-- Player phases in a row with no progress that end an attempt `stuck` (#510 fwd1 item C, ADR
+-- 0403). Every kept vanilla win outside the old Ch8 waits has at most 15 such phases (#510
+-- comment 6828202335); the 13 wins of the resumed Ch8 run have at most 2 under the full
+-- definition, while its stuck attempts ran 8 to 1,206. 16 spares every kept win and ends a wait
+-- within one more phase. Nicolas left the number to Fable (2026-11-12).
+M.QUIET_BOUND = 16
+
+-- Readings in a row without a new low of its own after which a ledger goal's row is stalled (the
+-- win stops waiting for it). FR-007's stall is three player phases in a row without a move that
+-- changes the chapter, and #510 call 3 (comment 6810567866) asked for the same three here.
+M.GOAL_QUIET = 3
 
 -- A run's player acts as one number, folded act by act (FNV-1a, 32 bits): who, what, where,
 -- on whom (the target's unit slot too: generic enemies share a charId). Equal on two attempts of one start means the same game was played twice. `h` is the
@@ -658,6 +683,28 @@ function M.run(api)
     -- whether this turn moved the chapter on: a lord moved, a kill, a Visit, Talk or Chest
     -- (FR-007's stall is three player phases in a row without one)
     local progressed, idle = false, 0
+    -- the progress signal (#510 fwd1 item C, ADR 0403): per player phase, whether it made
+    -- progress under one definition -- an event (a kill made in the player phase, a Visit, Talk,
+    -- Chest, door opened, wall broken, or the Seize) or a new low in turns-to-goal (planner's
+    -- `nearest`: the objective's nearest unit, or a feasible ledger goal's best taker, strictly
+    -- nearer than at any earlier reading of this attempt). Recorded in `rec.progress` and the
+    -- trace's `progress` lines. Two rules read it: `quiet` ends the attempt `stuck` at
+    -- M.QUIET_BOUND (the top of a player phase, below), and each goal's own run of readings
+    -- without a new low (`goalQuiet`) makes its ledger row stalled at M.GOAL_QUIET (memo()'s
+    -- quietGoals). `quiet` is never reset by those rules: the record is the plain count. FR-007's
+    -- `progressed`/`idle` above stays as it is, and `idle_3` still counts the lord's moves: it is
+    -- not this signal (what a stall event means is a separate call). Known limit: a phase's near
+    -- half is read at the NEXT player phase's first fresh plan, so it also holds what the enemy
+    -- phase did (on a Rout chapter the objective is the nearest enemy, and an enemy walking in is
+    -- a new low); the trace's `near` names the ids, so a reader tells "objective" from the rest.
+    local lows, quiet, eventsQuiet = {}, 0, 0   -- goal id -> least turns read; the phases in a row
+    local curPhase, prevPhase                   -- { turn, events = set, read }; prev awaits its reading
+    local goalQuiet = {}                        -- goal id -> readings in a row without a new low of its own
+    local stalledRows = {}                      -- "x,y" -> true: stalled rows of the last plan's ledger
+    local wallHp = {}                           -- "x,y" -> the wall's HP as the forecasts left it
+    if planned then
+        rec.progress = { quiet_max = 0, quiet_last = 0, events_quiet_max = 0, phases = 0 }
+    end
     -- the clean clear's recruits part, read from the game's party (api.party: the game's own
     -- MakePrepUnitList, i.e. IsUnitInCurrentRoster), never from the unit arrays: owed =
     -- api.recruits() less the party at the first read; joined = owed and in the party at the
@@ -676,6 +723,46 @@ function M.run(api)
             if watch.why and not pin then halt = halt or ("unmatched: " .. watch.why) end
         end
         if api.trace then api.trace(ev) end
+    end
+    local function markEvent(kind)
+        if planned and curPhase then curPhase.events[kind] = true end
+    end
+    -- a phase's progress, once its near half is known (`near`: the ids at a new low)
+    local function closePhase(ph, near)
+        local events = {}
+        for k in pairs(ph.events) do events[#events + 1] = k end
+        table.sort(events)
+        table.sort(near)
+        quiet = (#events > 0 or #near > 0) and 0 or quiet + 1
+        eventsQuiet = #events > 0 and 0 or eventsQuiet + 1
+        local p = rec.progress
+        p.quiet_max = math.max(p.quiet_max, quiet)
+        p.events_quiet_max = math.max(p.events_quiet_max, eventsQuiet)
+        p.phases = p.phases + 1
+        trace({ t = "progress", turn = ph.turn, events = events, near = near, quiet = quiet })
+    end
+    -- the first fresh plan of a player phase reads the goals' turns: a new low closes the phase
+    -- before it, the first reading of an id sets its low and is not progress
+    local function readNearest(plan)
+        if not (planned and curPhase and not curPhase.read and plan and plan.nearest) then return end
+        curPhase.read = true
+        local near, here = {}, {}
+        for _, n in ipairs(plan.nearest) do
+            local low = lows[n.id]
+            local lower = low and n.turns < low - 1e-9
+            if lower then near[#near + 1] = n.id end
+            lows[n.id] = low and math.min(low, n.turns) or n.turns
+            -- a ledger goal's own run: 0 on its first reading or a new low, else one more. An id
+            -- missing from this reading closed or lost its way, and starts again if it returns
+            if n.id ~= "objective" then
+                here[n.id] = true
+                goalQuiet[n.id] = (goalQuiet[n.id] == nil or lower) and 0 or goalQuiet[n.id] + 1
+            end
+        end
+        for id in pairs(goalQuiet) do
+            if not here[id] then goalQuiet[id] = nil end
+        end
+        if prevPhase then closePhase(prevPhase, near); prevPhase = nil end
     end
     -- each full-bag answer the harness gave, and each drop the game gave a player unit, since
     -- the last look (api.bag, api.drops)
@@ -803,6 +890,7 @@ function M.run(api)
                 -- a kill is progress when the player phase made it (FR-007's stall counts
                 -- player phases), never an enemy walking onto a counter
                 progressed = progressed or (k.phase or phase) == "player"
+                if (k.phase or phase) == "player" then markEvent("kill") end
             end
             -- of any side: a chapter can end on a green unit's death
             if not k.fault and lords[k.charId] then lordFell = true end
@@ -815,6 +903,7 @@ function M.run(api)
                 diedAt[d.id] = diedAt[d.id] or rec.plans.made
                 if killed[d.id] then
                     progressed = progressed or phase == "player"
+                    if phase == "player" then markEvent("kill") end
                 elseif not unread[d.id] then
                     leftMap[d.charId] = true
                 end
@@ -831,6 +920,14 @@ function M.run(api)
     end
     local function finish(outcome, why, fault)
         rec.outcome, rec.turns, rec.why = outcome, turn, why
+        -- the phases still open: the one waiting for its near half has none to read now (no
+        -- later plan), then the last played; the trace's `end` comes after
+        if planned then
+            if prevPhase then closePhase(prevPhase, {}) end
+            if curPhase then closePhase(curPhase, {}) end
+            prevPhase, curPhase = nil, nil
+            rec.progress.quiet_last = quiet
+        end
         -- the game's turn counter stops at 999 and two attempts of one start can be one game:
         -- the player phases played, and the acts played in them, in order (M.actsHash)
         rec.player_phases, rec.acts_hash = playerPhases, string.format("%08x", playerActs or 0)
@@ -904,9 +1001,12 @@ function M.run(api)
         for _, t in ipairs(rec.clear.rewards_missing) do
             -- M.REWARD_REASONS. Only the planner counts offers (its plans' `explore`), so a run
             -- without one cannot tell skipped from never offered
+            local reason = planned and M.REWARD_REASONS[t.why] or "unknown"
+            if outcome == "won" and planned and stalledRows[t.x .. "," .. t.y] then
+                reason = "stalled"
+            end
             rec.missed_rewards[#rec.missed_rewards + 1] = { x = t.x, y = t.y, kind = t.kind,
-                reason = planned and M.REWARD_REASONS[t.why] or "unknown",
-                closed_by = t.closed_by }
+                reason = reason, closed_by = t.closed_by }
         end
         if outcome == "won" then rec.turns_to_win = turn end
         if outcome == "stuck" then anomaly({ kind = "stall_abort", turn = turn }) end
@@ -1118,6 +1218,19 @@ function M.run(api)
                         .. "turn %d", turn, waitUntil))
                 end
             end
+            -- A wait that gains nothing ends (#510 fwd1 item C, ADR 0403): M.QUIET_BOUND player
+            -- phases in a row with no progress, with the same two guards as the board repeat
+            -- above -- a turn event still to fire may change the board, and a Survive chapter's
+            -- wait IS the play (the objective counts turns down). `quiet` lags one phase (a
+            -- phase closes at the next one's first plan), which only delays the end by a phase.
+            -- It is not reset while a guard holds, and nothing else reads it here: the check
+            -- fires only on this line, so the record stays the plain count.
+            if planned and quiet >= M.QUIET_BOUND and not sight.nextTurnEvent(turn)
+                and not (sight.objective and sight.objective.turnsLeft) then
+                for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
+                return "stuck", string.format("no progress in %d player phases in a row, and no "
+                    .. "turn event is left to change that", quiet)
+            end
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
             commit, movers = nil, {}
@@ -1150,6 +1263,12 @@ function M.run(api)
             trace({ t = "phase", phase = "player", units = M.snapshot(board) })
             playerPhases = playerPhases + 1
             playing = nil
+            if planned then
+                -- the phase before it never got a reading (no plan made in this one yet): it
+                -- closes on its events alone, then it is the one awaiting this phase's reading
+                if prevPhase then closePhase(prevPhase, {}) end
+                prevPhase, curPhase = curPhase, { turn = turn, events = {} }
+            end
             while true do
                 if halt then return "diag", halt end
                 -- one decision's reads in one save/load (sight.batch), when the sight batches
@@ -1159,9 +1278,17 @@ function M.run(api)
                         local why
                         -- what a plan call reads of the run: built only when one is asked for
                         local function memo()
+                            -- the ledger goals no unit has neared for M.GOAL_QUIET readings: the
+                            -- plan's ledger marks their rows stalled (goals.lua). Read before the
+                            -- plan, which is why botrun keeps the run of readings
+                            local quietGoals = {}
+                            for id, n in pairs(goalQuiet) do
+                                if n >= M.GOAL_QUIET then quietGoals[id] = true end
+                            end
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
-                                     budget = { attempt = lookLeft() }, seen = seenReds }
+                                     budget = { attempt = lookLeft() }, seen = seenReds,
+                                     quietGoals = quietGoals }
                         end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board
@@ -1232,6 +1359,14 @@ function M.run(api)
                         end
                         if plan then
                             sent, stuck = plan.goals, plan.stuck
+                            -- the tiles whose goal row this plan's ledger left stalled: a win
+                            -- that leaves one of them missing says so (`finish`)
+                            stalledRows = {}
+                            for _, g in ipairs(plan.ledger or {}) do
+                                local at = g.status == "stalled" and (g.kind == "visit" or g.kind == "chest")
+                                    and g.id:match("^%a+:(%-?%d+,%-?%d+)$")
+                                if at then stalledRows[at] = true end
+                            end
                             -- the board this plan committed to, and its decision index (a
                             -- death's plan_ref)
                             plan.ref, plan.snapshot = rec.plans.made, M.snapshot(board)
@@ -1284,6 +1419,7 @@ function M.run(api)
                             end
                         end
                         explore.offered(plan and plan.explore)
+                        readNearest(plan)
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
                                 ref = plan and plan.ref, audit = plan and plan.audit,
                                 judged = plan and plan.judged, kind = plan and plan.kind,
@@ -1294,6 +1430,7 @@ function M.run(api)
                                 explore = plan and plan.explore, goals = plan and plan.goals,
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
+                                nearest = plan and plan.nearest,
                                 lookahead = plan and plan.lookahead,
                                 win_fell = plan and plan.winFell })
                         playing, nextAct = a and plan, 2
@@ -1338,6 +1475,18 @@ function M.run(api)
                 if not trapped and (action.act == "visit" or action.act == "chest"
                         or action.act == "talk" or action.act == "rescue" or action.act == "drop") then
                     progressed = true
+                end
+                if not trapped then
+                    if action.act == "visit" or action.act == "chest" or action.act == "talk"
+                        or action.act == "door" or action.act == "seize" then
+                        markEvent(action.act)
+                    elseif action.act == "attack" and action.obstacle
+                        and action.obstacle.blow and action.obstacle.hp then
+                        -- a wall is broken when the forecasts, summed, take its HP
+                        local at = action.obstacle.x .. "," .. action.obstacle.y
+                        wallHp[at] = (wallHp[at] or action.obstacle.hp) - action.obstacle.blow.dealt
+                        if wallHp[at] <= 0 then markEvent("wall") end
+                    end
                 end
                 local battle = not trapped and action.act == "attack" and api.battle and api.battle() or nil
                 local after = api.board()

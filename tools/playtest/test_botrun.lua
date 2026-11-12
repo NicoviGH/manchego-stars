@@ -1363,6 +1363,11 @@ do
     local lost = seizer({}, { judged = false, admitted = false }).seize_skips[1]
     check(tostring(lost.justified) .. " " .. lost.reason, "false no plan with the Seize was judged",
           "seize skips: a Seize no plan judged is a fault")
+    -- a stalled row (ADR 0403) holds nothing: the skip lists no goal and is unjustified, with the
+    -- existing reason (the Seize was judged and admitted, and no feasible goal is left)
+    r = seizer({ { id = "visit:3,3", kind = "visit", status = "stalled" } })
+    check(tostring(r.seize_skips[1].justified) .. " " .. r.seize_skips[1].reason .. " " .. #r.seize_skips[1].ledger,
+          "false nothing left the win would close 0", "seize skips: only stalled rows, unjustified")
     r = seizer({ { id = "visit:3,3", kind = "visit", status = "closed" } })
     check(r.seize_skips[1].justified, false, "nothing the win would close: unjustified")
     check(r.stall_events[1] and r.stall_events[1].kind, "unjustified_seize_skip",
@@ -2295,6 +2300,199 @@ do
                                       target = 0x81, targetId = id })
     end
     check(strike(0x90) ~= strike(0x91), true, "acts hash: two enemies of one charId are two targets")
+end
+
+-- test_the_progress_record (#510 fwd1 item C): per player phase, an event or a new low in the
+-- planner's `nearest` is progress; a first reading, a lord's move and a Rescue are not. A
+-- shadow: it only records. `steps[t]` = { act = kind, nearest = { {id, turns} } } for player
+-- phase t; the run is won once `turns` enemy phases have passed.
+do
+    -- `o` (optional): hideTurns (the objective shows no turns left: not a Survive chapter),
+    -- eventTurn (the game's next turn event), moving (the enemy walks a new tile each phase, so
+    -- no board repeats and the repeat rule stays out of the way), ledger[t] (the ledger plan t
+    -- reports), explorable (open tiles). `g.quietAt[t]` = the sorted quietGoals the first plan
+    -- call of player phase t was given.
+    local function shadow(turns, steps, units, o)
+        o = o or {}
+        local g = fakeGame { units = units or standoff(), turnsLeft = turns, hit = 10,
+                             eventTurn = o.eventTurn, explorable = o.explorable,
+                             enemy = o.moving and function(g, find)
+                                 local e = find(0x81)
+                                 if e then e.x, e.y = g.turn % 10, 5 + g.turn // 10 end
+                                 return {}
+                             end or nil }
+        local evs = {}
+        g.api.trace = function(ev) evs[#evs + 1] = Json.decode(Json.encode(ev)) end
+        local sight = g.api.sight
+        g.api.sight = function()
+            local s = sight()
+            s.objective.gameOver = { 0x01 }
+            if o.hideTurns then
+                local refresh = s.refresh
+                s.refresh = function() refresh(); s.objective.turnsLeft = nil end
+                s.objective.turnsLeft = nil
+            end
+            return s
+        end
+        g.quietAt = {}
+        g.api.Planner = {
+            surprise = function() return "the plan is played out" end,
+            plan = function(_, board, _, _, opts)
+                for _, u in ipairs(board.units) do
+                    if u.faction == "blue" and u.acted then return nil end
+                end
+                if not g.quietAt[board.turn] then
+                    local ids = {}
+                    for id in pairs(opts.quietGoals or {}) do ids[#ids + 1] = id end
+                    table.sort(ids)
+                    g.quietAt[board.turn] = table.concat(ids, " ")
+                end
+                local st = steps[board.turn] or {}
+                local a = { unit = 0x01, unitId = 0x01, act = st.act or "wait",
+                            move = st.move or { x = 0, y = 0 }, target = st.target,
+                            targetId = st.target, obstacle = st.obstacle }
+                return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                            nearest = st.nearest or { { id = "objective", turns = 4 } },
+                            ledger = o.ledger and o.ledger[board.turn],
+                            explore = o.explore }
+            end,
+        }
+        local act = g.api.act
+        g.api.act = function(a)   -- a wall is struck by tile: no target for the fake to hit
+            if a.obstacle then a = { unitId = a.unitId, move = a.move, act = "wait" } end
+            return act(a)
+        end
+        Botrun.run(g.api)
+        local lines = {}
+        for _, e in ipairs(evs) do
+            if e.t == "progress" then lines[#lines + 1] = e end
+        end
+        return recordOf(g), lines, evs, g
+    end
+    local function line(l)
+        return string.format("%d:%s|%s|%d", l.turn, table.concat(l.events, ","),
+                             table.concat(l.near, ","), l.quiet)
+    end
+    local function lines(ls)
+        local out = {}
+        for i, l in ipairs(ls) do out[i] = line(l) end
+        return table.concat(out, " ")
+    end
+
+    -- (a) waits and a constant reading: every phase quiet, the count runs up
+    local r, ls, evs = shadow(3, {})
+    check(r.progress.quiet_max, 3, "progress: three quiet phases")
+    check(r.progress.quiet_last, 3, "progress: the quiet run at the end")
+    check(r.progress.events_quiet_max, 3, "progress: no events either")
+    check(r.progress.phases, 3, "progress: every player phase closed, the last in finish")
+    check(lines(ls), "1:||1 2:||2 3:||3", "progress: a trace line a phase, empty events and near")
+    check(evs[#evs].t, "end", "progress: the last phase is closed before the record")
+    check(evs[#evs].record.progress.phases, 3, "progress: the trace's record carries it")
+    local planAt
+    for _, e in ipairs(evs) do if e.t == "plan" and not planAt then planAt = e end end
+    check(planAt.nearest[1].id, "objective", "progress: the fresh plan's trace line names `nearest`")
+
+    -- (b) a new low resets and is named; a first reading of an id is not progress
+    local near = function(o, v) return { nearest = { { id = "objective", turns = o },
+                                                      v and { id = "visit:3,3", turns = v } or nil } } end
+    r, ls = shadow(4, { near(4), near(4), near(3), near(3, 2.5) })
+    check(lines(ls), "1:||1 2:|objective|0 3:||1 4:||2", "progress: a new low resets; a first reading does not")
+    check(r.progress.quiet_max, 2, "progress: the longest run")
+    check(r.progress.events_quiet_max, 4, "progress: events alone never reset it")
+    -- a reading that is no lower, or a higher one, is no new low
+    r, ls = shadow(3, { near(4), near(5), near(4.5) })
+    check(lines(ls), "1:||1 2:||2 3:||3", "progress: a worse reading is no low")
+
+    -- (c) a Visit resets the run; a lord's move and a Rescue do not
+    r, ls = shadow(4, { {}, { act = "visit" }, { act = "rescue", move = { x = 1, y = 0 } }, {} })
+    check(lines(ls), "1:||1 2:visit||0 3:||1 4:||2",
+          "progress: a Visit is an event; a lord's move and a Rescue are not")
+    check(r.progress.events_quiet_max, 2, "progress: the events-only run")
+    -- (d) a kill made in the player phase is an event; the near half is ignored by events_quiet_max
+    r, ls = shadow(3, { {}, { act = "attack", target = 0x81, move = { x = 0, y = 0 } },
+                        near(3) },
+                    { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10),
+                      unit(0x82, 1, "red", 9, 9, 10) })
+    check(lines(ls), "1:||1 2:kill|objective|0 3:||1", "progress: a kill in the player phase")
+    check(r.progress.events_quiet_max, 1, "progress: events_quiet_max ignores the near half")
+    check(r.progress.quiet_last, 1, "progress: the last phase, read by nothing, is quiet")
+    -- a door, a wall the forecasts break (two blows of 6 on HP 10) and the Seize are events too
+    local function wall(dealt) return { act = "attack", obstacle = { x = 1, y = 0, hp = 10,
+                                                                      blow = { dealt = dealt } } } end
+    r, ls = shadow(5, { { act = "door" }, wall(6), wall(6), {}, { act = "seize" } })
+    check(lines(ls), "1:door||0 2:||1 3:wall||0 4:||1 5:seize||0",
+          "progress: a door, the blow that breaks a wall, the Seize")
+    -- (e) a greedy style plays no plan: no progress record, no progress line
+    local g = fakeGame { units = rout(), aggression = "greedy" }
+    local seen = 0
+    g.api.trace = function(ev) if ev.t == "progress" then seen = seen + 1 end end
+    Botrun.run(g.api)
+    check(recordOf(g).progress, nil, "progress: none without a plan")
+    check(seen, 0, "progress: no trace line without a plan")
+
+    -- (rule 1) a ledger goal no unit has neared for GOAL_QUIET readings is in the plan's
+    -- opts.quietGoals: the first reading is 0, so the fifth plan's call is the first to carry it
+    -- (the plan before it has seen three readings, two without a new low); a new low removes it;
+    -- an id missing from a reading is dropped and starts fresh when it returns; "objective" is
+    -- no ledger goal and never listed
+    local v = function(t) return { nearest = { { id = "objective", turns = 4 },
+                                               { id = "visit:3,3", turns = t } } } end
+    local gone = { nearest = { { id = "objective", turns = 4 } } }
+    local _, _, _, ga = shadow(9, { v(5), v(5), v(5), v(5), v(5), v(4), gone, v(4), v(4) })
+    local got = {}
+    for t = 1, 9 do got[t] = ga.quietAt[t] == "" and "-" or ga.quietAt[t] end
+    check(table.concat(got, " "), "- - - - visit:3,3 visit:3,3 - - -",
+          "quiet goals: three readings without a new low; a new low, a gap and a return clear it")
+
+    -- (rule 2) player phases in a row with no progress end the attempt `stuck`. The count lags
+    -- a phase, so the run ends at the top of phase 18 with 16 closed quiet phases; one
+    -- phase fewer is won
+    local hide = { hideTurns = true, moving = true }
+    r = shadow(17, {}, nil, hide)
+    check(r.outcome, "won", "quiet bound: 15 closed quiet phases do not end the attempt")
+    r = shadow(18, {}, nil, hide)
+    check(r.outcome .. " | " .. r.why, "stuck | no progress in 16 player phases in a row, and no "
+        .. "turn event is left to change that", "quiet bound: 16 do")
+    check(r.progress.quiet_last, 17, "quiet bound: the record keeps the plain count (the 17th phase, played, closes in finish)")
+    -- a phase with progress in it resets the run
+    r = shadow(18, { [9] = { act = "visit" } }, nil, hide)
+    check(r.outcome, "won", "quiet bound: a progress phase restarts the count")
+    -- the guards: a turn event still to fire, a Survive chapter's countdown
+    r = shadow(30, {}, nil, { hideTurns = true, moving = true, eventTurn = 99 })
+    check(r.outcome, "won", "quiet bound: not while a turn event is still to fire")
+    r = shadow(30, {}, nil, { moving = true })
+    check(r.outcome, "won", "quiet bound: not while the objective counts turns down")
+    check(r.progress.quiet_last, 30, "quiet bound: the guarded phases still count, unreset")
+    -- greedy plays no plan and has no progress count: it is never ended by the bound
+    g = fakeGame { units = standoff(), turnsLeft = 30,
+                   enemy = function(g, find)
+                       local e = find(0x81)
+                       e.x, e.y = g.turn % 10, 5 + g.turn // 10
+                       return {}
+                   end, aggression = "greedy" }
+    local gs = g.api.sight
+    g.api.sight = function()
+        local s = gs()
+        local refresh = s.refresh
+        s.refresh = function() refresh(); s.objective.turnsLeft = nil end
+        s.objective.turnsLeft = nil
+        return s
+    end
+    Botrun.run(g.api)
+    check(tostring(recordOf(g).why):find("no progress", 1, true), nil,
+          "quiet bound: greedy is not bound")
+
+    -- a won run's missing reward whose goal row was stalled in the last plan: `stalled`
+    local open = { { x = 9, y = 0, kind = "visit" }, { x = 0, y = 9, kind = "visit" } }
+    r = shadow(3, {}, nil, { explorable = open, explore = { { x = 9, y = 0, die = 0 } },
+                              ledger = { [3] = { { id = "visit:9,0", kind = "visit", status = "stalled" },
+                                                 { id = "reward:1", kind = "reward", status = "stalled" } } } })
+    local why = {}
+    for _, m in ipairs(r.missed_rewards) do why[m.x .. "," .. m.y] = m.reason end
+    check(why["9,0"] .. " " .. why["0,9"], "stalled never_offered",
+          "missed reward: a stalled row's tile says so, another keeps its log reason")
+    r = shadow(3, {}, nil, { explorable = open, explore = { { x = 9, y = 0, die = 0 } } })
+    check(r.missed_rewards[1].reason, "skipped", "missed reward: with no stalled row it is skipped")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

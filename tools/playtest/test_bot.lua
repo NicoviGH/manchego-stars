@@ -3892,6 +3892,63 @@ do
           "visit:4,2 feasible", "visit before win: the ledger the plan leaves")
 end
 
+-- test_a_stalled_goal_does_not_hold_the_win (#510 fwd1 item C, call 3, ADR 0403): the same board
+-- as the visit above, but botrun reports the village's id in opts.quietGoals (no unit neared it
+-- for a while). Its row is stalled, the Seize forfeits nothing, and it is played; the plan's
+-- ledger and its `nearest` still name the village.
+do
+    local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }) },
+        field = function(t)
+            return t.x == 4 and t.y == 2
+                and { [2] = { [4] = 0 }, [3] = { [4] = 1 }, [4] = { [4] = 2 } } or nil
+        end,
+        explorable = { { x = 4, y = 2, kind = "visit" } },
+        canExplore = { [0x01] = { ["4,2"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(L, Z), sightOf(o), gifted("bold", 100),
+                                 { quietGoals = { ["visit:4,2"] = true } })
+    check(a and a.act, "seize", "stalled goal: the Seize is played")
+    check(plan and plan.ledger[1] and plan.ledger[1].id .. " " .. plan.ledger[1].status,
+          "visit:4,2 stalled", "stalled goal: the ledger names a stalled row")
+    check(plan and plan.nearest[2] and plan.nearest[2].id, "visit:4,2",
+          "stalled goal: its turns are still read (a new low makes it feasible again)")
+end
+
+-- test_the_plan_names_how_near_each_goal_is (#510 fwd1 item C, the progress record's near half):
+-- `nearest` holds the objective's nearest unit and each feasible visit row's best taker, in
+-- turns, sorted by id; a reward row has no tile and gives no entry.
+do
+    local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+    local M = blue(0x02, 1, 4, 4, { minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 4, 3 }), [0x02] = tiles({ 4, 4 }) },
+        field = function(t)
+            return t.x == 4 and t.y == 2
+                and { [2] = { [4] = 0 }, [3] = { [4] = 1 }, [4] = { [4] = 2 } } or nil
+        end,
+        explorable = { { x = 4, y = 2, kind = "visit" } },
+        canExplore = { [0x01] = { ["4,2"] = "visit" }, [0x02] = { ["4,2"] = "visit" } },
+        enemyPhase = function() return {} end,
+    }
+    local st = gifted("bold", 100)
+    st.rewards = { { item = 0x68, needs = "villages" } }
+    local _, plan = Planner.plan(B, boardOf(L, M, Z), sightOf(o), st)
+    local rows = {}
+    for _, r in ipairs(plan and plan.ledger or {}) do rows[#rows + 1] = r.id end
+    check(table.concat(rows, " "), "visit:4,2 reward:1", "nearest: the ledger holds a visit and a reward row")
+    local near = {}
+    for _, n in ipairs(plan and plan.nearest or {}) do near[#near + 1] = n.id .. "=" .. n.turns end
+    check(table.concat(near, " "), "objective=0.0 visit:4,2=0.2",
+          "nearest: the objective's nearest unit (M, on the tile; not the lord's 0.2), the visit's best taker (0.2, not M's 0.4), no reward")
+end
+
 -- test_the_win_is_not_deferred_for_a_green (FR-012, plan T034): the lord can Seize, and X
 -- kills green G unless the lord blocks instead. A green's survival is a tie-break after the
 -- win: the Seize is played.
