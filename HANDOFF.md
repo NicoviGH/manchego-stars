@@ -51,10 +51,12 @@ with what is confirmed and what is not: **#510 comment 6810177817**.
 
 **Next step: build the plan, #510 comment 6810567866** (written from eight offline reads by
 cheaper subagents; nothing in it is built). Read it whole first: it has five lessons, six
-build items in order (A to F), and six calls that are Nicolas's.
+build items in order (A to F), and six calls, **all approved by Nicolas (2026-11-11: "I
+approve all calls")**, so B and C are not waiting on anything. Call 1 advances the dice by a
+fixed count per attempt; it never re-rolls the seed (he checked exactly that).
 - **Start with A** (the records say what happened; no change of play) and **B** (the team pick
-  covers the scarce demand first, and a Talk is a demand). B and C amend settled text, so they
-  wait on Nicolas's calls 3 and 4; A does not.
+  covers the scarce demand first, and a Talk is a demand). B and C amend settled text
+  (Party selection, FR-015): record each as an ADR in its PR.
 - **C** ends a wait that gains nothing (one attempt ran 1,915 player phases). **D** is one
   instrumented run on each of two starts, before any more rules. **E** and **F** are sized
   after D; F tests the parked look on Ch7 before anything new is designed.
