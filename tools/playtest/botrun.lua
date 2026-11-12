@@ -10,7 +10,10 @@
 -- Bot.decide is asked for one action at a time until it returns nil; then the phase ends and the
 -- enemy phase is ridden out. The run ends:
 --   won      the chapter advanced (api.won)
---   lost     the game-over screen came up (api.lost), or the enemy phase reached it
+--   lost     the game-over screen came up (api.lost), or the enemy phase reached it, or our
+--            own act felled a unit whose death ends the game (M.LOST_IN_PLAYER_PHASE): the
+--            game's game-over event waits for the death quote and the act to end, so its
+--            screen is not up when the act returns
 --   stuck    a player phase began on a board already seen this run, and nothing ahead can
 --            change it -- for the planner, a board that comes round again AFTER the planner was
 --            made to change it once (its first repeat: opts.stalled, counted in the record's
@@ -32,7 +35,7 @@
 --                      one (the record's `plans`: made, acts played from a kept one, the enemy
 --                      phases they judged, and the uncertain kills they left to the average past
 --                      Planner.BRANCH: every plan judged, not only the ones played)
---   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, instrument }  what the
+--   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, team, instrument }  what the
 --                      record names; instrument = the bot hash and suite version (PT_INSTRUMENT)
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
@@ -60,9 +63,9 @@
 --                      UnitKill writes): { { id, charId, faction, killer|nil, turn|nil,
 --                      phase|nil (when it fell: "player" | "enemy") } }, and each
 --                      unit the watch could not read as { fault, id, charId, faction }. The
---                      only word on a blue or green loss: a unit gone from the field without
---                      one was unloaded by a script (a chapter's ending), or escaped, never
---                      killed
+--                      only word on a loss or a kill, of any faction: a unit gone from the
+--                      field without one was unloaded by a script (a chapter's ending, a
+--                      recruit a turn event takes away), or escaped, never killed
 --   battle()           OPTIONAL: Board.battle, the last real battle as the game rolled it
 --   bag()              OPTIONAL: each full-inventory answer since the last call: { charId,
 --                      item (the new one), sent (the item that went: to the convoy, or
@@ -474,8 +477,21 @@ M.DETAILS = {
 -- A missed reward's reason, from the explore log's status (exploreLog.summary): offered to a
 -- unit and never taken; never offered; closed by another side first (a pillage, a thief); or
 -- tried and the harness could not drive it (the run crashed there).
-M.REWARD_REASONS = { skipped = "skipped", unreached = "unreachable", closed = "closed",
+M.REWARD_REASONS = { skipped = "skipped", unreached = "never_offered", closed = "closed",
                      failed = "failed" }
+
+M.LOST_IN_PLAYER_PHASE = "game over in the player phase"
+
+-- A run's player acts as one number, folded act by act (FNV-1a, 32 bits): who, what, where,
+-- on whom (the target's unit slot too: generic enemies share a charId). Equal on two attempts of one start means the same game was played twice. `h` is the
+-- hash so far (nil at the start) -> the hash with `a` added.
+function M.actsHash(h, a)
+    h = h or 0x811C9DC5
+    local s = string.format("%s:%s:%d,%d:%s/%s;", tostring(a.unit), tostring(a.act), a.move.x,
+                            a.move.y, tostring(a.target), tostring(a.targetId))
+    for i = 1, #s do h = ((h ~ s:byte(i)) * 0x01000193) & 0xFFFFFFFF end
+    return h
+end
 
 -- d: a graded death ({ predicted, over_cap, flags, killer }); why: what the committing plan
 -- judged of it ({ struck: its killer among the judged strikers, strikers: how many,
@@ -594,7 +610,8 @@ function M.run(api)
     end
     local rec = { game = api.info.game, rom_hash = api.info.rom_hash, chapter = api.info.chapter,
                   mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
-                  attempt = api.info.attempt, style = api.style, bench = api.bench,
+                  attempt = api.info.attempt, team = api.info.team, style = api.style,
+                  bench = api.bench,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
@@ -622,6 +639,10 @@ function M.run(api)
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
     local lords, felled, talked, greenSeen = {}, {}, {}, {}
+    -- leftMap: the red units gone from the field that the game did not kill (charId -> true);
+    -- lordFell: the game killed a unit whose death ends it (Bot.gameOver). The game-over event
+    -- runs only once the death quote and the act are over, so its screen is not up yet
+    local leftMap, lordFell = {}, false
     -- per unit index of another side, the decision count when it fell: a slot the game freed
     -- after a plan's snapshot and reloaded with an arrival is not the snapshot's unit
     local diedAt = {}
@@ -646,6 +667,7 @@ function M.run(api)
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
+    local playerPhases, playerActs = 0, nil   -- rec.player_phases, rec.acts_hash
     local function trace(ev)
         ev.turn = ev.turn or turn
         if watch then
@@ -724,8 +746,9 @@ function M.run(api)
 
     -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
     -- given only if its three green villagers live), so both are deaths; a red one is a kill.
-    -- A blue or green death is one the game ran UnitKill on (api.killed); `list`, the board's
-    -- falls, gives the red kills and a killer where the watch saw no fight. A slot the watch
+    -- A death or a kill is one the game ran UnitKill on (api.killed); `list`, the board's
+    -- falls, gives a killer where the watch saw no fight, and the red units that left the
+    -- field unkilled (`leftMap`). A slot the watch
     -- could not read is a watch fault, never a guess.
     -- Each blue or green death is graded against the plan that committed to its board (plan,
     -- and for a player-phase death the action that struck: M.grade). An enemy-phase death is
@@ -736,10 +759,13 @@ function M.run(api)
     -- `now` (optional): the board read after the deaths, where a killer that arrived during the
     -- phase stands (lastBoard, from before it, does not hold one)
     local function record(list, phase, plan, action, movers, now)
-        local seen = {}
+        -- killed: the unit slots the game killed in this record; unread: those the watch
+        -- could not read, which neither fell nor left as far as anyone can say
+        local seen, killed, unread = {}, {}, {}
         for _, d in ipairs(list) do seen[d.id] = d end
         for _, k in ipairs(api.killed()) do
             if k.fault then
+                unread[k.id] = true
                 deathFaults[#deathFaults + 1] = { kind = "death_unread", why = k.fault,
                                                   charId = k.charId, faction = k.faction,
                                                   turn = turn, phase = phase }
@@ -773,16 +799,25 @@ function M.run(api)
                     anomaly({ kind = "unseen_green", turn = g.turn, charId = g.charId })
                 end
             else
-                felled[k.charId], diedAt[k.id] = true, rec.plans.made
+                felled[k.charId], diedAt[k.id], killed[k.id] = true, rec.plans.made, true
                 -- a kill is progress when the player phase made it (FR-007's stall counts
                 -- player phases), never an enemy walking onto a counter
                 progressed = progressed or (k.phase or phase) == "player"
             end
+            -- of any side: a chapter can end on a green unit's death
+            if not k.fault and lords[k.charId] then lordFell = true end
         end
         for _, d in ipairs(list) do
             if d.faction ~= "blue" and d.faction ~= "green" then
-                felled[d.charId], diedAt[d.id] = true, diedAt[d.id] or rec.plans.made
-                progressed = progressed or phase == "player"
+                -- gone from the field and not killed: a script unloaded it or it escaped
+                -- (Board.fate), as for a blue or green one. It did not fall
+                -- its slot is free either way: an arrival loaded there is another unit
+                diedAt[d.id] = diedAt[d.id] or rec.plans.made
+                if killed[d.id] then
+                    progressed = progressed or phase == "player"
+                elseif not unread[d.id] then
+                    leftMap[d.charId] = true
+                end
             end
         end
         -- a red one gone with the fighter that downed it: that fighter's kill
@@ -796,6 +831,9 @@ function M.run(api)
     end
     local function finish(outcome, why, fault)
         rec.outcome, rec.turns, rec.why = outcome, turn, why
+        -- the game's turn counter stops at 999 and two attempts of one start can be one game:
+        -- the player phases played, and the acts played in them, in order (M.actsHash)
+        rec.player_phases, rec.acts_hash = playerPhases, string.format("%08x", playerActs or 0)
         rec.frames = api.frames() - startFrame
         if api.costs then
             -- what the run spent: each figure the difference since it started
@@ -857,6 +895,7 @@ function M.run(api)
                 rec.missed_recruits[#rec.missed_recruits + 1] = { charId = c,
                     reason = (fellOurs[c] and "died_after_joining")
                         or (felled[c] and "killed_before_talk")
+                        or (leftMap[c] and "left_map")
                         or (talked[c] and "talk_skipped")
                         or (planned and "not_reached") or "unknown" }
             end
@@ -864,7 +903,7 @@ function M.run(api)
         rec.missed_rewards = {}
         for _, t in ipairs(rec.clear.rewards_missing) do
             -- M.REWARD_REASONS. Only the planner counts offers (its plans' `explore`), so a run
-            -- without one cannot tell skipped from unreachable
+            -- without one cannot tell skipped from never offered
             rec.missed_rewards[#rec.missed_rewards + 1] = { x = t.x, y = t.y, kind = t.kind,
                 reason = planned and M.REWARD_REASONS[t.why] or "unknown",
                 closed_by = t.closed_by }
@@ -1109,6 +1148,7 @@ function M.run(api)
                 end)
             end
             trace({ t = "phase", phase = "player", units = M.snapshot(board) })
+            playerPhases = playerPhases + 1
             playing = nil
             while true do
                 if halt then return "diag", halt end
@@ -1284,6 +1324,7 @@ function M.run(api)
                 end
                 if done == false then
                     record({}, "player", playing, action)   -- the deaths the act caused first
+                    if lordFell or api.lost() then return "lost", M.LOST_IN_PLAYER_PHASE end
                     return "crashed", "the harness could not perform " .. action.act
                         .. (why and (": " .. why) or "")
                 end
@@ -1316,6 +1357,12 @@ function M.run(api)
                         canto = action.canto, act = action.act, target = action.target, battles = { battle },
                         fell = fell, trapped = trapped or nil })
                 changes(after)
+                playerActs = M.actsHash(playerActs, action)
+                -- before any complaint about the act: an act that felled our lord is a loss,
+                -- however it left the board
+                if lordFell or (api.lost() and not api.won()) then
+                    return "lost", M.LOST_IN_PLAYER_PHASE
+                end
                 if done == "noseize" then
                     -- The bot seizes only with a unit the game's CanUnitSeize allows, on the tile
                     -- its location event names: a menu without Seize there is the two disagreeing.
@@ -1328,7 +1375,6 @@ function M.run(api)
                 end
                 board = after
                 if api.won() then return "won", "the chapter advanced" end
-                if api.lost() then return "lost", "game over" end
                 if board.phase ~= "blue" or board.turn ~= turn then break end
             end
             if halt then return "diag", halt end
@@ -1378,7 +1424,10 @@ function M.run(api)
                 if not counted[d.id] then all[#all + 1] = d end
             end
             record(all, "enemy", commit, nil, movers, now)
-            if phase == "gameover" then return "lost", "game over in the enemy phase" end
+            -- lordFell: the game killed a unit it ends on, whatever the phase came back as
+            if phase == "gameover" or lordFell then
+                return "lost", "game over in the enemy phase"
+            end
             if phase == "ended" then
                 if api.won() then return "won", "the chapter advanced in the enemy phase" end
                 return "lost", "the chapter ended without advancing"

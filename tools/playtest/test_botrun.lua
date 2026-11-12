@@ -1020,14 +1020,15 @@ do
     check(r.clean, false, "not in the party at the start: not clean")
 end
 
--- test_a_razed_village_is_missing_at_once: a brigand's pick act names the village, and the
--- game stops offering it.
+-- test_a_razed_village_is_missing_at_once: a brigand's pillage act names the village's own
+-- tile (the one the explore log keys, not the row above where the game runs the event), and
+-- the game stops offering it.
 do
     local tiles = { { x = 9, y = 8, kind = "visit" } }
     local r = judged { explorable = tiles, enemy = function(g, find)
         if #tiles == 0 then return {} end
         table.remove(tiles, 1)
-        return {}, { { id = 0x81, charId = 0x81, act = "pick", tile = { x = 9, y = 8 } } }
+        return {}, { { id = 0x81, charId = 0x81, act = "pillage", tile = { x = 9, y = 8 } } }
     end }
     local m = r.clear.rewards_missing[1]
     check(m and m.why, "closed", "razed: missing, closed")
@@ -1234,7 +1235,7 @@ do
     end
 end
 
--- test_graded_outcomes (FR-006, FR-008): an escort green and an allied green die; the owed
+-- test_graded_outcomes (FR-006, FR-008): two allied greens die; the owed
 -- recruit 0x30 was killed, 0x31 never reached; a village was never offered; the run is won.
 do
     local units = rout()
@@ -1263,19 +1264,15 @@ do
                              end
                              return {}
                          end }
-    local sight = g.api.sight
-    g.api.sight = function()
-        local s = sight()
-        s.objective.gameOver = { 0x41 }
-        return s
-    end
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.outcome, "won", "graded: a win with misses stays won (AS 2)")
     check(r.clean, false, "graded: and not clean")
     check(r.turns_to_win, r.turns, "graded: turns to win")
-    check(r.greens.escort_deaths[1], 0x41, "graded: the escort green, as the game says")
-    check(r.greens.allied_deaths[1], 0x42, "graded: the allied green")
+    -- an escort (a green the game ends on) cannot fall in a won run: its death is the loss,
+    -- test_a_protected_green_unit_felled_ends_the_run_lost
+    check(r.greens.allied_deaths[1], 0x41, "graded: an allied green")
+    check(r.greens.allied_deaths[2], 0x42, "graded: and the other")
     check(r.first_death_turn, 1, "graded: the joined recruit's death is a player death")
     local why = {}
     for _, m in ipairs(r.missed_recruits) do why[m.charId] = m.reason end
@@ -1671,7 +1668,7 @@ do
 end
 
 -- test_missed_reasons_under_the_planner: offered and never taken is skipped; closed by another
--- side before any offer is closed; never offered is unreachable; a Talk never offered is
+-- side before any offer is closed; never offered is never_offered; a Talk never offered is
 -- not_reached.
 do
     local tiles = { { x = 9, y = 0, kind = "visit" }, { x = 0, y = 9, kind = "visit" },
@@ -1700,7 +1697,7 @@ do
     for _, m in ipairs(r.missed_rewards) do why[m.x .. "," .. m.y] = m.reason end
     check(why["9,0"], "skipped", "reasons: offered, never taken")
     check(why["5,5"], "closed", "reasons: closed by another side before any offer")
-    check(why["0,9"], "unreachable", "reasons: never offered")
+    check(why["0,9"], "never_offered", "reasons: never offered")
     check(r.missed_recruits[1] and r.missed_recruits[1].reason, "not_reached",
           "reasons: a Talk never offered")
 end
@@ -2112,6 +2109,192 @@ do
         if e.t == "plan" and e.ref == 1 then audit = e.audit end
     end
     check(audit and audit.offered_n, 1, "the plan event carries plan.audit")
+end
+
+-- test_a_lord_felled_by_our_own_act_is_a_loss (fwd1 A): the game runs its game-over event only
+-- after the death quote, so the screen is not up when the act returns; the lord's death is the
+-- game's word already.
+do
+    local function lordDies(done)
+        local g = fakeGame { hit = 1, units = { unit(0x01, 0, "blue", 0, 0, 20),
+                                                unit(0x81, 0, "red", 5, 5, 30) } }
+        local sight = g.api.sight
+        g.api.sight = function()
+            local s = sight()
+            s.objective.gameOver = { 0x01 }
+            return s
+        end
+        local act, calls = g.api.act, 0
+        g.api.act = function(a)
+            calls = calls + 1
+            if calls > 3 then error("the run played on after its lord fell") end
+            act(a)
+            local l = g.units[1]
+            l.hp, l.dead, l.onField = 0, true, false
+            return done
+        end
+        g.api.endPhase = function() error("the run ended its phase after its lord fell") end
+        Botrun.run(g.api)
+        return recordOf(g)
+    end
+    local r = lordDies(true)
+    check(r.outcome, "lost", "a lord felled in the player phase: lost")
+    check(r.why, "game over in the player phase", "a lord felled in the player phase: why")
+    check(r.deaths[1] and r.deaths[1].phase, "player", "a lord felled in the player phase: the death")
+    r = lordDies(false)
+    check(r.outcome, "lost", "a lord felled by an act the harness lost track of: still lost")
+end
+
+-- test_a_recruit_a_script_removed_left_the_map (fwd1 A): the game's kills are api.killed()'s; a
+-- red unit gone from the field without one was unloaded or escaped, and did not fall.
+do
+    local units = rout()
+    units[#units + 1] = unit(0x30, 2, "red", 9, 0, 1)
+    units[#units + 1] = unit(0x33, 3, "red", 9, 1, 1)
+    local r = judged { units = units, recruits = { 0x30, 0x33 },
+                       enemy = function(g, find)
+                           if g.turn ~= 1 then return {} end
+                           for i, u in ipairs(g.units) do             -- a script took it away
+                               if u.id == 0x30 then table.remove(g.units, i); break end
+                           end
+                           local k = find(0x33)                       -- the game killed this one     
+                           k.hp, k.dead, k.onField = 0, true, false
+                           return {}
+                       end }
+    local why = {}
+    for _, m in ipairs(r.missed_recruits) do why[m.charId] = m.reason end
+    check(why[0x30], "left_map", "a recruit a script removed: left the map")
+    check(why[0x33], "killed_before_talk", "a recruit the game killed: killed before the Talk")
+    check(r.clean, false, "a recruit that left: the clear is not clean")
+    -- a slot the watch could not read neither fell nor left
+    units = rout()
+    units[#units + 1] = unit(0x30, 2, "red", 9, 0, 1)
+    local gone, told = false, false
+    r = judged { units = units, recruits = { 0x30 },
+                 enemy = function(g)
+                     if g.turn ~= 1 then return {} end
+                     table.remove(g.units, 3)
+                     gone = true
+                     return {}
+                 end,
+                 api = { killed = function()
+                     if not gone or told then return {} end
+                     told = true
+                     return { { fault = "replaced", id = 0x30, charId = 0x30, faction = "red" } }
+                 end } }
+    check(r.missed_recruits[1].reason, "unknown", "a recruit the watch could not read: no guess")
+    check(r.watch_faults[1] and r.watch_faults[1].why, "replaced", "and the fault is recorded")
+end
+
+-- test_a_slot_freed_without_a_kill_is_free_for_an_arrival (re-review of fwd1 A): a red unit
+-- leaves the field unkilled after a plan's snapshot, an arrival loads into its slot under the
+-- same generic charId and kills the unit that plan moved. The killer is no unit the plan saw.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) },
+                         turnsLeft = 2,
+                         enemy = function(g, find)
+                             if g.turn == 1 then
+                                 g.units[#g.units + 1] = unit(0x81, 4, "red", 1, 0, 10)
+                                 local u = find(0x01)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                             end
+                             return {}
+                         end }
+    g.api.Planner = {
+        -- one plan a player phase: kept until every blue unit has acted
+        surprise = function()
+            for _, u in ipairs(g.units) do
+                if u.faction == "blue" and not u.acted and not u.dead then return nil end
+            end
+            return "the plan is played out"
+        end,
+        plan = function(_, board)
+            local acts = {}
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and not u.acted and not u.dead then
+                    acts[#acts + 1] = { unit = u.charId, unitId = u.id, act = "wait",
+                                        move = { x = u.x, y = u.y } }
+                end
+            end
+            if not acts[1] then return nil end
+            return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
+                              enemies = { [0x81] = true } }
+        end,
+    }
+    local act = g.api.act
+    g.api.act = function(a)
+        if a.unitId == 0x02 then   -- while our second unit acts, a script takes the red away
+            for i, u in ipairs(g.units) do
+                if u.id == 0x81 then table.remove(g.units, i); break end
+            end
+        end
+        return act(a)
+    end
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                   phase = "enemy" } }
+    end
+    Botrun.run(g.api)
+    local d = recordOf(g).deaths[1]
+    check(d and d.flags.reinforcement, true, "a freed slot: its arrival is no unit the plan saw")
+end
+
+-- test_a_protected_green_unit_felled_ends_the_run_lost (fwd1 A): the game's set of units it
+-- ends on (Bot.gameOver) holds units of any side, and an enemy-phase kill of one is a loss even if
+-- the phase came back to the player before the game-over screen.
+do
+    local units = standoff()
+    units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
+    local g = fakeGame { units = units, turnsLeft = 5,
+                         enemy = function(g, find)
+                             local v = find(0x41)
+                             v.hp, v.dead, v.onField = 0, true, false
+                             return { { id = 0x41, charId = 0x41, faction = "green", killer = 0x81 } }
+                         end }
+    local sight = g.api.sight
+    g.api.sight = function()
+        local s = sight()
+        s.objective.gameOver = { 0x41 }
+        return s
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "lost", "a protected green felled: lost")
+    check(r.why, "game over in the enemy phase", "a protected green felled: in the enemy phase")
+    check(r.turns, 1, "a protected green felled: on the turn it fell")
+    check(r.greens.escort_deaths[1], 0x41, "a protected green felled: the escort, as the game says")
+end
+
+-- test_the_record_counts_player_phases_and_hashes_the_acts (fwd1 A): two attempts that played
+-- the same acts in the same order carry the same acts_hash, so a replay shows in the record.
+do
+    local function play(hit)
+        local g = fakeGame { hit = hit, units = rout() }
+        Botrun.run(g.api)
+        return recordOf(g)
+    end
+    local a, b, c = play(5), play(5), play(10)
+    check(a.team, nil, "the team pick: none without a campaign's prep screen")
+    local g = fakeGame { units = rout() }
+    g.api.info.team = { cap = 2, units = { { charId = 1, why = "forced" } } }
+    Botrun.run(g.api)
+    check(recordOf(g).team.units[1].why, "forced", "the team pick: the record carries it")
+    check(a.player_phases, 2, "player phases: one per player phase played")
+    check(c.player_phases, 1, "player phases: a one-phase win")
+    check(type(a.acts_hash), "string", "acts hash: recorded")
+    check(a.acts_hash, b.acts_hash, "acts hash: the same acts, the same hash")
+    check(a.acts_hash ~= c.acts_hash, true, "acts hash: fewer acts, another hash")
+    check(Botrun.actsHash(nil, { unit = 1, act = "wait", move = { x = 1, y = 2 } })
+          ~= Botrun.actsHash(nil, { unit = 1, act = "wait", move = { x = 2, y = 1 } }), true,
+          "acts hash: the tile counts")
+    local function strike(id)
+        return Botrun.actsHash(nil, { unit = 1, act = "attack", move = { x = 1, y = 2 },
+                                      target = 0x81, targetId = id })
+    end
+    check(strike(0x90) ~= strike(0x91), true, "acts hash: two enemies of one charId are two targets")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

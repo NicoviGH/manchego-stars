@@ -3287,8 +3287,11 @@ INSPECT.watchEnemyActs = function()
             -- the pillage below may have named its village before the act began
             cur.trapped, cur.act, cur.tile = true, BOARD.ACTIONS[kind], nil
         elseif decided == BOARD.AI_ACTION_PILLAGE and not cur.dest.chest then
-            -- AiPillageAction on a village: the tile event above it, no action type set
-            cur.act, cur.tile = "pillage", { x = cur.dest.x, y = cur.dest.y - 1 }
+            -- AiPillageAction on a village (cp_perform.c), no action type set. The act names
+            -- the village's own tile, the one a Visit stands on and sight.explorable lists: the
+            -- game runs the destruction event one row above it, and a tile named there matched
+            -- nothing in the run's explore log, so a razed village had no `closed_by`
+            cur.act, cur.tile = "pillage", { x = cur.dest.x, y = cur.dest.y }
         elseif kind ~= 0 then
             cur.act = BOARD.ACTIONS[kind] or string.format("0x%02X", kind)
             -- only AiStartCombatAction and AiStaffAction set +0D: any other act leaves the
@@ -4255,9 +4258,10 @@ INSPECT.campaignApi = function(game)
         return nil, "the promotion did not finish within its allowance"
     end
 
-    api.play = function(style, claims, attempt)
+    api.play = function(style, claims, attempt, pick)
         local b = INSPECT.botApi(game)
         b.style, b.claims = style, claims
+        b.info.team = pick   -- the prep screen's team pick, for the attempt's record
         -- what every vanilla village and House gives (goals.lua's priors)
         b.villageGifts, b.houseGifts = cfg.village_gifts, cfg.house_gifts
         b.info.campaign, b.info.attempt = id, attempt

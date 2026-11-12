@@ -60,18 +60,20 @@ offered therefore has `die` 0, and a player-phase death after one is `other/fore
 is the honest reading: the forecast said the counter could not kill.
 
 **Reasons for missed goals** (FR-006). A missed recruit was `died_after_joining` (it fell on our
-side), `killed_before_talk` (its charId fell on another side), `talk_skipped` (a plan's
+side), `killed_before_talk` (the game killed it on another side), `left_map` (it left the field and
+the game did not kill it: a script unloaded it or it escaped), `talk_skipped` (a plan's
 candidates offered the Talk: the plan record's `talks`) or `not_reached`. `died_after_joining` is
 not in the spec's list. The live proof needed it: vanilla Ch5 attempt 1's Joshua was talked over
 and fell on turn 9, so ADR 0376 counts him missing (not in the party at the end), and without it
 the record called him `talk_skipped`.
 
 A missed reward's reason is the explore log's status, renamed by one table (`M.REWARD_REASONS`):
-`skipped` (offered to a unit and never taken), `unreachable` (never offered), and two the spec
+`skipped` (offered to a unit and never taken), `never_offered` (no plan was offered it; whether a
+unit could have reached it is not known), and two the spec
 does not list, `closed` (another side closed it first: a pillage or a thief, offered before or
 not) and `failed` (tried, and the harness could not drive it: the run crashed there). A reward
 offered and then pillaged is `closed`, as its status says. `unknown` is the last reason. Only the planner records what it was offered (its plans' `explore` and
-`talks`), so a run without it (the greedy style) cannot tell skipped from unreachable, or a
+`talks`), so a run without it (the greedy style) cannot tell skipped from never offered, or a
 skipped Talk from one never reached, and says `unknown` rather than guess.
 
 **Stalls and anomalies** (FR-007). The old count of repeated boards is renamed `board_repeats`
@@ -116,3 +118,33 @@ agree on every count):
   (`died_after_joining`); attempt 2 loses nobody and skips the village at 5,6; attempt 3 loses
   0x04 on turn 2 at 29.4%. In the suite's four Ch5 seeds Joshua kills a unit of ours in every
   one, and seed 1001 misses him as `killed_before_talk`.
+
+## Amended 2026-11-11 (#510, run `fwd1`): four records said something that did not happen
+
+Run `fwd1` (findings: #510 comment 6810177817; plan item A: comment 6810567866) read four
+records that named the wrong thing. None changes how the bot plays.
+
+- **A lord felled by our own act is `lost`, why "game over in the player phase".** The game
+  runs its game-over event only after the death quote and the act, so `api.lost()` (the screen)
+  was still false when the act returned; the bot ended its phase into the title screen and the
+  record said `crashed`, "the enemy phase never returned control" (campaign `fwd1-cs-s4002`,
+  chapter index 9, attempt 10: charId 15 fell on its own attack on turn 15). The run now ends
+  on the kill itself: `api.killed()` named a unit of `Bot.gameOver`'s set.
+- **A red unit is killed only when the game says so.** A red one gone from the field with no
+  `api.killed()` entry was counted as felled; it is now read as a blue or green one always was
+  (unloaded by a script, or escaped). A recruit that left that way is missed as `left_map`, not
+  `killed_before_talk`.
+- **`unreachable` is now `never_offered`.** The record only ever knew that no plan was offered
+  the tile.
+- **A razed village names its raider.** The enemy-act watch named the row above the village
+  (where `AiPillageAction` runs the event), a tile the explore log does not hold, so
+  `closed_by` stayed empty. It names the village's tile now.
+
+Two things are added to an attempt's record:
+
+- `team`: the prep screen's pick (`cap`, `demands`, and per roster unit `charId`, `group`,
+  `forced`, `carried`, `answers`, `why` with `benched` for a unit left out, `covers`). Until
+  now only the worker's log held it.
+- `player_phases` and `acts_hash`: the player phases played (the game's turn counter stops at
+  999) and a hash of the player acts in order. Equal hashes on two attempts of one start mean
+  one game was played twice.
