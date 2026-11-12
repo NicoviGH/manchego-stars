@@ -9,28 +9,26 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): items A and B of the fwd1 plan are in PRs, reviewed and green; item C is next, and its first step changed.**
+**Next session starts here (2026-11-12): items A and B of the fwd1 plan are merged; item C is next, redesigned to record first.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** (Nicolas asked again on 2026-11-12) to check source,
 ADRs and research and to do offline reads. The plan is **#510 comment 6810567866** (six items A
 to F, six calls, all approved); its findings are comment 6810177817; item C's measurement and
 the Ch8 chest facts are **comment 6828202335**.
 
-**Open PRs (a stack; neither merged, both waiting on Nicolas's "merge").**
-- **PR #601, item A: the attempt's record says what happened** (`feat/510-fwd1-a-records`,
-  three commits, CI green on its head `c5b1495f`). No change of play. Reviewed and re-reviewed.
-- **PR #602, item B: the team pick covers the scarcest demand first** (ADR 0402,
-  `feat/510-fwd1-b-team-pick`, based on #601's branch, three commits). `suite --held-out`:
-  PROMOTED, 0 regressions, held-out 4 of 28 lost, none new. `/code-review 602 medium`: nine
-  findings closed, one scoped re-review, its one note closed. **Check CI on its head before
-  calling it ready.** When #601 merges, retarget #602 to `main` before deleting #601's branch.
-  The review's one open idea, "another kind before an enemy class whatever the counts", is
-  not built (same units on all 9 distinct kept picks); the pick's record now lists
-  `uncovered`, so the first real case shows.
+**Merged on 2026-11-12 (Nicolas: "Merge both"), no open PR of this work.**
+- **PR #601, item A:** the attempt's record says what happened (no change of play).
+- **PR #602, item B:** the team pick covers the scarcest demand first (ADR 0402).
+  `suite --held-out` PROMOTED, 0 regressions, held-out 4 of 28 lost, none new. The review's
+  one open idea, "another kind before an enemy class whatever the counts", is not built (same
+  units on all 9 distinct kept picks); the pick's record lists `uncovered`, so the first real
+  case shows. The frozen suite was not refrozen.
 
-**Still unanswered by Nicolas: the Talk demand (call 4's second half)** was built, refuted at
-vanilla Ch9's prep screen and removed (ADR 0402). Fable's recommendation: leave it dropped and
-let item D's instrumented run say whether any fielded unit can reach her before turn 12.
+**Nicolas's answers (2026-11-12).**
+- **Item C records first:** build the progress signal as a recording only (it ends nothing),
+  run one resumed vanilla Ch8 attempt set, then propose N to him from that table. N is his.
+- **The Talk demand stays dropped** (call 4's second half; ADR 0402). Item D's instrumented
+  run says whether any fielded unit can reach the Ch9 recruit before turn 12.
 
 **Item C's offline step is done, and it could not give N** (comment 6828202335).
 - Kept traces record acts and positions, not `sight.turnsTo`, the objective or a goal's best
@@ -55,10 +53,14 @@ Why a fielded thief is `never_offered` those chests is for item D or E: read the
 - Ch8 with the thief fielded: still no clean clear in 6 attempts; two end `stuck`.
 
 **Next steps, in order.**
-1. #602's CI, then both PRs wait for "merge".
-2. **Item C**: the progress signal in shadow first, then N's table, then the rule (amends
-   FR-015, so an ADR).
-3. **Call 1** (retries get different dice), then **item D** (one instrumented run on each of
+1. **Item C, redesigned.** Cut `feat/510-fwd1-c-<slug>` from `origin/main`. First PR: the
+   progress signal in shadow, one definition (a kill, a visit, a Talk, a chest, a door or wall
+   opened, or a new low in `sight.turnsTo` for the objective or a ledger goal's best taker),
+   recorded per player phase in the trace and the attempt's record. Then one
+   `resume --game vanilla --campaigns fwd1-cs-s4001,fwd1-cs-s4004 --chapter 9 --last 9` set
+   gives the longest quiet stretch per win and per `stuck`; put the table on #510 and ask
+   Nicolas for N. Only then the rule (amends FR-015, so an ADR; calls 2 and 3).
+2. **Call 1** (retries get different dice), then **item D** (one instrumented run on each of
    two starts; add the Ch8 door question), then E and F as the plan sizes them.
 
 **Not looked into.**
