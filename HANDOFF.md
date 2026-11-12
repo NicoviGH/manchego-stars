@@ -49,14 +49,21 @@ with what is confirmed and what is not: **#510 comment 6810177817**.
   the chapter's turn-12 event (the record wrongly says `killed_before_talk`); the lord never
   reaches her. The village at (11,15) is destroyed on turn 5.
 
-**Next step.** Ch8 is the wall most campaigns hit. The team pick leaves the
-thief out when a style's claims fill the cap first (a lead, in the findings comment: the chest
-demand is one among a dozen enemy-class demands). Then the chest goal that only the thief
-serves, and the seize that waits on it with no bound. Open from the findings: why no plan attacks the nearer mage on Ch7, why 4007's lord
-never marches to the seize tile on Ch7, why the army goes west in the three Ch8 attempts that
-got the west chests. Older scout walls still stand: `scout-ch13` loses 108 of 161, `scout-ch14`
-ends `stuck` on turn 19, Ch5x (4003) stalls on turn 33. For each wall: read the records and
-traces, name the cause, then build the smallest thing.
+**Next step: build the plan, #510 comment 6810567866** (written from eight offline reads by
+cheaper subagents; nothing in it is built). Read it whole first: it has five lessons, six
+build items in order (A to F), and six calls that are Nicolas's.
+- **Start with A** (the records say what happened; no change of play) and **B** (the team pick
+  covers the scarce demand first, and a Talk is a demand). B and C amend settled text, so they
+  wait on Nicolas's calls 3 and 4; A does not.
+- **C** ends a wait that gains nothing (one attempt ran 1,915 player phases). **D** is one
+  instrumented run on each of two starts, before any more rules. **E** and **F** are sized
+  after D; F tests the parked look on Ch7 before anything new is designed.
+- **Call 1 is the big one:** the game's dice are never re-seeded, so one style plays one game
+  and a chapter gets three real tries. The plan recommends advancing the dice per retry.
+- Corrections made to the findings (6810177817): 22 Ch8 attempts end `stuck`, not 23, and the
+  boss wait is admitted attacks outranked on progress, not "every plan over the cap".
+Older scout walls still stand: `scout-ch13` loses 108 of 161, `scout-ch14` ends `stuck` on
+turn 19, Ch5x (4003) stalls on turn 33.
 
 **Key files:** `tools/playtest/sight.lua` (`s.look`, `s.walkers`, `s.reveals`, `s.after`,
 `s.staged`), `tools/playtest/planner.lua` (the look block after "The look, in shadow";
@@ -67,6 +74,12 @@ traces, name the cause, then build the smallest thing.
 --attempts 2` (~3.5 min); `montecarlo.py look <trace dirs>` reads it.
 
 - **Lessons:**
+  - The team pick's reasons are only in `references/sim/<game>/<rom>/workers/*.log`
+    (`campaign: team`), not in the records or traces.
+  - A trace keeps 5 to 7 plans a decision and no per-act offers: "was it offered" needs an
+    instrumented run, not a read.
+  - A record's `wall_s` is the campaign's; an attempt's is `run_s`. Equal `frames` on two
+    attempts of one start means an exact replay.
   - **A probe's Lua table with both string keys and [1..n] is written as a JSON array**, the
     string keys lost: keep a probe's lists under a named key.
   - The beam's score gives a march no credit for ground gained: anything that picks "the
