@@ -2186,6 +2186,62 @@ do
     check(r.watch_faults[1] and r.watch_faults[1].why, "replaced", "and the fault is recorded")
 end
 
+-- test_a_slot_freed_without_a_kill_is_free_for_an_arrival (re-review of fwd1 A): a red unit
+-- leaves the field unkilled after a plan's snapshot, an arrival loads into its slot under the
+-- same generic charId and kills the unit that plan moved. The killer is no unit the plan saw.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) },
+                         turnsLeft = 2,
+                         enemy = function(g, find)
+                             if g.turn == 1 then
+                                 g.units[#g.units + 1] = unit(0x81, 4, "red", 1, 0, 10)
+                                 local u = find(0x01)
+                                 u.hp, u.dead, u.onField = 0, true, false
+                             end
+                             return {}
+                         end }
+    g.api.Planner = {
+        -- one plan a player phase: kept until every blue unit has acted
+        surprise = function()
+            for _, u in ipairs(g.units) do
+                if u.faction == "blue" and not u.acted and not u.dead then return nil end
+            end
+            return "the plan is played out"
+        end,
+        plan = function(_, board)
+            local acts = {}
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and not u.acted and not u.dead then
+                    acts[#acts + 1] = { unit = u.charId, unitId = u.id, act = "wait",
+                                        move = { x = u.x, y = u.y } }
+                end
+            end
+            if not acts[1] then return nil end
+            return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
+                              enemies = { [0x81] = true } }
+        end,
+    }
+    local act = g.api.act
+    g.api.act = function(a)
+        if a.unitId == 0x02 then   -- while our second unit acts, a script takes the red away
+            for i, u in ipairs(g.units) do
+                if u.id == 0x81 then table.remove(g.units, i); break end
+            end
+        end
+        return act(a)
+    end
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81, killerId = 0x81,
+                   phase = "enemy" } }
+    end
+    Botrun.run(g.api)
+    local d = recordOf(g).deaths[1]
+    check(d and d.flags.reinforcement, true, "a freed slot: its arrival is no unit the plan saw")
+end
+
 -- test_a_protected_green_unit_felled_ends_the_run_lost (fwd1 A): the game's set of units it
 -- ends on (Bot.gameOver) holds units of any side, and an enemy-phase kill of one is a loss even if
 -- the phase came back to the player before the game-over screen.
