@@ -9,49 +9,57 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11, late): items A and B of the fwd1 plan are built and in PRs; C is next.**
+**Next session starts here (2026-11-12): items A and B of the fwd1 plan are in PRs, reviewed and green; item C is next, and its first step changed.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
-the direction; use cheaper subagents to check source, ADRs and research before claiming or
-building. The plan is **#510 comment 6810567866** (six items A to F, six calls, all approved);
-its findings are comment 6810177817.
+the direction; **use cheaper subagents** (Nicolas asked again on 2026-11-12) to check source,
+ADRs and research and to do offline reads. The plan is **#510 comment 6810567866** (six items A
+to F, six calls, all approved); its findings are comment 6810177817; item C's measurement and
+the Ch8 chest facts are **comment 6828202335**.
 
 **Open PRs (a stack; neither merged, both waiting on Nicolas's "merge").**
 - **PR #601, item A: the attempt's record says what happened** (`feat/510-fwd1-a-records`,
-  three commits, CI green on the first two; check the third, `c5b1495f`). No change of play:
-  the suite's 28 runs have the same frames as main's. Reviewed (`/code-review medium`, six
-  findings) and re-reviewed by an independent reviewer; every finding closed. ADR 0388 amended.
-  What it changes: a lord felled by our own act is `lost` (the plan was wrong that the check
-  was missing: the game-over screen starts only after the death quote, so the check came too
-  early); a red unit is killed only when the game says so, and a recruit a script removed is
-  `left_map`; `unreachable` is `never_offered`; a razed village has its `closed_by`; the record
-  carries `team` (the prep screen's pick), `player_phases` and `acts_hash`.
+  three commits, CI green on its head `c5b1495f`). No change of play. Reviewed and re-reviewed.
 - **PR #602, item B: the team pick covers the scarcest demand first** (ADR 0402,
-  `feat/510-fwd1-b-team-pick`, based on #601's branch). Witness: the thief is fielded in 6 of 6
-  replayed Ch8 attempts (campaigns 4001 and 4004, tag `b2`). **Still owed on #602:
-  `montecarlo.py suite --held-out` with its promotion line, and `/code-review 602 medium`.**
-  When #601 merges, retarget #602 to `main` before deleting #601's branch.
+  `feat/510-fwd1-b-team-pick`, based on #601's branch, three commits). `suite --held-out`:
+  PROMOTED, 0 regressions, held-out 4 of 28 lost, none new. `/code-review 602 medium`: nine
+  findings closed, one scoped re-review, its one note closed. **Check CI on its head before
+  calling it ready.** When #601 merges, retarget #602 to `main` before deleting #601's branch.
+  The review's one open idea, "another kind before an enemy class whatever the counts", is
+  not built (same units on all 9 distinct kept picks); the pick's record now lists
+  `uncovered`, so the first real case shows.
 
-**Evidence turned against one approved part: the Talk demand (call 4's second half).** Built,
-refuted at vanilla Ch9's prep screen by one probe, and removed (ADR 0402 has it): the recruit
-(charId 18) is not on the board at the prep screen, and the lord, who is forced, is one of her
-two talkers, so a Talk demand cannot field the second (charId 4). **Nicolas has not answered
-this yet.** Fable's recommendation: leave it dropped and let item D's instrumented run say
-whether any fielded unit can reach her before turn 12 (calls 5 and 6).
+**Still unanswered by Nicolas: the Talk demand (call 4's second half)** was built, refuted at
+vanilla Ch9's prep screen and removed (ADR 0402). Fable's recommendation: leave it dropped and
+let item D's instrumented run say whether any fielded unit can reach her before turn 12.
+
+**Item C's offline step is done, and it could not give N** (comment 6828202335).
+- Kept traces record acts and positions, not `sight.turnsTo`, the objective or a goal's best
+  taker: only the events half of the progress definition is measurable offline.
+- On events alone the longest quiet stretch in a kept win is 31 player phases (vanilla Ch8;
+  a third of its 66 wins run 18 or more) and 74 (Manchego Stars chapter index 4, one game
+  replayed 12 times). Everywhere else it is 15 or less.
+- The long Ch8 wins look like the party waiting by the throne: the wait C exists to end, not
+  a reason to raise N (a subagent's reading of positions, not verified).
+- **So C starts by building the progress signal in shadow** (recorded per player phase, ending
+  nothing), then one resumed Ch8 run gives the table N is proposed from. N is still Nicolas's.
+
+**Vanilla Ch8's chests at (1,3) and (2,3) are behind the door at (1,5)** (decomp, read by a
+subagent; lines in the comment). The door opens to the thief's Lockpick or to the Door Key the
+armor knight at (20,10) drops; no Chest Key is on the map, so the chests need the thief. The
+team pick only counts units that open a chest now, never an enemy that drops a key
+(`s.keySources` is used in play only): right on Ch8, a gap on a map with a Chest Key drop.
+Why a fielded thief is `never_offered` those chests is for item D or E: read the door first.
 
 **What the new records already show.**
-- Campaign 4006's Ch9 start: its 8 attempts are 4 games (`acts_hash`: attempts 2, 5, 8 are
-  one; 3 and 4; 6 and 7). Call 1 (advance the dice per retry) is not built.
-- Ch8 with the thief fielded: still no clean clear in 6 attempts. The chests at (1,3) and
-  (2,3) are `never_offered`, and two attempts end `stuck` (one after 406 player phases). That
-  is items C and E.
+- Campaign 4006's Ch9 start: its 8 attempts are 4 games (`acts_hash`). Call 1 is not built.
+- Ch8 with the thief fielded: still no clean clear in 6 attempts; two end `stuck`.
 
 **Next steps, in order.**
-1. Finish #602: the held-out suite, then `/code-review 602 medium`, fix every finding.
-2. **Item C** (a wait that gains nothing ends; calls 2 and 3; amends FR-015, so an ADR).
-   First compute, offline over the kept winning traces, the longest run with no progress, and
-   propose N with that table.
+1. #602's CI, then both PRs wait for "merge".
+2. **Item C**: the progress signal in shadow first, then N's table, then the rule (amends
+   FR-015, so an ADR).
 3. **Call 1** (retries get different dice), then **item D** (one instrumented run on each of
-   two starts), then E and F as the plan sizes them.
+   two starts; add the Ch8 door question), then E and F as the plan sizes them.
 
 **Not looked into.**
 - The replay of campaign 4006's Ch9 start on #601 plays the same acts as run `fwd1`'s (four
@@ -107,6 +115,9 @@ turn 19, Ch5x (4003) stalls on turn 33.
     on the campaign's api never reaches botrun. Check a new switch's mark in the run's record.
   - A stopped `montecarlo.py` leaves its `run.sh` and `mgba-headless` workers running: kill
     those too, and check with `pgrep -fl mgba`.
+  - Stopping a run with `pkill` is refused by the permission check in auto mode: before a
+    long run, be sure the commit is the one to measure (review first, then the suite).
+  - A commit's pre-commit takes over two minutes: run `git commit` in the background.
   - A playtest run reads the working tree's Lua: never edit Lua or switch branches while one
     runs. HANDOFF goes to main by plumbing (the branch's pre-commit refuses it).
 - **From PR B (#599, merged), still open:** vanilla `scout-ch14` ends `stuck` on turn 19 in all
