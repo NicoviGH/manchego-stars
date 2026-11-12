@@ -9,7 +9,7 @@
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
 Each is an independent attempt: every attempt loads the same start state, and the styles are
 drawn without reading a result, so attempt k alone plays the k-th style with no memory, and
-with the dice the campaign's attempt k has: the game's RNG advanced k - 1 draws from the start
+with the dice the campaign's attempt k has: the game's RNG advanced k - 1 strides of draws from the start
 (ADR 0404; attempt 1 none). The campaign's own loop is not that: its retries remember what
 earlier attempts showed (ADRs 0386, 0399), so its attempt k can differ, and it goes past the
 style count.

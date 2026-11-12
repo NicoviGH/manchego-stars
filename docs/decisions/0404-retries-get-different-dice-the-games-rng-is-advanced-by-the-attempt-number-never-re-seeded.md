@@ -18,7 +18,7 @@ Ch6 retries had been exact repeats before that. A player who loses a map and tri
 not handed the same dice: a different move changes which rolls land where.
 
 **The decision.** Attempt k of a chapter start plays with the game's own generator advanced
-`(k - 1) * DICE_STRIDE` draws from the saved start (`DICE_STRIDE` = 1, campaign.lua), taken
+`(k - 1) * DICE_STRIDE` draws from the saved start (`DICE_STRIDE` = 1009, campaign.lua), taken
 just before the play (`api.advanceDice`, harness.lua; `Sight.advance`, sight.lua, which is
 `NextRN` of rng.c run on the three u16 words at `gRNSeeds` and written back).
 
@@ -30,9 +30,15 @@ just before the play (`api.advanceDice`, harness.lua; `Sight.advance`, sight.lua
 - **A run stays reproducible.** The same start and the same attempt number are the same dice.
   The advance is keyed on the attempt number, so it is the same in the campaign's k-th try, in
   one attempt alone (`api.only = k`, the pool) and in a diagnostic replay of it.
-- **A stride of 1.** `NextRN` is a 48-bit generator whose whole stream follows from its three
-  words, so one draw more puts every later roll on a different value of the stream; a bigger
-  stride would only skip further along the same stream.
+- **A stride of 1009, because one draw is absorbed.** The game draws a die for each tied
+  direction of a unit's path (`GenerateBestMovementScript`, bmidoten.c:218-226) and for AI
+  moves: 40 to 150 draws a turn on vanilla Ch8. Run `call1b` (campaign 4001, attempt 2): one
+  draw ahead at the start, turn 1 drew 59 where the unshifted game drew 60, and from turn 2 on
+  both games were on the same dice and played the same game (`acts_hash` and frames equal). The
+  stride is more draws than a whole attempt's turns of movement could give back.
+- **The dice are in the record.** `dice_start` is the three words after the advance, and each
+  player phase's `progress` line in the trace has `rn`, the words that phase started on: two
+  attempts on the same dice show as equal words, with no run.
 - **The record proves it.** The attempt's record has `dice_advanced` (0 on attempt 1). A
   campaign builds a fresh bot per attempt, so a switch set on the campaign's api never reaches
   botrun; the count travels through `api.play`'s arguments into `info`.

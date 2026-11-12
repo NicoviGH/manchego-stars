@@ -592,10 +592,11 @@ test_styles_are_drawn_again_up_to_the_cap()
 -- draws before attempt k's play, and hands the count to play for the record. Attempt 1 advances
 -- none: every measured cell plays as it always did.
 local function test_attempt_k_advances_the_dice_by_k_minus_1_strides()
-    check(Campaign.DICE_STRIDE, 1, "the stride is one draw")
+    check(Campaign.DICE_STRIDE > 150, true, "the stride is more than a turn draws (one draw is absorbed)")
     local g = fakeGame({ chapters = { { id = 3, outcomes = { "lost", "lost", "lost", "won" } } } })
     Campaign.run(g.api)
-    check(table.concat(g.dice, ","), "0,1,2,3", "the advance is 0 for attempt 1 and (k - 1) strides after")
+    local st = Campaign.DICE_STRIDE
+    check(table.concat(g.dice, ","), table.concat({ 0, st, 2 * st, 3 * st }, ","), "the advance is 0 for attempt 1 and (k - 1) strides after")
     for k, p in ipairs(g.plays) do
         check(p.dice, (k - 1) * Campaign.DICE_STRIDE, "attempt " .. k .. "'s play is told its dice")
     end
@@ -613,8 +614,8 @@ local function test_one_attempt_alone_advances_as_attempt_k()
     local alone = fakeGame({ chapters = { { id = 3 } } })
     alone.api.only = 3
     Campaign.run(alone.api)
-    check(table.concat(alone.dice, ","), "2", "attempt 3 alone advances two strides")
-    check(alone.plays[1].dice, 2, "and its play is told")
+    check(table.concat(alone.dice, ","), tostring(2 * Campaign.DICE_STRIDE), "attempt 3 alone advances two strides")
+    check(alone.plays[1].dice, 2 * Campaign.DICE_STRIDE, "and its play is told")
     local first = fakeGame({ chapters = { { id = 3 } } })
     first.api.only = 1
     Campaign.run(first.api)
@@ -622,7 +623,7 @@ local function test_one_attempt_alone_advances_as_attempt_k()
     local replay = fakeGame({ chapters = { { id = 3 } } })
     replay.api.only, replay.api.diag = 2, { ref = 1, mode = "deep" }
     Campaign.run(replay.api)
-    check(table.concat(replay.dice, ","), "1", "a diagnostic replay of attempt 2 asks for attempt 2's dice")
+    check(table.concat(replay.dice, ","), tostring(Campaign.DICE_STRIDE), "a diagnostic replay of attempt 2 asks for attempt 2's dice")
 end
 test_one_attempt_alone_advances_as_attempt_k()
 

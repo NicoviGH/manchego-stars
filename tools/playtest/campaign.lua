@@ -109,12 +109,15 @@ M.PREFIX = "CAMPAIGN "
 -- dice, ADR 0404)
 M.MAX_ATTEMPTS = 12
 
--- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE. One is
--- enough: NextRN (rng.c) is a 48-bit generator whose whole stream is a function of its three
--- words, so one draw more puts every later roll of the attempt on the next value of the stream,
--- and the rolls an attempt makes are not the ones the last made at the same events. A bigger
--- stride would only skip further along the same stream.
-M.DICE_STRIDE = 1
+-- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE. One
+-- draw is NOT enough: the game draws a die for each tied direction of a unit's path
+-- (GenerateBestMovementScript, bmidoten.c:218-226) and for AI moves, 40 to 150 draws a turn on
+-- vanilla Ch8, and a different draw there can use one draw fewer. Measured (run call1b,
+-- campaign 4001 attempt 2): one draw ahead at the start, turn 1 drew 59 where the unshifted
+-- game drew 60, and from turn 2 on both were on the same dice and played the same game. The
+-- stride is more draws than a whole attempt's quiet turns could give back (about 16 turns of
+-- 60), and a prime so no two attempts' offsets share a period with a turn's draws.
+M.DICE_STRIDE = 1009
 
 -- the draws attempt `attempt` advances the game's RNG (0 for attempt 1: a measured cell, ADR 0385)
 function M.diceFor(attempt) return (attempt - 1) * M.DICE_STRIDE end
