@@ -78,12 +78,12 @@ local function fakeGame(o)
         buy = function(p) g.bought[#g.bought + 1] = p; return true end,
         promote = function(u) g.promoted[#g.promoted + 1] = u.charId; return true end,
         claims = function() return o.claims or {} end,
-        play = function(style, claims, attempt)
+        play = function(style, claims, attempt, pick)
             local ch = o.chapters[g.at]
             g.attempt = g.attempt + 1
             local out = (ch.outcomes or {})[g.attempt] or "won"
             g.plays[#g.plays + 1] = { chapter = ch.id, style = style, claims = claims,
-                                      attempt = attempt }
+                                      attempt = attempt, pick = pick }
             local deaths = {}
             if out == "dead" or out == "lost" then
                 deaths = { { id = 2, charId = 0x02, faction = "blue", turn = 3, killer = 0x40,
@@ -333,6 +333,18 @@ local function test_between_deploys_shops_promotes()
     local ls = lines(g)
     check(ls[1].team.reasons[2].why, "covers", "the record says why each unit was fielded")
     check(ls[1].demands[1].id, "sustain", "and what the map asked")
+    -- the whole pick goes to the attempt's record (fwd1 A): the benched too, and what each
+    -- unit answers, which only the worker's log said
+    local pick = g.plays[1].pick
+    check(pick and pick.cap, 2, "the pick: the cap")
+    check(pick and pick.demands[1].id, "sustain", "the pick: what the map asked")
+    local by = {}
+    for _, u in ipairs(pick and pick.units or {}) do by[u.charId] = u end
+    check(by[3] and by[3].why, "covers", "the pick: why a unit was fielded")
+    check(by[3] and table.concat(by[3].answers, ","), "sustain", "the pick: what it answers")
+    check(by[3] and table.concat(by[3].covers, ","), "sustain", "the pick: what it covered")
+    check(by[2] and by[2].why, "benched", "the pick: a unit left out is in it")
+    check(by[2] and #by[2].answers, 0, "the pick: and answers nothing")
 end
 test_between_deploys_shops_promotes()
 

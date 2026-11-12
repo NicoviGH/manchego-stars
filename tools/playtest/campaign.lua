@@ -78,7 +78,9 @@
 --   buy(purchase)         one Bot.shop entry, through the shop screen; true | nil, why
 --   promote(entry)        spend the seal the game accepts for this roster entry; true | nil, why
 --   claims(chapter)       that chapter's resolved claims (bot.lua's Claims)
---   play(style, claims, attempt) -> botrun's record (it emits its own BOTRUN line)
+--   play(style, claims, attempt, pick) -> botrun's record (it emits its own BOTRUN line);
+--                         `pick` is the team pick as the record keeps it (between()'s
+--                         team.pick, nil without a prep screen): the record's `team`
 --   only                  OPTIONAL: the one attempt to play (see above)
 --   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
 --                         state is saved, unplayed (montecarlo.py `starts`: a cell loads only it)
@@ -143,8 +145,10 @@ end
 
 -- Between the chapter's start and its first move: the team, the shops, the seals. `need` is
 -- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team. Returns
--- the team ({ deploy, reasons }; deploy = the units fielded) or nil, why when the harness could
--- not do a step.
+-- the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
+-- the attempt's record, { cap, demands, units = { { charId, group, forced, carried, answers =
+-- the demand ids it answers, why ("benched" for one left out), covers } } }, so a pick can be
+-- read without the worker's log) or nil, why when the harness could not do a step.
 local function between(api, style, followed, need, carried)
     local Bot = api.Bot
     local roster = api.roster()
@@ -159,11 +163,19 @@ local function between(api, style, followed, need, carried)
                           answers = need.answers, strength = need.strength, carried = carried,
                           style = Bot.applyClaims(followed, { deploy = {} }) })
         local said = {}
+        team.pick = { cap = cap, demands = need.demands, units = {} }
         for _, u in ipairs(roster) do
             local r = team.reasons[u.charId]
-            said[#said + 1] = string.format("0x%02X %s%s%s=%s", u.charId, tostring(u.group),
-                u.forced and " forced" or "", carried[u.charId] and " carried" or "",
-                r and r.why or "benched")
+            local answers = {}
+            for _, d in ipairs(need.demands) do
+                if (need.answers[u.charId] or {})[d.id] then answers[#answers + 1] = d.id end
+            end
+            local p = { charId = u.charId, group = u.group, forced = u.forced or nil,
+                        carried = carried[u.charId] or nil, answers = answers,
+                        why = r and r.why or "benched", covers = r and r.demands }
+            team.pick.units[#team.pick.units + 1] = p
+            said[#said + 1] = string.format("0x%02X %s%s%s=%s", p.charId, tostring(p.group),
+                p.forced and " forced" or "", p.carried and " carried" or "", p.why)
         end
         api.log("campaign: team (cap " .. cap .. "): " .. table.concat(said, ", "))
         local ok, why = api.deploy(team.deploy)
@@ -326,7 +338,7 @@ function M.run(api)
                     end
                     style.memory = { enemies = copy }
                 end
-                local rec = api.play(style, followed, entry.attempts)
+                local rec = api.play(style, followed, entry.attempts, team.pick)
                 if api.diag then
                     return "played", string.format("chapter %d attempt %d: diagnostic replayed", ch,
                         entry.attempts)

@@ -104,6 +104,10 @@ DEAD_CONCEPTS = [
     # (styles drawn again), never once every style has been tried
     r'\bremembers only the (?:reinforcement )?arrival', r'\bremembers one thing\b',
     r'\bno tile, unit or outcome\b', r'\bno clean clear in all \d+ styles\b',
+    # retired by ADR 0388's 2026-11-11 amendment (#510, run fwd1): a missed reward no plan was
+    # offered is `never_offered`; the record never knew whether a unit could reach it
+    r'\bskipped from unreachable\b', r'`unreachable` \(never offered\)',
+    r'\bunreached = "unreachable"',
     # retired by ADR 0397 (#510): a key an enemy drops is a way to a chest or through a door,
     # so a door is no longer a breach only for a unit already holding a key
     r'\bwhich no rule here spends\b',

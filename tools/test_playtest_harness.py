@@ -506,6 +506,27 @@ class TestAiActionIds(unittest.TestCase):
             self.assertEqual(value, decomp.get(name), name)
 
 
+class TestPillageNamesTheVillage(unittest.TestCase):
+    def test_a_pillage_act_names_the_tile_the_explore_log_keys(self):
+        # botrun's explore log keys a village on the tile sight.explorable lists, the one a Visit
+        # stands on; AiPillageAction's gAiDecision is that same tile and its event runs one row
+        # above (cp_perform.c). The enemy-act watch named the row above, so `closedBy` matched
+        # nothing and a razed village carried no `closed_by` (fwd1, vanilla Ch9's (11,15)).
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import vanilla_decomp_text
+        decomp = vanilla_decomp_text('src/cp_perform.c')
+        body = decomp[decomp.index('AiPillageAction('):]
+        body = body[:body.index('\n}')]
+        self.assertIn('int y = gAiDecision.yMove;', body, 'the decision is the village tile')
+        self.assertRegex(body, r'y2 = y - 1;\s*StartAvailableTileEvent\(\(s8\)x, y2\)',
+                         'and the event runs one row above it')
+        with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        m = re.search(r'cur\.act, cur\.tile = "pillage", (\{[^}]*\})', text)
+        self.assertIsNotNone(m, 'the enemy-act watch names a pillaged tile')
+        self.assertEqual(m.group(1), '{ x = cur.dest.x, y = cur.dest.y }')
+
+
 class TestFullBagItems(unittest.TestCase):
     def test_bag_item_ids_are_the_decomps(self):
         # INSPECT.BAG names each key and passive item it lists (Bot.fullBag's kinds); a wrong id
