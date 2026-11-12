@@ -36,7 +36,8 @@
 --      More are judged beside them: on a Defeat Boss map the assault (every unit that
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
 --      never tries), the advance (each unit's act that gains the most ground toward its goal,
---      which the beam's judged score can cut while the rank puts it first), and on a stalled
+--      which the beam's judged score can cut while the rank puts it first), the Seize when
+--      the game offers it (the rest holding: the beam must not hide the win from the rank), and on a stalled
 --      board (opts.stalled) each unit's best act that
 --      changes the board, of which the best is played: a careful player that has stopped
 --      making progress takes the least it must.
@@ -69,7 +70,7 @@
 -- the fog read's chance to kill a blue one, on the played plan only (Bot.fogRead); and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
--- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"unstall"|"mend"|"rest",
+-- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"seize"|"unstall"|"mend"|"rest",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -93,12 +94,16 @@
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
--- to the average, opts = { stalled = bool, sent, explored (both Bot.candidates') } | nil,
+-- to the average, opts = { stalled = bool, sent, explored (both Bot.candidates'), quietGoals = the ledger ids
+-- no unit has neared for M.GOAL_QUIET readings (botrun's rule 1, ADR 0403) } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
 -- or chest each unit was sent to: { id, x, y }, goalWorth = what it does to each open goal
 -- (goals.lua): { id, kind, gold, worth, before, after (its chance after the judged phase),
 -- closes },
+-- nearest = the progress record's near half (botrun's rec.progress), sorted by id: { id, turns }
+-- for "objective" (its nearest unit's turns) and each feasible or stalled visit, chest or
+-- recruit row of the ledger (its best taker's turns), in ctx.turnsTo turns,
 -- winFell = the judged phase's chance our counter ends the chapter, talks = the charIds any
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
@@ -570,6 +575,39 @@ function M.plan(Bot, board, sight, style, opts)
     -- the completion ledger (FR-014): what is still to get at this decision, for the rank's
     -- forfeits and botrun's seize skips
     local ledger = Goals.ledger(goals, sight, style, ctx, before)
+    -- the progress signal's near half (#510 fwd1 item C; botrun's rules read it): how near the objective's
+    -- nearest unit is, and each still-feasible or stalled ledger goal's best taker, in turns (a
+    -- stalled row stays read: a new low there makes it feasible again, ADR 0403). Goals.chance
+    -- asked turnsTo for these very (unit, tile, from) above (a unit's own tile is the start
+    -- position, so the memo key matches turnsTo(u, tile)): no new path search.
+    local nearest = {}
+    do
+        local function least(g)
+            local n
+            for _, u in ipairs(g.takerUnits) do
+                local t = turnsTo(u, g.tile)
+                if t and (not n or t < n) then n = t end
+            end
+            return n
+        end
+        local goalById, obj = {}, nil
+        for _, g in ipairs(goals) do
+            goalById[g.id] = g
+            if g.kind == "objective" then
+                local t = least(g)
+                if t and (not obj or t < obj) then obj = t end
+            end
+        end
+        if obj then nearest[#nearest + 1] = { id = "objective", turns = obj } end
+        for _, r in ipairs(ledger) do
+            local g = (r.status == "feasible" or r.status == "stalled") and goalById[r.id]
+            if g and g.tile and (r.kind == "visit" or r.kind == "chest" or r.kind == "recruit") then
+                local t = least(g)
+                if t then nearest[#nearest + 1] = { id = r.id, turns = t } end
+            end
+        end
+        table.sort(nearest, function(x, y) return x.id < y.id end)
+    end
     -- each unit's assigned goal as the decision starts (FR-016): the recruit, village or chest
     -- it was sent to, else its way to the objective, and its turns there now. Progress is what a
     -- plan cuts from those turns, the game's own (sight.turnsTo, through a breach when cut off)
@@ -1473,6 +1511,28 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
     end
+    -- the Seize, whenever the game offers it, the rest holding (#510 fwd1 item C, ADR 0403): the
+    -- beam keeps what scores well act by act and can cut the one plan the rank puts first once
+    -- the goals' rows are stalled (vanilla Ch8, run fwd1c2, campaign 4004 attempt 10: the Seize
+    -- offered for 11 player phases, the four beam plans judged all waits over the cap, and the
+    -- win taken only when the lord was the last unit left to act; another attempt never took
+    -- it). Whether to take it is the rank's call (forfeits first); the beam only decides what
+    -- the rank gets to see. So when every other judged plan is over the cap and the Seize plan
+    -- is admitted, the Seize is played even though it forfeits a feasible goal: a win under the
+    -- cap beats a plan that risks a death (M.outranks: admitted first)
+    for _, c in ipairs(cands) do
+        for _, x in ipairs(c.acts) do
+            local n = x.act == "seize" and extend(start, x, c.unit.id)
+            if n then
+                local st = complete(n)
+                local k = table.concat(keysOf(st), " ")
+                if not have[k] then
+                    have[k] = true
+                    finals[#finals + 1] = { st = st, kind = "seize" }
+                end
+            end
+        end
+    end
     if stalled then
         for _, c in ipairs(cands) do
             local pick
@@ -1773,6 +1833,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- the ledger as this plan leaves it: what it forfeits is closed
     local shut = {}
     for _, id in ipairs(best.forfeited) do shut[id] = true end
+    best.nearest = nearest   -- the near half of botrun's progress record
     best.ledger = {}
     for _, r in ipairs(ledger) do
         best.ledger[#best.ledger + 1] = { id = r.id, kind = r.kind, closes_on = r.closes_on,

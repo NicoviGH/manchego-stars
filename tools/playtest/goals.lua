@@ -51,7 +51,11 @@
 -- row = { id, kind (visit, chest, recruit, reward), status, closes_on, needs (a reward's: the
 -- ids of the goals it needs) }. status: `feasible`; `unknown` for a village or chest when the
 -- sight has no read of who may use it or when it closes (sight.canExplore, sight.closings);
--- a reward is unknown when a goal it needs is. A goal no unit can reach this turn (a unit in
+-- `stalled` for a goal whose id is in ctx.quietGoals (no unit has neared it over GOAL_QUIET waiting player
+-- phases, botrun's reading; #510 call 3, amending FR-015): a stalled ROW no longer holds the
+-- win, since forfeited counts feasible rows only, but the goal stays a goal units may walk to,
+-- and one new low makes its row feasible again. A reward is unknown when a goal it needs is,
+-- else stalled when one is. (`stalled` also names a repeated board, ctx.stalled: not this.) A goal no unit can reach this turn (a unit in
 -- the way) stays feasible: only a closure loses it. One with no chance at all is no goal of
 -- the bot's: the game lets no player unit use it (a chest with no key in the army and none on
 -- an enemy that drops it), none has a way
@@ -203,21 +207,25 @@ function M.ledger(goals, sight, style, ctx, chances)
     for _, g in ipairs(goals) do
         if g.kind ~= "objective" and (chances[g.id] or 0) > M.DUST then
             local known = g.kind == "recruit" or reads
-            local row = { id = g.id, kind = g.kind, status = known and "feasible" or "unknown",
-                          closes_on = g.closes }
+            local status = known and "feasible" or "unknown"
+            if known and (ctx.quietGoals or {})[g.id] then status = "stalled" end
+            local row = { id = g.id, kind = g.kind, status = status, closes_on = g.closes }
             rows[#rows + 1], byId[g.id] = row, row
         end
     end
     for i, r in ipairs(style.rewards or {}) do
         if not voided(r, ctx.lost) then
             local ids, status, lost = {}, "feasible", false
+            local quiet = false
             for _, g in ipairs(goals) do
                 if g.kind ~= "objective" and needs(r, g) then
                     ids[#ids + 1] = g.id
                     lost = lost or not byId[g.id]
                     if byId[g.id] and byId[g.id].status == "unknown" then status = "unknown" end
+                    if byId[g.id] and byId[g.id].status == "stalled" then quiet = true end
                 end
             end
+            if quiet and status == "feasible" then status = "stalled" end
             -- none of what it needs left open: taken already, so the game gives it, nothing to get
             if #ids > 0 and not lost then
                 rows[#rows + 1] = { id = "reward:" .. i, kind = "reward", status = status,

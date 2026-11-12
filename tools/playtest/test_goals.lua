@@ -273,6 +273,24 @@ do
     check(row(l2, "recruit:144").status, "feasible", "ledger: a recruit needs no tile read")
     check(ids(Goals.forfeited(l2, g2, { win = 1 })), "recruit:144",
           "forfeits: an unknown goal is neither kept nor lost")
+
+    -- ctx.quietGoals (#510 call 3, ADR 0403): a goal no unit has neared for a while is a stalled
+    -- ROW. The win no longer forfeits it; a reward needing it is stalled too; unknown wins
+    local quiet = { recruitTalkers = ctx.recruitTalkers, objectiveTile = ctx.objectiveTile,
+                    quietGoals = { ["visit:4,0"] = true, ["visit:14,9"] = true } }
+    local l3 = Goals.ledger(goals, sight, style, quiet, chancesOf(goals, sight))
+    check(row(l3, "visit:4,0").status, "stalled", "ledger: a quiet goal's row is stalled")
+    check(row(l3, "visit:14,9").status, "stalled", "ledger: each quiet goal's row")
+    check(row(l3, "recruit:144").status, "feasible", "ledger: a goal not quiet stays feasible")
+    check(row(l3, "reward:1").status, "stalled", "ledger: a reward needing a stalled goal is stalled")
+    check(ids(Goals.forfeited(l3, goals, { win = 1 })), "recruit:144",
+          "forfeits: the win no longer closes a stalled row (nor the reward needing it)")
+    check(ids(Goals.forfeited(l3, goals, { win = 0 })), "",
+          "forfeits: a stalled row is not counted even when a looter closes the tile")
+    local qb = { recruitTalkers = ctx.recruitTalkers, objectiveTile = ctx.objectiveTile,
+                 quietGoals = { ["visit:4,0"] = true } }
+    local l4 = Goals.ledger(g2, blind, style, qb, chancesOf(g2, blind))
+    check(row(l4, "visit:4,0").status, "unknown", "ledger: an unknown row stays unknown")
 end
 
 -- TestKeyOnAnEnemyMakesTheChestAGoal: no player unit holds a Chest Key, but an enemy whose

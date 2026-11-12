@@ -108,6 +108,9 @@ DEAD_CONCEPTS = [
     # offered is `never_offered`; the record never knew whether a unit could reach it
     r'\bskipped from unreachable\b', r'`unreachable` \(never offered\)',
     r'\bunreached = "unreachable"',
+    # retired by ADR 0403 (#510 fwd1 item C): a board that cannot change any more is no longer
+    # the only "no progress" rule; sixteen player phases without progress end an attempt too
+    r'\bis the only "no progress" rule\b',
     # retired by ADR 0397 (#510): a key an enemy drops is a way to a chest or through a door,
     # so a door is no longer a breach only for a unit already holding a key
     r'\bwhich no rule here spends\b',

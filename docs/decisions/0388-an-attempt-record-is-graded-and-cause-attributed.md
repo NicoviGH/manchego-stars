@@ -62,16 +62,20 @@ is the honest reading: the forecast said the counter could not kill.
 **Reasons for missed goals** (FR-006). A missed recruit was `died_after_joining` (it fell on our
 side), `killed_before_talk` (the game killed it on another side), `left_map` (it left the field and
 the game did not kill it: a script unloaded it or it escaped), `talk_skipped` (a plan's
-candidates offered the Talk: the plan record's `talks`) or `not_reached`. `died_after_joining` is
+candidates offered the Talk: the plan record's `talks`) or `not_reached`. A won run's recruit
+whose row was stalled in the last plan's ledger is `stalled` (ADR 0403), after `left_map` and
+before `talk_skipped`. `died_after_joining` is
 not in the spec's list. The live proof needed it: vanilla Ch5 attempt 1's Joshua was talked over
 and fell on turn 9, so ADR 0376 counts him missing (not in the party at the end), and without it
 the record called him `talk_skipped`.
 
 A missed reward's reason is the explore log's status, renamed by one table (`M.REWARD_REASONS`):
 `skipped` (offered to a unit and never taken), `never_offered` (no plan was offered it; whether a
-unit could have reached it is not known), and two the spec
+unit could have reached it is not known), and three the spec
 does not list, `closed` (another side closed it first: a pillage or a thief, offered before or
-not) and `failed` (tried, and the harness could not drive it: the run crashed there). A reward
+not), `failed` (tried, and the harness could not drive it: the run crashed there) and, on a won
+run, `stalled` (its goal's row was stalled in the last plan, ADR 0403: the win did not wait for
+it; it overrides the log's word). A reward
 offered and then pillaged is `closed`, as its status says. `unknown` is the last reason. Only the planner records what it was offered (its plans' `explore` and
 `talks`), so a run without it (the greedy style) cannot tell skipped from never offered, or a
 skipped Talk from one never reached, and says `unknown` rather than guess.
@@ -148,3 +152,9 @@ Two things are added to an attempt's record:
 - `player_phases` and `acts_hash`: the player phases played (the game's turn counter stops at
   999) and a hash of the player acts in order. Equal hashes on two attempts of one start mean
   one game was played twice.
+- `progress` (#510 fwd1 item C, ADR 0403): `{ quiet_max, quiet_last, events_quiet_max,
+  phases }`, the player phases in a row that made no progress (an event, or a new low in
+  turns-to-goal), and the same counting events only; one `progress` trace line a phase says what
+  it made. Two rules read it (ADR 0403): a goal's row stalls after three waiting phases in which no unit neared it, and
+  sixteen quiet phases end the attempt `stuck`. Its definition and limit are in `botrun.lua`'s
+  progress-state comment.
