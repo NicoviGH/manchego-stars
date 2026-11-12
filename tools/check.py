@@ -111,6 +111,10 @@ DEAD_CONCEPTS = [
     # retired by ADR 0403 (#510 fwd1 item C): a board that cannot change any more is no longer
     # the only "no progress" rule; sixteen player phases without progress end an attempt too
     r'\bis the only "no progress" rule\b',
+    # retired by ADR 0404 (#510 fwd1 call 1): a retry gets its own dice, so a style played again
+    # is a new try, and a chapter stops at the attempts cap, not when every style was played
+    r'\bnever re-seeded\b', r'\bplayed with what it remembers\b', r'\breplays that try\b',
+    r'\bnever spent again\b',
     # retired by ADR 0397 (#510): a key an enemy drops is a way to a chest or through a door,
     # so a door is no longer a breach only for a unit already holding a key
     r'\bwhich no rule here spends\b',

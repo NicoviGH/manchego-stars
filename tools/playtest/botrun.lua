@@ -39,9 +39,11 @@
 --                      one (the record's `plans`: made, acts played from a kept one, the enemy
 --                      phases they judged, and the uncertain kills they left to the average past
 --                      Planner.BRANCH: every plan judged, not only the ones played)
---   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, team, instrument }  what the
---                      record names; instrument = the bot hash and suite version (PT_INSTRUMENT)
---                      the run by; campaign and attempt only when campaign.lua plays it
+--   info = { game, rom_hash, chapter, mode, seed, campaign, attempt, team, dice_advanced,
+--                      instrument }  what the record names; instrument = the bot hash and suite
+--                      version (PT_INSTRUMENT) the run by; campaign, attempt and dice_advanced
+--                      (the RNG draws the attempt was advanced, ADR 0404) only when campaign.lua
+--                      plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
 --   villageGifts, houseGifts  OPTIONAL: { items, gold }, what every vanilla village and House
 --                      gives (campaign_env): the worth of one whose gift is unknown (goals.lua)
@@ -639,6 +641,7 @@ function M.run(api)
     local rec = { game = api.info.game, rom_hash = api.info.rom_hash, chapter = api.info.chapter,
                   mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
                   attempt = api.info.attempt, team = api.info.team, style = api.style,
+                  dice_advanced = api.info.dice_advanced,
                   bench = api.bench,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},

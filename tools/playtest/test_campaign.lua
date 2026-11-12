@@ -40,7 +40,7 @@ end
 -- arrivals_seen } (the record's reinforcements seen on screen, ADR 0386).
 local function fakeGame(o)
     local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, promoted = {},
-                plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0 }
+                plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0, dice = {} }
     g.api = {
         Bot = Bot, Json = Json,
         info = { game = o.game or "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1",
@@ -78,12 +78,14 @@ local function fakeGame(o)
         buy = function(p) g.bought[#g.bought + 1] = p; return true end,
         promote = function(u) g.promoted[#g.promoted + 1] = u.charId; return true end,
         claims = function() return o.claims or {} end,
-        play = function(style, claims, attempt, pick)
+        -- harness.lua's advanceDice: the draws advanced, handed back for the record
+        advanceDice = function(n) g.dice[#g.dice + 1] = n; return n end,
+        play = function(style, claims, attempt, pick, dice)
             local ch = o.chapters[g.at]
             g.attempt = g.attempt + 1
             local out = (ch.outcomes or {})[g.attempt] or "won"
             g.plays[#g.plays + 1] = { chapter = ch.id, style = style, claims = claims,
-                                      attempt = attempt, pick = pick }
+                                      attempt = attempt, pick = pick, dice = dice }
             local deaths = {}
             if out == "dead" or out == "lost" then
                 deaths = { { id = 2, charId = 0x02, faction = "blue", turn = 3, killer = 0x40,
@@ -586,23 +588,78 @@ local function test_styles_are_drawn_again_up_to_the_cap()
 end
 test_styles_are_drawn_again_up_to_the_cap()
 
--- A try already played is never spent again (ADR 0399): the start state restores the game's RNG,
--- so a style with the memory it was played with replays that try exactly. Memory grows once
--- (attempt 1's one enemy) and then not: attempts 2 and 3 play the other two styles, attempt 4 the
--- first style again with the new memory, and then every style has been played with it.
-local function test_a_try_already_played_is_not_spent_again()
+-- Retries get different dice (ADR 0404): the loop advances the game's RNG (k - 1) * DICE_STRIDE
+-- draws before attempt k's play, and hands the count to play for the record. Attempt 1 advances
+-- none: every measured cell plays as it always did.
+local function test_attempt_k_advances_the_dice_by_k_minus_1_strides()
+    check(Campaign.DICE_STRIDE, 1, "the stride is one draw")
+    local g = fakeGame({ chapters = { { id = 3, outcomes = { "lost", "lost", "lost", "won" } } } })
+    Campaign.run(g.api)
+    check(table.concat(g.dice, ","), "0,1,2,3", "the advance is 0 for attempt 1 and (k - 1) strides after")
+    for k, p in ipairs(g.plays) do
+        check(p.dice, (k - 1) * Campaign.DICE_STRIDE, "attempt " .. k .. "'s play is told its dice")
+    end
+    local saved = Campaign.DICE_STRIDE
+    Campaign.DICE_STRIDE = 5
+    local h = fakeGame({ chapters = { { id = 3, outcomes = { "lost", "won" } } } })
+    Campaign.run(h.api)
+    Campaign.DICE_STRIDE = saved
+    check(table.concat(h.dice, ","), "0,5", "the stride scales the advance")
+end
+test_attempt_k_advances_the_dice_by_k_minus_1_strides()
+
+-- one attempt alone burns what the campaign's k-th try would; a diagnostic replay of it too
+local function test_one_attempt_alone_advances_as_attempt_k()
+    local alone = fakeGame({ chapters = { { id = 3 } } })
+    alone.api.only = 3
+    Campaign.run(alone.api)
+    check(table.concat(alone.dice, ","), "2", "attempt 3 alone advances two strides")
+    check(alone.plays[1].dice, 2, "and its play is told")
+    local first = fakeGame({ chapters = { { id = 3 } } })
+    first.api.only = 1
+    Campaign.run(first.api)
+    check(table.concat(first.dice, ","), "0", "attempt 1 alone advances none")
+    local replay = fakeGame({ chapters = { { id = 3 } } })
+    replay.api.only, replay.api.diag = 2, { ref = 1, mode = "deep" }
+    Campaign.run(replay.api)
+    check(table.concat(replay.dice, ","), "1", "a diagnostic replay of attempt 2 asks for attempt 2's dice")
+end
+test_one_attempt_alone_advances_as_attempt_k()
+
+-- With different dice a style played again is a new try, so the chapter no longer stops when
+-- every style has been played: it goes on to the cap (here 3 styles, one memory, 12 attempts).
+local function test_a_chapter_runs_to_the_cap_past_every_style()
     local outcomes = {}
     for i = 1, 12 do outcomes[i] = "lost" end
     local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes,
         enemies = { [1] = { { id = 0x90, charId = 0x40, classId = 0x0C } } } } } })
     local ok, why = Campaign.run(g.api)
     check(ok, false, "the chapter stops")
-    check(#g.plays, 4, "3 styles, then the first again with the memory it was not played with")
-    check(g.plays[4].style.aggression, g.plays[1].style.aggression, "attempt 4 is attempt 1's style")
-    check(why:find("every style played with what it remembers") ~= nil, true, "and it says why")
+    check(#g.plays, 12, "all 12 attempts are played, memory or no new memory")
+    check(why:find("12 attempts") ~= nil, true, "and the cap says so")
     check(lines(g)[1].outcome, "bot_fault", "a bot fault on vanilla")
 end
-test_a_try_already_played_is_not_spent_again()
+test_a_chapter_runs_to_the_cap_past_every_style()
+
+-- api.attempts bounds the retries in place of MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
+local function test_api_attempts_bounds_the_retries()
+    local outcomes = {}
+    for i = 1, 12 do outcomes[i] = "lost" end
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    g.api.attempts = 3
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "no clean clear in the bound stops the campaign")
+    check(#g.plays, 3, "exactly 3 attempts are played")
+    check(why:find("in 3 attempts", 1, true) ~= nil, true, "and it says 3 attempts: " .. tostring(why))
+    local one = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    one.api.attempts = 1
+    Campaign.run(one.api)
+    check(#one.plays, 1, "a bound of 1 plays one attempt")
+    local clear = fakeGame({ chapters = { { id = 5, outcomes = { "lost", "won" } }, { id = 6 } } })
+    clear.api.attempts = 3
+    check(Campaign.run(clear.api), true, "a clean clear inside the bound goes on")
+end
+test_api_attempts_bounds_the_retries()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)

@@ -844,5 +844,35 @@ check(Sight.exploreKey("chest", 6, 3, Sight.TERRAIN_CHEST_FULL)
 check(Sight.exploreKey("chest", 6, 3, 0x21), Sight.exploreKey("chest", 6, 3, 0x21),
       "the same tile and terrain is the same question")
 
+-- NextRN is rng.c's, word for word: the draws below were worked by hand from rng.c for the
+-- state InitRN(0) writes (initTable[0..2], no extra draws since 0 % 23 == 0). The first:
+-- (0x924E << 11) + (0xA36E >> 5) = 0x751B in 16 bits, s2 = 0xB784 * 2 + 1 (s1's top bit) =
+-- 0x6F09, and 0x751B ^ 0x6F09 = 0x1A12.
+do
+    local w = { 0xA36E, 0x924E, 0xB784 }
+    local got = {}
+    for i = 1, 4 do got[i] = string.format("%04X", Sight.nextRN(w)) end
+    check(table.concat(got, " "), "1A12 544D D47E 5A87", "NextRN: rng.c's first four draws")
+    check(string.format("%04X %04X %04X", w[1], w[2], w[3]), "5A87 D47E 544D",
+          "NextRN: the state shifts one word")
+end
+
+-- advance(api, n) = n single steps written back; 0 draws write nothing
+do
+    local mem = { [0x100] = 0xA36E, [0x102] = 0x924E, [0x104] = 0xB784 }
+    local writes = 0
+    local api = { SYM = { gRNSeeds = 0x100 },
+                  mem = { u16 = function(a) return mem[a] end },
+                  write16 = function(a, v) writes = writes + 1; mem[a] = v end }
+    Sight.advance(api, 0)
+    check(writes, 0, "advance(0) writes nothing")
+    check(mem[0x100], 0xA36E, "advance(0) leaves the state")
+    Sight.advance(api, 3)
+    check(string.format("%04X %04X %04X", mem[0x100], mem[0x102], mem[0x104]), "D47E 544D 1A12",
+          "advance(3) is three single steps")
+    Sight.advance(api, 1)
+    check(string.format("%04X", mem[0x100]), "5A87", "advance(1) after advance(3) is the fourth draw")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

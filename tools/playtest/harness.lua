@@ -3870,6 +3870,11 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
     end
     api.only = cfg.attempt
+    -- cfg.attempts: the retry cap for this run, in 1..MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
+    if cfg.attempts ~= nil and not (math.type(cfg.attempts) == "integer" and cfg.attempts >= 1) then
+        error("PT_CAMPAIGN: attempts must be an integer >= 1")
+    end
+    api.attempts = cfg.attempts
     -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
     api.startOnly = cfg.start_only
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
@@ -4258,10 +4263,22 @@ INSPECT.campaignApi = function(game)
         return nil, "the promotion did not finish within its allowance"
     end
 
-    api.play = function(style, claims, attempt, pick)
+    -- Retries get different dice (ADR 0404): the draws the game's RNG moves on for this attempt,
+    -- thrown away from the chapter start's state. A diagnostic replay burns what its original's
+    -- record says (PT_DIAG's dice_advanced; a record from before the switch has none: 0), never
+    -- what its attempt number implies. Returns the draws advanced: the record's `dice_advanced`.
+    api.advanceDice = function(n)
+        if api.diag and (PLAYTEST_DIAG or "") ~= "" then
+            n = Json.decode(PLAYTEST_DIAG).dice_advanced or 0
+        end
+        INSPECT.Sight.advance(INSPECT.sightApi(), n)
+        return n
+    end
+    api.play = function(style, claims, attempt, pick, dice)
         local b = INSPECT.botApi(game)
         b.style, b.claims = style, claims
         b.info.team = pick   -- the prep screen's team pick, for the attempt's record
+        b.info.dice_advanced = dice   -- proves the switch reached botrun (a campaign builds a bot per attempt)
         -- what every vanilla village and House gives (goals.lua's priors)
         b.villageGifts, b.houseGifts = cfg.village_gifts, cfg.house_gifts
         b.info.campaign, b.info.attempt = id, attempt

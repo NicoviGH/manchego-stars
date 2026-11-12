@@ -2287,6 +2287,12 @@ do
     g.api.info.team = { cap = 2, units = { { charId = 1, why = "forced" } } }
     Botrun.run(g.api)
     check(recordOf(g).team.units[1].why, "forced", "the team pick: the record carries it")
+    -- ADR 0404: the record proves the dice switch reached botrun (a campaign builds a bot per attempt)
+    check(a.dice_advanced, nil, "dice advanced: none outside a campaign")
+    local gd = fakeGame { units = rout() }
+    gd.api.info.dice_advanced = 2
+    Botrun.run(gd.api)
+    check(recordOf(gd).dice_advanced, 2, "dice advanced: the record carries what the attempt burned")
     check(a.player_phases, 2, "player phases: one per player phase played")
     check(c.player_phases, 1, "player phases: a one-phase win")
     check(type(a.acts_hash), "string", "acts hash: recorded")

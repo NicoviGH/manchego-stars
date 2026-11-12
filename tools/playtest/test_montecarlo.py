@@ -1264,6 +1264,63 @@ class Suite(unittest.TestCase):
         self.assertEqual([n for n in os.listdir(os.path.join(store, 'states')) if n.startswith('mem5')],
                          [], 'no copy is left behind')
 
+    def resume_store(self):
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        store = os.path.join(top, 'h')
+        os.makedirs(os.path.join(store, 'states', 'cs-s4001'))
+        with open(os.path.join(store, 'states', 'cs-s4001', '7.ss'), 'wb') as fh:
+            fh.write(b'x')
+        mc.write_pins(store, [{'campaign': 'cs-s4001', 'seed': 4001, 'outcome': 'bot_fault',
+                               'why': None, 'chapters': {'7': mc.sha1_file(
+                                   os.path.join(store, 'states', 'cs-s4001', '7.ss'))}}])
+        return store, {c['campaign']: c for c in mc.cell_pins(store)}
+
+    def test_resume_attempts_is_bounded_by_the_cap_and_reaches_the_campaign_env(self):
+        """`resume --attempts N` (#510 fwd1 call 1): N is 1 to campaign.lua's MAX_ATTEMPTS
+        (read from it, not restated), refused before any copy otherwise, and each task's
+        campaign env carries it as `attempts` (harness.lua's cfg.attempts); without it the env
+        has none, so the cap is the Lua one."""
+        store, pins = self.resume_store()
+        cap = mc.max_attempts()
+        self.assertEqual(cap, 12, 'campaign.lua\'s cap')
+        tasks = mc.resume_tasks(store, {'last': [22]}, ['cs-s4001'], pins, 'a1', attempts=3)
+        self.assertEqual(tasks[0]['campaign']['attempts'], 3)
+        edge = mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'a2', attempts=cap)
+        self.assertEqual(edge[0]['campaign']['attempts'], cap)
+        none = mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'a3')
+        self.assertNotIn('attempts', none[0]['campaign'])
+        for bad in (0, -1, cap + 1):
+            with self.assertRaisesRegex(ValueError, r'--attempts is %d, .* 1 to %d' % (bad, cap)):
+                mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'bad', attempts=bad)
+        self.assertFalse(os.path.exists(os.path.join(store, 'states', 'bad-cs-s4001')),
+                         'a refusal copies nothing')
+
+    def test_resume_main_takes_attempts_from_the_command_line_to_the_task(self):
+        store, _pins = self.resume_store()
+        seen = []
+
+        class Pool:
+            def __init__(self, *a, **k):
+                pass
+
+            def run(self, tasks):
+                seen.extend(tasks)
+                return iter(())
+        setup = ({}, {'ours': store, 'vanilla': store},
+                 lambda: {'ours': {'last': [22]}, 'vanilla': {'last': [22]}})
+        argv = ['resume', '--game', 'vanilla', '--tag', 'm1', '--attempts', '2']
+        with mock.patch.object(mc, 'suite_setup', return_value=setup), \
+                mock.patch.object(mc, 'Pool', Pool):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(mc.main(argv), 0)
+                self.assertEqual(seen[0]['campaign']['attempts'], 2)
+                self.assertEqual(mc.main(['resume', '--game', 'vanilla', '--tag', 'm2',
+                                          '--attempts', '99']), 1)
+        self.assertIn('refused: --attempts is 99', out.getvalue())
+        self.assertEqual(len(seen), 1, 'the refused run played nothing')
+
     def test_pinned_setup_checks_only_the_named_starts_and_refuses_the_rest(self):
         suite = self.load(self.suite())
         suite['snapshots'] = [{'snapshot_id': 'x', 'start_id': 'vanilla-ch3'}]
@@ -2471,10 +2528,17 @@ class Replay(unittest.TestCase):
     def test_the_diag_names_the_death_its_decision_and_the_original_trace(self):
         d = mc.replay_diag(self.rec(), 'force', ['b'], base='/runs')
         self.assertEqual(d, {'ref': 17, 'ref_from': 'plan_ref', 'mode': 'force', 'force': ['b'],
-                             'failure': {'charId': 0x01, 'turn': 4},
+                             'failure': {'charId': 0x01, 'turn': 4}, 'dice_advanced': 0,
                              'original_trace': '/runs/traces/t.jsonl.gz',
                              'run': dict(RUN, campaign='e1-ours-ch07',
                                          trace='traces/t.jsonl.gz')})
+        # ADR 0404: a replay burns what its original's record says, never what its attempt
+        # number implies: a record from before the switch has no field, and burned none
+        self.assertEqual(mc.replay_diag(self.rec(dice_advanced=3), 'force', ['b'])['dice_advanced'], 3)
+        old = self.rec()
+        old.pop('dice_advanced', None)
+        self.assertEqual(mc.replay_diag(dict(old, attempt=4), 'force', ['b'])['dice_advanced'], 0,
+                         'an old attempt-4 record replays no dice')
         two = self.rec(deaths=[_death(), _death(cid=0x02, turn=6, ref=30)])
         self.assertEqual(mc.replay_diag(two, 'deep', char=0x02, base='/r')['ref'], 30)
         self.assertEqual(mc.replay_diag(two, 'deep', char=0x02, ref=29, base='/r')['ref'], 29)
