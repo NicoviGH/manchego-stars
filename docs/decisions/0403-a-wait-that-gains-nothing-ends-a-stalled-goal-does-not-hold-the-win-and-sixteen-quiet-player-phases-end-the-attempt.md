@@ -25,13 +25,23 @@ nearer than at any earlier reading of that id. The planner reads the turns (`pla
 botrun counts the phases (`rec.progress`, the `progress` trace lines).
 
 **Rule 1: a ledger goal nobody has neared for three player phases stops holding the win.** Per
-goal id, botrun counts the readings in a row without a new low of its own
-(`M.GOAL_QUIET` = 3, FR-007's number). At three, the goal's ledger row is `stalled` (a reward
+goal id, botrun counts the readings in a row in which the goal was not neared
+(`M.GOAL_QUIET` = 3, FR-007's number). A goal is neared at a reading when its turns are strictly
+below every one of its last three readings (fewer when it has fewer; its first reading is run
+0). It is not measured against the goal's all-time low: a taker that walked away and is walking
+back would count as quiet until it passed its old best, and a chest was missed while a unit was
+walking to it. Against the window, a shuffle between two or three tiles (a period of at most
+three) can never beat it, and a longer wander that does only keeps the row feasible, which is
+the old behaviour and is still ended by rule 2. The phase's `near` list and rule 2's `quiet`
+stay on the all-time low. At three, the goal's ledger row is `stalled` (a reward
 needing it too; an `unknown` row stays `unknown`). `Goals.forfeited` counts `feasible` rows
 only, so the win no longer forfeits it and the Seize is not outranked on forfeits. The goal is
 unchanged for the units: they may still walk to it, and one new low makes its row `feasible`
 again. A stalled ROW is not a stalled board (`opts.stalled`, a repeated board). A won run whose
-missing reward's row was stalled in the last plan reports it as `stalled` in `missed_rewards`.
+missing reward's row, or missing recruit's row, was stalled in the last plan reports it as
+`stalled` in `missed_rewards` / `missed_recruits` (a recruit's reason comes after
+`died_after_joining`, `killed_before_talk` and `left_map`, before `talk_skipped` and
+`not_reached`).
 
 **Rule 2: sixteen player phases in a row with no progress end the attempt `stuck`**
 (`M.QUIET_BOUND` = 16). Every kept vanilla win outside the old Ch8 waits has at most 15 such
@@ -39,8 +49,13 @@ phases (#510 comment 6828202335). The 13 wins of the resumed Ch8 run have at mos
 full definition; its `stuck` attempts ran 8, 20, 30, 83, 389, 414, 436, 523, 611 and 1,206.
 Sixteen spares every kept win and ends a wait within one more phase. It fires at the top of a
 player phase, under the board-repeat rule's guard (a turn event still to fire may change the
-board) and not while a Survive objective counts turns down, whose wait is the play. The count
-lags one phase (a phase closes at the next phase's first plan), and the bound never resets it:
+board) and not while a Survive objective counts turns down, whose wait is the play. It does not
+fire in a diagnostic replay (`montecarlo.py replay`/`audit`): the replay must reach its pinned
+decision, and the bound only ends a run. Rule 1 stays on in a replay, because it changes the
+plans, and a replay holds each plan to the original trace (a plan that differs is `matched =
+false`, never a witness). So a replay of a kept run made before this change can differ from
+its trace under rule 1 and under the always-judged Seize, and then reports `matched = false`.
+The count lags one phase (a phase closes at the next phase's first plan), and the bound never resets it:
 the record stays the plain count.
 
 **The Seize is always judged when the game offers it.** The first run with rules 1 and 2 (run
@@ -50,7 +65,10 @@ in a row, and one attempt never took it. The beam keeps what scores well act by 
 it (campaign 4004 attempt 10, turn 20: the four beam plans judged were all waits over the cap).
 The planner now judges the Seize, the rest holding, beside the beam's plans (`kind = "seize"`),
 as it does the assault and the advance. Whether to take it stays the rank's call: a Seize that
-forfeits a feasible goal is still outranked.
+forfeits a feasible goal is still outranked by an admitted plan that does not. When every other
+judged plan is over the cap and the Seize plan is admitted, the Seize is played even though it
+forfeits feasible goals (admission is the rank's first key): a win under the cap beats a plan
+that risks a death.
 
 **Not changed.** `idle_3` and FR-007's stall still count the lord's moves; they are not this
 signal, and changing what a stall event means is a separate call. There is no rule for a boss

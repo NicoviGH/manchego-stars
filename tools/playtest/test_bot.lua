@@ -3932,6 +3932,44 @@ do
           "stalled goal: the Seize is judged though the beam cut it")
 end
 
+-- test_the_seize_is_played_when_every_other_plan_is_over_the_cap (#510 fwd1 item C, ADR 0403):
+-- the board of the visit above, but the enemy phase kills the lord on every tile except the
+-- objective's (the Seize ends the chapter before it strikes). The Seize forfeits the open
+-- village, yet it is the only admitted plan, and admission outranks forfeits: it is played.
+do
+    local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }) },
+        field = function(t)
+            return t.x == 4 and t.y == 2
+                and { [2] = { [4] = 0 }, [3] = { [4] = 1 }, [4] = { [4] = 2 } } or nil
+        end,
+        explorable = { { x = 4, y = 2, kind = "visit" } },
+        canExplore = { [0x01] = { ["4,2"] = "visit" } },
+        enemyPhase = function(plan)
+            local b = plan.blues[1]
+            if b.x == 4 and b.y == 4 then return {} end
+            return { { target = b.unit.id, takenHit = 80, takenDmg = 99, takenHits = 1,
+                       takenCrit = 0 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(L, Z), sightOf(o), gifted("careful", 100))
+    local seize
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.seizes then seize = c.rank end
+    end
+    check(a and a.act, "seize", "seize over the cap: the Seize is played")
+    check(seize and seize.forfeits .. " " .. tostring(seize.admitted), "1 true",
+          "seize over the cap: it forfeits the open village and is admitted")
+    local other
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if not c.seizes and c.rank.admitted then other = true end
+    end
+    check(other, nil, "seize over the cap: no other judged plan is under the cap")
+end
+
 -- test_the_plan_names_how_near_each_goal_is (#510 fwd1 item C, the progress record's near half):
 -- `nearest` holds the objective's nearest unit and each feasible visit row's best taker, in
 -- turns, sorted by id; a reward row has no tile and gives no entry.

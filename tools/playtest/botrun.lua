@@ -133,8 +133,10 @@
 --   event   a change on the board no act names: a unit arriving, a recruit, items gained/lost
 --   bag     a full inventory answered: the new item, the one that went, why
 --   drop    the game gave a player unit a fallen unit's item: from, to (charIds), item
---   progress  a player phase's progress, in the planner's styles only (#510 fwd1 item C, a
---           shadow: nothing reads it): `events` (the kinds this player phase made: kill, visit,
+--   progress  a player phase's progress, in the planner's styles only (#510 fwd1 item C, ADR
+--           0403). Two rules read it: `quiet` ends the attempt `stuck` (rule 2) and a goal's own
+--           readings stall its ledger row (rule 1, `quietGoals`). `events` (the kinds this
+--           player phase made: kill, visit,
 --           chest, talk, door, wall, seize), `near` (the goal ids at a new low in turns-to-goal at
 --           the next phase's first plan; "objective" or a ledger row's id), `quiet` (the player
 --           phases in a row without either, this one included). The record's `progress` sums
@@ -489,7 +491,8 @@ M.DETAILS = {
 -- tried and the harness could not drive it (the run crashed there).
 -- `stalled` is set by `finish`, not by the log: the tile's goal row was a stalled ROW (goals.lua:
 -- no unit neared it for M.GOAL_QUIET player phases) in the last plan made, so the win did not wait
--- for it (ADR 0403). It overrides the log's word for that tile.
+-- for it (ADR 0403). It overrides the log's word for that tile. A missed recruit's reason is
+-- `stalled` the same way (its `recruit:` row), after left_map and before talk_skipped.
 M.REWARD_REASONS = { skipped = "skipped", unreached = "never_offered", closed = "closed",
                      failed = "failed" }
 
@@ -700,7 +703,9 @@ function M.run(api)
     local lows, quiet, eventsQuiet = {}, 0, 0   -- goal id -> least turns read; the phases in a row
     local curPhase, prevPhase                   -- { turn, events = set, read }; prev awaits its reading
     local goalQuiet = {}                        -- goal id -> readings in a row without a new low of its own
-    local stalledRows = {}                      -- "x,y" -> true: stalled rows of the last plan's ledger
+    local goalReads = {}                        -- goal id -> its last M.GOAL_QUIET readings (turns)
+    -- stalled rows of the last plan's ledger: "x,y" (a village or chest) or "recruit:<charId>"
+    local stalledRows = {}
     local wallHp = {}                           -- "x,y" -> the wall's HP as the forecasts left it
     if planned then
         rec.progress = { quiet_max = 0, quiet_last = 0, events_quiet_max = 0, phases = 0 }
@@ -752,15 +757,29 @@ function M.run(api)
             local lower = low and n.turns < low - 1e-9
             if lower then near[#near + 1] = n.id end
             lows[n.id] = low and math.min(low, n.turns) or n.turns
-            -- a ledger goal's own run: 0 on its first reading or a new low, else one more. An id
-            -- missing from this reading closed or lost its way, and starts again if it returns
+            -- a ledger goal's own run: 0 on its first reading, or when it is strictly below
+            -- EVERY one of its last M.GOAL_QUIET readings, else one more. Not the all-time low:
+            -- a taker that walked away and is walking back would count as quiet until it passed
+            -- its old best (a chest missed while a unit walked to it). Against the window, a
+            -- shuffle between two or three tiles (period <= M.GOAL_QUIET) can never beat it, and
+            -- a longer wander that does only keeps the row feasible (the old behaviour, still
+            -- ended by M.QUIET_BOUND). An id missing from this reading closed or lost its way,
+            -- and starts again if it returns
             if n.id ~= "objective" then
                 here[n.id] = true
-                goalQuiet[n.id] = (goalQuiet[n.id] == nil or lower) and 0 or goalQuiet[n.id] + 1
+                local win = goalReads[n.id]
+                local neared = true   -- an empty window (the first reading) is run 0
+                for _, r in ipairs(win or {}) do
+                    if not (n.turns < r - 1e-9) then neared = false; break end
+                end
+                if win == nil then win = {}; goalReads[n.id] = win end
+                win[#win + 1] = n.turns
+                if #win > M.GOAL_QUIET then table.remove(win, 1) end
+                goalQuiet[n.id] = neared and 0 or goalQuiet[n.id] + 1
             end
         end
         for id in pairs(goalQuiet) do
-            if not here[id] then goalQuiet[id] = nil end
+            if not here[id] then goalQuiet[id], goalReads[id] = nil, nil end
         end
         if prevPhase then closePhase(prevPhase, near); prevPhase = nil end
     end
@@ -993,6 +1012,7 @@ function M.run(api)
                     reason = (fellOurs[c] and "died_after_joining")
                         or (felled[c] and "killed_before_talk")
                         or (leftMap[c] and "left_map")
+                        or (outcome == "won" and planned and stalledRows["recruit:" .. c] and "stalled")
                         or (talked[c] and "talk_skipped")
                         or (planned and "not_reached") or "unknown" }
             end
@@ -1225,7 +1245,12 @@ function M.run(api)
             -- phase closes at the next one's first plan), which only delays the end by a phase.
             -- It is not reset while a guard holds, and nothing else reads it here: the check
             -- fires only on this line, so the record stays the plain count.
-            if planned and quiet >= M.QUIET_BOUND and not sight.nextTurnEvent(turn)
+            -- Not in a diagnostic replay (diag): it plays a kept run to its pinned decision and
+            -- must reach it, and the bound only ends a run, so a kept run from before the bound
+            -- (16+ quiet phases ahead of its pin) would otherwise end `stuck` short of the
+            -- witness. Rule 1 stays on: it changes the plans, and a replay of a run made WITH it
+            -- must make the same plans to match its trace (a mismatch is `matched = false`).
+            if planned and not diag and quiet >= M.QUIET_BOUND and not sight.nextTurnEvent(turn)
                 and not (sight.objective and sight.objective.turnsLeft) then
                 for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
                 return "stuck", string.format("no progress in %d player phases in a row, and no "
@@ -1362,10 +1387,18 @@ function M.run(api)
                             -- the tiles whose goal row this plan's ledger left stalled: a win
                             -- that leaves one of them missing says so (`finish`)
                             stalledRows = {}
+                            local charOf = {}   -- a recruit row's id carries the unit id; the record keys charIds
+                            for _, u in ipairs(board.units) do charOf[u.id] = u.charId end
                             for _, g in ipairs(plan.ledger or {}) do
-                                local at = g.status == "stalled" and (g.kind == "visit" or g.kind == "chest")
-                                    and g.id:match("^%a+:(%-?%d+,%-?%d+)$")
-                                if at then stalledRows[at] = true end
+                                if g.status == "stalled" then
+                                    local at = (g.kind == "visit" or g.kind == "chest")
+                                        and g.id:match("^%a+:(%-?%d+,%-?%d+)$")
+                                    if at then
+                                        stalledRows[at] = true
+                                    elseif g.kind == "recruit" and charOf[g.unitId] then
+                                        stalledRows["recruit:" .. charOf[g.unitId]] = true
+                                    end
+                                end
                             end
                             -- the board this plan committed to, and its decision index (a
                             -- death's plan_ref)
@@ -1481,7 +1514,8 @@ function M.run(api)
                         or action.act == "door" or action.act == "seize" then
                         markEvent(action.act)
                     elseif action.act == "attack" and action.obstacle
-                        and action.obstacle.blow and action.obstacle.hp then
+                        and action.obstacle.blow and action.obstacle.blow.dealt
+                        and action.obstacle.hp then
                         -- a wall is broken when the forecasts, summed, take its HP
                         local at = action.obstacle.x .. "," .. action.obstacle.y
                         wallHp[at] = (wallHp[at] or action.obstacle.hp) - action.obstacle.blow.dealt

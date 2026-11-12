@@ -62,7 +62,9 @@ is the honest reading: the forecast said the counter could not kill.
 **Reasons for missed goals** (FR-006). A missed recruit was `died_after_joining` (it fell on our
 side), `killed_before_talk` (the game killed it on another side), `left_map` (it left the field and
 the game did not kill it: a script unloaded it or it escaped), `talk_skipped` (a plan's
-candidates offered the Talk: the plan record's `talks`) or `not_reached`. `died_after_joining` is
+candidates offered the Talk: the plan record's `talks`) or `not_reached`. A won run's recruit
+whose row was stalled in the last plan's ledger is `stalled` (ADR 0403), after `left_map` and
+before `talk_skipped`. `died_after_joining` is
 not in the spec's list. The live proof needed it: vanilla Ch5 attempt 1's Joshua was talked over
 and fell on turn 9, so ADR 0376 counts him missing (not in the party at the end), and without it
 the record called him `talk_skipped`.

@@ -2303,19 +2303,22 @@ do
 end
 
 -- test_the_progress_record (#510 fwd1 item C): per player phase, an event or a new low in the
--- planner's `nearest` is progress; a first reading, a lord's move and a Rescue are not. A
--- shadow: it only records. `steps[t]` = { act = kind, nearest = { {id, turns} } } for player
+-- planner's `nearest` is progress; a first reading, a lord's move and a Rescue are not. The
+-- helper is still called `shadow` (it began as a record-only signal); two rules read the
+-- signal now (ADR 0403). `steps[t]` = { act = kind, nearest = { {id, turns} } } for player
 -- phase t; the run is won once `turns` enemy phases have passed.
 do
     -- `o` (optional): hideTurns (the objective shows no turns left: not a Survive chapter),
     -- eventTurn (the game's next turn event), moving (the enemy walks a new tile each phase, so
     -- no board repeats and the repeat rule stays out of the way), ledger[t] (the ledger plan t
     -- reports), explorable (open tiles). `g.quietAt[t]` = the sorted quietGoals the first plan
-    -- call of player phase t was given.
+    -- call of player phase t was given; `recruits` (owed charIds) and `diag` (a diagnostic
+    -- replay's api.diag: no BOTRUN record, so the result is g.result = { ok, why }).
     local function shadow(turns, steps, units, o)
         o = o or {}
         local g = fakeGame { units = units or standoff(), turnsLeft = turns, hit = 10,
                              eventTurn = o.eventTurn, explorable = o.explorable,
+                             recruits = o.recruits,
                              enemy = o.moving and function(g, find)
                                  local e = find(0x81)
                                  if e then e.x, e.y = g.turn % 10, 5 + g.turn // 10 end
@@ -2362,12 +2365,13 @@ do
             if a.obstacle then a = { unitId = a.unitId, move = a.move, act = "wait" } end
             return act(a)
         end
-        Botrun.run(g.api)
+        g.api.diag = o.diag
+        g.result = { Botrun.run(g.api) }
         local lines = {}
         for _, e in ipairs(evs) do
             if e.t == "progress" then lines[#lines + 1] = e end
         end
-        return recordOf(g), lines, evs, g
+        return not o.diag and recordOf(g) or nil, lines, evs, g
     end
     local function line(l)
         return string.format("%d:%s|%s|%d", l.turn, table.concat(l.events, ","),
@@ -2444,6 +2448,22 @@ do
     check(table.concat(got, " "), "- - - - visit:3,3 visit:3,3 - - -",
           "quiet goals: three readings without a new low; a new low, a gap and a return clear it")
 
+    -- a goal's run is against its last GOAL_QUIET readings, not its all-time low: a taker that
+    -- walked away and is walking back is quiet while it rises, and is out again once a reading
+    -- beats its previous three
+    local function listed(readings)
+        local steps = {}
+        for i, t in ipairs(readings) do steps[i] = v(t) end
+        local _, _, _, gb = shadow(#readings + 1, steps)
+        local out = {}
+        for t = 1, #readings + 1 do out[t] = gb.quietAt[t] == "" and "-" or "q" end
+        return table.concat(out, " ")
+    end
+    check(listed({ 3, 4, 5, 6, 5, 4 }), "- - - - q q -",
+          "quiet goals: rising readings stall the row; one that beats the previous three clears it")
+    check(listed({ 5, 6, 5, 6, 5, 6, 5 }), "- - - - q q q q",
+          "quiet goals: a shuffle between two tiles becomes quiet and stays so")
+
     -- (rule 2) player phases in a row with no progress end the attempt `stuck`. The count lags
     -- a phase, so the run ends at the top of phase 18 with 16 closed quiet phases; one
     -- phase fewer is won
@@ -2463,6 +2483,19 @@ do
     r = shadow(30, {}, nil, { moving = true })
     check(r.outcome, "won", "quiet bound: not while the objective counts turns down")
     check(r.progress.quiet_last, 30, "quiet bound: the guarded phases still count, unreset")
+    -- a diagnostic replay is never ended by the bound: it must reach its pinned decision. The
+    -- original (a run that the bound ended) is the trace the replay is held to; ref 99 is never
+    -- reached, so the replay plays on past the 16th quiet phase
+    local _, _, origEvs = shadow(18, {}, nil, hide)
+    local _, _, _, gd = shadow(18, {}, nil, { hideTurns = true, moving = true,
+        diag = { ref = 99, mode = "force", force = {}, failure = { charId = 0x01, turn = 99 },
+                 run = { game = "fake", chapter = 1, seed = 7, attempt = 1 },
+                 original = origEvs } })
+    local dline = gd.emitted[#gd.emitted]
+    local dj = dline and dline:sub(1, #Botrun.DIAG_PREFIX) == Botrun.DIAG_PREFIX
+        and Json.decode(dline:sub(#Botrun.DIAG_PREFIX + 1)) or {}
+    check(tostring(dj.why):find("no progress", 1, true), nil,
+          "quiet bound: not in a diagnostic replay (" .. tostring(dj.why) .. ")")
     -- greedy plays no plan and has no progress count: it is never ended by the bound
     g = fakeGame { units = standoff(), turnsLeft = 30,
                    enemy = function(g, find)
@@ -2493,6 +2526,27 @@ do
           "missed reward: a stalled row's tile says so, another keeps its log reason")
     r = shadow(3, {}, nil, { explorable = open, explore = { { x = 9, y = 0, die = 0 } } })
     check(r.missed_rewards[1].reason, "skipped", "missed reward: with no stalled row it is skipped")
+
+    -- a won run's missed recruit whose row was stalled in the last plan: `stalled` (the row's id
+    -- carries the unit id, the record the charId); with no stalled row it is not_reached
+    local function withRecruit()
+        local us = standoff()
+        local gu = unit(0x50, 2, "green", 8, 8, 10)
+        gu.charId = 0x31
+        us[#us + 1] = gu
+        return us
+    end
+    local row = { { id = "recruit:80", kind = "recruit", unitId = 0x50, status = "stalled" } }
+    r = shadow(3, {}, withRecruit(), { recruits = { 0x31 }, ledger = { [3] = row } })
+    check(r.missed_recruits[1] and r.missed_recruits[1].reason, "stalled",
+          "missed recruit: a stalled recruit row says so")
+    r = shadow(3, {}, withRecruit(), { recruits = { 0x31 } })
+    check(r.missed_recruits[1] and r.missed_recruits[1].reason, "not_reached",
+          "missed recruit: with no stalled row it is not_reached")
+
+    -- a wall's blow with no `dealt` is no event and no error
+    r, ls = shadow(2, { { act = "attack", obstacle = { x = 1, y = 0, hp = 10, blow = {} } } })
+    check(lines(ls), "1:||1 2:||2", "wall: a blow with no `dealt` marks no event")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
