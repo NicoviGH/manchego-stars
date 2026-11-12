@@ -9,61 +9,61 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-11 night): the bot plays vanilla; Ch6 is through, Ch8 is the wall.**
+**Next session starts here (2026-11-11, late): items A and B of the fwd1 plan are built and in PRs; C is next.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
-the direction ("this project is yours too, so take ownership and be proactive"); use cheaper
-subagents to check source, ADRs and research before claiming or building.
+the direction; use cheaper subagents to check source, ADRs and research before claiming or
+building. The plan is **#510 comment 6810567866** (six items A to F, six calls, all approved);
+its findings are comment 6810177817.
 
-**What changed today.**
-- **PR #600 merged (`786c4127`, ADR 0401; Nicolas: "Yes I think we can merge it"):** on a Defeat Boss map a boss the party knows of is the march
-  goal, in sight or remembered by a retry; the boss is the unit the objective names. Witness
-  (`resume --tag kb1`, `kb2`): **the eight vanilla campaigns stopped at Ch6 all clear it clean**
-  (seven on attempt 2, one on attempt 3, 4 to 6 turns; none did in 6 styles before). Suite
-  `--held-out`: promoted, 0 regressions, every number as ADR 0400's. No first attempt changes.
-  The ADR says the principle is Nicolas's and the call Fable's. Reviewed by /code-review and an
-  independent reviewer, one scoped re-review; every finding fixed.
-- **Why Ch6 stopped the campaigns** (findings: #510 comment 6786548233, the two Fable entries):
-  its Civilians die from turn 8 unless the boss falls first (192 wins read), and retry memory
-  had made retries slower (median 12 to 13.5 turns against 10), because a retry marched on its
-  nearest remembered enemy and a remembered boss in fog was no goal.
-- **The look (W1) is parked**, on `feat/510-w1-look-shadow` (pushed, no PR, shadow only). Ch6
-  did not need it. With every look run (`resume --every-look`, commit `932e60f3`, run `w1u`)
-  it was right on start 4010 (both Civilian deaths called), blind on 4002 (none of three), and
-  cost 249% of the attempts' other AI calls. W2 and W3 are not started. Whether to drop it or
-  keep its two-phase "trade" part for Ch10/Ch13 is open: decide from the next wall, not now.
-- A detour, kept for the record: `pilot --chapter 1` ran (Manchego Stars ch01 3 of 50, vanilla
-  Ch1 0 of 50, validity held; in `cells.jsonl`, not posted). `pilot --chapter 0` was stopped
-  partway. Manchego Stars' ch02 stop is parked for step 10 and is not a blocker to raise.
+**Open PRs (a stack; neither merged, both waiting on Nicolas's "merge").**
+- **PR #601, item A: the attempt's record says what happened** (`feat/510-fwd1-a-records`,
+  three commits, CI green on the first two; check the third, `c5b1495f`). No change of play:
+  the suite's 28 runs have the same frames as main's. Reviewed (`/code-review medium`, six
+  findings) and re-reviewed by an independent reviewer; every finding closed. ADR 0388 amended.
+  What it changes: a lord felled by our own act is `lost` (the plan was wrong that the check
+  was missing: the game-over screen starts only after the death quote, so the check came too
+  early); a red unit is killed only when the game says so, and a recruit a script removed is
+  `left_map`; `unreachable` is `never_offered`; a razed village has its `closed_by`; the record
+  carries `team` (the prep screen's pick), `player_phases` and `acts_hash`.
+- **PR #602, item B: the team pick covers the scarcest demand first** (ADR 0402,
+  `feat/510-fwd1-b-team-pick`, based on #601's branch). Witness: the thief is fielded in 6 of 6
+  replayed Ch8 attempts (campaigns 4001 and 4004, tag `b2`). **Still owed on #602:
+  `montecarlo.py suite --held-out` with its promotion line, and `/code-review 602 medium`.**
+  When #601 merges, retarget #602 to `main` before deleting #601's branch.
 
-**Run `fwd1` is done (2026-11-11, 17:50; nothing in flight).** The eight vanilla campaigns
-played on from Ch6: all eight clear Ch6 clean again, none gets past chapter index 10. Findings,
-with what is confirmed and what is not: **#510 comment 6810177817**.
-- **Ch7 (index 8) stops 4005 and 4010:** the lord dies on turn 4 in all 7 attempts. On turn 3
-  the bot plays a plan it rates at 0.7% death that leaves her at half HP in reach of two Thunder
-  mages. The 7 attempts are 3 games (one per style); retry memory changes nothing.
-- **Ch8 (index 9) stops 4001, 4004, 4007, 4009 (4002 crashed on attempt 10, not looked into):**
-  1 clean clear in 68 attempts. The thief (charId 9, the only unit that can open a chest) is
-  left out of 30 of 68 parties; when deployed, the chest goal is the thief's alone and nobody
-  clears the door guards; the seize is then skipped for hundreds of turns (one attempt ran 999).
-- **Ch9 (index 10) stops 4006:** won 8 of 8, clean 0 of 8. The recruit (charId 18) leaves by
-  the chapter's turn-12 event (the record wrongly says `killed_before_talk`); the lord never
-  reaches her. The village at (11,15) is destroyed on turn 5.
+**Evidence turned against one approved part: the Talk demand (call 4's second half).** Built,
+refuted at vanilla Ch9's prep screen by one probe, and removed (ADR 0402 has it): the recruit
+(charId 18) is not on the board at the prep screen, and the lord, who is forced, is one of her
+two talkers, so a Talk demand cannot field the second (charId 4). **Nicolas has not answered
+this yet.** Fable's recommendation: leave it dropped and let item D's instrumented run say
+whether any fielded unit can reach her before turn 12 (calls 5 and 6).
 
-**Next step: build the plan, #510 comment 6810567866** (written from eight offline reads by
-cheaper subagents; nothing in it is built). Read it whole first: it has five lessons, six
-build items in order (A to F), and six calls, **all approved by Nicolas (2026-11-11: "I
-approve all calls")**, so B and C are not waiting on anything. Call 1 advances the dice by a
-fixed count per attempt; it never re-rolls the seed (he checked exactly that).
-- **Start with A** (the records say what happened; no change of play) and **B** (the team pick
-  covers the scarce demand first, and a Talk is a demand). B and C amend settled text
-  (Party selection, FR-015): record each as an ADR in its PR.
-- **C** ends a wait that gains nothing (one attempt ran 1,915 player phases). **D** is one
-  instrumented run on each of two starts, before any more rules. **E** and **F** are sized
-  after D; F tests the parked look on Ch7 before anything new is designed.
-- **Call 1 is the big one:** the game's dice are never re-seeded, so one style plays one game
-  and a chapter gets three real tries. The plan recommends advancing the dice per retry.
-- Corrections made to the findings (6810177817): 22 Ch8 attempts end `stuck`, not 23, and the
-  boss wait is admitted attacks outranked on progress, not "every plan over the cap".
+**What the new records already show.**
+- Campaign 4006's Ch9 start: its 8 attempts are 4 games (`acts_hash`: attempts 2, 5, 8 are
+  one; 3 and 4; 6 and 7). Call 1 (advance the dice per retry) is not built.
+- Ch8 with the thief fielded: still no clean clear in 6 attempts. The chests at (1,3) and
+  (2,3) are `never_offered`, and two attempts end `stuck` (one after 406 player phases). That
+  is items C and E.
+
+**Next steps, in order.**
+1. Finish #602: the held-out suite, then `/code-review 602 medium`, fix every finding.
+2. **Item C** (a wait that gains nothing ends; calls 2 and 3; amends FR-015, so an ADR).
+   First compute, offline over the kept winning traces, the longest run with no progress, and
+   propose N with that table.
+3. **Call 1** (retries get different dice), then **item D** (one instrumented run on each of
+   two starts), then E and F as the plan sizes them.
+
+**Not looked into.**
+- The replay of campaign 4006's Ch9 start on #601 plays the same acts as run `fwd1`'s (four
+  attempts compared act for act) but its frame counts differ a little (505261 against 505263;
+  2354316 against 2353490). The suite's frames are identical.
+- `tools/test_verdict_diff.py` failed twice on a clean local `main` (it lists the `tools`
+  folder as an unlisted input) and passed on a later run; CI on main is green.
+
+**Run `fwd1` (2026-11-11), for reference.** The eight vanilla campaigns all clear Ch6 and none
+gets past chapter index 10: Ch7 (index 8) stops 4005 and 4010 (the lord dies on turn 4), Ch8
+(index 9) stops 4001, 4004, 4007, 4009 (and 4002, whose "crash" was the lord's player-phase
+death #601 now records as `lost`), Ch9 (index 10) stops 4006 (recruit and village missed).
 Older scout walls still stand: `scout-ch13` loses 108 of 161, `scout-ch14` ends `stuck` on
 turn 19, Ch5x (4003) stalls on turn 33.
 
@@ -76,6 +76,15 @@ turn 19, Ch5x (4003) stalls on turn 33.
 --attempts 2` (~3.5 min); `montecarlo.py look <trace dirs>` reads it.
 
 - **Lessons:**
+  - A campaign's resumable start lives under the campaign that reached it: Ch8 and Ch9 starts
+    are `fwd1-cs-s<seed>`, not `cs-s<seed>` (`resume` refuses and lists the indexes it has).
+  - While a `resume` runs, a worker's live output is `/tmp/playtest-campaign@pool-*/`
+    (`playtest.log`, and `mgba-stdout.log` for the BOTRUN lines); `workers/*.log` is written
+    at the end. `resume` has no attempts cap on main: to read only the picks, stop it and kill
+    `run.sh` and `mgba-headless`.
+  - The chapter's talks (`Sight.talks`) are not its recruits: vanilla Ch8's six are
+    conversations with player units or units who arrive on our side.
+  - A worker log is megabytes of JSON lines: `grep` it, never `sed -n` a range of it.
   - The team pick's reasons are only in `references/sim/<game>/<rom>/workers/*.log`
     (`campaign: team`), not in the records or traces.
   - A trace keeps 5 to 7 plans a decision and no per-act offers: "was it offered" needs an
