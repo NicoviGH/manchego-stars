@@ -77,6 +77,9 @@
 --                      item (the new one), sent (the item that went: to the convoy, or
 --                      discarded when `discard`), discard, why } (Bot.fullBag's); the record's
 --                      `bag` and a `bag` trace event each
+--   dice()             OPTIONAL: the game's RNG words { s0, s1, s2 } (Sight.dice): the record's
+--                      `dice_start` and each `progress` trace line's `rn` (the words at the
+--                      start of that player phase)
 --   trace(event)       OPTIONAL: keep one event of the run's TRACE (below); an api that
 --                      keeps it in a file names the file in info.trace, and so in the record
 --   won(), lost()      the chapter advanced / the game-over screen is up
@@ -747,7 +750,8 @@ function M.run(api)
         p.quiet_max = math.max(p.quiet_max, quiet)
         p.events_quiet_max = math.max(p.events_quiet_max, eventsQuiet)
         p.phases = p.phases + 1
-        trace({ t = "progress", turn = ph.turn, events = events, near = near, quiet = quiet })
+        trace({ t = "progress", turn = ph.turn, events = events, near = near, quiet = quiet,
+                rn = ph.rn })
     end
     -- the first fresh plan of a player phase reads the goals' turns: a new low closes the phase
     -- before it, the first reading of an id sets its low and is not progress
@@ -1116,6 +1120,7 @@ function M.run(api)
 
     local function play()
         api.seed(api.info.seed)
+        rec.dice_start = api.dice and api.dice() or nil   -- right after the campaign's advance
         local sight = api.sight()
         -- a retry's memory (ADR 0399): what earlier attempts at this start showed plays as seen
         if sight.remember then sight.remember(style.memory and style.memory.enemies) end
@@ -1303,7 +1308,10 @@ function M.run(api)
                 -- the phase before it never got a reading (no plan made in this one yet): it
                 -- closes on its events alone, then it is the one awaiting this phase's reading
                 if prevPhase then closePhase(prevPhase, {}) end
-                prevPhase, curPhase = curPhase, { turn = turn, events = {} }
+                -- `rn`: the dice this phase starts on, before the bot's first act (nil without
+                -- api.dice); a `progress` line is no part of what a replay must match
+                prevPhase, curPhase = curPhase, { turn = turn, events = {},
+                                                  rn = api.dice and api.dice() or nil }
             end
             while true do
                 if halt then return "diag", halt end

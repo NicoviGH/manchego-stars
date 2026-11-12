@@ -3445,6 +3445,7 @@ INSPECT.botApi = function(game)
     end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
+    api.dice = function() return Sight.dice(sightApi) end
     -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
     -- The board that decision read goes beside it (.json): what a fresh emulator's load of the
     -- state is checked against once the state is a suite snapshot (PT_PINNED).

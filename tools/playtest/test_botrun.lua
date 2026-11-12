@@ -55,6 +55,7 @@ local function fakeGame(o)
         end
         return out
     end
+    g.rnWords = { 0x1111, 0x2222, 0x3333 }
     g.api = {
         Bot = Bot, Json = Json,
         info = { game = "fake", rom_hash = "abc", chapter = 1, mode = "normal", seed = 7 },
@@ -72,6 +73,12 @@ local function fakeGame(o)
             return out
         end,
         seed = function(s) g.seeded = s end,
+        -- the game's RNG words, read through the real Sight.dice over a fake memory (so the
+        -- shape is the producer's); the enemy phase "rolls": endPhase moves them on
+        dice = function()
+            return Sight.dice({ SYM = { gRNSeeds = 0x100 },
+                                mem = { u16 = function(a) return g.rnWords[(a - 0x100) // 2 + 1] end } })
+        end,
         board = copy,
         sight = function()
             g.sights = (g.sights or 0) + 1
@@ -127,6 +134,7 @@ local function fakeGame(o)
             return true
         end,
         endPhase = function()
+            g.rnWords[1] = g.rnWords[1] + 1
             local deaths, acts = {}, nil
             if o.enemy then deaths, acts = o.enemy(g, find) end
             deaths = deaths or {}
@@ -2392,6 +2400,12 @@ do
     -- (a) waits and a constant reading: every phase quiet, the count runs up
     local r, ls, evs = shadow(3, {})
     check(r.progress.quiet_max, 3, "progress: three quiet phases")
+    -- the dice (#510 fwd1 call 1): the record's words at play start, and each phase's words at its start
+    check(table.concat(r.dice_start, ","), "4369,8738,13107", "dice: the record keeps the words at play start")
+    check(#ls >= 2, true, "dice: two phases closed")
+    check(table.concat(ls[1].rn, ","), "4369,8738,13107", "dice: phase 1 starts on the words the play started on")
+    check(ls[2].rn[1], ls[1].rn[1] + 1, "dice: phase 2 starts on the words the enemy phase moved on")
+    check(#ls[1].rn, 3, "dice: three words")
     check(r.progress.quiet_last, 3, "progress: the quiet run at the end")
     check(r.progress.events_quiet_max, 3, "progress: no events either")
     check(r.progress.phases, 3, "progress: every player phase closed, the last in finish")

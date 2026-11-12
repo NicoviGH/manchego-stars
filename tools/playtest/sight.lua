@@ -213,6 +213,7 @@
 --                            from its own (GenerateExtendedMovementMap on each one's costs,
 --                            turns = cost / UNIT_MOV rounded up).
 -- Sight.seed(api, s)         InitRN(s): the game's own seeding, written into gRNSeeds.
+-- Sight.dice(api)            the three u16 words at gRNSeeds, as { s0, s1, s2 } (the one reader).
 -- Sight.advance(api, n)      n draws of the game's own NextRN taken from gRNSeeds and written
 --                            back (no new seed: the stream moves along, never restarts).
 
@@ -2409,10 +2410,17 @@ function M.seed(api, seed)
     local S = api.SYM
     local words = M.machine(api.cpu)(function(call)
         call(S.InitRN, { seed })
-        return { api.mem.u16(S.gRNSeeds), api.mem.u16(S.gRNSeeds + 2), api.mem.u16(S.gRNSeeds + 4) }
+        return M.dice(api)
     end)
     for i, v in ipairs(words) do api.write16(S.gRNSeeds + (i - 1) * 2, v) end
     return words
+end
+
+-- The game's RNG state: the three u16 words at gRNSeeds. A record that keeps them shows whether
+-- two attempts rolled the same dice.
+function M.dice(api)
+    local S = api.SYM
+    return { api.mem.u16(S.gRNSeeds), api.mem.u16(S.gRNSeeds + 2), api.mem.u16(S.gRNSeeds + 4) }
 end
 
 -- One NextRN (rng.c) on the three u16 words `w` = { s0, s1, s2 }, in place; returns the draw.
@@ -2433,7 +2441,7 @@ end
 function M.advance(api, n)
     if n <= 0 then return end
     local S = api.SYM
-    local w = { api.mem.u16(S.gRNSeeds), api.mem.u16(S.gRNSeeds + 2), api.mem.u16(S.gRNSeeds + 4) }
+    local w = M.dice(api)
     for _ = 1, n do M.nextRN(w) end
     for i, v in ipairs(w) do api.write16(S.gRNSeeds + (i - 1) * 2, v) end
 end

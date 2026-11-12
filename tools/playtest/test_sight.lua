@@ -864,6 +864,7 @@ do
     local api = { SYM = { gRNSeeds = 0x100 },
                   mem = { u16 = function(a) return mem[a] end },
                   write16 = function(a, v) writes = writes + 1; mem[a] = v end }
+    check(table.concat(Sight.dice(api), ","), "41838,37454,46980", "dice reads the three words")
     Sight.advance(api, 0)
     check(writes, 0, "advance(0) writes nothing")
     check(mem[0x100], 0xA36E, "advance(0) leaves the state")
