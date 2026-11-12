@@ -23,9 +23,9 @@ no clean clear whatever is played.
 **The rule.** While a demand still needs answerers:
 
 1. Take the open demand that the fewest units still fitting can answer.
-2. Equally scarce, a demand of another kind goes before an enemy class. A chest, a door or a
-   village goes unanswered without its unit; an enemy class is still fought by the rest of the
-   party. Then the first listed.
+2. Equally scarce, a demand of another kind goes before an enemy class. A demand of another
+   kind (a chest, a door, a village, the fog, the healing) goes unanswered without its unit; an
+   enemy class is still fought by the rest of the party. Then the first listed.
 3. Of that demand's answerers, field the one answering the most open demands (the old rule,
    now the tie-break), then a carried unit, then the earlier joiner.
 
@@ -61,6 +61,26 @@ witness (campaign 4006's Ch9 start), by one probe at the prep screen:
 The code was removed. Whether any fielded unit can reach her before she leaves is the plan's
 item D (one instrumented run), and its calls 5 and 6.
 
-**Proof.** `test_bot.lua` `test_team_covers_the_scarcest_demand_first`: each case fails without
-its part of the rule. `test_team_fill_is_the_best_answer_to_the_biggest_class` changes its
+**Scarce is a count of answerers, not answerers against the need** (review of PR #602). The
+order only matters when the slots run out, and then a demand with one answerer loses all of its
+cover if it is passed, while a class needing three of its three answerers loses a third of it.
+
+**Not built: another kind before an enemy class whatever the counts** (review of PR #602). With
+two units able to open the chests and enemy classes of one answerer each, the classes go first
+and both openers can be benched. Replayed offline over the 9 distinct picks kept so far (28
+vanilla records), that order fields the same units as this rule in all 9, and no
+demand of another kind with an answerer on the roster is left without one. So it is not a rule
+yet; the pick's record lists every such demand under `uncovered`, so the first real case shows
+in the record.
+
+**Proof.** `test_bot.lua` `test_team_covers_the_scarcest_demand_first`: the first, second and
+fourth cases fail on the old rule; the third and fifth pass on it and pin the new rule's own
+parts (step 3's tie-break, and passing over a demand nobody answers). `test_team_fill_is_the_best_answer_to_the_biggest_class` changes its
 expected order (the same four units, the scarcer class's answerer first).
+
+**The suite** (`montecarlo.py suite --held-out`, on the commit before the review's fixes, which
+do not change the pick): PROMOTED. 56 runs, each with a game result; 0 regressions on the frozen
+baseline; the same five deaths that lived when frozen as ADR 0401 (signals, not blockers);
+held-out 4 of 28 lost, none new; 2,685,802 `AiDecideMain` calls against a budget of 2,988,937.
+The suite's starts have their teams already, so it shows the pick broke nothing, not that it
+helps.

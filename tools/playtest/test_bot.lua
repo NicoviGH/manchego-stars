@@ -1415,6 +1415,8 @@ end
 local function team(t)
     t.maxima = t.maxima or {}
     t.demands = t.demands or {}
+    -- a case that does not turn on the kind takes it from the id, as sight.demandsOf names them
+    for _, d in ipairs(t.demands) do d.kind = d.kind or d.id:match("^%a+") end
     t.answers = t.answers or {}
     t.carried = t.carried or {}
     t.style = t.style or { deploy = {} }
@@ -1478,9 +1480,9 @@ local function test_team_covers_the_scarcest_demand_first()
     answers = { [0x01] = { ["enemy:3"] = true }, [0x04] = { chests = true } }
     p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
     check(csv(p.deploy), "4", "equally scarce: the chest before the enemy class")
+    -- a demand nobody who fits can answer is passed over, never a stop
     answers = { [0x01] = { chests = true }, [0x02] = { chests = true, fog = true },
                 [0x03] = { fog = true } }
-    -- a demand nobody who fits can answer is passed over, never a stop
     demands = { { id = "sustain", need = 1 }, { id = "fog", need = 1 } }
     p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
     check(csv(p.deploy), "2", "an unanswerable demand does not end the covering")
@@ -1550,6 +1552,13 @@ test_team_fill_is_the_best_answer_to_the_biggest_class()
 local function test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
     local ok = pcall(team, { roster = { unitOf(1, 0x01, 1) }, cap = 1 })
     check(ok, false, "a unit with no group raises: there is no default group")
+    -- past the helper, which names a kind from the id: the tie-break reads the kind
+    local err
+    ok, err = pcall(B.team, { roster = { teamUnit(1, 0x01, "magic") }, cap = 1, maxima = {},
+                              demands = { { id = "enemy:1", need = 1 } }, answers = {},
+                              carried = {}, style = { deploy = {} } })
+    check(ok, false, "a demand with no kind raises")
+    check(tostring(err):match("enemy:1 has no kind") ~= nil, true, "and the error names it")
     local p = team({ roster = { teamUnit(1, 0x01, "magic") }, cap = 3,
                      carried = { [0x09] = true } })
     check(csv(p.deploy), "1", "a carried unit no longer on the roster (dead, departed) drops out")

@@ -84,8 +84,10 @@ the game rules this record first put here (a level-10 check, a rank comparison):
 `canUse` are the game's own checks, read by the caller. The input shapes are in bot.lua's header.
 - `Bot.team(t)` (amended 2026-10-27, #510 PR E; it replaced the earlier "highest level fills
   the cap"): forced units in slot order (past every ceiling), then `style.deploy` (a followed
-  claim's units), then greedily the unit answering the most of the map's still-needed demands,
-  then fill by strength on the biggest demand; ties go to a carried unit, then the earlier joiner.
+  claim's units), then the map's still-needed demands, the scarcest first (ADR 0402 replaced
+  "greedily the unit answering the most of them", which is now the tie-break among a demand's
+  answerers), then fill by strength on the biggest demand; ties go to a carried unit, then the
+  earlier joiner.
   The demands and answers are the game's, read by sight.lua at the prep screen; each unit's team
   group is the caller's read of `team_groups.py`, and a group's maximum benches the later joiner.
   The design is the #510 plan comment's "Party selection" block. `give` is always `{}`: no

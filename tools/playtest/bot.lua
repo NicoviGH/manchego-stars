@@ -138,19 +138,21 @@
 --   halves it). The caller says which stock item is the Vulnerary, so no item id lives here.
 -- Bot.team(t) -> { deploy = {charIds}, reasons = {[charId] = reason}, give = {} }: whom the
 --   prep screen fields (#510 plan comment, "Party selection"). t = { roster, cap,
---   maxima = {[group] = n}, demands = {{ id, need }...}, answers = {[charId] = {[demandId] =
+--   maxima = {[group] = n}, demands = {{ id, kind, need }...}, answers = {[charId] = {[demandId] =
 --   true}}, strength = {[charId] = {[demandId] = n}}, carried = {[charId] = true}, style }. Each roster entry carries `group`, the
 --   caller's read of team_groups.py (the bot weighs no class); a unit without one raises.
---   A demand is what the map asks (an enemy class, chests, fog...), `need` how many answerers
---   cover it; `answers` and `strength` are measured by the caller in the game. In order:
---   forced units (slot order, past every ceiling); then style.deploy, a followed claim's units;
---   then, while a demand still needs answerers, the scarcest one first (ADR 0402): the open
---   demand the fewest units still fitting can answer (ties: a demand of another kind before
---   an enemy class, which any fighter still answers in part; then the first listed) gets, of
---   those units, the one answering the most open demands (ties: a carried unit, then the earlier
---   joiner = slot order). A demand nobody fitting answers is passed over. Then fill: the highest strength on
---   the biggest demand (largest need, first listed), same ties. Everything after the forced units
---   obeys `maxima`: a full group benches the later joiner, even if a slot stays empty.
+--   A demand is what the map asks (an enemy class, chests, fog...), `kind` sight.demandsOf's
+--   name for what it is ("enemy" for an enemy class; a demand without one raises), `need` how
+--   many answerers cover it; `answers` and `strength` are measured by the caller in the game.
+--   In order: forced units (slot order, past every ceiling); then style.deploy, a followed
+--   claim's units; then, while a demand still needs answerers, the scarcest one first (ADR
+--   0402): the open demand the fewest units still fitting can answer (ties: a demand of
+--   another kind before an enemy class, which the rest of the party still fights; then the
+--   first listed) gets, of those units, the one answering the most open demands (ties: a
+--   carried unit, then the earlier joiner = slot order). A demand nobody fitting answers is
+--   passed over. Then fill: the highest strength on the biggest demand (largest need, first
+--   listed), same ties. Everything after the forced units obeys `maxima`: a full group benches
+--   the later joiner, even if a slot stays empty.
 --   reason = { why = "forced"|"claim"|"covers"|"fill", demands = {ids} (covers),
 --   carried = bool }. No transfer rule is decided yet, so `give` is always empty.
 -- Bot.shop(gold, stock, party) -> {{ unit = charId, item }...}, one entry per purchase in the
@@ -2271,7 +2273,11 @@ function M.team(t)
         reasons[u.charId] = reason
     end
     local left = {}
-    for _, d in ipairs(t.demands) do left[d.id] = d.need end
+    for _, d in ipairs(t.demands) do
+        -- the covering's tie-break reads it: without one an enemy class would pass for another kind
+        if d.kind == nil then error("bot.lua: demand " .. tostring(d.id) .. " has no kind", 2) end
+        left[d.id] = d.need
+    end
     local function answers(u, id)
         return (t.answers[u.charId] or {})[id] == true
     end
@@ -2316,19 +2322,23 @@ function M.team(t)
         local scarce, fewest
         for _, d in ipairs(t.demands) do
             local n = 0
-            for _, c in ipairs(left[d.id] > 0 and roster or {}) do
-                if fits(c) and answers(c, d.id) then n = n + 1 end
+            if left[d.id] > 0 then
+                for _, c in ipairs(roster) do
+                    if fits(c) and answers(c, d.id) then n = n + 1 end
+                end
             end
-            -- equally scarce: a chest, a door or a village goes unanswered without its unit,
-            -- an enemy class is still fought by the rest
+            -- equally scarce: a demand of another kind (a chest, a door, a village, the fog,
+            -- the healing) goes unanswered without its unit, an enemy class is still fought
+            -- by the rest of the party
             if n > 0 and (not fewest or n < fewest
                     or (n == fewest and scarce.kind == "enemy" and d.kind ~= "enemy")) then
                 scarce, fewest = d, n
             end
         end
         local u = scarce and best(function(c)
+            if not answers(c, scarce.id) then return 0 end
             local n = 0
-            for _, d in ipairs(answers(c, scarce.id) and t.demands or {}) do
+            for _, d in ipairs(t.demands) do
                 if left[d.id] > 0 and answers(c, d.id) then n = n + 1 end
             end
             return n
