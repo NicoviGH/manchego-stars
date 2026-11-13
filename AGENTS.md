@@ -45,6 +45,11 @@ For our own conventions (prep, caps, objectives, economy, class mapping, art) **
 > Never run the full `make matrix` gate locally; run only scenarios your change could affect;
 > never run anything after a merge; on a failure spend **one instrumented run** covering your
 > next three hypotheses, not one run per guess.
+> **The frozen suite (`montecarlo.py suite`, 56 runs) is never run for a PR** (Nicolas,
+> 2026-11-13). A PR proves its change with unit tests and the run that showed the problem
+> (`suite --only <start>/<seed>`). The suite runs only before the bot's reading is relied on (a
+> chapter's difficulty verdict, a refreeze), over every change since the last one; a regression
+> it finds is bisected over those commits with `--only` on the run that got worse.
 
 ## Searching and context
 
@@ -180,7 +185,7 @@ Each tool's docstring is its manual; this table only says when to reach for it.
 | `make chapter [CH=chNN]` | get oriented on a chapter: declared vs built, scenes, art, enemy AI donors, scenario verdicts (#312). Prefer it to HANDOFF prose. |
 | `tools/playtest/run.sh <scenario>` | run ONE in-emulator scenario (rows from `matrix.yaml`) |
 | `tools/playtest/inspect_state.py` | `render` a playtest log, or `diff` two runs to the first divergence |
-| `tools/playtest/montecarlo.py` | the difficulty instrument (#510 step 9): `suite` (the frozen suite; a bot change's promotion), `starts`/`pilot`/`cell`/`report` (a chapter's Manchego Stars-vs-vanilla verdict), `attempts` (a chapter's attempts 1..N side by side: the first that clears), `story`/`audit`/`replay` (one run's trace, a failure's witness). Why: ADRs 0384 (SC-003's budget), 0385, 0388, 0392, 0395 |
+| `tools/playtest/montecarlo.py` | the difficulty instrument (#510 step 9): `suite` (the frozen suite: before the bot's reading is relied on, never per PR; `--only` plays named runs and judges nothing), `starts`/`pilot`/`cell`/`report` (a chapter's Manchego Stars-vs-vanilla verdict), `attempts` (a chapter's attempts 1..N side by side: the first that clears), `story`/`audit`/`replay` (one run's trace, a failure's witness). Why: ADRs 0384 (SC-003's budget), 0385, 0388, 0392, 0395 |
 | `make matrix [SUITE=…]` | the regression matrix, with a verdict cache (`--dry-run` is free). While working: the smallest covering set (`--scenarios a,b,c`). Before a merge: `SUITE=gate`. Before a build for the group: `SUITE=all`. |
 | `make verdict-diff [BASE=ref]` | every chapter's parity verdict, base vs this tree (ADR 0353; CI comments when a cell moves) |
 | `tools/gen_wiki.py` | the chapter wiki (#486, ADR 0347; CI deploys main's) |
