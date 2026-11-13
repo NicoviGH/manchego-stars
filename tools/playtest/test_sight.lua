@@ -385,7 +385,9 @@ do
 
     -- the guard (PT_LEAKGUARD): a nested sandbox that leaves a unit struct changed raises
     -- and names it; one whose writes were all kept does not. Sight.keepAi is that keep.
-    local function guarded() return { e.addr, other.addr } end
+    local function guarded()
+        return { { e.addr, Board.UNIT_SIZE, "unit struct" }, { other.addr, Board.UNIT_SIZE, "unit struct" } }
+    end
     local sandbox, api = Sight.batching(outer, guarded)
     local ok, why = pcall(sandbox, function()
         sandbox(function() w8(other.addr + BLOCK + 2, 1) end)
@@ -413,7 +415,11 @@ do
         check(fn, S.RefreshEntityBmMaps, "refresh: calls RefreshEntityBmMaps")
         m.w32(red.addr + STATE, (m.u32(red.addr + STATE) & ~Board.US_BIT9) | 0x100)
     end
-    local sandbox, api = Sight.batching(outer, function() return { red.addr } end)
+    local TRAPS = 0x0203A614
+    local sandbox, api = Sight.batching(outer, function()
+        return { { red.addr, Board.UNIT_SIZE, "unit struct" },
+                 { TRAPS, Sight.TRAP_MAX * Sight.TRAP_SIZE, "trap pool" } }
+    end)
     local seen = {}
     local ok, why = pcall(sandbox, function()
         sandbox(function()
@@ -425,6 +431,50 @@ do
     check(ok, true, "refresh: the guard finds nothing left changed: " .. tostring(why))
     check(seen[1], 0x00010100, "refresh: the plan's own read sees the enemy revealed")
     check(seen[2], Board.US_BIT9 | 0x00010000, "refresh: the next plan finds it in fog again")
+
+    -- keepRide: a ballista's rider that decides to strike with its own weapon steps off it
+    -- (bmarch.c TryRemoveUnitFromBallista, written here as the game writes it); the next plan
+    -- finds it riding, the ballista ridden and on its tile. A unit on foot keeps nothing.
+    local RIDE, trap = Sight.UNIT_BALLISTA, TRAPS + 2 * Sight.TRAP_SIZE
+    local S2 = { sTrapPool = TRAPS }
+    m.w32(red.addr + STATE, Sight.US_IN_BALLISTA)
+    m.w8(red.addr + RIDE, 2); m.w8(red.addr + RIDE + 1, 5)        -- its trap; movBonus
+    m.w8(trap, 7); m.w8(trap + 1, 3); m.w8(trap + 5, 1); m.w8(trap + 6, 4)   -- tile, ridden, uses
+    local function ride()
+        return table.concat({ m.u32(red.addr + STATE), m.u8(red.addr + RIDE), m.u8(trap),
+                              m.u8(trap + 1), m.u8(trap + 5), m.u8(trap + 6) }, ",")
+    end
+    local riding = ride()
+    local function stepsOff()
+        m.w32(red.addr + STATE, 0)
+        m.w8(red.addr + RIDE, 0)
+        m.w8(trap, 9); m.w8(trap + 1, 9); m.w8(trap + 5, 0)
+    end
+    ok, why = pcall(sandbox, function()
+        sandbox(function()
+            Sight.keepFog(api, { red })
+            Sight.keepRide(api, S2, red)
+            stepsOff()
+            seen[3] = ride()
+        end)
+        seen[4] = ride()
+    end)
+    check(ok, true, "keepRide: the guard finds nothing left changed: " .. tostring(why))
+    check(seen[3], "0,0,9,9,0,4", "keepRide: the plan's own read sees the rider on foot")
+    check(seen[4], riding, "keepRide: the next plan finds it riding, the ballista where it was")
+    ok, why = pcall(sandbox, function()
+        sandbox(function()
+            Sight.keepFog(api, { red })
+            m.w8(trap + 5, 0)
+        end)
+    end)
+    check(ok == false and tostring(why):find("sandbox leak: the trap pool at", 1, true) ~= nil,
+          true, "guard: a trap a nested sandbox leaves changed raises: " .. tostring(why))
+    m.w8(trap + 5, 1)
+    m.w32(red.addr + STATE, 0)
+    local kept = 0
+    Sight.keepRide({ mem = m, keep16 = function() kept = kept + 1 end }, S2, red)
+    check(kept, 0, "keepRide: a unit on foot keeps nothing")
 end
 
 -- Every enemy decision keeps the AI bytes first (the tests above prove only the helpers): read
@@ -454,6 +504,9 @@ do
     local fog = body and body:find("M.keepFog(api, all)", 1, true)
     check(fog ~= nil and fog < write, true,
           "refresh: aiDecide keeps the fog bits before its first write")
+    local ride = body and body:find("M.keepRide(api, S, e)", 1, true)
+    check(ride ~= nil and ride < write, true,
+          "keepRide: aiDecide keeps the rider's ballista before its first write")
     local _, keeps = src:gsub("\n +M%.keepAi%(", "")
     check(keeps, 1, "keepAi: aiDecide is its one caller")
     local calls, withUnits = 0, 0

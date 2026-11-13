@@ -22,10 +22,11 @@
 -- found in one instrumented run that logged every enemy decision and the target's bag). The
 -- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510). The map refresh
 -- is another: it rewrites each red's fog bits for where our units stand (M.refresh, #510).
+-- And a ballista's rider that decides to strike with its own weapon steps off it (M.keepRide).
 -- PT_LEAKGUARD=1 (run.sh) makes a run raise on the first unit struct a nested sandbox leaves
 -- changed (M.leaks): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
--- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh.
+-- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh, M.keepRide.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -243,6 +244,9 @@ M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
 -- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
 M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
+-- bmunit.h: US_IN_BALLISTA, and ballistaIndex at 0x1C (its trap's index in sTrapPool; the
+-- halfword's other byte is movBonus), what M.keepRide keeps
+M.US_IN_BALLISTA, M.UNIT_BALLISTA = 1 << 11, 0x1C
 -- include/cp_script.h: struct AiScr is 0x10 bytes, `cmd` at +00; AI_CMD_PILLAGE runs
 -- AiScriptCmd_10_DoLooting, and a script loops back with AI_CMD_GOTO.
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
@@ -878,9 +882,9 @@ end
 
 -- Sight.batching(outer, guarded) -> sandbox, api: Sight.machine made re-entrant (the planner's
 -- cost, #510 step 9) over `outer` (Sight.new's api), and an api whose writes it journals.
--- guarded = nil, or a function -> the addresses of the unit structs a nested sandbox must hand
--- back as it found them (M.leaks; PT_LEAKGUARD=1, a diagnostic: it reads every struct twice a
--- sandbox).
+-- guarded = nil, or a function -> the spans of memory ({ { addr, bytes, name } }: the unit
+-- structs, the trap pool) a nested sandbox must hand back as it found them (M.leaks;
+-- PT_LEAKGUARD=1, a diagnostic: it reads every span twice a sandbox).
 function M.batching(outer, guarded)
     -- The outermost sandbox() saves the state and loads it back at the end, as Sight.machine
     -- always did; a call made inside it (s.batch, or one read calling another) runs within
@@ -888,8 +892,8 @@ function M.batching(outer, guarded)
     -- read cannot leak into the next. A game function's own writes are not journaled. The
     -- ones a read can make fresh (a movement map, the battle structs, gAiDecision) it makes
     -- fresh first. The ones on a unit struct nothing makes fresh, so they are kept before the
-    -- call (keep16: M.equip's bag, M.keepAi's AI bytes, M.keepFog's state word) and the
-    -- journal puts them back.
+    -- call (keep16: M.equip's bag, M.keepAi's AI bytes, M.keepFog's state word, M.keepRide's
+    -- ballista) and the journal puts them back.
     local mem0 = outer.mem
     -- kept[depth] = the addresses keep16 holds for the sandbox open at that depth
     local journal, kept
@@ -933,7 +937,7 @@ function M.batching(outer, guarded)
             return a, b
         end
         local mark = #journal
-        local was = guarded and M.unitWords(mem0, guarded(), outer.Board.UNIT_SIZE)
+        local was = guarded and M.spanWords(mem0, guarded())
         depth = depth + 1
         kept[depth] = {}
         local ok, a, b = pcall(fn, outerCall, outerScratch)
@@ -1013,18 +1017,19 @@ function M.openMap(api, call, S, x, y)
     end
 end
 
--- M.unitWords(mem, addrs, size) -> { { addr, words, n } }: each unit struct (`size` bytes,
--- Board.UNIT_SIZE) as it reads now, in its n words.
+-- M.spanWords(mem, spans) -> { { addr, words, n, name } }: each span ({ addr, bytes, name }: a
+-- unit struct, the trap pool) as it reads now, in its n words.
 -- M.leaks(mem, was) -> nil, or what to raise: the first word of one that no longer reads as
 -- `was` has it. M.batching's guard (PT_LEAKGUARD=1) asks after a nested sandbox put its
--- journal back: a difference is a game call's write on a unit struct that nothing kept, the
--- kind that made one judged plan leak into the next twice (the bag, #554; the AI bytes, #510).
-function M.unitWords(mem, addrs, size)
-    local out, n = {}, size // 4
-    for x, addr in ipairs(addrs) do
-        local words = {}
-        for k = 0, n - 1 do words[k] = mem.u32(addr + k * 4) end
-        out[x] = { addr, words, n }
+-- journal back: a difference is a game call's write that nothing kept, the kind that made one
+-- judged plan leak into the next (the bag, #554; the AI bytes, the fog bits and a rider's
+-- ballista, #510).
+function M.spanWords(mem, spans)
+    local out = {}
+    for x, span in ipairs(spans) do
+        local words, n = {}, span[2] // 4
+        for k = 0, n - 1 do words[k] = mem.u32(span[1] + k * 4) end
+        out[x] = { span[1], words, n, span[3] }
     end
     return out
 end
@@ -1033,9 +1038,9 @@ function M.leaks(mem, was)
         for k = 0, u[3] - 1 do
             local now = mem.u32(u[1] + k * 4)
             if now ~= u[2][k] then
-                return ("sandbox leak: the unit struct at 0x%08X, word +0x%02X, was 0x%08X and "
+                return ("sandbox leak: the %s at 0x%08X, word +0x%02X, was 0x%08X and "
                     .. "is 0x%08X after its sandbox returned: a game call wrote it and no "
-                    .. "keep16 held it (sight.lua's header)"):format(u[1], k * 4, u[2][k], now)
+                    .. "keep16 held it (sight.lua's header)"):format(u[4], u[1], k * 4, u[2][k], now)
             end
         end
     end
@@ -1080,6 +1085,22 @@ end
 function M.refresh(api, call, S, units)
     M.keepFog(api, units)
     call(S.RefreshEntityBmMaps, {})
+end
+
+-- Inside a sandbox, before enemy `e` decides (aiDecide): a ballista's rider is put back on
+-- it when the sandbox returns. The AI's attack decision steps the deciding unit off a ballista
+-- that is spent, or when it picks its own weapon over it (cp_battle.c
+-- AiAttemptOffensiveAction and AiAttemptCombatWithinMovement: bmarch.c
+-- TryRemoveUnitFromBallista), which clears US_IN_BALLISTA (the state word: M.keepFog keeps
+-- it), the unit's ballistaIndex, and on the ballista's trap its ridden flag and its tile, set
+-- to the unit's. Without it the rider read as on foot, and the ballista as free and standing
+-- where a judged plan had stood the rider, for every plan judged after. Found by PT_LEAKGUARD
+-- on vanilla Ch13, turn 11 (#510).
+function M.keepRide(api, S, e)
+    if (api.mem.u32(e.addr + UNIT_STATE) & M.US_IN_BALLISTA) == 0 then return end
+    api.keep16(e.addr + M.UNIT_BALLISTA, 1)
+    api.keep16(S.sTrapPool + api.mem.u8(e.addr + M.UNIT_BALLISTA) * M.TRAP_SIZE,
+               M.TRAP_SIZE // 2)
 end
 
 function M.equip(api, call, S, u, slot)
@@ -1128,13 +1149,16 @@ end
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
 function M.new(outer)
-    -- outer.leakGuard (PT_LEAKGUARD=1): every nested sandbox hands the unit structs back as it
-    -- found them, or raises (M.leaks). The units are the board's, read each time.
+    -- outer.leakGuard (PT_LEAKGUARD=1): every nested sandbox hands the unit structs and the
+    -- trap pool back as it found them, or raises (M.leaks). The units are the board's, read
+    -- each time.
     local sandbox, api, open
     sandbox, api, open = M.batching(outer, outer.leakGuard and function()
-        local addrs = {}
-        for _, o in ipairs(api.board().units) do addrs[#addrs + 1] = o.addr end
-        return addrs
+        local spans = { { outer.SYM.sTrapPool, M.TRAP_MAX * M.TRAP_SIZE, "trap pool" } }
+        for _, o in ipairs(api.board().units) do
+            spans[#spans + 1] = { o.addr, outer.Board.UNIT_SIZE, "unit struct" }
+        end
+        return spans
     end)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
@@ -1580,6 +1604,7 @@ function M.new(outer)
     local function aiDecide(call, proc, e, all, before)
         M.keepAi(api, all)
         M.keepFog(api, all)   -- `setup` refreshes the maps
+        M.keepRide(api, S, e)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
         -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls
