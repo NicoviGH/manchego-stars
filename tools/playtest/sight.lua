@@ -305,8 +305,8 @@ local AI_WEIGHT_SHIFT, AI_WEIGHT_MASK = 3, 0x1F << 3
 -- What cp_phase.c AiPhaseInit writes at an enemy phase's start (M.aiPhaseStart): +78 orderState,
 -- +7B flags (AI_FLAG_0 = 1), +7E unk7E, +80 u32 specialItemFlags, +84 unk84, +85 bestBlueMov
 -- (SetupUnitInventoryAIFlags's), +86 cmd_result[8].
-local AI_ORDER_STATE, AI_FLAGS, AI_UNK7E, AI_ITEM_FLAGS, AI_UNK84, AI_CMD_RESULT =
-    0x78, 0x7B, 0x7E, 0x80, 0x84, 0x86
+local AI_ORDER_STATE, AI_FLAGS, AI_UNK7E, AI_ITEM_FLAGS, AI_UNK84, AI_BEST_MOV, AI_CMD_RESULT =
+    0x78, 0x7B, 0x7E, 0x80, 0x84, 0x85, 0x86
 local AI_FLAG_0, AI_CMD_RESULTS = 1, 8
 -- gAiDecision's itemSlot for the ballista (AiAttemptBallistaCombat's -1); its layout is
 -- board.lua's (Board.AI_DEC).
@@ -1193,7 +1193,13 @@ end
 -- around a player unit only when the working map is the movement map; nothing reads it there.
 -- `after` = the caller's next calls, run in the same list (a list is one emulated run, a call
 -- of its own a frame more on every phase and strike) -> the last one's r0.
-function M.aiPhaseStart(api, call, S, units, after)
+-- `known` = what the two calls wrote on this very board (M.phaseStarted, read after an
+-- earlier start), written back in their place: a strike stands one unit elsewhere and
+-- changes its equipped weapon, and neither call reads where a unit stands or which weapon
+-- is first (the heal flag is from HP, bestBlueMov and a player unit's flags from who is on
+-- the map, its Mov and what its bag holds), bar ai_counter and the scratch maps, which
+-- nothing reads. Calling them for every strike cost a vanilla Ch5 attempt 3% more CPU.
+function M.aiPhaseStart(api, call, S, units, after, known)
     local mem, A = api.mem, S.gAiState
     M.keepAi(api, units)
     api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
@@ -1203,9 +1209,23 @@ function M.aiPhaseStart(api, call, S, units, after)
     for k = 0, AI_CMD_RESULTS - 1 do api.write8(A + AI_CMD_RESULT + k, 0) end
     api.write32(A + AI_ITEM_FLAGS, mem.u32(S.gAiItemConfigTable + api.chapter() * 4))
     api.write16(A + AI_UNK84, 0)
+    if known then
+        api.write8(A + AI_BEST_MOV, known.mov)
+        for _, o in pairs(units) do api.write8(o.addr + M.UNIT_AI_FLAGS, known.flags[o.addr]) end
+        return call(after)
+    end
     local list = { { S.UpdateAllPhaseHealingAIStatus, {} }, { S.SetupUnitInventoryAIFlags, {} } }
     for _, c in ipairs(after) do list[#list + 1] = c end
     return call(list)
+end
+
+-- What a phase start's two calls left on the board, for M.aiPhaseStart's `known`:
+-- gAiState.bestBlueMov and every unit's aiFlags. Read inside the sandbox that started the
+-- phase, before any decision (a decision writes its own unit's flags).
+function M.phaseStarted(mem, S, units)
+    local known = { mov = mem.u8(S.gAiState + AI_BEST_MOV), flags = {} }
+    for _, o in pairs(units) do known.flags[o.addr] = mem.u8(o.addr + M.UNIT_AI_FLAGS) end
+    return known
 end
 
 function M.equip(api, call, S, u, slot)
@@ -1730,7 +1750,11 @@ function M.new(outer)
         local setup = { { S.RefreshEntityBmMaps, {} }, { S.AiUpdateNoMoveFlag, { e.addr } },
                         { S.AiInitDangerMap, {} } }
         if starts then
-            M.aiPhaseStart(api, call, S, all, setup)
+            -- the board's own phase start, read once a board (`seen`, as units() is): the
+            -- setup's three calls write no aiFlags and no bestBlueMov
+            local known = seen.phaseStart
+            M.aiPhaseStart(api, call, S, all, setup, known)
+            seen.phaseStart = known or M.phaseStarted(mem, S, all)
         else
             assert(mem.u8(S.gPlaySt + PLAY_FACTION) == M.PHASES[3],
                    "sight: an enemy decides inside a phase aiOrder started, or starts its own")

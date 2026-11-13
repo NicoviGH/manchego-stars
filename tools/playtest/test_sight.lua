@@ -573,6 +573,32 @@ do
           "aiPhaseStart: the phase reads what the setup wrote")
     check(state(), stale, "aiPhaseStart: the next read finds the player phase's state again")
     check(#log, 0, "aiPhaseStart: the guard finds no unit struct left changed")
+
+    -- `known`: a later start on the same board writes back what the two calls left (the
+    -- best Mov, every unit's aiFlags) and calls neither; the caller's call still runs
+    local known, again
+    ran = {}
+    ok, why = pcall(sandbox, function()
+        sandbox(function()
+            Sight.aiPhaseStart(api, call, S, { blue, red }, { { 0x08039AE8, {} } })
+            known = Sight.phaseStarted(m, S, { blue, red })
+        end)
+        ran = {}
+        sandbox(function()
+            Sight.aiPhaseStart(api, function(list)
+                for _, c in ipairs(list) do ran[#ran + 1] = c[1] end
+                return 17
+            end, S, { blue, red }, { { 0x08039AE8, {} } }, known)
+            again = state()
+        end)
+    end)
+    check(ok, true, "aiPhaseStart: a known start runs: " .. tostring(why))
+    check(#ran == 1 and ran[1], 0x08039AE8, "aiPhaseStart: a known start calls neither setup function")
+    -- as `inside`, but for ai_counter (the blue's stays 1: nothing reads it there)
+    check(again, table.concat({ Sight.PHASES[3], 0, 1, 0xFF, 0x80000003, 0, 7,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0x77, 0x42, 1, 1 }, ","),
+          "aiPhaseStart: a known start leaves the best Mov and the flags the calls did")
+    check(state() == stale and #log, 0, "aiPhaseStart: a known start is handed back too")
 end
 
 -- battleWord: a played exchange is kept by its two battle units less where they stand and less
@@ -605,7 +631,9 @@ do
               :find("local n = M%.aiPhaseStart%(api, call, S, all,%s*{ { S%.BuildAiUnitList, {} } }%)") ~= nil,
           true, "aiPhaseStart: aiOrder builds the order in the phase start's own list")
     local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
-    local started = decide:find("if starts then%s+M%.aiPhaseStart%(api, call, S, all, setup%)")
+    local started = decide:find("local known = seen%.phaseStart%s+"
+        .. "M%.aiPhaseStart%(api, call, S, all, setup, known%)%s+"
+        .. "seen%.phaseStart = known or M%.phaseStarted%(mem, S, all%)")
     local guard = decide:find("assert%(mem%.u8%(S%.gPlaySt %+ PLAY_FACTION%) == M%.PHASES%[3%]")
     local heal = decide:find("if healStale then table%.insert%(setup, 1, "
                              .. "{ S%.UpdateAllPhaseHealingAIStatus, {} }%) end")
