@@ -9,11 +9,27 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): fwd1 item C is merged (PR #603, ADR 0403); next is one PR for call 1 and an attempts cap.**
+**Next session starts here (2026-11-12): PR #604 (fwd1 call 1 and `resume --attempts`, ADR 0404) is reviewed and proven, and waits for Nicolas's "merge"; item D is next.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
 calls, all approved); its findings are comment 6810177817.
+
+**PR #604 (branch `feat/510-fwd1-call1-dice`): retries get different dice.** Not one of the
+PRs that may merge after review: it needs his "merge". CI was running on head 1e3c62e7 when
+this was written: check it for that sha before merging.
+- Attempt k of a chapter start has the game's RNG moved on (k - 1) * 1009 draws, no re-seed;
+  attempt 1 moves none. The stop "every style played" is gone: a chapter stops at the cap.
+  `resume --attempts N` bounds it, and a run that hits a lowered cap ends `capped`.
+- **One draw was not enough** (the first build): the game gave it back in turn 1 (59 draws
+  against 60) and played the same game. The PR body has the table. What drew one fewer is a
+  lead only (the die per tied path direction, bmidoten.c:218-226).
+- The dice are in the record: `dice_advanced`, `dice_start`, and `rn` on each player phase's
+  `progress` trace line.
+- The frozen suite was NOT run, on purpose: it plays only attempt 1, which is frame-identical
+  to main's in runs `call1c` and `call1d`.
+- `/code-review` medium (six findings, all fixed) and one scoped re-review are applied; the
+  PR's comment lists them.
 
 **PR #603 (item C, ADR 0403) is merged** (Nicolas: "merge", 2026-11-12), no open PR of this work.
 - CI green on its head, `/code-review` (high) and one scoped re-review applied,
@@ -42,9 +58,7 @@ calls, all approved); its findings are comment 6810177817.
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order.**
-1. **One PR: call 1 (retries get different dice) and an `--attempts` cap on `resume`.** In the
-   Ch8 set, attempts 2 and 3 of campaign 4001 are one game act for act, and so are 9 and 12;
-   `resume` always plays 12 attempts and its help lists no cap.
+1. **Merge PR #604** on Nicolas's word, once CI is green for its head sha.
 2. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
    charId 9 deaths added. Then E and F as the plan sizes them.
 
@@ -85,9 +99,16 @@ turn 19, Ch5x (4003) stalls on turn 33.
 (`M.ledger`'s `stalled` rows), tests in
 `test_bot.lua`, `test_sight.lua`, `test_montecarlo.py`. A Ch6 retry pair:
 `montecarlo.py resume --game vanilla --tag <new> --campaigns cs-s4001 --chapter 7 --last 7`
-(no attempts cap on main: next step 2); `montecarlo.py look <trace dirs>` reads it.
+(`--attempts N` caps it once #604 is merged); `montecarlo.py look <trace dirs>` reads it.
 
 - **Lessons:**
+  - The game's dice at a phase start are in the trace (`rn` on `progress` lines): "same dice?"
+    and "how many draws did a turn take" are a read, not a run (count NextRN steps between two
+    phases' words).
+  - A harness change has no unit test: after one, replay a kept attempt and compare frames
+    (`resume --campaigns fwd1-cs-s4001 --chapter 9 --last 9 --attempts 2`, about 10 minutes).
+  - The frozen suite plays only attempt 1 (`chapter_tasks`): a change that only touches
+    attempt 2 on cannot move it.
   - Start a `resume` and the suite at the same time: each works in its own `/tmp` folders and
     the suite's budget is counted in calls, not seconds (done once on 2026-11-12, no run without
     a game result). On a bot change run the suite FIRST: it is the shorter one (22 to 37
