@@ -1296,6 +1296,18 @@ class Suite(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(store, 'states', 'bad-cs-s4001')),
                          'a refusal copies nothing')
 
+    def test_max_attempts_names_the_file_when_the_cap_line_is_gone(self):
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        path = os.path.join(top, 'campaign.lua')
+        with open(path, 'w') as fh:
+            fh.write('M.RETRY_CAP = 12\n')
+        with self.assertRaisesRegex(ValueError, r'campaign\.lua has no line matching .*MAX_ATTEMPTS'):
+            mc.max_attempts.__wrapped__(path)
+
+    def test_a_capped_campaign_is_its_own_answer_not_a_failure_to_keep(self):
+        self.assertIn('capped', mc.PASSED_CAMPAIGN)
+
     def test_resume_main_takes_attempts_from_the_command_line_to_the_task(self):
         store, _pins = self.resume_store()
         seen = []

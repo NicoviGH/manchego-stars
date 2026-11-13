@@ -48,6 +48,9 @@
 --   bot_fault   the same on vanilla, which strong players clear clean: the bot is what failed,
 --               never the chapter (#510 step 9 design, decision 2). The chapter line's failures
 --               carry what spoiled each attempt and its trace
+--   capped      api.attempts is below MAX_ATTEMPTS and a chapter used them without a clean clear:
+--               the run was cut short on purpose, so it says nothing of the chapter or the bot
+--               (never infeasible or bot_fault)
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -89,13 +92,12 @@
 --   attempts              OPTIONAL: an integer in 1..MAX_ATTEMPTS bounding a chapter's attempts
 --                         in place of MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
 --   advanceDice(n)        advance the game's RNG n draws (Sight.advance) and return how many
---                         were advanced: the count the record keeps as `dice_advanced`. A
---                         diagnostic replay (diag) returns what its original's record says,
---                         not n, so a replay burns what its original did
+--                         were advanced: the count the record keeps as `dice_advanced`
 --   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
 --                         state is saved, unplayed (montecarlo.py `starts`: a cell loads only it)
 --   diag                  OPTIONAL, with only: that attempt is a diagnostic replay (botrun.lua's
---                         api.diag). Its one DIAG line is all it writes: no CAMPAIGN line, so
+--                         api.diag; a table, `dice_advanced` = the draws its original's record
+--                         says it advanced, absent on a record from before ADR 0404). Its one DIAG line is all it writes: no CAMPAIGN line, so
 --                         no endpoint is recorded, and it hands no record back
 --   emit(line), log(s)
 -- Campaign.run(api) -> ok, why, chapters. Each chapter emits ONE stdout line,
@@ -109,14 +111,15 @@ M.PREFIX = "CAMPAIGN "
 -- dice, ADR 0404)
 M.MAX_ATTEMPTS = 12
 
--- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE. One
--- draw is NOT enough: the game draws a die for each tied direction of a unit's path
--- (GenerateBestMovementScript, bmidoten.c:218-226) and for AI moves, 40 to 150 draws a turn on
--- vanilla Ch8, and a different draw there can use one draw fewer. Measured (run call1b,
--- campaign 4001 attempt 2): one draw ahead at the start, turn 1 drew 59 where the unshifted
--- game drew 60, and from turn 2 on both were on the same dice and played the same game. The
--- stride is more draws than a whole attempt's quiet turns could give back (about 16 turns of
--- 60), and a prime so no two attempts' offsets share a period with a turn's draws.
+-- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE.
+-- Measured: run call1b (stride 1), campaign 4001 attempt 2 started one draw ahead, drew 59 in
+-- turn 1 where the unshifted game drew 60, and was on the same dice from turn 2 and played the
+-- same game; a turn on vanilla Ch8 drew 7 to 147 dice in those games. Run call1c (stride
+-- 1009): attempts 2 and 3 of campaigns 4001 and 4004 were on different dice at turn 2 and played
+-- different games from main's. NOT proven: that a 1009-draw lead can never be given back; if it
+-- happens it shows as equal `rn` words in two attempts' traces. The cause of call1b is a lead,
+-- not confirmed: the game draws a die for each tied direction of a unit's path
+-- (GenerateBestMovementScript, bmidoten.c:218-226), so a shifted die can use one draw fewer.
 M.DICE_STRIDE = 1009
 
 -- the draws attempt `attempt` advances the game's RNG (0 for attempt 1: a measured cell, ADR 0385)
@@ -242,6 +245,11 @@ end
 
 function M.run(api)
     local Bot, Json, info = api.Bot, api.Json, api.info
+    if api.attempts ~= nil and not (math.type(api.attempts) == "integer"
+            and api.attempts >= 1 and api.attempts <= M.MAX_ATTEMPTS) then
+        error(string.format("campaign: attempts is %s, and a chapter start gets 1 to %d",
+            tostring(api.attempts), M.MAX_ATTEMPTS))
+    end
     local route = info.route
     local chapters = {}
     local function line(t)
@@ -258,13 +266,16 @@ function M.run(api)
     end
 
     -- a chapter with no clean clear left to try: on vanilla the bot's fault, on
-    -- Manchego Stars infeasible
+    -- Manchego Stars infeasible; with the cap lowered by api.attempts, only `capped`
     local function noClean(entry)
         local fault = info.game == "vanilla"
-        entry.outcome = fault and "bot_fault" or "infeasible"
+        local lowered = api.attempts ~= nil and api.attempts < M.MAX_ATTEMPTS
+        entry.outcome = lowered and "capped" or fault and "bot_fault" or "infeasible"
         line(entry)
         return entry.outcome, string.format("chapter %d: no clean clear in %d attempts%s",
-            entry.chapter, entry.attempts, fault and ", a bot fault" or "")
+            entry.chapter, entry.attempts,
+            lowered and string.format(", the cap lowered from %d", M.MAX_ATTEMPTS)
+            or fault and ", a bot fault" or "")
     end
 
     local function play()
@@ -357,7 +368,10 @@ function M.run(api)
                 end
                 -- after the prep screen and before the first move, so the draws land on the
                 -- play's dice whatever the screens above drew (they run the same every attempt)
-                local dice = api.advanceDice(M.diceFor(entry.attempts))
+                -- a replay burns what its original's record says (api.diag.dice_advanced; a
+                -- record from before the switch has none: 0), never what its attempt number says
+                local dice = api.advanceDice(api.diag and (api.diag.dice_advanced or 0)
+                                             or M.diceFor(entry.attempts))
                 local rec = api.play(style, followed, entry.attempts, team.pick, dice)
                 if api.diag then
                     return "played", string.format("chapter %d attempt %d: diagnostic replayed", ch,

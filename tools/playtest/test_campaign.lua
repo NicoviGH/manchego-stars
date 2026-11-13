@@ -620,10 +620,22 @@ local function test_one_attempt_alone_advances_as_attempt_k()
     first.api.only = 1
     Campaign.run(first.api)
     check(table.concat(first.dice, ","), "0", "attempt 1 alone advances none")
+    -- a replay burns what its original's record says (the diag line's dice_advanced), whatever
+    -- its attempt number: the record's count, and 0 for a record from before ADR 0404 (the diag
+    -- line of a pinned check is `{}`: harness.lua)
     local replay = fakeGame({ chapters = { { id = 3 } } })
-    replay.api.only, replay.api.diag = 2, { ref = 1, mode = "deep" }
+    replay.api.only, replay.api.diag = 2, { ref = 1, mode = "deep", dice_advanced = 7 }
     Campaign.run(replay.api)
-    check(table.concat(replay.dice, ","), tostring(Campaign.DICE_STRIDE), "a diagnostic replay of attempt 2 asks for attempt 2's dice")
+    check(table.concat(replay.dice, ","), "7", "a diagnostic replay of attempt 2 burns its record's dice")
+    check(replay.plays[1].dice, 7, "and its play is told")
+    local old = fakeGame({ chapters = { { id = 3 } } })
+    old.api.only, old.api.diag = 3, { ref = 1, mode = "deep" }
+    Campaign.run(old.api)
+    check(table.concat(old.dice, ","), "0", "an old attempt-3 record (no dice_advanced) replays none")
+    local pinned = fakeGame({ chapters = { { id = 3 } } })
+    pinned.api.only, pinned.api.diag = 3, {}
+    Campaign.run(pinned.api)
+    check(table.concat(pinned.dice, ","), "0", "a pinned check (diag = {}) burns none")
 end
 test_one_attempt_alone_advances_as_attempt_k()
 
@@ -651,7 +663,27 @@ local function test_api_attempts_bounds_the_retries()
     local ok, why = Campaign.run(g.api)
     check(ok, false, "no clean clear in the bound stops the campaign")
     check(#g.plays, 3, "exactly 3 attempts are played")
-    check(why:find("in 3 attempts", 1, true) ~= nil, true, "and it says 3 attempts: " .. tostring(why))
+    check(why, "chapter 5: no clean clear in 3 attempts, the cap lowered from 12",
+          "it says 3 attempts and the lowered cap")
+    -- a lowered cap is its own outcome, never the chapter's or the bot's verdict
+    check(lines(g)[1].outcome, "capped", "the chapter line says capped, not bot_fault")
+    check(lines(g)[2].outcome, "capped", "and so does the campaign line")
+    local ours = fakeGame({ game = "ours", chapters = { { id = 5, outcomes = outcomes } } })
+    ours.api.attempts = 2
+    Campaign.run(ours.api)
+    check(lines(ours)[1].outcome, "capped", "Manchego Stars: capped, not infeasible")
+    local full = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
+    full.api.attempts = Campaign.MAX_ATTEMPTS
+    Campaign.run(full.api)
+    check(lines(full)[1].outcome, "bot_fault", "a bound equal to the cap is the cap: bot_fault")
+    for _, bad in ipairs({ 0, -1, Campaign.MAX_ATTEMPTS + 1, 2.5 }) do
+        local b = fakeGame({ chapters = { { id = 5 } } })
+        b.api.attempts = bad
+        local bok, err = pcall(Campaign.run, b.api)
+        check(bok, false, "attempts " .. bad .. " is refused")
+        check(tostring(err):find("attempts is " .. tostring(bad) .. ", and a chapter start gets 1 to 12", 1, true) ~= nil,
+              true, "and the error names the value and the cap: " .. tostring(err))
+    end
     local one = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
     one.api.attempts = 1
     Campaign.run(one.api)

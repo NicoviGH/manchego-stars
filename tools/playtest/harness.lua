@@ -3317,9 +3317,14 @@ end
 -- A diagnostic replay (PT_DIAG, montecarlo.py's `replay`): { ref, mode, force, failure, run,
 -- original_trace = the original attempt's filed trace, gzipped or not }, as botrun.lua's api.diag
 -- with the trace read in (`original`). nil when the run is no diagnostic.
-INSPECT.diag = function(Json)
+INSPECT.diagLine = function(Json)
     if PLAYTEST_DIAG == nil or PLAYTEST_DIAG == "" then return nil end
-    local d = Json.decode(PLAYTEST_DIAG)
+    return Json.decode(PLAYTEST_DIAG)
+end
+
+INSPECT.diag = function(Json)
+    local d = INSPECT.diagLine(Json)
+    if not d then return nil end
     local path = assert(d.original_trace, "PT_DIAG: no original_trace")
     local fh = path:match("%.gz$") and io.popen("gzip -dc '" .. path:gsub("'", "'\\''") .. "'")
         or io.open(path)
@@ -3871,16 +3876,16 @@ INSPECT.campaignApi = function(game)
         error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
     end
     api.only = cfg.attempt
-    -- cfg.attempts: the retry cap for this run, in 1..MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
-    if cfg.attempts ~= nil and not (math.type(cfg.attempts) == "integer" and cfg.attempts >= 1) then
-        error("PT_CAMPAIGN: attempts must be an integer >= 1")
-    end
+    -- cfg.attempts: the retry cap for this run (montecarlo.py `resume --attempts`); the bound
+    -- is campaign.lua's to check
     api.attempts = cfg.attempts
     -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
     api.startOnly = cfg.start_only
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
     -- a pinned state's check (PT_PINNED) is one too: it hands no record back, writes no line
-    api.diag = ((PLAYTEST_DIAG or "") ~= "" or (PLAYTEST_PINNED or "") ~= "") or nil
+    -- A pinned check plays nothing (botrun.lua's check_pinned returns before a move; its task is
+    -- start_task's attempt 1, montecarlo.py), so it is a replay with no dice to burn: `{}`.
+    api.diag = INSPECT.diagLine(Json) or ((PLAYTEST_PINNED or "") ~= "" and {} or nil)
     if api.diag and not api.only then error("PT_DIAG and PT_PINNED play one attempt: PT_CAMPAIGN needs attempt") end
     -- Priced by the game for each unit that could buy, on the map: GetItemPurchasePrice reads
     -- the buyer (a Silver Card halves it) and charges half again while BM_FLAG_PREPSCREEN is
@@ -4265,13 +4270,9 @@ INSPECT.campaignApi = function(game)
     end
 
     -- Retries get different dice (ADR 0404): the draws the game's RNG moves on for this attempt,
-    -- thrown away from the chapter start's state. A diagnostic replay burns what its original's
-    -- record says (PT_DIAG's dice_advanced; a record from before the switch has none: 0), never
-    -- what its attempt number implies. Returns the draws advanced: the record's `dice_advanced`.
+    -- thrown away from the chapter start's state. campaign.lua says how many (a replay's is its
+    -- original's, api.diag.dice_advanced). Returns the draws advanced: the record's `dice_advanced`.
     api.advanceDice = function(n)
-        if api.diag and (PLAYTEST_DIAG or "") ~= "" then
-            n = Json.decode(PLAYTEST_DIAG).dice_advanced or 0
-        end
         INSPECT.Sight.advance(INSPECT.sightApi(), n)
         return n
     end

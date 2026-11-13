@@ -2412,7 +2412,7 @@ function M.seed(api, seed)
         call(S.InitRN, { seed })
         return M.dice(api)
     end)
-    for i, v in ipairs(words) do api.write16(S.gRNSeeds + (i - 1) * 2, v) end
+    M.setDice(api, words)
     return words
 end
 
@@ -2421,6 +2421,11 @@ end
 function M.dice(api)
     local S = api.SYM
     return { api.mem.u16(S.gRNSeeds), api.mem.u16(S.gRNSeeds + 2), api.mem.u16(S.gRNSeeds + 4) }
+end
+
+-- The three words written into the live gRNSeeds (the one writer: seed and advance use it).
+function M.setDice(api, words)
+    for i, v in ipairs(words) do api.write16(api.SYM.gRNSeeds + (i - 1) * 2, v) end
 end
 
 -- One NextRN (rng.c) on the three u16 words `w` = { s0, s1, s2 }, in place; returns the draw.
@@ -2440,10 +2445,9 @@ end
 -- moves the run along the stream it is on. 0 draws touch nothing (not even a write).
 function M.advance(api, n)
     if n <= 0 then return end
-    local S = api.SYM
     local w = M.dice(api)
     for _ = 1, n do M.nextRN(w) end
-    for i, v in ipairs(w) do api.write16(S.gRNSeeds + (i - 1) * 2, v) end
+    M.setDice(api, w)
 end
 
 return M

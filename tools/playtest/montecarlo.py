@@ -248,9 +248,10 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
 
 
 PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
-# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts (campaign.lua
-# noClean), and kept as FAILED they would crowd real crashes out of KEEP_FAILED
-PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible')
+# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts and `capped`
+# a cut made on purpose (campaign.lua noClean), and kept as FAILED they would crowd real crashes
+# out of KEEP_FAILED
+PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible', 'capped')
 
 
 def passing(recs):
@@ -2608,8 +2609,13 @@ def resume_seed(name, pins):
 def max_attempts(path=os.path.join(HERE, 'campaign.lua')):
     """The retry cap a chapter start gets (campaign.lua's M.MAX_ATTEMPTS): the one number,
     never restated here."""
+    pattern = r'M\.MAX_ATTEMPTS = (\d+)'
     with open(path) as fh:
-        return int(re.search(r'M\.MAX_ATTEMPTS = (\d+)', fh.read()).group(1))
+        found = re.search(pattern, fh.read())
+    if not found:
+        raise ValueError('%s has no line matching %r: the retry cap is read from it'
+                         % (path, pattern))
+    return int(found.group(1))
 
 
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
