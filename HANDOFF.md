@@ -9,7 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): fwd1 item D is read (#510 comment 6842371541); next is the planner item it found.**
+**Next session starts here (2026-11-13): PR #605 is open (the rank sees each goal's act, ADR 0405); its CI and Nicolas's merge are what is left.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
@@ -18,21 +18,48 @@ calls, all approved); its findings are comment 6810177817; item D's results are 
 **Which model leads (Nicolas agreed, 2026-11-12):** Fable led item D and sizes E and F; once
 they are precise briefs, Opus or Sonnet can lead their builds.
 
-**Item D in five lines** (one or a few attempts each: leads for the population).
-- The beam hides the goal's act from the rank: Ch9 turn 11 the Talk is offered and in none of
-  the 8 judged plans; Ch8 campaign 4001 turn 16 all 6 judged plans seize while two chests are
-  `feasible` and neared.
-- Ch7's pocket (4007): the march's field is the lord's for every unit (`field_unit` = 1), so an
-  ally sits on the lord's one nearer tile (5,15) for 22 turns.
-- Ch8's west chests: the door is not the block. The thief is sent, alone, and stops 2.5 to 3.7
-  turns short with enemy id 142 on her road (3 attempts of 4); everyone else is at the throne.
-- Ch7 4005 turn 3 and the Ch9 flyer on turn 2: under the cap this phase, wounded and alone the
-  next (item F's case).
-- Ch9's village: `closings` has an empty looter list from turn 2 on.
+**PR #605** (branch `feat/510-rank-sees-goal-act`, head 15768822): the planner item that item D
+found. ADR 0405 and the PR body have the tables.
+- **Done:** `/code-review` medium (8 findings) and one scoped re-review by a fresh subagent (3
+  findings), all applied; `suite --held-out` on the final code PROMOTED with 0 regressions
+  (instrument `2374a75d5563+v2`, not refrozen); the Ch8 and Ch9 starts run on the final code.
+- **Left:** CI on the head commit (`checks` green, `build` still running when this was
+  written), then the merge. The
+  memory rule lets a step-9 PR merge after review and CI; Nicolas has not been asked about
+  this one.
+- **What it does:** a judged plan for each ledger goal's offered Talk, Visit or chest no plan
+  holds (`goal`); two plans without the Seize while a goal is `feasible` and every plan seizes
+  (`noseize`: the first plan less its Seize, and every unit holding); and **no enemy phase is
+  judged after the Seize**, nor the lookahead's. That last one is a judge error older than the
+  PR: a unit at risk anywhere put the win over the cap.
+- **What the runs say:** the beam no longer hides the act (confirmed on Ch9 4006 turn 11 and
+  Ch8 4001 turn 16), and **neither chapter's result is better**. Ch9: the Talk plan is over
+  the cap (30.8% the lord dies after it), same games as main. Ch8 4001 attempt 1: the bot
+  waits turns 16 to 18 for the thief and seizes on turn 19 when she is at 63.5%; 19 turns
+  against 16, the same one death, the chests still missed. The other three Ch8 attempts are
+  main's games (the chests were already `stalled`).
+- **Found, not built:** the ledger does not know a recruit can leave. Ch9's recruit (charId
+  18) left the map in the enemy phase of turn 11 (`missed_recruits`: `left_map`); her row had
+  no `closes_on`, so the plan played read `forfeits` 0. Not on the issue yet.
+- **Untested:** whether the judge error is behind main's earlier late deaths on Ch8 (charId 9,
+  turns 17 to 23).
+- **Owed on #510:** a comment with these results (the PR body has them; the issue does not).
 
+**Item D's leads still open** (#510 comment 6842371541 has all of them): Ch7's pocket (4007):
+the march's field is the lord's for every unit, so an ally sits on her one nearer tile for 22
+turns. Ch8's west chests: the thief is sent alone and stops short with enemy id 142 on her
+road. Ch7 4005 turn 3 and the Ch9 flyer on turn 2: under the cap this phase, wounded and alone
+the next (item F's case). Ch9's village: `closings` has an empty looter list from turn 2 on.
 **The dump is kept, not merged:** local branch `probe/510-fwd1-d` (c7c27494), `PT_DPROBE=1`
-before `montecarlo.py resume`; `DPROBE <json>` lines land in `workers/*.log`. With it on, Ch8
-4001 attempt 1 played main's acts (`acts_hash` 22b2ff4a). Rebase it before reuse.
+before `montecarlo.py resume`; `DPROBE <json>` lines land in `workers/*.log`. Rebase it before
+reuse.
+
+**Asked by Nicolas (2026-11-13), answered from a code read, nothing measured:** the bot's item
+handling is basic. It buys each unit the cheapest Vulnerary and the cheapest usable weapon of
+each type it lacks (`Bot.shop`), picks a weapon per attack from the game's forecast, and sorts
+a full bag. It never trades on the map, never takes from the convoy at prep, and does not plan
+around weapon uses. Whether that has cost a run is not checked; a read of the kept records
+(units ending a chapter with no usable weapon or no healing) would say.
 
 **PR #604 is merged** (Nicolas: "Merge and handoff", 2026-11-12), no open PR of this work.
 - Attempt k of a chapter start has the game's RNG moved on (k - 1) * 1009 draws, no re-seed;
@@ -75,16 +102,13 @@ before `montecarlo.py resume`; `DPROBE <json>` lines land in `workers/*.log`. Wi
 - Three attempts still end `stuck` with the boss alive (campaign 4001 attempts 7 and 10,
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
-**Next steps, in order** (Nicolas agreed to the order, 2026-11-12: "Yes but let's do it next
-time").
-1. **The rank sees the goal's act** (new, small, planner.lua beside ADR 0403's Seize plan): a
-   judged plan for each offered Talk, chest and visit, and one plan without the Seize while a
-   ledger goal is `feasible`. Proof: unit tests that fail on main; the Ch9 and Ch8 4001 starts.
+**Next steps, in order** (Nicolas agreed to the order, 2026-11-12).
+1. **Land PR #605** (above).
 2. **Two reads owed before any rule:** why the looter list is empty from turn 2 (Ch9, a code
    read), and why the game gives the Ch7 pocket no tile north of y = 15 (a six-turn dump of
    terrain and move cost at (5,13) to (5,15)).
-3. **A unit's march tile from its own turns**, then item E on top of it; item F's test as the
-   plan wrote it.
+3. **A unit's march tile from its own turns**, then item E on top of it (the escort: both
+   goals #605 could not win are a unit alone at the goal); item F's test as the plan wrote it.
 
 **Three calls waiting for Nicolas.**
 - Put one vanilla Ch8 start in the frozen suite, so a change to the wait rules needs one run,
@@ -126,6 +150,14 @@ turn 19, Ch5x (4003) stalls on turn 33.
 (`--attempts N` caps it); `montecarlo.py look <trace dirs>` reads it.
 
 - **Lessons:**
+  - A plan kept in a trace's `considered` has its `rank` and `acts`: "was the plan judged, and
+    why was it refused" is a read of the trace (`kind`, `rejected`, `rank.max_die`), no run.
+  - The judge plays `sight.enemyPhase` on every plan it is not told to skip: when a plan's
+    act ends the chapter, check the phase is not charged to it.
+  - Stopping a run worked this session: `pkill -f "montecarlo.py suite"`, then `run.sh` and
+    `mgba-headless`; a stopped suite leaves part of an instrument's runs in `runs.jsonl`.
+  - Three runs at once (the suite and two `resume`s, 10 emulators) gave the same games as
+    alone (`acts_hash` equal); they take longer, not timed.
   - The game's dice at a phase start are in the trace (`rn` on `progress` lines): "same dice?"
     and "how many draws did a turn take" are a read, not a run (count NextRN steps between two
     phases' words).
