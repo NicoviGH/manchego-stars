@@ -9,16 +9,47 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, night): PR #607 is merged; the phase-start AI setup in judged phases (finding 6) is next, on Fable.**
+**Next session starts here (2026-11-13, afternoon): PR #608 is merged; replay the open leads as single runs before any planner change.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
-the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13); **use
-cheaper subagents** to check source, ADRs and research. The plan is **#510 comment 6810567866**;
-item D's results are comment 6842371541; the leak's findings are comment 6860128405.
-**Nicolas, 2026-11-13: the suite passes have slowed development badly and #510's scope keeps
-growing.** Standing rule since (AGENTS.md): **the frozen suite is never run for a PR.** A PR
-proves its change with unit tests and the run that showed the problem (`suite --only
-<start>/<seed>`); the suite runs only before the bot's reading is relied on (a difficulty
-verdict, a refreeze), and a regression it finds is bisected with `--only`.
+the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13). The plan
+is **#510 comment 6810567866**; item D's results are comment 6842371541; the leak's findings are
+comment 6860128405; the phase start's are comment 6866102739.
+- **Next step, agreed by Nicolas (2026-11-13: "Next instance will follow your
+  recommendations"):** the open leads below were diagnosed on reads that had the defects of
+  PRs #606 and #608. Replay each as ONE run on main (`resume --attempts 1`, or
+  `suite --only <start>/<seed>`; minutes each) and keep only what survives: Ch9 4006's village
+  and recruit, Ch8's thief (Colm) stopping short of the west chests (4001, 4004), Ch7 4005
+  turn 3 and the Ch9 flyer on turn 2 ("under the cap this phase, wounded and alone the next").
+  Write the result on #510 before picking a planner change.
+- **How to spend the session (Nicolas asked, 2026-11-13):** code reading, decomp searches and
+  the review go to Sonnet subagents from the first step; the main session chooses the test
+  and reads its result. A 12-second run (`suite --only scout-ch6/1001`) with a temporary log
+  settles most questions about a simulated decision faster than reading does.
+- **The frozen suite is never run for a PR** (AGENTS.md). A PR proves its change with unit
+  tests and the run that showed the problem; the suite runs only before the bot's reading is
+  relied on.
+- **Asked, not answered:** a finish line for "the bot plays vanilla well". Fable's suggestion:
+  a clean clear within the attempt cap on vanilla Ch1 to Ch9 from the pinned starts, then the
+  difficulty verdicts start. His call.
+
+**PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
+- A simulated enemy phase and a single strike now start as the game's phase does
+  (`Sight.aiPhaseStart`: `AiPhaseInit`'s fields and its two calls, the faction red). That was
+  finding 6.
+- **It was the cause of the looting read's last open lead (confirmed):** once every player
+  unit had acted, `gAiState.flags` read `AI_FLAG_BERSERKED` and every simulated enemy decided
+  as a berserked unit. Ch9 4006 attempt 1: 104 of 320 looter decisions attacked a red unit
+  without the fix, none with it.
+- That attempt is a loss on turn 10 without the fix and a win in 19 turns with no death with
+  it (tags `phstart1ctl`, `phstart1`, `phstart3`). One game: a lead. The village and the
+  recruit are still missed.
+- Cost level with main (the ADR has the table and the three changes that got it there). The
+  three suite runs played keep main's acts; no leak.
+- Review: `/code-review 608 medium` (11 findings) and one scoped re-review (6 notes), all
+  fixed; CI green on the head.
+- **Untested (ADR 0407 lists them):** that no AI path reads the scratch maps a later strike on
+  a board no longer refills; the looting read's `bestBlueMov` of 0; what else the phase start
+  decides (turn order after a wound, enemy healers, the AI's keys on turn 1).
 
 **PR #606 is merged** (b869fce5; Nicolas: "merge", 2026-11-13), no open PR of this work.
 - What it is now: a simulated enemy decision puts back what the game wrote on unit structs.
@@ -39,15 +70,7 @@ verdict, a refreeze), and a regression it finds is bisected with `--only`.
 - Campaign 4006's Ch9 attempt 1 is a win in 19 turns on main and a loss on turn 10 on this
   PR (the lord dies on a plan over the cap); so it was before the review (tags `keepai1` to
   `keepai6`). Not looked into.
-- **Finding 6, real and older than the PR, NOT in it:** a judged enemy phase never runs the
-  game's phase-start AI setup (`AiPhaseInit`, cp_phase.c: `gAiState.flags`, `cmd_result`,
-  `specialItemFlags`, `UpdateAllPhaseHealingAIStatus`, `SetupUnitInventoryAIFlags`; the first
-  again after each act, cp_perform.c). Shape of the fix: do it where the phase's order is
-  built (`aiOrder`) and in `strike`; the two functions need adding to `gen_symbols.py`. It
-  changes play: its own PR, proved on single runs (`--only`), no suite.
-- **Still open in the looting read, cause untested:** the last read of each player phase has
-  the looters attacking red units and taking no village (tags `keepai4`, `keepai6`). The
-  phase-start setup is the first thing to test it against.
+- Finding 6 and the looting read's last lead are closed by PR #608 (above).
 
 **PR #607 is merged** (cd2a2458; Nicolas: "Merge when green", 2026-11-13; ADR 0406).
 - `montecarlo.py suite --only <start>[/<seed>],...` plays only those runs, checks only those
