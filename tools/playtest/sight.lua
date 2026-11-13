@@ -287,8 +287,10 @@ local STATUS_PETRIFY, STATUS_13 = 11, 13
 -- struct BattleUnit is 0x80 bytes; its word at +0x10 holds xPos, yPos (the low half), maxHP
 -- and curHP. struct BattleStats: +00 config and +02 range share its first word.
 local BU_SIZE, BU_POSITION, POSITION_BITS = 0x80, 0x10, 0xFFFF
--- struct Unit +46 ai_counter: the third byte of the word at +44 (ai2, ai_b_pc, ai_counter)
-local BU_AI_COUNTER, AI_COUNTER_BITS = 0x44, 0x00FF0000
+-- The AI's two bytes on a unit the enemy phase's start rewrites (M.battleWord): +0A aiFlags,
+-- the third byte of the word at +08 (level, exp, aiFlags, index), and +46 ai_counter, the
+-- third of the word at +44 (ai2, ai_b_pc, ai_counter).
+local BU_AI_FLAGS, BU_AI_COUNTER, AI_BYTE_BITS = 0x08, 0x44, 0x00FF0000
 local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
 M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
@@ -323,7 +325,6 @@ local TALK_PID_A, TALK_PID_B, NO_PID = 0x08, 0x09, 0xFF
 local CHAPTER_TALKS = 0x04
 -- struct PlaySt: +0D chapterVisionRange (0 = no fog), +0F faction, +10 u16 chapterTurnNumber.
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
-local PLAY_CHAPTER = 0x0E   -- gPlaySt.chapterIndex
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 -- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
@@ -384,13 +385,13 @@ local REG_IE = M.REG_IE
 local SVC_NOIRQ = 0x13 | 0x80                 -- CPSR mode Supervisor, I
 -- A call LIST runs every call of it in one stretch of emulation: each call takes a whole frame
 -- however little of it the function uses (the rest spins in the loop), and one enemy's
--- decision is six calls (#510 step 9: ~8,000 of ch02's 9,748 calls an attempt). The stub,
+-- decision was five calls of its own (#510 step 9: ~8,000 of ch02's 9,748 calls an attempt). The stub,
 -- Thumb, ARMv4T (no blx): r4 walks a list of { addr|1, r0, r1, r2, r3, [sp] } words ended by
 -- addr 0; it calls each through a `bx r5` veneer and branches to the return loop at the end.
 -- r4-r6 are callee-saved (AAPCS), so every called function keeps them.
 -- Calls in one list. The list sits at loop + LIST_AT = top + 0xC0 and the caller's stack starts
--- at top + 0x180 or above, so 0xC0 bytes hold up to seven entries and the end word; an enemy's
--- decision (aiDecide) is six.
+-- at top + 0x180 or above, so 0xC0 bytes hold up to seven entries and the end word; the
+-- longest list is six, a decision inside its phase (aiDecide).
 M.LIST_MAX = 6
 M.LIST_STUB = {
     0x6825,           -- +00 ldr r5, [r4, #0]
@@ -1154,18 +1155,20 @@ function M.keepRide(api, S, e, units)
 end
 
 -- One word of a battle unit, at offset `at`, as the played exchanges are kept by it (the
--- sight's battleKey): less where the unit stands, and less its ai_counter. The enemy phase's
--- start writes a player unit's ai_counter as its allies within 8 tiles
--- (SetupUnitInventoryAIFlags, M.aiPhaseStart), no battle code reads it (only the AI, on the
--- unit deciding), and kept in the key it made one exchange a new one wherever the unit stood:
--- vanilla Ch6 seed 1001 played 1,949 simulations for the 1,496 it needs, the same decisions.
+-- sight's battleKey): less where the unit stands, and less its aiFlags and ai_counter. The
+-- enemy phase's start rewrites both on a unit (M.aiPhaseStart: the heal flag from its HP, a
+-- player unit's flags from its bag, its ai_counter a count of the units around it), and no
+-- battle code reads either: aiFlags is read in cp_*.c, cpextra_80407F0.c, eventscr3.c and
+-- bmsave.c alone, ai_counter by the AI on the unit deciding and by bmsave.c. Kept in the key,
+-- ai_counter made one exchange a new one wherever the unit stood: vanilla Ch6 seed 1001
+-- played 1,949 simulations for the 1,496 it needs, the same decisions.
 function M.battleWord(at, word)
     if at == BU_POSITION then return word & ~POSITION_BITS end
-    if at == BU_AI_COUNTER then return word & ~AI_COUNTER_BITS end
+    if at == BU_AI_FLAGS or at == BU_AI_COUNTER then return word & ~AI_BYTE_BITS end
     return word
 end
 
--- Inside a sandbox, before a simulated enemy phase orders or decides: the game's own phase start
+-- Inside a sandbox, where a simulated enemy phase begins: the game's own phase start
 -- (cp_phase.c AiPhaseInit), which no player-phase read had run. Its field assignments are
 -- written here as they stand and its two calls made, the faction red first:
 -- UpdateAllPhaseHealingAIStatus sets the heal flag (aiFlags bit 0) of each unit of
@@ -1180,11 +1183,17 @@ end
 -- AiPhaseBerserkInit's value), and every enemy then decided as a berserked unit, no script
 -- run: vanilla Ch9's looters attacked their own side in each such read, 104 decisions of 320
 -- in one attempt, and took no village (#510, ADR 0407).
--- Every write is journaled, the game's bestBlueMov with unk84's halfword and its unit bytes
--- by M.keepAi, so the sandbox hands the player phase's state back. `units` as M.keepAi's.
--- -> the two calls, for the caller to lead its next call list with: a list is one emulated
--- run, a call of their own a frame more on every phase and strike (M.LIST_MAX's note).
-function M.aiPhaseStart(api, S, units)
+-- What the sandbox hands back: every write made here (journaled), gAiState.bestBlueMov
+-- (journaled with unk84's halfword before the game writes it) and the units' aiFlags and
+-- ai_counter (M.keepAi; `units` as its: Board.read's every occupied slot). NOT handed back:
+-- the scratch maps SaveNumberOfAlliedUnitsIn0To8Range fills for each player unit
+-- (gBmMapMovement zeroed, and its 8-tile range added into whichever map gWorkingBmMap names
+-- then, cp_utility.c), as no game call's map writes are; what follows a phase start is an
+-- enemy's decision, which makes its maps anew. ai_counter is therefore a count of the units
+-- around a player unit only when the working map is the movement map; nothing reads it there.
+-- `after` = the caller's next calls, run in the same list (a list is one emulated run, a call
+-- of its own a frame more on every phase and strike) -> the last one's r0.
+function M.aiPhaseStart(api, call, S, units, after)
     local mem, A = api.mem, S.gAiState
     M.keepAi(api, units)
     api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
@@ -1192,10 +1201,11 @@ function M.aiPhaseStart(api, S, units)
     api.write8(A + AI_UNK7E, 0xFF)
     api.write8(A + AI_ORDER_STATE, 0)
     for k = 0, AI_CMD_RESULTS - 1 do api.write8(A + AI_CMD_RESULT + k, 0) end
-    api.write32(A + AI_ITEM_FLAGS,
-        mem.u32(S.gAiItemConfigTable + mem.u8(S.gPlaySt + PLAY_CHAPTER) * 4))
+    api.write32(A + AI_ITEM_FLAGS, mem.u32(S.gAiItemConfigTable + api.chapter() * 4))
     api.write16(A + AI_UNK84, 0)
-    return { { S.UpdateAllPhaseHealingAIStatus, {} }, { S.SetupUnitInventoryAIFlags, {} } }
+    local list = { { S.UpdateAllPhaseHealingAIStatus, {} }, { S.SetupUnitInventoryAIFlags, {} } }
+    for _, c in ipairs(after) do list[#list + 1] = c end
+    return call(list)
 end
 
 function M.equip(api, call, S, u, slot)
@@ -1692,14 +1702,15 @@ function M.new(outer)
     -- RefreshUnitSprites (they draw) and the US_HAS_MOVED_AI it sets after (read only by
     -- cp_order.c's list building, done before any decision). `all` = the board's units (M.keepAi keeps
     -- their AI bytes; the caller holds them, so no decision reads the board for it). `before`
-    -- runs just ahead of the decision (strike() narrows the targets there). `start` = the
-    -- phase start's calls (M.aiPhaseStart) when the decision is the phase's first act and
-    -- nothing ordered it (strike()); they lead the list. Any other decision leads with
-    -- UpdateAllPhaseHealingAIStatus, the faction red since its phase's order: the game reads
-    -- the heal flags again after every act (cp_perform.c CpPerform_Cleanup), and a staged
-    -- phase writes a striker's HP between two decisions. -> the struck unit's id and the strike as
+    -- runs just ahead of the decision (strike() narrows the targets there). `starts` = the
+    -- decision is its phase's first act and nothing ordered it (strike()): the phase start
+    -- (M.aiPhaseStart) leads its calls. Any other decision is inside a phase aiOrder started,
+    -- the faction red (asserted: decided on the player's, it would read the player phase's
+    -- gAiState again), and leads with UpdateAllPhaseHealingAIStatus: the game reads the heal
+    -- flags again after every act (cp_perform.c CpPerform_Cleanup), and a staged phase writes
+    -- a striker's HP between two decisions. -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
-    local function aiDecide(call, proc, e, all, before, start)
+    local function aiDecide(call, proc, e, all, before, starts)
         M.keepAi(api, all)
         M.keepFog(api, all)   -- `setup` refreshes the maps
         M.keepRide(api, S, e, all)
@@ -1713,17 +1724,22 @@ function M.new(outer)
             (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
         api.write8(S.gAiState + AI_DANGER_FILLED, 0)
         local decide = { { S.AiClearDecision, {} }, { S.AiDecideMain, {} } }
-        local setup = start or { { S.UpdateAllPhaseHealingAIStatus, {} } }
-        for _, c in ipairs({ { S.RefreshEntityBmMaps, {} }, { S.AiUpdateNoMoveFlag, { e.addr } },
-                             { S.AiInitDangerMap, {} } }) do setup[#setup + 1] = c end
-        if before then
-            call(setup)
-            before()
-            call(decide)
+        local setup = { { S.RefreshEntityBmMaps, {} }, { S.AiUpdateNoMoveFlag, { e.addr } },
+                        { S.AiInitDangerMap, {} } }
+        if starts then
+            M.aiPhaseStart(api, call, S, all, setup)
         else
-            setup[#setup + 1], setup[#setup + 2] = decide[1], decide[2]
+            assert(mem.u8(S.gPlaySt + PLAY_FACTION) == M.PHASES[3],
+                   "sight: an enemy decides inside a phase aiOrder started, or starts its own")
+            table.insert(setup, 1, { S.UpdateAllPhaseHealingAIStatus, {} })
+            if not before then
+                setup[#setup + 1], setup[#setup + 2] = decide[1], decide[2]
+                decide = nil
+            end
             call(setup)
         end
+        if before then before() end
+        if decide then call(decide) end
         local D = S.gAiDecision
         local DEC = Board.AI_DEC
         if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then return nil end
@@ -1744,12 +1760,11 @@ function M.new(outer)
             standOn(u, x, y)
             if from then standOn(e, from.x, from.y) end
             M.equip(api, call, S, u, slot)
-            -- the strike is the enemy's phase too: its start, on the board as stood
-            local start = M.aiPhaseStart(api, S, all)
+            -- the strike is the enemy's phase too, started on the board as stood (`starts`).
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
             local target, side = aiDecide(call, proc, e, all,
-                                          function() onlyTarget(u, all) end, start)
+                                          function() onlyTarget(u, all) end, true)
             if target ~= u.id then return nil end
             return side
         end)
@@ -1760,9 +1775,7 @@ function M.new(outer)
     -- (M.aiPhaseStart: the faction red, the heal flags the order reads), inside an open
     -- sandbox. `all` = the board's units, as aiDecide's.
     local function aiOrder(call, all)
-        local start = M.aiPhaseStart(api, S, all)
-        start[#start + 1] = { S.BuildAiUnitList, {} }
-        local n = call(start)
+        local n = M.aiPhaseStart(api, call, S, all, { { S.BuildAiUnitList, {} } })
         if n > 0 then call(S.SortAiUnitList, { n }) end
         local out = {}
         for i = 0, n - 1 do out[#out + 1] = mem.u8(S.gAiState + i) end
@@ -2030,7 +2043,11 @@ function M.new(outer)
             -- the question is when a tile falls if no player unit defends it: our units are
             -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
             -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
-            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell)
+            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell).
+            -- The phase start skips a hidden unit too (SetupUnitInventoryAIFlags), so the
+            -- replay's gAiState.bestBlueMov is 0: no tile is kept from a looter for a faster
+            -- player unit (cp_utility.c AiTryMoveTowards), the same question asked. Read off
+            -- the decomp; its effect on a closing turn is not measured.
             for _, o in ipairs(all) do
                 if o.faction ~= "red" and o.onField then
                     api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)

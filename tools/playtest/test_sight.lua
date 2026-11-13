@@ -6,6 +6,13 @@ local here = (arg[0]:match("(.*/)")) or "./"
 local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
 local fakeMem = dofile(here .. "fakemem.lua")
+-- sight.lua's own text, for the tests that read a call's place off the source
+local sightSrc
+do
+    local f = assert(io.open(here .. "sight.lua"))
+    sightSrc = f:read("a")
+    f:close()
+end
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -509,13 +516,13 @@ end
 do
     local m = fakeMem()
     local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16,
-                    write32 = m.w32, Board = Board }
+                    write32 = m.w32, Board = Board, chapter = function() return 5 end }
     local AI, PLAY, TABLE = 0x0203AA04, 0x0202BCF0, 0x080D8178
     local S = { gAiState = AI, gPlaySt = PLAY, gAiItemConfigTable = TABLE,
                 UpdateAllPhaseHealingAIStatus = 0x0803E640, SetupUnitInventoryAIFlags = 0x0803C064 }
     local blue, red = { addr = 0x02030000 }, { addr = 0x02030200 }
     local FLAGS, COUNTER = Sight.UNIT_AI_FLAGS, Sight.UNIT_AI_CONFIG + 6
-    m.w8(PLAY + 0x0E, 5); m.w8(PLAY + 0x0F, Sight.PHASES[1])      -- chapter 5, the player's phase
+    m.w8(PLAY + 0x0F, Sight.PHASES[1])                            -- the player's phase; chapter 5
     m.w32(TABLE + 5 * 4, 0x80000003)
     m.w8(AI + 0x78, 2); m.w8(AI + 0x7B, 4); m.w8(AI + 0x7E, 3)    -- orderState, BERSERKED, unk7E
     m.w32(AI + 0x80, 0xDEAD); m.w8(AI + 0x84, 1); m.w8(AI + 0x85, 9)
@@ -538,17 +545,18 @@ do
         m.w8(red.addr + FLAGS, 1)
         m.w8(AI + 0x85, 7)
         m.w8(blue.addr + FLAGS, 0x42); m.w8(blue.addr + COUNTER, 3)
+        return 17
     end
     local log = {}
     local sandbox, api = Sight.batching(outer, function()
         return { { blue.addr, Board.UNIT_SIZE, "unit struct" },
                  { red.addr, Board.UNIT_SIZE, "unit struct" } }
     end, log)
-    local inside
+    local inside, r0
     local ok, why = pcall(sandbox, function()
         sandbox(function()
-            -- the caller leads its own list with the two calls
-            call(Sight.aiPhaseStart(api, S, { blue, red }))
+            -- the caller's own next call rides in the phase start's list
+            r0 = Sight.aiPhaseStart(api, call, S, { blue, red }, { { 0x08039AE8, {} } })
             inside = state()
         end)
     end)
@@ -556,9 +564,10 @@ do
     check(atCall, table.concat({ Sight.PHASES[3], 0, 1, 0xFF, 0x80000003, 0, 0,
                                  0, 0, 0, 0, 0, 0, 0, 0, 0x77, 0x02, 1, 0 }, ","),
           "aiPhaseStart: the setup runs on AiPhaseInit's values, the faction red")
-    check(#ran == 2 and ran[1] == S.UpdateAllPhaseHealingAIStatus
-          and ran[2] == S.SetupUnitInventoryAIFlags, true,
-          "aiPhaseStart: the heal statuses, then the inventory flags, as AiPhaseInit calls them")
+    check(#ran == 3 and ran[1] == S.UpdateAllPhaseHealingAIStatus
+          and ran[2] == S.SetupUnitInventoryAIFlags and ran[3] == 0x08039AE8 and r0, 17,
+          "aiPhaseStart: the heal statuses, then the inventory flags, as AiPhaseInit calls "
+          .. "them, then the caller's call in the same list -> its r0")
     check(inside, table.concat({ Sight.PHASES[3], 0, 1, 0xFF, 0x80000003, 0, 7,
                                  0, 0, 0, 0, 0, 0, 0, 0, 0x77, 0x42, 3, 1 }, ","),
           "aiPhaseStart: the phase reads what the setup wrote")
@@ -567,37 +576,43 @@ do
 end
 
 -- battleWord: a played exchange is kept by its two battle units less where they stand and less
--- ai_counter, which the phase start rewrites wherever a player unit stands and no battle
--- reads; every other byte of the AI word (ai2, its script counter) and of the unit stays.
+-- aiFlags and ai_counter, which the phase start rewrites and no battle reads; every other
+-- byte of their words (the level, ai2, its script counter) and of the unit stays.
 do
     check(Sight.battleWord(0x44, 0x5A07FF03), 0x5A00FF03, "battleWord: ai_counter is left out")
+    check(Sight.battleWord(0x08, 0x0341630A), 0x0300630A, "battleWord: aiFlags is left out, the "
+          .. "level, the exp and the unit's index kept")
     check(Sight.battleWord(0x10, 0x12340A0B), 0x12340000, "battleWord: where the unit stands is left out")
     check(Sight.battleWord(0x40, 0x5A07FF03), 0x5A07FF03, "battleWord: every other word is whole")
-    local f = assert(io.open(here .. "sight.lua"))
-    local src = f:read("a")
-    f:close()
+    local src = sightSrc
     check(src:find("parts[#parts + 1] = M.battleWord(at, mem.u32(bu + at))", 1, true) ~= nil, true,
           "battleWord: the played exchanges' key is built from it")
 end
 
 -- Every simulated enemy phase starts through it (the test above proves only the helper): read
--- off the source, aiOrder and the strike each call Sight.aiPhaseStart, nothing else does, the
--- strike before its decision, and every aiOrder call hands it the units.
+-- off the source, aiOrder starts the phase in the list that builds its order, aiDecide starts
+-- one when told to (`starts`: the strike) and otherwise refuses a faction not red, and nothing
+-- else calls it. Every aiOrder call hands it the units.
 do
-    local f = assert(io.open(here .. "sight.lua"))
-    local src = f:read("a")
-    f:close()
-    local _, starts = src:gsub("[^\n]* = M%.aiPhaseStart%(api, S, all%)", "")
-    check(starts, 2, "aiPhaseStart: aiOrder and strike are its two callers")
-    for _, name in ipairs({ "local function aiOrder(call, all)", "function s.strike(" }) do
+    local src = sightSrc
+    local _, starts = src:gsub("M%.aiPhaseStart%(api, call, S, all,", "")
+    check(starts, 2, "aiPhaseStart: aiOrder and aiDecide are its two callers")
+    local function bodyOf(name)
         local at = src:find(name, 1, true)
-        local body = at and src:sub(at, src:find("\n    end\n", at, true))
-        local start = body and body:find("local start = M.aiPhaseStart(api, S, all)", 1, true)
-        local act = body and (body:find("start[#start + 1] = { S.BuildAiUnitList, {} }\n        local n = call(start)", 1, true)
-                              or body:find("function() onlyTarget(u, all) end, start)", 1, true))
-        check(start ~= nil and act ~= nil and start < act, true,
-              "aiPhaseStart: " .. name .. " leads its order or its decision with the phase's start")
+        return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
     end
+    check(bodyOf("local function aiOrder(call, all)")
+              :find("local n = M%.aiPhaseStart%(api, call, S, all,%s*{ { S%.BuildAiUnitList, {} } }%)") ~= nil,
+          true, "aiPhaseStart: aiOrder builds the order in the phase start's own list")
+    local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
+    local started = decide:find("if starts then%s+M%.aiPhaseStart%(api, call, S, all, setup%)")
+    local guard = decide:find("assert%(mem%.u8%(S%.gPlaySt %+ PLAY_FACTION%) == M%.PHASES%[3%]")
+    local heal = decide:find("table%.insert%(setup, 1, { S%.UpdateAllPhaseHealingAIStatus, {} }%)")
+    check(started ~= nil and guard ~= nil and heal ~= nil and started < guard and guard < heal, true,
+          "aiPhaseStart: a decision starts its phase, or is inside a red one and reads the "
+          .. "heal flags again first, as the game does after every act")
+    check(bodyOf("function s.strike("):find("function%(%) onlyTarget%(u, all%) end,%s*true%)") ~= nil,
+          true, "aiPhaseStart: the strike's decision starts its phase")
     -- the definition's own parameter list counts as one
     local calls, withUnits = 0, 0
     for args in src:gmatch("[^%w]aiOrder(%b())") do
@@ -614,9 +629,7 @@ end
 -- the fog bits: RefreshEntityBmMaps is called from Sight.refresh, from fullInfo (the outermost
 -- sandbox, whose load undoes it) and in aiDecide's call list, after its keepFog.
 do
-    local f = assert(io.open(here .. "sight.lua"))
-    local src = f:read("a")
-    f:close()
+    local src = sightSrc
     local _, refreshes = src:gsub("\n[^\n-]*S%.RefreshEntityBmMaps", "")
     check(refreshes, 3, "refresh: RefreshEntityBmMaps is called from refresh, fullInfo and aiDecide alone")
     for _, name in ipairs({ "function M.refresh(", "function M.fullInfo(",
@@ -626,7 +639,7 @@ do
         check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
               "refresh: " .. name .. " holds one of the three calls")
     end
-    local at = src:find("local function aiDecide(call, proc, e, all, before, start)", 1, true)
+    local at = src:find("local function aiDecide(call, proc, e, all, before, starts)", 1, true)
     local body = at and src:sub(at, src:find("\n    end\n", at, true))
     local keep = body and body:find("M.keepAi(api, all)", 1, true)
     local write = body and body:find("api.write", 1, true)
@@ -639,13 +652,11 @@ do
     check(ride ~= nil and ride < write, true,
           "keepRide: aiDecide keeps the rider's ballista before its first write")
     local _, keeps = src:gsub("\n +M%.keepAi%(", "")
+    -- aiPhaseStart's own keep comes before its call: its test above runs under the guard
     check(keeps, 2, "keepAi: aiDecide and aiPhaseStart are its two callers")
-    check(body:find("local setup = start or { { S.UpdateAllPhaseHealingAIStatus, {} } }", 1, true)
-          ~= nil, true, "aiPhaseStart: a decision no phase start leads reads the heal flags "
-          .. "again first, as the game does after every act")
     local calls, withUnits = 0, 0
     for args in src:gmatch("[^%w]aiDecide(%b())") do
-        if not args:find("^%(e%)") and not args:find("before, start%)$") then
+        if not args:find("^%(e%)") and not args:find("before, starts%)$") then
             calls = calls + 1
             local units = args:match("^%(call, proc, e, (%w+)[,)]")
             if units == "all" or units == "byId" then withUnits = withUnits + 1 end
@@ -661,9 +672,7 @@ end
 -- phases' staging each equip through it, both phases stage through that, and the game call
 -- appears in Sight.equip alone.
 do
-    local f = assert(io.open(here .. "sight.lua"))
-    local src = f:read("a")
-    f:close()
+    local src = sightSrc
     local _, direct = src:gsub("S%.EquipUnitItemSlot", "")
     check(direct, 1, "equip: EquipUnitItemSlot is called from Sight.equip alone")
     for _, name in ipairs({ "s.enemyPhase", "s.nextPhase" }) do
@@ -704,9 +713,7 @@ do
     check(Sight.playsAsSeen(bound, FOG, true), true, "playsAsSeen: in fog, remembered")
     -- and the emulator-bound reads that the fog alone would hide a unit from all ask it (the
     -- sandboxed game calls cannot run here; the campaign rerun is their proof, ADR 0399)
-    local f = assert(io.open(here .. "sight.lua"))
-    local src = f:read("a")
-    f:close()
+    local src = sightSrc
     local _, asks = src:gsub("M%.playsAsSeen%(Board, [^\n]-, s%.knows%(e%)%)", "")
     check(asks, 3, "playsAsSeen: decides, closings' looters and keySources ask it")
     local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
