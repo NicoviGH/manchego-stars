@@ -359,6 +359,10 @@ WANTED = [
     # The planner's enemy phase (#510 step 9): the enemy turn order, as the game builds it.
     'BuildAiUnitList',          # gAiState.units: the faction's units able to act (cp_order.c)
     'SortAiUnitList',           # that list in the order the AI moves them (cp_order.c)
+    # The enemy phase's own start (cp_phase.c AiPhaseInit; sight.lua aiPhaseStart).
+    'UpdateAllPhaseHealingAIStatus',  # each unit of the phase's faction: its heal flag from its HP
+    'SetupUnitInventoryAIFlags',  # the player's units: gAiState.bestBlueMov, their aiFlags by bag
+    'gAiItemConfigTable',       # u32 per chapter: the special items the AI may use there
     'MakePrepUnitList',         # the Pick Units roster, rebuilt into its EWRAM overlay (prepscreen.c)
     # campaign.lua (#510 step 9 PR E): between chapters, the game's own shop, rules and world map.
     'StartShopScreen',          # opens the Armory/Vendor screen for a unit over a stock list

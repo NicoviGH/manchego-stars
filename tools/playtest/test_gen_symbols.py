@@ -62,7 +62,8 @@ SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNS
          'CpPerform_BeginUnitMovement', 'EvCheck03_CHAR',
          'EvCheck04_CHARASM', 'CheckForCharacterEvents', 'GetUnitKeyItemSlotForTerrain',
          'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
-         'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon']
+         'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon',
+         'UpdateAllPhaseHealingAIStatus', 'SetupUnitInventoryAIFlags', 'gAiItemConfigTable']
 # campaign.lua's between-chapter reads and calls (#510 step 9 PR E).
 CAMPAIGN = ['StartShopScreen', 'Shop_Loop_BuyKeyHandler', 'sShopState', 'GetItemPurchasePrice',
             'CanUnitUseWeapon', 'CanUnitUsePromotionItem', 'ProcScr_WorldMapMain',
