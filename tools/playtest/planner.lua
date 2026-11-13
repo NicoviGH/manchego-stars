@@ -37,7 +37,9 @@
 --      reaches the boss strikes it, heaviest first -- a combination the beam's per-unit cut
 --      never tries), the advance (each unit's act that gains the most ground toward its goal,
 --      which the beam's judged score can cut while the rank puts it first), the Seize when
---      the game offers it (the rest holding: the beam must not hide the win from the rank), and on a stalled
+--      the game offers it (the rest holding: the beam must not hide the win from the rank),
+--      each open ledger goal's offered Talk, Visit or chest no plan above holds, and one plan
+--      without the Seize while a goal is feasible and every plan above seizes (ADR 0405), and on a stalled
 --      board (opts.stalled) each unit's best act that
 --      changes the board, of which the best is played: a careful player that has stopped
 --      making progress takes the least it must.
@@ -70,7 +72,7 @@
 -- the fog read's chance to kill a blue one, on the played plan only (Bot.fogRead); and
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
--- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"seize"|"unstall"|"mend"|"rest",
+-- player units it strikes, sorted), kind = "beam"|"assault"|"advance"|"seize"|"goal"|"wait"|"unstall"|"mend"|"rest",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -276,6 +278,16 @@ local function loss(W, st, charId)
     return st.gameOver[charId] and W.win or W.death
 end
 
+-- The ledger goal an act takes (Goals' ids): a Talk its recruit, a Visit or a chest its tile;
+-- nil for any other act.
+local function takes(act)
+    if act.act == "talk" then return "recruit:" .. act.targetId end
+    if act.act == "visit" or act.act == "chest" then
+        return act.act .. ":" .. act.move.x .. "," .. act.move.y
+    end
+    return nil
+end
+
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
@@ -332,7 +344,7 @@ local function score(act, st, W, style, odds)
         -- the recruit joins us: it is off the enemy side, for the plan's later acts and for the
         -- judged phase, as a kill is; its goal is taken (the goals' term)
         fx.gone = act.targetId
-        fx.took = "recruit:" .. act.targetId
+        fx.took = takes(act)
     elseif act.act == "rescue" then
         -- the target is carried (bmunit.c UnitRescue): off the map, never the AI's target, and
         -- dropped alive if its carrier dies (DropRescueOnDeath). What that saves it is the
@@ -344,7 +356,7 @@ local function score(act, st, W, style, odds)
     elseif act.act == "visit" or act.act == "chest" then
         -- the goal is taken; what it is worth against the risk there is the goals' term
         -- against the unit's exposure, by style
-        fx.took = act.act .. ":" .. act.move.x .. "," .. act.move.y
+        fx.took = takes(act)
     elseif act.act == "staff" and act.amount then
         -- a planned heal: what the target is short by now in the plan, up to the staff's amount.
         -- This is AddUnitHp's clamp to GetUnitMaxHp (sight.maxHps), applied here because the HP
@@ -1530,6 +1542,75 @@ function M.plan(Bot, board, sight, style, opts)
                     have[k] = true
                     finals[#finals + 1] = { st = st, kind = "seize" }
                 end
+            end
+        end
+    end
+    -- each goal's act the game offers (#510 fwd1 item D, ADR 0405): the Seize's step above, for
+    -- a Talk, a chest and a Visit. The beam decides which plans the rank judges, and cut the
+    -- one act that takes an open goal (vanilla Ch9, campaign 4006 turn 11: the lord's Talk to
+    -- the recruit offered and in none of the 8 plans judged; she left on turn 12). So an open
+    -- ledger goal whose act is offered and in no plan above gets one: the act (the best by its
+    -- own score, where more than one unit or tile offers it), then the first plan's other acts
+    -- where they still fit, as the mend keeps a plan. An ordering only: the rank decides.
+    local open = {}
+    for _, r in ipairs(ledger) do
+        if r.status == "feasible" or r.status == "stalled" then open[r.id] = true end
+    end
+    do
+        local held, bestFor, ids = {}, {}, {}
+        for _, f in ipairs(finals) do
+            for id in pairs(f.st.took) do held[id] = true end
+        end
+        for _, c in ipairs(cands) do
+            for _, x in ipairs(c.acts) do
+                local id = takes(x)
+                if id and open[id] and not held[id] then
+                    local b = bestFor[id]
+                    if not b then ids[#ids + 1] = id end
+                    if not b or (x.own or 0) > (b.a.own or 0)
+                            or ((x.own or 0) == (b.a.own or 0) and key(x) < key(b.a)) then
+                        bestFor[id] = { a = x, uid = c.unit.id }
+                    end
+                end
+            end
+        end
+        table.sort(ids)
+        local first = finals[1] and finals[1].st
+        for _, id in ipairs(ids) do
+            local b = bestFor[id]
+            local st = extend(start, b.a, b.uid)
+            if st then
+                for _, x in ipairs(first and first.acts or {}) do
+                    if x.unitId ~= b.uid then st = extend(st, x, x.unitId) or st end
+                end
+                st = complete(st)
+                local k = table.concat(keysOf(st), " ")
+                if not have[k] then
+                    have[k] = true
+                    finals[#finals + 1] = { st = st, kind = "goal" }
+                end
+            end
+        end
+    end
+    -- and its mirror: while a ledger goal is feasible, one plan that does not take the Seize.
+    -- Every plan judged took it (vanilla Ch8, campaign 4001 turn 16: all 6, forfeiting two chests
+    -- the thief had neared every turn), so the rank's first key had nothing to choose between.
+    -- The first plan with its Seize left out, that unit holding. A stalled row asks for none:
+    -- it no longer holds the win (ADR 0403).
+    do
+        local feasible, every = false, #finals > 0
+        for _, r in ipairs(ledger) do feasible = feasible or r.status == "feasible" end
+        for _, f in ipairs(finals) do every = every and seizesIn(f.st) end
+        if feasible and every then
+            local st = start
+            for _, x in ipairs(finals[1].st.acts) do
+                if x.act ~= "seize" then st = extend(st, x, x.unitId) or st end
+            end
+            st = complete(st)
+            local k = table.concat(keysOf(st), " ")
+            if not have[k] then
+                have[k] = true
+                finals[#finals + 1] = { st = st, kind = "wait" }
             end
         end
     end

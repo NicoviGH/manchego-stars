@@ -3970,6 +3970,102 @@ do
     check(other, nil, "seize over the cap: no other judged plan is under the cap")
 end
 
+-- test_the_rank_sees_an_offered_goal_act (#510 fwd1 item D's planner item, ADR 0405): U can
+-- take a goal at or from (4,2), a step away from the gate, and none of the beam's plans is
+-- judged (FINAL = 0: the beam cut the act, as it cut the Talk on vanilla Ch9 turn 11). A plan
+-- with the act is judged all the same, its other acts the first plan's (V's march). With the
+-- beam's plans judged and the act in one of them, no second plan is built for it.
+do
+    local function judged(o, final)
+        local U = blue(0x01, 0, 4, 3, { minRange = false })
+        -- with the beam's plans judged U is alone, so the beam keeps each of its three acts
+        local V = final and blue(0x02, 1, 0, 0, { minRange = false })
+            or red(0x84, 13, 14, { minRange = false })
+        local Z = red(0x83, 14, 14, { minRange = false })
+        o.objective = { kind = "seize", tile = { x = 4, y = 9 } }
+        o.reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }), [0x02] = tiles({ 0, 0 }, { 0, 1 }) }
+        o.enemyPhase = function() return {} end
+        local was = Planner.FINAL
+        Planner.FINAL = final or was
+        local _, plan = Planner.plan(B, boardOf(U, V, Z), sightOf(o), style("bold"))
+        Planner.FINAL = was
+        local goal, n = nil, 0
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if c.kind == "goal" then goal, n = table.concat(c.acts, " "), n + 1 end
+        end
+        return goal, n
+    end
+    for _, kind in ipairs({ "visit", "chest" }) do
+        local function o()
+            return { explorable = { { x = 4, y = 2, kind = kind } },
+                     canExplore = { [0x01] = { ["4,2"] = kind } } }
+        end
+        check(judged(o(), 0), "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
+              "goal act: the " .. kind .. " the beam cut is judged, the rest the first plan's")
+        check(select(2, judged(o())), 0,
+              "goal act: a " .. kind .. " a judged plan already holds gets no second plan")
+    end
+    -- a Talk to the recruit T, from beside it
+    local function talk()
+        return { talk = { [0x01] = { [0x30] = true } } },
+               blue(0x30, 5, 4, 1, { faction = "green", minRange = false })
+    end
+    local to, T = talk()
+    local st = claimed("bold", { id = "r1", kind = "recruit", unit = { 0x30 } })
+    local U = blue(0x01, 0, 4, 3, { minRange = false })
+    local V = blue(0x02, 1, 0, 0, { minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    to.objective = { kind = "seize", tile = { x = 4, y = 9 } }
+    to.reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }), [0x02] = tiles({ 0, 0 }, { 0, 1 }) }
+    to.enemyPhase = function() return {} end
+    local was = Planner.FINAL
+    Planner.FINAL = 0
+    local _, plan = Planner.plan(B, boardOf(U, V, Z, T), sightOf(to), st)
+    Planner.FINAL = was
+    local goal
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "goal" then goal = table.concat(c.acts, " ") end
+    end
+    check(goal, "1>talk@4,2>48 2>wait@0,1>nil", "goal act: the Talk the beam cut is judged")
+end
+
+-- test_one_plan_without_the_seize_while_a_goal_is_feasible (#510 fwd1 item D, ADR 0405): the
+-- lord can Seize, and the thief T is two turns from a chest only she opens. Every plan judged
+-- seizes (BEAM = 1, as all 6 did on vanilla Ch8, campaign 4001 turn 16), each forfeiting the
+-- chest. One plan without the Seize is judged too, and the rank plays it: no forfeit. With the
+-- chest's row stalled (opts.quietGoals) no such plan is built and the Seize is played.
+do
+    local function run(opts)
+        local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+        local T = blue(0x02, 1, 0, 9, { minRange = false })
+        local Z = red(0x83, 14, 14, { minRange = false })
+        local o = {
+            objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+            reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }), [0x02] = tiles({ 0, 9 }, { 5, 9 }) },
+            explorable = { { x = 10, y = 9, kind = "chest" } },
+            canExplore = { [0x02] = { ["10,9"] = "chest" } },
+            enemyPhase = function() return {} end,
+        }
+        local beam = Planner.BEAM
+        Planner.BEAM = 1
+        local a, plan = Planner.plan(B, boardOf(L, T, Z), sightOf(o), gifted("bold", 100), opts)
+        Planner.BEAM = beam
+        local kinds = {}
+        for _, c in ipairs(plan and plan.considered or {}) do
+            kinds[#kinds + 1] = c.kind .. (c.seizes and "+seize" or "") .. ":" .. c.rank.forfeits
+        end
+        table.sort(kinds)
+        return table.concat(kinds, " "), plan
+    end
+    local kinds, plan = run()
+    check(kinds:find("wait:0", 1, true) ~= nil, true, "no seize: a plan without the Seize is judged")
+    check(plan and plan.seizes, false, "no seize: and played, the chest still to get")
+    check(plan and #plan.forfeited, 0, "no seize: it forfeits nothing")
+    kinds, plan = run({ quietGoals = { ["chest:10,9"] = true } })
+    check(kinds:find("wait:", 1, true), nil, "no seize: a stalled chest asks for no such plan")
+    check(plan and plan.seizes, true, "no seize: and the Seize is played")
+end
+
 -- test_the_plan_names_how_near_each_goal_is (#510 fwd1 item C, the progress record's near half):
 -- `nearest` holds the objective's nearest unit and each feasible visit row's best taker, in
 -- turns, sorted by id; a reward row has no tile and gives no entry.
