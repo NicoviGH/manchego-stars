@@ -48,8 +48,8 @@ below plays main's acts on all three (the same act hashes) and reports no leak.
 | | Ch5 frames | Ch5 CPU s | Ch14 CPU s | wall |
 |---|---|---|---|---|
 | main (`d24e89c3a001`) | 166,458 | 72.4 | 46.2 | 1m18.0 |
-| the heal flags read before every decision (`47007dec`) | 171,743 | 75.6 | 48.2 | 1m21.3 |
-| the two calls on every strike (`9fc6f804`) | 169,527 | 74.5 | 47.8 | 1m21.2 |
+| the heal flags read before every decision, the two calls on every strike (`47007dec`) | 171,743 | 75.6 | 48.2 | 1m21.3 |
+| the two calls on every strike, the heal flags only when stale (`9fc6f804`) | 169,527 | 74.5 | 47.8 | 1m21.2 |
 | as merged (`c3fe6ffd`) | 166,271 | 72.6 | 47.2 | 1m18.3 |
 
 The ids are the records' instruments in the vanilla store's `runs.jsonl`. The last row was
