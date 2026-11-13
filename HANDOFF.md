@@ -9,7 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, evening): PR #606 is reviewed, green and waiting for Nicolas's "merge"; then make the suite cheap to probe BEFORE any more sandbox work.**
+**Next session starts here (2026-11-13, evening): PR #606 is merged; make the suite cheap to probe BEFORE any more sandbox work.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13); **use
 cheaper subagents** to check source, ADRs and research. The plan is **#510 comment 6810567866**;
@@ -17,7 +17,7 @@ item D's results are comment 6842371541; the leak's findings are comment 6860128
 **Nicolas, 2026-11-13: the suite passes have slowed development badly and #510's scope keeps
 growing. Run the full suite ONCE per PR, at the end; prove a fix on the one run that showed it.**
 
-**PR #606 (`feat/510-closings-leak`, head f7e1e002): reviewed, every finding applied, CI green on the head, NOT merged (Nicolas has not said "merge").**
+**PR #606 is merged** (b869fce5; Nicolas: "merge", 2026-11-13), no open PR of this work.
 - What it is now: a simulated enemy decision puts back what the game wrote on unit structs.
   Four leaks, each with a unit test that fails without its fix: the AI bytes (`Sight.keepAi`,
   once a sandbox, every unit), the fog bits a map refresh rewrites (`keepFog` / `refresh`;
@@ -150,12 +150,11 @@ around weapon uses. Whether that has cost a run is not checked; a read of the ke
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order.**
-1. PR #606: Nicolas's "merge" (squash; CI is green on f7e1e002).
-2. The two tool changes above, one small PR.
-3. The phase-start AI setup in judged phases (finding 6), its own PR; prove it on single runs
+1. The two tool changes above, one small PR.
+2. The phase-start AI setup in judged phases (finding 6), its own PR; prove it on single runs
    (`--only`, `PT_LEAKGUARD=1`), one suite at the end; test the end-of-phase looting read
    against it.
-4. Ask Nicolas about the seizer's progress weight (below), then size item E on the shared
+3. Ask Nicolas about the seizer's progress weight (below), then size item E on the shared
    field, not on per-unit marches. Item F's test as the plan wrote it.
 
 **Three calls waiting for Nicolas.**
