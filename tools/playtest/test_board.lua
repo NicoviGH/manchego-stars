@@ -27,18 +27,7 @@ local SYM = {
     gAiDecision = 0x0203AA96,
 }
 
-local function fakeMem()
-    local bytes = {}
-    local m = {}
-    function m.u8(a) return bytes[a] or 0 end
-    function m.s8(a) local v = m.u8(a); return v >= 0x80 and v - 0x100 or v end
-    function m.u16(a) return m.u8(a) | (m.u8(a + 1) << 8) end
-    function m.u32(a) return m.u16(a) | (m.u16(a + 2) << 16) end
-    function m.w8(a, v) bytes[a] = v & 0xFF end
-    function m.w16(a, v) m.w8(a, v); m.w8(a + 1, v >> 8) end
-    function m.w32(a, v) m.w16(a, v); m.w16(a + 2, v >> 16) end
-    return m
-end
+local fakeMem = dofile(here .. "fakemem.lua")
 
 local CHAR_BASE, CLASS_BASE = 0x08800000, 0x08810000
 local IA_WEAPON = 0x1

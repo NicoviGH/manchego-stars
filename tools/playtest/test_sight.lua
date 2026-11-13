@@ -5,6 +5,7 @@
 local here = (arg[0]:match("(.*/)")) or "./"
 local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
+local fakeMem = dofile(here .. "fakemem.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -120,11 +121,9 @@ end
 -- entries to its checks (one plain, one with an asm condition); CheckForCharacterEvents keeps
 -- the available one, the walk was asked for a pair no entry names, and the breakpoints go.
 do
-    local bytes, holds, at = {}, {}, {}
-    local function u8(a) return bytes[a] or 0 end
-    local function u32(a) return u8(a) | u8(a + 1) << 8 | u8(a + 2) << 16 | u8(a + 3) << 24 end
-    local function w8(a, v) bytes[a] = v & 0xFF end
-    local function w32(a, v) for i = 0, 3 do w8(a + i, v >> (8 * i)) end end
+    local holds, at = {}, {}
+    local m = fakeMem()
+    local u8, u32, w8, w32 = m.u8, m.u32, m.w8, m.w32
     local INFO, LIST, GROUP = 0x03000000, 0x08100000, 0x08200000
     w32(GROUP + 4, LIST)
     w8(LIST + 0x08, 0x01); w8(LIST + 0x09, 0x0E)        -- Eirika -> Ross
@@ -327,6 +326,202 @@ do
         end)
     end)
     check(bytes[at], 23, "keep16: put back when the sandbox returns")
+end
+
+-- keepAi, on byte-true memory (aiFlags is one byte of a halfword whose other byte is the unit's
+-- index): what the game's AI writes on unit structs while one decides is put back -- every
+-- unit's aiFlags and AI block, not the decider's alone. A looter the closings replay played
+-- past its last village read as no looter for the rest of the batch (#510).
+do
+    local cpu = fakeCpu(1)
+    local m, reads = fakeMem(), 0
+    local u8, w8, plain16 = m.u8, m.w8, m.u16
+    m.u16 = function(a) reads = reads + 1; return plain16(a) end
+    local outer = { cpu = cpu, mem = m, write8 = w8, write16 = m.w16, write32 = m.w32,
+                    Board = Board }
+    local FLAGS, BLOCK, LAST = Sight.UNIT_AI_FLAGS, Sight.UNIT_AI_CONFIG,
+        Sight.UNIT_AI_CONFIG + Sight.UNIT_AI_WORDS * 2 - 1
+    local e, other = { addr = 0x02030000 }, { addr = 0x02030100 }
+    local byId = { [3] = e, [9] = other }
+    -- the game's own writes, straight to memory: every AI byte of both units set to `v`
+    local function gameWrites(v)
+        for _, o in pairs(byId) do
+            w8(o.addr + FLAGS, v)
+            for at = o.addr + BLOCK, o.addr + LAST do w8(at, v) end
+        end
+    end
+    local function ai(o)
+        local out = { u8(o.addr + FLAGS), u8(o.addr + FLAGS + 1) }
+        for at = o.addr + BLOCK, o.addr + LAST do out[#out + 1] = u8(at) end
+        return table.concat(out, ",")
+    end
+    gameWrites(4)
+    w8(e.addr + FLAGS + 1, 3); w8(other.addr + FLAGS + 1, 9)   -- their indexes
+    local first, inner
+    local function sandboxed(sandbox, api)
+        sandbox(function()
+            sandbox(function()
+                Sight.keepAi(api, byId)
+                local kept = reads
+                Sight.keepAi(api, byId)
+                check(reads, kept, "keepAi: a second keep in one sandbox reads nothing")
+                gameWrites(7)
+                -- a sandbox inside puts back what IT found, the first decision's writes
+                sandbox(function()
+                    Sight.keepAi(api, byId)
+                    check(reads > kept, true, "keepAi: a nested sandbox keeps afresh")
+                    gameWrites(8)
+                end)
+                inner = ai(e) .. " " .. ai(other)
+            end)
+            first = ai(e) .. " " .. ai(other)
+        end)
+    end
+    sandboxed(Sight.batching(outer))
+    check(inner, "7,3,7,7,7,7,7,7,7,7 7,9,7,7,7,7,7,7,7,7",
+        "keepAi: a nested sandbox puts back the bytes as it found them")
+    check(first, "4,3,4,4,4,4,4,4,4,4 4,9,4,4,4,4,4,4,4,4",
+        "keepAi: every unit's aiFlags and AI block are put back, the index untouched")
+
+    -- the guard (PT_LEAKGUARD): a nested sandbox that leaves a unit struct changed raises
+    -- and names it; one whose writes were all kept does not. Sight.keepAi is that keep.
+    local function guarded()
+        return { { e.addr, Board.UNIT_SIZE, "unit struct" }, { other.addr, Board.UNIT_SIZE, "unit struct" } }
+    end
+    local sandbox, api = Sight.batching(outer, guarded)
+    local ok, why = pcall(sandbox, function()
+        sandbox(function() w8(other.addr + BLOCK + 2, 1) end)
+    end)
+    check(ok, false, "guard: a unit struct a nested sandbox leaves changed raises")
+    check(tostring(why):find(("sandbox leak: the unit struct at 0x%08X, word +0x40")
+              :format(other.addr), 1, true) ~= nil, true,
+          "guard: the error names the struct and the word: " .. tostring(why))
+    w8(other.addr + BLOCK + 2, 4)
+    ok, why = pcall(sandboxed, sandbox, api)
+    check(ok, true, "guard: writes that keepAi held raise nothing: " .. tostring(why))
+end
+
+-- refresh: the game's map refresh rewrites a red's fog bits for the board it runs on (a
+-- judged plan's), and the next plan must find them as they were (vanilla Ch6: an enemy one
+-- plan revealed stayed seen for the rest of the batch). The fake call is bmmap.c's write.
+do
+    local m = fakeMem()
+    local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16,
+                    write32 = m.w32, Board = Board }
+    local S, STATE = { RefreshEntityBmMaps = 0x0801A2D8 }, 0x0C
+    local red = { addr = 0x02030200 }
+    m.w32(red.addr + STATE, Board.US_BIT9 | 0x00010000)
+    local function call(fn)
+        check(fn, S.RefreshEntityBmMaps, "refresh: calls RefreshEntityBmMaps")
+        m.w32(red.addr + STATE, (m.u32(red.addr + STATE) & ~Board.US_BIT9) | 0x100)
+    end
+    local TRAPS = 0x0203A614
+    local sandbox, api = Sight.batching(outer, function()
+        return { { red.addr, Board.UNIT_SIZE, "unit struct" },
+                 { TRAPS, Sight.TRAP_MAX * Sight.TRAP_SIZE, "trap pool" } }
+    end)
+    local seen = {}
+    local ok, why = pcall(sandbox, function()
+        sandbox(function()
+            Sight.refresh(api, call, S, { [130] = red })
+            seen[1] = m.u32(red.addr + STATE)
+        end)
+        seen[2] = m.u32(red.addr + STATE)
+    end)
+    check(ok, true, "refresh: the guard finds nothing left changed: " .. tostring(why))
+    check(seen[1], 0x00010100, "refresh: the plan's own read sees the enemy revealed")
+    check(seen[2], Board.US_BIT9 | 0x00010000, "refresh: the next plan finds it in fog again")
+
+    -- keepRide: a ballista's rider that decides to strike with its own weapon steps off it
+    -- (bmarch.c TryRemoveUnitFromBallista, written here as the game writes it); the next plan
+    -- finds it riding, the ballista ridden and on its tile. A unit on foot keeps nothing.
+    local RIDE, trap = Sight.UNIT_BALLISTA, TRAPS + 2 * Sight.TRAP_SIZE
+    local S2 = { sTrapPool = TRAPS }
+    m.w32(red.addr + STATE, Sight.US_IN_BALLISTA)
+    m.w8(red.addr + RIDE, 2); m.w8(red.addr + RIDE + 1, 5)        -- its trap; movBonus
+    m.w8(trap, 7); m.w8(trap + 1, 3); m.w8(trap + 5, 1); m.w8(trap + 6, 4)   -- tile, ridden, uses
+    m.w32(red.addr + Sight.UNIT_SPRITE, 0x0203A0A8)
+    local function ride()
+        return table.concat({ m.u32(red.addr + STATE), m.u8(red.addr + RIDE), m.u8(trap),
+                              m.u8(trap + 1), m.u8(trap + 5), m.u8(trap + 6),
+                              m.u32(red.addr + Sight.UNIT_SPRITE) }, ",")
+    end
+    local riding = ride()
+    local function stepsOff()
+        m.w32(red.addr + STATE, 0)
+        m.w8(red.addr + RIDE, 0)
+        m.w8(trap, 9); m.w8(trap + 1, 9); m.w8(trap + 5, 0)
+        m.w32(red.addr + Sight.UNIT_SPRITE, 0)        -- RefreshUnitSprites, the unit hidden
+    end
+    ok, why = pcall(sandbox, function()
+        sandbox(function()
+            Sight.keepFog(api, { red })
+            Sight.keepRide(api, S2, red, { red })
+            stepsOff()
+            seen[3] = ride()
+        end)
+        seen[4] = ride()
+    end)
+    check(ok, true, "keepRide: the guard finds nothing left changed: " .. tostring(why))
+    check(seen[3], "0,0,9,9,0,4,0", "keepRide: the plan's own read sees the rider on foot")
+    check(seen[4], riding, "keepRide: the next plan finds it riding, the ballista where it was")
+    ok, why = pcall(sandbox, function()
+        sandbox(function()
+            Sight.keepFog(api, { red })
+            m.w8(trap + 5, 0)
+        end)
+    end)
+    check(ok == false and tostring(why):find("sandbox leak: the trap pool at", 1, true) ~= nil,
+          true, "guard: a trap a nested sandbox leaves changed raises: " .. tostring(why))
+    m.w8(trap + 5, 1)
+    m.w32(red.addr + STATE, 0)
+    local kept = 0
+    Sight.keepRide({ mem = m, keep16 = function() kept = kept + 1 end }, S2, red, { red })
+    check(kept, 0, "keepRide: a unit on foot keeps nothing")
+end
+
+-- Every enemy decision keeps the AI bytes first (the tests above prove only the helpers): read
+-- off the source, aiDecide calls Sight.keepAi before its first write, nothing else does, and
+-- every call of aiDecide hands it the board's units. And every map refresh in a sandbox keeps
+-- the fog bits: RefreshEntityBmMaps is called from Sight.refresh, from fullInfo (the outermost
+-- sandbox, whose load undoes it) and in aiDecide's call list, after its keepFog.
+do
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    local _, refreshes = src:gsub("\n[^\n-]*S%.RefreshEntityBmMaps", "")
+    check(refreshes, 3, "refresh: RefreshEntityBmMaps is called from refresh, fullInfo and aiDecide alone")
+    for _, name in ipairs({ "function M.refresh(", "function M.fullInfo(",
+                            "local function aiDecide(" }) do
+        local at = src:find(name, 1, true)
+        local body = at and src:sub(at, src:find("\nend\n", at, true) or #src)
+        check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
+              "refresh: " .. name .. " holds one of the three calls")
+    end
+    local at = src:find("local function aiDecide(call, proc, e, all, before)", 1, true)
+    local body = at and src:sub(at, src:find("\n    end\n", at, true))
+    local keep = body and body:find("M.keepAi(api, all)", 1, true)
+    local write = body and body:find("api.write", 1, true)
+    check(keep ~= nil and write ~= nil and keep < write, true,
+          "keepAi: aiDecide keeps the AI bytes before its first write")
+    local fog = body and body:find("M.keepFog(api, all)", 1, true)
+    check(fog ~= nil and fog < write, true,
+          "refresh: aiDecide keeps the fog bits before its first write")
+    local ride = body and body:find("M.keepRide(api, S, e, all)", 1, true)
+    check(ride ~= nil and ride < write, true,
+          "keepRide: aiDecide keeps the rider's ballista before its first write")
+    local _, keeps = src:gsub("\n +M%.keepAi%(", "")
+    check(keeps, 1, "keepAi: aiDecide is its one caller")
+    local calls, withUnits = 0, 0
+    for args in src:gmatch("[^%w]aiDecide(%b())") do
+        if not args:find("^%(e%)") and not args:find("before%)$") then
+            calls = calls + 1
+            local units = args:match("^%(call, proc, e, (%w+)[,)]")
+            if units == "all" or units == "byId" then withUnits = withUnits + 1 end
+        end
+    end
+    check(calls > 0 and calls == withUnits, true,
+          ("keepAi: each of aiDecide's %d calls hands it the units (%d do)"):format(calls, withUnits))
 end
 
 -- Every equip in sight.lua goes through Sight.equip: a sandbox read that called
