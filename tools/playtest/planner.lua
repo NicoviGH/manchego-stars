@@ -1499,6 +1499,15 @@ function M.plan(Bot, board, sight, style, opts)
     if a then finals[#finals + 1] = { st = a, kind = "assault" } end
     local have = {}
     for _, f in ipairs(finals) do have[table.concat(keysOf(f.st), " ")] = true end
+    -- one more plan for the rank to judge: `st` completed (every unit it leaves holding), as
+    -- `kind`, unless a plan with the same acts is there already or no unit took an act
+    local function offer(st, kind)
+        st = complete(st)
+        local k = table.concat(keysOf(st), " ")
+        if st == start or have[k] then return end
+        have[k] = true
+        finals[#finals + 1] = { st = st, kind = kind }
+    end
     local adv = advance(have)
     if adv then finals[#finals + 1] = { st = adv, kind = "advance" } end
     -- the rest of the plan in hand (opts.rest, botrun's on a replan): its acts as this board
@@ -1519,14 +1528,7 @@ function M.plan(Bot, board, sight, style, opts)
             local n = o and extend(st, o.a, o.uid)
             if n then st, kept = n, kept + 1 end
         end
-        if kept > 0 then
-            st = complete(st)
-            local k = table.concat(keysOf(st), " ")
-            if not have[k] then
-                have[k] = true
-                finals[#finals + 1] = { st = st, kind = "rest" }
-            end
-        end
+        if kept > 0 then offer(st, "rest") end
     end
     -- the Seize, whenever the game offers it, the rest holding (#510 fwd1 item C, ADR 0403): the
     -- beam keeps what scores well act by act and can cut the one plan the rank puts first once
@@ -1540,14 +1542,7 @@ function M.plan(Bot, board, sight, style, opts)
     for _, c in ipairs(cands) do
         for _, x in ipairs(c.acts) do
             local n = x.act == "seize" and extend(start, x, c.unit.id)
-            if n then
-                local st = complete(n)
-                local k = table.concat(keysOf(st), " ")
-                if not have[k] then
-                    have[k] = true
-                    finals[#finals + 1] = { st = st, kind = "seize" }
-                end
-            end
+            if n then offer(n, "seize") end
         end
     end
     -- each goal's act the game offers (#510 fwd1 item D, ADR 0405): the Seize's step above, for
@@ -1588,12 +1583,7 @@ function M.plan(Bot, board, sight, style, opts)
                 for _, x in ipairs(first and first.acts or {}) do
                     if x.unitId ~= b.uid then st = extend(st, x, x.unitId) or st end
                 end
-                st = complete(st)
-                local k = table.concat(keysOf(st), " ")
-                if not have[k] then
-                    have[k] = true
-                    finals[#finals + 1] = { st = st, kind = "goal" }
-                end
+                offer(st, "goal")
             end
         end
     end
@@ -1614,13 +1604,7 @@ function M.plan(Bot, board, sight, style, opts)
             for _, x in ipairs(acts) do
                 if x.act ~= "seize" then st = extend(st, x, x.unitId) or st end
             end
-            st = complete(st)
-            local k = table.concat(keysOf(st), " ")
-            -- `start` itself is no plan (no unit had a hold to take)
-            if st ~= start and not have[k] then
-                have[k] = true
-                finals[#finals + 1] = { st = st, kind = "noseize" }
-            end
+            offer(st, "noseize")
         end
     end
     if stalled then
@@ -1764,16 +1748,26 @@ function M.plan(Bot, board, sight, style, opts)
             local budget = opts and opts.budget or {}
             local room = deep and math.huge or math.min(budget.decision or M.LOOK_DECISION,
                                                         budget.attempt or M.LOOK_ATTEMPT)
-            if #fin > room then
+            -- a finalist that takes the Seize meets no second phase, as it met no first: the
+            -- chapter is over (ADR 0405). It costs no call and stays a finalist, ranked again
+            -- beside the others
+            local asks = 0
+            for _, st in ipairs(fin) do
+                if not seizesIn(st) then asks = asks + 1 end
+            end
+            if asks > room then
                 look.skipped = true
                 cost.look.skipped_budget = 1
             else
                 local clock = os.clock()
                 for _, st in ipairs(fin) do
-                    local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                                reds = st.phase.reds, opened = st.phase.opened,
-                                                carry = st.phase.carry })
-                    look.calls = look.calls + 1
+                    local r = {}
+                    if not seizesIn(st) then
+                        r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
+                                              reds = st.phase.reds, opened = st.phase.opened,
+                                              carry = st.phase.carry })
+                        look.calls = look.calls + 1
+                    end
                     -- every unit the first phase may strike, alive at its start: its HP then
                     local live = {}
                     for _, u in ipairs(st.phase.hit) do

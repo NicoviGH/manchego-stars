@@ -3996,6 +3996,14 @@ do
     local a, plan = Planner.plan(B, boardOf(L, T, Z), sightOf(o), style("careful"))
     check((a and a.act) .. " " .. tostring(plan and plan.rank.admitted), "seize true",
           "seize: no enemy phase is judged after it")
+    -- nor a second one: on the deep diagnostic every finalist meets the lookahead's phase,
+    -- which kills T too. The plan that seizes is never asked it and keeps its rank
+    o.nextPhase = o.enemyPhase
+    local sight = sightOf(o)
+    a, plan = Planner.plan(B, boardOf(L, T, Z), sight, style("careful"), { diag = "deep" })
+    check((a and a.act) .. " " .. tostring(plan and plan.rank.admitted) .. " "
+          .. tostring(plan and plan.rank.max_die) .. " " .. tostring(#(sight.asked or {}) > 0),
+          "seize true 0 true", "seize: nor is the lookahead's second phase")
 end
 
 -- test_the_rank_sees_an_offered_goal_act (#510 fwd1 item D's planner item, ADR 0405): U can
@@ -4054,6 +4062,11 @@ do
     local goal, n = judged(two, 0, nil, nil, blue(0x03, 2, 3, 3, { minRange = false }))
     check(tostring(goal and goal:match("^%d+>visit@4,2")) .. " " .. n, "3>visit@4,2 1",
           "goal act: two units offered one goal, one plan, the better act's")
+    -- and the other way round: W two steps back from the gate, U one, so U's is the better
+    two.reach = { [0x01] = tiles({ 4, 3 }, { 4, 2 }), [0x03] = tiles({ 4, 4 }, { 4, 2 }) }
+    goal, n = judged(two, 0, nil, nil, blue(0x03, 2, 4, 4, { minRange = false }))
+    check(tostring(goal and goal:match("^%d+>visit@4,2")) .. " " .. n, "1>visit@4,2 1",
+          "goal act: the better act's, whichever unit has it")
 end
 
 -- test_plans_without_the_seize_while_a_goal_is_feasible (#510 fwd1 item D, ADR 0405): the
