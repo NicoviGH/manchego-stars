@@ -19,7 +19,8 @@
 -- WHEN A JUDGED PHASE DISAGREES WITH THE BOARD ONE ACT LATER, SUSPECT THIS FILE BEFORE THE
 -- PLANNER. Nested sandboxes undo only api.write*; a game call that writes a unit struct (an
 -- equip reorders the bag) needs api.keep16 first, or one judged plan leaks into the next (#554:
--- found in one instrumented run that logged every enemy decision and the target's bag).
+-- found in one instrumented run that logged every enemy decision and the target's bag). The
+-- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510).
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
 -- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi.
 --
