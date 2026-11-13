@@ -23,8 +23,9 @@
 -- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510). The map refresh
 -- is another: it rewrites each red's fog bits for where our units stand (M.refresh, #510).
 -- And a ballista's rider that decides to strike with its own weapon steps off it (M.keepRide).
--- PT_LEAKGUARD=1 (run.sh) makes a run raise on the first unit struct a nested sandbox leaves
--- changed (M.leaks): run one after changing what a sandbox calls.
+-- PT_LEAKGUARD=1 (run.sh) logs every word of a unit struct a nested sandbox leaves changed,
+-- puts it back and plays on; the run fails at its end, listing them all (M.leaks; botrun's
+-- `leaks`): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
 -- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh, M.keepRide.
 --
@@ -880,12 +881,14 @@ local function eventSearch(api, call, info, offset)
     api.write32(info, api.mem.u32(events + offset))
 end
 
--- Sight.batching(outer, guarded) -> sandbox, api: Sight.machine made re-entrant (the planner's
--- cost, #510 step 9) over `outer` (Sight.new's api), and an api whose writes it journals.
--- guarded = nil, or a function -> the spans of memory ({ { addr, bytes, name } }: the unit
--- structs, the trap pool) a nested sandbox must hand back as it found them (M.leaks;
--- PT_LEAKGUARD=1, a diagnostic: it reads every span twice a sandbox).
-function M.batching(outer, guarded)
+-- Sight.batching(outer, guarded, log) -> sandbox, api: Sight.machine made re-entrant (the
+-- planner's cost, #510 step 9) over `outer` (Sight.new's api), and an api whose writes it
+-- journals. guarded = nil, or a function -> the spans of memory ({ { addr, bytes, name } }:
+-- the unit structs, the trap pool) a nested sandbox must hand back as it found them, and
+-- log = the list each word one did not hand back is added to (M.leaks), once a word, the
+-- word then put back so the run plays on as if kept (PT_LEAKGUARD=1, a diagnostic: it reads
+-- every span twice a sandbox).
+function M.batching(outer, guarded, log)
     -- The outermost sandbox() saves the state and loads it back at the end, as Sight.machine
     -- always did; a call made inside it (s.batch, or one read calling another) runs within
     -- that save, and every byte it wrote through `api` is put back when it returns, so one
@@ -949,8 +952,12 @@ function M.batching(outer, guarded)
             journal[k] = nil
         end
         if not ok then error(a, 0) end
-        local leak = was and M.leaks(mem0, was)
-        if leak then error(leak, 0) end
+        if was then
+            for _, l in ipairs(M.leaks(mem0, was)) do
+                M.logLeak(log, l)
+                outer.write32(l.addr + l.off, l.was)
+            end
+        end
         return a, b
     end
     -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
@@ -1019,11 +1026,14 @@ end
 
 -- M.spanWords(mem, spans) -> { { addr, words, n, name } }: each span ({ addr, bytes, name }: a
 -- unit struct, the trap pool) as it reads now, in its n words.
--- M.leaks(mem, was) -> nil, or what to raise: the first word of one that no longer reads as
--- `was` has it. M.batching's guard (PT_LEAKGUARD=1) asks after a nested sandbox put its
--- journal back: a difference is a game call's write that nothing kept, the kind that made one
--- judged plan leak into the next (the bag, #554; the AI bytes, the fog bits and a rider's
+-- M.leaks(mem, was) -> { { name, addr, off, was, now } }: every word of one that no longer
+-- reads as `was` has it. M.batching's guard (PT_LEAKGUARD=1) asks after a nested sandbox put
+-- its journal back: a difference is a game call's write that nothing kept, the kind that made
+-- one judged plan leak into the next (the bag, #554; the AI bytes, the fog bits and a rider's
 -- ballista, #510).
+-- M.logLeak(log, leak): `leak` added to `log` (a list, keyed by its word too), or the count
+-- of the one already there raised: one game call leaks the same word every plan it judges.
+-- M.leakLine(leak) -> what a run's end says of it.
 function M.spanWords(mem, spans)
     local out = {}
     for x, span in ipairs(spans) do
@@ -1034,17 +1044,29 @@ function M.spanWords(mem, spans)
     return out
 end
 function M.leaks(mem, was)
+    local out = {}
     for _, u in ipairs(was) do
         for k = 0, u[3] - 1 do
             local now = mem.u32(u[1] + k * 4)
             if now ~= u[2][k] then
-                return ("sandbox leak: the %s at 0x%08X, word +0x%02X, was 0x%08X and "
-                    .. "is 0x%08X after its sandbox returned: a game call wrote it and no "
-                    .. "keep16 held it (sight.lua's header)"):format(u[4], u[1], k * 4, u[2][k], now)
+                out[#out + 1] = { name = u[4], addr = u[1], off = k * 4, was = u[2][k], now = now }
             end
         end
     end
-    return nil
+    return out
+end
+function M.logLeak(log, l)
+    local key = l.addr + l.off
+    local got = log[key]
+    if got then got.n = got.n + 1 return end
+    l.n = 1
+    log[key] = l
+    log[#log + 1] = l
+end
+function M.leakLine(l)
+    return ("sandbox leak: the %s at 0x%08X, word +0x%02X, was 0x%08X and is 0x%08X after "
+        .. "its sandbox returned (%d times): a game call wrote it and no keep16 held it "
+        .. "(sight.lua's header)"):format(l.name, l.addr, l.off, l.was, l.now, l.n)
 end
 
 -- Inside a sandbox, before an enemy decides (aiDecide): the AI bytes of `units` (every unit on
@@ -1152,9 +1174,9 @@ end
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
 function M.new(outer)
-    -- outer.leakGuard (PT_LEAKGUARD=1): every nested sandbox hands the unit structs and the
-    -- trap pool back as it found them, or raises (M.leaks). The units are the board's, read
-    -- each time.
+    -- outer.leakGuard (PT_LEAKGUARD=1): the run's leak log. Every nested sandbox hands the
+    -- unit structs and the trap pool back as it found them, or what it did not is logged
+    -- there and put back (M.leaks). The units are the board's, read each time.
     local sandbox, api, open
     sandbox, api, open = M.batching(outer, outer.leakGuard and function()
         local spans = { { outer.SYM.sTrapPool, M.TRAP_MAX * M.TRAP_SIZE, "trap pool" } }
@@ -1162,7 +1184,7 @@ function M.new(outer)
             spans[#spans + 1] = { o.addr, outer.Board.UNIT_SIZE, "unit struct" }
         end
         return spans
-    end)
+    end, outer.leakGuard)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()

@@ -74,9 +74,10 @@
 #                           PT_BENCH (JSON charIds): an experiment's benched units, each only
 #                           waiting where it stands (`montecarlo.py pilot --bench-vanilla`).
 #                           PT_LEAKGUARD=1: a diagnostic. Every nested sandbox of the bot's
-#                           sight hands the unit structs back as it found them, or the run
-#                           raises naming the struct and the word (sight.lua's M.leaks). Slower:
-#                           set it for one run after a change to what a sandbox calls.
+#                           sight hands the unit structs back as it found them; each word one
+#                           does not is logged, put back and played on, and the attempt fails
+#                           at its end listing them all (sight.lua's M.leaks). Slower: set it
+#                           for one run after a change to what a sandbox calls.
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness

@@ -383,22 +383,31 @@ do
     check(first, "4,3,4,4,4,4,4,4,4,4 4,9,4,4,4,4,4,4,4,4",
         "keepAi: every unit's aiFlags and AI block are put back, the index untouched")
 
-    -- the guard (PT_LEAKGUARD): a nested sandbox that leaves a unit struct changed raises
-    -- and names it; one whose writes were all kept does not. Sight.keepAi is that keep.
+    -- the guard (PT_LEAKGUARD): a word a nested sandbox leaves changed is logged once, with
+    -- a count, and put back so play goes on as if kept; every leaking word is logged, not the
+    -- first alone. Writes all kept log nothing. Sight.keepAi is that keep.
     local function guarded()
         return { { e.addr, Board.UNIT_SIZE, "unit struct" }, { other.addr, Board.UNIT_SIZE, "unit struct" } }
     end
-    local sandbox, api = Sight.batching(outer, guarded)
-    local ok, why = pcall(sandbox, function()
-        sandbox(function() w8(other.addr + BLOCK + 2, 1) end)
+    local log = {}
+    local sandbox, api = Sight.batching(outer, guarded, log)
+    local after
+    sandbox(function()
+        for _ = 1, 2 do
+            sandbox(function() w8(other.addr + BLOCK + 2, 1); w8(e.addr + 2, 0x55) end)
+        end
+        after = m.u8(other.addr + BLOCK + 2) .. "," .. m.u8(e.addr + 2)
     end)
-    check(ok, false, "guard: a unit struct a nested sandbox leaves changed raises")
-    check(tostring(why):find(("sandbox leak: the unit struct at 0x%08X, word +0x40")
-              :format(other.addr), 1, true) ~= nil, true,
-          "guard: the error names the struct and the word: " .. tostring(why))
-    w8(other.addr + BLOCK + 2, 4)
-    ok, why = pcall(sandboxed, sandbox, api)
-    check(ok, true, "guard: writes that keepAi held raise nothing: " .. tostring(why))
+    check(#log, 2, "guard: both leaking words are logged, each once")
+    check(after, "4,0", "guard: each leaking word is put back as the sandbox found it")
+    local line = Sight.leakLine(log[2])
+    check(line:find(("sandbox leak: the unit struct at 0x%08X, word +0x40"):format(other.addr),
+              1, true) ~= nil and line:find("(2 times)", 1, true) ~= nil, true,
+          "guard: the line names the struct, the word and how often: " .. line)
+    log = {}
+    sandbox, api = Sight.batching(outer, guarded, log)
+    sandboxed(sandbox, api)
+    check(#log, 0, "guard: writes that keepAi held log nothing")
 end
 
 -- refresh: the game's map refresh rewrites a red's fog bits for the board it runs on (a
@@ -416,10 +425,11 @@ do
         m.w32(red.addr + STATE, (m.u32(red.addr + STATE) & ~Board.US_BIT9) | 0x100)
     end
     local TRAPS = 0x0203A614
+    local log = {}
     local sandbox, api = Sight.batching(outer, function()
         return { { red.addr, Board.UNIT_SIZE, "unit struct" },
                  { TRAPS, Sight.TRAP_MAX * Sight.TRAP_SIZE, "trap pool" } }
-    end)
+    end, log)
     local seen = {}
     local ok, why = pcall(sandbox, function()
         sandbox(function()
@@ -428,7 +438,7 @@ do
         end)
         seen[2] = m.u32(red.addr + STATE)
     end)
-    check(ok, true, "refresh: the guard finds nothing left changed: " .. tostring(why))
+    check(ok and #log == 0, true, "refresh: the guard finds nothing left changed: " .. tostring(why))
     check(seen[1], 0x00010100, "refresh: the plan's own read sees the enemy revealed")
     check(seen[2], Board.US_BIT9 | 0x00010000, "refresh: the next plan finds it in fog again")
 
@@ -462,18 +472,18 @@ do
         end)
         seen[4] = ride()
     end)
-    check(ok, true, "keepRide: the guard finds nothing left changed: " .. tostring(why))
+    check(ok and #log == 0, true, "keepRide: the guard finds nothing left changed: " .. tostring(why))
     check(seen[3], "0,0,9,9,0,4,0", "keepRide: the plan's own read sees the rider on foot")
     check(seen[4], riding, "keepRide: the next plan finds it riding, the ballista where it was")
-    ok, why = pcall(sandbox, function()
+    sandbox(function()
         sandbox(function()
             Sight.keepFog(api, { red })
             m.w8(trap + 5, 0)
         end)
     end)
-    check(ok == false and tostring(why):find("sandbox leak: the trap pool at", 1, true) ~= nil,
-          true, "guard: a trap a nested sandbox leaves changed raises: " .. tostring(why))
-    m.w8(trap + 5, 1)
+    check(#log == 1 and Sight.leakLine(log[1]):find("sandbox leak: the trap pool at", 1, true)
+          ~= nil and m.u8(trap + 5), 1, "guard: a trap a nested sandbox leaves changed is "
+          .. "logged and put back")
     m.w32(red.addr + STATE, 0)
     local kept = 0
     Sight.keepRide({ mem = m, keep16 = function() kept = kept + 1 end }, S2, red, { red })

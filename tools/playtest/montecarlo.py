@@ -2002,6 +2002,22 @@ def suite_tasks(suite, envs, instrument, outs, sets=SEED_SETS):
             for t in chapter_tasks(suite, envs, instrument, outs, st, kind)]
 
 
+def only_tasks(tasks, only, held_out):
+    """The suite's `tasks` that `only` names (`suite --only`), and the specs that name none.
+    A spec is a start id, every seed of it in the sets played (tuning, and held-out with
+    `held_out`), or `<start_id>/<seed>`, that seed in whichever set holds it."""
+    picked, bad = [], []
+    for spec in only:
+        sid, _, seed = spec.partition('/')
+        got = [t for t in tasks if t['stamp']['suite']['start_id'] == sid
+               and (str(t['seed']) == seed if seed
+                    else held_out or t['stamp']['suite']['set'] == 'tuning')]
+        if not got:
+            bad.append(spec)
+        picked.extend(t for t in got if t not in picked)
+    return picked, bad
+
+
 def chapter_tasks(suite, envs, instrument, outs, st, kind, seeds=None):
     """Attempt 1 of pinned start `st` (a suite start, or a cell start: cell_starts'), one
     task a seed: the game's campaign env
@@ -2156,8 +2172,11 @@ def load_frozen(path=FROZEN):
 
 def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=check_starts,
               kept=None, wall_limit_h=MAX_WALL_H, frozen=None, explain=None, snapshots=None,
-              result=None, again=None):
-    """Play the suite and say what it did, as lines to print. The tuning seeds always play,
+              result=None, again=None, only=None):
+    """Play the suite and say what it did, as lines to print. With `only` (only_tasks' specs)
+    it plays just those runs and judges nothing: no regressions, SC-003, snapshot or
+    promotion, so a probe of one run costs that run, not the suite. A held-out run named that
+    way is said only as whether it came back with a game result (FR-025). The tuning seeds always play,
     each run's line printed, and are judged on the frozen baseline (`frozen`, load_frozen's):
     regressions, unlabelled fallbacks and SC-003's calls on the same seeds frozen. With
     `held_out` the held-out seeds play too, said only as counts, never a start or seed: a
@@ -2179,8 +2198,12 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
     except FileNotFoundError as err:
         return ['refused: a campaign env cannot be built: %s' % err]
     outs = {g: os.path.join(d, 'runs.jsonl') for g, d in simdirs.items()}
-    sets = SEED_SETS if held_out else ('tuning',)
+    sets = SEED_SETS if held_out or only else ('tuning',)
     tasks = suite_tasks(suite, envs, instrument, outs, sets)
+    if only:
+        tasks, bad = only_tasks(tasks, only, held_out)
+        if bad:
+            return ['refused: --only names no suite run: %s' % ', '.join(bad)]
     hours = suite_estimate(suite, tasks, kept or {}, jobs)
     lines.append('%d runs on %d workers: about %.2f wall-hours' % (len(tasks), jobs, hours))
     if hours > wall_limit_h:
@@ -2218,6 +2241,17 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
             line = attempt_line(rec, set()) or 'attempt 1: %s (%s)' % (rec.get('outcome'),
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
+        elif only:
+            lines.append('%s held-out seed %s: %s' % (sid, rec.get('seed'), 'a game result'
+                                                       if o['invariant'] else
+                                                       'no game result'))
+    if only:
+        back = {(t['stamp']['suite']['start_id'], t['seed']) for t in tasks} & set(outcome)
+        lines.extend('%s seed %s: no run came back' % (t['stamp']['suite']['start_id'], t['seed'])
+                     for t in tasks if (t['stamp']['suite']['start_id'], t['seed']) not in back)
+        lines.append('--only: %d of %s came back; nothing judged (no regressions, SC-003, '
+                     'snapshots or promotion)' % (len(back), plural(len(tasks), 'run')))
+        return lines
     total = {'n': 0, 'cpu': 0.0, 'wall': 0.0, 'calls': 0, 'unread': 0,
              'look': collections.Counter()}
     missing = 0
@@ -2767,6 +2801,9 @@ def suite_main(args):
     if args.override and not args.freeze:
         print('--override only goes with --freeze')
         return 2
+    if args.only and args.freeze:
+        print('--only judges nothing, so it cannot --freeze')
+        return 2
     setup = suite_setup()
     if isinstance(setup, str):
         print(setup)
@@ -2781,6 +2818,7 @@ def suite_main(args):
     lines = run_suite(suite, envs, simdirs, play, args.jobs, args.held_out or args.freeze, inst,
                       kept=kept_walls(outs, inst, hashes), frozen=load_frozen(),
                       explain=store_explain(simdirs), result=result, again=pool.run,
+                      only=args.only,
                       snapshots=lambda built: snapshot_check(suite, built, inst,
                                                              jobs=args.jobs))
     for line in lines:
@@ -3690,6 +3728,10 @@ def main(argv=None):
                          '(Nicolas\'s call only, ADR 0395)')
     su.add_argument('--kept', action='store_true',
                     help="judge this instrument's kept runs instead of playing them again")
+    su.add_argument('--only', metavar='START[/SEED],...',
+                    type=lambda v: [x for x in v.split(',') if x],
+                    help='play just these runs and judge nothing: a start id (its tuning seeds, '
+                         'and held-out with --held-out) or one seed of it')
     su.add_argument('--jobs', type=int, default=8)
     args = ap.parse_args(argv)
     if args.cmd == 'cell':
