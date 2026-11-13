@@ -20,9 +20,15 @@ is comment 6866345084**.
   the cap this phase, wounded and alone the next": Ch7 4005 turn 3, Tana (charId 34) on Ch9
   turn 2, Colm (charId 9) on Ch8 4004. On main, no Talk with Ch9's recruit is ever offered;
   she leaves with no `closes_on` on her ledger row.
-- **Next step (Fable's call, under Nicolas's "follow your recommendations"):** item F as the
-  plan words it. Rebase `feat/510-w1-look-shadow` onto main (54 commits behind, about 2,000
-  lines), then `resume --every-look` on 4005's index-8 start, attempt 2, and read turn 3.
+- **Found on the same day (four instrumented runs, comment above):** Colm on Ch8 4004 holds a
+  Vulnerary, is offered it every turn from 5 to 16, and never uses it until turn 16. The beam
+  always marches him, and the repair round only retries a unit at risk, so a hurt unit held
+  out of reach never has its own heal judged.
+- **Next step (Fable's recommendation, waiting on Nicolas's go):** fix that gap first (a
+  small planner PR: unit test + the 4004 run as proof), then item F (the look: a shadow
+  recorder that plays the chosen plan two enemy phases ahead on retries; it changes no
+  decision). F needs `feat/510-w1-look-shadow` rebased (55 commits behind; conflicts in
+  bot.lua, botrun.lua, campaign.lua, montecarlo.py, planner.lua, sight.lua).
 - **Asked, not answered:** call 6 reopens on the plan's own terms (Ch9 still misses the
   recruit): is a recruit's departure remembered? Nicolas's call.
 - **How to spend the session (Nicolas asked, 2026-11-13):** code reading, decomp searches and
