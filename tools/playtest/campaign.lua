@@ -97,8 +97,9 @@
 --                         state is saved, unplayed (montecarlo.py `starts`: a cell loads only it)
 --   diag                  OPTIONAL, with only: that attempt is a diagnostic replay (botrun.lua's
 --                         api.diag; a table, `dice_advanced` = the draws its original's record
---                         says it advanced, absent on a record from before ADR 0404). Its one DIAG line is all it writes: no CAMPAIGN line, so
---                         no endpoint is recorded, and it hands no record back
+--                         says it advanced, absent on a record from before ADR 0404). Its
+--                         one DIAG line is all it writes: no CAMPAIGN line, so no endpoint is
+--                         recorded, and it hands no record back
 --   emit(line), log(s)
 -- Campaign.run(api) -> ok, why, chapters. Each chapter emits ONE stdout line,
 -- `CAMPAIGN <json>`, and the campaign a last one with `chapter = nil`.

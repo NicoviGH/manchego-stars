@@ -54,8 +54,8 @@ just before the play (`api.advanceDice`, harness.lua; `Sight.advance`, sight.lua
 played-with-what-it-remembers bookkeeping (a try key by style and memory size) and the stop
 "every style played with what it remembers" are retired. Once every style has been tried the
 styles are drawn again, and a chapter stops only at the attempts cap (12, ADR 0399), a clean
-clear, or a crash. `api.attempts` (`montecarlo.py resume --attempts N`, 1 to the cap, checked in campaign.lua) can bound
-it lower for a run; a chapter that used a lowered cap without a clean clear ends the campaign
+clear, or a crash. `api.attempts` (`montecarlo.py resume --attempts N`, 1 to the cap, checked
+in campaign.lua) can bound it lower for a run; a chapter that used a lowered cap without a clean clear ends the campaign
 `capped`, never `infeasible` or `bot_fault`.
 
 **The cost.** A failing chapter now always uses the full cap, where before it could stop early
