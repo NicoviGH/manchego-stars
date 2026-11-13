@@ -607,10 +607,18 @@ do
     local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
     local started = decide:find("if starts then%s+M%.aiPhaseStart%(api, call, S, all, setup%)")
     local guard = decide:find("assert%(mem%.u8%(S%.gPlaySt %+ PLAY_FACTION%) == M%.PHASES%[3%]")
-    local heal = decide:find("table%.insert%(setup, 1, { S%.UpdateAllPhaseHealingAIStatus, {} }%)")
+    local heal = decide:find("if healStale then table%.insert%(setup, 1, "
+                             .. "{ S%.UpdateAllPhaseHealingAIStatus, {} }%) end")
     check(started ~= nil and guard ~= nil and heal ~= nil and started < guard and guard < heal, true,
           "aiPhaseStart: a decision starts its phase, or is inside a red one and reads the "
-          .. "heal flags again first, as the game does after every act")
+          .. "heal flags again first when an enemy's HP was written since")
+    -- every write of an enemy's HP between two decisions of one phase marks them stale: the
+    -- one such write is nextPhase's, the counter's expected damage on a striker that lives
+    local hurt = src:find("math.max(1, t.strikerHp - math.floor(back + 0.5)))\n"
+                          .. "                            healStale = true", 1, true)
+    local _, writes = src:gsub("api%.write8%(e%.addr %+ UNIT_HP,", "")
+    check(hurt ~= nil and writes, 1, "aiPhaseStart: the one write of a deciding side's HP inside "
+          .. "a phase marks the heal flags stale")
     check(bodyOf("function s.strike("):find("function%(%) onlyTarget%(u, all%) end,%s*true%)") ~= nil,
           true, "aiPhaseStart: the strike's decision starts its phase")
     -- the definition's own parameter list counts as one

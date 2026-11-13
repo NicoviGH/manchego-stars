@@ -1706,10 +1706,13 @@ function M.new(outer)
     -- decision is its phase's first act and nothing ordered it (strike()): the phase start
     -- (M.aiPhaseStart) leads its calls. Any other decision is inside a phase aiOrder started,
     -- the faction red (asserted: decided on the player's, it would read the player phase's
-    -- gAiState again), and leads with UpdateAllPhaseHealingAIStatus: the game reads the heal
-    -- flags again after every act (cp_perform.c CpPerform_Cleanup), and a staged phase writes
-    -- a striker's HP between two decisions. -> the struck unit's id and the strike as
+    -- gAiState again). The game reads the heal flags again after every act (cp_perform.c
+    -- CpPerform_Cleanup); here they change only when a staged phase writes an enemy's HP
+    -- between two decisions (`healStale`, set there), and the next decision then leads with
+    -- UpdateAllPhaseHealingAIStatus: on every decision it was 36,166 calls in a vanilla Ch5
+    -- attempt. -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
+    local healStale = false
     local function aiDecide(call, proc, e, all, before, starts)
         M.keepAi(api, all)
         M.keepFog(api, all)   -- `setup` refreshes the maps
@@ -1731,13 +1734,14 @@ function M.new(outer)
         else
             assert(mem.u8(S.gPlaySt + PLAY_FACTION) == M.PHASES[3],
                    "sight: an enemy decides inside a phase aiOrder started, or starts its own")
-            table.insert(setup, 1, { S.UpdateAllPhaseHealingAIStatus, {} })
+            if healStale then table.insert(setup, 1, { S.UpdateAllPhaseHealingAIStatus, {} }) end
             if not before then
                 setup[#setup + 1], setup[#setup + 2] = decide[1], decide[2]
                 decide = nil
             end
             call(setup)
         end
+        healStale = false   -- a phase start reads them too
         if before then before() end
         if decide then call(decide) end
         local D = S.gAiDecision
@@ -1776,6 +1780,7 @@ function M.new(outer)
     -- sandbox. `all` = the board's units, as aiDecide's.
     local function aiOrder(call, all)
         local n = M.aiPhaseStart(api, call, S, all, { { S.BuildAiUnitList, {} } })
+        healStale = false
         if n > 0 then call(S.SortAiUnitList, { n }) end
         local out = {}
         for i = 0, n - 1 do out[#out + 1] = mem.u8(S.gAiState + i) end
@@ -1973,6 +1978,7 @@ function M.new(outer)
                             local _, back = M.odds({ t.counterDist }, t.strikerHp)
                             api.write8(e.addr + UNIT_HP,
                                 math.max(1, t.strikerHp - math.floor(back + 0.5)))
+                            healStale = true
                         end
                     else
                         local x, y = followMove(e)
