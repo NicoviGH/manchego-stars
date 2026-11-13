@@ -14,6 +14,10 @@ Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanill
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
 calls, all approved); its findings are comment 6810177817.
+**Which model leads (Nicolas agreed, 2026-11-12):** Fable leads item D and the sizing of E and
+F (reading the dumps against the hypotheses, deciding what rule follows), with Sonnet writing
+the instrumentation and Haiku doing the reads. Once E and F are precise briefs, Opus or Sonnet
+can lead their builds. A judgment from the call 1 session, not a measurement.
 
 **PR #604 is merged** (Nicolas: "Merge and handoff", 2026-11-12), no open PR of this work.
 - Attempt k of a chapter start has the game's RNG moved on (k - 1) * 1009 draws, no re-seed;
