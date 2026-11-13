@@ -57,16 +57,16 @@ still beats plans over it.
     over the cap on turn 17 (63%: it carried the first plan's attack by unit 16 on enemy 148),
     so the Seize was played. Won in 17 turns.
   - With every unit holding (run `goal8b`): that plan was under the cap on turn 17 and played.
-    On turn 19 the thief, alone in the west at 5 HP, was at 63.5%; every plan was over the cap,
-    the Seize among them, so the win was not taken. She died, and the Seize came on turn 20: 2
-    deaths. This is what showed the judge's error above.
+    On turn 19 the thief (Colm, charId 9), alone in the west at 5 HP, was at 63.5%; every plan
+    was over the cap, the Seize among them, so the win was not taken. He died, and the Seize
+    came on turn 20: 2 deaths. This is what showed the judge's error above.
   - With no enemy phase after the Seize (runs `goal8c`, `goal8d`, the final code): the bot
     waits turns 16 to 18 and seizes on turn 19. Won in 19 turns against main's 16, the same
     one death (charId 10, turn 10), the chests still missed.
 - **The other three Ch8 attempts** (4001 attempt 2, 4004 attempts 1 and 2) play main's games:
   the chests were already `stalled`.
 - **So what blocks both goals is the risk at the goal, not the beam**: a lord alone beside the
-  recruit, and a thief alone on the road to the chests. That is what the escort (item E) and
+  recruit, and Colm alone on the road to the chests. That is what the escort (item E) and
   the look (item F) are for. Whether the judge's error is behind any of main's earlier late
   deaths on Ch8 is untested.
 - **The frozen suite** (`suite --held-out`, final code, instrument `2374a75d5563+v2`):

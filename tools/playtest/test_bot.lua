@@ -3971,7 +3971,7 @@ do
 end
 
 -- test_no_enemy_phase_is_judged_after_the_seize (#510 fwd1 item D, ADR 0405): the lord can
--- Seize, and the enemy phase would kill T wherever she stands. The Seize ends the chapter
+-- Seize, and the enemy phase would kill T wherever it stands. The Seize ends the chapter
 -- before that phase (vanilla Ch8, run goal8b, campaign 4001 turn 19: the Seize plan read the
 -- thief's 63.5% and was over the cap, the thief died and the win came a turn later). So the
 -- plan that seizes is under the cap and played.
@@ -4070,7 +4070,7 @@ do
 end
 
 -- test_plans_without_the_seize_while_a_goal_is_feasible (#510 fwd1 item D, ADR 0405): the
--- lord can Seize, and the thief T is two turns from a chest only she opens. Every plan judged
+-- lord can Seize, and the thief T is two turns from a chest only it opens. Every plan judged
 -- seizes (BEAM = 1, as all 6 did on vanilla Ch8, campaign 4001 turn 16), each forfeiting the
 -- chest. Plans without the Seize are judged too, and the rank plays one: no forfeit. With the
 -- chest's row stalled (opts.quietGoals) no such plan is built and the Seize is played. Where
@@ -4108,7 +4108,7 @@ do
     kinds, plan = run({ quietGoals = { ["chest:10,9"] = true } })
     check(kinds:find("noseize", 1, true), nil, "no seize: a stalled chest asks for no such plan")
     check(plan and plan.seizes, true, "no seize: and the Seize is played")
-    -- T is struck dead at (5,9), where the first plan marches her; at home she is safe
+    -- T is struck dead at (5,9), where the first plan marches it; at home it is safe
     kinds, plan = run(nil, function(p)
         for _, b in ipairs(p.blues) do
             if b.x == 5 and b.y == 9 then

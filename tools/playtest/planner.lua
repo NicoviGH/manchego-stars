@@ -1274,7 +1274,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- a plan that takes the Seize ends the chapter there: the game plays no enemy phase
         -- after it, so none is judged (ADR 0405). Read against one, the Seize was over the cap
         -- for a death that could not happen (vanilla Ch8, run goal8b, campaign 4001 turn 19: the
-        -- thief's 63.5%, far from the throne; she died and the win came a turn later). A counter
+        -- thief's 63.5%, far from the throne; he died and the win came a turn later). A counter
         -- to a blow struck before the Seize is still the cap's (st.fought, below).
         local phase = not seizesIn(st) and sight.enemyPhase
         for i, w in ipairs(ways) do
