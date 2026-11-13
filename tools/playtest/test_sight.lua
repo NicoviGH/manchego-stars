@@ -327,6 +327,24 @@ do
         end)
     end)
     check(bytes[at], 23, "keep16: put back when the sandbox returns")
+    -- keepAi: what the game's AI writes on unit structs while one decides is put back -- the
+    -- deciding unit's ai_config, ai1, ai2, counters; any unit's aiFlags (a looter the closings
+    -- replay played past its last village read as no looter for the rest of the batch)
+    local e, other = { addr = 0x02030000 }, { addr = 0x02030100 }
+    for o = 0x40, 0x46, 2 do bytes[e.addr + o] = 4 end
+    bytes[e.addr + 0x0A], bytes[other.addr + 0x0A] = 1, 2
+    sandbox(function()
+        sandbox(function()
+            Sight.keepAi(api, e, { e, other })
+            for o = 0x40, 0x46, 2 do bytes[e.addr + o] = 0 end
+            bytes[e.addr + 0x0A], bytes[other.addr + 0x0A] = 9, 9
+        end)
+    end)
+    local back = true
+    for o = 0x40, 0x46, 2 do back = back and bytes[e.addr + o] == 4 end
+    check(back, true, "keepAi: the deciding unit's AI scripts and counters are put back")
+    check(bytes[e.addr + 0x0A] .. "," .. bytes[other.addr + 0x0A], "1,2",
+        "keepAi: every unit's aiFlags is put back")
 end
 
 -- Every equip in sight.lua goes through Sight.equip: a sandbox read that called

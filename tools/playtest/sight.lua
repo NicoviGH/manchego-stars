@@ -21,7 +21,7 @@
 -- equip reorders the bag) needs api.keep16 first, or one judged plan leaks into the next (#554:
 -- found in one instrumented run that logged every enemy decision and the target's bag).
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
--- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses.
+-- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -310,6 +310,9 @@ local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 -- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
 -- AI script indices)
 local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
+-- bmunit.h: aiFlags at 0x0A (the halfword's other byte is the unit's index, never written); the
+-- four halfwords from ai_config hold ai1, ai_a_pc, ai2, ai_b_pc, ai_counter (0x40 to 0x47)
+local UNIT_AI_FLAGS = 0x0A
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
 -- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
@@ -987,6 +990,20 @@ function M.openMap(api, call, S, x, y)
     end
 end
 
+-- Inside a sandbox, before enemy `e` decides (aiDecide): what the game's AI writes on unit
+-- structs is put back when the sandbox returns. Its script rewrites the deciding unit's own
+-- ai_config, ai1, ai2, both script counters and ai_counter (cp_script.c: AiScriptCmd_02_ChangeAi,
+-- every command's (*pc)++, AiScriptCmd_10_DoLooting's ai_counter), and aiFlags on it or on a
+-- unit in its way (cp_utility.c AiFindPillageLocation's escape flag, cp_0803E2F4.c:188), so
+-- `all` (every unit on the board) has its aiFlags kept. Without it a looter the closings replay
+-- had played past its last village read as no looter (PillageThenPursue sets AI2 to 0) for
+-- the rest of the decision's batch: vanilla Ch9's village read "closes in 3 phases" once and
+-- "never closes" every time after, each turn (#510).
+function M.keepAi(api, e, all)
+    for _, o in ipairs(all) do api.keep16(o.addr + UNIT_AI_FLAGS, 1) end
+    api.keep16(e.addr + UNIT_AI_CONFIG, 4)
+end
+
 function M.equip(api, call, S, u, slot)
     if not slot or slot <= 0 then return end
     api.keep16(u.addr + api.Board.UNIT_ITEMS, slot + 1)
@@ -1475,6 +1492,7 @@ function M.new(outer)
     -- decision (strike() narrows the targets there). -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
     local function aiDecide(call, proc, e, before)
+        M.keepAi(api, e, units())
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
         -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls
