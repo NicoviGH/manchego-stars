@@ -20,11 +20,12 @@
 -- PLANNER. Nested sandboxes undo only api.write*; a game call that writes a unit struct (an
 -- equip reorders the bag) needs api.keep16 first, or one judged plan leaks into the next (#554:
 -- found in one instrumented run that logged every enemy decision and the target's bag). The
--- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510).
+-- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510). The map refresh
+-- is another: it rewrites each red's fog bits for where our units stand (M.refresh, #510).
 -- PT_LEAKGUARD=1 (run.sh) makes a run raise on the first unit struct a nested sandbox leaves
 -- changed (M.leaks): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
--- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi.
+-- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -318,8 +319,6 @@ local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
 -- UNIT_AI_WORDS halfwords from ai_config, 0x40 to 0x47: ai_config, ai1 and ai_a_pc, ai2 and
 -- ai_b_pc, ai_counter and a padding byte
 M.UNIT_AI_FLAGS, M.UNIT_AI_CONFIG, M.UNIT_AI_WORDS = 0x0A, UNIT_AI_CONFIG, 4
--- struct Unit's size (bmunit.h: 0x48 bytes), in words: what M.batching's guard compares
-local UNIT_WORDS = 0x48 // 4
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
 -- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
@@ -889,7 +888,8 @@ function M.batching(outer, guarded)
     -- read cannot leak into the next. A game function's own writes are not journaled. The
     -- ones a read can make fresh (a movement map, the battle structs, gAiDecision) it makes
     -- fresh first. The ones on a unit struct nothing makes fresh, so they are kept before the
-    -- call (keep16: M.equip's bag, M.keepAi's AI bytes) and the journal puts them back.
+    -- call (keep16: M.equip's bag, M.keepAi's AI bytes, M.keepFog's state word) and the
+    -- journal puts them back.
     local mem0 = outer.mem
     -- kept[depth] = the addresses keep16 holds for the sandbox open at that depth
     local journal, kept
@@ -933,9 +933,9 @@ function M.batching(outer, guarded)
             return a, b
         end
         local mark = #journal
+        local was = guarded and M.unitWords(mem0, guarded(), outer.Board.UNIT_SIZE)
         depth = depth + 1
         kept[depth] = {}
-        local was = guarded and M.unitWords(mem0, guarded())
         local ok, a, b = pcall(fn, outerCall, outerScratch)
         kept[depth] = nil
         depth = depth - 1
@@ -1013,23 +1013,24 @@ function M.openMap(api, call, S, x, y)
     end
 end
 
--- M.unitWords(mem, addrs) -> { { addr, words } }: each unit struct as it reads now.
+-- M.unitWords(mem, addrs, size) -> { { addr, words, n } }: each unit struct (`size` bytes,
+-- Board.UNIT_SIZE) as it reads now, in its n words.
 -- M.leaks(mem, was) -> nil, or what to raise: the first word of one that no longer reads as
 -- `was` has it. M.batching's guard (PT_LEAKGUARD=1) asks after a nested sandbox put its
 -- journal back: a difference is a game call's write on a unit struct that nothing kept, the
 -- kind that made one judged plan leak into the next twice (the bag, #554; the AI bytes, #510).
-function M.unitWords(mem, addrs)
-    local out = {}
+function M.unitWords(mem, addrs, size)
+    local out, n = {}, size // 4
     for x, addr in ipairs(addrs) do
         local words = {}
-        for k = 0, UNIT_WORDS - 1 do words[k] = mem.u32(addr + k * 4) end
-        out[x] = { addr, words }
+        for k = 0, n - 1 do words[k] = mem.u32(addr + k * 4) end
+        out[x] = { addr, words, n }
     end
     return out
 end
 function M.leaks(mem, was)
     for _, u in ipairs(was) do
-        for k = 0, UNIT_WORDS - 1 do
+        for k = 0, u[3] - 1 do
             local now = mem.u32(u[1] + k * 4)
             if now ~= u[2][k] then
                 return ("sandbox leak: the unit struct at 0x%08X, word +0x%02X, was 0x%08X and "
@@ -1061,6 +1062,24 @@ function M.keepAi(api, units)
         api.keep16(o.addr + M.UNIT_AI_FLAGS, 1)
         api.keep16(o.addr + M.UNIT_AI_CONFIG, M.UNIT_AI_WORDS)
     end
+end
+
+-- Inside a sandbox, before the game refreshes its maps: every unit's state word is put back
+-- when the sandbox returns. RefreshEntityBmMaps (bmmap.c RefreshUnitsOnBmMap) rewrites a red
+-- unit's fog bits for the board it is called on: US_BIT9 set on one standing in fog, and
+-- cleared for US_BIT8 on one our units now see. A judged plan stands our units elsewhere, so
+-- the refresh inside it marks as seen an enemy only that plan would reveal; the journal puts
+-- our units back and, without this, left the enemy seen for every plan judged after it in
+-- the batch, where it then decided and struck (s.decides reads the bit before any refresh).
+-- Found by PT_LEAKGUARD on vanilla Ch6, turn 2 (#510). `units` as M.keepAi's.
+-- M.refresh is that keep and the call; aiDecide, whose refresh rides in its one call list,
+-- keeps and lists it itself. Every refresh inside a sandbox is one of the two.
+function M.keepFog(api, units)
+    for _, o in pairs(units) do api.keep16(o.addr + UNIT_STATE, 2) end
+end
+function M.refresh(api, call, S, units)
+    M.keepFog(api, units)
+    call(S.RefreshEntityBmMaps, {})
 end
 
 function M.equip(api, call, S, u, slot)
@@ -1560,6 +1579,7 @@ function M.new(outer)
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
     local function aiDecide(call, proc, e, all, before)
         M.keepAi(api, all)
+        M.keepFog(api, all)   -- `setup` refreshes the maps
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
         -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls
@@ -1827,7 +1847,7 @@ function M.new(outer)
             api.write16(S.gPlaySt + PLAY_TURN, mem.u16(S.gPlaySt + PLAY_TURN) + 1)
             -- the fog as the first phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
             -- enemy that walked out of it is seen, one that walked into it is not
-            call(S.RefreshEntityBmMaps, {})
+            M.refresh(api, call, S, byId)
             local out = playPhase(call, proc, byId, order(), decides, strike, remove)
             out.hp, out.moved = hp, moved
             return out
@@ -2152,7 +2172,7 @@ function M.new(outer)
                 for _, o in ipairs(units()) do byId[o.id] = o end
                 standOn(u, x, y)
                 stageCarry(byId, carry)
-                call(S.RefreshEntityBmMaps, {})
+                M.refresh(api, call, S, byId)
                 call(S.GenerateUnitMovementMapExt, { u.addr, mov - spent })
                 return movementTiles(u, x, y)
             end)
