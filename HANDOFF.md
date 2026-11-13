@@ -9,13 +9,16 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, evening): PR #606 is merged; make the suite cheap to probe BEFORE any more sandbox work.**
+**Next session starts here (2026-11-13, evening): PR #607 (`suite --only`, the leak guard's list) is open, its review applied; CI and the merge are next.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13); **use
 cheaper subagents** to check source, ADRs and research. The plan is **#510 comment 6810567866**;
 item D's results are comment 6842371541; the leak's findings are comment 6860128405.
 **Nicolas, 2026-11-13: the suite passes have slowed development badly and #510's scope keeps
-growing. Run the full suite ONCE per PR, at the end; prove a fix on the one run that showed it.**
+growing.** Standing rule since (AGENTS.md): **the frozen suite is never run for a PR.** A PR
+proves its change with unit tests and the run that showed the problem (`suite --only
+<start>/<seed>`); the suite runs only before the bot's reading is relied on (a difficulty
+verdict, a refreeze), and a regression it finds is bisected with `--only`.
 
 **PR #606 is merged** (b869fce5; Nicolas: "merge", 2026-11-13), no open PR of this work.
 - What it is now: a simulated enemy decision puts back what the game wrote on unit structs.
@@ -24,8 +27,8 @@ growing. Run the full suite ONCE per PR, at the end; prove a fix on the one run 
   vanilla Ch6 turn 2), a ballista's rider stepped off by the AI's attack decision and the
   redraw's map-sprite pointers (`keepRide`; vanilla Ch13 scout, seed 2002, turn 11).
 - **`PT_LEAKGUARD=1`** (off by default, about a fifth slower): a nested sandbox that leaves a
-  unit struct or the trap pool changed raises, naming the struct and the word. It found the
-  last three leaks. Set it for one run after any change to what a sandbox calls.
+  unit struct or the trap pool changed was the error it threw (PR #607 makes it a list). It
+  found the last three leaks. Set it for one run after any change to what a sandbox calls.
 - Review: `/code-review 606 medium` by a fresh subagent (9 findings) and one scoped re-review
   (4 notes), all applied; the PR body lists them with the proofs and the back-to-back timings.
 - Frozen suite with held-out seeds on f7e1e002, guard on: **PROMOTED, 0 regressions, 0 runs
@@ -40,7 +43,7 @@ growing. Run the full suite ONCE per PR, at the end; prove a fix on the one run 
   `specialItemFlags`, `UpdateAllPhaseHealingAIStatus`, `SetupUnitInventoryAIFlags`; the first
   again after each act, cp_perform.c). Shape of the fix: do it where the phase's order is
   built (`aiOrder`) and in `strike`; the two functions need adding to `gen_symbols.py`. It
-  changes play: its own PR, one suite at the end.
+  changes play: its own PR, proved on single runs (`--only`), no suite.
 - **Still open in the looting read, cause untested:** the last read of each player phase has
   the looters attacking red units and taking no village (tags `keepai4`, `keepai6`). The
   phase-start setup is the first thing to test it against.
@@ -51,7 +54,7 @@ growing. Run the full suite ONCE per PR, at the end; prove a fix on the one run 
   Where: `run_suite` builds `tasks` from `suite_tasks`; filter there and return before the
   judging. A held-out seed named this way prints only whether it came back with a game result.
 - The guard lists every leak in one run: log each (`M.leaks`), put the bytes back, play on,
-  and fail the run at its end. Today it raises on the first, so leaks surface one per pass.
+  and fail the run at its end. Until PR #607 the first leak stopped the run, one per pass.
 - Neither changes how the bot plays, so neither needs a suite run. One small PR.
 
 **The march from each unit's own turns was built and is NOT shipped** (branch
@@ -150,10 +153,12 @@ around weapon uses. Whether that has cost a run is not checked; a read of the ke
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order.**
-1. The two tool changes above, one small PR.
+1. PR #607 (the two tool changes above): `/code-review 607 medium` ran (10 findings, all
+   fixed, scoped re-review owed only if a fix changed behaviour), then CI, then Nicolas's merge.
+   Proof is in the PR body: `--only scout-ch6/1001` in 12 s; with `keepFog` off, 9 leaks
+   listed in one run that played the same 11297 frames.
 2. The phase-start AI setup in judged phases (finding 6), its own PR; prove it on single runs
-   (`--only`, `PT_LEAKGUARD=1`), one suite at the end; test the end-of-phase looting read
-   against it.
+   (`--only`, `PT_LEAKGUARD=1`), no suite; test the end-of-phase looting read against it.
 3. Ask Nicolas about the seizer's progress weight (below), then size item E on the shared
    field, not on per-unit marches. Item F's test as the plan wrote it.
 
