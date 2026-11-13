@@ -9,18 +9,22 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, afternoon): PR #608 is merged; replay the open leads as single runs before any planner change.**
+**Next session starts here (2026-11-13, evening): the leads are replayed on main; item F is next.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13). The plan
 is **#510 comment 6810567866**; item D's results are comment 6842371541; the leak's findings are
-comment 6860128405; the phase start's are comment 6866102739.
-- **Next step, agreed by Nicolas (2026-11-13: "Next instance will follow your
-  recommendations"):** the open leads below were diagnosed on reads that had the defects of
-  PRs #606 and #608. Replay each as ONE run on main (`resume --attempts 1`, or
-  `suite --only <start>/<seed>`; minutes each) and keep only what survives: Ch9 4006's village
-  and recruit, Ch8's thief (Colm) stopping short of the west chests (4001, 4004), Ch7 4005
-  turn 3 and the Ch9 flyer on turn 2 ("under the cap this phase, wounded and alone the next").
-  Write the result on #510 before picking a planner change.
+comment 6860128405; the phase start's are comment 6866102739; **the replay of D's leads on main
+is comment 6866345084**.
+- **Replayed (2026-11-13, one run each on main, tags `replay7`/`replay8`/`replay9`):** Ch9's
+  empty looter list was the leaks (refuted on main). Three leads survive as one case, "under
+  the cap this phase, wounded and alone the next": Ch7 4005 turn 3, Tana (charId 34) on Ch9
+  turn 2, Colm (charId 9) on Ch8 4004. On main, no Talk with Ch9's recruit is ever offered;
+  she leaves with no `closes_on` on her ledger row.
+- **Next step (Fable's call, under Nicolas's "follow your recommendations"):** item F as the
+  plan words it. Rebase `feat/510-w1-look-shadow` onto main (54 commits behind, about 2,000
+  lines), then `resume --every-look` on 4005's index-8 start, attempt 2, and read turn 3.
+- **Asked, not answered:** call 6 reopens on the plan's own terms (Ch9 still misses the
+  recruit): is a recruit's departure remembered? Nicolas's call.
 - **How to spend the session (Nicolas asked, 2026-11-13):** code reading, decomp searches and
   the review go to Sonnet subagents from the first step; the main session chooses the test
   and reads its result. A 12-second run (`suite --only scout-ch6/1001`) with a temporary log
