@@ -16,8 +16,9 @@ suite and judges nothing: no regressions, no SC-003, no snapshots, no promotion.
 id means its tuning seeds (and its held-out seeds with `--held-out`); a named seed is played
 from whichever set holds it. A held-out run is said only as whether it came back with a game
 result, never its outcome (FR-025). A spec that names no run is refused before anything
-plays. `--only` with `--freeze` is refused: a freeze needs the whole suite judged. The full
-suite still runs once per PR, at the end (ADR 0395 is unchanged).
+plays. `--only` with `--freeze` is refused: a freeze needs the whole suite judged. When the
+whole suite runs is AGENTS.md's rule, not this record's; `--only` is how a PR proves its change
+on the run that showed the problem, and how a regression the suite finds is bisected.
 
 **`PT_LEAKGUARD=1` logs every leak, then fails the run at its end.** It used to raise on the
 first word a nested sandbox left changed, so leaks came to light one per run. Now each such
