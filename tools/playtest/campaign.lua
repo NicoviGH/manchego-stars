@@ -6,20 +6,23 @@
 --
 -- The loop, per chapter: ride the game to the chapter's start (arrive: the scenes, the world
 -- map's walk to its next story node, the route split), save a state there, then attempt it.
--- An attempt draws a style never tried at this chapter start (drawStyle), picks the team
+-- An attempt draws a style (drawStyle; every style is tried before one is drawn again), picks the team
 -- (Bot.team, over what the map asks: api.needs, read once per chapter start since every attempt
 -- starts from the same state), buys at the shops the world map has open (Bot.shop, through the
 -- game's own shop screen), spends seals (Bot.promote), and plays the chapter (botrun.lua). A
 -- clean clear (the record's `clean`: won, no blue or green unit lost, every owed recruit
 -- joined, every village and chest taken) moves on and its team is CARRIED into the next
 -- chapter's pick; anything else loads the chapter-start state back and attempts again, at most
--- MAX_ATTEMPTS times (the retry cap, ADR 0399). The team follows from the claims a style
--- follows (a carry claim's units); once every style has been tried they are drawn again, each
--- one only if it was not yet played with what is remembered now (a style and a memory already
--- played replay that try exactly); with none left the chapter stops. The game's RNG is never
--- re-seeded on a restart: FE8 seeds it once at power-on and a suspend save stores it, so a
--- restart differs from the last only by the bot's style, its memory, and the game's RNG
--- following from that different play (the amendment, #510).
+-- MAX_ATTEMPTS times (the retry cap, ADR 0399; api.attempts bounds it lower). The team follows
+-- from the claims a style follows (a carry claim's units); once every style has been tried they
+-- are drawn again, and the chapter stops only at the cap.
+-- Retries get different dice (ADR 0404): loading the chapter start back restores the game's RNG,
+-- so a style replayed from it would replay the same game. Attempt k therefore plays with the
+-- game's own generator advanced (k - 1) * DICE_STRIDE draws from that saved state, the effect a
+-- player gets by redrawing a movement path (api.advanceDice, just before api.play). It never
+-- re-seeds: FE8 seeds its RNG once at power-on, and this only moves along the stream it is on.
+-- Attempt 1 advances none, so every measured cell (ADR 0385) plays as it always did, and a run
+-- stays reproducible: the same start and the same attempt number are the same dice.
 -- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
@@ -29,22 +32,25 @@
 -- dice result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
--- start state, the game's RNG in it; the style draws restart at each chapter start (api.seed)
--- and never read a result; and the start carries the team the campaign carried in (api.save,
--- arrive). So attempt k plays the style and team it would after k - 1 failures, but it is an
--- independent attempt, not the campaign's k-th try: it has no memory (the workers side by side
--- share no results, ADR 0386), and it ends at the style count, where the loop draws the styles
--- again with memory (ADR 0399). Attempt 1, every measured cell (ADR 0385), is the same either
--- way. It saves no state (the workers share the start's files) and moves on to no chapter.
+-- start state; the style draws restart at each chapter start (api.seed) and never read a
+-- result; and the start carries the team the campaign carried in (api.save, arrive). So attempt
+-- k plays the style, team and dice it would after k - 1 failures, but it is an independent
+-- attempt, not the campaign's k-th try: it has no memory (the workers side by side share no
+-- results, ADR 0386), and it ends at the style count (no_style). Attempt 1, every measured cell
+-- (ADR 0385), is the same either way. It saves no state (the workers share the start's files)
+-- and moves on to no chapter.
 -- A campaign stops when:
 --   done        the game has no next chapter (arrive says "end")
 --   played      api.only: its attempt was played (whatever the record says)
 --   no_style    api.only: this chapter start has fewer than k styles
---   infeasible  Manchego Stars: a chapter used MAX_ATTEMPTS without a clean clear: no later
+--   infeasible  Manchego Stars: a chapter used its attempts (the cap) without a clean clear: no later
 --               chapter is reached by a clean run, so none is played
 --   bot_fault   the same on vanilla, which strong players clear clean: the bot is what failed,
 --               never the chapter (#510 step 9 design, decision 2). The chapter line's failures
 --               carry what spoiled each attempt and its trace
+--   capped      api.attempts is below MAX_ATTEMPTS and a chapter used them without a clean clear:
+--               the run was cut short on purpose, so it says nothing of the chapter or the bot
+--               (never infeasible or bot_fault)
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -78,15 +84,22 @@
 --   buy(purchase)         one Bot.shop entry, through the shop screen; true | nil, why
 --   promote(entry)        spend the seal the game accepts for this roster entry; true | nil, why
 --   claims(chapter)       that chapter's resolved claims (bot.lua's Claims)
---   play(style, claims, attempt, pick) -> botrun's record (it emits its own BOTRUN line);
+--   play(style, claims, attempt, pick, dice) -> botrun's record (it emits its own BOTRUN line);
 --                         `pick` is the team pick as the record keeps it (between()'s
---                         team.pick, nil without a prep screen): the record's `team`
+--                         team.pick, nil without a prep screen): the record's `team`; `dice`
+--                         is advanceDice's answer: the record's `dice_advanced`
 --   only                  OPTIONAL: the one attempt to play (see above)
+--   attempts              OPTIONAL: an integer in 1..MAX_ATTEMPTS bounding a chapter's attempts
+--                         in place of MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
+--   advanceDice(n)        advance the game's RNG n draws (Sight.advance) and return how many
+--                         were advanced: the count the record keeps as `dice_advanced`
 --   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
 --                         state is saved, unplayed (montecarlo.py `starts`: a cell loads only it)
 --   diag                  OPTIONAL, with only: that attempt is a diagnostic replay (botrun.lua's
---                         api.diag). Its one DIAG line is all it writes: no CAMPAIGN line, so
---                         no endpoint is recorded, and it hands no record back
+--                         api.diag; a table, `dice_advanced` = the draws its original's record
+--                         says it advanced, absent on a record from before ADR 0404). Its
+--                         one DIAG line is all it writes: no CAMPAIGN line, so no endpoint is
+--                         recorded, and it hands no record back
 --   emit(line), log(s)
 -- Campaign.run(api) -> ok, why, chapters. Each chapter emits ONE stdout line,
 -- `CAMPAIGN <json>`, and the campaign a last one with `chapter = nil`.
@@ -95,9 +108,23 @@ local M = {}
 
 M.PREFIX = "CAMPAIGN "
 -- the retry cap a chapter start (Nicolas, 2026-11-10; ADR 0399): late chapters need many
--- restarts, and memory makes a repeated style play differently, so styles are drawn again once
--- every one has been tried
+-- restarts, so styles are drawn again once every one has been tried (each retry has its own
+-- dice, ADR 0404)
 M.MAX_ATTEMPTS = 12
+
+-- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE.
+-- Measured: run call1b (stride 1), campaign 4001 attempt 2 started one draw ahead, drew 59 in
+-- turn 1 where the unshifted game drew 60, and was on the same dice from turn 2 and played the
+-- same game; a turn on vanilla Ch8 drew 7 to 147 dice in those games. Run call1c (stride
+-- 1009): attempts 2 and 3 of campaigns 4001 and 4004 were on different dice at turn 2 and played
+-- different games from main's. NOT proven: that a 1009-draw lead can never be given back; if it
+-- happens it shows as equal `rn` words in two attempts' traces. The cause of call1b is a lead,
+-- not confirmed: the game draws a die for each tied direction of a unit's path
+-- (GenerateBestMovementScript, bmidoten.c:218-226), so a shifted die can use one draw fewer.
+M.DICE_STRIDE = 1009
+
+-- the draws attempt `attempt` advances the game's RNG (0 for attempt 1: a measured cell, ADR 0385)
+function M.diceFor(attempt) return (attempt - 1) * M.DICE_STRIDE end
 
 local function pick(random, list) return list[math.floor(random() * #list) + 1] end
 
@@ -106,8 +133,7 @@ local function pick(random, list) return list[math.floor(random() * #list) + 1] 
 -- route. A claim Bot.unplayed names plays the same followed or not, so it is no part of a style
 -- (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is the keys drawn so
 -- far. Returns the style and the claims followed, or nil when every style has been tried (the
--- loop then empties `tried` and draws again, skipping a try already played; one attempt alone
--- says no_style).
+-- loop then empties `tried` and draws again; one attempt alone says no_style).
 local function styleKey(aggression, ids) return aggression .. "|" .. table.concat(ids, ",") end
 
 function M.drawStyle(Bot, random, claims, route, tried)
@@ -220,6 +246,11 @@ end
 
 function M.run(api)
     local Bot, Json, info = api.Bot, api.Json, api.info
+    if api.attempts ~= nil and not (math.type(api.attempts) == "integer"
+            and api.attempts >= 1 and api.attempts <= M.MAX_ATTEMPTS) then
+        error(string.format("campaign: attempts is %s, and a chapter start gets 1 to %d",
+            tostring(api.attempts), M.MAX_ATTEMPTS))
+    end
     local route = info.route
     local chapters = {}
     local function line(t)
@@ -236,13 +267,16 @@ function M.run(api)
     end
 
     -- a chapter with no clean clear left to try: on vanilla the bot's fault, on
-    -- Manchego Stars infeasible
-    local function noClean(entry, tried)
+    -- Manchego Stars infeasible; with the cap lowered by api.attempts, only `capped`
+    local function noClean(entry)
         local fault = info.game == "vanilla"
-        entry.outcome = fault and "bot_fault" or "infeasible"
+        local lowered = api.attempts ~= nil and api.attempts < M.MAX_ATTEMPTS
+        entry.outcome = lowered and "capped" or fault and "bot_fault" or "infeasible"
         line(entry)
-        return entry.outcome, string.format("chapter %d: no clean clear in " .. tried .. "%s",
-            entry.chapter, entry.attempts, fault and ", a bot fault" or "")
+        return entry.outcome, string.format("chapter %d: no clean clear in %d attempts%s",
+            entry.chapter, entry.attempts,
+            lowered and string.format(", the cap lowered from %d", M.MAX_ATTEMPTS)
+            or fault and ", a bot fault" or "")
     end
 
     local function play()
@@ -282,6 +316,7 @@ function M.run(api)
             local need = cap and api.needs(api.roster()) or nil
             entry.demands = need and need.demands or nil
             local tried, remembered, known = {}, {}, {}
+            local attemptCap = api.attempts or M.MAX_ATTEMPTS
             -- a retry's memory of the enemy (ADR 0399): style.memory
             local memory, memoryKeys = { enemies = {} }, {}
             -- a unit whose class was not read cannot be told from another in its slot (its key
@@ -293,21 +328,6 @@ function M.run(api)
                     memory.enemies[#memory.enemies + 1] = { id = id, charId = charId,
                                                             classId = classId }
                 end
-            end
-            -- the tries made, by style and what was remembered then: the start state restores
-            -- the game's RNG, so the same style with the same memory replays that try move for
-            -- move, and is never spent again. Both lists only grow, so their sizes say which
-            local played = {}
-            local function tryKey(style)
-                return styleKey(style.aggression, style.claims) .. "#" .. #memory.enemies .. "/"
-                    .. #remembered
-            end
-            -- from a draw on, the first style not yet played with this memory (nil: none left)
-            local function unplayed(style, followed)
-                while style and played[tryKey(style)] do
-                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
-                end
-                return style, followed
             end
             while true do
                 local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
@@ -322,17 +342,11 @@ function M.run(api)
                     return "no_style", string.format("chapter %d has %d styles, not %d", ch,
                         entry.attempts, api.only)
                 end
-                style, followed = unplayed(style, followed)
                 if not style then
-                    -- every style tried: draw them again, each one not yet played with what is
-                    -- remembered now (ADR 0399); none left, and a retry could only replay a try
+                    -- every style tried: draw them again (ADR 0399); a retry has its own dice
                     tried = {}
-                    style, followed = unplayed(M.drawStyle(Bot, api.random, claims, route, tried))
-                    if not style then
-                        return noClean(entry, "%d attempts, every style played with what it remembers")
-                    end
+                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
                 end
-                played[tryKey(style)] = true
                 entry.attempts = entry.attempts + 1
                 local team, bwhy = between(api, style, followed, need, carried)
                 if not team then
@@ -353,7 +367,13 @@ function M.run(api)
                     end
                     style.memory = { enemies = copy }
                 end
-                local rec = api.play(style, followed, entry.attempts, team.pick)
+                -- after the prep screen and before the first move, so the draws land on the
+                -- play's dice whatever the screens above drew (they run the same every attempt)
+                -- a replay burns what its original's record says (api.diag.dice_advanced; a
+                -- record from before the switch has none: 0), never what its attempt number says
+                local dice = api.advanceDice(api.diag and (api.diag.dice_advanced or 0)
+                                             or M.diceFor(entry.attempts))
+                local rec = api.play(style, followed, entry.attempts, team.pick, dice)
                 if api.diag then
                     return "played", string.format("chapter %d attempt %d: diagnostic replayed", ch,
                         entry.attempts)
@@ -395,7 +415,7 @@ function M.run(api)
                 for _, e in ipairs(rec.enemies_seen or {}) do
                     rememberEnemy(e.id, e.charId, e.classId)
                 end
-                if entry.attempts >= M.MAX_ATTEMPTS then return noClean(entry, "%d attempts") end
+                if entry.attempts >= attemptCap then return noClean(entry) end
                 local lok, lwhy = api.load(ch)
                 if not lok then
                     entry.outcome = "crashed"

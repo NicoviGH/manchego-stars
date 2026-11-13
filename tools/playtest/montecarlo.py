@@ -7,10 +7,12 @@
 
 `attempts` plays attempts 1..N of the chapter at the env's `from` start side by side (env
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
-Each is an independent attempt: every attempt loads the same start state, the game's RNG in it,
-and the styles are drawn without reading a result, so attempt k alone plays the k-th style with
-no memory. The campaign's own loop is not that: its retries remember what earlier attempts
-showed (ADRs 0386, 0399), so its attempt k can differ, and it goes past the style count.
+Each is an independent attempt: every attempt loads the same start state, and the styles are
+drawn without reading a result, so attempt k alone plays the k-th style with no memory, and
+with the dice the campaign's attempt k has: the game's RNG advanced k - 1 strides of draws from the start
+(ADR 0404; attempt 1 none). The campaign's own loop is not that: its retries remember what
+earlier attempts showed (ADRs 0386, 0399), so its attempt k can differ, and it goes past the
+style count.
 
 A worker is `run.sh <scenario>` with PT_RUN_TAG, so copies of one scenario share no run dir,
 leftover kill or save (run.sh). Its records are read from the emulator's own stdout
@@ -28,7 +30,7 @@ analysis; `cell` then plays the confirmatory seeds with that choice.
 
     python3 tools/playtest/montecarlo.py starts --game ours|vanilla [--count 10] [--jobs 8]
     python3 tools/playtest/montecarlo.py resume --game vanilla --tag <tag> \
-        [--campaigns cs-s4001,...] [--chapter <i>] [--last <i>] [--jobs 8]
+        [--campaigns cs-s4001,...] [--chapter <i>] [--last <i>] [--attempts <n>] [--jobs 8]
     python3 tools/playtest/montecarlo.py pilot --chapter 3 [--starts 10]
     python3 tools/playtest/montecarlo.py cell --analysis paired \
         (--chapter <n> [--starts 10] | --ours <env .json> --vanilla <env .json> \
@@ -246,9 +248,10 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
 
 
 PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
-# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts (campaign.lua
-# noClean), and kept as FAILED they would crowd real crashes out of KEEP_FAILED
-PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible')
+# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts and `capped`
+# a cut made on purpose (campaign.lua noClean), and kept as FAILED they would crowd real crashes
+# out of KEEP_FAILED
+PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible', 'capped')
 
 
 def passing(recs):
@@ -2602,15 +2605,34 @@ def resume_seed(name, pins):
     return int(m.group(1)) if m else None
 
 
-def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False):
+@functools.lru_cache(maxsize=None)
+def max_attempts(path=os.path.join(HERE, 'campaign.lua')):
+    """The retry cap a chapter start gets (campaign.lua's M.MAX_ATTEMPTS): the one number,
+    never restated here."""
+    pattern = r'M\.MAX_ATTEMPTS = (\d+)'
+    with open(path) as fh:
+        found = re.search(pattern, fh.read())
+    if not found:
+        raise ValueError('%s has no line matching %r: the retry cap is read from it'
+                         % (path, pattern))
+    return int(found.group(1))
+
+
+def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
+                 attempts=None):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
     the copy leaves the pinned file alone. The campaign's own seed draws its styles again
     (campaign.lua's api.seed), and each chapter is retried with memory up to the cap (ADR
-    0399), on to `last` (the env's, the game's end, unless given). ValueError, before any copy,
-    when a campaign has no such start, its pinned start was rewritten, its seed is unknown, or
-    the new id is taken; a copy that fails removes every copy this call made, then raises."""
+    0399), on to `last` (the env's, the game's end, unless given), at most `attempts` a chapter
+    (the env's campaign.lua cap unless given). ValueError, before any copy, when `attempts` is
+    under 1 or over the cap, a campaign has no such start, its pinned start was rewritten, its
+    seed is unknown, or the new id is taken; a copy that fails removes every copy this call
+    made, then raises."""
+    if attempts is not None and not 1 <= attempts <= max_attempts():
+        raise ValueError('--attempts is %d, and a chapter start gets 1 to %d attempts'
+                         % (attempts, max_attempts()))
     plan = []
     for name in names:
         src = os.path.join(store, 'states', name)
@@ -2644,6 +2666,8 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
         camp = dict(env, id=new, **{'from': at})
         if last is not None:
             camp['last'] = [last]
+        if attempts is not None:
+            camp['attempts'] = attempts
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
     return tasks
@@ -2663,7 +2687,7 @@ def resume_main(args, pool=None):
     names = args.campaigns.split(',') if args.campaigns else sorted(pins)
     try:
         tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
-                             args.last, vanilla)
+                             args.last, vanilla, args.attempts)
     except ValueError as err:
         print('refused: %s' % err)
         return 1
@@ -2835,7 +2859,8 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
                 instrument=None):
     """PT_DIAG for one diagnostic replay of a death of suite run `rec` (whose trace is filed
     relative to `base`): the decision to pin, the mode, the forced plan, the death, the
-    original trace and the run. Without `ref`, the decision is the last that moved the unit in
+    original trace, the dice the run was advanced (its record's `dice_advanced`, 0 for a record
+    that has none) and the run. Without `ref`, the decision is the last that moved the unit in
     the original trace `events` (moved_ref), else the death's plan_ref; `ref_from` says which
     ('asked', 'act' or 'plan_ref'). Raises ValueError, saying why, on a replay it cannot make:
     a run not of the suite (a campaign's chapter is reached through every chapter before it),
@@ -2875,6 +2900,8 @@ def replay_diag(rec, mode, force=None, char=None, ref=None, base='.', events=(),
     return {'ref': ref, 'ref_from': ref_from, 'mode': mode,
             'force': list(force) if force else None,
             'failure': {'charId': d['charId'], 'turn': d.get('turn')},
+            # replay what the record says: one from before ADR 0404 has no field, and burned none
+            'dice_advanced': rec.get('dice_advanced') or 0,
             'original_trace': os.path.join(base, rec['trace']),
             'run': dict({k: rec.get(k) for k in RUN_NAME}, game=rec.get('game'),
                         trace=run_key(rec))}
@@ -3639,6 +3666,9 @@ def main(argv=None):
                     help="the chapter index to resume at (default: each campaign's latest start)")
     ru.add_argument('--last', type=int,
                     help="the chapter index to stop after (default: the game's end)")
+    ru.add_argument('--attempts', type=int,
+                    help='the most attempts a chapter start gets, 1 to the cap in campaign.lua '
+                         '(default: the cap)')
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,

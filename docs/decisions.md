@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-403 decisions. Read this index, then open the two or three you need — the whole
+404 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -248,6 +248,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0401` | [On a Defeat Boss map a boss the party knows of is the march goal, in sight or remembered](decisions/0401-on-a-defeat-boss-map-a-boss-the-party-knows-of-is-the-march-goal.md) | 2026-11-11 | #510 |
 | `0402` | [The team pick covers the scarcest demand first](decisions/0402-the-team-pick-covers-the-scarcest-demand-first.md) | 2026-11-11 | #510 |
 | `0403` | [A wait that gains nothing ends: a stalled goal does not hold the win, and sixteen quiet player phases end the attempt](decisions/0403-a-wait-that-gains-nothing-ends-a-stalled-goal-does-not-hold-the-win-and-sixteen-quiet-player-phases-end-the-attempt.md) | 2026-11-12 | #510 |
+| `0404` | [Retries get different dice: the game's RNG is advanced by the attempt number, never re-seeded](decisions/0404-retries-get-different-dice-the-games-rng-is-advanced-by-the-attempt-number-never-re-seeded.md) | 2026-11-12 | #510 |
 
 ---
 

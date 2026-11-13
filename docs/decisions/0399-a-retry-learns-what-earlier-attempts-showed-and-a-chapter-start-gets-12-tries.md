@@ -86,6 +86,9 @@ rule's. So a death reaches the next attempt only through its killer.
 
 ## 4. The retry cap
 
+> **Amended by ADR 0404 (2026-11-12):** a retry gets different dice, so a repeated try is no
+> longer a replay; "a try already played is never spent again" and its stop are retired.
+
 `MAX_ATTEMPTS` is **12 a chapter start**. It replaces "stop once every style has been tried"
 (Nicolas's call, a tuning weight). When the styles run out, they are drawn again, since memory
 makes a repeated style play differently. **A try already played is never spent again:** the

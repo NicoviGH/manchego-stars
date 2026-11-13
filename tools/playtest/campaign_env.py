@@ -36,7 +36,9 @@ N is an index, not a chapter's name: vanilla's is the chapter id in constants/ch
 
 To play that one chapter alone, set `last: [N]` in the JSON too, and `attempt: k` to play only
 the k-th style drawn: without `attempt`, campaign.lua retries the chapter until it clears clean
-and plays on to the next. Then `PT_CAMPAIGN="$(cat env.json)" tools/playtest/run.sh campaign`
+and plays on to the next (`attempts: n` bounds those retries below campaign.lua's cap;
+`montecarlo.py resume --attempts` sets it). Then
+`PT_CAMPAIGN="$(cat env.json)" tools/playtest/run.sh campaign`
 (`PT_VANILLA=1` for retail), or many attempts at once with `montecarlo.py attempts --env
 env.json`. Regenerate a Manchego Stars env with this script before measuring: an env kept in an old
 scratch dir predates `house_gifts`, and a House with no prior is worth 0 (that sent #556 the

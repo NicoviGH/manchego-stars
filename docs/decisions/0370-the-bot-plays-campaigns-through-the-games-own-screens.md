@@ -14,7 +14,7 @@ everyone alive. It is pure (tested with a fake api, `test_campaign.lua`); harnes
 `INSPECT.campaignApi` is its only window on the ROM, and **every rule in it is the game's** (the
 standing rule of ADR 0369: never re-create vanilla).
 
-**Restarts (the amendment on #510).** A failed attempt -- lost, stuck, or won with a death -- loads
+**Restarts (the amendment on #510).** (RNG: amended by ADR 0404, a retry advances the game's RNG by its attempt number.) A failed attempt -- lost, stuck, or won with a death -- loads
 the chapter-start state back and draws a NEW style (aggression uniform, the deploy order a
 uniform shuffle of the non-forced roster, each claim followed with p = 0.5). The RNG is never
 re-seeded: FE8 seeds it once at power-on and a suspend save stores it, so a restart differs only by
