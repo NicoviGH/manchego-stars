@@ -1271,12 +1271,16 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local function bluesIn(w) return inWay(planned, w, function(p) return p.unit.id end) end
         local strikes, outcomes, top, total = {}, {}, nil, 0
+        -- a plan that takes the Seize ends the chapter there: the game plays no enemy phase
+        -- after it, so none is judged (ADR 0405). Read against one, the Seize was over the cap
+        -- for a death that could not happen (vanilla Ch8, run goal8b, campaign 4001 turn 19: the
+        -- thief's 63.5%, far from the throne; she died and the win came a turn later). A counter
+        -- to a blow struck before the Seize is still the cap's (st.fought, below).
+        local phase = not seizesIn(st) and sight.enemyPhase
         for i, w in ipairs(ways) do
-            if sight.enemyPhase then cost.phases = cost.phases + 1 end
-            local s = sight.enemyPhase and sight.enemyPhase({ blues = bluesIn(w), gone = w.gone,
-                                                              reds = w.reds,
-                                                              opened = st.opened,
-                                                              carry = st.carry }) or {}
+            if phase then cost.phases = cost.phases + 1 end
+            local s = phase and phase({ blues = bluesIn(w), gone = w.gone, reds = w.reds,
+                                        opened = st.opened, carry = st.carry }) or {}
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
                 outcomes[#outcomes + 1] = { p = w.p * o.p, strikes = o.strikes, way = i }
                 total = total + w.p * o.p

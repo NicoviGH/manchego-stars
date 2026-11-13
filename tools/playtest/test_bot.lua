@@ -3970,6 +3970,34 @@ do
     check(other, nil, "seize over the cap: no other judged plan is under the cap")
 end
 
+-- test_no_enemy_phase_is_judged_after_the_seize (#510 fwd1 item D, ADR 0405): the lord can
+-- Seize, and the enemy phase would kill T wherever she stands. The Seize ends the chapter
+-- before that phase (vanilla Ch8, run goal8b, campaign 4001 turn 19: the Seize plan read the
+-- thief's 63.5% and was over the cap, the thief died and the win came a turn later). So the
+-- plan that seizes is under the cap and played.
+do
+    local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+    local T = blue(0x02, 1, 0, 9, { minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }) },
+        enemyPhase = function(plan)
+            local out = {}
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x02 then
+                    out[#out + 1] = { target = 0x02, takenHit = 80, takenDmg = 99, takenHits = 1,
+                                      takenCrit = 0 }
+                end
+            end
+            return out
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(L, T, Z), sightOf(o), style("careful"))
+    check((a and a.act) .. " " .. tostring(plan and plan.rank.admitted), "seize true",
+          "seize: no enemy phase is judged after it")
+end
+
 -- test_the_rank_sees_an_offered_goal_act (#510 fwd1 item D's planner item, ADR 0405): U can
 -- take a goal at or from (4,2), a step away from the gate, and none of the beam's plans is
 -- judged (FINAL = 0: the beam cut the act, as it cut the Talk on vanilla Ch9 turn 11). A plan
