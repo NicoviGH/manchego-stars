@@ -3974,20 +3974,23 @@ end
 -- take a goal at or from (4,2), a step away from the gate, and none of the beam's plans is
 -- judged (FINAL = 0: the beam cut the act, as it cut the Talk on vanilla Ch9 turn 11). A plan
 -- with the act is judged all the same, its other acts the first plan's (V's march). With the
--- beam's plans judged and the act in one of them, no second plan is built for it.
+-- beam's plans judged and the act in one of them, no second plan is built for it. A stalled
+-- row gets its plan too, and of two units offered one goal the plan has the better by its own
+-- score.
 do
-    local function judged(o, final)
+    -- the goal plans judged on the shared board, as key lists, and how many. `o` is the
+    -- sight's options, `final` Planner.FINAL for the call (nil: the beam's plans are judged
+    -- and U is alone, so the beam keeps each of its three acts), `more` the units besides U.
+    local function judged(o, final, st, opts, ...)
         local U = blue(0x01, 0, 4, 3, { minRange = false })
-        -- with the beam's plans judged U is alone, so the beam keeps each of its three acts
-        local V = final and blue(0x02, 1, 0, 0, { minRange = false })
-            or red(0x84, 13, 14, { minRange = false })
         local Z = red(0x83, 14, 14, { minRange = false })
         o.objective = { kind = "seize", tile = { x = 4, y = 9 } }
-        o.reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }), [0x02] = tiles({ 0, 0 }, { 0, 1 }) }
+        o.reach = o.reach or { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }),
+                               [0x02] = tiles({ 0, 0 }, { 0, 1 }) }
         o.enemyPhase = function() return {} end
         local was = Planner.FINAL
         Planner.FINAL = final or was
-        local _, plan = Planner.plan(B, boardOf(U, V, Z), sightOf(o), style("bold"))
+        local _, plan = Planner.plan(B, boardOf(U, Z, ...), sightOf(o), st or style("bold"), opts)
         Planner.FINAL = was
         local goal, n = nil, 0
         for _, c in ipairs(plan and plan.considered or {}) do
@@ -3995,47 +3998,45 @@ do
         end
         return goal, n
     end
+    local function V() return blue(0x02, 1, 0, 0, { minRange = false }) end
     for _, kind in ipairs({ "visit", "chest" }) do
         local function o()
             return { explorable = { { x = 4, y = 2, kind = kind } },
                      canExplore = { [0x01] = { ["4,2"] = kind } } }
         end
-        check(judged(o(), 0), "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
+        check(judged(o(), 0, nil, nil, V()), "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
               "goal act: the " .. kind .. " the beam cut is judged, the rest the first plan's")
         check(select(2, judged(o())), 0,
               "goal act: a " .. kind .. " a judged plan already holds gets no second plan")
+        check(judged(o(), 0, nil, { quietGoals = { [kind .. ":4,2"] = true } }, V()),
+              "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
+              "goal act: a stalled " .. kind .. " the game offers is judged too")
     end
     -- a Talk to the recruit T, from beside it
-    local function talk()
-        return { talk = { [0x01] = { [0x30] = true } } },
-               blue(0x30, 5, 4, 1, { faction = "green", minRange = false })
-    end
-    local to, T = talk()
-    local st = claimed("bold", { id = "r1", kind = "recruit", unit = { 0x30 } })
-    local U = blue(0x01, 0, 4, 3, { minRange = false })
-    local V = blue(0x02, 1, 0, 0, { minRange = false })
-    local Z = red(0x83, 14, 14, { minRange = false })
-    to.objective = { kind = "seize", tile = { x = 4, y = 9 } }
-    to.reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }), [0x02] = tiles({ 0, 0 }, { 0, 1 }) }
-    to.enemyPhase = function() return {} end
-    local was = Planner.FINAL
-    Planner.FINAL = 0
-    local _, plan = Planner.plan(B, boardOf(U, V, Z, T), sightOf(to), st)
-    Planner.FINAL = was
-    local goal
-    for _, c in ipairs(plan and plan.considered or {}) do
-        if c.kind == "goal" then goal = table.concat(c.acts, " ") end
-    end
-    check(goal, "1>talk@4,2>48 2>wait@0,1>nil", "goal act: the Talk the beam cut is judged")
+    check(judged({ talk = { [0x01] = { [0x30] = true } } }, 0,
+                 claimed("bold", { id = "r1", kind = "recruit", unit = { 0x30 } }), nil, V(),
+                 blue(0x30, 5, 4, 1, { faction = "green", minRange = false })),
+          "1>talk@4,2>48 2>wait@0,1>nil", "goal act: the Talk the beam cut is judged")
+    -- U and W are both offered the village. U's Visit is a step back from the gate and W's is
+    -- not, so W's scores better by its own score: one plan is built, not one a unit, with W's
+    local two = { explorable = { { x = 4, y = 2, kind = "visit" } },
+                  canExplore = { [0x01] = { ["4,2"] = "visit" }, [0x03] = { ["4,2"] = "visit" } },
+                  reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }),
+                            [0x03] = tiles({ 3, 3 }, { 4, 2 }) } }
+    local goal, n = judged(two, 0, nil, nil, blue(0x03, 2, 3, 3, { minRange = false }))
+    check(tostring(goal and goal:match("^%d+>visit@4,2")) .. " " .. n, "3>visit@4,2 1",
+          "goal act: two units offered one goal, one plan, the better act's")
 end
 
--- test_one_plan_without_the_seize_while_a_goal_is_feasible (#510 fwd1 item D, ADR 0405): the
+-- test_plans_without_the_seize_while_a_goal_is_feasible (#510 fwd1 item D, ADR 0405): the
 -- lord can Seize, and the thief T is two turns from a chest only she opens. Every plan judged
 -- seizes (BEAM = 1, as all 6 did on vanilla Ch8, campaign 4001 turn 16), each forfeiting the
--- chest. One plan without the Seize is judged too, and the rank plays it: no forfeit. With the
--- chest's row stalled (opts.quietGoals) no such plan is built and the Seize is played.
+-- chest. Plans without the Seize are judged too, and the rank plays one: no forfeit. With the
+-- chest's row stalled (opts.quietGoals) no such plan is built and the Seize is played. Where
+-- the first plan's other act is over the cap (T's march into X's strike), the plan with every
+-- unit holding is the one under it, and is played.
 do
-    local function run(opts)
+    local function run(opts, enemyPhase)
         local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
         local T = blue(0x02, 1, 0, 9, { minRange = false })
         local Z = red(0x83, 14, 14, { minRange = false })
@@ -4044,11 +4045,12 @@ do
             reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }), [0x02] = tiles({ 0, 9 }, { 5, 9 }) },
             explorable = { { x = 10, y = 9, kind = "chest" } },
             canExplore = { [0x02] = { ["10,9"] = "chest" } },
-            enemyPhase = function() return {} end,
+            enemyPhase = enemyPhase or function() return {} end,
         }
         local beam = Planner.BEAM
         Planner.BEAM = 1
-        local a, plan = Planner.plan(B, boardOf(L, T, Z), sightOf(o), gifted("bold", 100), opts)
+        local a, plan = Planner.plan(B, boardOf(L, T, Z), sightOf(o), gifted("careful", 100),
+                                     opts)
         Planner.BEAM = beam
         local kinds = {}
         for _, c in ipairs(plan and plan.considered or {}) do
@@ -4058,12 +4060,28 @@ do
         return table.concat(kinds, " "), plan
     end
     local kinds, plan = run()
-    check(kinds:find("wait:0", 1, true) ~= nil, true, "no seize: a plan without the Seize is judged")
+    check(kinds:find("noseize:0", 1, true) ~= nil, true,
+          "no seize: a plan without the Seize is judged")
     check(plan and plan.seizes, false, "no seize: and played, the chest still to get")
     check(plan and #plan.forfeited, 0, "no seize: it forfeits nothing")
     kinds, plan = run({ quietGoals = { ["chest:10,9"] = true } })
-    check(kinds:find("wait:", 1, true), nil, "no seize: a stalled chest asks for no such plan")
+    check(kinds:find("noseize", 1, true), nil, "no seize: a stalled chest asks for no such plan")
     check(plan and plan.seizes, true, "no seize: and the Seize is played")
+    -- T is struck dead at (5,9), where the first plan marches her; at home she is safe
+    kinds, plan = run(nil, function(p)
+        for _, b in ipairs(p.blues) do
+            if b.x == 5 and b.y == 9 then
+                return { { target = b.unit.id, takenHit = 80, takenDmg = 99, takenHits = 1,
+                           takenCrit = 0 } }
+            end
+        end
+        return {}
+    end)
+    local acts = {}
+    for _, x in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = Planner.key(x) end
+    table.sort(acts)
+    check(table.concat(acts, " ") .. " " .. tostring(plan and plan.kind),
+          "1>wait@4,3>nil 2>wait@0,9>nil noseize", "no seize: every unit holding is played")
 end
 
 -- test_the_plan_names_how_near_each_goal_is (#510 fwd1 item C, the progress record's near half):
