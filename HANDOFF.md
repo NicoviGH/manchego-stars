@@ -9,27 +9,26 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): PR #604 (fwd1 call 1 and `resume --attempts`, ADR 0404) is reviewed and proven, and waits for Nicolas's "merge"; item D is next.**
+**Next session starts here (2026-11-12): fwd1 call 1 is merged (PR #604, ADR 0404, 7b6212df); next is item D.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
 calls, all approved); its findings are comment 6810177817.
 
-**PR #604 (branch `feat/510-fwd1-call1-dice`): retries get different dice.** Not one of the
-PRs that may merge after review: it needs his "merge". CI was running on head 1e3c62e7 when
-this was written: check it for that sha before merging.
+**PR #604 is merged** (Nicolas: "Merge and handoff", 2026-11-12), no open PR of this work.
 - Attempt k of a chapter start has the game's RNG moved on (k - 1) * 1009 draws, no re-seed;
-  attempt 1 moves none. The stop "every style played" is gone: a chapter stops at the cap.
-  `resume --attempts N` bounds it, and a run that hits a lowered cap ends `capped`.
+  attempt 1 moves none. The stop "every style played" is gone: a chapter stops at the cap of
+  12. `resume --attempts N` bounds it, and a run that hits a lowered cap ends `capped`.
 - **One draw was not enough** (the first build): the game gave it back in turn 1 (59 draws
-  against 60) and played the same game. The PR body has the table. What drew one fewer is a
-  lead only (the die per tied path direction, bmidoten.c:218-226).
+  against 60) and played the same game. The PR body has the tables. What drew one fewer is a
+  lead only (the die per tied path direction, bmidoten.c:218-226). Not proven: that a
+  1009-draw lead can never be given back. Nicolas was told both stay open (not item D's).
 - The dice are in the record: `dice_advanced`, `dice_start`, and `rn` on each player phase's
   `progress` trace line.
-- The frozen suite was NOT run, on purpose: it plays only attempt 1, which is frame-identical
+- The frozen suite was NOT run, on purpose: it plays only attempt 1, which was frame-identical
   to main's in runs `call1c` and `call1d`.
-- `/code-review` medium (six findings, all fixed) and one scoped re-review are applied; the
-  PR's comment lists them.
+- With different dice, vanilla Ch8 (campaigns 4001 and 4004, three attempts each) still has
+  no clean clear: 5 won and 1 lost, none taking the chests.
 
 **PR #603 (item C, ADR 0403) is merged** (Nicolas: "merge", 2026-11-12), no open PR of this work.
 - CI green on its head, `/code-review` (high) and one scoped re-review applied,
@@ -58,8 +57,7 @@ this was written: check it for that sha before merging.
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order.**
-1. **Merge PR #604** on Nicolas's word, once CI is green for its head sha.
-2. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
+1. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
    charId 9 deaths added. Then E and F as the plan sizes them.
 
 **Three calls waiting for Nicolas.**
@@ -99,7 +97,7 @@ turn 19, Ch5x (4003) stalls on turn 33.
 (`M.ledger`'s `stalled` rows), tests in
 `test_bot.lua`, `test_sight.lua`, `test_montecarlo.py`. A Ch6 retry pair:
 `montecarlo.py resume --game vanilla --tag <new> --campaigns cs-s4001 --chapter 7 --last 7`
-(`--attempts N` caps it once #604 is merged); `montecarlo.py look <trace dirs>` reads it.
+(`--attempts N` caps it); `montecarlo.py look <trace dirs>` reads it.
 
 - **Lessons:**
   - The game's dice at a phase start are in the trace (`rn` on `progress` lines): "same dice?"
