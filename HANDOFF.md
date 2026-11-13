@@ -75,7 +75,8 @@ before `montecarlo.py resume`; `DPROBE <json>` lines land in `workers/*.log`. Wi
 - Three attempts still end `stuck` with the boss alive (campaign 4001 attempts 7 and 10,
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
-**Next steps, in order** (Nicolas has not yet answered the order; it is Fable's reading).
+**Next steps, in order** (Nicolas agreed to the order, 2026-11-12: "Yes but let's do it next
+time").
 1. **The rank sees the goal's act** (new, small, planner.lua beside ADR 0403's Seize plan): a
    judged plan for each offered Talk, chest and visit, and one plan without the Seize while a
    ledger goal is `feasible`. Proof: unit tests that fail on main; the Ch9 and Ch8 4001 starts.
