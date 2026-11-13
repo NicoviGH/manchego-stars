@@ -28,7 +28,7 @@
 -- `leaks`): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
 -- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh, M.keepRide,
--- M.aiPhaseStart, M.battleWord.
+-- M.aiPhaseStart, M.phaseStarted, M.phaseKey, M.decisionCalls, M.battleWord.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -1197,8 +1197,10 @@ end
 -- earlier start), written back in their place: a strike stands one unit elsewhere and
 -- changes its equipped weapon, and neither call reads where a unit stands or which weapon
 -- is first (the heal flag is from HP, bestBlueMov and a player unit's flags from who is on
--- the map, its Mov and what its bag holds), bar ai_counter and the scratch maps, which
--- nothing reads. Calling them for every strike cost a vanilla Ch5 attempt 3% more CPU.
+-- the map, its Mov and what its bag holds), bar ai_counter and the scratch maps: no decision
+-- read off them was seen to change (ADR 0407: the same acts on four runs with the calls on
+-- every strike and with them once a board). Called for every strike they cost vanilla Ch14
+-- seed 1001 47.8 CPU s against main's 46.2.
 function M.aiPhaseStart(api, call, S, units, after, known)
     local mem, A = api.mem, S.gAiState
     M.keepAi(api, units)
@@ -1226,6 +1228,39 @@ function M.phaseStarted(mem, S, units)
     local known = { mov = mem.u8(S.gAiState + AI_BEST_MOV), flags = {} }
     for _, o in pairs(units) do known.flags[o.addr] = mem.u8(o.addr + M.UNIT_AI_FLAGS) end
     return known
+end
+
+-- What a kept phase start (M.phaseStarted) is kept by: each unit's HP and state word as they
+-- read now, by its address. They are what the two calls read that a sandbox can have staged
+-- (a plan's HP, a unit hidden, carried or off the map), so a strike asked inside a staged
+-- board finds no start kept for it and makes its own; a unit's Mov and bag change only with
+-- the board (`seen`).
+function M.phaseKey(mem, units)
+    local parts = {}
+    for _, o in pairs(units) do
+        parts[#parts + 1] = ("%x:%d:%x"):format(o.addr, mem.u8(o.addr + UNIT_HP),
+                                                mem.u32(o.addr + UNIT_STATE))
+    end
+    table.sort(parts)
+    return table.concat(parts, ",")
+end
+
+-- One enemy decision's calls after its field writes (cp_decide.c CpDecide_Main's loop body):
+-- the per-unit setup, then the decision. `stale` = an enemy's HP was written since the heal
+-- flags were last read: UpdateAllPhaseHealingAIStatus leads, as the game runs it after every
+-- act (cp_perform.c CpPerform_Cleanup). Run before every decision it changed nothing where no
+-- HP had (the flag is HP against two thresholds, the exit one never under the enter one,
+-- cp_data.c gAI3HealingThresholdTable, and only that function writes it) and was 36,166 calls
+-- in a vanilla Ch5 attempt. `split` = the caller acts between the two (a phase start leads
+-- the setup, or the targets are narrowed after it): -> setup, decide; else one list, nil.
+function M.decisionCalls(S, unit, stale, split)
+    local setup = { { S.RefreshEntityBmMaps, {} }, { S.AiUpdateNoMoveFlag, { unit } },
+                    { S.AiInitDangerMap, {} } }
+    if stale then table.insert(setup, 1, { S.UpdateAllPhaseHealingAIStatus, {} }) end
+    local decide = { { S.AiClearDecision, {} }, { S.AiDecideMain, {} } }
+    if split then return setup, decide end
+    setup[#setup + 1], setup[#setup + 2] = decide[1], decide[2]
+    return setup, nil
 end
 
 function M.equip(api, call, S, u, slot)
@@ -1726,13 +1761,17 @@ function M.new(outer)
     -- decision is its phase's first act and nothing ordered it (strike()): the phase start
     -- (M.aiPhaseStart) leads its calls. Any other decision is inside a phase aiOrder started,
     -- the faction red (asserted: decided on the player's, it would read the player phase's
-    -- gAiState again). The game reads the heal flags again after every act (cp_perform.c
-    -- CpPerform_Cleanup); here they change only when a staged phase writes an enemy's HP
-    -- between two decisions (`healStale`, set there), and the next decision then leads with
-    -- UpdateAllPhaseHealingAIStatus: on every decision it was 36,166 calls in a vanilla Ch5
-    -- attempt. -> the struck unit's id and the strike as
+    -- gAiState again). Its calls are M.decisionCalls's, the heal flags read again first when
+    -- a staged phase wrote an enemy's HP since (`healStale`: wound() sets it).
+    -- -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
     local healStale = false
+    -- A simulated phase's own HP write, on the unit at `addr`: `decides` = it is of the side
+    -- deciding, whose heal flags the next decision must read again.
+    local function wound(addr, hp, decides)
+        api.write8(addr + UNIT_HP, hp)
+        if decides then healStale = true end
+    end
     local function aiDecide(call, proc, e, all, before, starts)
         M.keepAi(api, all)
         M.keepFog(api, all)   -- `setup` refreshes the maps
@@ -1746,23 +1785,21 @@ function M.new(outer)
         api.write8(S.gAiState + AI_WEIGHT_TABLE,
             (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
         api.write8(S.gAiState + AI_DANGER_FILLED, 0)
-        local decide = { { S.AiClearDecision, {} }, { S.AiDecideMain, {} } }
-        local setup = { { S.RefreshEntityBmMaps, {} }, { S.AiUpdateNoMoveFlag, { e.addr } },
-                        { S.AiInitDangerMap, {} } }
+        local setup, decide
         if starts then
-            -- the board's own phase start, read once a board (`seen`, as units() is): the
-            -- setup's three calls write no aiFlags and no bestBlueMov
-            local known = seen.phaseStart
+            -- the phase start as the two calls leave it on these HPs and states, read once
+            -- for them (M.phaseKey) on a board (`seen`, dropped by refresh()): the setup's
+            -- three calls write no aiFlags and no bestBlueMov
+            setup, decide = M.decisionCalls(S, e.addr, false, true)
+            seen.phaseStart = seen.phaseStart or {}
+            local key = M.phaseKey(mem, all)
+            local known = seen.phaseStart[key]
             M.aiPhaseStart(api, call, S, all, setup, known)
-            seen.phaseStart = known or M.phaseStarted(mem, S, all)
+            seen.phaseStart[key] = known or M.phaseStarted(mem, S, all)
         else
             assert(mem.u8(S.gPlaySt + PLAY_FACTION) == M.PHASES[3],
                    "sight: an enemy decides inside a phase aiOrder started, or starts its own")
-            if healStale then table.insert(setup, 1, { S.UpdateAllPhaseHealingAIStatus, {} }) end
-            if not before then
-                setup[#setup + 1], setup[#setup + 2] = decide[1], decide[2]
-                decide = nil
-            end
+            setup, decide = M.decisionCalls(S, e.addr, healStale, before ~= nil)
             call(setup)
         end
         healStale = false   -- a phase start reads them too
@@ -1907,7 +1944,9 @@ function M.new(outer)
             now[#now + 1] = t
             standOn(e, side.tile.x, side.tile.y)
             local _, mean = M.odds({ t.takenDist }, t.targetHp)
-            api.write8(addr + UNIT_HP, t.targetHp - math.floor(mean + 0.5))
+            -- a red target: only a berserked enemy strikes its own side
+            wound(addr, t.targetHp - math.floor(mean + 0.5),
+                  byId[target] ~= nil and byId[target].faction == "red")
             return t, now, addr
         end
         return byId, order, decides, strike, remove, gone
@@ -2000,9 +2039,8 @@ function M.new(outer)
                             -- it lives: our counter's expected damage stays on it, as a
                             -- strike's stays on its target
                             local _, back = M.odds({ t.counterDist }, t.strikerHp)
-                            api.write8(e.addr + UNIT_HP,
-                                math.max(1, t.strikerHp - math.floor(back + 0.5)))
-                            healStale = true
+                            wound(e.addr, math.max(1, t.strikerHp - math.floor(back + 0.5)),
+                                  true)
                         end
                     else
                         local x, y = followMove(e)

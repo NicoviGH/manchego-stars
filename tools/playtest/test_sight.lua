@@ -537,11 +537,13 @@ do
                              m.u8(red.addr + FLAGS) }) do out[#out + 1] = v end
         return table.concat(out, ",")
     end
-    local stale, atCall, ran = state(), nil, {}
-    -- the game's writes: the red's heal flag, the best blue Mov, a blue's flags and ally count
+    local stale, atCall, ran, setsUp = state(), nil, {}, true
+    -- the game's writes when the two setup functions are in the list (`setsUp`): the red's
+    -- heal flag, the best blue Mov, a blue's flags and ally count
     local function call(list)
         atCall = atCall or state()
         for _, c in ipairs(list) do ran[#ran + 1] = c[1] end
+        if not setsUp then return 17 end
         m.w8(red.addr + FLAGS, 1)
         m.w8(AI + 0x85, 7)
         m.w8(blue.addr + FLAGS, 0x42); m.w8(blue.addr + COUNTER, 3)
@@ -583,12 +585,9 @@ do
             Sight.aiPhaseStart(api, call, S, { blue, red }, { { 0x08039AE8, {} } })
             known = Sight.phaseStarted(m, S, { blue, red })
         end)
-        ran = {}
+        ran, setsUp = {}, false
         sandbox(function()
-            Sight.aiPhaseStart(api, function(list)
-                for _, c in ipairs(list) do ran[#ran + 1] = c[1] end
-                return 17
-            end, S, { blue, red }, { { 0x08039AE8, {} } }, known)
+            Sight.aiPhaseStart(api, call, S, { blue, red }, { { 0x08039AE8, {} } }, known)
             again = state()
         end)
     end)
@@ -599,6 +598,45 @@ do
                                 0, 0, 0, 0, 0, 0, 0, 0, 0x77, 0x42, 1, 1 }, ","),
           "aiPhaseStart: a known start leaves the best Mov and the flags the calls did")
     check(state() == stale and #log, 0, "aiPhaseStart: a known start is handed back too")
+
+    -- phaseKey: a kept start is kept by every unit's HP and state word, so a board staged
+    -- otherwise (a plan's HP, a unit hidden) finds none; where a unit stands is not in it
+    local key = Sight.phaseKey(m, { blue, red })
+    check(Sight.phaseKey(m, { [9] = red, [3] = blue }), key, "phaseKey: the units' order is not in it")
+    m.w8(blue.addr + 0x10, 7)
+    check(Sight.phaseKey(m, { blue, red }), key, "phaseKey: where a unit stands is not in it")
+    m.w8(red.addr + 0x13, 12)
+    check(Sight.phaseKey(m, { blue, red }) ~= key, true, "phaseKey: an HP staged is another board")
+    m.w8(red.addr + 0x13, 0)
+    m.w32(blue.addr + 0x0C, Board.US_HIDDEN)
+    check(Sight.phaseKey(m, { blue, red }) ~= key, true, "phaseKey: a unit hidden is another board")
+    check(Sight.phaseKey(m, { blue }) ~= key, true, "phaseKey: another set of units is another board")
+    m.w32(blue.addr + 0x0C, 0)
+end
+
+-- decisionCalls: one decision's calls, in cp_decide.c's order. The heal flags are read again
+-- first only when an enemy's HP was written since (`stale`), as the game does after every act;
+-- no list is longer than the stub holds, and a split decision's setup has room for the phase
+-- start's two calls ahead of it.
+do
+    local S = { RefreshEntityBmMaps = 1, AiUpdateNoMoveFlag = 2, AiInitDangerMap = 3,
+                AiClearDecision = 4, AiDecideMain = 5, UpdateAllPhaseHealingAIStatus = 6 }
+    local function names(list)
+        local out = {}
+        for i, c in ipairs(list or {}) do out[i] = c[1] end
+        return table.concat(out, ",")
+    end
+    local one, none = Sight.decisionCalls(S, 0x02030200, false, false)
+    check(names(one) .. "|" .. tostring(none), "1,2,3,4,5|nil", "decisionCalls: one list, the setup then the decision")
+    check(one[2][2][1], 0x02030200, "decisionCalls: AiUpdateNoMoveFlag is handed the unit")
+    local stale = Sight.decisionCalls(S, 0, true, false)
+    check(names(stale), "6,1,2,3,4,5", "decisionCalls: a stale heal flag is read again first")
+    check(#stale <= Sight.LIST_MAX, true, "decisionCalls: the longest list fits the stub")
+    local setup, decide = Sight.decisionCalls(S, 0, false, true)
+    check(names(setup) .. "|" .. names(decide), "1,2,3|4,5", "decisionCalls: split, the caller acts between")
+    check(#setup + 2 <= Sight.LIST_MAX, true, "decisionCalls: a phase start's two calls fit ahead of a split setup")
+    setup, decide = Sight.decisionCalls(S, 0, true, true)
+    check(names(setup) .. "|" .. names(decide), "6,1,2,3|4,5", "decisionCalls: split and stale")
 end
 
 -- battleWord: a played exchange is kept by its two battle units less where they stand and less
@@ -631,22 +669,23 @@ do
               :find("local n = M%.aiPhaseStart%(api, call, S, all,%s*{ { S%.BuildAiUnitList, {} } }%)") ~= nil,
           true, "aiPhaseStart: aiOrder builds the order in the phase start's own list")
     local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
-    local started = decide:find("local known = seen%.phaseStart%s+"
-        .. "M%.aiPhaseStart%(api, call, S, all, setup, known%)%s+"
-        .. "seen%.phaseStart = known or M%.phaseStarted%(mem, S, all%)")
+    local started = decide:find("M%.aiPhaseStart%(api, call, S, all, setup, known%)")
     local guard = decide:find("assert%(mem%.u8%(S%.gPlaySt %+ PLAY_FACTION%) == M%.PHASES%[3%]")
-    local heal = decide:find("if healStale then table%.insert%(setup, 1, "
-                             .. "{ S%.UpdateAllPhaseHealingAIStatus, {} }%) end")
-    check(started ~= nil and guard ~= nil and heal ~= nil and started < guard and guard < heal, true,
-          "aiPhaseStart: a decision starts its phase, or is inside a red one and reads the "
-          .. "heal flags again first when an enemy's HP was written since")
-    -- every write of an enemy's HP between two decisions of one phase marks them stale: the
-    -- one such write is nextPhase's, the counter's expected damage on a striker that lives
-    local hurt = src:find("math.max(1, t.strikerHp - math.floor(back + 0.5)))\n"
-                          .. "                            healStale = true", 1, true)
-    local _, writes = src:gsub("api%.write8%(e%.addr %+ UNIT_HP,", "")
-    check(hurt ~= nil and writes, 1, "aiPhaseStart: the one write of a deciding side's HP inside "
-          .. "a phase marks the heal flags stale")
+    local stale = decide:find("M%.decisionCalls%(S, e%.addr, healStale,")
+    check(started ~= nil and guard ~= nil and stale ~= nil and started < guard and guard < stale, true,
+          "aiPhaseStart: a decision starts its phase, or is inside a red one and is told "
+          .. "whether an enemy's HP was written since the heal flags were read")
+    check(decide:find("local key = M%.phaseKey%(mem, all%)%s+local known = seen%.phaseStart%[key%]") ~= nil
+          and decide:find("seen%.phaseStart%[key%] = known or M%.phaseStarted%(mem, S, all%)") ~= nil,
+          true, "aiPhaseStart: a strike's start is kept by the HPs and states it was read on")
+    -- an HP written inside a simulated phase goes through wound(), which marks the heal flags
+    -- stale for the deciding side: the staging's two writes come before the phase's order,
+    -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated)
+    local _, writes = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
+    local _, wounds = src:gsub("\n%s+wound%(", "")
+    check(writes == 4 and wounds == 2
+          and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
+          true, "aiPhaseStart: a phase's own HP writes are wound()'s, the heal flags stale after")
     check(bodyOf("function s.strike("):find("function%(%) onlyTarget%(u, all%) end,%s*true%)") ~= nil,
           true, "aiPhaseStart: the strike's decision starts its phase")
     -- the definition's own parameter list counts as one
@@ -667,9 +706,10 @@ end
 do
     local src = sightSrc
     local _, refreshes = src:gsub("\n[^\n-]*S%.RefreshEntityBmMaps", "")
-    check(refreshes, 3, "refresh: RefreshEntityBmMaps is called from refresh, fullInfo and aiDecide alone")
+    check(refreshes, 3, "refresh: RefreshEntityBmMaps is called from refresh, fullInfo and "
+          .. "a decision's calls (decisionCalls, aiDecide's) alone")
     for _, name in ipairs({ "function M.refresh(", "function M.fullInfo(",
-                            "local function aiDecide(" }) do
+                            "function M.decisionCalls(" }) do
         local at = src:find(name, 1, true)
         local body = at and src:sub(at, src:find("\nend\n", at, true) or #src)
         check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
