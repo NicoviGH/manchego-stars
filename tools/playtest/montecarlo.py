@@ -2002,19 +2002,28 @@ def suite_tasks(suite, envs, instrument, outs, sets=SEED_SETS):
             for t in chapter_tasks(suite, envs, instrument, outs, st, kind)]
 
 
+def suite_key(t):
+    """A suite task's run, (start_id, seed): the key a played record is filed under too."""
+    return t['stamp']['suite']['start_id'], t['seed']
+
+
 def only_tasks(tasks, only, held_out):
     """The suite's `tasks` that `only` names (`suite --only`), and the specs that name none.
     A spec is a start id, every seed of it in the sets played (tuning, and held-out with
-    `held_out`), or `<start_id>/<seed>`, that seed in whichever set holds it."""
-    picked, bad = [], []
+    `held_out`), or `<start_id>/<seed>`, that seed in whichever set holds it; a slash with
+    no seed after it names nothing."""
+    picked, keys, bad = [], set(), []
     for spec in only:
-        sid, _, seed = spec.partition('/')
-        got = [t for t in tasks if t['stamp']['suite']['start_id'] == sid
-               and (str(t['seed']) == seed if seed
+        sid, slash, seed = spec.partition('/')
+        got = [t for t in tasks if suite_key(t)[0] == sid
+               and (str(t['seed']) == seed if slash
                     else held_out or t['stamp']['suite']['set'] == 'tuning')]
         if not got:
             bad.append(spec)
-        picked.extend(t for t in got if t not in picked)
+        for t in got:
+            if suite_key(t) not in keys:
+                keys.add(suite_key(t))
+                picked.append(t)
     return picked, bad
 
 
@@ -2174,9 +2183,10 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
               kept=None, wall_limit_h=MAX_WALL_H, frozen=None, explain=None, snapshots=None,
               result=None, again=None, only=None):
     """Play the suite and say what it did, as lines to print. With `only` (only_tasks' specs)
-    it plays just those runs and judges nothing: no regressions, SC-003, snapshot or
-    promotion, so a probe of one run costs that run, not the suite. A held-out run named that
-    way is said only as whether it came back with a game result (FR-025). The tuning seeds always play,
+    it checks and plays just those runs and judges nothing: no regressions, SC-003, snapshot
+    or promotion, so a probe of one run costs that run, not the suite. A held-out run played
+    that way is said only by its tag (held_out_tag) and whether it came back with a game
+    result (FR-025). The tuning seeds always play,
     each run's line printed, and are judged on the frozen baseline (`frozen`, load_frozen's):
     regressions, unlabelled fallbacks and SC-003's calls on the same seeds frozen. With
     `held_out` the held-out seeds play too, said only as counts, never a start or seed: a
@@ -2189,6 +2199,9 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
     job over `wall_limit_h` (SC-007), before anything runs. `envs()` builds {game: campaign
     env}. `result`, a dict, is filled with what a freeze keeps."""
     lines = []
+    if only:   # a probe checks and plays the starts it names, so a broken other pin stops none
+        named = {spec.partition('/')[0] for spec in only}
+        suite = dict(suite, starts=[st for st in suite['starts'] if st['start_id'] in named])
     problems = check(suite, simdirs)
     if problems:
         return ['refused: %d pinned starts cannot be played as pinned:' % len(problems)] + \
@@ -2242,13 +2255,15 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
                                                                     rec.get('why'))
             lines.append('%s seed %s: %s' % (sid, rec.get('seed'), line))
         elif only:
-            lines.append('%s held-out seed %s: %s' % (sid, rec.get('seed'), 'a game result'
-                                                       if o['invariant'] else
-                                                       'no game result'))
+            lines.append('held-out run %s: %s' % (held_out_tag(sid, rec.get('seed')),
+                                                   'a game result' if o['invariant']
+                                                   else 'no game result'))
     if only:
-        back = {(t['stamp']['suite']['start_id'], t['seed']) for t in tasks} & set(outcome)
-        lines.extend('%s seed %s: no run came back' % (t['stamp']['suite']['start_id'], t['seed'])
-                     for t in tasks if (t['stamp']['suite']['start_id'], t['seed']) not in back)
+        # a held-out run is named by its tag, never its start or seed (FR-025)
+        back = {suite_key(t) for t in tasks} & set(outcome)
+        lines.extend(('%s seed %s' % suite_key(t) if t['stamp']['suite']['set'] == 'tuning'
+                      else 'held-out run %s' % held_out_tag(*suite_key(t)))
+                     + ': no run came back' for t in tasks if suite_key(t) not in back)
         lines.append('--only: %d of %s came back; nothing judged (no regressions, SC-003, '
                      'snapshots or promotion)' % (len(back), plural(len(tasks), 'run')))
         return lines

@@ -1569,23 +1569,44 @@ class Suite(unittest.TestCase):
     def test_only_a_start_is_its_tuning_seeds_and_held_out_with_the_flag(self):
         self.assertEqual(self.only_lines(['ours-ch02'])[1],
                          [('ours-ch02', 1003), ('ours-ch02', 1004)])
-        self.assertEqual(sorted(self.only_lines(['ours-ch02'], held_out=True)[1]),
-                         [('ours-ch02', s) for s in (1003, 1004, 2001, 2002)])
+        text, played = self.only_lines(['ours-ch02'], held_out=True)
+        self.assertEqual(sorted(played), [('ours-ch02', s) for s in (1003, 1004, 2001, 2002)])
+        self.assertNotIn('seed 200', text, 'a held-out seed is never printed (FR-025)')
+        self.assertEqual(self.only_lines(['ours-ch02', 'ours-ch02/1003'])[1],
+                         [('ours-ch02', 1003), ('ours-ch02', 1004)], 'each run plays once')
 
     def test_only_a_held_out_seed_says_whether_it_came_back_with_a_result(self):
         # FR-025: the seed was typed by whoever probes, the outcome is still never shown
         text, played = self.only_lines(['vanilla-ch3/2001', 'ours-ch02/2002'],
                                        back=lambda t: t['seed'] == 2001)
         self.assertEqual(played, [('vanilla-ch3', 2001), ('ours-ch02', 2002)])
-        self.assertIn('vanilla-ch3 held-out seed 2001: a game result', text)
-        self.assertIn('ours-ch02 seed 2002: no run came back', text)
-        self.assertNotIn('won', text)
+        self.assertIn('held-out run %s: a game result' % mc.held_out_tag('vanilla-ch3', 2001),
+                      text)
+        self.assertIn('held-out run %s: no run came back' % mc.held_out_tag('ours-ch02', 2002),
+                      text)
+        for hidden in ('won', '2001', '2002', 'vanilla-ch3', 'ours-ch02'):
+            self.assertNotIn(hidden, text)
         self.assertIn('--only: 1 of 2 runs came back', text)
 
     def test_only_refuses_a_spec_that_names_no_run_before_anything_plays(self):
-        text, played = self.only_lines(['vanilla-ch3/9999', 'nope', 'vanilla-ch3/1001'])
+        text, played = self.only_lines(['vanilla-ch3/9999', 'nope', 'vanilla-ch3/',
+                                        'vanilla-ch3/1001'])
         self.assertEqual(played, [])
-        self.assertEqual(text, 'refused: --only names no suite run: vanilla-ch3/9999, nope')
+        self.assertEqual(text, 'refused: --only names no suite run: vanilla-ch3/9999, nope, '
+                         'vanilla-ch3/')
+
+    def test_only_checks_only_the_starts_it_names(self):
+        # a broken pin of another start (a Manchego Stars rebuild) stops no vanilla probe
+        checked = []
+
+        def check(suite, simdirs):
+            checked.extend(st['start_id'] for st in suite['starts'])
+            return ['ours-ch02: pinned on another ROM'] if 'ours-ch02' in checked else []
+        lines = mc.run_suite(self.load(self.suite()), envs=lambda: {'vanilla': {}, 'ours': {}},
+                             simdirs={}, play=lambda tasks: iter(()), jobs=1, held_out=False,
+                             instrument='i', check=check, kept={}, only=['vanilla-ch3/1001'])
+        self.assertEqual(checked, ['vanilla-ch3'])
+        self.assertIn('vanilla-ch3 seed 1001: no run came back', '\n'.join(lines))
 
     def test_the_baseline_says_each_starts_cost_in_a_sentence(self):
         def play(tasks):

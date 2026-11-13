@@ -393,6 +393,11 @@ DEAD_CONCEPTS = [
     # (inject.raw_pids.stamp_boss_attributes), so no boss pays 40 less kill exp for riding one
     r'raw pids? (?:carr(?:y|ies)|has|have) no CA_BOSS',
     r'raw[- ]pid boss\b[^.\n]{0,60}\b(?:carries none|lacks CA_BOSS|40 less)',
+    # retired by #510 (ADR 0406): PT_LEAKGUARD no longer raises on the first leak; it logs each,
+    # puts it back, plays on and fails the run at its end listing them all
+    r'\b(?:makes a run|it) raises? on the first\b',
+    r'\bchanged raises,? naming the struct\b',
+    r'\braises? naming the struct and the word\b',
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as

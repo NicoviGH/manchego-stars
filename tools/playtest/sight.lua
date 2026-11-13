@@ -1031,8 +1031,9 @@ end
 -- its journal back: a difference is a game call's write that nothing kept, the kind that made
 -- one judged plan leak into the next (the bag, #554; the AI bytes, the fog bits and a rider's
 -- ballista, #510).
--- M.logLeak(log, leak): `leak` added to `log` (a list, keyed by its word too), or the count
--- of the one already there raised: one game call leaks the same word every plan it judges.
+-- M.logLeak(log, leak): `leak` added to the list `log` (log.seen indexes it by word), or the
+-- one already there counted again, with any new value it leaked to: one game call leaks the
+-- same word every plan it judges, and a second call may leak it to another value.
 -- M.leakLine(leak) -> what a run's end says of it.
 function M.spanWords(mem, spans)
     local out = {}
@@ -1056,17 +1057,27 @@ function M.leaks(mem, was)
     return out
 end
 function M.logLeak(log, l)
+    log.seen = log.seen or {}
     local key = l.addr + l.off
-    local got = log[key]
-    if got then got.n = got.n + 1 return end
-    l.n = 1
-    log[key] = l
-    log[#log + 1] = l
+    local got = log.seen[key]
+    if not got then
+        got = { name = l.name, addr = l.addr, off = l.off, was = l.was, nows = {}, n = 0 }
+        log.seen[key] = got
+        log[#log + 1] = got
+    end
+    got.n = got.n + 1
+    if not got.nows[l.now] then
+        got.nows[l.now] = true
+        got.nows[#got.nows + 1] = l.now
+    end
 end
 function M.leakLine(l)
-    return ("sandbox leak: the %s at 0x%08X, word +0x%02X, was 0x%08X and is 0x%08X after "
-        .. "its sandbox returned (%d times): a game call wrote it and no keep16 held it "
-        .. "(sight.lua's header)"):format(l.name, l.addr, l.off, l.was, l.now, l.n)
+    local nows = {}
+    for k, v in ipairs(l.nows) do nows[k] = ("0x%08X"):format(v) end
+    return ("sandbox leak: the %s at 0x%08X, word +0x%02X, was 0x%08X and is %s after its "
+        .. "sandbox returned (%d times): a game call wrote it and no keep16 held it "
+        .. "(sight.lua's header)"):format(l.name, l.addr, l.off, l.was,
+                                          table.concat(nows, " or "), l.n)
 end
 
 -- Inside a sandbox, before an enemy decides (aiDecide): the AI bytes of `units` (every unit on

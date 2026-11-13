@@ -393,8 +393,8 @@ do
     local sandbox, api = Sight.batching(outer, guarded, log)
     local after
     sandbox(function()
-        for _ = 1, 2 do
-            sandbox(function() w8(other.addr + BLOCK + 2, 1); w8(e.addr + 2, 0x55) end)
+        for k = 1, 2 do
+            sandbox(function() w8(other.addr + BLOCK + 2, 1); w8(e.addr + 2, k == 1 and 0x55 or 0x77) end)
         end
         after = m.u8(other.addr + BLOCK + 2) .. "," .. m.u8(e.addr + 2)
     end)
@@ -404,6 +404,9 @@ do
     check(line:find(("sandbox leak: the unit struct at 0x%08X, word +0x40"):format(other.addr),
               1, true) ~= nil and line:find("(2 times)", 1, true) ~= nil, true,
           "guard: the line names the struct, the word and how often: " .. line)
+    line = Sight.leakLine(log[1])
+    check(line:find("is 0x00550000 or 0x00770000", 1, true) ~= nil, true,
+          "guard: a word leaked to two values says both: " .. line)
     log = {}
     sandbox, api = Sight.batching(outer, guarded, log)
     sandboxed(sandbox, api)

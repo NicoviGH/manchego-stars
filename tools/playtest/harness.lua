@@ -154,8 +154,17 @@ local controllerFault
 -- above that line, which is why the shared R-on-a-name reader is INSPECT.helpAt and not
 -- VISIT.help (#493).
 local INSPECT = {}
--- PT_LEAKGUARD=1: the run's sandbox leaks (sight.lua M.logLeak), one log for every sight
+-- PT_LEAKGUARD=1: the run's sandbox leaks (sight.lua M.logLeak), one log for every sight.
+-- takeLeaks() -> the leaks logged since the last take, as lines (Sight.leakLine), the log
+-- emptied: botApi's leaks (an attempt's) and result() (any left over) both take them here.
 INSPECT.leakLog = PLAYTEST_LEAKGUARD == "1" and {} or nil
+function INSPECT.takeLeaks()
+    local log, out = INSPECT.leakLog, {}
+    if not log then return out end
+    for _, l in ipairs(log) do out[#out + 1] = INSPECT.Sight.leakLine(l) end
+    for k in pairs(log) do log[k] = nil end
+    return out
+end
 -- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
 -- rewinds the counter, so its frames are counted into INSPECT.sandboxFrames, and while one runs
 -- the stamp holds at the frame it started from (INSPECT.sandboxAt). run.sh's progress and frame
@@ -171,10 +180,10 @@ local function log(s)
 end
 local function result(verdict, why)
     -- PT_LEAKGUARD: a leak no bot run reported (botApi's leaks takes them) fails the scenario
-    local leaks = INSPECT.leakLog and #INSPECT.leakLog or 0
-    if leaks > 0 then
-        for _, l in ipairs(INSPECT.leakLog) do log(INSPECT.Sight.leakLine(l)) end
-        verdict, why = "FAIL", leaks .. " sandbox leak(s), each logged above (scenario reached: "
+    local leaks = INSPECT.takeLeaks()
+    if #leaks > 0 then
+        for _, line in ipairs(leaks) do log(line) end
+        verdict, why = "FAIL", #leaks .. " sandbox leak(s), each logged above (scenario reached: "
             .. why .. ")"
     end
     if verdict == "PASS" and controllerFault then
@@ -3462,14 +3471,7 @@ INSPECT.botApi = function(game)
     end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
-    -- the leaks logged since the last ask, as lines, the log emptied (PT_LEAKGUARD)
-    api.leaks = function()
-        local log, out = INSPECT.leakLog, {}
-        if not log then return out end
-        for _, l in ipairs(log) do out[#out + 1] = Sight.leakLine(l) end
-        for k in pairs(log) do log[k] = nil end
-        return out
-    end
+    api.leaks = INSPECT.takeLeaks   -- the attempt's sandbox leaks (PT_LEAKGUARD)
     api.dice = function() return Sight.dice(sightApi) end
     -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
     -- The board that decision read goes beside it (.json): what a fresh emulator's load of the

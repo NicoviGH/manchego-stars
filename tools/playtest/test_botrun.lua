@@ -483,6 +483,19 @@ do
     Botrun.run(g.api)
     check(recordOf(g).outcome, "won", "an empty log changes nothing")
     check(recordOf(g).leaks, nil, "and leaves no leaks in the record")
+
+    -- a leak from finish's own reads (the party read at the end) is this attempt's, and a
+    -- fault play() named (a wedged enemy phase: "timeout") is kept beside the leaks
+    g = fakeGame { move = 0, units = standoff() }
+    g.api.endPhase = function() return nil, {} end
+    local order = {}
+    g.api.party = function() order[#order + 1] = "party" return {} end
+    g.api.leaks = function() order[#order + 1] = "leaks" return { "sandbox leak: at the end" } end
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(order[#order], "leaks", "the log is taken after finish's own reads (the party's)")
+    check(type(r.env_status) == "table" and r.env_status.fault, "timeout",
+          "play()'s fault is kept with the leaks")
 end
 
 -- A repeated board with a turn event still to fire waits for it instead of ending stuck.

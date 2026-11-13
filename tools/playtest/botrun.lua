@@ -1066,6 +1066,18 @@ function M.run(api)
         -- play had begun (a unit was deployed): which runs fail then can follow what happened
         -- in them, so dropping them could bias the rest. A bot fault (a tile left open) is
         -- the bot's own play, measured, not the environment's.
+        -- PT_LEAKGUARD: every leak of the attempt, finish's own reads above included, its game
+        -- played on with each word put back. The record keeps what the game did (its deaths,
+        -- missed rewards); only its outcome says the run cannot be trusted, and a fault play()
+        -- named is kept.
+        local leaks = api.leaks and api.leaks() or {}
+        if #leaks > 0 then
+            rec.leaks = leaks
+            why = ("%d sandbox leak(s) (the record's leaks); the game ended %s: %s")
+                :format(#leaks, tostring(outcome), tostring(why))
+            outcome = "crashed"
+            rec.outcome, rec.why = outcome, why
+        end
         fault = fault or (outcome == "crashed" and "crash")
             or (#rec.watch_faults > 0 and "watch") or nil
         rec.env_status = fault and { fault = fault, outcome_dependent = #rec.deployed > 0 }
@@ -1655,14 +1667,7 @@ function M.run(api)
     end
 
     local ok, outcome, why, fault = pcall(play)
-    if not ok then outcome, why, fault = "crashed", "Lua error: " .. tostring(outcome), nil end
-    -- PT_LEAKGUARD: every leak of the attempt, its game played on with each word put back
-    local leaks = api.leaks and api.leaks() or {}
-    if #leaks > 0 then
-        rec.leaks = leaks
-        return finish("crashed", ("%d sandbox leak(s) (the record's leaks); the game ended %s: %s")
-            :format(#leaks, tostring(outcome), tostring(why)))
-    end
+    if not ok then return finish("crashed", "Lua error: " .. tostring(outcome)) end
     return finish(outcome, why, fault)
 end
 
