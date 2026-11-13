@@ -502,6 +502,112 @@ do
     check(kept, 0, "keepRide: a unit on foot keeps nothing")
 end
 
+-- aiPhaseStart: a simulated enemy phase starts as the game's does (cp_phase.c AiPhaseInit). The
+-- player phase leaves gAiState as the last enemy phase ended it, or as the save found it on
+-- turn 1, and gPlaySt.faction blue: the judged phase must find the game's phase-start values,
+-- have the two setup functions run on them with the faction red, and hand everything back.
+do
+    local m = fakeMem()
+    local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16,
+                    write32 = m.w32, Board = Board }
+    local AI, PLAY, TABLE = 0x0203AA04, 0x0202BCF0, 0x080D8178
+    local S = { gAiState = AI, gPlaySt = PLAY, gAiItemConfigTable = TABLE,
+                UpdateAllPhaseHealingAIStatus = 0x0803E640, SetupUnitInventoryAIFlags = 0x0803C064 }
+    local blue, red = { addr = 0x02030000 }, { addr = 0x02030200 }
+    local FLAGS, COUNTER = Sight.UNIT_AI_FLAGS, Sight.UNIT_AI_CONFIG + 6
+    m.w8(PLAY + 0x0E, 5); m.w8(PLAY + 0x0F, Sight.PHASES[1])      -- chapter 5, the player's phase
+    m.w32(TABLE + 5 * 4, 0x80000003)
+    m.w8(AI + 0x78, 2); m.w8(AI + 0x7B, 4); m.w8(AI + 0x7E, 3)    -- orderState, BERSERKED, unk7E
+    m.w32(AI + 0x80, 0xDEAD); m.w8(AI + 0x84, 1); m.w8(AI + 0x85, 9)
+    for k = 0, 7 do m.w8(AI + 0x86 + k, 0x10 + k) end
+    m.w8(AI + 0x8E, 0x77)                                         -- the byte past cmd_result
+    m.w8(blue.addr + FLAGS, 0x02); m.w8(blue.addr + COUNTER, 1); m.w8(red.addr + FLAGS, 0)
+    local function state()
+        local out = { m.u8(PLAY + 0x0F), m.u8(AI + 0x78), m.u8(AI + 0x7B), m.u8(AI + 0x7E),
+                      m.u32(AI + 0x80), m.u8(AI + 0x84), m.u8(AI + 0x85) }
+        for k = 0, 8 do out[#out + 1] = m.u8(AI + 0x86 + k) end
+        for _, v in ipairs({ m.u8(blue.addr + FLAGS), m.u8(blue.addr + COUNTER),
+                             m.u8(red.addr + FLAGS) }) do out[#out + 1] = v end
+        return table.concat(out, ",")
+    end
+    local stale, atCall, ran = state(), nil, {}
+    -- the game's writes: the red's heal flag, the best blue Mov, a blue's flags and ally count
+    local function call(list)
+        atCall = atCall or state()
+        for _, c in ipairs(list) do ran[#ran + 1] = c[1] end
+        m.w8(red.addr + FLAGS, 1)
+        m.w8(AI + 0x85, 7)
+        m.w8(blue.addr + FLAGS, 0x42); m.w8(blue.addr + COUNTER, 3)
+    end
+    local log = {}
+    local sandbox, api = Sight.batching(outer, function()
+        return { { blue.addr, Board.UNIT_SIZE, "unit struct" },
+                 { red.addr, Board.UNIT_SIZE, "unit struct" } }
+    end, log)
+    local inside
+    local ok, why = pcall(sandbox, function()
+        sandbox(function()
+            -- the caller leads its own list with the two calls
+            call(Sight.aiPhaseStart(api, S, { blue, red }))
+            inside = state()
+        end)
+    end)
+    check(ok, true, "aiPhaseStart: runs: " .. tostring(why))
+    check(atCall, table.concat({ Sight.PHASES[3], 0, 1, 0xFF, 0x80000003, 0, 0,
+                                 0, 0, 0, 0, 0, 0, 0, 0, 0x77, 0x02, 1, 0 }, ","),
+          "aiPhaseStart: the setup runs on AiPhaseInit's values, the faction red")
+    check(#ran == 2 and ran[1] == S.UpdateAllPhaseHealingAIStatus
+          and ran[2] == S.SetupUnitInventoryAIFlags, true,
+          "aiPhaseStart: the heal statuses, then the inventory flags, as AiPhaseInit calls them")
+    check(inside, table.concat({ Sight.PHASES[3], 0, 1, 0xFF, 0x80000003, 0, 7,
+                                 0, 0, 0, 0, 0, 0, 0, 0, 0x77, 0x42, 3, 1 }, ","),
+          "aiPhaseStart: the phase reads what the setup wrote")
+    check(state(), stale, "aiPhaseStart: the next read finds the player phase's state again")
+    check(#log, 0, "aiPhaseStart: the guard finds no unit struct left changed")
+end
+
+-- battleWord: a played exchange is kept by its two battle units less where they stand and less
+-- ai_counter, which the phase start rewrites wherever a player unit stands and no battle
+-- reads; every other byte of the AI word (ai2, its script counter) and of the unit stays.
+do
+    check(Sight.battleWord(0x44, 0x5A07FF03), 0x5A00FF03, "battleWord: ai_counter is left out")
+    check(Sight.battleWord(0x10, 0x12340A0B), 0x12340000, "battleWord: where the unit stands is left out")
+    check(Sight.battleWord(0x40, 0x5A07FF03), 0x5A07FF03, "battleWord: every other word is whole")
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    check(src:find("parts[#parts + 1] = M.battleWord(at, mem.u32(bu + at))", 1, true) ~= nil, true,
+          "battleWord: the played exchanges' key is built from it")
+end
+
+-- Every simulated enemy phase starts through it (the test above proves only the helper): read
+-- off the source, aiOrder and the strike each call Sight.aiPhaseStart, nothing else does, the
+-- strike before its decision, and every aiOrder call hands it the units.
+do
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    local _, starts = src:gsub("[^\n]* = M%.aiPhaseStart%(api, S, all%)", "")
+    check(starts, 2, "aiPhaseStart: aiOrder and strike are its two callers")
+    for _, name in ipairs({ "local function aiOrder(call, all)", "function s.strike(" }) do
+        local at = src:find(name, 1, true)
+        local body = at and src:sub(at, src:find("\n    end\n", at, true))
+        local start = body and body:find("local start = M.aiPhaseStart(api, S, all)", 1, true)
+        local act = body and (body:find("start[#start + 1] = { S.BuildAiUnitList, {} }\n        local n = call(start)", 1, true)
+                              or body:find("function() onlyTarget(u, all) end, start)", 1, true))
+        check(start ~= nil and act ~= nil and start < act, true,
+              "aiPhaseStart: " .. name .. " leads its order or its decision with the phase's start")
+    end
+    -- the definition's own parameter list counts as one
+    local calls, withUnits = 0, 0
+    for args in src:gmatch("[^%w]aiOrder(%b())") do
+        calls = calls + 1
+        if args == "(call, all)" or args == "(call, byId)" then withUnits = withUnits + 1 end
+    end
+    check(calls > 1 and calls == withUnits, true,
+          ("aiPhaseStart: each of aiOrder's %d mentions hands it the units (%d do)"):format(calls, withUnits))
+end
+
 -- Every enemy decision keeps the AI bytes first (the tests above prove only the helpers): read
 -- off the source, aiDecide calls Sight.keepAi before its first write, nothing else does, and
 -- every call of aiDecide hands it the board's units. And every map refresh in a sandbox keeps
@@ -520,7 +626,7 @@ do
         check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
               "refresh: " .. name .. " holds one of the three calls")
     end
-    local at = src:find("local function aiDecide(call, proc, e, all, before)", 1, true)
+    local at = src:find("local function aiDecide(call, proc, e, all, before, start)", 1, true)
     local body = at and src:sub(at, src:find("\n    end\n", at, true))
     local keep = body and body:find("M.keepAi(api, all)", 1, true)
     local write = body and body:find("api.write", 1, true)
@@ -533,10 +639,13 @@ do
     check(ride ~= nil and ride < write, true,
           "keepRide: aiDecide keeps the rider's ballista before its first write")
     local _, keeps = src:gsub("\n +M%.keepAi%(", "")
-    check(keeps, 1, "keepAi: aiDecide is its one caller")
+    check(keeps, 2, "keepAi: aiDecide and aiPhaseStart are its two callers")
+    check(body:find("local setup = start or { { S.UpdateAllPhaseHealingAIStatus, {} } }", 1, true)
+          ~= nil, true, "aiPhaseStart: a decision no phase start leads reads the heal flags "
+          .. "again first, as the game does after every act")
     local calls, withUnits = 0, 0
     for args in src:gmatch("[^%w]aiDecide(%b())") do
-        if not args:find("^%(e%)") and not args:find("before%)$") then
+        if not args:find("^%(e%)") and not args:find("before, start%)$") then
             calls = calls + 1
             local units = args:match("^%(call, proc, e, (%w+)[,)]")
             if units == "all" or units == "byId" then withUnits = withUnits + 1 end
