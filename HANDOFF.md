@@ -9,15 +9,30 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-12): fwd1 call 1 is merged (PR #604, ADR 0404, 7b6212df); next is item D.**
+**Next session starts here (2026-11-12): fwd1 item D is read (#510 comment 6842371541); next is the planner item it found.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
-calls, all approved); its findings are comment 6810177817.
-**Which model leads (Nicolas agreed, 2026-11-12):** Fable leads item D and the sizing of E and
-F (reading the dumps against the hypotheses, deciding what rule follows), with Sonnet writing
-the instrumentation and Haiku doing the reads. Once E and F are precise briefs, Opus or Sonnet
-can lead their builds. A judgment from the call 1 session, not a measurement.
+calls, all approved); its findings are comment 6810177817; item D's results are comment
+6842371541 (each hypothesis confirmed, refuted or untested).
+**Which model leads (Nicolas agreed, 2026-11-12):** Fable led item D and sizes E and F; once
+they are precise briefs, Opus or Sonnet can lead their builds.
+
+**Item D in five lines** (one or a few attempts each: leads for the population).
+- The beam hides the goal's act from the rank: Ch9 turn 11 the Talk is offered and in none of
+  the 8 judged plans; Ch8 campaign 4001 turn 16 all 6 judged plans seize while two chests are
+  `feasible` and neared.
+- Ch7's pocket (4007): the march's field is the lord's for every unit (`field_unit` = 1), so an
+  ally sits on the lord's one nearer tile (5,15) for 22 turns.
+- Ch8's west chests: the door is not the block. The thief is sent, alone, and stops 2.5 to 3.7
+  turns short with enemy id 142 on her road (3 attempts of 4); everyone else is at the throne.
+- Ch7 4005 turn 3 and the Ch9 flyer on turn 2: under the cap this phase, wounded and alone the
+  next (item F's case).
+- Ch9's village: `closings` has an empty looter list from turn 2 on.
+
+**The dump is kept, not merged:** local branch `probe/510-fwd1-d` (c7c27494), `PT_DPROBE=1`
+before `montecarlo.py resume`; `DPROBE <json>` lines land in `workers/*.log`. With it on, Ch8
+4001 attempt 1 played main's acts (`acts_hash` 22b2ff4a). Rebase it before reuse.
 
 **PR #604 is merged** (Nicolas: "Merge and handoff", 2026-11-12), no open PR of this work.
 - Attempt k of a chapter start has the game's RNG moved on (k - 1) * 1009 draws, no re-seed;
@@ -60,9 +75,15 @@ can lead their builds. A judgment from the call 1 session, not a measurement.
 - Three attempts still end `stuck` with the boss alive (campaign 4001 attempts 7 and 10,
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
-**Next steps, in order.**
-1. **Item D** (one instrumented run on each of two starts), with the Ch8 door question and the
-   charId 9 deaths added. Then E and F as the plan sizes them.
+**Next steps, in order** (Nicolas has not yet answered the order; it is Fable's reading).
+1. **The rank sees the goal's act** (new, small, planner.lua beside ADR 0403's Seize plan): a
+   judged plan for each offered Talk, chest and visit, and one plan without the Seize while a
+   ledger goal is `feasible`. Proof: unit tests that fail on main; the Ch9 and Ch8 4001 starts.
+2. **Two reads owed before any rule:** why the looter list is empty from turn 2 (Ch9, a code
+   read), and why the game gives the Ch7 pocket no tile north of y = 15 (a six-turn dump of
+   terrain and move cost at (5,13) to (5,15)).
+3. **A unit's march tile from its own turns**, then item E on top of it; item F's test as the
+   plan wrote it.
 
 **Three calls waiting for Nicolas.**
 - Put one vanilla Ch8 start in the frozen suite, so a change to the wait rules needs one run,
