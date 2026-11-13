@@ -1019,7 +1019,7 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE',
                      # and plays nothing, so it is no run of the start at all.
                      'PT_PINNED',
                      # The sight's leak guard (sight.lua M.leaks): a run that passes plays the
-                     # same game, but one that raises is a different result of the same start.
+                     # same game, but one that leaks fails: a different result of the same start.
                      'PT_LEAKGUARD',
                      # An experiment's benched units (montecarlo.py pilot --bench-vanilla): a
                      # unit that only waits makes a different run from the same start.

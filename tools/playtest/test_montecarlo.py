@@ -1544,6 +1544,70 @@ class Suite(unittest.TestCase):
         self.assertIn('refused', lines[-1])
         self.assertIn('8 wall-hours'.replace('8', '0.5'), lines[-1])
 
+    def only_lines(self, only, held_out=False, back=lambda t: True):
+        """run_suite's lines with `--only`, and the (start, seed) of each task it played."""
+        played = []
+
+        def play(tasks):
+            for t in tasks:
+                played.append((t['stamp']['suite']['start_id'], t['seed']))
+                if back(t):
+                    yield dict(t['stamp'], outcome='won', seed=t['seed'], wall_s=1.0)
+        text = '\n'.join(self.suite_lines(play, held_out=held_out, only=only,
+                                          frozen=frozen_fixture(30, 30)))
+        return text, played
+
+    def test_only_plays_the_named_runs_and_judges_nothing(self):
+        text, played = self.only_lines(['vanilla-ch3/1002'])
+        self.assertEqual(played, [('vanilla-ch3', 1002)])
+        self.assertIn('vanilla-ch3 seed 1002:', text)
+        self.assertIn('--only: 1 of 1 run came back; nothing judged', text)
+        for judged in ('SC-003 (', 'SC-003:', 'regressions:', 'PROMOTED', 'no run came back',
+                       'the suite: ', 'lookahead'):
+            self.assertNotIn(judged, text)
+
+    def test_only_a_start_is_its_tuning_seeds_and_held_out_with_the_flag(self):
+        self.assertEqual(self.only_lines(['ours-ch02'])[1],
+                         [('ours-ch02', 1003), ('ours-ch02', 1004)])
+        text, played = self.only_lines(['ours-ch02'], held_out=True)
+        self.assertEqual(sorted(played), [('ours-ch02', s) for s in (1003, 1004, 2001, 2002)])
+        self.assertNotIn('seed 200', text, 'a held-out seed is never printed (FR-025)')
+        self.assertEqual(self.only_lines(['ours-ch02', 'ours-ch02/1003'])[1],
+                         [('ours-ch02', 1003), ('ours-ch02', 1004)], 'each run plays once')
+
+    def test_only_a_held_out_seed_says_whether_it_came_back_with_a_result(self):
+        # FR-025: the seed was typed by whoever probes, the outcome is still never shown
+        text, played = self.only_lines(['vanilla-ch3/2001', 'ours-ch02/2002'],
+                                       back=lambda t: t['seed'] == 2001)
+        self.assertEqual(played, [('vanilla-ch3', 2001), ('ours-ch02', 2002)])
+        self.assertIn('held-out run %s: a game result' % mc.held_out_tag('vanilla-ch3', 2001),
+                      text)
+        self.assertIn('held-out run %s: no run came back' % mc.held_out_tag('ours-ch02', 2002),
+                      text)
+        for hidden in ('won', '2001', '2002', 'vanilla-ch3', 'ours-ch02'):
+            self.assertNotIn(hidden, text)
+        self.assertIn('--only: 1 of 2 runs came back', text)
+
+    def test_only_refuses_a_spec_that_names_no_run_before_anything_plays(self):
+        text, played = self.only_lines(['vanilla-ch3/9999', 'nope', 'vanilla-ch3/',
+                                        'vanilla-ch3/1001'])
+        self.assertEqual(played, [])
+        self.assertEqual(text, 'refused: --only names no suite run: vanilla-ch3/9999, nope, '
+                         'vanilla-ch3/')
+
+    def test_only_checks_only_the_starts_it_names(self):
+        # a broken pin of another start (a Manchego Stars rebuild) stops no vanilla probe
+        checked = []
+
+        def check(suite, simdirs):
+            checked.extend(st['start_id'] for st in suite['starts'])
+            return ['ours-ch02: pinned on another ROM'] if 'ours-ch02' in checked else []
+        lines = mc.run_suite(self.load(self.suite()), envs=lambda: {'vanilla': {}, 'ours': {}},
+                             simdirs={}, play=lambda tasks: iter(()), jobs=1, held_out=False,
+                             instrument='i', check=check, kept={}, only=['vanilla-ch3/1001'])
+        self.assertEqual(checked, ['vanilla-ch3'])
+        self.assertIn('vanilla-ch3 seed 1001: no run came back', '\n'.join(lines))
+
     def test_the_baseline_says_each_starts_cost_in_a_sentence(self):
         def play(tasks):
             # each worker also leaves its campaign's end, stamped alike: never a second run

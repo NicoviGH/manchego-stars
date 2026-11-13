@@ -461,6 +461,43 @@ do
     check(r.outcome, "crashed", "it is recorded as crashed")
 end
 
+-- PT_LEAKGUARD: a run whose sandboxes leaked plays on to its game result, then fails with
+-- every leak in its record and what the game ended as in its why; the log is asked once.
+do
+    local g = fakeGame { units = rout() }
+    local asked = 0
+    g.api.leaks = function()
+        asked = asked + 1
+        return { "sandbox leak: the unit struct at 0x02030200, word +0x40", "sandbox leak: the trap pool" }
+    end
+    local ok = Botrun.run(g.api)
+    check(ok, false, "a run that leaked is not a finished run")
+    local r = recordOf(g)
+    check(r.outcome, "crashed", "it is recorded as crashed")
+    check(r.leaks and #r.leaks, 2, "every leak is in the record")
+    check(r.why:find("^2 sandbox leak%(s%) %(the record's leaks%); the game ended won") ~= nil,
+          true, "its why says what the game ended as: " .. tostring(r.why))
+    check(asked, 1, "the log is asked once, at the attempt's end")
+    g = fakeGame { units = rout() }
+    g.api.leaks = function() return {} end
+    Botrun.run(g.api)
+    check(recordOf(g).outcome, "won", "an empty log changes nothing")
+    check(recordOf(g).leaks, nil, "and leaves no leaks in the record")
+
+    -- a leak from finish's own reads (the party read at the end) is this attempt's, and a
+    -- fault play() named (a wedged enemy phase: "timeout") is kept beside the leaks
+    g = fakeGame { move = 0, units = standoff() }
+    g.api.endPhase = function() return nil, {} end
+    local order = {}
+    g.api.party = function() order[#order + 1] = "party" return {} end
+    g.api.leaks = function() order[#order + 1] = "leaks" return { "sandbox leak: at the end" } end
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(order[#order], "leaks", "the log is taken after finish's own reads (the party's)")
+    check(type(r.env_status) == "table" and r.env_status.fault, "timeout",
+          "play()'s fault is kept with the leaks")
+end
+
 -- A repeated board with a turn event still to fire waits for it instead of ending stuck.
 do
     local g = fakeGame { move = 0, eventTurn = 4,

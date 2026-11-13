@@ -28,7 +28,9 @@
 --   crashed  anything the run could not do: an action or enemy phase the harness could not
 --            drive, an action that left its unit able to act, a Seize the menu refused though
 --            the game's CanUnitSeize allowed it, or any Lua error (a sight call that never
---            returned, a policy fault). The record is still emitted.
+--            returned, a policy fault), or a sandbox leak the guard logged (api.leaks: the
+--            record's `leaks`, its `why` saying what the game ended as). The record is still
+--            emitted.
 -- There is no turn cap. The "no progress" rules are the two `stuck` ones: a board that cannot
 -- change any more, and M.QUIET_BOUND player phases that gained nothing.
 --
@@ -56,6 +58,8 @@
 --   seed(s)            seed the game's RNG (Sight.seed)
 --   board()            Board.read
 --   sight()            Sight.new, called once
+--   leaks()            OPTIONAL: the sandbox leaks logged since the last ask, as lines, the log
+--                      emptied (PT_LEAKGUARD; sight.lua M.leaks): any fails the attempt
 --   act(action)        perform Bot.decide's or the planner's action (a Visit or Chest
 --                      included): true; "noseize" when the menu offered no
 --                      Seize; false on a controller fault
@@ -1062,6 +1066,18 @@ function M.run(api)
         -- play had begun (a unit was deployed): which runs fail then can follow what happened
         -- in them, so dropping them could bias the rest. A bot fault (a tile left open) is
         -- the bot's own play, measured, not the environment's.
+        -- PT_LEAKGUARD: every leak of the attempt, finish's own reads above included, its game
+        -- played on with each word put back. The record keeps what the game did (its deaths,
+        -- missed rewards); only its outcome says the run cannot be trusted, and a fault play()
+        -- named is kept.
+        local leaks = api.leaks and api.leaks() or {}
+        if #leaks > 0 then
+            rec.leaks = leaks
+            why = ("%d sandbox leak(s) (the record's leaks); the game ended %s: %s")
+                :format(#leaks, tostring(outcome), tostring(why))
+            outcome = "crashed"
+            rec.outcome, rec.why = outcome, why
+        end
         fault = fault or (outcome == "crashed" and "crash")
             or (#rec.watch_faults > 0 and "watch") or nil
         rec.env_status = fault and { fault = fault, outcome_dependent = #rec.deployed > 0 }
