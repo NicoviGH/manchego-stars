@@ -2002,9 +2002,10 @@ def suite_tasks(suite, envs, instrument, outs, sets=SEED_SETS):
             for t in chapter_tasks(suite, envs, instrument, outs, st, kind)]
 
 
-def suite_key(t):
-    """A suite task's run, (start_id, seed): the key a played record is filed under too."""
-    return t['stamp']['suite']['start_id'], t['seed']
+def suite_key(r):
+    """A suite run's key, (start_id, seed), of a task (its `stamp`) or of the record it played
+    (stamped alike); a record with no suite stamp has start_id None."""
+    return ((r.get('stamp') or r).get('suite') or {}).get('start_id'), r.get('seed')
 
 
 def only_tasks(tasks, only, held_out):
@@ -2230,7 +2231,7 @@ def run_suite(suite, envs, simdirs, play, jobs, held_out, instrument, check=chec
         sid, kind = st.get('start_id'), st.get('set')
         # a worker's records come together, its bot's first: its campaign's end is the run
         # only when the bot left none (records_of)
-        key = (sid, rec.get('seed'))
+        key = suite_key(rec)
         if sid is None or kind not in by_set or (not is_bot(rec) and key in seen):
             continue
         seen.add(key)

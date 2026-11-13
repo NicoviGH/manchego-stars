@@ -1061,13 +1061,16 @@ function M.logLeak(log, l)
     local key = l.addr + l.off
     local got = log.seen[key]
     if not got then
-        got = { name = l.name, addr = l.addr, off = l.off, was = l.was, nows = {}, n = 0 }
+        -- nows lists each value it leaked to, in order; nowSeen is the set (a value of 1 kept
+        -- in the list itself would overwrite its first entry)
+        got = { name = l.name, addr = l.addr, off = l.off, was = l.was, nows = {}, nowSeen = {},
+                n = 0 }
         log.seen[key] = got
         log[#log + 1] = got
     end
     got.n = got.n + 1
-    if not got.nows[l.now] then
-        got.nows[l.now] = true
+    if not got.nowSeen[l.now] then
+        got.nowSeen[l.now] = true
         got.nows[#got.nows + 1] = l.now
     end
 end

@@ -407,6 +407,15 @@ do
     line = Sight.leakLine(log[1])
     check(line:find("is 0x00550000 or 0x00770000", 1, true) ~= nil, true,
           "guard: a word leaked to two values says both: " .. line)
+    -- small values (a flag word leaked to 1, then 2) are values, never list slots
+    local small = {}
+    for _, v in ipairs({ 1, 2, 1 }) do
+        Sight.logLeak(small, { name = "unit struct", addr = 0x02030000, off = 4, was = 0, now = v })
+    end
+    local ok2, said = pcall(Sight.leakLine, small[1])
+    check(ok2 and said:find("is 0x00000001 or 0x00000002 after", 1, true) ~= nil
+          and said:find("(3 times)", 1, true) ~= nil, true,
+          "guard: a word leaked to 1, then 2, says both and counts three: " .. tostring(said))
     log = {}
     sandbox, api = Sight.batching(outer, guarded, log)
     sandboxed(sandbox, api)
