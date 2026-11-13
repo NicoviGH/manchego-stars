@@ -245,8 +245,8 @@ M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
 M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 -- bmunit.h: US_IN_BALLISTA, and ballistaIndex at 0x1C (its trap's index in sTrapPool; the
--- halfword's other byte is movBonus), what M.keepRide keeps
-M.US_IN_BALLISTA, M.UNIT_BALLISTA = 1 << 11, 0x1C
+-- halfword's other byte is movBonus) and pMapSpriteHandle at 0x3C, what M.keepRide keeps
+M.US_IN_BALLISTA, M.UNIT_BALLISTA, M.UNIT_SPRITE = 1 << 11, 0x1C, 0x3C
 -- include/cp_script.h: struct AiScr is 0x10 bytes, `cmd` at +00; AI_CMD_PILLAGE runs
 -- AiScriptCmd_10_DoLooting, and a script loops back with AI_CMD_GOTO.
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
@@ -1095,9 +1095,12 @@ end
 -- it), the unit's ballistaIndex, and on the ballista's trap its ridden flag and its tile, set
 -- to the unit's. Without it the rider read as on foot, and the ballista as free and standing
 -- where a judged plan had stood the rider, for every plan judged after. Found by PT_LEAKGUARD
--- on vanilla Ch13, turn 11 (#510).
-function M.keepRide(api, S, e)
+-- on vanilla Ch13, turn 11 (#510). The step off also redraws (RefreshUnitSprites), which
+-- writes every unit's pMapSpriteHandle anew, null on one the plan hid: only drawing reads it,
+-- and `units` (as M.keepAi's) have it kept all the same, so the guard stays exact.
+function M.keepRide(api, S, e, units)
     if (api.mem.u32(e.addr + UNIT_STATE) & M.US_IN_BALLISTA) == 0 then return end
+    for _, o in pairs(units) do api.keep16(o.addr + M.UNIT_SPRITE, 2) end
     api.keep16(e.addr + M.UNIT_BALLISTA, 1)
     api.keep16(S.sTrapPool + api.mem.u8(e.addr + M.UNIT_BALLISTA) * M.TRAP_SIZE,
                M.TRAP_SIZE // 2)
@@ -1604,7 +1607,7 @@ function M.new(outer)
     local function aiDecide(call, proc, e, all, before)
         M.keepAi(api, all)
         M.keepFog(api, all)   -- `setup` refreshes the maps
-        M.keepRide(api, S, e)
+        M.keepRide(api, S, e, all)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
         -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls

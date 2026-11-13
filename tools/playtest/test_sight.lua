@@ -440,27 +440,30 @@ do
     m.w32(red.addr + STATE, Sight.US_IN_BALLISTA)
     m.w8(red.addr + RIDE, 2); m.w8(red.addr + RIDE + 1, 5)        -- its trap; movBonus
     m.w8(trap, 7); m.w8(trap + 1, 3); m.w8(trap + 5, 1); m.w8(trap + 6, 4)   -- tile, ridden, uses
+    m.w32(red.addr + Sight.UNIT_SPRITE, 0x0203A0A8)
     local function ride()
         return table.concat({ m.u32(red.addr + STATE), m.u8(red.addr + RIDE), m.u8(trap),
-                              m.u8(trap + 1), m.u8(trap + 5), m.u8(trap + 6) }, ",")
+                              m.u8(trap + 1), m.u8(trap + 5), m.u8(trap + 6),
+                              m.u32(red.addr + Sight.UNIT_SPRITE) }, ",")
     end
     local riding = ride()
     local function stepsOff()
         m.w32(red.addr + STATE, 0)
         m.w8(red.addr + RIDE, 0)
         m.w8(trap, 9); m.w8(trap + 1, 9); m.w8(trap + 5, 0)
+        m.w32(red.addr + Sight.UNIT_SPRITE, 0)        -- RefreshUnitSprites, the unit hidden
     end
     ok, why = pcall(sandbox, function()
         sandbox(function()
             Sight.keepFog(api, { red })
-            Sight.keepRide(api, S2, red)
+            Sight.keepRide(api, S2, red, { red })
             stepsOff()
             seen[3] = ride()
         end)
         seen[4] = ride()
     end)
     check(ok, true, "keepRide: the guard finds nothing left changed: " .. tostring(why))
-    check(seen[3], "0,0,9,9,0,4", "keepRide: the plan's own read sees the rider on foot")
+    check(seen[3], "0,0,9,9,0,4,0", "keepRide: the plan's own read sees the rider on foot")
     check(seen[4], riding, "keepRide: the next plan finds it riding, the ballista where it was")
     ok, why = pcall(sandbox, function()
         sandbox(function()
@@ -473,7 +476,7 @@ do
     m.w8(trap + 5, 1)
     m.w32(red.addr + STATE, 0)
     local kept = 0
-    Sight.keepRide({ mem = m, keep16 = function() kept = kept + 1 end }, S2, red)
+    Sight.keepRide({ mem = m, keep16 = function() kept = kept + 1 end }, S2, red, { red })
     check(kept, 0, "keepRide: a unit on foot keeps nothing")
 end
 
@@ -504,7 +507,7 @@ do
     local fog = body and body:find("M.keepFog(api, all)", 1, true)
     check(fog ~= nil and fog < write, true,
           "refresh: aiDecide keeps the fog bits before its first write")
-    local ride = body and body:find("M.keepRide(api, S, e)", 1, true)
+    local ride = body and body:find("M.keepRide(api, S, e, all)", 1, true)
     check(ride ~= nil and ride < write, true,
           "keepRide: aiDecide keeps the rider's ballista before its first write")
     local _, keeps = src:gsub("\n +M%.keepAi%(", "")
