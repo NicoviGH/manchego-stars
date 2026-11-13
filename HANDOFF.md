@@ -9,14 +9,55 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13): PR #605 is merged (the rank sees each goal's act, ADR 0405); next are the two reads owed, then the march tile and item E.**
+**Next session starts here (2026-11-13, later): PR #606 is open with a clean suite and a review NOT yet applied; apply it, then decide the phase-start fix.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
-the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
-precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
-calls, all approved); its findings are comment 6810177817; item D's results are comment
-6842371541 (each hypothesis confirmed, refuted or untested).
-**Which model leads (Nicolas agreed, 2026-11-12):** Fable led item D and sizes E and F; once
-they are precise briefs, Opus or Sonnet can lead their builds.
+the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13); **use
+cheaper subagents** to check source, ADRs and research. The plan is **#510 comment 6810567866**;
+item D's results are comment 6842371541; **this session's findings are comment 6860128405**
+(the two reads owed, the own-march trial, the leak).
+
+**PR #606 (`feat/510-closings-leak`): a simulated enemy decision puts back the AI bytes the game wrote.**
+- Cause of Ch9's "looter list empty from turn 2": the bot's own looting read. The game's AI
+  rewrites the pirate's AI scripts as the replay plays it; nested sandboxes did not undo that,
+  so every read after the first in a decision found no looter. Every judged enemy phase leaked
+  the same way. Fix: `Sight.keepAi` at the top of `aiDecide`.
+- Frozen suite with held-out seeds on 3bc1e510: **PROMOTED, 0 regressions**; 45 of 56 runs play
+  main's acts, the 11 others are in the PR body (vanilla Ch5 seed 2001 goes from 4 deaths to a
+  clean win; the Ch9 scout's seeds 1001 and 1002 get worse: one death, a second village missed).
+  Work 4,722 s against 8,259 s for main's kept suite (not timed back to back).
+- **Owed before merge:** the `/code-review 606 medium` findings (7, reported in the session, none
+  applied): (1) no test that `aiDecide` calls `keepAi` (add a source-scan test like the equip
+  one); (2) the comment credits the escape flag to `AiFindPillageLocation`, it is
+  `AiGetChestUnlockItemSlot` (cp_utility.c:1016), and cites cp_0803E2F4.c by line, not function;
+  (3) keep once per sandbox, not per decision; (4) `aiDecide` re-reads `units()`; (5) keep every
+  unit's AI block, not only the decider's (unproven that no other unit's is written); (6) see
+  the next bullet; (7) put the timings in the PR, base and branch back to back with `uptime`.
+  A fresh-subagent review (the author never reviews) was started and died on the usage limit:
+  run one. CI on the head was not checked. Not merged; Nicolas has not said "merge".
+- **Finding 6, real and older than the PR:** a judged enemy phase never runs the game's
+  phase-start AI setup (`AiPhaseInit`, cp_phase.c:42-60: `gAiState.flags`, `cmd_result`,
+  `specialItemFlags`, `UpdateAllPhaseHealingAIStatus`, `SetupUnitInventoryAIFlags`; the first
+  again after each act, cp_perform.c:591). Shape of the fix: do it where the phase's order is
+  built (`aiOrder`) and in `strike`; the two functions need adding to `gen_symbols.py`. It
+  changes play, so it needs its own suite run (about 70 minutes). Recommended as its own PR
+  after #606.
+- **Still open in the looting read, cause untested:** the last read of each player phase (all
+  our units have acted) has the looters attacking red units and taking no village (tags
+  `keepai4`, `keepai6`). The phase-start setup above is the first thing to test it against.
+
+**The march from each unit's own turns was built and is NOT shipped** (branch
+`feat/510-own-march`, ad247931, local only). On Ch7 it ends the 28-turn pocket and splits the
+army from the lord, who then dies alone (tags `ownmarch1` against `ownmarch1ctl`). With PR
+#604's dice main clears Ch7 clean on attempt 2 from both starts: Ch7 is no longer a wall.
+The pocket itself is terrain: the river at (5,14) costs the lord her whole move (inferred from
+her reach), so (5,15) is her only way in, and an ally stood on it. **Step 2 of the agreed
+order is therefore the wrong base for item E; Nicolas has not been asked yet.** My
+recommendation, his call (it is a weight): on a Seize map count the seizing unit's progress
+above an escort's, so the plan that clears her tile wins.
+
+**Probes are throwaway and gone** (written to the session scratchpad); the tags above are in
+the vanilla store's `resume-runs.jsonl`. `story` names every enemy "the Archer" on vanilla Ch7
+(seen, not looked into).
 
 **PR #605 is merged** (2aa69c3c; Nicolas: "yeah merge", 2026-11-13), no open PR of this work.
 ADR 0405 has the tables; the results are also a #510 comment of 2026-11-13.
@@ -99,12 +140,12 @@ around weapon uses. Whether that has cost a run is not checked; a read of the ke
 - Three attempts still end `stuck` with the boss alive (campaign 4001 attempts 7 and 10,
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
-**Next steps, in order** (Nicolas agreed to the order, 2026-11-12).
-1. **Two reads owed before any rule:** why the looter list is empty from turn 2 (Ch9, a code
-   read), and why the game gives the Ch7 pocket no tile north of y = 15 (a six-turn dump of
-   terrain and move cost at (5,13) to (5,15)).
-2. **A unit's march tile from its own turns**, then item E on top of it (the escort: both
-   goals #605 could not win are a unit alone at the goal); item F's test as the plan wrote it.
+**Next steps, in order.**
+1. PR #606: a fresh review, apply every finding, CI on the head, then Nicolas's "merge".
+2. The phase-start AI setup in judged phases (finding 6), its own PR and suite; test the
+   end-of-phase looting read against it.
+3. Ask Nicolas about the seizer's progress weight (above), then size item E on the shared
+   field, not on per-unit marches. Item F's test as the plan wrote it.
 
 **Three calls waiting for Nicolas.**
 - Put one vanilla Ch8 start in the frozen suite, so a change to the wait rules needs one run,
