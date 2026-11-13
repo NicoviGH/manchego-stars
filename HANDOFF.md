@@ -40,10 +40,10 @@ found. ADR 0405 and the PR body have the tables.
   main's games (the chests were already `stalled`).
 - **Found, not built:** the ledger does not know a recruit can leave. Ch9's recruit (charId
   18) left the map in the enemy phase of turn 11 (`missed_recruits`: `left_map`); her row had
-  no `closes_on`, so the plan played read `forfeits` 0. Not on the issue yet.
+  no `closes_on`, so the plan played read `forfeits` 0.
 - **Untested:** whether the judge error is behind main's earlier late deaths on Ch8 (charId 9,
   turns 17 to 23).
-- **Owed on #510:** a comment with these results (the PR body has them; the issue does not).
+- **On #510:** the results are a comment of 2026-11-13 ("fwd1 item D's planner item: built").
 
 **Item D's leads still open** (#510 comment 6842371541 has all of them): Ch7's pocket (4007):
 the march's field is the lord's for every unit, so an ally sits on her one nearer tile for 22
