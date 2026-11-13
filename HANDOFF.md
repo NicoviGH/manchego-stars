@@ -9,7 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13): PR #605 is open (the rank sees each goal's act, ADR 0405); its CI and Nicolas's merge are what is left.**
+**Next session starts here (2026-11-13): PR #605 is merged (the rank sees each goal's act, ADR 0405); next are the two reads owed, then the march tile and item E.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction; **use cheaper subagents** to check source, ADRs and research, to build from a
 precise brief and to re-review. The plan is **#510 comment 6810567866** (six items A to F, six
@@ -18,36 +18,33 @@ calls, all approved); its findings are comment 6810177817; item D's results are 
 **Which model leads (Nicolas agreed, 2026-11-12):** Fable led item D and sizes E and F; once
 they are precise briefs, Opus or Sonnet can lead their builds.
 
-**PR #605** (branch `feat/510-rank-sees-goal-act`, head 15768822): the planner item that item D
-found. ADR 0405 and the PR body have the tables.
-- **Done:** `/code-review` medium (8 findings) and one scoped re-review by a fresh subagent (3
-  findings), all applied; `suite --held-out` on the final code PROMOTED with 0 regressions
-  (instrument `2374a75d5563+v2`, not refrozen); the Ch8 and Ch9 starts run on the final code.
-- **Left:** CI on the head commit (`checks` green, `build` still running when this was
-  written), then the merge. The
-  memory rule lets a step-9 PR merge after review and CI; Nicolas has not been asked about
-  this one.
+**PR #605 is merged** (2aa69c3c; Nicolas: "yeah merge", 2026-11-13), no open PR of this work.
+ADR 0405 has the tables; the results are also a #510 comment of 2026-11-13.
 - **What it does:** a judged plan for each ledger goal's offered Talk, Visit or chest no plan
   holds (`goal`); two plans without the Seize while a goal is `feasible` and every plan seizes
   (`noseize`: the first plan less its Seize, and every unit holding); and **no enemy phase is
-  judged after the Seize**, nor the lookahead's. That last one is a judge error older than the
-  PR: a unit at risk anywhere put the win over the cap.
+  judged after the Seize**, nor the lookahead's. That last one was a judge error older than
+  the PR: a unit at risk anywhere put the win over the cap.
 - **What the runs say:** the beam no longer hides the act (confirmed on Ch9 4006 turn 11 and
   Ch8 4001 turn 16), and **neither chapter's result is better**. Ch9: the Talk plan is over
-  the cap (30.8% the lord dies after it), same games as main. Ch8 4001 attempt 1: the bot
-  waits turns 16 to 18 for the thief and seizes on turn 19 when she is at 63.5%; 19 turns
-  against 16, the same one death, the chests still missed. The other three Ch8 attempts are
-  main's games (the chests were already `stalled`).
-- **Found, not built:** the ledger does not know a recruit can leave. Ch9's recruit (charId
-  18) left the map in the enemy phase of turn 11 (`missed_recruits`: `left_map`); her row had
-  no `closes_on`, so the plan played read `forfeits` 0.
-- **Untested:** whether the judge error is behind main's earlier late deaths on Ch8 (charId 9,
+  the cap (30.8% the lord dies after it), same games as main's before. Ch8 4001 attempt 1: the
+  bot waits turns 16 to 18 for the thief (Colm, charId 9) and seizes on turn 19 when he is at
+  63.5%; 19 turns against 16, the same one death, the chests still missed. The other three Ch8
+  attempts are the same games as before (the chests were already `stalled`).
+- **The suite** on the final code: PROMOTED, 0 regressions (instrument `2374a75d5563+v2`, not
+  refrozen); 7 of 56 runs play different acts, each with the same outcome, deaths and missed
+  rewards.
+- **Found, not built:** the ledger does not know a recruit can leave. Ch9's recruit (Amelia,
+  charId 18) left the map in the enemy phase of turn 11 (`missed_recruits`: `left_map`); her
+  row had no `closes_on`, so the plan played read `forfeits` 0.
+- **Untested:** whether the judge error was behind the earlier late deaths on Ch8 (Colm,
   turns 17 to 23).
-- **On #510:** the results are a comment of 2026-11-13 ("fwd1 item D's planner item: built").
+- **Names:** a unit is named from the decomp's `constants/characters.h` by its charId before
+  any pronoun is used (the thief was written "she" for a day; Nicolas caught it).
 
 **Item D's leads still open** (#510 comment 6842371541 has all of them): Ch7's pocket (4007):
 the march's field is the lord's for every unit, so an ally sits on her one nearer tile for 22
-turns. Ch8's west chests: the thief is sent alone and stops short with enemy id 142 on her
+turns. Ch8's west chests: the thief (Colm) is sent alone and stops short with enemy id 142 on his
 road. Ch7 4005 turn 3 and the Ch9 flyer on turn 2: under the cap this phase, wounded and alone
 the next (item F's case). Ch9's village: `closings` has an empty looter list from turn 2 on.
 **The dump is kept, not merged:** local branch `probe/510-fwd1-d` (c7c27494), `PT_DPROBE=1`
@@ -103,11 +100,10 @@ around weapon uses. Whether that has cost a run is not checked; a read of the ke
   campaign 4004 attempt 2): no plan that kills the boss is under the cap.
 
 **Next steps, in order** (Nicolas agreed to the order, 2026-11-12).
-1. **Land PR #605** (above).
-2. **Two reads owed before any rule:** why the looter list is empty from turn 2 (Ch9, a code
+1. **Two reads owed before any rule:** why the looter list is empty from turn 2 (Ch9, a code
    read), and why the game gives the Ch7 pocket no tile north of y = 15 (a six-turn dump of
    terrain and move cost at (5,13) to (5,15)).
-3. **A unit's march tile from its own turns**, then item E on top of it (the escort: both
+2. **A unit's march tile from its own turns**, then item E on top of it (the escort: both
    goals #605 could not win are a unit alone at the goal); item F's test as the plan wrote it.
 
 **Three calls waiting for Nicolas.**
