@@ -73,6 +73,10 @@
 #                           playing nothing (`montecarlo.py suite`'s snapshots).
 #                           PT_BENCH (JSON charIds): an experiment's benched units, each only
 #                           waiting where it stands (`montecarlo.py pilot --bench-vanilla`).
+#                           PT_LEAKGUARD=1: a diagnostic. Every nested sandbox of the bot's
+#                           sight hands the unit structs back as it found them, or the run
+#                           raises naming the struct and the word (sight.lua's M.leaks). Slower:
+#                           set it for one run after a change to what a sandbox calls.
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
@@ -318,6 +322,7 @@ PLAYTEST_INSTRUMENT = os.getenv("PT_INSTRUMENT") or ""
 PLAYTEST_DIAG = os.getenv("PT_DIAG") or ""
 PLAYTEST_PINNED = os.getenv("PT_PINNED") or ""
 PLAYTEST_BENCH = os.getenv("PT_BENCH") or ""
+PLAYTEST_LEAKGUARD = os.getenv("PT_LEAKGUARD") or ""
 PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"

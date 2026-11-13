@@ -15,6 +15,8 @@
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
 --   PLAYTEST_PINNED   -- a pinned decision state to load and read (PT_PINNED; api.check_pinned)
 --   PLAYTEST_BENCH    -- an experiment's benched charIds (PT_BENCH, JSON; botApi's api.bench)
+--   PLAYTEST_LEAKGUARD -- "1": sight.lua's sandboxes raise on a unit struct they leave changed
+--                        (PT_LEAKGUARD; sightApi's leakGuard)
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -3096,6 +3098,7 @@ INSPECT.sightApi = function()
         chapter = chapter,
         turn = turn,
         board = BOARD.read,
+        leakGuard = PLAYTEST_LEAKGUARD == "1",
     }
 end
 

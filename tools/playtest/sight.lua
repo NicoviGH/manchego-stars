@@ -21,6 +21,8 @@
 -- equip reorders the bag) needs api.keep16 first, or one judged plan leaks into the next (#554:
 -- found in one instrumented run that logged every enemy decision and the target's bag). The
 -- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510).
+-- PT_LEAKGUARD=1 (run.sh) makes a run raise on the first unit struct a nested sandbox leaves
+-- changed (M.leaks): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
 -- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi.
 --
@@ -311,9 +313,13 @@ local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 -- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
 -- AI script indices)
 local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
--- bmunit.h: aiFlags at 0x0A (the halfword's other byte is the unit's index, never written); the
--- four halfwords from ai_config hold ai1, ai_a_pc, ai2, ai_b_pc, ai_counter (0x40 to 0x47)
-local UNIT_AI_FLAGS = 0x0A
+-- bmunit.h, what M.keepAi keeps: aiFlags is the byte at 0x0A (0x0B, the other byte of its
+-- halfword, is the unit's index, written only when the unit is made); the AI block is the
+-- UNIT_AI_WORDS halfwords from ai_config, 0x40 to 0x47: ai_config, ai1 and ai_a_pc, ai2 and
+-- ai_b_pc, ai_counter and a padding byte
+M.UNIT_AI_FLAGS, M.UNIT_AI_CONFIG, M.UNIT_AI_WORDS = 0x0A, UNIT_AI_CONFIG, 4
+-- struct Unit's size (bmunit.h: 0x48 bytes), in words: what M.batching's guard compares
+local UNIT_WORDS = 0x48 // 4
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), read32(addr),
 -- write16(addr, v), write32(addr, v), save() -> state, load(state), frames(done, max) -> bool
@@ -871,17 +877,22 @@ local function eventSearch(api, call, info, offset)
     api.write32(info, api.mem.u32(events + offset))
 end
 
--- Sight.batching(outer) -> sandbox, api: Sight.machine made re-entrant (the planner's cost,
--- #510 step 9) over `outer` (Sight.new's api), and an api whose writes it journals.
-function M.batching(outer)
+-- Sight.batching(outer, guarded) -> sandbox, api: Sight.machine made re-entrant (the planner's
+-- cost, #510 step 9) over `outer` (Sight.new's api), and an api whose writes it journals.
+-- guarded = nil, or a function -> the addresses of the unit structs a nested sandbox must hand
+-- back as it found them (M.leaks; PT_LEAKGUARD=1, a diagnostic: it reads every struct twice a
+-- sandbox).
+function M.batching(outer, guarded)
     -- The outermost sandbox() saves the state and loads it back at the end, as Sight.machine
     -- always did; a call made inside it (s.batch, or one read calling another) runs within
     -- that save, and every byte it wrote through `api` is put back when it returns, so one
-    -- read cannot leak into the next. A game function's own writes (a movement map, the
-    -- battle structs, the AI's decision) are not journaled: each read that depends on one
-    -- makes it fresh first.
+    -- read cannot leak into the next. A game function's own writes are not journaled. The
+    -- ones a read can make fresh (a movement map, the battle structs, gAiDecision) it makes
+    -- fresh first. The ones on a unit struct nothing makes fresh, so they are kept before the
+    -- call (keep16: M.equip's bag, M.keepAi's AI bytes) and the journal puts them back.
     local mem0 = outer.mem
-    local journal
+    -- kept[depth] = the addresses keep16 holds for the sandbox open at that depth
+    local journal, kept
     local function journaled(read, write)
         return function(addr, v)
             if journal then journal[#journal + 1] = { addr, read(addr), write } end
@@ -893,12 +904,18 @@ function M.batching(outer)
         write16 = journaled(mem0.u16, outer.write16),
         write32 = journaled(mem0.u32, outer.write32),
         -- keep16(addr, n): the n halfwords from addr are put back when the sandbox returns,
-        -- for a game call about to write them itself (M.equip), with no write made now
+        -- for a game call about to write them itself (M.equip, M.keepAi), with no write made
+        -- now. A halfword is kept once a sandbox: its first value there is the one put back,
+        -- so a second keep (every enemy decision asks, M.keepAi) reads and journals nothing.
         keep16 = function(addr, n)
             if not journal then return end
+            local held = kept[#kept]
             for k = 0, n - 1 do
                 local at = addr + k * 2
-                journal[#journal + 1] = { at, mem0.u16(at), outer.write16 }
+                if not held[at] then
+                    held[at] = true
+                    journal[#journal + 1] = { at, mem0.u16(at), outer.write16 }
+                end
             end
         end,
     }, { __index = outer })
@@ -906,18 +923,21 @@ function M.batching(outer)
     local depth, outerCall, outerScratch = 0, nil, nil
     local function sandbox(fn)
         if depth == 0 then
-            depth, journal = 1, {}
+            depth, journal, kept = 1, {}, { {} }
             local ok, a, b = pcall(machine, function(call, scratch)
                 outerCall, outerScratch = call, scratch
                 return fn(call, scratch)
             end)
-            depth, journal, outerCall, outerScratch = 0, nil, nil, nil
+            depth, journal, kept, outerCall, outerScratch = 0, nil, nil, nil, nil
             if not ok then error(a, 0) end
             return a, b
         end
         local mark = #journal
         depth = depth + 1
+        kept[depth] = {}
+        local was = guarded and M.unitWords(mem0, guarded())
         local ok, a, b = pcall(fn, outerCall, outerScratch)
+        kept[depth] = nil
         depth = depth - 1
         for k = #journal, mark + 1, -1 do
             local e = journal[k]
@@ -925,6 +945,8 @@ function M.batching(outer)
             journal[k] = nil
         end
         if not ok then error(a, 0) end
+        local leak = was and M.leaks(mem0, was)
+        if leak then error(leak, 0) end
         return a, b
     end
     -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
@@ -991,18 +1013,54 @@ function M.openMap(api, call, S, x, y)
     end
 end
 
--- Inside a sandbox, before enemy `e` decides (aiDecide): what the game's AI writes on unit
--- structs is put back when the sandbox returns. Its script rewrites the deciding unit's own
--- ai_config, ai1, ai2, both script counters and ai_counter (cp_script.c: AiScriptCmd_02_ChangeAi,
--- every command's (*pc)++, AiScriptCmd_10_DoLooting's ai_counter), and aiFlags on it or on a
--- unit in its way (cp_utility.c AiFindPillageLocation's escape flag, cp_0803E2F4.c:188), so
--- `all` (every unit on the board) has its aiFlags kept. Without it a looter the closings replay
--- had played past its last village read as no looter (PillageThenPursue sets AI2 to 0) for
--- the rest of the decision's batch: vanilla Ch9's village read "closes in 3 phases" once and
--- "never closes" every time after, each turn (#510).
-function M.keepAi(api, e, all)
-    for _, o in ipairs(all) do api.keep16(o.addr + UNIT_AI_FLAGS, 1) end
-    api.keep16(e.addr + UNIT_AI_CONFIG, 4)
+-- M.unitWords(mem, addrs) -> { { addr, words } }: each unit struct as it reads now.
+-- M.leaks(mem, was) -> nil, or what to raise: the first word of one that no longer reads as
+-- `was` has it. M.batching's guard (PT_LEAKGUARD=1) asks after a nested sandbox put its
+-- journal back: a difference is a game call's write on a unit struct that nothing kept, the
+-- kind that made one judged plan leak into the next twice (the bag, #554; the AI bytes, #510).
+function M.unitWords(mem, addrs)
+    local out = {}
+    for x, addr in ipairs(addrs) do
+        local words = {}
+        for k = 0, UNIT_WORDS - 1 do words[k] = mem.u32(addr + k * 4) end
+        out[x] = { addr, words }
+    end
+    return out
+end
+function M.leaks(mem, was)
+    for _, u in ipairs(was) do
+        for k = 0, UNIT_WORDS - 1 do
+            local now = mem.u32(u[1] + k * 4)
+            if now ~= u[2][k] then
+                return ("sandbox leak: the unit struct at 0x%08X, word +0x%02X, was 0x%08X and "
+                    .. "is 0x%08X after its sandbox returned: a game call wrote it and no "
+                    .. "keep16 held it (sight.lua's header)"):format(u[1], k * 4, u[2][k], now)
+            end
+        end
+    end
+    return nil
+end
+
+-- Inside a sandbox, before an enemy decides (aiDecide): the AI bytes of `units` (every unit on
+-- the board, a list or a table by id) are put back when the sandbox returns, the ones the game's
+-- AI writes on unit structs as it decides. On the deciding unit (gActiveUnit): ai1, ai2 and both
+-- script counters (cp_script.c: AiScriptCmd_02_ChangeAi, and each command's (*pc)++ on ai_a_pc
+-- or ai_b_pc), ai_counter (AiScriptCmd_10_DoLooting; cp_battle.c
+-- AiAttemptStealActionWithinMovement; cp_0803E2F4.c AiTryMoveToSpecificPosition) and aiFlags
+-- (the escape flag: cp_utility.c AiGetChestUnlockItemSlot, which AiFindPillageLocation calls,
+-- and cp_script.c AiScriptCmd_17_DoEscape; cpextra_80407F0.c AiSpecialItemLockpick). On
+-- ANOTHER unit: aiFlags alone (cp_0803E2F4.c AiTryGetNearestHealPoint flags the unit standing
+-- on the heal tile). Every unit's whole AI block is kept all the same, not the decider's
+-- alone: a keep is free after the first one in a sandbox (keep16), and that no decision
+-- writes another unit's block is a reading of the decomp, not a measurement.
+-- Without it a looter the closings replay had played past its last village read as no looter
+-- (PillageThenPursue sets AI2 to 0) for the rest of the decision's batch: vanilla Ch9's village
+-- read "closes in 3 phases" once and "never closes" every time after, each turn (#510).
+function M.keepAi(api, units)
+    for _, o in pairs(units) do
+        api.keep16(o.addr + M.UNIT_AI_FLAGS, 1)
+        api.keep16(o.addr + M.UNIT_AI_CONFIG, M.UNIT_AI_WORDS)
+    end
 end
 
 function M.equip(api, call, S, u, slot)
@@ -1051,7 +1109,14 @@ end
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
 function M.new(outer)
-    local sandbox, api, open = M.batching(outer)
+    -- outer.leakGuard (PT_LEAKGUARD=1): every nested sandbox hands the unit structs back as it
+    -- found them, or raises (M.leaks). The units are the board's, read each time.
+    local sandbox, api, open
+    sandbox, api, open = M.batching(outer, outer.leakGuard and function()
+        local addrs = {}
+        for _, o in ipairs(api.board().units) do addrs[#addrs + 1] = o.addr end
+        return addrs
+    end)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
@@ -1489,11 +1554,12 @@ function M.new(outer)
     -- gProcScr_CpPerform, which plays the act on the sandbox's next frame. So its field
     -- assignments are written here and its calls made. Left out: RenderBmMap and
     -- RefreshUnitSprites (they draw) and the US_HAS_MOVED_AI it sets after (read only by
-    -- cp_order.c's list building, done before any decision). `before` runs just ahead of the
-    -- decision (strike() narrows the targets there). -> the struck unit's id and the strike as
+    -- cp_order.c's list building, done before any decision). `all` = the board's units (M.keepAi keeps
+    -- their AI bytes; the caller holds them, so no decision reads the board for it). `before`
+    -- runs just ahead of the decision (strike() narrows the targets there). -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
-    local function aiDecide(call, proc, e, before)
-        M.keepAi(api, e, units())
+    local function aiDecide(call, proc, e, all, before)
+        M.keepAi(api, all)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
         -- written before AiUpdateNoMoveFlag, which touches only gAiState.flags, so the calls
@@ -1535,7 +1601,7 @@ function M.new(outer)
             M.equip(api, call, S, u, slot)
             -- `u` is made the one target only after the danger map: the AI's target loops
             -- skips hidden units.
-            local target, side = aiDecide(call, proc, e, function() onlyTarget(u, all) end)
+            local target, side = aiDecide(call, proc, e, all, function() onlyTarget(u, all) end)
             if target ~= u.id then return nil end
             return side
         end)
@@ -1658,13 +1724,13 @@ function M.new(outer)
     -- may kill splits it: the enemies after it decide once with it standing and once with its
     -- tile free (each in a nested sandbox, so neither sees the other's board), the second as
     -- likely as its played counter kills it.
-    local function playPhase(call, proc, list, decides, strike, remove)
+    local function playPhase(call, proc, byId, list, decides, strike, remove)
         local function play(i, done)
             for k = i, #list do
                 local id = list[k]
                 local e = decides(id)
                 if e then
-                    local target, side = aiDecide(call, proc, e)
+                    local target, side = aiDecide(call, proc, e, byId)
                     if target then
                         local t
                         t, done = strike(e, id, target, side, done)
@@ -1703,8 +1769,8 @@ function M.new(outer)
 
     function s.enemyPhase(plan)
         return sandbox(function(call, proc)
-            local _, order, decides, strike, remove = stagePhase(call, plan)
-            return playPhase(call, proc, order(), decides, strike, remove)
+            local byId, order, decides, strike, remove = stagePhase(call, plan)
+            return playPhase(call, proc, byId, order(), decides, strike, remove)
         end)
     end
 
@@ -1727,7 +1793,7 @@ function M.new(outer)
             for _, id in ipairs(order()) do
                 local e = decides(id)
                 if e then
-                    local target, side = aiDecide(call, proc, e)
+                    local target, side = aiDecide(call, proc, e, byId)
                     if target then
                         local t, _, addr = strike(e, id, target, side, {})
                         moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
@@ -1762,7 +1828,7 @@ function M.new(outer)
             -- the fog as the first phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
             -- enemy that walked out of it is seen, one that walked into it is not
             call(S.RefreshEntityBmMaps, {})
-            local out = playPhase(call, proc, order(), decides, strike, remove)
+            local out = playPhase(call, proc, byId, order(), decides, strike, remove)
             out.hp, out.moved = hp, moved
             return out
         end)
@@ -1825,7 +1891,7 @@ function M.new(outer)
                 for _, id in ipairs(aiOrder(call)) do
                     local e = looter[id] and byId[id]
                     if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
-                        aiDecide(call, proc, e)
+                        aiDecide(call, proc, e, all)
                         local x, y = followMove(e)
                         if x then
                             if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then

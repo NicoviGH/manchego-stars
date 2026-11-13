@@ -327,24 +327,108 @@ do
         end)
     end)
     check(bytes[at], 23, "keep16: put back when the sandbox returns")
-    -- keepAi: what the game's AI writes on unit structs while one decides is put back -- the
-    -- deciding unit's ai_config, ai1, ai2, counters; any unit's aiFlags (a looter the closings
-    -- replay played past its last village read as no looter for the rest of the batch)
+end
+
+-- keepAi, on byte-true memory (aiFlags is one byte of a halfword whose other byte is the unit's
+-- index): what the game's AI writes on unit structs while one decides is put back -- every
+-- unit's aiFlags and AI block, not the decider's alone. A looter the closings replay played
+-- past its last village read as no looter for the rest of the batch (#510).
+do
+    local cpu = fakeCpu(1)
+    local bytes, reads = {}, 0
+    local function u8(a) return bytes[a] or 0 end
+    local function u16(a) reads = reads + 1; return u8(a) | u8(a + 1) << 8 end
+    local function w8(a, v) bytes[a] = v & 0xFF end
+    local function w16(a, v) w8(a, v); w8(a + 1, v >> 8) end
+    local outer = { cpu = cpu, mem = { u8 = u8, u16 = u16,
+                                       u32 = function(a) return u16(a) | u16(a + 2) << 16 end },
+                    write8 = w8, write16 = w16,
+                    write32 = function(a, v) w16(a, v); w16(a + 2, v >> 16) end, Board = Board }
+    local FLAGS, BLOCK, LAST = Sight.UNIT_AI_FLAGS, Sight.UNIT_AI_CONFIG,
+        Sight.UNIT_AI_CONFIG + Sight.UNIT_AI_WORDS * 2 - 1
     local e, other = { addr = 0x02030000 }, { addr = 0x02030100 }
-    for o = 0x40, 0x46, 2 do bytes[e.addr + o] = 4 end
-    bytes[e.addr + 0x0A], bytes[other.addr + 0x0A] = 1, 2
-    sandbox(function()
+    local byId = { [3] = e, [9] = other }
+    -- the game's own writes, straight to memory: every AI byte of both units set to `v`
+    local function gameWrites(v)
+        for _, o in pairs(byId) do
+            bytes[o.addr + FLAGS] = v
+            for at = o.addr + BLOCK, o.addr + LAST do bytes[at] = v end
+        end
+    end
+    local function ai(o)
+        local out = { u8(o.addr + FLAGS), u8(o.addr + FLAGS + 1) }
+        for at = o.addr + BLOCK, o.addr + LAST do out[#out + 1] = u8(at) end
+        return table.concat(out, ",")
+    end
+    gameWrites(4)
+    bytes[e.addr + FLAGS + 1], bytes[other.addr + FLAGS + 1] = 3, 9   -- their indexes
+    local first, inner
+    local function sandboxed(sandbox, api)
         sandbox(function()
-            Sight.keepAi(api, e, { e, other })
-            for o = 0x40, 0x46, 2 do bytes[e.addr + o] = 0 end
-            bytes[e.addr + 0x0A], bytes[other.addr + 0x0A] = 9, 9
+            sandbox(function()
+                Sight.keepAi(api, byId)
+                local kept = reads
+                Sight.keepAi(api, byId)
+                check(reads, kept, "keepAi: a second keep in one sandbox reads nothing")
+                gameWrites(7)
+                -- a sandbox inside puts back what IT found, the first decision's writes
+                sandbox(function()
+                    Sight.keepAi(api, byId)
+                    check(reads > kept, true, "keepAi: a nested sandbox keeps afresh")
+                    gameWrites(8)
+                end)
+                inner = ai(e) .. " " .. ai(other)
+            end)
+            first = ai(e) .. " " .. ai(other)
         end)
+    end
+    sandboxed(Sight.batching(outer))
+    check(inner, "7,3,7,7,7,7,7,7,7,7 7,9,7,7,7,7,7,7,7,7",
+        "keepAi: a nested sandbox puts back the bytes as it found them")
+    check(first, "4,3,4,4,4,4,4,4,4,4 4,9,4,4,4,4,4,4,4,4",
+        "keepAi: every unit's aiFlags and AI block are put back, the index untouched")
+
+    -- the guard (PT_LEAKGUARD): a nested sandbox that leaves a unit struct changed raises
+    -- and names it; one whose writes were all kept does not. Sight.keepAi is that keep.
+    local function guarded() return { e.addr, other.addr } end
+    local sandbox, api = Sight.batching(outer, guarded)
+    local ok, why = pcall(sandbox, function()
+        sandbox(function() bytes[other.addr + BLOCK + 2] = 1 end)
     end)
-    local back = true
-    for o = 0x40, 0x46, 2 do back = back and bytes[e.addr + o] == 4 end
-    check(back, true, "keepAi: the deciding unit's AI scripts and counters are put back")
-    check(bytes[e.addr + 0x0A] .. "," .. bytes[other.addr + 0x0A], "1,2",
-        "keepAi: every unit's aiFlags is put back")
+    check(ok, false, "guard: a unit struct a nested sandbox leaves changed raises")
+    check(tostring(why):find(("sandbox leak: the unit struct at 0x%08X, word +0x40")
+              :format(other.addr), 1, true) ~= nil, true,
+          "guard: the error names the struct and the word: " .. tostring(why))
+    bytes[other.addr + BLOCK + 2] = 4
+    ok, why = pcall(sandboxed, sandbox, api)
+    check(ok, true, "guard: writes that keepAi held raise nothing: " .. tostring(why))
+end
+
+-- Every enemy decision keeps the AI bytes first (the test above proves only the helper): read
+-- off the source, aiDecide calls Sight.keepAi before its first write, nothing else does, and
+-- every call of aiDecide hands it the board's units.
+do
+    local f = assert(io.open(here .. "sight.lua"))
+    local src = f:read("a")
+    f:close()
+    local at = src:find("local function aiDecide(call, proc, e, all, before)", 1, true)
+    local body = at and src:sub(at, src:find("\n    end\n", at, true))
+    local keep = body and body:find("M.keepAi(api, all)", 1, true)
+    local write = body and body:find("api.write", 1, true)
+    check(keep ~= nil and write ~= nil and keep < write, true,
+          "keepAi: aiDecide keeps the AI bytes before its first write")
+    local _, keeps = src:gsub("\n +M%.keepAi%(", "")
+    check(keeps, 1, "keepAi: aiDecide is its one caller")
+    local calls, withUnits = 0, 0
+    for args in src:gmatch("[^%w]aiDecide(%b())") do
+        if not args:find("^%(e%)") and not args:find("before%)$") then
+            calls = calls + 1
+            local _, commas = args:gsub(",", "")
+            if commas >= 3 then withUnits = withUnits + 1 end
+        end
+    end
+    check(calls > 0 and calls == withUnits, true,
+          ("keepAi: each of aiDecide's %d calls hands it the units (%d do)"):format(calls, withUnits))
 end
 
 -- Every equip in sight.lua goes through Sight.equip: a sandbox read that called
