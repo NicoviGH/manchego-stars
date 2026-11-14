@@ -9,37 +9,51 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14): PRs #611 and #612 are merged; Eirika's Ch15 turn 1 never decides.**
+**Next session starts here (2026-11-14, evening): PR #613 is merged; the party is the wall; build the party plan's PR 1.**
 - **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
-  routes; he left every call on the way to us (memory `finish-line-whole-vanilla-game`). The
-  definition and the roadmap are **#510 comment 6872554917**; the order now worked replaces
-  the plan's item E position.
-- **Merged:** PR #610 (item E1, a goal act also judged with every other unit holding; ADR 0405
-  amended). Nicolas: "Merge it", 2026-11-14.
-- **Merged (Nicolas: "Merge both", 2026-11-14), as a stack with `--merge`: #611 (274a7d73), then
-  #612 (aae87e09).** Each was reviewed (`/code-review` medium + one scoped re-review, every
-  finding fixed) and green on its head.
-  - **#611 the scout lap** (ADR 0409): `resume --scout` carries a campaign past a chapter it
-    cannot clear clean (first win with no unit lost, any win from attempt 4); `--route 1|2`;
-    a scout lap's states folder holds a `SCOUT` file and resumes only with `--scout`. Also a
-    promoted Canto unit spends its second move (Cormag's Elysian Whip hung Ch14's start).
-  - **#612 the doors** (ADR 0410): a door opens its whole map change (walkable ground only),
-    and the turns through several doors are one shortest-path read (`obstacleTurns`); an
-    asleep or berserked unit is never an actor (`Board.statusHeld`). **Ch14 is won** (`gate5`,
-    attempt 1, 22 turns, no death; again on `lap1d`); it was `stuck` in every record before.
-- **The wall table is #510 comment 6878903339; round 2 is comment 6881113521.** Eirika's
-  route: Ch9 (item E's misses), Ch10, Ch11, Ch12 clean, Ch13 (deaths), Ch14 won. Ephraim's:
-  Ch9 `stuck` at the gate (Colm, the only key, refuses the Door at 49-90%: item E).
-- **Next step: Eirika's Ch15 turn 1.** The lap's first decision there ran over an hour (8.4M
-  frames of game code, no plan) and was stopped. One instrumented run from its saved start: `resume --game vanilla --tag <t> --campaigns lap1d-lap1-fwd1-cs-s4006
-  --chapter 15 --last 15 --attempts 1 --scout`. Whether it is the new obstacle read, the
-  desert or something else is untested. Then carry the lap on (`--chapter 15 --scout`).
-- **After that:** item E (E2 a guard on the road counts in a unit's turns; E3 an idle unit takes
-  the guard; #510 comment 6872468981) for Ephraim's Ch9 gate and Ch8/Ch9's misses; then the
-  convoy (seals and boosters back out, promote at level 10, boosters to the lord first; #510
-  comment 6872948037, settled, not built).
+  routes (memory `finish-line-whole-vanilla-game`; #510 comment 6872554917).
+- **The plan now worked is #510 comment 6883980081** (party management; one comment, edited in
+  place). Three PRs and a proof lap: (1) gear: `Bot.shop` buys staves and tomes and replaces a
+  unit with no usable item with uses left; the saved state gains the convoy and uses left;
+  (2) the convoy: the settled design of comment 6872948037 plus a fielded unit taking a usable
+  convoy weapon before the shop; (3) levels: the game's own experience number
+  (`GetBattleUnitExpGain`) as a weighted term in `score()`, and the team fill by level (gated on
+  an offline check of `lap1d`'s rosters). **The proof lap starts from the prologue** (chapter 0,
+  `--chapter 0 --last 15 --scout`; Nicolas, 2026-11-14: the levels before Ch5 matter), against
+  `lap1d`, with the four "better" measures the comment sets in advance.
+- **Why (evidence in the comment):** at Eirika's Ch15 start Eirika is level 5, the army averages
+  5.1, 6 of 23 units hold nothing they can use (Vanessa from Ch9, Joshua Ch10, Natasha Ch11, Lute
+  and Artur Ch12-13, Dozla Ch14, Innes Ch15), seals and boosters sit in the wrong bags or the
+  convoy, ~13,000 gold idle from Ch9; Seth took 94 of 209 kills Ch9-Ch13, Eirika 2. **The
+  death-risk cap stays** (Nicolas agreed: the party, not caution, is the problem). An LLM does not
+  play moves (reproducibility and cost); an LLM adviser once a chapter is an option in the plan,
+  not decided.
+- **Open calls for Nicolas, each with its recommendation in the plan comment:** the experience
+  weight (start 0.3 a point); the fill by level (only if the offline check shows better teams);
+  the LLM adviser (not now). The 1/64 split floor of PR #613 shipped as built; Nicolas has not
+  said either way.
+- **Merged: PR #613** (23ad8bcc; Nicolas: "You may also merge the pr that's ready", 2026-11-14;
+  ADR 0411). Ch15's first decision ran over an hour because a judged enemy phase split in two at
+  every striker a counter might kill, with no bound (667 stack samples: the door read and the
+  desert refuted). A split is now played only while its rarer way is at least 1/64 of the phase
+  (`Sight.phaseWays`, `unsplit` counted); a decision over `Botrun.DECISION_FRAMES` = 4,000,000
+  frames (Nicolas, 2026-11-14) ends the attempt `timeout`, never retried, no game result
+  (`montecarlo.py` `NO_RESULT`); records keep `plans.slowest`. Reviewed (`/code-review 613`,
+  8 findings, all fixed in facb3c51); CI green on the head. Ch15 attempt 1 on it (tag `ch15b`,
+  then at a 1.5M limit): `timeout` on turn 5, Ewan (charId 0x18) dead on turn 2.
+- **The planner's cost on big maps is the step after the party:** each Ch15 decision still costs
+  about a million frames (plans x the plan's own uncertain kills, `Planner.BRANCH`, x 32-46
+  enemies). An unshipped probe applying the same 1/64 floor to the plan's own kills (local branch
+  `exp/510-plan-floor`, dcb944d1, `PT_EXP_FLOOR`; tag `ch15x`) played Ch15 in 216 s and lost on
+  turn 6 (Ewan, Knoll, Ephraim). One game: a lead. The ant-game opponent brain
+  (`~/Projects/ant-game`) suggests a cheap screen and exact simulation of a shortlist; it has no
+  late-game risk rule.
+- **After the party:** item E (E2, E3; #510 comment 6872468981) for Ephraim's Ch9 gate (Colm
+  refuses the Door at 49-90%) and Ch8/Ch9's misses.
 - **Kept:** the lap's states under `references/sim/vanilla/c25b145e3745/states/` (`lap1-`,
-  `lap1b-`, `lap1d-`, `lap2-`, `gate*-`, `dbg*-`; scout ones are marked `SCOUT`).
+  `lap1b-`, `lap1d-` (chapters 0-15, its 0-14 identical to `lap1-`), `lap2-` (Ephraim's 0-10 and
+  23), `ch15*-`, `probe*-`, `gate*-`, `dbg*-`; scout ones are marked `SCOUT`). The convoy is not
+  in `<n>.json`, only in `<n>.ss` (`gConvoyItemArray` 0x0203A81C).
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
   never run for a PR.
@@ -139,13 +153,6 @@ the next (item F's case). Ch9's village: `closings` has an empty looter list fro
 **The dump is kept, not merged:** local branch `probe/510-fwd1-d` (c7c27494), `PT_DPROBE=1`
 before `montecarlo.py resume`; `DPROBE <json>` lines land in `workers/*.log`. Rebase it before
 reuse.
-
-**Asked by Nicolas (2026-11-13), answered from a code read, nothing measured:** the bot's item
-handling is basic. It buys each unit the cheapest Vulnerary and the cheapest usable weapon of
-each type it lacks (`Bot.shop`), picks a weapon per attack from the game's forecast, and sorts
-a full bag. It never trades on the map, never takes from the convoy at prep, and does not plan
-around weapon uses. Whether that has cost a run is not checked; a read of the kept records
-(units ending a chapter with no usable weapon or no healing) would say.
 
 **PR #604 is merged** (Nicolas: "Merge and handoff", 2026-11-12), no open PR of this work.
 - Attempt k of a chapter start has the game's RNG moved on (k - 1) * 1009 draws, no re-seed;
