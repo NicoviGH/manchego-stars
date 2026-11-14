@@ -517,7 +517,9 @@ local function context(board, sight)
             ctx.onField[#ctx.onField + 1] = u
             ctx.standing[tileKey(u.x, u.y)] = u
             if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
-            if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
+            if u.faction == "blue" and not u.acted and not u.held then
+                ctx.actors[#ctx.actors + 1] = u
+            end
         end
     end
     table.sort(ctx.actors, function(a, b) return a.slot < b.slot end)

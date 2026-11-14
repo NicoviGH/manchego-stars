@@ -215,6 +215,20 @@ do
           "an empty slot or a plain unit is neither")
 end
 
+-- the status the game refuses the cursor for (playerphase.c: BERSERK 4, SLEEP 2) holds a unit;
+-- POISON (1) and the rest do not; the low nibble only
+do
+    local m = fakeMem()
+    defineItems(m)
+    for slot, status in ipairs({ 0, 1, 2, 4, 0x14 }) do
+        putUnit(m, SYM.gUnitArrayBlue, slot, { charId = slot + 1, x = slot, y = 1 })
+        m.w8(SYM.gUnitArrayBlue + slot * 0x48 + Board.UNIT_STATUS, status)
+    end
+    local got = {}
+    for slot = 1, 5 do got[slot] = tostring(Board.unitAt(m, SYM, SYM.gUnitArrayBlue, slot).held) end
+    check(table.concat(got, " "), "nil nil true true true", "held: sleep and berserk, by the low nibble")
+end
+
 -- The lean read: position/hp/state, and NOT the item/boss reads (which it must never touch).
 do
     local m = fakeMem()

@@ -659,7 +659,7 @@ local function observedUnit(unitId)
     local class = ru32(unit + 4)
     return {
         state = ru32(unit + 0x0C),
-        status = ru8(unit + 0x30) & 0xF,
+        status = ru8(unit + BOARD.UNIT_STATUS) & 0xF,
         attributes = (character ~= 0 and ru32(character + 0x28) or 0)
             | (class ~= 0 and ru32(class + 0x28) or 0),
     }
@@ -669,7 +669,7 @@ local function unitSelectKind(unitId, unit)
     if not unit then return nil end
     if (unitId & 0xC0) ~= faction() then return "no_control" end
     if (unit.state & 0x2) ~= 0 or (unit.attributes & 0x100000) ~= 0 then return "turn_ended" end
-    if unit.status == 2 or unit.status == 4 then return "no_control" end
+    if BOARD.statusHeld(unit.status) then return "no_control" end
     return "control"
 end
 local function observeController()

@@ -275,7 +275,7 @@ local function unit(o)
         id = o.id, slot = o.slot or 0, faction = o.faction or "blue", charId = o.charId or o.id,
         x = o.x, y = o.y, hp = o.hp or 20, maxhp = o.maxhp or o.hp or 20,
         onMap = true, onField = o.onField ~= false, dead = false, acted = o.acted or false,
-        fogged = o.fogged or false,
+        fogged = o.fogged or false, held = o.held,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons, level = o.level,
@@ -6163,9 +6163,21 @@ do
     check(plan.enemies[0x82], true, "offer: the plan's enemies hold the boss")
 end
 
+-- a unit the game will not let the player select (asleep or berserked, playerphase.c) is never
+-- an actor: the scout lap's Ch14 (2026-11-14) planned a berserked Cormag's attack, and the
+-- harness's move failed. It still stands on the board (an enemy may strike it).
+do
+    local held = blue(0x01, 0, 2, 2, { held = true })
+    local free = blue(0x02, 1, 4, 4)
+    local cands = B.candidates(boardOf(held, free, red(0x81, 9, 9)), sightOf({}), style("careful"))
+    local ids = {}
+    for _, c in ipairs(cands) do ids[#ids + 1] = c.unit.id end
+    check(table.concat(ids, ","), "2", "held: an asleep or berserked unit is offered no act")
+end
+
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
     print(string.format("ok -- %d assertions", tests))
 end
-
