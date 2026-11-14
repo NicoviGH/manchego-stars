@@ -51,6 +51,8 @@
 --   capped      api.attempts is below MAX_ATTEMPTS and a chapter used them without a clean clear:
 --               the run was cut short on purpose, so it says nothing of the chapter or the bot
 --               (never infeasible or bot_fault)
+--   (api.scout, the scout lap: a chapter with no clean clear is passed from a win, its chapter
+--   line `scouted`, and every line carries `scout = true`; a chapter with no win still stops it)
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -91,6 +93,8 @@
 --   only                  OPTIONAL: the one attempt to play (see above)
 --   attempts              OPTIONAL: an integer in 1..MAX_ATTEMPTS bounding a chapter's attempts
 --                         in place of MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
+--   scout                 OPTIONAL: true for the scout lap (montecarlo.py `resume --scout`,
+--                         M.SCOUT_PATIENCE, ADR 0409)
 --   advanceDice(n)        advance the game's RNG n draws (Sight.advance) and return how many
 --                         were advanced: the count the record keeps as `dice_advanced`
 --   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
@@ -177,7 +181,8 @@ local function byCharId(roster)
 end
 
 -- Between the chapter's start and its first move: the team, the shops, the seals. `need` is
--- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team. Returns
+-- the chapter's api.needs (nil without a prep screen); `carried` the last cleared (or, on the scout lap, scouted)
+-- team. Returns
 -- the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
 -- the attempt's record, { cap, demands, units = { { charId, group, forced, carried, answers =
 -- the demand ids it answers, why ("benched" for one left out), covers } }, uncovered = the
@@ -249,6 +254,17 @@ local function between(api, style, followed, need, carried)
         end
     end
     return team
+end
+
+-- the team a chapter line keeps: who was fielded, and why each was
+local function teamLine(team)
+    local out = { deploy = team.deploy, reasons = {} }
+    for _, charId in ipairs(team.deploy) do
+        local r = team.reasons[charId] or { why = "fielded" }
+        r.charId = charId
+        out.reasons[#out.reasons + 1] = r
+    end
+    return out
 end
 
 function M.run(api)
@@ -394,12 +410,7 @@ function M.run(api)
                 end
                 if rec.clean == true then
                     entry.outcome, entry.turns = "cleared", rec.turns
-                    entry.team = { deploy = team.deploy, reasons = {} }
-                    for _, charId in ipairs(team.deploy) do
-                        local r = team.reasons[charId] or { why = "fielded" }
-                        r.charId = charId
-                        entry.team.reasons[#entry.team.reasons + 1] = r
-                    end
+                    entry.team = teamLine(team)
                     carried = {}
                     for _, charId in ipairs(team.deploy) do carried[charId] = true end
                     break
@@ -409,11 +420,14 @@ function M.run(api)
                 for _, d in ipairs(rec.deaths or {}) do
                     if d.faction == "blue" then lost[d.charId] = true end
                 end
-                if api.scout and rec.outcome == "won"
-                        and (next(lost) == nil or entry.attempts >= M.SCOUT_PATIENCE) then
+                -- the patience never outlasts a lowered cap (`resume --scout --attempts 2`)
+                if api.scout and rec.outcome == "won" and (next(lost) == nil
+                        or entry.attempts >= math.min(M.SCOUT_PATIENCE, attemptCap)) then
                     entry.outcome, entry.turns = "scouted", rec.turns
-                    entry.deaths, entry.missed = rec.deaths, rec.clear
-                    entry.team = { deploy = team.deploy }
+                    entry.deaths = rec.deaths
+                    entry.missed = rec.clear and { recruits = rec.clear.recruits_missing,
+                                                   rewards = rec.clear.rewards_missing }
+                    entry.team = teamLine(team)
                     carried = {}
                     for _, charId in ipairs(team.deploy) do
                         if not lost[charId] then carried[charId] = true end

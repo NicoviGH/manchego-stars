@@ -298,6 +298,18 @@ local function test_the_scout_lap_carries_on_past_an_unclean_chapter()
 end
 test_the_scout_lap_carries_on_past_an_unclean_chapter()
 
+-- a cap lowered under the patience (`resume --scout --attempts 2`): the last attempt's win is
+-- taken, death or not, rather than the lap stopping at the chapter it exists to pass
+local function test_the_scout_patience_never_outlasts_a_lowered_cap()
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = { "dead", "dead" } },
+                                                        { id = 6 } } })
+    g.api.scout, g.api.attempts = true, 2
+    check(Campaign.run(g.api), true, "scout, cap 2: the lap goes on")
+    check(lines(g)[1].outcome .. " " .. lines(g)[1].attempts, "scouted 2",
+          "scout, cap 2: a win with a death on the last attempt is taken")
+end
+test_the_scout_patience_never_outlasts_a_lowered_cap()
+
 -- test_a_won_attempt_that_spoiled_a_part_is_retried: attempt 1 is won with a recruit missed,
 -- attempt 2 is clean; the failure keeps what spoiled it and the attempt's trace.
 local function test_a_won_attempt_that_spoiled_a_part_is_retried()

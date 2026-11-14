@@ -15,7 +15,9 @@ Eirika's route (#510 comment 6872554917).
 
 **Decision.** `montecarlo.py resume --scout` carries a campaign on past such a chapter. It
 takes the first win with no player unit lost, and from attempt `M.SCOUT_PATIENCE` (4) on, the
-first win of any kind. A chapter so passed says `scouted`, never `cleared`; every line of the
+first win of any kind (or from the last attempt, when `--attempts` sets a cap under 4). A win
+that lost only a green (an ally the player does not control) counts as one with no player unit
+lost. A chapter so passed says `scouted`, never `cleared`; every line of the
 campaign says `scout`; the dead are not carried. A chapter with no win in the cap still stops
 it. `resume --route 1|2` picks the branch at Ch8's split (Ephraim's route had no way in).
 
@@ -24,4 +26,5 @@ playing it again; the lap is for finding walls and harness faults, not for measu
 
 **What it is not.** A scout campaign's party is smaller than a clean one's, so a late board
 is harder than the real one. Its records say where the bot fails and why; they never feed a
-difficulty verdict, a suite fixture or a pinned start. Only a clean lap meets the finish line.
+difficulty verdict, a suite fixture or a pinned start. A scout lap's states folder holds a `SCOUT` file, and `resume` refuses to carry it on
+without `--scout`. `--route` is refused on Manchego Stars. Only a clean lap meets the finish line.

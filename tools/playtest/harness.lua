@@ -4278,8 +4278,8 @@ INSPECT.campaignApi = function(game)
             local ok = true
             if state == "player_map_idle" and classOf() ~= before then return true
             -- a Canto unit is handed back its move after the seal (playerphase.c
-            -- PlayPhaseForceActiveUnitCanto; vanilla Ch13, Cormag's Elysian Whip, campaign
-            -- lap1-fwd1-cs-s4006: class 0x1F to 0x21, then player_range_idle, and B does not
+            -- PlayPhaseForceActiveUnitCanto; vanilla Ch14's start, Cormag's Elysian Whip, on
+            -- the scout lap of 2026-11-14 from campaign 4006: class 0x1F to 0x21, then player_range_idle, and B does not
             -- close it): spent where the unit stands, as after any act (INSPECT.awaitActed).
             -- Only a changed class is let through: a unit selected with its class unchanged
             -- still runs out the allowance, loudly.
