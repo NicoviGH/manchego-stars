@@ -91,3 +91,5 @@ still beats plans over it.
   main's (`acts_hash` 756e0688), 2 min 21 s against 2 min 25 s. It gets no reward by itself;
   it stops a goal being blamed for another unit's risk. The guard on the road (items E2, E3)
   is ranked by the scout lap's wall table first (#510 comment 6872554917).
+- **Not run for it:** the frozen suite (never for a PR). If the next suite finds a regression,
+  this commit is one of those bisected with `suite --only` on the run that got worse.

@@ -4142,15 +4142,11 @@ end
 -- beam's plans judged and the act in one of them, no second plan is built for it. A stalled
 -- row gets its plan too, and of two units offered one goal the plan has the better by its own
 -- score.
-local Lone = {}
 do
     -- the goal plans judged on the shared board, as key lists, and how many. `o` is the
     -- sight's options, `final` Planner.FINAL for the call (nil: the beam's plans are judged
     -- and U is alone, so the beam keeps each of its three acts), `more` the units besides U.
-    local function judged(o, final, st, opts, ...)
-        return Lone.judged("goal", o, final, st, opts, ...)
-    end
-    function Lone.judged(want, o, final, st, opts, ...)
+    local function judged(want, o, final, st, opts, ...)
         local U = blue(0x01, 0, 4, 3, { minRange = false })
         local Z = red(0x83, 14, 14, { minRange = false })
         o.objective = { kind = "seize", tile = { x = 4, y = 9 } }
@@ -4173,21 +4169,23 @@ do
             return { explorable = { { x = 4, y = 2, kind = kind } },
                      canExplore = { [0x01] = { ["4,2"] = kind } } }
         end
-        check(judged(o(), 0, nil, nil, V()), "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
+        check(judged("goal", o(), 0, nil, nil, V()), "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
               "goal act: the " .. kind .. " the beam cut is judged, the rest the first plan's")
-        check(select(2, judged(o())), 0,
+        check(select(2, judged("goal", o())), 0,
               "goal act: a " .. kind .. " a judged plan already holds gets no second plan")
         -- item E1 (#510): the act is judged with every other unit holding too, since the first
         -- plan's other acts can put it over the cap by themselves (vanilla Ch9, campaign 4006
         -- turn 11: the Talk plan at 87.2% was another unit's attack across the map)
-        check(Lone.judged("lone", o(), 0, nil, nil, V()), "1>" .. kind .. "@4,2>nil 2>wait@0,0>nil",
+        check(select(2, judged("lone", o(), 0)), 0,
+              "goal act alone: no lone plan when the goal plan is already the act alone")
+        check(judged("lone", o(), 0, nil, nil, V()), "1>" .. kind .. "@4,2>nil 2>wait@0,0>nil",
               "goal act alone: the " .. kind .. " is judged with every other unit holding")
-        check(judged(o(), 0, nil, { quietGoals = { [kind .. ":4,2"] = true } }, V()),
+        check(judged("goal", o(), 0, nil, { quietGoals = { [kind .. ":4,2"] = true } }, V()),
               "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
               "goal act: a stalled " .. kind .. " the game offers is judged too")
     end
     -- a Talk to the recruit T, from beside it
-    check(judged({ talk = { [0x01] = { [0x30] = true } } }, 0,
+    check(judged("goal", { talk = { [0x01] = { [0x30] = true } } }, 0,
                  claimed("bold", { id = "r1", kind = "recruit", unit = { 0x30 } }), nil, V(),
                  blue(0x30, 5, 4, 1, { faction = "green", minRange = false })),
           "1>talk@4,2>48 2>wait@0,1>nil", "goal act: the Talk the beam cut is judged")
@@ -4197,12 +4195,12 @@ do
                   canExplore = { [0x01] = { ["4,2"] = "visit" }, [0x03] = { ["4,2"] = "visit" } },
                   reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }),
                             [0x03] = tiles({ 3, 3 }, { 4, 2 }) } }
-    local goal, n = judged(two, 0, nil, nil, blue(0x03, 2, 3, 3, { minRange = false }))
+    local goal, n = judged("goal", two, 0, nil, nil, blue(0x03, 2, 3, 3, { minRange = false }))
     check(tostring(goal and goal:match("^%d+>visit@4,2")) .. " " .. n, "3>visit@4,2 1",
           "goal act: two units offered one goal, one plan, the better act's")
     -- and the other way round: W two steps back from the gate, U one, so U's is the better
     two.reach = { [0x01] = tiles({ 4, 3 }, { 4, 2 }), [0x03] = tiles({ 4, 4 }, { 4, 2 }) }
-    goal, n = judged(two, 0, nil, nil, blue(0x03, 2, 4, 4, { minRange = false }))
+    goal, n = judged("goal", two, 0, nil, nil, blue(0x03, 2, 4, 4, { minRange = false }))
     check(tostring(goal and goal:match("^%d+>visit@4,2")) .. " " .. n, "1>visit@4,2 1",
           "goal act: the better act's, whichever unit has it")
 end
