@@ -79,3 +79,17 @@ still beats plans over it.
   2,988,937. The suite was not refrozen.
 - **Two suite runs were stopped part-way on purpose** (the review's fixes changed play under
   them) and have no result.
+
+## Amendment, 2026-11-13: the goal act alone (#510 item E1)
+
+- **Decision:** beside the goal plan, one more plan for each such act: the act with every
+  other unit holding (plan kind `lone`). The goal plan keeps the first plan's other acts, and
+  those can put it over the cap by themselves: on vanilla Ch9, campaign 4006 turn 11, the
+  Talk plan's 87.2% was Tana's attack across the map, not the Talk.
+- **What it changed (run `e1a`, Ch9 4006, attempt 1):** the lone Talk is judged at 30.8%
+  (Eirika, struck by two Pirates) and refused over the even style's cap, so the game is
+  main's (`acts_hash` 756e0688), 2 min 21 s against 2 min 25 s. It gets no reward by itself;
+  it stops a goal being blamed for another unit's risk. The guard on the road (items E2, E3)
+  is ranked by the scout lap's wall table first (#510 comment 6872554917).
+- **Not run for it:** the frozen suite (never for a PR). If the next suite finds a regression,
+  this commit is one of those bisected with `suite --only` on the run that got worse.

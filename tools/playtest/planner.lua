@@ -73,7 +73,7 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted),
--- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"noseize"|"unstall"|"mend"|"rest"|"heal",
+-- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -1577,7 +1577,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- best by its own score, where more than one unit or tile offers it), then the first plan's
     -- other acts where they still fit, as the mend keeps a plan. Every row counts, whatever its
     -- status: the ledger lists what is still to get, and the game offering the act is the
-    -- proof it can be taken now. An ordering only: the rank decides.
+    -- proof it can be taken now. Beside it, the act alone, every other unit holding (`lone`,
+    -- #510 item E1). An ordering only: the rank decides.
     local open = {}
     for _, r in ipairs(ledger) do open[r.id] = true end
     do
@@ -1602,12 +1603,17 @@ function M.plan(Bot, board, sight, style, opts)
         local first = finals[1] and finals[1].st
         for _, id in ipairs(ids) do
             local b = bestFor[id]
-            local st = extend(start, b.a, b.uid)
-            if st then
-                st = rebuild(st, first and first.acts or {}, function(x)
+            local alone = extend(start, b.a, b.uid)
+            if alone then
+                local st = rebuild(alone, first and first.acts or {}, function(x)
                     if x.unitId == b.uid then return false end
                 end)
                 offer(st, "goal")
+                -- and alone, every other unit holding (#510 item E1): the first plan's other
+                -- acts can put the act over the cap by themselves (vanilla Ch9, campaign 4006
+                -- turn 11: the Talk plan read 87.2%, all of it another unit's attack across
+                -- the map; the Talk alone read 30.8%). offer() drops it when it is the same plan.
+                offer(alone, "lone")
             end
         end
     end
