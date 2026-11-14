@@ -129,11 +129,13 @@
 -- Every game rule here is the GAME's answer, read by the caller and handed in: the bot weighs
 -- no rank, level or class (ADR 0369).
 -- roster entry (a unit, slot order): { id, charId, level, forced = bool|nil,
---   canUse = {[item] = true}, items = {{ id, type = weaponType|nil, kind = "vulnerary"|nil,
---   promotes = bool|nil }...} }. `canUse` is the game's CanUnitUseWeapon for this unit over the
---   stock; `promotes` is the game's own promotion-item check for THIS unit (class and level),
---   set on a seal it would accept.
--- stock entry: { item, price = {[charId] = n}, type = weaponType|nil, kind = "vulnerary"|nil };
+--   canUse = {[item] = true}, items = {{ id, uses, kind, type = weaponType|"staff"|nil,
+--   usable, vulnerary = true|nil, promotes = bool|nil }...} }: each item is the game's facts
+--   about it for THIS unit (harness.lua unitItemFacts). `canUse` is the game's can-use (a
+--   weapon's CanUnitUseWeapon, a staff's CanUnitUseStaff) for this unit over the stock;
+--   `promotes` is the game's own promotion-item check for THIS unit (class and level), set on
+--   a seal it would accept.
+-- stock entry: { item, price = {[charId] = n}, type = weaponType|"staff"|nil, vulnerary = true|nil };
 --   price is the game's for each buyer (GetItemPurchasePrice reads the unit: a Silver Card
 --   halves it). The caller says which stock item is the Vulnerary, so no item id lives here.
 -- Bot.team(t) -> { deploy = {charIds}, reasons = {[charId] = reason}, give = {} }: whom the
@@ -159,9 +161,16 @@
 --   order made, each naming the unit it is for (FE8's shop screen buys into the inventory of
 --   the unit that opened it, bmshop.c StartShopScreen). party is the deployed roster entries,
 --   in deploy order. One Vulnerary (the cheapest) per unit holding none first, then for each
---   unit and each weapon type among the stock it can use (type names in order) it holds none
---   of, the cheapest stock weapon of that type it can use. A purchase gold cannot cover is
---   skipped and the later ones are still tried.
+--   unit and each weapon or staff type among the stock it can use (type names in order) in
+--   which it holds no USABLE item with uses left (a held weapon the game says it cannot use, or
+--   a tome with 0 uses, counts as none), the cheapest stock item of that type it can use. A
+--   purchase gold cannot cover, or a full bag has no room for, is skipped and the later ones are
+--   still tried; a unit with nothing usable in hand keeps a slot free of a Vulnerary for its arms.
+-- Bot.armed(unit) -> bool: it holds a weapon or staff it can use, with uses left.
+-- Bot.arms(gold, stock, roster) -> { [charId] = stock item }: the item the shop would buy to
+--   arm each unit that is not armed (none: nothing in stock arms it, or its bag is full). The
+--   pick reads such a unit as holding it (harness.lua api.needs), so a unit the shop can arm
+--   ranks as armed, by the game's own numbers, not as the unarmed unit it is now.
 -- Bot.promote(unit, items) -> bool: a seal the game says promotes this unit is held.
 -- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
 --   caller spends seals in.
@@ -2538,31 +2547,84 @@ local function holdsAny(u, want)
     return false
 end
 
-function M.shop(gold, stock, party)
+-- A weapon or staff the unit can use now: the game's can-use and uses left (a broken tome, or
+-- a lance its rank forbids, arms nobody).
+local function usableWeapon(it)
+    return it.type ~= nil and it.usable == true and (it.uses or 0) > 0
+end
+
+function M.armed(u)
+    return holdsAny(u, usableWeapon)
+end
+
+-- What the shop would buy for one unit, in order: a Vulnerary when it holds none, then for each
+-- weapon or staff type among the stock it can use (type names in order) in which it holds no
+-- usable item with uses left, the cheapest stock item of that type it can use. Bag room and
+-- gold are the caller's.
+local function wants(u, stock)
     local out = {}
+    if not holdsAny(u, function(it) return it.vulnerary end) then
+        local s = cheapest(stock, u, function(s) return s.vulnerary end)
+        if s then out[#out + 1] = s end
+    end
+    local usable = function(s) return s.type ~= nil and (u.canUse or {})[s.item] end
+    local types, seen = {}, {}
+    for _, s in ipairs(stock) do
+        if usable(s) and not seen[s.type] then
+            seen[s.type] = true
+            types[#types + 1] = s.type
+        end
+    end
+    table.sort(types)
+    for _, t in ipairs(types) do
+        if not holdsAny(u, function(it) return it.type == t and usableWeapon(it) end) then
+            out[#out + 1] = cheapest(stock, u, function(s) return usable(s) and s.type == t end)
+        end
+    end
+    return out
+end
+
+-- Bag room is FE8's five slots (Board.ITEM_COUNT), spent by every purchase in order; a unit
+-- with no usable weapon or staff keeps one slot free of a Vulnerary for what arms it.
+function M.shop(gold, stock, party)
+    local out, room = {}, {}
+    for _, u in ipairs(party) do room[u.charId] = Board.ITEM_COUNT - #u.items end
     local function buy(u, s)
-        if not s or s.price[u.charId] > gold then return end
+        if room[u.charId] <= 0 or s.price[u.charId] > gold then return end
         gold = gold - s.price[u.charId]
+        room[u.charId] = room[u.charId] - 1
         out[#out + 1] = { unit = u.charId, item = s.item }
     end
+    local list = {}
+    for _, u in ipairs(party) do list[u.charId] = wants(u, stock) end
     for _, u in ipairs(party) do
-        if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then
-            buy(u, cheapest(stock, u, function(s) return s.kind == "vulnerary" end))
+        local w = list[u.charId]
+        if w[1] and w[1].vulnerary then
+            local arms = not M.armed(u) and w[2] ~= nil
+            if room[u.charId] > (arms and 1 or 0) then buy(u, w[1]) end
         end
     end
     for _, u in ipairs(party) do
-        local usable = function(s) return s.type ~= nil and (u.canUse or {})[s.item] end
-        local types, seen = {}, {}
-        for _, s in ipairs(stock) do
-            if usable(s) and not seen[s.type] then
-                seen[s.type] = true
-                types[#types + 1] = s.type
-            end
+        for _, s in ipairs(list[u.charId]) do
+            if not s.vulnerary then buy(u, s) end
         end
-        table.sort(types)
-        for _, t in ipairs(types) do
-            if not holdsAny(u, function(it) return it.type == t end) then
-                buy(u, cheapest(stock, u, function(s) return usable(s) and s.type == t end))
+    end
+    return out
+end
+
+-- Bot.arms(gold, stock, roster) -> { [charId] = stock item }: for each unit that is not armed
+-- (M.armed), the item the shop would buy to arm it with this gold and the unit's bag room;
+-- none for a unit nothing in stock can arm, or with a full bag. The pick asks the game how such
+-- a unit fights holding that item.
+function M.arms(gold, stock, roster)
+    local out = {}
+    for _, u in ipairs(roster) do
+        if not M.armed(u) and #u.items < Board.ITEM_COUNT then
+            for _, s in ipairs(wants(u, stock)) do
+                if not s.vulnerary and s.price[u.charId] <= gold then
+                    out[u.charId] = s.item
+                    break
+                end
             end
         end
     end

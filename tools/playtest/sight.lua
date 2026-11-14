@@ -1740,6 +1740,21 @@ function M.new(outer)
         return mine("weapons", u, function() return M.weapons(api, u, sandbox) end)
     end
 
+    -- fn(copy) with `value` (id | uses << 8) in the first empty slot of `u`'s bag, inside a
+    -- sandbox: what the game would say of the unit holding that item (an item the prep shop
+    -- would sell it), asked of the game itself and put back on return. `copy` is the board unit
+    -- with the item listed, so s.answer and s.weapons read it as held.
+    function s.holding(u, value, fn)
+        local slot = #u.items
+        if slot >= Board.ITEM_COUNT then error("sight.lua: holding: the bag is full", 2) end
+        return sandbox(function()
+            api.write16(u.addr + Board.UNIT_ITEMS + slot * 2, value)
+            local items = table.move(u.items, 1, slot, 1, {})
+            items[slot + 1] = { id = value & 0xFF, uses = value >> 8 }
+            return fn(setmetatable({ items = items }, { __index = u }))
+        end)
+    end
+
     function s.canSeize(u)
         return mine("seize", u, function() return M.canSeize(api, u, sandbox) end) or false
     end
