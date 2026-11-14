@@ -9,17 +9,16 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14): PRs #611 and #612 are open, reviewed and green; Eirika's Ch15 turn 1 never decides.**
+**Next session starts here (2026-11-14): PRs #611 and #612 are merged; Eirika's Ch15 turn 1 never decides.**
 - **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
   routes; he left every call on the way to us (memory `finish-line-whole-vanilla-game`). The
   definition and the roadmap are **#510 comment 6872554917**; the order now worked replaces
   the plan's item E position.
 - **Merged:** PR #610 (item E1, a goal act also judged with every other unit holding; ADR 0405
   amended). Nicolas: "Merge it", 2026-11-14.
-- **Open, CI green on the heads, reviewed (`/code-review` medium + one scoped re-review each, all
-  findings fixed): merge #611 first, then #612** (stacked: retarget #612 to `main` with
-  `gh pr edit 612 --base main` BEFORE deleting #611's branch; land with `--merge`). Not yet
-  approved by Nicolas for merge (#510's merge memory covers step 9 only).
+- **Merged (Nicolas: "Merge both", 2026-11-14), as a stack with `--merge`: #611 (274a7d73), then
+  #612 (aae87e09).** Each was reviewed (`/code-review` medium + one scoped re-review, every
+  finding fixed) and green on its head.
   - **#611 the scout lap** (ADR 0409): `resume --scout` carries a campaign past a chapter it
     cannot clear clean (first win with no unit lost, any win from attempt 4); `--route 1|2`;
     a scout lap's states folder holds a `SCOUT` file and resumes only with `--scout`. Also a
@@ -32,8 +31,7 @@ and start a fresh instance; don't rely on auto-compaction.
   route: Ch9 (item E's misses), Ch10, Ch11, Ch12 clean, Ch13 (deaths), Ch14 won. Ephraim's:
   Ch9 `stuck` at the gate (Colm, the only key, refuses the Door at 49-90%: item E).
 - **Next step: Eirika's Ch15 turn 1.** The lap's first decision there ran over an hour (8.4M
-  frames of game code, no plan) and was stopped. One instrumented run from its saved start
-  (PR #612's branch): `resume --game vanilla --tag <t> --campaigns lap1d-lap1-fwd1-cs-s4006
+  frames of game code, no plan) and was stopped. One instrumented run from its saved start: `resume --game vanilla --tag <t> --campaigns lap1d-lap1-fwd1-cs-s4006
   --chapter 15 --last 15 --attempts 1 --scout`. Whether it is the new obstacle read, the
   desert or something else is untested. Then carry the lap on (`--chapter 15 --scout`).
 - **After that:** item E (E2 a guard on the road counts in a unit's turns; E3 an idle unit takes
