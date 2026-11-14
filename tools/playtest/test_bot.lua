@@ -4142,11 +4142,15 @@ end
 -- beam's plans judged and the act in one of them, no second plan is built for it. A stalled
 -- row gets its plan too, and of two units offered one goal the plan has the better by its own
 -- score.
+local Lone = {}
 do
     -- the goal plans judged on the shared board, as key lists, and how many. `o` is the
     -- sight's options, `final` Planner.FINAL for the call (nil: the beam's plans are judged
     -- and U is alone, so the beam keeps each of its three acts), `more` the units besides U.
     local function judged(o, final, st, opts, ...)
+        return Lone.judged("goal", o, final, st, opts, ...)
+    end
+    function Lone.judged(want, o, final, st, opts, ...)
         local U = blue(0x01, 0, 4, 3, { minRange = false })
         local Z = red(0x83, 14, 14, { minRange = false })
         o.objective = { kind = "seize", tile = { x = 4, y = 9 } }
@@ -4159,7 +4163,7 @@ do
         Planner.FINAL = was
         local goal, n = nil, 0
         for _, c in ipairs(plan and plan.considered or {}) do
-            if c.kind == "goal" then goal, n = table.concat(c.acts, " "), n + 1 end
+            if c.kind == want then goal, n = table.concat(c.acts, " "), n + 1 end
         end
         return goal, n
     end
@@ -4173,6 +4177,11 @@ do
               "goal act: the " .. kind .. " the beam cut is judged, the rest the first plan's")
         check(select(2, judged(o())), 0,
               "goal act: a " .. kind .. " a judged plan already holds gets no second plan")
+        -- item E1 (#510): the act is judged with every other unit holding too, since the first
+        -- plan's other acts can put it over the cap by themselves (vanilla Ch9, campaign 4006
+        -- turn 11: the Talk plan at 87.2% was another unit's attack across the map)
+        check(Lone.judged("lone", o(), 0, nil, nil, V()), "1>" .. kind .. "@4,2>nil 2>wait@0,0>nil",
+              "goal act alone: the " .. kind .. " is judged with every other unit holding")
         check(judged(o(), 0, nil, { quietGoals = { [kind .. ":4,2"] = true } }, V()),
               "1>" .. kind .. "@4,2>nil 2>wait@0,1>nil",
               "goal act: a stalled " .. kind .. " the game offers is judged too")

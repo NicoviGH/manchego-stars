@@ -73,7 +73,7 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted),
--- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"noseize"|"unstall"|"mend"|"rest"|"heal",
+-- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -1608,6 +1608,11 @@ function M.plan(Bot, board, sight, style, opts)
                     if x.unitId == b.uid then return false end
                 end)
                 offer(st, "goal")
+                -- and alone, every other unit holding (#510 item E1): the first plan's other
+                -- acts can put the act over the cap by themselves (vanilla Ch9, campaign 4006
+                -- turn 11: the Talk plan read 87.2%, all of it another unit's attack across
+                -- the map; the Talk alone read 30.8%). offer() drops it when it is the same plan.
+                offer(extend(start, b.a, b.uid), "lone")
             end
         end
     end
