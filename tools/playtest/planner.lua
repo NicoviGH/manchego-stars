@@ -73,7 +73,7 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted),
--- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"noseize"|"unstall"|"mend"|"rest",
+-- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"noseize"|"unstall"|"mend"|"rest"|"heal",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -371,10 +371,13 @@ local function score(act, st, W, style, odds)
         fx.blocked = gain <= 0
     elseif act.act == "item" and act.amount then
         -- a Vulnerary on the unit itself: what it is short by now in the plan (a heal earlier
-        -- in it counts). FE8 refuses one at full HP (CanUnitUseHealItem), so then it is no act
+        -- in it counts). FE8 refuses one at full HP (CanUnitUseHealItem), so then it is no act.
+        -- The HP it would restore past max is thrown away with a use, and costs what a restored
+        -- HP earns: offered at any HP below max (bot.lua mend), unpriced it spent three uses
+        -- for 9 HP on vanilla Ch7 (#510; Nicolas approved the price, 2026-11-13)
         local hp = st.hp[act.unitId] or act.unitHp
         local gain = math.min(act.amount, act.unitMaxHp - hp)
-        v = v + W.heal * gain
+        v = v + W.heal * (gain - (act.amount - math.max(gain, 0)))
         fx.hp = hp + gain
         fx.heals = { id = act.unitId, hp = hp + gain }
         fx.blocked = gain <= 0
@@ -1720,6 +1723,35 @@ function M.plan(Bot, board, sight, style, opts)
         end
         pick()
         if best == base then break end   -- no mend outranked the plan it started from
+    end
+    -- The heal swap (#510): the best plan with each hurt unit it leaves waiting given its own heal
+    -- (a Vulnerary) on the tile the plan already gives it, judged as one more plan, kind "heal".
+    -- Neither the beam nor the mend judges it there: the beam keeps a unit's acts that score
+    -- best on their own, a march first, and the mend tries other acts only for a unit at risk,
+    -- so a hurt unit the plan holds out of reach never weighs its heal (vanilla Ch8 seed 4004:
+    -- the thief, charId 9, at 6 of 18 HP, offered his Vulnerary on turns 5 to 16, used it on
+    -- 16). A unit's heal is swapped in only where its own score is above nothing -- what it
+    -- restores against what it throws away (score) -- and the rank decides between the plans.
+    if best and Bot.mendAt then
+        local unitOf = {}
+        for _, c in ipairs(cands) do unitOf[c.unit.id] = c.unit end
+        local acts, swapped = {}, false
+        for _, a in ipairs(best.acts) do
+            local u = a.act == "wait" and unitOf[a.unitId] or nil
+            local h = u and Bot.mendAt(ctx, u, a.move) or nil
+            if h then
+                h.why, h.unitHp, h.unitMaxHp = "mend", u.hp, u.maxhp or u.hp
+                if score(h, start, W, style, odds) <= 0 then h = nil end
+            end
+            acts[#acts + 1] = h or a
+            swapped = swapped or h ~= nil
+        end
+        if swapped then
+            local st = start
+            for _, x in ipairs(acts) do st = extend(st, x, x.unitId) or st end
+            consider(complete(st), "heal")
+            pick()
+        end
     end
     -- The lookahead (FR-017, FR-018): at an irreversible transition, the finalists (the best
     -- M.FINAL plans judged, by rank) each meet a second enemy phase, our units holding between

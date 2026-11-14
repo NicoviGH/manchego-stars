@@ -1506,22 +1506,32 @@ local function staffHeal(ctx, gate, only)
     return a
 end
 
--- A unit with no attack its style allows heals itself (sight.mend: a Vulnerary) on the safest
--- tile the gate allows, when it is down at least the item's whole amount -- no HP of it is
--- wasted. nil otherwise.
-local function mend(ctx, u, gate)
+-- A unit's own heal (sight.mend: a Vulnerary) -- an "item" act. `tile` given: there (the
+-- planner's swap of a hurt unit's wait for its heal, on the tile its plan already gives it).
+-- Else on the safest tile the gate allows. The game offers it at any HP below max
+-- (CanUnitUseItem); `whole` keeps decide's rule, down at least the item's whole amount, while
+-- the planner is offered it whenever the game is and prices the HP thrown away (planner.lua
+-- score): gated at the whole amount, the Ch7 lord down 9 of a 10-HP Vulnerary was never
+-- offered hers and died on turn 4 (#510, vanilla Ch7 seed 4005). nil when there is none.
+local function mend(ctx, u, gate, whole, tile)
     if not (ctx.sight.mend and u.maxhp) then return nil end
     local m = ctx.sight.mend(u)
-    if not (m and u.maxhp - u.hp >= m.amount) then return nil end
-    local allowed = {}
-    for _, t in ipairs(waitTiles(ctx, u)) do
-        if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
+    if not (m and u.maxhp > u.hp) then return nil end
+    if whole and u.maxhp - u.hp < m.amount then return nil end
+    if not tile then
+        local allowed = {}
+        for _, t in ipairs(waitTiles(ctx, u)) do
+            if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
+        end
+        tile = safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u))
     end
-    local tile = safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u))
     local a = action(u, tile, "item", nil)
     a.slot, a.gain, a.amount = m.slot, math.min(u.maxhp - u.hp, m.amount), m.amount
     return a
 end
+
+-- The planner's heal swap: unit `u`'s own heal on `tile` (ctx: M.candidates' second value).
+function M.mendAt(ctx, u, tile) return mend(ctx, u, nil, false, tile) end
 
 -- The old clear-bot through decide: the first unit in slot order, pickTarget's pick, else
 -- pickMove toward the goal over sight.field when there is one. With no field pickMove's cork
@@ -1608,7 +1618,7 @@ function M.decide(board, sight, style)
     end
     local a = attacks[u]
     if a then return strikeAct(u, a) end
-    return mend(ctx, u, gate) or breach(ctx, u, gate, objective)
+    return mend(ctx, u, gate, true) or breach(ctx, u, gate, objective)
         or action(u, march(ctx, u, gate, objective), "wait")
 end
 

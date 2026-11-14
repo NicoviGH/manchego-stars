@@ -2090,6 +2090,32 @@ do
     check(a and a.act, "item", "mend: the cap is the game's max HP, not the raw stat")
 end
 
+-- test_planner_is_offered_a_vulnerary_below_max_hp (#510): A is 9 down with a 10-HP Vulnerary.
+-- The game lets it heal at any HP below max (CanUnitUseItem), so the planner's menu holds the
+-- heal; decide keeps its own rule, down the whole amount. Gated at the whole amount, vanilla
+-- Ch7's lord, 9 down, was never offered hers on turn 4 and died (seed 4005).
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 9, maxhp = 18 })
+    local o = { mend = { [0x01] = { slot = 1, amount = 10 } } }
+    local cands = B.candidates(boardOf(A), sightOf(o), style("careful"))
+    local item
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.acts) do
+            if a.act == "item" then item = a end
+        end
+    end
+    check(item and item.slot, 1, "offer: 9 down, the planner is offered the Vulnerary")
+    check(B.decide(boardOf(A), sightOf(o), style("careful")).act, "wait",
+          "offer: decide still waits for the whole amount")
+    A.hp = 18
+    cands = B.candidates(boardOf(A), sightOf(o), style("careful"))
+    local any = false
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.acts) do any = any or a.act == "item" end
+    end
+    check(any, false, "offer: none at full HP")
+end
+
 -- test_recruit_claim_talks_first_and_marches_when_out_of_reach: green T talkable by A.
 do
     local A = blue(0x01, 0, 0, 0)
@@ -2469,6 +2495,40 @@ do
     Planner.BEAM = beam
     check(at(a) .. " " .. tostring(plan and plan.kind), "0,0 mend",
           "planner: the mend keeps A out of the strike")
+end
+
+-- test_planner_prices_a_heal_thrown_away (#510): A is 1 HP down with a 10-HP Vulnerary and
+-- nothing can reach it. The heal restores 1 and throws 9 away, so the plan waits. Unpriced,
+-- the offer below max HP spent three uses for 9 HP on vanilla Ch7.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 17, maxhp = 18 })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }) },
+                mend = { [0x01] = { slot = 1, amount = 10 } } }
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    check(a and a.act, "wait", "price: 1 HP down, the Vulnerary is kept")
+end
+
+-- test_planner_swaps_a_held_units_wait_for_its_heal (#510): A is 12 down with a 10-HP
+-- Vulnerary and nothing can reach it. Its march to (1,0) scores best on its own, so the beam
+-- (BEAM = 1) keeps only that and no plan it builds heals A; no unit is at risk, so the mend
+-- tries nothing. The heal swap judges the plan with A's Vulnerary on (1,0), and the rank
+-- plays it: more HP left, the same tile (vanilla Ch8 seed 4004: the thief, 6 of 18 HP,
+-- offered his Vulnerary on turns 5 to 16, used it on 16).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 6, maxhp = 18 })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        mend = { [0x01] = { slot = 1, amount = 10 } },
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check((a and a.act) .. " " .. at(a) .. " " .. tostring(plan and plan.kind), "item 1,0 heal",
+          "swap: A heals on the tile its march gives it")
 end
 
 -- test_planner_beam_keeps_one_order: two units, two tiles each, nothing to fight. The beam
