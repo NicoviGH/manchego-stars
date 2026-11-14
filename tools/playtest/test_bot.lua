@@ -2498,16 +2498,18 @@ end
 
 -- test_planner_prices_a_heal_thrown_away (ADR 0408): A has a 10-HP Vulnerary and nothing can
 -- reach it. Each HP the heal throws away costs W.heal; each it restores earns W.heal and
--- closes W.taken of the judge's deficit. Careful (1.5, 2) uses it past 3 of its 10: 1 or 2
--- down, kept; 4 or 6 down, used.
+-- closes W.taken of the judge's deficit: used past W.heal * 10 / (2 * W.heal + W.taken) of its 10.
 do
     local X = red(0x81, 9, 9, { minRange = false })
     local o = { reach = { [0x01] = tiles({ 0, 0 }) },
                 mend = { [0x01] = { slot = 1, amount = 10 } } }
-    for _, c in ipairs({ { 17, "wait" }, { 16, "wait" }, { 14, "item" }, { 12, "item" } }) do
+    -- careful (1.5, 2): past 3 of 10; even (1, 1): past 10/3, so 3 down is kept there
+    for _, c in ipairs({ { 17, "wait", "careful" }, { 16, "wait", "careful" },
+                         { 14, "item", "careful" }, { 12, "item", "careful" },
+                         { 15, "wait", "even" }, { 14, "item", "even" } }) do
         local A = blue(0x01, 0, 0, 0, { minRange = false, hp = c[1], maxhp = 18 })
-        local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
-        check(a and a.act, c[2], "price: " .. (18 - c[1]) .. " HP down")
+        local a = Planner.plan(B, boardOf(A, X), sightOf(o), style(c[3]))
+        check(a and a.act, c[2], "price: " .. (18 - c[1]) .. " HP down, " .. c[3])
     end
 end
 
@@ -2544,6 +2546,35 @@ do
     end
     check(tostring(deep and deep.act) .. " " .. tostring(extended), "item true",
           "swap: the heal plan meets the lookahead as a finalist")
+end
+
+-- test_planner_swap_reads_the_plans_hp (ADR 0408): A is 12 down with a 4-HP Vulnerary; H heals
+-- it 11 with its staff. With BEAM = 1 the beam's best is the staff, then A's wait 1 short: on
+-- the plan's HP its Vulnerary would restore 1 and throw 3 away, below the break-even. The swap
+-- reads that same HP, swaps nothing, and judges no "heal" plan; read off the start board (12
+-- down, all 4 restored) it would swap the Vulnerary in on top of the staff.
+do
+    local H = blue(0x01, 0, 0, 1, { minRange = false })
+    local A = blue(0x02, 1, 0, 0, { hp = 8, maxhp = 20, minRange = false })
+    local X = red(0x81, 9, 9)
+    local o = {
+        reach = { [0x02] = tiles({ 0, 0 }), [0x01] = tiles({ 0, 1 }) },
+        mend = { [0x02] = { slot = 1, amount = 4 } },
+        staves = { [0x01] = { { slot = 0, amount = 11 } } },
+        heals = { [0x01] = { ["0,1"] = { { slot = 0, amount = 11, targets = { 0x02 } } } } },
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local ok, _, plan = pcall(Planner.plan, B, boardOf(H, A, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    if not ok then error(_) end
+    local beamBest, heal = nil, 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "beam" and not beamBest then beamBest = table.concat(c.acts, " ") end
+        if c.kind == "heal" then heal = heal + 1 end
+    end
+    check(beamBest, "1>staff@0,1>2 2>wait@0,0>nil", "swap HP: the beam's best is staff, then A waits")
+    check(heal, 0, "swap HP: no heal plan for the 1 HP the staff left")
 end
 
 -- test_planner_keeps_a_staff_heal_through_its_targets_act (ADR 0408): A is 12 down; H, first in

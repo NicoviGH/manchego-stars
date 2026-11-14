@@ -23,7 +23,7 @@ past max is thrown away with a use. It costs what a restored HP earns in the act
 (`W.heal`). Each HP restored also closes `W.taken` of the judge's deficit, so a heal pays off
 past `W.heal * amount / (2 * W.heal + W.taken)`: past 3 of a 10-HP Vulnerary for the careful
 style (1.5, 2), past 3.3 for even and bold. `test_planner_prices_a_heal_thrown_away` pins it
-for careful: 1 and 2 HP down, kept; 4 and 6 down, used.
+for careful (1 and 2 HP down, kept; 4 and 6, used) and even (3 kept, 4 used).
 
 **2. The heal swap (planner.lua, after the mend rounds).** The beam keeps the acts that
 score best on their own, so a march comes first. The mend tries other acts only for a unit
@@ -34,15 +34,16 @@ his Vulnerary on every player phase from 5 to 16 and used it on 16. **Now one mo
 on the same tile, read on the HP the plan has left it so far. A unit is swapped in only where
 the plan gains by it as the judge reads it (the act's score plus the deficit it closes),
 the same break-even as above, and the rank decides. Each act is rebuilt through one helper
-(`rebuild`), which the goal, noseize and mend plans now share.
+(`rebuild`), which the goal, noseize and mend plans now share. The swap costs one judged plan
+in the decisions where it finds a heal: 3 of 134 judged plans on the rerun of Ch7 (`heal7b`), 6 of 162
+on Ch8, 5 of 179 on Ch9.
 
 **3. A heal earlier in the plan stays (planner.lua `score`).** Found while testing the swap.
 Every act started from its unit's HP on the start board, and `extend` wrote that back. So when
 a staff healed a unit earlier in the plan and the unit then waited, the plan set it back to
 its old HP, and the judge read the heal as nothing. An act now starts from the HP the plan
 has given its unit. An attack keeps its own reading: the counter's ways add the plan's
-heals back, as before. This costs one judged plan in the decisions where a swap exists: 2 of 133
-judged plans on the PR's Ch7 run, 7 of 163 on Ch8, 5 of 179 on Ch9.
+heals back, as before.
 
 **ADR 0396's tests.** The quantities are the game's: the HP restored and the item's amount.
 The change removes a ban the game does not make. Both parts are offers, and the rank
@@ -71,8 +72,3 @@ It names no unit or chapter.
 **Untested:**
 - Other styles, and the frozen suite. The suite runs before the bot's reading is next relied
   on, not for this PR (AGENTS.md).
-- The swap's read of the plan's running HP has no test of its own. It differs from the start
-  board's only when a staff heals part of a unit's shortfall and the unit then waits. Under
-  these weights, every fixture tried ranks the unit's own heal before the staff instead. The
-  rebuild also falls back to the wait when a swapped heal no longer fits, so a fully healed
-  unit is covered either way.

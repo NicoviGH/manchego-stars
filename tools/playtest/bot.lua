@@ -1520,11 +1520,11 @@ local function healAct(u, m, tile)
     return a
 end
 
--- The planner's offer of a unit's own heal, on the safest tile the gate allows. Offered
--- whenever the game allows it; the planner prices the HP it throws away (ADR 0408). nil when
--- there is none.
-local function mend(ctx, u, gate)
-    local m = ownHeal(ctx, u)
+-- The planner's offer of a unit's own heal (`m`, ownHeal's, when the caller has read it), on
+-- the safest tile the gate allows. Offered whenever the game allows it; the planner prices the
+-- HP it throws away (ADR 0408). nil when there is none.
+local function mend(ctx, u, gate, m)
+    m = m or ownHeal(ctx, u)
     if not m then return nil end
     local allowed = {}
     for _, t in ipairs(waitTiles(ctx, u)) do
@@ -1626,7 +1626,7 @@ function M.decide(board, sight, style)
     if a then return strikeAct(u, a) end
     -- decide, which judges no plan, heals only when no HP of the item is thrown away
     local m = ownHeal(ctx, u)
-    local healed = m and u.maxhp - u.hp >= m.amount and mend(ctx, u, gate) or nil
+    local healed = m and u.maxhp - u.hp >= m.amount and mend(ctx, u, gate, m) or nil
     return healed or breach(ctx, u, gate, objective)
         or action(u, march(ctx, u, gate, objective), "wait")
 end

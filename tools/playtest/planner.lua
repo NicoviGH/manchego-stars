@@ -376,8 +376,8 @@ local function score(act, st, W, style, odds)
         -- a Vulnerary on the unit itself: what it is short by now in the plan (a heal earlier
         -- in it counts). FE8 refuses one at full HP (CanUnitUseHealItem), so then it is no act.
         -- The HP it would restore past max is thrown away with a use, and costs what a restored
-        -- HP earns: offered at any HP below max (bot.lua mend), unpriced it spent three uses
-        -- for 9 HP on vanilla Ch7 (#510; Nicolas approved the price, 2026-11-13)
+        -- HP earns: it is offered at any HP below max (bot.lua mend), and a use spent for a
+        -- point or two is a use gone (ADR 0408 has the break-even)
         local hp = st.hp[act.unitId] or act.unitHp
         local gain = math.min(act.amount, act.unitMaxHp - hp)
         v = v + W.heal * (gain - (act.amount - math.max(gain, 0)))
