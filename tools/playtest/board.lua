@@ -36,6 +36,10 @@
 local Board = {}
 
 Board.UNIT_SIZE = 0x48
+-- A unit the player cannot select for its status (playerphase.c: BERSERK and SLEEP are refused
+-- the cursor; the game moves a berserked unit itself). Its +30 low nibble is the status.
+Board.UNIT_STATUS = 0x30
+function Board.statusHeld(status) return status == 2 or status == 4 end
 -- Unit state bits, include/bmunit.h.
 Board.US_HIDDEN = 1 << 0
 Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
@@ -191,6 +195,10 @@ function Board.unitAt(mem, SYM, base, slot)
     local a = u.addr
     local clptr = mem.u32(a + 0x04)
     local items = Board.items(mem, a)
+    -- asleep or berserked: on the board, never an actor (vanilla Ch14, the scout lap of
+    -- 2026-11-14: a berserked Cormag was planned an attack and the harness's move failed).
+    -- Here, not in leanAt: the lean read is per-frame and counted (test_board)
+    u.held = Board.statusHeld(mem.u8(a + Board.UNIT_STATUS) & 0xF) or nil
     u.id = mem.u8(a + 0x0B)
     -- the Rescue pair (bmunit.c UnitRescue): `carrying` the id it carries, `carriedBy` the id
     -- that carries it. A carried unit is off the field (onField) but alive, at its carrier's
@@ -539,7 +547,8 @@ function Board.bind(mem, SYM)
         battle = function() return Board.battle(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
-        unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
+        unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,
+        UNIT_STATUS = Board.UNIT_STATUS, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
         US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,

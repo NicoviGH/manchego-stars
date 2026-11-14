@@ -186,6 +186,10 @@
 --                            and never crit (ComputeBattleObstacleStats).
 --   doors()                  the door tiles still closed: a tile whose command is Door
 --                            (read with the Seize tile) and whose terrain is still a door.
+--   mapChange(x, y)          the tiles opening the door or breaking the wall at (x, y) opens:
+--                            its map change's drawn tiles fieldUnit() can walk, { x, y, tile,
+--                            terrain, cost } (M.mapChangeTiles); nil when no change covers it.
+--                            Kept for the run.
 --   heals(u, x, y, hurt)     what `u` could heal standing on (x, y): per staff in staves(u)
 --                            that CanUnitUseItem allows there -- which builds vanilla's own heal
 --                            target list -- { slot, amount = GetUnitItemHealAmount, targets =
@@ -1014,25 +1018,44 @@ end
 -- a door or wall is no roof). No change at the tile: nothing.
 function M.openMap(api, call, S, x, y)
     local mem = api.mem
+    for _, t in ipairs(M.mapChangeTiles(mem, call, S, x, y) or {}) do
+        -- a u16 grid: `cell`'s row, two bytes a tile
+        api.write16(cell(mem, S.gBmMapBaseTiles, 0, t.y) + t.x * 2, t.tile)
+        api.write8(cell(mem, S.gBmMapTerrain, t.x, t.y), t.terrain)
+    end
+end
+
+-- The tiles the map change at (x, y) writes, { x, y, tile, terrain } row by row: each non-zero
+-- tile of its rectangle, as ApplyMapChangesById writes them, and the terrain
+-- RefreshTerrainBmMap reads for it (gTilesetTerrainLookup[tile >> 2]); nil when no change
+-- covers the tile. The one walk of a change's rectangle: openMap applies it, sight.mapChange
+-- says what a door or wall opens (a gate two tiles deep, a roofed room, opens whole with its
+-- first tile). `costs` (optional): a movement cost table (GetUnitMovementCost's s8 per terrain,
+-- -1 = no way); only the tiles it walks are kept, each with its `cost` -- a change also draws
+-- the walls round what it opens, and they are no ground.
+function M.mapChangeTiles(mem, call, S, x, y, costs)
     local id = call(S.GetMapChangeIdAt, { x, y })
-    if id >= 0x80000000 then return end
+    if id >= 0x80000000 then return nil end
     local mc = call(S.GetMapChange, { id })
-    if mc == 0 then return end
+    if mc == 0 then return nil end
     local x0, y0, w, h = mem.u8(mc + 1), mem.u8(mc + 2), mem.u8(mc + 3), mem.u8(mc + 4)
     local data, lookup = mem.u32(mc + 8), mem.u32(S.gTilesetTerrainLookup)
-    local k = 0
+    local out, k = {}, 0
     for iy = 0, h - 1 do
         for ix = 0, w - 1 do
             local tile = mem.u16(data + 2 * k)
             k = k + 1
             if tile ~= 0 then
-                local bx, by = x0 + ix, y0 + iy
-                -- a u16 grid: `cell`'s row, two bytes a tile
-                api.write16(cell(mem, S.gBmMapBaseTiles, 0, by) + bx * 2, tile)
-                api.write8(cell(mem, S.gBmMapTerrain, bx, by), mem.u8(lookup + (tile >> 2)))
+                local terrain = mem.u8(lookup + (tile >> 2))
+                local cost = costs and mem.s8(costs + terrain)
+                if not costs or cost > 0 then
+                    out[#out + 1] = { x = x0 + ix, y = y0 + iy, tile = tile, terrain = terrain,
+                                      cost = cost or nil }
+                end
             end
         end
     end
+    return out
 end
 
 -- M.spanWords(mem, spans) -> { { addr, words, n, name } }: each span ({ addr, bytes, name }: a
@@ -2564,6 +2587,24 @@ function M.new(outer)
             seen.mapKey = table.concat(parts, ";")
         end
         return seen.mapKey
+    end
+
+    -- What opening the door or breaking the wall at (x, y) opens: the tiles of its map change
+    -- the march walks, on fieldUnit()'s costs as field() reads (M.mapChangeTiles), each with
+    -- its cost; nil when it has no change. A change is the chapter's data, so the read is kept
+    -- for the run, per class.
+    local changes = {}
+    function s.mapChange(x, y)
+        local unit = s.fieldUnit()
+        if not unit then return nil end
+        local k = mem.u32(unit.addr + UNIT_CLASS) .. "@" .. x .. "," .. y
+        if changes[k] == nil then
+            changes[k] = sandbox(function(call)
+                local costs = call(S.GetUnitMovementCost, { unit.addr })
+                return M.mapChangeTiles(mem, call, S, x, y, costs)
+            end) or false
+        end
+        return changes[k] or nil
     end
 
     function s.obstacles()

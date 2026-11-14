@@ -517,7 +517,9 @@ local function context(board, sight)
             ctx.onField[#ctx.onField + 1] = u
             ctx.standing[tileKey(u.x, u.y)] = u
             if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
-            if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
+            if u.faction == "blue" and not u.acted and not u.held then
+                ctx.actors[#ctx.actors + 1] = u
+            end
         end
     end
     table.sort(ctx.actors, function(a, b) return a.slot < b.slot end)
@@ -940,10 +942,75 @@ end
 
 -- The obstacle that opens `u`'s way to `goal` when no walk reaches it: sight.field(goal) is
 -- known and leaves u's tile unreached. Of the obstacles the Attack command can strike
--- (sight.obstacles), one beside a tile the goal's field reaches, and whose own field reaches u,
--- the nearest u by that field. nil when u is not cut off, or nothing opens the way. A door is
--- one when u can open it, now or with a key it can take on the way (doorOpens).
+-- (sight.obstacles), one whose opening opens onto ground the goal's field reaches
+-- (stepsThrough): first one whose own field reaches u, the nearest u by that field; else one u
+-- has turns to through others (turnsFor, which asks this again for that obstacle), the fewest
+-- -- a way through two doors in a row is still a way, as a player opens them one after
+-- another (vanilla Ch14 (Eirika): three doors to the throne). nil when u is not cut off, or
+-- nothing opens the way. A door is one when u can open it, now or with a key it can take on
+-- the way (doorOpens).
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+-- The ground opening the door or wall `o` opens, "x,y" -> the cost to walk onto it: its map
+-- change's tiles the march walks (sight.mapChange) -- the game opens the change's whole
+-- rectangle (ApplyMapChangesById), so a gate two doors deep, or a door onto a roofed room,
+-- opens with its first tile (vanilla Ch9 (Ephraim): a 2x2 gate) -- and o's own tile, which a
+-- door opened or a wall broken always leaves to walk, even where the change draws none.
+local function opensTiles(ctx, o)
+    local out = { [tileKey(o.x, o.y)] = 1 }
+    for _, t in ipairs(ctx.sight.mapChange and ctx.sight.mapChange(o.x, o.y) or {}) do
+        out[tileKey(t.x, t.y)] = t.cost or 1
+    end
+    return out
+end
+
+-- The steps from the obstacle `o` onto the goal's ground (`field`, the goal's), the fewest over
+-- the ground opening it opens (opensTiles): from o to a tile of it, walked over that ground
+-- alone (a change's shut tiles are walked round), one step off it onto a tile the field
+-- reaches, and that tile's own way on. nil = what o opens touches none of the goal's ground,
+-- so o is no way to it.
+local function stepsThrough(ctx, field, o)
+    local ground = opensTiles(ctx, o)
+    -- the walk over the opened ground from o: a few tiles, so the cheapest open tile each pass
+    local dist, done = { [tileKey(o.x, o.y)] = 0 }, {}
+    while true do
+        local k, best
+        for key, d in pairs(dist) do
+            if not done[key] and (not best or d < best) then k, best = key, d end
+        end
+        if not k then break end
+        done[k] = true
+        local x, y = k:match("(-?%d+),(-?%d+)")
+        for _, side in ipairs(SIDES) do
+            local nk = tileKey(tonumber(x) + side[1], tonumber(y) + side[2])
+            local c = ground[nk]
+            if c and (not dist[nk] or best + c < dist[nk]) then dist[nk] = best + c end
+        end
+    end
+    local best
+    for k, d in pairs(dist) do
+        local x, y = k:match("(-?%d+),(-?%d+)")
+        for _, side in ipairs(SIDES) do
+            local row = field[tonumber(y) + side[2]]
+            local v = row and row[tonumber(x) + side[1]]
+            v = v and d + 1 + v
+            if v and (not best or v < best) then best = v end
+        end
+    end
+    return best
+end
+
+-- The goal's field distance at (x, y): the walk from there, nil when cut off or no field.
+local function walkFrom(ctx, goal, x, y)
+    local field = fieldFor(ctx, goal)
+    return field and field[y] and field[y][x]
+end
+
+-- `u` is cut off from `goal`: its field is known and leaves u's tile unreached (breachFor's
+-- case). With no field known, nothing says a way is cut.
+local function cutOff(ctx, goal, u)
+    return fieldFor(ctx, goal) ~= nil and walkFrom(ctx, goal, u.x, u.y) == nil
+end
 
 -- `u` holds a key or lockpick for doors (sight.opens, the Door command's own check).
 local function opener(ctx, u)
@@ -988,7 +1055,7 @@ local function keySources(ctx, u, lock)
     return ctx.keySrc[k]
 end
 
-local keyWay
+local keyWay, turnsFor
 
 -- Whether `u` can open the door `d`: it holds a key, or it has a way to an enemy whose fall
 -- gives it one and from there to the door (keyWay). A key no one can reach opens nothing, so a
@@ -997,6 +1064,75 @@ local function doorOpens(ctx, u, d, seeking)
     local lock = lockAt(ctx, u, d.x, d.y)
     if not lock then return true end
     return keyWay(ctx, u, d, u, lock, seeking) ~= nil
+end
+
+-- The doors `u` can open, then the walls (sight.obstacles): what may open a way, in the order
+-- a unit takes them -- opening a door costs one act, a wall its HP. A door is one when u can
+-- open it, now or with a key it can take on the way (doorOpens).
+local function openables(ctx, u, seeking)
+    local doors = {}
+    for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
+        if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, seeking)) then
+            doors[#doors + 1] = { x = d.x, y = d.y, door = true }
+        end
+    end
+    local lists = { ctx.sight.obstacles() }
+    if #doors > 0 then table.insert(lists, 1, doors) end
+    return lists
+end
+local function obstacleKey(o) return (o.door and "door " or "wall ") .. tileKey(o.x, o.y) end
+
+-- The turns `u` needs from `from` to each obstacle it may open (openables), by obstacleKey:
+-- the walk there (sight.turnsTo), a door it has no key for through its key (keyWay), and on
+-- from any obstacle it reaches through the ground opening that one opens (stepsThrough), the
+-- fewest -- the turns through any number of doors and walls, opened one after another as a
+-- player opens them (vanilla Ch14 (Eirika): three doors to the throne). One shortest-path
+-- read (Dijkstra) per unit, start and keys sought, kept for the decision. Asked per obstacle
+-- by recursion instead, X's way asked Y's and Y's asked X's: a guard cut the cycle, its
+-- answer was wrong for every later question, and dropping such answers ran a row of doors in
+-- time doubling with each door (#612 review). One asked again while it is being worked out
+-- (a key's way back to a door of the same read) reads as none. Second: the obstacles u walks
+-- to on its own costs (their turns are the walk's).
+local function obstacleTurns(ctx, u, from, seeking)
+    ctx.ways = ctx.ways or {}
+    local k = u.id .. "@" .. from.x .. "," .. from.y .. "|" .. lockSig(seeking)
+    if ctx.ways[k] then return ctx.ways[k][1], ctx.ways[k][2] end
+    ctx.ways[k] = { {}, {} }
+    local s, all, turns, walks, done = ctx.sight, {}, {}, {}, {}
+    for _, list in ipairs(openables(ctx, u, seeking)) do
+        for _, o in ipairs(list) do all[#all + 1] = o end
+    end
+    for _, o in ipairs(all) do
+        local lock = o.door and lockAt(ctx, u, o.x, o.y)
+        local n
+        if lock then n = select(2, keyWay(ctx, u, o, from, lock, seeking))
+        else
+            n = s.turnsTo and s.turnsTo(u, o, from)
+            walks[obstacleKey(o)] = n ~= nil
+        end
+        turns[obstacleKey(o)] = n
+    end
+    while true do
+        local p, best
+        for _, o in ipairs(all) do
+            local n = turns[obstacleKey(o)]
+            if n and not done[obstacleKey(o)] and (not best or n < best) then p, best = o, n end
+        end
+        if not p then break end
+        done[obstacleKey(p)] = true
+        for _, o in ipairs(all) do
+            -- a door locked to u opens only with its key: no way round that
+            local field = not done[obstacleKey(o)] and not (o.door and lockAt(ctx, u, o.x, o.y))
+                and fieldFor(ctx, o)
+            local steps = field and stepsThrough(ctx, field, p)
+            local n = steps and best + steps / s.mov(u)
+            if n and (not turns[obstacleKey(o)] or n < turns[obstacleKey(o)]) then
+                turns[obstacleKey(o)] = n
+            end
+        end
+    end
+    ctx.ways[k] = { turns, walks }
+    return turns, walks
 end
 
 local function breachFor(ctx, u, goal, seeking)
@@ -1008,27 +1144,30 @@ local function breachFor(ctx, u, goal, seeking)
     -- again (the key's holder cut off from the door), and that way would never end
     b, ctx.breaches[k] = false, false
     local field = fieldFor(ctx, goal)
-    if field and not (field[u.y] and field[u.y][u.x]) then
-        -- a unit that can open a door takes it first: opening costs one act, a wall its HP
-        local doors = {}
-        for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
-            if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, seeking)) then
-                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
+    if cutOff(ctx, goal, u) then
+        local lists = openables(ctx, u, seeking)
+        local opening = {}
+        for i, list in ipairs(lists) do
+            opening[i] = {}
+            for _, o in ipairs(list) do
+                if not (o.x == goal.x and o.y == goal.y) and stepsThrough(ctx, field, o) then
+                    opening[i][#opening[i] + 1] = o
+                end
             end
         end
-        local lists = { ctx.sight.obstacles() }
-        if #doors > 0 then table.insert(lists, 1, doors) end
-        for _, list in ipairs(lists) do
-            local bestD
-            for _, o in ipairs(list) do
-                local opens = false
-                for _, d in ipairs(SIDES) do
-                    local y = field[o.y + d[2]]
-                    if y and y[o.x + d[1]] then opens = true end
+        -- one obstacle before several: the walk's (the field's), then the turns through others
+        local reads = {
+            function(o) return walkFrom(ctx, o, u.x, u.y) end,
+            function(o) return obstacleTurns(ctx, u, u, seeking)[obstacleKey(o)] end,
+        }
+        for _, read in ipairs(reads) do
+            for _, list in ipairs(opening) do
+                local bestD
+                for _, o in ipairs(list) do
+                    local d = read(o)
+                    if d and (not bestD or d < bestD) then b, bestD = o, d end
                 end
-                local of = opens and fieldFor(ctx, o)
-                local d = of and of[u.y] and of[u.y][u.x]
-                if d and (not bestD or d < bestD) then b, bestD = o, d end
+                if b then break end
             end
             if b then break end
         end
@@ -1039,13 +1178,14 @@ end
 
 -- The turns `u` needs from `from` (default: where it stands) to `tile`, the goals' read
 -- (goals.lua's turnsTo): sight.turnsTo on its own costs, else, cut off by a door or a wall,
--- through the obstacle that opens the way (breachFor) as the march goes -- its moves to the
--- obstacle, one step through, the field beyond. Without the breach, vanilla Ch3's throne (behind
--- walls) was unreachable for every unit, so nothing pulled the army and a run took 22 turns.
--- A chest or door `u` has no key for is reached by way of the enemy whose fall gives it one
--- (keyWay): the walk to that enemy, then on from its tile with the key (`keyed`). Memoised
--- for the decision (ctx.keyTurns): the goals ask it per goal, taker and partial plan.
-local function turnsFor(ctx, u, tile, from, seeking, keyed)
+-- through the obstacle that opens the way (breachFor) as the march goes -- its turns to the
+-- obstacle (through any before it), the steps through what it opens (stepsThrough), the
+-- field beyond. Without the breach, vanilla Ch3's throne (behind walls) was unreachable for
+-- every unit, so nothing pulled the army and a run took 22 turns. A chest or door `u` has no
+-- key for is reached by way of the enemy whose fall gives it one (keyWay): the walk to that
+-- enemy, then on from its tile with the key (`keyed`). Memoised for the decision
+-- (ctx.keyTurns): the goals ask it per goal, taker and partial plan.
+turnsFor = function(ctx, u, tile, from, seeking, keyed)
     from = from or u
     ctx.keyTurns = ctx.keyTurns or {}
     local mk = u.id .. "@" .. from.x .. "," .. from.y .. ">" .. tile.x .. "," .. tile.y .. "|"
@@ -1059,15 +1199,10 @@ local function turnsFor(ctx, u, tile, from, seeking, keyed)
     else
         n = s.turnsTo and s.turnsTo(u, tile, from)
         local b = not n and s.turnsTo and breachFor(ctx, u, tile, seeking)
-        local toB = b and (b.door and turnsFor(ctx, u, b, from, seeking) or s.turnsTo(u, b, from))
+        local toB = b and obstacleTurns(ctx, u, from, seeking)[obstacleKey(b)]
         local field = toB and fieldFor(ctx, tile)
-        local beyond
-        for _, side in ipairs(field and SIDES or {}) do
-            local row = field[b.y + side[2]]
-            local v = row and row[b.x + side[1]]
-            if v and (not beyond or v < beyond) then beyond = v end
-        end
-        if beyond then n = toB + (1 + beyond) / s.mov(u) end
+        local through = field and stepsThrough(ctx, field, b)
+        if through then n = toB + through / s.mov(u) end
     end
     ctx.keyTurns[mk] = n or false
     return n
@@ -1101,7 +1236,14 @@ local function stepFor(ctx, u, tile, seeking)
         return e and stepFor(ctx, u, e, withLock(seeking, lock)) or tile
     end
     local b = breachFor(ctx, u, tile, seeking)
-    if b and b.door and lockAt(ctx, u, b.x, b.y) then return stepFor(ctx, u, b, seeking) end
+    -- a door u has no key for is reached through its key; one u cannot walk to on its own
+    -- costs (sight.turnsTo), through the obstacle before it. Each such step is to an obstacle
+    -- on fewer turns than the last (obstacleTurns: its way runs through the next), so the
+    -- steps end.
+    if b and (b.door and lockAt(ctx, u, b.x, b.y)
+              or not select(2, obstacleTurns(ctx, u, u, seeking))[obstacleKey(b)]) then
+        return stepFor(ctx, u, b, seeking)
+    end
     return b or tile
 end
 
@@ -1224,23 +1366,17 @@ end
 -- The march from `u` to `t` by the game's field from `t`, through the breach where the field
 -- has no way (breachFor); nil = no way at all.
 local function marchLength(ctx, u, t)
-    local field = fieldFor(ctx, t)
-    local d = field and field[u.y] and field[u.y][u.x]
-    if field and not d then
-        -- the way through the breach: the path to it, one step through, the path beyond
+    local d = walkFrom(ctx, t, u.x, u.y)
+    if cutOff(ctx, t, u) then
+        -- the way through the breach: the path to it, the steps through, the path beyond
         local b = breachFor(ctx, u, t)
-        if b and b.door and lockAt(ctx, u, b.x, b.y) then
-            -- its key first, as turnsFor counts the way (keyWay)
+        local toB = b and walkFrom(ctx, b, u.x, u.y)
+        if b and (not toB or b.door and lockAt(ctx, u, b.x, b.y)) then
+            -- its key first, or another obstacle before it, as turnsFor counts the way
             return movesFor(ctx, u, t)
         end
-        local of = b and fieldFor(ctx, b)
-        local toB, beyond = of and of[u.y] and of[u.y][u.x], nil
-        for _, side in ipairs(b and SIDES or {}) do
-            local row = field[b.y + side[2]]
-            local v = row and row[b.x + side[1]]
-            if v and (not beyond or v < beyond) then beyond = v end
-        end
-        d = toB and beyond and toB + 1 + beyond
+        local through = toB and stepsThrough(ctx, fieldFor(ctx, t), b)
+        d = through and toB + through
     end
     return d
 end
@@ -1756,8 +1892,7 @@ function M.explain(board, sight, style)
             if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
         end
         local goal = goalFor(ctx, u, o)
-        local field = fieldFor(ctx, goal)
-        local function fd(t) return field and field[t.y] and field[t.y][t.x] end
+        local function fd(t) return walkFrom(ctx, goal, t.x, t.y) end
         local function nearest(list)
             local best
             for _, t in ipairs(list) do
@@ -1985,9 +2120,8 @@ local function proposeOne(ctx, u)
     add(holds[1] and action(u, holds[1], "wait"), "hold")
     -- progress: how much nearer its march goal (the game's field to it) each act ends it
     local goal = marchGoal(ctx, u, objective)
-    local field = fieldFor(ctx, goal)
     local function fd(x, y)
-        if field then return field[y] and field[y][x] end
+        if fieldFor(ctx, goal) then return walkFrom(ctx, goal, x, y) end
         return goal and manhattan(x, y, goal.x, goal.y)
     end
     local here = fd(u.x, u.y)
@@ -2086,9 +2220,10 @@ function M.candidates(board, sight, style, opts)
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
     ctx.quietGoals = opts and opts.quietGoals or {}
-    -- memoised for the decision (turnsFor's ctx.keyTurns): the planner asks it per goal, taker
-    -- and partial plan, and a unit cut off goes through breachFor and the field again each time
-    ctx.keyTurns = {}
+    -- memoised for the decision (turnsFor's ctx.keyTurns, obstacleTurns' ctx.ways): the planner
+    -- asks it per goal, taker and partial plan, and a unit cut off goes through breachFor and
+    -- the field again each time
+    ctx.keyTurns, ctx.ways = {}, {}
     ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
     ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
