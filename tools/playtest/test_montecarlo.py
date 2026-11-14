@@ -359,6 +359,16 @@ class Attempts(unittest.TestCase):
                                 'why': 'Lua error'}, said)
         self.assertEqual(line, 'attempt 2: crashed before the bot reported (Lua error)')
 
+    def test_a_timed_out_attempt_is_listed_with_its_why(self):
+        # a decision past its budget (ADR 0411) has no game result, like a crash
+        said = set()
+        line = mc.attempt_line({'kind': 'campaign', 'outcome': 'timeout', 'task_attempt': 1,
+                                'why': 'the decision ran long'}, said)
+        self.assertEqual(line, 'attempt 1: timeout before the bot reported (the decision ran long)')
+        bot = mc.attempt_line({'attempt': 2, 'outcome': 'timeout', 'turns': 3,
+                               'why': 'the decision ran long'}, said)
+        self.assertIn('(the decision ran long)', bot)
+
     def test_attempts_need_a_saved_start(self):
         with self.assertRaises(ValueError):
             mc.attempt_tasks({'id': 'c'}, 2)
@@ -1210,6 +1220,30 @@ class Suite(unittest.TestCase):
         self.assertIn('ch01 (index 1): 3 of 3 pinned campaigns reached its start\n'
                       'ch02 (index 2): 2 of 3', out.getvalue())
 
+    def test_starts_does_not_pin_a_campaign_that_timed_out(self):
+        # a decision past its budget (ADR 0411) has no game result: like a crash, the seed
+        # is played again by the next `starts`
+        suite = self.load(self.suite())
+        suite['seed_sets']['starts'] = [4001, 4001]
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        store = os.path.join(top, 'h')
+        simdirs = {'vanilla': store, 'ours': os.path.join(top, 'o')}
+
+        class Fake:
+            def run(self, tasks):
+                for t in tasks:
+                    yield {'kind': 'campaign', 'seed': t['seed'], 'outcome': 'timeout',
+                           'why': 'too long'}
+        out = io.StringIO()
+        with mock.patch.object(mc, 'suite_setup', return_value=(
+                suite, simdirs, lambda: {'vanilla': {'last': [99]}, 'ours': {}})), \
+                contextlib.redirect_stdout(out):
+            self.assertEqual(mc.starts_main(mock.Mock(game='vanilla', count=1, jobs=1),
+                                            Fake()), 1)
+        self.assertEqual(mc.cell_pins(store), [], 'a timeout is not pinned')
+        self.assertIn('cs-s4001: timeout, not pinned (too long', out.getvalue())
+
     def test_resume_carries_a_campaign_on_under_a_new_id_from_its_saved_start(self):
         """`resume` (ADR 0399): a copy of the campaign's states under `<tag>-<campaign>`, so the
         pinned file is never re-saved; from its latest start unless told; its own seed; and a
@@ -1332,6 +1366,23 @@ class Suite(unittest.TestCase):
 
     def test_a_capped_campaign_is_its_own_answer_not_a_failure_to_keep(self):
         self.assertIn('capped', mc.PASSED_CAMPAIGN)
+
+    def test_resume_main_counts_timeouts_apart_from_crashes(self):
+        store, _pins = self.resume_store()
+
+        class Pool:
+            def __init__(self, *a, **k):
+                pass
+
+            def run(self, tasks):
+                yield {'kind': 'campaign', 'campaign': 'a', 'outcome': 'timeout', 'why': 'slow'}
+        setup = ({}, {'ours': store, 'vanilla': store},
+                 lambda: {'ours': {'last': [22]}, 'vanilla': {'last': [22]}})
+        out = io.StringIO()
+        with mock.patch.object(mc, 'suite_setup', return_value=setup), \
+                mock.patch.object(mc, 'Pool', Pool), contextlib.redirect_stdout(out):
+            self.assertEqual(mc.main(['resume', '--game', 'vanilla', '--tag', 'm3']), 1)
+        self.assertIn('0 crashed, 1 timed out', out.getvalue())
 
     def test_resume_main_takes_attempts_from_the_command_line_to_the_task(self):
         store, _pins = self.resume_store()
@@ -2425,6 +2476,11 @@ class Audit(unittest.TestCase):
             [f] = self.audit([_rec(_death())], [old])
             self.assertEqual(f['labels'], [], mode)
             self.assertIn('re-run it', ' '.join(f['notes']))
+
+    def test_a_replay_that_timed_out_is_a_failed_replay(self):
+        line = dict(_diag(avoided=False), outcome='timeout', why='the decision ran long')
+        findings = self.audit([_rec(_death())], [line])
+        self.assertIn('REPLAY FAILED: force: the decision ran long', ' '.join(findings[0]['notes']))
 
     def test_a_forced_plan_is_placed_by_its_whole_plan(self):
         # the plan the planner judged is the whole one (`planned`), whatever `chosen` holds

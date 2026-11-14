@@ -31,6 +31,10 @@
 --            returned, a policy fault), or a sandbox leak the guard logged (api.leaks: the
 --            record's `leaks`, its `why` saying what the game ended as). The record is still
 --            emitted.
+--   timeout  one decision ran more than M.DECISION_FRAMES frames of game code in its
+--            simulations (sight.watch asks before each game call): the record's `timeout` =
+--            { turn, frames, limit, stage, plans_judged, phases } (the last three the
+--            planner's opts.at: where it was). No game result; the record is still emitted.
 -- There is no turn cap. The "no progress" rules are the two `stuck` ones: a board that cannot
 -- change any more, and M.QUIET_BOUND player phases that gained nothing.
 --
@@ -514,6 +518,17 @@ M.LOST_IN_PLAYER_PHASE = "game over in the player phase"
 -- within one more phase. Nicolas left the number to Fable (2026-11-12).
 M.QUIET_BOUND = 16
 
+-- The frames of game code one decision may run in the planner's simulations before the attempt
+-- ends `timeout` (the record's `timeout`: the turn, the frames, the planner's stage; ADR 0411).
+-- Vanilla Ch15 (Eirika)'s first decision ran 8.4 million with no plan and was stopped by hand
+-- after an hour. The kept records hold no decision's own frames (from now: plans.slowest); the
+-- most any attempt averaged a decision is 152,790 (vanilla Ch4, campaign 4003: 3,055,800 over
+-- 20 plans). Nicolas set 4,000,000 (2026-11-14) because no kept record could have met it: the
+-- largest whole attempt is 3,545,061 frames. 1,500,000 was sized from per-attempt averages, and
+-- Ch15 already held a 1,220,020-frame decision (tag ch15b). plans.slowest will give real
+-- per-decision numbers to tighten it.
+M.DECISION_FRAMES = 4000000
+
 -- Readings in a row without a new low of its own after which a ledger goal's row is stalled (the
 -- win stops waiting for it). FR-007's stall is three player phases in a row without a move that
 -- changes the chapter, and #510 call 3 (comment 6810567866) asked for the same three here.
@@ -652,7 +667,11 @@ function M.run(api)
                   bench = api.bench,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
-                  plans = { made = 0, kept = 0, phases = 0, averaged = 0 }, bag = {},
+                  -- unsplit: the counter kills the judged phases left unsplit (sight's
+                  -- M.phaseWays); slowest: the decision that ran the most frames, and its
+                  -- turn (what M.DECISION_FRAMES is sized from)
+                  plans = { made = 0, kept = 0, phases = 0, averaged = 0, unsplit = 0,
+                            slowest = { frames = 0 } }, bag = {},
                   board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
@@ -729,6 +748,7 @@ function M.run(api)
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
+    local deciding   -- the decision being made: { turn, at (the planner's opts.at) }
     local playerPhases, playerActs = 0, nil   -- rec.player_phases, rec.acts_hash
     local function trace(ev)
         ev.turn = ev.turn or turn
@@ -1078,7 +1098,7 @@ function M.run(api)
             outcome = "crashed"
             rec.outcome, rec.why = outcome, why
         end
-        fault = fault or (outcome == "crashed" and "crash")
+        fault = fault or (outcome == "crashed" and "crash") or (outcome == "timeout" and "timeout")
             or (#rec.watch_faults > 0 and "watch") or nil
         rec.env_status = fault and { fault = fault, outcome_dependent = #rec.deployed > 0 }
             or "clean"
@@ -1387,6 +1407,7 @@ function M.run(api)
                         end
                         local replan = playing and why
                         local opts = memo()
+                        opts.at = deciding.at   -- where the planner is, for a timeout's record
                         if replan then
                             -- the plan in hand, from the act it did not play: judged again on
                             -- this board beside the new ones (Planner.plan's opts.rest)
@@ -1406,6 +1427,7 @@ function M.run(api)
                         cost = cost or {}
                         rec.plans.phases = rec.plans.phases + (cost.phases or 0)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
+                        rec.plans.unsplit = rec.plans.unsplit + (cost.unsplit or 0)
                         for k, v in pairs(cost.look or {}) do
                             rec.lookahead[k] = rec.lookahead[k] + v
                         end
@@ -1524,7 +1546,37 @@ function M.run(api)
                 end
                 local action
                 -- the pinned decision is not batched: full_info's sandbox must be the outermost
-                if sight.batch and not pinNow() then action = sight.batch(decide) else action = decide() end
+                -- the decision's frame budget (M.DECISION_FRAMES): asked before every game call
+                -- it makes, so one that runs away ends the attempt as `timeout`
+                local from = api.frames()
+                deciding = { turn = turn, at = {} }
+                if sight.watch then
+                    sight.watch(function()
+                        local spent = api.frames() - from
+                        if spent > M.DECISION_FRAMES then
+                            error({ timeout = true, frames = spent }, 0)
+                        end
+                    end)
+                end
+                -- the watch comes off however the decision ends: a timeout (or any error)
+                -- left on the sight would police the next game call outside any decision
+                local ran, got = pcall(function()
+                    if sight.batch and not pinNow() then return sight.batch(decide) end
+                    return decide()
+                end)
+                if sight.watch then sight.watch(nil) end
+                if not ran then
+                    -- the outer handler reads where the decision was; it is cleared here
+                    if type(got) == "table" then got.deciding = deciding end
+                    deciding = nil
+                    error(got, 0)
+                end
+                action = got
+                local spent = api.frames() - from
+                if spent > rec.plans.slowest.frames then
+                    rec.plans.slowest = { frames = spent, turn = turn }
+                end
+                deciding = nil
                 if halt then return "diag", halt end
                 if not action then break end
                 local done, why = api.act(action)
@@ -1667,6 +1719,18 @@ function M.run(api)
     end
 
     local ok, outcome, why, fault = pcall(play)
+    if not ok and type(outcome) == "table" and outcome.timeout then
+        -- the watch's (above): where the decision was when its budget ran out
+        local at = outcome.deciding
+        rec.timeout = { turn = at.turn, frames = outcome.frames, limit = M.DECISION_FRAMES,
+                        stage = at.at and at.at.stage,
+                        plans_judged = at.at and at.at.judged,
+                        phases = at.at and at.at.phases }
+        return finish("timeout", string.format(
+            "the decision on turn %d ran %d frames of game code, over the %d a decision may (%s)",
+            at.turn, outcome.frames, M.DECISION_FRAMES,
+            at.at and at.at.stage or "no planner stage"))
+    end
     if not ok then return finish("crashed", "Lua error: " .. tostring(outcome)) end
     return finish(outcome, why, fault)
 end

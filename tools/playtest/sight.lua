@@ -28,7 +28,8 @@
 -- `leaks`): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
 -- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh, M.keepRide,
--- M.aiPhaseStart, M.phaseStarted, M.phaseKey, M.decisionCalls, M.battleWord.
+-- M.aiPhaseStart, M.phaseStarted, M.phaseKey, M.decisionCalls, M.battleWord, M.phaseWays,
+-- M.watched.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -39,6 +40,8 @@
 -- calls whenever the board may have changed (after every action, at every phase); the chapter's
 -- goal and Seize tile are read once.
 --   refresh()                drop every board answer; recount the objective's turns left.
+--   watch(fn | nil)          fn() is asked before every game call from now on, and what it
+--                            raises ends the read (M.watched; botrun's decision budget).
 --   newPhase()               refresh(), and a fresh `cache` for the phase: an AI a turn event
 --                            rewrote between phases is in no cache key.
 --   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId, classId } }, every
@@ -115,11 +118,13 @@
 --                            the plan leaves an enemy. Where the target's counter may kill
 --                            the striker (its played chance, `felled`), the rest of the phase
 --                            is played both ways, the striker's tile freed in the second
---                            (ch02: a Brigand Marty killed let the next one in).
+--                            (ch02: a Brigand Marty killed let the next one in), while the
+--                            rarer way is at least M.SPLIT_FLOOR of the phase (M.phaseWays).
 --                            -> { { enemy, target, taken* as strike(), counterDist, felled,
 --                            strikerHp, targetHp } }: the likeliest
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
---                            to 1) for every way the phase went.
+--                            to 1) for every way the phase went, and .unsplit = the
+--                            uncertain counter kills below the floor, played one way.
 --   nextPhase(plan)          the enemy phase AFTER the next, our units holding between (the
 --                            planner's lookahead, FR-017): plan as enemyPhase's; the next phase
 --                            played along its expected way, every enemy moving, then the turn
@@ -441,6 +446,56 @@ local function writeRegisters(cpu, regs)
             cpu.read("pc"), regs.pc))
     end
 end
+-- An enemy phase's outcomes, { { p, strikes } } (p sums to 1), and how many uncertain counter
+-- kills it left unsplit. strikeAt(k, done) plays the k-th enemy of `n` after `done`'s strikes:
+-- nil when it does not strike, else its strike `t` (t.felled: the played chance the target's
+-- counter kills it), `done` with t added, and free(), which takes the striker off its tile.
+-- A striker the counter may kill splits the phase: the enemies after it decide once with it
+-- standing and once with its tile free (each in a nested `sandbox`, so neither sees the
+-- other's board), the second as likely as the counter kills it (ch02: a Brigand Marty killed
+-- let the next one in). A split is played only while its rarer side is at least `floor`
+-- (M.SPLIT_FLOOR) of the whole phase: below it the phase goes on the likelier way alone
+-- (the striker gone at even odds or better, as nextPhase's expected way has it) and the kill
+-- is counted, never silent. Every split played both ways doubled the phase with each such
+-- striker, a certain kill included: vanilla Ch15 (Eirika)'s first decision ran 8.4 million
+-- frames in one such phase without an answer (ADR 0411). The floor bounds the outcomes at
+-- 1 / floor, since each split leaves both sides at least that likely. The value is a tuning
+-- one (the ADR has what 1/64 and 1/256 cost and played).
+M.SPLIT_FLOOR = 1 / 64
+function M.phaseWays(n, strikeAt, sandbox, floor)
+    floor = floor or M.SPLIT_FLOOR
+    local unsplit = 0
+    local function play(i, done, mass)
+        for k = i, n do
+            local t, now, free = strikeAt(k, done)
+            if t then
+                done = now
+                local q = t.felled
+                if q > 0 and q < 1 and mass * math.min(q, 1 - q) >= floor then
+                    local out = {}
+                    local stood = sandbox(function() return play(k + 1, done, mass * (1 - q)) end)
+                    local fell = sandbox(function()
+                        free()
+                        return play(k + 1, done, mass * q)
+                    end)
+                    for _, o in ipairs(stood) do
+                        out[#out + 1] = { p = o.p * (1 - q), strikes = o.strikes }
+                    end
+                    for _, o in ipairs(fell) do
+                        out[#out + 1] = { p = o.p * q, strikes = o.strikes }
+                    end
+                    return out
+                elseif q > 0 then
+                    if q < 1 then unsplit = unsplit + 1 end
+                    if q >= 0.5 then free() end
+                end
+            end
+        end
+        return { { p = 1, strikes = done } }
+    end
+    return play(1, {}, 1), unsplit
+end
+
 -- Where a sandbox's frame starts below the game's sp (the call's stack top), and where its return
 -- loop sits above that.
 function M.top(sp) return (sp - 0x180) & ~7 end
@@ -1331,7 +1386,22 @@ end
 -- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
+-- M.watched(cpu) -> a cpu that asks `watch()` before it runs a game call's frames, and
+-- set(watch | nil), which names it. The one place every simulation passes through however
+-- deep its sandboxes nest, so a caller can end a read that runs away: what watch raises
+-- unwinds through each sandbox, which puts its writes back on the way (s.watch; botrun's
+-- decision budget, ADR 0411).
+function M.watched(cpu)
+    local watch
+    return setmetatable({ frames = function(done, max)
+        if watch then watch() end
+        return cpu.frames(done, max)
+    end }, { __index = cpu }), function(fn) watch = fn end
+end
+
 function M.new(outer)
+    local watchedCpu, setWatch = M.watched(outer.cpu)
+    outer = setmetatable({ cpu = watchedCpu }, { __index = outer })
     -- outer.leakGuard (PT_LEAKGUARD=1): the run's leak log. Every nested sandbox hands the
     -- unit structs and the trap pool back as it found them, or what it did not is logged
     -- there and put back (M.leaks). The units are the board's, read each time.
@@ -1349,6 +1419,8 @@ function M.new(outer)
     local s = { cache = {}, odds = M.odds }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
+    -- watch() is asked before every game call from now on (nil: no longer): M.watched.
+    s.watch = setWatch
     local seen   -- this board's answers, dropped by refresh()
     local remembered   -- remember()'s keys: { [Board.memoryKey] = true }, nil on attempt 1
 
@@ -1975,42 +2047,18 @@ function M.new(outer)
         return byId, order, decides, strike, remove, gone
     end
 
-    -- the phase from order[i] on, after `done`'s strikes -> its outcomes. A striker the counter
-    -- may kill splits it: the enemies after it decide once with it standing and once with its
-    -- tile free (each in a nested sandbox, so neither sees the other's board), the second as
-    -- likely as its played counter kills it.
+    -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
+    -- may kill the striker) -> the likeliest outcome's strikes, with .outcomes and .unsplit.
     local function playPhase(call, proc, byId, list, decides, strike, remove)
-        local function play(i, done)
-            for k = i, #list do
-                local id = list[k]
-                local e = decides(id)
-                if e then
-                    local target, side = aiDecide(call, proc, e, byId)
-                    if target then
-                        local t
-                        t, done = strike(e, id, target, side, done)
-                        local q = t.felled
-                        if q > 0 then
-                            local out = {}
-                            local stood = sandbox(function() return play(k + 1, done) end)
-                            local fell = sandbox(function()
-                                remove(e, side.tile.x, side.tile.y)
-                                return play(k + 1, done)
-                            end)
-                            for _, o in ipairs(stood) do
-                                out[#out + 1] = { p = o.p * (1 - q), strikes = o.strikes }
-                            end
-                            for _, o in ipairs(fell) do
-                                out[#out + 1] = { p = o.p * q, strikes = o.strikes }
-                            end
-                            return out
-                        end
-                    end
-                end
-            end
-            return { { p = 1, strikes = done } }
-        end
-        local outcomes = play(1, {})
+        local outcomes, unsplit = M.phaseWays(#list, function(k, done)
+            local id = list[k]
+            local e = decides(id)
+            if not e then return nil end
+            local target, side = aiDecide(call, proc, e, byId)
+            if not target then return nil end
+            local t, now = strike(e, id, target, side, done)
+            return t, now, function() remove(e, side.tile.x, side.tile.y) end
+        end, sandbox)
         -- the list is the likeliest outcome's strikes; every outcome rides on it
         local top = outcomes[1]
         for _, o in ipairs(outcomes) do
@@ -2018,7 +2066,7 @@ function M.new(outer)
         end
         local out = {}
         for x, t in ipairs(top.strikes) do out[x] = t end
-        out.outcomes = outcomes
+        out.outcomes, out.unsplit = outcomes, unsplit
         return out
     end
 
