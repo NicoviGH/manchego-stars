@@ -1572,7 +1572,7 @@ local function anyone(n) return setmetatable({}, { __index = function() return n
 
 local function test_shop_stops_at_gold()
     local stock = {
-        { item = 0x6C, price = anyone(300), kind = "vulnerary" },
+        { item = 0x6C, price = anyone(300), vulnerary = true },
         { item = 0x10, price = anyone(500), type = "sword" },
         { item = 0x11, price = anyone(400), type = "sword" },
         { item = 0x12, price = anyone(900), type = "sword" },
@@ -1595,14 +1595,14 @@ local function test_shop_stops_at_gold()
     check(flat(B.shop(1000, stock, { Bu, Cu0 })), "2:108,3:108,3:33",
         "skip then continue: the lance (700) is skipped at 400 gold, "
             .. "the axe (100) after it is bought")
-    A.items = { { id = 0x10, type = "sword", rank = 1 } }
-    check(flat(B.shop(10000, stock, { A, Bu })), "1:108,2:108,2:32", "a unit holding its type buys none")
+    A.items = { { kind = "weapon", id = 0x10, type = "sword", rank = 1, usable = true, uses = 40 } }
+    check(flat(B.shop(10000, stock, { A, Bu })), "2:108,2:32,1:108", "a unit holding its type buys none")
     local Cu = unitOf(3, 0x03, 1, { canUse = { [0x21] = true, [0x10] = true, [0x11] = true } })
     check(flat(B.shop(800, stock, { Cu })), "3:108,3:33,3:17",
         "skip-and-continue: exact fit, gold 800 buys vuln 300, axe 100, sword 400 in order")
     check(flat(B.shop(450, stock, { Cu })), "3:108,3:33",
         "the sword (400) is skipped at 50 gold, the buying stops there")
-    A.items = { { id = 0x10, type = "sword", rank = 1 }, { id = 0x6C, kind = "vulnerary" } }
+    A.items = { { kind = "weapon", id = 0x10, type = "sword", rank = 1, usable = true, uses = 40 }, { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } }
     check(flat(B.shop(10000, stock, { A, Bu })), "2:108,2:32",
         "a unit already holding a Vulnerary buys none")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
@@ -1614,10 +1614,109 @@ local function test_shop_stops_at_gold()
 end
 test_shop_stops_at_gold()
 
+-- test_arms_is_the_shops_spend_order: Bot.arms is M.shop's own loop over the unarmed, so it
+-- cannot say armed what the shop cannot pay for, nor read a unit holding one item when the shop
+-- buys two. Fails on an arms that prices each unit against the whole purse and keeps the first
+-- item it finds.
+local function test_arms_is_the_shops_spend_order()
+    local sword = { item = 0x10, price = anyone(400), type = "sword" }
+    local staff = { item = 0x4B, price = anyone(600), type = "staff" }
+    local function lacking(id, canUse)
+        return unitOf(id, id, 1, { canUse = canUse })
+    end
+    -- 600 gold, four units each lacking a 400 gold sword: the shop arms the first only
+    local roster = {}
+    for id = 1, 4 do roster[id] = lacking(id, { [0x10] = true }) end
+    local bought = B.arms(600, { sword }, roster)
+    local n = 0
+    for _ in pairs(bought) do n = n + 1 end
+    check(n, 1, "arms: 600 gold arms one of four units")
+    check(type(bought[1]) == "table" and bought[1][1], 0x10, "arms: the first unit, with the sword")
+    local shop = B.shop(600, { sword }, roster)
+    check(#shop, 1, "arms: the shop buys exactly that")
+    check(shop[1].unit, 1, "arms: for the unit arms names")
+    -- a unit that uses a staff and a sword is read holding both, as the shop buys both
+    local both = B.arms(10000, { sword, staff }, { lacking(5, { [0x10] = true, [0x4B] = true }) })
+    check(type(both[5]) == "table" and csv(both[5]), "75,16", "arms: a staff user who wields a sword holds both (types in order)")
+    local one = B.arms(10000, { sword, staff }, { lacking(6, { [0x10] = true }) })[6]
+    check(type(one) == "table" and csv(one), "16",
+          "arms: only what the unit can use")
+    -- an armed unit's Vulnerary never takes the gold that arms an unarmed one: the unarmed
+    -- are paid for first (500 gold: the 400 sword, not the 300 Vulnerary)
+    local vulnerary = { item = 0x6C, price = anyone(300), vulnerary = true }
+    local armedOne = unitOf(7, 7, 1, { canUse = { [0x10] = true }, items = {
+        { kind = "weapon", id = 0x10, type = "sword", usable = true, uses = 40 } } })
+    local bare = lacking(8, { [0x10] = true })
+    bare.items = { { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } }
+    local paid = B.shop(500, { vulnerary, sword }, { armedOne, bare })
+    check(#paid == 1 and paid[1].unit .. ":" .. paid[1].item, "8:16",
+          "shop: the unarmed unit's sword before the armed unit's Vulnerary")
+    check(csv(B.arms(500, { vulnerary, sword }, { armedOne, bare })[8]), "16",
+          "and arms says so")
+    -- a held weapon with no shop type (the Divinestone, ITYPE_DRAGN) still arms its holder
+    local dragon = unitOf(9, 9, 1, { items = {
+        { kind = "weapon", id = 0xAA, usable = true, uses = 20 } } })
+    check(B.armed(dragon), true, "a usable weapon with no shop type arms its holder")
+end
+test_arms_is_the_shops_spend_order()
+
+-- The shop arms a unit by the game's own facts (can-use, uses left), staves and tomes included
+-- (#510 party plan, PR 1). Each case fails on the shop that buys only a weapon type the unit
+-- "holds none of".
+local function test_shop_arms_by_usable_items_with_uses_left()
+
+    local stock = {
+        { item = 0x6C, price = anyone(300), vulnerary = true },
+        { item = 0x4B, price = anyone(600), type = "staff" },
+        { item = 0x4D, price = anyone(900), type = "anima" },
+        { item = 0x20, price = anyone(400), type = "lance" },
+    }
+    local function flat(r)
+        local t = {}
+        for _, e in ipairs(r) do t[#t + 1] = e.unit .. ":" .. e.item end
+        return csv(t)
+    end
+    local vuln = { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 }
+    -- a healer with no staff buys one
+    local healer = unitOf(1, 0x01, 1, { canUse = { [0x4B] = true }, items = { vuln } })
+    check(flat(B.shop(10000, stock, { healer })), "1:75", "a healer with no staff buys one")
+    check(B.armed(healer), false, "a healer with no staff is not armed")
+    check(csv(B.arms(10000, stock, { healer })[0x01]), "75", "the pick is told what arms it")
+    healer.items[#healer.items + 1] = { kind = "weapon", id = 0x4B, type = "staff", usable = true, uses = 5 }
+    check(flat(B.shop(10000, stock, { healer })), "", "a healer with a staff buys none")
+    check(B.armed(healer), true, "a healer with a staff is armed")
+    check(B.arms(10000, stock, { healer })[0x01], nil, "an armed unit needs nothing")
+    -- a unit whose only tome has 0 uses buys one
+    local mage = unitOf(2, 0x02, 1, { canUse = { [0x4D] = true }, items = { vuln,
+        { kind = "weapon", id = 0x4D, type = "anima", usable = true, uses = 0 } } })
+    check(flat(B.shop(10000, stock, { mage })), "2:77", "a tome with 0 uses is replaced")
+    mage.items[2].uses = 1
+    check(flat(B.shop(10000, stock, { mage })), "", "a tome with a use left is kept")
+    -- a held weapon the unit cannot use does not count
+    local knight = unitOf(3, 0x03, 1, { canUse = { [0x20] = true }, items = { vuln,
+        { kind = "weapon", id = 0x21, type = "lance", usable = false, uses = 30 } } })
+    check(B.armed(knight), false, "a lance the game says it cannot use is not armed")
+    check(flat(B.shop(10000, stock, { knight })), "3:32", "and a lance it can use is bought")
+    -- a full bag buys nothing
+    local full = unitOf(4, 0x04, 1, { canUse = { [0x20] = true }, items = {
+        { id = 1, kind = "other" }, { id = 2, kind = "other" }, { id = 3, kind = "other" },
+        { id = 4, kind = "other" }, { id = 5, kind = "other" } } })
+    check(flat(B.shop(10000, stock, { full })), "", "a full bag buys nothing")
+    check(B.arms(10000, stock, { full })[0x04], nil, "and cannot be armed")
+    -- one free slot goes to the arms, not the Vulnerary
+    local one = unitOf(5, 0x05, 1, { canUse = { [0x20] = true }, items = {
+        { id = 1, kind = "other" }, { id = 2, kind = "other" }, { id = 3, kind = "other" },
+        { id = 4, kind = "other" } } })
+    check(flat(B.shop(10000, stock, { one })), "5:32", "the last slot arms the unit")
+    -- gold decides: no gold, no arms
+    check(B.arms(100, stock, { knight })[0x03], nil, "a unit the gold cannot arm is not armed")
+end
+test_shop_arms_by_usable_items_with_uses_left()
+
 -- test_shop_budgets_at_the_buyers_price: a Silver Card halves A's prices only, so 450 gold buys
 -- B's Vulnerary (300) and A's (150); priced at B's 300 for both, A's would not fit.
 local function test_shop_budgets_at_the_buyers_price()
-    local stock = { { item = 0x6C, price = { [0x01] = 150, [0x02] = 300 }, kind = "vulnerary" } }
+    local stock = { { item = 0x6C, price = { [0x01] = 150, [0x02] = 300 }, vulnerary = true } }
     local t = {}
     for _, e in ipairs(B.shop(450, stock, { unitOf(2, 0x02, 1), unitOf(1, 0x01, 1) })) do
         t[#t + 1] = e.unit .. ":" .. e.item

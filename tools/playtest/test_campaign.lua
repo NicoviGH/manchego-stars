@@ -56,10 +56,15 @@ local function fakeGame(o)
             return { chapter = ch.id, carried = ch.carried, carriedUnknown = ch.carriedUnknown }
         end,
         seed = function(ch) g.seeds[#g.seeds + 1] = ch; if o.seed then o.seed(ch) end end,
-        save = function(ch, carried)
+        snapshot = function()
+            return o.snapshot or { gold = o.gold or 0, party = {}, convoy = {}, shops = {} }
+        end,
+        save = function(ch, record)
             g.saved[#g.saved + 1] = ch
             g.carriedSaved = g.carriedSaved or {}
-            g.carriedSaved[ch] = carried
+            g.carriedSaved[ch] = record.carried
+            g.records = g.records or {}
+            g.records[ch] = record
             return true
         end,
         load = function() g.loads = g.loads + 1; return true end,
@@ -68,8 +73,9 @@ local function fakeGame(o)
         teamGroups = function()
             return { ["2"] = "lord", ["5"] = "mounted", ["38"] = "healer" }, { mounted = 3 }
         end,
-        needs = function()
+        needs = function(_, arms)
             g.needsAsked = (g.needsAsked or 0) + 1
+            g.arms = arms
             return o.chapters[g.at].needs or { demands = {}, answers = {}, strength = {} }
         end,
         deploy = function(ids) g.deployed[#g.deployed + 1] = ids; return true end,
@@ -368,7 +374,7 @@ test_ours_without_a_clean_clear_is_infeasible()
 
 local function test_between_deploys_shops_promotes()
     -- priced per buyer, as the harness does (every roster unit pays the same here)
-    local stock = { { item = 0x6C, price = { 300, 300, 300, 300 }, kind = "vulnerary" },
+    local stock = { { item = 0x6C, price = { 300, 300, 300, 300 }, vulnerary = true },
                     { item = 0x10, price = { 500, 500, 500, 500 }, type = "sword" } }
     local needs = { demands = { { id = "sustain", kind = "sustain", need = 1 } },
                     answers = { [0x03] = { sustain = true } }, strength = {} }
@@ -385,11 +391,15 @@ local function test_between_deploys_shops_promotes()
     local d = g.deployed[1]
     check(table.concat(d, ","), "1,3", "forced first, then the unit answering the map's demand")
     check(g.needsAsked, 1, "the needs are read once per chapter start")
+    check(g.arms and g.arms[2] and g.arms[2][1], 0x10, "the pick is told which item arms the unarmed unit it could field")
+    check(g.arms and g.arms[3], nil, "and nothing for a unit no stock item arms")
     local who = {}
     for _, p in ipairs(g.bought) do who[#who + 1] = string.format("%d:%d", p.unit, p.item) end
     check(table.concat(who, ","), "1:108,3:108", "the shop buys for the deployed units only")
     check(table.concat(g.promoted, ","), "3", "a fielded unit holding a seal it accepts is promoted")
     local ls = lines(g)
+    check(#ls[1].buys, 2, "the chapter's record lists what the shop bought")
+    check(ls[1].buys[1].unit .. ":" .. ls[1].buys[1].item, "1:108", "each buy names its unit and item")
     check(ls[1].team.reasons[2].why, "covers", "the record says why each unit was fielded")
     check(ls[1].demands[1].id, "sustain", "and what the map asked")
     -- the whole pick goes to the attempt's record (fwd1 A): the benched too, and what each
@@ -407,6 +417,26 @@ local function test_between_deploys_shops_promotes()
     check(pick and #pick.uncovered, 0, "the pick: every demand with an answerer has one fielded")
 end
 test_between_deploys_shops_promotes()
+
+-- The chapter-start record keeps each item's uses left and the convoy (#510 party plan, PR 1):
+-- a later start can tell a broken tome from a fresh one, and what the convoy holds.
+local function test_the_saved_start_lists_uses_and_the_convoy()
+    local snap = { gold = 900,
+                   party = { { charId = 2, classId = 5, level = 3,
+                               items = { { id = 0x4D, uses = 0 }, { id = 0x6C, uses = 3 } } } },
+                   convoy = { { id = 0x82, uses = 1 }, { id = 0x10, uses = 40 } },
+                   shops = { "armory" } }
+    local g = fakeGame({ game = "vanilla", snapshot = snap, chapters = { { id = 9 } } })
+    Campaign.run(g.api)
+    local r = g.records[9]
+    check(r.game .. r.chapter .. r.gold, "vanilla9900", "the record names the game, chapter and gold")
+    check(r.party[1].items[1].id .. "x" .. r.party[1].items[1].uses, "77x0",
+          "a unit's item carries its uses left")
+    check(#r.convoy, 2, "the convoy's items are listed")
+    check(r.convoy[2].id .. "x" .. r.convoy[2].uses, "16x40", "each with its uses")
+    check(r.shops[1], "armory", "the open shops stay")
+end
+test_the_saved_start_lists_uses_and_the_convoy()
 
 -- ADR 0402's rule passes a demand of another kind when an enemy class has fewer answerers: no
 -- kept pick has shown it, so the record names the demand the day one does.

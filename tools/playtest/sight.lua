@@ -1048,7 +1048,10 @@ end
 -- `terrain`: the item put alone in its bag, GetUnitKeyItemSlotForTerrain (bmunit.c) asked, the
 -- bag put back. A Lockpick is a key only to a thief. io = { read16, write16 }, `call` the
 -- sandbox's, B = board.lua's Board. The one owner: sight.keySources and harness's
--- INSPECT.isKey (Bot.fullBag).
+-- INSPECT.isKey (Bot.fullBag). Not s.holding, which adds items after the unit's own for a
+-- read of the unit as it fights: the game's key check finds the first key in the bag, so this
+-- one needs the item alone, the others cleared (and, being a plain function over `io`, it is
+-- called with no Sight object, from the harness).
 function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
     local bag = {}
     for k = 0, B.ITEM_COUNT - 1 do
@@ -1059,6 +1062,32 @@ function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
     local key = call(S.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
     for k = 0, B.ITEM_COUNT - 1 do io.write16(unitAddr + B.UNIT_ITEMS + k * 2, bag[k]) end
     return key
+end
+
+-- fn(copy) with each of `values` (id | uses << 8, in order) in the first empty slots of `u`'s
+-- bag, inside a sandbox: what the game would say of the unit holding those items (what the
+-- prep shop would sell it), asked of the game itself and put back on return, fn's error
+-- included. `copy` is the board unit with the items listed, so s.answer and s.weapons read it
+-- as held. The bag must be packed: the board read (Board.items) and the roster stop at the
+-- first empty slot, so an item past a gap is one `u.items` does not list, and a value written
+-- after #u.items would land on it. api = M.batching's, sandbox its sandbox.
+function M.holding(api, sandbox, u, values, fn)
+    local Board = api.Board
+    local slot = #u.items
+    if slot + #values > Board.ITEM_COUNT then error("sight.lua: holding: the bag is full", 2) end
+    for k = slot, Board.ITEM_COUNT - 1 do
+        if api.mem.u16(u.addr + Board.UNIT_ITEMS + k * 2) ~= 0 then
+            error("sight.lua: holding: the bag is not packed (an item past slot " .. slot .. ")", 2)
+        end
+    end
+    return sandbox(function()
+        local items = table.move(u.items, 1, slot, 1, {})
+        for k, value in ipairs(values) do
+            api.write16(u.addr + Board.UNIT_ITEMS + (slot + k - 1) * 2, value)
+            items[slot + k] = { id = value & 0xFF, uses = value >> 8 }
+        end
+        return fn(setmetatable({ items = items }, { __index = u }))
+    end)
 end
 
 -- Inside a sandbox: the map change at (x, y) applied as the game applies it, every write
@@ -1739,6 +1768,9 @@ function M.new(outer)
     function s.weapons(u)
         return mine("weapons", u, function() return M.weapons(api, u, sandbox) end)
     end
+
+    -- fn(copy) with each of `values` (id | uses << 8) in the first empty slots of `u`'s bag: M.holding.
+    function s.holding(u, values, fn) return M.holding(api, sandbox, u, values, fn) end
 
     function s.canSeize(u)
         return mine("seize", u, function() return M.canSeize(api, u, sandbox) end) or false

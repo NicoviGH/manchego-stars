@@ -72,15 +72,19 @@
 --                         carried = {charIds}|nil (a resumed start: the team carried in),
 --                         carriedUnknown = true|nil (a start saved before records kept it) } |
 --                         "end" | nil, why
---   save(chapter, carried) write the chapter-start state, what the game gave (party, gold,
---                         items) and the carried team (charIds; nil = unknown, left out of the
---                         record); true | nil, why
+--   snapshot(chapter)     what the game holds at the start: { gold, party = { { charId, classId,
+--                         level, items = { { id, uses } } } }, convoy = { { id, uses } },
+--                         shops = the open world map nodes }
+--   save(chapter, record) write the chapter-start state and `record` (startRecord's: the
+--                         snapshot and the carried team) beside it; true | nil, why
 --   load(chapter)         load that state back; true | nil, why
 --   roster()              bot.lua's roster entries: every unit the player could field this
 --                         chapter, in slot order, each with its classId
 --   teamGroups()          groups, maxima: class id (string) -> team group, and each group's
 --                         most fielded (team_groups.py)
---   needs(roster)         { demands, answers, strength } for Bot.team, read at the prep screen
+--   needs(roster, arms)   { demands, answers, strength } for Bot.team, read at the prep screen;
+--                         a unit in `arms` ({ [charId] = { item id... } }, Bot.arms) is read
+--                         holding them
 --   cap()                 the prep screen's deploy cap, or nil when the chapter has no prep
 --                         screen (the game fields its own list; nothing is picked)
 --   deploy(charIds)       pick exactly these on the prep screen; true | nil, why
@@ -177,6 +181,15 @@ function M.drawStyle(Bot, random, claims, route, tried)
     end
 end
 
+-- The chapter-start record kept beside the saved state (references/sim/<game>/.../<n>.json):
+-- the game's snapshot (gold, each unit's bag with its uses left, the convoy's items, the open
+-- shops) and the team carried in (nil = unknown, left out; see arrive). Pure, so a test reads
+-- it without an emulator.
+function M.startRecord(game, ch, snap, carried)
+    return { game = game, chapter = ch, gold = snap.gold, party = snap.party,
+             convoy = snap.convoy, shops = snap.shops, carried = carried }
+end
+
 local function byCharId(roster)
     local out = {}
     for _, u in ipairs(roster) do out[u.charId] = u end
@@ -241,9 +254,11 @@ local function between(api, style, followed, need, carried)
         party = roster
         for _, u in ipairs(roster) do team.deploy[#team.deploy + 1] = u.charId end
     end
+    team.buys = {}
     for _, p in ipairs(Bot.shop(api.gold(), api.stock(), party)) do
         local ok, why = api.buy(p)
         if not ok then return nil, "buy: " .. tostring(why) end
+        team.buys[#team.buys + 1] = p
     end
     -- Re-read after the shop: a seal bought or moved changes what each unit holds.
     local now = byCharId(api.roster())
@@ -327,7 +342,7 @@ function M.run(api)
                     for charId in pairs(carried) do list[#list + 1] = charId end
                     table.sort(list)
                 end
-                local ok, swhy = api.save(ch, list)
+                local ok, swhy = api.save(ch, M.startRecord(info.game, ch, api.snapshot(ch), list))
                 if not ok then return "crashed", "save: " .. tostring(swhy) end
                 if api.startOnly == ch then
                     return "done", string.format("chapter %d's start is saved", ch)
@@ -339,7 +354,13 @@ function M.run(api)
             chapters[#chapters + 1] = entry
             local cap, cwhy = api.cap()
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end
-            local need = cap and api.needs(api.roster()) or nil
+            -- a unit the shop will arm is read holding what it will buy (Bot.arms), so the pick
+            -- does not bench it for what the shop is about to fix
+            local need
+            if cap then
+                local roster0 = api.roster()
+                need = api.needs(roster0, Bot.arms(api.gold(), api.stock(), roster0))
+            end
             entry.demands = need and need.demands or nil
             local tried, remembered, known = {}, {}, {}
             local attemptCap = api.attempts or M.MAX_ATTEMPTS
@@ -381,6 +402,8 @@ function M.run(api)
                     return "crashed", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, bwhy)
                 end
+                -- what the shop bought this attempt, kept even where no team is (one attempt alone)
+                entry.buys = team.buys
                 -- a retry's memory (ADR 0386): the turns earlier failures here saw a
                 -- reinforcement arrive on screen, read where a reinforcements claim's are
                 -- (style.arrivals); attempt 1, and any attempt alone, has none

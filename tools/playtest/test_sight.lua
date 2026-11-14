@@ -389,6 +389,47 @@ do
     check(bytes[at], 23, "keep16: put back when the sandbox returns")
 end
 
+-- test_holding_puts_the_bag_back: s.holding lists the unit's items then the ones it is handed
+-- (the first empty slots), and the bag is byte-identical after it, whether fn returns or
+-- errors; a bag with an item past a gap (which the board read would not list) raises.
+do
+    local m = fakeMem()
+    local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32,
+                    Board = Board, SYM = {}, map = function() return 1, 1 end }
+    local sandbox, api = Sight.batching(outer)
+    local s = { batch = sandbox }
+    function s.holding(u, values, fn) return Sight.holding(api, sandbox, u, values, fn) end
+    local addr = 0x02030400
+    local function bag()
+        local out = {}
+        for k = 0, Board.ITEM_COUNT - 1 do out[#out + 1] = m.u16(addr + Board.UNIT_ITEMS + k * 2) end
+        return table.concat(out, ",")
+    end
+    m.w16(addr + Board.UNIT_ITEMS, 0x2301)
+    local u = { addr = addr, items = { { id = 0x01, uses = 0x23 } } }
+    local seen
+    -- a nested read, as every real one is (the outermost sandbox is the emulator's own state)
+    s.batch(function()
+        local got = s.holding(u, { 0x1410, 0x0A20 }, function(copy)
+            seen = bag()
+            return #copy.items .. ":" .. copy.items[3].id .. "x" .. copy.items[3].uses
+        end)
+        check(got, "3:32x10", "holding: the copy lists every item handed")
+        check(seen, "8961,5136,2592,0,0", "holding: the game's bag holds them after the unit's own")
+        check(bag(), "8961,0,0,0,0", "holding: the bag is as it was on return")
+        local ok = pcall(s.holding, u, { 0x1410 }, function() error("fn fails") end)
+        check(ok, false, "holding: an error in fn passes through")
+        check(bag(), "8961,0,0,0,0", "holding: and the bag is as it was after it")
+        check(pcall(s.holding, u, { 1, 2, 3, 4, 5 }, function() end), false, "holding: no room raises")
+        -- an item past a gap: the packed read lists one, the game holds two
+        m.w16(addr + Board.UNIT_ITEMS + 4, 0x0505)
+        local packed, why = pcall(s.holding, u, { 0x1410 }, function() end)
+        check(packed, false, "holding: a bag with a gap raises")
+        check(tostring(why):find("not packed", 1, true) ~= nil, true, "holding: and says why")
+        check(bag(), "8961,0,1285,0,0", "holding: the refused bag is untouched")
+    end)
+end
+
 -- keepAi, on byte-true memory (aiFlags is one byte of a halfword whose other byte is the unit's
 -- index): what the game's AI writes on unit structs while one decides is put back -- every
 -- unit's aiFlags and AI block, not the decider's alone. A looter the closings replay played
