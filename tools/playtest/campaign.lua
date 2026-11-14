@@ -111,6 +111,13 @@ M.PREFIX = "CAMPAIGN "
 -- restarts, so styles are drawn again once every one has been tried (each retry has its own
 -- dice, ADR 0404)
 M.MAX_ATTEMPTS = 12
+-- The scout lap (api.scout, montecarlo.py `resume --scout`; #510 comment 6872554917): a
+-- campaign that carries on past a chapter it cannot clear clean, so the walls after it can be
+-- seen at all. It takes the first win with no player unit lost, and from this attempt on the
+-- first win of any kind. Its chapter lines say `scouted`, never `cleared`: a scout lap finds
+-- harness faults and missing abilities; it never says how hard a chapter is (its party is
+-- smaller than a clean one's).
+M.SCOUT_PATIENCE = 4
 
 -- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE.
 -- Measured: run call1b (stride 1), campaign 4001 attempt 2 started one draw ahead, drew 59 in
@@ -257,6 +264,7 @@ function M.run(api)
         if api.diag then return end   -- a diagnostic writes only its DIAG line (botrun.lua)
         t.campaign, t.game, t.rom_hash, t.mode, t.seed =
             info.campaign, info.game, info.rom_hash, info.mode, info.seed
+        t.scout = api.scout and true or nil
         api.emit(M.PREFIX .. Json.encode(t))
     end
     local function stop(outcome, why)
@@ -394,6 +402,22 @@ function M.run(api)
                     end
                     carried = {}
                     for _, charId in ipairs(team.deploy) do carried[charId] = true end
+                    break
+                end
+                -- the scout lap carries on from a win that was not clean (M.SCOUT_PATIENCE)
+                local lost = {}
+                for _, d in ipairs(rec.deaths or {}) do
+                    if d.faction == "blue" then lost[d.charId] = true end
+                end
+                if api.scout and rec.outcome == "won"
+                        and (next(lost) == nil or entry.attempts >= M.SCOUT_PATIENCE) then
+                    entry.outcome, entry.turns = "scouted", rec.turns
+                    entry.deaths, entry.missed = rec.deaths, rec.clear
+                    entry.team = { deploy = team.deploy }
+                    carried = {}
+                    for _, charId in ipairs(team.deploy) do
+                        if not lost[charId] then carried[charId] = true end
+                    end
                     break
                 end
                 entry.failures[#entry.failures + 1] = { attempt = entry.attempts, style = style,

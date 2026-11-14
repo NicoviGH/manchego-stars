@@ -1296,6 +1296,22 @@ class Suite(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(store, 'states', 'bad-cs-s4001')),
                          'a refusal copies nothing')
 
+    def test_resume_scout_and_route_reach_the_campaign_env(self):
+        """`resume --scout --route 2` (the scout lap, #510 comment 6872554917): each task's env
+        carries `scout` and `route` (harness.lua's cfg), the route in place of the env's; neither
+        is set without its flag; a route vanilla has not is refused before any copy."""
+        store, pins = self.resume_store()
+        tasks = mc.resume_tasks(store, {'route': 1}, ['cs-s4001'], pins, 's1', scout=True,
+                                route=2)
+        self.assertEqual((tasks[0]['campaign']['scout'], tasks[0]['campaign']['route']), (True, 2))
+        none = mc.resume_tasks(store, {'route': 1}, ['cs-s4001'], pins, 's2')
+        self.assertNotIn('scout', none[0]['campaign'])
+        self.assertEqual(none[0]['campaign']['route'], 1)
+        with self.assertRaisesRegex(ValueError, r'--route is 3'):
+            mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'bad', route=3)
+        self.assertFalse(os.path.exists(os.path.join(store, 'states', 'bad-cs-s4001')),
+                         'a refusal copies nothing')
+
     def test_max_attempts_names_the_file_when_the_cap_line_is_gone(self):
         top = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, top)

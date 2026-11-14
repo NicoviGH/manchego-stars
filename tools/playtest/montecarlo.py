@@ -2669,7 +2669,7 @@ def max_attempts(path=os.path.join(HERE, 'campaign.lua')):
 
 
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
-                 attempts=None):
+                 attempts=None, scout=False, route=None):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
@@ -2679,7 +2679,11 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     (the env's campaign.lua cap unless given). ValueError, before any copy, when `attempts` is
     under 1 or over the cap, a campaign has no such start, its pinned start was rewritten, its
     seed is unknown, or the new id is taken; a copy that fails removes every copy this call
-    made, then raises."""
+    made, then raises. `scout` carries each campaign on past a chapter it cannot clear clean (the
+    scout lap, campaign.lua M.SCOUT_PATIENCE); `route` (1 Eirika, 2 Ephraim) is the branch it
+    takes at vanilla's Ch8 split, in place of the env's."""
+    if route is not None and route not in (1, 2):
+        raise ValueError('--route is %d, and vanilla has routes 1 and 2' % route)
     if attempts is not None and not 1 <= attempts <= max_attempts():
         raise ValueError('--attempts is %d, and a chapter start gets 1 to %d attempts'
                          % (attempts, max_attempts()))
@@ -2718,6 +2722,10 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['last'] = [last]
         if attempts is not None:
             camp['attempts'] = attempts
+        if scout:
+            camp['scout'] = True
+        if route is not None:
+            camp['route'] = route
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
     return tasks
@@ -2737,7 +2745,7 @@ def resume_main(args, pool=None):
     names = args.campaigns.split(',') if args.campaigns else sorted(pins)
     try:
         tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
-                             args.last, vanilla, args.attempts)
+                             args.last, vanilla, args.attempts, args.scout, args.route)
     except ValueError as err:
         print('refused: %s' % err)
         return 1
@@ -3723,6 +3731,12 @@ def main(argv=None):
     ru.add_argument('--attempts', type=int,
                     help='the most attempts a chapter start gets, 1 to the cap in campaign.lua '
                          '(default: the cap)')
+    ru.add_argument('--scout', action='store_true',
+                    help='the scout lap: carry on past a chapter with no clean clear, from its '
+                         'first win (campaign.lua M.SCOUT_PATIENCE); its chapters say scouted')
+    ru.add_argument('--route', type=int,
+                    help='the branch taken at vanilla\'s Ch8 split: 1 Eirika, 2 Ephraim '
+                         '(default: the suite\'s)')
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,

@@ -3901,6 +3901,8 @@ INSPECT.campaignApi = function(game)
     -- cfg.attempts: the retry cap for this run (montecarlo.py `resume --attempts`); the bound
     -- is campaign.lua's to check
     api.attempts = cfg.attempts
+    -- cfg.scout: carry on past a chapter with no clean clear (campaign.lua M.SCOUT_PATIENCE)
+    api.scout = cfg.scout
     -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
     api.startOnly = cfg.start_only
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);

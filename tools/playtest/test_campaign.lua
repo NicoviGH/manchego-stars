@@ -268,6 +268,36 @@ local function test_infeasible_after_max_attempts()
 end
 test_infeasible_after_max_attempts()
 
+-- the scout lap (api.scout, #510 comment 6872554917): a vanilla chapter with no clean clear is
+-- carried on past from its first win with no player unit lost, and from M.SCOUT_PATIENCE on,
+-- from any win; the chapter line says scouted, every line says scout, and the dead are not
+-- carried
+local function test_the_scout_lap_carries_on_past_an_unclean_chapter()
+    local g = fakeGame({ game = "vanilla", chapters = {
+        { id = 5, outcomes = { "lost", "spoiled" } },
+        { id = 6, outcomes = { "dead", "dead", "lost", "dead" } }, { id = 7 } } })
+    g.api.scout = true
+    local ok = Campaign.run(g.api)
+    local ls = lines(g)
+    check(ok, true, "scout: the lap reaches the game's end")
+    check(ls[1].outcome .. " " .. ls[1].attempts, "scouted 2",
+          "scout: a win with a recruit missed and no death is carried on from")
+    check(ls[2].outcome .. " " .. ls[2].attempts, "scouted 4",
+          "scout: a win with a death only from the patience on")
+    check(ls[2].deaths[1].charId, 0x02, "scout: the line keeps who died")
+    check(g.carriedSaved[7] and table.concat(g.carriedSaved[7], ","), "1,3,4",
+          "scout: the dead are not carried")
+    check(ls[3].outcome, "cleared", "scout: a clean chapter is still cleared")
+    for _, l in ipairs(ls) do check(l.scout, true, "scout: every line says scout") end
+    -- without the flag the same game stops at the first chapter, as before
+    local plain = fakeGame({ game = "vanilla", chapters = {
+        { id = 5, outcomes = { "lost", "spoiled", "lost", "lost", "lost", "lost", "lost",
+                               "lost", "lost", "lost", "lost", "lost" } }, { id = 6 } } })
+    check(Campaign.run(plain.api), false, "no scout: no clean clear stops the campaign")
+    check(lines(plain)[1].scout, nil, "no scout: no line says scout")
+end
+test_the_scout_lap_carries_on_past_an_unclean_chapter()
+
 -- test_a_won_attempt_that_spoiled_a_part_is_retried: attempt 1 is won with a recruit missed,
 -- attempt 2 is clean; the failure keeps what spoiled it and the attempt's trace.
 local function test_a_won_attempt_that_spoiled_a_part_is_retried()
