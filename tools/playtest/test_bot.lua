@@ -2068,6 +2068,88 @@ do
     check(near(t, 1.4), true, "roof: the turns cross the room the door uncovers")
 end
 
+-- test_an_empty_change_still_opens_the_door: a change with no tile to walk (sight.mapChange
+-- returns none) still leaves the door's own tile open; read as "opens nothing", the door was
+-- no way at all (#612 review).
+do
+    local a, t = doorWay(4, {
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        doors = { { x = 2, y = 0 } }, changes = { ["2,0"] = {} },
+    })
+    check(a and a.door and (a.door.x .. "," .. a.door.y), "2,0", "empty change: the door opens")
+    check(near(t, 0.8), true, "empty change: the way runs through the door's own tile")
+end
+
+-- test_the_crossing_is_walked_round_what_the_change_leaves_shut: the door at (2,0) opens
+-- (2,1) (3,1) (4,1) (4,0) but not (3,0), so its far side (4,0) is four steps on, not two as
+-- the crow flies (#612 review). Turns: 2 to the door, 4 across, 1 off, 1 on = 8 / 5.
+do
+    local _, t = doorWay(6, {
+        field = fieldsOf { ["6,0"] = { ["5,0"] = 1, ["6,0"] = 0 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0 } },
+        doors = { { x = 2, y = 0 } },
+        changes = { ["2,0"] = { { x = 2, y = 0 }, { x = 2, y = 1 }, { x = 3, y = 1 },
+                                { x = 4, y = 1 }, { x = 4, y = 0 } } },
+    })
+    check(near(t, 1.6), true, "crossing: the steps go round the shut tile")
+end
+
+-- test_a_way_cut_short_by_its_own_question_is_not_kept: a row of rooms, A at (0,0): door W
+-- (2,0), Z (4,0), X (6,0), then the boss's room (7,0)-(8,0), whose far door Y (9,0) leads on.
+-- Asking for the boss asks X's way, which asks Y's (Y touches X's ground), which asks X's again
+-- while X is still being worked out: Y reads "no way" then. Kept, that answer said Y was cut
+-- off for the rest of the decision, though A reaches it by W, Z and X (#612 review).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 8, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        obstacles = {}, openers = { [0x01] = true },
+        field = fieldsOf { ["8,0"] = { ["7,0"] = 1, ["8,0"] = 0 },
+                           ["6,0"] = { ["5,0"] = 1, ["6,0"] = 0, ["7,0"] = 1, ["8,0"] = 2 },
+                           ["9,0"] = { ["7,0"] = 2, ["8,0"] = 1, ["9,0"] = 0, ["10,0"] = 1 },
+                           ["4,0"] = { ["3,0"] = 1, ["4,0"] = 0, ["5,0"] = 1 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1 } },
+        doors = { { x = 6, y = 0 }, { x = 9, y = 0 }, { x = 4, y = 0 }, { x = 2, y = 0 } },
+    }
+    -- asked first: the decision's own questions (the march on the boss) forgotten
+    local _, fresh = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+    fresh.breaches, fresh.keyTurns = {}, {}
+    local want = fresh.turnsTo(A, { x = 9, y = 0 })
+    check(want ~= nil, true, "cut: asked first, Y has a way")
+    local _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+    check(ctx.turnsTo(A, { x = 8, y = 0 }) ~= nil, true, "cut: the boss has a way")
+    check(ctx.turnsTo(A, { x = 9, y = 0 }), want, "cut: Y's way, asked after, is the same")
+end
+
+-- test_a_row_of_doors_is_read_in_few_steps: eight doors in a row, the boss beyond the last,
+-- the doors listed far first. Each door's way asks the next one's, which asks back (each
+-- touches the other's room): a read cut short so and never kept ran again for every way
+-- tried, and one turn of vanilla Ch14 (Eirika) took 14 minutes (#612 review). The game's
+-- reads stay few.
+do
+    local N = 8
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 2 * N + 1, 0, { isBoss = true, minRange = false })
+    local fields, doors = { [(2 * N + 1) .. ",0"] = { [(2 * N + 1) .. ",0"] = 0 } }, {}
+    for i = N, 1, -1 do
+        local x = 2 * i
+        fields[x .. ",0"] = { [(x - 1) .. ",0"] = 1, [x .. ",0"] = 0, [(x + 1) .. ",0"] = 1 }
+        doors[#doors + 1] = { x = x, y = 0 }
+    end
+    fields["2,0"]["0,0"] = 2
+    local sight = sightOf {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        obstacles = {}, openers = { [0x01] = true }, field = fieldsOf(fields), doors = doors,
+    }
+    local calls, read = 0, sight.turnsTo
+    sight.turnsTo = function(...) calls = calls + 1 return read(...) end
+    local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
+    check(near(ctx.turnsTo(A, { x = 2 * N + 1, y = 0 }), (2 + 2 * (N - 1) + 1) / 5), true,
+          "row: the way runs through all eight doors")
+    check(calls <= 4 * N, true, "row: the game's turns read " .. calls .. " times")
+end
+
 -- test_goal_turns_go_through_the_keys_enemies_drop: the chest at (4,0) sits in a room behind
 -- the door at (2,0), A holds no key, and both keys are drops: C, in the room at (3,0), drops a
 -- Chest Key, D, outside at (1,1), a Door Key. The way runs A -> D (0.4), D -> the door (0.4),

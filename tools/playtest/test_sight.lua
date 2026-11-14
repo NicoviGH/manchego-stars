@@ -287,7 +287,7 @@ do
     local mem = { u8 = function(a) return bytes[a] or 0 end,
                   u16 = function(a) return bytes[a] or 0 end,
                   u32 = function(a) return bytes[a] or 0 end }
-    local S = { GetMapChangeIdAt = 1, GetMapChange = 2 }
+    local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10 }
     local mc = 0x500
     bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 2, 2, 0x600
     bytes[0x600], bytes[0x602], bytes[0x604], bytes[0x606] = 0x88, 0x8C, 0x90, 0
@@ -303,6 +303,33 @@ do
     end
     check(table.concat(got, " "), "2,1=136 3,1=140 2,2=144", "change: the drawn tiles, row by row")
     check(Sight.mapChangeTiles(mem, call, S, 5, 0), nil, "change: none at a tile without one")
+end
+
+-- test_map_change_ground_is_only_what_the_unit_can_walk: with a unit's movement costs (the
+-- s8 table GetUnitMovementCost returns, -1 = no way), only the change's tiles it can walk are
+-- ground, each with its cost: a wall the change draws is not (#612 review).
+do
+    local bytes = {}
+    local mem = { u8 = function(a) return bytes[a] or 0 end,
+                  u16 = function(a) return bytes[a] or 0 end,
+                  u32 = function(a) return bytes[a] or 0 end }
+    local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10 }
+    local mc, costs = 0x500, 0x700
+    bytes[0x10] = 0x400
+    bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 3, 1, 0x600
+    bytes[0x600], bytes[0x602], bytes[0x604] = 0x88, 0x8C, 0x90
+    bytes[0x400 + (0x88 >> 2)], bytes[0x400 + (0x8C >> 2)], bytes[0x400 + (0x90 >> 2)] = 1, 2, 3
+    bytes[costs + 1], bytes[costs + 2], bytes[costs + 3] = 1, 0xFF, 2
+    local function call(fn, args)
+        if fn == S.GetMapChangeIdAt then return 3 end
+        return mc
+    end
+    local got = {}
+    for _, t in ipairs(Sight.mapChangeTiles(mem, call, S, 2, 1, costs)) do
+        got[#got + 1] = t.x .. "," .. t.y .. "/" .. t.terrain .. "/" .. t.cost
+    end
+    check(table.concat(got, " "), "2,1/1/1 4,1/3/2", "ground: the wall is left out, costs kept")
+    check(#Sight.mapChangeTiles(mem, call, S, 2, 1), 3, "ground: no costs, every drawn tile")
 end
 
 -- test_equip_does_not_leak_into_the_next_read: EquipUnitItemSlot (bmitem.c) moves the item to
