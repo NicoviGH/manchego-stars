@@ -9,12 +9,18 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, night): PR #609 is open (the heal fixes), CI running; it waits on Nicolas's "merge".**
+**Next session starts here (2026-11-13, night): PR #609 is merged; item E (the escort) is next, shaped from the leads below.**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13). The plan
 is **#510 comment 6810567866**; item D's results are comment 6842371541; the replay of D's
 leads on main, and why Colm never heals, are **comment 6866345084**.
-- **PR #609 (ADR 0408), branch `feat/510-mend-offer`:** a Vulnerary is offered to the planner
+- **Next step (Fable's recommendation; Nicolas said to follow it, 2026-11-13):** item E of the
+  plan, the escort. Every lead left is an enemy on a unit's road (Ch8's west chests, Ch9's
+  Amelia and village). Before designing it, replay Ch8 4004 and Ch9 4006 once on main
+  (`resume --attempts 1`) and read the turns named below; write the design as one comment on
+  #510 (no design docs).
+- **PR #609 is merged** (05d310df; Nicolas: "Merge and handoff", 2026-11-13; ADR 0408; CI green
+  on the head bee3570c): a Vulnerary is offered to the planner
   at any HP below max, priced for HP thrown away (Nicolas approved the price); a hurt unit the
   plan leaves waiting gets its own heal weighed (plan kind `heal`); a staff heal earlier in a
   plan is no longer undone by its target's later act (older bug, found in review). Ch7 4005
@@ -23,7 +29,8 @@ leads on main, and why Colm never heals, are **comment 6866345084**.
 - **Item F is not needed for Ch7:** the lord's death was the missing Vulnerary offer, not a
   horizon problem (a Fable subagent's probes `wprobeA`-`F`, checked against the traces).
 - **What is left on the leads** (#510 comment and ADR 0408): Ch8's west chests and Ch9's
-  Amelia and village are each an enemy on the road (plans over the cap at 76.7% and 87.2%):
+  Amelia and village are each an enemy on the road (Ch8 4004 turn 8: every plan south is over
+  the cap at 76.7%; Ch9 4006 turn 11: the Talk plan at 87.2%):
   item E, the escort. Tana on Ch9 turn 2 attacks into a wound (her heal was weighed on turn 4;
   waiting read 0%, healing 0.2%).
 - **Asked, not answered:** call 6 (is a recruit's departure remembered?), Nicolas's call;
