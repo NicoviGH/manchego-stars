@@ -292,7 +292,10 @@ end
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
-    local fx = { hp = act.unitHp, gone = nil, enemyHp = nil }
+    -- the HP the plan has left its unit so far: a heal earlier in the plan stays (from the start
+    -- board's, a staff heal before its target's wait was undone; ADR 0408). An attack's own HP
+    -- is set below, on the HP it fought at (the counter's ways add the plan's heals back)
+    local fx = { hp = st.hp[act.unitId] or act.unitHp, gone = nil, enemyHp = nil }
     local v = 0
     if act.act == "attack" and act.f then
         local f, e = act.f, act.targetUnit
@@ -736,6 +739,12 @@ function M.plan(Bot, board, sight, style, opts)
         return r
     end
 
+    -- what score reads of an act beside the act itself: its unit's HP and cap, its target
+    local function annotate(a, u)
+        a.unitHp, a.unitMaxHp = u.hp, u.maxhp or u.hp
+        a.targetUnit = a.targetId and byId[a.targetId]
+    end
+
     -- each unit's acts, its own best first (its score with what it does to the goals),
     -- PER_UNIT of them; every Visit and Chest offered,
     -- with its standing chance to die, for the run's trace (the rule's experiment)
@@ -744,8 +753,7 @@ function M.plan(Bot, board, sight, style, opts)
     for _, c in ipairs(cands) do
         local scored = {}
         for _, a in ipairs(c.acts) do
-            a.unitHp, a.unitMaxHp = c.unit.hp, c.unit.maxhp or c.unit.hp
-            a.targetUnit = a.targetId and byId[a.targetId]
+            annotate(a, c.unit)
             if a.act == "visit" or a.act == "chest" then
                 offered[#offered + 1] = { id = a.unitId, charId = a.unit, x = a.move.x,
                                           y = a.move.y, kind = a.act,
@@ -914,6 +922,19 @@ function M.plan(Bot, board, sight, style, opts)
                     local n = a.why == "hold" and extend(st, a, c.unit.id)
                     if n then st = n break end
                 end
+            end
+        end
+        return st
+    end
+
+    -- `st` with `acts` added in order, each where it still fits, as the mend keeps the rest of a
+    -- plan. `choose(x, st)` (optional) returns false to leave x out, or an act to try in x's
+    -- place first, x itself when that one no longer fits.
+    local function rebuild(st, acts, choose)
+        for _, x in ipairs(acts) do
+            local y = choose and choose(x, st)
+            if y ~= false then
+                st = (y and extend(st, y, y.unitId)) or extend(st, x, x.unitId) or st
             end
         end
         return st
@@ -1583,9 +1604,9 @@ function M.plan(Bot, board, sight, style, opts)
             local b = bestFor[id]
             local st = extend(start, b.a, b.uid)
             if st then
-                for _, x in ipairs(first and first.acts or {}) do
-                    if x.unitId ~= b.uid then st = extend(st, x, x.unitId) or st end
-                end
+                st = rebuild(st, first and first.acts or {}, function(x)
+                    if x.unitId == b.uid then return false end
+                end)
                 offer(st, "goal")
             end
         end
@@ -1603,11 +1624,9 @@ function M.plan(Bot, board, sight, style, opts)
         for _, r in ipairs(ledger) do feasible = feasible or r.status == "feasible" end
         for _, f in ipairs(finals) do every = every and seizesIn(f.st) end
         for _, acts in ipairs(feasible and every and { finals[1].st.acts, {} } or {}) do
-            local st = start
-            for _, x in ipairs(acts) do
-                if x.act ~= "seize" then st = extend(st, x, x.unitId) or st end
-            end
-            offer(st, "noseize")
+            offer(rebuild(start, acts, function(x)
+                if x.act == "seize" then return false end
+            end), "noseize")
         end
     end
     if stalled then
@@ -1711,10 +1730,9 @@ function M.plan(Bot, board, sight, style, opts)
                 local st = k ~= mine[t.uid] and not tried[k] and extend(start, t.a, t.uid)
                 tried[k] = true
                 if st then
-                    for _, x in ipairs(base.acts) do
-                        if x.unitId ~= t.uid then st = extend(st, x, x.unitId) or st end
-                    end
-                    st = complete(st)
+                    st = complete(rebuild(st, base.acts, function(x)
+                        if x.unitId == t.uid then return false end
+                    end))
                     -- a later round: new with #510 PR A
                     st.newer = round > 1 or base.newer or nil
                     consider(st, "mend")
@@ -1724,32 +1742,30 @@ function M.plan(Bot, board, sight, style, opts)
         pick()
         if best == base then break end   -- no mend outranked the plan it started from
     end
-    -- The heal swap (#510): the best plan with each hurt unit it leaves waiting given its own heal
-    -- (a Vulnerary) on the tile the plan already gives it, judged as one more plan, kind "heal".
-    -- Neither the beam nor the mend judges it there: the beam keeps a unit's acts that score
-    -- best on their own, a march first, and the mend tries other acts only for a unit at risk,
-    -- so a hurt unit the plan holds out of reach never weighs its heal (vanilla Ch8 seed 4004:
-    -- the thief, charId 9, at 6 of 18 HP, offered his Vulnerary on turns 5 to 16, used it on
-    -- 16). A unit's heal is swapped in only where its own score is above nothing -- what it
-    -- restores against what it throws away (score) -- and the rank decides between the plans.
+    -- The heal swap (ADR 0408): the best plan with each hurt unit it leaves waiting given its own
+    -- heal (a Vulnerary) on the tile the plan gives it, judged as one more plan, kind "heal".
+    -- The beam keeps the acts that score best on their own (a march first) and the mend tries
+    -- other acts only for a unit at risk, so neither judges the heal of a unit held out of
+    -- reach. A heal is swapped in where the plan gains by it as the judge reads it, on the
+    -- plan's HP so far: its own score (W.heal for each HP restored, the same for each thrown
+    -- away) and the deficit it closes (W.taken for each HP restored, the judge's `short`). The
+    -- rank decides between the plans.
     if best and Bot.mendAt then
         local unitOf = {}
         for _, c in ipairs(cands) do unitOf[c.unit.id] = c.unit end
-        local acts, swapped = {}, false
-        for _, a in ipairs(best.acts) do
-            local u = a.act == "wait" and unitOf[a.unitId] or nil
-            local h = u and Bot.mendAt(ctx, u, a.move) or nil
-            if h then
-                h.why, h.unitHp, h.unitMaxHp = "mend", u.hp, u.maxhp or u.hp
-                if score(h, start, W, style, odds) <= 0 then h = nil end
-            end
-            acts[#acts + 1] = h or a
-            swapped = swapped or h ~= nil
-        end
-        if swapped then
-            local st = start
-            for _, x in ipairs(acts) do st = extend(st, x, x.unitId) or st end
-            consider(complete(st), "heal")
+        local st = rebuild(start, best.acts, function(x, now)
+            local u = x.act == "wait" and unitOf[x.unitId] or nil
+            local h = u and Bot.mendAt(ctx, u, x.move) or nil
+            if not h then return nil end
+            h.why = "mend"
+            annotate(h, u)
+            local gain = math.min(h.amount, h.unitMaxHp - (now.hp[h.unitId] or h.unitHp))
+            return score(h, now, W, style, odds) + W.taken * gain > 0 and h or nil
+        end)
+        st = complete(st)
+        -- no heal fitted (none scored, or each lost its tile): no new plan to judge
+        if table.concat(keysOf(st), " ") ~= table.concat(keysOf(best), " ") then
+            consider(st, "heal")
             pick()
         end
     end

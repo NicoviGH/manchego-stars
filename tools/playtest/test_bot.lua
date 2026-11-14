@@ -2090,10 +2090,9 @@ do
     check(a and a.act, "item", "mend: the cap is the game's max HP, not the raw stat")
 end
 
--- test_planner_is_offered_a_vulnerary_below_max_hp (#510): A is 9 down with a 10-HP Vulnerary.
--- The game lets it heal at any HP below max (CanUnitUseItem), so the planner's menu holds the
--- heal; decide keeps its own rule, down the whole amount. Gated at the whole amount, vanilla
--- Ch7's lord, 9 down, was never offered hers on turn 4 and died (seed 4005).
+-- test_planner_is_offered_a_vulnerary_below_max_hp (ADR 0408): A is 9 down with a 10-HP
+-- Vulnerary. The game lets it heal at any HP below max, so the planner's menu holds the heal;
+-- decide, which judges no plan, keeps to the whole amount.
 do
     local A = blue(0x01, 0, 0, 0, { hp = 9, maxhp = 18 })
     local o = { mend = { [0x01] = { slot = 1, amount = 10 } } }
@@ -2497,24 +2496,27 @@ do
           "planner: the mend keeps A out of the strike")
 end
 
--- test_planner_prices_a_heal_thrown_away (#510): A is 1 HP down with a 10-HP Vulnerary and
--- nothing can reach it. The heal restores 1 and throws 9 away, so the plan waits. Unpriced,
--- the offer below max HP spent three uses for 9 HP on vanilla Ch7.
+-- test_planner_prices_a_heal_thrown_away (ADR 0408): A has a 10-HP Vulnerary and nothing can
+-- reach it. Each HP the heal throws away costs W.heal; each it restores earns W.heal and
+-- closes W.taken of the judge's deficit. Careful (1.5, 2) uses it past 3 of its 10: 1 or 2
+-- down, kept; 4 or 6 down, used.
 do
-    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 17, maxhp = 18 })
     local X = red(0x81, 9, 9, { minRange = false })
     local o = { reach = { [0x01] = tiles({ 0, 0 }) },
                 mend = { [0x01] = { slot = 1, amount = 10 } } }
-    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
-    check(a and a.act, "wait", "price: 1 HP down, the Vulnerary is kept")
+    for _, c in ipairs({ { 17, "wait" }, { 16, "wait" }, { 14, "item" }, { 12, "item" } }) do
+        local A = blue(0x01, 0, 0, 0, { minRange = false, hp = c[1], maxhp = 18 })
+        local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+        check(a and a.act, c[2], "price: " .. (18 - c[1]) .. " HP down")
+    end
 end
 
--- test_planner_swaps_a_held_units_wait_for_its_heal (#510): A is 12 down with a 10-HP
+-- test_planner_swaps_a_held_units_wait_for_its_heal (ADR 0408): A is 12 down with a 10-HP
 -- Vulnerary and nothing can reach it. Its march to (1,0) scores best on its own, so the beam
 -- (BEAM = 1) keeps only that and no plan it builds heals A; no unit is at risk, so the mend
 -- tries nothing. The heal swap judges the plan with A's Vulnerary on (1,0), and the rank
--- plays it: more HP left, the same tile (vanilla Ch8 seed 4004: the thief, 6 of 18 HP,
--- offered his Vulnerary on turns 5 to 16, used it on 16).
+-- plays it. On the deep diagnostic that plan is a finalist like any other and meets the
+-- lookahead's second phase.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 6, maxhp = 18 })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -2525,10 +2527,46 @@ do
     }
     local beam = Planner.BEAM
     Planner.BEAM = 1
-    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    local ok, a, plan = pcall(Planner.plan, B, boardOf(A, X), sightOf(o), style("careful"))
+    local deep, dplan
+    if ok then
+        o.nextPhase = function() return {} end
+        ok, deep, dplan = pcall(Planner.plan, B, boardOf(A, X), sightOf(o), style("careful"),
+                                { diag = "deep" })
+    end
     Planner.BEAM = beam
+    if not ok then error(a or deep) end
     check((a and a.act) .. " " .. at(a) .. " " .. tostring(plan and plan.kind), "item 1,0 heal",
           "swap: A heals on the tile its march gives it")
+    local extended
+    for _, c in ipairs(dplan and dplan.considered or {}) do
+        if c.kind == "heal" then extended = c.extended end
+    end
+    check(tostring(deep and deep.act) .. " " .. tostring(extended), "item true",
+          "swap: the heal plan meets the lookahead as a finalist")
+end
+
+-- test_planner_keeps_a_staff_heal_through_its_targets_act (ADR 0408): A is 12 down; H, first in
+-- the plan (the lower id), heals it 11 with its staff, then A waits. The plan leaves A at 19:
+-- each act starts from the HP the plan has given its unit. From the start board's HP, A's wait
+-- set it back to 8 and the heal counted for nothing in the judged phase.
+do
+    local H = blue(0x01, 0, 0, 1, { minRange = false })
+    local A = blue(0x02, 1, 0, 0, { hp = 8, maxhp = 20, minRange = false })
+    local X = red(0x81, 9, 9)
+    local o = {
+        reach = { [0x02] = tiles({ 0, 0 }), [0x01] = tiles({ 0, 1 }) },
+        staves = { [0x01] = { { slot = 0, amount = 11 } } },
+        heals = { [0x01] = { ["0,1"] = { { slot = 0, amount = 11, targets = { 0x02 } } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(H, A, X), sightOf(o), style("careful"))
+    local acts, hp = {}, nil
+    for _, a in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = a.act .. a.unitId end
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x02 then hp = p.hp end
+    end
+    check(table.concat(acts, " ") .. " " .. tostring(hp), "staff1 wait2 19",
+          "plan HP: the staff's heal stays through A's wait")
 end
 
 -- test_planner_beam_keeps_one_order: two units, two tiles each, nothing to fight. The beam
