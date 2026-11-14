@@ -9,28 +9,25 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, evening): the leads are replayed on main; item F is next.**
+**Next session starts here (2026-11-13, night): PR #609 is open (the heal fixes), CI running; it waits on Nicolas's "merge".**
 Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
 the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13). The plan
-is **#510 comment 6810567866**; item D's results are comment 6842371541; the leak's findings are
-comment 6860128405; the phase start's are comment 6866102739; **the replay of D's leads on main
-is comment 6866345084**.
-- **Replayed (2026-11-13, one run each on main, tags `replay7`/`replay8`/`replay9`):** Ch9's
-  empty looter list was the leaks (refuted on main). Three leads survive as one case, "under
-  the cap this phase, wounded and alone the next": Ch7 4005 turn 3, Tana (charId 34) on Ch9
-  turn 2, Colm (charId 9) on Ch8 4004. On main, no Talk with Ch9's recruit is ever offered;
-  she leaves with no `closes_on` on her ledger row.
-- **Found on the same day (four instrumented runs, comment above):** Colm on Ch8 4004 holds a
-  Vulnerary, is offered it every turn from 5 to 16, and never uses it until turn 16. The beam
-  always marches him, and the repair round only retries a unit at risk, so a hurt unit held
-  out of reach never has its own heal judged.
-- **Next step (Fable's recommendation, waiting on Nicolas's go):** fix that gap first (a
-  small planner PR: unit test + the 4004 run as proof), then item F (the look: a shadow
-  recorder that plays the chosen plan two enemy phases ahead on retries; it changes no
-  decision). F needs `feat/510-w1-look-shadow` rebased (55 commits behind; conflicts in
-  bot.lua, botrun.lua, campaign.lua, montecarlo.py, planner.lua, sight.lua).
-- **Asked, not answered:** call 6 reopens on the plan's own terms (Ch9 still misses the
-  recruit): is a recruit's departure remembered? Nicolas's call.
+is **#510 comment 6810567866**; item D's results are comment 6842371541; the replay of D's
+leads on main, and why Colm never heals, are **comment 6866345084**.
+- **PR #609 (ADR 0408), branch `feat/510-mend-offer`:** a Vulnerary is offered to the planner
+  at any HP below max, priced for HP thrown away (Nicolas approved the price); a hurt unit the
+  plan leaves waiting gets its own heal weighed (plan kind `heal`); a staff heal earlier in a
+  plan is no longer undone by its target's later act (older bug, found in review). Ch7 4005
+  goes from lost on turn 4 to won clean in 14. Review: `/code-review 609 medium` (9 findings)
+  and one scoped re-review, all fixed; the PR body lists them.
+- **Item F is not needed for Ch7:** the lord's death was the missing Vulnerary offer, not a
+  horizon problem (a Fable subagent's probes `wprobeA`-`F`, checked against the traces).
+- **What is left on the leads** (#510 comment and ADR 0408): Ch8's west chests and Ch9's
+  Amelia and village are each an enemy on the road (plans over the cap at 76.7% and 87.2%):
+  item E, the escort. Tana on Ch9 turn 2 attacks into a wound (her heal was weighed on turn 4;
+  waiting read 0%, healing 0.2%).
+- **Asked, not answered:** call 6 (is a recruit's departure remembered?), Nicolas's call;
+  telling the bot would not have saved Amelia in this game.
 - **How to spend the session (Nicolas asked, 2026-11-13):** code reading, decomp searches and
   the review go to Sonnet subagents from the first step; the main session chooses the test
   and reads its result. A 12-second run (`suite --only scout-ch6/1001`) with a temporary log
