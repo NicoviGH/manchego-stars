@@ -9,7 +9,15 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14, evening): PR #613 is merged; the party is the wall; build the party plan's PR 1.**
+**Next session starts here (2026-11-14, night): the party plan's PR 1 is merged (PR #614); build PR 2, the convoy.**
+- **Merged: PR #614** (bcc6ff3f; Nicolas: "Merge it", 2026-11-14; ADR 0412). The shop buys staves and
+  tomes, buys when a unit holds nothing usable with uses left, checks bag room, and pays the
+  unarmed first; `Bot.arms` is the shop's own loop, and the pick reads an armable unit holding
+  what it will buy (`sight.holding`). The chapter-start record lists uses and the convoy
+  (`INSPECT.convoyItems`); the chapter line has `buys`. Run `gear2` (lap1d's Ch13 start): won in
+  8 turns, no death, Artur, Vanessa and Lute fielded and armed, Natasha benched. Reviewed
+  (`/code-review 614 medium`, 10 findings, one scoped re-review, 4 notes), all fixed; CI green.
+  Untested: the roster read's speed-up; the convoy read against the emulator.
 - **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
   routes (memory `finish-line-whole-vanilla-game`; #510 comment 6872554917).
 - **The plan now worked is #510 comment 6883980081** (party management; one comment, edited in
@@ -28,10 +36,11 @@ and start a fresh instance; don't rely on auto-compaction.
   death-risk cap stays** (Nicolas agreed: the party, not caution, is the problem). An LLM does not
   play moves (reproducibility and cost); an LLM adviser once a chapter is an option in the plan,
   not decided.
-- **Open calls for Nicolas, each with its recommendation in the plan comment:** the experience
-  weight (start 0.3 a point); the fill by level (only if the offline check shows better teams);
-  the LLM adviser (not now). The 1/64 split floor of PR #613 shipped as built; Nicolas has not
-  said either way.
+- **Calls settled (Nicolas, 2026-11-14, "go with your recommendation"; recorded in the plan
+  comment):** PR 3's experience weight starts at 0.3 a point; the fill by level is dropped (the
+  offline check over lap1d's Ch10-Ch15 fielded 15 unarmed units against 0), so the experience
+  term ships alone; no LLM adviser now. The 1/64 split floor of PR #613: Nicolas has not said
+  either way.
 - **Merged: PR #613** (23ad8bcc; Nicolas: "You may also merge the pr that's ready", 2026-11-14;
   ADR 0411). Ch15's first decision ran over an hour because a judged enemy phase split in two at
   every striker a counter might kill, with no bound (667 stack samples: the door read and the
