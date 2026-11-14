@@ -1618,6 +1618,36 @@ test_shop_stops_at_gold()
 -- (#510 party plan, PR 1). Each case fails on the shop that buys only a weapon type the unit
 -- "holds none of".
 local function test_shop_arms_by_usable_items_with_uses_left()
+
+-- test_arms_is_the_shops_spend_order: Bot.arms is M.shop's own loop over the unarmed, so it
+-- cannot say armed what the shop cannot pay for, nor read a unit holding one item when the shop
+-- buys two. Fails on an arms that prices each unit against the whole purse and keeps the first
+-- item it finds.
+local function test_arms_is_the_shops_spend_order()
+    local sword = { item = 0x10, price = anyone(400), type = "sword" }
+    local staff = { item = 0x4B, price = anyone(600), type = "staff" }
+    local function lacking(id, canUse)
+        return unitOf(id, id, 1, { canUse = canUse })
+    end
+    -- 600 gold, four units each lacking a 400 gold sword: the shop arms the first only
+    local roster = {}
+    for id = 1, 4 do roster[id] = lacking(id, { [0x10] = true }) end
+    local bought = B.arms(600, { sword }, roster)
+    local n = 0
+    for _ in pairs(bought) do n = n + 1 end
+    check(n, 1, "arms: 600 gold arms one of four units")
+    check(type(bought[1]) == "table" and bought[1][1], 0x10, "arms: the first unit, with the sword")
+    local shop = B.shop(600, { sword }, roster)
+    check(#shop, 1, "arms: the shop buys exactly that")
+    check(shop[1].unit, 1, "arms: for the unit arms names")
+    -- a unit that uses a staff and a sword is read holding both, as the shop buys both
+    local both = B.arms(10000, { sword, staff }, { lacking(5, { [0x10] = true, [0x4B] = true }) })
+    check(type(both[5]) == "table" and csv(both[5]), "75,16", "arms: a staff user who wields a sword holds both (types in order)")
+    local one = B.arms(10000, { sword, staff }, { lacking(6, { [0x10] = true }) })[6]
+    check(type(one) == "table" and csv(one), "16",
+          "arms: only what the unit can use")
+end
+test_arms_is_the_shops_spend_order()
     local stock = {
         { item = 0x6C, price = anyone(300), vulnerary = true },
         { item = 0x4B, price = anyone(600), type = "staff" },
@@ -1634,7 +1664,7 @@ local function test_shop_arms_by_usable_items_with_uses_left()
     local healer = unitOf(1, 0x01, 1, { canUse = { [0x4B] = true }, items = { vuln } })
     check(flat(B.shop(10000, stock, { healer })), "1:75", "a healer with no staff buys one")
     check(B.armed(healer), false, "a healer with no staff is not armed")
-    check(B.arms(10000, stock, { healer })[0x01], 0x4B, "the pick is told what arms it")
+    check(csv(B.arms(10000, stock, { healer })[0x01]), "75", "the pick is told what arms it")
     healer.items[#healer.items + 1] = { id = 0x4B, type = "staff", usable = true, uses = 5 }
     check(flat(B.shop(10000, stock, { healer })), "", "a healer with a staff buys none")
     check(B.armed(healer), true, "a healer with a staff is armed")

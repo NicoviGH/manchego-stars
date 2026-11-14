@@ -3709,6 +3709,18 @@ INSPECT.prepList = function()
     end)
 end
 
+-- The convoy's items, { id, uses } each (gConvoyItemArray, id | uses << 8; gConvoyItemCount of
+-- them, at most CONVOY_ITEM_COUNT = 100, bmcontainer.h). The one read: api.snapshot keeps them,
+-- collectedItems looks for a gift among them.
+INSPECT.convoyItems = function()
+    local out = {}
+    for i = 0, math.min(ru8(SYM.gConvoyItemCount), 100) - 1 do
+        local v = ru16(SYM.gConvoyItemArray + i * 2)
+        out[#out + 1] = { id = v & 0xFF, uses = v >> 8 }
+    end
+    return out
+end
+
 -- An item's own facts, whoever holds it (the one read of the item's data; unitItemFacts adds
 -- what a unit changes): a weapon or staff -- kind "weapon", its type (a staff's is "staff"),
 -- rank, reach and effectiveness list -- and which item is the Vulnerary. Bot.shop's stock and a
@@ -3748,7 +3760,10 @@ INSPECT.isKey = function(call, unitAddr, value)
     return false
 end
 
-INSPECT.unitItemFacts = function(call, unitAddr, item)
+-- `rosterRead` (the roster's read: Bot.armed, the shop and the seal check) asks only the weapon's
+-- can-use, the uses and which item is the Vulnerary: the key, passive and heal kinds, two
+-- sandbox terrain reads and a heal read for every item, are Bot.fullBag's alone.
+INSPECT.unitItemFacts = function(call, unitAddr, item, rosterRead)
     local K = INSPECT.BAG
     local f = INSPECT.itemFacts(item.id)
     local data = SYM.gItemData + item.id * BOARD.ITEMDATA_STRIDE
@@ -3757,6 +3772,8 @@ INSPECT.unitItemFacts = function(call, unitAddr, item)
     if f.kind == "weapon" then
         local check = f.staff and SYM.CanUnitUseStaff or SYM.CanUnitUseWeapon
         f.usable = call(check, { unitAddr, value }) ~= 0
+    elseif rosterRead then
+        return f
     elseif INSPECT.isKey(call, unitAddr, value) then
         f.kind = "key"
     elseif K.PASSIVE[item.id] then
@@ -3953,13 +3970,13 @@ INSPECT.campaignApi = function(game)
                     if s.kind == "weapon" then
                         local new = call(SYM.MakeNewItem, { s.item })
                         if INSPECT.unitItemFacts(call, u.addr,
-                                { id = s.item, uses = new >> 8 }).usable then
+                                { id = s.item, uses = new >> 8 }, true).usable then
                             e.canUse[s.item] = true
                         end
                     end
                 end
                 for _, held in ipairs(u.items) do
-                    local f = INSPECT.unitItemFacts(call, u.addr, held)
+                    local f = INSPECT.unitItemFacts(call, u.addr, held, true)
                     f.promotes = call(SYM.CanUnitUsePromotionItem,
                         { u.addr, held.id | (held.uses << 8) }) ~= 0 or nil
                     e.items[#e.items + 1] = f
@@ -3985,12 +4002,16 @@ INSPECT.campaignApi = function(game)
                     answers[e.charId][d.id], strength[e.charId][d.id] = sight.answer(u, d)
                 end
             end
-            -- a unit the shop will arm is read holding what it will buy (Bot.arms), since it
-            -- will hold it when it fights
+            -- a unit the shop will arm is read holding everything it will buy (Bot.arms), since
+            -- it will hold them when it fights
             local buy = arms and arms[e.charId]
             if buy then
-                local value = INSPECT.gameCalls(function(call) return call(SYM.MakeNewItem, { buy }) end)
-                sight.holding(byChar[e.charId], value, read)
+                local values = INSPECT.gameCalls(function(call)
+                    local out = {}
+                    for _, id in ipairs(buy) do out[#out + 1] = call(SYM.MakeNewItem, { id }) end
+                    return out
+                end)
+                sight.holding(byChar[e.charId], values, read)
             else
                 read(byChar[e.charId])
             end
@@ -4112,12 +4133,8 @@ INSPECT.campaignApi = function(game)
             for _, it in ipairs(u.items) do items[#items + 1] = { id = it.id, uses = it.uses } end
             party[#party + 1] = { charId = u.charId, classId = u.classId, level = u.level, items = items }
         end
-        local convoy = {}
-        for i = 0, ru8(SYM.gConvoyItemCount) - 1 do
-            local v = ru16(SYM.gConvoyItemArray + i * 2)
-            convoy[#convoy + 1] = { id = v & 0xFF, uses = v >> 8 }
-        end
-        return { gold = gold(), party = party, convoy = convoy, shops = openNodes(ch) }
+        return { gold = gold(), party = party, convoy = INSPECT.convoyItems(),
+                 shops = openNodes(ch) }
     end
     -- The chapter-start state, kept in memory for the restarts and written beside the record
     -- campaign.lua built (startRecord), under references/sim.
@@ -6085,9 +6102,7 @@ local function collectedItems()
         local u = unitAt(SYM.gUnitArrayBlue, i)
         if u then for s = 0, 4 do items[#items + 1] = ru16(u.addr + 0x1E + s * 2) & 0xFF end end
     end
-    local n = ru8(SYM.gConvoyItemCount)
-    if n > 100 then n = 100 end     -- convoy cap (CONVOY_ITEM_COUNT, bmcontainer.h)
-    for i = 0, n - 1 do items[#items + 1] = ru16(SYM.gConvoyItemArray + i * 2) & 0xFF end
+    for _, it in ipairs(INSPECT.convoyItems()) do items[#items + 1] = it.id end
     return items
 end
 

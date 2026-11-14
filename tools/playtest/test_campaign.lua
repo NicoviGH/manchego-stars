@@ -391,7 +391,7 @@ local function test_between_deploys_shops_promotes()
     local d = g.deployed[1]
     check(table.concat(d, ","), "1,3", "forced first, then the unit answering the map's demand")
     check(g.needsAsked, 1, "the needs are read once per chapter start")
-    check(g.arms and g.arms[2], 0x10, "the pick is told which item arms the unarmed unit it could field")
+    check(g.arms and g.arms[2] and g.arms[2][1], 0x10, "the pick is told which item arms the unarmed unit it could field")
     check(g.arms and g.arms[3], nil, "and nothing for a unit no stock item arms")
     local who = {}
     for _, p in ipairs(g.bought) do who[#who + 1] = string.format("%d:%d", p.unit, p.item) end

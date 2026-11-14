@@ -167,9 +167,10 @@
 --   purchase gold cannot cover, or a full bag has no room for, is skipped and the later ones are
 --   still tried; a unit with nothing usable in hand keeps a slot free of a Vulnerary for its arms.
 -- Bot.armed(unit) -> bool: it holds a weapon or staff it can use, with uses left.
--- Bot.arms(gold, stock, roster) -> { [charId] = stock item }: the item the shop would buy to
---   arm each unit that is not armed (none: nothing in stock arms it, or its bag is full). The
---   pick reads such a unit as holding it (harness.lua api.needs), so a unit the shop can arm
+-- Bot.arms(gold, stock, roster) -> { [charId] = { item id... } }: the weapons and staves the
+--   shop would buy to arm each unit that is not armed, in its spend order, the purse shared
+--   (none: nothing in stock arms it, its bag is full, or the gold went before it). The pick
+--   reads such a unit as holding them (harness.lua api.needs), so a unit the shop can arm
 --   ranks as armed, by the game's own numbers, not as the unarmed unit it is now.
 -- Bot.promote(unit, items) -> bool: a seal the game says promotes this unit is held.
 -- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
@@ -2547,10 +2548,21 @@ local function holdsAny(u, want)
     return false
 end
 
+-- A weapon or staff the game says the unit can use (its rank, its class), and the one test of
+-- "can use" (Bot.fullBag's weighing and the shop's arming both ask it); not a rank it forbids.
+local function canUseWeapon(it)
+    return it.type ~= nil and it.usable == true
+end
+
+-- A weapon the game says the unit cannot use: the matching "unusable".
+local function cannotUseWeapon(it)
+    return it.type ~= nil and it.usable ~= true
+end
+
 -- A weapon or staff the unit can use now: the game's can-use and uses left (a broken tome, or
 -- a lance its rank forbids, arms nobody).
 local function usableWeapon(it)
-    return it.type ~= nil and it.usable == true and (it.uses or 0) > 0
+    return canUseWeapon(it) and (it.uses or 0) > 0
 end
 
 function M.armed(u)
@@ -2584,8 +2596,9 @@ local function wants(u, stock)
     return out
 end
 
--- Bag room is FE8's five slots (Board.ITEM_COUNT), spent by every purchase in order; a unit
--- with no usable weapon or staff keeps one slot free of a Vulnerary for what arms it.
+-- The shop's spend order, the one owner (Bot.arms asks it too, so the two cannot drift): bag
+-- room is FE8's five slots (Board.ITEM_COUNT), spent by every purchase in order; a unit with no
+-- usable weapon or staff keeps one slot free of a Vulnerary for what arms it.
 function M.shop(gold, stock, party)
     local out, room = {}, {}
     for _, u in ipairs(party) do room[u.charId] = Board.ITEM_COUNT - #u.items end
@@ -2593,7 +2606,7 @@ function M.shop(gold, stock, party)
         if room[u.charId] <= 0 or s.price[u.charId] > gold then return end
         gold = gold - s.price[u.charId]
         room[u.charId] = room[u.charId] - 1
-        out[#out + 1] = { unit = u.charId, item = s.item }
+        out[#out + 1] = { unit = u.charId, item = s.item, vulnerary = s.vulnerary }
     end
     local list = {}
     for _, u in ipairs(party) do list[u.charId] = wants(u, stock) end
@@ -2612,20 +2625,22 @@ function M.shop(gold, stock, party)
     return out
 end
 
--- Bot.arms(gold, stock, roster) -> { [charId] = stock item }: for each unit that is not armed
--- (M.armed), the item the shop would buy to arm it with this gold and the unit's bag room;
--- none for a unit nothing in stock can arm, or with a full bag. The pick asks the game how such
--- a unit fights holding that item.
+-- Bot.arms(gold, stock, roster) -> { [charId] = { item id... } }: every weapon or staff the shop
+-- would buy for each unit that is not armed (M.armed), in the order it buys them. It is
+-- M.shop run over those units with the one purse and each unit's bag room, so what it says
+-- the shop buys is what the shop buys; none for a unit nothing in stock can arm, a full bag,
+-- or a purse the units before it spent. The Vulneraries of the armed units, whom the shop
+-- would also pay for if fielded, are not in the purse: the deploy is not picked yet. The pick
+-- asks the game how such a unit fights holding those items.
 function M.arms(gold, stock, roster)
-    local out = {}
+    local unarmed, out = {}, {}
     for _, u in ipairs(roster) do
-        if not M.armed(u) and #u.items < Board.ITEM_COUNT then
-            for _, s in ipairs(wants(u, stock)) do
-                if not s.vulnerary and s.price[u.charId] <= gold then
-                    out[u.charId] = s.item
-                    break
-                end
-            end
+        if not M.armed(u) then unarmed[#unarmed + 1] = u end
+    end
+    for _, p in ipairs(M.shop(gold, stock, unarmed)) do
+        if not p.vulnerary then
+            out[p.unit] = out[p.unit] or {}
+            table.insert(out[p.unit], p.item)
         end
     end
     return out
@@ -2657,7 +2672,7 @@ function M.fullBag(held, new, convoyFull)
     local function usableOfType(t)
         local out = {}
         for _, it in ipairs(held) do
-            if it.kind == "weapon" and it.usable and it.type == t then out[#out + 1] = it end
+            if canUseWeapon(it) and it.type == t then out[#out + 1] = it end
         end
         return out
     end
@@ -2671,7 +2686,7 @@ function M.fullBag(held, new, convoyFull)
         wanted = #heals == 0
     elseif new.kind == "key" then
         wanted = true
-    elseif new.kind == "weapon" and new.usable then
+    elseif canUseWeapon(new) then
         local same = usableOfType(new.type)
         local with = { new }
         for _, w in ipairs(same) do with[#with + 1] = w end
@@ -2705,7 +2720,7 @@ function M.fullBag(held, new, convoyFull)
     end
     local unusable
     for i, it in ipairs(held) do
-        if it.kind == "weapon" and not it.usable
+        if cannotUseWeapon(it)
                 and (not unusable or (it.rank or 0) < (held[unusable].rank or 0)) then
             unusable = i
         end

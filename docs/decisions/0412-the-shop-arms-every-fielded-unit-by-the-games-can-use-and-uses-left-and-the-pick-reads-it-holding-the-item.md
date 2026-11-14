@@ -25,18 +25,26 @@ Vulnerary.
 **Decision 2: the harness reads an item once.** `INSPECT.itemFacts` is the one read of an
 item's data (weapon or staff, type, rank, reach, effectiveness, the Vulnerary); `unitItemFacts`
 adds what a unit changes (can-use, uses, key, heal...). The roster and the stock both go
-through them, so a staff is told from a sword the same way in the bag and on the shelf.
+through them, so a staff is told from a sword the same way in the bag and on the shelf. The
+roster, read three times a chapter, asks only for can-use, uses and the Vulnerary (a flag on
+`unitItemFacts`); the key, passive and heal classification is `Bot.fullBag`'s alone and was a
+sandbox read per held item for nothing.
 
-**Decision 3: the pick reads a unit the shop will arm holding what it will buy.** The plan's
-proposal, taken as written: `Bot.arms` names the item the shop would buy for each unarmed
-unit (with the gold and the bag room it has); `api.needs` asks the game, in a sandbox, what
-that unit answers (`sight.holding` writes the item into its bag and puts it back), so its
-strength is the game's number with the item in hand. `Bot.team` is unchanged: it ranks by the
+**Decision 3: the pick reads a unit the shop will arm holding everything it will buy, and
+`Bot.arms` is `Bot.shop`'s own spend loop.** The shop's loop (Vulneraries first, then each
+unit's weapons in order, one purse, five bag slots) is the one owner of the spend order.
+`Bot.arms` runs it over the unarmed units and returns, per unit, every weapon or staff it
+bought (a list: a unit that can use a staff and a sword holds both, types in name order), so
+a purse that arms one of four units says so, and the two cannot drift. It leaves out the
+Vulneraries of armed units, whom the shop pays for only if fielded: the deploy is not picked
+yet. `api.needs` asks the game, in a sandbox, what the unit answers (`sight.holding` writes the
+items after its own into its bag and puts them back; it refuses a bag with an item past a gap,
+which the board read and the roster would not list). `Bot.team` is unchanged: it ranks by the
 strengths it is given. A unit nothing in stock arms is read as it is, last.
 
 **Decision 4: the state says what is left.** The chapter-start record (`startRecord`) gains
-each item's uses left and the convoy's contents (`gConvoyItemArray`, read through
-`api.snapshot`); the chapter line gains `buys` (each purchase: unit, item) for the attempt.
+each item's uses left and the convoy's contents (`gConvoyItemArray`, read by `INSPECT.convoyItems`,
+clamped to the game's 100); the chapter line gains `buys` (each purchase: unit, item) for the attempt.
 
 Against ADR 0396's tests: each rule names a quantity the game produces (can-use, uses left,
 price, the unit's strength with the item); each is a purchase or an ordering; none names a
@@ -44,9 +52,7 @@ unit, class or chapter; the owners are the existing ones (`Bot.shop`, `Bot.team`
 `between()`, `api.save`/`roster`/`needs`).
 
 **Not covered here.** Weapon quality (a better weapon than the one held), taking from the
-convoy and experience are the plan's PR 2 and PR 3. `arms` prices each unit alone against the
-whole purse; the shop then spends it in order, so a purse too small for everyone can leave a
-unit the pick counted as armed unarmed (not measured: the lap's gold is 10,000 or more).
+convoy and experience are the plan's PR 2 and PR 3.
 
 **What it proved** (`lap1d`'s saved Ch13 start, campaign 4006, one attempt, tag `gear1`). The
 pick fielded Artur (0x13), Vanessa (0x06) and Lute (0x0C), three of the five units that had
