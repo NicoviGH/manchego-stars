@@ -461,6 +461,49 @@ do
     check(r.outcome, "crashed", "it is recorded as crashed")
 end
 
+-- A decision that runs past M.DECISION_FRAMES of game code ends the attempt `timeout`, with
+-- the turn, the frames and the limit in its record (ADR 0411): vanilla Ch15 (Eirika)'s first
+-- decision ran 8.4 million frames and was stopped by hand. The watch is asked before each
+-- game call (sight.watch); a decision within the budget plays on and is the record's slowest.
+do
+    local function run(perCall)
+        local g = fakeGame { units = rout() }
+        local sight = g.api.sight
+        g.api.sight = function()
+            local s = sight()
+            local watch
+            s.watch = function(fn) watch = fn end
+            local attack = s.attack
+            -- each attack read "runs" perCall frames of game code, the watch asked first
+            s.attack = function(...)
+                for _ = 1, 4 do
+                    if watch then watch() end
+                    g.frame = g.frame + perCall
+                end
+                return attack(...)
+            end
+            return s
+        end
+        local ok = Botrun.run(g.api)
+        return ok, recordOf(g)
+    end
+    local ok, r = run(Botrun.DECISION_FRAMES)
+    check(ok, false, "timeout: a decision over its budget is not a finished run")
+    check(r.outcome, "timeout", "timeout: it is its own outcome")
+    check(r.timeout and r.timeout.turn, 1, "timeout: the record names the turn")
+    check(r.timeout and r.timeout.limit, Botrun.DECISION_FRAMES, "timeout: and the limit")
+    check(r.timeout and r.timeout.frames > Botrun.DECISION_FRAMES, true,
+          "timeout: and the frames the decision had run")
+    check(type(r.env_status) == "table" and r.env_status.fault, "timeout",
+          "timeout: no game result, so the environment is not clean")
+    check(r.why:find("frames of game code", 1, true) ~= nil, true, "timeout: the why says so")
+    ok, r = run(1000)
+    check(r.outcome, "won", "timeout: a decision within the budget plays on")
+    check(r.timeout, nil, "timeout: and records none")
+    check(r.plans.slowest.frames >= 4000 and r.plans.slowest.turn ~= nil, true,
+          "timeout: the record keeps the slowest decision's frames and turn")
+end
+
 -- PT_LEAKGUARD: a run whose sandboxes leaked plays on to its game result, then fails with
 -- every leak in its record and what the game ended as in its why; the log is asked once.
 do

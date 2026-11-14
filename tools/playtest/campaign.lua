@@ -53,6 +53,9 @@
 --               (never infeasible or bot_fault)
 --   (api.scout, the scout lap: a chapter with no clean clear is passed from a win, its chapter
 --   line `scouted`, and every line carries `scout = true`; a chapter with no win still stops it)
+--   timeout     an attempt's decision ran past its frame budget (botrun's outcome,
+--               M.DECISION_FRAMES): the bot failing to decide. Never retried: the next
+--               attempt meets the same board and would spend the same budget
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -441,6 +444,12 @@ function M.run(api)
                     line(entry)
                     return "crashed", string.format("chapter %d attempt %d crashed", ch,
                         entry.attempts)
+                end
+                if rec.outcome == "timeout" then
+                    entry.outcome = "timeout"
+                    line(entry)
+                    return "timeout", string.format("chapter %d attempt %d: %s", ch,
+                        entry.attempts, tostring(rec.why))
                 end
                 for _, a in ipairs(rec.arrivals_seen or {}) do
                     if not known[a.turn] then

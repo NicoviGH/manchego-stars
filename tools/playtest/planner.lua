@@ -43,8 +43,9 @@
 --      stalled board (opts.stalled) each unit's best act that changes the board, of which the
 --      best is played: a careful player that has stopped making progress takes the least it
 --      must.
---      The enemy phase is played every way it can go where a counter may kill a striker
---      (its tile freed for the next), and once per way each uncertain kill can go, up to
+--      The enemy phase is played both ways where a counter may kill a striker (its tile
+--      freed for the next), while the rarer way is at least sight's SPLIT_FLOOR of the phase
+--      (ADR 0411), and once per way each uncertain kill can go, up to
 --      BRANCH of them (an enemy the average keeps may die, one it removes may live). Last, the
 --      best plan is mended: each unit it may lose tries its other acts (a green one, the acts
 --      of the player units that could save it; a recruit, the acts of the units it strikes), the
@@ -111,8 +112,12 @@
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
--- uncertain kills left to the average past BRANCH), look = { decisions, triggered, extended,
--- skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
+-- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
+-- left unsplit below sight's SPLIT_FLOOR, summed over them), look = { decisions, triggered,
+-- extended, skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
+-- opts.at = {} (optional; botrun's): written as the call goes, { stage ("propose", "search",
+-- "judge <kind>", "lookahead"), judged (the plans judged so far), phases }: what a decision
+-- cut short by its frame budget was doing (botrun's M.DECISION_FRAMES).
 -- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
 -- opts.seen = unit slot -> charId, every red a board showed out of fog this attempt (optional,
 -- botrun's): the fog rule's strongest enemy is one of these; without it, one in sight.
@@ -511,6 +516,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- one, whose game is the one that plays them), judged on this one -- with this board's
     -- enemies, so the trigger, the assault and the record see one the fog hid there
     local offer = opts and opts.offer
+    -- opts.at (botrun's, optional): where this call is, kept as it goes for the record of a
+    -- decision cut short (botrun's M.DECISION_FRAMES): { stage, judged, phases }
+    local now = opts and opts.at or {}
+    now.stage, now.judged, now.phases = "propose", 0, 0
     local cands, ctx
     if offer then
         local enemies, threats = Bot.enemiesOf(board, sight)
@@ -519,7 +528,8 @@ function M.plan(Bot, board, sight, style, opts)
     else
         cands, ctx = Bot.candidates(board, sight, style, opts)
     end
-    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0 } end
+    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0 } end
+    now.stage = "search"
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
@@ -1075,7 +1085,7 @@ function M.plan(Bot, board, sight, style, opts)
     local fogDie = (offer and Bot.fogRead(board, sight, opts and opts.seen) or ctx.fogRead()).die
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the average past BRANCH (never silent)
-    local cost = { phases = 0, averaged = 0,
+    local cost = { phases = 0, averaged = 0, unsplit = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0 } }
     -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
@@ -1272,7 +1282,6 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         st.averaged = #dims - st.branched
-        cost.averaged = cost.averaged + st.averaged
         -- `list`'s units as way `w` leaves them: one its counter killed gone (that death is
         -- score()'s, never the phase's), one it played the counter on at the HP it left, with
         -- field `clear` dropped (what that HP already holds); `idOf` reads a unit's id
@@ -1301,16 +1310,23 @@ function M.plan(Bot, board, sight, style, opts)
         -- thief's 63.5%, far from the throne; he died and the win came a turn later). A counter
         -- to a blow struck before the Seize is still the cap's (st.fought, below).
         local phase = not seizesIn(st) and sight.enemyPhase
+        -- the counter kills the phases left unsplit (sight's `unsplit`, M.phaseWays): counted
+        -- apart from `averaged`, which stays the plan's own uncertain kills past BRANCH
+        local unsplit = 0
         for i, w in ipairs(ways) do
             if phase then cost.phases = cost.phases + 1 end
+            now.phases = cost.phases
             local s = phase and phase({ blues = bluesIn(w), gone = w.gone, reds = w.reds,
                                         opened = st.opened, carry = st.carry }) or {}
+            unsplit = unsplit + (s.unsplit or 0)
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
                 outcomes[#outcomes + 1] = { p = w.p * o.p, strikes = o.strikes, way = i }
                 total = total + w.p * o.p
             end
             if not top or w.p > top then strikes, top = s, w.p end
         end
+        cost.averaged = cost.averaged + st.averaged
+        cost.unsplit = cost.unsplit + unsplit
         -- mutually exclusive branches, their chances normalized to sum to 1 (FR-009)
         local wayP = {}
         for _, o in ipairs(outcomes) do
@@ -1658,6 +1674,7 @@ function M.plan(Bot, board, sight, style, opts)
         best = i and judgedPlans[i].st
     end
     local function consider(st, kind)
+        now.stage, now.judged = "judge " .. kind, #considered
         judge(st)
         st.kind = kind
         local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
@@ -1782,6 +1799,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- original horizon, tagged `skipped`. A protected unit's death chance becomes that of dying
     -- in either phase, its branch-local first phase's kept, and the finalists are ranked again.
     local look = { calls = 0 }
+    now.stage, now.judged = "lookahead", #considered
     if best and sight.nextPhase then
         local idx = {}
         for i, j in ipairs(judgedPlans) do

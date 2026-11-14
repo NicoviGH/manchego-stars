@@ -33,7 +33,7 @@ local function roster()
     }
 end
 
--- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"... },
+-- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"|"timeout"... },
 -- options = n (a route split before it), needs = Bot.team's demands/answers/strength } };
 -- "dead" is a win with a death, "spoiled" a win with a recruit missed. o.route = the
 -- campaign's route setting, o.game the game (default "fake"). ch.seen = { [attempt] =
@@ -240,6 +240,21 @@ local function test_crash_is_never_retried()
     check(ls[#ls].outcome, "crashed", "the campaign line says crashed")
 end
 test_crash_is_never_retried()
+
+-- A decision over its frame budget (botrun's `timeout`, ADR 0411) stops the campaign as a crash
+-- does, under its own name: a retry would meet the same board and spend the same budget.
+local function test_timeout_is_never_retried()
+    local g = fakeGame({ chapters = { { id = 1, outcomes = { "timeout", "won" } }, { id = 2 } } })
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "a timeout stops the campaign")
+    check(#g.plays, 1, "and is not retried")
+    check(g.loads, 0, "no restart")
+    local ls = lines(g)
+    check(ls[#ls].outcome, "timeout", "the campaign line says timeout")
+    check(ls[#ls - 1].outcome, "timeout", "and so does the chapter's")
+    check(why:find("attempt 1") ~= nil, true, "the reason names the attempt")
+end
+test_timeout_is_never_retried()
 
 local function test_arrive_failure_is_a_crash()
     local g = fakeGame({ chapters = { { id = 1, arriveFails = true } } })

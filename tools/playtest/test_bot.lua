@@ -5348,6 +5348,30 @@ do
     check(plan and plan.averaged, 0, "branches: none left to the average, in the plan")
 end
 
+-- The counter kills a judged phase left unsplit (sight's `unsplit`, ADR 0411) are summed into the
+-- call's cost apart from `averaged`, which stays the plan's own uncertain kills past BRANCH;
+-- and opts.at says where the call is as it goes (what a decision cut short was doing).
+do
+    local units, o = threeOpenKills({ 90, 50, 70 })
+    local phase = o.enemyPhase
+    local at, during = {}, nil
+    o.enemyPhase = function(plan)
+        during = during or (at.stage .. "/" .. at.phases)
+        local out = phase(plan)
+        out.unsplit = 2
+        return out
+    end
+    local _, _, cost = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"),
+                                    { at = at })
+    check(cost.unsplit, 2 * cost.phases, "unsplit: each phase's count is summed into the cost")
+    check(cost.averaged, 0, "unsplit: and is no part of `averaged`")
+    check(during ~= nil and during:match("^judge %a+/1$") ~= nil, true,
+          "at: the first judged phase reads its stage and count (" .. tostring(during) .. ")")
+    check(at.stage, "lookahead", "at: the call ends in its last stage")
+    check(at.phases, cost.phases, "at: every phase was counted as it was played")
+    check(at.judged > 0, true, "at: and the plans judged")
+end
+
 -- test_branching_past_its_bound_plays_the_most_uncertain (PR #560 re-review): the kills land
 -- at 2RN 90, 50 and 70. With BRANCH = 1 only the 50% one is played both ways, the others keep
 -- the average (gone), and the call counts each kill left over in every plan it judged.

@@ -335,7 +335,7 @@ def records_of(task, text, where, log_path):
     bot = any(is_bot(r) for r in recs)
     for r in recs:
         r['run_dir'] = where
-        if r.get('outcome') == 'crashed':
+        if r.get('outcome') in ('crashed', 'timeout'):
             r['log'], r['log_tail'] = log_path, log_tail(log_path)
         # the campaign crashed (load, arrive, save, cap) before its bot reported: the
         # environment did not hold. A no_style or done end is the campaign's own answer.
@@ -784,7 +784,7 @@ def pilot_summary(pairs, cells, cpu_s=0.0, reach=None, looks=LOOKS):
 
 # ---- one cell, played to its verdict (PR-H, T095: chapter cells and campaign cells) ----
 
-UNUSABLE = ('crashed', 'no_style')   # no game result
+UNUSABLE = ('crashed', 'timeout', 'no_style')   # no game result
 
 
 def simdir(vanilla):
@@ -2772,7 +2772,7 @@ def resume_main(args, pool=None):
                      rec.get('outcome'), ' clean' if rec.get('clean') else '', rec.get('turns'),
                      len(rec.get('deaths') or [])), flush=True)
             continue
-        crashed += rec.get('outcome') == 'crashed'
+        crashed += rec.get('outcome') in ('crashed', 'timeout')
         # a scout lap's end says so: its `done` is never a clean game (ADR 0409)
         print('%s (from %s): %s%s (%s)' % (rec.get('campaign'), rec.get('resumed_from'),
                                            'scout lap ' if rec.get('scout') else '',

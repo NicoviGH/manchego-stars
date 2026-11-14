@@ -1338,5 +1338,81 @@ do
     check(string.format("%04X", mem[0x100]), "5A87", "advance(1) after advance(3) is the fourth draw")
 end
 
+-- Sight.phaseWays (ADR 0411): a striker the counter may kill splits the phase, the second way
+-- with its tile freed, only while the rarer side is at least the floor of the whole phase.
+-- Split at every such striker, a phase of 20 of them is 2^20 ways: vanilla Ch15 (Eirika)'s
+-- first decision never came back from such a phase.
+do
+    local function sandbox(fn) return fn() end
+    -- n strikers, each felled with chance q(k); `asked` counts the decisions played
+    local function phase(n, q, floor)
+        local asked, freed = 0, {}
+        local outcomes, averaged = Sight.phaseWays(n, function(k, done)
+            asked = asked + 1
+            local now = {}
+            for i, t in ipairs(done) do now[i] = t end
+            local t = { enemy = k, felled = q(k) }
+            now[#now + 1] = t
+            return t, now, function() freed[#freed + 1] = k end
+        end, sandbox, floor)
+        return outcomes, averaged, asked, freed
+    end
+    local function total(outcomes)
+        local p = 0
+        for _, o in ipairs(outcomes) do p = p + o.p end
+        return math.floor(p * 1e9 + 0.5) / 1e9
+    end
+    -- two uncertain strikers: both ways of each, as before
+    local out, averaged, asked = phase(2, function() return 0.5 end)
+    check(#out, 4, "ways: two even counter kills are four ways")
+    check(averaged, 0, "ways: none left unsplit")
+    check(asked, 3, "ways: the second striker decides once a way of the first")
+    check(total(out), 1, "ways: their chances sum to 1")
+    -- twenty of them: bounded by the floor, every way still at least that likely
+    out, averaged, asked = phase(20, function() return 0.5 end)
+    check(#out <= 1 / Sight.SPLIT_FLOOR, true,
+          "ways: 20 even counter kills stay within 1 / floor ways (" .. #out .. ")")
+    check(asked <= 20 / Sight.SPLIT_FLOOR, true,
+          "ways: and within that many decisions a striker (" .. asked .. ")")
+    check(averaged > 0, true, "ways: the kills left unsplit are counted")
+    check(total(out), 1, "ways: the bounded phase's chances still sum to 1")
+    local least = 1
+    for _, o in ipairs(out) do least = math.min(least, o.p) end
+    check(least >= Sight.SPLIT_FLOOR, true, "ways: no way played is rarer than the floor")
+    -- a sure kill is no split: one way, the tile freed, nothing to count
+    local freed
+    out, averaged, asked, freed = phase(3, function() return 1 end)
+    check(#out, 1, "ways: a sure counter kill is one way")
+    check(#freed, 3, "ways: each sure kill frees its tile")
+    check(averaged, 0, "ways: a sure kill is not an uncertain one left unsplit")
+    -- below the floor the phase goes the likelier way: the striker stands on a rare kill,
+    -- is gone on a likely one
+    out, averaged, asked, freed = phase(1, function() return 0.004 end)
+    check(#out .. "/" .. #freed .. "/" .. averaged, "1/0/1", "ways: a rare kill keeps the striker")
+    out, averaged, asked, freed = phase(1, function() return 0.996 end)
+    check(#out .. "/" .. #freed .. "/" .. averaged, "1/1/1", "ways: a near-sure kill frees the tile")
+    -- an enemy that does not strike splits nothing
+    out = Sight.phaseWays(3, function() return nil end, sandbox)
+    check(#out == 1 and #out[1].strikes == 0, true, "ways: no strike, one way")
+end
+
+-- Sight.watched: the watch is asked before every game call's frames, and what it raises ends
+-- the call before it runs (botrun's decision budget, ADR 0411); set(nil) asks no more.
+do
+    local ran, asked = 0, 0
+    local cpu, set = Sight.watched({ frames = function() ran = ran + 1; return true end,
+                                     read = function() return 7 end })
+    check(cpu.frames(), true, "watched: no watch, the call runs")
+    check(cpu.read(), 7, "watched: the rest of the cpu is the cpu's")
+    set(function() asked = asked + 1; if asked > 1 then error({ timeout = true }, 0) end end)
+    cpu.frames()
+    local ok, err = pcall(cpu.frames)
+    check(ok, false, "watched: the watch's error ends the call")
+    check(type(err) == "table" and err.timeout, true, "watched: its error value comes through")
+    check(ran, 2, "watched: the refused call ran no frame")
+    set(nil)
+    check(cpu.frames(), true, "watched: unset, the call runs again")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
