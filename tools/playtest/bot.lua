@@ -1207,24 +1207,17 @@ local function movesFor(ctx, u, tile)
     return n and n * ctx.sight.mov(u)
 end
 
--- `chain` = the obstacles this march has already stepped back through: each breach is read
--- with the one after it still open (breachFor), so asked again on its own, X's way can name Y
--- while Y's names X, and the steps would go round for good. The first met again is the step.
-local function stepFor(ctx, u, tile, seeking, chain)
+local function stepFor(ctx, u, tile, seeking)
     local lock = tile and lockAt(ctx, u, tile.x, tile.y)
     if lock then
         local e = keyWay(ctx, u, tile, u, lock, seeking)
-        return e and stepFor(ctx, u, e, withLock(seeking, lock), chain) or tile
+        return e and stepFor(ctx, u, e, withLock(seeking, lock)) or tile
     end
     local b = breachFor(ctx, u, tile, seeking)
     -- a door u has no key for is reached through its key; one u cannot walk to, through the
     -- obstacle before it (breachFor's turns through others)
     if b and (b.door and lockAt(ctx, u, b.x, b.y) or cutOff(ctx, b, u)) then
-        chain = chain or {}
-        local k = tileKey(b.x, b.y)
-        if chain[k] then return b end
-        chain[k] = true
-        return stepFor(ctx, u, b, seeking, chain)
+        return stepFor(ctx, u, b, seeking)
     end
     return b or tile
 end

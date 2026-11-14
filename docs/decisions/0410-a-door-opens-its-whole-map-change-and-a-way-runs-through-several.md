@@ -28,14 +28,15 @@ until that door's change uncovers it.
    `breachFor` takes first an obstacle the unit can walk to, the nearest; else one it has
    turns to through others (`turnsFor`, which asks the breach again for that obstacle), the
    fewest. The march (`stepFor`) and its length (`marchLength`) step to the first obstacle
-   of the chain, as they already did for a door's key, and the march stops at an obstacle
-   it meets twice.
+   of the chain, as they already did for a door's key. That step never comes round: a
+   breach kept for the decision was read with no open breach cut short, and an obstacle's
+   turns through the next one exceed that one's own.
 
 **A read cut short is kept only while its cut lasts.** Asking X's way asks Y's, and Y's
 asks X's again while X is still open; that inner answer ("no way through X") is true only
 inside X's question. Kept for the decision, it told every later question Y was cut off;
 never kept, the same reads ran again for every way tried, and one turn of Ch14 ran 14
-minutes before the stack overflowed. So each read notes the open breaches it was cut
+minutes and then crashed (a Lua stack overflow). So each read notes the open breaches it was cut
 against, and its answer is dropped when the deepest of them closes (`beginRead`/`endRead`).
 
 **What it proved** (one attempt each, from the lap's saved starts). The first version
