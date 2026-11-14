@@ -4277,6 +4277,14 @@ INSPECT.campaignApi = function(game)
             if stalled(obs, state) then return nil, "the promotion stalled (see the inspect snapshot)" end
             local ok = true
             if state == "player_map_idle" and classOf() ~= before then return true
+            -- a Canto unit is handed back its move after the seal (playerphase.c
+            -- PlayPhaseForceActiveUnitCanto; vanilla Ch13, Cormag's Elysian Whip, campaign
+            -- lap1-fwd1-cs-s4006: class 0x1F to 0x21, then player_range_idle, and B does not
+            -- close it): spent where the unit stands, as after any act (INSPECT.awaitActed).
+            -- Only a changed class is let through: a unit selected with its class unchanged
+            -- still runs out the allowance, loudly.
+            elseif state == "unit_selected" and classOf() ~= before then
+                ok = INSPECT.awaitActed(u.addr)
             elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
             elseif state == "yes_no_choice" then
                 ok = selectSemantic("answer_yes", "the promotion's prompt takes Yes", function(after)
