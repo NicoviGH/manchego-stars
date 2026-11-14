@@ -181,9 +181,8 @@ local function byCharId(roster)
 end
 
 -- Between the chapter's start and its first move: the team, the shops, the seals. `need` is
--- the chapter's api.needs (nil without a prep screen); `carried` the last cleared (or, on the scout lap, scouted)
--- team. Returns
--- the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
+-- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team (on the
+-- scout lap, scouted). Returns the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
 -- the attempt's record, { cap, demands, units = { { charId, group, forced, carried, answers =
 -- the demand ids it answers, why ("benched" for one left out), covers } }, uncovered = the
 -- ids of the demands of another kind than an enemy class that a roster unit answers and no
