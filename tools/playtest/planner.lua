@@ -518,8 +518,9 @@ function M.plan(Bot, board, sight, style, opts)
     local offer = opts and opts.offer
     -- opts.at (botrun's, optional): where this call is, kept as it goes for the record of a
     -- decision cut short (botrun's M.DECISION_FRAMES): { stage, judged, phases }
-    local now = opts and opts.at or {}
-    now.stage, now.judged, now.phases = "propose", 0, 0
+    -- (a call without it writes nothing: the planner is called thousands of times a run)
+    local now = opts and opts.at
+    if now then now.stage, now.judged, now.phases = "propose", 0, 0 end
     local cands, ctx
     if offer then
         local enemies, threats = Bot.enemiesOf(board, sight)
@@ -529,7 +530,7 @@ function M.plan(Bot, board, sight, style, opts)
         cands, ctx = Bot.candidates(board, sight, style, opts)
     end
     if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0 } end
-    now.stage = "search"
+    if now then now.stage = "search" end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
@@ -1315,7 +1316,7 @@ function M.plan(Bot, board, sight, style, opts)
         local unsplit = 0
         for i, w in ipairs(ways) do
             if phase then cost.phases = cost.phases + 1 end
-            now.phases = cost.phases
+            if now then now.phases = cost.phases end
             local s = phase and phase({ blues = bluesIn(w), gone = w.gone, reds = w.reds,
                                         opened = st.opened, carry = st.carry }) or {}
             unsplit = unsplit + (s.unsplit or 0)
@@ -1674,7 +1675,7 @@ function M.plan(Bot, board, sight, style, opts)
         best = i and judgedPlans[i].st
     end
     local function consider(st, kind)
-        now.stage, now.judged = "judge " .. kind, #considered
+        if now then now.stage, now.judged = "judge " .. kind, #considered end
         judge(st)
         st.kind = kind
         local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
@@ -1799,7 +1800,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- original horizon, tagged `skipped`. A protected unit's death chance becomes that of dying
     -- in either phase, its branch-local first phase's kept, and the finalists are ranked again.
     local look = { calls = 0 }
-    now.stage, now.judged = "lookahead", #considered
+    if now then now.stage, now.judged = "lookahead", #considered end
     if best and sight.nextPhase then
         local idx = {}
         for i, j in ipairs(judgedPlans) do

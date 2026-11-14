@@ -248,6 +248,8 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
 
 
 PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
+# ends with no game result: the harness crashed, or a decision ran past its budget (ADR 0411)
+NO_RESULT = ('crashed', 'timeout')
 # a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts and `capped`
 # a cut made on purpose (campaign.lua noClean), and kept as FAILED they would crowd real crashes
 # out of KEEP_FAILED
@@ -335,7 +337,7 @@ def records_of(task, text, where, log_path):
     bot = any(is_bot(r) for r in recs)
     for r in recs:
         r['run_dir'] = where
-        if r.get('outcome') in ('crashed', 'timeout'):
+        if r.get('outcome') in NO_RESULT:
             r['log'], r['log_tail'] = log_path, log_tail(log_path)
         # the campaign crashed (load, arrive, save, cap) before its bot reported: the
         # environment did not hold. A no_style or done end is the campaign's own answer.
@@ -550,11 +552,11 @@ def attempt_line(r, said):
     rewrote) would otherwise vanish from the listing."""
     if not is_bot(r):
         k = r.get('task_attempt')
-        if k is None or k in said or (r.get('outcome') != 'crashed' and r.get('env_status') is None):
+        if k is None or k in said or (r.get('outcome') not in NO_RESULT and r.get('env_status') is None):
             return None
         said.add(k)
-        if r.get('outcome') == 'crashed':
-            return 'attempt %s: crashed before the bot reported (%s)' % (k, r.get('why'))
+        if r.get('outcome') in NO_RESULT:
+            return 'attempt %s: %s before the bot reported (%s)' % (k, r.get('outcome'), r.get('why'))
         return 'attempt %s: the bot left no record; the campaign ended %s (%s)' % (
             k, r.get('outcome'), r.get('why'))
     said.add(r.get('attempt'))
@@ -576,7 +578,7 @@ def attempt_line(r, said):
         r.get('turns', '-'), len(r.get('deaths') or []),
         '' if r.get('frames') is None else ', %d frames' % r['frames'],
         '' if cost is None else ', %.1f CPU s' % cost,
-        ' (%s)' % r.get('why') if r.get('outcome') == 'crashed' else '',
+        ' (%s)' % r.get('why') if r.get('outcome') in NO_RESULT else '',
         ' (%s)' % why if why else '',
         ' [noted: %s]' % noted if noted else '',
         ' [stalls: %s]' % stalls if stalls else '') + anomalies
@@ -784,7 +786,7 @@ def pilot_summary(pairs, cells, cpu_s=0.0, reach=None, looks=LOOKS):
 
 # ---- one cell, played to its verdict (PR-H, T095: chapter cells and campaign cells) ----
 
-UNUSABLE = ('crashed', 'timeout', 'no_style')   # no game result
+UNUSABLE = NO_RESULT + ('no_style',)   # no game result
 
 
 def simdir(vanilla):
@@ -2618,12 +2620,13 @@ def starts_main(args, pool=None):
         if rec.get('chapter') is not None:
             continue   # an attempt; the record with no chapter says how the campaign ended
         seed = rec['seed']
-        if rec.get('outcome') == 'crashed':
-            # the harness failing, never the bot (campaign.lua): left unpinned, so the next
-            # `starts` plays the seed again rather than spend it on a crash
+        if rec.get('outcome') in NO_RESULT:
+            # no game result: a crash is the harness failing, a timeout a decision past its
+            # budget (ADR 0411). Left unpinned, so the next `starts` plays the seed again
+            # rather than spend it on a run that never finished
             crashed += 1
-            print('  %s: crashed, not pinned (%s; %s)' % (campaign_id(STARTS_PREFIX, seed),
-                                                         rec.get('why'),
+            print('  %s: %s, not pinned (%s; %s)' % (campaign_id(STARTS_PREFIX, seed),
+                                                  rec.get('outcome'), rec.get('why'),
                                                              rec.get('run_dir') or rec.get('log')),
                   flush=True)
             continue
@@ -2764,7 +2767,7 @@ def resume_main(args, pool=None):
     print('%d %s campaigns carried on, as %s-<campaign>, on %d workers'
           % (len(tasks), args.game, args.tag, args.jobs), flush=True)
     pool = pool or Pool(jobs=args.jobs, out=os.path.join(store, RESUME_RUNS))
-    crashed = 0
+    crashed = timed_out = 0
     for rec in pool.run(tasks):
         if rec.get('chapter') is not None:
             print('  %s chapter %s attempt %s: %s%s, %s turns, %d deaths'
@@ -2772,12 +2775,15 @@ def resume_main(args, pool=None):
                      rec.get('outcome'), ' clean' if rec.get('clean') else '', rec.get('turns'),
                      len(rec.get('deaths') or [])), flush=True)
             continue
-        crashed += rec.get('outcome') in ('crashed', 'timeout')
+        crashed += rec.get('outcome') == 'crashed'
+        timed_out += rec.get('outcome') == 'timeout'
         # a scout lap's end says so: its `done` is never a clean game (ADR 0409)
         print('%s (from %s): %s%s (%s)' % (rec.get('campaign'), rec.get('resumed_from'),
                                            'scout lap ' if rec.get('scout') else '',
                                            rec.get('outcome'), rec.get('why')), flush=True)
-    return 1 if crashed else 0
+    if crashed or timed_out:
+        print('%d crashed, %d timed out' % (crashed, timed_out), flush=True)
+    return 1 if crashed or timed_out else 0
 
 
 def kept_play(paths, instrument, rom_hashes):
@@ -3503,10 +3509,10 @@ def witness_label(diag, plan):
         # the pin then read avoided, and a full-information plan could use acts only the
         # fog-off board offered (ADR 0392)
         return None, '%s: a line from before `planned` was recorded; re-run it' % mode
-    if diag.get('outcome') == 'crashed':
+    if diag.get('outcome') in NO_RESULT:
         # the replay stopped on an error of its own after it matched: the unit fell, if it
         # did, because the run stopped, which says nothing about the plan. Every replay that
-        # reached its pin ends with a `why` (outcome "diag"); only a crash is a failure
+        # reached its pin ends with a `why` (outcome "diag"); only a crash or a timeout is a failure
         return None, 'REPLAY FAILED: %s: %s' % (mode, diag.get('why'))
     if diag.get('broken'):
         # the replay could not play its plan to the end (`broken`, the first act not played):

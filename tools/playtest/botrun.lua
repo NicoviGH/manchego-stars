@@ -523,9 +523,11 @@ M.QUIET_BOUND = 16
 -- Vanilla Ch15 (Eirika)'s first decision ran 8.4 million with no plan and was stopped by hand
 -- after an hour. The kept records hold no decision's own frames (from now: plans.slowest); the
 -- most any attempt averaged a decision is 152,790 (vanilla Ch4, campaign 4003: 3,055,800 over
--- 20 plans), and this is about ten times that -- some ten minutes of one worker. The number is
--- Nicolas's to confirm.
-M.DECISION_FRAMES = 1500000
+-- 20 plans). Nicolas set 4,000,000 (2026-11-14) because no kept record could have met it: the
+-- largest whole attempt is 3,545,061 frames. 1,500,000 was sized from per-attempt averages, and
+-- Ch15 already held a 1,220,020-frame decision (tag ch15b). plans.slowest will give real
+-- per-decision numbers to tighten it.
+M.DECISION_FRAMES = 4000000
 
 -- Readings in a row without a new low of its own after which a ledger goal's row is stalled (the
 -- win stops waiting for it). FR-007's stall is three player phases in a row without a move that
@@ -1556,8 +1558,20 @@ function M.run(api)
                         end
                     end)
                 end
-                if sight.batch and not pinNow() then action = sight.batch(decide) else action = decide() end
+                -- the watch comes off however the decision ends: a timeout (or any error)
+                -- left on the sight would police the next game call outside any decision
+                local ran, got = pcall(function()
+                    if sight.batch and not pinNow() then return sight.batch(decide) end
+                    return decide()
+                end)
                 if sight.watch then sight.watch(nil) end
+                if not ran then
+                    -- the outer handler reads where the decision was; it is cleared here
+                    if type(got) == "table" then got.deciding = deciding end
+                    deciding = nil
+                    error(got, 0)
+                end
+                action = got
                 local spent = api.frames() - from
                 if spent > rec.plans.slowest.frames then
                     rec.plans.slowest = { frames = spent, turn = turn }
@@ -1707,14 +1721,15 @@ function M.run(api)
     local ok, outcome, why, fault = pcall(play)
     if not ok and type(outcome) == "table" and outcome.timeout then
         -- the watch's (above): where the decision was when its budget ran out
-        rec.timeout = { turn = deciding.turn, frames = outcome.frames, limit = M.DECISION_FRAMES,
-                        stage = deciding.at and deciding.at.stage,
-                        plans_judged = deciding.at and deciding.at.judged,
-                        phases = deciding.at and deciding.at.phases }
+        local at = outcome.deciding
+        rec.timeout = { turn = at.turn, frames = outcome.frames, limit = M.DECISION_FRAMES,
+                        stage = at.at and at.at.stage,
+                        plans_judged = at.at and at.at.judged,
+                        phases = at.at and at.at.phases }
         return finish("timeout", string.format(
             "the decision on turn %d ran %d frames of game code, over the %d a decision may (%s)",
-            deciding.turn, outcome.frames, M.DECISION_FRAMES,
-            deciding.at and deciding.at.stage or "no planner stage"))
+            at.turn, outcome.frames, M.DECISION_FRAMES,
+            at.at and at.at.stage or "no planner stage"))
     end
     if not ok then return finish("crashed", "Lua error: " .. tostring(outcome)) end
     return finish(outcome, why, fault)

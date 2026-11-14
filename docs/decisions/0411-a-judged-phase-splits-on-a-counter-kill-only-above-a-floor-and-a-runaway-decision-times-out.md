@@ -50,7 +50,7 @@ Visit at (17,6), judged 199). Of the counter kills left unsplit at 1/64 in that 
 1.5 million frames, 18,002 were certain kills (no information lost), 8,089 were under 5% and
 the other 2,826 lay between.
 
-**Decision 2: a decision may run `Botrun.DECISION_FRAMES` (1,500,000) frames of game code;
+**Decision 2: a decision may run `Botrun.DECISION_FRAMES` (4,000,000) frames of game code;
 past that the attempt ends `timeout`.** `Sight.watched` asks a watch before every game call,
 however deep the sandboxes nest; botrun's watch raises once the decision is over its budget,
 each sandbox puts its writes back on the way out, and the record is emitted with outcome
@@ -60,14 +60,14 @@ are the planner's `opts.at`: where it was). The environment is not clean (`fault
 under its own name, never retried: the next attempt would meet the same board and spend the
 same budget.
 
-**Why 1,500,000, and that it is Nicolas's to confirm.** The kept records hold no decision's
+**Why 4,000,000: Nicolas set it (2026-11-14).** The kept records hold no decision's
 own frames (5,936 records read; from now on `plans.slowest` keeps the slowest decision's frames
 and turn). What they do hold is each attempt's frames and plans made: the most any attempt
 averaged per plan is 152,790 frames (vanilla Ch4, campaign 4003: 3,055,800 frames over 20
-plans), the median 2,259. The limit is about ten times that slowest average, some ten minutes
-of one worker, and under a fifth of what the hang had run when it was stopped. It is not
-proven that no kept attempt held one decision above it: the largest whole attempt is
-3,545,061 frames, so a limit of 4,000,000 is the one no kept record could have met.
+plans), the median 2,259. 1,500,000 was first proposed, about ten times that slowest average,
+but it was sized from per-attempt averages and Ch15 already held a 1,220,020-frame decision
+(tag ch15b). The largest whole attempt is 3,545,061 frames, so 4,000,000 is the limit no kept
+record could have met. `plans.slowest` will give real per-decision numbers to tighten it.
 
 **What it proved** (the lap's saved Ch15 start, one attempt each, campaign 4006).
 
@@ -100,5 +100,5 @@ It changes what `BRANCH` bounds and may move suite games, so it is recommended, 
 Nicolas's call.
 
 **Untested.** Whether the floor at 1/64 moves any suite game (the frozen suite is not run for
-a PR); whether any kept attempt held a decision over 1,500,000 frames; what Ch15 needs beyond
+a PR); whether any kept attempt held a decision over 4,000,000 frames; what Ch15 needs beyond
 the cost (the experiment's loss and its four over-cap turns are one game: a lead).

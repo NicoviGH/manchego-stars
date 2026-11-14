@@ -466,13 +466,14 @@ end
 -- decision ran 8.4 million frames and was stopped by hand. The watch is asked before each
 -- game call (sight.watch); a decision within the budget plays on and is the record's slowest.
 do
+    local watched   -- the last watch the bot set on the sight (nil once it unset it)
     local function run(perCall)
         local g = fakeGame { units = rout() }
         local sight = g.api.sight
         g.api.sight = function()
             local s = sight()
             local watch
-            s.watch = function(fn) watch = fn end
+            s.watch = function(fn) watch = fn; watched = fn end
             local attack = s.attack
             -- each attack read "runs" perCall frames of game code, the watch asked first
             s.attack = function(...)
@@ -497,6 +498,7 @@ do
     check(type(r.env_status) == "table" and r.env_status.fault, "timeout",
           "timeout: no game result, so the environment is not clean")
     check(r.why:find("frames of game code", 1, true) ~= nil, true, "timeout: the why says so")
+    check(watched, nil, "timeout: the watch is off the sight however the decision ended")
     ok, r = run(1000)
     check(r.outcome, "won", "timeout: a decision within the budget plays on")
     check(r.timeout, nil, "timeout: and records none")
