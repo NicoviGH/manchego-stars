@@ -279,6 +279,32 @@ do
     check(seen[3], 30, "openMap: a tile with no change changes nothing")
 end
 
+-- test_map_change_tiles_are_the_rectangles_drawn_tiles: the change at (2,1) is 2x2 at (2,1);
+-- the game writes only its non-zero tiles (ApplyMapChangesById), so (3,2), a 0, is not one.
+-- A tile with no change has none (nil).
+do
+    local bytes = {}
+    local mem = { u8 = function(a) return bytes[a] or 0 end,
+                  u16 = function(a) return bytes[a] or 0 end,
+                  u32 = function(a) return bytes[a] or 0 end }
+    local S = { GetMapChangeIdAt = 1, GetMapChange = 2 }
+    local mc = 0x500
+    bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 2, 2, 0x600
+    bytes[0x600], bytes[0x602], bytes[0x604], bytes[0x606] = 0x88, 0x8C, 0x90, 0
+    local function call(fn, args)
+        if fn == S.GetMapChangeIdAt then
+            return (args[1] == 2 and args[2] == 1) and 3 or 0xFFFFFFFF
+        end
+        return args[1] == 3 and mc or 0
+    end
+    local got = {}
+    for _, t in ipairs(Sight.mapChangeTiles(mem, call, S, 2, 1) or {}) do
+        got[#got + 1] = t.x .. "," .. t.y .. "=" .. t.tile
+    end
+    check(table.concat(got, " "), "2,1=136 3,1=140 2,2=144", "change: the drawn tiles, row by row")
+    check(Sight.mapChangeTiles(mem, call, S, 5, 0), nil, "change: none at a tile without one")
+end
+
 -- test_equip_does_not_leak_into_the_next_read: EquipUnitItemSlot (bmitem.c) moves the item to
 -- the front of the bag, a write the game makes and no journal sees. Two judged plans in one
 -- batch: the first equips slot 2, and the second must find the bag as it was, its slot 0 still

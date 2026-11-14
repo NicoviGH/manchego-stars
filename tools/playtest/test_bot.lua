@@ -451,6 +451,8 @@ local function sightOf(o)
     -- a retry's memory (sight.knows, ADR 0399): the red unit ids it remembers
     if o.known then s.knows = function(u) return o.known[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
+    -- the tiles a door's or wall's map change opens ("x,y" -> { { x, y } }; sight.mapChange)
+    if o.changes then s.mapChange = function(x, y) return o.changes[x .. "," .. y] end end
     -- what each unit holds no key for ("x,y" -> the lock), and who drops one (lock -> enemies)
     if o.locked then
         s.locked = function(u, x, y) return (o.locked[u.id] or {})[x .. "," .. y] end
@@ -2003,6 +2005,67 @@ do
     local _, ctx = B.candidates(boardOf(A, E), sight, style("careful"))
     local t = ctx.turnsTo(A, { x = 4, y = 0 })
     check(t ~= nil and t > 0, true, "breach: the goals' turns go through the door")
+end
+
+-- The way through doors (#510, the scout lap): A at (0,0) holds a key, the boss stands at the
+-- far end of the row, and `o` builds the doors between. What A does first and its turns there.
+local function doorWay(goalX, o)
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, goalX, 0, { isBoss = true, minRange = false })
+    o.objective, o.reach = { kind = "boss" }, { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
+    o.obstacles, o.openers = {}, { [0x01] = true }
+    local a = B.decide(boardOf(A, E), sightOf(o), style("careful"))
+    local _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+    return a, ctx.turnsTo(A, { x = goalX, y = 0 })
+end
+local function near(t, want) return t ~= nil and math.abs(t - want) < 1e-9 end
+
+-- test_a_gate_two_doors_deep_opens_as_one: the doors at (2,0) and (3,0) are one map change
+-- (the game opens its whole rectangle, ApplyMapChangesById). (3,0) touches the boss's side but
+-- A cannot walk to it; (2,0) is A's but touches only the other door. Read one tile at a time
+-- neither opened the way, and vanilla Ch9 (Ephraim)'s army held in its corner for 12 attempts.
+-- Turns: 2 moves to (2,0), 1 through the gate, 1 out, 1 to the boss = 5 / MOV 5.
+do
+    local gate = { { x = 2, y = 0 }, { x = 3, y = 0 } }
+    local a, t = doorWay(5, {
+        field = fieldsOf { ["5,0"] = { ["4,0"] = 1, ["5,0"] = 0 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0 },
+                           ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1, ["5,0"] = 2 } },
+        doors = gate, changes = { ["2,0"] = gate, ["3,0"] = gate },
+    })
+    check(a and a.act, "door", "gate: the cut-off unit opens the gate")
+    check(a and a.door and (a.door.x .. "," .. a.door.y), "2,0", "gate: the door it can reach")
+    check(near(t, 1.0), true, "gate: the turns run through both tiles of the gate")
+end
+
+-- test_a_way_runs_through_two_doors: doors at (2,0) and (5,0), the boss at (7,0). Only (5,0)
+-- touches the boss's side, and A reaches it only through (2,0); the way is both, in order.
+-- Turns: 2 to (2,0), 3 on to (5,0), 2 on to the boss = 7 / 5.
+do
+    local a, t = doorWay(7, {
+        field = fieldsOf { ["7,0"] = { ["6,0"] = 1, ["7,0"] = 0 },
+                           ["5,0"] = { ["3,0"] = 2, ["4,0"] = 1, ["5,0"] = 0, ["6,0"] = 1, ["7,0"] = 2 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1, ["4,0"] = 2 } },
+        doors = { { x = 2, y = 0 }, { x = 5, y = 0 } },
+    })
+    check(a and a.door and (a.door.x .. "," .. a.door.y), "2,0", "two doors: the first one first")
+    check(near(t, 1.4), true, "two doors: the turns count both")
+end
+
+-- test_a_door_onto_a_roofed_room: the door at (2,0) opens onto a room the game draws as roof
+-- (no walk) until the door's change uncovers it, (3,0) and (4,0); the door at (5,0) is the far
+-- wall's, the boss at (7,0) beyond (vanilla Ch14 (Eirika): (17,19), its 4x6 change, then
+-- (10,14)). Turns: 2 to (2,0), 3 across the room to (5,0), 2 on = 7 / 5.
+do
+    local a, t = doorWay(7, {
+        field = fieldsOf { ["7,0"] = { ["6,0"] = 1, ["7,0"] = 0 },
+                           ["5,0"] = { ["5,0"] = 0, ["6,0"] = 1, ["7,0"] = 2 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0 } },
+        doors = { { x = 2, y = 0 }, { x = 5, y = 0 } },
+        changes = { ["2,0"] = { { x = 2, y = 0 }, { x = 3, y = 0 }, { x = 4, y = 0 } } },
+    })
+    check(a and a.door and (a.door.x .. "," .. a.door.y), "2,0", "roof: the room's door first")
+    check(near(t, 1.4), true, "roof: the turns cross the room the door uncovers")
 end
 
 -- test_goal_turns_go_through_the_keys_enemies_drop: the chest at (4,0) sits in a room behind
