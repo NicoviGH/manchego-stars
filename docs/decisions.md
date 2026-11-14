@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-408 decisions. Read this index, then open the two or three you need — the whole
+409 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -253,6 +253,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0406` | [A probe plays only the runs it names, and the leak guard lists every leak](decisions/0406-a-probe-plays-only-the-runs-it-names-and-the-leak-guard-lists-every-leak.md) | 2026-11-13 | #510 |
 | `0407` | [A simulated enemy phase starts as the game's does](decisions/0407-a-simulated-enemy-phase-starts-as-the-games-does.md) | 2026-11-13 | #510 |
 | `0408` | [A hurt unit is offered its own heal at any HP below max, and a held unit weighs it](decisions/0408-a-hurt-unit-is-offered-its-own-heal-at-any-hp-below-max-and-a-held-unit-weighs-it.md) | 2026-11-13 | #510 |
+| `0409` | [The scout lap carries a campaign past a chapter it cannot clear clean](decisions/0409-the-scout-lap-carries-a-campaign-past-a-chapter-it-cannot-clear-clean.md) | 2026-11-13 | #510 |
 
 ---
 

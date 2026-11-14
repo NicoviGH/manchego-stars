@@ -51,6 +51,8 @@
 --   capped      api.attempts is below MAX_ATTEMPTS and a chapter used them without a clean clear:
 --               the run was cut short on purpose, so it says nothing of the chapter or the bot
 --               (never infeasible or bot_fault)
+--   (api.scout, the scout lap: a chapter with no clean clear is passed from a win, its chapter
+--   line `scouted`, and every line carries `scout = true`; a chapter with no win still stops it)
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
@@ -91,6 +93,8 @@
 --   only                  OPTIONAL: the one attempt to play (see above)
 --   attempts              OPTIONAL: an integer in 1..MAX_ATTEMPTS bounding a chapter's attempts
 --                         in place of MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
+--   scout                 OPTIONAL: true for the scout lap (montecarlo.py `resume --scout`,
+--                         M.SCOUT_PATIENCE, ADR 0409)
 --   advanceDice(n)        advance the game's RNG n draws (Sight.advance) and return how many
 --                         were advanced: the count the record keeps as `dice_advanced`
 --   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
@@ -111,6 +115,13 @@ M.PREFIX = "CAMPAIGN "
 -- restarts, so styles are drawn again once every one has been tried (each retry has its own
 -- dice, ADR 0404)
 M.MAX_ATTEMPTS = 12
+-- The scout lap (api.scout, montecarlo.py `resume --scout`; #510 comment 6872554917): a
+-- campaign that carries on past a chapter it cannot clear clean, so the walls after it can be
+-- seen at all. It takes the first win with no player unit lost, and from this attempt on the
+-- first win of any kind. Its chapter lines say `scouted`, never `cleared`: a scout lap finds
+-- harness faults and missing abilities; it never says how hard a chapter is (its party is
+-- smaller than a clean one's).
+M.SCOUT_PATIENCE = 4
 
 -- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE.
 -- Measured: run call1b (stride 1), campaign 4001 attempt 2 started one draw ahead, drew 59 in
@@ -170,8 +181,8 @@ local function byCharId(roster)
 end
 
 -- Between the chapter's start and its first move: the team, the shops, the seals. `need` is
--- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team. Returns
--- the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
+-- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team (on the
+-- scout lap, scouted). Returns the team ({ deploy, reasons, pick }; deploy = the units fielded; pick = the whole pick for
 -- the attempt's record, { cap, demands, units = { { charId, group, forced, carried, answers =
 -- the demand ids it answers, why ("benched" for one left out), covers } }, uncovered = the
 -- ids of the demands of another kind than an enemy class that a roster unit answers and no
@@ -244,6 +255,17 @@ local function between(api, style, followed, need, carried)
     return team
 end
 
+-- the team a chapter line keeps: who was fielded, and why each was
+local function teamLine(team)
+    local out = { deploy = team.deploy, reasons = {} }
+    for _, charId in ipairs(team.deploy) do
+        local r = team.reasons[charId] or { why = "fielded" }
+        r.charId = charId
+        out.reasons[#out.reasons + 1] = r
+    end
+    return out
+end
+
 function M.run(api)
     local Bot, Json, info = api.Bot, api.Json, api.info
     if api.attempts ~= nil and not (math.type(api.attempts) == "integer"
@@ -257,6 +279,7 @@ function M.run(api)
         if api.diag then return end   -- a diagnostic writes only its DIAG line (botrun.lua)
         t.campaign, t.game, t.rom_hash, t.mode, t.seed =
             info.campaign, info.game, info.rom_hash, info.mode, info.seed
+        t.scout = api.scout and true or nil
         api.emit(M.PREFIX .. Json.encode(t))
     end
     local function stop(outcome, why)
@@ -386,14 +409,28 @@ function M.run(api)
                 end
                 if rec.clean == true then
                     entry.outcome, entry.turns = "cleared", rec.turns
-                    entry.team = { deploy = team.deploy, reasons = {} }
-                    for _, charId in ipairs(team.deploy) do
-                        local r = team.reasons[charId] or { why = "fielded" }
-                        r.charId = charId
-                        entry.team.reasons[#entry.team.reasons + 1] = r
-                    end
+                    entry.team = teamLine(team)
                     carried = {}
                     for _, charId in ipairs(team.deploy) do carried[charId] = true end
+                    break
+                end
+                -- the scout lap carries on from a win that was not clean (M.SCOUT_PATIENCE)
+                local lost = {}
+                for _, d in ipairs(rec.deaths or {}) do
+                    if d.faction == "blue" then lost[d.charId] = true end
+                end
+                -- the patience never outlasts a lowered cap (`resume --scout --attempts 2`)
+                if api.scout and rec.outcome == "won" and (next(lost) == nil
+                        or entry.attempts >= math.min(M.SCOUT_PATIENCE, attemptCap)) then
+                    entry.outcome, entry.turns = "scouted", rec.turns
+                    entry.deaths = rec.deaths
+                    entry.missed = rec.clear and { recruits = rec.clear.recruits_missing,
+                                                   rewards = rec.clear.rewards_missing }
+                    entry.team = teamLine(team)
+                    carried = {}
+                    for _, charId in ipairs(team.deploy) do
+                        if not lost[charId] then carried[charId] = true end
+                    end
                     break
                 end
                 entry.failures[#entry.failures + 1] = { attempt = entry.attempts, style = style,

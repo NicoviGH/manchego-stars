@@ -3901,6 +3901,8 @@ INSPECT.campaignApi = function(game)
     -- cfg.attempts: the retry cap for this run (montecarlo.py `resume --attempts`); the bound
     -- is campaign.lua's to check
     api.attempts = cfg.attempts
+    -- cfg.scout: carry on past a chapter with no clean clear (campaign.lua M.SCOUT_PATIENCE)
+    api.scout = cfg.scout
     -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
     api.startOnly = cfg.start_only
     -- a diagnostic replays one attempt (botrun.lua reads the rest of PT_DIAG through botApi);
@@ -4275,6 +4277,14 @@ INSPECT.campaignApi = function(game)
             if stalled(obs, state) then return nil, "the promotion stalled (see the inspect snapshot)" end
             local ok = true
             if state == "player_map_idle" and classOf() ~= before then return true
+            -- a Canto unit is handed back its move after the seal (playerphase.c
+            -- PlayPhaseForceActiveUnitCanto; vanilla Ch14's start, Cormag's Elysian Whip, on
+            -- the scout lap of 2026-11-14 from campaign 4006: class 0x1F to 0x21, then player_range_idle, and B does not
+            -- close it): spent where the unit stands, as after any act (INSPECT.awaitActed).
+            -- Only a changed class is let through: a unit selected with its class unchanged
+            -- still runs out the allowance, loudly.
+            elseif state == "unit_selected" and classOf() ~= before then
+                ok = INSPECT.awaitActed(u.addr)
             elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
             elseif state == "yes_no_choice" then
                 ok = selectSemantic("answer_yes", "the promotion's prompt takes Yes", function(after)
