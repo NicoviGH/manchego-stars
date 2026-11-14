@@ -25,24 +25,26 @@ until that door's change uncovers it.
    obstacle opens the way when that ground touches the goal's ground; the steps through it
    are walked over that ground alone (`stepsThrough`).
 2. A way may run through several obstacles, opened one after another as a player opens them.
-   `breachFor` takes first an obstacle the unit can walk to, the nearest; else one it has
-   turns to through others (`turnsFor`, which asks the breach again for that obstacle), the
-   fewest. The march (`stepFor`) and its length (`marchLength`) step to the first obstacle
-   of the chain, as they already did for a door's key. That step never comes round: a
-   breach kept for the decision was read with no open breach cut short, and an obstacle's
-   turns through the next one exceed that one's own.
+   `obstacleTurns` reads, once per unit, start and keys sought, the turns to every obstacle
+   the unit may open: its own walk there, or a locked door's key way, and on from any
+   obstacle reached through the ground that one opens -- a shortest-path read (Dijkstra).
+   `breachFor` takes first an obstacle the unit can walk to, the nearest; else the one on the
+   fewest of those turns. The march (`stepFor`) and its length (`marchLength`) step to the
+   first obstacle of the chain, as they already did for a door's key; each step is to an
+   obstacle on fewer turns than the last, so the steps end.
 
-**A read cut short is kept only while its cut lasts.** Asking X's way asks Y's, and Y's
-asks X's again while X is still open; that inner answer ("no way through X") is true only
-inside X's question. Kept for the decision, it told every later question Y was cut off;
-never kept, the same reads ran again for every way tried, and one turn of Ch14 ran 14
-minutes and then crashed (a Lua stack overflow). So each read notes the open breaches it was cut
-against, and its answer is dropped when the deepest of them closes (`beginRead`/`endRead`).
+**Why one read, not a question per obstacle.** Asked per obstacle by recursion, X's way asks
+Y's and Y's asks X's. A guard that cuts the cycle answers "no way" for Y inside X's
+question; kept for the decision, that told every later question Y was cut off (#612 review);
+never kept, or kept only while the cut lasts, the same reads ran again for every way tried,
+in time doubling with each door in a row (one turn of Ch14 ran 14 minutes and then crashed
+with a Lua stack overflow). The shortest-path read has no cycle to cut: a row of N doors
+costs N + 1 reads of the game's turns (a unit test holds it).
 
 **What it proved** (one attempt each, from the lap's saved starts). The first version
-(without the walkable-ground and cut-memo corrections) won Ch14 in 28 turns: Colm opened
+(without the walkable-ground correction, and with the recursive read) won Ch14 in 28 turns: Colm opened
 (17,19) on turn 2, Seth (10,14) on turn 6 and a third door from (17,1) on turn 15, and the
-objective read a chance on turn 1 (0.17) where it read 0 before. The final version opened
+objective read a chance on turn 1 (0.17) where it read 0 before. A later version (the cut-short recursive read) opened
 (17,19) on turn 2 too, by Eirika at 6 HP with a Doorkey just taken; the Fighters that
 arrived as it opened killed her that enemy phase (a reinforcement, predicted 0%), and the
 attempt was lost. Ch9 ends `stuck` in both, at the next wall: Colm, the one unit the read
@@ -53,5 +55,5 @@ it; the units with no key read no way until the gate is open and hold in their c
 **Cost.** The read adds no game call per decision beyond a change's tiles, kept for the run.
 Ch9: 35.0 s of CPU (209 judged phases, 2163 movement maps), the same as the first version
 (34.6 s), against 25 s before (149 phases: units now move). Ch14's 393 s for the win was its
-first real fight (1146 judged phases, 43 kills). A unit test holds a row of eight doors to
-29 reads of the game's turns (217 when cut reads are never kept).
+first real fight (1146 judged phases, 43 kills). These runs were made before the shortest-path read
+replaced the recursive one; it has not been played since.

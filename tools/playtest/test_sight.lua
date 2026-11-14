@@ -311,6 +311,7 @@ end
 do
     local bytes = {}
     local mem = { u8 = function(a) return bytes[a] or 0 end,
+                  s8 = function(a) local v = bytes[a] or 0 return v >= 0x80 and v - 0x100 or v end,
                   u16 = function(a) return bytes[a] or 0 end,
                   u32 = function(a) return bytes[a] or 0 end }
     local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10 }

@@ -1047,9 +1047,8 @@ function M.mapChangeTiles(mem, call, S, x, y, costs)
             k = k + 1
             if tile ~= 0 then
                 local terrain = mem.u8(lookup + (tile >> 2))
-                -- an s8 read as a byte: 0x80 and up is negative, no way
-                local cost = costs and mem.u8(costs + terrain)
-                if not costs or (cost > 0 and cost < 0x80) then
+                local cost = costs and mem.s8(costs + terrain)
+                if not costs or cost > 0 then
                     out[#out + 1] = { x = x0 + ix, y = y0 + iy, tile = tile, terrain = terrain,
                                       cost = cost or nil }
                 end

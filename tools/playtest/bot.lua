@@ -1066,63 +1066,86 @@ local function doorOpens(ctx, u, d, seeking)
     return keyWay(ctx, u, d, u, lock, seeking) ~= nil
 end
 
--- A breach still being worked out reads as none when asked again: a door's key way, or the way
--- through another obstacle, can ask for this same breach (the key's holder cut off from the
--- door; X's way through Y, Y's through X), and that way would never end. An answer cut short
--- so holds only while that breach is open: kept for good, it said "no way" to every later
--- question in the decision (#612 review); not kept at all, the same reads ran again for every
--- way tried, and one turn of vanilla Ch14 took 14 minutes. So each read (beginRead/endRead)
--- notes the open breaches it was cut against (ctx.cuts, by depth, ctx.breachDepth), and its
--- answer is dropped when the deepest of them closes (ctx.taint).
-local function beginRead(ctx)
-    local outer = ctx.cuts or {}
-    ctx.cuts = {}
-    return outer
+-- The doors `u` can open, then the walls (sight.obstacles): what may open a way, in the order
+-- a unit takes them -- opening a door costs one act, a wall its HP. A door is one when u can
+-- open it, now or with a key it can take on the way (doorOpens).
+local function openables(ctx, u, seeking)
+    local doors = {}
+    for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
+        if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, seeking)) then
+            doors[#doors + 1] = { x = d.x, y = d.y, door = true }
+        end
+    end
+    local lists = { ctx.sight.obstacles() }
+    if #doors > 0 then table.insert(lists, 1, doors) end
+    return lists
 end
--- `value` kept in tbl[key]; `own` = the depth of the breach this read worked out, closing now
--- (its own cut is no cut: a way through itself is no way), nil for any other read
-local function endRead(ctx, outer, tbl, key, value, own)
-    ctx.taint = ctx.taint or {}
-    if own then
-        for _, e in ipairs(ctx.taint[own] or {}) do e[1][e[2]] = nil end
-        ctx.taint[own], ctx.cuts[own] = nil, nil
+local function obstacleKey(o) return (o.door and "door " or "wall ") .. tileKey(o.x, o.y) end
+
+-- The turns `u` needs from `from` to each obstacle it may open (openables), by obstacleKey:
+-- the walk there (sight.turnsTo), a door it has no key for through its key (keyWay), and on
+-- from any obstacle it reaches through the ground opening that one opens (stepsThrough), the
+-- fewest -- the turns through any number of doors and walls, opened one after another as a
+-- player opens them (vanilla Ch14 (Eirika): three doors to the throne). One shortest-path
+-- read (Dijkstra) per unit, start and keys sought, kept for the decision. Asked per obstacle
+-- by recursion instead, X's way asked Y's and Y's asked X's: a guard cut the cycle, its
+-- answer was wrong for every later question, and dropping such answers ran a row of doors in
+-- time doubling with each door (#612 review). One asked again while it is being worked out
+-- (a key's way back to a door of the same read) reads as none. Second: the obstacles u walks
+-- to on its own costs (their turns are the walk's).
+local function obstacleTurns(ctx, u, from, seeking)
+    ctx.ways = ctx.ways or {}
+    local k = u.id .. "@" .. from.x .. "," .. from.y .. "|" .. lockSig(seeking)
+    if ctx.ways[k] then return ctx.ways[k][1], ctx.ways[k][2] end
+    ctx.ways[k] = { {}, {} }
+    local s, all, turns, walks, done = ctx.sight, {}, {}, {}, {}
+    for _, list in ipairs(openables(ctx, u, seeking)) do
+        for _, o in ipairs(list) do all[#all + 1] = o end
     end
-    tbl[key] = value
-    local deepest
-    for d in pairs(ctx.cuts) do
-        outer[d] = true
-        if not deepest or d > deepest then deepest = d end
+    for _, o in ipairs(all) do
+        local lock = o.door and lockAt(ctx, u, o.x, o.y)
+        local n
+        if lock then n = select(2, keyWay(ctx, u, o, from, lock, seeking))
+        else
+            n = s.turnsTo and s.turnsTo(u, o, from)
+            walks[obstacleKey(o)] = n ~= nil
+        end
+        turns[obstacleKey(o)] = n
     end
-    if deepest then
-        ctx.taint[deepest] = ctx.taint[deepest] or {}
-        table.insert(ctx.taint[deepest], { tbl, key })
+    while true do
+        local p, best
+        for _, o in ipairs(all) do
+            local n = turns[obstacleKey(o)]
+            if n and not done[obstacleKey(o)] and (not best or n < best) then p, best = o, n end
+        end
+        if not p then break end
+        done[obstacleKey(p)] = true
+        for _, o in ipairs(all) do
+            -- a door locked to u opens only with its key: no way round that
+            local field = not done[obstacleKey(o)] and not (o.door and lockAt(ctx, u, o.x, o.y))
+                and fieldFor(ctx, o)
+            local steps = field and stepsThrough(ctx, field, p)
+            local n = steps and best + steps / s.mov(u)
+            if n and (not turns[obstacleKey(o)] or n < turns[obstacleKey(o)]) then
+                turns[obstacleKey(o)] = n
+            end
+        end
     end
-    ctx.cuts = outer
+    ctx.ways[k] = { turns, walks }
+    return turns, walks
 end
+
 local function breachFor(ctx, u, goal, seeking)
     if not (goal and ctx.sight.obstacles) then return nil end
     local k = goalKey(u.id, goal) .. "|" .. lockSig(seeking)
-    ctx.breachOpen = ctx.breachOpen or {}
-    if ctx.breachOpen[k] then
-        ctx.cuts[ctx.breachOpen[k]] = true
-        return nil
-    end
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
-    local outer, depth = beginRead(ctx), (ctx.breachDepth or 0) + 1
-    ctx.breachDepth, ctx.breachOpen[k] = depth, depth
-    b = false
+    -- one still being worked out reads as none: a door's key way can ask for this same breach
+    -- again (the key's holder cut off from the door), and that way would never end
+    b, ctx.breaches[k] = false, false
     local field = fieldFor(ctx, goal)
     if cutOff(ctx, goal, u) then
-        -- a unit that can open a door takes it first: opening costs one act, a wall its HP
-        local doors = {}
-        for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
-            if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, seeking)) then
-                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
-            end
-        end
-        local lists = { ctx.sight.obstacles() }
-        if #doors > 0 then table.insert(lists, 1, doors) end
+        local lists = openables(ctx, u, seeking)
         local opening = {}
         for i, list in ipairs(lists) do
             opening[i] = {}
@@ -1135,7 +1158,7 @@ local function breachFor(ctx, u, goal, seeking)
         -- one obstacle before several: the walk's (the field's), then the turns through others
         local reads = {
             function(o) return walkFrom(ctx, o, u.x, u.y) end,
-            function(o) return turnsFor(ctx, u, o, nil, seeking) end,
+            function(o) return obstacleTurns(ctx, u, u, seeking)[obstacleKey(o)] end,
         }
         for _, read in ipairs(reads) do
             for _, list in ipairs(opening) do
@@ -1149,8 +1172,7 @@ local function breachFor(ctx, u, goal, seeking)
             if b then break end
         end
     end
-    ctx.breachOpen[k], ctx.breachDepth = nil, depth - 1
-    endRead(ctx, outer, ctx.breaches, k, b, depth)
+    ctx.breaches[k] = b
     return b or nil
 end
 
@@ -1162,8 +1184,7 @@ end
 -- every unit, so nothing pulled the army and a run took 22 turns. A chest or door `u` has no
 -- key for is reached by way of the enemy whose fall gives it one (keyWay): the walk to that
 -- enemy, then on from its tile with the key (`keyed`). Memoised for the decision
--- (ctx.keyTurns): the goals ask it per goal, taker and partial plan -- while every breach a
--- read was cut short by is still being worked out (endRead).
+-- (ctx.keyTurns): the goals ask it per goal, taker and partial plan.
 turnsFor = function(ctx, u, tile, from, seeking, keyed)
     from = from or u
     ctx.keyTurns = ctx.keyTurns or {}
@@ -1171,7 +1192,6 @@ turnsFor = function(ctx, u, tile, from, seeking, keyed)
         .. lockSig(seeking) .. (keyed and "+" or "")
     local hit = ctx.keyTurns[mk]
     if hit ~= nil then return hit or nil end
-    local outer = beginRead(ctx)
     local s, n = ctx.sight, nil
     local lock = not keyed and lockAt(ctx, u, tile.x, tile.y)
     if lock then
@@ -1179,12 +1199,12 @@ turnsFor = function(ctx, u, tile, from, seeking, keyed)
     else
         n = s.turnsTo and s.turnsTo(u, tile, from)
         local b = not n and s.turnsTo and breachFor(ctx, u, tile, seeking)
-        local toB = b and turnsFor(ctx, u, b, from, seeking)
+        local toB = b and obstacleTurns(ctx, u, from, seeking)[obstacleKey(b)]
         local field = toB and fieldFor(ctx, tile)
         local through = field and stepsThrough(ctx, field, b)
         if through then n = toB + through / s.mov(u) end
     end
-    endRead(ctx, outer, ctx.keyTurns, mk, n or false)
+    ctx.keyTurns[mk] = n or false
     return n
 end
 
@@ -1216,9 +1236,12 @@ local function stepFor(ctx, u, tile, seeking)
         return e and stepFor(ctx, u, e, withLock(seeking, lock)) or tile
     end
     local b = breachFor(ctx, u, tile, seeking)
-    -- a door u has no key for is reached through its key; one u cannot walk to, through the
-    -- obstacle before it (breachFor's turns through others)
-    if b and (b.door and lockAt(ctx, u, b.x, b.y) or cutOff(ctx, b, u)) then
+    -- a door u has no key for is reached through its key; one u cannot walk to on its own
+    -- costs (sight.turnsTo), through the obstacle before it. Each such step is to an obstacle
+    -- on fewer turns than the last (obstacleTurns: its way runs through the next), so the
+    -- steps end.
+    if b and (b.door and lockAt(ctx, u, b.x, b.y)
+              or not select(2, obstacleTurns(ctx, u, u, seeking))[obstacleKey(b)]) then
         return stepFor(ctx, u, b, seeking)
     end
     return b or tile
@@ -2197,9 +2220,10 @@ function M.candidates(board, sight, style, opts)
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
     ctx.quietGoals = opts and opts.quietGoals or {}
-    -- memoised for the decision (turnsFor's ctx.keyTurns): the planner asks it per goal, taker
-    -- and partial plan, and a unit cut off goes through breachFor and the field again each time
-    ctx.keyTurns = {}
+    -- memoised for the decision (turnsFor's ctx.keyTurns, obstacleTurns' ctx.ways): the planner
+    -- asks it per goal, taker and partial plan, and a unit cut off goes through breachFor and
+    -- the field again each time
+    ctx.keyTurns, ctx.ways = {}, {}
     ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
     ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)

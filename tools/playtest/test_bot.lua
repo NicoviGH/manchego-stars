@@ -2114,7 +2114,7 @@ do
     }
     -- asked first: the decision's own questions (the march on the boss) forgotten
     local _, fresh = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
-    fresh.breaches, fresh.keyTurns = {}, {}
+    fresh.breaches, fresh.keyTurns, fresh.ways = {}, {}, {}
     local want = fresh.turnsTo(A, { x = 9, y = 0 })
     check(want ~= nil, true, "cut: asked first, Y has a way")
     local _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
@@ -2122,11 +2122,44 @@ do
     check(ctx.turnsTo(A, { x = 9, y = 0 }), want, "cut: Y's way, asked after, is the same")
 end
 
+-- test_a_read_that_hits_a_cut_answer_is_cut_too: A at (0,0) walks to door W; W opens onto
+-- Z's ground, Z onto X's, X onto the boss's. Y and X open onto each other's ground; V opens
+-- onto X's, and only Y onto V's. Asking for the boss works out X, which asks Y (cut short:
+-- X is open, so "no way"), then V, whose one way is Y: it finds Y's cut answer in the memo.
+-- Read as a plain "no way" and kept, V was cut off for the rest of the decision, though A
+-- reaches it by W, Z, X and Y (#612 re-review). The fields are drawn as the test needs them:
+-- a door is beside another's ground where one of its sides is in that field.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 8, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        obstacles = {}, openers = { [0x01] = true },
+        field = fieldsOf { ["8,0"] = { ["7,0"] = 1, ["8,0"] = 0 },
+                           ["6,0"] = { ["6,0"] = 0, ["5,0"] = 1, ["7,0"] = 1, ["6,1"] = 1,
+                                       ["9,5"] = 1, ["9,1"] = 1 },
+                           ["9,2"] = { ["9,2"] = 0, ["6,1"] = 1 },
+                           ["9,4"] = { ["9,4"] = 0, ["9,3"] = 1 },
+                           ["4,0"] = { ["3,0"] = 1, ["4,0"] = 0, ["5,0"] = 1 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1 } },
+        doors = { { x = 6, y = 0 }, { x = 9, y = 2 }, { x = 9, y = 4 }, { x = 4, y = 0 },
+                  { x = 2, y = 0 } },
+    }
+    -- asked first: the decision's own questions (the march on the boss) forgotten
+    local _, fresh = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+    fresh.breaches, fresh.keyTurns, fresh.ways = {}, {}, {}
+    local want = fresh.turnsTo(A, { x = 9, y = 4 })
+    check(want ~= nil, true, "cut hit: asked first, V has a way")
+    local _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+    check(ctx.turnsTo(A, { x = 8, y = 0 }) ~= nil, true, "cut hit: the boss has a way")
+    check(ctx.turnsTo(A, { x = 9, y = 4 }), want, "cut hit: V's way, asked after, is the same")
+end
+
 -- test_a_row_of_doors_is_read_in_few_steps: eight doors in a row, the boss beyond the last,
--- the doors listed far first. Each door's way asks the next one's, which asks back (each
--- touches the other's room): a read cut short so and never kept ran again for every way
--- tried, and one turn of vanilla Ch14 (Eirika) took 14 minutes (#612 review). The game's
--- reads stay few.
+-- the doors listed far first; each door touches the next one's room and the last one's. Asked
+-- per door by recursion, each way asked the next one's, which asked back: the reads doubled
+-- with each door, and one turn of vanilla Ch14 (Eirika) took 14 minutes (#612 review). The
+-- game's turns are read about once a door.
 do
     local N = 8
     local A = blue(0x01, 0, 0, 0)
