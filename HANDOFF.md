@@ -9,42 +9,42 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-13, night): PR #609 is merged; item E (the escort) is next, shaped from the leads below.**
-Nicolas (2026-11-11): "right now we're focused on getting the bot to play vanilla". Fable owns
-the direction and may pivot from the plan when the data says so (Nicolas, 2026-11-13). The plan
-is **#510 comment 6810567866**; item D's results are comment 6842371541; the replay of D's
-leads on main, and why Colm never heals, are **comment 6866345084**.
-- **Next step (Fable's recommendation; Nicolas said to follow it, 2026-11-13):** item E of the
-  plan, the escort. Every lead left is an enemy on a unit's road (Ch8's west chests, Ch9's
-  Amelia and village). Before designing it, replay Ch8 4004 and Ch9 4006 once on main
-  (`resume --attempts 1`) and read the turns named below; write the design as one comment on
-  #510 (no design docs).
-- **PR #609 is merged** (05d310df; Nicolas: "Merge and handoff", 2026-11-13; ADR 0408; CI green
-  on the head bee3570c): a Vulnerary is offered to the planner
-  at any HP below max, priced for HP thrown away (Nicolas approved the price); a hurt unit the
-  plan leaves waiting gets its own heal weighed (plan kind `heal`); a staff heal earlier in a
-  plan is no longer undone by its target's later act (older bug, found in review). Ch7 4005
-  goes from lost on turn 4 to won clean in 14. Review: `/code-review 609 medium` (9 findings)
-  and one scoped re-review, all fixed; the PR body lists them.
-- **Item F is not needed for Ch7:** the lord's death was the missing Vulnerary offer, not a
-  horizon problem (a Fable subagent's probes `wprobeA`-`F`, checked against the traces).
-- **What is left on the leads** (#510 comment and ADR 0408): Ch8's west chests and Ch9's
-  Amelia and village are each an enemy on the road (Ch8 4004 turn 8: every plan south is over
-  the cap at 76.7%; Ch9 4006 turn 11: the Talk plan at 87.2%):
-  item E, the escort. Tana on Ch9 turn 2 attacks into a wound (her heal was weighed on turn 4;
-  waiting read 0%, healing 0.2%).
-- **Asked, not answered:** call 6 (is a recruit's departure remembered?), Nicolas's call;
-  telling the bot would not have saved Amelia in this game.
-- **How to spend the session (Nicolas asked, 2026-11-13):** code reading, decomp searches and
-  the review go to Sonnet subagents from the first step; the main session chooses the test
-  and reads its result. A 12-second run (`suite --only scout-ch6/1001`) with a temporary log
-  settles most questions about a simulated decision faster than reading does.
-- **The frozen suite is never run for a PR** (AGENTS.md). A PR proves its change with unit
-  tests and the run that showed the problem; the suite runs only before the bot's reading is
-  relied on.
-- **Asked, not answered:** a finish line for "the bot plays vanilla well". Fable's suggestion:
-  a clean clear within the attempt cap on vanilla Ch1 to Ch9 from the pinned starts, then the
-  difficulty verdicts start. His call.
+**Next session starts here (2026-11-14): PRs #611 and #612 are open, reviewed and green; Eirika's Ch15 turn 1 never decides.**
+- **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
+  routes; he left every call on the way to us (memory `finish-line-whole-vanilla-game`). The
+  definition and the roadmap are **#510 comment 6872554917**; the order now worked replaces
+  the plan's item E position.
+- **Merged:** PR #610 (item E1, a goal act also judged with every other unit holding; ADR 0405
+  amended). Nicolas: "Merge it", 2026-11-14.
+- **Open, CI green on the heads, reviewed (`/code-review` medium + one scoped re-review each, all
+  findings fixed): merge #611 first, then #612** (stacked: retarget #612 to `main` with
+  `gh pr edit 612 --base main` BEFORE deleting #611's branch; land with `--merge`). Not yet
+  approved by Nicolas for merge (#510's merge memory covers step 9 only).
+  - **#611 the scout lap** (ADR 0409): `resume --scout` carries a campaign past a chapter it
+    cannot clear clean (first win with no unit lost, any win from attempt 4); `--route 1|2`;
+    a scout lap's states folder holds a `SCOUT` file and resumes only with `--scout`. Also a
+    promoted Canto unit spends its second move (Cormag's Elysian Whip hung Ch14's start).
+  - **#612 the doors** (ADR 0410): a door opens its whole map change (walkable ground only),
+    and the turns through several doors are one shortest-path read (`obstacleTurns`); an
+    asleep or berserked unit is never an actor (`Board.statusHeld`). **Ch14 is won** (`gate5`,
+    attempt 1, 22 turns, no death; again on `lap1d`); it was `stuck` in every record before.
+- **The wall table is #510 comment 6878903339; round 2 is comment 6881113521.** Eirika's
+  route: Ch9 (item E's misses), Ch10, Ch11, Ch12 clean, Ch13 (deaths), Ch14 won. Ephraim's:
+  Ch9 `stuck` at the gate (Colm, the only key, refuses the Door at 49-90%: item E).
+- **Next step: Eirika's Ch15 turn 1.** The lap's first decision there ran over an hour (8.4M
+  frames of game code, no plan) and was stopped. One instrumented run from its saved start
+  (PR #612's branch): `resume --game vanilla --tag <t> --campaigns lap1d-lap1-fwd1-cs-s4006
+  --chapter 15 --last 15 --attempts 1 --scout`. Whether it is the new obstacle read, the
+  desert or something else is untested. Then carry the lap on (`--chapter 15 --scout`).
+- **After that:** item E (E2 a guard on the road counts in a unit's turns; E3 an idle unit takes
+  the guard; #510 comment 6872468981) for Ephraim's Ch9 gate and Ch8/Ch9's misses; then the
+  convoy (seals and boosters back out, promote at level 10, boosters to the lord first; #510
+  comment 6872948037, settled, not built).
+- **Kept:** the lap's states under `references/sim/vanilla/c25b145e3745/states/` (`lap1-`,
+  `lap1b-`, `lap1d-`, `lap2-`, `gate*-`, `dbg*-`; scout ones are marked `SCOUT`).
+- **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
+  subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
+  never run for a PR.
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
 - A simulated enemy phase and a single strike now start as the game's phase does
