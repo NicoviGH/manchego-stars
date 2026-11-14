@@ -2550,13 +2550,16 @@ end
 
 -- A weapon or staff the game says the unit can use (its rank, its class), and the one test of
 -- "can use" (Bot.fullBag's weighing and the shop's arming both ask it); not a rank it forbids.
+-- A weapon is the game's own flag (IA_WEAPON or IA_STAFF, kind "weapon"), not a named type: a
+-- Dragonstone or a Ballista's type (bmitem.h ITYPE_DRAGN, ITYPE_BLLST) has no shop type name,
+-- and its holder is still armed.
 local function canUseWeapon(it)
-    return it.type ~= nil and it.usable == true
+    return it.kind == "weapon" and it.usable == true
 end
 
 -- A weapon the game says the unit cannot use: the matching "unusable".
 local function cannotUseWeapon(it)
-    return it.type ~= nil and it.usable ~= true
+    return it.kind == "weapon" and it.usable ~= true
 end
 
 -- A weapon or staff the unit can use now: the game's can-use and uses left (a broken tome, or
@@ -2608,20 +2611,32 @@ function M.shop(gold, stock, party)
         room[u.charId] = room[u.charId] - 1
         out[#out + 1] = { unit = u.charId, item = s.item, vulnerary = s.vulnerary }
     end
-    local list = {}
-    for _, u in ipairs(party) do list[u.charId] = wants(u, stock) end
-    for _, u in ipairs(party) do
-        local w = list[u.charId]
-        if w[1] and w[1].vulnerary then
-            local arms = not M.armed(u) and w[2] ~= nil
-            if room[u.charId] > (arms and 1 or 0) then buy(u, w[1]) end
+    -- Vulneraries first, then weapons, within one group of units.
+    local function spend(group)
+        local list = {}
+        for _, u in ipairs(group) do list[u.charId] = wants(u, stock) end
+        for _, u in ipairs(group) do
+            local w = list[u.charId]
+            if w[1] and w[1].vulnerary then
+                local arms = not M.armed(u) and w[2] ~= nil
+                if room[u.charId] > (arms and 1 or 0) then buy(u, w[1]) end
+            end
+        end
+        for _, u in ipairs(group) do
+            for _, s in ipairs(list[u.charId]) do
+                if not s.vulnerary then buy(u, s) end
+            end
         end
     end
+    -- The unarmed are paid for before the armed, so no armed unit's Vulnerary takes the gold
+    -- that arms a fielded unit, and Bot.arms (this loop over the roster's unarmed) is the
+    -- shop's own prefix.
+    local unarmed, armed = {}, {}
     for _, u in ipairs(party) do
-        for _, s in ipairs(list[u.charId]) do
-            if not s.vulnerary then buy(u, s) end
-        end
+        table.insert(M.armed(u) and armed or unarmed, u)
     end
+    spend(unarmed)
+    spend(armed)
     return out
 end
 
@@ -2629,9 +2644,10 @@ end
 -- would buy for each unit that is not armed (M.armed), in the order it buys them. It is
 -- M.shop run over those units with the one purse and each unit's bag room, so what it says
 -- the shop buys is what the shop buys; none for a unit nothing in stock can arm, a full bag,
--- or a purse the units before it spent. The Vulneraries of the armed units, whom the shop
--- would also pay for if fielded, are not in the purse: the deploy is not picked yet. The pick
--- asks the game how such a unit fights holding those items.
+-- or a purse the units before it spent. The shop pays the unarmed before the armed, and the
+-- fielded unarmed are a subset of these in the same order, so the gold spent before a unit
+-- here is never less than the shop's: a unit `arms` arms, the shop arms (it may arm one more
+-- `arms` left out). The pick asks the game how such a unit fights holding those items.
 function M.arms(gold, stock, roster)
     local unarmed, out = {}, {}
     for _, u in ipairs(roster) do

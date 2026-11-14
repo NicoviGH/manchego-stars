@@ -83,8 +83,8 @@
 --   teamGroups()          groups, maxima: class id (string) -> team group, and each group's
 --                         most fielded (team_groups.py)
 --   needs(roster, arms)   { demands, answers, strength } for Bot.team, read at the prep screen;
---                         a unit in `arms` ({ [charId] = stock item }, Bot.arms) is read holding
---                         that item
+--                         a unit in `arms` ({ [charId] = { item id... } }, Bot.arms) is read
+--                         holding them
 --   cap()                 the prep screen's deploy cap, or nil when the chapter has no prep
 --                         screen (the game fields its own list; nothing is picked)
 --   deploy(charIds)       pick exactly these on the prep screen; true | nil, why

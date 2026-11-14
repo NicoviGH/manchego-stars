@@ -31,13 +31,16 @@ roster, read three times a chapter, asks only for can-use, uses and the Vulnerar
 sandbox read per held item for nothing.
 
 **Decision 3: the pick reads a unit the shop will arm holding everything it will buy, and
-`Bot.arms` is `Bot.shop`'s own spend loop.** The shop's loop (Vulneraries first, then each
-unit's weapons in order, one purse, five bag slots) is the one owner of the spend order.
+`Bot.arms` is `Bot.shop`'s own spend loop.** The shop's loop (the unarmed units first, then the
+armed; within each, Vulneraries first, then each unit's weapons in order; one purse, five bag
+slots) is the one owner of the spend order.
 `Bot.arms` runs it over the unarmed units and returns, per unit, every weapon or staff it
 bought (a list: a unit that can use a staff and a sword holds both, types in name order), so
-a purse that arms one of four units says so, and the two cannot drift. It leaves out the
-Vulneraries of armed units, whom the shop pays for only if fielded: the deploy is not picked
-yet. `api.needs` asks the game, in a sandbox, what the unit answers (`sight.holding` writes the
+a purse that arms one of four units says so, and the two cannot drift. Because the shop pays
+the unarmed before the armed, no armed unit's Vulnerary takes the gold that arms a fielded
+unit, and the fielded unarmed are a subset of `arms`' units in the same order: a unit `arms`
+arms, the shop arms. A weapon is the game's own flag (`IA_WEAPON` or `IA_STAFF`), not a named
+type, so a Divinestone's holder is armed. `api.needs` asks the game, in a sandbox, what the unit answers (`sight.holding` writes the
 items after its own into its bag and puts them back; it refuses a bag with an item past a gap,
 which the board read and the roster would not list). `Bot.team` is unchanged: it ranks by the
 strengths it is given. A unit nothing in stock arms is read as it is, last.
