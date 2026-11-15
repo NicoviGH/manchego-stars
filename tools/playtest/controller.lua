@@ -147,8 +147,9 @@ local RULES = {
         name = "observation",
         check = function(observation)
             if observation.error then return unsupported(observation.error) end
-            -- the cursor's cell holds an id gUnitLookup has no unit for (green stops at 0x54,
-            -- bmunit.c). Malformed only where a unit is chosen from the map: the player phase or
+            -- the cursor's cell holds an id gUnitLookup has no unit for (0x3F, 0x55-0x7F, 0xB3-0xBF:
+            -- blue ends at 0x3E, green at 0x54, red at 0xB2, bmunit.c; the observer leaves purple,
+            -- 0xC0 up, out). Malformed only where a unit is chosen from the map: the player phase or
             -- the prep screen's formation cursor. Between chapters the map is mid-load and such
             -- bytes clear on their own (vanilla, entering Ch10: 1 frame, then 4).
             local c = observation.cursor

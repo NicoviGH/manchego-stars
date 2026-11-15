@@ -703,9 +703,14 @@ do
     check(got, nil, "a non-unit id under the formation cursor fails closed")
     local loading = { cursor = cell, procs = proc("game_control", "game_control_root"),
                       world = { chapter = 11, faction = 64, turn = 0 } }
-    got, why = C.classify(loading)
-    check(why ~= "gBmMapUnit id 0x7A has no gUnitLookup entry", true,
-          "a non-unit id while the chapter loads is not malformed")
+    check(C.classify(loading), "transition", "a non-unit id while the chapter loads is a transition")
+    -- the other half lives in harness.lua (not loadable outside mGBA): the observer reports the
+    -- fact and raises no error of its own for it
+    local f = assert(io.open(here .. "harness.lua"))
+    local harness = f:read("a")
+    f:close()
+    check(harness:find("gUnitLookup entry", 1, true), nil, "harness: no observer error for a non-unit cell")
+    check(harness:find("unit_unknown = unknown or nil", 1, true) ~= nil, true, "harness: the cell's fact is reported")
 end
 
 -- Trace lines are structured and carry the full state/action/postcondition transition.
