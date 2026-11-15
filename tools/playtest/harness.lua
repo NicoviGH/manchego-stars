@@ -3712,22 +3712,11 @@ INSPECT.prepList = function()
     end)
 end
 
--- The convoy's items, { id, uses, index } each (gConvoyItemArray, id | uses << 8; index its
--- slot, from 0), every non-empty one of its CONVOY_ITEM_COUNT slots, as GetConvoyItemCount
--- counts them. The game keeps the array packed (AddItemToConvoy fills the first empty slot;
--- the Supply screen's rebuild, ClearSupplyItems then one AddItemToConvoy an item, packs it),
--- but the read does not lean on it: a gap hides nothing (INSPECT.convoyFault names one). Not gConvoyItemCount:
--- convoymenu.c sets that only when its chooser opens, in an EWRAM overlay other screens reuse.
--- The one read: api.snapshot keeps them, api.convoy weighs them, collectedItems looks for a
--- gift among them.
-INSPECT.convoyItems = function()
-    local out = {}
-    for i = 0, BOARD.CONVOY_ITEM_COUNT - 1 do
-        local v = ru16(SYM.gConvoyItemArray + i * 2)
-        if v ~= 0 then out[#out + 1] = { id = v & 0xFF, uses = v >> 8, index = i } end
-    end
-    return out
-end
+-- The convoy's items and why it cannot be the game's own: Board.convoyItems / convoyFault (the
+-- one read, unit-tested over a fake memory). api.snapshot keeps the items, api.convoy weighs
+-- them, collectedItems looks for a gift among them; a give or take checks the fault first.
+INSPECT.convoyItems = BOARD.convoyItems
+INSPECT.convoyFault = BOARD.convoyFault
 
 -- An item as the game stores it in a bag or the convoy: id | uses << 8.
 INSPECT.packItem = function(it) return it.id | (it.uses << 8) end
@@ -3739,21 +3728,6 @@ INSPECT.itemsLine = function(list)
         out[#out + 1] = string.format("%X/%d%s", it.id, it.uses, it.index and ("@" .. it.index) or "")
     end
     return table.concat(out, " ")
-end
-
--- Why the convoy cannot be the game's own, or nil: an item after an empty slot (the game's
--- adds and rebuild keep it packed) or an item with no id. What RemoveItemFromConvoy's pack
--- would leave (it copies the scratch buffer in, ADR 0413's amendment); a give or take refuses
--- such a convoy rather than carry it on.
-INSPECT.convoyFault = function()
-    local gap = false
-    for i = 0, BOARD.CONVOY_ITEM_COUNT - 1 do
-        local v = ru16(SYM.gConvoyItemArray + i * 2)
-        if v == 0 then gap = true
-        elseif gap then return string.format("an item after an empty slot (slot %d)", i)
-        elseif (v & 0xFF) == 0 then return string.format("an item with no id (slot %d)", i) end
-    end
-    return nil
 end
 
 -- An item's own facts, whoever holds it (the one read of the item's data; unitItemFacts adds
@@ -4522,6 +4496,8 @@ INSPECT.campaignApi = function(game)
         end, true)
         if not r.added then return nil, "the bag is full" end
         local lost = r.lost
+        -- unreachable while a just-emptied convoy has room; if it fires, the item is already in the
+        -- bag and the convoy part refilled, so the error stops the campaign rather than play on
         if lost then
             return nil, moved(string.format("the convoy refused item 0x%X back", lost.id), u.addr,
                               bagWas, convoyWas)

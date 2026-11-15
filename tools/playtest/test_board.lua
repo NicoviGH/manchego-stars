@@ -25,6 +25,7 @@ local SYM = {
     gBattleActor = 0x0203A4EC,
     gBattleTarget = 0x0203A56C,
     gAiDecision = 0x0203AA96,
+    gConvoyItemArray = 0x0203A81C,
 }
 
 local fakeMem = dofile(here .. "fakemem.lua")
@@ -478,6 +479,36 @@ do
             check(bound[k], v, "bind: " .. k)
         end
     end
+end
+
+-- test_convoy_fault (#617): a give or take refuses a convoy the game would not make. A packed
+-- convoy of real items passes; a gap before an item, an item with no id, and an id past the
+-- item table (what RemoveItemFromConvoy's scratch-buffer copy left: about 40 garbage items)
+-- each name the slot. The read keeps every non-empty slot, gaps included.
+do
+    local m = fakeMem()
+    local function row(id) m.w8(SYM.gItemData + id * 0x24 + 0x06, id) end
+    row(0x01); row(0x14); row(0xCD)
+    local function slot(i, v) m.w16(SYM.gConvoyItemArray + i * 2, v) end
+    slot(0, 0x2E01); slot(1, 0x1414); slot(2, 0x01CD)
+    check(Board.convoyFault(m, SYM), nil, "convoyFault: a packed convoy of real items")
+    local items = Board.convoyItems(m, SYM)
+    check(#items, 3, "convoyItems: three items")
+    check(items[2].id .. "/" .. items[2].uses .. "@" .. items[2].index, "20/20@1", "convoyItems: id, uses, slot")
+    slot(5, 0x1E01)
+    check(Board.convoyFault(m, SYM), "an item after an empty slot (slot 5)", "convoyFault: a gap")
+    check(#Board.convoyItems(m, SYM), 4, "convoyItems: a gap hides nothing")
+    slot(5, 0); slot(3, 0x1E00)
+    check(Board.convoyFault(m, SYM), "an item with no id (slot 3)", "convoyFault: no id")
+    slot(3, 0x01CE)
+    check(Board.convoyFault(m, SYM), "item 0xCE has no row in the item table (slot 3)",
+          "convoyFault: an id past the table")
+    slot(3, 0x0130)
+    check(Board.convoyFault(m, SYM), "item 0x30 has no row in the item table (slot 3)",
+          "convoyFault: a row whose number is not its id")
+    local bound = Board.bind(m, SYM)
+    check(bound.convoyFault(), "item 0x30 has no row in the item table (slot 3)", "bind: convoyFault")
+    check(#bound.convoyItems(), 4, "bind: convoyItems")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

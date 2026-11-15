@@ -57,13 +57,13 @@ wrote about 40 (replayed as `dbgtake1`). PR 2's runs took items while the buffer
 a scan of the 27 saved states that record a convoy (`gear2`, `conv1` to `conv4`, `exp1`,
 `exp2`, `exp2b`, `exp2e`, `party1`) found no item with no id, no uses or an id past the item
 table. `lap1d`'s states hold the convoy only in their `.ss`, so they were not scanned; a give
-or take now refuses a convoy that is not the game's (`INSPECT.convoyFault`). The Supply screen's own Take
+or take now refuses a convoy that is not the game's (`Board.convoyFault`). The Supply screen's own Take
 (`sub_809E2C8`) puts the item in the bag's first empty slot, then rebuilds the convoy
 (`sub_80982B8`: `ClearSupplyItems`, then `AddItemToConvoy` for each item left). The harness
 now does that rebuild, fed from the convoy itself, so the convoy keeps its slot order less the
 item taken. The screen feeds it from its item list, which also moves the item's page first;
 that sort is not reproduced. Every give and take now checks the convoy is the game's before
-it acts (packed, every item with an id: `INSPECT.convoyFault`) and is exactly what it was with
+it acts (packed, every item an id with a row in the item table: `Board.convoyFault`, unit-tested) and is exactly what it was with
 or without that one item after. Replayed (`dbgtake2`):
 Seth gave the Knight Crest and took the Iron Lance, Kyle (0x11) took the Crest and was promoted
 Cavalier to Paladin, and Ch10 was won with no death.
