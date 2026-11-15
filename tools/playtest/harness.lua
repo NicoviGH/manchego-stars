@@ -3594,7 +3594,19 @@ INSPECT.botApi = function(game)
             end, 900) then return false end
             return waitFor(won, 9000, true)
         end
-        return chooseWait()
+        if not chooseWait() then return false end
+        -- The game checks AREA events when an action ends, Wait included, and the event runs
+        -- after the menu closes. Vanilla Ch15's hidden treasure (ch15a-eventinfo.h AREA 0,0-2,2,
+        -- EventScr_GiveTreasureToLuckyDog) gives an item there, and a full bag opens the
+        -- send-to-convoy chooser: returning at the menu left the chooser open under the next
+        -- act's move (ch15diag2 turn 12). So wait the event out as a Visit does, answering its
+        -- boxes and the chooser; the last unit's Wait ends the phase, which ends this too.
+        if not waitFor(function()
+            return faction() ~= 0 or won() or lost() or INSPECT.settled("event")
+        end, TUNE.combatFrames, true) then
+            return false, "the event after the Wait never ended"
+        end
+        return true
     end
     api.endPhase = function()
         local phaseTurn = turn()

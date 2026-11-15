@@ -711,6 +711,16 @@ do
     f:close()
     check(harness:find("gUnitLookup entry", 1, true), nil, "harness: no observer error for a non-unit cell")
     check(harness:find("unit_unknown = unknown or nil", 1, true) ~= nil, true, "harness: the cell's fact is reported")
+    -- api.act's plain Wait waits out the AREA event it can set off, answering the full-bag
+    -- chooser (waitFor's tapA), before the next act moves (ch15diag2 turn 12)
+    local body = harness:match("api%.act = function%(a%)(.-)\n    api%.endPhase")
+    check(body ~= nil, true, "harness: api.act is found")
+    local tail = body and body:match("\n        if not chooseWait%(%) then return false end(.*)$")
+    check(tail ~= nil, true, "harness: the plain Wait checks its own result")
+    check(tail and tail:find('INSPECT.settled("event")', 1, true) ~= nil, true,
+        "harness: the plain Wait waits out the event it set off")
+    check(tail and tail:find("TUNE.combatFrames, true)", 1, true) ~= nil, true,
+        "harness: ...answering the boxes and the full-bag chooser on the way")
 end
 
 -- Trace lines are structured and carry the full state/action/postcondition transition.
