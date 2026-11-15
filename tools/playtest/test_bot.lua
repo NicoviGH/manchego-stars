@@ -3357,7 +3357,8 @@ do
             field = function() return { [0] = { [0] = 50 } } end,
             fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = hit, dmg = 9, hits = 1, killsTarget = true } } } },
             enemyPhase = function(plan)
-                masses[#masses + 1] = plan.mass
+                -- the attack plan's phases only: its board holds X (the one that waits does not)
+                if plan.reds[0x81] then masses[#masses + 1] = plan.mass end
                 return {}
             end,
         }
@@ -3368,17 +3369,19 @@ do
         end
         table.sort(masses)
         for i, m in ipairs(masses) do masses[i] = string.format("%.3f", m) end
-        return sc and sc.phases, cost and cost.floored, masses
+        return sc and sc.phases, cost and cost.floored, masses, cost and cost.averaged
     end
-    local phases, floored, masses = judge(50)
+    local phases, floored, masses, averaged = judge(50)
+    check(averaged, 0, "floor: a kill split is not averaged")
     check(phases, 2, "floor: an even kill splits the plan into two phases")
     check(floored, 0, "floor: and leaves no way unsplit")
-    -- (the game's two-dice hit: 50 shown is 49.5% true; the 1.000 is the plan that waits)
-    check(table.concat(masses, " "), "0.495 0.505 1.000", "floor: each phase is told its way's share")
-    phases, floored, masses = judge(99)
+    -- (the game's two-dice hit: 50 shown is 49.5% true)
+    check(table.concat(masses, " "), "0.495 0.505", "floor: each phase is told its way's share")
+    phases, floored, masses, averaged = judge(99)
+    check(averaged, 1, "floor: a kill no way split is left to the average")
     check(phases, 1, "floor: a 1% miss is under the floor, one phase on the average")
     check(floored, 1, "floor: the way left unsplit is counted")
-    check(table.concat(masses, " "), "1.000 1.000", "floor: that phase is the whole plan")
+    check(table.concat(masses, " "), "1.000", "floor: that phase is the whole plan")
 end
 
 -- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that
@@ -5795,6 +5798,8 @@ end
 do
     local units, o = threeOpenKills({ 90, 50, 70 })
     local phase = o.enemyPhase
+    -- the same call with no unsplit kills: what `averaged` is without them
+    local _, _, plain = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
     local at, during = {}, nil
     o.enemyPhase = function(plan)
         during = during or (at.stage .. "/" .. at.phases)
@@ -5805,7 +5810,7 @@ do
     local _, _, cost = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"),
                                     { at = at })
     check(cost.unsplit, 2 * cost.phases, "unsplit: each phase's count is summed into the cost")
-    check(cost.averaged, 0, "unsplit: and is no part of `averaged`")
+    check(cost.averaged, plain.averaged, "unsplit: and is no part of `averaged`")
     check(during ~= nil and during:match("^judge %a+/1$") ~= nil, true,
           "at: the first judged phase reads its stage and count (" .. tostring(during) .. ")")
     check(at.stage, "lookahead", "at: the call ends in its last stage")

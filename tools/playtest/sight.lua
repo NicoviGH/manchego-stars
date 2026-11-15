@@ -462,7 +462,8 @@ end
 -- 1 / floor, since each split leaves both sides at least that likely. The value is a tuning
 -- one (the ADR has what 1/64 and 1/256 cost and played).
 -- `mass0` (optional, default 1): the phase's own chance within the plan the planner judges (one
--- way of the plan's uncertain kills, ADR 0415), so one floor bounds the whole judged plan.
+-- way of the plan's uncertain kills, ADR 0415), so one floor bounds the whole judged plan. The
+-- lookahead's phase (nextPhase) is the plan's average way, the whole plan: its default 1 is right.
 M.SPLIT_FLOOR = 1 / 64
 function M.phaseWays(n, strikeAt, sandbox, floor, mass0)
     floor = floor or M.SPLIT_FLOOR

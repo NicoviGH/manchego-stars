@@ -1273,15 +1273,18 @@ function M.plan(Bot, board, sight, style, opts)
             -- a dim too wide for the ways left keeps the average; a narrower one after it is
             -- still played
             if #ways * #d.ways <= 2 ^ M.BRANCH then
-                local nxt = {}
+                local nxt, split = {}, false
                 for _, w in ipairs(ways) do
                     -- a way splits on this kill only while the chance off its likeliest side is
                     -- at least sight's floor of the whole plan (ADR 0415); below it the way keeps
-                    -- the average, as a dim past BRANCH does
+                    -- the average, as a dim past BRANCH does. A counter's dim of three or more
+                    -- ways may still leave one of its ways rarer than the floor: the bound is on
+                    -- the chance off the likeliest, and BRANCH bounds the ways
                     if w.p * d.unsure < floor then
                         nxt[#nxt + 1] = w
                         st.floored = st.floored + 1
                     else
+                        split = true
                         for _, o in ipairs(d.ways) do
                             local n = { p = w.p * o.p, gone = w.gone, reds = w.reds, hp = w.hp,
                                         dead = w.dead }
@@ -1313,7 +1316,8 @@ function M.plan(Bot, board, sight, style, opts)
                     end
                 end
                 ways = nxt
-                st.branched = st.branched + 1
+                -- a kill every way floored was split nowhere: it is left to the average
+                if split then st.branched = st.branched + 1 end
             end
         end
         st.averaged = #dims - st.branched

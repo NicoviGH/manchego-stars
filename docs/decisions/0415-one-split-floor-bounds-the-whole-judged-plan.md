@@ -30,7 +30,11 @@ ways), and each way is an enemy phase of 30 to 46 enemies.
 off that kill's likeliest side is at least `Sight.SPLIT_FLOOR` of the whole plan, and each
 enemy phase is told its way's share of the plan (`mass`), so its own counter splits are
 bounded by the same floor of the plan, not of the phase.** Below the floor, the way keeps the
-average, as a kill past `BRANCH` does. Each way left unsplit is counted (the planner's
+average, as a kill past `BRANCH` does, and a kill every way left unsplit counts as averaged,
+not branched. The bound is on the chance off the likeliest side: a counter's dim of three or
+more ways may still leave one of its ways rarer than the floor, and `BRANCH` bounds the
+ways. The lookahead's phase is the plan's average way, the whole plan, so its share is 1.
+Each way left unsplit is counted (the planner's
 `cost.floored`, the record's `plans.floored`), apart from `averaged` and `unsplit`. The
 planner reads the floor from the sight (`sight.splitFloor`), so `Sight.SPLIT_FLOOR` stays
 its one owner.
@@ -51,7 +55,8 @@ without the change: `test_bot.lua` (an even kill splits the plan into two phases
 share; a 1% miss stays one phase and is counted) and `test_sight.lua` (a 10% counter kill
 splits a phase that is the whole plan and not one that is a tenth of it).
 
-**Untested.** Whether the floor moves any frozen-suite game: the suite is not run for a PR
+**Untested.** The evidence that the floor keeps the bot's choices is one start and one seed.
+Whether the floor moves any frozen-suite game: the suite is not run for a PR
 and runs before the bot's reading is next relied on. What Ch15 needs beyond the cost: all three
 Ch15 games tonight fell back to a sacrifice plan on most turns, and the two losses are
 Ephraim's death, the floored one at 6.5%. That is one game each, a lead and not a cause.
