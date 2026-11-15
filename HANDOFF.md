@@ -23,17 +23,16 @@ and start a fresh instance; don't rely on auto-compaction.
   - Confirmed: on turn 15, a replan had Colm (charId 9), at 27 HP and alone, attack a Knight.
     That plan was judged at 0 death and left him at 3 HP. Turns 16–17 then had no plan under the
     cap, and he died on turn 17. Not door-related.
-  - Both leads tested (#510, the comment after 6900592350):
-    - **The chest lead is mostly refuted.** The chests are reachable: attempt 2 opened all three.
-      The ledger's chest chance ignores enemy bodies, which is a simplification, not the cause.
-    - **The lookahead lead is confirmed.** No second phase was judged on turn 15:
-      `M.triggers` fires only on a breach or a boss's reach (ADR 0389).
-    - **Waiting on Nicolas:** whether to widen ADR 0389's triggers. My pick is a narrow trigger:
-      a unit left one hit from death by an enemy that reaches it next turn, with no heal in reach.
-    - The "0.147 then 0" was a wrong premise, now corrected on #510. That figure was the worst
-      unit's (likely unit 1, attacking 163 alone in the south), and Colm's own read was the same
-      in both decisions. Diagnostic gap: rejected plans don't record which unit makes their
-      `max_die`.
+  - **Settled** (#510, the latest comment). Three instrumented runs (`look1`–`look3`, edits
+    reverted) and map data from the base ROM.
+    - The root is the one-phase horizon while Colm is worn down 12 HP an enemy phase. With every
+      plan looked ahead, he still dies on turn 17.
+    - The look-ahead re-ranks only its 4 finalists (planner.lua ~1886-1990).
+    - The candidate trigger plus finalist fix saved Colm, but lost Forde on turn 9 at a death read
+      of 0, and took 27 turns instead of 19. It fired on 14 of 40 decisions, and the finalist fix
+      never changed a play.
+    - `story` calls generic enemies "the Knight" by mistake (here a Mercenary and a Cavalier).
+    - **Waiting on Nicolas:** park the trigger (my pick) or measure it on the frozen suite.
 - **The Seize-map jam** (Ch7's pocket): the Ch10 attempt-1 case is gone on `door4`, but Ch7's is
   still open. The recommendation still waiting on Nicolas: on a Seize map, count the seizing
   unit's progress above an escort's.
