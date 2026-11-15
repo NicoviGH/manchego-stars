@@ -296,6 +296,9 @@ local STATUS_PETRIFY, STATUS_13 = 11, 13
 -- struct BattleUnit is 0x80 bytes; its word at +0x10 holds xPos, yPos (the low half), maxHP
 -- and curHP. struct BattleStats: +00 config and +02 range share its first word.
 local BU_SIZE, BU_POSITION, POSITION_BITS = 0x80, 0x10, 0xFFFF
+-- A battle unit's copy of its Unit's curHP (+00 the Unit, its +13), and +7C nonZeroDamage:
+-- whether the side's blows dealt any damage. GetBattleUnitExpGain reads both.
+local BU_HP, BU_NONZERO_DAMAGE = 0x13, 0x7C
 -- The AI's two bytes on a unit the enemy phase's start rewrites (M.battleWord): +0A aiFlags,
 -- the third byte of the word at +08 (level, exp, aiFlags, index), and +46 ai_counter, the
 -- third of the word at +44 (ai2, ai_b_pc, ai_counter).
@@ -785,7 +788,7 @@ function M.attackOf(ours, eHp, uHp)
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
              killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
-             joint = ours.joint,
+             joint = ours.joint, exp = ours.exp,
              kill = kill, die = (M.odds({ ours.back }, uHp)), sure = M.least(ours.dealt) >= eHp,
              expected = expected, counterWorst = M.worst(ours.back) }
 end
@@ -1807,7 +1810,26 @@ function M.new(outer)
         return table.concat(parts, ":")
     end
 
-    local function exchange(call, proc, sim)
+    -- What the exchange just simulated teaches the actor, by the game's own count
+    -- (GetBattleUnitExpGain, bmbattle.c: BattleApplyExpGains awards it after a real battle; a
+    -- simulation never calls it): its experience when its blows deal nothing, when they deal
+    -- damage, and when they kill. The count tells the three apart by two fields only, the
+    -- actor's nonZeroDamage and the target's HP, so each read sets those two on the
+    -- simulation's battle units (the actor alive: a dead one gains nothing, which the planner
+    -- reads off the exchange's ways). Which of the three a plan gets is the planner's, at the
+    -- HP the plan leaves the target.
+    local function expOf(call)
+        api.write8(S.gBattleActor + BU_HP, 1)
+        local function count(damaged, hp)
+            api.write8(S.gBattleActor + BU_NONZERO_DAMAGE, damaged)
+            api.write8(S.gBattleTarget + BU_HP, hp)
+            return call(S.GetBattleUnitExpGain, { S.gBattleActor, S.gBattleTarget })
+        end
+        return { none = count(0, 1), hit = count(1, 1), kill = count(1, 0) }
+    end
+
+    -- `teaches`: our unit is the actor, so the exchange also reads its experience (expOf)
+    local function exchange(call, proc, sim, teaches)
         call({ sim, { S.InitBattleForecastBattleStats, { proc } } })
         local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
         side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
@@ -1815,12 +1837,16 @@ function M.new(outer)
         local key = battleKey()
         local known = playedBy[key]
         if not known then
+            -- the count first, on the plain simulation the key was read from: the played ways
+            -- run it again and again and leave the last way's battle units behind
+            local exp = teaches and expOf(call) or nil
             known = { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
                 return lost(S.gBattleTarget), lost(S.gBattleActor)
             end)) }
+            known[4] = exp
             playedBy[key] = known
         end
-        side.dealt, side.back, side.joint = known[1], known[2], known[3]
+        side.dealt, side.back, side.joint, side.exp = known[1], known[2], known[3], known[4]
         return side
     end
 
@@ -1829,7 +1855,7 @@ function M.new(outer)
         if not w then return nil end
         local ours = sandbox(function(call, proc)
             return exchange(call, proc,
-                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, w.slot } })
+                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, w.slot } }, true)
         end)
         return M.attackOf(ours, e.hp, u.hp)
     end

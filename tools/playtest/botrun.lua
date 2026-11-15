@@ -1630,6 +1630,9 @@ function M.run(api)
                         from = from and { x = from.x, y = from.y },
                         to = trapped and actor and { x = actor.x, y = actor.y } or action.move,
                         canto = action.canto, act = action.act, target = action.target, battles = { battle },
+                        -- the game's count the plan read for the attack (none / hit / kill), to
+                        -- check against the battle's own exp (its actor's)
+                        taught = action.f and action.f.exp,
                         fell = fell, trapped = trapped or nil })
                 changes(after)
                 playerActs = M.actsHash(playerActs, action)

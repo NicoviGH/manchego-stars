@@ -341,7 +341,7 @@ local function attackPlayed(f, uHp, tHp)
                                         dmg = f.counterDmg, crit = f.counterCrit,
                                         hits = f.counterHits },
                             killsTarget = f.killsTarget, dealt = dealt, back = back,
-                            joint = joint }, tHp, uHp)
+                            joint = joint, exp = f.exp }, tHp, uHp)
 end
 -- A fixture's enemy strike (sight.strike's, or one of sight.enemyPhase's), played on a unit
 -- at `hp`; one already carrying takenDist is left as it is.
@@ -2664,6 +2664,92 @@ do
     }
     local a = Planner.plan(B, boardOf(A, E1, E2), sight, style("careful"))
     check(a and a.targetId, 0x81, "planner: the kill")
+end
+
+-- The experience a fixture's attack teaches (sight's exp: the game's GetBattleUnitExpGain for
+-- blows that deal nothing, deal damage, kill). A unit that cannot gain levels counts 0 for all.
+local function taught(none, hit, kill) return { none = none, hit = hit, kill = kill } end
+local CAPPED = taught(0, 0, 0)
+
+-- test_planner_trains_the_unit_the_kill_teaches_more (#510 party plan, PR 3): A and C each kill
+-- E for sure. A cannot gain levels (CAPPED), C learns 40 from the kill: C takes it. A's plan is
+-- valued as it was before experience counted: what a unit cannot learn adds nothing.
+local function sureKills(expA, expC)
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 2, 0)
+    local E = red(0x81, 1, 0, { hp = 5 })
+    return boardOf(A, C, E), sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 2, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true, exp = expA } } },
+               [0x02] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true, exp = expC } } } },
+    }
+end
+-- the unit whose attack the chosen plan holds (its first, by act order)
+local function attacker(rec)
+    local id = rec and rec.rank and (" " .. rec.rank.key):match(" (%d+)>attack@")
+    return id and tonumber(id)
+end
+local function valueOf(rec, unitId)
+    local best
+    for _, c in ipairs(rec and rec.considered or {}) do
+        if (" " .. c.rank.key):find(" " .. unitId .. ">attack@") then
+            best = math.max(best or -math.huge, c.rank.value)
+        end
+    end
+    return best
+end
+do
+    local board, sight = sureKills(CAPPED, taught(1, 20, 40))
+    local _, rec = Planner.plan(B, board, sight, style("careful"))
+    check(attacker(rec), 2, "experience: the kill goes to the unit it teaches")
+    local b1, s1 = sureKills(CAPPED, nil)
+    local _, capped = Planner.plan(B, b1, s1, style("careful"))
+    local b0, s0 = sureKills(nil, nil)
+    local _, before = Planner.plan(B, b0, s0, style("careful"))
+    check(valueOf(capped, 1) ~= nil and valueOf(capped, 1) == valueOf(before, 1), true,
+          "experience: a unit that cannot gain levels adds nothing")
+end
+
+-- test_planner_lets_the_kill_fall_to_the_unit_it_teaches (#510 party plan, PR 3): E has 10 HP;
+-- A's and C's blows take 5 each, for sure, so neither kills alone. A learns 40 from the kill, C
+-- 10: C chips first and A finishes, the kill read at the HP C's blow leaves E. (Without the
+-- experience the two orders tie, and the key puts A's blow first.)
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 2, 0)
+    local E = red(0x81, 1, 0, { hp = 10 })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 2, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 5, hits = 1,
+                                                    exp = taught(1, 20, 40) } } },
+               [0x02] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 5, hits = 1,
+                                                    exp = taught(1, 5, 10) } } } },
+    }
+    local _, rec = Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
+    check(rec and rec.rank.key, "2>attack@2,0>129 1>attack@0,0>129",
+          "experience: C's chip first, so A finishes")
+end
+
+-- test_experience_never_buys_a_plan_over_the_cap (#510 party plan, PR 3; a guard, true before
+-- experience counted too): C learns 40 from the kill, but its blow can miss and E's counter
+-- then kills it, past careful's 1%. A's sure kill teaches nothing, and A takes it.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 2, 0, { hp = 10 })
+    local E = red(0x81, 1, 0, { hp = 5 })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 2, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true, exp = CAPPED } } },
+               [0x02] = { [0x81] = { ["2,0"] = fc { hit = 80, dmg = 9, hits = 1,
+                                                    killsTarget = true, counters = true,
+                                                    counterHit = 100, counterDmg = 20,
+                                                    counterHits = 1, exp = taught(1, 20, 40) } } } },
+    }
+    local _, rec = Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
+    check(attacker(rec), 1, "experience: the cap holds")
 end
 
 -- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, Manchego Stars ch03 turn 11):

@@ -159,7 +159,9 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
--- whose death ends it (a lord's); gold: points per gold
+-- whose death ends it (a lord's); exp: per experience point our unit's attack teaches it, the
+-- game's own count (a full level is 100: about one kill), so the blow that trains the unit
+-- that needs it most ranks first among blows of the same risk and progress; gold: points per gold
 -- a goal is worth (goals.lua: under careful no item outweighs a life, under bold a good one
 -- does). What each further turn to a goal leaves of its chance is goals.lua's GAMMA.
 -- Ground toward a goal, a Visit, a Talk recruit and the win itself: the goals' term (goalTerm
@@ -168,11 +170,11 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 -- win is the same win, so it waits while what it would close is worth more than the waiting.
 M.WEIGHTS = {
     careful = { death = 1000, taken = 2, dealt = 1, kill = 30, heal = 1.5, breach = 25,
-                win = 100000, gold = 0.04 },
+                win = 100000, gold = 0.04, exp = 0.3 },
     even = { death = 300, taken = 1, dealt = 1, kill = 30, heal = 1, breach = 25,
-             win = 100000, gold = 0.08 },
+             win = 100000, gold = 0.08, exp = 0.3 },
     bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, heal = 0.5, breach = 25,
-             win = 100000, gold = 0.15 },
+             win = 100000, gold = 0.15, exp = 0.3 },
 }
 
 -- The most predicted death chance a style accepts for any protected unit in a plan (ADR 0384,
@@ -294,6 +296,23 @@ local function takes(act)
     return nil
 end
 
+-- The experience attack `f` teaches its unit, over the exchange's ways (f.joint) at `hp`, the
+-- HP the plan leaves the target: f.exp is the game's count for blows that deal nothing, deal
+-- damage and kill (sight.lua expOf), and a way whose counter kills our unit (at `unitHp`)
+-- teaches nothing (GetBattleUnitExpGain: the actor's HP is 0). A kill an earlier blow of the
+-- plan set up is this unit's kill: the plan's chip and finish train the finisher.
+local function taught(f, hp, unitHp)
+    local x = f.exp
+    if not x then return 0 end
+    local sum = 0
+    for _, w in ipairs(f.joint or {}) do
+        if w.back < unitHp then
+            sum = sum + w.p * (w.dealt >= hp and x.kill or w.dealt > 0 and x.hit or x.none)
+        end
+    end
+    return sum
+end
+
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
@@ -325,6 +344,7 @@ local function score(act, st, W, style, odds)
             local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             v = v + W.dealt * dealt * target + W.kill * kill * worth
+                + W.exp * taught(f, hp, act.unitHp)
         end
         if f.counters then
             -- the counter's risk is its chance to kill (a target dead before it answers takes
