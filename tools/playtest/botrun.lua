@@ -1619,6 +1619,9 @@ function M.run(api)
                 end
                 action = got
                 local spent = api.frames() - from
+                -- every decision's frames, for the trace (#510, the cheap screen's test): the
+                -- slowest alone says nothing of what a shortlist would save
+                if trace then trace({ t = "decided", turn = turn, frames = spent }) end
                 if spent > rec.plans.slowest.frames then
                     rec.plans.slowest = { frames = spent, turn = turn }
                 end

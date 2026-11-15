@@ -3304,6 +3304,33 @@ do
     check(a and a.why, "retreat", "planner: it is the retreat")
 end
 
+-- test_planner_traces_the_screen (#510, the cheap screen's offline test): every plan judged
+-- carries what the beam knew before the judge -- its acts' summed score, the standing
+-- exposure of its likeliest death and the summed chance -- and the enemy phases its judge
+-- played. Standing on (1,0) X strikes A for 25 of A's 20 at 100%: 1; on (0,1) nothing reaches.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }), [0x81] = tiles({ 2, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 }, [1] = { [0] = 30 } } end,
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    local dies, n, whole = {}, 0, true
+    for _, c in ipairs(plan and plan.considered or {}) do
+        n = n + 1
+        local sc = c.screen or {}
+        whole = whole and type(sc.base) == "number" and type(sc.sum_die) == "number"
+            and type(sc.phases) == "number" and sc.phases >= 0
+        dies[table.concat(c.acts, " "):match("@(%d+,%d+)") or "?"] = sc.max_die
+    end
+    check(n > 0 and whole, true, "screen: every plan judged carries base, deaths and phases")
+    check(dies["1,0"], 1, "screen: standing in X's reach, the beam's read is a sure death")
+    check(dies["0,1"], 0, "screen: out of reach, none")
+end
+
 -- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that
 -- reaches (2,2), so B's march there costs nothing -- whichever unit the beam moves first.
 do

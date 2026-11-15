@@ -1702,12 +1702,28 @@ function M.plan(Bot, board, sight, style, opts)
         local i = M.rebase(ranks, function(k) return judgedPlans[k].ok end)
         best = i and judgedPlans[i].st
     end
+    -- what the beam knew of a plan before the judge, for the trace (#510, the cheap screen's
+    -- offline test): its acts' summed score and each act's standing exposure as the beam reads
+    -- it (exposed: the enemies that reach the tile, the plan's kills left out), the likeliest
+    -- death and the summed chance
+    local function screen(st)
+        local most, sum = 0, 0
+        for _, a in ipairs(st.acts) do
+            local die = (exposed(a, st.hp[a.unitId] or a.unitHp, st.gone, odds))
+            if die > most then most = die end
+            sum = sum + die
+        end
+        local function r4(x) return math.floor(x * 1e4 + 0.5) / 1e4 end
+        return { base = r4(st.base), max_die = r4(most), sum_die = r4(sum) }
+    end
     local function consider(st, kind)
         if now then now.stage, now.judged = "judge " .. kind, #considered end
+        local before, phases = screen(st), cost.phases
         judge(st)
         st.kind = kind
+        before.phases = cost.phases - phases   -- the enemy phases this plan's judge played
         local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
-                    seizes = seizesIn(st) or nil, weights = st.weights }
+                    seizes = seizesIn(st) or nil, weights = st.weights, screen = before }
         considered[#considered + 1] = c
         judgedPlans[#judgedPlans + 1] = { st = st, ok = not stalled or changes(st) }
         playable[c] = judgedPlans[#judgedPlans].ok
