@@ -9,43 +9,82 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15; main at 601008cc): PR #628 is merged. Colm's death on Ephraim's Ch9 is traced to two leads; the next step is a free trace read on each, then a call for Nicolas.**
-- **PR #628 merged** (601008cc, ADR 0420; Nicolas: "Ok yeah merge"). It adds the door escort and the
-  mid-map Supply of the convoy's Door Key.
-  - Proofs on the final code (tag `door4`): Eirika's Ch10 won on attempt 1 in 12 turns with no
-    death (it was stuck at `door2`). Ephraim's Ch9 had the same outcomes as before. The Supply
-    witness `supw2` played the same story as `supw1`.
-  - The first rerun (`door3`) found a crash in this PR: `api.use` (a seal or booster) called
-    `slotOf` and `count` as nil globals. Fixed, and `test_playtest_harness.py` now fails on any
-    stray global read in `harness.lua`.
-- **Colm's death on Ephraim's Ch9** (#510 comment 6900592350; trace
-  `door4-lap3p-cs-s4006/23-s4006-a1-b801f4c6`):
-  - Confirmed: on turn 15, a replan had Colm (charId 9), at 27 HP and alone, attack a Knight.
-    That plan was judged at 0 death and left him at 3 HP. Turns 16–17 then had no plan under the
-    cap, and he died on turn 17. Not door-related.
-  - **Settled** (#510, the latest comment). Three instrumented runs (`look1`–`look3`, edits
-    reverted) and map data from the base ROM.
-    - The root is the one-phase horizon while Colm is worn down 12 HP an enemy phase. With every
-      plan looked ahead, he still dies on turn 17.
-    - The look-ahead re-ranks only its 4 finalists (planner.lua ~1886-1990).
-    - The candidate trigger plus finalist fix saved Colm, but lost Forde on turn 9 at a death read
-      of 0, and took 27 turns instead of 19. It fired on 14 of 40 decisions, and the finalist fix
-      never changed a play.
-    - `story` calls generic enemies "the Knight" by mistake (here a Mercenary and a Cavalier).
-    - **Waiting on Nicolas:** park the trigger (my pick) or measure it on the frozen suite.
-- **The Seize-map jam** (Ch7's pocket): the Ch10 attempt-1 case is gone on `door4`, but Ch7's is
-  still open. The recommendation still waiting on Nicolas: on a Seize map, count the seizing
-  unit's progress above an escort's.
-- **Slow pre-commit** (Nicolas asked): a commit staging core bot files runs 57 of 131 test
-  files. Untested whether the tests alone are slow; time `python3 tools/run_tests.py` on a quiet
-  machine against run_tests.py's 199 s.
-- **After the Ch9 leads:** rerun both laps from the prologue in parallel (`montecarlo.py resume
-  --game vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
+**Next session starts here (2026-11-15, evening; main at the HANDOFF commit after 601008cc): hand the Colm Ch9 write-up to a Fable subagent that defines a solution, with leave to run small experiments through cheaper subagents.** Nothing is in flight; no open PR; the tree is clean.
+
+- **The problem** (all on #510; read these three comments in order):
+  - 6900592350, what happened. Ignore its "Knight" names and its "0.147" line; both are
+    corrected below.
+  - 6900703181, the leads tested.
+  - 6901059805, **settled**, with the map read and the three runs.
+  - In one line: on Ephraim's Ch9 the bot judges each plan against the next enemy phase only. A
+    lone thief, Colm (charId 9), is worn down 12 HP per enemy phase by a Mercenary, passes the
+    1% cap each turn because he survives one more hit, and dies on turn 17 with no safe tile
+    left.
+- **What was tried and did not help** (one game each, all from `lap3p-cs-s4006/23`, attempt 1;
+  the edits were reverted):
+  - `look1`, the look-ahead forced on turn 15: it read Colm's death (0.7299) and still played
+    the attack. The re-rank compares only the top 4 finalists (planner.lua ~1886-1990), and all
+    4 were the same attack. Two admitted plans were never compared.
+  - `look2`, every turn-15 plan looked ahead: the bot plays "advance" (Colm waits at (20,1)). He
+    still dies on turn 17.
+  - `look3`, the candidate: a "fragile" trigger (a unit's HP after phase 1 at or below one
+    enemy's worst strike) plus extending admitted non-finalists.
+    - Colm lives, but Forde (charId 0x10) dies on turn 9 at a death read of 0
+      (`zero_multi_attacker`), and the win takes 27 turns, not 19.
+    - It fired on 14 of 40 decisions. The finalist extension never changed a play.
+    - Look-ahead calls went from 12 to 80, CPU from 64.5 s to 83.2 s.
+- **The next step: brief a Fable subagent** (`model: "fable"`) to define the solution. Give it:
+  - the three #510 comments; ADRs 0384 (with its 2026-11-02 amendment, which rejected pricing HP
+    left before `progress`), 0389 (look-ahead only at irreversible transitions, Nicolas
+    2026-11-03) and 0396 (the five tests a planner rule passes);
+  - the traces in `references/sim/vanilla/c25b145e3745/traces/`: `door4-lap3p-cs-s4006`
+    (main) and `look1/2/3-lap3p-cs-s4006`;
+  - the edits as patches in `~/Projects/manchego-stars-assets/probes/colm-ch9/`
+    (`look1.patch`, `look2.patch`, `look3.patch`; apply, run, then `git checkout
+    tools/playtest/`). Each reproduces its run's acts hash on main (re-run as `look1v` to `look3v`);
+  - the map scripts in the same folder (`fe.py` parses the base ROM's map and move costs,
+    `m.py` is the move and attack-range model, `q2.py` the turn 16–17 safe-tile check,
+    `xc2.py` the cross-check against the trace's moves).
+- **Its leave:**
+  - Run small experiments through Sonnet subagents, one instrumented run at a time, each
+    covering the next few hypotheses. Use temporary edits only, reverted after each run, and
+    `montecarlo.py resume … --tag <new> --attempts 1` from the saved start. The command is in
+    the 6901059805 comment's runs.
+  - Never the frozen suite or `make matrix`. One checkout, one writer: no two runs at once.
+  - Every subagent that runs one does it in the foreground.
+  - It brings back ONE recommended rule with its proof. Any weight, or any change to ADR 0389's
+    rule, is Nicolas's call; it returns that as a recommendation, not a merged change.
+- **Questions to put to it:**
+  - Why the lone unit is not pulled back toward the army on turns 13–15, while it still has a
+    way out. The map read shows none by turn 16.
+  - Whether the fix belongs in the horizon (the look-ahead), in the march (`exploring()` keeps
+    a sent goal without re-checking risk or the army's distance), or in the hold choice
+    (`bySafety` ranks by summed damage, not death chance).
+  - How to test it on more than one game without the suite. `montecarlo.py --only` replays
+    named suite runs.
+- **Also found:**
+  - `story` calls every generic enemy "the Knight": here a Mercenary (157, class 0x0F) and a
+    Cavalier (133, class 0x05). The Ch7 "the Archer" note below is the same bug. Not fixed.
+  - Rejected plans record only `max_die`, never the unit or the way behind it. That is a
+    diagnostic gap, and `look1.patch` shows the per-unit record it would need.
+- **PR #628 merged** (601008cc, ADR 0420): the door escort and the mid-map Supply of the
+  convoy's Door Key.
+  - With it, Eirika's Ch10 was won in 12 turns with no death (`door4`).
+  - It also added a test that fails on a stray global read in `harness.lua`. That bug crashed
+    `door3`.
+- **The Seize-map jam** (Ch7's pocket) is still open. The recommendation waiting on Nicolas: on a
+  Seize map, count the seizing unit's progress above an escort's.
+- **Slow pre-commit** (Nicolas asked): untested whether the tests alone are slow. Time
+  `python3 tools/run_tests.py` on a quiet machine against run_tests.py's 199 s.
+- **After Ch9:** rerun both laps from the prologue in parallel (`montecarlo.py resume --game
+  vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
 - **Open call for Nicolas:** whether verdicts should leave out `stale` runs.
-- **Kept states:** `lap3e-`, `lap3p-`, `rider1-`, `advp1-`, `door1/2/3/4-` and `supw1/2-` are
-  stale under ADR 0417 and never a proof base.
+- **Kept states:** `lap3e-`, `lap3p-`, `rider1-`, `advp1-`, `door1-4-`, `supw1/2-` and
+  `look1-3-`/`look1v-3v-` are stale under ADR 0417 and never a proof base.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
-  subagents, design questions to a Fable subagent. The frozen suite is never run for a PR.
+  subagents, design to a Fable subagent. Brief every subagent to SETTLE its questions, not to
+  label them "untested": a subagent's open item is the lead's to close before reporting. The
+  frozen suite is never run for a PR.
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
 - A simulated enemy phase and a single strike now start as the game's phase does
