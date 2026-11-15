@@ -9,60 +9,36 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, late night; main at 4f2f1d48): PR #627 is merged; PR #628 (the door escort plus mid-map Supply) has its review fixed and needs a scoped re-review, then a fresh run of its proofs.**
-- **PR #627 merged** (4f2f1d48, ADR 0419; Nicolas: "First merge the ready pr"): a ballista's
-  rider has no weapons of his own and ends no move on another ballista's tile. Innes's crash on
-  Eirika's Ch10 is gone.
-- **PR #628** (`feat/510-door-escort`, head 417a1187, ADR 0420). Nicolas said yes to both parts
-  and to building them together.
-  - **The cause**, from a Fable advisor checked against the runs (#510 comment 6898817486,
-    corrected): the way read listed a locked door only for a unit that could open it. On Ch10
-    the army held while Gilliam (charId 3), the key holder, walked to the door alone and died.
-    The enemy's dropped Door Key sat in the convoy.
-  - **Escort:** a door a living teammate can reach and open is every unit's way, at the later
-    of its own walk and the opener's (`doorMates`, `mateTurns`, `escortTurns` in `bot.lua`).
-  - **Supply:** with no fielded opener and a locked door on the unit's way (`lockedOnWay`), a
-    unit takes the convoy's Door Key with Supply, then waits.
-    - Parts: `supplyKey`, `Sight.convoyKey`, `SupplyUsability`, and `INSPECT.takeFromConvoy`,
-      which is now shared with the campaign's `take`.
-    - The planner credits the Take with the breach weight, once per plan.
-  - **Review:** `/code-review 628 medium` gave 10 findings, all fixed in 417a1187. Every new
-    check fails on the code before its fix.
-  - **Runs, made BEFORE the review fixes**, so they need a rerun:
-    - `door2`, Eirika's Ch10: attempt 1 is still stuck after the door opened (see below);
-      attempt 2 won in 27 turns, where it was stuck before.
-    - `door2`, Ephraim's Ch9 (chapter id 23): won in 19 turns with 1 death, and in 21 turns with
-      none. Before the fix it had won in 21 turns with no death, so there is no improvement.
-    - Supply witness `supw1` (escort switched off for that run only): Garcia (charId 0x0A) took
-      the key on turn 7, and Eirika won in 19 turns.
-  - **Next, in order:**
-    1. A scoped re-review of 417a1187 alone (review-to-clean step 4).
-    2. Rerun the proofs on the final code, one after the other: both runs rewrite the same
-       vanilla symbol tables.
-       - `montecarlo.py resume --game vanilla --tag door3 --campaigns lap3e-cs-s4006 --chapter 11
-         --last 11 --attempts 2 --scout --route 1`
-       - the same with `--campaigns lap3p-cs-s4006 --chapter 23 --last 23 --route 2`
-       - the Supply witness again, tag `supw2`, with the escort off for that run only. In
-         `bot.lua`, delete the two lines after `n = select(2, keyWay(...))` in
-         `obstacleTurns` (`local e = escortTurns(...)` and its `if`), and drop
-         `or mateTurns(ctx, u, door) ~= nil` in `openables`. Run Eirika's Ch10 with
-         `--attempts 1`, then `git checkout tools/playtest/bot.lua`.
-    3. Update the PR body and ADR 0420 with the new results.
-    4. CI on the head, then Nicolas's "merge".
-- **Eirika's Ch10, attempt 1, after the door opened** (untested lead): by turn 20 every enemy
-  is dead, but Eirika (charId 1) is boxed in at (13,7) among allies and never seizes. It looks
-  like the Seize-map jam (the Ch7 pocket below).
-  - The recommendation still waiting on Nicolas: on a Seize map, count the seizing unit's
-    progress above an escort's.
-- **Slow pre-commit** (Nicolas asked): a commit staging core bot files makes the hook run 57 of
-  131 test files in parallel. During 417a1187 the load average went 3→32, alongside
-  video/audio services. Untested: whether the tests alone are slow; time
-  `python3 tools/run_tests.py` on a quiet machine and compare with run_tests.py's 199 s.
-- **After #628:** rerun both laps from the prologue in parallel (`montecarlo.py resume --game
-  vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
+**Next session starts here (2026-11-15; main at 601008cc): PR #628 is merged. Colm's death on Ephraim's Ch9 is traced to two leads; the next step is a free trace read on each, then a call for Nicolas.**
+- **PR #628 merged** (601008cc, ADR 0420; Nicolas: "Ok yeah merge"). It adds the door escort and the
+  mid-map Supply of the convoy's Door Key.
+  - Proofs on the final code (tag `door4`): Eirika's Ch10 won on attempt 1 in 12 turns with no
+    death (it was stuck at `door2`). Ephraim's Ch9 had the same outcomes as before. The Supply
+    witness `supw2` played the same story as `supw1`.
+  - The first rerun (`door3`) found a crash in this PR: `api.use` (a seal or booster) called
+    `slotOf` and `count` as nil globals. Fixed, and `test_playtest_harness.py` now fails on any
+    stray global read in `harness.lua`.
+- **Colm's death on Ephraim's Ch9** (#510 comment 6900592350; trace
+  `door4-lap3p-cs-s4006/23-s4006-a1-b801f4c6`):
+  - Confirmed: on turn 15, a replan had Colm (charId 9), at 27 HP and alone, attack a Knight.
+    That plan was judged at 0 death and left him at 3 HP. Turns 16–17 then had no plan under the
+    cap, and he died on turn 17. Not door-related.
+  - Lead 1: the cap reads only the next enemy phase. Next: read the trace for whether the
+    lookahead fired on turn 15. Any change here is a weight or rule, so it is Nicolas's call.
+  - Lead 2: chests (23,1) and (7,1) were never offered, yet the ledger read (23,1) at 0.85–1.00
+    and marched Colm to it. Next: why the chest was never offered, and why its chance stayed
+    near 1.
+- **The Seize-map jam** (Ch7's pocket): the Ch10 attempt-1 case is gone on `door4`, but Ch7's is
+  still open. The recommendation still waiting on Nicolas: on a Seize map, count the seizing
+  unit's progress above an escort's.
+- **Slow pre-commit** (Nicolas asked): a commit staging core bot files runs 57 of 131 test
+  files. Untested whether the tests alone are slow; time `python3 tools/run_tests.py` on a quiet
+  machine against run_tests.py's 199 s.
+- **After the Ch9 leads:** rerun both laps from the prologue in parallel (`montecarlo.py resume
+  --game vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
 - **Open call for Nicolas:** whether verdicts should leave out `stale` runs.
-- **Kept states:** `lap3e-`, `lap3p-`, `rider1-`, `advp1-`, `door1/2-` and `supw1-` are stale
-  under ADR 0417 and never a proof base.
+- **Kept states:** `lap3e-`, `lap3p-`, `rider1-`, `advp1-`, `door1/2/3/4-` and `supw1/2-` are
+  stale under ADR 0417 and never a proof base.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents, design questions to a Fable subagent. The frozen suite is never run for a PR.
 
