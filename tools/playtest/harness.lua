@@ -3419,6 +3419,9 @@ do
     -- the 0 it writes after the last item, so whatever the scratch buffer held lands in the
     -- convoy (party1's Ch10 start: about 40 garbage items; ADR 0413's amendment).
     local pack = INSPECT.packItem
+    -- the bag slot of unit struct `addr` holding item `id` at `uses`, or nil; and how many of
+    -- that item at those uses item list `list` holds. Fields of INSPECT, not locals, so the
+    -- Item command's use (api.use, below this block) reads the same two
     local function slotOf(addr, id, uses)
         for k = 0, BOARD.ITEM_COUNT - 1 do
             if ru16(addr + BOARD.UNIT_ITEMS + k * 2) == pack({ id = id, uses = uses }) then return k end
@@ -3432,6 +3435,7 @@ do
         end
         return n
     end
+    INSPECT.slotOf, INSPECT.countItem = slotOf, count
     -- whether item lists `a` and `b` hold the same items in the same order
     local function sameItems(a, b)
         if #a ~= #b then return false end
@@ -4601,15 +4605,15 @@ INSPECT.campaignApi = function(game)
     -- (a booster's one use is spent) and, for a seal (act.seal), its class has changed.
     api.use = function(a)
         local u = BOARD.find("blue", a.unit)
-        local slot = u and slotOf(u.addr, a.item, a.uses)
+        local slot = u and INSPECT.slotOf(u.addr, a.item, a.uses)
         if not slot then
             return nil, string.format("0x%02X holds no item 0x%X at %d uses", a.unit, a.item, a.uses)
         end
-        local before = count(BOARD.items(u.addr), a.item, a.uses)
+        local before = INSPECT.countItem(BOARD.items(u.addr), a.item, a.uses)
         local function classOf() return ru8(ru32(u.addr + 4) + 4) end
         local class = classOf()
         local function spent()
-            return count(BOARD.items(u.addr), a.item, a.uses) < before
+            return INSPECT.countItem(BOARD.items(u.addr), a.item, a.uses) < before
                 and (not a.seal or classOf() ~= class)
         end
         if not moveUnit(u.x, u.y, u.x, u.y) then return nil, "no command menu for the unit" end
