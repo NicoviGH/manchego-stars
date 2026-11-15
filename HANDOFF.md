@@ -45,15 +45,23 @@ and start a fresh instance; don't rely on auto-compaction.
   - the map scripts in the same folder (`fe.py` parses the base ROM's map and move costs,
     `m.py` is the move and attack-range model, `q2.py` the turn 16–17 safe-tile check,
     `xc2.py` the cross-check against the trace's moves).
-- **Its leave:**
-  - Run small experiments through Sonnet subagents, one instrumented run at a time, each
-    covering the next few hypotheses. Use temporary edits only, reverted after each run, and
-    `montecarlo.py resume … --tag <new> --attempts 1` from the saved start. The command is in
-    the 6901059805 comment's runs.
-  - Never the frozen suite or `make matrix`. One checkout, one writer: no two runs at once.
-  - Every subagent that runs one does it in the foreground.
-  - It brings back ONE recommended rule with its proof. Any weight, or any change to ADR 0389's
-    rule, is Nicolas's call; it returns that as a recommendation, not a merged change.
+- **Its leave** (Nicolas, 2026-11-15: give it room to experiment and try things out):
+  - **Experiment freely:** it decides what to try, and how many runs. It may prototype candidate
+    rules end to end on a local branch (`feat/510-<slug>`, never pushed, no PR), write probes and
+    scripts, and drive Sonnet subagents for the runs and the reading.
+  - **No run budget to ask for.** Each run covers the next few hypotheses, not one guess.
+  - **Widen the evidence past one game:** other saved starts in the vanilla store (the `lap3e-`
+    and `lap3p-` chapters, each run with `--attempts 1`), and named suite runs via `montecarlo.py
+    suite --only <start>/<seed>` (judges nothing, so it is allowed).
+  - **Limits, because the game and the machine impose them:**
+    - One checkout, one writer, so runs go one after another: they rewrite the same vanilla
+      symbol tables. No worktree.
+    - Never the whole frozen suite, nor `make matrix`.
+    - A subagent that runs a run does it in the foreground.
+    - Leave main and the tree clean at the end.
+  - **It brings back** ONE recommended rule, with its evidence across the games it tried and its
+    cost (look-ahead calls, CPU), plus the prototype branch. Any weight, or any change to ADR
+    0389's rule, is Nicolas's call; it returns that as a recommendation, not a merged change.
 - **Questions to put to it:**
   - Why the lone unit is not pulled back toward the army on turns 13–15, while it still has a
     way out. The map read shows none by turn 16.
