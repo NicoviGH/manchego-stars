@@ -42,8 +42,11 @@ and start a fresh instance; don't rely on auto-compaction.
        - `montecarlo.py resume --game vanilla --tag door3 --campaigns lap3e-cs-s4006 --chapter 11
          --last 11 --attempts 2 --scout --route 1`
        - the same with `--campaigns lap3p-cs-s4006 --chapter 23 --last 23 --route 2`
-       - the Supply witness again: escort off for one run, tag `supw2`; the
-         `obstacleTurns`/`openables` edits are in the transcript and must be reverted after.
+       - the Supply witness again, tag `supw2`, with the escort off for that run only. In
+         `bot.lua`, delete the two lines after `n = select(2, keyWay(...))` in
+         `obstacleTurns` (`local e = escortTurns(...)` and its `if`), and drop
+         `or mateTurns(ctx, u, door) ~= nil` in `openables`. Run Eirika's Ch10 with
+         `--attempts 1`, then `git checkout tools/playtest/bot.lua`.
     3. Update the PR body and ADR 0420 with the new results.
     4. CI on the head, then Nicolas's "merge".
 - **Eirika's Ch10, attempt 1, after the door opened** (untested lead): by turn 20 every enemy
