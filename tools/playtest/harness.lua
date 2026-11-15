@@ -3695,14 +3695,16 @@ INSPECT.BAG = {
                 [0x73] = "ITEM_SILVERCARD", [0x7C] = "ITEM_HOPLON_SHIELD" },
     -- The items the game's own Use routes to CanUnitUseStatGainItem (a booster) or to
     -- CanUnitUsePromotionItem (a seal): the two id lists of CanUnitUseItem's switch
-    -- (bmitemuse.c), ids from constants/items.h. Whether a unit can use one today is the game's
-    -- call (promotes / gains); this says only what the item is, so a seal nobody can use yet is
-    -- still told from a Vulnerary. ITEM_UNK_C1, the switch's last seal, no vanilla chapter gives.
+    -- (bmitemuse.c), ids from constants/items.h; tools/test_harness_item_use.py checks them
+    -- against the switch. Whether a unit can use one today is the game's call (promotes /
+    -- gains); this says only what the item is, so a seal nobody can use yet is still told from
+    -- a Vulnerary. Metis's Tome and the Juna Fruit are neither (the switch sends them elsewhere).
     USE = { [0x5B] = "booster", [0x5C] = "booster", [0x5D] = "booster", [0x5E] = "booster",
             [0x5F] = "booster", [0x60] = "booster", [0x61] = "booster", [0x62] = "booster",
             [0x63] = "booster",
             [0x64] = "seal", [0x65] = "seal", [0x66] = "seal", [0x67] = "seal", [0x68] = "seal",
-            [0x88] = "seal", [0x8A] = "seal", [0x97] = "seal", [0x98] = "seal", [0x99] = "seal" },
+            [0x88] = "seal", [0x8A] = "seal", [0x97] = "seal", [0x98] = "seal", [0x99] = "seal",
+            [0xC1] = "seal" },
 }
 INSPECT.bagLog = {}
 

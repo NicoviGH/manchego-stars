@@ -1824,7 +1824,7 @@ do
     end
     local swordsman = armedUnit(6, 8)   -- armed with a lance; can use anima, holds none
     local mage = unitOf(7, 7, 10)       -- nothing in hand (its tome broke)
-    local convoy = { tome(0x38, 1, 40, { 6, 7 }), tome(0x39, 2, 30, { 6, 7 }), tome(0x3A, 3, 0, { 6, 7 }) }
+    local convoy = { tome(0x38, 1, 40, { 6, 7 }), tome(0x39, 2, 30, { 6, 7 }, 30), tome(0x3A, 3, 0, { 6, 7 }) }
     check(acts(B.supply({ swordsman, mage }, convoy)), "take 7:39, take 6:38",
         "supply: the unarmed mage first takes the best tome with uses left, then the armed unit")
     check(acts(B.supply({ mage }, { tome(0x38, 1, 40, { 6 }) })), "",
@@ -1870,6 +1870,13 @@ do
     local sniper = unitOf(11, 11, 12, { items = { bow(4, 20) } })
     check(acts(B.supply({ sniper }, { bow(45, 45, { 11 }) })), "take 11:2D",
         "supply: a bow with 4 of 20 uses left takes the convoy's bow")
+    -- the convoy's bow that ends the shortage beats a higher-rank one that does not (else the
+    -- shop buys another after it; review of #624)
+    local worn = bow(2, 20, { 11 })
+    local iron = bow(45, 45, { 11 })
+    iron.id, iron.rank = 0x2C, 1
+    check(acts(B.supply({ sniper }, { worn, iron })), "take 11:2C",
+        "supply: a 4-use Silver Bow takes the full Iron Bow, not a 2-use Silver Bow")
     sniper.items = { bow(20, 20) }
     check(acts(B.supply({ sniper }, { bow(45, 45, { 11 }) })), "",
         "supply: a full Silver Bow takes no spare (the smallest full weapon held counts)")
@@ -1903,7 +1910,8 @@ do
     local function lance(rank, o)
         o = o or {}
         return { kind = "weapon", type = "lance", rank = rank, maxRange = o.maxRange or 1,
-                 effective = o.effective, usable = o.usable ~= false }
+                 effective = o.effective, usable = o.usable ~= false, uses = o.uses or 30,
+                 maxUses = 30 }
     end
     local function heal(uses) return { kind = "heal", uses = uses or 3 } end
     local key, gem = { kind = "key" }, { kind = "money" }
@@ -1933,6 +1941,12 @@ do
     check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "weapon", type = "bow", rank = 4,
               usable = false }), 0, "bag: a bow for a lance user goes to the convoy")
     check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "money" }), 0, "bag: money goes")
+    -- short of the type is the shop's own test (rule B): a lance at 4 of 30 uses wants a new
+    -- one of the same rank, and the gem makes room (review of #624: fullBag asked "holds none")
+    check(F({ lance(1, { uses = 4 }), heal(), key, gem, heal() }, lance(1)), 4,
+          "bag: a lance near breaking takes a full one of its rank")
+    check(F({ lance(1), heal(), key, gem, heal() }, lance(1)), 0,
+          "bag: a full lance takes no duplicate")
     check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other" }), 0, "bag: a seal goes")
     -- a seal or booster its holder can use is kept in hand (Bot.uses spends it): wanted when
     -- new, and never the one that leaves (fails on main: "a seal or booster" leaves second)

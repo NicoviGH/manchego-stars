@@ -489,6 +489,10 @@ local function test_between_takes_from_the_convoy()
     check(ok, false, "a failed take stops the campaign")
     check(why and why:find("supply: take 0x01 item 0x39: the bag is full", 1, true) ~= nil, true,
         "and says which act and why: " .. tostring(why))
+    local fl = lines(f)
+    local fprep = fl[1].prep and fl[1].prep[1]
+    check(fprep and fprep.attempt, 1, "a failed prep is still on the record (review of #624)")
+    check(fprep and #fprep.supply, 0, "with the acts that ran before the failed one: none here")
 end
 test_between_takes_from_the_convoy()
 

@@ -214,7 +214,8 @@ end
 -- ids of the demands of another kind than an enemy class that a roster unit answers and no
 -- fielded unit does (ADR 0402: the case its rule does not cover, so it shows when it happens)
 -- }, so a pick can be read without the worker's log) or nil, why when the harness could not do
--- a step.
+-- a step, and, once the supply has begun, the team so far (its supply and buys: the acts that
+-- ran before the failed one).
 local function between(api, style, followed, need, carried)
     local Bot = api.Bot
     local roster = api.roster()
@@ -306,20 +307,20 @@ local function between(api, style, followed, need, carried)
     local fielded, convoy, benched = fieldedNow(true)
     if convoy then
         local ok, why = apply(Bot.supply(fielded, convoy, benched))
-        if not ok then return nil, "supply: " .. why end
+        if not ok then return nil, "supply: " .. why, team end
         fielded = fieldedNow(false)   -- the shop weighs the bags only
     end
     team.buys = {}
     for _, p in ipairs(Bot.shop(api.gold(), api.stock(), fielded)) do
         local ok, why = api.buy(p)
-        if not ok then return nil, "buy: " .. tostring(why) end
+        if not ok then return nil, "buy: " .. tostring(why), team end
         team.buys[#team.buys + 1] = p
     end
     -- Re-read after the shop: a seal bought changes what each unit holds. Without a convoy only
     -- what a unit carries can be used.
     fielded, convoy = fieldedNow(true)
     local ok, why = apply(Bot.uses(fielded, convoy or {}))
-    if not ok then return nil, "use: " .. why end
+    if not ok then return nil, "use: " .. why, team end
     return team
 end
 
@@ -446,19 +447,23 @@ function M.run(api)
                     style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
                 end
                 entry.attempts = entry.attempts + 1
-                local team, bwhy = between(api, style, followed, need, carried)
+                local team, bwhy, partial = between(api, style, followed, need, carried)
+                -- what the shop bought and the convoy gave, one entry an attempt (each attempt
+                -- loads the start and preps again), the acts that ran before a failed one too
+                -- (they changed the bags); montecarlo.py's records_of files each on its
+                -- attempt's BOTRUN record, so resume-runs.jsonl keeps it
+                local prepped = team or partial
+                if prepped then
+                    entry.prep = entry.prep or {}
+                    entry.prep[#entry.prep + 1] = { attempt = entry.attempts,
+                                                    supply = prepped.supply, buys = prepped.buys }
+                end
                 if not team then
                     entry.outcome = "crashed"
                     line(entry)
                     return "crashed", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, bwhy)
                 end
-                -- what the shop bought and the convoy gave, one entry an attempt (each attempt
-                -- loads the start and preps again); montecarlo.py's records_of files each on its
-                -- attempt's BOTRUN record, so resume-runs.jsonl keeps it
-                entry.prep = entry.prep or {}
-                entry.prep[#entry.prep + 1] = { attempt = entry.attempts, supply = team.supply,
-                                                buys = team.buys }
                 -- a retry's memory (ADR 0386): the turns earlier failures here saw a
                 -- reinforcement arrive on screen, read where a reinforcements claim's are
                 -- (style.arrivals); attempt 1, and any attempt alone, has none
