@@ -36,6 +36,8 @@ and start a fresh instance; don't rely on auto-compaction.
   Seal), with what is unchecked. Brief it with that comment, the earlier plan (comment
   6872948037), ADR 0396's five tests and `docs/research.md`; it returns a design as ONE
   comment on #510 (no design doc), each rule tested against vanilla players, not built.
+  It sends cheaper (Sonnet or Haiku) subagents at will to check facts in the data and code
+  (the kept states, the decomp, the bot's item code) rather than assume them.
 - **Then:** Ephraim's route (item E: E2, E3; #510 comment 6872468981, Colm's Ch9 Door gate) and
   the chapters past 15 on both routes (the finish line: the whole vanilla game clean, memory
   `finish-line-whole-vanilla-game`). Ch15 still falls back to a sacrifice plan on most turns:
