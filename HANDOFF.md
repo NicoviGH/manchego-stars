@@ -30,8 +30,10 @@ and start a fresh instance; don't rely on auto-compaction.
       `M.triggers` fires only on a breach or a boss's reach (ADR 0389).
     - **Waiting on Nicolas:** whether to widen ADR 0389's triggers. My pick is a narrow trigger:
       a unit left one hit from death by an enemy that reaches it next turn, with no heal in reach.
-    - Unexplained: the same attack read 0.147 before the replan and 0 after it. A `Planner.plan`
-      `diag` replay on the turn-15 board would settle it.
+    - The "0.147 then 0" was a wrong premise, now corrected on #510. That figure was the worst
+      unit's (likely unit 1, attacking 163 alone in the south), and Colm's own read was the same
+      in both decisions. Diagnostic gap: rejected plans don't record which unit makes their
+      `max_die`.
 - **The Seize-map jam** (Ch7's pocket): the Ch10 attempt-1 case is gone on `door4`, but Ch7's is
   still open. The recommendation still waiting on Nicolas: on a Seize map, count the seizing
   unit's progress above an escort's.
