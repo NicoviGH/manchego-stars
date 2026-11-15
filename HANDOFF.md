@@ -9,24 +9,41 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14, night): the party plan's PR 1 is merged (PR #614); build PR 2, the convoy.**
-- **Merged: PR #614** (bcc6ff3f; Nicolas: "Merge it", 2026-11-14; ADR 0412). The shop buys staves and
-  tomes, buys when a unit holds nothing usable with uses left, checks bag room, and pays the
-  unarmed first; `Bot.arms` is the shop's own loop, and the pick reads an armable unit holding
-  what it will buy (`sight.holding`). The chapter-start record lists uses and the convoy
-  (`INSPECT.convoyItems`); the chapter line has `buys`. Run `gear2` (lap1d's Ch13 start): won in
-  8 turns, no death, Artur, Vanessa and Lute fielded and armed, Natasha benched. Reviewed
-  (`/code-review 614 medium`, 10 findings, one scoped re-review, 4 notes), all fixed; CI green.
-  Untested: the roster read's speed-up; the convoy read against the emulator.
+**Next session starts here (2026-11-14, late night): the party plan's PR 2 is merged (PR #615); build PR 3, the experience term.**
+- **Merged: PR #615** (12b754e7; Nicolas: "Merge and handoff please", 2026-11-14; ADR 0413).
+  The convoy gives back. `Bot.supply` runs before the shop: a unit gives back a seal or booster
+  it cannot use that another roster unit can, and takes the convoy's best usable weapon or
+  staff of each type it lacks, the unarmed first. `Bot.uses` runs after the shop: seals
+  highest level first, then boosters to the forced units first and then the lowest level, one
+  use a unit a chapter. `Bot.fullBag` keeps a usable seal or booster. `Bot.arms` reads the
+  convoy. The harness's `api.convoy`, `give`, `take` and `use` make the game's own container
+  calls, the same as the Supply screen's, with no screen driven. The chapter line has `supply`.
+  Status and results live in the plan comment (#510 comment 6883980081, "PR 2 is merged").
+- **Run** (`lap1d`'s Ch13 start, `conv1` to `conv4`): Lute (0x0C) went Mage to Sage and Forde
+  (0x10) Cavalier to Paladin. The chapter was won in 4 turns with no death, against 8 in
+  PR #614's `gear2`. One game: a lead.
+- **Fixed on the way:** PR #614's convoy read counted with `gConvoyItemCount` and saw 8 of 16
+  items. The shop and the supply now serve the fielded units in roster order, the order the
+  pick predicts in.
+- **Review:** `/code-review 615 medium` plus its five open checks (21 findings) and one scoped
+  re-review (5 notes), all fixed or answered (the PR comment has the table). CI green.
+- **Untested:** 7 or 8 of 12 units spend their first turn on an item (the prep screen's Use
+  would cost none; build it only if the lap shows a chapter lost to it); a branched promotion
+  takes the first class offered; whether `HasConvoyAccess` keeps the convoy closed before the
+  game opens it.
+- **Next, PR 3:** the game's own experience number (`GetBattleUnitExpGain`, `bmbattle.c`) as a
+  term in `score()` (`planner.lua`), weight 0.3 a point (settled), with no fill by level. Then
+  the proof lap from the prologue (`--chapter 0 --last 15 --scout`, tag `party1`) against
+  `lap1d`, with the four measures the plan comment sets.
 - **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
   routes (memory `finish-line-whole-vanilla-game`; #510 comment 6872554917).
 - **The plan now worked is #510 comment 6883980081** (party management; one comment, edited in
-  place). Three PRs and a proof lap: (1) gear: `Bot.shop` buys staves and tomes and replaces a
+  place). Three PRs and a proof lap: (1) gear (merged: PR #614, ADR 0412): `Bot.shop` buys staves and tomes and replaces a
   unit with no usable item with uses left; the saved state gains the convoy and uses left;
-  (2) the convoy: the settled design of comment 6872948037 plus a fielded unit taking a usable
+  (2) the convoy (merged: PR #615, ADR 0413): the settled design of comment 6872948037 plus a fielded unit taking a usable
   convoy weapon before the shop; (3) levels: the game's own experience number
-  (`GetBattleUnitExpGain`) as a weighted term in `score()`, and the team fill by level (gated on
-  an offline check of `lap1d`'s rosters). **The proof lap starts from the prologue** (chapter 0,
+  (`GetBattleUnitExpGain`) as a weighted term in `score()` (the fill by level was dropped: see
+  the calls below). **The proof lap starts from the prologue** (chapter 0,
   `--chapter 0 --last 15 --scout`; Nicolas, 2026-11-14: the levels before Ch5 matter), against
   `lap1d`, with the four "better" measures the comment sets in advance.
 - **Why (evidence in the comment):** at Eirika's Ch15 start Eirika is level 5, the army averages
