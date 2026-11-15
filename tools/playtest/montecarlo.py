@@ -345,16 +345,17 @@ def records_of(task, text, where, log_path):
         p = prep.pop((r.get('chapter'), r.get('attempt')), None)
         if p:
             r['supply'], r['buys'] = p.get('supply') or [], p.get('buys') or []
-        if r.get('chapter') in bots:
-            r['stale'] = stale_start(bots[r['chapter']], r.get('instrument'))
+        # every record says it: a chapter with no line (a Lua error cut it short) is unknown
+        r['stale'] = stale_start(bots.get(r.get('chapter')), r.get('instrument'))
     ends = [c for c in lines if c.get('chapter') is None]
     for c in ends[-1:]:
         c['kind'] = 'campaign'
         # the campaign's first start: who played up to it decides whether the whole run is
-        # stale (every later start has it behind it, ADR 0417)
-        if chapters:
-            c['start_bots'] = chapters[0].get('start_bots')
-            c['stale'] = stale_start(c['start_bots'], task_instrument(task))
+        # stale (every later start has it behind it, ADR 0417), against the version its
+        # attempts played under (none played: unknown, so any earlier bot makes it stale)
+        played = next((r.get('instrument') for r in recs if r.get('instrument')), None)
+        c['start_bots'] = chapters[0].get('start_bots') if chapters else None
+        c['stale'] = stale_start(c['start_bots'], played)
         # an attempt whose prep failed never played, so no BOTRUN took its acts: the campaign's
         # end (crashed, with why) keeps them
         if prep:
@@ -1253,13 +1254,8 @@ def cell_main(args):
     if chapter_cell:
         # a start an older or unknown bot played up to is played all the same (ADR 0417); the
         # verdict says how many it rests on, so it is never read as this bot's alone
-        inst = instrument_id()
-        for n in ('ours', 'vanilla'):
-            stale = [st for st in starts[n] if start_bots(simdirs[n], st['provenance']['campaign'],
-                                                           st['chapter'], inst)[1]]
-            if stale:
-                print('%s: %d of %d starts are stale (an older or unknown bot played up to them)'
-                      % (GAME_NAMES[n], len(stale), len(starts[n])))
+        for line in cell_stale_lines(simdirs, starts, instrument_id()):
+            print(line)
     print('\n'.join(validity_lines(v['validity'])))
     append_record(CELLS_FILE, cell_record(
         'chapter' if chapter_cell else 'campaign', number, twin, v, v['results'], v['paired'],
@@ -2741,9 +2737,16 @@ def stale_start(bots, instrument):
     the bot hash is compared: a suite manifest's version (`+vN`) changes no play."""
     def code(i):
         return str(i).split('+v')[0]
-    if not isinstance(bots, list) or not all(isinstance(b, str) for b in bots):
+    if known_bots(bots) is None:
         return True
     return any(code(b) != code(instrument) for b in bots)
+
+
+def known_bots(bots):
+    """`bots` when it is a list of versions (a start record's), else None: unknown."""
+    if isinstance(bots, list) and all(isinstance(b, str) for b in bots):
+        return bots
+    return None
 
 
 def start_bots(store, name, at, instrument):
@@ -2755,9 +2758,7 @@ def start_bots(store, name, at, instrument):
             bots = json.load(fh).get('bots')
     except (OSError, ValueError):
         bots = None
-    if not isinstance(bots, list) or not all(isinstance(b, str) for b in bots):
-        bots = None
-    return bots, stale_start(bots, instrument)
+    return known_bots(bots), stale_start(bots, instrument)
 
 
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
@@ -2835,16 +2836,38 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     return tasks
 
 
+def stale_starts(store, starts, instrument):
+    """[(name, at, bots)] for each of `starts` ([(campaign, chapter index)]) that is stale for
+    `instrument` (start_bots): the one loop resume's lines and a cell's count both read."""
+    out = []
+    for name, at in starts:
+        bots, stale = start_bots(store, name, at, instrument)
+        if stale:
+            out.append((name, at, bots))
+    return out
+
+
 def stale_lines(store, tasks):
-    """One line for each resume task whose start is stale (start_bots), naming who played up to
-    it."""
+    """One line for each resume task whose start is stale, naming who played up to it."""
     out = []
     for t in tasks:
         name, at = t['stamp']['resumed_from'].rsplit('/', 1)
-        bots, stale = start_bots(store, name, int(at), t['instrument'])
-        if stale:
+        for _, _, bots in stale_starts(store, [(name, int(at))], t['instrument']):
             out.append('  stale start %s: played up to by %s, not this bot alone'
                        % (t['stamp']['resumed_from'], ', '.join(bots or ['an unrecorded bot'])))
+    return out
+
+
+def cell_stale_lines(simdirs, starts, instrument):
+    """A chapter cell's line for each arm with stale starts ({arm: [cell start]}, cell_setup's):
+    how many of them an older or unknown bot played up to (ADR 0417)."""
+    out = []
+    for n in ('ours', 'vanilla'):
+        stale = stale_starts(simdirs[n], [(st['provenance']['campaign'], st['chapter'])
+                                          for st in starts[n]], instrument)
+        if stale:
+            out.append('%s: %d of %d starts are stale (an older or unknown bot played up to them)'
+                       % (GAME_NAMES[n], len(stale), len(starts[n])))
     return out
 
 

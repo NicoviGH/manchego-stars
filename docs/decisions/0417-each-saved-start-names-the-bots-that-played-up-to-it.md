@@ -44,12 +44,13 @@ to them is not on record.
 each version once in a row; a resumed start keeps its list; an unknown one stays unknown; each
 chapter line carries its start's list) and `test_montecarlo.py` (`start_bots`: none played,
 this bot only, an older bot, a manifest version alone, a list that is not one, no record; the
-stale line resume prints; each record judged from its chapter line, the end from the first
-start), each failing on main. Three fresh runs of campaign `cs-s4006`, about 11 s each, every
-chapter won clean: `vers2` (from the prologue through Ch1, after the review) saved `0.json`
-with `bots: []` and `1.json` with this bot's version, and its records say `stale: false`;
-`vers3` (from the old Ch2 start copied into `vers2`, which has no list) printed "stale start
-vers2-cs-s4006/2: played up to by an unrecorded bot", and its records say `stale: true`;
-`vers1` was the same check before the review.
+stale line resume prints and the count a chapter cell prints; each record judged from its
+chapter line, a chapter with none and an end with none as stale, the end from the first start
+against the version its attempts played), each failing on main. Three fresh runs of campaign
+`cs-s4006`, about 11 s each, every chapter won clean: `vers2` (from the prologue through Ch1,
+after the review) saved `0.json` with `bots: []` and `1.json` with this bot's version, and its
+records say `stale: false`; `vers3` (from the old Ch2 start copied into `vers2`, which has no
+list) printed "stale start vers2-cs-s4006/2: played up to by an unrecorded bot", and its
+records say `stale: true`; `vers1` was the same check before the review.
 
-**Untested:** the chapter cell's stale line in a real cell.
+**Untested:** the chapter cell's stale count in a real cell (its line is unit-tested).

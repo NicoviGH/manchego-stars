@@ -338,6 +338,12 @@ class Workers(unittest.TestCase):
                                 'BOTRUN {"chapter": 5, "attempt": 1, "instrument": "new+v2"}\n'
                                 'CAMPAIGN {"chapter": 5}', '/tmp/w', '/x.log')
         self.assertEqual(unknown[0]['stale'], True, 'a start with no list is stale')
+        # a chapter cut short by a Lua error left no line, and a campaign with no chapter line:
+        # both unknown, never read as current (review of #625)
+        cut = mc.records_of({}, 'BOTRUN {"chapter": 6, "attempt": 1, "instrument": "new+v2"}\n'
+                                'CAMPAIGN {"outcome": "crashed", "why": "Lua error: x"}',
+                            '/tmp/w', '/x.log')
+        self.assertEqual([r.get('stale') for r in cut], [True, True])
 
     def test_a_failed_prep_lands_on_the_campaign_end(self):
         # an attempt whose prep failed never played: no BOTRUN to carry its acts (review of #624)
@@ -1327,6 +1333,14 @@ class Suite(unittest.TestCase):
         tasks = [{'stamp': {'resumed_from': 'c/%d' % at}, 'instrument': 'new+v2'} for at in (3, 5)]
         self.assertEqual(mc.stale_lines(top, tasks),
                          ['  stale start c/5: played up to by old+v2, new+v2, not this bot alone'])
+        # a chapter cell counts its stale starts an arm (the vanilla arm here, none in Manchego Stars)
+        os.makedirs(os.path.join(top, 'o', 'states'))
+        cell = {'ours': [], 'vanilla': [{'provenance': {'campaign': 'c'}, 'chapter': at}
+                                        for at in (0, 3, 5, 7)]}
+        self.assertEqual(mc.cell_stale_lines({'ours': os.path.join(top, 'o'), 'vanilla': top},
+                                             cell, 'new+v2'),
+                         ['vanilla: 2 of 4 starts are stale (an older or unknown bot played up '
+                          'to them)'])
 
     def test_resume_carries_a_campaign_on_under_a_new_id_from_its_saved_start(self):
         """`resume` (ADR 0399): a copy of the campaign's states under `<tag>-<campaign>`, so the
