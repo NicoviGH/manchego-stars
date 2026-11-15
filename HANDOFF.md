@@ -9,7 +9,7 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, night; main at 2152f09e): both known lap stops are diagnosed. Innes's crash is fixed in PR #627 (awaiting Nicolas's merge); the Ch10 stall waits on a call of his.**
+**Next session starts here (2026-11-15, night; main at 2152f09e): both known lap stops are diagnosed. Innes's crash is fixed in PR #627 (awaiting Nicolas's merge); the Ch10 stall's fix waits on his yes.**
 - **PR #627** (`feat/510-ballista-rider`, ADR 0419): Innes (charId 11) joined vanilla Ch10
   (Eirika's route) riding a ballista he had emptied as a green unit on turn 10. The trace's
   `broke` was the ballista, not his bow (lead refuted). The game hides Attack from a rider, so
@@ -22,15 +22,15 @@ and start a fresh instance; don't rely on auto-compaction.
     was pending at handoff.
   - **Not built:** Exit and Attack w/Ballista, so a rider on an empty ballista holds for the
     rest of the chapter.
-- **The Ch10 stall** (attempts 1–2): cause confirmed, #510 comment 6898817486.
-  - Not the cap: every judged plan was admitted. One instrumented run (`advp1`, the same acts
-    hash) printed `advance`'s filter for each unit.
-  - From turn 9 on, no unit on foot has a way to the throne at (15,1). The army's only Door Key
-    was Gilliam's (charId 3), who died on turn 6 in a turn where every plan was over the cap.
-    Colm (charId 9, thief) was benched. Only the fliers (Vanessa, charId 6; Tana, charId 34) can
-    reach the throne, at 47–82% to die against a 15% cap. The six remaining guards stand still,
-    so the board repeats.
-  - **Nicolas's call** (team pick, a weight): see the session's recommendation.
+- **The Ch10 stall** (attempts 1–2): cause confirmed, #510 comment 6898817486 (corrected).
+  - From turn 4, while Gilliam (charId 3) is alive, no unit on foot but Gilliam reads a way to
+    the throne. The way read (`bot.lua` `openables`) counts a locked door only for a unit that
+    can open it itself. So the army holds, Gilliam walks to the door alone and dies on turn 6.
+  - A dropped Door Key also sat in the convoy from turn 3; the bot has no mid-map Supply act.
+  - The same pattern is on Ephraim's Ch9 (ADR 0410).
+  - **Recommended** (Fable advisor), awaiting Nicolas: a door a living teammate can open is a
+    way for every unit, at the later of its own walk and the opener's arrival. Mid-map Supply
+    for the convoy's key is a separate step.
 - **Next:** merge PR #627 on Nicolas's word. Then his call on the stall. Then the laps rerun
   from the prologue on both routes, in parallel (`montecarlo.py resume --game vanilla
   --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
