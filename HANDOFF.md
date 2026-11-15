@@ -9,10 +9,9 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, evening; main at 17a281c0 + HANDOFF): the fresh lap from the prologue ran on both routes and stopped on two harness crashes; one is fixed in PR #626, open.**
-- **First: merge PR #626 on Nicolas's word** (he has not said "merge" for it; memory
-  `merge-after-review` covers only #624 and #625). Review + scoped re-review clean, every
-  finding fixed, CI green on its head (1bc76f47). Branch `feat/510-seal-check`, ADR 0418.
+**Next session starts here (2026-11-15, evening; main at 6597fc33): the fresh lap from the prologue ran on both routes and stopped on two harness crashes; one is fixed (PR #626, merged).**
+- **PR #626 is merged** (6597fc33; Nicolas: "merge it", 2026-11-15). Review + scoped
+  re-review clean, every finding fixed, CI green on its head. ADR 0418.
   What it fixes: the harness asked `CanUnitUsePromotionItem` of every non-weapon item; its last
   class-list walk is unguarded, so any unit at level 10+ read a non-seal item from address 0.
   Ephraim's Elixir read as a seal and the lap crashed at vanilla Ch13 on his route (chapter id
@@ -38,7 +37,7 @@ and start a fresh instance; don't rely on auto-compaction.
   - `lap3p` (Ephraim, `--route 2`): through ids 23, 24, 62, 25; crashed at id 26's prep (the
     Elixir, fixed by #626).
 - **Next, in order:**
-  1. Merge #626 (on his word), then carry `lap3p` on: `montecarlo.py resume --game vanilla
+  1. Carry `lap3p` on: `montecarlo.py resume --game vanilla
      --tag <t> --campaigns lap3p-cs-s4006 --chapter 26 --scout --route 2` (that start is
      stale after #626's bot change: allowed, labelled).
   2. Innes's crash: ONE instrumented run of `lap3e-cs-s4006` id 11 attempt 3 to turn 14,
