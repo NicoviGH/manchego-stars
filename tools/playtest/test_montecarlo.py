@@ -1280,6 +1280,24 @@ class Suite(unittest.TestCase):
         self.assertEqual(mc.cell_pins(store), [], 'a timeout is not pinned')
         self.assertIn('cs-s4001: timeout, not pinned (too long', out.getvalue())
 
+    def test_a_start_says_which_bots_played_up_to_it(self):
+        """ADR 0417: a start's record names the bots that played the chapters before it; one an
+        older bot played, or one whose record never kept them, is stale, and played all the same
+        (no refusal)."""
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        d = os.path.join(top, 'states', 'c')
+        os.makedirs(d)
+        for at, rec in ((0, {'bots': []}), (3, {'bots': ['new+v2']}),
+                        (5, {'bots': ['old+v2', 'new+v2']}), (7, {})):
+            with open(os.path.join(d, '%d.json' % at), 'w') as fh:
+                json.dump(rec, fh)
+        self.assertEqual(mc.start_bots(top, 'c', 0, 'new+v2'), ([], False), 'nothing played')
+        self.assertEqual(mc.start_bots(top, 'c', 3, 'new+v2'), (['new+v2'], False))
+        self.assertEqual(mc.start_bots(top, 'c', 5, 'new+v2'), (['old+v2', 'new+v2'], True))
+        self.assertEqual(mc.start_bots(top, 'c', 7, 'new+v2'), (None, True), 'never kept')
+        self.assertEqual(mc.start_bots(top, 'c', 9, 'new+v2'), (None, True), 'no record')
+
     def test_resume_carries_a_campaign_on_under_a_new_id_from_its_saved_start(self):
         """`resume` (ADR 0399): a copy of the campaign's states under `<tag>-<campaign>`, so the
         pinned file is never re-saved; from its latest start unless told; its own seed; and a
@@ -1300,14 +1318,17 @@ class Suite(unittest.TestCase):
                                    for c in (6, 7)}}])
         pins = {c['campaign']: c for c in mc.cell_pins(store)}
         env = {'last': [22], 'route': 1}
-        tasks = mc.resume_tasks(store, env, ['cs-s4001', 'full-s4008'], pins, 'mem1', vanilla=True)
+        tasks = mc.resume_tasks(store, env, ['cs-s4001', 'full-s4008'], pins, 'mem1', vanilla=True,
+                                instrument='b0t+v2')
         self.assertEqual([(t['campaign']['id'], t['campaign']['from'], t['seed'],
                            t['campaign']['last']) for t in tasks],
                          [('mem1-cs-s4001', 7, 4001, [22]), ('mem1-full-s4008', 9, 4008, [22])])
         self.assertNotIn('attempt', tasks[0]['campaign'], 'every attempt, in sequence')
-        self.assertEqual(tasks[0]['stamp'], {'resumed_from': 'cs-s4001/7'})
+        self.assertEqual(tasks[0]['stamp'], {'resumed_from': 'cs-s4001/7', 'start_bots': None,
+                                             'stale': True})
         self.assertTrue(os.path.exists(os.path.join(store, 'states', 'mem1-cs-s4001', '7.ss')))
-        one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7)
+        one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7,
+                              instrument='b0t+v2')
         self.assertEqual((one[0]['campaign']['from'], one[0]['campaign']['last']), (6, [7]))
         with self.assertRaisesRegex(ValueError, 'already exists'):
             mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem1')

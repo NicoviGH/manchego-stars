@@ -3961,7 +3961,10 @@ INSPECT.campaignApi = function(game)
 
     local api = { Bot = BOT, Json = Json,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
-                 route = cfg.route },
+                 route = cfg.route,
+                 -- the bot hash and suite version montecarlo.py ran it under: each start this
+                 -- campaign saves names the bots that played the chapters before it (ADR 0417)
+                 instrument = PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil },
         random = math.random,
         -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
         -- attempt draws what the whole campaign would have drawn there
@@ -4109,7 +4112,7 @@ INSPECT.campaignApi = function(game)
                     .. "carried team; it resumes with none", played))
             end
             return { chapter = played, carried = saved.carried or {},
-                     carriedUnknown = saved.carried == nil }
+                     carriedUnknown = saved.carried == nil, bots = saved.bots }
         end
         local stalled = INSPECT.watch("arrive")
         for _ = 1, TUNE.bootSteps do
@@ -4126,9 +4129,11 @@ INSPECT.campaignApi = function(game)
                     local sapi = INSPECT.sightApi()
                     INSPECT.Sight.seed(sapi, seed)
                 end
+                -- the first map New Game reaches: no bot has played a chapter before it
+                local first = played == nil
                 played = ch
                 log(string.format("campaign: chapter %d starts (%s)", ch, state))
-                return { chapter = ch }
+                return { chapter = ch, bots = first and {} or nil }
             end
             if state == "world_map_idle" then
                 local target = INSPECT.gameCalls(function(call)

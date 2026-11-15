@@ -2711,8 +2711,21 @@ def max_attempts(path=os.path.join(HERE, 'campaign.lua')):
 SCOUT_MARK = 'SCOUT'
 
 
+def start_bots(store, name, at, instrument):
+    """Who played the chapters before campaign `name`'s start `at` (its record's `bots`, ADR
+    0417), and whether that start is stale: a bot version other than `instrument` (this run's)
+    played one of them, or the record never kept them (`bots` None). A stale start is still
+    played; its records say so, so a reading never mistakes it for this bot's own."""
+    try:
+        with open(os.path.join(store, 'states', name, '%d.json' % at)) as fh:
+            bots = json.load(fh).get('bots')
+    except (OSError, ValueError):
+        bots = None
+    return bots, bots is None or any(b != instrument for b in bots)
+
+
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
-                 attempts=None, scout=False, route=None):
+                 attempts=None, scout=False, route=None, instrument=None):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
@@ -2724,7 +2737,10 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     seed is unknown, or the new id is taken; a copy that fails removes every copy this call
     made, then raises. `scout` carries each campaign on past a chapter it cannot clear clean (the
     scout lap, campaign.lua M.SCOUT_PATIENCE); `route` (1 Eirika, 2 Ephraim) is the branch it
-    takes at vanilla's Ch8 split, in place of the env's."""
+    takes at vanilla's Ch8 split, in place of the env's. Each task's stamp says who played the
+    chapters before its start and whether it is stale against `instrument` (this bot's version,
+    instrument_id() unless given; start_bots)."""
+    instrument = instrument or instrument_id()
     if route is not None and not vanilla:
         raise ValueError('--route is vanilla\'s (the branch at its Ch8 split)')
     if route is not None and route not in (1, 2):
@@ -2777,8 +2793,10 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['scout'] = True
         if route is not None:
             camp['route'] = route
+        bots, stale = start_bots(store, name, at, instrument)
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
-                      'stamp': {'resumed_from': '%s/%d' % (name, at)}})
+                      'stamp': {'resumed_from': '%s/%d' % (name, at), 'start_bots': bots,
+                                'stale': stale}})
     return tasks
 
 
@@ -2802,6 +2820,14 @@ def resume_main(args, pool=None):
         return 1
     print('%d %s campaigns carried on, as %s-<campaign>, on %d workers'
           % (len(tasks), args.game, args.tag, args.jobs), flush=True)
+    # a start an older bot (or an unknown one) played up to is played all the same (Nicolas,
+    # 2026-11-15: no re-run every time), and said so here and on every record (ADR 0417)
+    for t in tasks:
+        st = t['stamp']
+        if st['stale']:
+            print('  stale start %s: played up to by %s, not this bot alone'
+                  % (st['resumed_from'], ', '.join(st['start_bots'] or ['an unrecorded bot'])),
+                  flush=True)
     pool = pool or Pool(jobs=args.jobs, out=os.path.join(store, RESUME_RUNS))
     crashed = timed_out = 0
     for rec in pool.run(tasks):
