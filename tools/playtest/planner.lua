@@ -296,18 +296,20 @@ local function takes(act)
     return nil
 end
 
--- The experience attack `f` teaches its unit, over the exchange's ways (f.joint) at `hp`, the
--- HP the plan leaves the target: f.exp is the game's count for blows that deal nothing, deal
--- damage and kill (sight.lua expOf), and a way whose counter kills our unit (at `unitHp`)
--- teaches nothing (GetBattleUnitExpGain: the actor's HP is 0). A kill an earlier blow of the
--- plan set up is this unit's kill: the plan's chip and finish train the finisher.
-local function taught(f, hp, unitHp)
-    local x = f.exp
+-- The experience an exchange teaches our unit, over its ways (`ways`: exchangeOf's joint,
+-- { p, dealt, back }): `x` is the game's count for our blows dealing nothing, dealing damage and
+-- killing (sight.lua expOf), `hp` the HP the other side is at, `unitHp` our unit's. A way that kills
+-- our unit teaches nothing (GetBattleUnitExpGain: its HP is 0). `struck`: the exchange is an
+-- enemy's strike on our unit, so our blows are its `back` (our counter) and its `dealt` is
+-- what we lose; else it is our attack, the other way round. ADR 0414.
+local function taught(x, ways, hp, unitHp, struck)
     if not x then return 0 end
     local sum = 0
-    for _, w in ipairs(f.joint or {}) do
-        if w.back < unitHp then
-            sum = sum + w.p * (w.dealt >= hp and x.kill or w.dealt > 0 and x.hit or x.none)
+    for _, w in ipairs(ways or {}) do
+        local ours, lost = w.dealt, w.back
+        if struck then ours, lost = w.back, w.dealt end
+        if lost < unitHp then
+            sum = sum + w.p * (ours >= hp and x.kill or ours > 0 and x.hit or x.none)
         end
     end
     return sum
@@ -344,7 +346,9 @@ local function score(act, st, W, style, odds)
             local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             v = v + W.dealt * dealt * target + W.kill * kill * worth
-                + W.exp * taught(f, hp, act.unitHp)
+                -- at the HP the plan leaves the target: a kill an earlier blow of the plan
+                -- set up is this unit's, so the plan's chip and finish train the finisher
+                + W.exp * taught(f.exp, f.joint, hp, act.unitHp)
         end
         if f.counters then
             -- the counter's risk is its chance to kill (a target dead before it answers takes
@@ -393,7 +397,8 @@ local function score(act, st, W, style, odds)
         local t = act.targetUnit
         local hp = st.hp[t.id] or t.hp
         local gain = math.min(act.amount, (t.maxhp or hp) - hp)
-        v = v + W.heal * gain
+        -- and the experience the staff teaches the healer (the game's count, sight.staffExp)
+        v = v + W.heal * gain + (gain > 0 and W.exp * (act.exp or 0) or 0)
         fx.heals = { id = t.id, hp = hp + gain }
         -- the game offers Staff only on someone hurt: a heal before the blow is no act
         fx.blocked = gain <= 0
@@ -1370,6 +1375,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- on the player's side it strikes, whose other acts may save it (vanilla Ch5: Joshua,
         -- killed by Seth's counter on turn 3, the planner paying nothing for it)
         local felled, struckBy, fell, winStruck = {}, {}, 0, {}
+        local learnt = 0   -- the experience our counters are expected to earn in the phase
         -- the units the phase may strike: the player's as the plan leaves them (its counter
         -- chained), then the greens where they stand; kept for the lookahead's second phase
         local hit = {}
@@ -1411,6 +1417,13 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
             fell = fell + o.p * (1 - lives)
+            -- what our units' counters learn in this way of the phase: each strike's own
+            -- exchange, played at the HPs the phase had left when it came (ADR 0414)
+            for _, s in ipairs(o.strikes) do
+                if s.taught and s.targetHp then
+                    learnt = learnt + o.p * taught(s.taught, s.joint, s.strikerHp, s.targetHp, true)
+                end
+            end
             for _, s in ipairs(o.strikes) do
                 if strikers[s.target] and s.enemy then strikers[s.target][s.enemy] = true end
                 if st.recruits[s.enemy] then
@@ -1469,7 +1482,7 @@ function M.plan(Bot, board, sight, style, opts)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.goalWorth = {}
-        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
+        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell) + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
         st.judged = judged
         st.strikes = strikes

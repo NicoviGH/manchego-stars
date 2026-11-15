@@ -534,27 +534,30 @@ M.DECISION_FRAMES = 4000000
 -- changes the chapter, and #510 call 3 (comment 6810567866) asked for the same three here.
 M.GOAL_QUIET = 3
 
--- Whether the experience the plan read for an attack (`taught`: the game's count for none /
--- hit / kill, sight's expOf) is what the real battle (`battle`, Board.battle) awarded its actor:
--- nil when it is, else { case, read, gave }. The case is the battle's: its actor dead (the count
--- is 0), its target dead, any blow of the actor's that dealt damage, else none. A battle between
--- two player units (blue ids, below 0x40) awards none (BattleApplyExpGains skips it), so there is
--- nothing to check; the other skip, PLAY_FLAG_EXTRA_MAP, is the link arena's, which the bot
--- never plays. ADR 0414.
-function M.taughtMiss(taught, battle)
-    local a, t = battle.actor, battle.target
-    if a.id and t.id and a.id < 0x40 and t.id < 0x40 then return nil end
+-- Whether the experience the plan read for one side of a battle (`taught`: the game's count for
+-- none / hit / kill, sight's expOf) is what the real battle (`battle`, Board.battle) awarded it:
+-- nil when it is, else { case, read, gave }. `side` is the player unit's: "actor" (our attack, the default) or
+-- "target" (an enemy's strike on our unit, its counter). The case is the battle's: our side dead
+-- (the count is 0), the other dead, any blow of our unit's that dealt damage, else none. A battle
+-- between two player units (blue ids, below 0x40) awards none (BattleApplyExpGains skips it),
+-- so there is nothing to check; the other skip, PLAY_FLAG_EXTRA_MAP, is the link arena's,
+-- which the bot never plays. ADR 0414.
+function M.taughtMiss(taught, battle, side)
+    side = side or "actor"
+    local me, them = battle.actor, battle.target
+    if side == "target" then me, them = them, me end
+    if me.id and them.id and me.id < 0x40 and them.id < 0x40 then return nil end
     local case = "none"
-    if a.hp == 0 then case = "dead"
-    elseif t.hp == 0 then case = "kill"
+    if me.hp == 0 then case = "dead"
+    elseif them.hp == 0 then case = "kill"
     else
         for _, h in ipairs(battle.hits) do
-            if h.by == "actor" and not h.miss and h.dmg > 0 then case = "hit" end
+            if h.by == side and not h.miss and h.dmg > 0 then case = "hit" end
         end
     end
     local read = case == "dead" and 0 or taught[case]
-    if read == a.exp then return nil end
-    return { case = case, read = read, gave = a.exp }
+    if read == me.exp then return nil end
+    return { case = case, read = read, gave = me.exp }
 end
 
 -- A run's player acts as one number, folded act by act (FNV-1a, 32 bits): who, what, where,
@@ -700,7 +703,10 @@ function M.run(api)
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
                   lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
                                 calls = 0, cpu_s = 0 },
-                  seize_skips = {}, stall_events = {}, anomalies = {} }
+                  seize_skips = {}, stall_events = {}, anomalies = {},
+                  -- the experience reads checked against the game's award (ADR 0414), per kind:
+                  -- a pass with none checked proves nothing
+                  taught_checked = { attack = 0, counter = 0, staff = 0 } }
     local explore = M.exploreLog()
     -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
     -- baseline and chosen keys once it is reached; `halt`, why the replay stops early
@@ -1640,10 +1646,22 @@ function M.run(api)
                 local battle = not trapped and action.act == "attack" and api.battle and api.battle() or nil
                 local taught = battle and action.f and action.f.exp
                 local miss = taught and M.taughtMiss(taught, battle)
+                if taught then rec.taught_checked.attack = rec.taught_checked.attack + 1 end
                 if miss then
                     -- the plan's experience read is not the game's: the term scored a wrong number
                     anomaly({ kind = "taught_miss", turn = turn, charId = battle.actor.charId,
                               case = miss.case, read = miss.read, gave = miss.gave })
+                end
+                -- a heal's: the staff's count against what the game's Staff command awarded
+                -- (gBattleActor's expGain, BattleApplyItemExpGains)
+                local healer = not trapped and action.act == "staff" and action.exp
+                    and api.itemUser and api.itemUser() or nil
+                if healer and healer.id == action.unitId then
+                    rec.taught_checked.staff = rec.taught_checked.staff + 1
+                end
+                if healer and healer.id == action.unitId and healer.exp ~= action.exp then
+                    anomaly({ kind = "taught_miss", turn = turn, charId = healer.charId,
+                              case = "staff", read = action.exp, gave = healer.exp })
                 end
                 local after = api.board()
                 sight.refresh()
@@ -1714,6 +1732,25 @@ function M.run(api)
                         end
                     end
                     explore.closedBy(a.tile.x, a.tile.y, a.charId, loot)
+                end
+                -- our unit's counter: what it learnt against the plan's read of that strike
+                -- (the committed plan's phase, its strike by this enemy on that unit)
+                for _, b in ipairs(a.battles or {}) do
+                    for _, st in ipairs(commit and commit.strikes or {}) do
+                        -- read at the level it fought at: a level-up since (an earlier battle,
+                        -- its own attack after the plan) changes the count honestly
+                        if b.actor.id == a.id and st.enemy == a.id and st.target == b.target.id
+                                and st.taught and st.targetLevel == b.target.levelBefore then
+                            local m = M.taughtMiss(st.taught, b, "target")
+                            rec.taught_checked.counter = rec.taught_checked.counter + 1
+                            if m then
+                                anomaly({ kind = "taught_miss", turn = turn,
+                                          charId = b.target.charId, case = "counter " .. m.case,
+                                          read = m.read, gave = m.gave })
+                            end
+                            break   -- the phase's one strike by this enemy on that unit
+                        end
+                    end
                 end
                 trace({ t = "act", phase = "enemy", unit = a.charId, id = a.id, from = a.from,
                         to = a.to, hp = a.hp, act = a.act, targetId = a.targetId, tile = a.tile,

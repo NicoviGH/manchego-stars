@@ -2752,6 +2752,52 @@ do
     check(attacker(rec), 1, "experience: the cap holds")
 end
 
+-- test_planner_stands_where_the_counter_teaches (#510 party plan, PR 3): at (1,0) E strikes A
+-- and misses, and A's counter kills it, which teaches A 30 (the game's count, the strike's
+-- `taught`); at (0,1), as far from E and F, nothing reaches A. F keeps E from being the Rout's
+-- last enemy. Without the experience the two tiles tie, and the key holds A at (0,1).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local E = red(0x81, 5, 5, { hp = 10, minRange = false })
+    local F = red(0x82, 9, 9, { minRange = false })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 1 }, { 1, 0 }) },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.x == 1 then
+                    return { { target = 0x01, enemy = 0x81, takenHit = 0, takenDmg = 0,
+                               takenHits = 1, takenCrit = 0, counterHit = 100, counterDmg = 10,
+                               counterHits = 1, strikerHp = 10, targetHp = 20,
+                               joint = { { p = 1, dealt = 0, back = 10 } },
+                               taught = taught(1, 10, 30) } }
+                end
+            end
+            return {}
+        end,
+    }
+    local _, rec = Planner.plan(B, boardOf(A, E, F), sight, style("careful"))
+    check(rec and rec.rank.key, "1>wait@1,0>nil", "experience: A stands where its counter learns")
+end
+
+-- test_planner_heals_with_the_healer_the_staff_teaches (#510 party plan, PR 3): A is 10 HP
+-- down; H and K each reach it with a 10-HP heal. H cannot gain levels, K learns 15 from the
+-- staff (the game's count, sight.staffExp): K heals.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false, acted = true })
+    local H = blue(0x02, 1, 1, 0, { minRange = false })
+    local K = blue(0x03, 2, 0, 1, { minRange = false })
+    local sight = sightOf {
+        reach = { [0x02] = tiles({ 1, 0 }), [0x03] = tiles({ 0, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10, exp = 0 } },
+                   [0x03] = { { slot = 0, amount = 10, exp = 15 } } },
+        heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x01 }, exp = 0 } } },
+                  [0x03] = { ["0,1"] = { { slot = 0, amount = 10, targets = { 0x01 }, exp = 15 } } } },
+    }
+    local _, rec = Planner.plan(B, boardOf(A, H, K), sight, style("careful"))
+    check(rec and rec.rank.key and rec.rank.key:find("3>staff@0,1>1", 1, true) ~= nil, true,
+          "experience: the healer the staff teaches heals: " .. tostring(rec and rec.rank.key))
+end
+
 -- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, Manchego Stars ch03 turn 11):
 -- A (12 HP) strikes E (9 HP): a hit kills it, a miss lets E's counter take 9. F's AI strikes A
 -- only when A is on 4 HP or less, and its blow kills him there. On A's mean HP after the

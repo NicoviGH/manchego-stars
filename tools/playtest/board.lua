@@ -514,6 +514,7 @@ local function battleSide(mem, b)
              -- InitObstacleBattleUnit builds a wall's (index 0) without InitBattleUnit, so its
              -- levelPrevious is whatever the last battle left there
              exp = exp, levelUp = id ~= 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
+             levelBefore = mem.s8(b + 0x70),
              broke = mem.s8(b + 0x7D) ~= 0 }
 end
 
@@ -535,6 +536,11 @@ function Board.battle(mem, SYM)
     return out
 end
 
+-- The battle unit the Staff command last set up (gBattleActor, BattleInitItemEffect): who used
+-- the item and the experience the game awarded it (BattleApplyItemExpGains: +6E expGain). A
+-- staff's use is no REAL battle, so Board.battle refuses it; this reads its actor alone.
+function Board.itemUser(mem, SYM) return battleSide(mem, SYM.gBattleActor) end
+
 -- The reader with its memory and symbols bound, for harness.lua: one top-level local there
 -- instead of one per helper.
 function Board.bind(mem, SYM)
@@ -554,6 +560,7 @@ function Board.bind(mem, SYM)
         items = function(addr) return Board.items(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
+        itemUser = function() return Board.itemUser(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,

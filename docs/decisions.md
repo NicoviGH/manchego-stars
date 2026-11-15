@@ -258,7 +258,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0411` | [A judged enemy phase splits on a counter kill only above a floor, and a decision that runs away ends its attempt timeout](decisions/0411-a-judged-phase-splits-on-a-counter-kill-only-above-a-floor-and-a-runaway-decision-times-out.md) | 2026-11-14 | #510 |
 | `0412` | [The shop arms a unit by the game's own can-use and uses left, and the pick reads it holding what the shop will buy](decisions/0412-the-shop-arms-every-fielded-unit-by-the-games-can-use-and-uses-left-and-the-pick-reads-it-holding-the-item.md) | 2026-11-14 | #510 |
 | `0413` | [The convoy gives back: weapons before the shop, seals and boosters after it](decisions/0413-the-convoy-gives-back-weapons-before-the-shop-seals-and-boosters-after-it.md) | 2026-11-14 | #510 |
-| `0414` | [The plan counts the experience the game would award its attack](decisions/0414-the-plan-counts-the-experience-the-game-would-award-its-attack.md) | 2026-11-14 | #510 |
+| `0414` | [The plan counts the experience the game would award: its attacks, its counters, its heals](decisions/0414-the-plan-counts-the-experience-the-game-would-award-its-attack.md) | 2026-11-14 | #510 |
 
 ---
 

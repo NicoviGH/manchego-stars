@@ -1629,7 +1629,7 @@ local function staffHeal(ctx, gate, only)
                         for _, id in ipairs(h.targets) do
                             local gain = math.min(missing[id] or 0, h.amount)
                             local c = { u = u, tile = t, slot = h.slot, id = id, gain = gain,
-                                        amount = h.amount,
+                                        amount = h.amount, exp = h.exp,
                                         left = -(missing[id] or 0),
                                         worst = worstCase(ctx, u, t.x, t.y, nil).sum }
                             if gain > 0 and (not best or c.gain > best.gain
@@ -1647,7 +1647,8 @@ local function staffHeal(ctx, gate, only)
     if not best then return nil end
     local a = action(best.u, best.tile, "staff", nil)
     -- the amount too: the planner reads what the target is short by when the heal lands
-    a.slot, a.targetId, a.gain, a.amount = best.slot, best.id, best.gain, best.amount
+    -- and the experience the staff teaches (the planner's score)
+    a.slot, a.targetId, a.gain, a.amount, a.exp = best.slot, best.id, best.gain, best.amount, best.exp
     for _, b in ipairs(ctx.blues) do
         if b.id == best.id then a.target = b.charId end
     end
@@ -2095,7 +2096,7 @@ local function proposeOne(ctx, u)
             for _, h in ipairs(ctx.sight.heals(u, t.x, t.y, others)) do
                 for _, id in ipairs(h.targets) do
                     if not best[id] or w < best[id].w then
-                        best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount }
+                        best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount, exp = h.exp }
                     end
                 end
             end
@@ -2104,7 +2105,7 @@ local function proposeOne(ctx, u)
             local c = best[b.id]
             if c then
                 local a = action(u, c.tile, "staff", b)
-                a.slot, a.amount = c.slot, c.amount
+                a.slot, a.amount, a.exp = c.slot, c.amount, c.exp
                 add(a, "heal")
             end
         end

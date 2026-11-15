@@ -778,9 +778,13 @@ do
     -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
     -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf)
     local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
-    local _, onBattle = src:gsub("api%.write8%(S%.gBattle%a+ %+ UNIT_HP,", "")
+    local _, onBattle = src:gsub("api%.write8%(me %+ UNIT_HP,", "")
+    local _, onThem = src:gsub("api%.write8%(them %+ UNIT_HP,", "")
+    onBattle = onBattle + onThem
     local writes = all - onBattle
     check(onBattle, 2, "aiPhaseStart: the battle units' HP is written only by the experience count")
+    check(src:find("local me, them = S.gBattleActor, S.gBattleTarget", 1, true) ~= nil, true,
+          "aiPhaseStart: `me` and `them` are the battle units (M.expOf)")
     local _, wounds = src:gsub("\n%s+wound%(", "")
     check(writes == 4 and wounds == 2
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
@@ -1476,9 +1480,20 @@ do
         seen[#seen + 1] = damaged .. "/" .. hp .. "/" .. mem[S.gBattleActor + 0x13]
         return damaged == 0 and 1 or hp == 0 and 40 or 12
     end
-    local x = Sight.expOf(api, call, S)
+    local x = Sight.expOf(api, call, S, "actor")
     check(table.concat(seen, " "), "0/1/1 1/1/1 1/0/1", "expOf: each case's fields, the actor alive")
     check(x.none == 1 and x.hit == 12 and x.kill == 40, true, "expOf: each case's count")
+    -- the struck side (our unit's counter): the same three cases with the two units swapped
+    seen, mem = {}, {}
+    local swapped = function(addr, args)
+        check(args[1] == S.gBattleTarget and args[2] == S.gBattleActor, true,
+              "expOf: the struck side counts itself against the striker")
+        local damaged, hp = mem[S.gBattleTarget + 0x7C], mem[S.gBattleActor + 0x13]
+        seen[#seen + 1] = damaged .. "/" .. hp .. "/" .. mem[S.gBattleTarget + 0x13]
+        return damaged == 0 and 1 or hp == 0 and 40 or 12
+    end
+    x = Sight.expOf(api, swapped, S, "target")
+    check(table.concat(seen, " "), "0/1/1 1/1/1 1/0/1", "expOf: the struck side's fields, it alive")
 end
 
 -- M.known (ADR 0414): a key first read by an enemy's strike (no count) gets its count from the
@@ -1498,6 +1513,21 @@ do
     order = {}
     Sight.known(memo, "m", true, count, play)
     check(table.concat(order, ","), "count,play", "known: on a miss the count comes first")
+end
+
+-- M.staffExp (ADR 0414): the Staff command's setup for the unit and slot, then the game's count
+-- on the battle unit it set up.
+do
+    local S = { BattleInitItemEffect = 0x0802C000, GetBattleUnitStaffExp = 0x0802C100,
+                gBattleActor = 0x0203A4EC }
+    local calls = {}
+    local function call(addr, args)
+        calls[#calls + 1] = string.format("%X(%s)", addr, table.concat(args, ","))
+        return addr == S.GetBattleUnitStaffExp and 11 or 0
+    end
+    check(Sight.staffExp(call, S, 0x0202BE4C, 2), 11, "staffExp: the game's count")
+    check(table.concat(calls, " "), string.format("%X(%d,2) %X(%d)", S.BattleInitItemEffect,
+          0x0202BE4C, S.GetBattleUnitStaffExp, S.gBattleActor), "staffExp: set up, then counted")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
