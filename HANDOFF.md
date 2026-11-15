@@ -23,11 +23,15 @@ and start a fresh instance; don't rely on auto-compaction.
   - Confirmed: on turn 15, a replan had Colm (charId 9), at 27 HP and alone, attack a Knight.
     That plan was judged at 0 death and left him at 3 HP. Turns 16–17 then had no plan under the
     cap, and he died on turn 17. Not door-related.
-  - Lead 1: the cap reads only the next enemy phase. Next: read the trace for whether the
-    lookahead fired on turn 15. Any change here is a weight or rule, so it is Nicolas's call.
-  - Lead 2: chests (23,1) and (7,1) were never offered, yet the ledger read (23,1) at 0.85–1.00
-    and marched Colm to it. Next: why the chest was never offered, and why its chance stayed
-    near 1.
+  - Both leads tested (#510, the comment after 6900592350):
+    - **The chest lead is mostly refuted.** The chests are reachable: attempt 2 opened all three.
+      The ledger's chest chance ignores enemy bodies, which is a simplification, not the cause.
+    - **The lookahead lead is confirmed.** No second phase was judged on turn 15:
+      `M.triggers` fires only on a breach or a boss's reach (ADR 0389).
+    - **Waiting on Nicolas:** whether to widen ADR 0389's triggers. My pick is a narrow trigger:
+      a unit left one hit from death by an enemy that reaches it next turn, with no heal in reach.
+    - Unexplained: the same attack read 0.147 before the replan and 0 after it. A `Planner.plan`
+      `diag` replay on the turn-15 board would settle it.
 - **The Seize-map jam** (Ch7's pocket): the Ch10 attempt-1 case is gone on `door4`, but Ch7's is
   still open. The recommendation still waiting on Nicolas: on a Seize map, count the seizing
   unit's progress above an escort's.
