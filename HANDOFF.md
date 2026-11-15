@@ -9,49 +9,35 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, overnight run, Nicolas away; he gave Claude merge authority and its own calls): Eirika's route is played through vanilla Ch15, cleared clean.**
-- **The lap:** `party1e` (main at c072f9ae): from party1c's Ch14 start, Ch14 won in 27 turns
-  with no deaths; Ch15 attempt 1 lost on turn 11 (Ephraim, a 6% roll); **Ch15 attempt 2 won in
-  27 turns with no deaths**; slowest decision 63k frames. The whole lap took 9m44s.
-- **Merged tonight, all reviewed (`/code-review medium`), every finding fixed, CI green:**
-  - #618: a non-unit byte under the cursor fails only on a live map, not while a chapter loads.
-  - #619: the trace records what the beam knew of each plan (`screen`) and each decision's frames (`decided`).
-  - #621: every Wait waits out the event it sets off (`Controller.actionTailOver`). Ch15's
-    hidden treasure had left the full-bag chooser under the next act.
-  - #622 (**ADR 0415, my call under Nicolas's overnight delegation; his to reverse**): one split
-    floor (1/64) bounds the whole judged plan. Ch15's slowest decision went from 3.56M to 98k
-    frames; Ch14 plays act for act the same.
-  - #623 (closes #620): a kept call waits for the CPU to rest in the BIOS halt. A mid-frame
-    `StartShopScreen` let the terrain window's draw overwrite the prep shop's stock, so every
-    resumed Ch15 start (and every retry) crashed in the shop.
-- **Findings** are on #510 (comments 6889897783 for the party lap measures, 6892653016 for the
-  cost, and the Ch15 clear after it).
-- **Owed / untested:** whether #622's floor or #623's rest guard moves a frozen-suite game; the
-  suite runs before the bot's reading is next relied on (a verdict or a refreeze), over every
-  change since the last one.
-- **First, after the clear (Nicolas, 2026-11-15): a Fable subagent designs the party fixes.**
-  The Ch15 party is better than `lap1d`'s but not clean: #510 comment 6896123722 lists what
-  is fixed and the five gaps left (Innes with no bow while two sit in the convoy; unusable
-  items in bags; unused boosters; Eirika unpromoted, her Lunar Brace unlocated; Tana's Ocean
-  Seal), with what is unchecked. Brief it with that comment, the earlier plan (comment
-  6872948037), ADR 0396's five tests and `docs/research.md`; it returns a design as ONE
-  comment on #510 (no design doc), each rule tested against vanilla players, not built.
-  It sends cheaper (Sonnet or Haiku) subagents at will to check facts in the data and code
-  (the kept states, the decomp, the bot's item code) rather than assume them.
-- **Then:** Ephraim's route (item E: E2, E3; #510 comment 6872468981, Colm's Ch9 Door gate) and
-  the chapters past 15 on both routes (the finish line: the whole vanilla game clean, memory
-  `finish-line-whole-vanilla-game`). Ch15 still falls back to a sacrifice plan on most turns:
-  the next lead on how well the bot plays it, not its cost.
-- **Throwaway local branches (never merge, delete when done):** `probe/510-ch15-cost`,
-  `probe/510-wait-proof`, `probe/510-floor-measure`, `probe/620-shop`, `probe/510-mapunit`,
-  `exp/510-plan-floor` (superseded by #622).
-- **Kept states** under `references/sim/vanilla/c25b145e3745/states/`: `party1e-` (through
-  Ch15), `party1c-`, `party1d-`, `lap1d-`, `lap2-` (Ephraim's 0-10 and 23), and the probe
-  tags. The convoy is only in `<n>.ss` (`gConvoyItemArray` 0x0203A81C).
+**Next session starts here (2026-11-15, afternoon): the fresh lap from the prologue is running, on main at 17a281c0.**
+- **Merged today, each reviewed (`/code-review medium` + one scoped re-review), every finding fixed, CI green:**
+  - #624 (ADR 0416, amends 0413): before the shop every roster unit, benched too, gives the
+    convoy what it cannot use this chapter (rule A); a unit takes or buys a spare weapon once
+    its weapons of a type hold under half of one full weapon's uses (rule B, `Bot.M.SPARE` =
+    0.5, Nicolas: "tune it if it has adverse effects"); each attempt's `supply` and `buys` are
+    on its BOTRUN record in `resume-runs.jsonl`. Design: #510 comment 6896261936 (Fable).
+  - #625 (ADR 0417): each saved start's `<n>.json` lists `bots`, the bot versions that played
+    the chapters before it; every record says `stale` (an older or unknown bot played up to its
+    start; bot hash only). Never refused (Nicolas: no re-run after every change). The vanilla
+    store's 253 New Game `0.json` records were backfilled with `"bots": []`.
+- **Nicolas, 2026-11-15:** no more proofs on outdated saves; the run proof of both PRs is the
+  fresh lap. **Open call for him:** whether verdicts should leave out `stale` runs (records
+  say it; nothing filters).
+- **The lap:** `montecarlo.py resume --game vanilla --campaigns cs-s4006 --chapter 0 --scout`,
+  tag `lap3e` (`--route 1`, Eirika) and `lap3p` (`--route 2`, Ephraim), started in parallel.
+  Logs in the session scratchpad; records in the vanilla store's `resume-runs.jsonl`. Read
+  per chapter: result, deaths, `supply`/`buys` (rule A and B at work), `stale` false. A
+  prologue-to-Ch1 run took 11 s (tags `vers1`-`vers3`, the #625 checks).
+- **Then:** the walls the lap finds, on both routes, toward the finish line (the whole vanilla
+  game clean, memory `finish-line-whole-vanilla-game`). Still open from before: Ch15 falls
+  back to a sacrifice plan on most turns; Colm's Ch9 Door gate on Ephraim's route (#510
+  comment 6872468981); whether Ch16's ending promotes Eirika by itself (ADR 0416, untested).
+- **Old kept states** (`party1e-`, `party1c-`, `lap1d-`, `lap2-`, probe tags) are stale under
+  ADR 0417: never a proof base again. Throwaway local branches from before (`probe/510-*`,
+  `exp/510-plan-floor`) can be deleted.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
   never run for a PR.
-
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
 - A simulated enemy phase and a single strike now start as the game's phase does
