@@ -1417,15 +1417,28 @@ local function marchToward(u, tx, ty, maxx, maxy)
     if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
         return controllerState(after) == "unit_selected"
     end, 120) then return false end
-    local best, bestd = nil, 999
+    local tiles = {}
     for y = 0, maxy do
         for x = 0, maxx do
             if reachCost(x, y) < 120 and not tileOccupied(x, y)
                 and not (x == u.x and y == u.y) then
-                local d = BOARD.distance(tx, ty, x, y)
-                if d < bestd then best, bestd = { x = x, y = y }, d end
+                tiles[#tiles + 1] = { x = x, y = y }
             end
         end
+    end
+    -- a ballista's rider ends on no other ballista's tile (the game's CanMoveActiveUnitTo)
+    local state = ru32(u.addr + 0x0C)
+    if INSPECT.loadSight().riding(state) then
+        local api = INSPECT.sightApi()
+        local rider = { addr = u.addr, x = u.x, y = u.y, state = state }
+        tiles = INSPECT.Sight.machine(api.cpu)(function(call)
+            return INSPECT.Sight.riderTiles(api, call, rider, tiles)
+        end)
+    end
+    local best, bestd = nil, 999
+    for _, t in ipairs(tiles) do
+        local d = BOARD.distance(tx, ty, t.x, t.y)
+        if d < bestd then best, bestd = t, d end
     end
     if not best or not cursorTo(best.x, best.y) then return false end
     if not guardedInput("confirm_move", "A", "live unit command menu opens", function(after)

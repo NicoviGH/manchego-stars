@@ -1697,6 +1697,41 @@ do
           "riderTiles: asked as the active unit, setting out from his tile")
     check(keys(Sight.riderTiles(api, call, onFoot, tiles)), "2,22 4,23 7,23 6,22",
           "riderTiles: a unit on foot keeps every tile")
+    -- a Canto move sets out from the act's tile: that one is kept unasked and is the origin
+    asked = {}
+    check(keys(Sight.riderTiles(api, call, innes, { { x = 7, y = 23 }, { x = 4, y = 23 } },
+                                { x = 7, y = 23 })), "7,23",
+          "riderTiles: a Canto rider keeps its set-out tile and ends on no ballista's")
+    check(table.concat(asked, " ") .. " " .. m.u16(S.gActiveUnitMoveOrigin) .. ","
+          .. m.u16(S.gActiveUnitMoveOrigin + 2), "4,23:0 7,23",
+          "riderTiles: a Canto rider is asked setting out from the act's tile")
+
+    -- the wiring: every reader of a move's tiles filters a rider's, and the answers' memo
+    -- keys whether the unit rides (a rider's empty weapons are never served on foot)
+    local function bodyOf(src, head)
+        local at = src:find(head, 1, true)
+        return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
+    end
+    check(bodyOf(sightSrc, "    function s.reach(u, friends)")
+              :find("M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))", 1, true)
+          ~= nil, true, "riderTiles: s.reach filters the rider's tiles")
+    check(bodyOf(sightSrc, "    function s.cantoTiles(u, a)")
+              :find("M.riderTiles(api, call, u, movementTiles(u, x, y), { x = x, y = y })", 1,
+                    true) ~= nil, true, "riderTiles: s.cantoTiles filters the rider's tiles")
+    check(bodyOf(sightSrc, "    local function ownKey(kind, u, hp)")
+              :find("M.riding(u.state)", 1, true) ~= nil, true,
+          "weapons: the answers' memo keys whether the unit rides")
+    local hf = assert(io.open(here .. "harness.lua"))
+    local harnessSrc = hf:read("a")
+    hf:close()
+    local march = harnessSrc:find("local function marchToward(u, tx, ty, maxx, maxy)", 1, true)
+    local marchBody = march and harnessSrc:sub(march, harnessSrc:find("\nend\n", march, true))
+        or ""
+    check(marchBody:find("INSPECT.Sight.riderTiles(api, call, rider, tiles)", 1, true) ~= nil,
+          true, "riderTiles: harness marchToward filters the rider's tiles")
+    -- M.riding is the one rider test: no other reads the bit off a state word
+    local _, copies = sightSrc:gsub("& M%.US_IN_BALLISTA", "")
+    check(copies, 1, "riding: sight.lua reads US_IN_BALLISTA in M.riding alone")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
