@@ -29,7 +29,14 @@ and start a fresh instance; don't rely on auto-compaction.
 - **Owed / untested:** whether #622's floor or #623's rest guard moves a frozen-suite game; the
   suite runs before the bot's reading is next relied on (a verdict or a refreeze), over every
   change since the last one.
-- **Next:** Ephraim's route (item E: E2, E3; #510 comment 6872468981, Colm's Ch9 Door gate) and
+- **First, after the clear (Nicolas, 2026-11-15): a Fable subagent designs the party fixes.**
+  The Ch15 party is better than `lap1d`'s but not clean: #510 comment 6896123722 lists what
+  is fixed and the five gaps left (Innes with no bow while two sit in the convoy; unusable
+  items in bags; unused boosters; Eirika unpromoted, her Lunar Brace unlocated; Tana's Ocean
+  Seal), with what is unchecked. Brief it with that comment, the earlier plan (comment
+  6872948037), ADR 0396's five tests and `docs/research.md`; it returns a design as ONE
+  comment on #510 (no design doc), each rule tested against vanilla players, not built.
+- **Then:** Ephraim's route (item E: E2, E3; #510 comment 6872468981, Colm's Ch9 Door gate) and
   the chapters past 15 on both routes (the finish line: the whole vanilla game clean, memory
   `finish-line-whole-vanilla-game`). Ch15 still falls back to a sacrifice plan on most turns:
   the next lead on how well the bot plays it, not its cost.
