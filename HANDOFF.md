@@ -9,27 +9,19 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14, late night): PR #617 (the convoy take fix) is open and owes one scoped re-review; then merge on Nicolas's word and resume the proof lap.**
-- **The lap `party1` crashed at its Ch10 start** (chapter indices 0-9 all won; Ch7 on attempt
-  2). Cause, confirmed: PR #615's `api.take` called `RemoveItemFromConvoy`, which no game code
-  calls; its pack copies all 100 convoy slots back from `gGenericBuffer`, so the scratch
-  buffer's contents became about 40 garbage convoy items (replayed as `dbgtake1`).
-- **PR #617** (branch `fix/510-convoy-take`, head 20902d0f; ADR 0413 amended): a take does what
-  the Supply screen's Take does (`sub_809E2C8`, `sub_80982B8`: the item into the bag, then
-  `ClearSupplyItems` and `AddItemToConvoy` for each item left). A give or take refuses a
-  convoy that is not the game's (`INSPECT.convoyFault`) and checks the convoy is exactly what
-  it was with or without the item. Runs `dbgtake2` and `dbgtake4` (from `party1`'s Ch9 start):
-  Seth gave the Knight Crest and took an Iron Lance, Kyle (0x11) took the Crest and was
-  promoted Cavalier to Paladin, Ch10 won with no death.
-- **Owed on #617:** `/code-review` ran (13 findings, all fixed in 20902d0f; table on the PR).
-  The fix changed behaviour, so ONE scoped re-review of 20902d0f is owed; fix what it returns,
-  then CI on the head, then Nicolas's "merge" (#617 is not covered by a standing merge
-  approval). Nicolas has already said the lap resumes after it.
-- **Then resume the lap:** `python3 tools/playtest/montecarlo.py resume --game vanilla --tag
-  party1b --campaigns party1-lap1d-lap1-fwd1-cs-s4006 --chapter 9 --last 15 --scout` (Ch9's
-  replay is deterministic: same acts). Report the four measures of the plan comment (#510
-  comment 6883980081, "Better means, set now") against `lap1d`, any `taught_miss` and the
-  `taught_unchecked` counts, and apply its stop rule. `party1`'s states 0-9 are good.
+**Next session starts here (2026-11-14, overnight): PR #617 is merged (41ec41e0); the proof lap `party1b` (Ch9 start to Ch15) is running.**
+- **The lap:** `python3 tools/playtest/montecarlo.py resume --game vanilla --tag party1b
+  --campaigns party1-lap1d-lap1-fwd1-cs-s4006 --chapter 9 --last 15 --scout`. When it ends,
+  report the four measures of the plan comment (#510 comment 6883980081, "Better means, set
+  now") against `lap1d`, any `taught_miss` and the `taught_unchecked` counts, and apply its stop
+  rule (party better on 1-3 and Ch15 still fails: the planner's cost is next, not the cap).
+- **PR #617** (the convoy take, ADR 0413 amended): a take does what the Supply screen's Take
+  does (the item into the bag, then `ClearSupplyItems` and `AddItemToConvoy` for each item
+  left). `Board.convoyFault` refuses a convoy that is not the game's (a gap, no id, or an id
+  with no item row; unit-tested in `test_board.lua`). Reviewed, re-reviewed, CI green.
+  `dbgtake5` (party1's index-9 start) plays the same acts as `dbgtake4`: won, 19 turns, no death.
+- **Cause of the earlier crash, confirmed:** PR #615's take called `RemoveItemFromConvoy`, whose
+  pack copies all 100 convoy slots back from `gGenericBuffer` (about 40 garbage items).
 - **Merged today: PR #616** (de95e0f9, ADR 0414): the plan's value counts the experience the
   game would award for an attack, a counter in the judged enemy phase and a heal, 0.3 a point;
   every run checks each read against the game's award (`taught_miss`, `taught_checked`,
