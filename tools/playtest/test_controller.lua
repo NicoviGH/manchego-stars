@@ -691,6 +691,28 @@ got, why = C.classify({ error = "malformed live menu", procs = proc("menu", "men
 check(got, nil, "malformed observation fails closed")
 check(why, "malformed live menu", "observer rejection is preserved")
 
+-- A cursor cell with no unit behind it (#510, the lap's crash entering Ch10): malformed on a
+-- live map, a passing load state between chapters (game_control alone, turn 0).
+do
+    local cell = { x = 0, y = 0, width = 16, height = 10, unit = 0x7A, unit_unknown = true }
+    local live = { cursor = cell, procs = proc("player_phase", "player_main_idle") }
+    got, why = C.classify(live)
+    check(got, nil, "a non-unit id under the cursor on a live map fails closed")
+    check(why, "gBmMapUnit id 0x7A has no gUnitLookup entry", "the non-unit id is named")
+    got = C.classify({ cursor = cell, procs = proc("sally", "sally_idle") })
+    check(got, nil, "a non-unit id under the formation cursor fails closed")
+    local loading = { cursor = cell, procs = proc("game_control", "game_control_root"),
+                      world = { chapter = 11, faction = 64, turn = 0 } }
+    check(C.classify(loading), "transition", "a non-unit id while the chapter loads is a transition")
+    -- the other half lives in harness.lua (not loadable outside mGBA): the observer reports the
+    -- fact and raises no error of its own for it
+    local f = assert(io.open(here .. "harness.lua"))
+    local harness = f:read("a")
+    f:close()
+    check(harness:find("gUnitLookup entry", 1, true), nil, "harness: no observer error for a non-unit cell")
+    check(harness:find("unit_unknown = unknown or nil", 1, true) ~= nil, true, "harness: the cell's fact is reported")
+end
+
 -- Trace lines are structured and carry the full state/action/postcondition transition.
 local trace = C.formatTrace({
     state = "unit_command_menu",
