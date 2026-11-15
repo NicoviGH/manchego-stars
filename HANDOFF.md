@@ -36,17 +36,19 @@ and start a fresh instance; don't rely on auto-compaction.
     `references/sim/vanilla/c25b145e3745/traces/lap3e-cs-s4006/11-s4006-a{1,2,3}-*.jsonl.gz`.
   - `lap3p` (Ephraim, `--route 2`): through ids 23, 24, 62, 25; crashed at id 26's prep (the
     Elixir, fixed by #626).
-- **Next, in order:**
-  1. Rerun both laps from the prologue on the latest bot (not a resume from `lap3p`'s Ch13
-     start: #626 changed item reads for every unit at level 10+, so earlier chapters may
-     play differently, and a stale start mixes bot versions). `montecarlo.py resume --game
-     vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`, in parallel;
-     Eirika's reached her Ch10 in about 25 min.
-  2. Innes's crash: ONE instrumented run of `lap3e-cs-s4006` id 11 attempt 3 to turn 14,
-     printing Innes's bag `{id, uses}` and the game's can-attack, to confirm the broken-bow
-     lead before a fix (a crash is the harness's fault: fix before trusting runs past it).
-  3. Eirika's Ch10 stuck pattern: the cap leaves only "hold"; read `rank.max_exceed` on a1
-     turns 13-19 (`montecarlo.py story`) before proposing anything.
+- **Next, in order (Nicolas, 2026-11-15: fix the known issues before the runs):**
+  1. Innes's crash at Eirika's Ch10 (a crash is the harness's fault). Diagnose with ONE
+     instrumented replay of the run that showed it (`lap3e-cs-s4006` id 11 attempt 3, to turn
+     14), printing Innes's bag `{id, uses}` and the game's can-attack, to confirm or refute
+     the broken-bow lead. Then the fix, with a unit test that fails without it.
+  2. Eirika's Ch10 stuck pattern (the cap leaves only all-hold plans): read `rank.max_exceed`
+     on a1 turns 13-19 (`montecarlo.py story` on the traces above), state the cause, then a
+     fix or a recommendation to Nicolas if it is a weight or the cap (his calls).
+  3. Only then rerun both laps from the prologue on the fixed bot, in parallel:
+     `montecarlo.py resume --game vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2
+     --tag <new>` (Eirika's reached her Ch10 in about 25 min). Not a resume from `lap3p`'s Ch13
+     start: #626 changed item reads for every unit at level 10+, so earlier chapters may play
+     differently, and a stale start mixes bot versions.
 - **Open call for Nicolas:** whether verdicts should leave out `stale` runs (records say it;
   nothing filters).
 - **Old kept states** (`party1e-`, `lap1d-`, `lap2-`, probes) are stale under ADR 0417, never
