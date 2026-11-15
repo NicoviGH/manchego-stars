@@ -38,6 +38,30 @@ class TestHarnessLoads(unittest.TestCase):
                          'harness.lua does not load: %s' % done.stderr.decode())
 
 
+    def test_harness_reads_no_stray_global(self):
+        # PR #628: moving the convoy's helpers into a `do` block left the Item command's use
+        # (api.use) calling `slotOf` and `count` as globals, nil at run time. The chunk still
+        # compiled and every unit test passed; the first scout lap to use a seal crashed.
+        # Every global harness.lua reads must be the emulator's, a run setting (PLAYTEST_*)
+        # or Lua's own.
+        import shutil
+        import subprocess
+        luac = shutil.which('luac')
+        if not luac:
+            self.skipTest('no luac (brew install lua)')
+        listing = subprocess.run([luac, '-l', '-l', '-p', HARNESS],
+                                 capture_output=True, text=True, check=True).stdout
+        read = set(re.findall(r'GETTABUP\s.*_ENV "(\w+)"', listing))
+        self.assertTrue(read, 'the luac listing format changed: no global read found')
+        known = {'emu', 'callbacks', 'SYM', 'CAMPAIGN', 'C', 'PROCSCR',
+                 '_G', 'assert', 'coroutine', 'dofile', 'error', 'io', 'ipairs', 'math',
+                 'next', 'os', 'pairs', 'pcall', 'require', 'select', 'setmetatable',
+                 'string', 'table', 'tonumber', 'tostring', 'type', 'utf8', 'xpcall'}
+        stray = sorted(n for n in read if n not in known and not n.startswith('PLAYTEST_'))
+        self.assertEqual(stray, [], 'harness.lua reads these as globals (nil at run time '
+                                    'unless the emulator or the run defines them)')
+
+
 class TestChooseAttackContract(unittest.TestCase):
     """#232. chooseAttack is the shared attack path -- every combat scenario in the
     campaign routes through it -- so both of its waits have to hold in every mode the

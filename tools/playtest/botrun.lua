@@ -1249,6 +1249,8 @@ function M.run(api)
             local byIdNow = byId(board)
             local u = byIdNow[a.unitId]
             if not (u and u.faction == "blue" and u.onField and not u.acted) then return nil end
+            -- a Take names its item, which a key does not carry (Bot.takeItem), or is no act
+            if a.act == "supply" and not Bot.takeItem(sight, u, a) then return nil end
             pin.unoffered[#pin.unoffered + 1] = k
             a.unit = u.charId
             if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end
@@ -1649,12 +1651,13 @@ function M.run(api)
                     explore.visited(action, turn)
                 end
                 if not trapped and (action.act == "visit" or action.act == "chest"
-                        or action.act == "talk" or action.act == "rescue" or action.act == "drop") then
+                        or action.act == "talk" or action.act == "rescue" or action.act == "drop"
+                        or action.act == "supply") then
                     progressed = true
                 end
                 if not trapped then
                     if action.act == "visit" or action.act == "chest" or action.act == "talk"
-                        or action.act == "door" or action.act == "seize" then
+                        or action.act == "door" or action.act == "seize" or action.act == "supply" then
                         markEvent(action.act)
                     elseif action.act == "attack" and action.obstacle
                         and action.obstacle.blow and action.obstacle.blow.dealt

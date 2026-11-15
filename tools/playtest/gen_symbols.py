@@ -343,6 +343,7 @@ WANTED = [
     'UnitActionMenu_CanSeize',  # Seize: CanUnitSeize on the Seize tile (bmmenu.c)
     'RescueUsability',          # Rescue: an adjacent ally CanUnitRescue carries (bmmenu.c)
     'DropUsability',            # Drop: a carried unit and a tile beside it to set it on (bmmenu.c)
+    'SupplyUsability',          # Supply mid-map: the lord, or a unit beside the lord (bmmenu.c)
     # The planner's goals (#510 step 9): what an item is worth, a class's costs and AI scripts.
     'GetItemCost',              # price per use x uses: the party's worth sums it (bmitem.c)
     'GetItemMaxUses',           # an item's full uses (bmitem.c)

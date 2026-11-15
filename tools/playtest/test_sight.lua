@@ -1734,5 +1734,29 @@ do
     check(copies, 1, "riding: sight.lua reads US_IN_BALLISTA in M.riding alone")
 end
 
+-- convoyKey (#510, Supply mid-map): the convoy's first item that lets the unit open a door, as
+-- the Supply screen's Take would hand it; none with a full bag, a convoy that is not the
+-- game's, or no such item. legal asks it again for the key the act names.
+do
+    local convoy, fault = {}, nil
+    local Bd = { ITEM_COUNT = 5, convoyItems = function() return convoy end,
+                 convoyFault = function() return fault end }
+    local opens = function(id) return id == 0x6A end
+    local u = { items = { {}, {} } }
+    convoy = { { id = 0x14, uses = 30 }, { id = 0x6A, uses = 1 } }
+    local k = Sight.convoyKey(Bd, nil, {}, u, opens)
+    check(k and (k.id .. "x" .. k.uses), "106x1", "convoyKey: the first item that opens a door")
+    check(Sight.convoyKey(Bd, nil, {}, { items = { {}, {}, {}, {}, {} } }, opens), nil,
+          "convoyKey: none into a full bag")
+    fault = "a garbage slot"
+    check(Sight.convoyKey(Bd, nil, {}, u, opens), nil, "convoyKey: none from a convoy not the game's")
+    fault, convoy = nil, { { id = 0x14, uses = 30 } }
+    check(Sight.convoyKey(Bd, nil, {}, u, opens), nil, "convoyKey: none with no key in it")
+    local at = sightSrc:find('elseif a.act == "supply" then', 1, true)
+    local branch = at and sightSrc:sub(at, sightSrc:find("elseif", at + 10, true)) or ""
+    check(branch:find("key.id == a.item", 1, true) ~= nil and branch:find("key.uses == a.uses", 1, true) ~= nil,
+          true, "legal: a Take is legal only while the key it names is the convoy's")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

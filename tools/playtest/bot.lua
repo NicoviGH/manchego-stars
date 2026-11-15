@@ -57,8 +57,9 @@
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
 --   `slot` is the item an attack strikes with (one of sight.weapons), a heal's staff or a used
 --   item; nil = the first the Weapon Select menu lists.
---   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue" and
---   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) only the planner's
+--   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue",
+--   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) and "supply" (the
+--   convoy's door key taken, `item`/`uses`, then Wait: supplyKey) only the planner's
 --   proposals (Bot.candidates) make. `canto` (optional, the proposals'): the tile a Canto
 --   unit moves on to after the act (cantoMoves); the unit ends there (Board.endTile).
 --
@@ -788,6 +789,15 @@ end
 
 local function safest(ctx, u, tiles) return bySafety(ctx, u, tiles)[1] end
 
+-- The tiles of `tiles` the gate lets `u` end on (no target: a wait, a march's step, a heal's)
+local function gated(ctx, u, tiles, gate)
+    local out = {}
+    for _, t in ipairs(tiles) do
+        if gate(ctx, u, t.x, t.y, nil) then out[#out + 1] = t end
+    end
+    return out
+end
+
 -- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
 -- `spent` (the attack's own counter, f.counterWorst) already off its HP. An attack whose
 -- counter alone can kill is refused before any gate is asked (every style but greedy; a known
@@ -1081,21 +1091,60 @@ local function doorOpens(ctx, u, d, seeking)
     return keyWay(ctx, u, d, u, lock, seeking) ~= nil
 end
 
+local function obstacleKey(o) return (o.door and "door " or "wall ") .. tileKey(o.x, o.y) end
+local obstacleTurns
+
+-- The living teammates of `u` who open doors themselves (opener): a door one of them opens
+-- opens its whole map change for every unit (ApplyMapChangesById), so it is a way for `u`
+-- too, escorting its opener (escortTurns). Only those who hold the means: one fetching a key
+-- from an enemy is that key's way, and asking it here would ask `u`'s way back. An opener's
+-- own way never asks this (no door is locked to it), so the read cannot cycle.
+local function doorMates(ctx, u)
+    local out = {}
+    for _, m in ipairs(ctx.blues or {}) do
+        if m.id ~= u.id and not m.dead and opener(ctx, m) then out[#out + 1] = m end
+    end
+    return out
+end
+
+-- The soonest turns a teammate of `u` (doorMates) needs to the door `d`, through what it opens
+-- on its way; nil when none has a way there (a key holder cut off from it opens nothing).
+local function mateTurns(ctx, u, d)
+    local soonest
+    for _, m in ipairs(doorMates(ctx, u)) do
+        local n = obstacleTurns(ctx, m, m)[obstacleKey(d)]
+        if n and (not soonest or n < soonest) then soonest = n end
+    end
+    return soonest
+end
+
 -- The doors `u` can open, then the walls (sight.obstacles): what may open a way, in the order
 -- a unit takes them -- opening a door costs one act, a wall its HP. A door is one when u can
--- open it, now or with a key it can take on the way (doorOpens).
+-- open it, now or with a key it can take on the way (doorOpens), or a teammate can (doorMates).
 local function openables(ctx, u, seeking)
     local doors = {}
     for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
-        if opener(ctx, u) or (ctx.sight.locked and doorOpens(ctx, u, d, seeking)) then
-            doors[#doors + 1] = { x = d.x, y = d.y, door = true }
+        local door = { x = d.x, y = d.y, door = true }
+        if opener(ctx, u) or (ctx.sight.locked and (doorOpens(ctx, u, d, seeking)
+                                                    or mateTurns(ctx, u, door) ~= nil)) then
+            doors[#doors + 1] = door
         end
     end
     local lists = { ctx.sight.obstacles() }
     if #doors > 0 then table.insert(lists, 1, doors) end
     return lists
 end
-local function obstacleKey(o) return (o.door and "door " or "wall ") .. tileKey(o.x, o.y) end
+
+-- `u`'s turns from `from` to the door `d` it holds no key for, opened by a teammate
+-- (doorMates): the later of its own walk to the door and the soonest opener's turns there --
+-- it gains no ground running ahead of the one who opens it, so the army arrives with its
+-- opener (vanilla Ch10 on Eirika's route: the only key holder walked to the door alone while
+-- every other unit read no way, and died there). nil with no opener who has a way to it.
+local function escortTurns(ctx, u, d, from)
+    local walk = ctx.sight.turnsTo and ctx.sight.turnsTo(u, d, from)
+    local soonest = walk and mateTurns(ctx, u, d)
+    return soonest and math.max(walk, soonest) or nil
+end
 
 -- The turns `u` needs from `from` to each obstacle it may open (openables), by obstacleKey:
 -- the walk there (sight.turnsTo), a door it has no key for through its key (keyWay), and on
@@ -1108,7 +1157,7 @@ local function obstacleKey(o) return (o.door and "door " or "wall ") .. tileKey(
 -- time doubling with each door (#612 review). One asked again while it is being worked out
 -- (a key's way back to a door of the same read) reads as none. Second: the obstacles u walks
 -- to on its own costs (their turns are the walk's).
-local function obstacleTurns(ctx, u, from, seeking)
+obstacleTurns = function(ctx, u, from, seeking)
     ctx.ways = ctx.ways or {}
     local k = u.id .. "@" .. from.x .. "," .. from.y .. "|" .. lockSig(seeking)
     if ctx.ways[k] then return ctx.ways[k][1], ctx.ways[k][2] end
@@ -1120,7 +1169,11 @@ local function obstacleTurns(ctx, u, from, seeking)
     for _, o in ipairs(all) do
         local lock = o.door and lockAt(ctx, u, o.x, o.y)
         local n
-        if lock then n = select(2, keyWay(ctx, u, o, from, lock, seeking))
+        if lock then
+            n = select(2, keyWay(ctx, u, o, from, lock, seeking))
+            -- `lock` is only a door's here: its key's way or its opener's, the sooner
+            local e = escortTurns(ctx, u, o, from)
+            if e and (not n or e < n) then n = e end
         else
             n = s.turnsTo and s.turnsTo(u, o, from)
             walks[obstacleKey(o)] = n ~= nil
@@ -1297,6 +1350,50 @@ local function breach(ctx, u, gate, objective)
         end
     end
     return nil
+end
+
+-- A door locked to `u` on its way to `goal`: `u` is cut off from it (cutOff), walks to the
+-- door, and the door's opening opens onto ground the goal's field reaches (stepsThrough, as
+-- breachFor reads an obstacle). nil when there is none.
+local function lockedOnWay(ctx, u, goal)
+    if not (goal and ctx.sight.doors and cutOff(ctx, goal, u)) then return nil end
+    local field = fieldFor(ctx, goal)
+    for _, d in ipairs(ctx.sight.doors()) do
+        if lockAt(ctx, u, d.x, d.y) and walkFrom(ctx, d, u.x, u.y)
+                and stepsThrough(ctx, field, d) then
+            return d
+        end
+    end
+    return nil
+end
+
+-- A Take `a` (a "supply" act) with the item it takes filled in: the convoy's door key for `u`
+-- now (sight.convoyKey), or nil with none. An act's key does not carry the item, so a Take
+-- built from a key (botrun's forced act) is filled here too.
+function M.takeItem(sight, u, a)
+    local key = sight.convoyKey and sight.convoyKey(u)
+    if not key then return nil end
+    a.item, a.uses = key.id, key.uses
+    return a
+end
+
+-- The convoy's door key, taken with the Supply command (#510, vanilla Ch10 on Eirika's route:
+-- the one key holder died, the dropped key sat in the convoy, and every unit read no way to
+-- the throne). Offered when a door locked to `u` stands on its way to its goal (lockedOnWay),
+-- no fielded unit opens doors (with one, the door is already every unit's way: doorMates),
+-- and the convoy holds what lets `u` open it (sight.convoyKey): from the safest wait tile the
+-- gate allows where the game's Supply command is enabled (the lord's, or beside the lord). The
+-- game would let it act on after the Take (SupplyCommandEffect returns to the unit menu); the
+-- act ends with a Wait, the one act the plan models after it.
+local function supplyKey(ctx, u, gate, objective)
+    local s = ctx.sight
+    if not (s.convoyKey and s.offers and s.locked) or opener(ctx, u)
+            or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goalFor(ctx, u, objective)) then
+        return nil
+    end
+    local best = safest(ctx, u, gated(ctx, u, s.offers(u, waitTiles(ctx, u), "supply"), gate))
+    if not best then return nil end
+    return M.takeItem(s, u, action(u, best, "supply", nil))
 end
 
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
@@ -1551,11 +1648,8 @@ end
 local function holding(ctx) return M.nextArrival(ctx.style.arrivals, ctx.turn) == 1 end
 
 local function march(ctx, u, gate, objective)
-    local tiles, allowed = behindWalls(ctx, u, waitTiles(ctx, u)), {}
-    for _, t in ipairs(tiles) do
-        if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
-    end
-    allowed = onTerrain(ctx, allowed)
+    local tiles = behindWalls(ctx, u, waitTiles(ctx, u))
+    local allowed = onTerrain(ctx, gated(ctx, u, tiles, gate))
     local goal = nil
     if not holding(ctx) then goal = marchGoal(ctx, u, objective) end
     if #allowed == 0 or not goal then
@@ -1684,10 +1778,7 @@ end
 local function mend(ctx, u, gate, m)
     m = m or ownHeal(ctx, u)
     if not m then return nil end
-    local allowed = {}
-    for _, t in ipairs(waitTiles(ctx, u)) do
-        if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
-    end
+    local allowed = gated(ctx, u, waitTiles(ctx, u), gate)
     return healAct(u, m, safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u)))
 end
 
@@ -1909,10 +2000,8 @@ function M.explain(board, sight, style)
             e.id, e.charId, e.classId or 0, at(e), e.hp, e.isBoss and " BOSS" or "")
     end
     for _, u in ipairs(ctx.blues) do
-        local tiles, allowed = waitTiles(ctx, u), {}
-        for _, t in ipairs(tiles) do
-            if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
-        end
+        local tiles = waitTiles(ctx, u)
+        local allowed = gated(ctx, u, tiles, gate)
         local goal = goalFor(ctx, u, o)
         local function fd(t) return walkFrom(ctx, goal, t.x, t.y) end
         local function nearest(list)
@@ -2087,6 +2176,7 @@ local function proposeOne(ctx, u)
         if c.target.isBoss then offer(c) end
     end
     add(breach(ctx, u, open, objective), "breach")
+    add(supplyKey(ctx, u, open, objective), "supply")
     for _, t in ipairs(ctx.onField) do
         if t.faction ~= "blue" then add(talkFrom(ctx, u, t, open), "talk") end
     end
