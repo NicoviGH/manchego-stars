@@ -9,7 +9,9 @@
 -- An attempt draws a style (drawStyle; every style is tried before one is drawn again), picks the team
 -- (Bot.team, over what the map asks: api.needs, read once per chapter start since every attempt
 -- starts from the same state), buys at the shops the world map has open (Bot.shop, through the
--- game's own shop screen), spends seals (Bot.promote), and plays the chapter (botrun.lua). A
+-- game's own shop screen), takes from the convoy before it and gives seals and boosters back
+-- (Bot.supply), spends seals and boosters after it (Bot.uses), and plays the chapter
+-- (botrun.lua). A
 -- clean clear (the record's `clean`: won, no blue or green unit lost, every owed recruit
 -- joined, every village and chest taken) moves on and its team is CARRIED into the next
 -- chapter's pick; anything else loads the chapter-start state back and attempts again, at most
@@ -83,15 +85,23 @@
 --   teamGroups()          groups, maxima: class id (string) -> team group, and each group's
 --                         most fielded (team_groups.py)
 --   needs(roster, arms)   { demands, answers, strength } for Bot.team, read at the prep screen;
---                         a unit in `arms` ({ [charId] = { item id... } }, Bot.arms) is read
---                         holding them
+--                         a unit in `arms` ({ [charId] = { { id, uses }... } }, Bot.arms) is
+--                         read holding them (uses nil: as the shop makes the item)
 --   cap()                 the prep screen's deploy cap, or nil when the chapter has no prep
 --                         screen (the game fields its own list; nothing is picked)
 --   deploy(charIds)       pick exactly these on the prep screen; true | nil, why
 --   gold(), stock()       the party's gold; the stock of every shop the world map has open
 --                         at this point (bot.lua's stock entries; {} when none)
 --   buy(purchase)         one Bot.shop entry, through the shop screen; true | nil, why
---   promote(entry)        spend the seal the game accepts for this roster entry; true | nil, why
+--   convoy(roster)        convoy, weighed: the convoy's items, each with the game's facts and
+--                         `for[charId] = { usable, promotes, gains }` over the roster, and a
+--                         copy of `roster` whose every non-weapon item has its full kind and
+--                         `for` (Bot.fullBag and Bot.supply weigh them). nil when the game gives
+--                         the party no convoy (HasConvoyAccess)
+--   give(act), take(act)  one Bot.supply / Bot.uses act: the unit's item to the convoy, the
+--                         convoy's item (id and uses) to the unit; true | nil, why
+--   use(act)              the unit uses that item (a seal or a booster) by its Item command;
+--                         true | nil, why
 --   claims(chapter)       that chapter's resolved claims (bot.lua's Claims)
 --   play(style, claims, attempt, pick, dice) -> botrun's record (it emits its own BOTRUN line);
 --                         `pick` is the team pick as the record keeps it (between()'s
@@ -248,28 +258,60 @@ local function between(api, style, followed, need, carried)
                 and ("; uncovered: " .. table.concat(team.pick.uncovered, ", ")) or ""))
         local ok, why = api.deploy(team.deploy)
         if not ok then return nil, "deploy: " .. tostring(why) end
-        local by = byCharId(roster)
-        for _, charId in ipairs(team.deploy) do party[#party + 1] = by[charId] end
+        -- the fielded units in roster (slot) order, not deploy order: Bot.arms reads the
+        -- roster's unarmed in that order before the pick, so serving the fielded in the same
+        -- order is what makes a unit it reads armed armed (its docstring)
+        local fielded = {}
+        for _, charId in ipairs(team.deploy) do fielded[charId] = true end
+        for _, u in ipairs(roster) do
+            if fielded[u.charId] then party[#party + 1] = u end
+        end
     else
         party = roster
         for _, u in ipairs(roster) do team.deploy[#team.deploy + 1] = u.charId end
     end
+    -- The convoy (api.convoy: nil when the game gives the party none, HasConvoyAccess), then
+    -- the shop for what it could not give, then the seals and boosters (Bot.supply, Bot.uses).
+    -- Each step re-reads the bags: a take, a give or a purchase changes what a unit holds.
+    local function fieldedNow(withConvoy)
+        local now = api.roster()
+        local convoy, weighed
+        if withConvoy then convoy, weighed = api.convoy(now) end
+        now = weighed or now
+        local by = byCharId(now)
+        local out = {}
+        for _, u in ipairs(party) do out[#out + 1] = by[u.charId] or u end
+        return out, convoy
+    end
+    team.supply = {}
+    local function apply(acts)
+        for _, a in ipairs(acts) do
+            local ok, why = api[a.act](a)
+            if not ok then
+                return nil, string.format("%s 0x%02X item 0x%X: %s", a.act, a.unit, a.item,
+                    tostring(why))
+            end
+            team.supply[#team.supply + 1] = a
+        end
+        return true
+    end
+    local fielded, convoy = fieldedNow(true)
+    if convoy then
+        local ok, why = apply(Bot.supply(fielded, convoy))
+        if not ok then return nil, "supply: " .. why end
+        fielded = fieldedNow(false)   -- the shop weighs the bags only
+    end
     team.buys = {}
-    for _, p in ipairs(Bot.shop(api.gold(), api.stock(), party)) do
+    for _, p in ipairs(Bot.shop(api.gold(), api.stock(), fielded)) do
         local ok, why = api.buy(p)
         if not ok then return nil, "buy: " .. tostring(why) end
         team.buys[#team.buys + 1] = p
     end
-    -- Re-read after the shop: a seal bought or moved changes what each unit holds.
-    local now = byCharId(api.roster())
-    local fielded = {}
-    for _, u in ipairs(party) do fielded[#fielded + 1] = now[u.charId] or u end
-    for _, u in ipairs(Bot.promoteOrder(fielded)) do
-        if Bot.promote(u, u.items) then
-            local ok, why = api.promote(u)
-            if not ok then return nil, "promote: " .. tostring(why) end
-        end
-    end
+    -- Re-read after the shop: a seal bought changes what each unit holds. Without a convoy only
+    -- what a unit carries can be used.
+    fielded, convoy = fieldedNow(true)
+    local ok, why = apply(Bot.uses(fielded, convoy or {}))
+    if not ok then return nil, "use: " .. why end
     return team
 end
 
@@ -354,12 +396,13 @@ function M.run(api)
             chapters[#chapters + 1] = entry
             local cap, cwhy = api.cap()
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end
-            -- a unit the shop will arm is read holding what it will buy (Bot.arms), so the pick
-            -- does not bench it for what the shop is about to fix
+            -- a unit the convoy or the shop will arm is read holding what it will get (Bot.arms),
+            -- so the pick does not bench it for what the supply is about to fix
             local need
             if cap then
                 local roster0 = api.roster()
-                need = api.needs(roster0, Bot.arms(api.gold(), api.stock(), roster0))
+                local convoy0 = api.convoy(roster0)   -- its weapons only: Bot.arms weighs no bag kind
+                need = api.needs(roster0, Bot.arms(api.gold(), api.stock(), roster0, convoy0 or {}))
             end
             entry.demands = need and need.demands or nil
             local tried, remembered, known = {}, {}, {}
@@ -402,8 +445,9 @@ function M.run(api)
                     return "crashed", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, bwhy)
                 end
-                -- what the shop bought this attempt, kept even where no team is (one attempt alone)
-                entry.buys = team.buys
+                -- what the shop bought and the convoy gave this attempt, kept even where no team
+                -- is (one attempt alone)
+                entry.buys, entry.supply = team.buys, team.supply
                 -- a retry's memory (ADR 0386): the turns earlier failures here saw a
                 -- reinforcement arrive on screen, read where a reinforcements claim's are
                 -- (style.arrivals); attempt 1, and any attempt alone, has none

@@ -75,7 +75,6 @@ WANTED = [
                                 # resolution for the cursor's gBmMapUnit entry.
     'gConvoyItemArray',         # the convoy (extern u16[]; include/variables.h). Low byte of
                                 # each entry is the item id -- where an overflow charm-gift lands.
-    'gConvoyItemCount',         # u8 count of live convoy entries (include/bmcontainer.h).
     'gAiDecision',              # struct AiDecision (include/cp_common.h): the action the AI
                                 # just chose -- actor +0x01, target +0x06, item slot +0x07.
                                 # ch06halberd reads which weapon the dropper swung, and at whom.
@@ -382,6 +381,13 @@ WANTED = [
     'GetNextUnclearedNode',     # the node of the next story chapter (worldmap_path.c)
     'MakeNewItem',              # an item at full uses, as the shop makes its stock (bmitem.c)
     'IsCharacterForceDeployed', # the prep screen's forced-unit check (prep_unitselect.c)
+    # campaign.lua's convoy (the party plan's PR 2): the Supply screen's own container calls.
+    'HasConvoyAccess',          # whether the party has a convoy this chapter (bmcontainer.c)
+    'AddItemToConvoy',          # an item into the convoy's first empty slot (bmcontainer.c)
+    'RemoveItemFromConvoy',     # a convoy slot emptied, the list packed (bmcontainer.c)
+    'UnitAddItem',              # an item into a unit's first empty bag slot (bmunit.c)
+    'UnitRemoveInvalidItems',   # a unit's bag packed after a slot is cleared (bmunit.c)
+    'CanUnitUseItemPrepScreen', # what the prep screen's Use offers: a booster that gains (bmitemuse.c)
 ]
 
 

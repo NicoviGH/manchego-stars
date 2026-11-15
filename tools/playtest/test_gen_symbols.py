@@ -68,7 +68,9 @@ SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNS
 CAMPAIGN = ['StartShopScreen', 'Shop_Loop_BuyKeyHandler', 'sShopState', 'GetItemPurchasePrice',
             'CanUnitUseWeapon', 'CanUnitUsePromotionItem', 'ProcScr_WorldMapMain',
             'WorldMap_Loop', 'gGMData', 'gWMNodeData', 'GetNextUnclearedNode', 'MakeNewItem',
-            'IsCharacterForceDeployed']
+            'IsCharacterForceDeployed', 'HasConvoyAccess', 'AddItemToConvoy',
+            'RemoveItemFromConvoy', 'UnitAddItem', 'UnitRemoveInvalidItems',
+            'CanUnitUseItemPrepScreen']
 ELFS = {'ours': os.path.join(gs.DECOMP, 'fireemblem8.elf'),
         'vanilla': os.path.join(gs.REPO, 'build', 'vanilla-fe8', 'fireemblem8.elf')}
 

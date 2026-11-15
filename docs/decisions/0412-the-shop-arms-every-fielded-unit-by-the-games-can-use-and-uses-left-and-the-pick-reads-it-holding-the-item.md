@@ -48,6 +48,9 @@ strengths it is given. A unit nothing in stock arms is read as it is, last.
 **Decision 4: the state says what is left.** The chapter-start record (`startRecord`) gains
 each item's uses left and the convoy's contents (`gConvoyItemArray`, read by `INSPECT.convoyItems`,
 clamped to the game's 100); the chapter line gains `buys` (each purchase: unit, item) for the attempt.
+*Corrected by ADR 0413 (2026-11-14): that count came from `gConvoyItemCount`, which the game sets
+only while its send-to-convoy chooser is open; the convoy is now read to its first empty slot
+(at this lap's Ch13 start, 16 items, not 8).*
 
 Against ADR 0396's tests: each rule names a quantity the game produces (can-use, uses left,
 price, the unit's strength with the item); each is a purchase or an ordering; none names a
