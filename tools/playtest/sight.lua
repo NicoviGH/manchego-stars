@@ -206,7 +206,7 @@
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
 --   salve(u)                 whether `u` holds such an item at all, whatever its HP (the
---                            planner's wear, #510 prototype): mend() offers none at full HP.
+--                            planner's wear, ADR 0421): mend() offers none at full HP.
 --   obstacles()              every obstacle the Attack command can strike, as
 --                            TryAddTrapsToTargetList (bmtarget.c) lists them from the trap pool:
 --                            a TRAP_OBSTACLE's damaged wall at its tile, or the tile below where

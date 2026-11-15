@@ -6962,7 +6962,7 @@ local function wears(hp, o, ...)
     return boardOf(A, X, ...), sightOf(so), gifted("careful", 1000)
 end
 
--- test_a_struck_unit_no_heal_reaches_is_judged_on_three_phases (#510, prototype): one blow of
+-- test_a_struck_unit_no_heal_reaches_is_judged_on_three_phases (ADR 0421): one blow of
 -- 12 a phase never kills 27 HP in the phase the cap reads, so the march into reach read 0 and
 -- was played; with no heal of the army's able to reach the unit its HP carries, and the third blow
 -- kills. The cap reads the three phases (the second played by sight.nextPhase, the third taken
@@ -7005,6 +7005,23 @@ do
                                    reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
                                              [0x02] = tiles({ 14, 0 }) } }, H)
     check(at(Planner.plan(B, board, sight, st)), "0,0", "wear: a staff two turns off is no heal in reach")
+
+    -- its own budget spent (the attempt's left, opts.budget.wear): the plan keeps the one-phase
+    -- reading, the march goes, and every plan left unread is counted for botrun's wear_budget
+    board, sight, st = wears()
+    a, plan, cost = Planner.plan(B, board, sight, st, { budget = { wear = 0 } })
+    check(at(a), "1,0", "wear: no call left, the next phase alone is read")
+    check(cost.look.wear, 0, "wear: no call past the budget")
+    check(cost.look.wear_skipped > 0, true, "wear: the plans left unread are counted")
+    check(plan.lookahead.wear_skipped, cost.look.wear_skipped, "wear: and recorded on the plan")
+    -- the decision's own cap holds whatever the attempt has left
+    local was = Planner.WEAR_DECISION
+    Planner.WEAR_DECISION = 0
+    board, sight, st = wears()
+    a, plan, cost = Planner.plan(B, board, sight, st, { budget = { wear = 1000 } })
+    Planner.WEAR_DECISION = was
+    check(at(a), "1,0", "wear: the decision's cap spent, the next phase alone is read")
+    check(cost.look.wear_skipped > 0, true, "wear: counted the same")
 end
 
 if fails > 0 then

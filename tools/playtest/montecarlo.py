@@ -2149,14 +2149,16 @@ def suite_estimate(suite, tasks, kept, jobs):
 
 
 def lookahead_line(look):
-    """The lookahead's trigger rate, coverage, skipped extensions and CPU (SC-003), in words.
-    `look` is a Counter of botrun's rec.lookahead fields (FR-018), summed: a field no record
-    had reads 0."""
+    """The lookahead's trigger rate, coverage, skipped extensions and CPU (SC-003), and the
+    wear's calls, CPU and plans past its budget (ADR 0421), in words. `look` is a Counter of
+    botrun's rec.lookahead fields (FR-018), summed: a field no record had reads 0."""
     return ('lookahead: %d of %d decisions triggered (%.1f%%), %d extended, %d skipped for '
-            'budget, %d calls, %.1f CPU s' % (
+            'budget, %d calls, %.1f CPU s; wear: %d calls, %.1f CPU s, %d plans past its '
+            'budget' % (
                 look['triggered'], look['decisions'],
                 100.0 * look['triggered'] / max(1, look['decisions']), look['extended'],
-                look['skipped_budget'], look['calls'], look['cpu_s']))
+                look['skipped_budget'], look['calls'], look['cpu_s'],
+                look['wear'], look['wear_cpu_s'], look['wear_skipped']))
 
 
 def held_out_tag(start_id, seed):

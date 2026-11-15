@@ -1811,14 +1811,16 @@ class Suite(unittest.TestCase):
         # FR-018 / SC-003: the trigger rate, coverage, skipped extensions and CPU, per start and
         # summed; a record from before the lookahead has none and adds nothing
         look = {'decisions': 10, 'triggered': 2, 'extended': 1, 'skipped_budget': 1,
-                'calls': 4, 'cpu_s': 0.25}
+                'calls': 4, 'cpu_s': 0.25, 'wear': 3, 'wear_cpu_s': 0.5, 'wear_skipped': 1}
         text = self.sc003(lambda i, t: {'outcome': 'won', 'lookahead': look} if i % 2 == 0
                           else {'outcome': 'won'})
         self.assertIn('vanilla-ch3 (vanilla chapter 3, fixture): 4 runs', text)
         self.assertIn('lookahead: 4 of 20 decisions triggered (20.0%), 2 extended, 2 skipped '
-                      'for budget, 8 calls, 0.5 CPU s', text)
+                      'for budget, 8 calls, 0.5 CPU s; wear: 6 calls, 1.0 CPU s, 2 plans past '
+                      'its budget', text)
         self.assertIn('the suite\'s lookahead: 8 of 40 decisions triggered (20.0%), 4 extended, '
-                      '4 skipped for budget, 16 calls, 1.0 CPU s', text)
+                      '4 skipped for budget, 16 calls, 1.0 CPU s; wear: 12 calls, 2.0 CPU s, '
+                      '4 plans past its budget', text)
 
     def sc003(self, records, held_out=True, keep=lambda t: True, frozen=None):
         """The suite's lines when each task `keep` allows comes back as `records(i, task)`."""

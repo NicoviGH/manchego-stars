@@ -58,6 +58,9 @@
 --      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
 --      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
 --      that of dying in either phase, and those plans are ranked again among themselves.
+--      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's can
+--      reach before the phase after, is read on M.WEAR enemy phases with its HP carried (the
+--      wear, ADR 0421), within its own budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
@@ -95,7 +98,7 @@
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both), wear (what the
 -- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
--- read: #510 prototype, M.WEAR; `die` counts it) }, lookahead =
+-- read: ADR 0421, M.WEAR; `die` counts it) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
 -- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, mend_rounds =
 -- { before, now } (whether a plan judged without the mend's later rounds was under the cap,
@@ -120,11 +123,13 @@
 -- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
 -- left unsplit below sight's SPLIT_FLOOR, summed over them), floored (the ways of the plan's
 -- uncertain kills left unsplit below that floor of the plan, ADR 0415), look = { decisions, triggered,
--- extended, skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
+-- extended, skipped_budget, calls, cpu_s, wear, wear_cpu_s, wear_skipped } (the lookahead's and
+-- the wear's; absent when no unit can act) }.
 -- opts.at = {} (optional; botrun's): written as the call goes, { stage ("propose", "search",
 -- "judge <kind>", "lookahead"), judged (the plans judged so far), phases }: what a decision
 -- cut short by its frame budget was doing (botrun's M.DECISION_FRAMES).
--- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
+-- opts.budget = { decision, attempt, wear } (optional): the lookahead calls this decision may
+-- spend, and the wear's calls left this attempt.
 -- opts.seen = unit slot -> charId, every red a board showed out of fog this attempt (optional,
 -- botrun's): the fog rule's strongest enemy is one of these; without it, one in sight.
 -- opts.rest = the act keys (M.key) of the plan in hand not yet played (optional; botrun's on a
@@ -197,9 +202,14 @@ M.DUST = Goals.DUST
 -- (#570)
 M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
--- the wear (#510, prototype): the most enemy phases a unit's HP is carried over while no heal
--- of the army's can reach it
+-- the wear (ADR 0421): the most enemy phases a unit's HP is carried over while no heal of the
+-- army's can reach it. 3, the least that read Colm's Ch9 death (27 HP outlives two hits of 12:
+-- runs wg2x23 and wg3x23, #510). Its own budget of sight.nextPhase calls, beside the
+-- lookahead's: a decision and an attempt. The most seen were 57 and 122 (vanilla Ch11,
+-- lap3e/11, run wn11), so neither cut any of the 31 games behind the ADR
 M.WEAR = 3
+M.WEAR_DECISION = 64
+M.WEAR_ATTEMPT = 256
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
@@ -1126,7 +1136,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
-                            calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0 } }
+                            calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
     -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
@@ -1426,7 +1436,7 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             hitOf[i] = inWay(hit, w, function(u) return u.id end, "back")
         end
-        -- The wear (#510, prototype): whether a heal of the army's can reach a unit of the plan
+        -- The wear (ADR 0421): whether a heal of the army's can reach a unit of the plan
         -- before the enemy phase after the next. None can when it holds none of its own
         -- (sight.salve) and no staff of the army's gets beside it next turn, by the game's turns
         -- from where the plan leaves the healer. Its HP then carries from phase to phase.
@@ -1781,7 +1791,7 @@ function M.plan(Bot, board, sight, style, opts)
         local function r4(x) return math.floor(x * 1e4 + 0.5) / 1e4 end
         return { base = r4(st.base), max_die = r4(most), sum_die = r4(sum) }
     end
-    -- The wear (#510, prototype): a unit the judged phase strikes that no heal of the army's reaches
+    -- The wear (ADR 0421): a unit the judged phase strikes that no heal of the army's reaches
     -- before the phase after it (judge's st.worn) is read on M.WEAR enemy phases, its HP
     -- carried from each into the next. The second is played by the game's AI, our units
     -- holding between (sight.nextPhase); each one past it is taken as the second again. Its
@@ -1789,12 +1799,19 @@ function M.plan(Bot, board, sight, style, opts)
     -- it go (the likeliest way's strikes, st.strikes), then the later ones' on what is left.
     -- Only such a unit takes the later phases here: for any other the turn between can
     -- restore it, and the hold is no reading (ADR 0389's amendment of 2026-11-08). One
-    -- sight.nextPhase call a plan, counted beside the lookahead's and outside its budget.
+    -- sight.nextPhase call a plan, within its own budget beside the lookahead's: M.WEAR_DECISION
+    -- a decision and opts.budget.wear left of M.WEAR_ATTEMPT. A plan past it keeps the one-phase
+    -- reading and is counted (`wear_skipped`): botrun records a wear_budget anomaly.
     -- The mend does not try such a unit's other acts for the wear alone: tried, it lost
     -- vanilla Ch5x's two chests and its clean clear (runs wr5 and wn5, #510).
-    local wearCalls, wearCpu = 0, 0
+    local wearCalls, wearCpu, wearSkipped = 0, 0, 0
+    local wearRoom = math.min(M.WEAR_DECISION, (opts and opts.budget or {}).wear or M.WEAR_ATTEMPT)
     local function wear(st)
         if not (sight.nextPhase and st.worn and #st.worn > 0) or seizesIn(st) then return end
+        if wearCalls >= wearRoom then
+            wearSkipped = wearSkipped + 1
+            return
+        end
         local clock = os.clock()
         local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
                                     reds = st.phase.reds, opened = st.phase.opened,
@@ -2082,10 +2099,11 @@ function M.plan(Bot, board, sight, style, opts)
             cost.look.calls = look.calls
         end
     end
-    -- the wear's calls and time, beside the lookahead's and outside its budget (FR-018's is
-    -- for the irreversible transitions: spent here, the boss fight went unread)
+    -- the wear's calls, time and plans past its budget, beside the lookahead's and outside its
+    -- budget (FR-018's is for the irreversible transitions: spent here, the boss fight went unread)
     look.wear = wearCalls > 0 and wearCalls or nil
-    cost.look.wear, cost.look.wear_cpu_s = wearCalls, wearCpu
+    look.wear_skipped = wearSkipped > 0 and wearSkipped or nil
+    cost.look.wear, cost.look.wear_cpu_s, cost.look.wear_skipped = wearCalls, wearCpu, wearSkipped
     if not best or #best.acts == 0 then return nil, nil, cost end
     best.lookahead = look
     -- best first; after a lookahead the finalists before the rest, whose ranks were never asked
