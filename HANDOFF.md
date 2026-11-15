@@ -37,9 +37,11 @@ and start a fresh instance; don't rely on auto-compaction.
   - `lap3p` (Ephraim, `--route 2`): through ids 23, 24, 62, 25; crashed at id 26's prep (the
     Elixir, fixed by #626).
 - **Next, in order:**
-  1. Carry `lap3p` on: `montecarlo.py resume --game vanilla
-     --tag <t> --campaigns lap3p-cs-s4006 --chapter 26 --scout --route 2` (that start is
-     stale after #626's bot change: allowed, labelled).
+  1. Rerun both laps from the prologue on the latest bot (not a resume from `lap3p`'s Ch13
+     start: #626 changed item reads for every unit at level 10+, so earlier chapters may
+     play differently, and a stale start mixes bot versions). `montecarlo.py resume --game
+     vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`, in parallel;
+     Eirika's reached her Ch10 in about 25 min.
   2. Innes's crash: ONE instrumented run of `lap3e-cs-s4006` id 11 attempt 3 to turn 14,
      printing Innes's bag `{id, uses}` and the game's can-attack, to confirm the broken-bow
      lead before a fix (a crash is the harness's fault: fix before trusting runs past it).
