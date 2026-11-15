@@ -9,38 +9,36 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14, overnight): PR #617 is merged (41ec41e0); the proof lap `party1b` (Ch9 start to Ch15) is running.**
-- **The lap:** `python3 tools/playtest/montecarlo.py resume --game vanilla --tag party1b
-  --campaigns party1-lap1d-lap1-fwd1-cs-s4006 --chapter 9 --last 15 --scout`. When it ends,
-  report the four measures of the plan comment (#510 comment 6883980081, "Better means, set
-  now") against `lap1d`, any `taught_miss` and the `taught_unchecked` counts, and apply its stop
-  rule (party better on 1-3 and Ch15 still fails: the planner's cost is next, not the cap).
-- **PR #617** (the convoy take, ADR 0413 amended): a take does what the Supply screen's Take
-  does (the item into the bag, then `ClearSupplyItems` and `AddItemToConvoy` for each item
-  left). `Board.convoyFault` refuses a convoy that is not the game's (a gap, no id, or an id
-  with no item row; unit-tested in `test_board.lua`). Reviewed, re-reviewed, CI green.
-  `dbgtake5` (party1's index-9 start) plays the same acts as `dbgtake4`: won, 19 turns, no death.
-- **Cause of the earlier crash, confirmed:** PR #615's take called `RemoveItemFromConvoy`, whose
-  pack copies all 100 convoy slots back from `gGenericBuffer` (about 40 garbage items).
-- **Merged today: PR #616** (de95e0f9, ADR 0414): the plan's value counts the experience the
-  game would award for an attack, a counter in the judged enemy phase and a heal, 0.3 a point;
-  every run checks each read against the game's award (`taught_miss`, `taught_checked`,
-  `taught_unchecked`). The plan comment records it.
-- **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
-  routes (memory `finish-line-whole-vanilla-game`; #510 comment 6872554917).
-- **The planner's cost on big maps is the step after the party:** each Ch15 decision still costs
-  about a million frames (plans x the plan's own uncertain kills, `Planner.BRANCH`, x 32-46
-  enemies). An unshipped probe applying the same 1/64 floor to the plan's own kills (local branch
-  `exp/510-plan-floor`, dcb944d1, `PT_EXP_FLOOR`; tag `ch15x`) played Ch15 in 216 s and lost on
-  turn 6 (Ewan, Knoll, Ephraim). One game: a lead. The ant-game opponent brain
-  (`~/Projects/ant-game`) suggests a cheap screen and exact simulation of a shortlist; it has no
-  late-game risk rule.
-- **After the party:** item E (E2, E3; #510 comment 6872468981) for Ephraim's Ch9 gate (Colm
-  refuses the Door at 49-90%) and Ch8/Ch9's misses.
-- **Kept:** the lap's states under `references/sim/vanilla/c25b145e3745/states/` (`lap1-`,
-  `lap1b-`, `lap1d-` (chapters 0-15, its 0-14 identical to `lap1-`), `lap2-` (Ephraim's 0-10 and
-  23), `ch15*-`, `probe*-`, `gate*-`, `dbg*-`; scout ones are marked `SCOUT`). The convoy is not
-  in `<n>.json`, only in `<n>.ss` (`gConvoyItemArray` 0x0203A81C).
+**Next session starts here (2026-11-15, overnight run, Nicolas away; he gave Claude merge authority and its own calls): Eirika's route is played through vanilla Ch15, cleared clean.**
+- **The lap:** `party1e` (main at c072f9ae): from party1c's Ch14 start, Ch14 won in 27 turns
+  with no deaths; Ch15 attempt 1 lost on turn 11 (Ephraim, a 6% roll); **Ch15 attempt 2 won in
+  27 turns with no deaths**; slowest decision 63k frames. The whole lap took 9m44s.
+- **Merged tonight, all reviewed (`/code-review medium`), every finding fixed, CI green:**
+  - #618: a non-unit byte under the cursor fails only on a live map, not while a chapter loads.
+  - #619: the trace records what the beam knew of each plan (`screen`) and each decision's frames (`decided`).
+  - #621: every Wait waits out the event it sets off (`Controller.actionTailOver`). Ch15's
+    hidden treasure had left the full-bag chooser under the next act.
+  - #622 (**ADR 0415, my call under Nicolas's overnight delegation; his to reverse**): one split
+    floor (1/64) bounds the whole judged plan. Ch15's slowest decision went from 3.56M to 98k
+    frames; Ch14 plays act for act the same.
+  - #623 (closes #620): a kept call waits for the CPU to rest in the BIOS halt. A mid-frame
+    `StartShopScreen` let the terrain window's draw overwrite the prep shop's stock, so every
+    resumed Ch15 start (and every retry) crashed in the shop.
+- **Findings** are on #510 (comments 6889897783 for the party lap measures, 6892653016 for the
+  cost, and the Ch15 clear after it).
+- **Owed / untested:** whether #622's floor or #623's rest guard moves a frozen-suite game; the
+  suite runs before the bot's reading is next relied on (a verdict or a refreeze), over every
+  change since the last one.
+- **Next:** Ephraim's route (item E: E2, E3; #510 comment 6872468981, Colm's Ch9 Door gate) and
+  the chapters past 15 on both routes (the finish line: the whole vanilla game clean, memory
+  `finish-line-whole-vanilla-game`). Ch15 still falls back to a sacrifice plan on most turns:
+  the next lead on how well the bot plays it, not its cost.
+- **Throwaway local branches (never merge, delete when done):** `probe/510-ch15-cost`,
+  `probe/510-wait-proof`, `probe/510-floor-measure`, `probe/620-shop`, `probe/510-mapunit`,
+  `exp/510-plan-floor` (superseded by #622).
+- **Kept states** under `references/sim/vanilla/c25b145e3745/states/`: `party1e-` (through
+  Ch15), `party1c-`, `party1d-`, `lap1d-`, `lap2-` (Ephraim's 0-10 and 23), and the probe
+  tags. The convoy is only in `<n>.ss` (`gConvoyItemArray` 0x0203A81C).
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
   never run for a PR.
