@@ -9,23 +9,31 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14, night): the party plan's three PRs are merged; the proof lap `party1` is running.**
-- **Merged: PR #616** (de95e0f9; Nicolas: "Yes" to merge on green, 2026-11-14; ADR 0414). The plan's
-  value gains 0.3 a point for the experience the game would award, read with the game's own
-  functions in the sandbox: an attack (`GetBattleUnitExpGain`, at the HP the plan leaves the
-  target), a counter in the judged enemy phase (the struck unit's count, over the phase's ways),
-  a heal (`GetBattleUnitStaffExp`). Nicolas asked for counters and heals before the lap.
-- **Every run checks the reads** against the game's award: a difference is a `taught_miss`
-  anomaly; `taught_checked` / `taught_unchecked` count the checks and the battles not checked
-  (printed in the attempt line). `lap1d` Ch2-Ch3 (`exp2e`): 14 attacks, 20 counters, 4 heals
-  checked, all equal, none unchecked. Prologue to Ch4 won clean on attempt 1 (`exp2`).
-- **Untested:** the Silencer's doubling (a checked Silencer kill would show as a `taught_miss`).
-- **Running: the proof lap** `python3 tools/playtest/montecarlo.py resume --game vanilla --tag
-  party1 --campaigns lap1d-lap1-fwd1-cs-s4006 --chapter 0 --last 15 --scout`, started on
-  de95e0f9. When it ends: report the four measures of the plan comment (#510 comment
-  6883980081, "Better means, set now") against `lap1d`, any `taught_miss` and the unchecked
-  counts, and apply the stop rule there. Its log was in the session scratchpad; the results
-  are in the vanilla store (`resume-runs.jsonl`, tag `party1`).
+**Next session starts here (2026-11-14, late night): PR #617 (the convoy take fix) is open and owes one scoped re-review; then merge on Nicolas's word and resume the proof lap.**
+- **The lap `party1` crashed at its Ch10 start** (chapter indices 0-9 all won; Ch7 on attempt
+  2). Cause, confirmed: PR #615's `api.take` called `RemoveItemFromConvoy`, which no game code
+  calls; its pack copies all 100 convoy slots back from `gGenericBuffer`, so the scratch
+  buffer's contents became about 40 garbage convoy items (replayed as `dbgtake1`).
+- **PR #617** (branch `fix/510-convoy-take`, head 20902d0f; ADR 0413 amended): a take does what
+  the Supply screen's Take does (`sub_809E2C8`, `sub_80982B8`: the item into the bag, then
+  `ClearSupplyItems` and `AddItemToConvoy` for each item left). A give or take refuses a
+  convoy that is not the game's (`INSPECT.convoyFault`) and checks the convoy is exactly what
+  it was with or without the item. Runs `dbgtake2` and `dbgtake4` (from `party1`'s Ch9 start):
+  Seth gave the Knight Crest and took an Iron Lance, Kyle (0x11) took the Crest and was
+  promoted Cavalier to Paladin, Ch10 won with no death.
+- **Owed on #617:** `/code-review` ran (13 findings, all fixed in 20902d0f; table on the PR).
+  The fix changed behaviour, so ONE scoped re-review of 20902d0f is owed; fix what it returns,
+  then CI on the head, then Nicolas's "merge" (#617 is not covered by a standing merge
+  approval). Nicolas has already said the lap resumes after it.
+- **Then resume the lap:** `python3 tools/playtest/montecarlo.py resume --game vanilla --tag
+  party1b --campaigns party1-lap1d-lap1-fwd1-cs-s4006 --chapter 9 --last 15 --scout` (Ch9's
+  replay is deterministic: same acts). Report the four measures of the plan comment (#510
+  comment 6883980081, "Better means, set now") against `lap1d`, any `taught_miss` and the
+  `taught_unchecked` counts, and apply its stop rule. `party1`'s states 0-9 are good.
+- **Merged today: PR #616** (de95e0f9, ADR 0414): the plan's value counts the experience the
+  game would award for an attack, a counter in the judged enemy phase and a heal, 0.3 a point;
+  every run checks each read against the game's award (`taught_miss`, `taught_checked`,
+  `taught_unchecked`). The plan comment records it.
 - **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
   routes (memory `finish-line-whole-vanilla-game`; #510 comment 6872554917).
 - **The planner's cost on big maps is the step after the party:** each Ch15 decision still costs
