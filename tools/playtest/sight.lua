@@ -503,8 +503,23 @@ end
 -- loop sits above that.
 function M.top(sp) return (sp - 0x180) & ~7 end
 M.SCRATCH_AT, M.LOOP_AT = 0x10, 0x80   -- below SCRATCH_AT: a fifth argument, at the stack top
+-- A kept call runs only while the game rests between frames, its CPU halted in the BIOS's
+-- VBlankIntrWait: pc reads M.REST_PC there (measured 2026-11-15, vanilla Ch15's prep, every
+-- resting boundary 0x1F8 with cpsr 0x2000001F). A frame can also end inside the game's own
+-- VBlank work (the same run: pc 0x2E8, a BIOS routine called from OnVBlank's Proc_Run, the
+-- terrain window drawing). The registers put back resume that work where it stood, with the
+-- pointers it held: StartShopScreen kept there ended the terrain window, the shop took its
+-- freed slot (the free list hands back the last slot freed), and the resumed draw wrote its
+-- text over the shop's stock (#620: the list shrank under the hand and the purchase failed).
+-- So a kept call first runs frames until the CPU rests, and fails loudly if it never does.
+M.REST_PC, M.REST_FRAMES = 0x1F8, 600
 function M.machine(cpu, keep)
     return function(fn)
+        if keep and cpu.read("pc") ~= M.REST_PC
+                and not cpu.frames(function() return cpu.read("pc") == M.REST_PC end, M.REST_FRAMES) then
+            error(string.format("sight: the CPU never rested between frames in %d frames (pc 0x%08X): "
+                .. "a kept call would resume the game mid-frame", M.REST_FRAMES, cpu.read("pc")))
+        end
         -- The load puts every register back; only cpsr is kept here. A kept call loads
         -- nothing, so it reads every register first.
         local state = keep and readRegisters(cpu) or cpu.save()
