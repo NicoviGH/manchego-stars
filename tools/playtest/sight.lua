@@ -1859,7 +1859,7 @@ function M.new(outer)
     function s.reach(u, friends)
         return sandbox(function(call)
             call(S.GenerateUnitMovementMap, { u.addr })
-            return movementTiles(u, u.x, u.y, friends)
+            return M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))
         end)
     end
 
@@ -2884,9 +2884,37 @@ function M.range(api, u, sandbox)
     return mn and { min = mn, max = mx } or nil
 end
 
+-- Inside a sandbox, after `u`'s movement map: `tiles` (its reach) less those a ballista's rider
+-- may not end on. A rider moves with its ballista, and the game's own check
+-- (CanMoveActiveUnitTo, playerphase.c) lets it end on no tile a ballista stands on but the one
+-- it set out from; the ridden one's trap keeps the tile it was boarded on until the rider
+-- exits (TryRemoveUnitFromBallista). An ally's tile (`by`, reach's `friends`) is asked with the
+-- ally lifted off gBmMapUnit, as it will be once it has moved. A unit on foot keeps them all.
+function M.riderTiles(api, call, u, tiles)
+    if ((u.state or 0) & M.US_IN_BALLISTA) == 0 then return tiles end
+    local S, mem = api.SYM, api.mem
+    api.write32(S.gActiveUnit, u.addr)
+    api.write16(S.gActiveUnitMoveOrigin, u.x)
+    api.write16(S.gActiveUnitMoveOrigin + 2, u.y)
+    local out = {}
+    for _, t in ipairs(tiles) do
+        local at = t.by and cell(mem, S.gBmMapUnit, t.x, t.y)
+        if at then api.write8(at, 0) end
+        if (t.x == u.x and t.y == u.y) or call(S.CanMoveActiveUnitTo, { t.x, t.y }) ~= 0 then
+            out[#out + 1] = t
+        end
+        if at then api.write8(at, t.by) end
+    end
+    return out
+end
+
 -- `u`'s weapons as Weapon Select lists them (sight.weapons), without a whole sight.
 function M.weapons(api, u, sandbox)
     local S = api.SYM
+    -- A ballista's rider is shown no Attack (AttackCommandUsability's US_IN_BALLISTA gate):
+    -- only Attack w/Ballista, which the bot never plays. Vanilla Ch10 (Eirika's route): Innes
+    -- (charId 11) joined riding an emptied ballista and the bot planned his bow (#510).
+    if ((u.state or 0) & M.US_IN_BALLISTA) ~= 0 then return {} end
     return (sandbox or M.machine(api.cpu))(function(call)
         local out = {}
         for i, it in ipairs(u.items) do

@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-418 decisions. Read this index, then open the two or three you need — the whole
+419 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -263,6 +263,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0416` | [What a unit cannot use goes to the convoy, and a spare comes before the last weapon breaks](decisions/0416-what-a-unit-cannot-use-goes-to-the-convoy-and-a-spare-comes-before-the-last-weapon-breaks.md) | 2026-11-15 | #510 |
 | `0417` | [Each saved start names the bots that played up to it, and a resume says when it is stale](decisions/0417-each-saved-start-names-the-bots-that-played-up-to-it.md) | 2026-11-15 | #510 |
 | `0418` | [The seal and booster checks are asked only of seals and boosters](decisions/0418-the-seal-and-booster-checks-are-asked-only-of-seals-and-boosters.md) | 2026-11-15 | #510 |
+| `0419` | [A ballista's rider is planned as the game shows it: no Attack of its own, no other ballista's tile](decisions/0419-a-ballista-rider-is-planned-as-the-game-shows-it-no-attack-of-its-own.md) | 2026-11-15 | #510 |
 
 ---
 
