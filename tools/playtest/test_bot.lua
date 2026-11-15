@@ -497,6 +497,7 @@ local function sightOf(o)
         end
     end
     s.odds = Sight.odds
+    s.splitFloor = Sight.SPLIT_FLOOR
     -- each strike played on its target at the HP the plan gives it; the lookahead's second
     -- phase (o.nextPhase, sight.nextPhase) also says each unit's HP when it begins, the plan's
     -- unless the fixture gives its own
@@ -3341,6 +3342,48 @@ do
     check(line("1>wait@0,0>nil 2>wait@0,2>nil"), "0.0 0.0 0.0 1", "screen: none in reach")
 end
 
+-- test_planner_floors_the_plans_ways (ADR 0415): a way of the plan's uncertain kills splits only
+-- while the chance off its likeliest side is at least sight's floor of the whole plan, and each
+-- enemy phase is told its way's share of the plan (sight bounds its own splits by it). A strikes
+-- X from (0,0) for a kill at `hit`%; Y, far off, keeps the map from being won by X's death.
+do
+    local function judge(hit)
+        local A = blue(0x01, 0, 0, 0)
+        local X = red(0x81, 1, 0, { hp = 5 })
+        local Y = red(0x82, 9, 9, { minRange = false })
+        local masses = {}
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }) },
+            field = function() return { [0] = { [0] = 50 } } end,
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = hit, dmg = 9, hits = 1, killsTarget = true } } } },
+            enemyPhase = function(plan)
+                -- the attack plan's phases only: its board holds X (the one that waits does not)
+                if plan.reds[0x81] then masses[#masses + 1] = plan.mass end
+                return {}
+            end,
+        }
+        local _, plan, cost = Planner.plan(B, boardOf(A, X, Y), sightOf(o), style("bold"))
+        local sc
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if table.concat(c.acts, " ") == "1>attack@0,0>129" then sc = c.screen end
+        end
+        table.sort(masses)
+        for i, m in ipairs(masses) do masses[i] = string.format("%.3f", m) end
+        return sc and sc.phases, cost and cost.floored, masses, cost and cost.averaged
+    end
+    local phases, floored, masses, averaged = judge(50)
+    check(averaged, 0, "floor: a kill split is not averaged")
+    check(phases, 2, "floor: an even kill splits the plan into two phases")
+    check(floored, 0, "floor: and leaves no way unsplit")
+    -- (the game's two-dice hit: 50 shown is 49.5% true)
+    check(table.concat(masses, " "), "0.495 0.505", "floor: each phase is told its way's share")
+    phases, floored, masses, averaged = judge(99)
+    check(averaged, 1, "floor: a kill no way split is left to the average")
+    check(phases, 1, "floor: a 1% miss is under the floor, one phase on the average")
+    check(floored, 1, "floor: the way left unsplit is counted")
+    check(table.concat(masses, " "), "1.000", "floor: that phase is the whole plan")
+end
+
 -- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that
 -- reaches (2,2), so B's march there costs nothing -- whichever unit the beam moves first.
 do
@@ -5755,6 +5798,8 @@ end
 do
     local units, o = threeOpenKills({ 90, 50, 70 })
     local phase = o.enemyPhase
+    -- the same call with no unsplit kills: what `averaged` is without them
+    local _, _, plain = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"))
     local at, during = {}, nil
     o.enemyPhase = function(plan)
         during = during or (at.stage .. "/" .. at.phases)
@@ -5765,7 +5810,7 @@ do
     local _, _, cost = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), style("bold"),
                                     { at = at })
     check(cost.unsplit, 2 * cost.phases, "unsplit: each phase's count is summed into the cost")
-    check(cost.averaged, 0, "unsplit: and is no part of `averaged`")
+    check(cost.averaged, plain.averaged, "unsplit: and is no part of `averaged`")
     check(during ~= nil and during:match("^judge %a+/1$") ~= nil, true,
           "at: the first judged phase reads its stage and count (" .. tostring(during) .. ")")
     check(at.stage, "lookahead", "at: the call ends in its last stage")

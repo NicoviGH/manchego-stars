@@ -694,9 +694,10 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   -- unsplit: the counter kills the judged phases left unsplit (sight's
-                  -- M.phaseWays); slowest: the decision that ran the most frames, and its
+                  -- M.phaseWays); floored: the ways of a plan's uncertain kills left unsplit
+                  -- (the planner's, ADR 0415); slowest: the decision that ran the most frames, and its
                   -- turn (what M.DECISION_FRAMES is sized from)
-                  plans = { made = 0, kept = 0, phases = 0, averaged = 0, unsplit = 0,
+                  plans = { made = 0, kept = 0, phases = 0, averaged = 0, unsplit = 0, floored = 0,
                             slowest = { frames = 0 } }, bag = {},
                   board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
@@ -1474,6 +1475,7 @@ function M.run(api)
                         rec.plans.phases = rec.plans.phases + (cost.phases or 0)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         rec.plans.unsplit = rec.plans.unsplit + (cost.unsplit or 0)
+                        rec.plans.floored = rec.plans.floored + (cost.floored or 0)
                         for k, v in pairs(cost.look or {}) do
                             rec.lookahead[k] = rec.lookahead[k] + v
                         end

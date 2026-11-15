@@ -103,6 +103,7 @@ local function fakeGame(o)
                 end,
                 strike = function() return Sight.strikeOf(nil) end,
                 odds = Sight.odds,
+                splitFloor = Sight.SPLIT_FLOOR,
                 nextTurnEvent = function(turn)
                     g.eventAsks = (g.eventAsks or 0) + 1
                     return o.eventTurn and o.eventTurn > turn and o.eventTurn or nil
