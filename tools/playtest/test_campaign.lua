@@ -39,7 +39,7 @@ end
 -- campaign's route setting, o.game the game (default "fake"). ch.seen = { [attempt] =
 -- arrivals_seen } (the record's reinforcements seen on screen, ADR 0386).
 local function fakeGame(o)
-    local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, promoted = {},
+    local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, used = {}, calls = {},
                 plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0, dice = {} }
     g.api = {
         Bot = Bot, Json = Json,
@@ -81,8 +81,20 @@ local function fakeGame(o)
         deploy = function(ids) g.deployed[#g.deployed + 1] = ids; return true end,
         gold = function() return o.gold or 0 end,
         stock = function() return o.stock or {} end,
-        buy = function(p) g.bought[#g.bought + 1] = p; return true end,
-        promote = function(u) g.promoted[#g.promoted + 1] = u.charId; return true end,
+        buy = function(p)
+            g.bought[#g.bought + 1] = p
+            g.calls[#g.calls + 1] = "buy"
+            return true
+        end,
+        -- nil: the game gives no convoy (HasConvoyAccess); o.convoy = its items
+        convoy = function() return o.convoy end,
+        give = function(a) g.calls[#g.calls + 1] = "give"; return true end,
+        take = function(a) g.calls[#g.calls + 1] = "take"; return true end,
+        use = function(a)
+            g.used[#g.used + 1] = a.unit
+            g.calls[#g.calls + 1] = "use"
+            return true
+        end,
         claims = function() return o.claims or {} end,
         -- harness.lua's advanceDice: the draws advanced, handed back for the record
         advanceDice = function(n) g.dice[#g.dice + 1] = n; return n end,
@@ -384,19 +396,21 @@ local function test_between_deploys_shops_promotes()
     local base = g.api.roster
     g.api.roster = function()
         local r = base()
-        r[3].items = { { id = 0x88, promotes = true } }
+        r[3].items = { { id = 0x88, kind = "other", uses = 1, promotes = true } }
         return r
     end
     Campaign.run(g.api)
     local d = g.deployed[1]
     check(table.concat(d, ","), "1,3", "forced first, then the unit answering the map's demand")
     check(g.needsAsked, 1, "the needs are read once per chapter start")
-    check(g.arms and g.arms[2] and g.arms[2][1], 0x10, "the pick is told which item arms the unarmed unit it could field")
+    check(g.arms and g.arms[2] and g.arms[2][1] and g.arms[2][1].id, 0x10,
+        "the pick is told which item arms the unarmed unit it could field")
     check(g.arms and g.arms[3], nil, "and nothing for a unit no stock item arms")
     local who = {}
     for _, p in ipairs(g.bought) do who[#who + 1] = string.format("%d:%d", p.unit, p.item) end
     check(table.concat(who, ","), "1:108,3:108", "the shop buys for the deployed units only")
-    check(table.concat(g.promoted, ","), "3", "a fielded unit holding a seal it accepts is promoted")
+    check(table.concat(g.used, ","), "3", "a fielded unit holding a seal it accepts uses it")
+    check(table.concat(g.calls, ","), "buy,buy,use", "without a convoy: the shop, then the seal")
     local ls = lines(g)
     check(#ls[1].buys, 2, "the chapter's record lists what the shop bought")
     check(ls[1].buys[1].unit .. ":" .. ls[1].buys[1].item, "1:108", "each buy names its unit and item")
@@ -417,6 +431,63 @@ local function test_between_deploys_shops_promotes()
     check(pick and #pick.uncovered, 0, "the pick: every demand with an answerer has one fielded")
 end
 test_between_deploys_shops_promotes()
+
+-- The convoy (the party plan's PR 2): a fielded unit takes its weapon from the convoy before
+-- the shop, so the shop buys none of it; a seal comes out after the shop and is used; the
+-- chapter's record lists every act; a failed take stops the campaign with its reason.
+local function test_between_takes_from_the_convoy()
+    local elfire = { id = 0x39, kind = "weapon", type = "anima", rank = 2, uses = 30,
+                     ["for"] = { [0x01] = { usable = true } } }
+    local crest = { id = 0x65, kind = "other", uses = 1, ["for"] = { [0x01] = { promotes = true } } }
+    local stock = { { item = 0x38, price = { 500, 500, 500, 500 }, type = "anima" } }
+    local function game(takeFails)
+        local g = fakeGame({ cap = 1, gold = 10000, stock = stock, random = cycle({ 0.1 }),
+                             convoy = {}, chapters = { { id = 1 } } })
+        local bag, store = {}, { elfire, crest }
+        g.api.roster = function()
+            local r = roster()
+            r[1].canUse = { [0x38] = true }
+            r[1].items = {}
+            for i, it in ipairs(bag) do r[1].items[i] = it end
+            return r
+        end
+        g.api.convoy = function() return store end
+        g.api.take = function(a)
+            g.calls[#g.calls + 1] = "take"
+            if takeFails then return nil, "the bag is full" end
+            for i, it in ipairs(store) do
+                if it.id == a.item then
+                    local h = {}
+                    for k, v in pairs(it) do h[k] = v end
+                    local f = it["for"][a.unit]
+                    h.usable, h.promotes = f.usable, f.promotes
+                    bag[#bag + 1] = h
+                    table.remove(store, i)
+                    break
+                end
+            end
+            return true
+        end
+        return g
+    end
+    local g = game(false)
+    Campaign.run(g.api)
+    check(g.arms and g.arms[1] and g.arms[1][1] and g.arms[1][1].uses, 30,
+        "the pick reads the lord holding the convoy's Elfire at its own uses")
+    check(#g.bought, 0, "the convoy armed the lord: the shop buys no tome")
+    check(table.concat(g.calls, ","), "take,take,use", "the tome, then the crest taken and used")
+    check(table.concat(g.used, ","), "1", "the lord uses the crest")
+    local ls = lines(g)
+    local said = {}
+    for _, a in ipairs(ls[1].supply or {}) do said[#said + 1] = a.act .. ":" .. a.item end
+    check(table.concat(said, ","), "take:57,take:101,use:101", "the record lists every act")
+    local f = game(true)
+    local ok, why = Campaign.run(f.api)
+    check(ok, false, "a failed take stops the campaign")
+    check(why and why:find("supply: take 0x01 item 0x39: the bag is full", 1, true) ~= nil, true,
+        "and says which act and why: " .. tostring(why))
+end
+test_between_takes_from_the_convoy()
 
 -- The chapter-start record keeps each item's uses left and the convoy (#510 party plan, PR 1):
 -- a later start can tell a broken tome from a fresh one, and what the convoy holds.

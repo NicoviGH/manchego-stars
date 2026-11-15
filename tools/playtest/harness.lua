@@ -3651,7 +3651,7 @@ INSPECT.CAMPAIGN = {
     shopSteps = 4000,                           -- frames one purchase may take, fades included
 }
 
--- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +10 pEffectiveness, +19
+-- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +0C pStatBonuses, +10 pEffectiveness, +19
 -- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
 -- types.h BmSt +2C um_tmp_item (the item that found no room); the bag itself is board.lua's
 -- (Board.UNIT_ITEMS, ITEM_COUNT); menu_def.c's
@@ -3659,6 +3659,7 @@ INSPECT.CAMPAIGN = {
 -- the items the engine tests by id or attribute while carried -- the Member Card (eventinfo.c),
 -- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
 INSPECT.BAG = {
+    ITEM_STAT_BONUSES = 0x0C,                   -- ItemData +0C pStatBonuses
     ITEM_EFFECTIVE = 0x10, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C, ITEM_USE_EFFECT = 0x1E,
     IA_STAFF = 4, BMST_TMP_ITEM = 0x2C,
     CHAR_NUMBER = 0x04,                         -- CharacterData +04 number (bmunit.h)
@@ -3709,14 +3710,19 @@ INSPECT.prepList = function()
     end)
 end
 
--- The convoy's items, { id, uses } each (gConvoyItemArray, id | uses << 8; gConvoyItemCount of
--- them, at most CONVOY_ITEM_COUNT = 100, bmcontainer.h). The one read: api.snapshot keeps them,
--- collectedItems looks for a gift among them.
+-- The convoy's items, { id, uses, index } each (gConvoyItemArray, id | uses << 8; index its
+-- slot, from 0). The game keeps the array packed (bmcontainer.c ShrinkConvoyItemList after
+-- every removal; AddItemToConvoy fills the first empty slot), so it is read to its first empty
+-- slot, at most CONVOY_ITEM_COUNT. Not gConvoyItemCount: convoymenu.c sets that only when its
+-- chooser opens, in an EWRAM overlay other screens reuse. The one read: api.snapshot keeps
+-- them, api.convoy weighs them, collectedItems looks for a gift among them.
+INSPECT.CONVOY_ITEM_COUNT = 100                 -- bmcontainer.h
 INSPECT.convoyItems = function()
     local out = {}
-    for i = 0, math.min(ru8(SYM.gConvoyItemCount), 100) - 1 do
+    for i = 0, INSPECT.CONVOY_ITEM_COUNT - 1 do
         local v = ru16(SYM.gConvoyItemArray + i * 2)
-        out[#out + 1] = { id = v & 0xFF, uses = v >> 8 }
+        if v == 0 then break end
+        out[#out + 1] = { id = v & 0xFF, uses = v >> 8, index = i }
     end
     return out
 end
@@ -3760,9 +3766,10 @@ INSPECT.isKey = function(call, unitAddr, value)
     return false
 end
 
--- `rosterRead` (the roster's read: Bot.armed, the shop and the seal check) asks only the weapon's
--- can-use, the uses and which item is the Vulnerary: the key, passive and heal kinds, two
--- sandbox terrain reads and a heal read for every item, are Bot.fullBag's alone.
+-- `rosterRead` (the roster's read: Bot.armed, the shop, the supply) asks only the weapon's
+-- can-use, a seal's or booster's use, the uses and which item is the Vulnerary: the key,
+-- passive and heal kinds, two sandbox terrain reads and a heal read for every item, are
+-- Bot.fullBag's alone (api.convoy reads them for the bags the supply may swap from).
 INSPECT.unitItemFacts = function(call, unitAddr, item, rosterRead)
     local K = INSPECT.BAG
     local f = INSPECT.itemFacts(item.id)
@@ -3772,7 +3779,16 @@ INSPECT.unitItemFacts = function(call, unitAddr, item, rosterRead)
     if f.kind == "weapon" then
         local check = f.staff and SYM.CanUnitUseStaff or SYM.CanUnitUseWeapon
         f.usable = call(check, { unitAddr, value }) ~= 0
-    elseif rosterRead then
+        return f
+    end
+    -- A seal that promotes this unit now (class and level), or a booster that raises one of its
+    -- stats (an item with stat bonuses the prep screen's Use offers it: CanUnitUseItemPrepScreen
+    -- asks CanUnitUseStatGainItem, which says no at a stat's cap). Bot.supply and Bot.fullBag
+    -- weigh them.
+    f.promotes = call(SYM.CanUnitUsePromotionItem, { unitAddr, value }) ~= 0 or nil
+    f.gains = not f.promotes and ru32(data + K.ITEM_STAT_BONUSES) ~= 0
+        and call(SYM.CanUnitUseItemPrepScreen, { unitAddr, value }) ~= 0 or nil
+    if rosterRead then
         return f
     elseif INSPECT.isKey(call, unitAddr, value) then
         f.kind = "key"
@@ -3976,10 +3992,7 @@ INSPECT.campaignApi = function(game)
                     end
                 end
                 for _, held in ipairs(u.items) do
-                    local f = INSPECT.unitItemFacts(call, u.addr, held, true)
-                    f.promotes = call(SYM.CanUnitUsePromotionItem,
-                        { u.addr, held.id | (held.uses << 8) }) ~= 0 or nil
-                    e.items[#e.items + 1] = f
+                    e.items[#e.items + 1] = INSPECT.unitItemFacts(call, u.addr, held, true)
                 end
                 out[#out + 1] = e
             end
@@ -4002,13 +4015,17 @@ INSPECT.campaignApi = function(game)
                     answers[e.charId][d.id], strength[e.charId][d.id] = sight.answer(u, d)
                 end
             end
-            -- a unit the shop will arm is read holding everything it will buy (Bot.arms), since
-            -- it will hold them when it fights
+            -- a unit the convoy or the shop will arm is read holding everything it will get
+            -- (Bot.arms), since it will hold them when it fights: a convoy item at its uses, a
+            -- bought one as the shop makes it
             local buy = arms and arms[e.charId]
             if buy then
                 local values = INSPECT.gameCalls(function(call)
                     local out = {}
-                    for _, id in ipairs(buy) do out[#out + 1] = call(SYM.MakeNewItem, { id }) end
+                    for _, it in ipairs(buy) do
+                        out[#out + 1] = it.uses and (it.id | (it.uses << 8))
+                            or call(SYM.MakeNewItem, { it.id })
+                    end
                     return out
                 end)
                 sight.holding(byChar[e.charId], values, read)
@@ -4124,8 +4141,8 @@ INSPECT.campaignApi = function(game)
     end
 
     -- What the game holds at the chapter's start, as campaign.lua's startRecord keeps it: gold,
-    -- each unit's bag with its uses left, the convoy's items (gConvoyItemArray, id | uses << 8,
-    -- gConvoyItemCount of them: bmcontainer.h) and the open shop nodes.
+    -- each unit's bag with its uses left, the convoy's items (INSPECT.convoyItems) and the open
+    -- shop nodes.
     api.snapshot = function(ch)
         local party = {}
         for _, u in ipairs(units()) do
@@ -4133,7 +4150,9 @@ INSPECT.campaignApi = function(game)
             for _, it in ipairs(u.items) do items[#items + 1] = { id = it.id, uses = it.uses } end
             party[#party + 1] = { charId = u.charId, classId = u.classId, level = u.level, items = items }
         end
-        return { gold = gold(), party = party, convoy = INSPECT.convoyItems(),
+        local convoy = {}
+        for _, c in ipairs(INSPECT.convoyItems()) do convoy[#convoy + 1] = { id = c.id, uses = c.uses } end
+        return { gold = gold(), party = party, convoy = convoy,
                  shops = openNodes(ch) }
     end
     -- The chapter-start state, kept in memory for the restarts and written beside the record
@@ -4302,44 +4321,165 @@ INSPECT.campaignApi = function(game)
         return nil, "the purchase did not finish within its allowance"
     end
 
-    -- Spend a seal as the player does: the unit's Item command, the seal's row, Use. A branched
-    -- promotion takes the first class the game's menu offers, and every prompt after it a yes;
-    -- done when the unit's class has changed and the map is back.
-    api.promote = function(entry)
-        local slot
-        for i, it in ipairs(entry.items) do
-            if it.promotes then slot = i - 1; break end
+    -- The convoy as Bot.supply weighs it, or nil when the game gives the party none
+    -- (HasConvoyAccess: bmcontainer.c, by chapter). Every convoy item gets the game's facts for
+    -- every unit of the whole roster (MakePrepUnitList's, benched units included, on the map
+    -- too) as `for[charId] = { usable, promotes, gains }`; every non-weapon item in `roster`'s
+    -- bags gets the same `for` and its full kind (unitItemFacts: the key, heal and money reads
+    -- Bot.fullBag weighs when a full bag gives first). A convoy item is only ever taken as a
+    -- weapon, a seal or a booster, so a non-weapon's kind there is "other", as in a bag.
+    api.convoy = function(roster)
+        if INSPECT.gameCalls(function(call) return call(SYM.HasConvoyAccess, {}) end) == 0 then
+            return nil
         end
-        local u = BOARD.find("blue", entry.charId)
-        if not (slot and u) then
-            return nil, string.format("no seal or no unit for 0x%02X", entry.charId)
+        local items, all = INSPECT.convoyItems(), {}
+        for _, addr in ipairs(INSPECT.prepList()) do
+            all[#all + 1] = { addr = addr, charId = ru8(ru32(addr) + INSPECT.BAG.CHAR_NUMBER) }
         end
+        local byChar = {}
+        for _, u in ipairs(all) do byChar[u.charId] = u end
+        return INSPECT.gameCalls(function(call)
+            -- A non-weapon's answers read its id, never its uses (CanUnitUsePromotionItem's and
+            -- CanUnitUseStatGainItem's GetItemIndex / GetItemStatBonuses, the key and heal reads),
+            -- so one read a unit and an id serves every copy (a Vulnerary in every bag); a
+            -- weapon's is asked of its value.
+            local memo = {}
+            local function facts(addr, it, full)
+                local key = string.format("%d:%d:%d:%s", addr, it.id,
+                    INSPECT.itemFacts(it.id).kind == "weapon" and it.uses or -1, full and "f" or "r")
+                if memo[key] == nil then memo[key] = INSPECT.unitItemFacts(call, addr, it, not full) end
+                return memo[key]
+            end
+            local function forAll(it)
+                local f = {}
+                for _, u in ipairs(all) do
+                    local x = facts(u.addr, it)
+                    f[u.charId] = { usable = x.usable, promotes = x.promotes, gains = x.gains }
+                end
+                return f
+            end
+            for _, e in ipairs(roster) do
+                local u = byChar[e.charId] or BOARD.find("blue", e.charId)
+                for _, it in ipairs(e.items) do
+                    if it.kind ~= "weapon" and u then
+                        it.kind = facts(u.addr, it, true).kind
+                        it["for"] = forAll(it)
+                    end
+                end
+            end
+            local out = {}
+            for _, c in ipairs(items) do
+                local f = INSPECT.itemFacts(c.id)
+                f.uses, f.index = c.uses, c.index
+                f.kind = f.kind or "other"
+                f["for"] = forAll(c)
+                out[#out + 1] = f
+            end
+            return out
+        end)
+    end
+
+    -- One Bot.supply act, by the game's own container calls, as its Supply screen makes them
+    -- (prep_itemsupply.c: a give clears the bag's slot, UnitRemoveInvalidItems packs the bag,
+    -- AddItemToConvoy stores it; a take is UnitAddItem and RemoveItemFromConvoy, which packs
+    -- the convoy). Called on the first player phase, where the prep screen's Supply would have
+    -- left the same bags and convoy: no screen, no turn spent. The item is found by id and uses.
+    local function slotOf(addr, id, uses)
+        for k = 0, BOARD.ITEM_COUNT - 1 do
+            if ru16(addr + BOARD.UNIT_ITEMS + k * 2) == (id | (uses << 8)) then return k end
+        end
+        return nil
+    end
+    local function count(list, id, uses)
+        local n = 0
+        for _, it in ipairs(list) do
+            if it.id == id and it.uses == uses then n = n + 1 end
+        end
+        return n
+    end
+    api.give = function(a)
+        local u = BOARD.find("blue", a.unit)
+        local k = u and slotOf(u.addr, a.item, a.uses)
+        if not k then return nil, string.format("0x%02X holds no item 0x%X at %d uses", a.unit, a.item, a.uses) end
+        if #INSPECT.convoyItems() >= INSPECT.CONVOY_ITEM_COUNT then return nil, "the convoy is full" end
+        local before = count(INSPECT.convoyItems(), a.item, a.uses)
+        INSPECT.gameCalls(function(call)
+            emu:write16(u.addr + BOARD.UNIT_ITEMS + k * 2, 0)
+            call(SYM.UnitRemoveInvalidItems, { u.addr })
+            call(SYM.AddItemToConvoy, { a.item | (a.uses << 8) })
+        end, true)
+        if count(INSPECT.convoyItems(), a.item, a.uses) ~= before + 1 then
+            return nil, "the item did not reach the convoy"
+        end
+        log(string.format("supply: 0x%02X gives item 0x%X (%s)", a.unit, a.item, a.why or ""))
+        return true
+    end
+    api.take = function(a)
+        local u = BOARD.find("blue", a.unit)
+        if not u then return nil, string.format("no fielded unit 0x%02X", a.unit) end
+        local at
+        for _, c in ipairs(INSPECT.convoyItems()) do
+            if c.id == a.item and c.uses == a.uses then at = c.index; break end
+        end
+        if not at then return nil, string.format("no item 0x%X at %d uses in the convoy", a.item, a.uses) end
+        local before = count(BOARD.items(u.addr), a.item, a.uses)
+        local added = INSPECT.gameCalls(function(call)
+            if call(SYM.UnitAddItem, { u.addr, a.item | (a.uses << 8) }) == 0 then return false end
+            call(SYM.RemoveItemFromConvoy, { at })
+            return true
+        end, true)
+        if not added then return nil, "the bag is full" end
+        if count(BOARD.items(u.addr), a.item, a.uses) ~= before + 1 then
+            return nil, "the item did not reach the bag"
+        end
+        log(string.format("supply: 0x%02X takes item 0x%X (%s)", a.unit, a.item, a.why or ""))
+        return true
+    end
+
+    -- Use a seal or a booster as the player does: the unit's Item command, the item's row, Use.
+    -- A branched promotion takes the first class the game's menu offers, and every prompt after
+    -- it a yes; done when the map is back and the unit holds one fewer of the item at those uses
+    -- (a booster's one use is spent) and, for a seal (act.seal), its class has changed.
+    api.use = function(a)
+        local u = BOARD.find("blue", a.unit)
+        local slot = u and slotOf(u.addr, a.item, a.uses)
+        if not slot then
+            return nil, string.format("0x%02X holds no item 0x%X at %d uses", a.unit, a.item, a.uses)
+        end
+        local before = count(BOARD.items(u.addr), a.item, a.uses)
         local function classOf() return ru8(ru32(u.addr + 4) + 4) end
-        local before = classOf()
+        local class = classOf()
+        local function spent()
+            return count(BOARD.items(u.addr), a.item, a.uses) < before
+                and (not a.seal or classOf() ~= class)
+        end
         if not moveUnit(u.x, u.y, u.x, u.y) then return nil, "no command menu for the unit" end
         local opened, why = INSPECT.itemSubmenu(slot)
         if not opened then return nil, why end
-        if not selectSemantic("use_item", "Use starts the promotion", function(after)
+        if not selectSemantic("use_item", "Use starts the item", function(after)
             return controllerState(after) ~= "item_submenu"
-        end, 120) then return nil, "the seal could not be used" end
-        local stalled = INSPECT.watch("promote")
+        end, 120) then return nil, "the item could not be used" end
+        local stalled = INSPECT.watch("use")
         for _ = 1, TUNE.bootSteps do
             local obs = observeController()
             local state = controllerState(obs)
-            if stalled(obs, state) then return nil, "the promotion stalled (see the inspect snapshot)" end
+            if stalled(obs, state) then return nil, "the use stalled (see the inspect snapshot)" end
             local ok = true
-            if state == "player_map_idle" and classOf() ~= before then return true
+            if state == "player_map_idle" and spent() then
+                log(string.format("supply: 0x%02X uses item 0x%X (%s; class 0x%02X to 0x%02X)", a.unit,
+                    a.item, a.why or "", class, classOf()))
+                return true
             -- a Canto unit is handed back its move after the seal (playerphase.c
             -- PlayPhaseForceActiveUnitCanto; vanilla Ch14's start, Cormag's Elysian Whip, on
             -- the scout lap of 2026-11-14 from campaign 4006: class 0x1F to 0x21, then player_range_idle, and B does not
             -- close it): spent where the unit stands, as after any act (INSPECT.awaitActed).
-            -- Only a changed class is let through: a unit selected with its class unchanged
-            -- still runs out the allowance, loudly.
-            elseif state == "unit_selected" and classOf() ~= before then
+            -- Only a spent item (a seal's class changed) is let through: a unit selected
+            -- otherwise still runs out the allowance, loudly.
+            elseif state == "unit_selected" and spent() then
                 ok = INSPECT.awaitActed(u.addr)
             elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
             elseif state == "yes_no_choice" then
-                ok = selectSemantic("answer_yes", "the promotion's prompt takes Yes", function(after)
+                ok = selectSemantic("answer_yes", "the item's prompt takes Yes", function(after)
                     return controllerState(after) ~= "yes_no_choice"
                 end, 120)
             elseif state == "generic_menu" then
@@ -4348,9 +4488,9 @@ INSPECT.campaignApi = function(game)
             else
                 yield()
             end
-            if not ok then return nil, "the promotion refused an input in " .. tostring(state) end
+            if not ok then return nil, "the use refused an input in " .. tostring(state) end
         end
-        return nil, "the promotion did not finish within its allowance"
+        return nil, "the use did not finish within its allowance"
     end
 
     -- Retries get different dice (ADR 0404): the draws the game's RNG moves on for this attempt,

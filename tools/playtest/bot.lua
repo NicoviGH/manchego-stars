@@ -167,14 +167,15 @@
 --   purchase gold cannot cover, or a full bag has no room for, is skipped and the later ones are
 --   still tried; a unit with nothing usable in hand keeps a slot free of a Vulnerary for its arms.
 -- Bot.armed(unit) -> bool: it holds a weapon or staff it can use, with uses left.
--- Bot.arms(gold, stock, roster) -> { [charId] = { item id... } }: the weapons and staves the
---   shop would buy to arm each unit that is not armed, in its spend order, the purse shared
---   (none: nothing in stock arms it, its bag is full, or the gold went before it). The pick
---   reads such a unit as holding them (harness.lua api.needs), so a unit the shop can arm
---   ranks as armed, by the game's own numbers, not as the unarmed unit it is now.
--- Bot.promote(unit, items) -> bool: a seal the game says promotes this unit is held.
--- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
---   caller spends seals in.
+-- Bot.arms(gold, stock, roster, convoy) -> { [charId] = { { id, uses }... } }: the weapons
+--   and staves the convoy, then the shop, would give each unit that is not armed, in their
+--   order, the convoy and the purse shared (none: nothing in reach arms it, its bag is full, or
+--   the units before it took it). The pick reads such a unit as holding them (harness.lua
+--   api.needs), so a unit the supply or the shop can arm ranks as armed, by the game's own
+--   numbers, not as the unarmed unit it is now.
+-- Bot.supply(party, convoy) -> acts: before the shop, what the fielded units give the convoy
+--   and the weapons they take from it. Bot.uses(party, convoy) -> acts: after the shop, the
+--   seals and boosters they take and use. Their docstrings have the rules.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
 -- Bot.fullBag(held, new, convoyFull) -> slot, why: a unit given an item with no room (FE8's
 --   chooser, convoymenu.c) sends one item to the convoy -- or discards it when the convoy is
@@ -2640,36 +2641,212 @@ function M.shop(gold, stock, party)
     return out
 end
 
--- Bot.arms(gold, stock, roster) -> { [charId] = { item id... } }: every weapon or staff the shop
--- would buy for each unit that is not armed (M.armed), in the order it buys them. It is
--- M.shop run over those units with the one purse and each unit's bag room, so what it says
--- the shop buys is what the shop buys; none for a unit nothing in stock can arm, a full bag,
--- or a purse the units before it spent. The shop pays the unarmed before the armed, and the
--- fielded unarmed are a subset of these in the same order, so the gold spent before a unit
--- here is never less than the shop's: a unit `arms` arms, the shop arms (it may arm one more
--- `arms` left out). The pick asks the game how such a unit fights holding those items.
-function M.arms(gold, stock, roster)
-    local unarmed, out = {}, {}
-    for _, u in ipairs(roster) do
-        if not M.armed(u) then unarmed[#unarmed + 1] = u end
-    end
-    for _, p in ipairs(M.shop(gold, stock, unarmed)) do
-        if not p.vulnerary then
-            out[p.unit] = out[p.unit] or {}
-            table.insert(out[p.unit], p.item)
-        end
-    end
-    return out
+-- ── the convoy gives back (#510 comment 6872948037; the party plan's PR 2) ─────────────────
+-- Every "can this unit use it" is the game's own answer, handed in per unit as an item's
+-- `for[charId] = { usable, promotes, gains }` (harness.lua api.convoy: CanUnitUseWeapon /
+-- CanUnitUseStaff, CanUnitUsePromotionItem, CanUnitUseStatGainItem). A bag item's top-level
+-- usable / promotes / gains are its holder's.
+
+-- the item as `charId` would hold it: its facts for that unit on top
+local function asHeld(it, charId)
+    local h = {}
+    for k, v in pairs(it) do h[k] = v end
+    local f = (it["for"] or {})[charId] or {}
+    h.usable, h.promotes, h.gains = f.usable, f.promotes, f.gains
+    return h
 end
 
-function M.promote(unit, items)
-    for _, it in ipairs(items) do
-        if it.promotes then return true end
+local function forUnit(it, charId) return (it["for"] or {})[charId] or {} end
+
+-- a seal or booster some roster unit can use (its `for` lists the whole roster)
+local function anyUser(it)
+    for _, f in pairs(it["for"] or {}) do
+        if f.promotes or f.gains then return true end
     end
     return false
 end
 
-function M.promoteOrder(units) return byLevel(units) end
+-- The supply's working copy: each fielded unit's bag and the convoy, and the acts that changed
+-- them, in order. `swap` lets a full bag give first what Bot.fullBag would send (it needs every
+-- held item's kind: api.convoy's read, not the roster's).
+local function ledger(party, convoy, swap)
+    local L = { acts = {}, bags = {}, pool = {} }
+    for _, u in ipairs(party) do
+        local b = {}
+        for i, it in ipairs(u.items) do b[i] = it end
+        L.bags[u.charId] = b
+    end
+    for i, it in ipairs(convoy) do L.pool[i] = it end
+    function L.give(charId, i, why)
+        local it = table.remove(L.bags[charId], i)
+        L.pool[#L.pool + 1] = it
+        L.acts[#L.acts + 1] = { act = "give", unit = charId, item = it.id, uses = it.uses, why = why }
+    end
+    -- the convoy's i-th item into the unit's bag; false when there is no room for it
+    function L.take(charId, i, why)
+        local it, bag = L.pool[i], L.bags[charId]
+        local h = asHeld(it, charId)
+        if #bag >= Board.ITEM_COUNT then
+            if not swap then return false end
+            local slot, swhy = M.fullBag(bag, h, false)
+            if slot == 0 then return false end
+            L.give(charId, slot, "room: " .. swhy)   -- appended after i: i still names it
+        end
+        table.remove(L.pool, i)
+        bag[#bag + 1] = h
+        L.acts[#L.acts + 1] = { act = "take", unit = charId, item = it.id, uses = it.uses, why = why }
+        return true
+    end
+    function L.armed(charId) return holdsAny({ items = L.bags[charId] }, usableWeapon) end
+    return L
+end
+
+-- The unarmed first, then the armed (the shop's own order), each in party order.
+local function unarmedFirst(party, armed)
+    local a, b = {}, {}
+    for _, u in ipairs(party) do table.insert(armed(u) and b or a, u) end
+    for _, u in ipairs(b) do a[#a + 1] = u end
+    return a
+end
+
+-- The convoy's weapons and staves: for each type among them the unit can use with uses left
+-- (type names in order) in which it holds no usable item, the convoy's best of that type for it
+-- (the highest rank, then the most uses, then the first) -- the shop's `wants`, from storage.
+local function takeWeapons(L, party)
+    for _, u in ipairs(unarmedFirst(party, function(v) return L.armed(v.charId) end)) do
+        local types, seen = {}, {}
+        for _, it in ipairs(L.pool) do
+            if it.kind == "weapon" and it.type and forUnit(it, u.charId).usable
+                    and (it.uses or 0) > 0 and not seen[it.type] then
+                seen[it.type] = true
+                types[#types + 1] = it.type
+            end
+        end
+        table.sort(types)
+        for _, t in ipairs(types) do
+            local bag = { items = L.bags[u.charId] }
+            if not holdsAny(bag, function(it) return it.type == t and usableWeapon(it) end) then
+                local best
+                for i, it in ipairs(L.pool) do
+                    if it.kind == "weapon" and it.type == t and forUnit(it, u.charId).usable
+                            and (it.uses or 0) > 0 then
+                        local b = best and L.pool[best]
+                        if not b or (it.rank or 0) > (b.rank or 0)
+                                or ((it.rank or 0) == (b.rank or 0) and it.uses > b.uses) then
+                            best = i
+                        end
+                    end
+                end
+                L.take(u.charId, best, "a usable " .. t)
+            end
+        end
+    end
+end
+
+-- Bot.supply(party, convoy) -> acts, before the shop: what the fielded units give the convoy
+-- and take from it (the party plan's PR 2; comment 6872948037's rules). party = the fielded
+-- units in deploy order, each item with the game's facts and its kind (api.convoy's read);
+-- convoy = its items, each with `for` over every roster unit.
+--   1. A fielded unit carrying a seal or booster it cannot use, that another roster unit can,
+--      gives it to the convoy, so the unit that can takes it (now if fielded, else later).
+--   2. Weapons and staves from the convoy, the unarmed first (takeWeapons), so the shop buys
+--      only what storage cannot give.
+-- A full bag gives first what Bot.fullBag would send. acts = { act = "give" | "take" | "use",
+-- unit = charId, item = id, uses, seal = true (a use that promotes) | nil, why }.
+function M.supply(party, convoy)
+    local L = ledger(party, convoy, true)
+    for _, u in ipairs(party) do
+        local i = 1
+        while i <= #L.bags[u.charId] do
+            local it = L.bags[u.charId][i]
+            if it.kind ~= "weapon" and not (it.promotes or it.gains) and anyUser(it) then
+                L.give(u.charId, i, "a seal or booster it cannot use")
+            else
+                i = i + 1
+            end
+        end
+    end
+    takeWeapons(L, party)
+    return L.acts
+end
+
+-- Bot.uses(party, convoy) -> acts, after the shop (the same shapes as Bot.supply's): the seals
+-- and boosters the fielded units use, each taken from the convoy first when not in the bag.
+--   3. A seal for each fielded unit the game says one promotes, the highest level first (ties
+--      by party order). One use a unit a chapter, since each costs the unit its first turn
+--      (api.use is the Item command).
+--   4. A booster for each fielded unit left that the game says gains from one: the units the
+--      game forces onto the map first (the lord), then the lowest level (ties by party order).
+-- Its own first, else the convoy's (a full bag gives first what Bot.fullBag would send).
+function M.uses(party, convoy)
+    local L = ledger(party, convoy, true)
+    local used = {}
+    local function useOne(u, fact, why)
+        if used[u.charId] then return end
+        for _, it in ipairs(L.bags[u.charId]) do
+            if it[fact] then
+                used[u.charId] = true
+                L.acts[#L.acts + 1] = { act = "use", unit = u.charId, item = it.id, uses = it.uses,
+                                        seal = fact == "promotes" or nil, why = why }
+                return
+            end
+        end
+        for i, it in ipairs(L.pool) do
+            if forUnit(it, u.charId)[fact] then
+                if L.take(u.charId, i, why) then return useOne(u, fact, why) end
+                return
+            end
+        end
+    end
+    for _, u in ipairs(byLevel(party)) do useOne(u, "promotes", "promotes it") end
+    local order = {}
+    for i, u in ipairs(party) do order[i] = { u = u, i = i } end
+    table.sort(order, function(x, y)
+        if (x.u.forced or false) ~= (y.u.forced or false) then return x.u.forced == true end
+        if x.u.level ~= y.u.level then return x.u.level < y.u.level end
+        return x.i < y.i
+    end)
+    for _, o in ipairs(order) do useOne(o.u, "gains", "raises a stat") end
+    return L.acts
+end
+
+-- Bot.arms(gold, stock, roster, convoy) -> { [charId] = { { id, uses }... } }: every weapon or
+-- staff that would arm each unit that is not armed (M.armed): the convoy's first (takeWeapons,
+-- Bot.supply's own step, uses as stored), then the shop's (uses nil: as the shop makes it),
+-- in the order they are taken and bought. It is those two loops run over the unarmed with the
+-- one convoy, the one purse and each unit's bag room, so what it says is what the supply and
+-- the shop do; none for a unit nothing in reach arms, a full bag, or a purse or a convoy the
+-- units before it spent. Both serve the unarmed before the armed, and the fielded unarmed are
+-- a subset of these in the same order, so what a unit here has to choose from is never more
+-- than it will have: a unit `arms` arms is armed (the real supply may arm one more: a full
+-- bag gives first there, which needs every item's kind, not the roster's read). The pick asks
+-- the game how such a unit fights holding those items.
+function M.arms(gold, stock, roster, convoy)
+    local unarmed, out = {}, {}
+    for _, u in ipairs(roster) do
+        if not M.armed(u) then unarmed[#unarmed + 1] = u end
+    end
+    local L = ledger(unarmed, convoy or {}, false)
+    takeWeapons(L, unarmed)
+    for _, a in ipairs(L.acts) do
+        out[a.unit] = out[a.unit] or {}
+        table.insert(out[a.unit], { id = a.item, uses = a.uses })
+    end
+    local after = {}
+    for i, u in ipairs(unarmed) do
+        local v = {}
+        for k, x in pairs(u) do v[k] = x end
+        v.items = L.bags[u.charId]
+        after[i] = v
+    end
+    for _, p in ipairs(M.shop(gold, stock, after)) do
+        if not p.vulnerary then
+            out[p.unit] = out[p.unit] or {}
+            table.insert(out[p.unit], { id = p.item })
+        end
+    end
+    return out
+end
 
 -- A weapon's own reach and bonus damage, against the unit's other weapons of its type: what a
 -- higher rank cannot replace (a Javelin's range, an Armorslayer's effectiveness).
@@ -2702,6 +2879,8 @@ function M.fullBag(held, new, convoyFull)
         wanted = #heals == 0
     elseif new.kind == "key" then
         wanted = true
+    elseif new.kind ~= "weapon" and (new.promotes or new.gains) then
+        wanted = true   -- a seal or booster its holder can use: Bot.supply uses it
     elseif canUseWeapon(new) then
         local same = usableOfType(new.type)
         local with = { new }
@@ -2749,7 +2928,9 @@ function M.fullBag(held, new, convoyFull)
                   { unusable, "a weapon the unit cannot use" } }
     else
         order = { { first(function(it) return it.kind == "money" end), "money" },
-                  { first(function(it) return it.kind == "other" end), "a seal or booster" },
+                  { first(function(it)
+                      return it.kind == "other" and not (it.promotes or it.gains)
+                  end), "a seal or booster it cannot use" },
                   { unusable, "a weapon the unit cannot use" },
                   { spareHeal, "a spare healing item" }, { beatenAt, "a weapon it beats" } }
     end

@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0413 (#510, the party plan's PR 2): a seal is one of the acts Bot.uses
+    # plans (from the bag or the convoy) and api.use spends; the convoy is read to its first
+    # empty slot, never by gConvoyItemCount (set only while its chooser is open)
+    r'\bBot\.promote(?:Order)?\b', r'\bapi\.promote\b', r'\bgConvoyItemCount of them\b',
     # retired by #510 PR A (ADR 0400): the flat fog penalty in the judged score gave way to one
     # strike from the strongest enemy seen, from the fog's edge, as a tie-breaker; the versions
     # refuted on the way (that strike inside the chance to die, the sturdy units leading into

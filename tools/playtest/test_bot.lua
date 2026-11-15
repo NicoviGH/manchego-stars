@@ -1618,6 +1618,13 @@ test_shop_stops_at_gold()
 -- cannot say armed what the shop cannot pay for, nor read a unit holding one item when the shop
 -- buys two. Fails on an arms that prices each unit against the whole purse and keeps the first
 -- item it finds.
+-- the item ids of a Bot.arms list
+local function idsOf(list)
+    local out = {}
+    for i, it in ipairs(list) do out[i] = it.id end
+    return out
+end
+
 local function test_arms_is_the_shops_spend_order()
     local sword = { item = 0x10, price = anyone(400), type = "sword" }
     local staff = { item = 0x4B, price = anyone(600), type = "staff" }
@@ -1631,15 +1638,16 @@ local function test_arms_is_the_shops_spend_order()
     local n = 0
     for _ in pairs(bought) do n = n + 1 end
     check(n, 1, "arms: 600 gold arms one of four units")
-    check(type(bought[1]) == "table" and bought[1][1], 0x10, "arms: the first unit, with the sword")
+    check(type(bought[1]) == "table" and bought[1][1].id, 0x10, "arms: the first unit, with the sword")
+    check(bought[1][1].uses, nil, "arms: a bought item's uses are the shop's (MakeNewItem)")
     local shop = B.shop(600, { sword }, roster)
     check(#shop, 1, "arms: the shop buys exactly that")
     check(shop[1].unit, 1, "arms: for the unit arms names")
     -- a unit that uses a staff and a sword is read holding both, as the shop buys both
     local both = B.arms(10000, { sword, staff }, { lacking(5, { [0x10] = true, [0x4B] = true }) })
-    check(type(both[5]) == "table" and csv(both[5]), "75,16", "arms: a staff user who wields a sword holds both (types in order)")
+    check(type(both[5]) == "table" and csv(idsOf(both[5])), "75,16", "arms: a staff user who wields a sword holds both (types in order)")
     local one = B.arms(10000, { sword, staff }, { lacking(6, { [0x10] = true }) })[6]
-    check(type(one) == "table" and csv(one), "16",
+    check(type(one) == "table" and csv(idsOf(one)), "16",
           "arms: only what the unit can use")
     -- an armed unit's Vulnerary never takes the gold that arms an unarmed one: the unarmed
     -- are paid for first (500 gold: the 400 sword, not the 300 Vulnerary)
@@ -1651,7 +1659,7 @@ local function test_arms_is_the_shops_spend_order()
     local paid = B.shop(500, { vulnerary, sword }, { armedOne, bare })
     check(#paid == 1 and paid[1].unit .. ":" .. paid[1].item, "8:16",
           "shop: the unarmed unit's sword before the armed unit's Vulnerary")
-    check(csv(B.arms(500, { vulnerary, sword }, { armedOne, bare })[8]), "16",
+    check(csv(idsOf(B.arms(500, { vulnerary, sword }, { armedOne, bare })[8])), "16",
           "and arms says so")
     -- a held weapon with no shop type (the Divinestone, ITYPE_DRAGN) still arms its holder
     local dragon = unitOf(9, 9, 1, { items = {
@@ -1681,7 +1689,7 @@ local function test_shop_arms_by_usable_items_with_uses_left()
     local healer = unitOf(1, 0x01, 1, { canUse = { [0x4B] = true }, items = { vuln } })
     check(flat(B.shop(10000, stock, { healer })), "1:75", "a healer with no staff buys one")
     check(B.armed(healer), false, "a healer with no staff is not armed")
-    check(csv(B.arms(10000, stock, { healer })[0x01]), "75", "the pick is told what arms it")
+    check(csv(idsOf(B.arms(10000, stock, { healer })[0x01])), "75", "the pick is told what arms it")
     healer.items[#healer.items + 1] = { kind = "weapon", id = 0x4B, type = "staff", usable = true, uses = 5 }
     check(flat(B.shop(10000, stock, { healer })), "", "a healer with a staff buys none")
     check(B.armed(healer), true, "a healer with a staff is armed")
@@ -1725,20 +1733,99 @@ local function test_shop_budgets_at_the_buyers_price()
 end
 test_shop_budgets_at_the_buyers_price()
 
-local function test_promote_reads_the_games_answer()
-    -- `promotes` is the game's own check (class and level): the bot adds no rule of its own.
-    check(B.promote(unitOf(1, 1, 10), { { id = 0x82, promotes = true } }), true,
-        "a seal the game accepts promotes")
-    check(B.promote(unitOf(1, 1, 15), {}), false, "no seal, no promotion")
-    check(B.promote(unitOf(1, 1, 15), { { id = 0x82, promotes = false } }), false,
-        "a seal that does not promote this unit is not one")
-    local o = B.promoteOrder({ unitOf(1, 0x01, 8), unitOf(2, 0x02, 12), unitOf(3, 0x03, 12),
-                               unitOf(4, 0x04, 15) })
-    local ids = {}
-    for _, u in ipairs(o) do ids[#ids + 1] = u.id end
-    check(csv(ids), "4,2,3,1", "promote order: highest level first, ties by slot")
+-- ── the convoy gives back (the party plan's PR 2; #510 comment 6872948037) ──────────────
+do
+    local function lance(uses) return { kind = "weapon", id = 0x14, type = "lance", rank = 1,
+                                        usable = true, uses = uses or 40 } end
+    -- an item with the game's per-unit facts (api.convoy's `for`); `own` = its holder's
+    local function item(id, facts, own)
+        local it = { id = id, kind = "other", uses = 1, ["for"] = facts }
+        for k, v in pairs(own or {}) do it[k] = v end
+        return it
+    end
+    local function acts(list)
+        local out = {}
+        for _, a in ipairs(list) do
+            out[#out + 1] = string.format("%s %d:%X", a.act, a.unit, a.item)
+        end
+        return table.concat(out, ", ")
+    end
+    local function armedUnit(charId, level, extra)
+        local u = unitOf(charId, charId, level, extra)
+        u.items = u.items[1] and u.items or { lance() }
+        return u
+    end
+
+    -- 3. a convoy seal goes to the highest-level unit the game says it promotes; one nobody
+    -- can use stays (fails on main: no Bot.uses, and the old promote read only the own bag)
+    local crest = item(0x65, { [1] = { promotes = true }, [2] = { promotes = true } })
+    check(acts(B.uses({ armedUnit(1, 10), armedUnit(2, 12) }, { crest })), "take 2:65, use 2:65",
+        "uses: the convoy's seal to the highest level the game accepts")
+    check(acts(B.uses({ armedUnit(1, 10) }, { item(0x65, { [1] = {} }) })), "",
+        "uses: a seal the game says promotes nobody stays")
+    local own = armedUnit(3, 10, { items = { lance(), item(0x64, nil, { promotes = true }) } })
+    check(acts(B.uses({ own }, { item(0x64, { [3] = { promotes = true } }) })), "use 3:64",
+        "uses: its own seal first, nothing taken")
+    check(B.uses({ own }, {})[1].seal, true, "uses: a seal's use says so (api.use checks the class)")
+    check(B.uses({ armedUnit(8, 3, { items = { lance(), item(0x5B, nil, { gains = true }) } }) },
+        {})[1].seal, nil, "uses: a booster's does not")
+    -- one use a unit a chapter, the seal before the booster
+    local both = armedUnit(4, 10, { items = { lance(), item(0x64, nil, { promotes = true }),
+                                              item(0x5C, nil, { gains = true }) } })
+    check(acts(B.uses({ both }, {})), "use 4:64", "uses: one use a unit, the seal first")
+
+    -- 4. a booster: the forced unit first, then the lowest level; nobody when the game says no
+    -- stat gains
+    local lord = armedUnit(1, 5, { forced = true })
+    local low = armedUnit(2, 2)
+    local robe = function(f) return item(0x5B, f) end
+    check(acts(B.uses({ low, lord }, { robe({ [1] = { gains = true }, [2] = { gains = true } }) })),
+        "take 1:5B, use 1:5B", "uses: a booster to the unit the game forces onto the map")
+    check(acts(B.uses({ low, lord, armedUnit(3, 9) },
+            { robe({ [2] = { gains = true }, [3] = { gains = true } }) })),
+        "take 2:5B, use 2:5B", "uses: then the lowest level")
+    check(acts(B.uses({ low, lord }, { robe({ [1] = {}, [2] = {} }) })), "",
+        "uses: no gain, no booster (CanUnitUseStatGainItem says no at a cap)")
+
+    -- a full bag gives first what Bot.fullBag sends (money), then takes and uses
+    local fullU = armedUnit(5, 10, { items = { lance(), lance(30), { kind = "heal", uses = 3 },
+                                              { kind = "key", id = 0x69, uses = 1 },
+                                              { kind = "money", id = 0xBC, uses = 1 } } })
+    check(acts(B.uses({ fullU }, { item(0x65, { [5] = { promotes = true } }) })),
+        "give 5:BC, take 5:65, use 5:65", "uses: a full bag gives its gem first")
+
+    -- 1. a seal its holder cannot use, that another roster unit (benched too) can, goes back;
+    -- one nobody can use stays where it is
+    local ring = item(0x68, { [1] = {}, [9] = { promotes = true } })
+    local bolt = item(0x67, { [1] = {}, [9] = {} })
+    local holder = armedUnit(1, 4, { items = { lance(), ring, bolt } })
+    check(acts(B.supply({ holder }, {})), "give 1:68",
+        "supply: the ring a benched unit can use goes to the convoy, the useless bolt stays")
+
+    -- 2. convoy weapons: the unarmed first, the best of the type it can use, uses left
+    local function tome(id, rank, uses, users)
+        local f = {}
+        for _, c in ipairs(users) do f[c] = { usable = true } end
+        return { id = id, kind = "weapon", type = "anima", rank = rank, uses = uses, ["for"] = f }
+    end
+    local swordsman = armedUnit(6, 8)   -- armed with a lance; can use anima, holds none
+    local mage = unitOf(7, 7, 10)       -- nothing in hand (its tome broke)
+    local convoy = { tome(0x38, 1, 40, { 6, 7 }), tome(0x39, 2, 30, { 6, 7 }), tome(0x3A, 3, 0, { 6, 7 }) }
+    check(acts(B.supply({ swordsman, mage }, convoy)), "take 7:39, take 6:38",
+        "supply: the unarmed mage first takes the best tome with uses left, then the armed unit")
+    check(acts(B.supply({ mage }, { tome(0x38, 1, 40, { 6 }) })), "",
+        "supply: a tome the game says the unit cannot use is never taken")
+
+    -- Bot.arms reads the convoy before the shop: the tome comes from storage, so the shop buys
+    -- none of that type
+    local fire = { item = 0x38, price = anyone(560), type = "anima" }
+    local m2 = unitOf(7, 7, 10, { canUse = { [0x38] = true } })
+    local got = B.arms(10000, { fire }, { m2 }, { tome(0x39, 2, 30, { 7 }) })[7]
+    check(type(got) == "table" and #got == 1 and got[1].id == 0x39 and got[1].uses, 30,
+        "arms: the convoy's Elfire at its own uses, and nothing bought")
+    check(type(B.arms(10000, { fire }, { m2 })[7]) == "table"
+        and B.arms(10000, { fire }, { m2 })[7][1].id, 0x38, "arms: no convoy, the shop's Fire")
 end
-test_promote_reads_the_games_answer()
 
 local function test_route_follows_style()
     local opts = { "a", "b", "c" }
@@ -1785,6 +1872,14 @@ do
               usable = false }), 0, "bag: a bow for a lance user goes to the convoy")
     check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "money" }), 0, "bag: money goes")
     check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other" }), 0, "bag: a seal goes")
+    -- a seal or booster its holder can use is kept in hand (Bot.uses spends it): wanted when
+    -- new, and never the one that leaves (fails on main: "a seal or booster" leaves second)
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other", promotes = true }), 4,
+          "bag: a seal its holder can use stays, the gem goes")
+    check(F({ lance(1), heal(), key, { kind = "other", gains = true }, lance(2) }, lance(4)), 1,
+          "bag: a usable booster is kept, the beaten lance goes")
+    check(F({ lance(1), heal(), key, { kind = "other" }, lance(2) }, lance(4)), 4,
+          "bag: a seal it cannot use still goes first")
     -- the convoy full: a discard takes duplicates and low tiers, never money
     check(F({ lance(1), heal(), key, gem, lance(2) }, lance(4), true), 1, "bag: discard the beaten lance")
     check(F({ heal(1), heal(), key, gem, lance(2) }, key, true), 1, "bag: discard a spare heal")
