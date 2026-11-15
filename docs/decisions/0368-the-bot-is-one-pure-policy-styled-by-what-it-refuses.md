@@ -101,6 +101,8 @@ the game rules this record first put here (a level-10 check, a rank comparison):
 - `Bot.promote(unit, items)`: a seal the game accepts for this unit is held. The order is
   `Bot.promoteOrder(units)` (highest level first, ties by slot order); the caller spends a seal
   per true.
+  *Corrected by ADR 0413 (2026-11-14): both are retired; `Bot.uses` plans each seal and booster
+  use (from the bag or the convoy) and `api.use` spends it.*
 - `Bot.route(options, style)`: `style.route` validated as an index into `options` (it raises on
   anything else). `route` joins `Bot.STYLES` as an axis the runner samples, 50/50 per campaign.
 

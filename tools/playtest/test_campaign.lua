@@ -489,6 +489,29 @@ local function test_between_takes_from_the_convoy()
 end
 test_between_takes_from_the_convoy()
 
+-- The shop serves the fielded in roster order, the order Bot.arms reads them in before the
+-- pick, not deploy order: the forced unit in slot 2 is fielded first and still buys second.
+-- Fails on a between() that walks team.deploy.
+local function test_between_serves_the_fielded_in_roster_order()
+    local stock = { { item = 0x6C, price = { 300, 300, 300, 300 }, vulnerary = true } }
+    local needs = { demands = { { id = "sustain", kind = "sustain", need = 1 } },
+                    answers = { [0x01] = { sustain = true } }, strength = {} }
+    local g = fakeGame({ cap = 2, gold = 10000, stock = stock, random = cycle({ 0.1 }),
+                         chapters = { { id = 1, needs = needs } } })
+    local base = g.api.roster
+    g.api.roster = function()
+        local r = base()
+        r[1].forced, r[2].forced = false, true
+        return r
+    end
+    Campaign.run(g.api)
+    check(table.concat(g.deployed[1], ","), "2,1", "deploy order: the forced unit first")
+    local who = {}
+    for _, p in ipairs(g.bought) do who[#who + 1] = p.unit end
+    check(table.concat(who, ","), "1,2", "the shop buys in roster order")
+end
+test_between_serves_the_fielded_in_roster_order()
+
 -- The chapter-start record keeps each item's uses left and the convoy (#510 party plan, PR 1):
 -- a later start can tell a broken tome from a fresh one, and what the convoy holds.
 local function test_the_saved_start_lists_uses_and_the_convoy()

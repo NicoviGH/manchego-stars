@@ -66,6 +66,15 @@ Board.ITEMDATA_STRIDE = 0x24
 local IA_WEAPON = 1 << 0
 -- include/bmunit.h: struct Unit +0x1E u16 items[UNIT_ITEM_COUNT] (id | uses << 8)
 Board.UNIT_ITEMS, Board.ITEM_COUNT = 0x1E, 5
+Board.CONVOY_ITEM_COUNT = 100                   -- bmcontainer.h: the convoy's slots
+
+-- A shallow copy of a table: the one owner (bot.lua, planner.lua and harness.lua copy a unit,
+-- an item, a style or a goal before changing a field of it).
+function Board.copy(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    return out
+end
 
 -- Array bounds are the DECOMP's (bmunit.h: blue[62] / red[50] / green[20]), never the
 -- roster of the day: `blue` once searched 8 for as long as the cast WAS 8, and missed a
@@ -554,7 +563,7 @@ function Board.bind(mem, SYM)
         US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
         US_RESCUING = Board.US_RESCUING, US_RESCUED = Board.US_RESCUED, UNIT_RESCUE = Board.UNIT_RESCUE,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE, UNIT_ITEMS = Board.UNIT_ITEMS,
-        ITEM_COUNT = Board.ITEM_COUNT,
+        ITEM_COUNT = Board.ITEM_COUNT, CONVOY_ITEM_COUNT = Board.CONVOY_ITEM_COUNT, copy = Board.copy,
         BATTLE_REAL = Board.BATTLE_REAL, ACTIONS = Board.ACTIONS,
         ACTION_COMBAT = Board.ACTION_COMBAT, ACTION_STAFF = Board.ACTION_STAFF,
         ACTION_PICK = Board.ACTION_PICK, ACTION_TRAPPED = Board.ACTION_TRAPPED,

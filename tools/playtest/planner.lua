@@ -470,11 +470,7 @@ local function blowsOn(strikes)
     return out
 end
 
-local function copy(t)
-    local out = {}
-    for k, v in pairs(t) do out[k] = v end
-    return out
-end
+local copy = Board.copy
 
 -- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
 -- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
@@ -592,8 +588,7 @@ function M.plan(Bot, board, sight, style, opts)
         if c.by then
             at, late = pos[c.by] or byId[c.by] or g.tile, Goals.GAMMA
         end
-        local moved = {}
-        for k, v in pairs(g) do moved[k] = v end
+        local moved = Board.copy(g)
         moved.tile = { x = at.x, y = at.y }
         return Goals.chance(moved, pos, Goals.GAMMA, turnsTo) * late
     end

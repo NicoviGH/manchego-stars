@@ -3711,18 +3711,17 @@ INSPECT.prepList = function()
 end
 
 -- The convoy's items, { id, uses, index } each (gConvoyItemArray, id | uses << 8; index its
--- slot, from 0). The game keeps the array packed (bmcontainer.c ShrinkConvoyItemList after
--- every removal; AddItemToConvoy fills the first empty slot), so it is read to its first empty
--- slot, at most CONVOY_ITEM_COUNT. Not gConvoyItemCount: convoymenu.c sets that only when its
--- chooser opens, in an EWRAM overlay other screens reuse. The one read: api.snapshot keeps
--- them, api.convoy weighs them, collectedItems looks for a gift among them.
-INSPECT.CONVOY_ITEM_COUNT = 100                 -- bmcontainer.h
+-- slot, from 0), every non-empty one of its CONVOY_ITEM_COUNT slots. The game keeps the array
+-- packed (bmcontainer.c ShrinkConvoyItemList after a removal; AddItemToConvoy fills the first
+-- empty slot), but the read does not lean on it: a gap hides nothing. Not gConvoyItemCount:
+-- convoymenu.c sets that only when its chooser opens, in an EWRAM overlay other screens reuse.
+-- The one read: api.snapshot keeps them, api.convoy weighs them, collectedItems looks for a
+-- gift among them.
 INSPECT.convoyItems = function()
     local out = {}
-    for i = 0, INSPECT.CONVOY_ITEM_COUNT - 1 do
+    for i = 0, BOARD.CONVOY_ITEM_COUNT - 1 do
         local v = ru16(SYM.gConvoyItemArray + i * 2)
-        if v == 0 then break end
-        out[#out + 1] = { id = v & 0xFF, uses = v >> 8, index = i }
+        if v ~= 0 then out[#out + 1] = { id = v & 0xFF, uses = v >> 8, index = i } end
     end
     return out
 end
@@ -4321,13 +4320,14 @@ INSPECT.campaignApi = function(game)
         return nil, "the purchase did not finish within its allowance"
     end
 
-    -- The convoy as Bot.supply weighs it, or nil when the game gives the party none
-    -- (HasConvoyAccess: bmcontainer.c, by chapter). Every convoy item gets the game's facts for
-    -- every unit of the whole roster (MakePrepUnitList's, benched units included, on the map
-    -- too) as `for[charId] = { usable, promotes, gains }`; every non-weapon item in `roster`'s
-    -- bags gets the same `for` and its full kind (unitItemFacts: the key, heal and money reads
-    -- Bot.fullBag weighs when a full bag gives first). A convoy item is only ever taken as a
-    -- weapon, a seal or a booster, so a non-weapon's kind there is "other", as in a bag.
+    -- The convoy as Bot.supply weighs it, and `roster` as it weighs the bags: convoy, roster
+    -- (a copy; the one handed in is not changed), or nil when the game gives the party no
+    -- convoy (HasConvoyAccess: bmcontainer.c, by chapter). Every convoy item gets the game's
+    -- facts for every unit of the whole roster (MakePrepUnitList's, benched units included, on
+    -- the map too) as `for[charId] = { usable, promotes, gains }`; in the copy every non-weapon
+    -- bag item gets the same `for` and its full kind (unitItemFacts: the key, heal and money
+    -- reads Bot.fullBag weighs when a full bag gives first). A convoy item is only ever taken as
+    -- a weapon, a seal or a booster, so a non-weapon's kind there is "other", as in a bag.
     api.convoy = function(roster)
         if INSPECT.gameCalls(function(call) return call(SYM.HasConvoyAccess, {}) end) == 0 then
             return nil
@@ -4358,14 +4358,23 @@ INSPECT.campaignApi = function(game)
                 end
                 return f
             end
-            for _, e in ipairs(roster) do
+            local bags = {}
+            for i, e in ipairs(roster) do
                 local u = byChar[e.charId] or BOARD.find("blue", e.charId)
-                for _, it in ipairs(e.items) do
-                    if it.kind ~= "weapon" and u then
-                        it.kind = facts(u.addr, it, true).kind
-                        it["for"] = forAll(it)
-                    end
+                if not u then
+                    error(string.format("api.convoy: roster unit 0x%02X is in no unit array", e.charId))
                 end
+                local copy = BOARD.copy(e)
+                copy.items = {}
+                for j, it in ipairs(e.items) do
+                    local c = BOARD.copy(it)
+                    if c.kind ~= "weapon" then
+                        c.kind = facts(u.addr, it, true).kind
+                        c["for"] = forAll(it)
+                    end
+                    copy.items[j] = c
+                end
+                bags[i] = copy
             end
             local out = {}
             for _, c in ipairs(items) do
@@ -4375,7 +4384,7 @@ INSPECT.campaignApi = function(game)
                 f["for"] = forAll(c)
                 out[#out + 1] = f
             end
-            return out
+            return out, bags
         end)
     end
 
@@ -4401,15 +4410,17 @@ INSPECT.campaignApi = function(game)
         local u = BOARD.find("blue", a.unit)
         local k = u and slotOf(u.addr, a.item, a.uses)
         if not k then return nil, string.format("0x%02X holds no item 0x%X at %d uses", a.unit, a.item, a.uses) end
-        if #INSPECT.convoyItems() >= INSPECT.CONVOY_ITEM_COUNT then return nil, "the convoy is full" end
+        if #INSPECT.convoyItems() >= BOARD.CONVOY_ITEM_COUNT then return nil, "the convoy is full" end
         local before = count(INSPECT.convoyItems(), a.item, a.uses)
+        local held = count(BOARD.items(u.addr), a.item, a.uses)
         INSPECT.gameCalls(function(call)
             emu:write16(u.addr + BOARD.UNIT_ITEMS + k * 2, 0)
             call(SYM.UnitRemoveInvalidItems, { u.addr })
             call(SYM.AddItemToConvoy, { a.item | (a.uses << 8) })
         end, true)
-        if count(INSPECT.convoyItems(), a.item, a.uses) ~= before + 1 then
-            return nil, "the item did not reach the convoy"
+        if count(INSPECT.convoyItems(), a.item, a.uses) ~= before + 1
+                or count(BOARD.items(u.addr), a.item, a.uses) ~= held - 1 then
+            return nil, "the item did not move from the bag to the convoy"
         end
         log(string.format("supply: 0x%02X gives item 0x%X (%s)", a.unit, a.item, a.why or ""))
         return true
@@ -4423,14 +4434,18 @@ INSPECT.campaignApi = function(game)
         end
         if not at then return nil, string.format("no item 0x%X at %d uses in the convoy", a.item, a.uses) end
         local before = count(BOARD.items(u.addr), a.item, a.uses)
+        local stored = count(INSPECT.convoyItems(), a.item, a.uses)
         local added = INSPECT.gameCalls(function(call)
             if call(SYM.UnitAddItem, { u.addr, a.item | (a.uses << 8) }) == 0 then return false end
             call(SYM.RemoveItemFromConvoy, { at })
             return true
         end, true)
         if not added then return nil, "the bag is full" end
-        if count(BOARD.items(u.addr), a.item, a.uses) ~= before + 1 then
-            return nil, "the item did not reach the bag"
+        -- both sides: a copy into the bag that left the convoy's own in place would pass the
+        -- bag's count alone
+        if count(BOARD.items(u.addr), a.item, a.uses) ~= before + 1
+                or count(INSPECT.convoyItems(), a.item, a.uses) ~= stored - 1 then
+            return nil, "the item did not move from the convoy to the bag"
         end
         log(string.format("supply: 0x%02X takes item 0x%X (%s)", a.unit, a.item, a.why or ""))
         return true

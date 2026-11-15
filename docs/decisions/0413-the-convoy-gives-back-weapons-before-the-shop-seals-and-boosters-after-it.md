@@ -53,12 +53,22 @@ the unit's class has changed.
 arm is read holding that item at its stored uses (`api.needs`), and the shop buys none of that
 type.
 
-**Decision 5: the convoy is read to its first empty slot, not by `gConvoyItemCount`.** ADR
-0412's read took its count from `gConvoyItemCount`, which `convoymenu.c` sets only when the
-send-to-convoy chooser opens, in an overlay other screens reuse. The game keeps the array
-packed, so the read stops at the first empty slot, at most 100. At `lap1d`'s Ch13 start the old
-read listed 8 items and the new one lists 16. That matches the 16 the design comment read from
-the `.ss`.
+The supply and the shop serve the fielded units in roster (slot) order, the order `Bot.arms`
+reads them in; they had served them in deploy order. In deploy order, a forced unit from a
+later slot came first and could take the last item `arms` had given an earlier slot, so a unit
+read as armed went in unarmed. In roster order, fewer units come before each one, so what is
+left for it is never less.
+
+**Decision 5: the convoy is read slot by slot, not by `gConvoyItemCount`.** ADR 0412's read
+took its count from `gConvoyItemCount`, which `convoymenu.c` sets only when the send-to-convoy
+chooser opens, in an overlay other screens reuse. The read now takes every non-empty slot of
+the 100. The game keeps the array packed, but the read does not rely on that. At `lap1d`'s
+Ch13 start the old read listed 8 items and the new one lists 16. That matches the 16 the
+design comment read from the `.ss`.
+
+**Decision 6: the ledger knows the convoy's 100 slots.** A give into a full convoy is not
+planned, so a full convoy never stops a chapter over housekeeping. `api.give` and `api.take`
+each check both sides of the move: the bag and the convoy.
 
 **The record.** Each chapter line gains `supply`, the acts in order:
 `{ act, unit, item, uses, seal, why }`.

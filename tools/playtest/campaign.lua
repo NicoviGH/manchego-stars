@@ -93,10 +93,11 @@
 --   gold(), stock()       the party's gold; the stock of every shop the world map has open
 --                         at this point (bot.lua's stock entries; {} when none)
 --   buy(purchase)         one Bot.shop entry, through the shop screen; true | nil, why
---   convoy(roster)        the convoy's items, each with the game's facts and `for[charId] =
---                         { usable, promotes, gains }` over the roster; it also sets every
---                         roster item's full kind and `for` (Bot.fullBag and Bot.supply weigh
---                         them). nil when the game gives the party no convoy (HasConvoyAccess)
+--   convoy(roster)        convoy, weighed: the convoy's items, each with the game's facts and
+--                         `for[charId] = { usable, promotes, gains }` over the roster, and a
+--                         copy of `roster` whose every non-weapon item has its full kind and
+--                         `for` (Bot.fullBag and Bot.supply weigh them). nil when the game gives
+--                         the party no convoy (HasConvoyAccess)
 --   give(act), take(act)  one Bot.supply / Bot.uses act: the unit's item to the convoy, the
 --                         convoy's item (id and uses) to the unit; true | nil, why
 --   use(act)              the unit uses that item (a seal or a booster) by its Item command;
@@ -257,8 +258,14 @@ local function between(api, style, followed, need, carried)
                 and ("; uncovered: " .. table.concat(team.pick.uncovered, ", ")) or ""))
         local ok, why = api.deploy(team.deploy)
         if not ok then return nil, "deploy: " .. tostring(why) end
-        local by = byCharId(roster)
-        for _, charId in ipairs(team.deploy) do party[#party + 1] = by[charId] end
+        -- the fielded units in roster (slot) order, not deploy order: Bot.arms reads the
+        -- roster's unarmed in that order before the pick, so serving the fielded in the same
+        -- order is what makes a unit it reads armed armed (its docstring)
+        local fielded = {}
+        for _, charId in ipairs(team.deploy) do fielded[charId] = true end
+        for _, u in ipairs(roster) do
+            if fielded[u.charId] then party[#party + 1] = u end
+        end
     else
         party = roster
         for _, u in ipairs(roster) do team.deploy[#team.deploy + 1] = u.charId end
@@ -268,7 +275,9 @@ local function between(api, style, followed, need, carried)
     -- Each step re-reads the bags: a take, a give or a purchase changes what a unit holds.
     local function fieldedNow(withConvoy)
         local now = api.roster()
-        local convoy = withConvoy and api.convoy(now) or nil
+        local convoy, weighed
+        if withConvoy then convoy, weighed = api.convoy(now) end
+        now = weighed or now
         local by = byCharId(now)
         local out = {}
         for _, u in ipairs(party) do out[#out + 1] = by[u.charId] or u end
@@ -392,8 +401,8 @@ function M.run(api)
             local need
             if cap then
                 local roster0 = api.roster()
-                need = api.needs(roster0, Bot.arms(api.gold(), api.stock(), roster0,
-                    api.convoy(roster0) or {}))
+                local convoy0 = api.convoy(roster0)   -- its weapons only: Bot.arms weighs no bag kind
+                need = api.needs(roster0, Bot.arms(api.gold(), api.stock(), roster0, convoy0 or {}))
             end
             entry.demands = need and need.demands or nil
             local tried, remembered, known = {}, {}, {}
