@@ -429,9 +429,14 @@ local function score(act, st, W, style, odds)
         fx.wall = { at = at, hp = hp - act.obstacle.blow.dealt }
         fx.blocked = hp <= 0
         if fx.wall.hp <= 0 then fx.opened = at end
-    elseif act.obstacle or act.act == "door" or act.act == "supply" then
-        -- a door's opening, a wall's strike, or the convoy's door key taken when no one
-        -- fielded can open a door (bot.lua supplyKey): each is the act that opens the way
+    elseif act.act == "supply" then
+        -- the convoy's door key taken when no one fielded can open the door on the way
+        -- (bot.lua supplyKey): the act that opens the way, as a door's opening or a wall's
+        -- strike is. The convoy holds that one key: a second Take of it in the plan is no act
+        v = v + W.breach
+        fx.took = "convoy:" .. act.item .. "x" .. act.uses
+        fx.blocked = st.took[fx.took] == true
+    elseif act.obstacle or act.act == "door" then
         v = v + W.breach
         if act.door then fx.opened = act.door.x .. "," .. act.door.y end
     elseif act.act == "seize" then

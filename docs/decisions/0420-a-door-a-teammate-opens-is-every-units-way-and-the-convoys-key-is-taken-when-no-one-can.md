@@ -26,26 +26,40 @@ traces; every claim below was checked against the run.
 **Decision.**
 - **Escort (`bot.lua`).** A locked door a living teammate opens (`doorMates`: one holding the
   means, `opener`) is a way for every unit, since the game opens the door's whole map change.
-  A unit's turns to it (`escortTurns`) are the later of its own walk there and the soonest
-  opener's, so no unit gains ground by running ahead of the one who opens it. Doors only: a
-  chest pays only its opener. A teammate who would fetch a key from an enemy is not counted,
-  since asking that teammate's way would ask this unit's way back.
-- **The convoy's key (`supplyKey`).** When a door is locked to a unit, no fielded unit opens
-  doors, and the convoy holds an item that would let it open one (`sight.convoyKey`, the game's
-  own key check), it is offered Supply from the least exposed tile the game enables it on.
+  - The door is listed only when a teammate has a way to it (`mateTurns`). A key holder cut off
+    from the door opens nothing, and a wall the unit can strike stays its way.
+  - A unit's turns to it (`escortTurns`) are the later of its own walk there and the soonest
+    opener's, so no unit gains ground by running ahead of the one who opens it.
+  - When an enemy also drops a key for it, the sooner of the two ways counts.
+  - Doors only: a chest pays only its opener.
+  - A teammate who would fetch a key from an enemy is not counted, since asking that teammate's
+    way would ask this unit's way back.
+- **The convoy's key (`supplyKey`).** A unit is offered Supply when a door locked to it stands on
+  its way (`lockedOnWay`: it is cut off from its goal, walks to the door, and the door opens
+  onto the goal's ground), no fielded unit opens doors, and the convoy holds an item that would
+  let it open the door (`sight.convoyKey`, the game's own key check). It goes to the safest tile
+  the game enables Supply on (`safest`).
   - The plan credits the Take as the act that opens the way (the breach weight, the same one
-    as a door's opening or a wall's strike).
+    as a door's opening or a wall's strike). The convoy's one key is taken once per plan: a
+    second Take of it is no act.
   - The harness checks that the game's menu offers Supply, takes the item with the screen's own
     container calls (`INSPECT.takeFromConvoy`, lifted out of the campaign api's `take` so both
     use one copy), then waits. The game would let the unit act on after the Take; the plan
     models only the Wait.
-  - `sight.legal` asks `SupplyUsability` and the convoy key again for a kept plan.
+  - `sight.legal` asks `SupplyUsability` again for a kept plan, and asks that the key the act
+    names is still the convoy's. A forced diagnostic replay fills the act's item from the
+    convoy (`botrun` `forcedAct`).
 
 **Proof.**
-- **Unit tests** (`test_bot.lua`, "escort:" and "supply:"). Each fails without its part: the
-  escort's 2 checks without the escort; the offer's 2 without `supplyKey`; the value check
-  without the planner's credit. Without that credit the plan picked Supply only by an
-  alphabetical tie with Wait.
+- **Unit tests** (`test_bot.lua` "escort:" and "supply:"; `test_sight.lua` "convoyKey:" and
+  "legal:"). Every positive check fails without its part:
+  - the escort's two turns checks without the escort;
+  - the offer's two without `supplyKey`;
+  - the value check without the planner's credit (without it the plan picked Supply only by an
+    alphabetical tie with Wait);
+  - the review's four (a door no teammate reaches, a door off the way, one Take a plan, the
+    sooner way) on the code before the review;
+  - the `convoyKey` ones without `Sight.convoyKey`.
 - **Runs** (2 attempts each from the lap's saved starts, tag `door2`).
   - Eirika's Ch10, attempt 2: won in 27 turns, where it was stuck before. Gilliam opened the
     door on turn 23.

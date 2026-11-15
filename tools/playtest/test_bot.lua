@@ -2337,6 +2337,24 @@ do
     a, k = wayOf(1, true)
     check(a ~= nil and k ~= nil and a > k + 1e-9, true, "escort: A's own walk when it is the later")
     check(wayOf(8, false), nil, "escort: with no one to open it, the locked door is no way")
+    -- an enemy far off drops a Door Key too (8 turns there, 8 back): the opener's way is the
+    -- sooner, so A's turns are still K's (review of PR #628: the key's way was taken whenever
+    -- there was one)
+    local D = red(0x82, 0, 9, { minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["0,1"] = 8,
+                                       ["0,9"] = 40 },
+                           ["0,9"] = { ["0,0"] = 40, ["0,9"] = 0 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x02] = true },
+        locked = { [0x01] = { ["2,0"] = "door" } }, keySources = { door = { D } },
+    }
+    local _, ctx = B.candidates(boardOf(A, K, E, D), sightOf(o), style("careful"))
+    local ka, kk = ctx.turnsTo(A, { x = 4, y = 0 }), ctx.turnsTo(K, { x = 4, y = 0 })
+    check(ka ~= nil and near(ka, kk), true,
+          "escort: the opener's way when it is sooner than a key's (" .. tostring(ka) .. ")")
 end
 
 -- test_the_convoys_door_key_is_taken_when_no_one_can_open_the_door (#510, vanilla Ch10 on
@@ -2389,6 +2407,71 @@ do
     check(took ~= nil and waited ~= nil and took > waited, true,
           "supply: valued above the wait on its tile (" .. tostring(took) .. " vs "
           .. tostring(waited) .. ")")
+end
+
+-- test_a_door_no_teammate_can_reach_is_no_way (review of PR #628): A is cut off by the wall
+-- at (2,0), which is also a door locked to A; K holds a key but has no way to that door. The
+-- door is no way for A, so A still strikes the wall (listing it for any key holder at all sent
+-- A at a door no one could open).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local K = blue(0x02, 1, 0, 5)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = { { x = 2, y = 0, hp = 20 } }, doors = { { x = 2, y = 0 } },
+        openers = { [0x02] = true }, locked = { [0x01] = { ["2,0"] = "door" } },
+    }
+    local p = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    local struck = false
+    for _, c in ipairs(p) do
+        if c.unit.id == 0x01 then
+            for _, a in ipairs(c.acts) do
+                if a.act == "attack" and a.obstacle then struck = true end
+            end
+        end
+    end
+    check(struck, true, "escort: a door no teammate can reach leaves the wall A's way")
+end
+
+-- test_supply_only_for_a_door_on_the_way_and_one_take_a_plan (review of PR #628): a locked door
+-- that is not on A's way (A walks to the boss) offers no Supply; and with the key's Take
+-- offered to two units, no plan takes the one key twice.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 0, 1)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local key = { [0x01] = { id = 0x6A, uses = 1 }, [0x02] = { id = 0x6A, uses = 1 } }
+    local walkable = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = FROM_WALL, ["2,5"] = { ["0,0"] = 7, ["2,5"] = 0 } },
+        obstacles = {}, doors = { { x = 2, y = 5 } }, convoyKey = key,
+        locked = { [0x01] = { ["2,5"] = "door" } }, supplyAt = { ["1,0"] = true },
+    }
+    local offered = false
+    for _, c in ipairs(B.candidates(boardOf(A, E), sightOf(walkable), style("careful"))) do
+        for _, a in ipairs(c.acts) do if a.act == "supply" then offered = true end end
+    end
+    check(offered, false, "supply: not for a door off the unit's way")
+    local o = {
+        convoyKey = key, objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0,
+                                                             ["0,1"] = 3, ["1,1"] = 2 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } },
+        locked = { [0x01] = { ["2,0"] = "door" }, [0x02] = { ["2,0"] = "door" } },
+        supplyAt = { ["1,0"] = true, ["1,1"] = true },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, E), sightOf(o), style("careful"))
+    local both, any = false, false
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local k = table.concat(c.acts, " ")
+        local _, n = k:gsub(">supply@", "")
+        if n > 0 then any = true end
+        if n > 1 then both = true end
+    end
+    check(any and not both, true, "supply: a plan takes the convoy's one key once")
 end
 
 -- test_a_gate_two_doors_deep_opens_as_one: the doors at (2,0) and (3,0) are one map change
