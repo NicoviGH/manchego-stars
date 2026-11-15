@@ -289,16 +289,13 @@ M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
 
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
 local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
-             statusOut = 0x6F, hpInitial = 0x72, weaponBroke = 0x7D }
+             statusOut = 0x6F, hpInitial = 0x72, nonZeroDamage = 0x7C, weaponBroke = 0x7D }
 -- include/bmunit.h UNIT_STATUS_PETRIFY and UNIT_STATUS_13: the two statuses a blow sets that
 -- end the battle like a death (BattleGenerateHit)
 local STATUS_PETRIFY, STATUS_13 = 11, 13
 -- struct BattleUnit is 0x80 bytes; its word at +0x10 holds xPos, yPos (the low half), maxHP
 -- and curHP. struct BattleStats: +00 config and +02 range share its first word.
 local BU_SIZE, BU_POSITION, POSITION_BITS = 0x80, 0x10, 0xFFFF
--- A battle unit's copy of its Unit's curHP (+00 the Unit, its +13), and +7C nonZeroDamage:
--- whether the side's blows dealt any damage. GetBattleUnitExpGain reads both.
-local BU_HP, BU_NONZERO_DAMAGE = 0x13, 0x7C
 -- The AI's two bytes on a unit the enemy phase's start rewrites (M.battleWord): +0A aiFlags,
 -- the third byte of the word at +08 (level, exp, aiFlags, index), and +46 ai_counter, the
 -- third of the word at +44 (ai2, ai_b_pc, ai_counter).
@@ -686,6 +683,25 @@ function M.exchangeOf(leaves)
         return a.back < b.back
     end)
     return dealt, back, joint
+end
+
+-- What the exchange just simulated teaches the actor, by the game's own count
+-- (GetBattleUnitExpGain, bmbattle.c: BattleApplyExpGains awards it after a real battle; a
+-- simulation never calls it): its experience when its blows deal nothing, when they deal
+-- damage, and when they kill. The count tells the three apart by two fields only, the actor's
+-- nonZeroDamage and the target's HP (the Unit sits at +00 of a battle unit, so its curHP is
+-- UNIT_HP there too), so each read sets those two on the simulation's battle units, the actor
+-- alive: a dead one gains nothing, which the planner reads off the exchange's ways. Which of
+-- the three a plan gets is the planner's, at the HP the plan leaves the target. Inside a
+-- sandbox, on the plain simulation (ADR 0414).
+function M.expOf(api, call, S)
+    api.write8(S.gBattleActor + UNIT_HP, 1)
+    local function count(damaged, hp)
+        api.write8(S.gBattleActor + BU.nonZeroDamage, damaged)
+        api.write8(S.gBattleTarget + UNIT_HP, hp)
+        return call(S.GetBattleUnitExpGain, { S.gBattleActor, S.gBattleTarget })
+    end
+    return { none = count(0, 1), hit = count(1, 1), kill = count(1, 0) }
 end
 
 -- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
@@ -1810,24 +1826,6 @@ function M.new(outer)
         return table.concat(parts, ":")
     end
 
-    -- What the exchange just simulated teaches the actor, by the game's own count
-    -- (GetBattleUnitExpGain, bmbattle.c: BattleApplyExpGains awards it after a real battle; a
-    -- simulation never calls it): its experience when its blows deal nothing, when they deal
-    -- damage, and when they kill. The count tells the three apart by two fields only, the
-    -- actor's nonZeroDamage and the target's HP, so each read sets those two on the
-    -- simulation's battle units (the actor alive: a dead one gains nothing, which the planner
-    -- reads off the exchange's ways). Which of the three a plan gets is the planner's, at the
-    -- HP the plan leaves the target.
-    local function expOf(call)
-        api.write8(S.gBattleActor + BU_HP, 1)
-        local function count(damaged, hp)
-            api.write8(S.gBattleActor + BU_NONZERO_DAMAGE, damaged)
-            api.write8(S.gBattleTarget + BU_HP, hp)
-            return call(S.GetBattleUnitExpGain, { S.gBattleActor, S.gBattleTarget })
-        end
-        return { none = count(0, 1), hit = count(1, 1), kill = count(1, 0) }
-    end
-
     -- `teaches`: our unit is the actor, so the exchange also reads its experience (expOf)
     local function exchange(call, proc, sim, teaches)
         call({ sim, { S.InitBattleForecastBattleStats, { proc } } })
@@ -1836,16 +1834,18 @@ function M.new(outer)
         side.killsTarget = mem.u8(S.gBattleTarget + UNIT_HP) == 0
         local key = battleKey()
         local known = playedBy[key]
+        -- the count first, on the plain simulation the key was read from: the played ways run
+        -- it again and again and leave the last way's battle units behind. Read whenever the
+        -- key's entry lacks it, so an entry a non-teaching read made first is filled in
+        local exp = known and known[4]
+        if teaches and not exp then exp = M.expOf(api, call, S) end
         if not known then
-            -- the count first, on the plain simulation the key was read from: the played ways
-            -- run it again and again and leave the last way's battle units behind
-            local exp = teaches and expOf(call) or nil
             known = { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
                 return lost(S.gBattleTarget), lost(S.gBattleActor)
             end)) }
-            known[4] = exp
             playedBy[key] = known
         end
+        known[4] = exp
         side.dealt, side.back, side.joint, side.exp = known[1], known[2], known[3], known[4]
         return side
     end

@@ -2660,5 +2660,23 @@ do
     check(lines(ls), "1:||1 2:||2", "wall: a blow with no `dealt` marks no event")
 end
 
+-- taughtMiss (ADR 0414): the plan's experience read against the real battle's, case by case.
+-- Seth's prologue kill read none 1 / hit 4 / kill 4 and the battle gave 4 (tag exp1).
+do
+    local x = { none = 1, hit = 10, kill = 34 }
+    local function fight(actorHp, targetHp, exp, hits)
+        return { actor = { hp = actorHp, exp = exp }, target = { hp = targetHp }, hits = hits or {} }
+    end
+    local landed = { { by = "actor", miss = false, dmg = 7 } }
+    check(Botrun.taughtMiss(x, fight(20, 0, 34, landed)), nil, "taughtMiss: a kill read right")
+    check(Botrun.taughtMiss(x, fight(20, 5, 10, landed)), nil, "taughtMiss: a hit read right")
+    check(Botrun.taughtMiss(x, fight(20, 12, 1, { { by = "actor", miss = true, dmg = 0 },
+                                                  { by = "target", miss = false, dmg = 5 } })),
+          nil, "taughtMiss: blows that dealt nothing read right, the counter's not ours")
+    check(Botrun.taughtMiss(x, fight(0, 12, 0, landed)), nil, "taughtMiss: a dead actor gains 0")
+    local m = Botrun.taughtMiss(x, fight(20, 0, 40, landed))
+    check(m and (m.case .. " " .. m.read .. " " .. m.gave), "kill 34 40", "taughtMiss: a wrong read is named")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

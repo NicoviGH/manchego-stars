@@ -534,6 +534,25 @@ M.DECISION_FRAMES = 4000000
 -- changes the chapter, and #510 call 3 (comment 6810567866) asked for the same three here.
 M.GOAL_QUIET = 3
 
+-- Whether the experience the plan read for an attack (`taught`: the game's count for none /
+-- hit / kill, sight's expOf) is what the real battle (`battle`, Board.battle) awarded its actor:
+-- nil when it is, else { case, read, gave }. The case is the battle's: its actor dead (the count
+-- is 0), its target dead, any blow of the actor's that dealt damage, else none. ADR 0414.
+function M.taughtMiss(taught, battle)
+    local a, t = battle.actor, battle.target
+    local case = "none"
+    if a.hp == 0 then case = "dead"
+    elseif t.hp == 0 then case = "kill"
+    else
+        for _, h in ipairs(battle.hits) do
+            if h.by == "actor" and not h.miss and h.dmg > 0 then case = "hit" end
+        end
+    end
+    local read = case == "dead" and 0 or taught[case]
+    if read == a.exp then return nil end
+    return { case = case, read = read, gave = a.exp }
+end
+
 -- A run's player acts as one number, folded act by act (FNV-1a, 32 bits): who, what, where,
 -- on whom (the target's unit slot too: generic enemies share a charId). Equal on two attempts of one start means the same game was played twice. `h` is the
 -- hash so far (nil at the start) -> the hash with `a` added.
@@ -1615,6 +1634,13 @@ function M.run(api)
                     end
                 end
                 local battle = not trapped and action.act == "attack" and api.battle and api.battle() or nil
+                local taught = battle and action.f and action.f.exp
+                local miss = taught and M.taughtMiss(taught, battle)
+                if miss then
+                    -- the plan's experience read is not the game's: the term scored a wrong number
+                    anomaly({ kind = "taught_miss", turn = turn, charId = battle.actor.charId,
+                              case = miss.case, read = miss.read, gave = miss.gave })
+                end
                 local after = api.board()
                 sight.refresh()
                 before = board
@@ -1630,9 +1656,9 @@ function M.run(api)
                         from = from and { x = from.x, y = from.y },
                         to = trapped and actor and { x = actor.x, y = actor.y } or action.move,
                         canto = action.canto, act = action.act, target = action.target, battles = { battle },
-                        -- the game's count the plan read for the attack (none / hit / kill), to
-                        -- check against the battle's own exp (its actor's)
-                        taught = action.f and action.f.exp,
+                        -- the game's count the plan read for the attack (none / hit / kill);
+                        -- M.taughtMiss checks it against the battle's own exp
+                        taught = taught or nil,
                         fell = fell, trapped = trapped or nil })
                 changes(after)
                 playerActs = M.actsHash(playerActs, action)

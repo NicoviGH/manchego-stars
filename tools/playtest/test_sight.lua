@@ -775,8 +775,12 @@ do
           true, "aiPhaseStart: a strike's start is kept by the HPs and states it was read on")
     -- an HP written inside a simulated phase goes through wound(), which marks the heal flags
     -- stale for the deciding side: the staging's two writes come before the phase's order,
-    -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated)
-    local _, writes = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
+    -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
+    -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf)
+    local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
+    local _, onBattle = src:gsub("api%.write8%(S%.gBattle%a+ %+ UNIT_HP,", "")
+    local writes = all - onBattle
+    check(onBattle, 2, "aiPhaseStart: the battle units' HP is written only by the experience count")
     local _, wounds = src:gsub("\n%s+wound%(", "")
     check(writes == 4 and wounds == 2
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
@@ -1453,6 +1457,28 @@ do
     check(ran, 2, "watched: the refused call ran no frame")
     set(nil)
     check(cpu.frames(), true, "watched: unset, the call runs again")
+end
+
+-- M.expOf (ADR 0414): the game's GetBattleUnitExpGain called three times on the simulation's
+-- battle units, the actor alive, each call after nonZeroDamage (+7C) and the target's curHP
+-- (+13) are set to its case: none (0, alive), hit (1, alive), kill (1, 0 HP).
+do
+    local S = { gBattleActor = 0x0203A4EC, gBattleTarget = 0x0203A56C,
+                GetBattleUnitExpGain = 0x0802B900 }
+    local mem = {}
+    local api = { write8 = function(a, v) mem[a] = v end }
+    local seen = {}
+    local function call(addr, args)
+        check(addr, S.GetBattleUnitExpGain, "expOf: calls the game's count")
+        check(args[1] == S.gBattleActor and args[2] == S.gBattleTarget, true,
+              "expOf: on the simulation's actor and target")
+        local damaged, hp = mem[S.gBattleActor + 0x7C], mem[S.gBattleTarget + 0x13]
+        seen[#seen + 1] = damaged .. "/" .. hp .. "/" .. mem[S.gBattleActor + 0x13]
+        return damaged == 0 and 1 or hp == 0 and 40 or 12
+    end
+    local x = Sight.expOf(api, call, S)
+    check(table.concat(seen, " "), "0/1/1 1/1/1 1/0/1", "expOf: each case's fields, the actor alive")
+    check(x.none == 1 and x.hit == 12 and x.kill == 40, true, "expOf: each case's count")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

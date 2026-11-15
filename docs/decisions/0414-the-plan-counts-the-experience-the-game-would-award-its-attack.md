@@ -26,7 +26,7 @@ experience (9) weigh as much as a 0.9% death chance (1000 × 0.009).
 
 **Decision 2: the count is read in the sandbox, three ways an exchange.** The forecast's
 simulation does not award experience: only `BattleApplyExpGains` does, after a real battle.
-So after the plain simulation, `sight.lua`'s `expOf` calls `GetBattleUnitExpGain` on the
+So after the plain simulation, `Sight.expOf` calls `GetBattleUnitExpGain` on the
 simulation's battle units three times. The count tells outcomes apart by two fields only: the
 actor's `nonZeroDamage` and the target's HP. Each call sets those two, for blows that deal
 nothing (`none`), blows that deal damage (`hit`) and a kill (`kill`). The actor's HP is set to
@@ -41,8 +41,12 @@ unit teaches nothing. A way that deals at least the HP the plan leaves the targe
 Any other damage is a hit; no damage is `none`. So when an earlier blow of the plan chips the
 target, the kill belongs to the unit that finishes it, and the plan can choose who that is.
 
-**The record.** Each player-phase act in the trace gains `taught`: the three numbers the plan
-read. That lets a run check them against the battle's own `exp` (its actor's).
+**The record.** Each player-phase attack in the trace gains `taught`: the three numbers the
+plan read. Every run checks them against the battle's own `exp` (its actor's):
+`Botrun.taughtMiss` takes the case from the battle (actor dead, target dead, a blow of the
+actor's that dealt damage, else none), and a read that differs is an anomaly, `taught_miss`,
+on the attempt's record, which the report prints. The read is stored with the exchange's
+played ways, and is filled in whenever a teaching read finds the key's entry without it.
 
 **What it proved.** `lap1d`'s prologue and Ch1 starts, one attempt each (tag `exp1`). Both
 were won clean, in 2 and 6 turns. All 7 player attacks matched: in each one, the read for the
@@ -52,10 +56,13 @@ Gilliam (0x03) and Franz).
 
 **Cost.** Three short game calls a new exchange; a memo hit costs nothing more. The prologue
 played on main (tag `exp1ctl`) and on this branch (tag `exp1b`), back to back, gave the same
-acts (`acts_hash` cb9c483f). It took 3,055 frames on main and 3,079 on the branch. The slowest
-decision took 414 and 432.
+acts (`acts_hash` cb9c483f). It took 3,055 frames on main and 3,079 on the branch, and 4.42
+and 4.46 CPU seconds. The slowest decision took 414 and 432. After the review's fixes the
+prologue and Ch1 played the same acts and frames again (tag `exp1c`), with no `taught_miss`.
 
-**Unit tests** (`test_bot.lua`). Of two sure kills, the unit the kill teaches more takes it.
+**Unit tests** (`test_bot.lua`, `test_sight.lua`, `test_botrun.lua`). `Sight.expOf` sets
+each case's two fields and calls the game's count on the battle units; `taughtMiss` reads each
+case off a battle and names a wrong read. Of two sure kills, the unit the kill teaches more takes it.
 On a target neither kills alone, the plan chips with the unit that learns less, so the other
 finishes. Both fail on main's code. Two guards pass on both: a unit that cannot gain levels
 adds nothing to its plan's value, and experience never takes a plan over the cap.
