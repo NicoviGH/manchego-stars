@@ -205,6 +205,8 @@
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff,
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
+--   salve(u)                 whether `u` holds such an item at all, whatever its HP (the
+--                            planner's wear, #510 prototype): mend() offers none at full HP.
 --   obstacles()              every obstacle the Attack command can strike, as
 --                            TryAddTrapsToTargetList (bmtarget.c) lists them from the trap pool:
 --                            a TRAP_OBSTACLE's damaged wall at its tile, or the tile below where
@@ -2777,6 +2779,20 @@ function M.new(outer)
                 end
             end
             return nil
+        end) end)
+    end
+
+    -- Whether `u` holds a heal it may use on itself (a Vulnerary, an Elixir), whatever its HP
+    -- now: the item s.mend offers once it is hurt (CanUnitUseItem refuses one at full HP).
+    function s.salve(u)
+        return mine("salve", u, function() return sandbox(function(call)
+            for _, it in ipairs(u.items) do
+                if call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) > 0
+                    and call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) == 0 then
+                    return true
+                end
+            end
+            return false
         end) end)
     end
 

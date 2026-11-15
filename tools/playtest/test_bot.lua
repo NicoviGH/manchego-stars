@@ -430,6 +430,9 @@ local function sightOf(o)
     if o.staves then s.staves = function(u) return o.staves[u.id] or {} end end
     if o.heals then s.heals = function(u, x, y) return (o.heals[u.id] or {})[x .. "," .. y] or {} end end
     if o.mend then s.mend = function(u) return o.mend[u.id] end end
+    -- who holds a heal of its own, whatever its HP (sight.salve); a fixture that names none
+    -- has no read, and the planner reads no wear
+    if o.salve then s.salve = function(u) return o.salve[u.id] == true end end
     -- the fog read's strike (sight.strike with `from`, the fog's edge): o.fogStrike(u, e, x, y,
     -- fx, fy) answers it; a strike with no `from` is the fake's own
     if o.fogStrike then
@@ -6931,6 +6934,78 @@ do
     check(table.concat(ids, ","), "2", "held: an asleep or berserked unit is offered no act")
 end
 
+-- A (27 HP unless given) at (0,0) is pulled to (1,0) toward a village. An enemy strikes
+-- whoever stands on (1,0) for 12, every blow landing, in the next enemy phase and in the one
+-- after it. `o` adds to the sight: who holds a heal of its own, and who a staff.
+local function wears(hp, o, ...)
+    local A = blue(0x01, 0, 0, 0, { hp = hp or 27, minRange = false })
+    local X = red(0x81, 0, 9, { minRange = false })
+    local function strikes(plan)
+        for _, b in ipairs(plan.blues) do
+            if b.x == 1 and b.unit.id == 0x01 then
+                return { { target = b.unit.id, takenHit = 100, takenDmg = 12, takenHits = 1,
+                           takenCrit = 0 } }
+            end
+        end
+        return {}
+    end
+    local so = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function(t)
+            return t.x == 9 and t.y == 0 and { [0] = { [0] = 40, [1] = 20 } } or nil
+        end,
+        explorable = { { x = 9, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["9,0"] = "visit" } },
+        enemyPhase = strikes, nextPhase = strikes, salve = {},
+    }
+    for k, v in pairs(o or {}) do so[k] = v end
+    return boardOf(A, X, ...), sightOf(so), gifted("careful", 1000)
+end
+
+-- test_a_struck_unit_no_heal_reaches_is_judged_on_three_phases (#510, prototype): one blow of
+-- 12 a phase never kills 27 HP in the phase the cap reads, so the march into reach read 0 and
+-- was played; with no heal of the army's able to reach the unit its HP carries, and the third blow
+-- kills. The cap reads the three phases (the second played by sight.nextPhase, the third taken
+-- as the second again), and the unit stays out of reach.
+do
+    local board, sight, st = wears()
+    local a, plan, cost = Planner.plan(B, board, sight, st)
+    check(at(a), "0,0", "wear: three blows of 12 on 27 HP, no heal in reach: A stays out")
+    local march
+    for _, c in ipairs(plan.considered) do
+        if c.acts[1] == "1>wait@1,0>nil" then march = c end
+    end
+    check(march ~= nil and march.rank.admitted, false, "wear: the march into reach is over the cap")
+    check(march and march.rank.max_die, 1, "wear: the third blow's sure death")
+    check(march and march.rank.first_max_exceed, 0, "wear: the next phase's own reading is kept")
+    check(cost.look.wear > 0, true, "wear: its second phases are counted")
+    check(cost.look.calls, 0, "wear: outside the lookahead's budget")
+    check(plan.lookahead.calls, 0, "wear: the plan's lookahead made no call")
+
+    -- 40 HP outlasts three blows: no death in them, the march goes
+    board, sight, st = wears(40)
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "wear: 40 HP outlasts three blows of 12")
+
+    -- a heal of its own: its HP does not carry, the next phase alone is read
+    board, sight, st = wears(27, { salve = { [0x01] = true } })
+    a, plan, cost = Planner.plan(B, board, sight, st)
+    check(at(a), "1,0", "wear: a unit holding its own heal is read on the next phase")
+    check(cost.look.wear, 0, "wear: no second phase asked for it")
+
+    -- a staff of the army's one turn away: the same
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    board, sight, st = wears(27, { staves = { [0x02] = { { slot = 0, amount = 10 } } },
+                                   reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
+                                             [0x02] = tiles({ 0, 1 }) } }, H)
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "wear: a staff within a turn, the march goes")
+
+    -- that staff too far to reach it next turn (MOV 5, 13 tiles off): A stays out again
+    H = blue(0x02, 1, 14, 0, { minRange = false })
+    board, sight, st = wears(27, { staves = { [0x02] = { { slot = 0, amount = 10 } } },
+                                   reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
+                                             [0x02] = tiles({ 14, 0 }) } }, H)
+    check(at(Planner.plan(B, board, sight, st)), "0,0", "wear: a staff two turns off is no heal in reach")
+end
 
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)

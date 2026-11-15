@@ -702,8 +702,9 @@ function M.run(api)
                   board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
+                  -- and the wear's own calls and CPU (#510, prototype), outside that budget
                   lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
-                                calls = 0, cpu_s = 0 },
+                                calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0 },
                   seize_skips = {}, stall_events = {}, anomalies = {},
                   -- the experience reads checked against the game's award (ADR 0414), per kind:
                   -- a pass with none checked proves nothing

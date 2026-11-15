@@ -93,7 +93,9 @@
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
--- lookahead's second phase's chance, when extended; `die` then counts both) }, lookahead =
+-- lookahead's second phase's chance, when extended; `die` then counts both), wear (what the
+-- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
+-- read: #510 prototype, M.WEAR; `die` counts it) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
 -- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, mend_rounds =
 -- { before, now } (whether a plan judged without the mend's later rounds was under the cap,
@@ -195,6 +197,9 @@ M.DUST = Goals.DUST
 -- (#570)
 M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
+-- the wear (#510, prototype): the most enemy phases a unit's HP is carried over while no heal
+-- of the army's can reach it
+M.WEAR = 3
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
@@ -1121,7 +1126,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
-                            calls = 0, cpu_s = 0 } }
+                            calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0 } }
     -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
@@ -1421,6 +1426,30 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             hitOf[i] = inWay(hit, w, function(u) return u.id end, "back")
         end
+        -- The wear (#510, prototype): whether a heal of the army's can reach a unit of the plan
+        -- before the enemy phase after the next. None can when it holds none of its own
+        -- (sight.salve) and no staff of the army's gets beside it next turn, by the game's turns
+        -- from where the plan leaves the healer. Its HP then carries from phase to phase.
+        local plannedBy, unhealed = {}, {}
+        for _, p in ipairs(planned) do plannedBy[p.unit.id] = p end
+        -- -> the enemy phases the unit meets before a heal of the army's can reach it: 1 when one
+        -- reaches it next turn, M.WEAR at most
+        local function carries(id)
+            if unhealed[id] ~= nil then return unhealed[id] end
+            local p, n = plannedBy[id], 1
+            if p ~= nil and sight.salve ~= nil and turnsTo ~= nil and not sight.salve(p.unit) then
+                n = M.WEAR
+                for _, q in ipairs(planned) do
+                    if q ~= p and sight.staves and #sight.staves(q.unit) > 0 then
+                        local t = turnsTo(q.unit, { x = p.x, y = p.y }, { x = q.x, y = q.y })
+                        local mov = sight.mov and sight.mov(q.unit) or 1
+                        if t and t - 1 / mov <= 1 + M.DUST then n = 1 end
+                    end
+                end
+            end
+            unhealed[id] = n
+            return n
+        end
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             for _, u in ipairs(hitOf[o.way]) do
@@ -1511,6 +1540,14 @@ function M.plan(Bot, board, sight, style, opts)
         st.goalWorth = {}
         judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell) + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
+        -- the units the phase strikes that no heal of the army's reaches after it, in id order
+        st.worn, st.wearFor = {}, {}
+        for _, p in ipairs(planned) do
+            if (struck[p.unit.id] or 0) > 0 and carries(p.unit.id) > 1 then
+                st.worn[#st.worn + 1] = p.unit.id
+                st.wearFor[p.unit.id] = carries(p.unit.id)
+            end
+        end
         st.judged = judged
         st.strikes = strikes
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
@@ -1744,10 +1781,76 @@ function M.plan(Bot, board, sight, style, opts)
         local function r4(x) return math.floor(x * 1e4 + 0.5) / 1e4 end
         return { base = r4(st.base), max_die = r4(most), sum_die = r4(sum) }
     end
+    -- The wear (#510, prototype): a unit the judged phase strikes that no heal of the army's reaches
+    -- before the phase after it (judge's st.worn) is read on M.WEAR enemy phases, its HP
+    -- carried from each into the next. The second is played by the game's AI, our units
+    -- holding between (sight.nextPhase); each one past it is taken as the second again. Its
+    -- chance to die is that of dying in any of them: every way the first phase's strikes on
+    -- it go (the likeliest way's strikes, st.strikes), then the later ones' on what is left.
+    -- Only such a unit takes the later phases here: for any other the turn between can
+    -- restore it, and the hold is no reading (ADR 0389's amendment of 2026-11-08). One
+    -- sight.nextPhase call a plan, counted beside the lookahead's and outside its budget.
+    -- The mend does not try such a unit's other acts for the wear alone: tried, it lost
+    -- vanilla Ch5x's two chests and its clean clear (runs wr5 and wn5, #510).
+    local wearCalls, wearCpu = 0, 0
+    local function wear(st)
+        if not (sight.nextPhase and st.worn and #st.worn > 0) or seizesIn(st) then return end
+        local clock = os.clock()
+        local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
+                                    reds = st.phase.reds, opened = st.phase.opened,
+                                    carry = st.phase.carry })
+        wearCalls = wearCalls + 1
+        local worn, units = {}, {}
+        for _, id in ipairs(st.worn) do worn[id] = true end
+        for _, u in ipairs(st.phase.hit) do
+            if worn[u.id] then units[#units + 1] = u end
+        end
+        local one = struckIn(st.strikes, units)
+        local both = {}
+        for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
+            for _, u in ipairs(units) do
+                -- the phases past the second: the second's strikes on it again, each only
+                -- while its striker has outlived our counters before it
+                local all = {}
+                for _, s in ipairs(st.strikes) do all[#all + 1] = s end
+                for _, s in ipairs(o.strikes) do
+                    if s.target == u.id then
+                        all[#all + 1] = s
+                        local live, left = 1 - (s.felled or 0), 1
+                        for _ = 3, st.wearFor[u.id] do
+                            left = left * live
+                            local later = { [0] = 1 - left }
+                            for d, p in pairs(s.takenDist) do later[d] = (later[d] or 0) + p * left end
+                            all[#all + 1] = { target = u.id, takenDist = later }
+                        end
+                    end
+                end
+                local res = struckIn(all, { u })
+                both[u.id] = (both[u.id] or 0) + o.p * res[u.id].d
+            end
+        end
+        local more = {}
+        for _, u in ipairs(units) do more[u.id] = math.max(0, both[u.id] - one[u.id].d) end
+        local any = false
+        for _, pr in ipairs(st.protected) do
+            if (more[pr.id] or 0) > M.DUST then
+                pr.wear, pr.phases = more[pr.id], st.wearFor[pr.id]
+                pr.die, any = math.min(1, pr.die + pr.wear), true
+            end
+        end
+        for _, p in ipairs(st.predict) do
+            if (more[p.id] or 0) > M.DUST and not p.green and not p.recruit then p.wear = more[p.id] end
+        end
+        -- admission again, the next phase's own numbers kept (`first_*`): over the cap the
+        -- next phase still ranks first (ADR 0389's amendment)
+        if any then admit(st) end
+        wearCpu = wearCpu + (os.clock() - clock)
+    end
     local function consider(st, kind)
         if now then now.stage, now.judged = "judge " .. kind, #considered end
         local before, phases = screen(st), cost.phases
         judge(st)
+        wear(st)
         st.kind = kind
         before.phases = cost.phases - phases   -- the enemy phases this plan's judge played
         local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
@@ -1939,7 +2042,8 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, pr in ipairs(st.protected) do
                         protected[pr.id] = true
                         pr.second = second[pr.id] or 0
-                        pr.die = 1 - (1 - pr.die) * (1 - pr.second)
+                        -- beside the wear's reading of the same second phase: the worse
+                        pr.die = math.max(pr.die, 1 - (1 - pr.first) * (1 - pr.second))
                         rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end
                     for _, u in ipairs(st.phase.hit) do
@@ -1978,6 +2082,10 @@ function M.plan(Bot, board, sight, style, opts)
             cost.look.calls = look.calls
         end
     end
+    -- the wear's calls and time, beside the lookahead's and outside its budget (FR-018's is
+    -- for the irreversible transitions: spent here, the boss fight went unread)
+    look.wear = wearCalls > 0 and wearCalls or nil
+    cost.look.wear, cost.look.wear_cpu_s = wearCalls, wearCpu
     if not best or #best.acts == 0 then return nil, nil, cost end
     best.lookahead = look
     -- best first; after a lookahead the finalists before the rest, whose ranks were never asked
