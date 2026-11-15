@@ -9,64 +9,25 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-14, late night): the party plan's PR 2 is merged (PR #615); build PR 3, the experience term.**
-- **Merged: PR #615** (12b754e7; Nicolas: "Merge and handoff please", 2026-11-14; ADR 0413).
-  The convoy gives back. `Bot.supply` runs before the shop: a unit gives back a seal or booster
-  it cannot use that another roster unit can, and takes the convoy's best usable weapon or
-  staff of each type it lacks, the unarmed first. `Bot.uses` runs after the shop: seals
-  highest level first, then boosters to the forced units first and then the lowest level, one
-  use a unit a chapter. `Bot.fullBag` keeps a usable seal or booster. `Bot.arms` reads the
-  convoy. The harness's `api.convoy`, `give`, `take` and `use` make the game's own container
-  calls, the same as the Supply screen's, with no screen driven. The chapter line has `supply`.
-  Status and results live in the plan comment (#510 comment 6883980081, "PR 2 is merged").
-- **Run** (`lap1d`'s Ch13 start, `conv1` to `conv4`): Lute (0x0C) went Mage to Sage and Forde
-  (0x10) Cavalier to Paladin. The chapter was won in 4 turns with no death, against 8 in
-  PR #614's `gear2`. One game: a lead.
-- **Fixed on the way:** PR #614's convoy read counted with `gConvoyItemCount` and saw 8 of 16
-  items. The shop and the supply now serve the fielded units in roster order, the order the
-  pick predicts in.
-- **Review:** `/code-review 615 medium` plus its five open checks (21 findings) and one scoped
-  re-review (5 notes), all fixed or answered (the PR comment has the table). CI green.
-- **Untested:** 7 or 8 of 12 units spend their first turn on an item (the prep screen's Use
-  would cost none; build it only if the lap shows a chapter lost to it); a branched promotion
-  takes the first class offered; whether `HasConvoyAccess` keeps the convoy closed before the
-  game opens it.
-- **Next, PR 3:** the game's own experience number (`GetBattleUnitExpGain`, `bmbattle.c`) as a
-  term in `score()` (`planner.lua`), weight 0.3 a point (settled), with no fill by level. Then
-  the proof lap from the prologue (`--chapter 0 --last 15 --scout`, tag `party1`) against
-  `lap1d`, with the four measures the plan comment sets.
+**Next session starts here (2026-11-14, night): the party plan's three PRs are merged; the proof lap `party1` is running.**
+- **Merged: PR #616** (de95e0f9; Nicolas: "Yes" to merge on green, 2026-11-14; ADR 0414). The plan's
+  value gains 0.3 a point for the experience the game would award, read with the game's own
+  functions in the sandbox: an attack (`GetBattleUnitExpGain`, at the HP the plan leaves the
+  target), a counter in the judged enemy phase (the struck unit's count, over the phase's ways),
+  a heal (`GetBattleUnitStaffExp`). Nicolas asked for counters and heals before the lap.
+- **Every run checks the reads** against the game's award: a difference is a `taught_miss`
+  anomaly; `taught_checked` / `taught_unchecked` count the checks and the battles not checked
+  (printed in the attempt line). `lap1d` Ch2-Ch3 (`exp2e`): 14 attacks, 20 counters, 4 heals
+  checked, all equal, none unchecked. Prologue to Ch4 won clean on attempt 1 (`exp2`).
+- **Untested:** the Silencer's doubling (a checked Silencer kill would show as a `taught_miss`).
+- **Running: the proof lap** `python3 tools/playtest/montecarlo.py resume --game vanilla --tag
+  party1 --campaigns lap1d-lap1-fwd1-cs-s4006 --chapter 0 --last 15 --scout`, started on
+  de95e0f9. When it ends: report the four measures of the plan comment (#510 comment
+  6883980081, "Better means, set now") against `lap1d`, any `taught_miss` and the unchecked
+  counts, and apply the stop rule there. Its log was in the session scratchpad; the results
+  are in the vanilla store (`resume-runs.jsonl`, tag `party1`).
 - **The finish line (Nicolas, 2026-11-13): the bot beats the whole vanilla game clean**, both
   routes (memory `finish-line-whole-vanilla-game`; #510 comment 6872554917).
-- **The plan now worked is #510 comment 6883980081** (party management; one comment, edited in
-  place). Three PRs and a proof lap: (1) gear (merged: PR #614, ADR 0412): `Bot.shop` buys staves and tomes and replaces a
-  unit with no usable item with uses left; the saved state gains the convoy and uses left;
-  (2) the convoy (merged: PR #615, ADR 0413): the settled design of comment 6872948037 plus a fielded unit taking a usable
-  convoy weapon before the shop; (3) levels: the game's own experience number
-  (`GetBattleUnitExpGain`) as a weighted term in `score()` (the fill by level was dropped: see
-  the calls below). **The proof lap starts from the prologue** (chapter 0,
-  `--chapter 0 --last 15 --scout`; Nicolas, 2026-11-14: the levels before Ch5 matter), against
-  `lap1d`, with the four "better" measures the comment sets in advance.
-- **Why (evidence in the comment):** at Eirika's Ch15 start Eirika is level 5, the army averages
-  5.1, 6 of 23 units hold nothing they can use (Vanessa from Ch9, Joshua Ch10, Natasha Ch11, Lute
-  and Artur Ch12-13, Dozla Ch14, Innes Ch15), seals and boosters sit in the wrong bags or the
-  convoy, ~13,000 gold idle from Ch9; Seth took 94 of 209 kills Ch9-Ch13, Eirika 2. **The
-  death-risk cap stays** (Nicolas agreed: the party, not caution, is the problem). An LLM does not
-  play moves (reproducibility and cost); an LLM adviser once a chapter is an option in the plan,
-  not decided.
-- **Calls settled (Nicolas, 2026-11-14, "go with your recommendation"; recorded in the plan
-  comment):** PR 3's experience weight starts at 0.3 a point; the fill by level is dropped (the
-  offline check over lap1d's Ch10-Ch15 fielded 15 unarmed units against 0), so the experience
-  term ships alone; no LLM adviser now. The 1/64 split floor of PR #613: Nicolas has not said
-  either way.
-- **Merged: PR #613** (23ad8bcc; Nicolas: "You may also merge the pr that's ready", 2026-11-14;
-  ADR 0411). Ch15's first decision ran over an hour because a judged enemy phase split in two at
-  every striker a counter might kill, with no bound (667 stack samples: the door read and the
-  desert refuted). A split is now played only while its rarer way is at least 1/64 of the phase
-  (`Sight.phaseWays`, `unsplit` counted); a decision over `Botrun.DECISION_FRAMES` = 4,000,000
-  frames (Nicolas, 2026-11-14) ends the attempt `timeout`, never retried, no game result
-  (`montecarlo.py` `NO_RESULT`); records keep `plans.slowest`. Reviewed (`/code-review 613`,
-  8 findings, all fixed in facb3c51); CI green on the head. Ch15 attempt 1 on it (tag `ch15b`,
-  then at a 1.5M limit): `timeout` on turn 5, Ewan (charId 0x18) dead on turn 2.
 - **The planner's cost on big maps is the step after the party:** each Ch15 decision still costs
   about a million frames (plans x the plan's own uncertain kills, `Planner.BRANCH`, x 32-46
   enemies). An unshipped probe applying the same 1/64 floor to the plan's own kills (local branch
@@ -83,6 +44,7 @@ and start a fresh instance; don't rely on auto-compaction.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
   never run for a PR.
+
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
 - A simulated enemy phase and a single strike now start as the game's phase does
