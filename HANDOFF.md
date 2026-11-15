@@ -9,32 +9,48 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, afternoon): the fresh lap from the prologue is running, on main at 17a281c0.**
-- **Merged today, each reviewed (`/code-review medium` + one scoped re-review), every finding fixed, CI green:**
-  - #624 (ADR 0416, amends 0413): before the shop every roster unit, benched too, gives the
-    convoy what it cannot use this chapter (rule A); a unit takes or buys a spare weapon once
-    its weapons of a type hold under half of one full weapon's uses (rule B, `Bot.M.SPARE` =
-    0.5, Nicolas: "tune it if it has adverse effects"); each attempt's `supply` and `buys` are
-    on its BOTRUN record in `resume-runs.jsonl`. Design: #510 comment 6896261936 (Fable).
-  - #625 (ADR 0417): each saved start's `<n>.json` lists `bots`, the bot versions that played
-    the chapters before it; every record says `stale` (an older or unknown bot played up to its
-    start; bot hash only). Never refused (Nicolas: no re-run after every change). The vanilla
-    store's 253 New Game `0.json` records were backfilled with `"bots": []`.
-- **Nicolas, 2026-11-15:** no more proofs on outdated saves; the run proof of both PRs is the
-  fresh lap. **Open call for him:** whether verdicts should leave out `stale` runs (records
-  say it; nothing filters).
-- **The lap:** `montecarlo.py resume --game vanilla --campaigns cs-s4006 --chapter 0 --scout`,
-  tag `lap3e` (`--route 1`, Eirika) and `lap3p` (`--route 2`, Ephraim), started in parallel.
-  Logs in the session scratchpad; records in the vanilla store's `resume-runs.jsonl`. Read
-  per chapter: result, deaths, `supply`/`buys` (rule A and B at work), `stale` false. A
-  prologue-to-Ch1 run took 11 s (tags `vers1`-`vers3`, the #625 checks).
-- **Then:** the walls the lap finds, on both routes, toward the finish line (the whole vanilla
-  game clean, memory `finish-line-whole-vanilla-game`). Still open from before: Ch15 falls
-  back to a sacrifice plan on most turns; Colm's Ch9 Door gate on Ephraim's route (#510
-  comment 6872468981); whether Ch16's ending promotes Eirika by itself (ADR 0416, untested).
-- **Old kept states** (`party1e-`, `party1c-`, `lap1d-`, `lap2-`, probe tags) are stale under
-  ADR 0417: never a proof base again. Throwaway local branches from before (`probe/510-*`,
-  `exp/510-plan-floor`) can be deleted.
+**Next session starts here (2026-11-15, evening; main at 17a281c0 + HANDOFF): the fresh lap from the prologue ran on both routes and stopped on two harness crashes; one is fixed in PR #626, open.**
+- **First: merge PR #626 on Nicolas's word** (he has not said "merge" for it; memory
+  `merge-after-review` covers only #624 and #625). Review + scoped re-review clean, every
+  finding fixed, CI green on its head (1bc76f47). Branch `feat/510-seal-check`, ADR 0418.
+  What it fixes: the harness asked `CanUnitUsePromotionItem` of every non-weapon item; its last
+  class-list walk is unguarded, so any unit at level 10+ read a non-seal item from address 0.
+  Ephraim's Elixir read as a seal and the lap crashed at vanilla Ch13 on his route (chapter id
+  26). Now `promotes`/`gains` are asked only of `INSPECT.BAG.USE` seals/boosters, and
+  `Bot.fullBag` sends only a real seal/booster as one. Proof: `elix0` (control, main) crashes,
+  `elix1` (fix) wins Ch13 in 16 turns, no death. 4,290 worker logs: no earlier run used a
+  wrong item.
+- **Merged today** (each `/code-review medium` + one scoped re-review, all findings fixed):
+  - #624 (ADR 0416): every roster unit, benched too, gives the convoy what it cannot use this
+    chapter; a spare weapon below half of one full weapon (`Bot.M.SPARE` = 0.5, Nicolas: tune
+    if adverse); each attempt's `supply`/`buys` on its BOTRUN record. Seen working in both laps.
+  - #625 (ADR 0417): saved starts list `bots`; every record says `stale`; resume prints stale
+    starts, never refuses. 253 New Game `0.json` backfilled `"bots": []`.
+- **The lap** (campaign `cs-s4006` from its prologue, scout, instrument `7ea7cb0020c5+v2`,
+  records `stale: false`, about 25 min to Eirika's stop):
+  - `lap3e` (Eirika, `--route 1`): through chapter id 10, stops at id 11 = vanilla Ch10 on her
+    route (`CHAPTER_E_10`, Seize). Attempts 1-2 `stuck`: the cap left only all-hold plans, the
+    army sat in a corner 6-14 turns (Forde, charId 16, missed a 44% attack every turn).
+    Attempt 3 `crashed` turn 14: the bot planned Innes (charId 11) to attack from (7,23) but
+    the game's menu had no Attack. Lead (untested): Innes's Silver Bow broke in the turn-10
+    enemy phase (actor `broke: true`) while the board still lists it. Traces under
+    `references/sim/vanilla/c25b145e3745/traces/lap3e-cs-s4006/11-s4006-a{1,2,3}-*.jsonl.gz`.
+  - `lap3p` (Ephraim, `--route 2`): through ids 23, 24, 62, 25; crashed at id 26's prep (the
+    Elixir, fixed by #626).
+- **Next, in order:**
+  1. Merge #626 (on his word), then carry `lap3p` on: `montecarlo.py resume --game vanilla
+     --tag <t> --campaigns lap3p-cs-s4006 --chapter 26 --scout --route 2` (that start is
+     stale after #626's bot change: allowed, labelled).
+  2. Innes's crash: ONE instrumented run of `lap3e-cs-s4006` id 11 attempt 3 to turn 14,
+     printing Innes's bag `{id, uses}` and the game's can-attack, to confirm the broken-bow
+     lead before a fix (a crash is the harness's fault: fix before trusting runs past it).
+  3. Eirika's Ch10 stuck pattern: the cap leaves only "hold"; read `rank.max_exceed` on a1
+     turns 13-19 (`montecarlo.py story`) before proposing anything.
+- **Open call for Nicolas:** whether verdicts should leave out `stale` runs (records say it;
+  nothing filters).
+- **Old kept states** (`party1e-`, `lap1d-`, `lap2-`, probes) are stale under ADR 0417, never
+  a proof base. Probe tags from today: `vers1`-`vers3`, `elix0`, `elix1`. Throwaway local
+  branches (`probe/510-*`, `exp/510-plan-floor`) can be deleted.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
   never run for a PR.
