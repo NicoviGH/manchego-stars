@@ -1481,5 +1481,24 @@ do
     check(x.none == 1 and x.hit == 12 and x.kill == 40, true, "expOf: each case's count")
 end
 
+-- M.known (ADR 0414): a key first read by an enemy's strike (no count) gets its count from the
+-- first teaching read, before nothing is played again; a later non-teaching read keeps it; the
+-- count runs before the play on a miss.
+do
+    local memo, order = {}, {}
+    local function count() order[#order + 1] = "count"; return { none = 1, hit = 5, kill = 9 } end
+    local function play() order[#order + 1] = "play"; return { "d", "b", "j" } end
+    local k = Sight.known(memo, "k", false, count, play)
+    check(k[4], nil, "known: a strike's read has no count")
+    k = Sight.known(memo, "k", true, count, play)
+    check(k[4] and k[4].kill, 9, "known: the first teaching read fills it in")
+    check(table.concat(order, ","), "play,count", "known: played once, counted once")
+    Sight.known(memo, "k", false, count, play)
+    check(memo.k[4] and memo.k[4].kill, 9, "known: a non-teaching read keeps it")
+    order = {}
+    Sight.known(memo, "m", true, count, play)
+    check(table.concat(order, ","), "count,play", "known: on a miss the count comes first")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

@@ -94,6 +94,10 @@ class Records(unittest.TestCase):
         self.assertIn('[stalls: idle_3 turn 6]', line)
         self.assertIn('anomaly: seize_delay turn 5 -> python3 tools/playtest/montecarlo.py '
                       'story t.jsonl.gz --turn 5', line)
+        miss = dict(V2, anomalies=[{'kind': 'taught_miss', 'turn': 3, 'charId': 0x04,
+                                    'case': 'kill', 'read': 34, 'gave': 30}])
+        self.assertIn('anomaly: taught_miss turn 3 (0x04 kill: read 34, battle gave 30)',
+                      mc.attempt_line(miss, set()))
         other = dict(_GRADED[0], cause='other', detail='unrevealed_killer', predicted=0,
                      flags={})
         self.assertIn('other (blindspot: unrevealed_killer) at 0.0%', mc.death(other))

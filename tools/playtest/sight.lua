@@ -704,6 +704,25 @@ function M.expOf(api, call, S)
     return { none = count(0, 1), hit = count(1, 1), kill = count(1, 0) }
 end
 
+-- An exchange's played results, kept by its battle key (`memo`: key -> { dealt, back, joint,
+-- exp }): `play()` makes the first three on a miss, and `count()` (M.expOf) the fourth for a
+-- `teaches` read whenever the entry lacks it, so an entry a non-teaching read (an enemy's
+-- strike) made first is filled in, and none is ever cleared. The count runs first: both are
+-- called on the plain simulation the key was read from, and the played ways leave the last
+-- way's battle units behind. The count leaves the battle units written (its cases' fields);
+-- the sandbox puts them back, and no caller reads them after an exchange. Pure.
+function M.known(memo, key, teaches, count, play)
+    local known = memo[key]
+    local exp = known and known[4]
+    if teaches and not exp then exp = count() end
+    if not known then
+        known = play()
+        memo[key] = known
+    end
+    if exp then known[4] = exp end
+    return known
+end
+
 -- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
 -- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes caught
 -- at S.BattleRoll1RN/S.BattleRoll2RN's entry (M.withBreaks) and its simResult (r1, which a
@@ -1832,20 +1851,13 @@ function M.new(outer)
         local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
         side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
         side.killsTarget = mem.u8(S.gBattleTarget + UNIT_HP) == 0
-        local key = battleKey()
-        local known = playedBy[key]
-        -- the count first, on the plain simulation the key was read from: the played ways run
-        -- it again and again and leave the last way's battle units behind. Read whenever the
-        -- key's entry lacks it, so an entry a non-teaching read made first is filled in
-        local exp = known and known[4]
-        if teaches and not exp then exp = M.expOf(api, call, S) end
-        if not known then
-            known = { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
-                return lost(S.gBattleTarget), lost(S.gBattleActor)
-            end)) }
-            playedBy[key] = known
-        end
-        known[4] = exp
+        local known = M.known(playedBy, battleKey(), teaches,
+            function() return M.expOf(api, call, S) end,
+            function()
+                return { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
+                    return lost(S.gBattleTarget), lost(S.gBattleActor)
+                end)) }
+            end)
         side.dealt, side.back, side.joint, side.exp = known[1], known[2], known[3], known[4]
         return side
     end

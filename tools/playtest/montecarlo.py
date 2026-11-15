@@ -545,6 +545,15 @@ def spoiled(r, who=hex_id):
     return '; '.join(out)
 
 
+def anomaly_detail(a):
+    """What an anomaly says beyond its kind and turn: a taught_miss's case, the experience the
+    plan read and what the battle gave (ADR 0414)."""
+    if a['kind'] == 'taught_miss':
+        return ' (0x%02X %s: read %s, battle gave %s)' % (a.get('charId') or 0, a.get('case'),
+                                                         a.get('read'), a.get('gave'))
+    return ''
+
+
 def attempt_line(r, said):
     """The line `attempts` prints for record `r`, or None. `said` = the attempts already
     printed. A worker's CAMPAIGN end is printed only when no BOTRUN of its attempt was: a run
@@ -570,8 +579,9 @@ def attempt_line(r, said):
     if r.get('outcome') != 'won' and graded:
         why = 'deaths: ' + graded
     stalls = ', '.join('%s turn %s' % (e['kind'], e['turn']) for e in r.get('stall_events') or [])
-    anomalies = ''.join('\n    anomaly: %s turn %s%s' % (
-        a['kind'], a.get('turn'), ' -> %s' % a['narrate'] if a.get('narrate') else '')
+    anomalies = ''.join('\n    anomaly: %s turn %s%s%s' % (
+        a['kind'], a.get('turn'), anomaly_detail(a),
+        ' -> %s' % a['narrate'] if a.get('narrate') else '')
         for a in r.get('anomalies') or [])
     return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s%s%s%s' % (
         r.get('attempt'), r.get('outcome'), ' clean' if r.get('clean') is True else '',

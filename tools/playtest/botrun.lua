@@ -537,9 +537,13 @@ M.GOAL_QUIET = 3
 -- Whether the experience the plan read for an attack (`taught`: the game's count for none /
 -- hit / kill, sight's expOf) is what the real battle (`battle`, Board.battle) awarded its actor:
 -- nil when it is, else { case, read, gave }. The case is the battle's: its actor dead (the count
--- is 0), its target dead, any blow of the actor's that dealt damage, else none. ADR 0414.
+-- is 0), its target dead, any blow of the actor's that dealt damage, else none. A battle between
+-- two player units (blue ids, below 0x40) awards none (BattleApplyExpGains skips it), so there is
+-- nothing to check; the other skip, PLAY_FLAG_EXTRA_MAP, is the link arena's, which the bot
+-- never plays. ADR 0414.
 function M.taughtMiss(taught, battle)
     local a, t = battle.actor, battle.target
+    if a.id and t.id and a.id < 0x40 and t.id < 0x40 then return nil end
     local case = "none"
     if a.hp == 0 then case = "dead"
     elseif t.hp == 0 then case = "kill"

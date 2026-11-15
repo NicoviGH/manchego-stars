@@ -99,7 +99,7 @@ local function fakeGame(o)
                                             counter = { armed = false, hits = 0 },
                                             killsTarget = dmg >= e.hp,
                                             dealt = { [math.min(dmg, e.hp)] = 1 },
-                                            back = { [0] = 1 } }, e.hp, u.hp)
+                                            back = { [0] = 1 }, exp = o.taught }, e.hp, u.hp)
                 end,
                 strike = function() return Sight.strikeOf(nil) end,
                 odds = Sight.odds,
@@ -2676,6 +2676,31 @@ do
     check(Botrun.taughtMiss(x, fight(0, 12, 0, landed)), nil, "taughtMiss: a dead actor gains 0")
     local m = Botrun.taughtMiss(x, fight(20, 0, 40, landed))
     check(m and (m.case .. " " .. m.read .. " " .. m.gave), "kill 34 40", "taughtMiss: a wrong read is named")
+    local blues = fight(20, 0, 0, landed)
+    blues.actor.id, blues.target.id = 0x01, 0x02
+    check(Botrun.taughtMiss(x, blues), nil, "taughtMiss: two player units' battle awards none")
+end
+
+-- test_a_wrong_experience_read_is_an_anomaly (ADR 0414): the run checks every attack's read
+-- against its battle; the fake's attack reads kill 30 and its battle gives 7.
+for _, gave in ipairs({ 30, 7 }) do
+    local g = fakeGame { units = rout(), hit = 20, taught = { none = 1, hit = 10, kill = 30 } }
+    g.api.battle = function()
+        return { actor = { id = 0x01, charId = 1, hp = 20, exp = gave },
+                 target = { id = 0x81, charId = 0x81, hp = 0 }, hits = { { by = "actor", dmg = 10 } } }
+    end
+    g.api.Planner = dofile(here .. "planner.lua")   -- the plan's attack carries the read
+    Botrun.run(g.api)
+    local miss
+    for _, a in ipairs(recordOf(g).anomalies) do
+        if a.kind == "taught_miss" then miss = a end
+    end
+    if gave == 30 then
+        check(miss, nil, "taught_miss: a right read raises nothing")
+    else
+        check(miss and (miss.case .. " " .. miss.read .. " " .. miss.gave), "kill 30 7",
+              "taught_miss: a wrong read is on the record, named")
+    end
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
