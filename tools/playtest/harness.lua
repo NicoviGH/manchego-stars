@@ -3413,7 +3413,7 @@ INSPECT.botApi = function(game)
                  mode = TUNE.difficultyName[TUNE.difficultyWant],
                  seed = tonumber(PLAYTEST_SEED) or 1,
                  -- the bot hash and suite version montecarlo.py ran it under (botrun's record)
-                 instrument = PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil },
+                 instrument = INSPECT.instrument() },
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
         -- an experiment's benched units (PT_BENCH, JSON charIds; montecarlo.py `pilot
@@ -3708,6 +3708,12 @@ INSPECT.BAG = {
 }
 INSPECT.bagLog = {}
 
+-- The bot hash and suite version montecarlo.py ran this under (PT_INSTRUMENT), nil when run by
+-- hand: botrun's record and the campaign's start lineage (ADR 0417) both read it here.
+INSPECT.instrument = function()
+    return PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil
+end
+
 -- The world map's cursor and lord, for the observer: the open nodes, the node the cursor sits
 -- on (sub_80B961C, the L jump, puts ix/iy exactly on a node's x/y << 8), the lord's node.
 INSPECT.worldMap = function()
@@ -3964,7 +3970,7 @@ INSPECT.campaignApi = function(game)
                  route = cfg.route,
                  -- the bot hash and suite version montecarlo.py ran it under: each start this
                  -- campaign saves names the bots that played the chapters before it (ADR 0417)
-                 instrument = PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil },
+                 instrument = INSPECT.instrument() },
         random = math.random,
         -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
         -- attempt draws what the whole campaign would have drawn there

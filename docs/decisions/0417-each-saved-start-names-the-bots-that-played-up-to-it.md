@@ -14,19 +14,26 @@ version; 745 of the vanilla store's 746 attempt records have it). A saved chapte
 (`<n>.json`) named no version at all, so a run resumed from `party1e`'s Ch15 start could not
 tell that older bots had played Ch0 to Ch14.
 
-**Decision 1: each saved start records `bots`**, the bot versions that played the chapters
-before it, oldest first, each once in a row. New Game's first map has none (`[]`); every later
-start a run reaches gets that run's version after its own start's list (`Campaign.withBot`); a
-resumed start keeps its record's list. A start resumed from a record that never kept them stays
-unknown (`bots` absent) for every start after it. The campaign learns its version from
-`PT_INSTRUMENT` (montecarlo.py sets it for every task); a run without one writes "unversioned".
+**Decision 1: each saved start records `bots`**, the bot versions (montecarlo.py's instrument)
+that played the chapters before it, oldest first, each once in a row. New Game's first map has
+none (`[]`); every later start a run reaches gets that run's version after its own start's list
+(`Campaign.withBot`); a resumed start keeps its record's list. A start resumed from a record
+that never kept them stays unknown (`bots` absent) for every start after it. The campaign reads
+its version where botrun does (`INSPECT.instrument`, from `PT_INSTRUMENT`, which montecarlo.py
+sets for every task); a run without one writes "unversioned" into the list, the one place a
+missing version needs a name.
 
-**Decision 2: a stale start is played, and said to be stale.** `montecarlo.py resume` reads the
-start's `bots` (`start_bots`) and stamps every record of the task with `start_bots` and
-`stale`: true when a version other than this run's played a chapter before it, or the list is
-unknown. It prints one line for each stale start before the runs begin. It never refuses one:
-Nicolas does not want a lap re-run after every change. A reading that relies on the bot (a
-verdict, a refreeze, a finish-line claim) uses records with `stale` false.
+**Decision 2: every record says whether its start was stale; a stale start is still played.**
+Each chapter line carries `start_bots`, and `records_of` judges each BOTRUN record of that
+chapter `stale` (`stale_start`): true when a bot whose code differs from the one that played
+the attempt played a chapter before its start, or who did is unknown. Only the bot hash is
+compared; a suite manifest version (`+vN`) changes no play. The campaign's end record keeps its
+first start's `start_bots` and `stale`, which every later start has behind it. This covers
+every run kind that plays through the campaign (resume, attempts, cells, the suite), not only
+resume. Nothing is refused: Nicolas does not want a lap re-run after every change. `resume`
+prints a line for each stale start before it plays, and a chapter cell prints how many of its
+starts are stale under its verdict. Which verdicts should leave stale runs out is not decided
+here: the records now say it, and the call is Nicolas's.
 
 **The New Game records were backfilled.** The vanilla store's 253 `0.json` records (chapter 0,
 Eirika and Seth, 0 gold: New Game's start in every one, checked before writing) got `"bots":
@@ -34,9 +41,13 @@ Eirika and Seth, 0 gold: New Game's start in every one, checked before writing) 
 to them is not on record.
 
 **Proof.** `test_campaign.lua` (New Game's first map names no bot, the next start this run's,
-each version once in a row; a resumed start keeps its list; an unknown one stays unknown),
-`test_montecarlo.py` (`start_bots`: none played, this bot only, an older bot, a record with no
-list, no record; the resume stamp), each failing on main.
+each version once in a row; a resumed start keeps its list; an unknown one stays unknown; each
+chapter line carries its start's list) and `test_montecarlo.py` (`start_bots`: none played,
+this bot only, an older bot, a manifest version alone, a list that is not one, no record; the
+stale line resume prints; each record judged from its chapter line, the end from the first
+start), each failing on main. One fresh run (tag `vers1`, campaign `cs-s4006` from the prologue
+through Ch1, 11 s, both chapters won clean): `0.json` has `bots: []` and `1.json` this bot's
+version.
 
-**Untested:** the harness's `arrive` returning `bots` in the emulator; the fresh lap from the
-prologue is its first run.
+**Untested:** the chapter cell's stale line in a real cell; the review's changes after the
+`vers1` run (the stale judgment moved from resume's stamp to `records_of`) in the emulator.

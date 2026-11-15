@@ -423,8 +423,10 @@ function M.run(api)
                 end
             end
             local claims = api.claims(ch) or {}
+            -- start_bots: who played the chapters before this start (absent: unknown);
+            -- montecarlo.py's records_of judges each attempt stale against it (ADR 0417)
             local entry = { chapter = ch, attempts = 0, failures = {},
-                            carried_unknown = at.carriedUnknown or nil }
+                            carried_unknown = at.carriedUnknown or nil, start_bots = bots }
             chapters[#chapters + 1] = entry
             local cap, cwhy = api.cap()
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end

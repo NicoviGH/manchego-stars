@@ -318,6 +318,27 @@ class Workers(unittest.TestCase):
         self.assertNotIn('supply', recs[2])
         self.assertNotIn('prep', recs[2])
 
+    def test_each_record_says_whether_its_start_was_stale(self):
+        # ADR 0417: a chapter line's start_bots judges its attempts; the end keeps the first
+        # start's (every run kind: resume, attempts, cells, not only resume's stamp)
+        text = ('BOTRUN {"outcome": "won", "chapter": 3, "attempt": 1, "instrument": "new+v2"}\n'
+                'BOTRUN {"outcome": "won", "chapter": 4, "attempt": 1, "instrument": "new+v2"}\n'
+                'CAMPAIGN {"chapter": 3, "attempts": 1, "start_bots": ["old+v2"]}\n'
+                'CAMPAIGN {"chapter": 4, "attempts": 1, "start_bots": ["old+v2", "new+v2"]}\n'
+                'CAMPAIGN {"outcome": "played"}')
+        recs = mc.records_of({'instrument': 'new+v2'}, text, '/tmp/w', '/x.log')
+        self.assertEqual([r.get('stale') for r in recs], [True, True, True])
+        self.assertEqual(recs[2]['start_bots'], ['old+v2'])
+        fresh = mc.records_of({'instrument': 'new+v2'},
+                              'BOTRUN {"outcome": "won", "chapter": 0, "attempt": 1, '
+                              '"instrument": "new+v2"}\nCAMPAIGN {"chapter": 0, "start_bots": []}\n'
+                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/x.log')
+        self.assertEqual([r.get('stale') for r in fresh], [False, False])
+        unknown = mc.records_of({'instrument': 'new+v2'},
+                                'BOTRUN {"chapter": 5, "attempt": 1, "instrument": "new+v2"}\n'
+                                'CAMPAIGN {"chapter": 5}', '/tmp/w', '/x.log')
+        self.assertEqual(unknown[0]['stale'], True, 'a start with no list is stale')
+
     def test_a_failed_prep_lands_on_the_campaign_end(self):
         # an attempt whose prep failed never played: no BOTRUN to carry its acts (review of #624)
         text = ('CAMPAIGN {"chapter": 15, "attempts": 1, "outcome": "crashed", "prep": ['
@@ -1297,6 +1318,15 @@ class Suite(unittest.TestCase):
         self.assertEqual(mc.start_bots(top, 'c', 5, 'new+v2'), (['old+v2', 'new+v2'], True))
         self.assertEqual(mc.start_bots(top, 'c', 7, 'new+v2'), (None, True), 'never kept')
         self.assertEqual(mc.start_bots(top, 'c', 9, 'new+v2'), (None, True), 'no record')
+        self.assertEqual(mc.start_bots(top, 'c', 3, 'new+v3'), (['new+v2'], False),
+                         'a suite manifest version alone changes no play')
+        with open(os.path.join(d, '11.json'), 'w') as fh:
+            json.dump({'bots': 'new+v2'}, fh)
+        self.assertEqual(mc.start_bots(top, 'c', 11, 'new+v2'), (None, True), 'not a list')
+        # resume prints a line for a stale start, none for a current one
+        tasks = [{'stamp': {'resumed_from': 'c/%d' % at}, 'instrument': 'new+v2'} for at in (3, 5)]
+        self.assertEqual(mc.stale_lines(top, tasks),
+                         ['  stale start c/5: played up to by old+v2, new+v2, not this bot alone'])
 
     def test_resume_carries_a_campaign_on_under_a_new_id_from_its_saved_start(self):
         """`resume` (ADR 0399): a copy of the campaign's states under `<tag>-<campaign>`, so the
@@ -1324,8 +1354,9 @@ class Suite(unittest.TestCase):
                            t['campaign']['last']) for t in tasks],
                          [('mem1-cs-s4001', 7, 4001, [22]), ('mem1-full-s4008', 9, 4008, [22])])
         self.assertNotIn('attempt', tasks[0]['campaign'], 'every attempt, in sequence')
-        self.assertEqual(tasks[0]['stamp'], {'resumed_from': 'cs-s4001/7', 'start_bots': None,
-                                             'stale': True})
+        self.assertEqual(tasks[0]['stamp'], {'resumed_from': 'cs-s4001/7'})
+        self.assertEqual(tasks[0]['instrument'], 'b0t+v2',
+                         'the version it is judged against is the one it runs under')
         self.assertTrue(os.path.exists(os.path.join(store, 'states', 'mem1-cs-s4001', '7.ss')))
         one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7,
                               instrument='b0t+v2')

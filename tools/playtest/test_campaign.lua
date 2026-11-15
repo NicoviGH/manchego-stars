@@ -517,6 +517,11 @@ local function test_each_start_names_the_bots_before_it()
     check(Json.encode(r[0].bots), "[]", "New Game's first map: no bot played before it")
     check(table.concat(r[1].bots, ","), "new+v2", "the next start: this run's bot")
     check(table.concat(r[2].bots, ","), "new+v2", "each version once in a row")
+    local g = fakeGame({ chapters = { { id = 0, bots = { "old+v2" } }, { id = 1 } } })
+    g.api.info.instrument = "new+v2"
+    Campaign.run(g.api)
+    check(table.concat(lines(g)[2].start_bots, ","), "old+v2,new+v2",
+          "each chapter line names who played up to its start (records_of judges it)")
     r = run({ "old+v2" }, "new+v2")
     check(table.concat(r[0].bots, ","), "old+v2", "a resumed start keeps its own record")
     check(table.concat(r[1].bots, ","), "old+v2,new+v2", "then this run's bot after it")
