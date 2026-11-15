@@ -9,54 +9,36 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, evening; main at 6597fc33): the fresh lap from the prologue ran on both routes and stopped on two harness crashes; one is fixed (PR #626, merged).**
-- **PR #626 is merged** (6597fc33; Nicolas: "merge it", 2026-11-15). Review + scoped
-  re-review clean, every finding fixed, CI green on its head. ADR 0418.
-  What it fixes: the harness asked `CanUnitUsePromotionItem` of every non-weapon item; its last
-  class-list walk is unguarded, so any unit at level 10+ read a non-seal item from address 0.
-  Ephraim's Elixir read as a seal and the lap crashed at vanilla Ch13 on his route (chapter id
-  26). Now `promotes`/`gains` are asked only of `INSPECT.BAG.USE` seals/boosters, and
-  `Bot.fullBag` sends only a real seal/booster as one. Proof: `elix0` (control, main) crashes,
-  `elix1` (fix) wins Ch13 in 16 turns, no death. 4,290 worker logs: no earlier run used a
-  wrong item.
-- **Merged today** (each `/code-review medium` + one scoped re-review, all findings fixed):
-  - #624 (ADR 0416): every roster unit, benched too, gives the convoy what it cannot use this
-    chapter; a spare weapon below half of one full weapon (`Bot.M.SPARE` = 0.5, Nicolas: tune
-    if adverse); each attempt's `supply`/`buys` on its BOTRUN record. Seen working in both laps.
-  - #625 (ADR 0417): saved starts list `bots`; every record says `stale`; resume prints stale
-    starts, never refuses. 253 New Game `0.json` backfilled `"bots": []`.
-- **The lap** (campaign `cs-s4006` from its prologue, scout, instrument `7ea7cb0020c5+v2`,
-  records `stale: false`, about 25 min to Eirika's stop):
-  - `lap3e` (Eirika, `--route 1`): through chapter id 10, stops at id 11 = vanilla Ch10 on her
-    route (`CHAPTER_E_10`, Seize). Attempts 1-2 `stuck`: the cap left only all-hold plans, the
-    army sat in a corner 6-14 turns (Forde, charId 16, missed a 44% attack every turn).
-    Attempt 3 `crashed` turn 14: the bot planned Innes (charId 11) to attack from (7,23) but
-    the game's menu had no Attack. Lead (untested): Innes's Silver Bow broke in the turn-10
-    enemy phase (actor `broke: true`) while the board still lists it. Traces under
-    `references/sim/vanilla/c25b145e3745/traces/lap3e-cs-s4006/11-s4006-a{1,2,3}-*.jsonl.gz`.
-  - `lap3p` (Ephraim, `--route 2`): through ids 23, 24, 62, 25; crashed at id 26's prep (the
-    Elixir, fixed by #626).
-- **Next, in order (Nicolas, 2026-11-15: fix the known issues before the runs):**
-  1. Innes's crash at Eirika's Ch10 (a crash is the harness's fault). Diagnose with ONE
-     instrumented replay of the run that showed it (`lap3e-cs-s4006` id 11 attempt 3, to turn
-     14), printing Innes's bag `{id, uses}` and the game's can-attack, to confirm or refute
-     the broken-bow lead. Then the fix, with a unit test that fails without it.
-  2. Eirika's Ch10 stuck pattern (the cap leaves only all-hold plans): read `rank.max_exceed`
-     on a1 turns 13-19 (`montecarlo.py story` on the traces above), state the cause, then a
-     fix or a recommendation to Nicolas if it is a weight or the cap (his calls).
-  3. Only then rerun both laps from the prologue on the fixed bot, in parallel:
-     `montecarlo.py resume --game vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2
-     --tag <new>` (Eirika's reached her Ch10 in about 25 min). Not a resume from `lap3p`'s Ch13
-     start: #626 changed item reads for every unit at level 10+, so earlier chapters may play
-     differently, and a stale start mixes bot versions.
-- **Open call for Nicolas:** whether verdicts should leave out `stale` runs (records say it;
-  nothing filters).
-- **Old kept states** (`party1e-`, `lap1d-`, `lap2-`, probes) are stale under ADR 0417, never
-  a proof base. Probe tags from today: `vers1`-`vers3`, `elix0`, `elix1`. Throwaway local
-  branches (`probe/510-*`, `exp/510-plan-floor`) can be deleted.
+**Next session starts here (2026-11-15, night; main at 2152f09e): both known lap stops are diagnosed. Innes's crash is fixed in PR #627 (awaiting Nicolas's merge); the Ch10 stall waits on a call of his.**
+- **PR #627** (`feat/510-ballista-rider`, ADR 0419): Innes (charId 11) joined vanilla Ch10
+  (Eirika's route) riding a ballista he had emptied as a green unit on turn 10. The trace's
+  `broke` was the ballista, not his bow (lead refuted). The game hides Attack from a rider, so
+  the bot's bow plan crashed. Now a rider has no weapons of his own and ends no move on another
+  ballista's tile (`Sight.riding`, `Sight.riderTiles`, the game's `CanMoveActiveUnitTo`).
+  - Proof: unit tests fail without the fix. Tag `rider1` replays `lap3e-cs-s4006/11`: attempt 3
+    plays the same 153 acts, then Innes waits on turn 14. All 8 attempts end with a real result,
+    none crashed, and attempt 8 wins.
+  - `/code-review 627 medium` found 6 findings, all fixed. The scoped re-review was clean. CI
+    was pending at handoff.
+  - **Not built:** Exit and Attack w/Ballista, so a rider on an empty ballista holds for the
+    rest of the chapter.
+- **The Ch10 stall** (attempts 1–2): cause confirmed, #510 comment 6898817486.
+  - Not the cap: every judged plan was admitted. One instrumented run (`advp1`, the same acts
+    hash) printed `advance`'s filter for each unit.
+  - From turn 9 on, no unit on foot has a way to the throne at (15,1). The army's only Door Key
+    was Gilliam's (charId 3), who died on turn 6 in a turn where every plan was over the cap.
+    Colm (charId 9, thief) was benched. Only the fliers (Vanessa, charId 6; Tana, charId 34) can
+    reach the throne, at 47–82% to die against a 15% cap. The six remaining guards stand still,
+    so the board repeats.
+  - **Nicolas's call** (team pick, a weight): see the session's recommendation.
+- **Next:** merge PR #627 on Nicolas's word. Then his call on the stall. Then the laps rerun
+  from the prologue on both routes, in parallel (`montecarlo.py resume --game vanilla
+  --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
+- **Open call for Nicolas:** whether verdicts should leave out `stale` runs.
+- **Kept states:** `lap3e-`, `lap3p-`, `rider1-` and `advp1-` are stale under ADR 0417 and
+  never a proof base. Old probes (`party1e-`, `lap1d-`, `lap2-`, `vers*`, `elix*`) likewise.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
-  subagents; design questions to a Fable subagent (Nicolas, 2026-11-13). The frozen suite is
-  never run for a PR.
+  subagents, design questions to a Fable subagent. The frozen suite is never run for a PR.
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
 - A simulated enemy phase and a single strike now start as the game's phase does
