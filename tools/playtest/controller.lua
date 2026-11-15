@@ -147,6 +147,14 @@ local RULES = {
         name = "observation",
         check = function(observation)
             if observation.error then return unsupported(observation.error) end
+            -- the cursor's cell holds an id gUnitLookup has no unit for (green stops at 0x54,
+            -- bmunit.c). Malformed only where a unit is chosen from the map: the player phase or
+            -- the prep screen's formation cursor. Between chapters the map is mid-load and such
+            -- bytes clear on their own (vanilla, entering Ch10: 1 frame, then 4).
+            local c = observation.cursor
+            if c and c.unit_unknown and (proc(observation, "player_phase") or proc(observation, "sally")) then
+                return unsupported(string.format("gBmMapUnit id 0x%02X has no gUnitLookup entry", c.unit))
+            end
             return rejected("the observer reported no malformed structure")
         end,
     },

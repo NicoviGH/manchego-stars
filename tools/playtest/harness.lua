@@ -834,15 +834,17 @@ local function observeController()
         end
         local unitData = observedUnit(unit)
         local selectKind = unitSelectKind(unit, unitData)
-        if unit > 0 and unit < 0xC0 and not unitData then
-            observation.error = string.format("gBmMapUnit id 0x%02X has no gUnitLookup entry", unit)
-        end
+        -- a fact, not an error: while a chapter loads the map can hold bytes that are no unit
+        -- for a frame or more (the size changed before the rows, or the cells before their
+        -- fill); controller.lua's observation rule calls it malformed only on a live map
+        local unknown = unit > 0 and unit < 0xC0 and not unitData
         observation.cursor = {
             x = x, y = y, width = w, height = h, unit = unit,
             unit_faction = unitFaction, unit_state = unitData and unitData.state or nil,
             unit_status = unitData and unitData.status or nil,
             unit_attributes = unitData and unitData.attributes or nil,
             unit_select_kind = selectKind, unit_selectable = selectKind == "control",
+            unit_unknown = unknown or nil,
             reachable = reachable,
         }
     end
