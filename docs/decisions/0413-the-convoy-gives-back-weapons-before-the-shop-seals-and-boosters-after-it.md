@@ -85,6 +85,10 @@ Innes (0x0B) and Moulder (0x05) an Angelic Robe or a Dracoshield each. The chapt
 35), Lute 4 (`gear2`: 1). Both runs miss the same recruit (charId 0x0E, as `gear2` did). One
 game is a lead, not a verdict.
 
+After the review (roster order and the rest), the same start played once more (`conv4`,
+`acts_hash` 55159bb6, a different game because the shop's order changed). It was won in
+4 turns with no death, with the same promotions, and Artur (0x13) also used a Dracoshield.
+
 **Cost.** A convoy read asks the game about each bag item and convoy item for every roster
 unit. A non-weapon's answers read only its id (`GetUnitItemSlot`, `GetUnitItemHealAmount`,
 the two use checks), so one read serves each unit and id. A chapter start reads the convoy
