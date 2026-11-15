@@ -1703,9 +1703,10 @@ function M.plan(Bot, board, sight, style, opts)
         best = i and judgedPlans[i].st
     end
     -- what the beam knew of a plan before the judge, for the trace (#510, the cheap screen's
-    -- offline test): its acts' summed score and each act's standing exposure as the beam reads
-    -- it (exposed: the enemies that reach the tile, the plan's kills left out), the likeliest
-    -- death and the summed chance
+    -- offline test): its acts' summed score, and over its acts' standing exposure (exposed: the
+    -- enemies that reach the tile) at the plan's final kills and HP, the likeliest death and the
+    -- summed chance. The beam scored each act at the kills and HP when it was added, so an
+    -- early act here can read lower than it scored: the judge's view, which a screen must match.
     local function screen(st)
         local most, sum = 0, 0
         for _, a in ipairs(st.acts) do

@@ -3305,30 +3305,40 @@ do
 end
 
 -- test_planner_traces_the_screen (#510, the cheap screen's offline test): every plan judged
--- carries what the beam knew before the judge -- its acts' summed score, the standing
--- exposure of its likeliest death and the summed chance -- and the enemy phases its judge
--- played. Standing on (1,0) X strikes A for 25 of A's 20 at 100%: 1; on (0,1) nothing reaches.
+-- carries what the beam knew before the judge -- its acts' summed score, the likeliest death
+-- and the summed chance over its acts' standing exposure at the plan's final kills and HP --
+-- and the enemy phases its judge played. X strikes B on (2,2) for 25 of 20 at 100% and A on
+-- (0,1) at 50%; A's sure kill from (0,0) takes X out of every exposure.
 do
-    local A = blue(0x01, 0, 0, 0, { minRange = false })
-    local X = red(0x81, 3, 0)
+    local A = blue(0x01, 0, 0, 0)
+    local Bu = blue(0x02, 1, 0, 2, { minRange = false })
+    local X = red(0x81, 1, 0, { hp = 5 })
+    -- Y, far off, keeps the map from being won by X's death (the win makes every move moot)
+    local Y = red(0x82, 9, 9, { minRange = false })
     local o = {
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }), [0x81] = tiles({ 2, 0 }) },
-        field = function() return { [0] = { [0] = 40, [1] = 20 }, [1] = { [0] = 30 } } end,
-        danger = { ["1,0"] = 1 },
-        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }), [0x02] = tiles({ 0, 2 }, { 2, 2 }),
+                  [0x81] = tiles({ 1, 0 }, { 2, 1 }, { 1, 1 }) },
+        field = function() return { [0] = { [0] = 50, [1] = 45 }, [2] = { [0] = 40, [2] = 20 } } end,
+        danger = { ["2,2"] = 1, ["0,1"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true },
+                                     ["0,1"] = fc { takenHit = 50, takenDmg = 25, takenHits = 1 } } },
+               [0x02] = { [0x81] = { ["2,2"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+        enemyPhase = function() return {} end,
     }
-    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
-    local dies, n, whole = {}, 0, true
-    for _, c in ipairs(plan and plan.considered or {}) do
-        n = n + 1
-        local sc = c.screen or {}
-        whole = whole and type(sc.base) == "number" and type(sc.sum_die) == "number"
-            and type(sc.phases) == "number" and sc.phases >= 0
-        dies[table.concat(c.acts, " "):match("@(%d+,%d+)") or "?"] = sc.max_die
+    local final = Planner.FINAL
+    Planner.FINAL = 8
+    local _, plan = Planner.plan(B, boardOf(A, Bu, X, Y), sightOf(o), style("bold"))
+    Planner.FINAL = final
+    local by = {}
+    for _, c in ipairs(plan and plan.considered or {}) do by[table.concat(c.acts, " ")] = c.screen or {} end
+    local function line(acts)
+        local sc = by[acts]
+        return sc and string.format("%s %s %s %s", sc.base, sc.max_die, sc.sum_die, sc.phases) or "not judged"
     end
-    check(n > 0 and whole, true, "screen: every plan judged carries base, deaths and phases")
-    check(dies["1,0"], 1, "screen: standing in X's reach, the beam's read is a sure death")
-    check(dies["0,1"], 0, "screen: out of reach, none")
+    check(line("1>attack@0,0>129 2>wait@2,2>nil"), "45.0 0.0 0.0 1", "screen: the kill takes X out of B's exposure")
+    check(line("1>wait@0,0>nil 2>wait@2,2>nil"), "0.0 1.0 1.0 1", "screen: B alone in X's reach")
+    check(line("1>wait@0,1>nil 2>wait@2,2>nil"), "0.0 1.0 1.505 1", "screen: two in reach, the likeliest and the sum")
+    check(line("1>wait@0,0>nil 2>wait@0,2>nil"), "0.0 0.0 0.0 1", "screen: none in reach")
 end
 
 -- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that
