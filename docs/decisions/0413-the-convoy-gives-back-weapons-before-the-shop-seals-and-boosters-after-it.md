@@ -39,7 +39,7 @@ A held one is no longer the second thing to leave; only one its holder cannot us
 driven by keys.** The design opened the convoy screen on the map (`StartBmSupply`) and drove
 Take and Give with keys. The screen itself is three calls (`prep_itemsupply.c`). A give clears
 the bag slot, `UnitRemoveInvalidItems` packs the bag, and `AddItemToConvoy` stores the item. A
-take is `UnitAddItem` then `RemoveItemFromConvoy`, which packs the convoy. The harness makes
+take was `UnitAddItem` then `RemoveItemFromConvoy` (replaced: see the amendment below). The harness makes
 those calls kept, on the first player phase, so no screen is opened and no turn is spent. They
 leave the bags and the convoy as the prep screen's Supply would have, and that screen reaches
 every unit for free. Each act finds its item by id and uses, and checks after the call that
@@ -47,6 +47,26 @@ the item has moved; a failed act stops the campaign with its reason. The supply 
 the game gives the party a convoy (`HasConvoyAccess`). Use stays the Item command, as for
 seals before; `api.use` widens `api.promote` to boosters, and a seal's use counts only once
 the unit's class has changed.
+
+**Amended 2026-11-14 (the proof lap `party1`, crashed at its Ch10 start): a take rebuilds the
+convoy as the Supply screen does.** The take above used `RemoveItemFromConvoy`, which no game
+code calls. Its pack (`ShrinkConvoyItemList`) gathers the items into `gGenericBuffer`, writes a
+0 after the last one, empties the convoy and copies all 100 slots back from the buffer. So
+whatever the scratch buffer held past that 0 became convoy items. At `party1`'s Ch10 start it
+wrote about 40 (replayed as `dbgtake1`). PR 2's runs took items while the buffer was clean:
+a scan of the 27 saved states that record a convoy (`gear2`, `conv1` to `conv4`, `exp1`,
+`exp2`, `exp2b`, `exp2e`, `party1`) found no item with no id, no uses or an id past the item
+table. `lap1d`'s states hold the convoy only in their `.ss`, so they were not scanned; a give
+or take now refuses a convoy that is not the game's (`Board.convoyFault`). The Supply screen's own Take
+(`sub_809E2C8`) puts the item in the bag's first empty slot, then rebuilds the convoy
+(`sub_80982B8`: `ClearSupplyItems`, then `AddItemToConvoy` for each item left). The harness
+now does that rebuild, fed from the convoy itself, so the convoy keeps its slot order less the
+item taken. The screen feeds it from its item list, which also moves the item's page first;
+that sort is not reproduced. Every give and take now checks the convoy is the game's before
+it acts (packed, every item an id with a row in the item table: `Board.convoyFault`, unit-tested) and is exactly what it was with
+or without that one item after. Replayed (`dbgtake2`):
+Seth gave the Knight Crest and took the Iron Lance, Kyle (0x11) took the Crest and was promoted
+Cavalier to Paladin, and Ch10 was won with no death.
 
 **Decision 4: the pick reads the convoy too.** `Bot.arms(gold, stock, roster, convoy)` runs
 `Bot.supply`'s weapon step and then the shop over the unarmed units, so a unit the convoy will

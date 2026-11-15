@@ -63,6 +63,7 @@ Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that d
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
+Board.ITEMDATA_NUMBER = 0x06    -- bmitem.h ItemData +06 number: the row's own id (data_items.c)
 local IA_WEAPON = 1 << 0
 -- include/bmunit.h: struct Unit +0x1E u16 items[UNIT_ITEM_COUNT] (id | uses << 8)
 Board.UNIT_ITEMS, Board.ITEM_COUNT = 0x1E, 5
@@ -195,6 +196,42 @@ function Board.items(mem, addr)
         if (raw & 0xFF) ~= 0 then items[#items + 1] = { id = raw & 0xFF, uses = raw >> 8 } end
     end
     return items
+end
+
+-- The convoy's items, { id, uses, index } each (gConvoyItemArray, id | uses << 8; index its
+-- slot, from 0), every non-empty one of its CONVOY_ITEM_COUNT slots, as GetConvoyItemCount
+-- counts them. The game keeps the array packed (AddItemToConvoy fills the first empty slot;
+-- the Supply screen's rebuild, ClearSupplyItems then one AddItemToConvoy an item, packs it),
+-- but the read does not lean on it: a gap hides nothing (convoyFault names one). Not
+-- gConvoyItemCount: convoymenu.c sets that only when its chooser opens, in an EWRAM overlay
+-- other screens reuse.
+function Board.convoyItems(mem, SYM)
+    local out = {}
+    for i = 0, Board.CONVOY_ITEM_COUNT - 1 do
+        local v = mem.u16(SYM.gConvoyItemArray + i * 2)
+        if v ~= 0 then out[#out + 1] = { id = v & 0xFF, uses = v >> 8, index = i } end
+    end
+    return out
+end
+
+-- Why the convoy cannot be the game's own, or nil: an item after an empty slot (the game's
+-- adds and rebuild keep it packed), an item with no id, or an id gItemData has no row for (every
+-- row's `number` is its own id; past the table the bytes are whatever follows it). What
+-- RemoveItemFromConvoy's pack would leave (it copies the scratch buffer in, ADR 0413's
+-- amendment); a give or take refuses such a convoy rather than carry it on.
+function Board.convoyFault(mem, SYM)
+    local gap = false
+    for i = 0, Board.CONVOY_ITEM_COUNT - 1 do
+        local v = mem.u16(SYM.gConvoyItemArray + i * 2)
+        local id = v & 0xFF
+        if v == 0 then gap = true
+        elseif gap then return string.format("an item after an empty slot (slot %d)", i)
+        elseif id == 0 then return string.format("an item with no id (slot %d)", i)
+        elseif mem.u8(SYM.gItemData + id * Board.ITEMDATA_STRIDE + Board.ITEMDATA_NUMBER) ~= id then
+            return string.format("item 0x%X has no row in the item table (slot %d)", id, i)
+        end
+    end
+    return nil
 end
 
 -- FULL: the lean read plus index, class, items and boss attribute.
@@ -561,6 +598,8 @@ function Board.bind(mem, SYM)
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         items = function(addr) return Board.items(mem, addr) end,
+        convoyItems = function() return Board.convoyItems(mem, SYM) end,
+        convoyFault = function() return Board.convoyFault(mem, SYM) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
         itemUser = function() return Board.itemUser(mem, SYM) end,
