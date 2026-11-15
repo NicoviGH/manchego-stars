@@ -711,16 +711,12 @@ do
     f:close()
     check(harness:find("gUnitLookup entry", 1, true), nil, "harness: no observer error for a non-unit cell")
     check(harness:find("unit_unknown = unknown or nil", 1, true) ~= nil, true, "harness: the cell's fact is reported")
-    -- api.act's plain Wait waits out the AREA event it can set off, answering the full-bag
-    -- chooser (waitFor's tapA), before the next act moves (ch15diag2 turn 12)
-    local body = harness:match("api%.act = function%(a%)(.-)\n    api%.endPhase")
-    check(body ~= nil, true, "harness: api.act is found")
-    local tail = body and body:match("\n        if not chooseWait%(%) then return false end(.*)$")
-    check(tail ~= nil, true, "harness: the plain Wait checks its own result")
-    check(tail and tail:find('INSPECT.settled("event")', 1, true) ~= nil, true,
-        "harness: the plain Wait waits out the event it set off")
-    check(tail and tail:find("TUNE.combatFrames, true)", 1, true) ~= nil, true,
-        "harness: ...answering the boxes and the full-bag chooser on the way")
+    -- every Wait (chooseWait) waits the action's tail out on Controller.actionTailOver,
+    -- answering boxes and the full-bag chooser on the way (waitFor's tapA)
+    local body = harness:match("local function chooseWait%(stopWhen%)(.-)\nend\n")
+    check(body ~= nil, true, "harness: chooseWait is found")
+    check(body and body:find("Controller.actionTailOver", 1, true) ~= nil, true,
+        "harness: chooseWait waits out the action's tail")
 end
 
 -- Trace lines are structured and carry the full state/action/postcondition transition.
@@ -1001,6 +997,27 @@ busy({}, false,
     "an observation with no world block cannot claim to be busy")
 busy({ world = {} }, false,
     "nor can one whose faction was not observed")
+
+-- actionTailOver -- when a unit's action, Wait included, is really over (ch15diag2 turn 12):
+-- the AREA event it set off and the full-bag chooser on top of it come after the menu closes
+local function tail(observation, want, msg)
+    check(C.actionTailOver(observation), want, msg)
+end
+local live = { world = { faction = 0 } }
+tail({ world = live.world, procs = proc("player_phase", "player_main_idle") }, true,
+    "the map back in the player's hands ends the action")
+tail({ world = live.world, procs = proc("player_phase", "player_range_idle") }, false,
+    "a unit still selected is not the end")
+tail({ world = live.world, procs = {} }, false,
+    "the menu gone but the map not yet idle is not the end: the event may start next frame")
+tail({ world = live.world, procs = { player_phase = { idle = "player_main_idle" },
+                                     std_event = { idle = "event_engine" } } }, false,
+    "an event the action set off is still the action")
+tail({ world = live.world, procs = sendToConvoy.procs, menu = sendToConvoy.menu }, false,
+    "so is the full-bag chooser that event opened")
+tail({ world = { faction = 128 } }, true,
+    "the last unit's action ends the phase, and the phase leaving the player ends the wait")
+tail(nil, false, "no observation is no end")
 
 
 if fails > 0 then

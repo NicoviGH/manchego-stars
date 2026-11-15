@@ -953,6 +953,23 @@ function M.engineIsWorking(observation)
     return false
 end
 
+--- Whether the tail of a unit's action is over, read from one observation after its command
+--- menu closed. The game checks AREA events when an action ends, Wait included, and the
+--- event runs after the menu is gone: vanilla Ch15's hidden treasure (ch15a-eventinfo.h AREA
+--- 0,0-2,2, EventScr_GiveTreasureToLuckyDog) gives an item there, and a full bag opens the
+--- send-to-convoy chooser on top of it (ch15diag2 turn 12 crashed on the next act's move).
+--- "No event running" alone is not the end: the event engine may start a frame after the
+--- menu closed. The tail is over once the map is the player's to command again, or once the
+--- phase has left the player (the last unit's action ends it).
+function M.actionTailOver(observation)
+    if not observation then return false end
+    local world = observation.world
+    if world and world.faction and world.faction ~= FACTION_PLAYER then return true end
+    local procs = observation.procs or {}
+    if procs.std_event or procs.battle then return false end
+    return M.classify(observation) == "player_map_idle"
+end
+
 function M.formatTrace(record)
     return jsonEncode({
         event = "transition",

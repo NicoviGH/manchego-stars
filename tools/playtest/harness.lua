@@ -1218,10 +1218,21 @@ local function moveUnit(fx, fy, tx, ty, haltOk)
     return false
 end
 
-local function chooseWait()
-    return selectSemantic("wait", "Wait closes the unit command menu", function(after)
+-- Wait, and the tail of the action it ends: an AREA event the Wait set off and the full-bag
+-- chooser that event can open (Controller.actionTailOver), answered on the way as a Visit's
+-- are (waitFor's tapA). `stopWhen` (optional): a second exit, the caller's won-or-lost, for an
+-- event that ends the chapter and so never hands the map back.
+local function chooseWait(stopWhen)
+    if not selectSemantic("wait", "Wait closes the unit command menu", function(after)
         return after.menu == nil
-    end, 120)
+    end, 120) then return false end
+    if waitFor(function()
+        return Controller.actionTailOver(observeController()) or (stopWhen ~= nil and stopWhen())
+    end, TUNE.combatFrames, true) then return true end
+    traceFailure("await_wait_tail", "the event after the Wait ends and the map is idle",
+        "fail:wait-tail-timeout", nil, "controller-wait-tail-timeout")
+    freezeReport("controller wait tail timeout")
+    return false
 end
 
 -- `targetId` (optional): the unit to talk to, the selector stepped to it (INSPECT.stepTarget).
@@ -3594,19 +3605,7 @@ INSPECT.botApi = function(game)
             end, 900) then return false end
             return waitFor(won, 9000, true)
         end
-        if not chooseWait() then return false end
-        -- The game checks AREA events when an action ends, Wait included, and the event runs
-        -- after the menu closes. Vanilla Ch15's hidden treasure (ch15a-eventinfo.h AREA 0,0-2,2,
-        -- EventScr_GiveTreasureToLuckyDog) gives an item there, and a full bag opens the
-        -- send-to-convoy chooser: returning at the menu left the chooser open under the next
-        -- act's move (ch15diag2 turn 12). So wait the event out as a Visit does, answering its
-        -- boxes and the chooser; the last unit's Wait ends the phase, which ends this too.
-        if not waitFor(function()
-            return faction() ~= 0 or won() or lost() or INSPECT.settled("event")
-        end, TUNE.combatFrames, true) then
-            return false, "the event after the Wait never ended"
-        end
-        return true
+        return chooseWait(function() return won() or lost() end)
     end
     api.endPhase = function()
         local phaseTurn = turn()
