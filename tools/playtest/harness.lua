@@ -3413,7 +3413,7 @@ INSPECT.botApi = function(game)
                  mode = TUNE.difficultyName[TUNE.difficultyWant],
                  seed = tonumber(PLAYTEST_SEED) or 1,
                  -- the bot hash and suite version montecarlo.py ran it under (botrun's record)
-                 instrument = PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil },
+                 instrument = INSPECT.instrument() },
         style = style,
         claims = decode(PLAYTEST_CLAIMS, {}),
         -- an experiment's benched units (PT_BENCH, JSON charIds; montecarlo.py `pilot
@@ -3708,6 +3708,12 @@ INSPECT.BAG = {
 }
 INSPECT.bagLog = {}
 
+-- The bot hash and suite version montecarlo.py ran this under (PT_INSTRUMENT), nil when run by
+-- hand: botrun's record and the campaign's start lineage (ADR 0417) both read it here.
+INSPECT.instrument = function()
+    return PLAYTEST_INSTRUMENT ~= "" and PLAYTEST_INSTRUMENT or nil
+end
+
 -- The world map's cursor and lord, for the observer: the open nodes, the node the cursor sits
 -- on (sub_80B961C, the L jump, puts ix/iy exactly on a node's x/y << 8), the lord's node.
 INSPECT.worldMap = function()
@@ -3961,7 +3967,10 @@ INSPECT.campaignApi = function(game)
 
     local api = { Bot = BOT, Json = Json,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
-                 route = cfg.route },
+                 route = cfg.route,
+                 -- the bot hash and suite version montecarlo.py ran it under: each start this
+                 -- campaign saves names the bots that played the chapters before it (ADR 0417)
+                 instrument = INSPECT.instrument() },
         random = math.random,
         -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
         -- attempt draws what the whole campaign would have drawn there
@@ -4109,7 +4118,7 @@ INSPECT.campaignApi = function(game)
                     .. "carried team; it resumes with none", played))
             end
             return { chapter = played, carried = saved.carried or {},
-                     carriedUnknown = saved.carried == nil }
+                     carriedUnknown = saved.carried == nil, bots = saved.bots }
         end
         local stalled = INSPECT.watch("arrive")
         for _ = 1, TUNE.bootSteps do
@@ -4126,9 +4135,11 @@ INSPECT.campaignApi = function(game)
                     local sapi = INSPECT.sightApi()
                     INSPECT.Sight.seed(sapi, seed)
                 end
+                -- the first map New Game reaches: no bot has played a chapter before it
+                local first = played == nil
                 played = ch
                 log(string.format("campaign: chapter %d starts (%s)", ch, state))
-                return { chapter = ch }
+                return { chapter = ch, bots = first and {} or nil }
             end
             if state == "world_map_idle" then
                 local target = INSPECT.gameCalls(function(call)

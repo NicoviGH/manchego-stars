@@ -53,7 +53,8 @@ local function fakeGame(o)
             if ch.options then g.routeAsked = route({ "a", "b" }) end
             if ch.arriveFails then return nil, "the world map never handed over" end
             g.attempt = 0
-            return { chapter = ch.id, carried = ch.carried, carriedUnknown = ch.carriedUnknown }
+            return { chapter = ch.id, carried = ch.carried, carriedUnknown = ch.carriedUnknown,
+                     bots = ch.bots }
         end,
         seed = function(ch) g.seeds[#g.seeds + 1] = ch; if o.seed then o.seed(ch) end end,
         snapshot = function()
@@ -501,6 +502,35 @@ local function test_between_takes_from_the_convoy()
     check(table.concat(done, ","), "take:57", "with the acts that ran before the failed one")
 end
 test_between_takes_from_the_convoy()
+
+-- ADR 0417: each saved start names the bots that played the chapters before it. New Game's
+-- first map: none; every later start this run reaches: this run's bot after the start's own; a
+-- resumed start whose record never kept them stays unknown. Fails on a startRecord with no bots.
+local function test_each_start_names_the_bots_before_it()
+    local function run(first, instrument)
+        local g = fakeGame({ chapters = { { id = 0, bots = first }, { id = 1 }, { id = 2 } } })
+        g.api.info.instrument = instrument
+        Campaign.run(g.api)
+        return g.records
+    end
+    local r = run({}, "new+v2")
+    check(Json.encode(r[0].bots), "[]", "New Game's first map: no bot played before it")
+    check(table.concat(r[1].bots, ","), "new+v2", "the next start: this run's bot")
+    check(table.concat(r[2].bots, ","), "new+v2", "each version once in a row")
+    local g = fakeGame({ chapters = { { id = 0, bots = { "old+v2" } }, { id = 1 } } })
+    g.api.info.instrument = "new+v2"
+    Campaign.run(g.api)
+    check(table.concat(lines(g)[2].start_bots, ","), "old+v2,new+v2",
+          "each chapter line names who played up to its start (records_of judges it)")
+    r = run({ "old+v2" }, "new+v2")
+    check(table.concat(r[0].bots, ","), "old+v2", "a resumed start keeps its own record")
+    check(table.concat(r[1].bots, ","), "old+v2,new+v2", "then this run's bot after it")
+    r = run(nil, "new+v2")
+    check(r[1].bots, nil, "a start resumed from a record that never kept them stays unknown")
+    r = run({}, nil)
+    check(table.concat(r[1].bots, ","), "unversioned", "a run with no version says so")
+end
+test_each_start_names_the_bots_before_it()
 
 -- Rule A (#510 comment 6896261936): the benched units' bags reach Bot.supply, so a booster on
 -- a unit left out of the map goes to the convoy. Fails on a between() that hands Bot.supply

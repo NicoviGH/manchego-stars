@@ -318,6 +318,33 @@ class Workers(unittest.TestCase):
         self.assertNotIn('supply', recs[2])
         self.assertNotIn('prep', recs[2])
 
+    def test_each_record_says_whether_its_start_was_stale(self):
+        # ADR 0417: a chapter line's start_bots judges its attempts; the end keeps the first
+        # start's (every run kind: resume, attempts, cells, not only resume's stamp)
+        text = ('BOTRUN {"outcome": "won", "chapter": 3, "attempt": 1, "instrument": "new+v2"}\n'
+                'BOTRUN {"outcome": "won", "chapter": 4, "attempt": 1, "instrument": "new+v2"}\n'
+                'CAMPAIGN {"chapter": 3, "attempts": 1, "start_bots": ["old+v2"]}\n'
+                'CAMPAIGN {"chapter": 4, "attempts": 1, "start_bots": ["old+v2", "new+v2"]}\n'
+                'CAMPAIGN {"outcome": "played"}')
+        recs = mc.records_of({'instrument': 'new+v2'}, text, '/tmp/w', '/x.log')
+        self.assertEqual([r.get('stale') for r in recs], [True, True, True])
+        self.assertEqual(recs[2]['start_bots'], ['old+v2'])
+        fresh = mc.records_of({'instrument': 'new+v2'},
+                              'BOTRUN {"outcome": "won", "chapter": 0, "attempt": 1, '
+                              '"instrument": "new+v2"}\nCAMPAIGN {"chapter": 0, "start_bots": []}\n'
+                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/x.log')
+        self.assertEqual([r.get('stale') for r in fresh], [False, False])
+        unknown = mc.records_of({'instrument': 'new+v2'},
+                                'BOTRUN {"chapter": 5, "attempt": 1, "instrument": "new+v2"}\n'
+                                'CAMPAIGN {"chapter": 5}', '/tmp/w', '/x.log')
+        self.assertEqual(unknown[0]['stale'], True, 'a start with no list is stale')
+        # a chapter cut short by a Lua error left no line, and a campaign with no chapter line:
+        # both unknown, never read as current (review of #625)
+        cut = mc.records_of({}, 'BOTRUN {"chapter": 6, "attempt": 1, "instrument": "new+v2"}\n'
+                                'CAMPAIGN {"outcome": "crashed", "why": "Lua error: x"}',
+                            '/tmp/w', '/x.log')
+        self.assertEqual([r.get('stale') for r in cut], [True, True])
+
     def test_a_failed_prep_lands_on_the_campaign_end(self):
         # an attempt whose prep failed never played: no BOTRUN to carry its acts (review of #624)
         text = ('CAMPAIGN {"chapter": 15, "attempts": 1, "outcome": "crashed", "prep": ['
@@ -1280,6 +1307,41 @@ class Suite(unittest.TestCase):
         self.assertEqual(mc.cell_pins(store), [], 'a timeout is not pinned')
         self.assertIn('cs-s4001: timeout, not pinned (too long', out.getvalue())
 
+    def test_a_start_says_which_bots_played_up_to_it(self):
+        """ADR 0417: a start's record names the bots that played the chapters before it; one an
+        older bot played, or one whose record never kept them, is stale, and played all the same
+        (no refusal)."""
+        top = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, top)
+        d = os.path.join(top, 'states', 'c')
+        os.makedirs(d)
+        for at, rec in ((0, {'bots': []}), (3, {'bots': ['new+v2']}),
+                        (5, {'bots': ['old+v2', 'new+v2']}), (7, {})):
+            with open(os.path.join(d, '%d.json' % at), 'w') as fh:
+                json.dump(rec, fh)
+        self.assertEqual(mc.start_bots(top, 'c', 0, 'new+v2'), ([], False), 'nothing played')
+        self.assertEqual(mc.start_bots(top, 'c', 3, 'new+v2'), (['new+v2'], False))
+        self.assertEqual(mc.start_bots(top, 'c', 5, 'new+v2'), (['old+v2', 'new+v2'], True))
+        self.assertEqual(mc.start_bots(top, 'c', 7, 'new+v2'), (None, True), 'never kept')
+        self.assertEqual(mc.start_bots(top, 'c', 9, 'new+v2'), (None, True), 'no record')
+        self.assertEqual(mc.start_bots(top, 'c', 3, 'new+v3'), (['new+v2'], False),
+                         'a suite manifest version alone changes no play')
+        with open(os.path.join(d, '11.json'), 'w') as fh:
+            json.dump({'bots': 'new+v2'}, fh)
+        self.assertEqual(mc.start_bots(top, 'c', 11, 'new+v2'), (None, True), 'not a list')
+        # resume prints a line for a stale start, none for a current one
+        tasks = [{'stamp': {'resumed_from': 'c/%d' % at}, 'instrument': 'new+v2'} for at in (3, 5)]
+        self.assertEqual(mc.stale_lines(top, tasks),
+                         ['  stale start c/5: played up to by old+v2, new+v2, not this bot alone'])
+        # a chapter cell counts its stale starts an arm (the vanilla arm here, none in Manchego Stars)
+        os.makedirs(os.path.join(top, 'o', 'states'))
+        cell = {'ours': [], 'vanilla': [{'provenance': {'campaign': 'c'}, 'chapter': at}
+                                        for at in (0, 3, 5, 7)]}
+        self.assertEqual(mc.cell_stale_lines({'ours': os.path.join(top, 'o'), 'vanilla': top},
+                                             cell, 'new+v2'),
+                         ['vanilla: 2 of 4 starts are stale (an older or unknown bot played up '
+                          'to them)'])
+
     def test_resume_carries_a_campaign_on_under_a_new_id_from_its_saved_start(self):
         """`resume` (ADR 0399): a copy of the campaign's states under `<tag>-<campaign>`, so the
         pinned file is never re-saved; from its latest start unless told; its own seed; and a
@@ -1300,14 +1362,18 @@ class Suite(unittest.TestCase):
                                    for c in (6, 7)}}])
         pins = {c['campaign']: c for c in mc.cell_pins(store)}
         env = {'last': [22], 'route': 1}
-        tasks = mc.resume_tasks(store, env, ['cs-s4001', 'full-s4008'], pins, 'mem1', vanilla=True)
+        tasks = mc.resume_tasks(store, env, ['cs-s4001', 'full-s4008'], pins, 'mem1', vanilla=True,
+                                instrument='b0t+v2')
         self.assertEqual([(t['campaign']['id'], t['campaign']['from'], t['seed'],
                            t['campaign']['last']) for t in tasks],
                          [('mem1-cs-s4001', 7, 4001, [22]), ('mem1-full-s4008', 9, 4008, [22])])
         self.assertNotIn('attempt', tasks[0]['campaign'], 'every attempt, in sequence')
         self.assertEqual(tasks[0]['stamp'], {'resumed_from': 'cs-s4001/7'})
+        self.assertEqual(tasks[0]['instrument'], 'b0t+v2',
+                         'the version it is judged against is the one it runs under')
         self.assertTrue(os.path.exists(os.path.join(store, 'states', 'mem1-cs-s4001', '7.ss')))
-        one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7)
+        one = mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem2', chapter=6, last=7,
+                              instrument='b0t+v2')
         self.assertEqual((one[0]['campaign']['from'], one[0]['campaign']['last']), (6, [7]))
         with self.assertRaisesRegex(ValueError, 'already exists'):
             mc.resume_tasks(store, env, ['cs-s4001'], pins, 'mem1')

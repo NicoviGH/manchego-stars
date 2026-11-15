@@ -72,7 +72,10 @@
 --   arrive(route)         ride the game to the next chapter's start; at a route split the
 --                         harness calls route(options) -> index. Returns { chapter = n,
 --                         carried = {charIds}|nil (a resumed start: the team carried in),
---                         carriedUnknown = true|nil (a start saved before records kept it) } |
+--                         carriedUnknown = true|nil (a start saved before records kept it),
+--                         bots = the start record's bots (a resumed start; nil: a record saved
+--                         before they were kept) | {} (the first map New Game reaches) | nil (a
+--                         start this run reached by playing the chapter before) } |
 --                         "end" | nil, why
 --   snapshot(chapter)     what the game holds at the start: { gold, party = { { charId, classId,
 --                         level, items = { { id, uses } } } }, convoy = { { id, uses } },
@@ -195,9 +198,22 @@ end
 -- the game's snapshot (gold, each unit's bag with its uses left, the convoy's items, the open
 -- shops) and the team carried in (nil = unknown, left out; see arrive). Pure, so a test reads
 -- it without an emulator.
-function M.startRecord(game, ch, snap, carried)
+-- bots = the bot versions (montecarlo.py's instrument) that played the chapters before this
+-- start, oldest first, each once in a row; nil when a start it was resumed from never kept them
+-- (ADR 0417: montecarlo.py resume says such a start is stale).
+function M.startRecord(game, ch, snap, carried, bots)
     return { game = game, chapter = ch, gold = snap.gold, party = snap.party,
-             convoy = snap.convoy, shops = snap.shops, carried = carried }
+             convoy = snap.convoy, shops = snap.shops, carried = carried, bots = bots }
+end
+
+-- The bots that played every chapter before the next start: `bots` with this run's version
+-- after it, unless it is already the last (nil stays nil: unknown stays unknown).
+function M.withBot(bots, instrument)
+    if bots == nil then return nil end
+    local out = { table.unpack(bots) }
+    local me = instrument or "unversioned"
+    if out[#out] ~= me then out[#out + 1] = me end
+    return out
 end
 
 local function byCharId(roster)
@@ -373,6 +389,8 @@ function M.run(api)
 
     local function play()
         local carried = {}
+        -- the bots that played every chapter before this start (ADR 0417); nil: unknown
+        local bots, arrived = nil, false
         while true do
             local at, why = api.arrive(function(options)
                 return Bot.route(options, { route = route })
@@ -380,6 +398,10 @@ function M.run(api)
             if at == "end" then return "done", "the game has no next chapter" end
             if not at then return "crashed", "arrive: " .. tostring(why) end
             local ch = at.chapter
+            -- a resumed start or New Game's first map says who played before it; any later start
+            -- was reached by this run playing the chapter before
+            if arrived then bots = M.withBot(bots, info.instrument) else bots = at.bots end
+            arrived = true
             api.seed(ch)
             if at.carried then
                 carried = {}
@@ -393,15 +415,18 @@ function M.run(api)
                     for charId in pairs(carried) do list[#list + 1] = charId end
                     table.sort(list)
                 end
-                local ok, swhy = api.save(ch, M.startRecord(info.game, ch, api.snapshot(ch), list))
+                local ok, swhy = api.save(ch, M.startRecord(info.game, ch, api.snapshot(ch), list,
+                                                            bots))
                 if not ok then return "crashed", "save: " .. tostring(swhy) end
                 if api.startOnly == ch then
                     return "done", string.format("chapter %d's start is saved", ch)
                 end
             end
             local claims = api.claims(ch) or {}
+            -- start_bots: who played the chapters before this start (absent: unknown);
+            -- montecarlo.py's records_of judges each attempt stale against it (ADR 0417)
             local entry = { chapter = ch, attempts = 0, failures = {},
-                            carried_unknown = at.carriedUnknown or nil }
+                            carried_unknown = at.carriedUnknown or nil, start_bots = bots }
             chapters[#chapters + 1] = entry
             local cap, cwhy = api.cap()
             if cwhy then return "crashed", string.format("chapter %d: cap: %s", ch, cwhy) end
