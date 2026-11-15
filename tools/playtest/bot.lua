@@ -160,7 +160,8 @@
 -- Bot.shop(gold, stock, party) -> {{ unit = charId, item }...}, one entry per purchase in the
 --   order made, each naming the unit it is for (FE8's shop screen buys into the inventory of
 --   the unit that opened it, bmshop.c StartShopScreen). party is the deployed roster entries,
---   in roster order (the order Bot.arms reads them in). One Vulnerary (the cheapest) per unit holding none first, then for each
+--   in roster order (the order Bot.arms reads them in). One Vulnerary (the cheapest) per unit
+--   holding none first, then for each
 --   unit and each weapon or staff type among the stock it can use (type names in order) in
 --   which it holds no USABLE item with uses left (a held weapon the game says it cannot use, or
 --   a tome with 0 uses, counts as none), the cheapest stock item of that type it can use. A
@@ -2758,14 +2759,12 @@ end
 function M.supply(party, convoy)
     local L = ledger(party, convoy, true)
     for _, u in ipairs(party) do
-        local i = 1
-        while i <= #L.bags[u.charId] do
+        -- from the last slot down, so a give (which packs the bag) never moves an item not yet
+        -- looked at
+        for i = #L.bags[u.charId], 1, -1 do
             local it = L.bags[u.charId][i]
-            if it.kind ~= "weapon" and not (it.promotes or it.gains) and anyUser(it)
-                    and L.give(u.charId, i, "a seal or booster it cannot use") then
-                -- given: the next item is now at i
-            else
-                i = i + 1
+            if it.kind ~= "weapon" and not (it.promotes or it.gains) and anyUser(it) then
+                L.give(u.charId, i, "a seal or booster it cannot use")   -- false: the convoy is full
             end
         end
     end

@@ -3651,7 +3651,8 @@ INSPECT.CAMPAIGN = {
     shopSteps = 4000,                           -- frames one purchase may take, fades included
 }
 
--- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +0C pStatBonuses, +10 pEffectiveness, +19
+-- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +0C pStatBonuses,
+-- +10 pEffectiveness, +19
 -- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
 -- types.h BmSt +2C um_tmp_item (the item that found no room); the bag itself is board.lua's
 -- (Board.UNIT_ITEMS, ITEM_COUNT); menu_def.c's
@@ -4338,6 +4339,16 @@ INSPECT.campaignApi = function(game)
         end
         local byChar = {}
         for _, u in ipairs(all) do byChar[u.charId] = u end
+        -- every roster unit's struct, found before the sandbox runs (an error raised inside it
+        -- would leave the machine half set up)
+        local addrOf = {}
+        for _, e in ipairs(roster) do
+            local u = byChar[e.charId] or BOARD.find("blue", e.charId)
+            if not u then
+                error(string.format("api.convoy: roster unit 0x%02X is in no unit array", e.charId))
+            end
+            addrOf[e.charId] = u.addr
+        end
         return INSPECT.gameCalls(function(call)
             -- A non-weapon's answers read its id, never its uses (CanUnitUsePromotionItem's and
             -- CanUnitUseStatGainItem's GetItemIndex / GetItemStatBonuses, the key and heal reads),
@@ -4360,16 +4371,12 @@ INSPECT.campaignApi = function(game)
             end
             local bags = {}
             for i, e in ipairs(roster) do
-                local u = byChar[e.charId] or BOARD.find("blue", e.charId)
-                if not u then
-                    error(string.format("api.convoy: roster unit 0x%02X is in no unit array", e.charId))
-                end
                 local copy = BOARD.copy(e)
                 copy.items = {}
                 for j, it in ipairs(e.items) do
                     local c = BOARD.copy(it)
                     if c.kind ~= "weapon" then
-                        c.kind = facts(u.addr, it, true).kind
+                        c.kind = facts(addrOf[e.charId], it, true).kind
                         c["for"] = forAll(it)
                     end
                     copy.items[j] = c

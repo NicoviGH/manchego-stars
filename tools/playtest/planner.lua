@@ -588,7 +588,7 @@ function M.plan(Bot, board, sight, style, opts)
         if c.by then
             at, late = pos[c.by] or byId[c.by] or g.tile, Goals.GAMMA
         end
-        local moved = Board.copy(g)
+        local moved = copy(g)
         moved.tile = { x = at.x, y = at.y }
         return Goals.chance(moved, pos, Goals.GAMMA, turnsTo) * late
     end

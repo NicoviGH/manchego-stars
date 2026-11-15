@@ -1802,6 +1802,18 @@ do
     check(acts(B.supply({ holder }, {})), "give 1:68",
         "supply: the ring a benched unit can use goes to the convoy, the useless bolt stays")
 
+    -- a full convoy (Board.CONVOY_ITEM_COUNT) takes no give: the ring stays in the bag, and a
+    -- full bag that would have to give to make room takes nothing (api.give would refuse both)
+    local full = {}
+    for k = 1, Board.CONVOY_ITEM_COUNT do full[k] = item(0x6C, {}) end
+    check(acts(B.supply({ armedUnit(1, 4, { items = { lance(), ring } }) }, full)), "",
+        "supply: a full convoy takes no give")
+    local packed = armedUnit(5, 10, { items = { lance(), lance(30), { kind = "heal", uses = 3 },
+                                               { kind = "key", id = 0x69, uses = 1 },
+                                               { kind = "money", id = 0xBC, uses = 1 } } })
+    full[Board.CONVOY_ITEM_COUNT] = item(0x65, { [5] = { promotes = true } })
+    check(acts(B.uses({ packed }, full)), "", "uses: a full bag cannot make room in a full convoy")
+
     -- 2. convoy weapons: the unarmed first, the best of the type it can use, uses left
     local function tome(id, rank, uses, users)
         local f = {}
