@@ -55,7 +55,18 @@ local function fakeCpu(cost)
         end
         return false
     end
+    cpu.live = function(done, max) return cpu.frames(done, max) end
     return cpu, function() return loads, ram end
+end
+
+-- mGBA's pc write refills the pipeline: a pc written in the BIOS reads one instruction ahead
+-- (measured at the halt loop, ARM: +4). `keep` lists the pcs the test sets as they read.
+local function refills(cpu, keep)
+    local write = cpu.write
+    function cpu.write(r, v)
+        if r == "pc" and v < 0x08000000 and not (keep or {})[v] then v = v + 4 end
+        write(r, v)
+    end
 end
 
 -- test_roll_chance_counts_every_draw: Roll1RN and Roll2RN's odds over every 16-bit NextRN
@@ -954,11 +965,7 @@ end
 -- write that lands one instruction ahead (mGBA's pipeline refill, measured).
 do
     local cpu, seen = fakeCpu(2)
-    local write = cpu.write
-    function cpu.write(r, v)
-        if r == "pc" and v < 0x08000000 then v = v + 4 end   -- the refill, at the BIOS loop
-        write(r, v)
-    end
+    refills(cpu)
     local before = {}
     for _, r in ipairs({ "r0", "r4", "sp", "lr", "pc", "cpsr" }) do before[r] = cpu.read(r) end
     local got = Sight.machine(cpu, true)(function(call)
@@ -971,6 +978,49 @@ do
     check(ram.marker, "kept", "and what it wrote stays")
     check(ram[Sight.REG_IE], nil, "a kept call leaves REG_IE alone")
     for r, v in pairs(before) do check(cpu.read(r), v, "register " .. r .. " is put back") end
+end
+
+-- A kept call waits for the CPU to rest between frames (#620): a frame that ended inside the
+-- game's VBlank work (pc 0x2E8) is run on until pc reads the BIOS's halt, and the registers
+-- put back are the resting ones; a CPU that never rests fails loudly.
+do
+    local cpu, seen = fakeCpu(2)
+    cpu.write("pc", 0x2E8)
+    local frames, waited = cpu.frames, 0
+    function cpu.live(done, max)
+        if cpu.read("pc") == 0x2E8 then
+            for _ = 1, max do
+                waited = waited + 1
+                if waited == 3 then cpu.write("pc", Sight.REST_PC) end
+                if done() then return true end
+            end
+            return false
+        end
+        return frames(done, max)
+    end
+    refills(cpu, { [0x2E8] = true, [Sight.REST_PC] = true })
+    local got = Sight.machine(cpu, true)(function(call) return call(0x08001001, { 2, 40 }) end)
+    check(got, 42, "rest: the kept call runs once the CPU rests")
+    check(waited, 3, "rest: after the frames it took to rest")
+    check(cpu.read("pc"), Sight.REST_PC, "rest: and the game resumes from its rest, not mid-frame")
+    local busy = fakeCpu(2)
+    busy.write("pc", 0x2E8)
+    local ok, err = pcall(Sight.machine(busy, true), function(call) return call(0x08001001, { 1, 1 }) end)
+    check(ok, false, "rest: a CPU that never rests stops the kept call")
+    check(tostring(err):find("never rested", 1, true) ~= nil, true, "rest: and says why")
+    -- a kept call's frames are real ones (cpu.live), never the sight's counted cpu.frames
+    local real = fakeCpu(2)
+    refills(real)
+    local sightFrames = real.frames
+    real.live = function(done, max) return sightFrames(done, max) end
+    real.frames = function() error("a kept call stepped the sight's frames") end
+    check(Sight.machine(real, true)(function(call) return call(0x08001001, { 1, 2 }) end), 3,
+          "rest: a kept call runs on real frames")
+    -- a sandboxed call loads its state back: it needs no rest
+    local sandboxed = fakeCpu(2)
+    sandboxed.write("pc", 0x2E8)
+    check(Sight.machine(sandboxed)(function(call) return call(0x08001001, { 2, 3 }) end), 5,
+          "rest: a sandboxed call runs where the frame ended")
 end
 
 do
