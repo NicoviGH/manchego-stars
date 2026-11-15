@@ -3674,16 +3674,14 @@ INSPECT.CAMPAIGN = {
     shopSteps = 4000,                           -- frames one purchase may take, fades included
 }
 
--- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +0C pStatBonuses,
--- +10 pEffectiveness, +19
--- encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
+-- A full bag (INSPECT.answerFullBag): include/bmitem.h ItemData +10 pEffectiveness, +14
+-- maxUses, +19 encodedRange (max in the low nibble), +1C weaponRank, +1E useEffectId; IA_STAFF; include/
 -- types.h BmSt +2C um_tmp_item (the item that found no room); the bag itself is board.lua's
 -- (Board.UNIT_ITEMS, ITEM_COUNT); menu_def.c's
 -- convoy chooser rows. Keys: what GetUnitKeyItemSlotForTerrain looks for (bmunit.c). Passive:
 -- the items the engine tests by id or attribute while carried -- the Member Card (eventinfo.c),
 -- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
 INSPECT.BAG = {
-    ITEM_STAT_BONUSES = 0x0C,                   -- ItemData +0C pStatBonuses
     ITEM_EFFECTIVE = 0x10, ITEM_MAX_USES = 0x14, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C,
     ITEM_USE_EFFECT = 0x1E,
     IA_STAFF = 4, BMST_TMP_ITEM = 0x2C,
@@ -3828,12 +3826,16 @@ INSPECT.unitItemFacts = function(call, unitAddr, item, rosterRead)
         return f
     end
     -- A seal that promotes this unit now (class and level), or a booster that raises one of its
-    -- stats (an item with stat bonuses the prep screen's Use offers it: CanUnitUseItemPrepScreen
-    -- asks CanUnitUseStatGainItem, which says no at a stat's cap). Bot.supply and Bot.fullBag
-    -- weigh them.
-    f.promotes = call(SYM.CanUnitUsePromotionItem, { unitAddr, value }) ~= 0 or nil
-    f.gains = not f.promotes and ru32(data + K.ITEM_STAT_BONUSES) ~= 0
-        and call(SYM.CanUnitUseItemPrepScreen, { unitAddr, value }) ~= 0 or nil
+    -- stats (CanUnitUseStatGainItem says no at a stat's cap). Bot.supply and Bot.fullBag weigh
+    -- them. Each check is asked only of the items the game's own Use routes to it (`use`,
+    -- K.USE; the prep screen's Use sends a booster to CanUnitUseStatGainItem):
+    -- CanUnitUsePromotionItem's last class-list walk is unguarded (bmitemuse.c), so for any
+    -- other item a unit at level 10 or higher walks a NULL list: it read Ephraim's Elixir as a
+    -- seal (lap3p, vanilla Ch13 on his route, ADR 0418).
+    f.promotes = f.use == "seal" and call(SYM.CanUnitUsePromotionItem, { unitAddr, value }) ~= 0
+        or nil
+    f.gains = f.use == "booster" and call(SYM.CanUnitUseItemPrepScreen, { unitAddr, value }) ~= 0
+        or nil
     if rosterRead then
         return f
     elseif INSPECT.isKey(call, unitAddr, value) then

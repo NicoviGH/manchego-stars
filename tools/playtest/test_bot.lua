@@ -1952,15 +1952,21 @@ do
           "bag: a lance near breaking takes a full one of its rank")
     check(F({ lance(1), heal(), key, gem, heal() }, lance(1)), 0,
           "bag: a full lance takes no duplicate")
-    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other" }), 0, "bag: a seal goes")
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other", use = "seal" }), 0,
+          "bag: a seal goes")
     -- a seal or booster its holder can use is kept in hand (Bot.uses spends it): wanted when
     -- new, and never the one that leaves (fails on main: "a seal or booster" leaves second)
-    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other", promotes = true }), 4,
+    check(F({ lance(1), heal(), key, gem, lance(2) }, { kind = "other", use = "seal", promotes = true }), 4,
           "bag: a seal its holder can use stays, the gem goes")
-    check(F({ lance(1), heal(), key, { kind = "other", gains = true }, lance(2) }, lance(4)), 1,
+    check(F({ lance(1), heal(), key, { kind = "other", use = "booster", gains = true }, lance(2) },
+            lance(4)), 1,
           "bag: a usable booster is kept, the beaten lance goes")
-    check(F({ lance(1), heal(), key, { kind = "other" }, lance(2) }, lance(4)), 4,
+    check(F({ lance(1), heal(), key, { kind = "other", use = "seal" }, lance(2) }, lance(4)), 4,
           "bag: a seal it cannot use still goes first")
+    -- an item that is neither a seal nor a booster (Pure Water) is never sent as one; the
+    -- beaten lance goes instead (review of #626: the test asked only `kind == "other"`)
+    check(F({ lance(1), heal(), key, { kind = "other", id = 0x6E }, lance(2) }, lance(4)), 1,
+          "bag: Pure Water is not sent as a seal")
     -- the convoy full: a discard takes duplicates and low tiers, never money
     check(F({ lance(1), heal(), key, gem, lance(2) }, lance(4), true), 1, "bag: discard the beaten lance")
     check(F({ heal(1), heal(), key, gem, lance(2) }, key, true), 1, "bag: discard a spare heal")

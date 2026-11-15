@@ -92,6 +92,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0418 (#510, lap3p's Ch13 crash): a booster is what the game's Use routes to
+    # CanUnitUseStatGainItem (INSPECT.BAG.USE), no longer any item with a stat-bonus pointer
+    r'\bK\.ITEM_STAT_BONUSES\b', r'\ban item with stat bonuses\b',
     # retired by ADR 0413's amendment (2026-11-14, party1's Ch10 crash): a take rebuilds the
     # convoy as the Supply screen does (ClearSupplyItems, AddItemToConvoy for each item left);
     # RemoveItemFromConvoy has no caller in the game and its pack copies the scratch buffer in

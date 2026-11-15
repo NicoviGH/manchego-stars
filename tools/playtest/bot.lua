@@ -130,11 +130,13 @@
 -- no rank, level or class (ADR 0369).
 -- roster entry (a unit, slot order): { id, charId, level, forced = bool|nil,
 --   canUse = {[item] = true}, items = {{ id, uses, kind, type = weaponType|"staff"|nil,
---   usable, vulnerary = true|nil, promotes = bool|nil }...} }: each item is the game's facts
---   about it for THIS unit (harness.lua unitItemFacts). `canUse` is the game's can-use (a
---   weapon's CanUnitUseWeapon, a staff's CanUnitUseStaff) for this unit over the stock;
---   `promotes` is the game's own promotion-item check for THIS unit (class and level), set on
---   a seal it would accept.
+--   usable, vulnerary = true|nil, maxUses, use = "seal"|"booster"|nil, promotes = bool|nil,
+--   gains = bool|nil }...} }: each item is the game's facts about it for THIS unit (harness.lua
+--   unitItemFacts). `canUse` is the game's can-use (a weapon's CanUnitUseWeapon, a staff's
+--   CanUnitUseStaff) for this unit over the stock; `use` says the item is a seal or a booster
+--   (the game's own Use switch); `promotes` is the game's promotion-item check for THIS unit
+--   (class and level), asked only of a seal, and `gains` its stat-gain check, only of a
+--   booster (ADR 0418).
 -- stock entry: { item, price = {[charId] = n}, type = weaponType|"staff"|nil, vulnerary = true|nil };
 --   price is the game's for each buyer (GetItemPurchasePrice reads the unit: a Silver Card
 --   halves it). The caller says which stock item is the Vulnerary, so no item id lives here.
@@ -2993,7 +2995,7 @@ function M.fullBag(held, new, convoyFull)
     else
         order = { { first(function(it) return it.kind == "money" end), "money" },
                   { first(function(it)
-                      return it.kind == "other" and not (it.promotes or it.gains)
+                      return it.use ~= nil and not (it.promotes or it.gains)
                   end), "a seal or booster it cannot use" },
                   { unusable, "a weapon the unit cannot use" },
                   { spareHeal, "a spare healing item" }, { beatenAt, "a weapon it beats" } }
