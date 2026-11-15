@@ -1249,13 +1249,8 @@ function M.run(api)
             local byIdNow = byId(board)
             local u = byIdNow[a.unitId]
             if not (u and u.faction == "blue" and u.onField and not u.acted) then return nil end
-            -- a Take names its item, which a key does not carry: the convoy's key for the unit
-            -- now (sight.convoyKey), or no act
-            if a.act == "supply" then
-                local key = sight.convoyKey and sight.convoyKey(u)
-                if not key then return nil end
-                a.item, a.uses = key.id, key.uses
-            end
+            -- a Take names its item, which a key does not carry (Bot.takeItem), or is no act
+            if a.act == "supply" and not Bot.takeItem(sight, u, a) then return nil end
             pin.unoffered[#pin.unoffered + 1] = k
             a.unit = u.charId
             if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end

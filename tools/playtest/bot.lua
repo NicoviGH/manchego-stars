@@ -789,6 +789,15 @@ end
 
 local function safest(ctx, u, tiles) return bySafety(ctx, u, tiles)[1] end
 
+-- The tiles of `tiles` the gate lets `u` end on (no target: a wait, a march's step, a heal's)
+local function gated(ctx, u, tiles, gate)
+    local out = {}
+    for _, t in ipairs(tiles) do
+        if gate(ctx, u, t.x, t.y, nil) then out[#out + 1] = t end
+    end
+    return out
+end
+
 -- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
 -- `spent` (the attack's own counter, f.counterWorst) already off its HP. An attack whose
 -- counter alone can kill is refused before any gate is asked (every style but greedy; a known
@@ -1125,6 +1134,7 @@ local function openables(ctx, u, seeking)
     if #doors > 0 then table.insert(lists, 1, doors) end
     return lists
 end
+
 -- `u`'s turns from `from` to the door `d` it holds no key for, opened by a teammate
 -- (doorMates): the later of its own walk to the door and the soonest opener's turns there --
 -- it gains no ground running ahead of the one who opens it, so the army arrives with its
@@ -1357,6 +1367,16 @@ local function lockedOnWay(ctx, u, goal)
     return nil
 end
 
+-- A Take `a` (a "supply" act) with the item it takes filled in: the convoy's door key for `u`
+-- now (sight.convoyKey), or nil with none. An act's key does not carry the item, so a Take
+-- built from a key (botrun's forced act) is filled here too.
+function M.takeItem(sight, u, a)
+    local key = sight.convoyKey and sight.convoyKey(u)
+    if not key then return nil end
+    a.item, a.uses = key.id, key.uses
+    return a
+end
+
 -- The convoy's door key, taken with the Supply command (#510, vanilla Ch10 on Eirika's route:
 -- the one key holder died, the dropped key sat in the convoy, and every unit read no way to
 -- the throne). Offered when a door locked to `u` stands on its way to its goal (lockedOnWay),
@@ -1371,17 +1391,9 @@ local function supplyKey(ctx, u, gate, objective)
             or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goalFor(ctx, u, objective)) then
         return nil
     end
-    local key = s.convoyKey(u)
-    if not key then return nil end
-    local tiles = {}
-    for _, t in ipairs(s.offers(u, waitTiles(ctx, u), "supply")) do
-        if gate(ctx, u, t.x, t.y, nil) then tiles[#tiles + 1] = t end
-    end
-    local best = safest(ctx, u, tiles)
+    local best = safest(ctx, u, gated(ctx, u, s.offers(u, waitTiles(ctx, u), "supply"), gate))
     if not best then return nil end
-    local a = action(u, best, "supply", nil)
-    a.item, a.uses = key.id, key.uses
-    return a
+    return M.takeItem(s, u, action(u, best, "supply", nil))
 end
 
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
@@ -1636,11 +1648,8 @@ end
 local function holding(ctx) return M.nextArrival(ctx.style.arrivals, ctx.turn) == 1 end
 
 local function march(ctx, u, gate, objective)
-    local tiles, allowed = behindWalls(ctx, u, waitTiles(ctx, u)), {}
-    for _, t in ipairs(tiles) do
-        if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
-    end
-    allowed = onTerrain(ctx, allowed)
+    local tiles = behindWalls(ctx, u, waitTiles(ctx, u))
+    local allowed = onTerrain(ctx, gated(ctx, u, tiles, gate))
     local goal = nil
     if not holding(ctx) then goal = marchGoal(ctx, u, objective) end
     if #allowed == 0 or not goal then
@@ -1769,10 +1778,7 @@ end
 local function mend(ctx, u, gate, m)
     m = m or ownHeal(ctx, u)
     if not m then return nil end
-    local allowed = {}
-    for _, t in ipairs(waitTiles(ctx, u)) do
-        if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
-    end
+    local allowed = gated(ctx, u, waitTiles(ctx, u), gate)
     return healAct(u, m, safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u)))
 end
 
@@ -1994,10 +2000,8 @@ function M.explain(board, sight, style)
             e.id, e.charId, e.classId or 0, at(e), e.hp, e.isBoss and " BOSS" or "")
     end
     for _, u in ipairs(ctx.blues) do
-        local tiles, allowed = waitTiles(ctx, u), {}
-        for _, t in ipairs(tiles) do
-            if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
-        end
+        local tiles = waitTiles(ctx, u)
+        local allowed = gated(ctx, u, tiles, gate)
         local goal = goalFor(ctx, u, o)
         local function fd(t) return walkFrom(ctx, goal, t.x, t.y) end
         local function nearest(list)

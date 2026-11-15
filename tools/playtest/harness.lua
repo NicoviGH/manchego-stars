@@ -3408,7 +3408,7 @@ do
     -- (prep_itemsupply.c: a give clears the bag's slot, UnitRemoveInvalidItems packs the bag,
     -- AddItemToConvoy stores it; a take, sub_809E2C8, puts the item in the bag's first empty
     -- slot and rebuilds the convoy without it, sub_80982B8: ClearSupplyItems, then
-    -- AddItemToConvoy for each item left). Bot.supply's are called on the first player phase,
+    -- AddItemToConvoy for each item left). Bot.supply's acts are played on the first player phase,
     -- where the prep screen's Supply would have left the same bags and convoy: no screen, no
     -- turn spent; api.act's mid-map take after the game's menu offers Supply, then Wait. The
     -- item is found by id and uses. The rebuild is fed from the convoy itself, not from the

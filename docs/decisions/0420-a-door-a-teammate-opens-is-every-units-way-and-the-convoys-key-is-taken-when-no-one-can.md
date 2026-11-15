@@ -48,10 +48,10 @@ traces; every claim below was checked against the run.
     models only the Wait.
   - `sight.legal` asks `SupplyUsability` again for a kept plan, and asks that the key the act
     names is still the convoy's. A forced diagnostic replay fills the act's item from the
-    convoy (`botrun` `forcedAct`).
+    convoy through the same `Bot.takeItem` the offer uses (`botrun` `forcedAct`).
 
 **Proof.**
-- **Unit tests** (`test_bot.lua` "escort:" and "supply:"; `test_sight.lua` "convoyKey:" and
+- **Unit tests** (`test_bot.lua` "escort:", "supply:" and "takeItem:"; `test_sight.lua` "convoyKey:" and
   "legal:"). Every positive check fails without its part:
   - the escort's two turns checks without the escort;
   - the offer's two without `supplyKey`;
@@ -59,7 +59,8 @@ traces; every claim below was checked against the run.
     alphabetical tie with Wait);
   - the review's four (a door no teammate reaches, a door off the way, one Take a plan, the
     sooner way) on the code before the review;
-  - the `convoyKey` ones without `Sight.convoyKey`.
+  - the `convoyKey` ones without `Sight.convoyKey`;
+  - the `takeItem` one without its item fill.
 - **Runs** (2 attempts each from the lap's saved starts, tag `door2`).
   - Eirika's Ch10, attempt 2: won in 27 turns, where it was stuck before. Gilliam opened the
     door on turn 23.

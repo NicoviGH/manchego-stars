@@ -2389,6 +2389,12 @@ do
     check(supplies({ convoyKey = key, openers = { [0x02] = true } }, A, K, E), nil,
           "supply: not while a teammate opens the door")
     check(supplies({ convoyKey = {} }, A, E), nil, "supply: not with no key in the convoy")
+    -- a Take rebuilt from its key (botrun's forced act) names no item: takeItem fills it in
+    local taken = B.takeItem(sightOf({ convoyKey = key }), A, { act = "supply" })
+    check(taken and (taken.item .. "x" .. taken.uses), "106x1",
+          "takeItem: a Take built from its key takes the convoy's key for the unit now")
+    check(B.takeItem(sightOf({ convoyKey = {} }), A, { act = "supply" }), nil,
+          "takeItem: no Take with no key in the convoy")
     -- the plan credits it as the act that opens the way (the breach weight), over a wait
     local o = { convoyKey = key, objective = { kind = "boss" },
                 reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
