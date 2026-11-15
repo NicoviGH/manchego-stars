@@ -37,25 +37,25 @@ exchange's other played results (`Sight.known`), under the same battle key. `exc
 a player unit (decision 4).
 
 **Decision 3: the plan picks which of the three applies, at the HP it leaves the target.**
-`taught(x, ways, hp, unitHp, struck)` walks the exchange's ways (`f.joint`). A way whose
-counter kills our unit teaches nothing. A way that deals at least the HP the plan leaves the target is a kill.
-Any other damage is a hit; no damage is `none`. So when an earlier blow of the plan chips the
-target, the kill belongs to the unit that finishes it, and the plan can choose who that is.
+`taught(x, ways, hp, unitHp, struck)` walks the exchange's ways (`f.joint`). A way whose counter
+kills our unit teaches nothing. A way that deals at least the HP the plan leaves the target is a
+kill. Any other damage is a hit; no damage is `none`. So when an earlier blow of the plan chips
+the target, the kill belongs to the unit that finishes it, and the plan can choose who that is.
 
 **Decision 4: a counter in the judged enemy phase scores what it teaches.** BattleApplyExpGains
-awards both sides, so a unit struck in the enemy phase learns from its counter: 1 when its
-blows deal nothing (or it cannot answer), more when they wound, the kill's count when they kill.
-An enemy's strike on a player unit reads that unit's count (`Sight.expOf` with the side
-`"target"`: the same two fields, on the swapped battle units) and keeps it on the strike
-(`taught`, beside its `joint`). The judged phase adds `W.exp` times, over every way the phase
-can go (its chance), each strike's count over its exchange's ways (`taught` with `struck`: our
-blows are the counter, our loss the strike's damage), at the HPs the phase had left when the
-strike came (`Sight.strikeAt`), the target's level beside it. Its phase's ways already play a
-counter that kills the striker both ways. So standing where a counter will kill trains the
-unit that stands there, within the cap. Only the judged phase reads the count
-(`s.enemyPhase`); the lookahead's second phase and a single strike's forecast do not, as
-nothing scores them. A memo entry keeps the side it counted, and a read of that key for the
-other side is an error.
+awards both sides, so a unit struck in the enemy phase learns from its counter: 1 when its blows
+deal nothing (or it cannot answer), more when they wound, the kill's count when they kill. An
+enemy's strike on a player unit reads that unit's count (`Sight.expOf` with the side `"target"`:
+the same two fields, on the swapped battle units) and keeps it on the strike (`taught`, beside
+its `joint`). The judged phase adds `W.exp` times, over every way the phase can go (its chance),
+each strike's count over its exchange's ways (`taught` with `struck`: our blows are the counter,
+our loss the strike's damage), at the HPs the phase had left when the strike came
+(`Sight.strikeAt`), the target's level beside it. Its phase's ways already play a counter that
+kills the striker both ways. So standing where a counter will kill trains the unit that stands
+there, within the cap. Only the judged phase reads the count (`s.enemyPhase`); the lookahead's
+second phase and a single strike's forecast do not, as nothing scores them (`learningAs` sets
+the flag for each and puts it back). A memo entry keeps the side it counted, and a read of that
+key for the other side is an error.
 
 **Decision 5: a heal scores what its staff teaches.** `GetBattleUnitStaffExp`
 (`bmbattle.c`): 10 plus the staff's cost per use over 20, halved once promoted, 0 for a unit
@@ -75,10 +75,11 @@ counter is checked the same way, side `"target"`, against the committed plan's s
 enemy on that unit, when the unit fights at the level the read was made at (a level-up since
 changes the count honestly). A heal is checked against the Staff command's award
 (`Board.itemUser`: gBattleActor's `expGain`). The record's `taught_checked` counts the checks
-made by kind, and `taught_unchecked` the battles no read could be checked against: a counter
-in a rarer way than the plan's likeliest, on another target or at another level, and a heal
-whose battle unit is another unit's. The report's attempt line prints both, so a pass with
-few checks shows as one.
+made by kind. `taught_unchecked` names each kind it could not check:
+an attack read with no battle record, a counter the committed plan read at another level
+(`counter_level`), one it has no strike for at all, a rarer way or an enemy it did not see
+(`counter_unplanned`), and a heal with no battle unit or another unit's. The report's attempt
+line prints both, so a pass with few checks shows as one.
 
 **What it proved.** `lap1d`'s prologue and Ch1 starts, one attempt each (tag `exp1`). Both
 were won clean, in 2 and 6 turns. All 7 player attacks matched: in each one, the read for the
@@ -99,15 +100,15 @@ prologue and Ch1 played the same acts and frames again (tag `exp1c`), with no `t
 The counter and staff reads, Ch1 back to back without and with them (tags `exp2ctl`, `exp2c`,
 same `acts_hash` 4c0fbb8a): 13,889 and 14,183 frames, 4.23 and 4.20 CPU seconds.
 
-**Unit tests** (`test_bot.lua`, `test_sight.lua`, `test_botrun.lua`). `Sight.expOf` sets
-each case's two fields and calls the game's count on the battle units; `taughtMiss` reads each
-case off a battle and names a wrong read. Of two sure kills, the unit the kill teaches more takes it.
+**Unit tests** (`test_bot.lua`, `test_sight.lua`, `test_botrun.lua`). `Sight.expOf` sets each
+case's two fields and calls the game's count on the battle units; `taughtMiss` reads each case
+off a battle and names a wrong read. Of two sure kills, the unit the kill teaches more takes it.
 On a target neither kills alone, the plan chips with the unit that learns less, so the other
 finishes. A unit stands where its counter learns; of two healers, the one the staff teaches
-heals. Each of these fails on the code without its term. `Sight.staffExp` and the struck side
-of `Sight.expOf` have their own tests, and a run test shows a wrong heal or counter read on
-the record, and a counter at another level unchecked. Two guards pass on both: a unit that cannot gain levels
-adds nothing to its plan's value, and experience never takes a plan over the cap.
+heals. Each of these fails on the code without its term. `Sight.staffExp` and the struck side of
+`Sight.expOf` have their own tests, and a run test shows a wrong heal or counter read on the
+record, and a counter at another level unchecked. Two guards pass on both: a unit that cannot
+gain levels adds nothing to its plan's value, and experience never takes a plan over the cap.
 
 **Not covered here.** The count is read on the plain simulation, where nothing procs, so an
 Assassin's Silencer kill, which the game doubles (`GetUnitExpMultiplier`), is read at single

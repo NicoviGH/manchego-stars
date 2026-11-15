@@ -551,9 +551,10 @@ def taught_line(r):
     n, u = r.get('taught_checked'), r.get('taught_unchecked') or {}
     if not n:
         return ''
-    return '\n    experience checked: %d attacks, %d counters, %d heals (unchecked: %d counters, %d heals)' % (
-        n.get('attack', 0), n.get('counter', 0), n.get('staff', 0),
-        u.get('counter', 0), u.get('staff', 0))
+    return ('\n    experience checked: %d attacks, %d counters, %d heals (unchecked: %d attacks, '
+            '%d counters at another level, %d counters the plan never read, %d heals)') % (
+        n.get('attack', 0), n.get('counter', 0), n.get('staff', 0), u.get('attack', 0),
+        u.get('counter_level', 0), u.get('counter_unplanned', 0), u.get('staff', 0))
 
 
 def anomaly_detail(a):

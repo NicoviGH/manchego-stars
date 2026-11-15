@@ -1871,6 +1871,16 @@ function M.new(outer)
     -- whether a strike on a player unit reads its counter's count: only the judged phase
     -- (s.enemyPhase) scores it; the lookahead's phases and a single strike's forecast do not
     local learning = false
+    -- fn() with `learning` set to `v`, put back as it was after. No pcall: an error keeps its
+    -- traceback, and leaves the flag at `v` only until the next entry sets its own, which
+    -- costs reads at most (an unscored count), never a wrong score.
+    local function learningAs(v, fn)
+        local was = learning
+        learning = v
+        local out = fn()
+        learning = was
+        return out
+    end
     local function battleKey()
         local parts = { mem.u32(S.gBattleStats) }
         for _, bu in ipairs({ S.gBattleActor, S.gBattleTarget }) do
@@ -2024,7 +2034,7 @@ function M.new(outer)
 
     function s.strike(u, e, x, y, slot, from)
         local all = units()
-        local t = sandbox(function(call, proc)
+        local t = learningAs(false, function() return sandbox(function(call, proc)
             standOn(u, x, y)
             if from then standOn(e, from.x, from.y) end
             M.equip(api, call, S, u, slot)
@@ -2035,7 +2045,7 @@ function M.new(outer)
                                           function() onlyTarget(u, all) end, true)
             if target ~= u.id then return nil end
             return side
-        end)
+        end) end)
         return M.strikeOf(t)
     end
 
@@ -2177,14 +2187,10 @@ function M.new(outer)
     end
 
     function s.enemyPhase(plan)
-        learning = true
-        local ok, out = pcall(sandbox, function(call, proc)
+        return learningAs(true, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
             return playPhase(call, proc, byId, order(), decides, strike, remove)
-        end)
-        learning = false
-        if not ok then error(out, 0) end
-        return out
+        end) end)
     end
 
     -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
@@ -2200,7 +2206,7 @@ function M.new(outer)
     -- begins, 0 when the first left it dead }
     -- and .moved = the enemies the first phase moved, { { id, x, y } }.
     function s.nextPhase(plan)
-        return sandbox(function(call, proc)
+        return learningAs(false, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
             local moved = {}
             for _, id in ipairs(order()) do
@@ -2244,7 +2250,7 @@ function M.new(outer)
             local out = playPhase(call, proc, byId, order(), decides, strike, remove)
             out.hp, out.moved = hp, moved
             return out
-        end)
+        end) end)
     end
 
     -- When each village or chest still open (explorable()) closes: the first enemy phase,

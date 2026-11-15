@@ -2697,7 +2697,7 @@ end
 -- test_a_wrong_heal_or_counter_read_is_an_anomaly (ADR 0414): a heal whose staff count the game
 -- did not award, and a counter whose plan read (the committed plan's strike) the battle did not,
 -- each land on the record; a counter fought at another level than the read is not checked.
-local function healAndCounter(staffGave, counterGave, level, healer)
+local function healAndCounter(staffGave, counterGave, level, healer, unplanned)
     local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 1, 20),
                                    unit(0x81, 0, "red", 9, 9, 10) },
                          enemy = function(g)
@@ -2710,7 +2710,10 @@ local function healAndCounter(staffGave, counterGave, level, healer)
                                     hits = { { by = "actor", miss = false, dmg = 5 },
                                              { by = "target", miss = false, dmg = 4 } } } } } }
                          end }
-    g.api.itemUser = function() return { id = healer or 0x02, charId = 2, exp = staffGave } end
+    g.api.itemUser = function()
+        if healer == false then return nil end
+        return { id = healer or 0x02, charId = 2, exp = staffGave }
+    end
     local asks = 0
     g.api.Planner = {
         key = function(a) return a.unitId .. a.act end,
@@ -2723,8 +2726,9 @@ local function healAndCounter(staffGave, counterGave, level, healer)
                            { unit = 0x02, unitId = 0x02, act = "staff", move = { x = 0, y = 1 },
                              targetId = 0x01, exp = 11 } }
             return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } }, enemies = {},
-                              strikes = { { enemy = 0x81, target = 0x01, targetLevel = 5,
-                                            taught = { none = 1, hit = 10, kill = 30 } } } },
+                              strikes = unplanned and {} or
+                                  { { enemy = 0x81, target = 0x01, targetLevel = 5,
+                                      taught = { none = 1, hit = 10, kill = 30 } } } },
                    { phases = 0, averaged = 0 }
         end,
     }
@@ -2734,16 +2738,35 @@ local function healAndCounter(staffGave, counterGave, level, healer)
         if a.kind == "taught_miss" then out[#out + 1] = a.case .. " " .. a.read .. " " .. a.gave end
     end
     local n, u = recordOf(g).taught_checked, recordOf(g).taught_unchecked
-    return table.concat(out, "; "), n.staff .. " " .. n.counter, u.staff .. " " .. u.counter
+    return table.concat(out, "; "), n.staff .. " " .. n.counter,
+           u.staff .. " " .. u.counter_level .. " " .. u.counter_unplanned
 end
 check(healAndCounter(11, 10, 5), "", "taught_miss: a right heal and counter raise nothing")
 check(select(2, healAndCounter(11, 10, 5)), "1 1", "taught_checked: the heal and the counter counted")
 check(select(2, healAndCounter(11, 30, 6)), "1 0", "taught_checked: a counter not checked is not counted")
-check(select(3, healAndCounter(11, 30, 6)), "0 1", "taught_unchecked: the counter at another level is")
+check(select(3, healAndCounter(11, 30, 6)), "0 1 0", "taught_unchecked: the counter at another level is")
 -- the Staff command's battle unit is another unit's: nothing to check, counted unchecked
 local missed, checked, unchecked = healAndCounter(5, 10, 5, 0x01)
-check(missed .. " | " .. checked .. " | " .. unchecked, " | 0 1 | 1 0",
+check(missed .. " | " .. checked .. " | " .. unchecked, " | 0 1 | 1 0 0",
       "taught_unchecked: a heal read off another unit's battle unit is not compared")
+-- no battle unit to read at all (itemUser nil): the heal is unchecked, not silent
+missed, checked, unchecked = healAndCounter(5, 10, 5, false)
+check(checked .. " | " .. unchecked, "0 1 | 1 0 0", "taught_unchecked: a heal with no battle unit")
+-- a counter the committed plan has no strike for: unplanned, apart from one at another level
+missed, checked, unchecked = healAndCounter(11, 30, 5, nil, true)
+check(missed .. " | " .. checked .. " | " .. unchecked, " | 1 0 | 0 0 1",
+      "taught_unchecked: a counter the plan never read is unplanned")
+
+-- an attack read with no battle record (the battle read failed): unchecked, not silent
+do
+    local g = fakeGame { units = rout(), hit = 20, taught = { none = 1, hit = 10, kill = 30 } }
+    g.api.Planner = dofile(here .. "planner.lua")
+    g.api.battle = function() return nil end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.taught_checked.attack .. " " .. r.taught_unchecked.attack, "0 1",
+          "taught_unchecked: an attack with no battle to check against")
+end
 check(healAndCounter(5, 30, 5), "staff 11 5; counter hit 10 30", "taught_miss: both wrong reads named")
 check(healAndCounter(11, 30, 6), "", "taught_miss: a counter at another level is not checked")
 

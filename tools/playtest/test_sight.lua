@@ -1554,5 +1554,40 @@ do
           "known: the other side's read of that key raises")
 end
 
+-- The counter's count is read only in the judged phase (ADR 0414), read off the source: the
+-- strike's exchange teaches only while `learning`, which only s.enemyPhase sets true, and
+-- nextPhase and s.strike set false, each through learningAs (which puts the flag back); the
+-- judged strike takes its level from the board unit.
+do
+    local src = sightSrc
+    check(src:find('exchange(call, proc, sim, learning and target < 0x40 and "target" or nil)', 1, true) ~= nil,
+          true, "learning: a strike on a player unit counts only while learning")
+    local _, sets = src:gsub("learning = [%a]+", "")
+    check(sets, 3, "learning: set only by its declaration and learningAs (set, put back)")
+    local function bodyOf(name)
+        local at = src:find(name, 1, true)
+        return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
+    end
+    check(bodyOf("function s.enemyPhase(plan)"):find("learningAs(true,", 1, true) ~= nil, true,
+          "learning: the judged phase counts")
+    check(bodyOf("function s.nextPhase(plan)"):find("learningAs(false,", 1, true) ~= nil, true,
+          "learning: the lookahead's phase does not")
+    check(bodyOf("function s.strike(u, e, x, y, slot, from)"):find("learningAs(false,", 1, true) ~= nil,
+          true, "learning: a single strike's forecast does not")
+    local call = src:find("local t = M.strikeAt(side, id, target,", 1, true)
+    check(call ~= nil and src:find("byId[target] and byId[target].level)", call, true) ~= nil, true,
+          "strikeAt: the judged strike's level is the board unit's")
+end
+
+-- M.known: an entry a non-teaching read made takes the side of the first teaching read.
+do
+    local memo = {}
+    local function count() return { none = 1, hit = 2, kill = 3 } end
+    Sight.known(memo, "k", nil, count, function() return {} end)
+    check(memo.k.side, nil, "known: a non-teaching entry has no side")
+    Sight.known(memo, "k", "target", count, function() return {} end)
+    check(memo.k.side .. " " .. memo.k[4].kill, "target 3", "known: the first teaching read sets it")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

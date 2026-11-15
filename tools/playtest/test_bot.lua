@@ -2798,6 +2798,32 @@ do
           "experience: the healer the staff teaches heals: " .. tostring(rec and rec.rank.key))
 end
 
+-- test_both_heal_proposals_carry_the_staffs_experience (ADR 0414): the heal for a wounded ally
+-- (staffHeal) and the one for an ally the plan's blows may wound (the full-HP proposal) each
+-- carry the staff's count, through healWith.
+do
+    local function heals(hp)
+        local A = blue(0x01, 0, 0, 0, { hp = hp, maxhp = 20, minRange = false })
+        local H = blue(0x02, 1, 1, 0, { minRange = false })
+        local o = {
+            staves = { [0x02] = { { slot = 0, amount = 10, exp = 15 } } },
+            heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x01 }, exp = 15 } } } },
+            reach = { [0x02] = tiles({ 1, 0 }) },
+        }
+        local out = {}
+        for _, c in ipairs(B.candidates(boardOf(A, H), sightOf(o), style("careful"))) do
+            for _, a in ipairs(c.acts) do
+                if a.act == "staff" then out[#out + 1] = tostring(a.exp) end
+            end
+        end
+        return table.concat(out, ",")
+    end
+    check(heals(10):find("15", 1, true) ~= nil and not heals(10):find("nil", 1, true), true,
+          "heal: the wounded ally's heal carries the staff's count: " .. heals(10))
+    check(heals(20) ~= "" and not heals(20):find("nil", 1, true), true,
+          "heal: the heal the plan may need carries it too: " .. heals(20))
+end
+
 -- test_the_enemy_phase_is_played_on_each_way_the_counter_goes (T100b, Manchego Stars ch03 turn 11):
 -- A (12 HP) strikes E (9 HP): a hit kills it, a miss lets E's counter take 9. F's AI strikes A
 -- only when A is on 4 HP or less, and its blow kills him there. On A's mean HP after the
