@@ -174,8 +174,9 @@
 --   the units before it took it). The pick reads such a unit as holding them (harness.lua
 --   api.needs), so a unit the supply or the shop can arm ranks as armed, by the game's own
 --   numbers, not as the unarmed unit it is now.
--- Bot.supply(party, convoy) -> acts: before the shop, what the fielded units give the convoy
---   and the weapons they take from it. Bot.uses(party, convoy) -> acts: after the shop, the
+-- Bot.supply(party, convoy, benched) -> acts: before the shop, what the roster (benched units
+--   too) gives the convoy because it cannot use it this chapter, and the weapons the fielded
+--   units take from it. Bot.uses(party, convoy) -> acts: after the shop, the
 --   seals and boosters they take and use. Their docstrings have the rules.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
 -- Bot.fullBag(held, new, convoyFull) -> slot, why: a unit given an item with no room (FE8's
@@ -2587,31 +2588,62 @@ local function splitArmed(party, armed)
     return unarmed, out
 end
 
+-- A weapon's full uses (ItemData maxUses): the harness reads it for every stock, convoy and bag
+-- weapon (INSPECT.itemFacts); one without it raises, so a missing read never passes as "holds
+-- none".
+local function fullUses(x)
+    return x.maxUses or error(string.format("item 0x%X has no maxUses", x.item or x.id or -1))
+end
+
+-- How many uses short of the type `t` the unit holding `items` is (> 0: short, so a spare is
+-- wanted), when the weapons on offer of the type start at `offered` full uses: one full weapon
+-- (the fewest full uses among those on offer and the ones it holds) times M.SPARE, less the
+-- uses its usable weapons of the type hold together. A spare comes before the last weapon
+-- breaks, not after (Nicolas, 2026-11-15: rule B of #510 comment 6896261936); a unit holding
+-- nothing of the type is short, as before. The one test of "short of a type": lackedTypes (the
+-- shop, the convoy, Bot.arms) and Bot.fullBag (a weapon arriving in a full bag) both ask it.
+-- M.SPARE is half a weapon (Nicolas, 2026-11-15, to be tuned if it costs): at one whole, a unit
+-- that had spent one use (an Elfire at 29 of 30) bought a spare at every chapter start.
+M.SPARE = 0.5
+local function shortfall(items, t, offered)
+    local held, need = 0, offered
+    for _, it in ipairs(items) do
+        if it.type == t and usableWeapon(it) then
+            held = held + it.uses
+            need = math.min(need, it.maxUses or need)
+        end
+    end
+    return need * M.SPARE - held
+end
+
 -- The weapon or staff types among `list` (stock entries or convoy items) the unit can use
--- (usable(x): the game's can-use for it), in name order, of which it holds no usable item with
--- uses left: one owner for what the shop buys and the convoy gives, one item of each.
+-- (usable(x): the game's can-use for it), in name order, that it is short of (shortfall), and
+-- by how many uses each: one owner for what the shop buys and the convoy gives, one item of
+-- each.
 local function lackedTypes(u, list, usable)
-    local types, seen = {}, {}
+    local types, full = {}, {}
     for _, x in ipairs(list) do
-        if x.type ~= nil and usable(x) and not seen[x.type] then
-            seen[x.type] = true
-            types[#types + 1] = x.type
+        if x.type ~= nil and usable(x) then
+            if not full[x.type] then types[#types + 1] = x.type end
+            full[x.type] = math.min(full[x.type] or math.huge, fullUses(x))
         end
     end
     table.sort(types)
-    local out = {}
+    local out, gap = {}, {}
     for _, t in ipairs(types) do
-        if not holdsAny(u, function(it) return it.type == t and usableWeapon(it) end) then
+        local short = shortfall(u.items or {}, t, full[t])
+        if short > 0 then
             out[#out + 1] = t
+            gap[t] = short
         end
     end
-    return out
+    return out, gap
 end
 
 -- What the shop would buy for one unit, in order: a Vulnerary when it holds none, then for each
--- weapon or staff type among the stock it can use (type names in order) in which it holds no
--- usable item with uses left, the cheapest stock item of that type it can use. Bag room and
--- gold are the caller's.
+-- weapon or staff type among the stock it can use that it is short of (lackedTypes, type names
+-- in order), the cheapest stock item of that type it can use. Bag room and gold are the
+-- caller's.
 local function wants(u, stock)
     local out = {}
     if not holdsAny(u, function(it) return it.vulnerary end) then
@@ -2678,20 +2710,14 @@ local function asHeld(it, charId)
     return h
 end
 
--- a seal or booster some roster unit can use (its `for` lists the whole roster)
-local function anyUser(it)
-    for _, f in pairs(it["for"] or {}) do
-        if f.promotes or f.gains then return true end
-    end
-    return false
-end
-
--- The supply's working copy: each fielded unit's bag and the convoy, and the acts that changed
--- them, in order. `swap` lets a full bag give first what Bot.fullBag would send (it needs every
--- held item's kind: api.convoy's read, not the roster's).
-local function ledger(party, convoy, swap)
+-- The supply's working copy: each unit's bag (the fielded, and for Bot.supply the benched)
+-- and the convoy, and the acts that changed them, in order. `swap` lets a full bag give first
+-- what Bot.fullBag would send (it needs every held item's kind: api.convoy's read, not the
+-- roster's).
+local function ledger(party, convoy, swap, benched)
     local L = { acts = {}, bags = {}, pool = {} }
     for _, u in ipairs(party) do L.bags[u.charId] = copyList(u.items) end
+    for _, u in ipairs(benched or {}) do L.bags[u.charId] = copyList(u.items) end
     L.pool = copyList(convoy)
     -- false when the convoy is full (api.give would refuse it): the item stays in the bag
     function L.give(charId, i, why)
@@ -2729,23 +2755,30 @@ local function unarmedFirst(party, armed)
 end
 
 -- The convoy's weapons and staves: for each type lackedTypes names (the shop's own test), the
--- convoy's best of that type for the unit: the highest rank, then the most uses, then the
--- first. Not the shop's cheapest, on purpose: a stored item costs nothing, so the best one is
--- taken.
+-- convoy's best of that type for the unit: one whose uses end the shortage first (else the
+-- shop would buy another after it), then the highest rank, then the most uses, then the first.
+-- Not the shop's cheapest, on purpose: a stored item costs nothing, so the best one is taken.
 local function takeWeapons(L, party)
     for _, u in ipairs(unarmedFirst(party, function(v) return L.armed(v.charId) end)) do
         local function usable(it)
             return it.kind == "weapon" and forUnit(it, u.charId).usable and (it.uses or 0) > 0
         end
-        for _, t in ipairs(lackedTypes({ items = L.bags[u.charId] }, L.pool, usable)) do
+        local types, gap = lackedTypes({ items = L.bags[u.charId] }, L.pool, usable)
+        for _, t in ipairs(types) do
             local best
+            local function key(it)
+                return it.uses >= gap[t] and 1 or 0, it.rank or 0, it.uses
+            end
+            local function beats(a, b)
+                local a1, a2, a3 = key(a)
+                local b1, b2, b3 = key(b)
+                if a1 ~= b1 then return a1 > b1 end
+                if a2 ~= b2 then return a2 > b2 end
+                return a3 > b3
+            end
             for i, it in ipairs(L.pool) do
-                if it.type == t and usable(it) then
-                    local b = best and L.pool[best]
-                    if not b or (it.rank or 0) > (b.rank or 0)
-                            or ((it.rank or 0) == (b.rank or 0) and it.uses > b.uses) then
-                        best = i
-                    end
+                if it.type == t and usable(it) and (not best or beats(it, L.pool[best])) then
+                    best = i
                 end
             end
             L.take(u.charId, best, "a usable " .. t)
@@ -2753,28 +2786,46 @@ local function takeWeapons(L, party)
     end
 end
 
--- Bot.supply(party, convoy) -> acts, before the shop: what the fielded units give the convoy
--- and take from it (the party plan's PR 2; comment 6872948037's rules). party = the fielded
--- units in roster order, each item with the game's facts and its kind (api.convoy's read);
+-- Why a unit gives an item to the convoy before the shop, or nil when it keeps it: what it
+-- cannot use this chapter (rule A of #510 comment 6896261936). A weapon or staff the game says
+-- it cannot use (cannotUseWeapon, Bot.fullBag's own test); a seal or booster (the item's `use`)
+-- the game says it cannot use now; and a benched unit's every seal and booster, since only a
+-- fielded unit uses one (api.use is the map's Item command). From the convoy the existing
+-- rules hand each to a fielded unit that can use it (takeWeapons, Bot.uses), now or later.
+local function cannotUseNow(it, fielded)
+    if it.kind == "weapon" then
+        return cannotUseWeapon(it) and "a weapon it cannot use" or nil
+    elseif it.use then
+        if not fielded then return "a " .. it.use .. " a benched unit cannot use" end
+        if not (it.promotes or it.gains) then return "a " .. it.use .. " it cannot use" end
+    end
+    return nil
+end
+
+-- Bot.supply(party, convoy, benched) -> acts, before the shop: what the roster gives the convoy
+-- and what the fielded units take from it (the party plan's PR 2; comment 6872948037's rules,
+-- widened by comment 6896261936's rule A). party = the fielded units in roster order, benched =
+-- the roster's other units, each item with the game's facts and its kind (api.convoy's read);
 -- convoy = its items, each with `for` over every roster unit.
---   1. A fielded unit carrying a seal or booster it cannot use, that another roster unit can,
---      gives it to the convoy, so the unit that can takes it (now if fielded, else later).
+--   1. Every roster unit gives what it cannot use this chapter (cannotUseNow).
 --   2. Weapons and staves from the convoy, the unarmed first (takeWeapons), so the shop buys
 --      only what storage cannot give.
 -- A full bag gives first what Bot.fullBag would send. acts = { act = "give" | "take" | "use",
 -- unit = charId, item = id, uses, seal = true (a use that promotes) | nil, why }.
-function M.supply(party, convoy)
-    local L = ledger(party, convoy, true)
-    for _, u in ipairs(party) do
-        -- from the last slot down, so a give (which packs the bag) never moves an item not yet
-        -- looked at
-        for i = #L.bags[u.charId], 1, -1 do
-            local it = L.bags[u.charId][i]
-            if it.kind ~= "weapon" and not (it.promotes or it.gains) and anyUser(it) then
-                L.give(u.charId, i, "a seal or booster it cannot use")   -- false: the convoy is full
+function M.supply(party, convoy, benched)
+    local L = ledger(party, convoy, true, benched)
+    local function giveBack(list, fielded)
+        for _, u in ipairs(list or {}) do
+            -- from the last slot down, so a give (which packs the bag) never moves an item not
+            -- yet looked at
+            for i = #L.bags[u.charId], 1, -1 do
+                local why = cannotUseNow(L.bags[u.charId][i], fielded)
+                if why then L.give(u.charId, i, why) end   -- false: the convoy is full
             end
         end
     end
+    giveBack(party, true)
+    giveBack(benched, false)
     takeWeapons(L, party)
     return L.acts
 end
@@ -2896,7 +2947,9 @@ function M.fullBag(held, new, convoyFull)
         local same = usableOfType(new.type)
         local with = { new }
         for _, w in ipairs(same) do with[#with + 1] = w end
-        if #same == 0 or special(new, with) then
+        -- short of the type (the shop's and the convoy's own test, rule B), or it adds reach
+        -- or bonus damage
+        if shortfall(held, new.type, fullUses(new)) > 0 or special(new, with) then
             wanted = true
         else
             for _, w in ipairs(same) do

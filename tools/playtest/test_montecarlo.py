@@ -302,6 +302,32 @@ class Workers(unittest.TestCase):
                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
         self.assertEqual([r.get('env_status') for r in both], ['clean', None])
 
+    def test_each_attempts_prep_lands_on_its_bot_record(self):
+        # ADR 0413 said the record keeps the supply; it was only in the worker log, since
+        # records_of dropped every chapter line (#510 comment 6896261936)
+        text = ('BOTRUN {"outcome": "lost", "chapter": 15, "attempt": 1}\n'
+                'BOTRUN {"outcome": "won", "chapter": 15, "attempt": 2}\n'
+                'CAMPAIGN {"chapter": 15, "attempts": 2, "prep": ['
+                '{"attempt": 1, "supply": [{"act": "take", "unit": 11, "item": 46}], "buys": []},'
+                '{"attempt": 2, "supply": [], "buys": [{"unit": 1, "item": 1}]}]}\n'
+                'CAMPAIGN {"outcome": "played"}')
+        recs = mc.records_of({}, text, '/tmp/w', '/x.log')
+        self.assertEqual([r.get('supply') for r in recs[:2]],
+                         [[{'act': 'take', 'unit': 11, 'item': 46}], []])
+        self.assertEqual([r.get('buys') for r in recs[:2]], [[], [{'unit': 1, 'item': 1}]])
+        self.assertNotIn('supply', recs[2])
+        self.assertNotIn('prep', recs[2])
+
+    def test_a_failed_prep_lands_on_the_campaign_end(self):
+        # an attempt whose prep failed never played: no BOTRUN to carry its acts (review of #624)
+        text = ('CAMPAIGN {"chapter": 15, "attempts": 1, "outcome": "crashed", "prep": ['
+                '{"attempt": 1, "supply": [{"act": "give", "unit": 9, "item": 92}]}]}\n'
+                'CAMPAIGN {"outcome": "crashed", "why": "chapter 15 attempt 1: use: x"}')
+        end = mc.records_of({}, text, '/tmp/w', '/x.log')[0]
+        self.assertEqual(end['kind'], 'campaign')
+        self.assertEqual(end['prep'], [{'chapter': 15, 'attempt': 1,
+                                        'supply': [{'act': 'give', 'unit': 9, 'item': 92}]}])
+
     def test_a_campaigns_own_answer_is_no_environment_fault(self):
         # campaign.lua ends no_style (fewer styles than the attempt asked) before any bot plays
         rec = mc.records_of({}, 'CAMPAIGN {"outcome": "no_style"}', '/tmp/w', '/x.log')[0]

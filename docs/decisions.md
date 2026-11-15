@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-415 decisions. Read this index, then open the two or three you need — the whole
+416 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -260,6 +260,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0413` | [The convoy gives back: weapons before the shop, seals and boosters after it](decisions/0413-the-convoy-gives-back-weapons-before-the-shop-seals-and-boosters-after-it.md) | 2026-11-14 | #510 |
 | `0414` | [The plan counts the experience the game would award: its attacks, its counters, its heals](decisions/0414-the-plan-counts-the-experience-the-game-would-award-its-attack.md) | 2026-11-14 | #510 |
 | `0415` | [One split floor bounds the whole judged plan: its uncertain kills and its enemy phases](decisions/0415-one-split-floor-bounds-the-whole-judged-plan.md) | 2026-11-15 | #510 |
+| `0416` | [What a unit cannot use goes to the convoy, and a spare comes before the last weapon breaks](decisions/0416-what-a-unit-cannot-use-goes-to-the-convoy-and-a-spare-comes-before-the-last-weapon-breaks.md) | 2026-11-15 | #510 |
 
 ---
 
