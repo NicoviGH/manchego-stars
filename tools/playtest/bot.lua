@@ -2602,7 +2602,9 @@ end
 -- breaks, not after (Nicolas, 2026-11-15: rule B of #510 comment 6896261936); a unit holding
 -- nothing of the type is short, as before. The one test of "short of a type": lackedTypes (the
 -- shop, the convoy, Bot.arms) and Bot.fullBag (a weapon arriving in a full bag) both ask it.
-M.SPARE = 1
+-- M.SPARE is half a weapon (Nicolas, 2026-11-15, to be tuned if it costs): at one whole, a unit
+-- that had spent one use (an Elfire at 29 of 30) bought a spare at every chapter start.
+M.SPARE = 0.5
 local function shortfall(items, t, offered)
     local held, need = 0, offered
     for _, it in ipairs(items) do

@@ -441,6 +441,7 @@ local function test_between_takes_from_the_convoy()
                      ["for"] = { [0x01] = { usable = true } } }
     local crest = { id = 0x65, kind = "other", uses = 1, ["for"] = { [0x01] = { promotes = true } } }
     local stock = { { item = 0x38, price = { 500, 500, 500, 500 }, type = "anima", maxUses = 40 } }
+    -- takeFails: true fails every take, an item id fails only that item's
     local function game(takeFails)
         local g = fakeGame({ cap = 1, gold = 10000, stock = stock, random = cycle({ 0.1 }),
                              convoy = {}, chapters = { { id = 1 } } })
@@ -455,7 +456,7 @@ local function test_between_takes_from_the_convoy()
         g.api.convoy = function() return store end
         g.api.take = function(a)
             g.calls[#g.calls + 1] = "take"
-            if takeFails then return nil, "the bag is full" end
+            if takeFails == true or takeFails == a.item then return nil, "the bag is full" end
             for i, it in ipairs(store) do
                 if it.id == a.item then
                     local h = {}
@@ -489,10 +490,15 @@ local function test_between_takes_from_the_convoy()
     check(ok, false, "a failed take stops the campaign")
     check(why and why:find("supply: take 0x01 item 0x39: the bag is full", 1, true) ~= nil, true,
         "and says which act and why: " .. tostring(why))
-    local fl = lines(f)
-    local fprep = fl[1].prep and fl[1].prep[1]
-    check(fprep and fprep.attempt, 1, "a failed prep is still on the record (review of #624)")
-    check(fprep and #fprep.supply, 0, "with the acts that ran before the failed one: none here")
+    -- the crest's take fails after the Elfire's ran: the record keeps the Elfire's (review of
+    -- #624; fails on a between() that records no prep for a failed attempt)
+    local c = game(0x65)
+    check(select(1, Campaign.run(c.api)), false, "a failed crest take stops the campaign")
+    local cprep = (lines(c)[1].prep or {})[1] or {}
+    local done = {}
+    for _, a in ipairs(cprep.supply or {}) do done[#done + 1] = a.act .. ":" .. a.item end
+    check(cprep.attempt, 1, "a failed prep is still on the record")
+    check(table.concat(done, ","), "take:57", "with the acts that ran before the failed one")
 end
 test_between_takes_from_the_convoy()
 

@@ -1888,6 +1888,11 @@ do
     check(#bought == 1 and bought[1].item, 0x01, "shop: a Rapier with 4 of 40 uses buys an Iron Sword")
     lord.items[1].uses = 40
     check(#B.shop(10000, { ironSword }, { lord }), 0, "shop: a full Rapier buys none")
+    -- the line is half a weapon (Nicolas, 2026-11-15): 20 of 40 is not short, 19 is
+    lord.items[1].uses = 20
+    check(#B.shop(10000, { ironSword }, { lord }), 0, "shop: a Rapier at half its uses buys none")
+    lord.items[1].uses = 19
+    check(#B.shop(10000, { ironSword }, { lord }), 1, "shop: a Rapier under half buys a sword")
     check(B.armed(sniper) and B.armed(lord), true, "rule B does not change who is armed")
     lord.canUse[0x02] = true
     local ok, err = pcall(B.shop, 10000, { { item = 0x02, price = anyone(1), type = "sword" } },

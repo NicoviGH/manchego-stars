@@ -335,12 +335,17 @@ def records_of(task, text, where, log_path):
     prep = {(c['chapter'], p.get('attempt')): p
             for c in lines if c.get('chapter') is not None for p in c.get('prep') or []}
     for r in recs:
-        p = prep.get((r.get('chapter'), r.get('attempt')))
+        p = prep.pop((r.get('chapter'), r.get('attempt')), None)
         if p:
             r['supply'], r['buys'] = p.get('supply') or [], p.get('buys') or []
     ends = [c for c in lines if c.get('chapter') is None]
     for c in ends[-1:]:
         c['kind'] = 'campaign'
+        # an attempt whose prep failed never played, so no BOTRUN took its acts: the campaign's
+        # end (crashed, with why) keeps them
+        if prep:
+            c['prep'] = [dict(p, chapter=ch) for (ch, _), p in sorted(prep.items(),
+                                                                    key=lambda kv: str(kv[0]))]
         recs.append(c)
     attempt = (task.get('campaign') or {}).get('attempt')
     bot = any(is_bot(r) for r in recs)

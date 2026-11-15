@@ -316,6 +316,17 @@ class Workers(unittest.TestCase):
                          [[{'act': 'take', 'unit': 11, 'item': 46}], []])
         self.assertEqual([r.get('buys') for r in recs[:2]], [[], [{'unit': 1, 'item': 1}]])
         self.assertNotIn('supply', recs[2])
+        self.assertNotIn('prep', recs[2])
+
+    def test_a_failed_prep_lands_on_the_campaign_end(self):
+        # an attempt whose prep failed never played: no BOTRUN to carry its acts (review of #624)
+        text = ('CAMPAIGN {"chapter": 15, "attempts": 1, "outcome": "crashed", "prep": ['
+                '{"attempt": 1, "supply": [{"act": "give", "unit": 9, "item": 92}]}]}\n'
+                'CAMPAIGN {"outcome": "crashed", "why": "chapter 15 attempt 1: use: x"}')
+        end = mc.records_of({}, text, '/tmp/w', '/x.log')[0]
+        self.assertEqual(end['kind'], 'campaign')
+        self.assertEqual(end['prep'], [{'chapter': 15, 'attempt': 1,
+                                        'supply': [{'act': 'give', 'unit': 9, 'item': 92}]}])
 
     def test_a_campaigns_own_answer_is_no_environment_fault(self):
         # campaign.lua ends no_style (fewer styles than the attempt asked) before any bot plays
