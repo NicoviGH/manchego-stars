@@ -258,6 +258,8 @@ M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 -- bmunit.h: US_IN_BALLISTA, and ballistaIndex at 0x1C (its trap's index in sTrapPool; the
 -- halfword's other byte is movBonus) and pMapSpriteHandle at 0x3C, what M.keepRide keeps
 M.US_IN_BALLISTA, M.UNIT_BALLISTA, M.UNIT_SPRITE = 1 << 11, 0x1C, 0x3C
+-- whether a unit state word (+0C) is a ballista's rider's
+function M.riding(state) return ((state or 0) & M.US_IN_BALLISTA) ~= 0 end
 -- include/cp_script.h: struct AiScr is 0x10 bytes, `cmd` at +00; AI_CMD_PILLAGE runs
 -- AiScriptCmd_10_DoLooting, and a script loops back with AI_CMD_GOTO.
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
@@ -1031,6 +1033,14 @@ end
 
 local function cell(mem, base, x, y) return mem.u32(mem.u32(base) + y * 4) + x end
 local function grid(mem, base, x, y) return mem.u8(cell(mem, base, x, y)) end
+-- gBmMapUnit's (x, y): set to unit `id` (0 = no unit) by putOn; liftOff clears it only when
+-- `id` is the one there (a sandbox may have stood another unit on it), true when it did.
+function M.putOn(api, x, y, id) api.write8(cell(api.mem, api.SYM.gBmMapUnit, x, y), id) end
+function M.liftOff(api, x, y, id)
+    if grid(api.mem, api.SYM.gBmMapUnit, x, y) ~= id then return false end
+    M.putOn(api, x, y, 0)
+    return true
+end
 local function readGrid(mem, base, w, h)
     local g = {}
     for y = 0, h - 1 do
@@ -1352,7 +1362,7 @@ end
 -- writes every unit's pMapSpriteHandle anew, null on one the plan hid: only drawing reads it,
 -- and `units` (as M.keepAi's) have it kept all the same, so the guard stays exact.
 function M.keepRide(api, S, e, units)
-    if (api.mem.u32(e.addr + UNIT_STATE) & M.US_IN_BALLISTA) == 0 then return end
+    if not M.riding(api.mem.u32(e.addr + UNIT_STATE)) then return end
     for _, o in pairs(units) do api.keep16(o.addr + M.UNIT_SPRITE, 2) end
     api.keep16(e.addr + M.UNIT_BALLISTA, 1)
     api.keep16(S.sTrapPool + api.mem.u8(e.addr + M.UNIT_BALLISTA) * M.TRAP_SIZE,
@@ -1739,12 +1749,14 @@ function M.new(outer)
     end
 
     -- A unit's own answers (its weapon's reach, Seize, staves, Vulnerary, keys) depend on the
-    -- unit alone -- class, level, HP, status, items -- never on where anyone stands, so they
-    -- outlive refresh(): keyed by those facts, a changed unit is simply a new key.
+    -- unit alone -- class, level, HP, status, items, whether it rides a ballista (a rider has
+    -- no weapon of its own: M.weapons) -- never on where anyone stands, so they outlive
+    -- refresh(): keyed by those facts, a changed unit is simply a new key.
     local own = {}
     -- `hp` is "-" for an answer HP never moves (max HP)
     local function ownKey(kind, u, hp)
-        local parts = { kind, u.id, u.classId or "-", u.level or "-", hp, u.status or "-" }
+        local parts = { kind, u.id, u.classId or "-", u.level or "-", hp, u.status or "-",
+                        M.riding(u.state) and "r" or "-" }
         for _, it in ipairs(u.items or {}) do parts[#parts + 1] = it.id .. "x" .. it.uses end
         return table.concat(parts, ":")
     end
@@ -1859,7 +1871,7 @@ function M.new(outer)
     function s.reach(u, friends)
         return sandbox(function(call)
             call(S.GenerateUnitMovementMap, { u.addr })
-            return movementTiles(u, u.x, u.y, friends)
+            return M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))
         end)
     end
 
@@ -1968,10 +1980,8 @@ function M.new(outer)
     local function standOn(u, x, y)
         -- where it stands now, not u.x/u.y: a sandbox may have moved it already
         local cx, cy = mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)
-        if mem.u8(cell(mem, S.gBmMapUnit, cx, cy)) == u.id then
-            api.write8(cell(mem, S.gBmMapUnit, cx, cy), 0)
-        end
-        api.write8(cell(mem, S.gBmMapUnit, x, y), u.id)
+        M.liftOff(api, cx, cy, u.id)
+        M.putOn(api, x, y, u.id)
         api.write8(u.addr + UNIT_X, x)
         api.write8(u.addr + UNIT_Y, y)
     end
@@ -2110,9 +2120,7 @@ function M.new(outer)
             local r = t and byId[c.by or mem.u8(t.addr + Board.UNIT_RESCUE)]
             if t and c.by and r then
                 local tx, ty = mem.u8(t.addr + UNIT_X), mem.u8(t.addr + UNIT_Y)
-                if mem.u8(cell(mem, S.gBmMapUnit, tx, ty)) == t.id then
-                    api.write8(cell(mem, S.gBmMapUnit, tx, ty), 0)
-                end
+                M.liftOff(api, tx, ty, t.id)
                 api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) | CARRY)
                 api.write32(r.addr + UNIT_STATE, mem.u32(r.addr + UNIT_STATE) | Board.US_RESCUING)
                 api.write8(t.addr + Board.UNIT_RESCUE, r.id)
@@ -2147,9 +2155,7 @@ function M.new(outer)
         end
         stageCarry(byId, plan.carry)
         local function remove(e, x, y)
-            if mem.u8(cell(mem, S.gBmMapUnit, x, y)) == e.id then
-                api.write8(cell(mem, S.gBmMapUnit, x, y), 0)
-            end
+            M.liftOff(api, x, y, e.id)
             api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN)
         end
         local gone = {}
@@ -2604,7 +2610,7 @@ function M.new(outer)
                 stageCarry(byId, carry)
                 M.refresh(api, call, S, byId)
                 call(S.GenerateUnitMovementMapExt, { u.addr, mov - spent })
-                return movementTiles(u, x, y)
+                return M.riderTiles(api, call, u, movementTiles(u, x, y), { x = x, y = y })
             end)
         end
         seen.canto[k] = out
@@ -2884,9 +2890,39 @@ function M.range(api, u, sandbox)
     return mn and { min = mn, max = mx } or nil
 end
 
+-- Inside a sandbox (or Sight.machine's), after `u`'s movement map from `from` (default its own
+-- tile; a Canto move's, the act's): `tiles` less those a ballista's rider may not end on. A
+-- rider moves with its ballista, and the game's own check (CanMoveActiveUnitTo, playerphase.c)
+-- lets it end on no tile a ballista stands on but the one it set out from; the ridden one's
+-- trap keeps the tile it was boarded on until the rider exits (TryRemoveUnitFromBallista).
+-- An ally's tile (`by`, reach's `friends`) is asked with the ally lifted off gBmMapUnit, as it
+-- will be once it has moved. A unit on foot keeps them all. The callers: s.reach,
+-- s.cantoTiles, and harness.lua's marchToward.
+function M.riderTiles(api, call, u, tiles, from)
+    if not M.riding(u.state) then return tiles end
+    local S = api.SYM
+    local ox, oy = from and from.x or u.x, from and from.y or u.y
+    api.write32(S.gActiveUnit, u.addr)
+    api.write16(S.gActiveUnitMoveOrigin, ox)
+    api.write16(S.gActiveUnitMoveOrigin + 2, oy)
+    local out = {}
+    for _, t in ipairs(tiles) do
+        local lifted = t.by and M.liftOff(api, t.x, t.y, t.by)
+        if (t.x == ox and t.y == oy) or call(S.CanMoveActiveUnitTo, { t.x, t.y }) ~= 0 then
+            out[#out + 1] = t
+        end
+        if lifted then M.putOn(api, t.x, t.y, t.by) end
+    end
+    return out
+end
+
 -- `u`'s weapons as Weapon Select lists them (sight.weapons), without a whole sight.
 function M.weapons(api, u, sandbox)
     local S = api.SYM
+    -- A ballista's rider is shown no Attack (AttackCommandUsability's US_IN_BALLISTA gate):
+    -- only Attack w/Ballista, which the bot never plays. Vanilla Ch10 (Eirika's route): Innes
+    -- (charId 11) joined riding an emptied ballista and the bot planned his bow (#510).
+    if M.riding(u.state) then return {} end
     return (sandbox or M.machine(api.cpu))(function(call)
         local out = {}
         for i, it in ipairs(u.items) do

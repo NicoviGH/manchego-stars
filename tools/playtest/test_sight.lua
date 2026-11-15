@@ -1645,5 +1645,94 @@ do
     check(memo.k.side .. " " .. memo.k[4].kill, "target 3", "known: the first teaching read sets it")
 end
 
+-- A ballista's rider (#510, vanilla Ch10 on Eirika's route): Innes (charId 11) joined riding an
+-- emptied ballista, the bot planned his Silver Bow from (7,23), and the game showed him no
+-- Attack there (AttackCommandUsability hides it from a rider). weapons() lists nothing for a
+-- rider and his bow on foot; riderTiles() drops the tiles CanMoveActiveUnitTo refuses him (a
+-- ballista's), keeps his own, and asks an ally's tile with the ally lifted off the map.
+do
+    local m = fakeMem()
+    local S = { CanUnitUseWeaponNow = 1, CanMoveActiveUnitTo = 2, gActiveUnit = 0x100,
+                gActiveUnitMoveOrigin = 0x110, gBmMapUnit = 0x200 }
+    local ROWS = 0x300                      -- gBmMapUnit -> row pointers -> 32-wide rows
+    m.w32(S.gBmMapUnit, ROWS)
+    for y = 0, 31 do m.w32(ROWS + y * 4, 0x1000 + y * 32) end
+    local api = { SYM = S, mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32,
+                  Board = { itemRange = function() return 2, 3 end } }
+    local BOW = 0x2F
+    local innes = { addr = 0x4000, x = 2, y = 22, items = { { id = BOW, uses = 5 } },
+                    state = Sight.US_IN_BALLISTA }
+    local function sandbox(fn)
+        return fn(function(fnAddr) return fnAddr == S.CanUnitUseWeaponNow and 1 or 0 end)
+    end
+    check(#Sight.weapons(api, innes, sandbox), 0, "weapons: a ballista's rider is listed none")
+    local onFoot = { addr = innes.addr, x = 2, y = 22, items = innes.items, state = 0 }
+    local w = Sight.weapons(api, onFoot, sandbox)
+    check(#w == 1 and w[1].slot == 0 and w[1].max == 3, true, "weapons: on foot, his bow")
+
+    -- (4,23) is the ballista's: refused while gBmMapUnit is clear there; (6,22) is an ally's
+    m.w8(0x1000 + 22 * 32 + 6, 0x15)
+    local asked = {}
+    local function call(fnAddr, args)
+        if fnAddr ~= S.CanMoveActiveUnitTo then return 0 end
+        local x, y = args[1], args[2]
+        asked[#asked + 1] = string.format("%d,%d:%d", x, y, m.u8(0x1000 + y * 32 + x))
+        if m.u8(0x1000 + y * 32 + x) ~= 0 then return 0 end
+        return (x == 4 and y == 23) and 0 or 1
+    end
+    local tiles = { { x = 2, y = 22 }, { x = 4, y = 23 }, { x = 7, y = 23 },
+                    { x = 6, y = 22, by = 0x15 } }
+    local function keys(list)
+        local out = {}
+        for _, t in ipairs(list) do out[#out + 1] = t.x .. "," .. t.y end
+        return table.concat(out, " ")
+    end
+    check(keys(Sight.riderTiles(api, call, innes, tiles)), "2,22 7,23 6,22",
+          "riderTiles: a rider ends on no other ballista's tile")
+    check(table.concat(asked, " "), "4,23:0 7,23:0 6,22:0",
+          "riderTiles: his own tile is never asked, an ally's is asked with it lifted")
+    check(m.u8(0x1000 + 22 * 32 + 6), 0x15, "riderTiles: the ally is put back on the map")
+    check(m.u32(S.gActiveUnit) .. " " .. m.u16(S.gActiveUnitMoveOrigin) .. ","
+          .. m.u16(S.gActiveUnitMoveOrigin + 2), "16384 2,22",
+          "riderTiles: asked as the active unit, setting out from his tile")
+    check(keys(Sight.riderTiles(api, call, onFoot, tiles)), "2,22 4,23 7,23 6,22",
+          "riderTiles: a unit on foot keeps every tile")
+    -- a Canto move sets out from the act's tile: that one is kept unasked and is the origin
+    asked = {}
+    check(keys(Sight.riderTiles(api, call, innes, { { x = 7, y = 23 }, { x = 4, y = 23 } },
+                                { x = 7, y = 23 })), "7,23",
+          "riderTiles: a Canto rider keeps its set-out tile and ends on no ballista's")
+    check(table.concat(asked, " ") .. " " .. m.u16(S.gActiveUnitMoveOrigin) .. ","
+          .. m.u16(S.gActiveUnitMoveOrigin + 2), "4,23:0 7,23",
+          "riderTiles: a Canto rider is asked setting out from the act's tile")
+
+    -- the wiring: every reader of a move's tiles filters a rider's, and the answers' memo
+    -- keys whether the unit rides (a rider's empty weapons are never served on foot)
+    local function bodyOf(src, head)
+        local at = src:find(head, 1, true)
+        return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
+    end
+    check(bodyOf(sightSrc, "    function s.reach(u, friends)")
+              :find("M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))", 1, true)
+          ~= nil, true, "riderTiles: s.reach filters the rider's tiles")
+    check(bodyOf(sightSrc, "    function s.cantoTiles(u, a)")
+              :find("M.riderTiles(api, call, u, movementTiles(u, x, y), { x = x, y = y })", 1,
+                    true) ~= nil, true, "riderTiles: s.cantoTiles filters the rider's tiles")
+    check(bodyOf(sightSrc, "    local function ownKey(kind, u, hp)")
+              :find("M.riding(u.state)", 1, true) ~= nil, true,
+          "weapons: the answers' memo keys whether the unit rides")
+    local hf = assert(io.open(here .. "harness.lua"))
+    local harnessSrc = hf:read("a")
+    hf:close()
+    local march = harnessSrc:find("local function marchToward(u, tx, ty, maxx, maxy)", 1, true)
+    local marchBody = march and harnessSrc:sub(march, harnessSrc:find("\nend\n", march, true))
+        or ""
+    check(marchBody:find("INSPECT.Sight.riderTiles(api, call, rider, tiles)", 1, true) ~= nil,
+          true, "riderTiles: harness marchToward filters the rider's tiles")
+    -- M.riding is the one rider test: no other reads the bit off a state word
+    local _, copies = sightSrc:gsub("& M%.US_IN_BALLISTA", "")
+    check(copies, 1, "riding: sight.lua reads US_IN_BALLISTA in M.riding alone")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
