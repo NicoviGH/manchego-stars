@@ -534,6 +534,32 @@ M.DECISION_FRAMES = 4000000
 -- changes the chapter, and #510 call 3 (comment 6810567866) asked for the same three here.
 M.GOAL_QUIET = 3
 
+-- Whether the experience the plan read for one side of a battle (`taught`: the game's count for
+-- none / hit / kill, sight's expOf) is what the real battle (`battle`, Board.battle) awarded it:
+-- nil when it is, else { case, read, gave }. `side` is the player unit's: "actor" (our attack, the default) or
+-- "target" (an enemy's strike on our unit, its counter). The case is the battle's: our side dead
+-- (the count is 0), the other dead, any blow of our unit's that dealt damage, else none. A battle
+-- between two player units (blue ids, below 0x40) awards none (BattleApplyExpGains skips it),
+-- so there is nothing to check; the other skip, PLAY_FLAG_EXTRA_MAP, is the link arena's,
+-- which the bot never plays. ADR 0414.
+function M.taughtMiss(taught, battle, side)
+    side = side or "actor"
+    local me, them = battle.actor, battle.target
+    if side == "target" then me, them = them, me end
+    if me.id and them.id and me.id < 0x40 and them.id < 0x40 then return nil end
+    local case = "none"
+    if me.hp == 0 then case = "dead"
+    elseif them.hp == 0 then case = "kill"
+    else
+        for _, h in ipairs(battle.hits) do
+            if h.by == side and not h.miss and h.dmg > 0 then case = "hit" end
+        end
+    end
+    local read = case == "dead" and 0 or taught[case]
+    if read == me.exp then return nil end
+    return { case = case, read = read, gave = me.exp }
+end
+
 -- A run's player acts as one number, folded act by act (FNV-1a, 32 bits): who, what, where,
 -- on whom (the target's unit slot too: generic enemies share a charId). Equal on two attempts of one start means the same game was played twice. `h` is the
 -- hash so far (nil at the start) -> the hash with `a` added.
@@ -677,7 +703,17 @@ function M.run(api)
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
                   lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
                                 calls = 0, cpu_s = 0 },
-                  seize_skips = {}, stall_events = {}, anomalies = {} }
+                  seize_skips = {}, stall_events = {}, anomalies = {},
+                  -- the experience reads checked against the game's award (ADR 0414), per kind:
+                  -- a pass with none checked proves nothing
+                  taught_checked = { attack = 0, counter = 0, staff = 0 },
+                  -- the reads or battles that could not be checked: an attack read with no
+                  -- battle record, a counter the committed plan has a strike for but at
+                  -- another level (counter_level), one it has none for at all: a rarer way, an
+                  -- enemy it did not see (counter_unplanned), a heal with no battle unit or
+                  -- another unit's
+                  taught_unchecked = { attack = 0, counter_level = 0, counter_unplanned = 0,
+                                       staff = 0 } }
     local explore = M.exploreLog()
     -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
     -- baseline and chosen keys once it is reached; `halt`, why the replay stops early
@@ -712,6 +748,16 @@ function M.run(api)
     -- each with its turn: montecarlo.py's keep_trace gives it the story command (`narrate`)
     -- once the trace is filed where it will stay
     local function anomaly(a) rec.anomalies[#rec.anomalies + 1] = a end
+    -- one experience check (ADR 0414): counted by kind, a read the game's award differs from an
+    -- anomaly (`miss`: taughtMiss's, or nil when they agree)
+    local function checkTaught(kind, turn, charId, miss, case)
+        rec.taught_checked[kind] = rec.taught_checked[kind] + 1
+        if miss then
+            anomaly({ kind = "taught_miss", turn = turn, charId = charId,
+                      case = case and (case .. " " .. miss.case) or miss.case,
+                      read = miss.read, gave = miss.gave })
+        end
+    end
     -- whether this turn moved the chapter on: a lord moved, a kill, a Visit, Talk or Chest
     -- (FR-007's stall is three player phases in a row without one)
     local progressed, idle = false, 0
@@ -1615,6 +1661,24 @@ function M.run(api)
                     end
                 end
                 local battle = not trapped and action.act == "attack" and api.battle and api.battle() or nil
+                -- the plan's experience read against what the game awarded: a difference is the
+                -- term scoring a wrong number
+                local taught = action.act == "attack" and action.f and action.f.exp
+                if taught and battle then
+                    checkTaught("attack", turn, battle.actor.charId, M.taughtMiss(taught, battle))
+                elseif taught then
+                    rec.taught_unchecked.attack = rec.taught_unchecked.attack + 1
+                end
+                -- a heal's: the staff's count against what the game's Staff command awarded
+                -- (gBattleActor's expGain, BattleApplyItemExpGains)
+                local healer = not trapped and action.act == "staff" and action.exp
+                    and api.itemUser and api.itemUser() or nil
+                if healer and healer.id == action.unitId then
+                    checkTaught("staff", turn, healer.charId, healer.exp ~= action.exp
+                        and { case = "staff", read = action.exp, gave = healer.exp } or nil)
+                elseif not trapped and action.act == "staff" and action.exp then
+                    rec.taught_unchecked.staff = rec.taught_unchecked.staff + 1
+                end
                 local after = api.board()
                 sight.refresh()
                 before = board
@@ -1630,6 +1694,9 @@ function M.run(api)
                         from = from and { x = from.x, y = from.y },
                         to = trapped and actor and { x = actor.x, y = actor.y } or action.move,
                         canto = action.canto, act = action.act, target = action.target, battles = { battle },
+                        -- the game's count the plan read for the attack (none / hit / kill);
+                        -- M.taughtMiss checks it against the battle's own exp
+                        taught = taught or nil,
                         fell = fell, trapped = trapped or nil })
                 changes(after)
                 playerActs = M.actsHash(playerActs, action)
@@ -1681,6 +1748,30 @@ function M.run(api)
                         end
                     end
                     explore.closedBy(a.tile.x, a.tile.y, a.charId, loot)
+                end
+                -- our unit's counter: what it learnt against the plan's read of that strike
+                -- (the committed plan's phase, its strike by this enemy on that unit), read at
+                -- the level it fought at: a level-up since (an earlier battle, its own attack
+                -- after the plan) changes the count honestly
+                for _, b in ipairs(a.battles or {}) do
+                    if b.actor.id == a.id and b.target.id < 0x40 then
+                        local read
+                        for _, st in ipairs(commit and commit.strikes or {}) do
+                            if st.enemy == a.id and st.target == b.target.id and st.taught then
+                                read = st
+                                break   -- the phase's one strike by this enemy on that unit
+                            end
+                        end
+                        local u = rec.taught_unchecked
+                        if read and read.targetLevel == b.target.levelBefore then
+                            checkTaught("counter", turn, b.target.charId,
+                                        M.taughtMiss(read.taught, b, "target"), "counter")
+                        elseif read then
+                            u.counter_level = u.counter_level + 1
+                        else
+                            u.counter_unplanned = u.counter_unplanned + 1
+                        end
+                    end
                 end
                 trace({ t = "act", phase = "enemy", unit = a.charId, id = a.id, from = a.from,
                         to = a.to, hp = a.hp, act = a.act, targetId = a.targetId, tile = a.tile,

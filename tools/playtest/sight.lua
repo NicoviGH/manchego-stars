@@ -289,7 +289,7 @@ M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
 
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
 local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
-             statusOut = 0x6F, hpInitial = 0x72, weaponBroke = 0x7D }
+             statusOut = 0x6F, hpInitial = 0x72, nonZeroDamage = 0x7C, weaponBroke = 0x7D }
 -- include/bmunit.h UNIT_STATUS_PETRIFY and UNIT_STATUS_13: the two statuses a blow sets that
 -- end the battle like a death (BattleGenerateHit)
 local STATUS_PETRIFY, STATUS_13 = 11, 13
@@ -685,6 +685,61 @@ function M.exchangeOf(leaves)
     return dealt, back, joint
 end
 
+-- What the exchange just simulated teaches one side of it, by the game's own count
+-- (GetBattleUnitExpGain, bmbattle.c: BattleApplyExpGains awards it to both sides after a real
+-- battle; a simulation never calls it): `side` "actor" (our attack) or "target" (our unit an
+-- enemy strikes, its counter's), its experience when its blows deal nothing, when they deal
+-- damage, and when they kill. The count tells the three apart by two fields only, the side's
+-- nonZeroDamage and the other's HP (the Unit sits at +00 of a battle unit, so its curHP is
+-- UNIT_HP there too), so each read sets those two on the simulation's battle units, the side
+-- alive: a dead one gains nothing, which the planner reads off the exchange's ways. Which of
+-- the three a plan gets is the planner's, at the HPs the plan leaves. Inside a sandbox, on the
+-- plain simulation (ADR 0414).
+function M.expOf(api, call, S, side)
+    local me, them = S.gBattleActor, S.gBattleTarget
+    if side == "target" then me, them = them, me end
+    api.write8(me + UNIT_HP, 1)
+    local function count(damaged, hp)
+        api.write8(me + BU.nonZeroDamage, damaged)
+        api.write8(them + UNIT_HP, hp)
+        return call(S.GetBattleUnitExpGain, { me, them })
+    end
+    return { none = count(0, 1), hit = count(1, 1), kill = count(1, 0) }
+end
+
+-- The experience a heal with the staff in item `slot` teaches the unit at `addr`, by the game's
+-- own count (GetBattleUnitStaffExp, bmbattle.c: 10 + the staff's cost per use / 20, halved once
+-- promoted, 0 for a unit that cannot gain levels), on the battle unit the Staff command sets up
+-- (BattleInitItemEffect). The count's 1 for a miss never applies to a heal: the setup clears
+-- the blows (ClearBattleHits) and a heal rolls none. Inside a sandbox (ADR 0414).
+function M.staffExp(call, S, addr, slot)
+    call(S.BattleInitItemEffect, { addr, slot })
+    return call(S.GetBattleUnitStaffExp, { S.gBattleActor })
+end
+
+-- An exchange's played results, kept by its battle key (`memo`: key -> { dealt, back, joint,
+-- exp }): `play()` makes the first three on a miss, and `count()` (M.expOf) the fourth for a
+-- `teaches` read whenever the entry lacks it, so an entry a non-teaching read (an enemy's
+-- strike) made first is filled in, and none is ever cleared. The count runs first: both are
+-- called on the plain simulation the key was read from, and the played ways leave the last
+-- way's battle units behind. The count leaves the battle units written (its cases' fields);
+-- the sandbox puts them back, and no caller reads them after an exchange. Pure.
+function M.known(memo, key, teaches, count, play)
+    local known = memo[key]
+    -- the count is one side's: a key read for the other side is a broken assumption (the key's
+    -- actor decides the side), never a count to hand back
+    assert(not (teaches and known and known.side and known.side ~= teaches),
+           "sight: one battle key read for both sides' experience")
+    local exp = known and known[4]
+    if teaches and not exp then exp = count() end
+    if not known then
+        known = play()
+        memo[key] = known
+    end
+    if exp then known[4], known.side = exp, known.side or teaches end
+    return known
+end
+
 -- Every way one exchange can go, as the game plays it (ADR 0377): `sim` ({ addr, args }:
 -- BattleGenerateSimulation or its ballista twin) is run again and again, each roll it makes caught
 -- at S.BattleRoll1RN/S.BattleRoll2RN's entry (M.withBreaks) and its simResult (r1, which a
@@ -785,21 +840,37 @@ function M.attackOf(ours, eHp, uHp)
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
              killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
-             joint = ours.joint,
+             joint = ours.joint, exp = ours.exp,
              kill = kill, die = (M.odds({ ours.back }, uHp)), sure = M.least(ours.dealt) >= eHp,
              expected = expected, counterWorst = M.worst(ours.back) }
 end
 
+-- A judged phase's strike by enemy `id` on unit `target` (strikeOf's, `side` its simulation),
+-- played at the HPs the phase had left when it came: strikerHp / targetHp, which its exchange's
+-- ways were simulated at, felled the chance our counter kills the striker, and targetLevel the
+-- target's level (the board's), the one its count (`taught`) was read at: a level-up since
+-- changes the count. Pure.
+function M.strikeAt(side, id, target, strikerHp, targetHp, level)
+    local t = M.strikeOf(side)
+    t.enemy, t.target = id, target
+    t.strikerHp, t.targetHp, t.targetLevel = strikerHp, targetHp, level
+    t.felled = (M.odds({ t.counterDist }, t.strikerHp))
+    return t
+end
+
 -- The enemy's strike read off its simulation, or none (nil) when its AI does not strike:
 -- taken* as the window shows it, takenDist what it takes off our unit (takenWorst: the most),
--- counterDist what our counter takes off it.
+-- counterDist what our counter takes off it; joint the two together (exchangeOf's, dealt =
+-- what it takes off our unit, back = what our counter takes off it); taught our unit's count
+-- (expOf's, its side "target"), nil when the target is no player unit.
 function M.strikeOf(t)
     local dealt = t and t.dealt or { [0] = 1 }
     return { takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
              takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
              takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil,
              takenDist = dealt, takenWorst = M.worst(dealt),
-             counterDist = t and t.back or { [0] = 1 } }
+             counterDist = t and t.back or { [0] = 1 },
+             joint = t and t.joint or nil, taught = t and t.exp or nil }
 end
 
 -- Whether our attack ANSWERS its target, and how hard: the game's own simulation kills it
@@ -1797,6 +1868,19 @@ function M.new(outer)
     -- stand and their ai_counter (M.battleWord), and gBattleStats' config and range. The
     -- chapter (BattleCheckSilencer reads it) is this sight's own.
     local playedBy = {}
+    -- whether a strike on a player unit reads its counter's count: only the judged phase
+    -- (s.enemyPhase) scores it; the lookahead's phases and a single strike's forecast do not
+    local learning = false
+    -- fn() with `learning` set to `v`, put back as it was after. No pcall: an error keeps its
+    -- traceback, and leaves the flag at `v` only until the next entry sets its own, which
+    -- costs reads at most (an unscored count), never a wrong score.
+    local function learningAs(v, fn)
+        local was = learning
+        learning = v
+        local out = fn()
+        learning = was
+        return out
+    end
     local function battleKey()
         local parts = { mem.u32(S.gBattleStats) }
         for _, bu in ipairs({ S.gBattleActor, S.gBattleTarget }) do
@@ -1807,20 +1891,21 @@ function M.new(outer)
         return table.concat(parts, ":")
     end
 
-    local function exchange(call, proc, sim)
+    -- `teaches`: the side ("actor" or "target") that is our unit, whose experience the exchange
+    -- also reads (expOf). A key's actor is in it, so a key is always read for the same side.
+    local function exchange(call, proc, sim, teaches)
         call({ sim, { S.InitBattleForecastBattleStats, { proc } } })
         local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
         side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
         side.killsTarget = mem.u8(S.gBattleTarget + UNIT_HP) == 0
-        local key = battleKey()
-        local known = playedBy[key]
-        if not known then
-            known = { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
-                return lost(S.gBattleTarget), lost(S.gBattleActor)
-            end)) }
-            playedBy[key] = known
-        end
-        side.dealt, side.back, side.joint = known[1], known[2], known[3]
+        local known = M.known(playedBy, battleKey(), teaches,
+            function() return M.expOf(api, call, S, teaches) end,
+            function()
+                return { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
+                    return lost(S.gBattleTarget), lost(S.gBattleActor)
+                end)) }
+            end)
+        side.dealt, side.back, side.joint, side.exp = known[1], known[2], known[3], known[4]
         return side
     end
 
@@ -1829,7 +1914,7 @@ function M.new(outer)
         if not w then return nil end
         local ours = sandbox(function(call, proc)
             return exchange(call, proc,
-                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, w.slot } })
+                { S.BattleGenerateSimulation, { u.addr, e.addr, x, y, w.slot } }, "actor")
         end)
         return M.attackOf(ours, e.hp, u.hp)
     end
@@ -1941,14 +2026,15 @@ function M.new(outer)
         local sim = slot == BALLISTA_SLOT
             and { S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy } }
             or { S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot } }
-        local side = exchange(call, proc, sim)
+        -- a player unit struck (a blue index) learns from its counter: its side is read too
+        local side = exchange(call, proc, sim, learning and target < 0x40 and "target" or nil)
         side.slot, side.tile = slot, { x = sx, y = sy }
         return target, side
     end
 
     function s.strike(u, e, x, y, slot, from)
         local all = units()
-        local t = sandbox(function(call, proc)
+        local t = learningAs(false, function() return sandbox(function(call, proc)
             standOn(u, x, y)
             if from then standOn(e, from.x, from.y) end
             M.equip(api, call, S, u, slot)
@@ -1959,7 +2045,7 @@ function M.new(outer)
                                           function() onlyTarget(u, all) end, true)
             if target ~= u.id then return nil end
             return side
-        end)
+        end) end)
         return M.strikeOf(t)
     end
 
@@ -2061,11 +2147,9 @@ function M.new(outer)
         end
         -- e strikes as it decided: stood on its tile, its expected damage off the target
         local function strike(e, id, target, side, done)
-            local t = M.strikeOf(side)
-            t.enemy, t.target = id, target
             local addr = mem.u32(S.gUnitLookup + target * 4)
-            t.strikerHp, t.targetHp = mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP)
-            t.felled = (M.odds({ t.counterDist }, t.strikerHp))
+            local t = M.strikeAt(side, id, target, mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP),
+                                 byId[target] and byId[target].level)
             local now = {}
             for x = 1, #done do now[x] = done[x] end
             now[#now + 1] = t
@@ -2103,10 +2187,10 @@ function M.new(outer)
     end
 
     function s.enemyPhase(plan)
-        return sandbox(function(call, proc)
+        return learningAs(true, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
             return playPhase(call, proc, byId, order(), decides, strike, remove)
-        end)
+        end) end)
     end
 
     -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
@@ -2122,7 +2206,7 @@ function M.new(outer)
     -- begins, 0 when the first left it dead }
     -- and .moved = the enemies the first phase moved, { { id, x, y } }.
     function s.nextPhase(plan)
-        return sandbox(function(call, proc)
+        return learningAs(false, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
             local moved = {}
             for _, id in ipairs(order()) do
@@ -2166,7 +2250,7 @@ function M.new(outer)
             local out = playPhase(call, proc, byId, order(), decides, strike, remove)
             out.hp, out.moved = hp, moved
             return out
-        end)
+        end) end)
     end
 
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
@@ -2589,7 +2673,8 @@ function M.new(outer)
                     if call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0
                         and call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) > 0 then
                         out[#out + 1] = { slot = i - 1,
-                            amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) }
+                            amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }),
+                            exp = M.staffExp(call, S, u.addr, i - 1) }
                     end
                 end
                 return out
@@ -2616,7 +2701,7 @@ function M.new(outer)
                     for k = 0, call(S.GetSelectTargetCount, {}) - 1 do
                         targets[#targets + 1] = mem.u8(call(S.GetTarget, { k }) + 2)
                     end
-                    out[#out + 1] = { slot = slot, targets = targets,
+                    out[#out + 1] = { slot = slot, targets = targets, exp = st.exp,
                                       amount = call(S.GetUnitItemHealAmount, { u.addr, item }) }
                 end
             end

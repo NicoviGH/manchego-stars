@@ -3435,6 +3435,7 @@ INSPECT.botApi = function(game)
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
         battle = BOARD.battle,
+        itemUser = BOARD.itemUser,   -- the Staff command's user and its experience (ADR 0414)
         -- every full-bag answer since the last call (INSPECT.answerFullBag's log)
         bag = function() return unread(INSPECT.bagLog) end,
         -- every drop the game gave a player unit since the last call (INSPECT.watchDrops, kept

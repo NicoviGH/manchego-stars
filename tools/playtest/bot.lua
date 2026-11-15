@@ -1610,6 +1610,13 @@ local function seize(ctx)
     return nil
 end
 
+-- A heal act's staff, from the game's heal read (`h`: sight.heals' entry, or a candidate that
+-- copied it): its slot, the HP it restores (the planner reads what the target is short by when
+-- it lands) and the experience it teaches the healer (sight.staffExp: the planner's score).
+local function healWith(a, h)
+    a.slot, a.amount, a.exp = h.slot, h.amount, h.exp
+end
+
 -- A healer's staff, once the fighters have acted: of the heals the game offers (sight.heals) from wait
 -- tiles the gate allows, the one restoring the most HP -- the ally's missing HP up to the
 -- staff's amount -- then the most wounded ally, then the safest tile. Slot order picks among
@@ -1629,7 +1636,7 @@ local function staffHeal(ctx, gate, only)
                         for _, id in ipairs(h.targets) do
                             local gain = math.min(missing[id] or 0, h.amount)
                             local c = { u = u, tile = t, slot = h.slot, id = id, gain = gain,
-                                        amount = h.amount,
+                                        amount = h.amount, exp = h.exp,
                                         left = -(missing[id] or 0),
                                         worst = worstCase(ctx, u, t.x, t.y, nil).sum }
                             if gain > 0 and (not best or c.gain > best.gain
@@ -1646,8 +1653,8 @@ local function staffHeal(ctx, gate, only)
     end
     if not best then return nil end
     local a = action(best.u, best.tile, "staff", nil)
-    -- the amount too: the planner reads what the target is short by when the heal lands
-    a.slot, a.targetId, a.gain, a.amount = best.slot, best.id, best.gain, best.amount
+    a.targetId, a.gain = best.id, best.gain
+    healWith(a, best)
     for _, b in ipairs(ctx.blues) do
         if b.id == best.id then a.target = b.charId end
     end
@@ -2095,7 +2102,7 @@ local function proposeOne(ctx, u)
             for _, h in ipairs(ctx.sight.heals(u, t.x, t.y, others)) do
                 for _, id in ipairs(h.targets) do
                     if not best[id] or w < best[id].w then
-                        best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount }
+                        best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount, exp = h.exp }
                     end
                 end
             end
@@ -2104,7 +2111,7 @@ local function proposeOne(ctx, u)
             local c = best[b.id]
             if c then
                 local a = action(u, c.tile, "staff", b)
-                a.slot, a.amount = c.slot, c.amount
+                healWith(a, c)
                 add(a, "heal")
             end
         end

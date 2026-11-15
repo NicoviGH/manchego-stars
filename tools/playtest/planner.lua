@@ -159,7 +159,9 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
--- whose death ends it (a lord's); gold: points per gold
+-- whose death ends it (a lord's); exp: per experience point our unit's attack teaches it, the
+-- game's own count (a full level is 100: about one kill), so the blow that trains the unit
+-- that needs it most ranks first among blows of the same risk and progress; gold: points per gold
 -- a goal is worth (goals.lua: under careful no item outweighs a life, under bold a good one
 -- does). What each further turn to a goal leaves of its chance is goals.lua's GAMMA.
 -- Ground toward a goal, a Visit, a Talk recruit and the win itself: the goals' term (goalTerm
@@ -168,11 +170,11 @@ M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any
 -- win is the same win, so it waits while what it would close is worth more than the waiting.
 M.WEIGHTS = {
     careful = { death = 1000, taken = 2, dealt = 1, kill = 30, heal = 1.5, breach = 25,
-                win = 100000, gold = 0.04 },
+                win = 100000, gold = 0.04, exp = 0.3 },
     even = { death = 300, taken = 1, dealt = 1, kill = 30, heal = 1, breach = 25,
-             win = 100000, gold = 0.08 },
+             win = 100000, gold = 0.08, exp = 0.3 },
     bold = { death = 60, taken = 0.5, dealt = 1, kill = 40, heal = 0.5, breach = 25,
-             win = 100000, gold = 0.15 },
+             win = 100000, gold = 0.15, exp = 0.3 },
 }
 
 -- The most predicted death chance a style accepts for any protected unit in a plan (ADR 0384,
@@ -294,6 +296,25 @@ local function takes(act)
     return nil
 end
 
+-- The experience an exchange teaches our unit, over its ways (`ways`: exchangeOf's joint,
+-- { p, dealt, back }): `x` is the game's count for our blows dealing nothing, dealing damage and
+-- killing (sight.lua expOf), `hp` the HP the other side is at, `unitHp` our unit's. A way that kills
+-- our unit teaches nothing (GetBattleUnitExpGain: its HP is 0). `struck`: the exchange is an
+-- enemy's strike on our unit, so our blows are its `back` (our counter) and its `dealt` is
+-- what we lose; else it is our attack, the other way round. ADR 0414.
+local function taught(x, ways, hp, unitHp, struck)
+    if not x then return 0 end
+    local sum = 0
+    for _, w in ipairs(ways or {}) do
+        local ours, lost = w.dealt, w.back
+        if struck then ours, lost = w.back, w.dealt end
+        if lost < unitHp then
+            sum = sum + w.p * (ours >= hp and x.kill or ours > 0 and x.hit or x.none)
+        end
+    end
+    return sum
+end
+
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
@@ -325,6 +346,9 @@ local function score(act, st, W, style, odds)
             local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             v = v + W.dealt * dealt * target + W.kill * kill * worth
+                -- at the HP the plan leaves the target: a kill an earlier blow of the plan
+                -- set up is this unit's, so the plan's chip and finish train the finisher
+                + W.exp * taught(f.exp, f.joint, hp, act.unitHp)
         end
         if f.counters then
             -- the counter's risk is its chance to kill (a target dead before it answers takes
@@ -373,7 +397,8 @@ local function score(act, st, W, style, odds)
         local t = act.targetUnit
         local hp = st.hp[t.id] or t.hp
         local gain = math.min(act.amount, (t.maxhp or hp) - hp)
-        v = v + W.heal * gain
+        -- and the experience the staff teaches the healer (the game's count, sight.staffExp)
+        v = v + W.heal * gain + (gain > 0 and W.exp * (act.exp or 0) or 0)
         fx.heals = { id = t.id, hp = hp + gain }
         -- the game offers Staff only on someone hurt: a heal before the blow is no act
         fx.blocked = gain <= 0
@@ -1350,6 +1375,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- on the player's side it strikes, whose other acts may save it (vanilla Ch5: Joshua,
         -- killed by Seth's counter on turn 3, the planner paying nothing for it)
         local felled, struckBy, fell, winStruck = {}, {}, 0, {}
+        local learnt = 0   -- the experience our counters are expected to earn in the phase
         -- the units the phase may strike: the player's as the plan leaves them (its counter
         -- chained), then the greens where they stand; kept for the lookahead's second phase
         local hit = {}
@@ -1391,6 +1417,13 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
             fell = fell + o.p * (1 - lives)
+            -- what our units' counters learn in this way of the phase: each strike's own
+            -- exchange, played at the HPs the phase had left when it came (ADR 0414)
+            for _, s in ipairs(o.strikes) do
+                if s.taught and s.targetHp then
+                    learnt = learnt + o.p * taught(s.taught, s.joint, s.strikerHp, s.targetHp, true)
+                end
+            end
             for _, s in ipairs(o.strikes) do
                 if strikers[s.target] and s.enemy then strikers[s.target][s.enemy] = true end
                 if st.recruits[s.enemy] then
@@ -1449,7 +1482,7 @@ function M.plan(Bot, board, sight, style, opts)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.goalWorth = {}
-        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell)
+        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell) + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
         st.judged = judged
         st.strikes = strikes

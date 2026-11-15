@@ -502,6 +502,9 @@ end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
+-- struct BattleUnit: +08 the Unit's level (after the battle), +70 levelPrevious (before it)
+local BU_LEVEL, BU_LEVEL_BEFORE = 0x08, 0x70
+
 local function battleSide(mem, b)
     local exp = mem.s8(b + 0x6E)
     local id, charId = fighterOf(mem, b)
@@ -513,7 +516,8 @@ local function battleSide(mem, b)
              hit = s16(mem.u16(b + 0x64)), crit = s16(mem.u16(b + 0x6A)),
              -- InitObstacleBattleUnit builds a wall's (index 0) without InitBattleUnit, so its
              -- levelPrevious is whatever the last battle left there
-             exp = exp, levelUp = id ~= 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
+             exp = exp, levelUp = id ~= 0 and mem.s8(b + BU_LEVEL) ~= mem.s8(b + BU_LEVEL_BEFORE),
+             levelBefore = mem.s8(b + BU_LEVEL_BEFORE),
              broke = mem.s8(b + 0x7D) ~= 0 }
 end
 
@@ -535,6 +539,11 @@ function Board.battle(mem, SYM)
     return out
 end
 
+-- The battle unit the Staff command last set up (gBattleActor, BattleInitItemEffect): who used
+-- the item and the experience the game awarded it (BattleApplyItemExpGains: +6E expGain). A
+-- staff's use is no REAL battle, so Board.battle refuses it; this reads its actor alone.
+function Board.itemUser(mem, SYM) return battleSide(mem, SYM.gBattleActor) end
+
 -- The reader with its memory and symbols bound, for harness.lua: one top-level local there
 -- instead of one per helper.
 function Board.bind(mem, SYM)
@@ -554,6 +563,7 @@ function Board.bind(mem, SYM)
         items = function(addr) return Board.items(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         battle = function() return Board.battle(mem, SYM) end,
+        itemUser = function() return Board.itemUser(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,

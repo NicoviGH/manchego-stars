@@ -293,6 +293,9 @@ WANTED = [
     'BattleGenerateBallistaSimulation',
     'BattleRoll1RN',            # every one-number roll of a battle: crits, skill procs (bmbattle.c)
     'BattleRoll2RN',            # the two-number hit roll; both return simResult when simulating  # a ballista's strike (bmbattle.c)
+    'GetBattleUnitExpGain',     # the experience a battle awards; a simulation never calls it (bmbattle.c)
+    'BattleInitItemEffect',     # the Staff command's battle unit for a staff (bmbattle.c)
+    'GetBattleUnitStaffExp',    # the experience a staff awards (bmbattle.c)
     'gActiveUnit',              # struct Unit *: the AI decides for THIS unit
     # The chapter's talks (eventinfo.c): the walk's two talk checks, caught to read each entry,
     # and the Talk command's own availability check.

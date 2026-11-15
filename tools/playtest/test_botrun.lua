@@ -99,7 +99,7 @@ local function fakeGame(o)
                                             counter = { armed = false, hits = 0 },
                                             killsTarget = dmg >= e.hp,
                                             dealt = { [math.min(dmg, e.hp)] = 1 },
-                                            back = { [0] = 1 } }, e.hp, u.hp)
+                                            back = { [0] = 1 }, exp = o.taught }, e.hp, u.hp)
                 end,
                 strike = function() return Sight.strikeOf(nil) end,
                 odds = Sight.odds,
@@ -2658,6 +2658,138 @@ do
     -- a wall's blow with no `dealt` is no event and no error
     r, ls = shadow(2, { { act = "attack", obstacle = { x = 1, y = 0, hp = 10, blow = {} } } })
     check(lines(ls), "1:||1 2:||2", "wall: a blow with no `dealt` marks no event")
+end
+
+-- taughtMiss (ADR 0414): the plan's experience read against the real battle's, case by case.
+-- Seth's prologue kill read none 1 / hit 4 / kill 4 and the battle gave 4 (tag exp1).
+do
+    local x = { none = 1, hit = 10, kill = 34 }
+    local function fight(actorHp, targetHp, exp, hits)
+        return { actor = { hp = actorHp, exp = exp }, target = { hp = targetHp }, hits = hits or {} }
+    end
+    local landed = { { by = "actor", miss = false, dmg = 7 } }
+    check(Botrun.taughtMiss(x, fight(20, 0, 34, landed)), nil, "taughtMiss: a kill read right")
+    check(Botrun.taughtMiss(x, fight(20, 5, 10, landed)), nil, "taughtMiss: a hit read right")
+    check(Botrun.taughtMiss(x, fight(20, 12, 1, { { by = "actor", miss = true, dmg = 0 },
+                                                  { by = "target", miss = false, dmg = 5 } })),
+          nil, "taughtMiss: blows that dealt nothing read right, the counter's not ours")
+    check(Botrun.taughtMiss(x, fight(0, 12, 0, landed)), nil, "taughtMiss: a dead actor gains 0")
+    local m = Botrun.taughtMiss(x, fight(20, 0, 40, landed))
+    check(m and (m.case .. " " .. m.read .. " " .. m.gave), "kill 34 40", "taughtMiss: a wrong read is named")
+    local blues = fight(20, 0, 0, landed)
+    blues.actor.id, blues.target.id = 0x01, 0x02
+    check(Botrun.taughtMiss(x, blues), nil, "taughtMiss: two player units' battle awards none")
+    -- our unit struck (side "target"): its own HP, the striker's, and its counter's blows
+    local struck = function(myHp, theirHp, exp, hits)
+        return { actor = { id = 0x81, hp = theirHp }, target = { id = 0x01, hp = myHp, exp = exp },
+                 hits = hits }
+    end
+    local counter = { { by = "actor", miss = false, dmg = 4 }, { by = "target", miss = false, dmg = 6 } }
+    check(Botrun.taughtMiss(x, struck(16, 0, 34, counter), "target"), nil, "taughtMiss: a counter kill")
+    check(Botrun.taughtMiss(x, struck(16, 4, 10, counter), "target"), nil, "taughtMiss: a counter hit")
+    check(Botrun.taughtMiss(x, struck(16, 10, 1, { { by = "actor", miss = false, dmg = 4 } }), "target"),
+          nil, "taughtMiss: struck with no counter landed: none, the striker's blow not ours")
+    check(Botrun.taughtMiss(x, struck(0, 10, 0, counter), "target"), nil, "taughtMiss: killed, 0")
+    m = Botrun.taughtMiss(x, struck(16, 4, 34, counter), "target")
+    check(m and (m.case .. " " .. m.read .. " " .. m.gave), "hit 10 34", "taughtMiss: struck, named")
+end
+
+-- test_a_wrong_heal_or_counter_read_is_an_anomaly (ADR 0414): a heal whose staff count the game
+-- did not award, and a counter whose plan read (the committed plan's strike) the battle did not,
+-- each land on the record; a counter fought at another level than the read is not checked.
+local function healAndCounter(staffGave, counterGave, level, healer, unplanned)
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 1, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) },
+                         enemy = function(g)
+                             if g.turn > 1 then g.over = true return {}, {} end
+                             return {}, { { id = 0x81, charId = 0x81, from = { x = 9, y = 9 },
+                                            to = { x = 1, y = 0 }, hp = 10, battles = { {
+                                    actor = { id = 0x81, charId = 0x81, hp = 6 },
+                                    target = { id = 0x01, charId = 1, hp = 15, exp = counterGave,
+                                               levelBefore = level },
+                                    hits = { { by = "actor", miss = false, dmg = 5 },
+                                             { by = "target", miss = false, dmg = 4 } } } } } }
+                         end }
+    g.api.itemUser = function()
+        if healer == false then return nil end
+        return { id = healer or 0x02, charId = 2, exp = staffGave }
+    end
+    local asks = 0
+    g.api.Planner = {
+        key = function(a) return a.unitId .. a.act end,
+        -- the plan played out, the stub's next ask is the end of the phase
+        surprise = function(p, k) return k >= #p.acts and "played out" or nil end,
+        plan = function(_, board)
+            asks = asks + 1
+            if asks > 1 or board.turn > 1 then return nil, nil, { phases = 0, averaged = 0 } end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } },
+                           { unit = 0x02, unitId = 0x02, act = "staff", move = { x = 0, y = 1 },
+                             targetId = 0x01, exp = 11 } }
+            return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } }, enemies = {},
+                              strikes = unplanned and {} or
+                                  { { enemy = 0x81, target = 0x01, targetLevel = 5,
+                                      taught = { none = 1, hit = 10, kill = 30 } } } },
+                   { phases = 0, averaged = 0 }
+        end,
+    }
+    Botrun.run(g.api)
+    local out = {}
+    for _, a in ipairs(recordOf(g).anomalies) do
+        if a.kind == "taught_miss" then out[#out + 1] = a.case .. " " .. a.read .. " " .. a.gave end
+    end
+    local n, u = recordOf(g).taught_checked, recordOf(g).taught_unchecked
+    return table.concat(out, "; "), n.staff .. " " .. n.counter,
+           u.staff .. " " .. u.counter_level .. " " .. u.counter_unplanned
+end
+check(healAndCounter(11, 10, 5), "", "taught_miss: a right heal and counter raise nothing")
+check(select(2, healAndCounter(11, 10, 5)), "1 1", "taught_checked: the heal and the counter counted")
+check(select(2, healAndCounter(11, 30, 6)), "1 0", "taught_checked: a counter not checked is not counted")
+check(select(3, healAndCounter(11, 30, 6)), "0 1 0", "taught_unchecked: the counter at another level is")
+-- the Staff command's battle unit is another unit's: nothing to check, counted unchecked
+local missed, checked, unchecked = healAndCounter(5, 10, 5, 0x01)
+check(missed .. " | " .. checked .. " | " .. unchecked, " | 0 1 | 1 0 0",
+      "taught_unchecked: a heal read off another unit's battle unit is not compared")
+-- no battle unit to read at all (itemUser nil): the heal is unchecked, not silent
+missed, checked, unchecked = healAndCounter(5, 10, 5, false)
+check(checked .. " | " .. unchecked, "0 1 | 1 0 0", "taught_unchecked: a heal with no battle unit")
+-- a counter the committed plan has no strike for: unplanned, apart from one at another level
+missed, checked, unchecked = healAndCounter(11, 30, 5, nil, true)
+check(missed .. " | " .. checked .. " | " .. unchecked, " | 1 0 | 0 0 1",
+      "taught_unchecked: a counter the plan never read is unplanned")
+
+-- an attack read with no battle record (the battle read failed): unchecked, not silent
+do
+    local g = fakeGame { units = rout(), hit = 20, taught = { none = 1, hit = 10, kill = 30 } }
+    g.api.Planner = dofile(here .. "planner.lua")
+    g.api.battle = function() return nil end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.taught_checked.attack .. " " .. r.taught_unchecked.attack, "0 1",
+          "taught_unchecked: an attack with no battle to check against")
+end
+check(healAndCounter(5, 30, 5), "staff 11 5; counter hit 10 30", "taught_miss: both wrong reads named")
+check(healAndCounter(11, 30, 6), "", "taught_miss: a counter at another level is not checked")
+
+-- test_a_wrong_experience_read_is_an_anomaly (ADR 0414): the run checks every attack's read
+-- against its battle; the fake's attack reads kill 30 and its battle gives 7.
+for _, gave in ipairs({ 30, 7 }) do
+    local g = fakeGame { units = rout(), hit = 20, taught = { none = 1, hit = 10, kill = 30 } }
+    g.api.battle = function()
+        return { actor = { id = 0x01, charId = 1, hp = 20, exp = gave },
+                 target = { id = 0x81, charId = 0x81, hp = 0 }, hits = { { by = "actor", dmg = 10 } } }
+    end
+    g.api.Planner = dofile(here .. "planner.lua")   -- the plan's attack carries the read
+    Botrun.run(g.api)
+    local miss
+    for _, a in ipairs(recordOf(g).anomalies) do
+        if a.kind == "taught_miss" then miss = a end
+    end
+    if gave == 30 then
+        check(miss, nil, "taught_miss: a right read raises nothing")
+    else
+        check(miss and (miss.case .. " " .. miss.read .. " " .. miss.gave), "kill 30 7",
+              "taught_miss: a wrong read is on the record, named")
+    end
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

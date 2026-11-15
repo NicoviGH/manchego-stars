@@ -775,8 +775,14 @@ do
           true, "aiPhaseStart: a strike's start is kept by the HPs and states it was read on")
     -- an HP written inside a simulated phase goes through wound(), which marks the heal flags
     -- stale for the deciding side: the staging's two writes come before the phase's order,
-    -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated)
-    local _, writes = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
+    -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
+    -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf)
+    local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
+    local at = src:find("function M.expOf(", 1, true)
+    local count = at and src:sub(at, src:find("\nend\n", at, true)) or ""
+    local _, onBattle = count:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
+    local writes = all - onBattle
+    check(onBattle, 2, "aiPhaseStart: the experience count writes the battle units' HP twice")
     local _, wounds = src:gsub("\n%s+wound%(", "")
     check(writes == 4 and wounds == 2
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
@@ -1453,6 +1459,134 @@ do
     check(ran, 2, "watched: the refused call ran no frame")
     set(nil)
     check(cpu.frames(), true, "watched: unset, the call runs again")
+end
+
+-- M.expOf (ADR 0414): the game's GetBattleUnitExpGain called three times on the simulation's
+-- battle units, the actor alive, each call after nonZeroDamage (+7C) and the target's curHP
+-- (+13) are set to its case: none (0, alive), hit (1, alive), kill (1, 0 HP).
+do
+    local S = { gBattleActor = 0x0203A4EC, gBattleTarget = 0x0203A56C,
+                GetBattleUnitExpGain = 0x0802B900 }
+    local mem = {}
+    local api = { write8 = function(a, v) mem[a] = v end }
+    local seen = {}
+    local function call(addr, args)
+        check(addr, S.GetBattleUnitExpGain, "expOf: calls the game's count")
+        check(args[1] == S.gBattleActor and args[2] == S.gBattleTarget, true,
+              "expOf: on the simulation's actor and target")
+        local damaged, hp = mem[S.gBattleActor + 0x7C], mem[S.gBattleTarget + 0x13]
+        seen[#seen + 1] = damaged .. "/" .. hp .. "/" .. mem[S.gBattleActor + 0x13]
+        return damaged == 0 and 1 or hp == 0 and 40 or 12
+    end
+    local x = Sight.expOf(api, call, S, "actor")
+    check(table.concat(seen, " "), "0/1/1 1/1/1 1/0/1", "expOf: each case's fields, the actor alive")
+    check(x.none == 1 and x.hit == 12 and x.kill == 40, true, "expOf: each case's count")
+    -- the struck side (our unit's counter): the same three cases with the two units swapped
+    seen, mem = {}, {}
+    local swapped = function(addr, args)
+        check(args[1] == S.gBattleTarget and args[2] == S.gBattleActor, true,
+              "expOf: the struck side counts itself against the striker")
+        local damaged, hp = mem[S.gBattleTarget + 0x7C], mem[S.gBattleActor + 0x13]
+        seen[#seen + 1] = damaged .. "/" .. hp .. "/" .. mem[S.gBattleTarget + 0x13]
+        return damaged == 0 and 1 or hp == 0 and 40 or 12
+    end
+    x = Sight.expOf(api, swapped, S, "target")
+    check(table.concat(seen, " "), "0/1/1 1/1/1 1/0/1", "expOf: the struck side's fields, it alive")
+end
+
+-- M.known (ADR 0414): a key first read by an enemy's strike (no count) gets its count from the
+-- first teaching read, before nothing is played again; a later non-teaching read keeps it; the
+-- count runs before the play on a miss.
+do
+    local memo, order = {}, {}
+    local function count() order[#order + 1] = "count"; return { none = 1, hit = 5, kill = 9 } end
+    local function play() order[#order + 1] = "play"; return { "d", "b", "j" } end
+    local k = Sight.known(memo, "k", false, count, play)
+    check(k[4], nil, "known: a strike's read has no count")
+    k = Sight.known(memo, "k", true, count, play)
+    check(k[4] and k[4].kill, 9, "known: the first teaching read fills it in")
+    check(table.concat(order, ","), "play,count", "known: played once, counted once")
+    Sight.known(memo, "k", false, count, play)
+    check(memo.k[4] and memo.k[4].kill, 9, "known: a non-teaching read keeps it")
+    order = {}
+    Sight.known(memo, "m", true, count, play)
+    check(table.concat(order, ","), "count,play", "known: on a miss the count comes first")
+end
+
+-- M.staffExp (ADR 0414): the Staff command's setup for the unit and slot, then the game's count
+-- on the battle unit it set up.
+do
+    local S = { BattleInitItemEffect = 0x0802C000, GetBattleUnitStaffExp = 0x0802C100,
+                gBattleActor = 0x0203A4EC }
+    local calls = {}
+    local function call(addr, args)
+        calls[#calls + 1] = string.format("%X(%s)", addr, table.concat(args, ","))
+        return addr == S.GetBattleUnitStaffExp and 11 or 0
+    end
+    check(Sight.staffExp(call, S, 0x0202BE4C, 2), 11, "staffExp: the game's count")
+    check(table.concat(calls, " "), string.format("%X(%d,2) %X(%d)", S.BattleInitItemEffect,
+          0x0202BE4C, S.GetBattleUnitStaffExp, S.gBattleActor), "staffExp: set up, then counted")
+end
+
+-- M.strikeAt / M.strikeOf (ADR 0414): a judged strike keeps its exchange's ways and its
+-- target's count, and the HPs and level they were read at.
+do
+    local side = { armed = true, hit = 70, dmg = 5, crit = 0, hits = 1, dealt = { [0] = 0.3, [5] = 0.7 },
+                   back = { [0] = 0.5, [10] = 0.5 }, joint = { { p = 1, dealt = 5, back = 10 } },
+                   exp = { none = 1, hit = 10, kill = 30 }, slot = 0, tile = { x = 1, y = 0 } }
+    local t = Sight.strikeAt(side, 0x81, 0x01, 10, 20, 7)
+    check(t.joint == side.joint and t.taught == side.exp, true, "strikeAt: the ways and the count")
+    check(t.enemy .. " " .. t.target .. " " .. t.strikerHp .. " " .. t.targetHp .. " " .. t.targetLevel,
+          "129 1 10 20 7", "strikeAt: who, the HPs and the level read at")
+    check(t.felled, 0.5, "strikeAt: our counter's chance to fell the striker")
+    local none = Sight.strikeOf(nil)
+    check(none.joint == nil and none.taught == nil, true, "strikeOf: no strike, no ways or count")
+end
+
+-- M.known keeps one side's count: a key read for the other side is an error, never a count.
+do
+    local memo = {}
+    local function count() return { none = 1, hit = 2, kill = 3 } end
+    local function play() return {} end
+    Sight.known(memo, "k", "actor", count, play)
+    check(memo.k.side, "actor", "known: the entry keeps the side counted")
+    check(pcall(Sight.known, memo, "k", "target", count, play), false,
+          "known: the other side's read of that key raises")
+end
+
+-- The counter's count is read only in the judged phase (ADR 0414), read off the source: the
+-- strike's exchange teaches only while `learning`, which only s.enemyPhase sets true, and
+-- nextPhase and s.strike set false, each through learningAs (which puts the flag back); the
+-- judged strike takes its level from the board unit.
+do
+    local src = sightSrc
+    check(src:find('exchange(call, proc, sim, learning and target < 0x40 and "target" or nil)', 1, true) ~= nil,
+          true, "learning: a strike on a player unit counts only while learning")
+    local _, sets = src:gsub("learning = [%a]+", "")
+    check(sets, 3, "learning: set only by its declaration and learningAs (set, put back)")
+    local function bodyOf(name)
+        local at = src:find(name, 1, true)
+        return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
+    end
+    check(bodyOf("function s.enemyPhase(plan)"):find("learningAs(true,", 1, true) ~= nil, true,
+          "learning: the judged phase counts")
+    check(bodyOf("function s.nextPhase(plan)"):find("learningAs(false,", 1, true) ~= nil, true,
+          "learning: the lookahead's phase does not")
+    check(bodyOf("function s.strike(u, e, x, y, slot, from)"):find("learningAs(false,", 1, true) ~= nil,
+          true, "learning: a single strike's forecast does not")
+    local call = src:find("local t = M.strikeAt(side, id, target,", 1, true)
+    check(call ~= nil and src:find("byId[target] and byId[target].level)", call, true) ~= nil, true,
+          "strikeAt: the judged strike's level is the board unit's")
+end
+
+-- M.known: an entry a non-teaching read made takes the side of the first teaching read.
+do
+    local memo = {}
+    local function count() return { none = 1, hit = 2, kill = 3 } end
+    Sight.known(memo, "k", nil, count, function() return {} end)
+    check(memo.k.side, nil, "known: a non-teaching entry has no side")
+    Sight.known(memo, "k", "target", count, function() return {} end)
+    check(memo.k.side .. " " .. memo.k[4].kill, "target 3", "known: the first teaching read sets it")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
