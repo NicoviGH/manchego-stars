@@ -8,6 +8,8 @@ issues: [510]
 
 # The convoy gives back: weapons before the shop, seals and boosters after it
 
+**Amended by ADR 0416 (Nicolas, 2026-11-15).** Rule 1 below is widened: every roster unit, benched too, gives what it cannot use this chapter, whether or not another unit can use it today. "The record" below is now a chapter line's `prep`, one entry an attempt, filed on each attempt's BOTRUN record as `supply` and `buys`.
+
 The bot sent seals, boosters and spare weapons to the convoy (the party's shared storage) and
 never took anything out. It promoted a unit only when that unit carried its own seal, and it
 never used a booster. At campaign 4006's Ch13 start (tag `lap1d`) the convoy held a Knight

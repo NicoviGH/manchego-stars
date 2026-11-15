@@ -273,15 +273,23 @@ local function between(api, style, followed, need, carried)
     -- The convoy (api.convoy: nil when the game gives the party none, HasConvoyAccess), then
     -- the shop for what it could not give, then the seals and boosters (Bot.supply, Bot.uses).
     -- Each step re-reads the bags: a take, a give or a purchase changes what a unit holds.
+    -- -> the fielded units, the convoy, and the roster's other units (the benched: Bot.supply
+    -- takes their seals and boosters and what they cannot use), each re-read now.
     local function fieldedNow(withConvoy)
         local now = api.roster()
         local convoy, weighed
         if withConvoy then convoy, weighed = api.convoy(now) end
         now = weighed or now
         local by = byCharId(now)
-        local out = {}
-        for _, u in ipairs(party) do out[#out + 1] = by[u.charId] or u end
-        return out, convoy
+        local out, isFielded, benched = {}, {}, {}
+        for _, u in ipairs(party) do
+            out[#out + 1] = by[u.charId] or u
+            isFielded[u.charId] = true
+        end
+        for _, u in ipairs(now) do
+            if not isFielded[u.charId] then benched[#benched + 1] = u end
+        end
+        return out, convoy, benched
     end
     team.supply = {}
     local function apply(acts)
@@ -295,9 +303,9 @@ local function between(api, style, followed, need, carried)
         end
         return true
     end
-    local fielded, convoy = fieldedNow(true)
+    local fielded, convoy, benched = fieldedNow(true)
     if convoy then
-        local ok, why = apply(Bot.supply(fielded, convoy))
+        local ok, why = apply(Bot.supply(fielded, convoy, benched))
         if not ok then return nil, "supply: " .. why end
         fielded = fieldedNow(false)   -- the shop weighs the bags only
     end
@@ -445,9 +453,12 @@ function M.run(api)
                     return "crashed", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, bwhy)
                 end
-                -- what the shop bought and the convoy gave this attempt, kept even where no team
-                -- is (one attempt alone)
-                entry.buys, entry.supply = team.buys, team.supply
+                -- what the shop bought and the convoy gave, one entry an attempt (each attempt
+                -- loads the start and preps again); montecarlo.py's records_of files each on its
+                -- attempt's BOTRUN record, so resume-runs.jsonl keeps it
+                entry.prep = entry.prep or {}
+                entry.prep[#entry.prep + 1] = { attempt = entry.attempts, supply = team.supply,
+                                                buys = team.buys }
                 -- a retry's memory (ADR 0386): the turns earlier failures here saw a
                 -- reinforcement arrive on screen, read where a reinforcements claim's are
                 -- (style.arrivals); attempt 1, and any attempt alone, has none

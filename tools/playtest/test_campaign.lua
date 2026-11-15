@@ -387,7 +387,7 @@ test_ours_without_a_clean_clear_is_infeasible()
 local function test_between_deploys_shops_promotes()
     -- priced per buyer, as the harness does (every roster unit pays the same here)
     local stock = { { item = 0x6C, price = { 300, 300, 300, 300 }, vulnerary = true },
-                    { item = 0x10, price = { 500, 500, 500, 500 }, type = "sword" } }
+                    { item = 0x10, price = { 500, 500, 500, 500 }, type = "sword", maxUses = 46 } }
     local needs = { demands = { { id = "sustain", kind = "sustain", need = 1 } },
                     answers = { [0x03] = { sustain = true } }, strength = {} }
     local g = fakeGame({ cap = 2, gold = 10000, stock = stock, random = cycle({ 0.1 }),
@@ -412,8 +412,9 @@ local function test_between_deploys_shops_promotes()
     check(table.concat(g.used, ","), "3", "a fielded unit holding a seal it accepts uses it")
     check(table.concat(g.calls, ","), "buy,buy,use", "without a convoy: the shop, then the seal")
     local ls = lines(g)
-    check(#ls[1].buys, 2, "the chapter's record lists what the shop bought")
-    check(ls[1].buys[1].unit .. ":" .. ls[1].buys[1].item, "1:108", "each buy names its unit and item")
+    local buys = ls[1].prep[1].buys
+    check(#buys, 2, "the chapter's record lists what the shop bought")
+    check(buys[1].unit .. ":" .. buys[1].item, "1:108", "each buy names its unit and item")
     check(ls[1].team.reasons[2].why, "covers", "the record says why each unit was fielded")
     check(ls[1].demands[1].id, "sustain", "and what the map asked")
     -- the whole pick goes to the attempt's record (fwd1 A): the benched too, and what each
@@ -436,10 +437,10 @@ test_between_deploys_shops_promotes()
 -- the shop, so the shop buys none of it; a seal comes out after the shop and is used; the
 -- chapter's record lists every act; a failed take stops the campaign with its reason.
 local function test_between_takes_from_the_convoy()
-    local elfire = { id = 0x39, kind = "weapon", type = "anima", rank = 2, uses = 30,
+    local elfire = { id = 0x39, kind = "weapon", type = "anima", rank = 2, uses = 30, maxUses = 30,
                      ["for"] = { [0x01] = { usable = true } } }
     local crest = { id = 0x65, kind = "other", uses = 1, ["for"] = { [0x01] = { promotes = true } } }
-    local stock = { { item = 0x38, price = { 500, 500, 500, 500 }, type = "anima" } }
+    local stock = { { item = 0x38, price = { 500, 500, 500, 500 }, type = "anima", maxUses = 40 } }
     local function game(takeFails)
         local g = fakeGame({ cap = 1, gold = 10000, stock = stock, random = cycle({ 0.1 }),
                              convoy = {}, chapters = { { id = 1 } } })
@@ -479,7 +480,9 @@ local function test_between_takes_from_the_convoy()
     check(table.concat(g.used, ","), "1", "the lord uses the crest")
     local ls = lines(g)
     local said = {}
-    for _, a in ipairs(ls[1].supply or {}) do said[#said + 1] = a.act .. ":" .. a.item end
+    local prep = (ls[1].prep or {})[1] or {}
+    check(prep.attempt, 1, "the record's prep names its attempt")
+    for _, a in ipairs(prep.supply or {}) do said[#said + 1] = a.act .. ":" .. a.item end
     check(table.concat(said, ","), "take:57,take:101,use:101", "the record lists every act")
     local f = game(true)
     local ok, why = Campaign.run(f.api)
@@ -488,6 +491,30 @@ local function test_between_takes_from_the_convoy()
         "and says which act and why: " .. tostring(why))
 end
 test_between_takes_from_the_convoy()
+
+-- Rule A (#510 comment 6896261936): the benched units' bags reach Bot.supply, so a booster on
+-- a unit left out of the map goes to the convoy. Fails on a between() that hands Bot.supply
+-- the fielded units only.
+local function test_between_hands_the_benched_to_the_supply()
+    local g = fakeGame({ cap = 1, gold = 0, stock = {}, random = cycle({ 0.1 }), convoy = {},
+                         chapters = { { id = 1 } } })
+    local base = g.api.roster
+    g.api.roster = function()
+        local r = base()
+        r[4].items = { { id = 0x5E, kind = "other", uses = 1, use = "booster",
+                         ["for"] = { [0x01] = { gains = true } } } }
+        return r
+    end
+    local gave = {}
+    g.api.give = function(a)
+        gave[#gave + 1] = string.format("%d:%X", a.unit, a.item)
+        return true
+    end
+    Campaign.run(g.api)
+    check(table.concat(g.deployed[1], ","), "1", "only the lord is fielded")
+    check(table.concat(gave, ","), "4:5E", "the benched unit's booster goes to the convoy")
+end
+test_between_hands_the_benched_to_the_supply()
 
 -- The shop serves the fielded in roster order, the order Bot.arms reads them in before the
 -- pick, not deploy order: the forced unit in slot 2 is fielded first and still buys second.

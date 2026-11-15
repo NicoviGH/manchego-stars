@@ -1574,11 +1574,11 @@ local function anyone(n) return setmetatable({}, { __index = function() return n
 local function test_shop_stops_at_gold()
     local stock = {
         { item = 0x6C, price = anyone(300), vulnerary = true },
-        { item = 0x10, price = anyone(500), type = "sword" },
-        { item = 0x11, price = anyone(400), type = "sword" },
-        { item = 0x12, price = anyone(900), type = "sword" },
-        { item = 0x20, price = anyone(700), type = "lance" },
-        { item = 0x21, price = anyone(100), type = "axe" },
+        { item = 0x10, price = anyone(500), type = "sword", maxUses = 46 },
+        { item = 0x11, price = anyone(400), type = "sword", maxUses = 30 },
+        { item = 0x12, price = anyone(900), type = "sword", maxUses = 20 },
+        { item = 0x20, price = anyone(700), type = "lance", maxUses = 45 },
+        { item = 0x21, price = anyone(100), type = "axe", maxUses = 45 },
     }
     -- canUse is the game's CanUnitUseWeapon: A can wield the two cheaper swords, not 0x12.
     local A = unitOf(1, 0x01, 1, { canUse = { [0x10] = true, [0x11] = true } })
@@ -1596,14 +1596,14 @@ local function test_shop_stops_at_gold()
     check(flat(B.shop(1000, stock, { Bu, Cu0 })), "2:108,3:108,3:33",
         "skip then continue: the lance (700) is skipped at 400 gold, "
             .. "the axe (100) after it is bought")
-    A.items = { { kind = "weapon", id = 0x10, type = "sword", rank = 1, usable = true, uses = 40 } }
+    A.items = { { kind = "weapon", id = 0x10, type = "sword", rank = 1, usable = true, uses = 46 } }
     check(flat(B.shop(10000, stock, { A, Bu })), "2:108,2:32,1:108", "a unit holding its type buys none")
     local Cu = unitOf(3, 0x03, 1, { canUse = { [0x21] = true, [0x10] = true, [0x11] = true } })
     check(flat(B.shop(800, stock, { Cu })), "3:108,3:33,3:17",
         "skip-and-continue: exact fit, gold 800 buys vuln 300, axe 100, sword 400 in order")
     check(flat(B.shop(450, stock, { Cu })), "3:108,3:33",
         "the sword (400) is skipped at 50 gold, the buying stops there")
-    A.items = { { kind = "weapon", id = 0x10, type = "sword", rank = 1, usable = true, uses = 40 }, { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } }
+    A.items = { { kind = "weapon", id = 0x10, type = "sword", rank = 1, usable = true, uses = 46 }, { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } }
     check(flat(B.shop(10000, stock, { A, Bu })), "2:108,2:32",
         "a unit already holding a Vulnerary buys none")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
@@ -1627,8 +1627,8 @@ local function idsOf(list)
 end
 
 local function test_arms_is_the_shops_spend_order()
-    local sword = { item = 0x10, price = anyone(400), type = "sword" }
-    local staff = { item = 0x4B, price = anyone(600), type = "staff" }
+    local sword = { item = 0x10, price = anyone(400), type = "sword", maxUses = 46 }
+    local staff = { item = 0x4B, price = anyone(600), type = "staff", maxUses = 30 }
     local function lacking(id, canUse)
         return unitOf(id, id, 1, { canUse = canUse })
     end
@@ -1654,7 +1654,7 @@ local function test_arms_is_the_shops_spend_order()
     -- are paid for first (500 gold: the 400 sword, not the 300 Vulnerary)
     local vulnerary = { item = 0x6C, price = anyone(300), vulnerary = true }
     local armedOne = unitOf(7, 7, 1, { canUse = { [0x10] = true }, items = {
-        { kind = "weapon", id = 0x10, type = "sword", usable = true, uses = 40 } } })
+        { kind = "weapon", id = 0x10, type = "sword", usable = true, uses = 46 } } })
     local bare = lacking(8, { [0x10] = true })
     bare.items = { { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } }
     local paid = B.shop(500, { vulnerary, sword }, { armedOne, bare })
@@ -1676,9 +1676,9 @@ local function test_shop_arms_by_usable_items_with_uses_left()
 
     local stock = {
         { item = 0x6C, price = anyone(300), vulnerary = true },
-        { item = 0x4B, price = anyone(600), type = "staff" },
-        { item = 0x4D, price = anyone(900), type = "anima" },
-        { item = 0x20, price = anyone(400), type = "lance" },
+        { item = 0x4B, price = anyone(600), type = "staff", maxUses = 30 },
+        { item = 0x4D, price = anyone(900), type = "anima", maxUses = 40 },
+        { item = 0x20, price = anyone(400), type = "lance", maxUses = 45 },
     }
     local function flat(r)
         local t = {}
@@ -1691,16 +1691,16 @@ local function test_shop_arms_by_usable_items_with_uses_left()
     check(flat(B.shop(10000, stock, { healer })), "1:75", "a healer with no staff buys one")
     check(B.armed(healer), false, "a healer with no staff is not armed")
     check(csv(idsOf(B.arms(10000, stock, { healer })[0x01])), "75", "the pick is told what arms it")
-    healer.items[#healer.items + 1] = { kind = "weapon", id = 0x4B, type = "staff", usable = true, uses = 5 }
-    check(flat(B.shop(10000, stock, { healer })), "", "a healer with a staff buys none")
+    healer.items[#healer.items + 1] = { kind = "weapon", id = 0x4B, type = "staff", usable = true, uses = 30 }
+    check(flat(B.shop(10000, stock, { healer })), "", "a healer with a full staff buys none")
     check(B.armed(healer), true, "a healer with a staff is armed")
     check(B.arms(10000, stock, { healer })[0x01], nil, "an armed unit needs nothing")
     -- a unit whose only tome has 0 uses buys one
     local mage = unitOf(2, 0x02, 1, { canUse = { [0x4D] = true }, items = { vuln,
         { kind = "weapon", id = 0x4D, type = "anima", usable = true, uses = 0 } } })
     check(flat(B.shop(10000, stock, { mage })), "2:77", "a tome with 0 uses is replaced")
-    mage.items[2].uses = 1
-    check(flat(B.shop(10000, stock, { mage })), "", "a tome with a use left is kept")
+    mage.items[2].uses = 40
+    check(flat(B.shop(10000, stock, { mage })), "", "a full tome buys no spare")
     -- a held weapon the unit cannot use does not count
     local knight = unitOf(3, 0x03, 1, { canUse = { [0x20] = true }, items = { vuln,
         { kind = "weapon", id = 0x21, type = "lance", usable = false, uses = 30 } } })
@@ -1795,13 +1795,13 @@ do
     check(acts(B.uses({ fullU }, { item(0x65, { [5] = { promotes = true } }) })),
         "give 5:BC, take 5:65, use 5:65", "uses: a full bag gives its gem first")
 
-    -- 1. a seal its holder cannot use, that another roster unit (benched too) can, goes back;
-    -- one nobody can use stays where it is
-    local ring = item(0x68, { [1] = {}, [9] = { promotes = true } })
-    local bolt = item(0x67, { [1] = {}, [9] = {} })
+    -- 1. a seal its holder cannot use goes back, whether another roster unit can use it today
+    -- (the ring) or nobody yet (the bolt: every user under level 10)
+    local ring = item(0x68, { [1] = {}, [9] = { promotes = true } }, { use = "seal" })
+    local bolt = item(0x67, { [1] = {}, [9] = {} }, { use = "seal" })
     local holder = armedUnit(1, 4, { items = { lance(), ring, bolt } })
-    check(acts(B.supply({ holder }, {})), "give 1:68",
-        "supply: the ring a benched unit can use goes to the convoy, the useless bolt stays")
+    check(acts(B.supply({ holder }, {})), "give 1:67, give 1:68",
+        "supply: a seal its holder cannot use goes to the convoy, used by anyone today or not")
 
     -- a full convoy (Board.CONVOY_ITEM_COUNT) takes no give: the ring stays in the bag, and a
     -- full bag that would have to give to make room takes nothing (api.give would refuse both)
@@ -1816,10 +1816,11 @@ do
     check(acts(B.uses({ packed }, full)), "", "uses: a full bag cannot make room in a full convoy")
 
     -- 2. convoy weapons: the unarmed first, the best of the type it can use, uses left
-    local function tome(id, rank, uses, users)
+    local function tome(id, rank, uses, users, maxUses)
         local f = {}
         for _, c in ipairs(users) do f[c] = { usable = true } end
-        return { id = id, kind = "weapon", type = "anima", rank = rank, uses = uses, ["for"] = f }
+        return { id = id, kind = "weapon", type = "anima", rank = rank, uses = uses,
+                 maxUses = maxUses or 40, ["for"] = f }
     end
     local swordsman = armedUnit(6, 8)   -- armed with a lance; can use anima, holds none
     local mage = unitOf(7, 7, 10)       -- nothing in hand (its tome broke)
@@ -1831,13 +1832,61 @@ do
 
     -- Bot.arms reads the convoy before the shop: the tome comes from storage, so the shop buys
     -- none of that type
-    local fire = { item = 0x38, price = anyone(560), type = "anima" }
+    local fire = { item = 0x38, price = anyone(560), type = "anima", maxUses = 40 }
     local m2 = unitOf(7, 7, 10, { canUse = { [0x38] = true } })
-    local got = B.arms(10000, { fire }, { m2 }, { tome(0x39, 2, 30, { 7 }) })[7]
+    local got = B.arms(10000, { fire }, { m2 }, { tome(0x39, 2, 30, { 7 }, 30) })[7]
     check(type(got) == "table" and #got == 1 and got[1].id == 0x39 and got[1].uses, 30,
         "arms: the convoy's Elfire at its own uses, and nothing bought")
     check(type(B.arms(10000, { fire }, { m2 })[7]) == "table"
         and B.arms(10000, { fire }, { m2 })[7][1].id, 0x38, "arms: no convoy, the shop's Fire")
+
+    -- Rule A (#510 comment 6896261936): what a unit cannot use this chapter goes to the
+    -- convoy. Each case fails on the supply that gave only a seal or booster some roster unit
+    -- could use today, and read no benched bag.
+    local axe = { kind = "weapon", id = 0x1F, type = "axe", rank = 1, usable = false, uses = 45,
+                  maxUses = 45 }
+    local vuln = { kind = "heal", id = 0x6C, uses = 3, vulnerary = true }
+    local keeper = armedUnit(2, 7, { items = { lance(), axe, vuln,
+        item(0x65, nil, { use = "seal", promotes = true }) } })
+    check(acts(B.supply({ keeper }, {})), "give 2:1F",
+        "supply: a weapon its holder cannot use goes back; a usable seal and a Vulnerary stay")
+    local energy = item(0x5C, { [3] = { gains = true } }, { use = "booster", gains = true })
+    local bench = armedUnit(9, 5, { items = { lance(), energy, vuln, axe,
+        item(0x68, nil, { use = "seal", promotes = true }) } })
+    check(acts(B.supply({}, {}, { bench })), "give 9:68, give 9:1F, give 9:5C",
+        "supply: a benched unit gives its seals and boosters, usable or not, and what it "
+            .. "cannot wield; it keeps its lance and Vulnerary")
+    check(acts(B.supply({ keeper }, full, { bench })), "",
+        "supply: a full convoy takes no give from the benched either")
+
+    -- Rule B: a unit is short of a type below one full weapon of it, so a spare comes before
+    -- the last one breaks. Fails on the lackedTypes that asked only "holds none with uses left".
+    local function bow(uses, maxUses, users)
+        local f = {}
+        for _, c in ipairs(users or {}) do f[c] = { usable = true } end
+        return { kind = "weapon", id = 0x2D, type = "bow", rank = 3, uses = uses,
+                 maxUses = maxUses, usable = true, ["for"] = f }
+    end
+    local sniper = unitOf(11, 11, 12, { items = { bow(4, 20) } })
+    check(acts(B.supply({ sniper }, { bow(45, 45, { 11 }) })), "take 11:2D",
+        "supply: a bow with 4 of 20 uses left takes the convoy's bow")
+    sniper.items = { bow(20, 20) }
+    check(acts(B.supply({ sniper }, { bow(45, 45, { 11 }) })), "",
+        "supply: a full Silver Bow takes no spare (the smallest full weapon held counts)")
+    local ironSword = { item = 0x01, price = anyone(460), type = "sword", maxUses = 46 }
+    local lord = unitOf(12, 12, 7, { canUse = { [0x01] = true }, items = {
+        { kind = "weapon", id = 0x09, type = "sword", rank = 1, usable = true, uses = 4,
+          maxUses = 40 }, vuln } })
+    local bought = B.shop(10000, { ironSword }, { lord })
+    check(#bought == 1 and bought[1].item, 0x01, "shop: a Rapier with 4 of 40 uses buys an Iron Sword")
+    lord.items[1].uses = 40
+    check(#B.shop(10000, { ironSword }, { lord }), 0, "shop: a full Rapier buys none")
+    check(B.armed(sniper) and B.armed(lord), true, "rule B does not change who is armed")
+    lord.canUse[0x02] = true
+    local ok, err = pcall(B.shop, 10000, { { item = 0x02, price = anyone(1), type = "sword" } },
+                          { lord })
+    check(not ok and tostring(err):find("has no maxUses", 1, true) ~= nil, true,
+        "shop: a stock weapon without its full uses raises, never reads as 'holds none'")
 end
 
 local function test_route_follows_style()

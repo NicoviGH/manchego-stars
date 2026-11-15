@@ -3684,7 +3684,8 @@ INSPECT.CAMPAIGN = {
 -- the Silver Card (bmshop.c), the Delphi and Hoplon Shields (IA_NEGATE_FLYING / _CRIT).
 INSPECT.BAG = {
     ITEM_STAT_BONUSES = 0x0C,                   -- ItemData +0C pStatBonuses
-    ITEM_EFFECTIVE = 0x10, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C, ITEM_USE_EFFECT = 0x1E,
+    ITEM_EFFECTIVE = 0x10, ITEM_MAX_USES = 0x14, ITEM_RANGE = 0x19, ITEM_RANK = 0x1C,
+    ITEM_USE_EFFECT = 0x1E,
     IA_STAFF = 4, BMST_TMP_ITEM = 0x2C,
     CHAR_NUMBER = 0x04,                         -- CharacterData +04 number (bmunit.h)
     MENU_DISCARD_FIRST = 0x24, MENU_SEND_FIRST = 0x2A,
@@ -3692,6 +3693,16 @@ INSPECT.BAG = {
     -- battle code, the cards in the shop), with no one function to ask, so they are listed.
     PASSIVE = { [0x71] = "ITEM_DELPHISHIELD", [0x72] = "ITEM_MEMBERCARD",
                 [0x73] = "ITEM_SILVERCARD", [0x7C] = "ITEM_HOPLON_SHIELD" },
+    -- The items the game's own Use routes to CanUnitUseStatGainItem (a booster) or to
+    -- CanUnitUsePromotionItem (a seal): the two id lists of CanUnitUseItem's switch
+    -- (bmitemuse.c), ids from constants/items.h. Whether a unit can use one today is the game's
+    -- call (promotes / gains); this says only what the item is, so a seal nobody can use yet is
+    -- still told from a Vulnerary. ITEM_UNK_C1, the switch's last seal, no vanilla chapter gives.
+    USE = { [0x5B] = "booster", [0x5C] = "booster", [0x5D] = "booster", [0x5E] = "booster",
+            [0x5F] = "booster", [0x60] = "booster", [0x61] = "booster", [0x62] = "booster",
+            [0x63] = "booster",
+            [0x64] = "seal", [0x65] = "seal", [0x66] = "seal", [0x67] = "seal", [0x68] = "seal",
+            [0x88] = "seal", [0x8A] = "seal", [0x97] = "seal", [0x98] = "seal", [0x99] = "seal" },
 }
 INSPECT.bagLog = {}
 
@@ -3754,17 +3765,19 @@ end
 
 -- An item's own facts, whoever holds it (the one read of the item's data; unitItemFacts adds
 -- what a unit changes): a weapon or staff -- kind "weapon", its type (a staff's is "staff"),
--- rank, reach and effectiveness list -- and which item is the Vulnerary. Bot.shop's stock and a
--- unit's bag both read it, so a staff or a tome is told from a sword the same way in each.
+-- rank, full uses, reach and effectiveness list -- which item is the Vulnerary, and whether it
+-- is a seal or a booster (`use`, K.USE). Bot.shop's stock and a unit's bag both read it, so a
+-- staff or a tome is told from a sword the same way in each.
 INSPECT.itemFacts = function(id)
     local C, K = INSPECT.CAMPAIGN, INSPECT.BAG
     local data = SYM.gItemData + id * BOARD.ITEMDATA_STRIDE
-    local facts = { id = id, vulnerary = id == C.VULNERARY or nil }
+    local facts = { id = id, vulnerary = id == C.VULNERARY or nil, use = K.USE[id] }
     if (ru32(data + C.ITEM_ATTRIBUTES) & (C.IA_WEAPON | K.IA_STAFF)) ~= 0 then
         facts.kind = "weapon"
         facts.staff = (ru32(data + C.ITEM_ATTRIBUTES) & K.IA_STAFF) ~= 0 or nil
         facts.type = C.WEAPON_TYPES[ru8(data + C.ITEM_TYPE)]
         facts.rank = ru8(data + K.ITEM_RANK)
+        facts.maxUses = ru8(data + K.ITEM_MAX_USES)
         facts.maxRange = ru8(data + K.ITEM_RANGE) & 0xF
         local eff = ru32(data + K.ITEM_EFFECTIVE)
         facts.effective = eff ~= 0 and eff or nil
@@ -3917,7 +3930,7 @@ INSPECT.campaignApi = function(game)
                     seen[it] = true
                     local e = INSPECT.itemFacts(it)
                     list[#list + 1] = { item = it, type = e.type, kind = e.kind, vulnerary = e.vulnerary,
-                                        shop = shop }
+                                        maxUses = e.maxUses, shop = shop }
                 end
             end
         end

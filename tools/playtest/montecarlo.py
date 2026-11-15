@@ -327,9 +327,18 @@ def log_tail(path, n=30):
 def records_of(task, text, where, log_path):
     """A worker's records: its BOTRUN lines, and its campaign's last CAMPAIGN line (the one
     without a chapter: how the campaign ended, and why) as a record of kind `campaign`; each
-    names its run dir. A worker that left neither says why it has none, from its log."""
+    names its run dir. Each attempt's prep (a chapter line's `prep`: what the convoy gave and
+    took and the shop bought) goes on that attempt's BOTRUN record as `supply` and `buys`. A
+    worker that left neither says why it has none, from its log."""
     recs = parse_lines(text, BOTRUN)
-    ends = [c for c in parse_lines(text, CAMPAIGN) if c.get('chapter') is None]
+    lines = parse_lines(text, CAMPAIGN)
+    prep = {(c['chapter'], p.get('attempt')): p
+            for c in lines if c.get('chapter') is not None for p in c.get('prep') or []}
+    for r in recs:
+        p = prep.get((r.get('chapter'), r.get('attempt')))
+        if p:
+            r['supply'], r['buys'] = p.get('supply') or [], p.get('buys') or []
+    ends = [c for c in lines if c.get('chapter') is None]
     for c in ends[-1:]:
         c['kind'] = 'campaign'
         recs.append(c)
