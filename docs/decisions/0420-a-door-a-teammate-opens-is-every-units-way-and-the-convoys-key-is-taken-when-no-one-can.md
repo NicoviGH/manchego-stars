@@ -61,18 +61,24 @@ traces; every claim below was checked against the run.
     sooner way) on the code before the review;
   - the `convoyKey` ones without `Sight.convoyKey`;
   - the `takeItem` one without its item fill.
-- **Runs** (2 attempts each from the lap's saved starts, tag `door2`).
-  - Eirika's Ch10, attempt 2: won in 27 turns, where it was stuck before. Gilliam opened the
-    door on turn 23.
-  - Eirika's Ch10, attempt 1: Gilliam opened the door on turn 5 and lived, but the attempt is
-    still `stuck` (30 turns). Every enemy was dead by turn 20, and Eirika stood boxed in at
-    (13,7) among allies with no key left (Gilliam's was used up). Untested lead: allies block the
-    lord's way on a Seize map once the enemies are gone, the HANDOFF's open Ch7 item.
-  - Ephraim's Ch9 (chapter id 23): won in 19 turns with one death (charId 0x11), and in 21 turns
-    with none; the unit holding the key (unit 2) opened the gate on turn 6 in both. Before the
-    fix the same start had won in 21 turns with no death, so Ch9 shows no improvement and one
-    more death on attempt 1.
-- **Supply witness** (tag `supw1`, attempt 1 with the escort switched off for that run only, so
-  the original lockout replays). Gilliam died on turn 6 as before. Garcia (charId 0x0A) took the
-  convoy's Door Key (0x6A) with Supply on turn 7, opened the door on turn 12, and Eirika seized
-  on turn 19: won.
+- **Runs on the final code** (from the lap's saved starts, up to 2 attempts each, tag `door4`;
+  `door3` crashed on the harness bug below, before any turn).
+  - Eirika's Ch10, attempt 1: **won in 12 turns with no death**. Gilliam (charId 3) opened the
+    door on turn 6 and lived; Eirika seized on turn 12. On the code before the review (tag
+    `door2`) this attempt was `stuck` after 30 turns, with every enemy dead by turn 20 and Eirika
+    boxed in at (13,7) among allies; at `door2`, attempt 2 won in 27 turns. A lead, one start:
+    the review's fixes are what changed between the two.
+  - Ephraim's Ch9 (chapter id 23): won in 19 turns with one death, and in 21 turns with none,
+    the outcomes `door2` had (different acts). The death is Colm (charId 9, in both), in the
+    enemy phase of turn 17 on a plan read at 52% over a 1% cap. Before the fix the same start had
+    won in 21 turns with no death, so Ch9 shows no improvement.
+- **Supply witness** (tag `supw2`, attempt 1 with the escort switched off for that run only, so
+  the original lockout replays; `supw1` on the code before the review played the same story).
+  Gilliam died on turn 6 as before. Garcia (charId 0x0A) took the convoy's Door Key (0x6A) with
+  Supply on turn 7, opened the door on turn 12, and Eirika seized on turn 19: won.
+- **A harness bug the first rerun found:** lifting the convoy's helpers into a `do` block left
+  the Item command's use (`api.use`, a seal or booster) calling `slotOf` and `count` as nil
+  globals; the scout lap's opening seal crashed. The block exports them as `INSPECT.slotOf` and
+  `INSPECT.countItem`, and `test_playtest_harness.py` now fails on any global `harness.lua`
+  reads that is not the emulator's, a `PLAYTEST_*` setting or Lua's own (it fails on the code
+  before the fix).
