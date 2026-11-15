@@ -4398,9 +4398,17 @@ INSPECT.campaignApi = function(game)
 
     -- One Bot.supply act, by the game's own container calls, as its Supply screen makes them
     -- (prep_itemsupply.c: a give clears the bag's slot, UnitRemoveInvalidItems packs the bag,
-    -- AddItemToConvoy stores it; a take is UnitAddItem and RemoveItemFromConvoy, which packs
-    -- the convoy). Called on the first player phase, where the prep screen's Supply would have
-    -- left the same bags and convoy: no screen, no turn spent. The item is found by id and uses.
+    -- AddItemToConvoy stores it; a take, sub_809E2C8, puts the item in the bag's first empty
+    -- slot and rebuilds the convoy without it, sub_80982B8: ClearSupplyItems, then
+    -- AddItemToConvoy for each item left). Called on the first player phase, where the prep
+    -- screen's Supply would have left the same bags and convoy: no screen, no turn spent. The
+    -- item is found by id and uses.
+    -- The rebuild is fed from the convoy itself, in its order, not from the screen's item list
+    -- (gPrepScreenItemList, sorted by page, in buffers the map may hold): the screen also sorts
+    -- the convoy's page; nothing here reads the convoy's order. Never RemoveItemFromConvoy: no
+    -- game code calls it, and its pack (ShrinkConvoyItemList) copies all CONVOY_ITEM_COUNT
+    -- slots back from gGenericBuffer, past the one it zeroed after the last item, so whatever
+    -- the scratch buffer held lands in the convoy (party1's Ch10 start: 40 garbage items).
     local function slotOf(addr, id, uses)
         for k = 0, BOARD.ITEM_COUNT - 1 do
             if ru16(addr + BOARD.UNIT_ITEMS + k * 2) == (id | (uses << 8)) then return k end
@@ -4443,17 +4451,41 @@ INSPECT.campaignApi = function(game)
         if not at then return nil, string.format("no item 0x%X at %d uses in the convoy", a.item, a.uses) end
         local before = count(BOARD.items(u.addr), a.item, a.uses)
         local stored = count(INSPECT.convoyItems(), a.item, a.uses)
+        local bagWas, convoyWas, frameWas = BOARD.items(u.addr), INSPECT.convoyItems(), emu:currentFrame()
         local added = INSPECT.gameCalls(function(call)
             if call(SYM.UnitAddItem, { u.addr, a.item | (a.uses << 8) }) == 0 then return false end
-            call(SYM.RemoveItemFromConvoy, { at })
+            call(SYM.ClearSupplyItems, {})
+            for _, c in ipairs(convoyWas) do
+                if c.index ~= at then call(SYM.AddItemToConvoy, { c.id | (c.uses << 8) }) end
+            end
             return true
         end, true)
         if not added then return nil, "the bag is full" end
         -- both sides: a copy into the bag that left the convoy's own in place would pass the
         -- bag's count alone
+        -- and the convoy is exactly what it was without that one item, in order: a take that
+        -- wrote anything else into it (as RemoveItemFromConvoy's pack did) fails here
+        local left, now = {}, INSPECT.convoyItems()
+        for _, c in ipairs(convoyWas) do
+            if c.index ~= at then left[#left + 1] = c.id | (c.uses << 8) end
+        end
+        local same = #now == #left
+        for i, c in ipairs(now) do same = same and (c.id | (c.uses << 8)) == left[i] end
         if count(BOARD.items(u.addr), a.item, a.uses) ~= before + 1
-                or count(INSPECT.convoyItems(), a.item, a.uses) ~= stored - 1 then
-            return nil, "the item did not move from the convoy to the bag"
+                or count(now, a.item, a.uses) ~= stored - 1 or not same then
+            -- what tells the causes apart: the slot taken, both sides before and after, and
+            -- whether frames ran across the calls (a proc that rewrote them)
+            local function list(l)
+                local out = {}
+                for _, it in ipairs(l) do
+                    out[#out + 1] = string.format("%X/%d%s", it.id, it.uses, it.index and ("@" .. it.index) or "")
+                end
+                return table.concat(out, " ")
+            end
+            return nil, string.format("the item did not move from the convoy to the bag (slot %d at 0x%08X; "
+                .. "bag %s -> %s; convoy %s -> %s; frames %d -> %d)", at, u.addr, list(bagWas),
+                list(BOARD.items(u.addr)), list(convoyWas), list(INSPECT.convoyItems()), frameWas,
+                emu:currentFrame())
         end
         log(string.format("supply: 0x%02X takes item 0x%X (%s)", a.unit, a.item, a.why or ""))
         return true

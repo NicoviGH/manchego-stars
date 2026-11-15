@@ -48,6 +48,21 @@ the game gives the party a convoy (`HasConvoyAccess`). Use stays the Item comman
 seals before; `api.use` widens `api.promote` to boosters, and a seal's use counts only once
 the unit's class has changed.
 
+**Amended 2026-11-14 (the proof lap `party1`, crashed at its Ch10 start): a take rebuilds the
+convoy as the Supply screen does.** The take above used `RemoveItemFromConvoy`, which no game
+code calls. Its pack (`ShrinkConvoyItemList`) gathers the items into `gGenericBuffer`, writes a
+0 after the last one, empties the convoy and copies all 100 slots back from the buffer. So
+whatever the scratch buffer held past that 0 became convoy items. At `party1`'s Ch10 start it
+wrote about 40 (replayed as `dbgtake1`). PR 2's runs took items while the buffer was clean;
+no saved state of `lap1d` or the runs since holds such an item. The Supply screen's own Take
+(`sub_809E2C8`) puts the item in the bag's first empty slot, then rebuilds the convoy
+(`sub_80982B8`: `ClearSupplyItems`, then `AddItemToConvoy` for each item left). The harness
+now does that rebuild, fed from the convoy's own order. The screen feeds it from its item
+list, which sorts the item's page first; nothing here reads the convoy's order. The take now
+also checks that the convoy is exactly what it was without that item. Replayed (`dbgtake2`):
+Seth gave the Knight Crest and took the Iron Lance, Kyle (0x11) took the Crest and was promoted
+Cavalier to Paladin, and Ch10 was won with no death.
+
 **Decision 4: the pick reads the convoy too.** `Bot.arms(gold, stock, roster, convoy)` runs
 `Bot.supply`'s weapon step and then the shop over the unarmed units, so a unit the convoy will
 arm is read holding that item at its stored uses (`api.needs`), and the shop buys none of that

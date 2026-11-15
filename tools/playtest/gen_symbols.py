@@ -387,7 +387,7 @@ WANTED = [
     # campaign.lua's convoy (the party plan's PR 2): the Supply screen's own container calls.
     'HasConvoyAccess',          # whether the party has a convoy this chapter (bmcontainer.c)
     'AddItemToConvoy',          # an item into the convoy's first empty slot (bmcontainer.c)
-    'RemoveItemFromConvoy',     # a convoy slot emptied, the list packed (bmcontainer.c)
+    'ClearSupplyItems',         # the convoy emptied, before the Supply screen rebuilds it (bmcontainer.c)
     'UnitAddItem',              # an item into a unit's first empty bag slot (bmunit.c)
     'UnitRemoveInvalidItems',   # a unit's bag packed after a slot is cleared (bmunit.c)
     'CanUnitUseItemPrepScreen', # what the prep screen's Use offers: a booster that gains (bmitemuse.c)

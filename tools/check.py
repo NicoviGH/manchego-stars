@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0413's amendment (2026-11-14, party1's Ch10 crash): a take rebuilds the
+    # convoy as the Supply screen does (ClearSupplyItems, AddItemToConvoy for each item left);
+    # RemoveItemFromConvoy has no caller in the game and its pack copies the scratch buffer in
+    r'\bSYM\.RemoveItemFromConvoy\b', r'\btake is UnitAddItem and RemoveItemFromConvoy\b',
     # retired by ADR 0413 (#510, the party plan's PR 2): a seal is one of the acts Bot.uses
     # plans (from the bag or the convoy) and api.use spends; the convoy is read to its first
     # empty slot, never by gConvoyItemCount (set only while its chooser is open)
