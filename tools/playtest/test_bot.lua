@@ -497,6 +497,7 @@ local function sightOf(o)
         end
     end
     s.odds = Sight.odds
+    s.splitFloor = Sight.SPLIT_FLOOR
     -- each strike played on its target at the HP the plan gives it; the lookahead's second
     -- phase (o.nextPhase, sight.nextPhase) also says each unit's HP when it begins, the plan's
     -- unless the fixture gives its own
@@ -3339,6 +3340,45 @@ do
     check(line("1>wait@0,0>nil 2>wait@2,2>nil"), "0.0 1.0 1.0 1", "screen: B alone in X's reach")
     check(line("1>wait@0,1>nil 2>wait@2,2>nil"), "0.0 1.0 1.505 1", "screen: two in reach, the likeliest and the sum")
     check(line("1>wait@0,0>nil 2>wait@0,2>nil"), "0.0 0.0 0.0 1", "screen: none in reach")
+end
+
+-- test_planner_floors_the_plans_ways (ADR 0415): a way of the plan's uncertain kills splits only
+-- while the chance off its likeliest side is at least sight's floor of the whole plan, and each
+-- enemy phase is told its way's share of the plan (sight bounds its own splits by it). A strikes
+-- X from (0,0) for a kill at `hit`%; Y, far off, keeps the map from being won by X's death.
+do
+    local function judge(hit)
+        local A = blue(0x01, 0, 0, 0)
+        local X = red(0x81, 1, 0, { hp = 5 })
+        local Y = red(0x82, 9, 9, { minRange = false })
+        local masses = {}
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }) },
+            field = function() return { [0] = { [0] = 50 } } end,
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = hit, dmg = 9, hits = 1, killsTarget = true } } } },
+            enemyPhase = function(plan)
+                masses[#masses + 1] = plan.mass
+                return {}
+            end,
+        }
+        local _, plan, cost = Planner.plan(B, boardOf(A, X, Y), sightOf(o), style("bold"))
+        local sc
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if table.concat(c.acts, " ") == "1>attack@0,0>129" then sc = c.screen end
+        end
+        table.sort(masses)
+        for i, m in ipairs(masses) do masses[i] = string.format("%.3f", m) end
+        return sc and sc.phases, cost and cost.floored, masses
+    end
+    local phases, floored, masses = judge(50)
+    check(phases, 2, "floor: an even kill splits the plan into two phases")
+    check(floored, 0, "floor: and leaves no way unsplit")
+    -- (the game's two-dice hit: 50 shown is 49.5% true; the 1.000 is the plan that waits)
+    check(table.concat(masses, " "), "0.495 0.505 1.000", "floor: each phase is told its way's share")
+    phases, floored, masses = judge(99)
+    check(phases, 1, "floor: a 1% miss is under the floor, one phase on the average")
+    check(floored, 1, "floor: the way left unsplit is counted")
+    check(table.concat(masses, " "), "1.000 1.000", "floor: that phase is the whole plan")
 end
 
 -- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that

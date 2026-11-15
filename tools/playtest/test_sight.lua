@@ -1392,7 +1392,7 @@ end
 do
     local function sandbox(fn) return fn() end
     -- n strikers, each felled with chance q(k); `asked` counts the decisions played
-    local function phase(n, q, floor)
+    local function phase(n, q, floor, mass0)
         local asked, freed = 0, {}
         local outcomes, averaged = Sight.phaseWays(n, function(k, done)
             asked = asked + 1
@@ -1401,7 +1401,7 @@ do
             local t = { enemy = k, felled = q(k) }
             now[#now + 1] = t
             return t, now, function() freed[#freed + 1] = k end
-        end, sandbox, floor)
+        end, sandbox, floor, mass0)
         return outcomes, averaged, asked, freed
     end
     local function total(outcomes)
@@ -1438,6 +1438,12 @@ do
     check(#out .. "/" .. #freed .. "/" .. averaged, "1/0/1", "ways: a rare kill keeps the striker")
     out, averaged, asked, freed = phase(1, function() return 0.996 end)
     check(#out .. "/" .. #freed .. "/" .. averaged, "1/1/1", "ways: a near-sure kill frees the tile")
+    -- the floor is of the whole judged plan (ADR 0415): a phase that is one way of the plan's
+    -- uncertain kills (mass0) splits only while the rarer side is that floor of the PLAN
+    out, averaged = phase(1, function() return 0.1 end)
+    check(#out .. "/" .. averaged, "2/0", "ways: a 10% kill splits a phase that is the whole plan")
+    out, averaged = phase(1, function() return 0.1 end, nil, 0.1)
+    check(#out .. "/" .. averaged, "1/1", "ways: and stays unsplit in a way a tenth of the plan")
     -- an enemy that does not strike splits nothing
     out = Sight.phaseWays(3, function() return nil end, sandbox)
     check(#out == 1 and #out[1].strikes == 0, true, "ways: no strike, one way")

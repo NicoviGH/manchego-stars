@@ -461,8 +461,10 @@ end
 -- frames in one such phase without an answer (ADR 0411). The floor bounds the outcomes at
 -- 1 / floor, since each split leaves both sides at least that likely. The value is a tuning
 -- one (the ADR has what 1/64 and 1/256 cost and played).
+-- `mass0` (optional, default 1): the phase's own chance within the plan the planner judges (one
+-- way of the plan's uncertain kills, ADR 0415), so one floor bounds the whole judged plan.
 M.SPLIT_FLOOR = 1 / 64
-function M.phaseWays(n, strikeAt, sandbox, floor)
+function M.phaseWays(n, strikeAt, sandbox, floor, mass0)
     floor = floor or M.SPLIT_FLOOR
     local unsplit = 0
     local function play(i, done, mass)
@@ -493,7 +495,7 @@ function M.phaseWays(n, strikeAt, sandbox, floor)
         end
         return { { p = 1, strikes = done } }
     end
-    return play(1, {}, 1), unsplit
+    return play(1, {}, mass0 or 1), unsplit
 end
 
 -- Where a sandbox's frame starts below the game's sp (the call's stack top), and where its return
@@ -1516,7 +1518,7 @@ function M.new(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
-    local s = { cache = {}, odds = M.odds }
+    local s = { cache = {}, odds = M.odds, splitFloor = M.SPLIT_FLOOR }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     -- watch() is asked before every game call from now on (nil: no longer): M.watched.
@@ -2165,7 +2167,7 @@ function M.new(outer)
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
     -- may kill the striker) -> the likeliest outcome's strikes, with .outcomes and .unsplit.
-    local function playPhase(call, proc, byId, list, decides, strike, remove)
+    local function playPhase(call, proc, byId, list, decides, strike, remove, mass0)
         local outcomes, unsplit = M.phaseWays(#list, function(k, done)
             local id = list[k]
             local e = decides(id)
@@ -2174,7 +2176,7 @@ function M.new(outer)
             if not target then return nil end
             local t, now = strike(e, id, target, side, done)
             return t, now, function() remove(e, side.tile.x, side.tile.y) end
-        end, sandbox)
+        end, sandbox, nil, mass0)
         -- the list is the likeliest outcome's strikes; every outcome rides on it
         local top = outcomes[1]
         for _, o in ipairs(outcomes) do
@@ -2189,7 +2191,7 @@ function M.new(outer)
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
-            return playPhase(call, proc, byId, order(), decides, strike, remove)
+            return playPhase(call, proc, byId, order(), decides, strike, remove, plan.mass)
         end) end)
     end
 
