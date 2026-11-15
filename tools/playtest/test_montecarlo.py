@@ -98,6 +98,10 @@ class Records(unittest.TestCase):
                                     'case': 'kill', 'read': 34, 'gave': 30}])
         self.assertIn('anomaly: taught_miss turn 3 (0x04 kill: read 34, battle gave 30)',
                       mc.attempt_line(miss, set()))
+        checked = dict(V2, taught_checked={'attack': 5, 'counter': 9, 'staff': 1},
+                       taught_unchecked={'counter': 2, 'staff': 0})
+        self.assertIn('experience checked: 5 attacks, 9 counters, 1 heals '
+                      '(unchecked: 2 counters, 0 heals)', mc.attempt_line(checked, set()))
         other = dict(_GRADED[0], cause='other', detail='unrevealed_killer', predicted=0,
                      flags={})
         self.assertIn('other (blindspot: unrevealed_killer) at 0.0%', mc.death(other))

@@ -502,6 +502,9 @@ end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
+-- struct BattleUnit: +08 the Unit's level (after the battle), +70 levelPrevious (before it)
+local BU_LEVEL, BU_LEVEL_BEFORE = 0x08, 0x70
+
 local function battleSide(mem, b)
     local exp = mem.s8(b + 0x6E)
     local id, charId = fighterOf(mem, b)
@@ -513,8 +516,8 @@ local function battleSide(mem, b)
              hit = s16(mem.u16(b + 0x64)), crit = s16(mem.u16(b + 0x6A)),
              -- InitObstacleBattleUnit builds a wall's (index 0) without InitBattleUnit, so its
              -- levelPrevious is whatever the last battle left there
-             exp = exp, levelUp = id ~= 0 and mem.s8(b + 0x08) ~= mem.s8(b + 0x70),
-             levelBefore = mem.s8(b + 0x70),
+             exp = exp, levelUp = id ~= 0 and mem.s8(b + BU_LEVEL) ~= mem.s8(b + BU_LEVEL_BEFORE),
+             levelBefore = mem.s8(b + BU_LEVEL_BEFORE),
              broke = mem.s8(b + 0x7D) ~= 0 }
 end
 

@@ -726,13 +726,17 @@ end
 -- the sandbox puts them back, and no caller reads them after an exchange. Pure.
 function M.known(memo, key, teaches, count, play)
     local known = memo[key]
+    -- the count is one side's: a key read for the other side is a broken assumption (the key's
+    -- actor decides the side), never a count to hand back
+    assert(not (teaches and known and known.side and known.side ~= teaches),
+           "sight: one battle key read for both sides' experience")
     local exp = known and known[4]
     if teaches and not exp then exp = count() end
     if not known then
         known = play()
         memo[key] = known
     end
-    if exp then known[4] = exp end
+    if exp then known[4], known.side = exp, known.side or teaches end
     return known
 end
 
@@ -839,6 +843,19 @@ function M.attackOf(ours, eHp, uHp)
              joint = ours.joint, exp = ours.exp,
              kill = kill, die = (M.odds({ ours.back }, uHp)), sure = M.least(ours.dealt) >= eHp,
              expected = expected, counterWorst = M.worst(ours.back) }
+end
+
+-- A judged phase's strike by enemy `id` on unit `target` (strikeOf's, `side` its simulation),
+-- played at the HPs the phase had left when it came: strikerHp / targetHp, which its exchange's
+-- ways were simulated at, felled the chance our counter kills the striker, and targetLevel the
+-- target's level (the board's), the one its count (`taught`) was read at: a level-up since
+-- changes the count. Pure.
+function M.strikeAt(side, id, target, strikerHp, targetHp, level)
+    local t = M.strikeOf(side)
+    t.enemy, t.target = id, target
+    t.strikerHp, t.targetHp, t.targetLevel = strikerHp, targetHp, level
+    t.felled = (M.odds({ t.counterDist }, t.strikerHp))
+    return t
 end
 
 -- The enemy's strike read off its simulation, or none (nil) when its AI does not strike:
@@ -1851,6 +1868,9 @@ function M.new(outer)
     -- stand and their ai_counter (M.battleWord), and gBattleStats' config and range. The
     -- chapter (BattleCheckSilencer reads it) is this sight's own.
     local playedBy = {}
+    -- whether a strike on a player unit reads its counter's count: only the judged phase
+    -- (s.enemyPhase) scores it; the lookahead's phases and a single strike's forecast do not
+    local learning = false
     local function battleKey()
         local parts = { mem.u32(S.gBattleStats) }
         for _, bu in ipairs({ S.gBattleActor, S.gBattleTarget }) do
@@ -1997,7 +2017,7 @@ function M.new(outer)
             and { S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy } }
             or { S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot } }
         -- a player unit struck (a blue index) learns from its counter: its side is read too
-        local side = exchange(call, proc, sim, target < 0x40 and "target" or nil)
+        local side = exchange(call, proc, sim, learning and target < 0x40 and "target" or nil)
         side.slot, side.tile = slot, { x = sx, y = sy }
         return target, side
     end
@@ -2117,13 +2137,9 @@ function M.new(outer)
         end
         -- e strikes as it decided: stood on its tile, its expected damage off the target
         local function strike(e, id, target, side, done)
-            local t = M.strikeOf(side)
-            t.enemy, t.target = id, target
             local addr = mem.u32(S.gUnitLookup + target * 4)
-            t.strikerHp, t.targetHp = mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP)
-            -- the level its count was read at (a unit's +08): a level-up since changes the count
-            t.targetLevel = mem.u8(addr + 0x08)
-            t.felled = (M.odds({ t.counterDist }, t.strikerHp))
+            local t = M.strikeAt(side, id, target, mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP),
+                                 byId[target] and byId[target].level)
             local now = {}
             for x = 1, #done do now[x] = done[x] end
             now[#now + 1] = t
@@ -2161,10 +2177,14 @@ function M.new(outer)
     end
 
     function s.enemyPhase(plan)
-        return sandbox(function(call, proc)
+        learning = true
+        local ok, out = pcall(sandbox, function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
             return playPhase(call, proc, byId, order(), decides, strike, remove)
         end)
+        learning = false
+        if not ok then error(out, 0) end
+        return out
     end
 
     -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,

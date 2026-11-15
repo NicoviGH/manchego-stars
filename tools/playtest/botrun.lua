@@ -706,7 +706,11 @@ function M.run(api)
                   seize_skips = {}, stall_events = {}, anomalies = {},
                   -- the experience reads checked against the game's award (ADR 0414), per kind:
                   -- a pass with none checked proves nothing
-                  taught_checked = { attack = 0, counter = 0, staff = 0 } }
+                  taught_checked = { attack = 0, counter = 0, staff = 0 },
+                  -- the battles a read could not be checked against: a counter with no
+                  -- matching strike in the committed plan (a rarer way, another target) or at
+                  -- another level, a heal whose battle unit is another unit's
+                  taught_unchecked = { counter = 0, staff = 0 } }
     local explore = M.exploreLog()
     -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
     -- baseline and chosen keys once it is reached; `halt`, why the replay stops early
@@ -741,6 +745,16 @@ function M.run(api)
     -- each with its turn: montecarlo.py's keep_trace gives it the story command (`narrate`)
     -- once the trace is filed where it will stay
     local function anomaly(a) rec.anomalies[#rec.anomalies + 1] = a end
+    -- one experience check (ADR 0414): counted by kind, a read the game's award differs from an
+    -- anomaly (`miss`: taughtMiss's, or nil when they agree)
+    local function checkTaught(kind, turn, charId, miss, case)
+        rec.taught_checked[kind] = rec.taught_checked[kind] + 1
+        if miss then
+            anomaly({ kind = "taught_miss", turn = turn, charId = charId,
+                      case = case and (case .. " " .. miss.case) or miss.case,
+                      read = miss.read, gave = miss.gave })
+        end
+    end
     -- whether this turn moved the chapter on: a lord moved, a kill, a Visit, Talk or Chest
     -- (FR-007's stall is three player phases in a row without one)
     local progressed, idle = false, 0
@@ -1644,24 +1658,21 @@ function M.run(api)
                     end
                 end
                 local battle = not trapped and action.act == "attack" and api.battle and api.battle() or nil
+                -- the plan's experience read against what the game awarded: a difference is the
+                -- term scoring a wrong number
                 local taught = battle and action.f and action.f.exp
-                local miss = taught and M.taughtMiss(taught, battle)
-                if taught then rec.taught_checked.attack = rec.taught_checked.attack + 1 end
-                if miss then
-                    -- the plan's experience read is not the game's: the term scored a wrong number
-                    anomaly({ kind = "taught_miss", turn = turn, charId = battle.actor.charId,
-                              case = miss.case, read = miss.read, gave = miss.gave })
+                if taught then
+                    checkTaught("attack", turn, battle.actor.charId, M.taughtMiss(taught, battle))
                 end
                 -- a heal's: the staff's count against what the game's Staff command awarded
                 -- (gBattleActor's expGain, BattleApplyItemExpGains)
                 local healer = not trapped and action.act == "staff" and action.exp
                     and api.itemUser and api.itemUser() or nil
                 if healer and healer.id == action.unitId then
-                    rec.taught_checked.staff = rec.taught_checked.staff + 1
-                end
-                if healer and healer.id == action.unitId and healer.exp ~= action.exp then
-                    anomaly({ kind = "taught_miss", turn = turn, charId = healer.charId,
-                              case = "staff", read = action.exp, gave = healer.exp })
+                    checkTaught("staff", turn, healer.charId, healer.exp ~= action.exp
+                        and { case = "staff", read = action.exp, gave = healer.exp } or nil)
+                elseif healer then
+                    rec.taught_unchecked.staff = rec.taught_unchecked.staff + 1
                 end
                 local after = api.board()
                 sight.refresh()
@@ -1734,21 +1745,24 @@ function M.run(api)
                     explore.closedBy(a.tile.x, a.tile.y, a.charId, loot)
                 end
                 -- our unit's counter: what it learnt against the plan's read of that strike
-                -- (the committed plan's phase, its strike by this enemy on that unit)
+                -- (the committed plan's phase, its strike by this enemy on that unit), read at
+                -- the level it fought at: a level-up since (an earlier battle, its own attack
+                -- after the plan) changes the count honestly
                 for _, b in ipairs(a.battles or {}) do
-                    for _, st in ipairs(commit and commit.strikes or {}) do
-                        -- read at the level it fought at: a level-up since (an earlier battle,
-                        -- its own attack after the plan) changes the count honestly
-                        if b.actor.id == a.id and st.enemy == a.id and st.target == b.target.id
-                                and st.taught and st.targetLevel == b.target.levelBefore then
-                            local m = M.taughtMiss(st.taught, b, "target")
-                            rec.taught_checked.counter = rec.taught_checked.counter + 1
-                            if m then
-                                anomaly({ kind = "taught_miss", turn = turn,
-                                          charId = b.target.charId, case = "counter " .. m.case,
-                                          read = m.read, gave = m.gave })
+                    if b.actor.id == a.id and b.target.id < 0x40 then
+                        local read
+                        for _, st in ipairs(commit and commit.strikes or {}) do
+                            if st.enemy == a.id and st.target == b.target.id and st.taught
+                                    and st.targetLevel == b.target.levelBefore then
+                                read = st
+                                break   -- the phase's one strike by this enemy on that unit
                             end
-                            break   -- the phase's one strike by this enemy on that unit
+                        end
+                        if read then
+                            checkTaught("counter", turn, b.target.charId,
+                                        M.taughtMiss(read.taught, b, "target"), "counter")
+                        else
+                            rec.taught_unchecked.counter = rec.taught_unchecked.counter + 1
                         end
                     end
                 end

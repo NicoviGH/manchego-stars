@@ -778,13 +778,11 @@ do
     -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
     -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf)
     local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
-    local _, onBattle = src:gsub("api%.write8%(me %+ UNIT_HP,", "")
-    local _, onThem = src:gsub("api%.write8%(them %+ UNIT_HP,", "")
-    onBattle = onBattle + onThem
+    local at = src:find("function M.expOf(", 1, true)
+    local count = at and src:sub(at, src:find("\nend\n", at, true)) or ""
+    local _, onBattle = count:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
     local writes = all - onBattle
-    check(onBattle, 2, "aiPhaseStart: the battle units' HP is written only by the experience count")
-    check(src:find("local me, them = S.gBattleActor, S.gBattleTarget", 1, true) ~= nil, true,
-          "aiPhaseStart: `me` and `them` are the battle units (M.expOf)")
+    check(onBattle, 2, "aiPhaseStart: the experience count writes the battle units' HP twice")
     local _, wounds = src:gsub("\n%s+wound%(", "")
     check(writes == 4 and wounds == 2
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
@@ -1528,6 +1526,32 @@ do
     check(Sight.staffExp(call, S, 0x0202BE4C, 2), 11, "staffExp: the game's count")
     check(table.concat(calls, " "), string.format("%X(%d,2) %X(%d)", S.BattleInitItemEffect,
           0x0202BE4C, S.GetBattleUnitStaffExp, S.gBattleActor), "staffExp: set up, then counted")
+end
+
+-- M.strikeAt / M.strikeOf (ADR 0414): a judged strike keeps its exchange's ways and its
+-- target's count, and the HPs and level they were read at.
+do
+    local side = { armed = true, hit = 70, dmg = 5, crit = 0, hits = 1, dealt = { [0] = 0.3, [5] = 0.7 },
+                   back = { [0] = 0.5, [10] = 0.5 }, joint = { { p = 1, dealt = 5, back = 10 } },
+                   exp = { none = 1, hit = 10, kill = 30 }, slot = 0, tile = { x = 1, y = 0 } }
+    local t = Sight.strikeAt(side, 0x81, 0x01, 10, 20, 7)
+    check(t.joint == side.joint and t.taught == side.exp, true, "strikeAt: the ways and the count")
+    check(t.enemy .. " " .. t.target .. " " .. t.strikerHp .. " " .. t.targetHp .. " " .. t.targetLevel,
+          "129 1 10 20 7", "strikeAt: who, the HPs and the level read at")
+    check(t.felled, 0.5, "strikeAt: our counter's chance to fell the striker")
+    local none = Sight.strikeOf(nil)
+    check(none.joint == nil and none.taught == nil, true, "strikeOf: no strike, no ways or count")
+end
+
+-- M.known keeps one side's count: a key read for the other side is an error, never a count.
+do
+    local memo = {}
+    local function count() return { none = 1, hit = 2, kill = 3 } end
+    local function play() return {} end
+    Sight.known(memo, "k", "actor", count, play)
+    check(memo.k.side, "actor", "known: the entry keeps the side counted")
+    check(pcall(Sight.known, memo, "k", "target", count, play), false,
+          "known: the other side's read of that key raises")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

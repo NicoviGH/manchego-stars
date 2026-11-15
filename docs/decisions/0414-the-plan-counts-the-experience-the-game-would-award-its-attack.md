@@ -37,8 +37,8 @@ exchange's other played results (`Sight.known`), under the same battle key. `exc
 a player unit (decision 4).
 
 **Decision 3: the plan picks which of the three applies, at the HP it leaves the target.**
-`taught(x, ways, hp, unitHp, struck)` walks the exchange's ways (`f.joint`). A way whose counter kills our
-unit teaches nothing. A way that deals at least the HP the plan leaves the target is a kill.
+`taught(x, ways, hp, unitHp, struck)` walks the exchange's ways (`f.joint`). A way whose
+counter kills our unit teaches nothing. A way that deals at least the HP the plan leaves the target is a kill.
 Any other damage is a hit; no damage is `none`. So when an earlier blow of the plan chips the
 target, the kill belongs to the unit that finishes it, and the plan can choose who that is.
 
@@ -50,16 +50,21 @@ An enemy's strike on a player unit reads that unit's count (`Sight.expOf` with t
 (`taught`, beside its `joint`). The judged phase adds `W.exp` times, over every way the phase
 can go (its chance), each strike's count over its exchange's ways (`taught` with `struck`: our
 blows are the counter, our loss the strike's damage), at the HPs the phase had left when the
-strike came. Its phase's ways already play a counter that kills the striker both ways. So
-standing where a counter will kill trains the unit that stands there, within the cap.
+strike came (`Sight.strikeAt`), the target's level beside it. Its phase's ways already play a
+counter that kills the striker both ways. So standing where a counter will kill trains the
+unit that stands there, within the cap. Only the judged phase reads the count
+(`s.enemyPhase`); the lookahead's second phase and a single strike's forecast do not, as
+nothing scores them. A memo entry keeps the side it counted, and a read of that key for the
+other side is an error.
 
 **Decision 5: a heal scores what its staff teaches.** `GetBattleUnitStaffExp`
 (`bmbattle.c`): 10 plus the staff's cost per use over 20, halved once promoted, 0 for a unit
 that cannot gain levels. `Sight.staffExp` reads it on the battle unit the Staff command sets
 up (`BattleInitItemEffect`, which also clears the blows, so the count's 1 for a miss never
 applies to a heal). `s.staves` and `s.heals` carry it, the heal acts carry it, and `score()`
-adds `W.exp` times it to a heal that restores anything. A dance (20 a use) is not planned, so it
-is not counted.
+adds `W.exp` times it to a heal that restores anything. Both heal proposals carry it through
+one helper (`healWith`, `bot.lua`). A dance (20 a use) is not counted: the bot proposes no
+Dance (neither `bot.lua` nor `planner.lua` has one).
 
 **The record.** Each player-phase attack in the trace gains `taught`: the three numbers the
 plan read. Every run checks them against the battle's own `exp` (its actor's):
@@ -70,7 +75,10 @@ counter is checked the same way, side `"target"`, against the committed plan's s
 enemy on that unit, when the unit fights at the level the read was made at (a level-up since
 changes the count honestly). A heal is checked against the Staff command's award
 (`Board.itemUser`: gBattleActor's `expGain`). The record's `taught_checked` counts the checks
-made by kind, so a pass with none made shows as one.
+made by kind, and `taught_unchecked` the battles no read could be checked against: a counter
+in a rarer way than the plan's likeliest, on another target or at another level, and a heal
+whose battle unit is another unit's. The report's attempt line prints both, so a pass with
+few checks shows as one.
 
 **What it proved.** `lap1d`'s prologue and Ch1 starts, one attempt each (tag `exp1`). Both
 were won clean, in 2 and 6 turns. All 7 player attacks matched: in each one, the read for the
@@ -103,8 +111,9 @@ adds nothing to its plan's value, and experience never takes a plan over the cap
 
 **Not covered here.** The count is read on the plain simulation, where nothing procs, so an
 Assassin's Silencer kill, which the game doubles (`GetUnitExpMultiplier`), is read at single
-value. The run's check catches it: the battle gives twice the read, and the attempt records a
-`taught_miss`. It is made exact if a run shows one. A counter's count is read at the HP the
+value. The run's check catches it when the Silencer kill is a checked battle: the battle
+gives twice the read, and the attempt records a `taught_miss`. It is made exact if a run shows
+one. A counter's count is read at the HP the
 phase had left when its strike came, the phase's expected HP, as the strike itself is played.
 Whether the terms move the party's levels is the proof lap's to show: from the prologue,
 against `lap1d`, on the four measures the plan comment set.

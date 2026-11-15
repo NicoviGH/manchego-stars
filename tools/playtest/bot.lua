@@ -1610,6 +1610,13 @@ local function seize(ctx)
     return nil
 end
 
+-- A heal act's staff, from the game's heal read (`h`: sight.heals' entry, or a candidate that
+-- copied it): its slot, the HP it restores (the planner reads what the target is short by when
+-- it lands) and the experience it teaches the healer (sight.staffExp: the planner's score).
+local function healWith(a, h)
+    a.slot, a.amount, a.exp = h.slot, h.amount, h.exp
+end
+
 -- A healer's staff, once the fighters have acted: of the heals the game offers (sight.heals) from wait
 -- tiles the gate allows, the one restoring the most HP -- the ally's missing HP up to the
 -- staff's amount -- then the most wounded ally, then the safest tile. Slot order picks among
@@ -1646,9 +1653,8 @@ local function staffHeal(ctx, gate, only)
     end
     if not best then return nil end
     local a = action(best.u, best.tile, "staff", nil)
-    -- the amount too: the planner reads what the target is short by when the heal lands
-    -- and the experience the staff teaches (the planner's score)
-    a.slot, a.targetId, a.gain, a.amount, a.exp = best.slot, best.id, best.gain, best.amount, best.exp
+    a.targetId, a.gain = best.id, best.gain
+    healWith(a, best)
     for _, b in ipairs(ctx.blues) do
         if b.id == best.id then a.target = b.charId end
     end
@@ -2105,7 +2111,7 @@ local function proposeOne(ctx, u)
             local c = best[b.id]
             if c then
                 local a = action(u, c.tile, "staff", b)
-                a.slot, a.amount, a.exp = c.slot, c.amount, c.exp
+                healWith(a, c)
                 add(a, "heal")
             end
         end

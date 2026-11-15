@@ -2697,11 +2697,11 @@ end
 -- test_a_wrong_heal_or_counter_read_is_an_anomaly (ADR 0414): a heal whose staff count the game
 -- did not award, and a counter whose plan read (the committed plan's strike) the battle did not,
 -- each land on the record; a counter fought at another level than the read is not checked.
-local function healAndCounter(staffGave, counterGave, level)
+local function healAndCounter(staffGave, counterGave, level, healer)
     local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 1, 20),
                                    unit(0x81, 0, "red", 9, 9, 10) },
                          enemy = function(g)
-                             if g.turn > 1 then g.over = true end
+                             if g.turn > 1 then g.over = true return {}, {} end
                              return {}, { { id = 0x81, charId = 0x81, from = { x = 9, y = 9 },
                                             to = { x = 1, y = 0 }, hp = 10, battles = { {
                                     actor = { id = 0x81, charId = 0x81, hp = 6 },
@@ -2710,7 +2710,7 @@ local function healAndCounter(staffGave, counterGave, level)
                                     hits = { { by = "actor", miss = false, dmg = 5 },
                                              { by = "target", miss = false, dmg = 4 } } } } } }
                          end }
-    g.api.itemUser = function() return { id = 0x02, charId = 2, exp = staffGave } end
+    g.api.itemUser = function() return { id = healer or 0x02, charId = 2, exp = staffGave } end
     local asks = 0
     g.api.Planner = {
         key = function(a) return a.unitId .. a.act end,
@@ -2733,12 +2733,17 @@ local function healAndCounter(staffGave, counterGave, level)
     for _, a in ipairs(recordOf(g).anomalies) do
         if a.kind == "taught_miss" then out[#out + 1] = a.case .. " " .. a.read .. " " .. a.gave end
     end
-    local n = recordOf(g).taught_checked
-    return table.concat(out, "; "), n.staff .. " " .. n.counter
+    local n, u = recordOf(g).taught_checked, recordOf(g).taught_unchecked
+    return table.concat(out, "; "), n.staff .. " " .. n.counter, u.staff .. " " .. u.counter
 end
 check(healAndCounter(11, 10, 5), "", "taught_miss: a right heal and counter raise nothing")
 check(select(2, healAndCounter(11, 10, 5)), "1 1", "taught_checked: the heal and the counter counted")
 check(select(2, healAndCounter(11, 30, 6)), "1 0", "taught_checked: a counter not checked is not counted")
+check(select(3, healAndCounter(11, 30, 6)), "0 1", "taught_unchecked: the counter at another level is")
+-- the Staff command's battle unit is another unit's: nothing to check, counted unchecked
+local missed, checked, unchecked = healAndCounter(5, 10, 5, 0x01)
+check(missed .. " | " .. checked .. " | " .. unchecked, " | 0 1 | 1 0",
+      "taught_unchecked: a heal read off another unit's battle unit is not compared")
 check(healAndCounter(5, 30, 5), "staff 11 5; counter hit 10 30", "taught_miss: both wrong reads named")
 check(healAndCounter(11, 30, 6), "", "taught_miss: a counter at another level is not checked")
 

@@ -545,6 +545,17 @@ def spoiled(r, who=hex_id):
     return '; '.join(out)
 
 
+def taught_line(r):
+    """The experience reads the run checked against the game's award, and the battles it
+    could not check (ADR 0414): a pass with none checked proves nothing, so it is shown."""
+    n, u = r.get('taught_checked'), r.get('taught_unchecked') or {}
+    if not n:
+        return ''
+    return '\n    experience checked: %d attacks, %d counters, %d heals (unchecked: %d counters, %d heals)' % (
+        n.get('attack', 0), n.get('counter', 0), n.get('staff', 0),
+        u.get('counter', 0), u.get('staff', 0))
+
+
 def anomaly_detail(a):
     """What an anomaly says beyond its kind and turn: a taught_miss's case, the experience the
     plan read and what the battle gave (ADR 0414)."""
@@ -591,7 +602,7 @@ def attempt_line(r, said):
         ' (%s)' % r.get('why') if r.get('outcome') in NO_RESULT else '',
         ' (%s)' % why if why else '',
         ' [noted: %s]' % noted if noted else '',
-        ' [stalls: %s]' % stalls if stalls else '') + anomalies
+        ' [stalls: %s]' % stalls if stalls else '') + taught_line(r) + anomalies
 
 
 def first_clean(records):
