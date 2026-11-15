@@ -3114,6 +3114,15 @@ INSPECT.sightApi = function()
             -- INSPECT.sandboxFrames keeps it, and log() stamps lines with it added, so a run's
             -- cost, run.sh's frame budget and its stall watch all see what the sight spent. A
             -- heartbeat line every TUNE.sandboxHeartbeat frames keeps a long think visible.
+            -- Real frames, the game's own: a kept call's (Sight.machine(cpu, true)) are never
+            -- loaded back, so they are not the sight's frames and are not counted as them
+            live = function(done, max)
+                for _ = 1, max do
+                    yield()
+                    if done() then return true end
+                end
+                return false
+            end,
             frames = function(done, max)
                 local t0 = os.clock()
                 local function spent() INSPECT.costs.run = INSPECT.costs.run + os.clock() - t0 end

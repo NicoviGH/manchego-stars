@@ -356,7 +356,8 @@ M.UNIT_AI_FLAGS, M.UNIT_AI_CONFIG, M.UNIT_AI_WORDS = 0x0A, UNIT_AI_CONFIG, 4
 --
 -- Sight.machine(cpu, true) is the same call KEPT (#510 step 9 PR E): what the game function
 -- wrote stays -- a shop proc it started runs on the next frame -- and only the registers are put
--- back, so the game resumes where the frame left it. They are read and written in the mode the
+-- back, so the game resumes where the frame left it: at its rest between frames, which a kept
+-- call first runs real frames to reach (M.REST_PC, below). They are read and written in the mode the
 -- frame ended in, System's sp and lr too (the call's own mode). pc is put back through a
 -- measured write: mGBA's pc write refills the pipeline, so it reads one instruction past what
 -- was written (measured 2026-10-27 at a frame boundary, the BIOS halt loop, ARM: +4).
@@ -512,13 +513,21 @@ M.SCRATCH_AT, M.LOOP_AT = 0x10, 0x80   -- below SCRATCH_AT: a fifth argument, at
 -- freed slot (the free list hands back the last slot freed), and the resumed draw wrote its
 -- text over the shop's stock (#620: the list shrank under the hand and the purchase failed).
 -- So a kept call first runs frames until the CPU rests, and fails loudly if it never does.
+-- The halt is reached only from the end of a main loop (bm.c's, the two battle loops', the link
+-- error screen's: every VBlankIntrWait in src/ follows its loop's Proc_Run), so a CPU resting
+-- there holds no proc walk. 0x1F8 is the halt of the BIOS the emulator runs: mGBA's built-in
+-- one (no gba.bios is configured); another BIOS rests elsewhere and fails the wait loudly.
+-- A kept call's frames, the wait and the call's own, are real frames (cpu.live): no load
+-- rewinds them, so they are not counted as the sight's (cpu.frames).
 M.REST_PC, M.REST_FRAMES = 0x1F8, 600
 function M.machine(cpu, keep)
     return function(fn)
+        local frames = keep and assert(cpu.live, "sight: a kept call needs cpu.live") or cpu.frames
         if keep and cpu.read("pc") ~= M.REST_PC
-                and not cpu.frames(function() return cpu.read("pc") == M.REST_PC end, M.REST_FRAMES) then
-            error(string.format("sight: the CPU never rested between frames in %d frames (pc 0x%08X): "
-                .. "a kept call would resume the game mid-frame", M.REST_FRAMES, cpu.read("pc")))
+                and not frames(function() return cpu.read("pc") == M.REST_PC end, M.REST_FRAMES) then
+            error(string.format("sight: the CPU never rested between frames in %d frames (pc 0x%08X, "
+                .. "rest 0x%X, mGBA's built-in BIOS): a kept call would resume the game mid-frame",
+                M.REST_FRAMES, cpu.read("pc"), M.REST_PC))
         end
         -- The load puts every register back; only cpsr is kept here. A kept call loads
         -- nothing, so it reads every register first.
@@ -548,7 +557,7 @@ function M.machine(cpu, keep)
             cpu.write("sp", top)
             if lr then cpu.write("lr", lr) end
             cpu.write("pc", pc)
-            if not cpu.frames(returned, M.FRAME_BUDGET) then
+            if not frames(returned, M.FRAME_BUDGET) then
                 error(string.format("sight: %s did not return in %d frames (pc 0x%08X)",
                     what, M.FRAME_BUDGET, cpu.read("pc")))
             end
