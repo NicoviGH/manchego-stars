@@ -3399,6 +3399,126 @@ INSPECT.diag = function(Json)
     return d
 end
 
+-- An item as the game stores it in a bag or the convoy: id | uses << 8.
+INSPECT.packItem = function(it) return it.id | (it.uses << 8) end
+
+do
+    -- One Bot.supply act, or a mid-map Supply take (api.act's "supply"), by the game's own
+    -- container calls, as its Supply screen makes them
+    -- (prep_itemsupply.c: a give clears the bag's slot, UnitRemoveInvalidItems packs the bag,
+    -- AddItemToConvoy stores it; a take, sub_809E2C8, puts the item in the bag's first empty
+    -- slot and rebuilds the convoy without it, sub_80982B8: ClearSupplyItems, then
+    -- AddItemToConvoy for each item left). Called on the first player phase, where the prep
+    -- screen's Supply would have left the same bags and convoy: no screen, no turn spent. The
+    -- item is found by id and uses. The rebuild is fed from the convoy itself, not from the
+    -- screen's item list (gPrepScreenItemList, in buffers the map may hold), so the convoy
+    -- keeps its slot order less the item taken; the screen would also move that item's page
+    -- first. Never RemoveItemFromConvoy: no game code calls it, and its pack
+    -- (ShrinkConvoyItemList) copies all CONVOY_ITEM_COUNT slots back from gGenericBuffer, past
+    -- the 0 it writes after the last item, so whatever the scratch buffer held lands in the
+    -- convoy (party1's Ch10 start: about 40 garbage items; ADR 0413's amendment).
+    local pack = INSPECT.packItem
+    local function slotOf(addr, id, uses)
+        for k = 0, BOARD.ITEM_COUNT - 1 do
+            if ru16(addr + BOARD.UNIT_ITEMS + k * 2) == pack({ id = id, uses = uses }) then return k end
+        end
+        return nil
+    end
+    local function count(list, id, uses)
+        local n = 0
+        for _, it in ipairs(list) do
+            if it.id == id and it.uses == uses then n = n + 1 end
+        end
+        return n
+    end
+    -- whether item lists `a` and `b` hold the same items in the same order
+    local function sameItems(a, b)
+        if #a ~= #b then return false end
+        for i = 1, #a do
+            if pack(a[i]) ~= pack(b[i]) then return false end
+        end
+        return true
+    end
+    -- a failed move's message: what tells the causes apart, both sides before and after
+    local function moved(what, addr, bagWas, convoyWas)
+        return string.format("%s (unit at 0x%08X; bag %s -> %s; convoy %s -> %s)", what, addr,
+            INSPECT.itemsLine(bagWas), INSPECT.itemsLine(BOARD.items(addr)),
+            INSPECT.itemsLine(convoyWas), INSPECT.itemsLine(INSPECT.convoyItems()))
+    end
+    INSPECT.giveToConvoy = function(a)
+        local u = BOARD.find("blue", a.unit)
+        local k = u and slotOf(u.addr, a.item, a.uses)
+        if not k then return nil, string.format("0x%02X holds no item 0x%X at %d uses", a.unit, a.item, a.uses) end
+        local fault = INSPECT.convoyFault()
+        if fault then return nil, "the convoy is not the game's: " .. fault end
+        local convoyWas, bagWas = INSPECT.convoyItems(), BOARD.items(u.addr)
+        if #convoyWas >= BOARD.CONVOY_ITEM_COUNT then return nil, "the convoy is full" end
+        INSPECT.gameCalls(function(call)
+            emu:write16(u.addr + BOARD.UNIT_ITEMS + k * 2, 0)
+            call(SYM.UnitRemoveInvalidItems, { u.addr })
+            call(SYM.AddItemToConvoy, { pack({ id = a.item, uses = a.uses }) })
+        end, true)
+        -- the convoy is what it was with the item after the last one, and the bag one fewer
+        local want = {}
+        for _, c in ipairs(convoyWas) do want[#want + 1] = c end
+        want[#want + 1] = { id = a.item, uses = a.uses }
+        if not sameItems(INSPECT.convoyItems(), want)
+                or count(BOARD.items(u.addr), a.item, a.uses) ~= count(bagWas, a.item, a.uses) - 1 then
+            return nil, moved("the item did not move from the bag to the convoy", u.addr, bagWas, convoyWas)
+        end
+        log(string.format("supply: 0x%02X gives item 0x%X (%s)", a.unit, a.item, a.why or ""))
+        return true
+    end
+    -- A take as the Supply screen's Take makes it (sub_809E2C8): the item into the bag's first
+    -- empty slot, then the convoy rebuilt without it (sub_80982B8), in its own slot order: the
+    -- screen's item list also moves the item's page first, which is not reproduced.
+    INSPECT.takeFromConvoy = function(a)
+        local u = BOARD.find("blue", a.unit)
+        if not u then return nil, string.format("no fielded unit 0x%02X", a.unit) end
+        local fault = INSPECT.convoyFault()
+        if fault then return nil, "the convoy is not the game's: " .. fault end
+        local convoyWas, bagWas = INSPECT.convoyItems(), BOARD.items(u.addr)
+        local at
+        for _, c in ipairs(convoyWas) do
+            if c.id == a.item and c.uses == a.uses then at = c.index; break end
+        end
+        if not at then return nil, string.format("no item 0x%X at %d uses in the convoy", a.item, a.uses) end
+        -- what the convoy holds after: every item but the one taken, in order
+        local left = {}
+        for _, c in ipairs(convoyWas) do
+            if c.index ~= at then left[#left + 1] = c end
+        end
+        -- one value back (what the sandbox returns): { added, lost = the item the rebuild lost }
+        local r = INSPECT.gameCalls(function(call)
+            if call(SYM.UnitAddItem, { u.addr, pack({ id = a.item, uses = a.uses }) }) == 0 then return { added = false } end
+            call(SYM.ClearSupplyItems, {})
+            for _, c in ipairs(left) do
+                -- AddItemToConvoy's -1: no empty slot, which a convoy just emptied always has
+                if call(SYM.AddItemToConvoy, { pack(c) }) == 0xFFFFFFFF then
+                    return { added = true, lost = c }
+                end
+            end
+            return { added = true }
+        end, true)
+        if not r.added then return nil, "the bag is full" end
+        local lost = r.lost
+        -- unreachable while a just-emptied convoy has room; if it fires, the item is already in the
+        -- bag and the convoy part refilled, so the error stops the campaign rather than play on
+        if lost then
+            return nil, moved(string.format("the convoy refused item 0x%X back", lost.id), u.addr,
+                              bagWas, convoyWas)
+        end
+        -- both sides: a copy into the bag that left the convoy's own in place would pass the
+        -- bag's count alone, and a convoy holding anything but the items left fails too
+        if count(BOARD.items(u.addr), a.item, a.uses) ~= count(bagWas, a.item, a.uses) + 1
+                or not sameItems(INSPECT.convoyItems(), left) then
+            return nil, moved("the item did not move from the convoy to the bag", u.addr, bagWas, convoyWas)
+        end
+        log(string.format("supply: 0x%02X takes item 0x%X (%s)", a.unit, a.item, a.why or ""))
+        return true
+    end
+end
+
 -- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
 INSPECT.botApi = function(game)
     -- the entries `list` gained since the last look at it
@@ -3618,6 +3738,19 @@ INSPECT.botApi = function(game)
             end, 120) then return false, "the item's submenu offered no Use" end
             if INSPECT.awaitActed(u.addr, function() return won() or lost() end) then return true end
             return false, "the unit never finished using the item"
+        elseif a.act == "supply" then
+            -- the convoy's door key (bot.lua supplyKey): the game's menu must offer Supply on
+            -- this tile (SupplyUsability: the lord, or beside the lord), the item is taken as
+            -- the screen's Take makes it (INSPECT.takeFromConvoy, the game's container calls),
+            -- and the unit then waits. SupplyCommandEffect returns to the unit menu, so the
+            -- Wait is the game's own next command
+            if not Controller.findAction(Controller.legalActions(observeController()), "open_supply") then
+                return false, "the game offers no Supply on this tile"
+            end
+            local took, why = INSPECT.takeFromConvoy({ unit = a.unit, item = a.item, uses = a.uses,
+                                                       why = "the way's door key" })
+            if not took then return false, why end
+            return chooseWait(function() return won() or lost() end)
         elseif a.act == "seize" then
             if not Controller.findAction(Controller.legalActions(observeController()), "seize") then
                 return cancelUnitActionMenu() and "noseize"
@@ -3770,8 +3903,6 @@ end
 INSPECT.convoyItems = BOARD.convoyItems
 INSPECT.convoyFault = BOARD.convoyFault
 
--- An item as the game stores it in a bag or the convoy: id | uses << 8.
-INSPECT.packItem = function(it) return it.id | (it.uses << 8) end
 
 -- A bag's or the convoy's items as one line, for a failed act's message: id/uses, @slot.
 INSPECT.itemsLine = function(list)
@@ -4461,119 +4592,7 @@ INSPECT.campaignApi = function(game)
         end)
     end
 
-    -- One Bot.supply act, by the game's own container calls, as its Supply screen makes them
-    -- (prep_itemsupply.c: a give clears the bag's slot, UnitRemoveInvalidItems packs the bag,
-    -- AddItemToConvoy stores it; a take, sub_809E2C8, puts the item in the bag's first empty
-    -- slot and rebuilds the convoy without it, sub_80982B8: ClearSupplyItems, then
-    -- AddItemToConvoy for each item left). Called on the first player phase, where the prep
-    -- screen's Supply would have left the same bags and convoy: no screen, no turn spent. The
-    -- item is found by id and uses. The rebuild is fed from the convoy itself, not from the
-    -- screen's item list (gPrepScreenItemList, in buffers the map may hold), so the convoy
-    -- keeps its slot order less the item taken; the screen would also move that item's page
-    -- first. Never RemoveItemFromConvoy: no game code calls it, and its pack
-    -- (ShrinkConvoyItemList) copies all CONVOY_ITEM_COUNT slots back from gGenericBuffer, past
-    -- the 0 it writes after the last item, so whatever the scratch buffer held lands in the
-    -- convoy (party1's Ch10 start: about 40 garbage items; ADR 0413's amendment).
-    local pack = INSPECT.packItem
-    local function slotOf(addr, id, uses)
-        for k = 0, BOARD.ITEM_COUNT - 1 do
-            if ru16(addr + BOARD.UNIT_ITEMS + k * 2) == pack({ id = id, uses = uses }) then return k end
-        end
-        return nil
-    end
-    local function count(list, id, uses)
-        local n = 0
-        for _, it in ipairs(list) do
-            if it.id == id and it.uses == uses then n = n + 1 end
-        end
-        return n
-    end
-    -- whether item lists `a` and `b` hold the same items in the same order
-    local function sameItems(a, b)
-        if #a ~= #b then return false end
-        for i = 1, #a do
-            if pack(a[i]) ~= pack(b[i]) then return false end
-        end
-        return true
-    end
-    -- a failed move's message: what tells the causes apart, both sides before and after
-    local function moved(what, addr, bagWas, convoyWas)
-        return string.format("%s (unit at 0x%08X; bag %s -> %s; convoy %s -> %s)", what, addr,
-            INSPECT.itemsLine(bagWas), INSPECT.itemsLine(BOARD.items(addr)),
-            INSPECT.itemsLine(convoyWas), INSPECT.itemsLine(INSPECT.convoyItems()))
-    end
-    api.give = function(a)
-        local u = BOARD.find("blue", a.unit)
-        local k = u and slotOf(u.addr, a.item, a.uses)
-        if not k then return nil, string.format("0x%02X holds no item 0x%X at %d uses", a.unit, a.item, a.uses) end
-        local fault = INSPECT.convoyFault()
-        if fault then return nil, "the convoy is not the game's: " .. fault end
-        local convoyWas, bagWas = INSPECT.convoyItems(), BOARD.items(u.addr)
-        if #convoyWas >= BOARD.CONVOY_ITEM_COUNT then return nil, "the convoy is full" end
-        INSPECT.gameCalls(function(call)
-            emu:write16(u.addr + BOARD.UNIT_ITEMS + k * 2, 0)
-            call(SYM.UnitRemoveInvalidItems, { u.addr })
-            call(SYM.AddItemToConvoy, { pack({ id = a.item, uses = a.uses }) })
-        end, true)
-        -- the convoy is what it was with the item after the last one, and the bag one fewer
-        local want = {}
-        for _, c in ipairs(convoyWas) do want[#want + 1] = c end
-        want[#want + 1] = { id = a.item, uses = a.uses }
-        if not sameItems(INSPECT.convoyItems(), want)
-                or count(BOARD.items(u.addr), a.item, a.uses) ~= count(bagWas, a.item, a.uses) - 1 then
-            return nil, moved("the item did not move from the bag to the convoy", u.addr, bagWas, convoyWas)
-        end
-        log(string.format("supply: 0x%02X gives item 0x%X (%s)", a.unit, a.item, a.why or ""))
-        return true
-    end
-    -- A take as the Supply screen's Take makes it (sub_809E2C8): the item into the bag's first
-    -- empty slot, then the convoy rebuilt without it (sub_80982B8), in its own slot order: the
-    -- screen's item list also moves the item's page first, which is not reproduced.
-    api.take = function(a)
-        local u = BOARD.find("blue", a.unit)
-        if not u then return nil, string.format("no fielded unit 0x%02X", a.unit) end
-        local fault = INSPECT.convoyFault()
-        if fault then return nil, "the convoy is not the game's: " .. fault end
-        local convoyWas, bagWas = INSPECT.convoyItems(), BOARD.items(u.addr)
-        local at
-        for _, c in ipairs(convoyWas) do
-            if c.id == a.item and c.uses == a.uses then at = c.index; break end
-        end
-        if not at then return nil, string.format("no item 0x%X at %d uses in the convoy", a.item, a.uses) end
-        -- what the convoy holds after: every item but the one taken, in order
-        local left = {}
-        for _, c in ipairs(convoyWas) do
-            if c.index ~= at then left[#left + 1] = c end
-        end
-        -- one value back (what the sandbox returns): { added, lost = the item the rebuild lost }
-        local r = INSPECT.gameCalls(function(call)
-            if call(SYM.UnitAddItem, { u.addr, pack({ id = a.item, uses = a.uses }) }) == 0 then return { added = false } end
-            call(SYM.ClearSupplyItems, {})
-            for _, c in ipairs(left) do
-                -- AddItemToConvoy's -1: no empty slot, which a convoy just emptied always has
-                if call(SYM.AddItemToConvoy, { pack(c) }) == 0xFFFFFFFF then
-                    return { added = true, lost = c }
-                end
-            end
-            return { added = true }
-        end, true)
-        if not r.added then return nil, "the bag is full" end
-        local lost = r.lost
-        -- unreachable while a just-emptied convoy has room; if it fires, the item is already in the
-        -- bag and the convoy part refilled, so the error stops the campaign rather than play on
-        if lost then
-            return nil, moved(string.format("the convoy refused item 0x%X back", lost.id), u.addr,
-                              bagWas, convoyWas)
-        end
-        -- both sides: a copy into the bag that left the convoy's own in place would pass the
-        -- bag's count alone, and a convoy holding anything but the items left fails too
-        if count(BOARD.items(u.addr), a.item, a.uses) ~= count(bagWas, a.item, a.uses) + 1
-                or not sameItems(INSPECT.convoyItems(), left) then
-            return nil, moved("the item did not move from the convoy to the bag", u.addr, bagWas, convoyWas)
-        end
-        log(string.format("supply: 0x%02X takes item 0x%X (%s)", a.unit, a.item, a.why or ""))
-        return true
-    end
+    api.give, api.take = INSPECT.giveToConvoy, INSPECT.takeFromConvoy
 
     -- Use a seal or a booster as the player does: the unit's Item command, the item's row, Use.
     -- A branched promotion takes the first class the game's menu offers, and every prompt after

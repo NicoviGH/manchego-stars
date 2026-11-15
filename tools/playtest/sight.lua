@@ -2447,6 +2447,18 @@ function M.new(outer)
         return out
     end
 
+    -- The convoy's first item that would let `u` open a door (opensWith, the game's own key
+    -- check), { id, uses }; nil when its bag has no room for it or the convoy holds none, or
+    -- when the convoy is not the game's (Board.convoyFault). What the Supply command's Take
+    -- would hand it (prep_itemsupply.c: Take refuses a full bag).
+    function s.convoyKey(u)
+        if #(u.items or {}) >= Board.ITEM_COUNT or Board.convoyFault(mem, S) then return nil end
+        for _, c in ipairs(Board.convoyItems(mem, S)) do
+            if opensWith(u, c.id, M.TERRAIN_DOOR) then return { id = c.id, uses = c.uses } end
+        end
+        return nil
+    end
+
     function s.locked(u, x, y)
         local t = s.terrain(x, y)
         if (t == M.TERRAIN_DOOR or t == M.TERRAIN_CHEST_FULL) and not s.opens(u, t) then return t end
@@ -2537,7 +2549,7 @@ function M.new(outer)
     local MENU_CHECK = { talk = "TalkCommandUsability", door = "DoorCommandUsability",
                          visit = "VisitCommandUsability", chest = "ChestCommandUsability",
                          seize = "UnitActionMenu_CanSeize", rescue = "RescueUsability",
-                         drop = "DropUsability" }
+                         drop = "DropUsability", supply = "SupplyUsability" }
 
     -- whether the last target list built holds unit `id`, or the tile `at` with uid `uid` (a
     -- wall's is 0, a door's TERRAIN_DOOR: TryAddClosedDoorToTargetList)
@@ -2669,6 +2681,8 @@ function M.new(outer)
             elseif a.act == "item" then
                 local it = u.items[a.slot + 1]
                 return it ~= nil and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0
+            elseif a.act == "supply" then
+                return menuOffers(call, "supply") and s.convoyKey(u) ~= nil
             elseif a.act == "drop" then
                 return call(S[MENU_CHECK.drop], { 0, 0 }) == M.MENU_ENABLED
                     and listed(call, nil, a.dropAt)   -- a drop tile's uid is 0 (TryAddToDropTargetList)

@@ -1649,12 +1649,13 @@ function M.run(api)
                     explore.visited(action, turn)
                 end
                 if not trapped and (action.act == "visit" or action.act == "chest"
-                        or action.act == "talk" or action.act == "rescue" or action.act == "drop") then
+                        or action.act == "talk" or action.act == "rescue" or action.act == "drop"
+                        or action.act == "supply") then
                     progressed = true
                 end
                 if not trapped then
                     if action.act == "visit" or action.act == "chest" or action.act == "talk"
-                        or action.act == "door" or action.act == "seize" then
+                        or action.act == "door" or action.act == "seize" or action.act == "supply" then
                         markEvent(action.act)
                     elseif action.act == "attack" and action.obstacle
                         and action.obstacle.blow and action.obstacle.blow.dealt
