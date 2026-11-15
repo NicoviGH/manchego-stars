@@ -8,6 +8,10 @@ issues: [510]
 
 # The convoy gives back: weapons before the shop, seals and boosters after it
 
+**Amended by ADR 0418 (2026-11-15).** A booster is now an item the game's Use routes to
+`CanUnitUseStatGainItem` (its `use`), no longer any item with stat bonuses; the promotion check
+is asked only of a seal.
+
 **Amended by ADR 0416 (Nicolas, 2026-11-15).** Rule 1 below is widened: every roster unit, benched too, gives what it cannot use this chapter, whether or not another unit can use it today. "The record" below is now a chapter line's `prep`, one entry an attempt, filed on each attempt's BOTRUN record as `supply` and `buys`.
 
 The bot sent seals, boosters and spare weapons to the convoy (the party's shared storage) and

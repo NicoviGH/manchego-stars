@@ -3829,9 +3829,9 @@ INSPECT.unitItemFacts = function(call, unitAddr, item, rosterRead)
     -- stats (CanUnitUseStatGainItem says no at a stat's cap). Bot.supply and Bot.fullBag weigh
     -- them. Each check is asked only of the items the game's own Use routes to it (`use`,
     -- K.USE; the prep screen's Use sends a booster to CanUnitUseStatGainItem):
-    -- CanUnitUsePromotionItem walks a NULL class list for any other item a lord holds
-    -- (bmitemuse.c: Eirika's and Ephraim's branch sets a list only for the two braces), so it
-    -- read Ephraim's Elixir as a seal (lap3p, vanilla Ch13 on his route, ADR 0418).
+    -- CanUnitUsePromotionItem's last class-list walk is unguarded (bmitemuse.c), so for any
+    -- other item a unit at level 10 or higher walks a NULL list: it read Ephraim's Elixir as a
+    -- seal (lap3p, vanilla Ch13 on his route, ADR 0418).
     f.promotes = f.use == "seal" and call(SYM.CanUnitUsePromotionItem, { unitAddr, value }) ~= 0
         or nil
     f.gains = f.use == "booster" and call(SYM.CanUnitUseItemPrepScreen, { unitAddr, value }) ~= 0
