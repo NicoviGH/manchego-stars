@@ -9,64 +9,45 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, late night; main at the HANDOFF commit after 8ac07d63): rerun both laps from the prologue in parallel, now that the step aside is in** (`montecarlo.py resume --game vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`). Nothing is in flight; no open PR; the tree is clean.
+**Next session starts here (2026-11-16, early morning; main at this HANDOFF commit, 4f0f2fea's code). Six open PRs from the overnight laps wait on Nicolas.** Read #510 comments 6906859807 (the second-phase read) and 6914401766 (the overnight laps) first.
 
-- **PR #630 merged** (8ac07d63, ADR 0422; Nicolas: "Yes" to merge on clean review + CI). The
-  `lap3e/9` jam is found and fixed (#510 comment 6905221090):
-  - **Cause (confirmed, run `jam1`):** the door at (20,7) opens only from (20,8); Joshua (charId
-    0x20, no key) held it, and his only other tiles were Garcia's and Ross's, whose only other
-    tiles were each other's or his. A loop no order of moves breaks.
-  - **The rule:** a unit whose tile a teammate's offered act asks for (`vacate`) is offered a
-    wait on its safest free tile (`aside`, `bot.lua` `propose`/`aside`); the planner's menu
-    always keeps it. An offer, not a weight.
-  - **Results, attempt 1:** `lap3e/9` stuck → won turn 24, no death (`aside1`). The Ch7 Seize
-    pocket `fwd1-cs-s4005/8` stuck → won clean turn 12 (`aside7`), so **the Seize-map weight
-    recommendation is withdrawn**. 14 suite runs: deaths 8 → 8, wins 10 → 12, clean clears
-    2 → 4 (vanilla Ch3 stuck → won clean, both seeds). Same-act runs cost level.
-  - Review: `/code-review 630 medium` (6 findings, 1 half-refuted with evidence) and one scoped
-    re-review (1 comment nit), all fixed.
-- **The open lead: the over-cap door on `lap3e/9`.** Turns 7-9 play `fallback_sacrifice`
-  plans: every finalist reads over the cap. Turn 8's 0.73 (Colm, charId 9) and 0.52 (Kyle,
-  0x11) are the lookahead's SECOND phase (`second`; `trigger: breach`), read with our units
-  holding still; the next phase read 0 for both, and both lived (Colm 19 → 5 HP). No healer
-  was fielded (`sustain` uncovered). Untested: whether the second phase's "everyone holds"
-  is what overstates it (ADR 0421's "a unit that could simply walk away").
-  **Recommended first, not yet agreed by Nicolas:** a calibration read over the kept traces
-  (`montecarlo.py calibration`: judged second phases against the played ones) before the laps.
-  Nicolas asked the next instance to check, before any change:
-  - **First:** whether `calibration` scores the lookahead's second phase (`second`) at all, or
-    only the next phase. If not, extend it, still from saved traces only (no runs).
-  - Then whether the second-phase reads run above what the game played. That would confirm
-    or refute "everyone holds still" as the model error behind the over-limit plays (Ch8
-    turn 8: Colm next phase 0, second phase 0.73; `lap3e/5` turn 6 at 0.82; `scout-ch14`).
-  - Only then pick between fixing the read and the full-lap reruns.
-- **The Seize-map jam** is closed by PR #630 (above); `feat/510-own-march` stays unshipped.
-- **Also found, not fixed:**
-  - `story` calls every generic enemy "the Knight" (a Mercenary, class 0x0F; a Cavalier,
-    0x05). The Ch7 "the Archer" note below is the same bug.
-  - Rejected plans record only `max_die`, never the unit or the way behind it. The `lap3e/9`
-    read needed a temporary log to name Forde.
-  - On main, a fallback at a pessimistic two-phase read decides games: `lap3e/5` turn 6 opens a
-    door at 0.82, `lap3e/9` turn 3 at 0.73.
-  - In `scout-ch14`, Colm (charId 9) dies on turn 7 at 24.5% under a labelled fallback, with and
-    without the wear.
-  - `scout-ch6` (both seeds) loses on turn 2 on main: Eirika (charId 0x01) dies at a 0% read
-    (`zero_multi_attacker`).
-- **Slow pre-commit** (Nicolas asked): untested whether the tests alone are slow. Time
-  `python3 tools/run_tests.py` on a quiet machine against run_tests.py's 199 s. The self-hosted
-  CI runner shares this machine, so check that it is idle first.
-- **Open call for Nicolas:** whether verdicts should leave out `stale` runs.
-- **Kept states:** `lap3e-`, `lap3p-`, `rider1-`, `advp1-`, `door1-4-`, `supw1/2-` and
-  `look1-3-`/`look1v-3v-` are stale under ADR 0417 and never a proof base. The wear's probe
-  saves (`wear`, `wr`, `mb`, `wn`, `wtwo`, `wg`, `wf`, `wz`, `wy`, `wd`) are deleted; their
-  traces and records are kept. The `colm-ch9` patches and map scripts stay in
-  `~/Projects/manchego-stars-assets/probes/colm-ch9/`.
-  This session's tags `jam1`, `aside1`, `aside1r`, `aside7`, `aside7r`, `aside7ctl` (and the
-  suite runs of instruments `5441b0b472f4` / `5958bfa4c3f8`) are probes, never a proof base.
-- **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
-  subagents, design to a Fable subagent. Brief every subagent to SETTLE its questions, not to
-  label them "untested": a subagent's open item is the lead's to close before reporting. The
-  frozen suite is never run for a PR.
+- **Open PRs**, all #510. Each was reviewed by a fresh subagent and every finding fixed. CI:
+  #631 and #632 green; check #633-#636 before any merge.
+  - **The stack, each based on the one before:** #631 (a staff is a heal only if `DoItemUse`
+    heals one ally with it) → #632 (a scene's yes/no between chapters takes its highlighted
+    answer, logged) → #633 (an act is done only once the map is idle past Canto) → #634 (the
+    heal swap's act names the ally on its tile) → #635 (a full bag between chapters is answered
+    by the bot's chooser). A stack lands with `--merge`, each child retargeted to main before
+    its parent's branch is deleted.
+  - **#636** (from main, independent): `calibration`'s third table, the lookahead's second phase
+    against the phase played.
+  - **Merge permission:** memory says #510 step 9 PRs may merge after review + CI, but these
+    were left for Nicolas to say.
+- **The second phase (Nicolas's questions, answered):** `calibration` did not score it (#636 adds
+  it). It reads far above the game: second > 50% → 71.5% predicted, 3.0% died (436
+  unit-phases); even units that held their tile died at 13.3%. In 779 of 1,875 fallback plays,
+  every unit's next-phase read was under the cap and only the second phase put the plan over.
+  **Recommendation, Nicolas's call (it changes what the lookahead means):** the second phase
+  counts only the threat the army cannot answer: each unit on its safest free tile, the enemies
+  our units can kill that turn removed first. Cheaper alternative: the second phase ranks
+  finalists but never puts a plan over the cap.
+- **Where the laps stopped** (states in the vanilla store):
+  - Eirika: `bag1-heal4-heal1-lap4e-cs-s4006`, **E_20 attempt 1 crashes on turn 24**: Saleh
+    (charId 0x17) planned Physic on himself at 29 HP, and the game's list left him out (the
+    healer is listed only when wounded). The sight read him as wounded, the game at full HP.
+    Unsettled. **Next step:** one instrumented replay of that decision (deterministic: attempt
+    1 from `bag1…/20`), logging `GetUnitMaxHp` and the heals' targets.
+  - Ephraim: `lap4p-cs-s4006`, **I_14 (Seize, Vigarde charId 0x6B on the throne): no clear in
+    12 attempts.** A strength wall, not a missing plan: `feat/510-throne-assault` (unshipped)
+    builds the assault on the throne's holder, and every assault reads a unit dying at about
+    99%. Same 12 games move for move.
+- **Found, not fixed:** E_19's losses are mostly its green civilians (charId 0xCD, 7 to 18
+  deaths an attempt). The second-phase over-read above. Kept from before: `story` names every
+  generic enemy "the Knight"; rejected plans record only `max_die`; `scout-ch6` turn 2 at a 0%
+  read; Colm in `scout-ch14`.
+- **Kept states:** this night's tags (`lap4e`, `lap4p`, `heal1`-`heal4`, `canto1`, `vac1`,
+  `bag1`, `throne1`) are probes on branch code, never a proof base. Open from before: slow
+  pre-commit timing; whether verdicts should leave out `stale` runs (Nicolas's call).
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
 - A simulated enemy phase and a single strike now start as the game's phase does
