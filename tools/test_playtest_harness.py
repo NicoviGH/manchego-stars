@@ -161,6 +161,20 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertIn('STALL_CEILING', body, 'the wait must still terminate on its own')
         self.assertIn('fail:state-timeout', body)
 
+    def test_a_scene_prompt_between_chapters_is_answered_and_logged(self):
+        # The Eirika lap from vanilla's prologue (2026-11-15) crashed after E_16: the scene at
+        # chapter index 71 asks a yes/no question no pick came before, and the arrival loop
+        # answered only a pick's confirmation. The prompt takes its highlighted answer, and
+        # the message it showed is logged, so the choice is on the record.
+        body = _block(_read_harness(), 'local stalled = INSPECT.watch("arrive")',
+                      'unsupported state between chapters')
+        pick = body.index('elseif state == "yes_no_choice" and menuPicked ~= nil then')
+        scene = body.index('elseif state == "yes_no_choice" then', pick)
+        tail = body[scene:]
+        self.assertIn('INSPECT.activeMsg()', tail[:tail.index('guardedInput')])
+        self.assertIn('INSPECT.msgLine()', tail[:tail.index('guardedInput')])
+        self.assertIn('"answer_default", "A"', tail)
+
     def test_the_win_fired_by_the_last_kill_leaves_no_turn_to_end(self):
         # #335. A clear-bot that kills the final enemy can fire the DefeatAll win right there,
         # and the ending then plays INSIDE the old chapter slot -- so `chapter() ~= start` is

@@ -1903,6 +1903,17 @@ end
 -- locked box 8 wraps in two; its substitute is two authored boxes). Read it during a dialogue
 -- wait -- unit names and menus decode through the same function and overwrite it.
 INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
+-- The active message's first line as GetStringFromIndex decoded it into sMsgString: its bytes up
+-- to the first control code (below 0x20), at most 64. Read it while the box is up, as activeMsg.
+INSPECT.msgLine = function()
+    local line, at = {}, SYM.sMsgString
+    while #line < 64 do
+        local b = ru8(at + #line)
+        if b < 0x20 then break end
+        line[#line + 1] = string.char(b)
+    end
+    return table.concat(line)
+end
 
 -- struct ProcCmd (include/proc.h): opcode, dataImm, dataPtr at +04 -- 8 bytes a command
 INSPECT.PROC_CMD_SIZE = 8
@@ -4329,6 +4340,18 @@ INSPECT.campaignApi = function(game)
                     return nil, "the pick's prompt refused Yes"
                 end
                 menuPicked = nil
+            elseif state == "yes_no_choice" then
+                -- a story scene's own question, no pick before it (vanilla: the scene at chapter
+                -- index 71 after E_16, campaign 4006's Eirika lap, 2026-11-15). The highlighted
+                -- answer is taken, as every prompt here is (the lead's, the shop's, an item's),
+                -- and the message and its first line are logged, so the choice is on the record
+                log(string.format("campaign: chapter %s's prompt 0x%X \"%s\" takes %s",
+                    tostring(ch), INSPECT.activeMsg(), INSPECT.msgLine(),
+                    tostring(obs.choice and obs.choice.current)))
+                if not guardedInput("answer_default", "A", "the scene's prompt takes its answer",
+                        function(after) return controllerState(after) ~= "yes_no_choice" end, 120) then
+                    return nil, "a scene's prompt refused its answer"
+                end
             elseif state ~= "player_map_idle" then
                 local advanced = advanceBootState(obs, state)
                 if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
@@ -6061,14 +6084,7 @@ INSPECT.helpAt = function(x, y, want)
     else
         guardedInput("help_left", "LEFT", "help moves onto the name",
             function() return INSPECT.activeMsg() == want end, 120)
-        local msg = INSPECT.activeMsg()
-        local line, at = {}, SYM.sMsgString
-        while #line < 64 do
-            local b = ru8(at + #line)
-            if b < 0x20 then break end
-            line[#line + 1] = string.char(b)
-        end
-        why = {msg = msg, line1 = table.concat(line)}
+        why = {msg = INSPECT.activeMsg(), line1 = INSPECT.msgLine()}
     end
     if now() == "stat_screen_help" then
         guardedInput("close_help", "B", "the help box closes",
