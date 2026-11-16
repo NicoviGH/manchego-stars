@@ -31,6 +31,8 @@ and start a fresh instance; don't rely on auto-compaction.
   holding still; the next phase read 0 for both, and both lived (Colm 19 → 5 HP). No healer
   was fielded (`sustain` uncovered). Untested: whether the second phase's "everyone holds"
   is what overstates it (ADR 0421's "a unit that could simply walk away").
+  **Recommended first, not yet agreed by Nicolas:** a calibration read over the kept traces
+  (`montecarlo.py calibration`: judged second phases against the played ones) before the laps.
 - **The Seize-map jam** is closed by PR #630 (above); `feat/510-own-march` stays unshipped.
 - **Also found, not fixed:**
   - `story` calls every generic enemy "the Knight" (a Mercenary, class 0x0F; a Cavalier,
