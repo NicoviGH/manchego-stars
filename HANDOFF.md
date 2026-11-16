@@ -33,6 +33,13 @@ and start a fresh instance; don't rely on auto-compaction.
   is what overstates it (ADR 0421's "a unit that could simply walk away").
   **Recommended first, not yet agreed by Nicolas:** a calibration read over the kept traces
   (`montecarlo.py calibration`: judged second phases against the played ones) before the laps.
+  Nicolas asked the next instance to check, before any change:
+  - **First:** whether `calibration` scores the lookahead's second phase (`second`) at all, or
+    only the next phase. If not, extend it, still from saved traces only (no runs).
+  - Then whether the second-phase reads run above what the game played. That would confirm
+    or refute "everyone holds still" as the model error behind the over-limit plays (Ch8
+    turn 8: Colm next phase 0, second phase 0.73; `lap3e/5` turn 6 at 0.82; `scout-ch14`).
+  - Only then pick between fixing the read and the full-lap reruns.
 - **The Seize-map jam** is closed by PR #630 (above); `feat/510-own-march` stays unshipped.
 - **Also found, not fixed:**
   - `story` calls every generic enemy "the Knight" (a Mercenary, class 0x0F; a Cavalier,
