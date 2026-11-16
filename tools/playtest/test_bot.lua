@@ -2224,6 +2224,66 @@ do
     check(where[0x01], "0,2", "holds: A holds on its next safe tile, not the exposed one")
 end
 
+-- test_a_unit_on_the_tile_a_teammate_needs_is_offered_a_free_one: the door at (2,0) opens
+-- only from (1,0), where J, who holds no key, stands. J's other tiles are C's and D's, whose
+-- own only other tile is J's: a loop no order of moves breaks, and J's free tile (0,2) comes
+-- after its holds. J is offered that free tile because K's Door asks J's tile, so the plan
+-- moves J off and K opens the door. Vanilla Ch8 (lap3e, seed 4006): Joshua held the one tile
+-- beside the door for 17 turns, Garcia and Ross on the two tiles he was offered.
+do
+    local K = blue(0x01, 0, 0, 1)
+    local J = blue(0x02, 1, 1, 0)
+    local C = blue(0x03, 2, 0, 0)
+    local D = blue(0x04, 3, 1, 1)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 1 }, { 1, 0 }),
+                  [0x02] = tiles({ 1, 0 }, { 0, 0 }, { 1, 1 }, { 0, 2 }),
+                  [0x03] = tiles({ 0, 0 }, { 1, 0 }), [0x04] = tiles({ 1, 1 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["4,0"] = 2, ["0,1"] = 3, ["1,1"] = 2, ["0,2"] = 4 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+    }
+    local _, plan = Planner.plan(B, boardOf(K, J, C, D, E), sightOf(o), style("careful"))
+    local order = {}
+    for _, a in ipairs(plan and plan.acts or {}) do
+        order[#order + 1] = a.unitId .. ">" .. a.act .. "@" .. at(a)
+    end
+    order = table.concat(order, " ")
+    local aside, door = order:find("2>wait@0,2", 1, true), order:find("1>door@1,0", 1, true)
+    check(aside ~= nil and door ~= nil and aside < door, true,
+          "aside: J steps to its free tile, then K opens the door (" .. order .. ")")
+
+    -- J's offered asides (Bot.candidates), on the same board with `edit` applied to it
+    local function asidesOf(edit, st)
+        local p = { reach = {}, field = o.field, objective = o.objective, obstacles = {},
+                    doors = o.doors, openers = o.openers }
+        for id, r in pairs(o.reach) do p.reach[id] = r end
+        if edit then edit(p) end
+        local cands = B.candidates(boardOf(K, J, C, D, E), sightOf(p), st or style("careful"))
+        local out = {}
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
+                if a.why == "aside" then out[#out + 1] = at(a) end
+            end
+        end
+        return table.concat(out, " ")
+    end
+    check(asidesOf(), "0,2", "aside: J is offered its one free tile, once")
+    local benched = style("careful")
+    benched.bench = { J.charId }
+    check(asidesOf(nil, benched), "", "aside: none for a benched unit")
+    check(asidesOf(function(p) p.reach[0x02] = tiles({ 1, 0 }, { 0, 2 }, { 0, 0 }, { 1, 1 }) end),
+          "", "aside: none when the free tile is already one of J's waits")
+    check(asidesOf(function(p) p.reach[0x02] = tiles({ 1, 0 }, { 0, 0 }, { 1, 1 }) end), "",
+          "aside: none when J has no free tile")
+    check(asidesOf(function(p)
+        p.reach[0x01], p.reach[0x03], p.reach[0x04] = tiles({ 0, 1 }), tiles({ 0, 0 }), tiles({ 1, 1 })
+    end), "", "aside: none when no teammate's act asks for J's tile")
+end
+
 -- test_a_visited_tile_is_not_offered_again: a House (eventinfo House(0, ...), flag 0) keeps
 -- its Visit for good, so the game offers it every turn. Once we have visited it, it is no one's
 -- goal and no Visit is proposed there: vanilla Ch1's two houses held Seth and Eirika on them
