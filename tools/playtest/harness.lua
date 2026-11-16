@@ -4295,6 +4295,11 @@ INSPECT.campaignApi = function(game)
             if not (obs.procs.yes_no or obs.procs.talk_choice) then
                 local msg = INSPECT.activeMsg()
                 if not asked[1] or asked[1].msg ~= msg then
+                    -- each message once, newest first: one decoding again (a name, a label)
+                    -- moves to the front rather than pushing the question out
+                    for i = #asked, 1, -1 do
+                        if asked[i].msg == msg then table.remove(asked, i) end
+                    end
                     table.insert(asked, 1, { msg = msg, line = INSPECT.msgLine() })
                     asked[4] = nil
                 end
