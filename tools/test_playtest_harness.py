@@ -171,9 +171,12 @@ class TestAwaitControllerState(unittest.TestCase):
         pick = body.index('elseif state == "yes_no_choice" and menuPicked ~= nil then')
         scene = body.index('elseif state == "yes_no_choice" then', pick)
         tail = body[scene:]
-        self.assertIn('INSPECT.activeMsg()', tail[:tail.index('guardedInput')])
-        self.assertIn('INSPECT.msgLine()', tail[:tail.index('guardedInput')])
-        self.assertIn('"answer_default", "A"', tail)
+        # the question's box, read while it was up: the prompt's labels own sActiveMsg after
+        self.assertIn('asked = { msg = INSPECT.activeMsg(), line = INSPECT.msgLine() }',
+                      body[:pick])
+        self.assertIn('asked and asked.msg', tail[:tail.index('guardedInput')])
+        # the controller's own name for the highlighted answer (a bare A is an illegal input)
+        self.assertIn('guardedInput("answer_" .. current, "A"', tail)
 
     def test_the_win_fired_by_the_last_kill_leaves_no_turn_to_end(self):
         # #335. A clear-bot that kills the final enemy can fire the DefeatAll win right there,

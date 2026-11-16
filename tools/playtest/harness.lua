@@ -4283,10 +4283,16 @@ INSPECT.campaignApi = function(game)
                      carriedUnknown = saved.carried == nil, bots = saved.bots }
         end
         local stalled = INSPECT.watch("arrive")
+        -- the last dialogue box shown, its message id and first line: a scene's prompt is asked
+        -- under it, and once the prompt is up its Yes/No labels own sActiveMsg
+        local asked
         for _ = 1, TUNE.bootSteps do
             if TUNE.bootHook then TUNE.bootHook() end
             local obs = observeController()
             local state, why = controllerState(obs)
+            if state == "dialogue_wait" then
+                asked = { msg = INSPECT.activeMsg(), line = INSPECT.msgLine() }
+            end
             if stalled(obs, state) then
                 return nil, "parked on an unclassified wait (see the inspect snapshot)"
             end
@@ -4344,11 +4350,11 @@ INSPECT.campaignApi = function(game)
                 -- a story scene's own question, no pick before it (vanilla: the scene at chapter
                 -- index 71 after E_16, campaign 4006's Eirika lap, 2026-11-15). The highlighted
                 -- answer is taken, as every prompt here is (the lead's, the shop's, an item's),
-                -- and the message and its first line are logged, so the choice is on the record
-                log(string.format("campaign: chapter %s's prompt 0x%X \"%s\" takes %s",
-                    tostring(ch), INSPECT.activeMsg(), INSPECT.msgLine(),
-                    tostring(obs.choice and obs.choice.current)))
-                if not guardedInput("answer_default", "A", "the scene's prompt takes its answer",
+                -- and the box it was asked under is logged, so the choice is on the record
+                local current = obs.choice and obs.choice.current or "yes"
+                log(string.format("campaign: chapter %s's prompt under message 0x%X \"%s\" takes %s",
+                    tostring(ch), asked and asked.msg or 0, asked and asked.line or "", current))
+                if not guardedInput("answer_" .. current, "A", "the scene's prompt takes its answer",
                         function(after) return controllerState(after) ~= "yes_no_choice" end, 120) then
                     return nil, "a scene's prompt refused its answer"
                 end
