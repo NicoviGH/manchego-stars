@@ -1693,12 +1693,10 @@ function M.new(outer)
     end
     function s.mov(u) return movOf(u) end
     -- the api's, for the goals: cost / UNIT_MOV NOT rounded (every step toward a goal counts;
-    -- goals.lua rounds up where the real arrival matters), from `from` (default: where u stands).
-    -- nil for a `from` off the map too (the planner's healsNext asks every tile in a reach)
+    -- goals.lua rounds up where the real arrival matters), from `from` (default: where u stands)
     function s.turnsTo(u, tile, from)
         from = from or u
-        local row = costGrid(u, tile)[from.y]
-        local cost = row and row[from.x]
+        local cost = costGrid(u, tile)[from.y][from.x]
         if not cost then return nil end
         return cost / movOf(u)
     end

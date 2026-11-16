@@ -7009,7 +7009,7 @@ do
     check(at(Planner.plan(B, board, sight, st)), "0,0", "wear: a staff two turns off is no heal in reach")
 
     -- a staff's own reach (#629 review): from (8,0) on MOV 5 the healer gets to (3,0), two
-    -- tiles from A on (1,0). A reach of 1 is no heal next turn; a reach of 3 (Physic's Mag/2) is
+    -- tiles from A on (1,0). A reach of 1 is no heal next turn; a staff reach of 3 is
     H = blue(0x02, 1, 8, 0, { minRange = false })
     local function physic(range)
         return wears(27, { staves = { [0x02] = { { slot = 0, amount = 10, range = range } } },
@@ -7018,6 +7018,20 @@ do
     end
     check(at(Planner.plan(B, physic(1))), "0,0", "wear: a reach of 1, seven tiles off, no heal")
     check(at(Planner.plan(B, physic(3))), "1,0", "wear: a reach of 3 heals from two tiles off")
+
+    -- the healer's move is read out from its own tile (#629 re-review): the costs out from (8,0)
+    -- reach (2,0) in one turn, the costs back from (2,0) would take three. The march goes
+    H = blue(0x02, 1, 8, 0, { minRange = false })
+    board, sight, st = wears(27, {
+        staves = { [0x02] = { { slot = 0, amount = 10, range = 1 } } },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 8, 0 }) },
+        field = function(t)
+            if t.x == 8 and t.y == 0 then return { [0] = { [2] = 5 } } end   -- out from the healer
+            if t.x == 2 and t.y == 0 then return { [0] = { [8] = 15 } } end   -- back from (2,0)
+            if t.x == 9 and t.y == 0 then return { [0] = { [0] = 40, [1] = 20 } } end
+            return nil
+        end }, H)
+    check(at(Planner.plan(B, board, sight, st)), "1,0", "wear: the healer's own way out, one turn")
 
     -- its own budget spent (the attempt's left, opts.budget.wear): the plan keeps the one-phase
     -- reading, the march goes, and every plan left unread is counted for botrun's wear_budget
@@ -7062,6 +7076,27 @@ do
     end
     check(march and march.rank.first_game_over, 0, "wear: the next phase ends no game")
     check(march and march.rank.game_over, 1, "wear: the third blow ends it")
+
+    -- the next phase already may end it (#629 re-review): a 30 blow in 3 ways of 10 kills A
+    -- there, a 12 in the rest wears it to death by the third. The game over is the lord's whole
+    -- death, the later one taken given it lived (unconditioned it read 1 - 0.7 x 0.3 = 0.79)
+    local function heavy(plan)
+        local blow = strikes12(plan)
+        if #blow == 0 then return {} end
+        local big = {}
+        for k, v in pairs(blow[1]) do big[k] = v end
+        big.takenDmg = 30
+        return { outcomes = { { p = 0.3, strikes = { big } }, { p = 0.7, strikes = blow } } }
+    end
+    board, sight, st = wears(27, { enemyPhase = heavy,
+                                   objective = { kind = "rout", gameOver = { 0x01 } } })
+    a, plan = Planner.plan(B, board, sight, st)
+    for _, c in ipairs(plan.considered) do
+        if c.acts[1] == "1>wait@1,0>nil" then march = c end
+    end
+    check(march and math.abs(march.rank.first_game_over - 0.3) < 1e-9, true, "wear: the next phase's 0.3")
+    check(march and math.abs(march.rank.game_over - march.rank.max_die) < 1e-9, true,
+          "wear: the game over is the lord's whole death")
 
     -- the lookahead on a worn plan (#629 review): it reuses the wear's second phase, no second
     -- call, and the worn unit's death stays the wear's reading of it

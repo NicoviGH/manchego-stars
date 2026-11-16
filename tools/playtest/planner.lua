@@ -96,7 +96,8 @@
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
--- lookahead's second phase's chance, when extended; `die` then counts both), wear (what the
+-- lookahead's second phase's chance, when extended; `die` then counts both, but for a unit the
+-- wear read, whose `die` is the wear's reading of the later phases alone), wear (what the
 -- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
 -- read: ADR 0421, M.WEAR; `die` counts it) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep, wear (the wear's
@@ -1157,9 +1158,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- (M.outranks), which the lookahead's call overwrites.
     -- Whether healer `q` (a plan's entry: unit, x, y), from where the plan leaves it, can stand
     -- within one of its staves' reach of `p`'s tile next turn: a tile 1 to that reach away
-    -- (Manhattan, as the game's staff range) its own MOV gets it to. sight.turnsTo from its
-    -- tile (GenerateExtendedMovementMap: the costs out from it, units not blocking, as for the
-    -- AI). Memoised for the decision per healer, its tile and the tile healed.
+    -- (Manhattan, as the game's staff range), on the map, that its own MOV gets it to.
+    -- sight.turnsTo with the healer's tile as its `tile` (GenerateExtendedMovementMap: the costs
+    -- out from it, units not blocking, as for the AI), read at each tile. Memoised for the
+    -- decision per healer, its tile and the tile healed.
     local healReach = {}
     local function healsNext(q, p)
         local k = q.unit.id .. "@" .. q.x .. "," .. q.y .. ">" .. p.x .. "," .. p.y
@@ -1168,12 +1170,14 @@ function M.plan(Bot, board, sight, style, opts)
             for _, sv in ipairs(sight.staves and sight.staves(q.unit) or {}) do
                 r = math.max(r, sv.range or 1)
             end
-            local from = { x = q.x, y = q.y }
+            local healer, map = { x = q.x, y = q.y }, board.map
             for dx = -r, r do
                 local span = r - math.abs(dx)
                 for dy = -span, span do
-                    if not ok and (dx ~= 0 or dy ~= 0) then
-                        local t = sight.turnsTo(q.unit, from, { x = p.x + dx, y = p.y + dy })
+                    local x, y = p.x + dx, p.y + dy
+                    if not ok and (dx ~= 0 or dy ~= 0) and x >= 0 and y >= 0
+                        and x < map.w and y < map.h then
+                        local t = sight.turnsTo(q.unit, healer, { x = x, y = y })
                         ok = t ~= nil and t <= 1 + M.DUST
                     end
                 end
@@ -1891,7 +1895,13 @@ function M.plan(Bot, board, sight, style, opts)
             if more > M.DUST then
                 pr.wear, pr.phases = more, st.wearFor[pr.id]
                 pr.die, any = math.min(1, pr.die + more), true
-                if gameOver[pr.charId] then lives = lives * (1 - more) end
+                -- `more` is the chance it lives through the next phase and dies after; the game
+                -- over already holds the next phase's, so it takes the later death given that
+                -- one lived (#629 re-review: unconditioned, a lord's game over read below its death)
+                local lived = 1 - (one[pr.id] or 0)
+                if gameOver[pr.charId] then
+                    lives = lives * (lived > M.DUST and math.max(0, 1 - more / lived) or 1)
+                end
             end
         end
         st.rank.game_over = 1 - (1 - st.rank.game_over) * lives
@@ -1906,6 +1916,7 @@ function M.plan(Bot, board, sight, style, opts)
         local before, phases = screen(st), cost.phases
         judge(st)
         wear(st)
+        st.outcomes, st.hitOf = nil, nil   -- the wear's alone: not kept on every judged plan
         st.kind = kind
         before.phases = cost.phases - phases   -- the enemy phases this plan's judge played
         local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
