@@ -54,7 +54,8 @@ read on `M.WEAR` = 3 enemy phases, its HP carried from each phase into the next:
 **Changed after the evidence (PR #629's review).** The 31 games below ran on the prototype
 (3ffc387a), which read the next phase off its likeliest way's strikes only, left the game over
 out, took every staff for a reach of 1 and a staff its holder cannot use for a self-heal. The
-fixed rule's re-run is in the PR.
+fixed rule (35bf830f) was re-run on the 17 starts and the 14 suite runs: see "The fixed rule,
+re-run" below.
 
 **Why three.** Three is the least that reads the witness: 27 HP outlives two hits of 12. Two
 phases (`wg2x23`) lose Colm on turn 17 as main does. Three cost `lap3e/9` nine turns, and the
@@ -90,6 +91,27 @@ witness, not a verdict).**
   - The 12 starts with main's acts: CPU +2.9%.
   - The 14 suite runs: CPU 591.8 → 600.7 s (+1.5%), the lookahead's calls unchanged, 123 wear
     calls.
+
+**The fixed rule, re-run (35bf830f, tags `wy<ch>`; suite instrument `5958bfa4c3f8`).**
+- **It plays the prototype's acts in 30 of the 31 games.** The witness is the same: won on turn
+  26, Colm lives. All 14 suite runs play main's acts.
+- **The one change is `lap3e/9`:** stuck after 21 turns. The prototype won it in 18 and main in 9,
+  with no death in any of the three.
+  - The split is turn 3. Read over every way the next phase goes, Forde (charId 0x10), after his
+    attack on enemy 145, dies over three phases at 0.113 (cap 0.05, even). Read off the likeliest
+    way alone, the prototype's reading, he dies at 0. So "advance" is not admitted, and the
+    attack plan is played. Instrumented run `wd9`: the two reach tests agree on every unit, and
+    only the reading over each way differs.
+  - From turn 10 on the wear makes no call, and every plan judged is admitted. The stall is the
+    march: the board repeats 5 times, no Seize is skipped or played, and the turn-9 arrivals never come
+    into sight. Untested: why the march jams there.
+- **Totals against main (17 starts):** blue deaths 14 → 13, clean clears 6 → 7, wins 16 → 15.
+- **Cost against main,** measured with the CI runner building on the same machine, so the CPU is
+  noisy:
+  - The 17 starts: CPU 1020.1 → 1050.3 s (+3.0%), `AiDecideMain` 272,359 → 290,943 (+6.8%),
+    462 wear calls taking 32.6 s.
+  - The 14 suite runs: CPU 591.8 → 597.9 s (+1.0%), lookahead calls 232 → 223 (it reuses the
+    wear's second phase), 123 wear calls taking 4.4 s.
 
 **Also found, not fixed.**
 - A fallback at a pessimistic two-phase read decides games on main: `lap3e/5` turn 6 opens a
