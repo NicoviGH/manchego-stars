@@ -4283,17 +4283,21 @@ INSPECT.campaignApi = function(game)
                      carriedUnknown = saved.carried == nil, bots = saved.bots }
         end
         local stalled = INSPECT.watch("arrive")
-        -- the last message decoded before a prompt opened, its id and first line: a scene's
-        -- question (GetStringFromIndex's sActiveMsg; once the prompt is up its Yes/No labels own
-        -- it). The line is read only when the id changes.
-        local asked
+        -- the last three distinct messages decoded before a prompt opened, ids and first lines:
+        -- a scene's question is among them (GetStringFromIndex's sActiveMsg). Its Yes/No labels
+        -- can decode before the choice proc is seen (E_16's first prompt logged 0x843 "Yes"), so
+        -- one would not do. A line is read only when the id changes.
+        local asked = {}
         for _ = 1, TUNE.bootSteps do
             if TUNE.bootHook then TUNE.bootHook() end
             local obs = observeController()
             local state, why = controllerState(obs)
             if not (obs.procs.yes_no or obs.procs.talk_choice) then
                 local msg = INSPECT.activeMsg()
-                if not asked or asked.msg ~= msg then asked = { msg = msg, line = INSPECT.msgLine() } end
+                if not asked[1] or asked[1].msg ~= msg then
+                    table.insert(asked, 1, { msg = msg, line = INSPECT.msgLine() })
+                    asked[4] = nil
+                end
             end
             if stalled(obs, state) then
                 return nil, "parked on an unclassified wait (see the inspect snapshot)"
@@ -4352,8 +4356,10 @@ INSPECT.campaignApi = function(game)
                 -- answer is taken, as every prompt here is (the lead's, the shop's, an item's),
                 -- and the question it asked is logged, so the choice is on the record
                 local current = obs.choice.current
-                log(string.format("campaign: chapter %s's prompt after message 0x%X \"%s\" takes %s",
-                    tostring(ch), asked and asked.msg or 0, asked and asked.line or "", tostring(current)))
+                local trail = {}
+                for _, m in ipairs(asked) do trail[#trail + 1] = string.format("0x%X \"%s\"", m.msg, m.line) end
+                log(string.format("campaign: chapter %s's prompt (messages before it, newest first: %s) takes %s",
+                    tostring(ch), table.concat(trail, ", "), tostring(current)))
                 if not current then return nil, "a scene's prompt shows no highlighted answer" end
                 if not guardedInput("answer_" .. current, "A", "the scene's prompt takes its answer",
                         INSPECT.promptClosed, 120) then

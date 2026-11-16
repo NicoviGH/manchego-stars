@@ -166,8 +166,8 @@ class TestAwaitControllerState(unittest.TestCase):
         # chapter index 71 asks a yes/no question no pick came before, and the arrival loop
         # answered only a pick's confirmation. The prompt takes its highlighted answer under the
         # controller's own name for it (a bare A is an illegal input), and the question is
-        # logged: the last message decoded before a choice proc opened (its labels own
-        # sActiveMsg after).
+        # logged: the last three messages decoded before a choice proc opened (its labels can
+        # decode first: E_16's first prompt logged 0x843 "Yes").
         body = _block(_read_harness(), 'local stalled = INSPECT.watch("arrive")',
                       'unsupported state between chapters')
         pick = body.index('elseif state == "yes_no_choice" and menuPicked ~= nil then')
@@ -176,7 +176,8 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertRegex(before, r'if not \(obs\.procs\.yes_no or obs\.procs\.talk_choice\) then'
                                  r'[\s\S]*?INSPECT\.activeMsg\(\)[\s\S]*?INSPECT\.msgLine\(\)')
         answer = tail.index('guardedInput')
-        self.assertRegex(tail[:answer], r'asked\s+and\s+asked\.msg')
+        self.assertRegex(before, r'table\.insert\(asked,\s*1,')
+        self.assertRegex(tail[:answer], r'for _, m in ipairs\(asked\)')
         self.assertRegex(tail[:answer], r'if not current then return nil,')
         self.assertRegex(tail, r'guardedInput\(\s*"answer_"\s*\.\.\s*current\s*,\s*"A"')
 
