@@ -400,6 +400,27 @@ do
     check(bytes[at], 23, "keep16: put back when the sandbox returns")
 end
 
+-- test_a_self_heal_is_no_staff (ADR 0421): Sight.selfHeals lists the heals a unit uses on itself.
+-- A Heal staff its holder cannot use (CanUnitUseStaff 0: no rank, silenced) is no such heal, so
+-- the wear does not take it for one; the Vulnerary behind it is.
+do
+    local S = { GetUnitItemHealAmount = 1, CanUnitUseStaff = 2 }
+    local staff, vul = 0x6C, 0x6E
+    local B = { staffRange = function(item) return (item & 0xFF) == staff and 1 or nil end }
+    local function call(fn, args)
+        if fn == S.GetUnitItemHealAmount then return 10 end
+        if fn == S.CanUnitUseStaff then return 0 end
+        error("selfHeals: asked " .. tostring(fn))
+    end
+    local u = { addr = 0x200, items = { { id = staff, uses = 20 }, { id = vul, uses = 3 } } }
+    local got = Sight.selfHeals(B, call, S, u)
+    check(#got, 1, "selfHeals: the staff its holder cannot use is no self-heal")
+    check(got[1] and got[1].slot, 1, "selfHeals: the Vulnerary, slot 1")
+    check(got[1] and got[1].amount, 10, "selfHeals: its amount")
+    u.items = { { id = staff, uses = 20 } }
+    check(#Sight.selfHeals(B, call, S, u), 0, "selfHeals: a staff alone heals its holder never")
+end
+
 -- test_holding_puts_the_bag_back: s.holding lists the unit's items then the ones it is handed
 -- (the first empty slots), and the bag is byte-identical after it, whether fn returns or
 -- errors; a bag with an item past a gap (which the board read would not list) raises.

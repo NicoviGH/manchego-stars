@@ -153,3 +153,8 @@ keeps the cap from admitting a plan it sees go wrong.
 - **Not done:** an honest turn between the phases (this planner's own plan on the board the
   first phase leaves) made the numbers right but cost 4.6x and played worse (the plan comment).
   The hold stays, as decided above.
+
+**Amended 2026-11-15 (Nicolas, #510): the wear (ADR 0421).** One case outside the irreversible
+transitions also reads past the next phase. A unit the next phase strikes, that no heal of the
+army's can reach before the phase after, is read on three enemy phases with its HP carried. That
+is the one case where the hold is close to true. It has its own call budget, beside this one's.

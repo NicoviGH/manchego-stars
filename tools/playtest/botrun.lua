@@ -702,8 +702,10 @@ function M.run(api)
                   board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
+                  -- and the wear's own calls, CPU and plans past its budget (ADR 0421)
                   lookahead = { decisions = 0, triggered = 0, extended = 0, skipped_budget = 0,
-                                calls = 0, cpu_s = 0 },
+                                calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0,
+                                wear_skipped = 0 },
                   seize_skips = {}, stall_events = {}, anomalies = {},
                   -- the experience reads checked against the game's award (ADR 0414), per kind:
                   -- a pass with none checked proves nothing
@@ -721,14 +723,11 @@ function M.run(api)
     local diag = api.diag
     local watch = diag and M.matcher(diag.original, diag.ref, Json)
     local pin, halt
-    -- the lookahead's calls left this attempt (Planner.LOOK_ATTEMPT, FR-018)
-    local function lookLeft()
-        return (api.Planner and api.Planner.LOOK_ATTEMPT or 0) - rec.lookahead.calls
+    -- the calls left this attempt of a Planner budget `cap`, `used` of them spent: the
+    -- lookahead's (LOOK_ATTEMPT, FR-018) and the wear's (WEAR_ATTEMPT, ADR 0421)
+    local function callsLeft(cap, used)
+        return (api.Planner and api.Planner[cap] or 0) - rec.lookahead[used]
     end
-    -- the attempt's lookahead_budget anomaly, once one is recorded: a decision the attempt's
-    -- budget left one phase deep shows in the record, not only in the sum (#570: 32 calls ran
-    -- out before ours-ch03's boss fight, and only `skipped_budget` said so)
-    local lookOut
     -- what the graded record reads (FR-003..007): the charIds whose death ends the game
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
@@ -795,6 +794,21 @@ function M.run(api)
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
+    -- each budget's anomaly, once one is recorded (kind -> the anomaly): a decision a budget
+    -- left one phase deep shows in the record, not only in the sum (#570: 32 calls ran out
+    -- before ours-ch03's boss fight, and only `skipped_budget` said so). lookahead_budget
+    -- counts the decisions skipped, wear_budget the plans
+    local budgetOut = {}
+    local function overBudget(kind, n)
+        if n <= 0 then return end
+        local a = budgetOut[kind]
+        if a then
+            a.skipped = a.skipped + n
+        else
+            budgetOut[kind] = { kind = kind, turn = turn, skipped = n }
+            anomaly(budgetOut[kind])
+        end
+    end
     local deciding   -- the decision being made: { turn, at (the planner's opts.at) }
     local playerPhases, playerActs = 0, nil   -- rec.player_phases, rec.acts_hash
     local function trace(ev)
@@ -1416,7 +1430,9 @@ function M.run(api)
                             end
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
-                                     budget = { attempt = lookLeft() }, seen = seenReds,
+                                     budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
+                                                wear = callsLeft("WEAR_ATTEMPT", "wear") },
+                                     seen = seenReds,
                                      quietGoals = quietGoals }
                         end
                         if playing and playing.forced then
@@ -1481,14 +1497,8 @@ function M.run(api)
                         for k, v in pairs(cost.look or {}) do
                             rec.lookahead[k] = rec.lookahead[k] + v
                         end
-                        if (cost.look or {}).skipped_budget == 1 then
-                            if lookOut then
-                                lookOut.skipped = lookOut.skipped + 1
-                            else
-                                lookOut = { kind = "lookahead_budget", turn = turn, skipped = 1 }
-                                anomaly(lookOut)
-                            end
-                        end
+                        overBudget("lookahead_budget", (cost.look or {}).skipped_budget or 0)
+                        overBudget("wear_budget", (cost.look or {}).wear_skipped or 0)
                         if plan then
                             sent, stuck = plan.goals, plan.stuck
                             -- the tiles whose goal row this plan's ledger left stalled: a win

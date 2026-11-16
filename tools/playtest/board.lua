@@ -65,6 +65,7 @@ Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
 Board.ITEMDATA_NUMBER = 0x06    -- bmitem.h ItemData +06 number: the row's own id (data_items.c)
 local IA_WEAPON = 1 << 0
+local IA_STAFF = 1 << 2    -- include/bmitem.h
 -- include/bmunit.h: struct Unit +0x1E u16 items[UNIT_ITEM_COUNT] (id | uses << 8)
 Board.UNIT_ITEMS, Board.ITEM_COUNT = 0x1E, 5
 Board.CONVOY_ITEM_COUNT = 100                   -- bmcontainer.h: the convoy's slots
@@ -95,16 +96,32 @@ local function onFieldState(state, x, y)
 end
 
 -- An item's attack reach, (minRange, maxRange), as bmitem.c GetItemMinRange/GetItemMaxRange read
--- it (encodedRange >> 4 and & 0xF; both are inline, so no symbol to call), or nil for a staff /
+-- it (encodedRange >> 4 and & 0xF, read off ItemData with no game call), or nil for a staff /
 -- non-weapon (IA_WEAPON unset) or no item. WHICH item a unit attacks with is the game's answer
 -- (sight.lua range(): GetUnitEquippedWeapon), never read off a slot here.
 function Board.itemRange(mem, SYM, item)
+    local attributes, er = Board.itemData(mem, SYM, item)
+    if not attributes or (attributes & IA_WEAPON) == 0 then return nil end
+    return er >> 4, er & 0xF
+end
+
+-- An item's ItemData attributes (+0x08, IA_*) and encodedRange (+0x19, min << 4 | max), as
+-- bmitem.c GetItemAttributes and GetItemEncodedRange read them; nil for no item. The one owner
+-- of both reads: itemRange and staffRange are made of it.
+function Board.itemData(mem, SYM, item)
     item = item & 0xFF
     if item == 0 then return nil end
     local data = SYM.gItemData + item * Board.ITEMDATA_STRIDE
-    if (mem.u32(data + 0x08) & IA_WEAPON) == 0 then return nil end
-    local er = mem.u8(data + 0x19)
-    return er >> 4, er & 0xF
+    return mem.u32(data + 0x08), mem.u8(data + 0x19)
+end
+
+-- A staff's reach, GetItemMaxRange (encodedRange & 0xF): 0 is its holder's Mag/2, which the
+-- game asks GetUnitMagBy2Range for (GetUnitItemUseReachBits, bmitem.c). nil for an item that is
+-- no staff (IA_STAFF unset: a Vulnerary heals only its holder).
+function Board.staffRange(mem, SYM, item)
+    local attributes, er = Board.itemData(mem, SYM, item)
+    if not attributes or (attributes & IA_STAFF) == 0 then return nil end
+    return er & 0xF
 end
 
 -- Tile distance, FE8's RECT_DISTANCE (include/bmmap.h): |dx| + |dy|. The one owner of it here.
@@ -596,6 +613,7 @@ function Board.bind(mem, SYM)
         findIn = function(base, count, charId) return Board.findIn(mem, SYM, base, count, charId) end,
         find = function(faction, charId) return Board.find(mem, SYM, faction, charId) end,
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
+        staffRange = function(item) return Board.staffRange(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         items = function(addr) return Board.items(mem, addr) end,
         convoyItems = function() return Board.convoyItems(mem, SYM) end,

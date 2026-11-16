@@ -58,6 +58,9 @@
 --      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
 --      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
 --      that of dying in either phase, and those plans are ranked again among themselves.
+--      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's can
+--      reach before the phase after, is read on M.WEAR enemy phases with its HP carried (the
+--      wear, ADR 0421), within its own budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
@@ -93,8 +96,12 @@
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
 -- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
--- lookahead's second phase's chance, when extended; `die` then counts both) }, lookahead =
--- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep }, audit = the
+-- lookahead's second phase's chance, when extended; `die` then counts both, but for a unit the
+-- wear read, whose `die` is the wear's reading of the later phases alone), wear (what the
+-- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
+-- read: ADR 0421, M.WEAR; `die` counts it) }, lookahead =
+-- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep, wear (the wear's
+-- calls, ADR 0421), wear_skipped (its plans past the budget) }, audit = the
 -- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, mend_rounds =
 -- { before, now } (whether a plan judged without the mend's later rounds was under the cap,
 -- and whether the played one is: #510 PR A), visibility =
@@ -118,11 +125,13 @@
 -- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
 -- left unsplit below sight's SPLIT_FLOOR, summed over them), floored (the ways of the plan's
 -- uncertain kills left unsplit below that floor of the plan, ADR 0415), look = { decisions, triggered,
--- extended, skipped_budget, calls, cpu_s } (the lookahead's; absent when no unit can act) }.
+-- extended, skipped_budget, calls, cpu_s, wear, wear_cpu_s, wear_skipped } (the lookahead's and
+-- the wear's; absent when no unit can act) }.
 -- opts.at = {} (optional; botrun's): written as the call goes, { stage ("propose", "search",
 -- "judge <kind>", "lookahead"), judged (the plans judged so far), phases }: what a decision
 -- cut short by its frame budget was doing (botrun's M.DECISION_FRAMES).
--- opts.budget = { decision, attempt } (optional): the lookahead calls this decision may spend.
+-- opts.budget = { decision, attempt, wear } (optional): the lookahead calls this decision may
+-- spend, and the wear's calls left this attempt.
 -- opts.seen = unit slot -> charId, every red a board showed out of fog this attempt (optional,
 -- botrun's): the fog rule's strongest enemy is one of these; without it, one in sight.
 -- opts.rest = the act keys (M.key) of the plan in hand not yet played (optional; botrun's on a
@@ -195,6 +204,14 @@ M.DUST = Goals.DUST
 -- (#570)
 M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
+-- the wear (ADR 0421): the most enemy phases a unit's HP is carried over while no heal of the
+-- army's can reach it. 3, the least that read Colm's Ch9 death (27 HP outlives two hits of 12:
+-- runs wg2x23 and wg3x23, #510). Its own budget of sight.nextPhase calls, beside the
+-- lookahead's: a decision and an attempt. The most seen were 57 and 122 (vanilla Ch11,
+-- lap3e/11, run wn11), so neither cut any of the 31 games behind the ADR
+M.WEAR = 3
+M.WEAR_DECISION = 64
+M.WEAR_ATTEMPT = 256
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
@@ -1121,7 +1138,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
-                            calls = 0, cpu_s = 0 } }
+                            calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
     -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
     -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
     -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
@@ -1139,6 +1156,36 @@ function M.plan(Bot, board, sight, style, opts)
     -- The first call is the next phase's alone, and its numbers are kept (`first_*`, a
     -- protected unit's `first`): over the cap they rank ahead of the two-phase ones
     -- (M.outranks), which the lookahead's call overwrites.
+    -- Whether healer `q` (a plan's entry: unit, x, y), from where the plan leaves it, can stand
+    -- within one of its staves' reach of `p`'s tile next turn: a tile 1 to that reach away
+    -- (Manhattan, as the game's staff range), on the map, that its own MOV gets it to.
+    -- sight.turnsTo with the healer's tile as its `tile` (GenerateExtendedMovementMap: the costs
+    -- out from it, units not blocking, as for the AI), read at each tile. Memoised for the
+    -- decision per healer, its tile and the tile healed.
+    local healReach = {}
+    local function healsNext(q, p)
+        local k = q.unit.id .. "@" .. q.x .. "," .. q.y .. ">" .. p.x .. "," .. p.y
+        if healReach[k] == nil then
+            local r, ok = 0, false
+            for _, sv in ipairs(sight.staves and sight.staves(q.unit) or {}) do
+                r = math.max(r, sv.range or 1)
+            end
+            local healer, map = { x = q.x, y = q.y }, board.map
+            for dx = -r, r do
+                local span = r - math.abs(dx)
+                for dy = -span, span do
+                    local x, y = p.x + dx, p.y + dy
+                    if not ok and (dx ~= 0 or dy ~= 0) and x >= 0 and y >= 0
+                        and x < map.w and y < map.h then
+                        local t = sight.turnsTo(q.unit, healer, { x = x, y = y })
+                        ok = t ~= nil and t <= 1 + M.DUST
+                    end
+                end
+            end
+            healReach[k] = ok
+        end
+        return healReach[k]
+    end
     local function admit(st)
         local rank = st.rank
         local firstCall = rank.first_game_over == nil
@@ -1421,6 +1468,29 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             hitOf[i] = inWay(hit, w, function(u) return u.id end, "back")
         end
+        -- The wear (ADR 0421): whether a heal of the army's can reach a unit of the plan
+        -- before the enemy phase after the next. None can when it holds none of its own
+        -- (sight.salve) and no staff of the army's gets within its reach next turn (healsNext).
+        -- Its HP then carries from phase to phase.
+        local plannedBy, unhealed = {}, {}
+        for _, p in ipairs(planned) do plannedBy[p.unit.id] = p end
+        -- -> the enemy phases the unit meets before a heal of the army's can reach it: 1 when one
+        -- reaches it next turn, M.WEAR at most
+        local function carries(id)
+            if unhealed[id] ~= nil then return unhealed[id] end
+            local p, n = plannedBy[id], 1
+            if p ~= nil and sight.salve ~= nil and sight.turnsTo ~= nil and not sight.salve(p.unit) then
+                n = M.WEAR
+                for _, q in ipairs(planned) do
+                    if q ~= p and healsNext(q, p) then
+                        n = 1
+                        break
+                    end
+                end
+            end
+            unhealed[id] = n
+            return n
+        end
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             for _, u in ipairs(hitOf[o.way]) do
@@ -1511,6 +1581,16 @@ function M.plan(Bot, board, sight, style, opts)
         st.goalWorth = {}
         judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell) + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
+        -- each way the phase went and its units' HP there, for the wear's later phases
+        st.outcomes, st.hitOf = outcomes, hitOf
+        -- the units the phase strikes that no heal of the army's reaches after it, in id order
+        st.worn, st.wearFor = {}, {}
+        for _, p in ipairs(planned) do
+            if (struck[p.unit.id] or 0) > 0 and carries(p.unit.id) > 1 then
+                st.worn[#st.worn + 1] = p.unit.id
+                st.wearFor[p.unit.id] = carries(p.unit.id)
+            end
+        end
         st.judged = judged
         st.strikes = strikes
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
@@ -1744,10 +1824,99 @@ function M.plan(Bot, board, sight, style, opts)
         local function r4(x) return math.floor(x * 1e4 + 0.5) / 1e4 end
         return { base = r4(st.base), max_die = r4(most), sum_die = r4(sum) }
     end
+    -- The wear (ADR 0421): a unit the judged phase strikes that no heal of the army's reaches
+    -- before the phase after it (judge's st.worn) is read on M.WEAR enemy phases, its HP
+    -- carried from each into the next. The second is played by the game's AI, our units
+    -- holding between (sight.nextPhase); each one past it is taken as the second again. Its
+    -- chance to die is that of dying in any of them: each way the next phase went (judge's
+    -- st.outcomes, on that way's HP: st.hitOf), the same ways its own death is read over, then
+    -- the later phases' strikes on what is left. A unit whose death ends the game adds its
+    -- later death to the game over, as the lookahead's second phase does.
+    -- Only such a unit takes the later phases here: for any other the turn between can
+    -- restore it, and the hold is no reading (ADR 0389's amendment of 2026-11-08). One
+    -- sight.nextPhase call a plan, within its own budget beside the lookahead's: M.WEAR_DECISION
+    -- a decision and opts.budget.wear left of M.WEAR_ATTEMPT. A plan past it keeps the one-phase
+    -- reading and is counted (`wear_skipped`): botrun records a wear_budget anomaly.
+    -- The mend does not try such a unit's other acts for the wear alone: tried, it lost
+    -- vanilla Ch5x's two chests and its clean clear (runs wr5 and wn5, #510).
+    local wearCalls, wearCpu, wearSkipped = 0, 0, 0
+    local wearRoom = math.min(M.WEAR_DECISION, (opts and opts.budget or {}).wear or M.WEAR_ATTEMPT)
+    local function wear(st)
+        if not (sight.nextPhase and st.worn and #st.worn > 0) or seizesIn(st) then return end
+        if wearCalls >= wearRoom then
+            wearSkipped = wearSkipped + 1
+            return
+        end
+        local clock = os.clock()
+        local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
+                                    reds = st.phase.reds, opened = st.phase.opened,
+                                    carry = st.phase.carry })
+        wearCalls = wearCalls + 1
+        -- the lookahead's second phase for this plan is this same call: kept for it
+        st.wearNext = r
+        local worn = {}
+        for _, id in ipairs(st.worn) do worn[id] = true end
+        st.wornRead = worn
+        local seconds = r.outcomes or { { p = 1, strikes = r } }
+        -- per unit, its death in the next phase (one) and in all M.WEAR (all3), each way's
+        local one, all3 = {}, {}
+        for _, o1 in ipairs(st.outcomes) do
+            local units = {}
+            for _, u in ipairs(st.hitOf[o1.way]) do
+                if worn[u.id] then units[#units + 1] = u end
+            end
+            local first = #units > 0 and struckIn(o1.strikes, units)
+            for _, u in ipairs(units) do
+                one[u.id] = (one[u.id] or 0) + o1.p * first[u.id].d
+                for _, o2 in ipairs(seconds) do
+                    -- the phases past the second: the second's strikes on it again, each only
+                    -- while its striker has outlived our counters before it
+                    local all = {}
+                    for _, s in ipairs(o1.strikes) do all[#all + 1] = s end
+                    for _, s in ipairs(o2.strikes) do
+                        if s.target == u.id then
+                            all[#all + 1] = s
+                            local live, left = 1 - (s.felled or 0), 1
+                            for _ = 3, st.wearFor[u.id] do
+                                left = left * live
+                                local later = { [0] = 1 - left }
+                                for d, p in pairs(s.takenDist) do later[d] = (later[d] or 0) + p * left end
+                                all[#all + 1] = { target = u.id, takenDist = later }
+                            end
+                        end
+                    end
+                    all3[u.id] = (all3[u.id] or 0) + o1.p * o2.p * struckIn(all, { u })[u.id].d
+                end
+            end
+        end
+        local any, lives = false, 1
+        for _, pr in ipairs(st.protected) do
+            local more = math.max(0, (all3[pr.id] or 0) - (one[pr.id] or 0))
+            if more > M.DUST then
+                pr.wear, pr.phases = more, st.wearFor[pr.id]
+                pr.die, any = math.min(1, pr.die + more), true
+                -- `more` is the chance it lives through the next phase and dies after; the game
+                -- over already holds the next phase's, so it takes the later death given that
+                -- one lived (#629 re-review: unconditioned, a lord's game over read below its death)
+                local lived = 1 - (one[pr.id] or 0)
+                if gameOver[pr.charId] then
+                    lives = lives * (lived > M.DUST and math.max(0, 1 - more / lived) or 1)
+                end
+            end
+        end
+        st.rank.game_over = 1 - (1 - st.rank.game_over) * lives
+        -- admission again, the next phase's own numbers kept (`first_*`): over the cap the
+        -- next phase still ranks first (ADR 0389's amendment). `predict` stays the next
+        -- phase's: botrun grades each phase against the plan made just before it
+        if any then admit(st) end
+        wearCpu = wearCpu + (os.clock() - clock)
+    end
     local function consider(st, kind)
         if now then now.stage, now.judged = "judge " .. kind, #considered end
         local before, phases = screen(st), cost.phases
         judge(st)
+        wear(st)
+        st.outcomes, st.hitOf = nil, nil   -- the wear's alone: not kept on every judged plan
         st.kind = kind
         before.phases = cost.phases - phases   -- the enemy phases this plan's judge played
         local c = { judged = st.judged, acts = st.keys, kind = kind, rank = st.rank,
@@ -1898,7 +2067,7 @@ function M.plan(Bot, board, sight, style, opts)
             -- beside the others
             local asks = 0
             for _, st in ipairs(fin) do
-                if not seizesIn(st) then asks = asks + 1 end
+                if not seizesIn(st) and not st.wearNext then asks = asks + 1 end
             end
             if asks > room then
                 look.skipped = true
@@ -1907,17 +2076,27 @@ function M.plan(Bot, board, sight, style, opts)
                 local clock = os.clock()
                 for _, st in ipairs(fin) do
                     local r = {}
-                    if not seizesIn(st) then
+                    if st.wearNext then
+                        r = st.wearNext   -- the wear asked this same phase (ADR 0421): no call
+                    elseif not seizesIn(st) then
                         r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
                                               reds = st.phase.reds, opened = st.phase.opened,
                                               carry = st.phase.carry })
                         look.calls = look.calls + 1
                     end
+                    -- the units the wear read (ADR 0421): their later phases are its reading,
+                    -- the same second phase on each way's HP and the third, already in their
+                    -- death and the game over
+                    local wornRead = st.wornRead or {}
                     -- every unit the first phase may strike, alive at its start: its HP then
                     local live = {}
                     for _, u in ipairs(st.phase.hit) do
                         local hp = r.hp and r.hp[u.id] or 0
                         if hp > 0 then live[#live + 1] = { id = u.id, charId = u.charId, hp = hp } end
+                    end
+                    local unworn = {}
+                    for _, u in ipairs(live) do
+                        if not wornRead[u.id] then unworn[#unworn + 1] = u end
                     end
                     local second, lost, over = {}, {}, 0
                     for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
@@ -1926,6 +2105,7 @@ function M.plan(Bot, board, sight, style, opts)
                             second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
                             lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
                         end
+                        if #unworn < #live then none = select(2, struckIn(o.strikes, unworn)) end
                         over = over + o.p * (1 - none)
                     end
                     -- each unit's death in either phase, and what the rank reads of it: the
@@ -1939,7 +2119,7 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, pr in ipairs(st.protected) do
                         protected[pr.id] = true
                         pr.second = second[pr.id] or 0
-                        pr.die = 1 - (1 - pr.die) * (1 - pr.second)
+                        if not wornRead[pr.id] then pr.die = 1 - (1 - pr.die) * (1 - pr.second) end
                         rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end
                     for _, u in ipairs(st.phase.hit) do
@@ -1978,6 +2158,11 @@ function M.plan(Bot, board, sight, style, opts)
             cost.look.calls = look.calls
         end
     end
+    -- the wear's calls, time and plans past its budget, beside the lookahead's and outside its
+    -- budget (FR-018's is for the irreversible transitions: spent here, the boss fight went unread)
+    look.wear = wearCalls > 0 and wearCalls or nil
+    look.wear_skipped = wearSkipped > 0 and wearSkipped or nil
+    cost.look.wear, cost.look.wear_cpu_s, cost.look.wear_skipped = wearCalls, wearCpu, wearSkipped
     if not best or #best.acts == 0 then return nil, nil, cost end
     best.lookahead = look
     -- best first; after a lookahead the finalists before the rest, whose ranks were never asked

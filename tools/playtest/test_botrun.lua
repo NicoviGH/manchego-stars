@@ -1855,7 +1855,8 @@ end
 
 -- test_an_exhausted_lookahead_is_an_anomaly (#570): a decision the attempt's budget left one
 -- phase deep is visible in the record -- one lookahead_budget anomaly an attempt, on the first
--- such turn, counting every decision skipped -- not only as a sum in rec.lookahead.
+-- such turn, counting every decision skipped -- not only as a sum in rec.lookahead. The wear's
+-- budget the same (ADR 0421): one wear_budget anomaly counting every plan it left unread.
 do
     local Planner = dofile(here .. "planner.lua")
     local g = fakeGame { units = rout() }
@@ -1863,7 +1864,7 @@ do
         surprise = Planner.surprise, LOOK_ATTEMPT = 0,
         plan = function(_, board)
             local look = { decisions = 1, triggered = 1, extended = 0, skipped_budget = 1,
-                           calls = 0, cpu_s = 0 }
+                           calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 2 }
             for _, u in ipairs(board.units) do
                 if u.faction == "blue" and u.acted then return nil, nil, { look = look } end
             end
@@ -1876,14 +1877,18 @@ do
     }
     Botrun.run(g.api)
     local r = recordOf(g)
-    local seen = {}
+    local seen = { lookahead_budget = {}, wear_budget = {} }
     for _, a in ipairs(r.anomalies) do
-        if a.kind == "lookahead_budget" then seen[#seen + 1] = a end
+        if seen[a.kind] then table.insert(seen[a.kind], a) end
     end
     check(r.lookahead.skipped_budget > 1, true, "more than one decision skipped")
-    check(#seen, 1, "one lookahead_budget anomaly an attempt")
-    check(seen[1] and seen[1].skipped, r.lookahead.skipped_budget, "counting every skip")
-    check(seen[1] and seen[1].turn ~= nil, true, "on the turn it first ran out")
+    for kind, sum in pairs({ lookahead_budget = r.lookahead.skipped_budget,
+                             wear_budget = r.lookahead.wear_skipped }) do
+        local s = seen[kind]
+        check(#s, 1, "one " .. kind .. " anomaly an attempt")
+        check(s[1] and s[1].skipped, sum, kind .. " counting every skip")
+        check(s[1] and s[1].turn ~= nil and s[1].turn > 0, true, kind .. " on the turn it first ran out")
+    end
 end
 
 -- The diagnostic replay (#510 step 9 PR F, T072/T074, FR-019): the attempt played again from

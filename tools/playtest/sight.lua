@@ -33,7 +33,8 @@
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
---        Board (board.lua's bound reader, Board.bind: itemRange(item), distance(ax, ay, bx, by)),
+--        Board (board.lua's bound reader, Board.bind: itemRange(item), staffRange(item),
+--        distance(ax, ay, bx, by)),
 --        map = function() -> w, h, chapter = function() -> index,
 --        turn = function() -> n, board = Board.read }
 -- ONE sight per run. Its answers about the board are kept until refresh(), which the caller
@@ -145,7 +146,8 @@
 --   unseen()                 every tile the fog hides now: gBmMapFog 0 there, which
 --                            RefreshEntityBmMaps never leaves without fog (bmmap.c). An enemy
 --                            in fog is the game's US_BIT9 (board.lua), no target.
---   staves(u)                the staves `u` can heal with, { slot (0-based), amount }:
+--   staves(u)                the staves `u` can heal with, { slot (0-based), amount, exp,
+--                            range (its reach: Board.staffRange, Physic's Mag/2) }:
 --                            CanUnitUseStaff, and GetUnitItemHealAmount > 0.
 --   canTalk(u, t)            the Talk command's own pair check, CheckForCharacterEvents (what
 --                            MakeTalkTargetList adds a neighbour by).
@@ -202,9 +204,11 @@
 --                            one HP short, for a heal the planner means to follow a blow.
 --   maxHps(units)            sets each unit's `maxhp` to GetUnitMaxHp (maxHP + the equipped
 --                            weapon's HP bonus), the cap AddUnitHp holds a heal to.
---   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff,
+--   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff (IA_STAFF),
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
+--   salve(u)                 whether `u` holds such an item at all, whatever its HP (the
+--                            planner's wear, ADR 0421): mend() offers none at full HP.
 --   obstacles()              every obstacle the Attack command can strike, as
 --                            TryAddTrapsToTargetList (bmtarget.c) lists them from the trap pool:
 --                            a TRAP_OBSTACLE's damaged wall at its tile, or the tile below where
@@ -640,6 +644,22 @@ end
 
 -- An inventory entry as the unit struct holds it: the item id, its uses in the high byte.
 local function itemOf(it) return it.id | (it.uses << 8) end
+
+-- The items in `u`'s inventory that heal their holder (a Vulnerary, an Elixir), in order:
+-- { slot, item, amount }. A heal that is no staff (Board.staffRange, IA_STAFF): asking
+-- CanUnitUseStaff instead would let through a staff its holder cannot use (no rank, asleep,
+-- silenced: bmitem.c CanUnitUseStaff), which heals others, never its holder. `call` is a
+-- sandbox's, `Board` the bound reader; s.mend and s.salve's one owner.
+function M.selfHeals(Board, call, S, u)
+    local out = {}
+    for i, it in ipairs(u.items) do
+        local amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) })
+        if amount > 0 and Board.staffRange(itemOf(it)) == nil then
+            out[#out + 1] = { slot = i - 1, item = itemOf(it), amount = amount }
+        end
+    end
+    return out
+end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 local function s32(v) return v >= 0x80000000 and v - 0x100000000 or v end
@@ -1760,8 +1780,9 @@ function M.new(outer)
         for _, it in ipairs(u.items or {}) do parts[#parts + 1] = it.id .. "x" .. it.uses end
         return table.concat(parts, ":")
     end
-    local function mine(kind, u, ask)
-        local k = ownKey(kind, u, u.hp)
+    -- `hp` (optional): "-" for a read its HP does not change (s.salve); default u.hp
+    local function mine(kind, u, ask, hp)
+        local k = ownKey(kind, u, hp or u.hp)
         local v = own[k]
         if v == nil then
             v = ask()
@@ -2714,9 +2735,13 @@ function M.new(outer)
                 for i, it in ipairs(u.items) do
                     if call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0
                         and call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) > 0 then
+                        -- its reach (Board.staffRange), 0 for Physic's Mag/2
+                        -- (GetUnitItemUseReachBits, bmitem.c; GetUnitMagBy2Range, bmunit.c)
+                        local range = api.Board.staffRange(itemOf(it)) or 1
+                        if range == 0 then range = call(S.GetUnitMagBy2Range, { u.addr }) end
                         out[#out + 1] = { slot = i - 1,
                             amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }),
-                            exp = M.staffExp(call, S, u.addr, i - 1) }
+                            exp = M.staffExp(call, S, u.addr, i - 1), range = range }
                     end
                 end
                 return out
@@ -2769,15 +2794,21 @@ function M.new(outer)
 
     function s.mend(u)
         return mine("mend", u, function() return sandbox(function(call)
-            for i, it in ipairs(u.items) do
-                local amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) })
-                if amount > 0 and call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) == 0
-                    and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0 then
-                    return { slot = i - 1, amount = amount }
+            for _, h in ipairs(M.selfHeals(api.Board, call, S, u)) do
+                if call(S.CanUnitUseItem, { u.addr, h.item }) ~= 0 then
+                    return { slot = h.slot, amount = h.amount }
                 end
             end
             return nil
         end) end)
+    end
+
+    -- Whether `u` holds a heal for itself at all, whatever its HP now: the item s.mend offers
+    -- once it is hurt (CanUnitUseItem refuses one at full HP). One read for every HP.
+    function s.salve(u)
+        return mine("salve", u, function() return sandbox(function(call)
+            return #M.selfHeals(api.Board, call, S, u) > 0
+        end) end, "-")
     end
 
     -- The map as a phase can change it: the terrain of every tile with a command (a door
