@@ -769,9 +769,9 @@ local function worstCase(ctx, u, x, y, spared)
     return w
 end
 
--- Of `tiles`, the one with the smallest worst case, the unit's own tile first on a tie (holding
--- costs nothing).
--- `tiles`, safest first: the lowest worst case, its own tile first on a tie, then board order.
+-- `tiles`, safest first: the lowest worst case, the unit's own tile first on a tie (holding
+-- costs nothing), then the most ground by `gain(x, y)` when given (a step aside's), then board
+-- order. safest is its first.
 local function bySafety(ctx, u, tiles, gain)
     local out = {}
     for i, t in ipairs(tiles) do
