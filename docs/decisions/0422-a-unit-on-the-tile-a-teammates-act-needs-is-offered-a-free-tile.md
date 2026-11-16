@@ -27,11 +27,14 @@ safest first, own tile first on a tie) can all be its own tile or other allies' 
 unit a teammate asks to move had no free tile to move to.
 
 **The rule (`bot.lua` `propose` and `aside`; `planner.lua`'s menu).**
-- After every unit's acts are proposed, a unit whose tile some teammate's act asks for (any
-  act's `vacate`) is offered one more wait, `why = "aside"`. It goes to the safest tile it may
+- After every unit's acts are proposed, a unit whose tile any teammate's offered act asks for
+  (its `vacate`) is offered one more wait, `why = "aside"`. That includes acts the rank will
+  never play, so an aside can change the beam where none is played (two runs below).
+  A unit whose goal has not changed keeps its proposal without the aside (`base`), so each
+  pass asks again who needs its tile. It goes to the safest tile it may
   wait on that no unit stands on, other than its own (`waitTiles` with `ctx.freeOnly`). Ties
   go to the most ground toward its own march goal (`groundFor`, the gain the retreat already
-  used), then board order.
+  used), then board order: `bySafety`'s order with that tie-break added.
 - It is not offered when the tile is already one of the unit's waits, to a benched unit (its
   claim holds it), or when there is no free tile.
 - The planner's menu always keeps it, as it keeps holds, retreats, Rescues and Drops. Its own
@@ -74,7 +77,7 @@ unit a teammate asks to move had no free tile to move to.
   994.7 s, mostly the two Ch3 games that now play to a win (61.8 → 99.3 s). The unit tests are
   unchanged in time (one test added).
 
-**Also found, not fixed.**
+**Also found, not fixed** (on #510, comment 6905221090).
 - On `lap3e/9` the door is opened under labelled fallbacks: `fallback_sacrifice` on turns 7 to
   9, at up to 0.73. It is the same family ADR 0421 lists (a pessimistic two-phase read deciding
   games).

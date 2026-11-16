@@ -772,15 +772,16 @@ end
 -- Of `tiles`, the one with the smallest worst case, the unit's own tile first on a tie (holding
 -- costs nothing).
 -- `tiles`, safest first: the lowest worst case, its own tile first on a tie, then board order.
-local function bySafety(ctx, u, tiles)
+local function bySafety(ctx, u, tiles, gain)
     local out = {}
     for i, t in ipairs(tiles) do
         out[i] = { t = t, i = i, sum = worstCase(ctx, u, t.x, t.y, nil).sum,
-                   own = t.x == u.x and t.y == u.y }
+                   own = t.x == u.x and t.y == u.y, g = gain and gain(t.x, t.y) or 0 }
     end
     table.sort(out, function(a, b)
         if a.sum ~= b.sum then return a.sum < b.sum end
         if a.own ~= b.own then return a.own end
+        if a.g ~= b.g then return a.g > b.g end
         return a.i < b.i
     end)
     for i, o in ipairs(out) do out[i] = o.t end
@@ -2115,8 +2116,6 @@ local function exposed(ctx, u, acts)
     return acts
 end
 
--- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
--- each is).
 -- progress: how much nearer its march goal (the game's field to it) `u` ends on (x, y), as
 -- gain(x, y); 0 where either end has no way to the goal.
 local function groundFor(ctx, u, objective)
@@ -2132,6 +2131,8 @@ local function groundFor(ctx, u, objective)
     end
 end
 
+-- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
+-- each is).
 local function proposeOne(ctx, u)
     local held = benchedWait(ctx, u)
     if held then
@@ -2273,30 +2274,33 @@ local function proposeOne(ctx, u)
     return { unit = u, acts = exposed(ctx, u, acts) }
 end
 
--- The step aside offered to `c.unit` (propose): of the tiles it may wait on that no unit
--- stands on, less its own, the safest, the most ground toward its march goal on a tie, then
--- board order. Added to c.acts unless an act there already ends on it; nothing for a benched
--- unit (its claim holds it) or one with no such tile.
+-- `c` (a unit's proposal, propose's) with the step aside offered to `c.unit`: of the tiles
+-- it may wait on that no unit stands on, less its own, the safest, the most ground toward its
+-- march goal on a tie, then board order (bySafety). `c` itself when an act of its already
+-- ends there, for a benched unit (its claim holds it), or with no such tile.
 local function aside(ctx, c)
     local u = c.unit
-    if benchedWait(ctx, u) then return end
+    if benchedWait(ctx, u) then return c end
     ctx.freeOnly = true
     local tiles = waitTiles(ctx, u)
     ctx.freeOnly = nil
-    local gain, best = groundFor(ctx, u, ctx.sight.objective), nil
-    for i, t in ipairs(tiles) do
-        if t.x ~= u.x or t.y ~= u.y then
-            local o = { t = t, i = i, sum = worstCase(ctx, u, t.x, t.y, nil).sum, g = gain(t.x, t.y) }
-            if not best or o.sum < best.sum or (o.sum == best.sum and o.g > best.g) then best = o end
-        end
+    local others = {}
+    for _, t in ipairs(tiles) do
+        if t.x ~= u.x or t.y ~= u.y then others[#others + 1] = t end
     end
-    if not best then return end
+    local best = bySafety(ctx, u, others, groundFor(ctx, u, ctx.sight.objective))[1]
+    if not best then return c end
     for _, a in ipairs(c.acts) do
-        if a.act == "wait" and a.move.x == best.t.x and a.move.y == best.t.y then return end
+        if a.act == "wait" and a.move.x == best.x and a.move.y == best.y then return c end
     end
-    local a = action(u, best.t, "wait")
+    local a = action(u, best, "wait")
     a.why = "aside"
-    c.acts[#c.acts + 1] = exposed(ctx, u, { a })[1]
+    local acts = {}
+    for i, x in ipairs(c.acts) do acts[i] = x end
+    acts[#acts + 1] = exposed(ctx, u, { a })[1]
+    -- `base` is the proposal without the aside: propose keeps that one for a unit whose goal
+    -- has not changed, so the next pass asks again who needs its tile
+    return { unit = u, acts = acts, base = c }
 end
 
 -- Every unit's acts (proposeOne). Given the last proposal `last` and the goals it was made for
@@ -2306,11 +2310,11 @@ local function propose(ctx, last, was)
     for _, c in ipairs(last or {}) do
         local a, b = was[c.unit.id], ctx.exploreGoal[c.unit.id]
         if (a == nil) == (b == nil) and (not a or (a.x == b.x and a.y == b.y)) then
-            kept[c.unit.id] = c
+            kept[c.unit.id] = c.base or c
         end
     end
     for _, u in ipairs(ctx.actors) do out[#out + 1] = kept[u.id] or proposeOne(ctx, u) end
-    -- a unit whose tile a teammate's act asks for (its `vacate`) is offered a tile no one
+    -- a unit whose tile a teammate's offered act asks for (its `vacate`) is offered a tile no one
     -- stands on: its march and holds may all end on its own tile or other allies', and allies
     -- asked in a loop leave no order of moves that frees the tile (vanilla Ch8: Joshua on the
     -- one tile beside the door, Garcia and Ross on the two he was offered)
@@ -2320,8 +2324,8 @@ local function propose(ctx, last, was)
             if a.vacate then asked[a.vacate] = true end
         end
     end
-    for _, c in ipairs(out) do
-        if asked[c.unit.id] then aside(ctx, c) end
+    for i, c in ipairs(out) do
+        if asked[c.unit.id] then out[i] = aside(ctx, c) end
     end
     return out
 end

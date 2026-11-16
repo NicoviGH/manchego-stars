@@ -2255,6 +2255,33 @@ do
     local aside, door = order:find("2>wait@0,2", 1, true), order:find("1>door@1,0", 1, true)
     check(aside ~= nil and door ~= nil and aside < door, true,
           "aside: J steps to its free tile, then K opens the door (" .. order .. ")")
+
+    -- J's offered asides (Bot.candidates), on the same board with `edit` applied to it
+    local function asidesOf(edit, st)
+        local p = { reach = {}, field = o.field, objective = o.objective, obstacles = {},
+                    doors = o.doors, openers = o.openers }
+        for id, r in pairs(o.reach) do p.reach[id] = r end
+        if edit then edit(p) end
+        local cands = B.candidates(boardOf(K, J, C, D, E), sightOf(p), st or style("careful"))
+        local out = {}
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
+                if a.why == "aside" then out[#out + 1] = at(a) end
+            end
+        end
+        return table.concat(out, " ")
+    end
+    check(asidesOf(), "0,2", "aside: J is offered its one free tile, once")
+    local benched = style("careful")
+    benched.bench = { J.charId }
+    check(asidesOf(nil, benched), "", "aside: none for a benched unit")
+    check(asidesOf(function(p) p.reach[0x02] = tiles({ 1, 0 }, { 0, 2 }, { 0, 0 }, { 1, 1 }) end),
+          "", "aside: none when the free tile is already one of J's waits")
+    check(asidesOf(function(p) p.reach[0x02] = tiles({ 1, 0 }, { 0, 0 }, { 1, 1 }) end), "",
+          "aside: none when J has no free tile")
+    check(asidesOf(function(p)
+        p.reach[0x01], p.reach[0x03], p.reach[0x04] = tiles({ 0, 1 }), tiles({ 0, 0 }), tiles({ 1, 1 })
+    end), "", "aside: none when no teammate's act asks for J's tile")
 end
 
 -- test_a_visited_tile_is_not_offered_again: a House (eventinfo House(0, ...), flag 0) keeps
