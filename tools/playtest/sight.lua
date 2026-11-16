@@ -148,7 +148,7 @@
 --                            in fog is the game's US_BIT9 (board.lua), no target.
 --   staves(u)                the staves `u` can heal with, { slot (0-based), amount, exp,
 --                            range (its reach: Board.staffRange, Physic's Mag/2) }:
---                            CanUnitUseStaff, and GetUnitItemHealAmount > 0.
+--                            one of M.HEAL_STAVES that CanUnitUseStaff allows.
 --   canTalk(u, t)            the Talk command's own pair check, CheckForCharacterEvents (what
 --                            MakeTalkTargetList adds a neighbour by).
 --   offers(u, tiles, act, target)  of `tiles`, those where `u` standing there gets the unit
@@ -269,6 +269,13 @@ function M.riding(state) return ((state or 0) & M.US_IN_BALLISTA) ~= 0 end
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL = 0x69, 0x6B, 0x04
+-- The staves the game heals one ally with: bmitemuse.c DoItemUse sends Heal, Mend and Recover
+-- (0x4B-0x4D) and Physic (0x4E) to DoUseHealStaff, gSelectInfo_Heal's target selection, the one
+-- the harness plays. GetUnitItemHealAmount (bmitem.c) is no test of it: it adds its holder's
+-- power for ANY staff (IA_STAFF), so a Barrier read as a heal and its use opened
+-- gSelectInfo_Barrier (vanilla E_16, campaign 4006, turn 5: a crash). Fortify heals in
+-- an area with no target selection (SetStaffUseAction): not one of them.
+M.HEAL_STAVES = { [0x4B] = true, [0x4C] = true, [0x4D] = true, [0x4E] = true }
 -- include/bmunit.h CA_CANTO: a second move after an act (playerphase.c TryMakeCantoUnit),
 -- read off the character's and the class's attributes ORed (UNIT_CATTRIBUTES)
 M.CA_CANTO = 1 << 1
@@ -2733,8 +2740,7 @@ function M.new(outer)
             return sandbox(function(call)
                 local out = {}
                 for i, it in ipairs(u.items) do
-                    if call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0
-                        and call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) > 0 then
+                    if M.HEAL_STAVES[it.id] and call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0 then
                         -- its reach (Board.staffRange), 0 for Physic's Mag/2
                         -- (GetUnitItemUseReachBits, bmitem.c; GetUnitMagBy2Range, bmunit.c)
                         local range = api.Board.staffRange(itemOf(it)) or 1
