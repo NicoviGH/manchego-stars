@@ -2117,6 +2117,21 @@ end
 
 -- One unit's acts this phase, from the view `ctx` holds (M.candidates' doc below says what
 -- each is).
+-- progress: how much nearer its march goal (the game's field to it) `u` ends on (x, y), as
+-- gain(x, y); 0 where either end has no way to the goal.
+local function groundFor(ctx, u, objective)
+    local goal = marchGoal(ctx, u, objective)
+    local function fd(x, y)
+        if fieldFor(ctx, goal) then return walkFrom(ctx, goal, x, y) end
+        return goal and manhattan(x, y, goal.x, goal.y)
+    end
+    local here = fd(u.x, u.y)
+    return function(x, y)
+        local there = fd(x, y)
+        return (here and there) and (here - there) or 0
+    end
+end
+
 local function proposeOne(ctx, u)
     local held = benchedWait(ctx, u)
     if held then
@@ -2230,17 +2245,7 @@ local function proposeOne(ctx, u)
     ctx.freeOnly = nil
     local holds = bySafety(ctx, u, waitTiles(ctx, u))
     add(holds[1] and action(u, holds[1], "wait"), "hold")
-    -- progress: how much nearer its march goal (the game's field to it) each act ends it
-    local goal = marchGoal(ctx, u, objective)
-    local function fd(x, y)
-        if fieldFor(ctx, goal) then return walkFrom(ctx, goal, x, y) end
-        return goal and manhattan(x, y, goal.x, goal.y)
-    end
-    local here = fd(u.x, u.y)
-    local function gain(x, y)
-        local there = fd(x, y)
-        return (here and there) and (here - there) or 0
-    end
+    local gain = groundFor(ctx, u, objective)
     -- the retreat: the safest tile that still gains ground, the most ground on a tie, so a
     -- unit has a way forward that is not the march's exposed front
     local function retreatOver(tiles)
@@ -2268,6 +2273,32 @@ local function proposeOne(ctx, u)
     return { unit = u, acts = exposed(ctx, u, acts) }
 end
 
+-- The step aside offered to `c.unit` (propose): of the tiles it may wait on that no unit
+-- stands on, less its own, the safest, the most ground toward its march goal on a tie, then
+-- board order. Added to c.acts unless an act there already ends on it; nothing for a benched
+-- unit (its claim holds it) or one with no such tile.
+local function aside(ctx, c)
+    local u = c.unit
+    if benchedWait(ctx, u) then return end
+    ctx.freeOnly = true
+    local tiles = waitTiles(ctx, u)
+    ctx.freeOnly = nil
+    local gain, best = groundFor(ctx, u, ctx.sight.objective), nil
+    for i, t in ipairs(tiles) do
+        if t.x ~= u.x or t.y ~= u.y then
+            local o = { t = t, i = i, sum = worstCase(ctx, u, t.x, t.y, nil).sum, g = gain(t.x, t.y) }
+            if not best or o.sum < best.sum or (o.sum == best.sum and o.g > best.g) then best = o end
+        end
+    end
+    if not best then return end
+    for _, a in ipairs(c.acts) do
+        if a.act == "wait" and a.move.x == best.t.x and a.move.y == best.t.y then return end
+    end
+    local a = action(u, best.t, "wait")
+    a.why = "aside"
+    c.acts[#c.acts + 1] = exposed(ctx, u, { a })[1]
+end
+
 -- Every unit's acts (proposeOne). Given the last proposal `last` and the goals it was made for
 -- (`was`, ctx.exploreGoal then), only the units whose goal has changed since are proposed again.
 local function propose(ctx, last, was)
@@ -2279,6 +2310,19 @@ local function propose(ctx, last, was)
         end
     end
     for _, u in ipairs(ctx.actors) do out[#out + 1] = kept[u.id] or proposeOne(ctx, u) end
+    -- a unit whose tile a teammate's act asks for (its `vacate`) is offered a tile no one
+    -- stands on: its march and holds may all end on its own tile or other allies', and allies
+    -- asked in a loop leave no order of moves that frees the tile (vanilla Ch8: Joshua on the
+    -- one tile beside the door, Garcia and Ross on the two he was offered)
+    local asked = {}
+    for _, c in ipairs(out) do
+        for _, a in ipairs(c.acts) do
+            if a.vacate then asked[a.vacate] = true end
+        end
+    end
+    for _, c in ipairs(out) do
+        if asked[c.unit.id] then aside(ctx, c) end
+    end
     return out
 end
 

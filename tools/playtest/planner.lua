@@ -847,8 +847,10 @@ function M.plan(Bot, board, sight, style, opts)
             if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
                     or x.a.why == "hold" or x.a.why == "retreat"
                     -- what a Rescue or Drop saves or opens is the judged phase's to read, and
-                    -- its own score never sees the phase
-                    or x.a.act == "rescue" or x.a.act == "drop" then
+                    -- its own score never sees the phase; a step aside's is the teammate's
+                    -- act it frees the tile for (Bot.candidates' aside), which its own score
+                    -- never sees either
+                    or x.a.act == "rescue" or x.a.act == "drop" or x.a.why == "aside" then
                 menu[#menu + 1] = x.a
             end
         end
