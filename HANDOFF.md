@@ -9,35 +9,29 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-15, night; main at the HANDOFF commit after 93ba2e17): find why the march jams on Ephraim's Ch5 (`lap3e/9`, run `wy9`), the one game the wear lost.** Nothing is in flight; no open PR; the tree is clean.
+**Next session starts here (2026-11-15, late night; main at the HANDOFF commit after 8ac07d63): rerun both laps from the prologue in parallel, now that the step aside is in** (`montecarlo.py resume --game vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`). Nothing is in flight; no open PR; the tree is clean.
 
-- **PR #629 merged** (93ba2e17, ADR 0421, amends ADR 0389; Nicolas: "merge and handoff"). Colm's
-  Ch9 death is fixed by the wear:
-  - **The rule:** a unit the next enemy phase strikes, that no heal of the army's can reach
-    before the phase after, is judged on three enemy phases, its HP carried from one to the next.
-  - **Where it lives:** `planner.lua` `carries`/`healsNext` in `judge`, `wear()` in `consider`.
-  - **Its budget:** `M.WEAR_DECISION` 64 and `M.WEAR_ATTEMPT` 256 calls, with a `wear_budget`
-    anomaly when it runs out.
-  - Defined by a Fable subagent. `/code-review 629 medium` and one scoped re-review gave 16
-    findings, all fixed.
-  - **The evidence and the re-run** are on #510: comments 6903393935 and 6904449566.
-- **The open lead: Ephraim's Ch5 (`lap3e/9`).** On the final rule it is stuck after 21 turns,
-  where main won in 9 and the prototype in 18, with no death in any of them.
-  - **Confirmed:** the split is turn 3. Read over every way, Forde (charId 0x10) reads 0.113
-    over three phases, so a different plan is played. That is the rule working as designed.
-  - **Confirmed:** from turn 10 the wear makes no call, and every plan judged is admitted.
-  - **The stall:** the board repeats 5 times, no Seize is skipped or played, the turn-9 arrivals
-    never come into sight, and `DoorCommandUsability` is asked 6x as often as on the prototype.
-  - **Untested:** why the march jams there. It may be the same family as the Seize-map jam below.
-  - **How to look:** the trace is `references/sim/vanilla/c25b145e3745/traces/wy9-lap3e-cs-s4006/`.
-    Replay it with `montecarlo.py resume --game vanilla --tag <t> --campaigns lap3e-cs-s4006
-    --chapter 9 --last 9 --attempts 1 --scout --route 1 --jobs 1` (about 1 min, deterministic).
-- **Not a block for the bot's reading:** it is one game of 31, and the wear's own part in it is
-  correct. It becomes one if the Ch5 jam shows up on the full laps (next item).
-- **After that:** rerun both laps from the prologue in parallel (`montecarlo.py resume --game
-  vanilla --campaigns cs-s4006 --chapter 0 --scout --route 1|2 --tag <new>`).
-- **The Seize-map jam** (Ch7's pocket) is still open. The recommendation waiting on Nicolas: on a
-  Seize map, count the seizing unit's progress above an escort's.
+- **PR #630 merged** (8ac07d63, ADR 0422; Nicolas: "Yes" to merge on clean review + CI). The
+  `lap3e/9` jam is found and fixed (#510 comment 6905221090):
+  - **Cause (confirmed, run `jam1`):** the door at (20,7) opens only from (20,8); Joshua (charId
+    0x20, no key) held it, and his only other tiles were Garcia's and Ross's, whose only other
+    tiles were each other's or his. A loop no order of moves breaks.
+  - **The rule:** a unit whose tile a teammate's offered act asks for (`vacate`) is offered a
+    wait on its safest free tile (`aside`, `bot.lua` `propose`/`aside`); the planner's menu
+    always keeps it. An offer, not a weight.
+  - **Results, attempt 1:** `lap3e/9` stuck → won turn 24, no death (`aside1`). The Ch7 Seize
+    pocket `fwd1-cs-s4005/8` stuck → won clean turn 12 (`aside7`), so **the Seize-map weight
+    recommendation is withdrawn**. 14 suite runs: deaths 8 → 8, wins 10 → 12, clean clears
+    2 → 4 (vanilla Ch3 stuck → won clean, both seeds). Same-act runs cost level.
+  - Review: `/code-review 630 medium` (6 findings, 1 half-refuted with evidence) and one scoped
+    re-review (1 comment nit), all fixed.
+- **The open lead: the over-cap door on `lap3e/9`.** Turns 7-9 play `fallback_sacrifice`
+  plans: every finalist reads over the cap. Turn 8's 0.73 (Colm, charId 9) and 0.52 (Kyle,
+  0x11) are the lookahead's SECOND phase (`second`; `trigger: breach`), read with our units
+  holding still; the next phase read 0 for both, and both lived (Colm 19 → 5 HP). No healer
+  was fielded (`sustain` uncovered). Untested: whether the second phase's "everyone holds"
+  is what overstates it (ADR 0421's "a unit that could simply walk away").
+- **The Seize-map jam** is closed by PR #630 (above); `feat/510-own-march` stays unshipped.
 - **Also found, not fixed:**
   - `story` calls every generic enemy "the Knight" (a Mercenary, class 0x0F; a Cavalier,
     0x05). The Ch7 "the Archer" note below is the same bug.
@@ -58,6 +52,8 @@ and start a fresh instance; don't rely on auto-compaction.
   saves (`wear`, `wr`, `mb`, `wn`, `wtwo`, `wg`, `wf`, `wz`, `wy`, `wd`) are deleted; their
   traces and records are kept. The `colm-ch9` patches and map scripts stay in
   `~/Projects/manchego-stars-assets/probes/colm-ch9/`.
+  This session's tags `jam1`, `aside1`, `aside1r`, `aside7`, `aside7r`, `aside7ctl` (and the
+  suite runs of instruments `5441b0b472f4` / `5958bfa4c3f8`) are probes, never a proof base.
 - **How to spend the session:** code reading, decomp searches and reviews go to Sonnet
   subagents, design to a Fable subagent. Brief every subagent to SETTLE its questions, not to
   label them "untested": a subagent's open item is the lead's to close before reporting. The
