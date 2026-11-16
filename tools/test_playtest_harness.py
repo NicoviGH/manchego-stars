@@ -185,10 +185,19 @@ class TestAwaitControllerState(unittest.TestCase):
         # After E_19 (2026-11-16) a scene gave an item to a unit with a full bag, and the
         # arrival loop stopped: "unsupported state between chapters: send_to_convoy". It asks
         # the same chooser the map does (INSPECT.answerWait -> INSPECT.onFullBag).
-        body = _block(_read_harness(), 'local stalled = INSPECT.watch("arrive")',
+        harness = _read_harness()
+        body = _block(harness, 'local stalled = INSPECT.watch("arrive")',
                       'unsupported state between chapters')
-        self.assertRegex(body, r'elseif state == "send_to_convoy" and INSPECT\.onFullBag then'
-                               r'[\s\S]*?INSPECT\.answerWait\(state\)')
+        bag = body.index('elseif state == "send_to_convoy" then')
+        # before the generic fallback, so it is reached
+        self.assertLess(bag, body.index('elseif state ~= "player_map_idle" then'))
+        branch = body[bag:body.index('elseif state ~= "player_map_idle" then')]
+        self.assertIn('INSPECT.answerWait(state)', branch)
+        # its answer is marked read: the next chapter's record never claims it (PR #635 review)
+        self.assertRegex(branch, r'INSPECT\.bagLog\.seen\s*=\s*#INSPECT\.bagLog')
+        # the campaign installs the chooser itself, before any attempt's botApi
+        camp = _block(harness, 'INSPECT.campaignApi = function(game)', 'local seed = ')
+        self.assertIn('INSPECT.onFullBag = INSPECT.answerFullBag', camp)
 
     def test_every_yes_no_prompt_closes_by_one_predicate(self):
         # PR #632 review: the "prompt has closed" predicate had six hand-rolled copies.
