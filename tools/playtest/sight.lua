@@ -227,8 +227,8 @@
 --                            counter (M.answerOf); strength = its expected damage that round.
 --                            chests/doors: GetUnitKeyItemSlotForTerrain finds a key or lockpick
 --                            (ChestCommandUsability, DoorCommandUsability). fog: GetUnitFogViewRange
---                            sees past the chapter's range (a thief, a torch). sustain: a held
---                            staff CanUnitUseStaff accepts. village: it reaches the tile, from
+--                            sees past the chapter's range (a thief, a torch). sustain: a
+--                            staff it heals with (staves()). village: it reaches the tile, from
 --                            fieldUnit()'s tile, in no more turns than the fastest red unit
 --                            from its own (GenerateExtendedMovementMap on each one's costs,
 --                            turns = cost / UNIT_MOV rounded up).
@@ -651,6 +651,25 @@ end
 
 -- An inventory entry as the unit struct holds it: the item id, its uses in the high byte.
 local function itemOf(it) return it.id | (it.uses << 8) end
+
+-- The staves in `u`'s inventory it heals one ally with (M.HEAL_STAVES) and CanUnitUseStaff
+-- allows, in order: { slot, amount (GetUnitItemHealAmount), exp (M.staffExp), range (its reach,
+-- Board.staffRange; 0 is Physic's Mag/2: GetUnitItemUseReachBits, bmitem.c, and
+-- GetUnitMagBy2Range, bmunit.c) }. `call` is a sandbox's, `Board` the bound reader; s.staves'
+-- one owner, and through it the `sustain` demand's.
+function M.healStaves(Board, call, S, u)
+    local out = {}
+    for i, it in ipairs(u.items) do
+        local item = itemOf(it)
+        if M.HEAL_STAVES[item & 0xFF] and call(S.CanUnitUseStaff, { u.addr, item }) ~= 0 then
+            local range = Board.staffRange(item) or 1
+            if range == 0 then range = call(S.GetUnitMagBy2Range, { u.addr }) end
+            out[#out + 1] = { slot = i - 1, amount = call(S.GetUnitItemHealAmount, { u.addr, item }),
+                              exp = M.staffExp(call, S, u.addr, i - 1), range = range }
+        end
+    end
+    return out
+end
 
 -- The items in `u`'s inventory that heal their holder (a Vulnerary, an Elixir), in order:
 -- { slot, item, amount }. A heal that is no staff (Board.staffRange, IA_STAFF): asking
@@ -1751,12 +1770,7 @@ function M.new(outer)
                 return call(S.GetUnitFogViewRange, { u.addr })
             end) > mem.u8(S.gPlaySt + PLAY_VISION), 0
         elseif d.kind == "sustain" then
-            return sandbox(function(call)
-                for _, it in ipairs(u.items) do
-                    if call(S.CanUnitUseStaff, { u.addr, it.id }) ~= 0 then return true end
-                end
-                return false
-            end), 0
+            return #s.staves(u) > 0, 0
         elseif d.kind == "village" then
             if raced[d.id] == nil then
                 local best = false
@@ -2737,21 +2751,7 @@ function M.new(outer)
 
     function s.staves(u)
         return mine("staves", u, function()
-            return sandbox(function(call)
-                local out = {}
-                for i, it in ipairs(u.items) do
-                    if M.HEAL_STAVES[it.id] and call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0 then
-                        -- its reach (Board.staffRange), 0 for Physic's Mag/2
-                        -- (GetUnitItemUseReachBits, bmitem.c; GetUnitMagBy2Range, bmunit.c)
-                        local range = api.Board.staffRange(itemOf(it)) or 1
-                        if range == 0 then range = call(S.GetUnitMagBy2Range, { u.addr }) end
-                        out[#out + 1] = { slot = i - 1,
-                            amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }),
-                            exp = M.staffExp(call, S, u.addr, i - 1), range = range }
-                    end
-                end
-                return out
-            end)
+            return sandbox(function(call) return M.healStaves(api.Board, call, S, u) end)
         end)
     end
 

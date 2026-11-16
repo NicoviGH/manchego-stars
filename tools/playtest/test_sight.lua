@@ -421,6 +421,35 @@ do
     check(#Sight.selfHeals(B, call, S, u), 0, "selfHeals: a staff alone heals its holder never")
 end
 
+-- test_a_barrier_is_no_heal_staff: Sight.healStaves lists the staves a unit heals one ally with.
+-- GetUnitItemHealAmount adds its holder's power for any staff (bmitem.c), so a Barrier read 5
+-- here and was offered as a heal; the game then opened its own target selection and the run
+-- crashed (vanilla E_16, PR #631). A Heal its holder cannot use is none; a Physic's reach of 0 is
+-- its holder's Mag/2.
+do
+    local S = { GetUnitItemHealAmount = 1, CanUnitUseStaff = 2, GetUnitMagBy2Range = 3,
+                BattleInitItemEffect = 4, GetBattleUnitStaffExp = 5, gBattleActor = 0x10 }
+    local barrier, heal, physic = 0x59, 0x4B, 0x4E
+    local B = { staffRange = function(item) return (item & 0xFF) == physic and 0 or 1 end }
+    local usable = { [barrier] = true, [physic] = true }
+    local function call(fn, args)
+        if fn == S.GetUnitItemHealAmount then return ((args[2] & 0xFF) == barrier) and 5 or 15 end
+        if fn == S.CanUnitUseStaff then return usable[args[2] & 0xFF] and 1 or 0 end
+        if fn == S.GetUnitMagBy2Range then return 4 end
+        if fn == S.BattleInitItemEffect then return 0 end
+        if fn == S.GetBattleUnitStaffExp then return 11 end
+        error("healStaves: asked " .. tostring(fn))
+    end
+    local u = { addr = 0x200, items = { { id = barrier, uses = 15 }, { id = heal, uses = 30 },
+                                         { id = physic, uses = 15 } } }
+    local got = Sight.healStaves(B, call, S, u)
+    check(#got, 1, "healStaves: the Barrier and the unusable Heal are no heal staves")
+    check(got[1] and got[1].slot, 2, "healStaves: the Physic, slot 2")
+    check(got[1] and got[1].amount, 15, "healStaves: its amount")
+    check(got[1] and got[1].range, 4, "healStaves: its reach, Mag/2")
+    check(got[1] and got[1].exp, 11, "healStaves: its experience")
+end
+
 -- test_holding_puts_the_bag_back: s.holding lists the unit's items then the ones it is handed
 -- (the first empty slots), and the bag is byte-identical after it, whether fn returns or
 -- errors; a bag with an item past a gap (which the board read would not list) raises.
