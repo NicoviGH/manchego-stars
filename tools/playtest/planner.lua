@@ -171,6 +171,21 @@ M.BRANCH = 8
 M.AUDIT_WAYS = 4  -- the judged phase's ways whose chances a plan's audit record keeps
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
 
+-- On a Seize map, the enemy standing on the seize tile (sight.objective.tile): the game offers
+-- the Seize to no one while it holds the tile, so its death is the win's one step, as a Defeat
+-- Boss map's boss's is (vanilla I_14, campaign 4006's Ephraim lap, 2026-11-15: Vigarde, charId
+-- 0x6B, on the throne; twelve attempts never struck him together and stalled). The assault
+-- strikes it; its HP is weighed as any enemy's (BOSS_WORTH stays the Defeat Boss map's). Its
+-- id, or nil. Pure.
+function M.throne(objective, enemies)
+    local tile = objective and objective.kind == "seize" and objective.tile
+    if not tile then return nil end
+    for _, e in ipairs(enemies) do
+        if e.x == tile.x and e.y == tile.y then return e.id end
+    end
+    return nil
+end
+
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
 -- whose death ends it (a lord's); exp: per experience point our unit's attack teaches it, the
@@ -1114,7 +1129,8 @@ function M.plan(Bot, board, sight, style, opts)
     end
 
     -- The assault (Nicolas, 2026-10-28): on a Defeat Boss map, every unit that can strike the
-    -- boss this phase does, the heaviest expected blow first, until the plan counts it dead.
+    -- boss this phase does, the heaviest expected blow first, until the plan counts it dead. On
+    -- a Seize map, the enemy holding the seize tile (M.throne) is that boss.
     -- One unit's strike alone rarely beats holding -- the counter, then the boss's own phase
     -- -- so the beam cuts it, and the combination is never tried; this plan is that
     -- combination, and the judge weighs it like any other. While too few units reach the boss
@@ -1122,10 +1138,11 @@ function M.plan(Bot, board, sight, style, opts)
     -- arrives.
     local function assault()
         local boss
+        local throne = M.throne(sight.objective, ctx.enemies)
         for _, e in ipairs(ctx.enemies) do
-            if e.isBoss then boss = e end
+            if (objective == "boss" and e.isBoss) or e.id == throne then boss = e end
         end
-        if objective ~= "boss" or not boss then return nil end
+        if not boss then return nil end
         local strikers = {}
         for _, c in ipairs(cands) do
             local opts = {}

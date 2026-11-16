@@ -4326,6 +4326,21 @@ do
     local alone, aplan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
     check(aplan and aplan.kind, "beam", "assault: none with one striker")
     check(alone and alone.act ~= "attack", true, "assault: a lone strike is not made")
+    -- a Seize map whose seize tile the boss holds (vanilla I_14's Vigarde): the game offers no
+    -- Seize past him, so his death is the win's step and the assault is the same
+    o.objective = { kind = "seize", tile = { x = 1, y = 1 } }
+    Planner.BEAM = 2
+    local _, held = Planner.plan(B, boardOf(blue(0x01, 0, 0, 0), blue(0x02, 1, 0, 2), plain),
+                                 sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(held and held.kind, "assault", "assault: the enemy holding the seize tile")
+    check(Planner.throne(o.objective, { { id = 0x81, x = 1, y = 1 } }), 0x81,
+          "throne: the enemy on the seize tile")
+    check(Planner.throne(o.objective, { { id = 0x81, x = 2, y = 1 } }), nil,
+          "throne: none off it")
+    check(Planner.throne({ kind = "boss" }, { { id = 0x81, x = 1, y = 1 } }), nil,
+          "throne: none on a map with no seize tile")
+    o.objective = { kind = "boss" }
 end
 
 -- test_a_remembered_boss_is_the_march_goal (#510, ADR 0401; vanilla Ch6 retries): on a Defeat
