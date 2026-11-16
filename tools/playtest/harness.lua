@@ -1309,8 +1309,14 @@ end
 -- (playerphase.c TryMakeCantoUnit hands it a second move, then only Wait). Without one, the
 -- second move is spent where the unit stands.
 INSPECT.awaitActed = function(actorAddr, stopWhen, canto)
+    -- US_UNSELECTABLE alone is no proof: the act sets it BEFORE TryMakeCantoUnit runs, which
+    -- clears it and hands a Canto unit its second move (playerphase.c). Read in that window, a
+    -- Rescue looked done 37 frames after its confirm, the bot replanned, and the next unit's
+    -- input met Seth's (charId 2) Canto move (vanilla E_19, campaign 4006's Eirika lap,
+    -- 2026-11-16: "could not perform rescue"). So it counts once the map is idle again.
     local function acted()
-        return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
+        return ((ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
+                and controllerState() == "player_map_idle")
             or faction() ~= 0
             or (stopWhen ~= nil and stopWhen())
     end

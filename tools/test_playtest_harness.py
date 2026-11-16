@@ -187,6 +187,15 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertEqual(harness.count('~= "yes_no_choice"'), 1, 'INSPECT.promptClosed owns it')
         self.assertIn('INSPECT.promptClosed = function(after)', harness)
 
+    def test_an_act_is_done_only_once_the_map_is_idle_past_canto(self):
+        # The act sets US_UNSELECTABLE before TryMakeCantoUnit clears it and hands a Canto unit
+        # its second move (playerphase.c). awaitActed read the bit in that window after a
+        # Rescue (vanilla E_19, 2026-11-16), the bot replanned, and the next unit's input met
+        # the Canto move. The bit counts only with the map idle again.
+        body = _block(_read_harness(), 'INSPECT.awaitActed = function(', '\n    local done = ')
+        self.assertRegex(body, r'\(ru32\(actorAddr \+ 0x0C\) & 0x2\) ~= 0[^\n]*\n\s*'
+                               r'and controllerState\(\) == "player_map_idle"\)')
+
     def test_the_win_fired_by_the_last_kill_leaves_no_turn_to_end(self):
         # #335. A clear-bot that kills the final enemy can fire the DefeatAll win right there,
         # and the ending then plays INSIDE the old chapter slot -- so `chapter() ~= start` is
