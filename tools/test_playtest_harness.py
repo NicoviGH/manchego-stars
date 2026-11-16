@@ -535,6 +535,16 @@ class TestHealStaves(unittest.TestCase):
         lua = {int(v, 16) for v in re.findall(r'\[(0x[0-9A-Fa-f]+)\] = true', m.group(1))}
         self.assertEqual(lua, heal)
 
+    def test_the_sustain_demand_is_answered_by_a_heal_staff(self):
+        # The team's `sustain` demand took any staff CanUnitUseStaff allows, so a Barrier
+        # fielded as the party's healer (PR #631 review). It asks s.staves, the one owner of
+        # what a heal staff is.
+        with open(os.path.join(REPO, 'tools/playtest/sight.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        body = _block(text, 'elseif d.kind == "sustain" then', 'elseif d.kind == "village"')
+        self.assertIn('#s.staves(u) > 0', body)
+        self.assertNotIn('CanUnitUseStaff', body)
+
 
 class TestAiActionIds(unittest.TestCase):
     def test_board_lua_ai_actions_are_the_decomps(self):
