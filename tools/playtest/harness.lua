@@ -1290,7 +1290,13 @@ INSPECT.commitTarget = function(actorAddr, stopWhen, what)
     return INSPECT.awaitActed(actorAddr, stopWhen)
 end
 
--- An act (combat, a staff, an item) ends when the actor is greyed out. The budget has to fit
+-- Whether the unit at `addr` is greyed out (US_UNSELECTABLE, read live): the act's own mark.
+-- Alone it is no proof an act is over -- a Canto unit's act sets it, then TryMakeCantoUnit
+-- clears it for the second move (awaitActed below).
+INSPECT.greyed = function(addr) return (ru32(addr + 0x0C) & BOARD.US_UNSELECTABLE) ~= 0 end
+
+-- An act (combat, a staff, an item) ends when the actor is greyed out with the map idle again
+-- (past any Canto move), the phase leaves blue, or `stopWhen` holds. The budget has to fit
 -- an animation NOBODY IS SKIPPING: the old 1200 was sized when waitFor still mashed A on a
 -- 50-frame cadence, which advanced the in-battle quote text. #220 retired that cadence on
 -- principle, and the ch00 boss animation then measured 1238 frames -- 38 over, so every
@@ -1315,8 +1321,7 @@ INSPECT.awaitActed = function(actorAddr, stopWhen, canto)
     -- input met Seth's (charId 2) Canto move (vanilla E_19, campaign 4006's Eirika lap,
     -- 2026-11-16: "could not perform rescue"). So it counts once the map is idle again.
     local function acted()
-        return ((ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
-                and controllerState() == "player_map_idle")
+        return (INSPECT.greyed(actorAddr) and controllerState() == "player_map_idle")
             or faction() ~= 0
             or (stopWhen ~= nil and stopWhen())
     end
@@ -2088,7 +2093,7 @@ scenarios.controller_turn = function()
         return result("FAIL", "controller could not move a live unit in place")
     end
     if not chooseWait() then return result("FAIL", "live unit menu did not expose semantic Wait") end
-    if not waitFor(function() return (ru32(actor.addr + 0x0C) & 0x2) ~= 0 end, 300) then
+    if not waitFor(function() return INSPECT.greyed(actor.addr) end, 300) then
         return result("FAIL", "Wait did not mark the acting unit unselectable")
     end
     for i = 0, 49 do
@@ -3704,7 +3709,7 @@ INSPECT.botApi = function(game)
             -- the phase leaving blue ends it too (INSPECT.awaitActed): the enemy phase is
             -- api.endPhase's to watch
             local function settled()
-                return won() or lost() or dead() or (ru32(u.addr + 0x0C) & 0x2) ~= 0
+                return won() or lost() or dead() or INSPECT.greyed(u.addr)
                     or faction() ~= 0
             end
             if not chooseAttack(u.addr, function()
