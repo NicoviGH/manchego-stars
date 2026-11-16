@@ -181,6 +181,15 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertRegex(tail[:answer], r'if not current then return nil,')
         self.assertRegex(tail, r'guardedInput\(\s*"answer_"\s*\.\.\s*current\s*,\s*"A"')
 
+    def test_a_full_bag_between_chapters_is_answered_by_the_bots_chooser(self):
+        # After E_19 (2026-11-16) a scene gave an item to a unit with a full bag, and the
+        # arrival loop stopped: "unsupported state between chapters: send_to_convoy". It asks
+        # the same chooser the map does (INSPECT.answerWait -> INSPECT.onFullBag).
+        body = _block(_read_harness(), 'local stalled = INSPECT.watch("arrive")',
+                      'unsupported state between chapters')
+        self.assertRegex(body, r'elseif state == "send_to_convoy" and INSPECT\.onFullBag then'
+                               r'[\s\S]*?INSPECT\.answerWait\(state\)')
+
     def test_every_yes_no_prompt_closes_by_one_predicate(self):
         # PR #632 review: the "prompt has closed" predicate had six hand-rolled copies.
         harness = _read_harness()

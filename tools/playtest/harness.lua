@@ -4381,6 +4381,13 @@ INSPECT.campaignApi = function(game)
                         INSPECT.promptClosed, 120) then
                     return nil, "a scene's prompt refused its answer"
                 end
+            elseif state == "send_to_convoy" and INSPECT.onFullBag then
+                -- a scene's gift to a unit with a full bag (vanilla, after E_19 on campaign
+                -- 4006's Eirika lap, 2026-11-16): the bot's own chooser answers it, as on the map
+                -- (INSPECT.answerWait), and its answer is in the bag log like any other
+                if not INSPECT.answerWait(state) then
+                    return nil, "a scene's gift met a full bag and the chooser failed"
+                end
             elseif state ~= "player_map_idle" then
                 local advanced = advanceBootState(obs, state)
                 if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
