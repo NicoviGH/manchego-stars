@@ -3344,7 +3344,11 @@ class Calibration(unittest.TestCase):
             self.assertEqual(sum(r[0] for r in mc.calibration([kept])['second'].values()), 0,
                              'no second phase met, or the unit off the field at it')
         lines = '\n'.join(mc.calibration_lines(mc.calibration([la()])))
-        self.assertIn('| over 50% | 1 | 0 | 0.0% | 80.0% | 1 | 0.0% | 10.0% |', lines)
+        self.assertIn('| over 50% | 1 | 0 | 0.0% | 80.0% | 1 | 0.0% | 0 | - | 10.0% |', lines)
+        # a summed chance a hair over 1 is the top bin, not a crash (PR #636 review)
+        self.assertEqual(mc.calibration_bin(1.0000000000000002), 'over 50%')
+        drift = mc.calibration([la(second=1.0000000000000002)])['second']['over 50%']
+        self.assertEqual(drift[0], 1)
 
     def test_a_trace_index_is_named_as_the_game_names_it(self):
         # one owner of the name: the twin rows, then the route chapters' constants

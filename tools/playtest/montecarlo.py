@@ -3331,6 +3331,14 @@ def style_caps():
 CALIBRATION_BINS = ((0.0, '0'), (0.01, 'up to 1%'), (0.05, '1 to 5%'), (0.15, '5 to 15%'),
                     (0.5, '15 to 50%'), (1.0, 'over 50%'))
 # what the plan that moved a dead unit said of it (#510 PR A): the death-table's columns
+
+
+def calibration_bin(p):
+    """A predicted chance's CALIBRATION_BINS label; a sum of weighted outcomes a hair over 1
+    (float drift) is the top bin, never a StopIteration."""
+    return next((lb for hi, lb in CALIBRATION_BINS if p <= hi), CALIBRATION_BINS[-1][1])
+
+
 MOVER_KINDS = ('moved over the cap', 'moved under, over by the phase end',
                'under: dice', 'under: fog', 'under: arrival', 'under: blind spot',
                'no cap', 'no prediction')
@@ -3357,10 +3365,12 @@ def calibration(traces):
     {'traces', 'distinct', 'bins', 'deaths', 'second'}.
 
     `second`: label -> [unit-phases, died, summed second, held, held died, summed re-read, re-read
-    count]. Each protected unit of a phase's last plan that met the lookahead's second phase
+    count]. Each BLUE protected unit of a phase's last plan that met the lookahead's second phase
     (ADR 0389: `protected[].second`, read with our units holding), binned by that chance, against
     the game's next enemy phase: on the field at its start (else no unit-phase), died in it or
-    not, held when it stood on the tile it had at the phase before. The re-read is the next
+    not, held when it stood on the tile it had at the phase before. A green or other game-over
+    unit is not read (the snapshots and deaths here are blue), and one that died in the player
+    phase between is no unit-phase: `Actual` is given that it lived to the second phase. The re-read is the next
     phase's own last plan's chance for it, read after the moves played (#510 comment
     6906859807)."""
     caps, dust = style_caps()
@@ -3408,8 +3418,7 @@ def calibration(traces):
             # unit-phase, whatever the plan said of it
             for p in [p for p in (last or {}).get('predict') or [] if p.get('id') in field]:
                 die = p.get('die') or 0
-                label = next(lb for hi, lb in CALIBRATION_BINS if die <= hi)
-                row = bins[label]
+                row = bins[calibration_bin(die)]
                 row[0] += 1
                 row[1] += (turn, p.get('id')) in died
                 row[2] += die
@@ -3422,7 +3431,7 @@ def calibration(traces):
                 # gone before the second phase (died, carried): no unit-phase of it
                 if sec is None or uid not in tiles or uid not in nxt[3]:
                     continue
-                row = second[next(lb for hi, lb in CALIBRATION_BINS if sec <= hi)]
+                row = second[calibration_bin(sec)]
                 dead = (turn + 1, uid) in died
                 row[0] += 1
                 row[1] += dead
@@ -3494,13 +3503,13 @@ def calibration_lines(c):
     def pct(num, n):
         return '%.1f%%' % (100.0 * num / n) if n else '-'
     out += ['', "The lookahead's second phase (our units holding) against the phase played:", '',
-            '| Second phase | Unit-phases | Died | Actual | Mean second | Held | Held died '
-            '| Mean re-read |', '|---|---|---|---|---|---|---|---|']
+            '| Second phase | Unit-phases | Died | Actual | Mean second | Held | Held actual '
+            '| Moved | Moved actual | Mean re-read |', '|---|---|---|---|---|---|---|---|---|---|']
     for label, (n, dead, total, held, heldDead, reread, rn) in c['second'].items():
         if n:
-            out.append('| %s | %d | %d | %s | %s | %d | %s | %s |' % (
+            out.append('| %s | %d | %d | %s | %s | %d | %s | %d | %s | %s |' % (
                 label, n, dead, pct(dead, n), pct(total, n), held, pct(heldDead, held),
-                pct(reread, rn)))
+                n - held, pct(dead - heldDead, n - held), pct(reread, rn)))
     return out
 
 
