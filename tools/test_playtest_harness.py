@@ -164,19 +164,27 @@ class TestAwaitControllerState(unittest.TestCase):
     def test_a_scene_prompt_between_chapters_is_answered_and_logged(self):
         # The Eirika lap from vanilla's prologue (2026-11-15) crashed after E_16: the scene at
         # chapter index 71 asks a yes/no question no pick came before, and the arrival loop
-        # answered only a pick's confirmation. The prompt takes its highlighted answer, and
-        # the message it showed is logged, so the choice is on the record.
+        # answered only a pick's confirmation. The prompt takes its highlighted answer under the
+        # controller's own name for it (a bare A is an illegal input), and the question is
+        # logged: the last message decoded before a choice proc opened (its labels own
+        # sActiveMsg after).
         body = _block(_read_harness(), 'local stalled = INSPECT.watch("arrive")',
                       'unsupported state between chapters')
         pick = body.index('elseif state == "yes_no_choice" and menuPicked ~= nil then')
         scene = body.index('elseif state == "yes_no_choice" then', pick)
-        tail = body[scene:]
-        # the question's box, read while it was up: the prompt's labels own sActiveMsg after
-        self.assertIn('asked = { msg = INSPECT.activeMsg(), line = INSPECT.msgLine() }',
-                      body[:pick])
-        self.assertIn('asked and asked.msg', tail[:tail.index('guardedInput')])
-        # the controller's own name for the highlighted answer (a bare A is an illegal input)
-        self.assertIn('guardedInput("answer_" .. current, "A"', tail)
+        before, tail = body[:pick], body[scene:]
+        self.assertRegex(before, r'if not \(obs\.procs\.yes_no or obs\.procs\.talk_choice\) then'
+                                 r'[\s\S]*?INSPECT\.activeMsg\(\)[\s\S]*?INSPECT\.msgLine\(\)')
+        answer = tail.index('guardedInput')
+        self.assertRegex(tail[:answer], r'asked\s+and\s+asked\.msg')
+        self.assertRegex(tail[:answer], r'if not current then return nil,')
+        self.assertRegex(tail, r'guardedInput\(\s*"answer_"\s*\.\.\s*current\s*,\s*"A"')
+
+    def test_every_yes_no_prompt_closes_by_one_predicate(self):
+        # PR #632 review: the "prompt has closed" predicate had six hand-rolled copies.
+        harness = _read_harness()
+        self.assertEqual(harness.count('~= "yes_no_choice"'), 1, 'INSPECT.promptClosed owns it')
+        self.assertIn('INSPECT.promptClosed = function(after)', harness)
 
     def test_the_win_fired_by_the_last_kill_leaves_no_turn_to_end(self):
         # #335. A clear-bot that kills the final enemy can fire the DefeatAll win right there,

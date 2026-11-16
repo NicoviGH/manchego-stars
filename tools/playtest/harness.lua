@@ -865,6 +865,8 @@ controllerState = function(observation)
     end
     return at.state, at.why
 end
+-- A guarded input's predicate for every yes/no prompt: the prompt has closed. The one owner.
+INSPECT.promptClosed = function(after) return controllerState(after) ~= "yes_no_choice" end
 local function legalNames(actions)
     local names = {}
     for _, action in ipairs(actions or {}) do names[#names + 1] = action.intention end
@@ -4044,9 +4046,7 @@ INSPECT.answerFullBag = function()
         return controllerState(after) ~= "send_to_convoy" or after.choice ~= nil
     end, 120) then return false end
     if controllerState() == "yes_no_choice" then
-        return selectSemantic("answer_yes", "the discard is confirmed", function(after)
-            return controllerState(after) ~= "yes_no_choice"
-        end, 120)
+        return selectSemantic("answer_yes", "the discard is confirmed", INSPECT.promptClosed, 120)
     end
     return true
 end
@@ -4283,15 +4283,17 @@ INSPECT.campaignApi = function(game)
                      carriedUnknown = saved.carried == nil, bots = saved.bots }
         end
         local stalled = INSPECT.watch("arrive")
-        -- the last dialogue box shown, its message id and first line: a scene's prompt is asked
-        -- under it, and once the prompt is up its Yes/No labels own sActiveMsg
+        -- the last message decoded before a prompt opened, its id and first line: a scene's
+        -- question (GetStringFromIndex's sActiveMsg; once the prompt is up its Yes/No labels own
+        -- it). The line is read only when the id changes.
         local asked
         for _ = 1, TUNE.bootSteps do
             if TUNE.bootHook then TUNE.bootHook() end
             local obs = observeController()
             local state, why = controllerState(obs)
-            if state == "dialogue_wait" then
-                asked = { msg = INSPECT.activeMsg(), line = INSPECT.msgLine() }
+            if not (obs.procs.yes_no or obs.procs.talk_choice) then
+                local msg = INSPECT.activeMsg()
+                if not asked or asked.msg ~= msg then asked = { msg = msg, line = INSPECT.msgLine() } end
             end
             if stalled(obs, state) then
                 return nil, "parked on an unclassified wait (see the inspect snapshot)"
@@ -4340,9 +4342,7 @@ INSPECT.campaignApi = function(game)
                 menuPicked = picked
             elseif state == "yes_no_choice" and menuPicked ~= nil then
                 -- the pick's confirmation: "Will <lead> lead the party?", or the route's
-                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", function(after)
-                    return controllerState(after) ~= "yes_no_choice"
-                end, 120) then
+                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", INSPECT.promptClosed, 120) then
                     return nil, "the pick's prompt refused Yes"
                 end
                 menuPicked = nil
@@ -4350,12 +4350,13 @@ INSPECT.campaignApi = function(game)
                 -- a story scene's own question, no pick before it (vanilla: the scene at chapter
                 -- index 71 after E_16, campaign 4006's Eirika lap, 2026-11-15). The highlighted
                 -- answer is taken, as every prompt here is (the lead's, the shop's, an item's),
-                -- and the box it was asked under is logged, so the choice is on the record
-                local current = obs.choice and obs.choice.current or "yes"
-                log(string.format("campaign: chapter %s's prompt under message 0x%X \"%s\" takes %s",
-                    tostring(ch), asked and asked.msg or 0, asked and asked.line or "", current))
+                -- and the question it asked is logged, so the choice is on the record
+                local current = obs.choice.current
+                log(string.format("campaign: chapter %s's prompt after message 0x%X \"%s\" takes %s",
+                    tostring(ch), asked and asked.msg or 0, asked and asked.line or "", tostring(current)))
+                if not current then return nil, "a scene's prompt shows no highlighted answer" end
                 if not guardedInput("answer_" .. current, "A", "the scene's prompt takes its answer",
-                        function(after) return controllerState(after) ~= "yes_no_choice" end, 120) then
+                        INSPECT.promptClosed, 120) then
                     return nil, "a scene's prompt refused its answer"
                 end
             elseif state ~= "player_map_idle" then
@@ -4515,17 +4516,13 @@ INSPECT.campaignApi = function(game)
                 -- Before the purchase every prompt is a yes: Buy, the price, send to storage.
                 -- After it, the greeting's B leaves.
                 if bought then
-                    ok = guardedInput("cancel_choice", "B", "the shop's prompt closes", function(after)
-                        return controllerState(after) ~= "yes_no_choice"
-                    end, 120)
+                    ok = guardedInput("cancel_choice", "B", "the shop's prompt closes", INSPECT.promptClosed, 120)
                 elseif obs.choice.current ~= "yes" then
                     ok = guardedInput("select_yes", "LEFT", "Yes is highlighted", function(after)
                         return after.choice ~= nil and after.choice.current == "yes"
                     end, 60)
                 else
-                    ok = guardedInput("answer_yes", "A", "the prompt takes Yes", function(after)
-                        return controllerState(after) ~= "yes_no_choice"
-                    end, 120)
+                    ok = guardedInput("answer_yes", "A", "the prompt takes Yes", INSPECT.promptClosed, 120)
                 end
             elseif state == "shop_buy" then
                 local c = obs.shop.cursor
@@ -4671,9 +4668,7 @@ INSPECT.campaignApi = function(game)
                 ok = INSPECT.awaitActed(u.addr)
             elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
             elseif state == "yes_no_choice" then
-                ok = selectSemantic("answer_yes", "the item's prompt takes Yes", function(after)
-                    return controllerState(after) ~= "yes_no_choice"
-                end, 120)
+                ok = selectSemantic("answer_yes", "the item's prompt takes Yes", INSPECT.promptClosed, 120)
             elseif state == "generic_menu" then
                 ok = guardedInput("select_current_menu_item", "A", "the first class is chosen",
                     function(after) return controllerState(after) ~= "generic_menu" end, 120)
