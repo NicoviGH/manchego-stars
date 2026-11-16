@@ -347,6 +347,7 @@ WANTED = [
     # The planner's goals (#510 step 9): what an item is worth, a class's costs and AI scripts.
     'GetItemCost',              # price per use x uses: the party's worth sums it (bmitem.c)
     'GetItemMaxUses',           # an item's full uses (bmitem.c)
+    'GetUnitMagBy2Range',       # Physic's reach, Mag/2: a staff of reach 0 (bmunit.c; ADR 0421)
     'GetClassData',             # a class's struct: costs, MOV, attributes (bmunit.c)
     'gpAi1Table',               # AI scripts by index (cp_data.c): a looter's holds
     'gpAi2Table',               # AI_CMD_PILLAGE (vanilla's are AI2 0x04/0x05)

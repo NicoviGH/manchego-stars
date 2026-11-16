@@ -6937,18 +6937,20 @@ end
 -- A (27 HP unless given) at (0,0) is pulled to (1,0) toward a village. An enemy strikes
 -- whoever stands on (1,0) for 12, every blow landing, in the next enemy phase and in the one
 -- after it. `o` adds to the sight: who holds a heal of its own, and who a staff.
+-- one blow of 12 on A where it stands on (1,0), in the enemy's reach
+local function strikes12(plan)
+    for _, b in ipairs(plan.blues) do
+        if b.x == 1 and b.unit.id == 0x01 then
+            return { { target = b.unit.id, takenHit = 100, takenDmg = 12, takenHits = 1,
+                       takenCrit = 0 } }
+        end
+    end
+    return {}
+end
 local function wears(hp, o, ...)
     local A = blue(0x01, 0, 0, 0, { hp = hp or 27, minRange = false })
     local X = red(0x81, 0, 9, { minRange = false })
-    local function strikes(plan)
-        for _, b in ipairs(plan.blues) do
-            if b.x == 1 and b.unit.id == 0x01 then
-                return { { target = b.unit.id, takenHit = 100, takenDmg = 12, takenHits = 1,
-                           takenCrit = 0 } }
-            end
-        end
-        return {}
-    end
+    local strikes = strikes12
     local so = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
         field = function(t)
@@ -7006,6 +7008,17 @@ do
                                              [0x02] = tiles({ 14, 0 }) } }, H)
     check(at(Planner.plan(B, board, sight, st)), "0,0", "wear: a staff two turns off is no heal in reach")
 
+    -- a staff's own reach (#629 review): from (8,0) on MOV 5 the healer gets to (3,0), two
+    -- tiles from A on (1,0). A reach of 1 is no heal next turn; a reach of 3 (Physic's Mag/2) is
+    H = blue(0x02, 1, 8, 0, { minRange = false })
+    local function physic(range)
+        return wears(27, { staves = { [0x02] = { { slot = 0, amount = 10, range = range } } },
+                           reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
+                                     [0x02] = tiles({ 8, 0 }) } }, H)
+    end
+    check(at(Planner.plan(B, physic(1))), "0,0", "wear: a reach of 1, seven tiles off, no heal")
+    check(at(Planner.plan(B, physic(3))), "1,0", "wear: a reach of 3 heals from two tiles off")
+
     -- its own budget spent (the attempt's left, opts.budget.wear): the plan keeps the one-phase
     -- reading, the march goes, and every plan left unread is counted for botrun's wear_budget
     board, sight, st = wears()
@@ -7022,6 +7035,74 @@ do
     Planner.WEAR_DECISION = was
     check(at(a), "1,0", "wear: the decision's cap spent, the next phase alone is read")
     check(cost.look.wear_skipped > 0, true, "wear: counted the same")
+
+    -- each way the next phase goes, on that way's HP (#629 review): the blow lands in half the
+    -- ways only, the likeliest way's strikes are none. Where it lands, two more kill (27 - 36);
+    -- where it does not, two leave 3 HP. Read off the likeliest way's strikes, the wear saw 27
+    -- HP met by two blows and nothing; each way's, it reads a half chance and A stays out
+    local function halfway(plan)
+        local blow = strikes12(plan)
+        if #blow == 0 then return {} end
+        return { outcomes = { { p = 0.5, strikes = blow }, { p = 0.5, strikes = {} } } }
+    end
+    board, sight, st = wears(27, { enemyPhase = halfway })
+    a, plan = Planner.plan(B, board, sight, st)
+    check(at(a), "0,0", "wear: a blow in half the ways, then two more: A stays out")
+    for _, c in ipairs(plan.considered) do
+        if c.acts[1] == "1>wait@1,0>nil" then march = c end
+    end
+    check(march and math.abs(march.rank.max_die - 0.5) < 1e-9, true, "wear: the half chance, each way read")
+
+    -- a unit whose death ends the game: its later death is the game over's too (#629 review),
+    -- which ranks over-cap plans first
+    board, sight, st = wears(27, { objective = { kind = "rout", gameOver = { 0x01 } } })
+    a, plan = Planner.plan(B, board, sight, st)
+    for _, c in ipairs(plan.considered) do
+        if c.acts[1] == "1>wait@1,0>nil" then march = c end
+    end
+    check(march and march.rank.first_game_over, 0, "wear: the next phase ends no game")
+    check(march and march.rank.game_over, 1, "wear: the third blow ends it")
+
+    -- the lookahead on a worn plan (#629 review): it reuses the wear's second phase, no second
+    -- call, and the worn unit's death stays the wear's reading of it
+    board, sight, st = wears()
+    local calls, next = 0, sight.nextPhase
+    sight.nextPhase = function(...) calls = calls + 1 return next(...) end
+    a, plan, cost = Planner.plan(B, board, sight, st, { diag = "deep" })
+    check(calls, cost.look.wear + cost.look.calls, "wear: every second phase counted once")
+    for _, c in ipairs(plan.considered) do
+        if c.acts[1] == "1>wait@1,0>nil" then march = c end
+    end
+    check(march and march.extended, true, "wear: the march was a finalist the lookahead read")
+    check(march and march.rank.max_die, 1, "wear: its death the wear's three phases")
+    -- the finalists it read, less the worn ones (A on (1,0), its wear read): each one call
+    local read, worn = 0, 0
+    for _, c in ipairs(plan.considered) do
+        if c.extended then
+            read = read + 1
+            if c.rank.max_die == 1 then worn = worn + 1 end
+        end
+    end
+    check(worn > 0, true, "wear: a worn finalist was read")
+    check(cost.look.calls, read - worn, "wear: a worn finalist costs the lookahead no call")
+
+    -- one reading of the worn unit's later phases, the wear's (#629 review): the lookahead adds
+    -- neither its own second phase to the unit's death nor to the game over. Its own reading
+    -- starts A on the 10 HP the game's played phase left (r.hp), which the second blow kills
+    local function tenLeft(plan)
+        local out = strikes12(plan)
+        out.hp = { [0x01] = 10 }
+        return out
+    end
+    board, sight, st = wears(27, { enemyPhase = halfway, nextPhase = tenLeft,
+                                   objective = { kind = "rout", gameOver = { 0x01 } } })
+    a, plan = Planner.plan(B, board, sight, st, { diag = "deep" })
+    for _, c in ipairs(plan.considered) do
+        if c.acts[1] == "1>wait@1,0>nil" then march = c end
+    end
+    check(march and march.extended, true, "wear: the lord's march read by the lookahead")
+    check(march and math.abs(march.rank.max_die - 0.5) < 1e-9, true, "wear: its death the wear's half")
+    check(march and math.abs(march.rank.game_over - 0.5) < 1e-9, true, "wear: and the game over's")
 end
 
 if fails > 0 then

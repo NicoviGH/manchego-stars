@@ -22,16 +22,24 @@ whose HP nothing restores.
 **The rule (`planner.lua` `carries()` in `judge()`, `wear()` in `consider()`).** Some units the
 judged phase strikes have no heal that can reach them before the phase after. Each such unit is
 read on `M.WEAR` = 3 enemy phases, its HP carried from each phase into the next:
-- **"No heal can reach it":** it holds no item that heals itself (`sight.salve`), and no staff
-  user of the army can get beside it next turn. That is counted in the game's movement turns
-  (`turnsTo`), from where the plan leaves the healer. It is a yes or no one turn out: counting
-  the healer's turns instead (runs `wearg1`, `wearg3`) played a healer that never came.
+- **"No heal can reach it":** it holds no item that heals itself (`sight.salve`: a heal that is
+  no staff, `Board.staffRange`), and no staff user of the army can get within its staff's reach
+  of it next turn (`healsNext`). The reach is the staff's own (`Board.staffRange`, Physic's
+  Mag/2), the move the game's costs out from where the plan leaves the healer
+  (`sight.turnsTo`, GenerateExtendedMovementMap, units not blocking). It is a yes or no one turn
+  out: counting the healer's turns instead (runs `wearg1`, `wearg3`) played a healer that never
+  came.
 - **The second phase** is played by the game's AI with our units holding (`sight.nextPhase`, as
   ADR 0389 plays it). The third is the second again, each strike counted only while its striker
   outlives our counters before it.
-- **Its death chance** is that of dying in any of them, and it replaces the unit's death in the
-  plan's `protected`. Admission is asked again with the next phase's own numbers kept
-  (`first_*`), so over the cap the next phase still ranks first (0389's 2026-11-08 amendment).
+- **Its death chance** is that of dying in any of them, read over each way the next phase went
+  on that way's HP (the same ways its next-phase death is read over), and it replaces the
+  unit's death in the plan's `protected`. A unit whose death ends the game adds its later death
+  to `game_over`. Admission is asked again with the next phase's own numbers kept (`first_*`),
+  so over the cap the next phase still ranks first (0389's 2026-11-08 amendment). `predict`
+  stays the next phase's: botrun grades each phase against the plan made just before it.
+- **Beside the lookahead:** a finalist the wear read reuses its second phase (no second call),
+  and a worn unit's later phases stay the wear's reading, in its death and in the game over.
 - **Only that unit** takes the later phases. Any other unit can be restored in the turn between,
   so the hold would be no reading for it. No rank key and no filter is added.
 - **The mend does not try a worn unit's other acts for the wear alone.** Tried (runs `wr<ch>`),
@@ -42,6 +50,11 @@ read on `M.WEAR` = 3 enemy phases, its HP carried from each phase into the next:
   budget keeps the one-phase reading and is counted (`wear_skipped`). The attempt's first such
   plan is a `wear_budget` anomaly counting every one. `montecarlo.py suite` prints the wear's
   calls, CPU and skips beside the lookahead's.
+
+**Changed after the evidence (PR #629's review).** The 31 games below ran on the prototype
+(3ffc387a), which read the next phase off its likeliest way's strikes only, left the game over
+out, took every staff for a reach of 1 and a staff its holder cannot use for a self-heal. The
+fixed rule's re-run is in the PR.
 
 **Why three.** Three is the least that reads the witness: 27 HP outlives two hits of 12. Two
 phases (`wg2x23`) lose Colm on turn 17 as main does. Three cost `lap3e/9` nine turns, and the

@@ -42,6 +42,8 @@ local function defineItems(m)
     item(1, IA_WEAPON, 1, 1)
     item(2, IA_WEAPON, 2, 2)
     item(3, 0x4, 1, 1)
+    item(4, 0x4, 1, 0)    -- Physic's reach: 0, its holder's Mag/2
+    item(5, 0, 0, 0)      -- a Vulnerary: neither weapon nor staff
 end
 
 -- Put a unit in `faction`'s array at `slot`. o: charId, classId, x, y, hp, maxhp, level,
@@ -116,6 +118,12 @@ do
     mn, mx = Board.itemRange(mem, SYM, 1 | (46 << 8))
     check(mn .. "-" .. mx, "1-1", "a sword reads 1-1, the uses byte ignored")
     check(Board.itemRange(mem, SYM, 0), nil, "no item, no reach")
+    -- Board.staffRange (ADR 0421): a staff's reach, 0 for Mag/2; nil for anything else
+    check(Board.staffRange(mem, SYM, 3 | (30 << 8)), 1, "a Heal staff reaches 1")
+    check(Board.staffRange(mem, SYM, 4), 0, "Physic reads 0, its holder's Mag/2")
+    check(Board.staffRange(mem, SYM, 5), nil, "a Vulnerary is no staff")
+    check(Board.staffRange(mem, SYM, 2), nil, "a bow is no staff")
+    check(Board.staffRange(mem, SYM, 0), nil, "no item, no staff")
     check(Board.unit(b, "blue", 2).minRange, nil, "the board read carries no reach")
     local items = Board.unit(b, "blue", 2).items
     check(#items, 2, "items lists only the held slots")
