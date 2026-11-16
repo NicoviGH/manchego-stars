@@ -3407,6 +3407,26 @@ do
           "swap: the heal plan meets the lookahead as a finalist")
 end
 
+-- test_the_swapped_heal_names_the_ally_on_its_tile (ADR 0408, 0422): the heal swap asks
+-- Bot.mendAt for A's Vulnerary on (1,0), where K, yet to act, stands. The act names K to vacate,
+-- as every offered act on an ally's tile does, so the planner holds it until K has moved; without
+-- it the swap healed A on K's tile first and the harness could not end the move there (vanilla
+-- E_19, 2026-11-16).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 6, maxhp = 18 })
+    local K = blue(0x02, 1, 1, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 1, 0 }, { 2, 0 }) },
+        mend = { [0x01] = { slot = 1, amount = 10 } },
+    }
+    local _, ctx = B.candidates(boardOf(A, K, X), sightOf(o), style("careful"))
+    local h = B.mendAt(ctx, A, { x = 1, y = 0 })
+    check(h and h.act, "item", "swapped heal: A's Vulnerary")
+    check(h and h.vacate, K.id, "swapped heal: K, on its tile, is named to vacate")
+    check(h and type(h.exposure), "table", "swapped heal: its exposure is read")
+end
+
 -- test_planner_swap_reads_the_plans_hp (ADR 0408): A is 12 down with a 4-HP Vulnerary; H heals
 -- it 11 with its staff. With BEAM = 1 the beam's best is the staff, then A's wait 1 short: on
 -- the plan's HP its Vulnerary would restore 1 and throw 3 away, below the break-even. The swap
