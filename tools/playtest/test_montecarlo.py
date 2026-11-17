@@ -3300,7 +3300,7 @@ class Calibration(unittest.TestCase):
         self.assertIn('| Ch5 | 1 | 1 |', '\n'.join(mc.calibration_lines(mc.calibration([t()]))))
 
     @staticmethod
-    def lookahead(second=0.8, extended=True, held=True, dies=False, gone=False):
+    def lookahead(second=0.8, extended=True, held=True, dies=False, gone=False, reply=None):
         """Turn 1's last plan met the second phase for unit 1 (and 0 for unit 2); turn 2's re-read
         it at 0.1 after the moves. Unit 2 dies on turn 1's phase."""
         def blues(turn):
@@ -3323,7 +3323,8 @@ class Calibration(unittest.TestCase):
             {'t': 'phase', 'phase': 'player', 'turn': 1},
             {'t': 'plan', 'ref': 1, 'lookahead': look,
              'predict': [{'id': 1, 'die': 0}, {'id': 2, 'die': 0.9}],
-             'protected': [{'id': 1, 'first': 0, 'second': second, 'die': second},
+             'protected': [dict({'id': 1, 'first': 0, 'second': second, 'die': second},
+                                **({} if reply is None else {'reply': reply})),
                            {'id': 2, 'first': 0.9, 'second': 0, 'die': 0.9}]},
             {'t': 'phase', 'phase': 'enemy', 'turn': 1, 'units': blues(1)},
             {'t': 'phase', 'phase': 'player', 'turn': 2},
@@ -3349,6 +3350,18 @@ class Calibration(unittest.TestCase):
         self.assertEqual(mc.calibration_bin(1.0000000000000002), 'over 50%')
         drift = mc.calibration([la(second=1.0000000000000002)])['second']['over 50%']
         self.assertEqual(drift[0], 1)
+
+    def test_the_reply_is_read_beside_the_hold_on_the_same_units(self):
+        # PT_REPLY=shadow (#510 comment 6906859807): binned by its own read, the hold's beside
+        la = self.lookahead
+        c = mc.calibration([la(reply=0.1), la(dies=True, held=False, second=0.3, reply=0.6)])
+        self.assertEqual(c['reply']['5 to 15%'], [1, 0, 0.1, 0.8], 'lived; the hold read 0.8')
+        self.assertEqual(c['reply']['over 50%'], [1, 1, 0.6, 0.3], 'died; the hold read 0.3')
+        plain = mc.calibration([la()])
+        self.assertEqual(sum(r[0] for r in plain['reply'].values()), 0, 'no shadow, no row')
+        self.assertNotIn("army's reply", '\n'.join(mc.calibration_lines(plain)))
+        lines = '\n'.join(mc.calibration_lines(c))
+        self.assertIn('| 5 to 15% | 1 | 0 | 0.0% | 10.0% | 80.0% |', lines)
 
     def test_a_trace_index_is_named_as_the_game_names_it(self):
         # one owner of the name: the twin rows, then the route chapters' constants

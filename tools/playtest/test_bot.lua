@@ -537,8 +537,13 @@ local function sightOf(o)
     end
     if o.enemyPhase then s.enemyPhase = phaseOf(o.enemyPhase) end
     if o.nextPhase then
-        local next = phaseOf(o.nextPhase)
-        s.nextPhase = function(plan)
+        local next, replied = phaseOf(o.nextPhase), phaseOf(o.replyPhase or o.nextPhase)
+        -- `reply` (PT_REPLY=shadow): the army's reply's second phase, o.replyPhase's, counted apart
+        s.nextPhase = function(plan, reply)
+            if reply then
+                s.replied = (s.replied or 0) + 1
+                return replied(plan)
+            end
             s.asked = s.asked or {}
             s.asked[#s.asked + 1] = plan
             return next(plan)
@@ -6577,8 +6582,9 @@ end
 
 -- A at (0,0) is pulled to (1,0) toward a village; the next enemy phase leaves (1,0) alone, the
 -- one after it kills a unit there for sure (o.nextPhase). `boss`: a boss stands at (2,0), so
--- (1,0) is a first step into its reach -- the lookahead's trigger.
-local function looksAhead(boss)
+-- (1,0) is a first step into its reach -- the lookahead's trigger. `replyPhase`: the second
+-- phase with the army's reply played between (sightOf's), the hold's when nil.
+local function looksAhead(boss, replyPhase)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 0, 9, { minRange = false })
     local K = boss and red(0x82, 2, 9, { isBoss = true, minRange = 1, maxRange = 1 })
@@ -6599,6 +6605,7 @@ local function looksAhead(boss)
             end
             return {}
         end,
+        replyPhase = replyPhase,
     }
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
@@ -6679,6 +6686,34 @@ do
     a, plan = Planner.plan(B, board, sight, st,
                            { budget = { attempt = Planner.LOOK_ATTEMPT - 19 * Planner.FINAL } })
     check(plan.lookahead.extended, true, "lookahead: room left after ours-ch03's 19 triggers")
+end
+
+-- test_reply_is_read_beside_the_hold (#510 comment 6906859807): with opts.reply each finalist
+-- also meets the second phase with the army's reply played between (sight.nextPhase's `reply`),
+-- one more call each, kept as protected[].reply. It ranks nothing: the played act, the rank and
+-- `second` are the hold's. Here the reply's phase kills A at (0,0), where the hold's spares it.
+do
+    local board, sight, st = looksAhead(true)
+    local a0, plan0 = Planner.plan(B, board, sight, st)
+    check(sight.replied, nil, "reply: not asked without opts.reply")
+    check(plan0.protected[1].reply, nil, "reply: no reading without it")
+
+    board, sight, st = looksAhead(true, function(plan)
+        for _, b in ipairs(plan.blues) do
+            if b.x == 0 then
+                return { { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0 } }
+            end
+        end
+        return {}
+    end)
+    local a, plan, cost = Planner.plan(B, board, sight, st, { reply = true })
+    check(at(a), at(a0), "reply: the act played is the hold's")
+    check(plan.protected[1].second, plan0.protected[1].second, "reply: `second` is the hold's")
+    check(plan.protected[1].die, plan0.protected[1].die, "reply: the death the rank reads is the hold's")
+    check(plan.protected[1].reply, 1, "reply: kept as protected[].reply")
+    check(plan.lookahead.reply_calls, plan.lookahead.calls, "reply: one more call a finalist")
+    check(cost.look.calls, plan.lookahead.calls, "reply: its calls are not the budget's")
 end
 
 -- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn

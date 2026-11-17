@@ -920,6 +920,49 @@ function M.attackOf(ours, eHp, uHp)
              expected = expected, counterWorst = M.worst(ours.back) }
 end
 
+-- The army's reply's kills (sight.nextPhase with `reply`; #510 comment 6906859807): options =
+-- { { unit, enemy, tile, p } }, every kill one of our units can make from a free tile it
+-- reaches, p its chance. A kill at even odds or better is made, as the lookahead's own line
+-- has a striker our counter kills at even odds gone: the likeliest first, one act a unit, one
+-- death an enemy, one unit a tile. -> the kills made, in that order. Pure.
+function M.replyKills(options)
+    local sure = {}
+    for _, o in ipairs(options) do
+        if o.p >= 0.5 then sure[#sure + 1] = o end
+    end
+    table.sort(sure, function(a, b)
+        if a.p ~= b.p then return a.p > b.p end
+        if a.unit ~= b.unit then return a.unit < b.unit end
+        if a.enemy ~= b.enemy then return a.enemy < b.enemy end
+        if a.tile.y ~= b.tile.y then return a.tile.y < b.tile.y end
+        return a.tile.x < b.tile.x
+    end)
+    local acted, dead, taken, out = {}, {}, {}, {}
+    for _, o in ipairs(sure) do
+        local at = o.tile.x .. "," .. o.tile.y
+        if not acted[o.unit] and not dead[o.enemy] and not taken[at] then
+            acted[o.unit], dead[o.enemy], taken[at] = true, true, true
+            out[#out + 1] = o
+        end
+    end
+    return out
+end
+
+-- The army's reply's step for a unit that kills nothing: the tile of `tiles` the fewest
+-- enemies reach (`danger(x, y)`), its own tile `at` on a tie, then the nearest, then the first
+-- in `tiles`. nil when `tiles` is empty. Pure.
+function M.safest(tiles, danger, at)
+    local best, bestDanger, bestDist
+    for _, t in ipairs(tiles) do
+        local d = danger(t.x, t.y)
+        local dist = math.abs(t.x - at.x) + math.abs(t.y - at.y)
+        if not best or d < bestDanger or (d == bestDanger and dist < bestDist) then
+            best, bestDanger, bestDist = t, d, dist
+        end
+    end
+    return best
+end
+
 -- A judged phase's strike by enemy `id` on unit `target` (strikeOf's, `side` its simulation),
 -- played at the HPs the phase had left when it came: strikerHp / targetHp, which its exchange's
 -- ways were simulated at, felled the chance our counter kills the striker, and targetLevel the
@@ -2268,6 +2311,112 @@ function M.new(outer)
         end) end)
     end
 
+    -- The army's reply between the lookahead's two enemy phases (#510 comment 6906859807): the
+    -- turn our units would play there, read cheaply, in place of the hold. The hold read 71.5%
+    -- death where 3.0% died: the army kills and blocks between the phases. First every kill
+    -- our units can make at even odds or better (M.replyKills, one read a weapon distance:
+    -- the target's tile, not the attacker's, sets the blow), the killer stood on its tile and
+    -- the counter's expected damage on it (kept at 1 HP or more, as nextPhase keeps a
+    -- striker's); then each
+    -- unit that killed nothing steps to the free tile in its reach the fewest enemies left
+    -- reach (M.safest), the most threatened first. Greens are the AI's and hold. Inside
+    -- nextPhase's sandbox, after its first phase; `remove` is stagePhase's.
+    -- -> { kills = { { unit, enemy, x, y, p } }, steps = { { unit, x, y } } }
+    local function armyReply(call, proc, byId, remove)
+        local ours, reds = {}, {}
+        for _, o in pairs(byId) do
+            local st = mem.u32(o.addr + UNIT_STATE)
+            if (st & US_HIDDEN) == 0 and mem.u8(o.addr + UNIT_HP) > 0 then
+                if o.faction == "blue" then
+                    ours[#ours + 1] = o
+                elseif o.faction == "red" and M.playsAsSeen(Board, st, s.knows(o)) then
+                    reds[#reds + 1] = o
+                end
+            end
+        end
+        local function byUnit(a, b) return a.id < b.id end
+        table.sort(ours, byUnit)
+        table.sort(reds, byUnit)
+        local function at(o) return mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y) end
+        local function reach(u)
+            local ux, uy = at(u)
+            call(S.GenerateUnitMovementMap, { u.addr })
+            return M.riderTiles(api, call, u, movementTiles(u, ux, uy), { x = ux, y = uy })
+        end
+        local options = {}
+        for _, u in ipairs(ours) do
+            local weapons, tiles, uhp = s.weapons(u), reach(u), mem.u8(u.addr + UNIT_HP)
+            for _, e in ipairs(reds) do
+                local ex, ey = at(e)
+                local ehp, asked = mem.u8(e.addr + UNIT_HP), {}
+                for _, t in ipairs(tiles) do
+                    local d = math.abs(t.x - ex) + math.abs(t.y - ey)
+                    local wp = not asked[d] and Board.weaponFor(weapons or {}, t.x, t.y, ex, ey)
+                    if wp then
+                        asked[d] = true
+                        local side = exchange(call, proc, { S.BattleGenerateSimulation,
+                            { u.addr, e.addr, t.x, t.y, wp.slot } }, "actor")
+                        options[#options + 1] = { unit = u.id, enemy = e.id, tile = t,
+                                                  p = M.attackOf(side, ehp, uhp).kill,
+                                                  back = side.back }
+                    end
+                end
+            end
+        end
+        local out, acted = { kills = {}, steps = {} }, {}
+        for _, k in ipairs(M.replyKills(options)) do
+            local u, e = byId[k.unit], byId[k.enemy]
+            remove(e, at(e))
+            standOn(u, k.tile.x, k.tile.y)
+            local hp = mem.u8(u.addr + UNIT_HP)
+            local _, back = M.odds({ k.back }, hp)
+            wound(u.addr, math.max(1, hp - math.floor(back + 0.5)), false)
+            acted[u.id] = true
+            out.kills[#out.kills + 1] = { unit = k.unit, enemy = k.enemy, x = k.tile.x,
+                                          y = k.tile.y, p = k.p }
+        end
+        -- the threat left, on our phase (GenerateDangerZoneRange reads the non-active side's)
+        -- and the fog as the first phase left it. It counts every unit with a character, a
+        -- hidden one too, so the gone stand under a roof for the read, as s.threat roofs the rest
+        M.refresh(api, call, S, byId)
+        local roofed = {}
+        for _, o in pairs(byId) do
+            local st = mem.u32(o.addr + UNIT_STATE)
+            if o.faction == "red" and (st & US_HIDDEN) ~= 0 and (st & US_UNDER_A_ROOF) == 0 then
+                api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
+                roofed[#roofed + 1] = o
+            end
+        end
+        api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[1])
+        liftRemembered()
+        call(S.GenerateDangerZoneRange, { 0 })
+        local danger = readGrid(mem, S.gBmMapRange, w, h)
+        for _, o in ipairs(roofed) do
+            api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) & ~US_UNDER_A_ROOF)
+        end
+        local function threat(x, y) return danger[y] and danger[y][x] or 0 end
+        local rest, onTile = {}, {}
+        for _, u in ipairs(ours) do
+            if not acted[u.id] then
+                rest[#rest + 1] = u
+                onTile[u.id] = threat(at(u))
+            end
+        end
+        table.sort(rest, function(a, b)
+            if onTile[a.id] ~= onTile[b.id] then return onTile[a.id] > onTile[b.id] end
+            return a.id < b.id
+        end)
+        for _, u in ipairs(rest) do
+            local ux, uy = at(u)
+            local t = M.safest(reach(u), threat, { x = ux, y = uy })
+            if t and (t.x ~= ux or t.y ~= uy) then
+                standOn(u, t.x, t.y)
+                out.steps[#out.steps + 1] = { unit = u.id, x = t.x, y = t.y }
+            end
+        end
+        return out
+    end
+
     -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
     -- FR-017; the hold is the R-8 spike's intervening player turn). plan as enemyPhase's. The
     -- next phase is played along its expected way, unbranched: each enemy goes where its own
@@ -2280,7 +2429,10 @@ function M.new(outer)
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
     -- and .moved = the enemies the first phase moved, { { id, x, y } }.
-    function s.nextPhase(plan)
+    -- `reply` (#510 comment 6906859807): our units play armyReply's turn between the two
+    -- phases in place of the hold; .reply = what they played. Read beside the hold (the planner's
+    -- `reply` option) until calibration says which reads the game.
+    function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)
             local moved = {}
@@ -2310,6 +2462,7 @@ function M.new(outer)
                     end
                 end
             end
+            local played = reply and armyReply(call, proc, byId, remove) or nil
             -- player units and the greens: a green whose death ends the game is protected too
             local hp = {}
             for id, o in pairs(byId) do
@@ -2323,7 +2476,7 @@ function M.new(outer)
             -- enemy that walked out of it is seen, one that walked into it is not
             M.refresh(api, call, S, byId)
             local out = playPhase(call, proc, byId, order(), decides, strike, remove)
-            out.hp, out.moved = hp, moved
+            out.hp, out.moved, out.reply = hp, moved, played
             return out
         end) end)
     end

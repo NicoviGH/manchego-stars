@@ -533,6 +533,41 @@ local copy = Board.copy
 -- 2026-11-03). `enemies` are the ones in sight and those a retry remembers (Bot.candidates'
 -- ctx.threats, ADR 0399): a remembered boss in fog is a boss whose reach a unit steps into.
 -- -> the kinds, sorted, or nil.
+-- A finalist's staged board for sight.nextPhase: its first phase as the judge played it.
+function M.staged(st)
+    local ph = st.phase
+    return { blues = ph.blues, gone = ph.gone, reds = ph.reds, opened = ph.opened,
+             carry = ph.carry }
+end
+
+-- What a lookahead's second phase `r` (sight.nextPhase's) reads of the units the first phase
+-- may strike (`hit`), each alive at its start at the HP r.hp gives it -> second (each one's
+-- death chance in it), lost (its HP lost), over (the chance any unit not in `worn` dies, as
+-- struckIn's `none` reads it: the game over's share). `struckIn` is the judge's; `worn` the
+-- units the wear read (ADR 0421), whose later phases are its reading. Pure given struckIn.
+function M.secondRead(r, hit, struckIn, worn)
+    worn = worn or {}
+    local live, unworn = {}, {}
+    for _, u in ipairs(hit) do
+        local hp = r.hp and r.hp[u.id] or 0
+        if hp > 0 then
+            live[#live + 1] = { id = u.id, charId = u.charId, hp = hp }
+            if not worn[u.id] then unworn[#unworn + 1] = live[#live] end
+        end
+    end
+    local second, lost, over = {}, {}, 0
+    for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
+        local res, none = struckIn(o.strikes, live)
+        for _, u in ipairs(live) do
+            second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
+            lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
+        end
+        if #unworn < #live then none = select(2, struckIn(o.strikes, unworn)) end
+        over = over + o.p * (1 - none)
+    end
+    return second, lost, over
+end
+
 function M.triggers(fin, byId, enemies, sight)
     local hit = {}
     local bosses = {}
@@ -1850,9 +1885,7 @@ function M.plan(Bot, board, sight, style, opts)
             return
         end
         local clock = os.clock()
-        local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                    reds = st.phase.reds, opened = st.phase.opened,
-                                    carry = st.phase.carry })
+        local r = sight.nextPhase(M.staged(st))
         wearCalls = wearCalls + 1
         -- the lookahead's second phase for this plan is this same call: kept for it
         st.wearNext = r
@@ -2081,34 +2114,19 @@ function M.plan(Bot, board, sight, style, opts)
                     if st.wearNext then
                         r = st.wearNext   -- the wear asked this same phase (ADR 0421): no call
                     elseif not seizesIn(st) then
-                        r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                              reds = st.phase.reds, opened = st.phase.opened,
-                                              carry = st.phase.carry })
+                        r = sight.nextPhase(M.staged(st))
                         look.calls = look.calls + 1
                     end
                     -- the units the wear read (ADR 0421): their later phases are its reading,
                     -- the same second phase on each way's HP and the third, already in their
                     -- death and the game over
                     local wornRead = st.wornRead or {}
-                    -- every unit the first phase may strike, alive at its start: its HP then
-                    local live = {}
-                    for _, u in ipairs(st.phase.hit) do
-                        local hp = r.hp and r.hp[u.id] or 0
-                        if hp > 0 then live[#live + 1] = { id = u.id, charId = u.charId, hp = hp } end
-                    end
-                    local unworn = {}
-                    for _, u in ipairs(live) do
-                        if not wornRead[u.id] then unworn[#unworn + 1] = u end
-                    end
-                    local second, lost, over = {}, {}, 0
-                    for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
-                        local res, none = struckIn(o.strikes, live)
-                        for _, u in ipairs(live) do
-                            second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
-                            lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
-                        end
-                        if #unworn < #live then none = select(2, struckIn(o.strikes, unworn)) end
-                        over = over + o.p * (1 - none)
+                    local second, lost, over = M.secondRead(r, st.phase.hit, struckIn, wornRead)
+                    local replied
+                    if opts and opts.reply and r.hp then
+                        replied = M.secondRead(sight.nextPhase(M.staged(st), true),
+                                               st.phase.hit, struckIn)
+                        look.reply_calls = (look.reply_calls or 0) + 1
                     end
                     -- each unit's death in either phase, and what the rank reads of it: the
                     -- protected units' admission, the greens' summed death, the HP left, and
@@ -2121,6 +2139,7 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, pr in ipairs(st.protected) do
                         protected[pr.id] = true
                         pr.second = second[pr.id] or 0
+                        if replied then pr.reply = replied[pr.id] or 0 end
                         if not wornRead[pr.id] then pr.die = 1 - (1 - pr.die) * (1 - pr.second) end
                         rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end
