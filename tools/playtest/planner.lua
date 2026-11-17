@@ -1876,6 +1876,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- reading and is counted (`wear_skipped`): botrun records a wear_budget anomaly.
     -- The mend does not try such a unit's other acts for the wear alone: tried, it lost
     -- vanilla Ch5x's two chests and its clean clear (runs wr5 and wn5, #510).
+    -- opts.reply (PT_REPLY, #510 comment 6906859807): "on" plays the army's reply between the
+    -- two enemy phases in place of the hold (sight.nextPhase's `reply`) wherever a second
+    -- phase is read, the wear's and the lookahead's; "shadow" reads it beside the hold only
+    local replyOn = opts and opts.reply == "on" or false
     local wearCalls, wearCpu, wearSkipped = 0, 0, 0
     local wearRoom = math.min(M.WEAR_DECISION, (opts and opts.budget or {}).wear or M.WEAR_ATTEMPT)
     local function wear(st)
@@ -1885,7 +1889,7 @@ function M.plan(Bot, board, sight, style, opts)
             return
         end
         local clock = os.clock()
-        local r = sight.nextPhase(M.staged(st))
+        local r = sight.nextPhase(M.staged(st), replyOn)
         wearCalls = wearCalls + 1
         -- the lookahead's second phase for this plan is this same call: kept for it
         st.wearNext = r
@@ -2114,7 +2118,7 @@ function M.plan(Bot, board, sight, style, opts)
                     if st.wearNext then
                         r = st.wearNext   -- the wear asked this same phase (ADR 0421): no call
                     elseif not seizesIn(st) then
-                        r = sight.nextPhase(M.staged(st))
+                        r = sight.nextPhase(M.staged(st), replyOn)
                         look.calls = look.calls + 1
                     end
                     -- the units the wear read (ADR 0421): their later phases are its reading,
@@ -2123,7 +2127,7 @@ function M.plan(Bot, board, sight, style, opts)
                     local wornRead = st.wornRead or {}
                     local second, lost, over = M.secondRead(r, st.phase.hit, struckIn, wornRead)
                     local replied
-                    if opts and opts.reply and r.hp then
+                    if opts and opts.reply == "shadow" and r.hp then
                         replied = M.secondRead(sight.nextPhase(M.staged(st), true),
                                                st.phase.hit, struckIn)
                         look.reply_calls = (look.reply_calls or 0) + 1

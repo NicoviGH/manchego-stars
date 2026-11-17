@@ -6707,13 +6707,25 @@ do
         end
         return {}
     end)
-    local a, plan, cost = Planner.plan(B, board, sight, st, { reply = true })
+    local a, plan, cost = Planner.plan(B, board, sight, st, { reply = "shadow" })
     check(at(a), at(a0), "reply: the act played is the hold's")
     check(plan.protected[1].second, plan0.protected[1].second, "reply: `second` is the hold's")
     check(plan.protected[1].die, plan0.protected[1].die, "reply: the death the rank reads is the hold's")
     check(plan.protected[1].reply, 1, "reply: kept as protected[].reply")
     check(plan.lookahead.reply_calls, plan.lookahead.calls, "reply: one more call a finalist")
     check(cost.look.calls, plan.lookahead.calls, "reply: its calls are not the budget's")
+end
+
+-- test_reply_on_reads_the_second_phase_with_the_army_s_reply (#510 comment 6960188976): with
+-- opts.reply = "on" every second phase is the reply's, the hold's never asked. Here the hold's
+-- second phase kills A at (1,0) and the reply's does not: the march goes, as without a trigger.
+do
+    local board, sight, st = looksAhead(true, function() return {} end)
+    local a, plan = Planner.plan(B, board, sight, st, { reply = "on" })
+    check(at(a), "1,0", "reply on: the reply's second phase spares the march, so it goes")
+    check(sight.asked, nil, "reply on: the hold's second phase is never asked")
+    check(sight.replied, plan.lookahead.calls, "reply on: each finalist's call is the reply's")
+    check(plan.protected[1].reply, nil, "reply on: no shadow beside it")
 end
 
 -- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn

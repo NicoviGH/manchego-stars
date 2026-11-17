@@ -1434,8 +1434,8 @@ function M.run(api)
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
                                      quietGoals = quietGoals,
-                                     -- PT_REPLY=shadow: the army's reply read beside the hold
-                                     reply = api.replyShadow }
+                                     -- PT_REPLY: the army's reply, "shadow" or "on"
+                                     reply = api.reply }
                         end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board
