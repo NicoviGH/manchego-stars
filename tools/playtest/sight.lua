@@ -2941,6 +2941,13 @@ function M.new(outer)
         if hurt then s.maxHps(hurt) end
         return sandbox(function(call)
             standOn(u, x, y)
+            -- the healer off the unit map, as the game has it while its menu is open:
+            -- UnitBeginAction (bmunit.c) clears its tile and PlayerPhase_FinishAction
+            -- (playerphase.c) puts it back only after the act, so Physic's list
+            -- (ForEachUnitInRange, bmtarget.c) never holds the healer itself. Stood on the
+            -- tile, a wounded healer listed itself and the game refused the target (vanilla
+            -- E_20, campaign 4006, turn 24: Saleh, charId 0x17, a crash).
+            M.liftOff(api, x, y, u.id)
             -- a planned heal: these allies read as wounded, so the game's list offers them
             for _, o in ipairs(hurt or {}) do
                 if mem.u8(o.addr + UNIT_HP) >= o.maxhp then api.write8(o.addr + UNIT_HP, o.maxhp - 1) end

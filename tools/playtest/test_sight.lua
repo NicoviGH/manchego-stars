@@ -1874,6 +1874,16 @@ do
     check(factions, 2, "armyReply: writes the faction for the danger read and puts it back")
     check(reply:find("M.equip(api, call, S, u, k.slot)", 1, true) ~= nil, true,
           "armyReply: a killer equips the weapon it killed with")
+    -- test_a_healer_never_lists_itself: the game's heal list is made with the acting unit off
+    -- the unit map (UnitBeginAction), so s.heals lifts the healer off the tile it stands it on
+    -- (vanilla E_20, campaign 4006, turn 24: Saleh's Physic on himself, a crash)
+    local ha = sightSrc:find("    function s.heals(u, x, y, hurt)", 1, true)
+    local heals = ha and sightSrc:sub(ha, sightSrc:find("\n    end\n", ha, true)) or ""
+    local stood = heals:find("standOn(u, x, y)", 1, true)
+    local lifted = heals:find("M.liftOff(api, x, y, u.id)", 1, true)
+    local listed = heals:find("S.GetSelectTargetCount", 1, true)
+    check(stood ~= nil and lifted ~= nil and listed ~= nil and stood < lifted and lifted < listed,
+          true, "heals: the healer is lifted off its tile before the game's list is read")
     local la = sightSrc:find("local function liftRemembered()", 1, true)
     local lift = la and sightSrc:sub(la, sightSrc:find("\n    end\n", la, true)) or ""
     check(lift:find("mem.u8(o.addr + UNIT_X)", 1, true) ~= nil
