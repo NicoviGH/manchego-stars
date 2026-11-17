@@ -1874,21 +1874,46 @@ do
     check(factions, 2, "armyReply: writes the faction for the danger read and puts it back")
     check(reply:find("M.equip(api, call, S, u, k.slot)", 1, true) ~= nil, true,
           "armyReply: a killer equips the weapon it killed with")
-    -- test_a_healer_never_lists_itself: the game's heal list is made with the acting unit off
-    -- the unit map (UnitBeginAction), so s.heals lifts the healer off the tile it stands it on
-    -- (vanilla E_20, campaign 4006, turn 24: Saleh's Physic on himself, a crash)
+    -- the wiring: the heal list is read with the healer as the menu finds it (M.asActive)
     local ha = sightSrc:find("    function s.heals(u, x, y, hurt)", 1, true)
     local heals = ha and sightSrc:sub(ha, sightSrc:find("\n    end\n", ha, true)) or ""
-    local stood = heals:find("standOn(u, x, y)", 1, true)
-    local lifted = heals:find("M.liftOff(api, x, y, u.id)", 1, true)
-    local listed = heals:find("S.GetSelectTargetCount", 1, true)
-    check(stood ~= nil and lifted ~= nil and listed ~= nil and stood < lifted and lifted < listed,
-          true, "heals: the healer is lifted off its tile before the game's list is read")
+    check(heals:find("asActive(u, x, y)", 1, true) ~= nil and heals:find("standOn(", 1, true) == nil,
+          true, "heals: the healer stands as the active unit, not merely on the tile")
     local la = sightSrc:find("local function liftRemembered()", 1, true)
     local lift = la and sightSrc:sub(la, sightSrc:find("\n    end\n", la, true)) or ""
     check(lift:find("mem.u8(o.addr + UNIT_X)", 1, true) ~= nil
           and lift:find("o.x", 1, true) == nil, true,
           "liftRemembered: where a red stands now, off its struct, not the snapshot")
+end
+
+-- test_the_active_unit_is_off_the_unit_map: the game makes every unit-menu list with the acting
+-- unit off gBmMapUnit (UnitBeginAction clears its tile; PlayerPhase_FinishAction puts it back
+-- after the act), so a staff never lists its holder. Sight.asActive stands it on (x, y) in its
+-- struct, clears its old tile and leaves the new one empty, and makes it the active unit
+-- (vanilla E_20, campaign 4006, turn 24: Saleh's Physic on himself, a crash).
+do
+    local m = fakeMem()
+    local S = { gActiveUnit = 0x100, gActiveUnitId = 0x104, gBmMapUnit = 0x200 }
+    local ROWS = 0x300
+    m.w32(S.gBmMapUnit, ROWS)
+    for y = 0, 31 do m.w32(ROWS + y * 4, 0x1000 + y * 32) end
+    local api = { SYM = S, mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32,
+                  Board = { US_HAS_MOVED = 1 << 6 } }
+    local saleh = { id = 2, addr = 0x4000 }
+    m.w8(saleh.addr + 0x10, 9); m.w8(saleh.addr + 0x11, 2)
+    m.w32(saleh.addr + 0x0C, 1 << 6)
+    m.w8(0x1000 + 2 * 32 + 9, saleh.id)
+    m.w8(0x1000 + 0 * 32 + 8, 5)              -- an ally next to where he goes
+    Sight.asActive(api, saleh, 7, 0)
+    check(m.u8(saleh.addr + 0x10) .. "," .. m.u8(saleh.addr + 0x11), "7,0", "asActive: his struct on the tile")
+    check(m.u8(0x1000 + 2 * 32 + 9), 0, "asActive: his old tile cleared")
+    check(m.u8(0x1000 + 0 * 32 + 7), 0, "asActive: off the unit map on the new tile, as UnitBeginAction has him")
+    check(m.u8(0x1000 + 0 * 32 + 8), 5, "asActive: the ally stays on the map")
+    check(m.u32(saleh.addr + 0x0C) & (1 << 6), 0, "asActive: not yet acted")
+    check(m.u32(S.gActiveUnit) .. "/" .. m.u8(S.gActiveUnitId), "16384/2", "asActive: the active unit")
+    -- Sight.standOn leaves a unit ON the map: the enemy phase's and the reply's moves
+    Sight.standOn(api, saleh, 6, 1)
+    check(m.u8(0x1000 + 1 * 32 + 6), saleh.id, "standOn: on the unit map")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

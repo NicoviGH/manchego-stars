@@ -1720,14 +1720,15 @@ end
 -- staff's amount -- then the most wounded ally, then the safest tile. Slot order picks among
 -- healers. nil when no ally is wounded or no healer reaches one.
 local function staffHeal(ctx, gate, only)
-    local missing, any = {}, false
+    local missing, hurt = {}, 0
     for _, b in ipairs(ctx.blues) do
-        if b.maxhp and b.hp < b.maxhp then missing[b.id], any = b.maxhp - b.hp, true end
+        if b.maxhp and b.hp < b.maxhp then missing[b.id], hurt = b.maxhp - b.hp, hurt + 1 end
     end
-    if not (any and ctx.sight.heals) then return nil end
+    if not (hurt > 0 and ctx.sight.heals) then return nil end
     local best
     for _, u in ipairs(only and { only } or ctx.actors) do
-        if #ctx.sight.staves(u) > 0 then
+        -- a staff never heals its holder (sight.asActive), so a healer wounded alone has no one
+        if hurt > (missing[u.id] and 1 or 0) and #ctx.sight.staves(u) > 0 then
             for _, t in ipairs(waitTiles(ctx, u)) do
                 if gate(ctx, u, t.x, t.y, nil) then
                     for _, h in ipairs(ctx.sight.heals(u, t.x, t.y)) do
