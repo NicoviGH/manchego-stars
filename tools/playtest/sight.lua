@@ -126,8 +126,9 @@
 --                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
 --                            to 1) for every way the phase went, and .unsplit = the
 --                            uncertain counter kills below the floor, played one way.
---   nextPhase(plan)          the enemy phase AFTER the next, our units holding between (the
---                            planner's lookahead, FR-017): plan as enemyPhase's; the next phase
+--   nextPhase(plan, reply)   the enemy phase AFTER the next (the planner's lookahead, FR-017),
+--                            our units holding between, or with `reply` playing armyReply's
+--                            turn: plan as enemyPhase's; the next phase
 --                            played along its expected way, every enemy moving, then the turn
 --                            advanced, the fog refreshed and the second played as enemyPhase
 --                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
@@ -2417,8 +2418,9 @@ function M.new(outer)
         return out
     end
 
-    -- The enemy phase AFTER the next one, our units holding between (#510 step 9's lookahead,
-    -- FR-017; the hold is the R-8 spike's intervening player turn). plan as enemyPhase's. The
+    -- The enemy phase AFTER the next one (#510 step 9's lookahead, FR-017), our units holding
+    -- between (the R-8 spike's intervening player turn) unless `reply` asks armyReply's turn
+    -- there (below). plan as enemyPhase's. The
     -- next phase is played along its expected way, unbranched: each enemy goes where its own
     -- decision takes it (a strike's tile, or the move it decides without striking), a strike
     -- takes its expected damage, a player unit left at 0 HP is off the map, and a striker our
@@ -2429,9 +2431,9 @@ function M.new(outer)
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
     -- and .moved = the enemies the first phase moved, { { id, x, y } }.
-    -- `reply` (#510 comment 6906859807): our units play armyReply's turn between the two
-    -- phases in place of the hold; .reply = what they played. Read beside the hold (the planner's
-    -- `reply` option) until calibration says which reads the game.
+    -- `reply` (#510 comment 6906859807, ADR 0389's amendment of 2026-11-17): our units play
+    -- armyReply's turn between the two phases in place of the hold; .reply = what they played.
+    -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove = stagePhase(call, plan)

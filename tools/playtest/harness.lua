@@ -12,7 +12,7 @@
 --   PLAYTEST_STATEDIR -- save-state checkpoint dir (ckpt_*/record* scenarios)
 --   PLAYTEST_SEED     -- fuzz/llm seed (PT_SEED)
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
---   PLAYTEST_REPLY    -- "shadow" / "on": the army's reply beside / in place of the hold (api.reply)
+--   PLAYTEST_REPLY    -- "hold": second phases read with our units holding, the old control (api.reply)
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
 --   PLAYTEST_PINNED   -- a pinned decision state to load and read (PT_PINNED; api.check_pinned)
 --   PLAYTEST_BENCH    -- an experiment's benched charIds (PT_BENCH, JSON; botApi's api.bench)
@@ -3663,10 +3663,9 @@ INSPECT.botApi = function(game)
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
     api.leaks = INSPECT.takeLeaks   -- the attempt's sandbox leaks (PT_LEAKGUARD)
-    -- PT_REPLY (Planner's opts.reply): "shadow" reads each second phase with the army's reply
-    -- played between beside the hold (protected[].reply, ranking nothing); "on" reads it in
-    -- place of the hold
-    api.reply = (PLAYTEST_REPLY == "shadow" or PLAYTEST_REPLY == "on") and PLAYTEST_REPLY or nil
+    -- PT_REPLY=hold (Planner's opts.reply): every second phase read with our units holding, the
+    -- control the army's reply replaced (ADR 0389's amendment of 2026-11-17)
+    api.reply = PLAYTEST_REPLY == "hold" and "hold" or nil
     api.dice = function() return Sight.dice(sightApi) end
     -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
     -- The board that decision read goes beside it (.json): what a fresh emulator's load of the

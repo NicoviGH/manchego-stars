@@ -538,14 +538,15 @@ local function sightOf(o)
     if o.enemyPhase then s.enemyPhase = phaseOf(o.enemyPhase) end
     if o.nextPhase then
         local next, replied = phaseOf(o.nextPhase), phaseOf(o.replyPhase or o.nextPhase)
-        -- `reply` (PT_REPLY=shadow): the army's reply's second phase, o.replyPhase's, counted apart
+        -- `reply`: the second phase after the army's reply, o.replyPhase's (o.nextPhase's when
+        -- none); every call is in `asked`, the reply's counted in `replied` too
         s.nextPhase = function(plan, reply)
+            s.asked = s.asked or {}
+            s.asked[#s.asked + 1] = plan
             if reply then
                 s.replied = (s.replied or 0) + 1
                 return replied(plan)
             end
-            s.asked = s.asked or {}
-            s.asked[#s.asked + 1] = plan
             return next(plan)
         end
     end
@@ -6688,44 +6689,22 @@ do
     check(plan.lookahead.extended, true, "lookahead: room left after ours-ch03's 19 triggers")
 end
 
--- test_reply_is_read_beside_the_hold (#510 comment 6906859807): with opts.reply each finalist
--- also meets the second phase with the army's reply played between (sight.nextPhase's `reply`),
--- one more call each, kept as protected[].reply. It ranks nothing: the played act, the rank and
--- `second` are the hold's. Here the reply's phase kills A at (0,0), where the hold's spares it.
+-- test_the_second_phase_reads_the_army_s_reply (ADR 0389's amendment of 2026-11-17): every
+-- second phase is asked with the army's reply (sight.nextPhase's `reply`); opts.reply = "hold"
+-- (PT_REPLY=hold) asks the hold instead. Here the hold's second phase kills A at (1,0) and the
+-- reply's spares it: the march goes, and the hold keeps A back.
 do
-    local board, sight, st = looksAhead(true)
-    local a0, plan0 = Planner.plan(B, board, sight, st)
-    check(sight.replied, nil, "reply: not asked without opts.reply")
-    check(plan0.protected[1].reply, nil, "reply: no reading without it")
-
-    board, sight, st = looksAhead(true, function(plan)
-        for _, b in ipairs(plan.blues) do
-            if b.x == 0 then
-                return { { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
-                           takenHits = 1, takenCrit = 0 } }
-            end
-        end
-        return {}
-    end)
-    local a, plan, cost = Planner.plan(B, board, sight, st, { reply = "shadow" })
-    check(at(a), at(a0), "reply: the act played is the hold's")
-    check(plan.protected[1].second, plan0.protected[1].second, "reply: `second` is the hold's")
-    check(plan.protected[1].die, plan0.protected[1].die, "reply: the death the rank reads is the hold's")
-    check(plan.protected[1].reply, 1, "reply: kept as protected[].reply")
-    check(plan.lookahead.reply_calls, plan.lookahead.calls, "reply: one more call a finalist")
-    check(cost.look.calls, plan.lookahead.calls, "reply: its calls are not the budget's")
-end
-
--- test_reply_on_reads_the_second_phase_with_the_army_s_reply (#510 comment 6960188976): with
--- opts.reply = "on" every second phase is the reply's, the hold's never asked. Here the hold's
--- second phase kills A at (1,0) and the reply's does not: the march goes, as without a trigger.
-do
-    local board, sight, st = looksAhead(true, function() return {} end)
-    local a, plan = Planner.plan(B, board, sight, st, { reply = "on" })
-    check(at(a), "1,0", "reply on: the reply's second phase spares the march, so it goes")
-    check(sight.asked, nil, "reply on: the hold's second phase is never asked")
-    check(sight.replied, plan.lookahead.calls, "reply on: each finalist's call is the reply's")
-    check(plan.protected[1].reply, nil, "reply on: no shadow beside it")
+    local played = { kills = {}, steps = { { unit = 0x01, x = 0, y = 0 } } }
+    local board, sight, st = looksAhead(true, function() return { reply = played } end)
+    local a, plan = Planner.plan(B, board, sight, st)
+    check(at(a), "1,0", "reply: the reply's second phase spares the march, so it goes")
+    check(plan.lookahead.reply, played, "reply: what it played is in the played plan's trace")
+    check(sight.replied, #sight.asked, "reply: every second phase is the reply's")
+    check(plan.lookahead.calls, #sight.asked, "reply: one call a finalist, as the hold's")
+    board, sight, st = looksAhead(true, function() return {} end)
+    a = Planner.plan(B, board, sight, st, { reply = "hold" })
+    check(at(a), "0,0", "reply: PT_REPLY=hold reads the hold, which keeps A back")
+    check(sight.replied, nil, "reply: and never asks the reply")
 end
 
 -- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn

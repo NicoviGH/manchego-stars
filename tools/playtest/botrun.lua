@@ -1434,7 +1434,7 @@ function M.run(api)
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
                                      quietGoals = quietGoals,
-                                     -- PT_REPLY: the army's reply, "shadow" or "on"
+                                     -- PT_REPLY=hold: the second phases' old control
                                      reply = api.reply }
                         end
                         if playing and playing.forced then

@@ -78,12 +78,10 @@
 #                           does not is logged, put back and played on, and the attempt fails
 #                           at its end listing them all (sight.lua's M.leaks). Slower: set it
 #                           for one run after a change to what a sandbox calls.
-#                           PT_REPLY=shadow: a measurement. Each lookahead also reads its
-#                           second phase with our units' reply played between (sight.lua
-#                           armyReply), kept as protected[].reply for `montecarlo.py
-#                           calibration`; the plan played is the same. One more call a finalist.
-#                           PT_REPLY=on: an experiment. Every second phase (the lookahead's and
-#                           the wear's) is read with that reply in place of the hold.
+#                           PT_REPLY=hold: a control. Every second phase (the lookahead's and
+#                           the wear's) is read with our units holding between the two enemy
+#                           phases, as before ADR 0389's amendment of 2026-11-17, in place of
+#                           the army's reply (sight.lua armyReply).
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness

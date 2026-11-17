@@ -3366,23 +3366,18 @@ def calibration(traces):
 
     `second`: label -> [unit-phases, died, summed second, held, held died, summed re-read, re-read
     count]. Each BLUE protected unit of a phase's last plan that met the lookahead's second phase
-    (ADR 0389: `protected[].second`, read with our units holding), binned by that chance, against
-    the game's next enemy phase: on the field at its start (else no unit-phase), died in it or
+    (ADR 0389: `protected[].second`, read after our army's reply since its amendment of
+    2026-11-17, our units holding before it and under PT_REPLY=hold), binned by that chance,
+    against the game's next enemy phase: on the field at its start (else no unit-phase), died in it or
     not, held when it stood on the tile it had at the phase before. A green or other game-over
     unit is not read (the snapshots and deaths here are blue), and one that died in the player
     phase between is no unit-phase: `Actual` is given that it lived to the second phase. The re-read is the next
     phase's own last plan's chance for it, read after the moves played (#510 comment
-    6906859807).
-
-    `reply`: label -> [unit-phases, died, summed reply, summed second]. The same unit-phases as
-    `second`, binned by the read with the army's reply played between (`protected[].reply`,
-    PT_REPLY=shadow: sight.lua armyReply), the hold's `second` of the same units beside it. A
-    plan read without the shadow has no `reply` and adds nothing."""
+    6906859807)."""
     caps, dust = style_caps()
     bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
     second = collections.OrderedDict((label, [0, 0, 0.0, 0, 0, 0.0, 0])
                                      for _, label in CALIBRATION_BINS)
-    reply = collections.OrderedDict((label, [0, 0, 0.0, 0.0]) for _, label in CALIBRATION_BINS)
     deaths = collections.defaultdict(collections.Counter)
     seen = set()
     for events in traces:
@@ -3448,13 +3443,6 @@ def calibration(traces):
                 if uid in reread:
                     row[5] += reread[uid]
                     row[6] += 1
-                rep = pr.get('reply')
-                if rep is not None:
-                    rrow = reply[calibration_bin(rep)]
-                    rrow[0] += 1
-                    rrow[1] += dead
-                    rrow[2] += rep
-                    rrow[3] += sec
         name = chapter_label(info)
         for (turn, uid), d in died.items():
             last, moved = phases.get(turn, (None, {}))[:2]
@@ -3485,7 +3473,7 @@ def calibration(traces):
                 kind = 'under: blind spot'
             deaths[name][kind] += 1
     return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'deaths': deaths,
-            'second': second, 'reply': reply}
+            'second': second}
 
 
 def chapter_label(info):
@@ -3498,7 +3486,7 @@ def chapter_label(info):
 
 
 def calibration_lines(c):
-    """calibration()'s tables, as markdown: the fourth only when a trace read the reply."""
+    """calibration()'s three tables, as markdown."""
     out = ['%d traces, %d distinct plays.' % (c['traces'], c['distinct']), '',
            '| Predicted | Unit-phases | Died | Actual | Mean predicted |', '|---|---|---|---|---|']
     for label, (n, dead, total) in c['bins'].items():
@@ -3515,7 +3503,7 @@ def calibration_lines(c):
 
     def pct(num, n):
         return '%.1f%%' % (100.0 * num / n) if n else '-'
-    out += ['', "The lookahead's second phase (our units holding) against the phase played:", '',
+    out += ['', "The lookahead's second phase against the phase played:", '',
             '| Second phase | Unit-phases | Died | Actual | Mean second | Held | Held actual '
             '| Moved | Moved actual | Mean re-read |', '|---|---|---|---|---|---|---|---|---|---|']
     for label, (n, dead, total, held, heldDead, reread, rn) in c['second'].items():
@@ -3523,15 +3511,6 @@ def calibration_lines(c):
             out.append('| %s | %d | %d | %s | %s | %d | %s | %d | %s | %s |' % (
                 label, n, dead, pct(dead, n), pct(total, n), held, pct(heldDead, held),
                 n - held, pct(dead - heldDead, n - held), pct(reread, rn)))
-    if any(r[0] for r in c['reply'].values()):
-        out += ['', "The second phase with the army's reply between (PT_REPLY=shadow), the "
-                "same units' hold beside it:", '',
-                '| Reply phase | Unit-phases | Died | Actual | Mean reply | Mean second |',
-                '|---|---|---|---|---|---|']
-        for label, (n, dead, total, sec) in c['reply'].items():
-            if n:
-                out.append('| %s | %d | %d | %s | %s | %s |' % (
-                    label, n, dead, pct(dead, n), pct(total, n), pct(sec, n)))
     return out
 
 
