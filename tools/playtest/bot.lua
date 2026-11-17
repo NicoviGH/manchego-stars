@@ -1727,7 +1727,8 @@ local function staffHeal(ctx, gate, only)
     if not (hurt > 0 and ctx.sight.heals) then return nil end
     local best
     for _, u in ipairs(only and { only } or ctx.actors) do
-        -- a staff never heals its holder (sight.asActive), so a healer wounded alone has no one
+        -- a shortcut only: sight.heals reads the game's list, which never holds the healer
+        -- (Sight.asActive), so a healer wounded alone is skipped without asking it
         if hurt > (missing[u.id] and 1 or 0) and #ctx.sight.staves(u) > 0 then
             for _, t in ipairs(waitTiles(ctx, u)) do
                 if gate(ctx, u, t.x, t.y, nil) then

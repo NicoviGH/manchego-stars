@@ -1141,16 +1141,23 @@ function M.standOn(api, u, x, y)
     api.write8(u.addr + UNIT_Y, y)
 end
 -- Inside a sandbox: `u` on (x, y) as the active unit, not yet acted, as the unit menu finds
--- it after a move: its struct there and gActiveUnit it, and OFF the unit map. UnitBeginAction
--- (bmunit.c) clears its tile and PlayerPhase_FinishAction (playerphase.c) puts it back only
--- after the act, so no list the menu makes holds the unit itself: Physic's (ForEachUnitInRange,
--- bmtarget.c) listed a wounded healer stood on its tile, and the game refused the target
--- (vanilla E_20, campaign 4006, turn 24: Saleh, charId 0x17, a crash).
-function M.asActive(api, u, x, y)
+-- it after a move: its struct there and gActiveUnit it, and OFF the unit map, the part of
+-- UnitBeginAction (bmunit.c) a menu read sees. Its tile stays clear until
+-- PlayerPhase_FinishAction (playerphase.c) puts it back after the act, so no list the menu
+-- makes holds the unit itself. Left out: US_HIDDEN and gActiveUnitMoveOrigin, which no menu or
+-- target code reads; a RefreshEntityBmMaps after this would put the unit back (bmmap.c skips
+-- only hidden units), so no read here calls one.
+-- Physic's list (ForEachUnitInRange, bmtarget.c) listed a wounded healer stood on its tile and
+-- the game refused the target (vanilla E_20, campaign 4006, turn 24: Saleh, charId 0x17, a crash).
+-- `asIs`: the unit's state left as it stands (canAttack asks from where a unit is, which may
+-- be after its Canto move: AttackCommandUsability hides Attack from a US_HAS_MOVED unit).
+function M.asActive(api, u, x, y, asIs)
     local S = api.SYM
     M.standOn(api, u, x, y)
     M.liftOff(api, x, y, u.id)
-    api.write32(u.addr + UNIT_STATE, api.mem.u32(u.addr + UNIT_STATE) & ~api.Board.US_HAS_MOVED)
+    if not asIs then
+        api.write32(u.addr + UNIT_STATE, api.mem.u32(u.addr + UNIT_STATE) & ~api.Board.US_HAS_MOVED)
+    end
     api.write32(S.gActiveUnit, u.addr)
     api.write8(S.gActiveUnitId, u.id)
 end
@@ -3188,7 +3195,7 @@ end
 function M.canAttack(api, u, sandbox)
     local S = api.SYM
     return (sandbox or M.machine(api.cpu))(function(call)
-        api.write32(S.gActiveUnit, u.addr)
+        M.asActive(api, u, api.mem.u8(u.addr + UNIT_X), api.mem.u8(u.addr + UNIT_Y), true)
         return call(S.AttackCommandUsability, { 0, 0 }) == M.MENU_ENABLED
     end)
 end
