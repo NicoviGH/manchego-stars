@@ -29,8 +29,8 @@ read on `M.WEAR` = 3 enemy phases, its HP carried from each phase into the next:
   (`sight.turnsTo`, GenerateExtendedMovementMap, units not blocking). It is a yes or no one turn
   out: counting the healer's turns instead (runs `wearg1`, `wearg3`) played a healer that never
   came.
-- **The second phase** is played by the game's AI with our units holding (`sight.nextPhase`, as
-  ADR 0389 plays it). The third is the second again, each strike counted only while its striker
+- **The second phase** is played by the game's AI after our army's reply (`sight.nextPhase`, as
+  ADR 0389 plays it; with our units holding until its amendment of 2026-11-17). The third is the second again, each strike counted only while its striker
   outlives our counters before it.
 - **Its death chance** is that of dying in any of them, read over each way the next phase went
   on that way's HP (the same ways its next-phase death is read over), and it replaces the

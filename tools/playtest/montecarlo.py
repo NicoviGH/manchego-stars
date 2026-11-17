@@ -65,8 +65,8 @@ each beside the twin; `--decision` reads only that decision's components (FR-032
 `calibration` reads kept traces, each play once, and prints three tables (#510 PR A): each blue
 unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; each
 chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against its
-style's cap; and the lookahead's second phase (read with our units holding) against the phase
-the game played after, split by whether the unit held its tile. Every change to the bot's first
+style's cap; and the lookahead's second phase (read after our army's reply, ADR 0389) against
+the phase the game played after, split by whether the unit held its tile. Every change to the bot's first
 attempts is read by it the same way.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>

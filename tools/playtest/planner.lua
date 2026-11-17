@@ -525,14 +525,6 @@ end
 
 local copy = Board.copy
 
--- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
--- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
--- struck ("breach"); a unit stepping into a boss's reach from outside it ("boss": its
--- end tile under sight.threat, its start tile not). No arrival trigger: the second phase
--- cannot place the wave yet, so it would learn nothing about it (ADR 0389, Nicolas
--- 2026-11-03). `enemies` are the ones in sight and those a retry remembers (Bot.candidates'
--- ctx.threats, ADR 0399): a remembered boss in fog is a boss whose reach a unit steps into.
--- -> the kinds, sorted, or nil.
 -- A finalist's staged board for sight.nextPhase: its first phase as the judge played it.
 function M.staged(st)
     local ph = st.phase
@@ -542,7 +534,7 @@ end
 
 -- What a lookahead's second phase `r` (sight.nextPhase's) reads of the units the first phase
 -- may strike (`hit`), each alive at its start at the HP r.hp gives it -> second (each one's
--- death chance in it), lost (its HP lost), over (the chance any unit not in `worn` dies, as
+-- death chance in it), lost (its HP lost in it, and to a counter in the army's reply), over (the chance any unit not in `worn` dies, as
 -- struckIn's `none` reads it: the game over's share). `struckIn` is the judge's; `worn` the
 -- units the wear read (ADR 0421), whose later phases are its reading. Pure given struckIn.
 function M.secondRead(r, hit, struckIn, worn)
@@ -556,6 +548,11 @@ function M.secondRead(r, hit, struckIn, worn)
         end
     end
     local second, lost, over = {}, {}, 0
+    -- the counter each killer took in the army's reply (sight.nextPhase's .reply): HP the
+    -- plan loses between the phases, as the first phase's strikes are
+    for _, k in ipairs((r.reply or {}).kills or {}) do
+        lost[k.unit] = (lost[k.unit] or 0) + (k.lost or 0)
+    end
     for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
         local res, none = struckIn(o.strikes, live)
         for _, u in ipairs(live) do
@@ -568,6 +565,14 @@ function M.secondRead(r, hit, struckIn, worn)
     return second, lost, over
 end
 
+-- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
+-- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
+-- struck ("breach"); a unit stepping into a boss's reach from outside it ("boss": its
+-- end tile under sight.threat, its start tile not). No arrival trigger: the second phase
+-- cannot place the wave yet, so it would learn nothing about it (ADR 0389, Nicolas
+-- 2026-11-03). `enemies` are the ones in sight and those a retry remembers (Bot.candidates'
+-- ctx.threats, ADR 0399): a remembered boss in fog is a boss whose reach a unit steps into.
+-- -> the kinds, sorted, or nil.
 function M.triggers(fin, byId, enemies, sight)
     local hit = {}
     local bosses = {}

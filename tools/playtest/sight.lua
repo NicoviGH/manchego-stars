@@ -1891,25 +1891,49 @@ function M.new(outer)
     end
     function s.knows(u) return M.knows(Board, remembered, u) end
     -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
-    -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen
+    -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen.
+    -- Where each stands and its fog bit are read off its unit struct, not the board's snapshot:
+    -- inside nextPhase the first phase has moved them (armyReply's danger read)
     local function liftRemembered()
         if not remembered then return end
         for _, o in ipairs(units()) do
-            -- in fog, yet counts as seen (Board.playsAsSeen): remembered
-            if o.faction == "red" and o.onField and not o.dead and o.fogged
-                and Board.playsAsSeen(o.fogged, s.knows(o)) then
-                api.write8(cell(mem, S.gBmMapFog, o.x, o.y), 1)
+            local st = mem.u32(o.addr + UNIT_STATE)
+            -- counts as seen (Board.playsAsSeen): in sight, its tile is already out of the
+            -- fog; in fog, remembered
+            if o.faction == "red" and o.onField and (st & US_HIDDEN) == 0
+                and Board.playsAsSeen(st, s.knows(o)) then
+                api.write8(cell(mem, S.gBmMapFog, mem.u8(o.addr + UNIT_X),
+                                mem.u8(o.addr + UNIT_Y)), 1)
             end
         end
     end
 
+    -- Inside a sandbox: the danger map (gBmMapRange, how many enemies reach each tile) on the
+    -- board as it stands, every remembered red lifted out of the fog. GenerateDangerZoneRange
+    -- counts every unit with a character, a hidden one too, and leaves out only one under a roof
+    -- or in fog: a red `roofed(o, state)` names is put under a roof for the read, then taken out.
+    -- s.danger's, s.threat's and armyReply's one reader.
+    local function dangerGrid(call, roofed)
+        local roof = {}
+        for _, o in ipairs(units()) do
+            local st = mem.u32(o.addr + UNIT_STATE)
+            if o.faction == "red" and roofed and (st & US_UNDER_A_ROOF) == 0 and roofed(o, st) then
+                api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
+                roof[#roof + 1] = o
+            end
+        end
+        liftRemembered()
+        call(S.GenerateDangerZoneRange, { 0 })
+        local g = readGrid(mem, S.gBmMapRange, w, h)
+        for _, o in ipairs(roof) do
+            api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) & ~US_UNDER_A_ROOF)
+        end
+        return g
+    end
+
     function s.danger(x, y)
         if not seen.danger then
-            seen.danger = sandbox(function(call)
-                liftRemembered()
-                call(S.GenerateDangerZoneRange, { 0 })
-                return readGrid(mem, S.gBmMapRange, w, h)
-            end)
+            seen.danger = sandbox(function(call) return dangerGrid(call) end)
         end
         return seen.danger[y] and seen.danger[y][x] or 0
     end
@@ -1917,15 +1941,7 @@ function M.new(outer)
     function s.threat(e)
         if not seen.threats[e.id] then
             seen.threats[e.id] = sandbox(function(call)
-                for _, o in ipairs(units()) do
-                    if o.faction == "red" and o.id ~= e.id then
-                        local st = mem.u32(o.addr + UNIT_STATE)
-                        api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
-                    end
-                end
-                liftRemembered()
-                call(S.GenerateDangerZoneRange, { 0 })
-                return readGrid(mem, S.gBmMapRange, w, h)
+                return dangerGrid(call, function(o) return o.id ~= e.id end)
             end)
         end
         local g = seen.threats[e.id]
@@ -1954,11 +1970,16 @@ function M.new(outer)
         return out
     end
 
+    -- Inside a sandbox: the tiles `u` reaches standing on (x, y) (its struct's own tile: the
+    -- movement map reads where it stands), less a rider's forbidden ones. s.reach's and
+    -- armyReply's one reader.
+    local function reachIn(call, u, x, y, friends)
+        call(S.GenerateUnitMovementMap, { u.addr })
+        return M.riderTiles(api, call, u, movementTiles(u, x, y, friends), { x = x, y = y })
+    end
+
     function s.reach(u, friends)
-        return sandbox(function(call)
-            call(S.GenerateUnitMovementMap, { u.addr })
-            return M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))
-        end)
+        return sandbox(function(call) return reachIn(call, u, u.x, u.y, friends) end)
     end
 
     function s.weapons(u)
@@ -2315,14 +2336,18 @@ function M.new(outer)
     -- The army's reply between the lookahead's two enemy phases (#510 comment 6906859807): the
     -- turn our units would play there, read cheaply, in place of the hold. The hold read 71.5%
     -- death where 3.0% died: the army kills and blocks between the phases. First every kill
-    -- our units can make at even odds or better (M.replyKills, one read a weapon distance:
-    -- the target's tile, not the attacker's, sets the blow), the killer stood on its tile and
-    -- the counter's expected damage on it (kept at 1 HP or more, as nextPhase keeps a
-    -- striker's); then each
-    -- unit that killed nothing steps to the free tile in its reach the fewest enemies left
-    -- reach (M.safest), the most threatened first. Greens are the AI's and hold. Inside
-    -- nextPhase's sandbox, after its first phase; `remove` is stagePhase's.
-    -- -> { kills = { { unit, enemy, x, y, p } }, steps = { { unit, x, y } } }
+    -- our units can make at even odds or better (M.replyKills), taken as made, as nextPhase
+    -- takes a striker our counter kills at even odds: its miss is not read (#510 PR 637 review:
+    -- whether a kill the reply made left a death unread is checked on the runs, not assumed).
+    -- The kill's chance is read once a weapon distance (the target's tile sets the blow), and
+    -- every free tile at that distance offers it; the counter the killer takes is read again on
+    -- the tile it is given, its weapon equipped as the attack would, and its expected damage
+    -- stays on it (at 1 HP or more, as nextPhase keeps a striker's) and is reported as `lost`.
+    -- Then each unit that killed nothing steps to the free tile in its reach that the fewest
+    -- enemies left reach (M.safest), the most threatened first. Greens are the AI's and hold.
+    -- Inside nextPhase's sandbox, after its first phase; `remove` is stagePhase's. The faction
+    -- written for the danger read is put back, so the turn after reads the phase as the hold's.
+    -- -> { kills = { { unit, enemy, x, y, p, lost } }, steps = { { unit, x, y } } }
     local function armyReply(call, proc, byId, remove)
         local ours, reds = {}, {}
         for _, o in pairs(byId) do
@@ -2341,25 +2366,29 @@ function M.new(outer)
         local function at(o) return mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y) end
         local function reach(u)
             local ux, uy = at(u)
-            call(S.GenerateUnitMovementMap, { u.addr })
-            return M.riderTiles(api, call, u, movementTiles(u, ux, uy), { x = ux, y = uy })
+            return reachIn(call, u, ux, uy)
+        end
+        local function strike(u, e, t, slot)
+            return exchange(call, proc, { S.BattleGenerateSimulation,
+                { u.addr, e.addr, t.x, t.y, slot } }, "actor")
         end
         local options = {}
         for _, u in ipairs(ours) do
-            local weapons, tiles, uhp = s.weapons(u), reach(u), mem.u8(u.addr + UNIT_HP)
+            local weapons, tiles, uhp = s.weapons(u) or {}, reach(u), mem.u8(u.addr + UNIT_HP)
             for _, e in ipairs(reds) do
                 local ex, ey = at(e)
-                local ehp, asked = mem.u8(e.addr + UNIT_HP), {}
+                local ehp, read = mem.u8(e.addr + UNIT_HP), {}
                 for _, t in ipairs(tiles) do
                     local d = math.abs(t.x - ex) + math.abs(t.y - ey)
-                    local wp = not asked[d] and Board.weaponFor(weapons or {}, t.x, t.y, ex, ey)
-                    if wp then
-                        asked[d] = true
-                        local side = exchange(call, proc, { S.BattleGenerateSimulation,
-                            { u.addr, e.addr, t.x, t.y, wp.slot } }, "actor")
+                    if read[d] == nil then
+                        local wp = Board.weaponFor(weapons, t.x, t.y, ex, ey)
+                        read[d] = wp and { slot = wp.slot,
+                                           p = M.attackOf(strike(u, e, t, wp.slot), ehp, uhp).kill }
+                                  or false
+                    end
+                    if read[d] then
                         options[#options + 1] = { unit = u.id, enemy = e.id, tile = t,
-                                                  p = M.attackOf(side, ehp, uhp).kill,
-                                                  back = side.back }
+                                                  p = read[d].p, slot = read[d].slot }
                     end
                 end
             end
@@ -2367,34 +2396,24 @@ function M.new(outer)
         local out, acted = { kills = {}, steps = {} }, {}
         for _, k in ipairs(M.replyKills(options)) do
             local u, e = byId[k.unit], byId[k.enemy]
+            local hp = mem.u8(u.addr + UNIT_HP)
+            local _, back = M.odds({ strike(u, e, k.tile, k.slot).back }, hp)
             remove(e, at(e))
             standOn(u, k.tile.x, k.tile.y)
-            local hp = mem.u8(u.addr + UNIT_HP)
-            local _, back = M.odds({ k.back }, hp)
-            wound(u.addr, math.max(1, hp - math.floor(back + 0.5)), false)
+            M.equip(api, call, S, u, k.slot)
+            local left = math.max(1, hp - math.floor(back + 0.5))
+            wound(u.addr, left, false)
             acted[u.id] = true
             out.kills[#out.kills + 1] = { unit = k.unit, enemy = k.enemy, x = k.tile.x,
-                                          y = k.tile.y, p = k.p }
+                                          y = k.tile.y, p = k.p, lost = hp - left }
         end
-        -- the threat left, on our phase (GenerateDangerZoneRange reads the non-active side's)
-        -- and the fog as the first phase left it. It counts every unit with a character, a
-        -- hidden one too, so the gone stand under a roof for the read, as s.threat roofs the rest
+        -- the threat left, read on our phase (GenerateDangerZoneRange reads the non-active
+        -- side's) with the fog as the first phase left it; the gone stand under a roof for it
         M.refresh(api, call, S, byId)
-        local roofed = {}
-        for _, o in pairs(byId) do
-            local st = mem.u32(o.addr + UNIT_STATE)
-            if o.faction == "red" and (st & US_HIDDEN) ~= 0 and (st & US_UNDER_A_ROOF) == 0 then
-                api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
-                roofed[#roofed + 1] = o
-            end
-        end
+        local faction = mem.u8(S.gPlaySt + PLAY_FACTION)
         api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[1])
-        liftRemembered()
-        call(S.GenerateDangerZoneRange, { 0 })
-        local danger = readGrid(mem, S.gBmMapRange, w, h)
-        for _, o in ipairs(roofed) do
-            api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) & ~US_UNDER_A_ROOF)
-        end
+        local danger = dangerGrid(call, function(_, st) return (st & US_HIDDEN) ~= 0 end)
+        api.write8(S.gPlaySt + PLAY_FACTION, faction)
         local function threat(x, y) return danger[y] and danger[y][x] or 0 end
         local rest, onTile = {}, {}
         for _, u in ipairs(ours) do

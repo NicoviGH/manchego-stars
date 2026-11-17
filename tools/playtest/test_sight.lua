@@ -956,7 +956,11 @@ do
     local _, asks = src:gsub("M%.playsAsSeen%(Board, [^\n]-, s%.knows%(e%)%)", "")
     check(asks, 3, "playsAsSeen: decides, closings' looters and keySources ask it")
     local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
-    check(lifts, 3, "knows: danger, threat and the army's reply lift the remembered out of the fog")
+    check(lifts, 1, "knows: the one danger reader (dangerGrid) lifts the remembered out of the fog")
+    local _, readers = src:gsub("call%(S%.GenerateDangerZoneRange", "")
+    local _, users = src:gsub("dangerGrid%(call", "")
+    users = users - select(2, src:gsub("function dangerGrid%(", ""))
+    check(readers .. "/" .. users, "1/3", "knows: danger, threat and the army's reply read it there")
     local _, fogTests = src:gsub("& Board%.US_BIT9%)", "")
     check(fogTests, 1, "the fog bit is read in playsAsSeen alone")
 end
@@ -1763,9 +1767,12 @@ do
         local at = src:find(head, 1, true)
         return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
     end
-    check(bodyOf(sightSrc, "    function s.reach(u, friends)")
-              :find("M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))", 1, true)
-          ~= nil, true, "riderTiles: s.reach filters the rider's tiles")
+    check(bodyOf(sightSrc, "    local function reachIn(call, u, x, y, friends)")
+              :find("M.riderTiles(api, call, u, movementTiles(u, x, y, friends), { x = x, y = y })",
+                    1, true) ~= nil
+          and bodyOf(sightSrc, "    function s.reach(u, friends)")
+              :find("reachIn(call, u, u.x, u.y, friends)", 1, true) ~= nil,
+          true, "riderTiles: s.reach (and the army's reply) filter the rider's tiles in reachIn")
     check(bodyOf(sightSrc, "    function s.cantoTiles(u, a)")
               :find("M.riderTiles(api, call, u, movementTiles(u, x, y), { x = x, y = y })", 1,
                     true) ~= nil, true, "riderTiles: s.cantoTiles filters the rider's tiles")

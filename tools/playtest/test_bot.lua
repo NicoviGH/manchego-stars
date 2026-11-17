@@ -6707,6 +6707,21 @@ do
     check(sight.replied, nil, "reply: and never asks the reply")
 end
 
+-- test_second_read_prices_the_reply_s_counter (PR 637 review): a kill in the army's reply costs
+-- the killer the counter's HP between the phases; Planner.secondRead counts it in `lost`, as the
+-- second phase's own strikes, so a plan whose reply bleeds a unit ranks below one that does not.
+do
+    local struck = function(_, live)
+        local res = {}
+        for _, u in ipairs(live) do res[u.id] = { d = 0, t = 3 } end
+        return res, 1
+    end
+    local r = { hp = { [0x01] = 13 }, reply = { kills = { { unit = 0x01, enemy = 0x81, lost = 7 } } } }
+    local second, lost, over = Planner.secondRead(r, { { id = 0x01, charId = 1 } }, struck)
+    check(lost[0x01], 10, "secondRead: the reply's counter (7) and the second phase's strikes (3)")
+    check(second[0x01] .. "/" .. over, "0/0", "secondRead: no death read from the counter alone")
+end
+
 -- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn
 -- 18, replayed): every plan is over the cap. The march to (1,0) may die in the next enemy phase
 -- (70% shown); the hold at (0,0) is safe there, and dies only in the lookahead's second phase,
