@@ -9,20 +9,8 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-16, early morning; main at this HANDOFF commit, 4f0f2fea's code). Six open PRs from the overnight laps wait on Nicolas.** Read #510 comments 6906859807 (the second-phase read) and 6914401766 (the overnight laps) first.
+**Next session starts here (2026-11-17; main at this HANDOFF commit, 13875b81's code). The six overnight PRs are merged** (Nicolas: "yes merge all those PRs", 2026-11-17): the stack #631→#635 with `--merge` (952a5101..0da248ab), #636 squashed (13875b81); all branches deleted. Read #510 comments 6906859807 (the second-phase read) and 6914401766 (the overnight laps) first.
 
-- **Open PRs**, all #510. Each was reviewed by a fresh subagent and every finding fixed. CI:
-  #631 and #632 green; check #633-#636 before any merge.
-  - **The stack, each based on the one before:** #631 (a staff is a heal only if `DoItemUse`
-    heals one ally with it) → #632 (a scene's yes/no between chapters takes its highlighted
-    answer, logged) → #633 (an act is done only once the map is idle past Canto) → #634 (the
-    heal swap's act names the ally on its tile) → #635 (a full bag between chapters is answered
-    by the bot's chooser). A stack lands with `--merge`, each child retargeted to main before
-    its parent's branch is deleted.
-  - **#636** (from main, independent): `calibration`'s third table, the lookahead's second phase
-    against the phase played.
-  - **Merge permission:** memory says #510 step 9 PRs may merge after review + CI, but these
-    were left for Nicolas to say.
 - **The second phase (Nicolas's questions, answered):** `calibration` did not score it (#636 adds
   it). It reads far above the game: second > 50% → 71.5% predicted, 3.0% died (436
   unit-phases); even units that held their tile died at 13.3%. In 779 of 1,875 fallback plays,
