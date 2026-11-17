@@ -62,10 +62,12 @@ each beside the twin; `--decision` reads only that decision's components (FR-032
 
     python3 tools/playtest/montecarlo.py calibration <trace or dir> [...] [--instrument I]
 
-`calibration` reads kept traces, each play once, and prints two tables (#510 PR A): each blue
-unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; and
-each chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against
-its style's cap. Every change to the bot's first attempts is read by it the same way.
+`calibration` reads kept traces, each play once, and prints three tables (#510 PR A): each blue
+unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; each
+chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against its
+style's cap; and the lookahead's second phase (read with our units holding) against the phase
+the game played after, split by whether the unit held its tile. Every change to the bot's first
+attempts is read by it the same way.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
@@ -3329,6 +3331,14 @@ def style_caps():
 CALIBRATION_BINS = ((0.0, '0'), (0.01, 'up to 1%'), (0.05, '1 to 5%'), (0.15, '5 to 15%'),
                     (0.5, '15 to 50%'), (1.0, 'over 50%'))
 # what the plan that moved a dead unit said of it (#510 PR A): the death-table's columns
+
+
+def calibration_bin(p):
+    """A predicted chance's CALIBRATION_BINS label; a sum of weighted outcomes a hair over 1
+    (float drift) is the top bin, never a StopIteration."""
+    return next((lb for hi, lb in CALIBRATION_BINS if p <= hi), CALIBRATION_BINS[-1][1])
+
+
 MOVER_KINDS = ('moved over the cap', 'moved under, over by the phase end',
                'under: dice', 'under: fog', 'under: arrival', 'under: blind spot',
                'no cap', 'no prediction')
@@ -3352,9 +3362,21 @@ def calibration(traces):
     last plan if none did) against its style's cap (`deaths`: chapter -> Counter). Under the
     cap with a prediction of 0, the record's own flags say fog or arrival; a record graded
     before #510 PR A took those flags from the phase's last plan. Returns
-    {'traces', 'distinct', 'bins', 'deaths'}."""
+    {'traces', 'distinct', 'bins', 'deaths', 'second'}.
+
+    `second`: label -> [unit-phases, died, summed second, held, held died, summed re-read, re-read
+    count]. Each BLUE protected unit of a phase's last plan that met the lookahead's second phase
+    (ADR 0389: `protected[].second`, read with our units holding), binned by that chance, against
+    the game's next enemy phase: on the field at its start (else no unit-phase), died in it or
+    not, held when it stood on the tile it had at the phase before. A green or other game-over
+    unit is not read (the snapshots and deaths here are blue), and one that died in the player
+    phase between is no unit-phase: `Actual` is given that it lived to the second phase. The re-read is the next
+    phase's own last plan's chance for it, read after the moves played (#510 comment
+    6906859807)."""
     caps, dust = style_caps()
     bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
+    second = collections.OrderedDict((label, [0, 0, 0.0, 0, 0, 0.0, 0])
+                                     for _, label in CALIBRATION_BINS)
     deaths = collections.defaultdict(collections.Counter)
     seen = set()
     for events in traces:
@@ -3366,7 +3388,8 @@ def calibration(traces):
         info = start.get('info') or {}
         cap = caps.get((start.get('style') or {}).get('aggression'))
         end = next((e.get('record') or {} for e in events if e.get('t') == 'end'), {})
-        phases = {}   # turn -> (the phase's last plan, {unit slot: its mover}, slots on the field)
+        # turn -> (the phase's last plan, {unit slot: its mover}, slots on the field, their tiles)
+        phases = {}
         plan, movers = None, {}
         for e in events:
             t = e.get('t')
@@ -3377,9 +3400,9 @@ def calibration(traces):
             elif t == 'act' and e.get('phase') == 'player' and plan is not None:
                 movers[e.get('id')] = plan
             elif t == 'phase' and e.get('phase') == 'enemy':
-                phases[e.get('turn')] = (plan, movers, {u.get('id'): u.get('charId')
-                                                        for u in e.get('units') or []
-                                                        if u.get('faction') == 'blue'})
+                blues = [u for u in e.get('units') or [] if u.get('faction') == 'blue']
+                phases[e.get('turn')] = (plan, movers, {u.get('id'): u.get('charId') for u in blues},
+                                         {u.get('id'): (u.get('x'), u.get('y')) for u in blues})
         # a record from before deaths carried their slot names the character only
         died = {}
         for d in end.get('deaths') or []:
@@ -3387,22 +3410,41 @@ def calibration(traces):
                 continue
             uid = d.get('id')
             if uid is None:
-                field = (phases.get(d.get('turn')) or (None, None, {}))[2]
+                field = (phases.get(d.get('turn')) or (None, None, {}, {}))[2]
                 uid = next((i for i, ch in field.items() if ch == d.get('charId')), None)
             died[(d.get('turn'), uid)] = d
-        for turn, (last, moved, field) in phases.items():
+        for turn, (last, moved, field, tiles) in phases.items():
             # only a unit on the field in the phase: a carried or already dead one is no
             # unit-phase, whatever the plan said of it
             for p in [p for p in (last or {}).get('predict') or [] if p.get('id') in field]:
                 die = p.get('die') or 0
-                label = next(lb for hi, lb in CALIBRATION_BINS if die <= hi)
-                row = bins[label]
+                row = bins[calibration_bin(die)]
                 row[0] += 1
                 row[1] += (turn, p.get('id')) in died
                 row[2] += die
+            nxt = phases.get(turn + 1)
+            if not nxt or not ((last or {}).get('lookahead') or {}).get('extended'):
+                continue
+            reread = {p.get('id'): p.get('die') or 0 for p in (nxt[0] or {}).get('predict') or []}
+            for pr in (last or {}).get('protected') or []:
+                uid, sec = pr.get('id'), pr.get('second')
+                # gone before the second phase (died, carried): no unit-phase of it
+                if sec is None or uid not in tiles or uid not in nxt[3]:
+                    continue
+                row = second[calibration_bin(sec)]
+                dead = (turn + 1, uid) in died
+                row[0] += 1
+                row[1] += dead
+                row[2] += sec
+                if tiles[uid] == nxt[3][uid]:
+                    row[3] += 1
+                    row[4] += dead
+                if uid in reread:
+                    row[5] += reread[uid]
+                    row[6] += 1
         name = chapter_label(info)
         for (turn, uid), d in died.items():
-            last, moved, _ = phases.get(turn, (None, {}, {}))
+            last, moved = phases.get(turn, (None, {}))[:2]
             mover = moved.get(uid) or last
 
             def die_of(pl):
@@ -3429,7 +3471,8 @@ def calibration(traces):
             else:
                 kind = 'under: blind spot'
             deaths[name][kind] += 1
-    return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'deaths': deaths}
+    return {'traces': len(traces), 'distinct': len(seen), 'bins': bins, 'deaths': deaths,
+            'second': second}
 
 
 def chapter_label(info):
@@ -3442,7 +3485,7 @@ def chapter_label(info):
 
 
 def calibration_lines(c):
-    """calibration()'s two tables, as markdown."""
+    """calibration()'s three tables, as markdown."""
     out = ['%d traces, %d distinct plays.' % (c['traces'], c['distinct']), '',
            '| Predicted | Unit-phases | Died | Actual | Mean predicted |', '|---|---|---|---|---|']
     for label, (n, dead, total) in c['bins'].items():
@@ -3456,6 +3499,17 @@ def calibration_lines(c):
         row = c['deaths'][ch]
         out.append('| %s | %d | %s |' % (ch, sum(row.values()),
                                          ' | '.join(str(row[k]) for k in kinds)))
+
+    def pct(num, n):
+        return '%.1f%%' % (100.0 * num / n) if n else '-'
+    out += ['', "The lookahead's second phase (our units holding) against the phase played:", '',
+            '| Second phase | Unit-phases | Died | Actual | Mean second | Held | Held actual '
+            '| Moved | Moved actual | Mean re-read |', '|---|---|---|---|---|---|---|---|---|---|']
+    for label, (n, dead, total, held, heldDead, reread, rn) in c['second'].items():
+        if n:
+            out.append('| %s | %d | %d | %s | %s | %d | %s | %d | %s | %s |' % (
+                label, n, dead, pct(dead, n), pct(total, n), held, pct(heldDead, held),
+                n - held, pct(dead - heldDead, n - held), pct(reread, rn)))
     return out
 
 

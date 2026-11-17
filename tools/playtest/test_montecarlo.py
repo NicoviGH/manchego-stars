@@ -3299,6 +3299,57 @@ class Calibration(unittest.TestCase):
                          'a unit off the field in the phase is no unit-phase')
         self.assertIn('| Ch5 | 1 | 1 |', '\n'.join(mc.calibration_lines(mc.calibration([t()]))))
 
+    @staticmethod
+    def lookahead(second=0.8, extended=True, held=True, dies=False, gone=False):
+        """Turn 1's last plan met the second phase for unit 1 (and 0 for unit 2); turn 2's re-read
+        it at 0.1 after the moves. Unit 2 dies on turn 1's phase."""
+        def blues(turn):
+            out = [{'id': 1, 'charId': 1, 'faction': 'blue', 'x': 3, 'y': 3},
+                   {'id': 2, 'charId': 2, 'faction': 'blue', 'x': 4, 'y': 4}]
+            if turn == 2:
+                out = [] if gone else out[:1]
+                if out and not held:
+                    out[0] = dict(out[0], x=5)
+            return out
+        dead = [{'faction': 'blue', 'phase': 'enemy', 'turn': 1, 'id': 2, 'charId': 2}]
+        if dies:
+            dead.append({'faction': 'blue', 'phase': 'enemy', 'turn': 2, 'id': 1, 'charId': 1})
+        look = {'extended': True} if extended else {}
+        # a moved unit's act, so the two plays are two (trace_key)
+        step = [] if held else [{'t': 'act', 'phase': 'player', 'turn': 2, 'id': 1, 'act': 'wait',
+                                 'to': {'x': 5, 'y': 3}}]
+        return [
+            {'t': 'start', 'info': {'game': 'vanilla', 'chapter': 6}, 'style': {'aggression': 'bold'}},
+            {'t': 'phase', 'phase': 'player', 'turn': 1},
+            {'t': 'plan', 'ref': 1, 'lookahead': look,
+             'predict': [{'id': 1, 'die': 0}, {'id': 2, 'die': 0.9}],
+             'protected': [{'id': 1, 'first': 0, 'second': second, 'die': second},
+                           {'id': 2, 'first': 0.9, 'second': 0, 'die': 0.9}]},
+            {'t': 'phase', 'phase': 'enemy', 'turn': 1, 'units': blues(1)},
+            {'t': 'phase', 'phase': 'player', 'turn': 2},
+            {'t': 'plan', 'ref': 2, 'predict': [{'id': 1, 'die': 0.1}]},
+        ] + step + [
+            {'t': 'phase', 'phase': 'enemy', 'turn': 2, 'units': blues(2)},
+            {'t': 'end', 'record': {'deaths': dead}},
+        ]
+
+    def test_the_second_phase_is_read_against_the_phase_played_after(self):
+        la = self.lookahead
+        c = mc.calibration([la(), la(dies=True, held=False, second=0.3)])
+        self.assertEqual(c['second']['over 50%'], [1, 0, 0.8, 1, 0, 0.1, 1],
+                         'held, lived; its re-read is the next phase\'s own plan')
+        self.assertEqual(c['second']['15 to 50%'][:5], [1, 1, 0.3, 0, 0], 'moved, died')
+        self.assertEqual(c['second']['0'][0], 0, 'a unit dead in the first phase is no unit-phase')
+        for kept in (la(extended=False), la(gone=True)):
+            self.assertEqual(sum(r[0] for r in mc.calibration([kept])['second'].values()), 0,
+                             'no second phase met, or the unit off the field at it')
+        lines = '\n'.join(mc.calibration_lines(mc.calibration([la()])))
+        self.assertIn('| over 50% | 1 | 0 | 0.0% | 80.0% | 1 | 0.0% | 0 | - | 10.0% |', lines)
+        # a summed chance a hair over 1 is the top bin, not a crash (PR #636 review)
+        self.assertEqual(mc.calibration_bin(1.0000000000000002), 'over 50%')
+        drift = mc.calibration([la(second=1.0000000000000002)])['second']['over 50%']
+        self.assertEqual(drift[0], 1)
+
     def test_a_trace_index_is_named_as_the_game_names_it(self):
         # one owner of the name: the twin rows, then the route chapters' constants
         self.assertEqual([mc.vanilla_label(i) for i in (0, 5, 6, 7, 10, 999)],
