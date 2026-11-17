@@ -175,13 +175,18 @@ turn the 2026-11-08 amendment set aside (the planner's own plan, 4.6x).
   (six pinned campaigns), E_15 (`lap4e`) and I_13 (`lap4p`), 3,234 unit-phases, 8 deaths. The
   hold read 67 units over 15% (5 died), 41.2 deaths expected; the reply 33 (5 died), 19.3
   expected. Still about twice the deaths seen.
-- **Played, same starts, attempts and dice** (tags `reply1*` against `replyon1*`): won 18 →
-  21, stuck 12 → 11, lost 2 → 0, deaths 38 → 33, plans played on a fallback 182 → 98; Ch8's 17
-  attempts won both ways took 370 → 335 turns. One game a pair: a lead, not a verdict. CPU on
-  vanilla Ch3 1001: 29.1 s hold, 30.9 s with the reply read beside it.
+- **Played, same starts, attempts and dice** (tags `reply1*` hold against `replyfix1*`, this
+  PR's head): won 17 → 20 (Ch8 17 → 19 of 24, E_15 0 → 1 of 4, I_13 0 of 4), stuck 13 → 12,
+  lost 2 → 0, deaths 38 → 30, plans played on a fallback 182 → 98; Ch8's 17 attempts won both
+  ways took 370 → 335 turns. One game a pair: a lead, not a verdict. Cost: vanilla Ch3 and Ch5
+  1001 back to back, main 57.5 CPU s against 58.4 (the reply replaces the hold's call).
 - **Its blind spot:** of 9 deaths after a lookahead with the reply on, 6 were read at 0%. Three
   were the bot's own next move leaving the tile the read held safe (its own read then), one
   dice, and two a seen enemy the next phase's simulation sent at a neighbour (#510 comment
   6961789474: a lead on `aiDecide`'s target choice, older than this). The played plan's trace
-  keeps what the reply played (`lookahead.reply`).
+  keeps what the reply played (`lookahead.reply`). On `replyfix1*`, 4 of 9 such deaths were by
+  an enemy the reply had killed (3 of them at a sure 100%), and in all 4 the bot never attacked
+  it that turn: the reply's kills, like its steps, are acts the next plan need not play. A kill
+  at even odds is taken as made, as nextPhase takes a striker our counter kills; its miss is
+  not read (PR 637 review), and no death here was such a miss.
 - **Control:** `PT_REPLY=hold` reads every second phase with our units holding, as before.
