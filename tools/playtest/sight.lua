@@ -1898,10 +1898,11 @@ function M.new(outer)
         if not remembered then return end
         for _, o in ipairs(units()) do
             local st = mem.u32(o.addr + UNIT_STATE)
-            -- counts as seen (Board.playsAsSeen): in sight, its tile is already out of the
-            -- fog; in fog, remembered
+            -- counts as seen (M.playsAsSeen): in sight, its tile is already out of the fog
+            -- (inside nextPhase once M.refresh has run, as armyReply runs it first); in fog,
+            -- remembered
             if o.faction == "red" and o.onField and (st & US_HIDDEN) == 0
-                and Board.playsAsSeen(st, s.knows(o)) then
+                and M.playsAsSeen(Board, st, s.knows(o)) then
                 api.write8(cell(mem, S.gBmMapFog, mem.u8(o.addr + UNIT_X),
                                 mem.u8(o.addr + UNIT_Y)), 1)
             end
@@ -1971,11 +1972,16 @@ function M.new(outer)
     end
 
     -- Inside a sandbox: the tiles `u` reaches standing on (x, y) (its struct's own tile: the
-    -- movement map reads where it stands), less a rider's forbidden ones. s.reach's and
-    -- armyReply's one reader.
+    -- movement map reads where it stands), less a rider's forbidden ones. s.reach's,
+    -- armyReply's and cantoTiles' readers.
+    -- tilesIn: after a movement map is made (reachIn's, or cantoTiles' own Ext one), the tiles
+    -- of it `u` may end on from (x, y). reachIn: the map from where it stands, then those.
+    local function tilesIn(call, u, x, y, friends)
+        return M.riderTiles(api, call, u, movementTiles(u, x, y, friends), { x = x, y = y })
+    end
     local function reachIn(call, u, x, y, friends)
         call(S.GenerateUnitMovementMap, { u.addr })
-        return M.riderTiles(api, call, u, movementTiles(u, x, y, friends), { x = x, y = y })
+        return tilesIn(call, u, x, y, friends)
     end
 
     function s.reach(u, friends)
@@ -2830,7 +2836,7 @@ function M.new(outer)
                 stageCarry(byId, carry)
                 M.refresh(api, call, S, byId)
                 call(S.GenerateUnitMovementMapExt, { u.addr, mov - spent })
-                return M.riderTiles(api, call, u, movementTiles(u, x, y), { x = x, y = y })
+                return tilesIn(call, u, x, y)
             end)
         end
         seen.canto[k] = out

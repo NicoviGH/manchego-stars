@@ -12,7 +12,8 @@
 --   PLAYTEST_STATEDIR -- save-state checkpoint dir (ckpt_*/record* scenarios)
 --   PLAYTEST_SEED     -- fuzz/llm seed (PT_SEED)
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
---   PLAYTEST_REPLY    -- "hold": second phases read with our units holding, the old control (api.reply)
+--   PLAYTEST_REPLY    -- "hold": second phases read with our units holding, the old control
+--                        (api.reply)
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
 --   PLAYTEST_PINNED   -- a pinned decision state to load and read (PT_PINNED; api.check_pinned)
 --   PLAYTEST_BENCH    -- an experiment's benched charIds (PT_BENCH, JSON; botApi's api.bench)

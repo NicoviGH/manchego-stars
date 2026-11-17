@@ -54,10 +54,11 @@
 --      of the player units that could save it; a recruit, the acts of the units it strikes), the
 --      rest of the plan kept, and those are judged too. At an irreversible transition (M.triggers:
 --      a door opened or a wall struck, a first step into a seen boss's reach) the best M.FINAL
---      plans each meet a second enemy phase, our army's reply played between (sight.nextPhase): all of
---      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
---      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
---      that of dying in either phase, and those plans are ranked again among themselves.
+--      plans each meet a second enemy phase, our army's reply played between
+--      (sight.nextPhase): all of them or none, within M.LOOK_DECISION calls a decision and
+--      opts.budget.attempt left of M.LOOK_ATTEMPT, else skipped and tagged. Each protected
+--      unit's death chance becomes that of dying in either phase, and those plans are ranked
+--      again among themselves.
 --      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's can
 --      reach before the phase after, is read on M.WEAR enemy phases with its HP carried (the
 --      wear, ADR 0421), within its own budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
@@ -534,9 +535,10 @@ end
 
 -- What a lookahead's second phase `r` (sight.nextPhase's) reads of the units the first phase
 -- may strike (`hit`), each alive at its start at the HP r.hp gives it -> second (each one's
--- death chance in it), lost (its HP lost in it, and to a counter in the army's reply), over (the chance any unit not in `worn` dies, as
--- struckIn's `none` reads it: the game over's share). `struckIn` is the judge's; `worn` the
--- units the wear read (ADR 0421), whose later phases are its reading. Pure given struckIn.
+-- death chance in it), lost (its HP lost in it, and to a counter in the army's reply), over
+-- (the chance any unit not in `worn` dies, as struckIn's `none` reads it: the game over's
+-- share). `struckIn` is the judge's; `worn` the units the wear read (ADR 0421), whose later
+-- phases are its reading. Pure given struckIn.
 function M.secondRead(r, hit, struckIn, worn)
     worn = worn or {}
     local live, unworn = {}, {}

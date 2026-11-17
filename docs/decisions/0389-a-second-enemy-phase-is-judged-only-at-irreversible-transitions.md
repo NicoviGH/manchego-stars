@@ -188,5 +188,8 @@ turn the 2026-11-08 amendment set aside (the planner's own plan, 4.6x).
   an enemy the reply had killed (3 of them at a sure 100%), and in all 4 the bot never attacked
   it that turn: the reply's kills, like its steps, are acts the next plan need not play. A kill
   at even odds is taken as made, as nextPhase takes a striker our counter kills; its miss is
-  not read (PR 637 review), and no death here was such a miss.
+  not read (PR 637 review), and no death here was such a miss. Of the 431 kills the played
+  plans' replies made, 139 were at 50-99%: untested whether reading their misses would change
+  which plan wins. The hold's games above are counted from the log (a hand count had read 18
+  won, 12 stuck); fallbacks and Ch8's turns are recounted on `replyfix1*`.
 - **Control:** `PT_REPLY=hold` reads every second phase with our units holding, as before.

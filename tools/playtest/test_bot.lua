@@ -6716,7 +6716,8 @@ do
         for _, u in ipairs(live) do res[u.id] = { d = 0, t = 3 } end
         return res, 1
     end
-    local r = { hp = { [0x01] = 13 }, reply = { kills = { { unit = 0x01, enemy = 0x81, lost = 7 } } } }
+    local r = { hp = { [0x01] = 13 },
+                reply = { kills = { { unit = 0x01, enemy = 0x81, lost = 7 } } } }
     local second, lost, over = Planner.secondRead(r, { { id = 0x01, charId = 1 } }, struck)
     check(lost[0x01], 10, "secondRead: the reply's counter (7) and the second phase's strikes (3)")
     check(second[0x01] .. "/" .. over, "0/0", "secondRead: no death read from the counter alone")
