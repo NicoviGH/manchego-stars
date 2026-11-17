@@ -537,10 +537,16 @@ local function sightOf(o)
     end
     if o.enemyPhase then s.enemyPhase = phaseOf(o.enemyPhase) end
     if o.nextPhase then
-        local next = phaseOf(o.nextPhase)
-        s.nextPhase = function(plan)
+        local next, replied = phaseOf(o.nextPhase), phaseOf(o.replyPhase or o.nextPhase)
+        -- `reply`: the second phase after the army's reply, o.replyPhase's (o.nextPhase's when
+        -- none); every call is in `asked`, the reply's counted in `replied` too
+        s.nextPhase = function(plan, reply)
             s.asked = s.asked or {}
             s.asked[#s.asked + 1] = plan
+            if reply then
+                s.replied = (s.replied or 0) + 1
+                return replied(plan)
+            end
             return next(plan)
         end
     end
@@ -6577,8 +6583,9 @@ end
 
 -- A at (0,0) is pulled to (1,0) toward a village; the next enemy phase leaves (1,0) alone, the
 -- one after it kills a unit there for sure (o.nextPhase). `boss`: a boss stands at (2,0), so
--- (1,0) is a first step into its reach -- the lookahead's trigger.
-local function looksAhead(boss)
+-- (1,0) is a first step into its reach -- the lookahead's trigger. `replyPhase`: the second
+-- phase with the army's reply played between (sightOf's), the hold's when nil.
+local function looksAhead(boss, replyPhase)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local X = red(0x81, 0, 9, { minRange = false })
     local K = boss and red(0x82, 2, 9, { isBoss = true, minRange = 1, maxRange = 1 })
@@ -6599,6 +6606,7 @@ local function looksAhead(boss)
             end
             return {}
         end,
+        replyPhase = replyPhase,
     }
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
@@ -6679,6 +6687,40 @@ do
     a, plan = Planner.plan(B, board, sight, st,
                            { budget = { attempt = Planner.LOOK_ATTEMPT - 19 * Planner.FINAL } })
     check(plan.lookahead.extended, true, "lookahead: room left after ours-ch03's 19 triggers")
+end
+
+-- test_the_second_phase_reads_the_army_s_reply (ADR 0389's amendment of 2026-11-17): every
+-- second phase is asked with the army's reply (sight.nextPhase's `reply`); opts.reply = "hold"
+-- (PT_REPLY=hold) asks the hold instead. Here the hold's second phase kills A at (1,0) and the
+-- reply's spares it: the march goes, and the hold keeps A back.
+do
+    local played = { kills = {}, steps = { { unit = 0x01, x = 0, y = 0 } } }
+    local board, sight, st = looksAhead(true, function() return { reply = played } end)
+    local a, plan = Planner.plan(B, board, sight, st)
+    check(at(a), "1,0", "reply: the reply's second phase spares the march, so it goes")
+    check(plan.lookahead.reply, played, "reply: what it played is in the played plan's trace")
+    check(sight.replied, #sight.asked, "reply: every second phase is the reply's")
+    check(plan.lookahead.calls, #sight.asked, "reply: one call a finalist, as the hold's")
+    board, sight, st = looksAhead(true, function() return {} end)
+    a = Planner.plan(B, board, sight, st, { reply = "hold" })
+    check(at(a), "0,0", "reply: PT_REPLY=hold reads the hold, which keeps A back")
+    check(sight.replied, nil, "reply: and never asks the reply")
+end
+
+-- test_second_read_prices_the_reply_s_counter (PR 637 review): a kill in the army's reply costs
+-- the killer the counter's HP between the phases; Planner.secondRead counts it in `lost`, as the
+-- second phase's own strikes, so a plan whose reply bleeds a unit ranks below one that does not.
+do
+    local struck = function(_, live)
+        local res = {}
+        for _, u in ipairs(live) do res[u.id] = { d = 0, t = 3 } end
+        return res, 1
+    end
+    local r = { hp = { [0x01] = 13 },
+                reply = { kills = { { unit = 0x01, enemy = 0x81, lost = 7 } } } }
+    local second, lost, over = Planner.secondRead(r, { { id = 0x01, charId = 1 } }, struck)
+    check(lost[0x01], 10, "secondRead: the reply's counter (7) and the second phase's strikes (3)")
+    check(second[0x01] .. "/" .. over, "0/0", "secondRead: no death read from the counter alone")
 end
 
 -- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn

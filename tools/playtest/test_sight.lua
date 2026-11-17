@@ -837,7 +837,8 @@ do
     -- an HP written inside a simulated phase goes through wound(), which marks the heal flags
     -- stale for the deciding side: the staging's two writes come before the phase's order,
     -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
-    -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf)
+    -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf).
+    -- wound()'s callers: a strike's target, the lookahead's striker, the army reply's killer
     local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
     local at = src:find("function M.expOf(", 1, true)
     local count = at and src:sub(at, src:find("\nend\n", at, true)) or ""
@@ -845,7 +846,7 @@ do
     local writes = all - onBattle
     check(onBattle, 2, "aiPhaseStart: the experience count writes the battle units' HP twice")
     local _, wounds = src:gsub("\n%s+wound%(", "")
-    check(writes == 4 and wounds == 2
+    check(writes == 4 and wounds == 3
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
           true, "aiPhaseStart: a phase's own HP writes are wound()'s, the heal flags stale after")
     check(bodyOf("function s.strike("):find("function%(%) onlyTarget%(u, all%) end,%s*true%)") ~= nil,
@@ -955,7 +956,12 @@ do
     local _, asks = src:gsub("M%.playsAsSeen%(Board, [^\n]-, s%.knows%(e%)%)", "")
     check(asks, 3, "playsAsSeen: decides, closings' looters and keySources ask it")
     local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
-    check(lifts, 2, "knows: danger and threat lift the remembered out of the fog")
+    check(lifts, 1, "knows: the one danger reader (dangerGrid) lifts the remembered out of the fog")
+    local _, readers = src:gsub("call%(S%.GenerateDangerZoneRange", "")
+    local _, users = src:gsub("dangerGrid%(call", "")
+    users = users - select(2, src:gsub("function dangerGrid%(", ""))
+    check(readers .. "/" .. users, "1/3",
+          "knows: danger, threat and the army's reply read it there")
     local _, fogTests = src:gsub("& Board%.US_BIT9%)", "")
     check(fogTests, 1, "the fog bit is read in playsAsSeen alone")
 end
@@ -1676,7 +1682,8 @@ do
     end
     check(bodyOf("function s.enemyPhase(plan)"):find("learningAs(true,", 1, true) ~= nil, true,
           "learning: the judged phase counts")
-    check(bodyOf("function s.nextPhase(plan)"):find("learningAs(false,", 1, true) ~= nil, true,
+    check(bodyOf("function s.nextPhase(plan, reply)"):find("learningAs(false,", 1, true) ~= nil,
+          true,
           "learning: the lookahead's phase does not")
     check(bodyOf("function s.strike(u, e, x, y, slot, from)"):find("learningAs(false,", 1, true) ~= nil,
           true, "learning: a single strike's forecast does not")
@@ -1762,12 +1769,17 @@ do
         local at = src:find(head, 1, true)
         return at and src:sub(at, src:find("\n    end\n", at, true)) or ""
     end
-    check(bodyOf(sightSrc, "    function s.reach(u, friends)")
-              :find("M.riderTiles(api, call, u, movementTiles(u, u.x, u.y, friends))", 1, true)
-          ~= nil, true, "riderTiles: s.reach filters the rider's tiles")
+    check(bodyOf(sightSrc, "    local function tilesIn(call, u, x, y, friends)")
+              :find("M.riderTiles(api, call, u, movementTiles(u, x, y, friends), { x = x, y = y })",
+                    1, true) ~= nil
+          and bodyOf(sightSrc, "    local function reachIn(call, u, x, y, friends)")
+              :find("return tilesIn(call, u, x, y, friends)", 1, true) ~= nil
+          and bodyOf(sightSrc, "    function s.reach(u, friends)")
+              :find("reachIn(call, u, u.x, u.y, friends)", 1, true) ~= nil,
+          true, "riderTiles: s.reach (and the army's reply) filter the rider's tiles in tilesIn")
     check(bodyOf(sightSrc, "    function s.cantoTiles(u, a)")
-              :find("M.riderTiles(api, call, u, movementTiles(u, x, y), { x = x, y = y })", 1,
-                    true) ~= nil, true, "riderTiles: s.cantoTiles filters the rider's tiles")
+              :find("return tilesIn(call, u, x, y)", 1, true) ~= nil, true,
+          "riderTiles: s.cantoTiles filters the rider's tiles in tilesIn")
     check(bodyOf(sightSrc, "    local function ownKey(kind, u, hp)")
               :find("M.riding(u.state)", 1, true) ~= nil, true,
           "weapons: the answers' memo keys whether the unit rides")
@@ -1806,6 +1818,67 @@ do
     local branch = at and sightSrc:sub(at, sightSrc:find("elseif", at + 10, true)) or ""
     check(branch:find("key.id == a.item", 1, true) ~= nil and branch:find("key.uses == a.uses", 1, true) ~= nil,
           true, "legal: a Take is legal only while the key it names is the convoy's")
+end
+
+-- replyKills / safest: the army's reply between the lookahead's two enemy phases (#510 comment
+-- 6906859807). A kill at even odds or better is made, the likeliest first, one act a unit, one
+-- death an enemy and one unit a tile; a unit that kills nothing steps to the tile the fewest
+-- enemies reach, staying put on a tie, then the nearest.
+do
+    local function opt(unit, enemy, x, y, p)
+        return { unit = unit, enemy = enemy, tile = { x = x, y = y }, p = p }
+    end
+    local function keys(ks)
+        local out = {}
+        for _, k in ipairs(ks) do
+            out[#out + 1] = k.unit .. ">" .. k.enemy .. "@" .. k.tile.x .. "," .. k.tile.y
+        end
+        return table.concat(out, " ")
+    end
+    check(keys(Sight.replyKills({ opt(1, 0x81, 2, 2, 0.49) })), "",
+          "replyKills: under even odds no kill is made")
+    check(keys(Sight.replyKills({ opt(1, 0x81, 2, 2, 0.5) })), "1>129@2,2",
+          "replyKills: even odds kill")
+    -- unit 1 kills 0x81 surer than unit 2 does, so 2 takes 0x82
+    check(keys(Sight.replyKills({ opt(2, 0x81, 3, 3, 0.7), opt(1, 0x81, 2, 2, 0.9),
+                                  opt(2, 0x82, 4, 4, 0.6) })), "1>129@2,2 2>130@4,4",
+          "replyKills: the likeliest first, one death an enemy")
+    -- unit 1's surest kill uses it up: its second is not made
+    check(keys(Sight.replyKills({ opt(1, 0x81, 2, 2, 0.9), opt(1, 0x82, 2, 3, 0.8) })), "1>129@2,2",
+          "replyKills: one act a unit")
+    -- both want (2,2): the first keeps it, the second kills from another tile
+    check(keys(Sight.replyKills({ opt(1, 0x81, 2, 2, 0.9), opt(2, 0x82, 2, 2, 0.8),
+                                  opt(2, 0x82, 5, 5, 0.7) })), "1>129@2,2 2>130@5,5",
+          "replyKills: one unit a tile")
+
+    local d = { ["1,1"] = 2, ["2,1"] = 0, ["3,1"] = 0, ["1,2"] = 1 }
+    local function danger(x, y) return d[x .. "," .. y] or 9 end
+    local tiles = { { x = 1, y = 1 }, { x = 3, y = 1 }, { x = 2, y = 1 }, { x = 1, y = 2 } }
+    local t = Sight.safest(tiles, danger, { x = 1, y = 1 })
+    check(t.x .. "," .. t.y, "2,1", "safest: the fewest enemies, the nearest of the tied")
+    d["1,1"] = 0
+    t = Sight.safest(tiles, danger, { x = 1, y = 1 })
+    check(t.x .. "," .. t.y, "1,1", "safest: its own tile when no tile is safer")
+    check(Sight.safest({}, danger, { x = 1, y = 1 }), nil, "safest: no tile, no step")
+    -- the reply is read only beside the hold: nextPhase plays it only when asked
+    local at = sightSrc:find("function s.nextPhase(plan, reply)", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("\n    end\n", at, true)) or ""
+    check(body:find("reply and armyReply(", 1, true) ~= nil, true,
+          "nextPhase: the army's reply only when asked")
+    -- the reply's emulator-side fixes (PR 637 review; the runs are their proof, no fake CPU
+    -- plays them): the faction put back after the danger read, the killer's weapon equipped,
+    -- and the remembered reds lifted where they stand now
+    local ra = sightSrc:find("local function armyReply(", 1, true)
+    local reply = ra and sightSrc:sub(ra, sightSrc:find("\n    end\n", ra, true)) or ""
+    local _, factions = reply:gsub("api%.write8%(S%.gPlaySt %+ PLAY_FACTION", "")
+    check(factions, 2, "armyReply: writes the faction for the danger read and puts it back")
+    check(reply:find("M.equip(api, call, S, u, k.slot)", 1, true) ~= nil, true,
+          "armyReply: a killer equips the weapon it killed with")
+    local la = sightSrc:find("local function liftRemembered()", 1, true)
+    local lift = la and sightSrc:sub(la, sightSrc:find("\n    end\n", la, true)) or ""
+    check(lift:find("mem.u8(o.addr + UNIT_X)", 1, true) ~= nil
+          and lift:find("o.x", 1, true) == nil, true,
+          "liftRemembered: where a red stands now, off its struct, not the snapshot")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

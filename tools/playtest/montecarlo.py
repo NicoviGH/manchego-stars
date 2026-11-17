@@ -65,9 +65,9 @@ each beside the twin; `--decision` reads only that decision's components (FR-032
 `calibration` reads kept traces, each play once, and prints three tables (#510 PR A): each blue
 unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; each
 chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against its
-style's cap; and the lookahead's second phase (read with our units holding) against the phase
-the game played after, split by whether the unit held its tile. Every change to the bot's first
-attempts is read by it the same way.
+style's cap; and the lookahead's second phase (read after our army's reply, ADR 0389) against
+the phase the game played after, split by whether the unit held its tile. Every change to the
+bot's first attempts is read by it the same way.
 
     python3 tools/playtest/montecarlo.py story <trace .jsonl[.gz]>
 
@@ -3364,15 +3364,16 @@ def calibration(traces):
     before #510 PR A took those flags from the phase's last plan. Returns
     {'traces', 'distinct', 'bins', 'deaths', 'second'}.
 
-    `second`: label -> [unit-phases, died, summed second, held, held died, summed re-read, re-read
-    count]. Each BLUE protected unit of a phase's last plan that met the lookahead's second phase
-    (ADR 0389: `protected[].second`, read with our units holding), binned by that chance, against
-    the game's next enemy phase: on the field at its start (else no unit-phase), died in it or
-    not, held when it stood on the tile it had at the phase before. A green or other game-over
-    unit is not read (the snapshots and deaths here are blue), and one that died in the player
-    phase between is no unit-phase: `Actual` is given that it lived to the second phase. The re-read is the next
-    phase's own last plan's chance for it, read after the moves played (#510 comment
-    6906859807)."""
+    `second`: label -> [unit-phases, died, summed second, held, held died, summed re-read,
+    re-read count]. Each BLUE protected unit of a phase's last plan that met the lookahead's
+    second phase (ADR 0389: `protected[].second`, read after our army's reply since its
+    amendment of 2026-11-17, our units holding before it and under PT_REPLY=hold), binned by
+    that chance, against the game's next enemy phase: on the field at its start (else no
+    unit-phase), died in it or not, held when it stood on the tile it had at the phase before. A
+    green or other game-over unit is not read (the snapshots and deaths here are blue), and one
+    that died in the player phase between is no unit-phase: `Actual` is given that it lived to
+    the second phase. The re-read is the next phase's own last plan's chance for it, read after
+    the moves played (#510 comment 6906859807)."""
     caps, dust = style_caps()
     bins = collections.OrderedDict((label, [0, 0, 0.0]) for _, label in CALIBRATION_BINS)
     second = collections.OrderedDict((label, [0, 0, 0.0, 0, 0, 0.0, 0])
@@ -3502,7 +3503,7 @@ def calibration_lines(c):
 
     def pct(num, n):
         return '%.1f%%' % (100.0 * num / n) if n else '-'
-    out += ['', "The lookahead's second phase (our units holding) against the phase played:", '',
+    out += ['', "The lookahead's second phase against the phase played:", '',
             '| Second phase | Unit-phases | Died | Actual | Mean second | Held | Held actual '
             '| Moved | Moved actual | Mean re-read |', '|---|---|---|---|---|---|---|---|---|---|']
     for label, (n, dead, total, held, heldDead, reread, rn) in c['second'].items():

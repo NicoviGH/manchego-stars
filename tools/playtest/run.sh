@@ -78,6 +78,10 @@
 #                           does not is logged, put back and played on, and the attempt fails
 #                           at its end listing them all (sight.lua's M.leaks). Slower: set it
 #                           for one run after a change to what a sandbox calls.
+#                           PT_REPLY=hold: a control. Every second phase (the lookahead's and
+#                           the wear's) is read with our units holding between the two enemy
+#                           phases, as before ADR 0389's amendment of 2026-11-17, in place of
+#                           the army's reply (sight.lua armyReply).
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
@@ -324,6 +328,7 @@ PLAYTEST_DIAG = os.getenv("PT_DIAG") or ""
 PLAYTEST_PINNED = os.getenv("PT_PINNED") or ""
 PLAYTEST_BENCH = os.getenv("PT_BENCH") or ""
 PLAYTEST_LEAKGUARD = os.getenv("PT_LEAKGUARD") or ""
+PLAYTEST_REPLY = os.getenv("PT_REPLY") or ""
 PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"

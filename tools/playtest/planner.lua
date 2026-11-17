@@ -54,10 +54,11 @@
 --      of the player units that could save it; a recruit, the acts of the units it strikes), the
 --      rest of the plan kept, and those are judged too. At an irreversible transition (M.triggers:
 --      a door opened or a wall struck, a first step into a seen boss's reach) the best M.FINAL
---      plans each meet a second enemy phase, our units holding between (sight.nextPhase): all of
---      them or none, within M.LOOK_DECISION calls a decision and opts.budget.attempt left of
---      M.LOOK_ATTEMPT, else skipped and tagged. Each protected unit's death chance becomes
---      that of dying in either phase, and those plans are ranked again among themselves.
+--      plans each meet a second enemy phase, our army's reply played between
+--      (sight.nextPhase): all of them or none, within M.LOOK_DECISION calls a decision and
+--      opts.budget.attempt left of M.LOOK_ATTEMPT, else skipped and tagged. Each protected
+--      unit's death chance becomes that of dying in either phase, and those plans are ranked
+--      again among themselves.
 --      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's can
 --      reach before the phase after, is read on M.WEAR enemy phases with its HP carried (the
 --      wear, ADR 0421), within its own budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
@@ -524,6 +525,47 @@ local function blowsOn(strikes)
 end
 
 local copy = Board.copy
+
+-- A finalist's staged board for sight.nextPhase: its first phase as the judge played it.
+function M.staged(st)
+    local ph = st.phase
+    return { blues = ph.blues, gone = ph.gone, reds = ph.reds, opened = ph.opened,
+             carry = ph.carry }
+end
+
+-- What a lookahead's second phase `r` (sight.nextPhase's) reads of the units the first phase
+-- may strike (`hit`), each alive at its start at the HP r.hp gives it -> second (each one's
+-- death chance in it), lost (its HP lost in it, and to a counter in the army's reply), over
+-- (the chance any unit not in `worn` dies, as struckIn's `none` reads it: the game over's
+-- share). `struckIn` is the judge's; `worn` the units the wear read (ADR 0421), whose later
+-- phases are its reading. Pure given struckIn.
+function M.secondRead(r, hit, struckIn, worn)
+    worn = worn or {}
+    local live, unworn = {}, {}
+    for _, u in ipairs(hit) do
+        local hp = r.hp and r.hp[u.id] or 0
+        if hp > 0 then
+            live[#live + 1] = { id = u.id, charId = u.charId, hp = hp }
+            if not worn[u.id] then unworn[#unworn + 1] = live[#live] end
+        end
+    end
+    local second, lost, over = {}, {}, 0
+    -- the counter each killer took in the army's reply (sight.nextPhase's .reply): HP the
+    -- plan loses between the phases, as the first phase's strikes are
+    for _, k in ipairs((r.reply or {}).kills or {}) do
+        lost[k.unit] = (lost[k.unit] or 0) + (k.lost or 0)
+    end
+    for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
+        local res, none = struckIn(o.strikes, live)
+        for _, u in ipairs(live) do
+            second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
+            lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
+        end
+        if #unworn < #live then none = select(2, struckIn(o.strikes, unworn)) end
+        over = over + o.p * (1 - none)
+    end
+    return second, lost, over
+end
 
 -- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
 -- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
@@ -1828,8 +1870,8 @@ function M.plan(Bot, board, sight, style, opts)
     end
     -- The wear (ADR 0421): a unit the judged phase strikes that no heal of the army's reaches
     -- before the phase after it (judge's st.worn) is read on M.WEAR enemy phases, its HP
-    -- carried from each into the next. The second is played by the game's AI, our units
-    -- holding between (sight.nextPhase); each one past it is taken as the second again. Its
+    -- carried from each into the next. The second is played by the game's AI after our army's
+    -- reply (sight.nextPhase); each one past it is taken as the second again. Its
     -- chance to die is that of dying in any of them: each way the next phase went (judge's
     -- st.outcomes, on that way's HP: st.hitOf), the same ways its own death is read over, then
     -- the later phases' strikes on what is left. A unit whose death ends the game adds its
@@ -1841,6 +1883,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- reading and is counted (`wear_skipped`): botrun records a wear_budget anomaly.
     -- The mend does not try such a unit's other acts for the wear alone: tried, it lost
     -- vanilla Ch5x's two chests and its clean clear (runs wr5 and wn5, #510).
+    -- Every second phase, the wear's and the lookahead's, is read after our army's reply
+    -- (sight.nextPhase's `reply`; ADR 0389's amendment of 2026-11-17). opts.reply = "hold"
+    -- (PT_REPLY=hold) reads it with our units holding instead, the control it replaced
+    local replyOn = not (opts and opts.reply == "hold")
     local wearCalls, wearCpu, wearSkipped = 0, 0, 0
     local wearRoom = math.min(M.WEAR_DECISION, (opts and opts.budget or {}).wear or M.WEAR_ATTEMPT)
     local function wear(st)
@@ -1850,9 +1896,7 @@ function M.plan(Bot, board, sight, style, opts)
             return
         end
         local clock = os.clock()
-        local r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                    reds = st.phase.reds, opened = st.phase.opened,
-                                    carry = st.phase.carry })
+        local r = sight.nextPhase(M.staged(st), replyOn)
         wearCalls = wearCalls + 1
         -- the lookahead's second phase for this plan is this same call: kept for it
         st.wearNext = r
@@ -2037,8 +2081,8 @@ function M.plan(Bot, board, sight, style, opts)
         end
     end
     -- The lookahead (FR-017, FR-018): at an irreversible transition, the finalists (the best
-    -- M.FINAL plans judged, by rank) each meet a second enemy phase, our units holding between
-    -- (sight.nextPhase; the hold is the R-8 spike's intervening turn). All of them or none: the
+    -- M.FINAL plans judged, by rank) each meet a second enemy phase, our army's reply played
+    -- between (sight.nextPhase; it replaced the R-8 spike's hold). All of them or none: the
     -- calls it needs, one a finalist, within the decision's and the attempt's budget, else the
     -- original horizon, tagged `skipped`. A protected unit's death chance becomes that of dying
     -- in either phase, its branch-local first phase's kept, and the finalists are ranked again.
@@ -2081,35 +2125,18 @@ function M.plan(Bot, board, sight, style, opts)
                     if st.wearNext then
                         r = st.wearNext   -- the wear asked this same phase (ADR 0421): no call
                     elseif not seizesIn(st) then
-                        r = sight.nextPhase({ blues = st.phase.blues, gone = st.phase.gone,
-                                              reds = st.phase.reds, opened = st.phase.opened,
-                                              carry = st.phase.carry })
+                        r = sight.nextPhase(M.staged(st), replyOn)
                         look.calls = look.calls + 1
                     end
                     -- the units the wear read (ADR 0421): their later phases are its reading,
                     -- the same second phase on each way's HP and the third, already in their
                     -- death and the game over
                     local wornRead = st.wornRead or {}
-                    -- every unit the first phase may strike, alive at its start: its HP then
-                    local live = {}
-                    for _, u in ipairs(st.phase.hit) do
-                        local hp = r.hp and r.hp[u.id] or 0
-                        if hp > 0 then live[#live + 1] = { id = u.id, charId = u.charId, hp = hp } end
-                    end
-                    local unworn = {}
-                    for _, u in ipairs(live) do
-                        if not wornRead[u.id] then unworn[#unworn + 1] = u end
-                    end
-                    local second, lost, over = {}, {}, 0
-                    for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
-                        local res, none = struckIn(o.strikes, live)
-                        for _, u in ipairs(live) do
-                            second[u.id] = (second[u.id] or 0) + o.p * res[u.id].d
-                            lost[u.id] = (lost[u.id] or 0) + o.p * res[u.id].t
-                        end
-                        if #unworn < #live then none = select(2, struckIn(o.strikes, unworn)) end
-                        over = over + o.p * (1 - none)
-                    end
+                    local second, lost, over = M.secondRead(r, st.phase.hit, struckIn, wornRead)
+                    -- what the army's reply played there (sight.nextPhase's .reply): the
+                    -- played plan's goes in its trace, so a death read safe can be checked
+                    -- against the turn the read assumed
+                    st.replied = r.reply
                     -- each unit's death in either phase, and what the rank reads of it: the
                     -- protected units' admission, the greens' summed death, the HP left, and
                     -- the judged score's price for each death and for the HP lost. Only the
@@ -2151,6 +2178,7 @@ function M.plan(Bot, board, sight, style, opts)
                 for _, st in ipairs(fin) do
                     if M.outranks(st.rank, best.rank) then best = st end
                 end
+                look.reply = best.replied
                 for _, c in ipairs(considered) do
                     for _, st in ipairs(fin) do
                         if c.rank == st.rank then c.extended = true end

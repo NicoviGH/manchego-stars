@@ -158,3 +158,38 @@ keeps the cap from admitting a plan it sees go wrong.
 transitions also reads past the next phase. A unit the next phase strikes, that no heal of the
 army's can reach before the phase after, is read on three enemy phases with its HP carried. That
 is the one case where the hold is close to true. It has its own call budget, beside this one's.
+
+**Amended 2026-11-17 (Nicolas: "ship", #510 comments 6906859807, 6960188976, 6961473943): the
+turn between is the army's reply, not the hold.** The hold read far above the game: second
+phase over 50% read 71.5% where 3.0% died (436 unit-phases), and in 779 of 1,875 fallback plays
+only the second phase put the plan over the cap. Between the two enemy phases `sight.nextPhase`
+now plays a cheap reply (`armyReply`): every kill our units can make at even odds or better,
+likeliest first, one act a unit (`Sight.replyKills`); then each unit that killed nothing steps
+to the free tile in its reach that the fewest remaining enemies reach, the most threatened first
+(`Sight.safest`). Greens hold. It costs no more calls than the hold; this is not the honest
+turn the 2026-11-08 amendment set aside (the planner's own plan, 4.6x).
+- **Both second phases take it:** the lookahead's and the wear's (ADR 0421). The amendment of
+  2026-11-15 held the hold "close to true" for a unit no heal reaches; the measured games below
+  played the reply in both, so both changed together. Not measured apart.
+- **Read beside the hold first** (a shadow read, same games move for move): 32 plays from Ch8
+  (six pinned campaigns), E_15 (`lap4e`) and I_13 (`lap4p`), 3,234 unit-phases, 8 deaths. The
+  hold read 67 units over 15% (5 died), 41.2 deaths expected; the reply 33 (5 died), 19.3
+  expected. Still about twice the deaths seen.
+- **Played, same starts, attempts and dice** (tags `reply1*` hold against `replyfix1*`, this
+  PR's head): won 17 → 20 (Ch8 17 → 19 of 24, E_15 0 → 1 of 4, I_13 0 of 4), stuck 13 → 12,
+  lost 2 → 0, deaths 38 → 30, plans played on a fallback 182 → 98; Ch8's 17 attempts won both
+  ways took 370 → 335 turns. One game a pair: a lead, not a verdict. Cost: vanilla Ch3 and Ch5
+  1001 back to back, main 57.5 CPU s against 58.4 (the reply replaces the hold's call).
+- **Its blind spot:** of 9 deaths after a lookahead with the reply on, 6 were read at 0%. Three
+  were the bot's own next move leaving the tile the read held safe (its own read then), one
+  dice, and two a seen enemy the next phase's simulation sent at a neighbour (#510 comment
+  6961789474: a lead on `aiDecide`'s target choice, older than this). The played plan's trace
+  keeps what the reply played (`lookahead.reply`). On `replyfix1*`, 4 of 9 such deaths were by
+  an enemy the reply had killed (3 of them at a sure 100%), and in all 4 the bot never attacked
+  it that turn: the reply's kills, like its steps, are acts the next plan need not play. A kill
+  at even odds is taken as made, as nextPhase takes a striker our counter kills; its miss is
+  not read (PR 637 review), and no death here was such a miss. Of the 431 kills the played
+  plans' replies made, 139 were at 50-99%: untested whether reading their misses would change
+  which plan wins. The hold's games above are counted from the log (a hand count had read 18
+  won, 12 stuck); fallbacks and Ch8's turns are recounted on `replyfix1*`.
+- **Control:** `PT_REPLY=hold` reads every second phase with our units holding, as before.

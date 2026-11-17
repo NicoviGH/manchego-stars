@@ -1433,7 +1433,9 @@ function M.run(api)
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
-                                     quietGoals = quietGoals }
+                                     quietGoals = quietGoals,
+                                     -- PT_REPLY=hold: the second phases' old control
+                                     reply = api.reply }
                         end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board
