@@ -865,6 +865,8 @@ controllerState = function(observation)
     end
     return at.state, at.why
 end
+-- A guarded input's predicate for every yes/no prompt: the prompt has closed. The one owner.
+INSPECT.promptClosed = function(after) return controllerState(after) ~= "yes_no_choice" end
 local function legalNames(actions)
     local names = {}
     for _, action in ipairs(actions or {}) do names[#names + 1] = action.intention end
@@ -1903,6 +1905,17 @@ end
 -- locked box 8 wraps in two; its substitute is two authored boxes). Read it during a dialogue
 -- wait -- unit names and menus decode through the same function and overwrite it.
 INSPECT.activeMsg = function() return ru32(SYM.sActiveMsg) end
+-- The active message's first line as GetStringFromIndex decoded it into sMsgString: its bytes up
+-- to the first control code (below 0x20), at most 64. Read it while the box is up, as activeMsg.
+INSPECT.msgLine = function()
+    local line, at = {}, SYM.sMsgString
+    while #line < 64 do
+        local b = ru8(at + #line)
+        if b < 0x20 then break end
+        line[#line + 1] = string.char(b)
+    end
+    return table.concat(line)
+end
 
 -- struct ProcCmd (include/proc.h): opcode, dataImm, dataPtr at +04 -- 8 bytes a command
 INSPECT.PROC_CMD_SIZE = 8
@@ -4033,9 +4046,7 @@ INSPECT.answerFullBag = function()
         return controllerState(after) ~= "send_to_convoy" or after.choice ~= nil
     end, 120) then return false end
     if controllerState() == "yes_no_choice" then
-        return selectSemantic("answer_yes", "the discard is confirmed", function(after)
-            return controllerState(after) ~= "yes_no_choice"
-        end, 120)
+        return selectSemantic("answer_yes", "the discard is confirmed", INSPECT.promptClosed, 120)
     end
     return true
 end
@@ -4272,10 +4283,27 @@ INSPECT.campaignApi = function(game)
                      carriedUnknown = saved.carried == nil, bots = saved.bots }
         end
         local stalled = INSPECT.watch("arrive")
+        -- the last three distinct messages decoded before a prompt opened, ids and first lines:
+        -- a scene's question is among them (GetStringFromIndex's sActiveMsg). Its Yes/No labels
+        -- can decode before the choice proc is seen (E_16's first prompt logged 0x843 "Yes"), so
+        -- one would not do. A line is read only when the id changes.
+        local asked = {}
         for _ = 1, TUNE.bootSteps do
             if TUNE.bootHook then TUNE.bootHook() end
             local obs = observeController()
             local state, why = controllerState(obs)
+            if not (obs.procs.yes_no or obs.procs.talk_choice) then
+                local msg = INSPECT.activeMsg()
+                if not asked[1] or asked[1].msg ~= msg then
+                    -- each message once, newest first: one decoding again (a name, a label)
+                    -- moves to the front rather than pushing the question out
+                    for i = #asked, 1, -1 do
+                        if asked[i].msg == msg then table.remove(asked, i) end
+                    end
+                    table.insert(asked, 1, { msg = msg, line = INSPECT.msgLine() })
+                    asked[4] = nil
+                end
+            end
             if stalled(obs, state) then
                 return nil, "parked on an unclassified wait (see the inspect snapshot)"
             end
@@ -4323,12 +4351,25 @@ INSPECT.campaignApi = function(game)
                 menuPicked = picked
             elseif state == "yes_no_choice" and menuPicked ~= nil then
                 -- the pick's confirmation: "Will <lead> lead the party?", or the route's
-                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", function(after)
-                    return controllerState(after) ~= "yes_no_choice"
-                end, 120) then
+                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", INSPECT.promptClosed, 120) then
                     return nil, "the pick's prompt refused Yes"
                 end
                 menuPicked = nil
+            elseif state == "yes_no_choice" then
+                -- a story scene's own question, no pick before it (vanilla: the scene at chapter
+                -- index 71 after E_16, campaign 4006's Eirika lap, 2026-11-15). The highlighted
+                -- answer is taken, as every prompt here is (the lead's, the shop's, an item's),
+                -- and the question it asked is logged, so the choice is on the record
+                local current = obs.choice.current
+                local trail = {}
+                for _, m in ipairs(asked) do trail[#trail + 1] = string.format("0x%X \"%s\"", m.msg, m.line) end
+                log(string.format("campaign: chapter %s's prompt (messages before it, newest first: %s) takes %s",
+                    tostring(ch), table.concat(trail, ", "), tostring(current)))
+                if not current then return nil, "a scene's prompt shows no highlighted answer" end
+                if not guardedInput("answer_" .. current, "A", "the scene's prompt takes its answer",
+                        INSPECT.promptClosed, 120) then
+                    return nil, "a scene's prompt refused its answer"
+                end
             elseif state ~= "player_map_idle" then
                 local advanced = advanceBootState(obs, state)
                 if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
@@ -4486,17 +4527,13 @@ INSPECT.campaignApi = function(game)
                 -- Before the purchase every prompt is a yes: Buy, the price, send to storage.
                 -- After it, the greeting's B leaves.
                 if bought then
-                    ok = guardedInput("cancel_choice", "B", "the shop's prompt closes", function(after)
-                        return controllerState(after) ~= "yes_no_choice"
-                    end, 120)
+                    ok = guardedInput("cancel_choice", "B", "the shop's prompt closes", INSPECT.promptClosed, 120)
                 elseif obs.choice.current ~= "yes" then
                     ok = guardedInput("select_yes", "LEFT", "Yes is highlighted", function(after)
                         return after.choice ~= nil and after.choice.current == "yes"
                     end, 60)
                 else
-                    ok = guardedInput("answer_yes", "A", "the prompt takes Yes", function(after)
-                        return controllerState(after) ~= "yes_no_choice"
-                    end, 120)
+                    ok = guardedInput("answer_yes", "A", "the prompt takes Yes", INSPECT.promptClosed, 120)
                 end
             elseif state == "shop_buy" then
                 local c = obs.shop.cursor
@@ -4642,9 +4679,7 @@ INSPECT.campaignApi = function(game)
                 ok = INSPECT.awaitActed(u.addr)
             elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
             elseif state == "yes_no_choice" then
-                ok = selectSemantic("answer_yes", "the item's prompt takes Yes", function(after)
-                    return controllerState(after) ~= "yes_no_choice"
-                end, 120)
+                ok = selectSemantic("answer_yes", "the item's prompt takes Yes", INSPECT.promptClosed, 120)
             elseif state == "generic_menu" then
                 ok = guardedInput("select_current_menu_item", "A", "the first class is chosen",
                     function(after) return controllerState(after) ~= "generic_menu" end, 120)
@@ -6061,14 +6096,7 @@ INSPECT.helpAt = function(x, y, want)
     else
         guardedInput("help_left", "LEFT", "help moves onto the name",
             function() return INSPECT.activeMsg() == want end, 120)
-        local msg = INSPECT.activeMsg()
-        local line, at = {}, SYM.sMsgString
-        while #line < 64 do
-            local b = ru8(at + #line)
-            if b < 0x20 then break end
-            line[#line + 1] = string.char(b)
-        end
-        why = {msg = msg, line1 = table.concat(line)}
+        why = {msg = INSPECT.activeMsg(), line1 = INSPECT.msgLine()}
     end
     if now() == "stat_screen_help" then
         guardedInput("close_help", "B", "the help box closes",
