@@ -512,6 +512,40 @@ class TestUnitStateBits(unittest.TestCase):
             self.assertEqual(1 << int(shift), decomp.get(name), name)
 
 
+class TestHealStaves(unittest.TestCase):
+    def test_sight_lua_heal_staves_are_the_ones_doitemuse_heals_with(self):
+        # sight.staves offers a staff as a heal; the harness then plays gSelectInfo_Heal's
+        # target selection. GetUnitItemHealAmount adds power for every staff, so it let a
+        # Barrier through and the game opened gSelectInfo_Barrier (vanilla E_16, a crash). The
+        # set is the case labels DoItemUse (bmitemuse.c) sends to DoUseHealStaff.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        items = enum_values(vanilla_decomp_text('include/constants/items.h'), 'ITEM_')
+        src = vanilla_decomp_text('src/bmitemuse.c')
+        body = src[src.index('void DoItemUse('):]
+        body = body[:body.index('\n}\n')]
+        heal = set()
+        for labels, call in re.findall(r'((?:\s*case \w+:)+)\s*(\w+)\(', body):
+            if call == 'DoUseHealStaff':
+                heal |= {items[n] for n in re.findall(r'case (\w+):', labels)}
+        self.assertEqual(len(heal), 4, 'Heal, Mend, Recover, Physic')
+        with open(os.path.join(REPO, 'tools/playtest/sight.lua'), encoding='utf-8') as fh:
+            m = re.search(r'^M\.HEAL_STAVES = \{([^}]*)\}', fh.read(), re.M)
+        self.assertIsNotNone(m, 'sight.lua names M.HEAL_STAVES in one table')
+        lua = {int(v, 16) for v in re.findall(r'\[(0x[0-9A-Fa-f]+)\] = true', m.group(1))}
+        self.assertEqual(lua, heal)
+
+    def test_the_sustain_demand_is_answered_by_a_heal_staff(self):
+        # The team's `sustain` demand took any staff CanUnitUseStaff allows, so a Barrier
+        # fielded as the party's healer (PR #631 review). It asks s.staves, the one owner of
+        # what a heal staff is.
+        with open(os.path.join(REPO, 'tools/playtest/sight.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        body = _block(text, 'elseif d.kind == "sustain" then', 'elseif d.kind == "village"')
+        self.assertIn('#s.staves(u) > 0', body)
+        self.assertNotIn('CanUnitUseStaff', body)
+
+
 class TestAiActionIds(unittest.TestCase):
     def test_board_lua_ai_actions_are_the_decomps(self):
         # board.lua names the AI's action ids it reads off gAiDecision (Board.fate tells an
