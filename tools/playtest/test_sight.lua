@@ -1702,6 +1702,15 @@ do
     check(memo.k.side .. " " .. memo.k[4].kill, "target 3", "known: the first teaching read sets it")
 end
 
+-- A fake gBmMapUnit over `m` at S.gBmMapUnit: 32 row pointers at 0x300 to 32-wide rows from
+-- 0x1000, so (x, y) is the byte at 0x1000 + y * 32 + x; and a sight api over it.
+local function fakeUnitMap(m, S, Board)
+    local ROWS = 0x300
+    m.w32(S.gBmMapUnit, ROWS)
+    for y = 0, 31 do m.w32(ROWS + y * 4, 0x1000 + y * 32) end
+    return { SYM = S, mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32, Board = Board }
+end
+
 -- A ballista's rider (#510, vanilla Ch10 on Eirika's route): Innes (charId 11) joined riding an
 -- emptied ballista, the bot planned his Silver Bow from (7,23), and the game showed him no
 -- Attack there (AttackCommandUsability hides it from a rider). weapons() lists nothing for a
@@ -1711,11 +1720,7 @@ do
     local m = fakeMem()
     local S = { CanUnitUseWeaponNow = 1, CanMoveActiveUnitTo = 2, gActiveUnit = 0x100,
                 gActiveUnitMoveOrigin = 0x110, gBmMapUnit = 0x200 }
-    local ROWS = 0x300                      -- gBmMapUnit -> row pointers -> 32-wide rows
-    m.w32(S.gBmMapUnit, ROWS)
-    for y = 0, 31 do m.w32(ROWS + y * 4, 0x1000 + y * 32) end
-    local api = { SYM = S, mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32,
-                  Board = { itemRange = function() return 2, 3 end } }
+    local api = fakeUnitMap(m, S, { itemRange = function() return 2, 3 end })
     local BOW = 0x2F
     local innes = { addr = 0x4000, x = 2, y = 22, items = { { id = BOW, uses = 5 } },
                     state = Sight.US_IN_BALLISTA }
@@ -1874,11 +1879,59 @@ do
     check(factions, 2, "armyReply: writes the faction for the danger read and puts it back")
     check(reply:find("M.equip(api, call, S, u, k.slot)", 1, true) ~= nil, true,
           "armyReply: a killer equips the weapon it killed with")
+    -- the wiring: the heal list is read with the healer as the menu finds it (M.asActive)
+    local ha = sightSrc:find("    function s.heals(u, x, y, hurt)", 1, true)
+    local heals = ha and sightSrc:sub(ha, sightSrc:find("\n    end\n", ha, true)) or ""
+    -- a live line of its own (not a comment), and nothing after it stands the healer back on
+    local live = heals:find("\n%s*asActive%(u, x, y%)\n")
+    check(live ~= nil and heals:find("standOn(", 1, true) == nil and heals:find("putOn(", 1, true) == nil,
+          true, "heals: the healer stands as the active unit, not merely on the tile")
     local la = sightSrc:find("local function liftRemembered()", 1, true)
     local lift = la and sightSrc:sub(la, sightSrc:find("\n    end\n", la, true)) or ""
     check(lift:find("mem.u8(o.addr + UNIT_X)", 1, true) ~= nil
           and lift:find("o.x", 1, true) == nil, true,
           "liftRemembered: where a red stands now, off its struct, not the snapshot")
+end
+
+-- test_the_active_unit_is_off_the_unit_map: the game makes every unit-menu list with the acting
+-- unit off gBmMapUnit (UnitBeginAction clears its tile; PlayerPhase_FinishAction puts it back
+-- after the act), so a staff never lists its holder. Sight.asActive stands it on (x, y) in its
+-- struct, clears its old tile and leaves the new one empty, and makes it the active unit
+-- (vanilla E_20, campaign 4006, turn 24: Saleh's Physic on himself, a crash).
+do
+    local m = fakeMem()
+    local S = { gActiveUnit = 0x100, gActiveUnitId = 0x104, gBmMapUnit = 0x200 }
+    local api = fakeUnitMap(m, S, { US_HAS_MOVED = 1 << 6 })
+    local saleh = { id = 2, addr = 0x4000 }
+    m.w8(saleh.addr + 0x0B, saleh.id)
+    m.w8(saleh.addr + 0x10, 9); m.w8(saleh.addr + 0x11, 2)
+    m.w32(saleh.addr + 0x0C, 1 << 6)
+    m.w8(0x1000 + 2 * 32 + 9, saleh.id)
+    m.w8(0x1000 + 0 * 32 + 8, 5)              -- an ally next to where he goes
+    Sight.asActive(api, saleh, 7, 0)
+    check(m.u8(saleh.addr + 0x10) .. "," .. m.u8(saleh.addr + 0x11), "7,0", "asActive: his struct on the tile")
+    check(m.u8(0x1000 + 2 * 32 + 9), 0, "asActive: his old tile cleared")
+    check(m.u8(0x1000 + 0 * 32 + 7), 0, "asActive: off the unit map on the new tile, as UnitBeginAction has him")
+    check(m.u8(0x1000 + 0 * 32 + 8), 5, "asActive: the ally stays on the map")
+    check(m.u32(saleh.addr + 0x0C) & (1 << 6), 0, "asActive: not yet acted")
+    check(m.u32(S.gActiveUnit) .. "/" .. m.u8(S.gActiveUnitId), "16384/2", "asActive: the active unit")
+    -- Sight.canAttack (harness.lua's clear loop) asks the game with the unit staged the same way
+    m.w8(0x1000 + 1 * 32 + 6, saleh.id); m.w8(saleh.addr + 0x10, 6); m.w8(saleh.addr + 0x11, 1)
+    m.w32(S.gActiveUnit, 0)
+    m.w32(saleh.addr + 0x0C, 1 << 6)          -- after a Canto move
+    S.AttackCommandUsability = 9
+    local seen
+    -- harness.lua hands it a lean unit (Board.leanAt): no `id`, read off the struct
+    Sight.canAttack(api, { addr = saleh.addr }, function(fn)
+        return fn(function()
+            seen = m.u8(0x1000 + 1 * 32 + 6) .. "/" .. m.u32(S.gActiveUnit) .. "/" .. (m.u32(saleh.addr + 0x0C) >> 6)
+            return 1
+        end)
+    end)
+    check(seen, "0/16384/1", "canAttack: the attacker off its tile, the active unit, its Canto move kept")
+    -- Sight.standOn leaves a unit ON the map: the enemy phase's and the reply's moves
+    Sight.standOn(api, saleh, 6, 1)
+    check(m.u8(0x1000 + 1 * 32 + 6), saleh.id, "standOn: on the unit map")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

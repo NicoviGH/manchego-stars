@@ -1131,6 +1131,41 @@ function M.liftOff(api, x, y, id)
     M.putOn(api, x, y, 0)
     return true
 end
+-- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
+-- Its id off the struct (+0B, as Board.unitAt reads it): harness.lua hands canAttack a lean unit
+-- (Board.leanAt), which has none.
+local UNIT_INDEX = 0x0B
+function M.standOn(api, u, x, y)
+    -- where it stands now, not u.x/u.y: a sandbox may have moved it already
+    local cx, cy = api.mem.u8(u.addr + UNIT_X), api.mem.u8(u.addr + UNIT_Y)
+    local id = api.mem.u8(u.addr + UNIT_INDEX)
+    M.liftOff(api, cx, cy, id)
+    M.putOn(api, x, y, id)
+    api.write8(u.addr + UNIT_X, x)
+    api.write8(u.addr + UNIT_Y, y)
+end
+-- Inside a sandbox: `u` on (x, y) as the active unit, not yet acted, as the unit menu finds
+-- it after a move: its struct there and gActiveUnit it, and OFF the unit map, the part of
+-- UnitBeginAction (bmunit.c) a menu read sees. Its tile stays clear until
+-- PlayerPhase_FinishAction (playerphase.c) puts it back after the act, so no list the menu
+-- makes holds the unit itself. Left out: US_HIDDEN and gActiveUnitMoveOrigin, which no menu or
+-- target code reads; a RefreshEntityBmMaps after this would put the unit back (bmmap.c skips
+-- only hidden units), so no read here calls one.
+-- Physic's list (ForEachUnitInRange, bmtarget.c) listed a wounded healer stood on its tile and
+-- the game refused the target (vanilla E_20, campaign 4006, turn 24: Saleh, charId 0x17, a crash).
+-- `asIs`: the unit's state left as it stands (canAttack asks from where a unit is, which may
+-- be after its Canto move: AttackCommandUsability hides Attack from a US_HAS_MOVED unit).
+function M.asActive(api, u, x, y, asIs)
+    local S = api.SYM
+    local id = api.mem.u8(u.addr + UNIT_INDEX)
+    M.standOn(api, u, x, y)
+    M.liftOff(api, x, y, id)
+    if not asIs then
+        api.write32(u.addr + UNIT_STATE, api.mem.u32(u.addr + UNIT_STATE) & ~api.Board.US_HAS_MOVED)
+    end
+    api.write32(S.gActiveUnit, u.addr)
+    api.write8(S.gActiveUnitId, id)
+end
 local function readGrid(mem, base, w, h)
     local g = {}
     for y = 0, h - 1 do
@@ -2089,15 +2124,7 @@ function M.new(outer)
         end) end)
     end
 
-    -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
-    local function standOn(u, x, y)
-        -- where it stands now, not u.x/u.y: a sandbox may have moved it already
-        local cx, cy = mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)
-        M.liftOff(api, cx, cy, u.id)
-        M.putOn(api, x, y, u.id)
-        api.write8(u.addr + UNIT_X, x)
-        api.write8(u.addr + UNIT_Y, y)
-    end
+    local function standOn(u, x, y) M.standOn(api, u, x, y) end
 
     -- Hides every other unit the AI could choose, so its own routine can only pick `u`. Hidden
     -- units keep their gBmMapUnit entries: they still block as they do.
@@ -2690,14 +2717,7 @@ function M.new(outer)
         end)
     end
 
-    -- Inside a sandbox: `u` stands on (x, y) as the active unit, not yet acted, as the unit
-    -- menu finds it after a move.
-    local function asActive(u, x, y)
-        standOn(u, x, y)
-        api.write32(u.addr + UNIT_STATE, mem.u32(u.addr + UNIT_STATE) & ~Board.US_HAS_MOVED)
-        api.write32(S.gActiveUnit, u.addr)
-        api.write8(S.gActiveUnitId, u.id)
-    end
+    local function asActive(u, x, y) M.asActive(api, u, x, y) end
 
     -- A razed village keeps its Visit command (GetAvailableTileEventCommand), but the Visit
     -- menu is shown to no one there (VisitCommandUsability reads the tile): ch02's (12,3) on
@@ -2940,7 +2960,8 @@ function M.new(outer)
         if #staves == 0 then return {} end
         if hurt then s.maxHps(hurt) end
         return sandbox(function(call)
-            standOn(u, x, y)
+            -- as the menu finds the healer: off the unit map, so it never lists itself
+            asActive(u, x, y)
             -- a planned heal: these allies read as wounded, so the game's list offers them
             for _, o in ipairs(hurt or {}) do
                 if mem.u8(o.addr + UNIT_HP) >= o.maxhp then api.write8(o.addr + UNIT_HP, o.maxhp - 1) end
@@ -3179,7 +3200,7 @@ end
 function M.canAttack(api, u, sandbox)
     local S = api.SYM
     return (sandbox or M.machine(api.cpu))(function(call)
-        api.write32(S.gActiveUnit, u.addr)
+        M.asActive(api, u, api.mem.u8(u.addr + UNIT_X), api.mem.u8(u.addr + UNIT_Y), true)
         return call(S.AttackCommandUsability, { 0, 0 }) == M.MENU_ENABLED
     end)
 end
