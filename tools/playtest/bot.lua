@@ -1766,6 +1766,23 @@ local function ownHeal(ctx, u)
     return ctx.sight.mend(u)
 end
 
+-- `acts` of `u`, each told the ally its act's tile asks to move (`vacate`) and what can strike
+-- it where it ends (Board.endTile: a Canto move's tile) next phase (`exposure`, each enemy's own
+-- strike: the planner's odds).
+local function exposed(ctx, u, acts)
+    for _, a in ipairs(acts) do
+        local friend = vacated(ctx, u, a.move.x, a.move.y)
+        a.vacate = friend and friend.id
+        a.exposure = {}
+        local held = a.act == "attack" and a.slot or nil
+        local at = Board.endTile(a)
+        for _, s in ipairs(exposure(ctx, u, at.x, at.y, held)) do
+            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
+        end
+    end
+    return acts
+end
+
 -- That heal's "item" act on `tile`.
 local function healAct(u, m, tile)
     local a = action(u, tile, "item", nil)
@@ -1786,7 +1803,10 @@ end
 -- The planner's heal swap: unit `u`'s own heal on `tile` (ctx: M.candidates' second value).
 function M.mendAt(ctx, u, tile)
     local m = ownHeal(ctx, u)
-    return m and healAct(u, m, tile) or nil
+    -- told its tile's ally and its exposure as every offered act is (exposed): without the
+    -- `vacate`, the swap's heal took Kyle's (charId 0x11) tile before he left it, and the
+    -- harness could not end the move there (vanilla E_19, 2026-11-16: "could not perform item")
+    return m and exposed(ctx, u, { healAct(u, m, tile) })[1] or nil
 end
 
 -- The old clear-bot through decide: the first unit in slot order, pickTarget's pick, else
@@ -2097,23 +2117,6 @@ local function cantoMoves(ctx, u, acts, gain)
         end
     end
     return out
-end
-
--- `acts` of `u`, each told the ally its act's tile asks to move (`vacate`) and what can strike
--- it where it ends (Board.endTile: a Canto move's tile) next phase (`exposure`, each enemy's own
--- strike: the planner's odds).
-local function exposed(ctx, u, acts)
-    for _, a in ipairs(acts) do
-        local friend = vacated(ctx, u, a.move.x, a.move.y)
-        a.vacate = friend and friend.id
-        a.exposure = {}
-        local held = a.act == "attack" and a.slot or nil
-        local at = Board.endTile(a)
-        for _, s in ipairs(exposure(ctx, u, at.x, at.y, held)) do
-            a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
-        end
-    end
-    return acts
 end
 
 -- progress: how much nearer its march goal (the game's field to it) `u` ends on (x, y), as
