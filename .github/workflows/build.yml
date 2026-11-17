@@ -155,12 +155,8 @@ jobs:
         with:
           submodules: recursive
 
-      # Python as checks.yml pins it: the runner's default moved to 3.13 (2026-11-17), which
-      # dropped `aifc` (tools/wav_to_aif.py, tools/test_inject_sounds.py)
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
+      # No setup-python here: the decomp's own scripts run on the system Python
+      # (`#!/bin/python3`, fireemblem8u/scripts/gfxtools), which the deps below go into.
       - name: Install dependencies
         run: |
           sudo apt-get update
