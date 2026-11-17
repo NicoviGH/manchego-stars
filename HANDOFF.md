@@ -9,16 +9,31 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
-**Next session starts here (2026-11-17; main at this HANDOFF commit, 13875b81's code). The six overnight PRs are merged** (Nicolas: "yes merge all those PRs", 2026-11-17): the stack #631→#635 with `--merge` (952a5101..0da248ab), #636 squashed (13875b81); all branches deleted. Read #510 comments 6906859807 (the second-phase read) and 6914401766 (the overnight laps) first.
+**Next session starts here (2026-11-17, evening; main at this HANDOFF commit, 614a3c40's code). PR #637 is merged** (Nicolas: "ship and handoff", 2026-11-17; ADR 0389 amended): the lookahead's and the wear's second phase now read the **army's reply** between the two enemy phases (every kill at even odds or better, then each other unit to its safest free tile) instead of our units holding. `PT_REPLY=hold` is the control. Read #510 comments 6960188976, 6962994569 (results, corrected count) and 6961789474 (the misses, a lead) first.
 
-- **The second phase (Nicolas's questions, answered):** `calibration` did not score it (#636 adds
-  it). It reads far above the game: second > 50% → 71.5% predicted, 3.0% died (436
-  unit-phases); even units that held their tile died at 13.3%. In 779 of 1,875 fallback plays,
-  every unit's next-phase read was under the cap and only the second phase put the plan over.
-  **Recommendation, Nicolas's call (it changes what the lookahead means):** the second phase
-  counts only the threat the army cannot answer: each unit on its safest free tile, the enemies
-  our units can kill that turn removed first. Cheaper alternative: the second phase ranks
-  finalists but never puts a plan over the cap.
+- **What it did** (same 32 starts, attempts and dice; Ch8 ×6 pinned campaigns, E_15 from `lap4e`,
+  I_13 from `lap4p`): won 17 → 20, lost 2 → 0, deaths 38 → 30, fallback plans 182 → 98. One
+  game a pair: a lead. The frozen suite has not been run on it (it runs before the bot's
+  reading is relied on, over every change since the last one).
+- **The reply's blind spot (open):** it assumes a turn the bot does not then play. Of 9 deaths
+  after a lookahead, 4 were by an enemy the reply had counted killed (3 at 100%), none of them
+  attacked that turn; others were steps the bot did not take. Untested: why the next plan
+  passes up a sure kill the reply found (#510 comment 6962994569 names the four decisions).
+  139 of 431 reply kills were at 50-99% and taken as made; untested whether their misses
+  change a plan.
+- **Lead kept (#510 comment 6961789474):** the next phase's simulation sends an enemy at a
+  different unit than the game does (`aiDecide`'s target choice; two decisions named there).
+- **Party strength (Nicolas asked; checked at Ch8 only):** entering Ch8 the bot's deployed party
+  has a median of about L4 against the derived band's typical L7 (`docs/fe8-pacing-reference.md`);
+  Eirika L3. At I_13 (Ephraim route) Ephraim/Seth L12, Kyle L11, the rest L8-9 or below,
+  only Lute promoted. The band stops at Ch8, so "under-strength later" is a lead. Likely cause,
+  untested: Seth (promoted) takes the kills.
+- **Next, in order (Claude's recommendation):** (1) E_20's crash below, one instrumented replay;
+  (2) extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
+  party chapter by chapter, who takes the experience; (3) laps again from the prologue.
+- **CI:** the runner's default Python moved to 3.13 today and dropped `aifc`; main's `tests` job
+  had failed since. #637 pins 3.12 on the `tests` and `verdict-diff` jobs (the ROM build keeps
+  the system Python its decomp scripts' `#!/bin/python3` runs).
 - **Where the laps stopped** (states in the vanilla store):
   - Eirika: `bag1-heal4-heal1-lap4e-cs-s4006`, **E_20 attempt 1 crashes on turn 24**: Saleh
     (charId 0x17) planned Physic on himself at 29 HP, and the game's list left him out (the
@@ -30,11 +45,12 @@ and start a fresh instance; don't rely on auto-compaction.
     builds the assault on the throne's holder, and every assault reads a unit dying at about
     99%. Same 12 games move for move.
 - **Found, not fixed:** E_19's losses are mostly its green civilians (charId 0xCD, 7 to 18
-  deaths an attempt). The second-phase over-read above. Kept from before: `story` names every
+  deaths an attempt). Kept from before: `story` names every
   generic enemy "the Knight"; rejected plans record only `max_die`; `scout-ch6` turn 2 at a 0%
   read; Colm in `scout-ch14`.
-- **Kept states:** this night's tags (`lap4e`, `lap4p`, `heal1`-`heal4`, `canto1`, `vac1`,
-  `bag1`, `throne1`) are probes on branch code, never a proof base. Open from before: slow
+- **Kept states:** the overnight tags (`lap4e`, `lap4p`, `heal1`-`heal4`, `canto1`, `vac1`,
+  `bag1`, `throne1`) are probes on branch code, never a proof base. Today's: `reply1*` (the
+  hold, shadow), `replyon1*` (first cut), `replyfix1*` (#637's code). Open from before: slow
   pre-commit timing; whether verdicts should leave out `stale` runs (Nicolas's call).
 
 **PR #608 is merged** (43468046; Nicolas: "Yes merge when able and handoff", 2026-11-13; ADR 0407).
