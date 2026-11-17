@@ -1903,6 +1903,7 @@ do
     local S = { gActiveUnit = 0x100, gActiveUnitId = 0x104, gBmMapUnit = 0x200 }
     local api = fakeUnitMap(m, S, { US_HAS_MOVED = 1 << 6 })
     local saleh = { id = 2, addr = 0x4000 }
+    m.w8(saleh.addr + 0x0B, saleh.id)
     m.w8(saleh.addr + 0x10, 9); m.w8(saleh.addr + 0x11, 2)
     m.w32(saleh.addr + 0x0C, 1 << 6)
     m.w8(0x1000 + 2 * 32 + 9, saleh.id)
@@ -1920,7 +1921,8 @@ do
     m.w32(saleh.addr + 0x0C, 1 << 6)          -- after a Canto move
     S.AttackCommandUsability = 9
     local seen
-    Sight.canAttack(api, saleh, function(fn)
+    -- harness.lua hands it a lean unit (Board.leanAt): no `id`, read off the struct
+    Sight.canAttack(api, { addr = saleh.addr }, function(fn)
         return fn(function()
             seen = m.u8(0x1000 + 1 * 32 + 6) .. "/" .. m.u32(S.gActiveUnit) .. "/" .. (m.u32(saleh.addr + 0x0C) >> 6)
             return 1

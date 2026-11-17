@@ -1132,11 +1132,15 @@ function M.liftOff(api, x, y, id)
     return true
 end
 -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
+-- Its id off the struct (+0B, as Board.unitAt reads it): harness.lua hands canAttack a lean unit
+-- (Board.leanAt), which has none.
+local UNIT_INDEX = 0x0B
 function M.standOn(api, u, x, y)
     -- where it stands now, not u.x/u.y: a sandbox may have moved it already
     local cx, cy = api.mem.u8(u.addr + UNIT_X), api.mem.u8(u.addr + UNIT_Y)
-    M.liftOff(api, cx, cy, u.id)
-    M.putOn(api, x, y, u.id)
+    local id = api.mem.u8(u.addr + UNIT_INDEX)
+    M.liftOff(api, cx, cy, id)
+    M.putOn(api, x, y, id)
     api.write8(u.addr + UNIT_X, x)
     api.write8(u.addr + UNIT_Y, y)
 end
@@ -1153,13 +1157,14 @@ end
 -- be after its Canto move: AttackCommandUsability hides Attack from a US_HAS_MOVED unit).
 function M.asActive(api, u, x, y, asIs)
     local S = api.SYM
+    local id = api.mem.u8(u.addr + UNIT_INDEX)
     M.standOn(api, u, x, y)
-    M.liftOff(api, x, y, u.id)
+    M.liftOff(api, x, y, id)
     if not asIs then
         api.write32(u.addr + UNIT_STATE, api.mem.u32(u.addr + UNIT_STATE) & ~api.Board.US_HAS_MOVED)
     end
     api.write32(S.gActiveUnit, u.addr)
-    api.write8(S.gActiveUnitId, u.id)
+    api.write8(S.gActiveUnitId, id)
 end
 local function readGrid(mem, base, w, h)
     local g = {}
