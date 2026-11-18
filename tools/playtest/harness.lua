@@ -14,6 +14,7 @@
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
 --   PLAYTEST_REPLY    -- "hold": second phases read with our units holding, the old control
 --   PLAYTEST_USEPRICE -- "off" | gold: what a plan pays per weapon use (#642, Bot.usePrice)
+--   PLAYTEST_SHADOW   -- a PT_USEPRICE value: each decision's shadow plan at it (#642, botrun)
 --                        (api.reply)
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)
 --   PLAYTEST_PINNED   -- a pinned decision state to load and read (PT_PINNED; api.check_pinned)
@@ -3670,6 +3671,8 @@ INSPECT.botApi = function(game)
     api.reply = PLAYTEST_REPLY == "hold" and "hold" or nil
     -- PT_USEPRICE (#642): "off", or the gold a use of a weapon the game gives no price costs
     api.usePrice = (PLAYTEST_USEPRICE ~= nil and PLAYTEST_USEPRICE ~= "") and PLAYTEST_USEPRICE or nil
+    -- PT_SHADOW (#642): each decision also plans at this weapon-use price, judged, never played
+    api.shadow = (PLAYTEST_SHADOW ~= nil and PLAYTEST_SHADOW ~= "") and PLAYTEST_SHADOW or nil
     api.dice = function() return Sight.dice(sightApi) end
     -- The game's state at the pinned decision, kept beside the trace: a board fixture (T084).
     -- The board that decision read goes beside it (.json): what a fresh emulator's load of the

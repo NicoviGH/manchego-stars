@@ -297,6 +297,42 @@ function M.events(before, after)
     return out
 end
 
+-- PT_SHADOW's record (#642): the played plan and the shadow's, side by side. `priced` is
+-- what each plan paid for its weapon uses (W.gold x useCost, in points); `free` its judged
+-- value with that price given back, so the two compare on what the judge alone reads.
+local SHADOW_RANK = { "admitted", "max_die", "sum_die", "game_over", "green_die", "forfeits",
+                      "complete", "progress", "value" }
+-- `weapons` the item each attack strikes with ("unit id:item id"), from `board`'s bags.
+function M.shadowOf(Planner, style, plan, splan, knob, board)
+    local W = Planner.WEIGHTS[style.aggression]
+    local bags = {}
+    for _, u in ipairs(board and board.units or {}) do bags[u.id] = u.items end
+    local function side(p)
+        if not p then return nil end
+        local out, priced, rare = { keys = Planner.keysOf(p), fallback = p.fallback }, 0, 0
+        out.weapons = {}
+        for _, a in ipairs(p.acts or {}) do
+            priced = priced + W.gold * (a.useCost or 0)
+            if (a.useCost or 0) > 0 then rare = rare + 1 end
+            local it = a.act == "attack" and a.slot and (bags[a.unitId] or {})[a.slot + 1]
+            if it then out.weapons[#out.weapons + 1] = a.unitId .. ":" .. it.id end
+        end
+        for _, k in ipairs(SHADOW_RANK) do out[k] = p.rank and p.rank[k] end
+        out.priced, out.priced_acts = priced, rare
+        out.free = out.value and out.value + priced
+        return out
+    end
+    local played, shadow = side(plan), side(splan)
+    local same = shadow ~= nil
+    if shadow then
+        same = #played.keys == #shadow.keys
+        for i = 1, same and #played.keys or 0 do
+            if played.keys[i] ~= shadow.keys[i] then same = false end
+        end
+    end
+    return { knob = knob, same = same, played = played, shadow = shadow }
+end
+
 local function actOf(a)
     return { unit = a.unit, act = a.act, x = a.move.x, y = a.move.y, target = a.target,
              why = a.why, canto = a.canto,
@@ -1493,6 +1529,20 @@ function M.run(api)
                         else
                             a, plan, cost = api.Planner.plan(Bot, board, sight, style, opts)
                         end
+                        -- PT_SHADOW (#642's per-decision measure): the plan this same board
+                        -- makes at another weapon-use price, judged and never played. Its frames
+                        -- are not the decision's (the frame budget's `discount`); its cost is not
+                        -- charged to the run's lookahead budget
+                        local shadow
+                        if api.shadow and plan and not pin then
+                            local sopts = {}
+                            for k, v in pairs(opts) do sopts[k] = v end
+                            sopts.usePrice, sopts.at = api.shadow, nil
+                            local f0 = api.frames()
+                            local _, splan = api.Planner.plan(Bot, board, sight, style, sopts)
+                            deciding.discount = (deciding.discount or 0) + api.frames() - f0
+                            shadow = M.shadowOf(api.Planner, style, plan, splan, api.shadow, board)
+                        end
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1
                         cost = cost or {}
@@ -1581,6 +1631,10 @@ function M.run(api)
                         end
                         explore.offered(plan and plan.explore)
                         readNearest(plan)
+                        if shadow then
+                            shadow.t, shadow.ref, shadow.turn = "shadow", plan and plan.ref, turn
+                            trace(shadow)
+                        end
                         trace({ t = "plan", choice = a and actOf(a), replan = replan,
                                 ref = plan and plan.ref, audit = plan and plan.audit,
                                 judged = plan and plan.judged, kind = plan and plan.kind,
@@ -1618,7 +1672,7 @@ function M.run(api)
                 deciding = { turn = turn, at = {} }
                 if sight.watch then
                     sight.watch(function()
-                        local spent = api.frames() - from
+                        local spent = api.frames() - from - (deciding.discount or 0)
                         if spent > M.DECISION_FRAMES then
                             error({ timeout = true, frames = spent }, 0)
                         end

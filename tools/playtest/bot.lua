@@ -441,8 +441,8 @@ M.memoryKey = Board.memoryKey
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 -- The gold one use of a weapon the game gives no price costs a plan (#642): a Sacred Twin,
 -- Excalibur, the legendaries (ItemData costPerUse 0). A shop weapon's use costs its own
--- costPerUse (sight.usePrice). PT_USEPRICE overrides it ("off": no price, one weapon an
--- attack as before). Being tuned: #642.
+-- costPerUse (sight.usePrice). PT_USEPRICE overrides it ("off": no price and no spares, the
+-- bot before #642). Being tuned: #642.
 M.RARE_USE = 600
 
 -- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
@@ -2158,14 +2158,8 @@ local function proposeOne(ctx, u)
             .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
             .. (a.dropAt and ("/" .. a.dropAt.x .. "," .. a.dropAt.y) or "")
             .. (a.canto and ("~" .. a.canto.x .. "," .. a.canto.y) or "")
-        -- the same strike with another weapon is another act (#642): the first weapon offered
-        -- keeps the plain key, each other one is told apart by its slot (the planner's key too)
-        if seen[k] and a.act == "attack" and ctx.priceUse and seen[k] ~= a.slot then
-            k = k .. "#" .. tostring(a.slot)
-            a.slotKey = true
-        end
         if seen[k] then return end
-        seen[k] = a.slot or true
+        seen[k] = true
         a.why = why
         acts[#acts + 1] = a
     end
@@ -2191,8 +2185,8 @@ local function proposeOne(ctx, u)
             guard[e] = c
         end
     end
-    -- each pick with the unit's other weapons from the same tile (#642): which weapon
-    -- strikes is the planner's to weigh against what each use costs, not expected damage's
+    -- the unit's weapons that make each strike, by target and tile (#642): a strike is
+    -- priced over the cheapest of them, and carries the cheaper ones as its spares
     local others = {}
     if ctx.priceUse then
         for _, c in ipairs(attackOptions(ctx, u, open, true)) do
@@ -2213,24 +2207,34 @@ local function proposeOne(ctx, u)
         -- strike (#642), in gold: its expected uses at the difference in price per use. A unit
         -- with no cheaper weapon there pays nothing, so the price chooses the weapon and never
         -- whether to strike (a Manakete's Divinestone is its only weapon: Ch17, #642 comment)
+        -- The strike keeps the weapon expected damage picked (betterAttack), as with the price
+        -- off: the beam never sees the price (an act it cuts on its own score is never judged,
+        -- and a Twin's kill that keeps a unit alive was cut that way: #642's shadow runs).
+        -- Each cheaper weapon that makes the same strike rides along as a `spare`: the planner
+        -- judges the plan with it in this one's place (Planner's spare step), where the cap and
+        -- the judge read what the swap costs beside what it saves.
         if ctx.priceUse then
+            local here = others[c.target.id .. "@" .. c.tile.x .. "," .. c.tile.y] or {}
             local least = perUse(c.slot)
-            for _, o in ipairs(others[c.target.id .. "@" .. c.tile.x .. "," .. c.tile.y] or {}) do
-                least = math.min(least, perUse(o.slot))
-            end
+            for _, o in ipairs(here) do least = math.min(least, perUse(o.slot)) end
             a.useCost = (c.f.uses or 0) * (perUse(c.slot) - least)
+            for _, o in ipairs(here) do
+                if perUse(o.slot) < perUse(c.slot) then
+                    local b = strikeAct(u, o)
+                    b.f, b.spent, b.first = o.f, o.spent, o.first
+                    b.useCost = (o.f.uses or 0) * (perUse(o.slot) - least)
+                    -- another weapon, another act: its slot tells the key apart (Planner.key)
+                    b.slotKey, b.why = true, "attack"
+                    a.spares = a.spares or {}
+                    a.spares[#a.spares + 1] = b
+                end
+            end
         end
         add(a, "attack")
     end
     for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
         for _, list in ipairs({ best, safe, guard }) do
-            local c = list[e]
-            if c then
-                offer(c)
-                for _, o in ipairs(others[e.id .. "@" .. c.tile.x .. "," .. c.tile.y] or {}) do
-                    if o.slot ~= c.slot then offer(o) end
-                end
-            end
+            if list[e] then offer(list[e]) end
         end
     end
     -- the boss from every tile: the planner's assault seats several strikers around it,

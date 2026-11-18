@@ -81,7 +81,7 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted),
--- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal",
+-- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal"|"spare",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -387,8 +387,6 @@ local function score(act, st, W, style, odds)
             -- them, for the judge to play the enemy phase on the HP each pair leaves (T100b)
             if f.joint then fx.exchange = { target = e.id, joint = f.joint } end
         end
-        -- what the strike spends of its weapon, at the gold's points (#642, Bot's useCost)
-        v = v - W.gold * (act.useCost or 0)
         fx.enemyHp = { id = e.id, hp = hp - dealt }
         -- what the blow does, for the judge to play the kill both ways (its odds composed with
         -- the plan's other blows on the target, at the target's own HP)
@@ -1639,6 +1637,10 @@ function M.plan(Bot, board, sight, style, opts)
                 st.wearFor[p.unit.id] = carries(p.unit.id)
             end
         end
+        -- what the plan's strikes spend of their weapons, at the gold's points (#642, Bot's
+        -- useCost): charged here, on the judged plan, and never on an act's own score, so the
+        -- beam builds the plan a dear weapon's kill makes safe and the cap reads it first
+        for _, a in ipairs(st.acts) do judged = judged - W.gold * (a.useCost or 0) end
         st.judged = judged
         st.strikes = strikes
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
@@ -2083,6 +2085,40 @@ function M.plan(Bot, board, sight, style, opts)
             consider(st, "heal")
             pick()
         end
+    end
+    -- The spare (#642): the best plan with each strike's cheaper weapon in its place (Bot's
+    -- `spares`: the same target from the same tile), judged as one more plan, kind "spare";
+    -- with two or more such strikes, also all of them swapped at once. The beam never sees a
+    -- weapon's price, so this is where a Steel Lance's same kill outranks a Siegmund's: the
+    -- price is in each judged plan's value, below the cap and the plan's progress.
+    if best then
+        local swaps = {}
+        for i, a in ipairs(best.acts) do
+            for _, b in ipairs(a.spares or {}) do
+                if not b.unitHp then
+                    annotate(b, byId[b.unitId])
+                    b.die = select(2, score(b, start, W, style, odds)).die or 0
+                end
+                swaps[#swaps + 1] = { [i] = b }
+            end
+        end
+        if #swaps > 1 then
+            local all = {}
+            for _, sw in ipairs(swaps) do
+                for i, b in pairs(sw) do all[i] = all[i] or b end
+            end
+            swaps[#swaps + 1] = all
+        end
+        local was = table.concat(keysOf(best), " ")
+        for _, sw in ipairs(swaps) do
+            local i = 0
+            local st = complete(rebuild(start, best.acts, function()
+                i = i + 1
+                return sw[i]
+            end))
+            if table.concat(keysOf(st), " ") ~= was then consider(st, "spare") end
+        end
+        if #swaps > 0 then pick() end
     end
     -- The lookahead (FR-017, FR-018): at an irreversible transition, the finalists (the best
     -- M.FINAL plans judged, by rank) each meet a second enemy phase, our army's reply played

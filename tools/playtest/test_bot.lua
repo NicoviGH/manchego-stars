@@ -933,6 +933,40 @@ do
     check(a and a.act, "attack", "and the chip is struck")
 end
 
+-- #642's shadow runs: the price never reaches the beam. A's Siegmund kill on E is the only
+-- act that keeps C alive (E kills C in its phase); A's four waits outscore that strike once
+-- its price is taken off its own score, so a beam that saw the price cut the kill before the
+-- judge read C's death, and every plan judged lost C. Priced on the judged plan, the kill is
+-- judged, alone under the cap, and played whatever its price.
+do
+    local SIEGMUND, STEEL = 0x92, 0x16
+    local A = blue(0x01, 0, 0, 0, { minRange = false,
+                                    weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 1 } },
+                                    items = { { id = SIEGMUND, uses = 20 },
+                                              { id = STEEL, uses = 30 } } })
+    local C = blue(0x02, 1, 3, 3, { minRange = false, hp = 10 })
+    local E = red(0x81, 1, 0, { hp = 20, minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 0, 3 }, { 0, 4 }),
+                  [0x02] = tiles({ 3, 3 }) },
+        usePrice = function(id) return id == STEEL and 16 or nil end,
+        fc = { [0x01] = { [0x81] = {
+            ["0,0/0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true },
+            ["0,0/1"] = fc { hit = 100, dmg = 10, hits = 1 } } } },
+        enemyPhase = function(plan)
+            if (plan.gone or {})[0x81] then return {} end
+            return { { enemy = 0x81, target = 0x02, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, C, E), sightOf(o), style("careful"),
+                                 { usePrice = "100000" })
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/0",
+          "#642: the dear kill that saves a life is judged and struck, at any price")
+    check(plan and plan.rank and plan.rank.admitted, true, "#642: and its plan is under the cap")
+end
+
 -- test_objective_seize: the lord with the seize tile in reach and danger 0 there seizes,
 -- ahead of a sure kill; a unit that is not the lord never does.
 do
