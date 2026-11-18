@@ -4177,7 +4177,7 @@ INSPECT.campaignApi = function(game)
 
     local api = { Bot = BOT, Json = Json,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
-                 route = cfg.route,
+                 route = cfg.route, sealAt = cfg.sealAt,
                  -- the bot hash and suite version montecarlo.py ran it under: each start this
                  -- campaign saves names the bots that played the chapters before it (ADR 0417)
                  instrument = INSPECT.instrument() },

@@ -2788,6 +2788,18 @@ def max_attempts(path=os.path.join(HERE, 'campaign.lua')):
 
 # the file a scout lap's states folder holds, so its starts are never carried on as clean ones
 SCOUT_MARK = 'SCOUT'
+# the file a `--seal-at` lap's states folder holds (#639): the level it promoted at, so a later
+# resume of it plays the same policy on the party it built, never silently policy 10
+SEAL_AT_MARK = 'SEALAT'
+
+
+def marked_seal_at(folder):
+    """The promotion level a campaign's states folder is marked with (SEAL_AT_MARK), or None."""
+    try:
+        with open(os.path.join(folder, SEAL_AT_MARK)) as fh:
+            return int(fh.read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return None
 
 
 def stale_start(bots, instrument):
@@ -2821,7 +2833,7 @@ def start_bots(store, name, at, instrument):
 
 
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
-                 attempts=None, scout=False, route=None, instrument=None):
+                 attempts=None, scout=False, route=None, instrument=None, seal_at=None):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
@@ -2833,13 +2845,19 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     seed is unknown, or the new id is taken; a copy that fails removes every copy this call
     made, then raises. `scout` carries each campaign on past a chapter it cannot clear clean (the
     scout lap, campaign.lua M.SCOUT_PATIENCE); `route` (1 Eirika, 2 Ephraim) is the branch it
-    takes at vanilla's Ch8 split, in place of the env's. Each task runs under `instrument`
+    takes at vanilla's Ch8 split, in place of the env's; `seal_at` (10 or 20, #639) is the level
+    the bot uses a promotion item at (bot.lua Bot.uses; unset plays 10), written into each run's
+    style (campaign.lua stamps 10 when unset) so every record says which policy it played. A
+    campaign a `seal_at` lap made is marked (SEAL_AT_MARK): resuming it without `seal_at`
+    inherits the level, a different one is refused. Each task runs under `instrument`
     (instrument_id() unless given); its records say whether their start was stale (records_of).
     """
     if route is not None and not vanilla:
         raise ValueError('--route is vanilla\'s (the branch at its Ch8 split)')
     if route is not None and route not in (1, 2):
         raise ValueError('--route is %d, and vanilla has routes 1 and 2' % route)
+    if seal_at is not None and seal_at not in (10, 20):
+        raise ValueError('--seal-at is %d, and the bot promotes at 10 or 20' % seal_at)
     if attempts is not None and not 1 <= attempts <= max_attempts():
         raise ValueError('--attempts is %d, and a chapter start gets 1 to %d attempts'
                          % (attempts, max_attempts()))
@@ -2861,14 +2879,19 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
         if seed is None:
             raise ValueError('%s: no pin and no -s<seed> in its id, so its seed is unknown' % name)
         new = '%s-%s' % (tag, name)
+        marked = marked_seal_at(src)
+        if marked is not None and seal_at is not None and seal_at != marked:
+            raise ValueError('%s was played with --seal-at %d, so --seal-at %d would play a party '
+                             'built under one policy with another' % (name, marked, seal_at))
+        level = seal_at if seal_at is not None else marked
         if not scout and os.path.exists(os.path.join(src, SCOUT_MARK)):
             raise ValueError('%s is a scout lap (ADR 0409): its party is not a clean one\'s, so '
                              'it is carried on only with --scout' % name)
         if os.path.exists(os.path.join(store, 'states', new)):
             raise ValueError('%s already exists: pick another --tag' % new)
-        plan.append((name, new, at, seed))
+        plan.append((name, new, at, seed, level))
     tasks, copied = [], []
-    for name, new, at, seed in plan:
+    for name, new, at, seed, level in plan:
         try:
             shutil.copytree(os.path.join(store, 'states', name), os.path.join(store, 'states', new))
         except OSError:
@@ -2878,8 +2901,8 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             raise
         copied.append(os.path.join(store, 'states', new))
         if scout:
-            with open(os.path.join(store, 'states', new, SCOUT_MARK), 'w') as fh:
-                fh.write('a scout lap (ADR 0409): never a clean start\n')
+            write_mark(os.path.join(store, 'states', new), SCOUT_MARK,
+                       'a scout lap (ADR 0409): never a clean start')
         camp = dict(env, id=new, **{'from': at})
         if last is not None:
             camp['last'] = [last]
@@ -2889,10 +2912,20 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['scout'] = True
         if route is not None:
             camp['route'] = route
+        if level is not None:
+            camp['sealAt'] = level
+            write_mark(os.path.join(store, 'states', new), SEAL_AT_MARK, '%d' % level)
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'instrument': instrument,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
     return tasks
+
+
+def write_mark(folder, name, text):
+    """A one-line marker file in a campaign's states folder (SCOUT_MARK, SEAL_AT_MARK): what a
+    later resume of that campaign must know about how its starts were played."""
+    with open(os.path.join(folder, name), 'w') as fh:
+        fh.write(text + '\n')
 
 
 def stale_starts(store, starts, instrument):
@@ -2945,7 +2978,8 @@ def resume_main(args, pool=None):
     from matrix import ManifestError
     try:
         tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
-                             args.last, vanilla, args.attempts, args.scout, args.route)
+                             args.last, vanilla, args.attempts, args.scout, args.route,
+                             seal_at=args.seal_at)
     except (ValueError, ManifestError) as err:
         print('refused: %s' % err)
         return 1
@@ -4000,6 +4034,11 @@ def main(argv=None):
     ru.add_argument('--route', type=int,
                     help='the branch taken at vanilla\'s Ch8 split: 1 Eirika, 2 Ephraim '
                          '(default: the suite\'s)')
+    ru.add_argument('--seal-at', type=int, dest='seal_at',
+                    help='the level the bot uses a promotion item at, 10 or 20 (default 10, the '
+                         'game\'s own floor; #639); each record\'s style says sealAt. Unlike --route '
+                         '(vanilla\'s Ch8 split) both games have promotion items; a campaign a '
+                         '--seal-at lap made keeps its level on a later resume')
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,
