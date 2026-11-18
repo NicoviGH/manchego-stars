@@ -82,6 +82,12 @@
 #                           the wear's) is read with our units holding between the two enemy
 #                           phases, as before ADR 0389's amendment of 2026-11-17, in place of
 #                           the army's reply (sight.lua armyReply).
+#                           PT_USEPRICE=off|<gold>: the price a plan pays per weapon use
+#                           (#642). off: no price, and one weapon per attack as before; a
+#                           number: the gold a use costs of a weapon the game gives no price.
+#                           PT_SHADOW=<a PT_USEPRICE value>: each decision is also planned
+#                           at that price on the same board, judged and never played; the
+#                           trace's `shadow` event sets the two side by side (#642).
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
@@ -329,6 +335,8 @@ PLAYTEST_PINNED = os.getenv("PT_PINNED") or ""
 PLAYTEST_BENCH = os.getenv("PT_BENCH") or ""
 PLAYTEST_LEAKGUARD = os.getenv("PT_LEAKGUARD") or ""
 PLAYTEST_REPLY = os.getenv("PT_REPLY") or ""
+PLAYTEST_USEPRICE = os.getenv("PT_USEPRICE") or ""
+PLAYTEST_SHADOW = os.getenv("PT_SHADOW") or ""
 PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"

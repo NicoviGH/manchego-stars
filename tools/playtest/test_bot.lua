@@ -279,6 +279,7 @@ local function unit(o)
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons, level = o.level,
+        items = o.items,   -- { { id, uses } }: what a weapon use costs is read by its id (#642)
         mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
         carrying = o.carrying, carriedBy = o.carriedBy,   -- a Rescue pair (board.lua)
     }
@@ -391,6 +392,8 @@ local function sightOf(o)
         cache = o.cache,
         terrain = o.terrain,
         weapons = weapons,
+        -- The game's price per use (sight.usePrice; nil: no price), when the test prices uses
+        usePrice = o.usePrice,
         -- The game's CanUnitSeize, modelled by the objective's lord (anyone, when none is named).
         canSeize = function(u)
             local lord = (o.objective or {}).lord
@@ -889,6 +892,192 @@ do
     local swordOnly = blue(0x01, 0, 0, 0)
     check(B.decide(boardOf(swordOnly, far), sight, style("careful")).act, "wait",
           "a sword alone does not reach two tiles")
+end
+
+-- #642: a plan pays for the weapon uses it spends. Two weapons make the same sure kill: the
+-- plan strikes with the one whose use costs less (a Steel Lance at its own 16 gold, not a
+-- Siegmund, which the game gives no price); with the price off (PT_USEPRICE=off) it keeps the
+-- one expected damage picked. Where only the dear weapon kills, the kill is still worth it.
+do
+    local SIEGMUND, STEEL = 0x92, 0x16
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 1 } },
+                                    items = { { id = SIEGMUND, uses = 20 },
+                                              { id = STEEL, uses = 30 } } })
+    local E = red(0x81, 0, 1, { hp = 20 })
+    local function priced(steel)
+        return { reach = { [0x01] = tiles({ 0, 0 }) },
+                 usePrice = function(id) return id == STEEL and 16 or nil end,
+                 fc = { [0x01] = { [0x81] = {
+                     ["0,0/0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true },
+                     ["0,0/1"] = steel } } } }
+    end
+    local same = priced(fc { hit = 100, dmg = 30, hits = 1, killsTarget = true })
+    local a = Planner.plan(B, boardOf(A, E), sightOf(same), style("careful"))
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/1", "the same kill: the cheaper use")
+    a = Planner.plan(B, boardOf(A, E), sightOf(same), style("careful"), { usePrice = "off" })
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/0", "price off: expected damage's pick")
+    local weak = priced(fc { hit = 100, dmg = 10, hits = 1 })
+    a = Planner.plan(B, boardOf(A, E), sightOf(weak), style("careful"))
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/0", "only the dear weapon kills: it strikes")
+    -- a unit whose only weapon has no price pays nothing for it: the price picks the weapon,
+    -- never whether to strike (a chip the planner takes at no price is taken at any)
+    local M = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 } },
+                                    items = { { id = SIEGMUND, uses = 20 } } })
+    local chip = { reach = { [0x01] = tiles({ 0, 0 }) },
+                   usePrice = function(id) return id == STEEL and 16 or nil end,
+                   fc = { [0x01] = { [0x81] = { ["0,0/0"] = fc { hit = 100, dmg = 5, hits = 1 } } } } }
+    local free = Planner.plan(B, boardOf(M, E), sightOf(chip), style("careful"), { usePrice = "off" })
+    a = Planner.plan(B, boardOf(M, E), sightOf(chip), style("careful"), { usePrice = "100000" })
+    check(a and a.act, free and free.act, "one weapon: the price does not stop its strike")
+    check(a and a.act, "attack", "and the chip is struck")
+end
+
+-- #642's shadow runs: the price never reaches the beam. A's Siegmund kill on E is the only
+-- act that keeps C alive (E kills C in its phase); A's four waits outscore that strike once
+-- its price is taken off its own score, so a beam that saw the price cut the kill before the
+-- judge read C's death, and every plan judged lost C. Priced on the judged plan, the kill is
+-- judged, alone under the cap, and played whatever its price.
+do
+    local SIEGMUND, STEEL = 0x92, 0x16
+    local A = blue(0x01, 0, 0, 0, { minRange = false,
+                                    weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 1 } },
+                                    items = { { id = SIEGMUND, uses = 20 },
+                                              { id = STEEL, uses = 30 } } })
+    local C = blue(0x02, 1, 3, 3, { minRange = false, hp = 10 })
+    local E = red(0x81, 1, 0, { hp = 20, minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 0, 3 }, { 0, 4 }),
+                  [0x02] = tiles({ 3, 3 }) },
+        usePrice = function(id) return id == STEEL and 16 or nil end,
+        fc = { [0x01] = { [0x81] = {
+            ["0,0/0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true },
+            ["0,0/1"] = fc { hit = 100, dmg = 10, hits = 1 } } } },
+        enemyPhase = function(plan)
+            if (plan.gone or {})[0x81] then return {} end
+            return { { enemy = 0x81, target = 0x02, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, takenCrit = 0, targetHp = 10 } }
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, C, E), sightOf(o), style("careful"),
+                                 { usePrice = "100000" })
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/0",
+          "#642: the dear kill that saves a life is judged and struck, at any price")
+    check(plan and plan.rank and plan.rank.admitted, true, "#642: and its plan is under the cap")
+end
+
+-- #642 review (PR #643): the spares. A carries a Siegmund (no price), a Spear (600 a use, dearer
+-- than M.RARE_USE) and an Iron Lance (8 a use); all three make the same sure kill of E.
+do
+    local SIEGMUND, SPEAR, IRON = 0x92, 0x1A, 0x14
+    local prices = { [SPEAR] = 600, [IRON] = 8 }
+    local function bag(id)
+        return blue(id, id - 1, 0, id - 1, { minRange = false,
+            weapons = { { slot = 0, min = 1, max = 1 }, { slot = 1, min = 1, max = 1 },
+                        { slot = 2, min = 1, max = 1 } },
+            items = { { id = SIEGMUND, uses = 20 }, { id = SPEAR, uses = 15 },
+                      { id = IRON, uses = 45 } } })
+    end
+    local kill = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true }
+    local function sightFor(units, extra)
+        local o = { reach = {}, fc = {}, usePrice = function(id) return prices[id] end }
+        for _, u in ipairs(units) do
+            o.reach[u.id] = tiles({ 0, u.y })
+            o.fc[u.id] = { [0x80 + u.id] = { ["0,0/0"] = kill, ["0,0/1"] = kill, ["0,0/2"] = kill,
+                                              ["0," .. u.y .. "/0"] = kill,
+                                              ["0," .. u.y .. "/1"] = kill,
+                                              ["0," .. u.y .. "/2"] = kill } }
+        end
+        for k, v in pairs(extra or {}) do o[k] = v end
+        return sightOf(o)
+    end
+    local A = bag(0x01)
+    local E = red(0x81, 1, 0, { hp = 20, minRange = false })
+
+    -- the charge: a weapon with no price is the dearest whatever a shop weapon costs per use
+    check(B.useCharge(nil, 600, 600, 300), 300, "useCharge: no price, over a 600-gold spare: RARE_USE")
+    check(B.useCharge(nil, 8, 600, 300), 892, "useCharge: no price: RARE_USE over the dearest spare")
+    check(B.useCharge(600, 8, 600, 300), 592, "useCharge: two shop weapons: the difference")
+    check(B.useCharge(nil, nil, nil, 300), 0, "useCharge: no priced weapon there: nothing")
+    -- (finding 3) the Spear costs more a use than RARE_USE, yet the Siegmund is still the dear one
+    local two = blue(0x01, 0, 0, 0, { minRange = false,
+        weapons = { { slot = 0, min = 1, max = 1 }, { slot = 1, min = 1, max = 1 } },
+        items = { { id = SIEGMUND, uses = 20 }, { id = SPEAR, uses = 15 } } })
+    local a = Planner.plan(B, boardOf(two, E), sightFor({ two }), style("careful"))
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/1",
+          "#642: a 600-gold Spear's use is spent before a Siegmund's")
+
+    -- (finding 9) one strike with two spares: each judged once, no third "all swapped" plan;
+    -- the cheapest (the Iron Lance) is played
+    local plan
+    a, plan = Planner.plan(B, boardOf(A, E), sightFor({ A }), style("careful"))
+    local spares = 0
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "spare" then spares = spares + 1 end
+    end
+    check(spares, 2, "#642: one strike's two spares are two plans, judged once each")
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/2", "#642: the cheapest spare strikes")
+    -- (finding 9) two strikes with spares: the all-swapped plan takes each one's CHEAPEST spare
+    local A2 = bag(0x02)
+    local E2 = red(0x82, 1, 1, { hp = 20, minRange = false })
+    local _, both = Planner.plan(B, boardOf(A, A2, E, E2), sightFor({ A, A2 }), style("careful"))
+    local slots = {}
+    for _, x in ipairs(both and both.acts or {}) do
+        if x.act == "attack" then slots[#slots + 1] = x.unitId .. "/" .. tostring(x.slot) end
+    end
+    table.sort(slots)
+    check(table.concat(slots, " "), "1/2 2/2", "#642: all swapped, each to its cheapest spare")
+
+    -- (findings 1, 10) a spare is offered under its own key, and that key reads back its slot
+    local cands = B.candidates(boardOf(A, E), sightFor({ A }), style("careful"))
+    local byKey = Planner.offeredByKey(cands)
+    check(byKey["1>attack@0,0>129#2"] and byKey["1>attack@0,0>129#2"].a.slot, 2,
+          "#642: a spare is found by its own key")
+    local back = Planner.unkey("1>attack@0,0>129~3,4#2")
+    check(back.slot .. "/" .. tostring(back.slotKey) .. "/" .. back.canto.x .. "," .. back.targetId,
+          "2/true/3,129", "#642: unkey reads a spare's slot back")
+    -- (finding 6) a spare is told its exposure, as every offered act is
+    local exposedSpares, spareCount = 0, 0
+    for _, c in ipairs(cands) do
+        for _, x in ipairs(c.acts) do
+            for _, b in ipairs(x.spares or {}) do
+                spareCount = spareCount + 1
+                if type(b.exposure) == "table" then exposedSpares = exposedSpares + 1 end
+            end
+        end
+    end
+    check(spareCount > 0 and exposedSpares, spareCount, "#642: every spare's exposure is read")
+
+    -- (finding 2) a replan's rest keeps a strike that played a spare
+    local _, rested = Planner.plan(B, boardOf(A, E), sightFor({ A }), style("careful"),
+                                   { rest = { "1>attack@0,0>129#2" } })
+    local restKept
+    for _, c in ipairs(rested and rested.considered or {}) do
+        if c.kind == "rest" then restKept = c.acts[1] end
+    end
+    check(restKept, "1>attack@0,0>129#2", "#642: the rest of the plan keeps its spare's strike")
+
+    -- (finding 5) a Canto strike's spares move on to the same tile
+    local s = sightFor({ A })
+    s.cantoTiles = function(_, x)
+        if x.act ~= "attack" then return {} end
+        return tiles({ 0, 0 }, { 0, 1 })
+    end
+    local cantoed, matched = 0, 0
+    for _, c in ipairs(B.candidates(boardOf(A, E), s, style("bold"))) do
+        for _, x in ipairs(c.acts) do
+            if x.canto and x.spares then
+                for _, b in ipairs(x.spares) do
+                    cantoed = cantoed + 1
+                    if b.canto and b.canto.x == x.canto.x and b.canto.y == x.canto.y then
+                        matched = matched + 1
+                    end
+                end
+            end
+        end
+    end
+    check(cantoed > 0 and matched, cantoed, "#642: a Canto strike's spares move on with it")
 end
 
 -- test_objective_seize: the lord with the seize tile in reach and danger 0 there seizes,

@@ -1023,6 +1023,10 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE',
                      'PT_LEAKGUARD',
                      # The second phases' old control (PT_REPLY=hold): the bot plays another game.
                      'PT_REPLY',
+                     # The weapon-use price's knob (#642): the bot plays another game.
+                     'PT_USEPRICE',
+                     # #642's shadow plan per decision: a diagnostic, never played.
+                     'PT_SHADOW',
                      # An experiment's benched units (montecarlo.py pilot --bench-vanilla): a
                      # unit that only waits makes a different run from the same start.
                      'PT_BENCH',

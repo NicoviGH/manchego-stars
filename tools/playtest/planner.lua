@@ -81,7 +81,7 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted),
--- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal",
+-- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal"|"spare",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
@@ -469,6 +469,8 @@ local function key(act)
     -- a Drop is told apart by where it sets the unit down, a Canto move by where it ends
     if act.dropAt then k = k .. "/" .. act.dropAt.x .. "," .. act.dropAt.y end
     if act.canto then k = k .. "~" .. act.canto.x .. "," .. act.canto.y end
+    -- the same strike with another of the unit's weapons (#642): its slot
+    if act.slotKey then k = k .. "#" .. tostring(act.slot) end
     return k
 end
 
@@ -479,13 +481,18 @@ local function keysOf(st)
     return out
 end
 
--- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt, canto } read back,
--- for a forced replay's act no candidate offered (botrun). It raises on a string no key gave.
+-- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt, canto,
+-- slot (a spare's: slotKey) } read back, for a forced replay's act no candidate offered
+-- (botrun). It raises on a string no key gave.
 local function unkey(k)
     local id, act, x, y, tgt = k:match("^(%-?%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")
     if not id then error("planner.lua: not an act key: " .. k) end
     local a = { unitId = tonumber(id), act = act, move = { x = tonumber(x), y = tonumber(y) } }
-    local rest, dx, dy = tgt:match("^(.-)~(%-?%d+),(%-?%d+)$")
+    -- a strike with another of the unit's weapons (#642): key's last suffix, so read first
+    local rest, slot = tgt:match("^(.-)#(%d+)$")
+    if rest then tgt, a.slot, a.slotKey = rest, tonumber(slot), true end
+    local dx, dy
+    rest, dx, dy = tgt:match("^(.-)~(%-?%d+),(%-?%d+)$")
     if rest then
         tgt, a.canto = rest, { x = tonumber(dx), y = tonumber(dy) }
     end
@@ -502,9 +509,28 @@ local function unkey(k)
     return a
 end
 
+-- Every act the candidates `cands` (Bot.candidates') offer, by its key: { a, uid } each, the
+-- first offer of a key kept. A strike's spares (#642, Bot's `spares`) are offered too, each by
+-- its own key: a plan that played one names it so, and a replan's rest (opts.rest) or a forced
+-- replay (botrun) that looked only at the acts lost its strike or raised on its key.
+local function offeredByKey(cands)
+    local out = {}
+    local function put(a, uid)
+        local k = key(a)
+        if not out[k] then out[k] = { a = a, uid = uid } end
+    end
+    for _, c in ipairs(cands) do
+        for _, x in ipairs(c.acts) do
+            put(x, c.unit.id)
+            for _, b in ipairs(x.spares or {}) do put(b, c.unit.id) end
+        end
+    end
+    return out
+end
+
 -- One act's identity and a plan's, for the diagnostics too: a forced replay, its DIAG line and
 -- the audit name a plan by this list (botrun, montecarlo.py), never by a second spelling
-M.key, M.keysOf, M.unkey = key, keysOf, unkey
+M.key, M.keysOf, M.unkey, M.offeredByKey = key, keysOf, unkey, offeredByKey
 
 -- whether a plan takes the Seize
 local function seizesIn(st)
@@ -846,6 +872,16 @@ function M.plan(Bot, board, sight, style, opts)
     local function annotate(a, u)
         a.unitHp, a.unitMaxHp = u.hp, u.maxhp or u.hp
         a.targetUnit = a.targetId and byId[a.targetId]
+    end
+    -- a strike's spare (#642) annotated as the menus annotate every offered act, with its
+    -- counter's chance to kill (`die`, the record's): read only once a plan takes it (the spare
+    -- step, a replan's rest), since most never are. Any other act is annotated already.
+    local function readied(b)
+        if not b.unitHp then
+            annotate(b, byId[b.unitId])
+            b.die = select(2, score(b, start, W, style, odds)).die or 0
+        end
+        return b
     end
 
     -- each unit's acts, its own best first (its score with what it does to the goals),
@@ -1635,6 +1671,10 @@ function M.plan(Bot, board, sight, style, opts)
                 st.wearFor[p.unit.id] = carries(p.unit.id)
             end
         end
+        -- what the plan's strikes spend of their weapons, at the gold's points (#642, Bot's
+        -- useCost): charged here, on the judged plan, and never on an act's own score, so the
+        -- beam builds the plan a dear weapon's kill makes safe and the cap reads it first
+        for _, a in ipairs(st.acts) do judged = judged - W.gold * (a.useCost or 0) end
         st.judged = judged
         st.strikes = strikes
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
@@ -1738,13 +1778,11 @@ function M.plan(Bot, board, sight, style, opts)
     -- game; the rest of the plan in hand, replayed on that board, lost no lord).
     local rest = opts and opts.rest
     if rest and #rest > 0 then
-        local byKey = {}
-        for _, c in ipairs(cands) do
-            for _, x in ipairs(c.acts) do byKey[key(x)] = { a = x, uid = c.unit.id } end
-        end
+        local byKey = offeredByKey(cands)
         local st, kept = start, 0
         for _, k in ipairs(rest) do
             local o = byKey[k]
+            if o then readied(o.a) end   -- a spare is read only once a plan takes it
             local n = o and extend(st, o.a, o.uid)
             if n then st, kept = n, kept + 1 end
         end
@@ -2079,6 +2117,35 @@ function M.plan(Bot, board, sight, style, opts)
             consider(st, "heal")
             pick()
         end
+    end
+    -- The spare (#642): the best plan with each strike's cheaper weapon in its place (Bot's
+    -- `spares`: the same target from the same tile), judged as one more plan, kind "spare";
+    -- with two or more such strikes, also all of them swapped at once. The beam never sees a
+    -- weapon's price, so this is where a Steel Lance's same kill outranks a Siegmund's: the
+    -- price is in each judged plan's value, below the cap and the plan's progress.
+    if best then
+        -- each swap alone; then, with two or more strikes that have spares, each one's cheapest
+        -- spare (the least useCost; slot order on a tie) all at once. With one such strike that
+        -- plan is one of the swaps already, and judging it again would waste an enemy phase.
+        local swaps, all, swapped = {}, {}, 0
+        for i, a in ipairs(best.acts) do
+            for _, b in ipairs(a.spares or {}) do
+                swaps[#swaps + 1] = { [i] = readied(b) }
+                if not all[i] then swapped = swapped + 1 end
+                if not all[i] or (b.useCost or 0) < (all[i].useCost or 0) then all[i] = b end
+            end
+        end
+        if swapped > 1 then swaps[#swaps + 1] = all end
+        local was = table.concat(keysOf(best), " ")
+        for _, sw in ipairs(swaps) do
+            local i = 0
+            local st = complete(rebuild(start, best.acts, function()
+                i = i + 1
+                return sw[i]
+            end))
+            if table.concat(keysOf(st), " ") ~= was then consider(st, "spare") end
+        end
+        if #swaps > 0 then pick() end
     end
     -- The lookahead (FR-017, FR-018): at an irreversible transition, the finalists (the best
     -- M.FINAL plans judged, by rank) each meet a second enemy phase, our army's reply played

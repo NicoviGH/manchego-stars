@@ -1180,6 +1180,28 @@ do
     check(f.expected, 3.5, "expected: the mean damage dealt")
     check(f.counterWorst, 18, "counterWorst: a critical counter")
     check(f.die, 0, "die: nothing takes our 20")
+    check(string.format("%.4f", f.uses), string.format("%.4f", Sight.rollChance(2, 70)),
+        "uses: one blow, spent only if it lands (the 2RN hit roll)")
+end
+
+-- #642 review (PR #643, finding 4): one use's price, from the game's GetItemCost at the item's
+-- GetItemMaxUses. An unbreakable item (IA_UNBREAKABLE: GetItemMaxUses 0xFF, GetItemAfterUse
+-- takes no use) never wears out, so a use costs nothing: neither its costPerUse over 255 (a
+-- Hoplon Shield's 5000) nor the price of a weapon the game gives none (a monster's claw).
+do
+    check(Sight.usePriceOf(5000, 0xFF), 0, "an unbreakable item with a price: no use costs anything")
+    check(Sight.usePriceOf(0, 0xFF), 0, "an unbreakable weapon with no price: nothing either")
+    check(Sight.usePriceOf(480, 30), 16, "a Steel Lance: its price over its uses")
+    check(Sight.usePriceOf(0, 30), nil, "a Siegmund: the game gives it no price")
+end
+
+-- #642: a weapon that spends a use on a miss (IA_MAGIC, IA_UNCOUNTERABLE) spends every blow.
+do
+    local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 2, armed = true,
+                               spendsMiss = true, counter = hitter, killsTarget = true,
+                               dealt = { [10] = 0.49, [5] = 0.42, [0] = 0.09 },
+                               back = { [0] = 1 } }, 30, 20)
+    check(f.uses, 2, "a tome: both blows spend a use, hit or miss")
 end
 
 do
@@ -1233,6 +1255,7 @@ do
     local bytes = {}
     local mem = {
         u16 = function(a) return bytes[a] or 0 end,
+        u32 = function(a) return bytes[a] or 0 end,
         s8 = function(a) local v = bytes[a] or 0; return v >= 0x80 and v - 0x100 or v end,
     }
     local A, T, P = 0x100, 0x200, 0x300
@@ -1243,6 +1266,9 @@ do
     local side = Sight.side(mem, A, T, P, 0x50)
     check(string.format("%d/%d/%d/%d/%s", side.hit, side.dmg, side.crit, side.hits,
         tostring(side.armed)), "70/8/3/2/true", "side: the window's hit, damage, crit, blows")
+    check(side.spendsMiss, false, "a weapon with no IA_MAGIC spends a use only on a hit")
+    bytes[A + 0x4C] = 0x2 | 0x1   -- IA_WEAPON | IA_MAGIC (include/bmitem.h)
+    check(Sight.side(mem, A, T, P, 0x50).spendsMiss, true, "a tome spends one on a miss (#642)")
 end
 
 -- eventOrder: the check runs at a player phase's start, so this turn's green and red phases are
