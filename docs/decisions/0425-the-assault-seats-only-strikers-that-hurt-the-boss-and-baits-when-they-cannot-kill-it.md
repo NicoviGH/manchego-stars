@@ -93,7 +93,7 @@ her strike into the counter) was never judged. The diagnosis and the design are 
   - On attempt 2 Ephraim baits Vigarde (0x6B) on turns 29-31, and the throne's +5 a turn
     outpaces the chip.
   - The attempt-3 harness crash happens on base too.
-- **Ch17** (seeds 1-3, 6 attempts each, before the floor): 17/18 won, base 18/18. First clean
+- **Ch17** (style seeds 1-3, 6 attempts each, 13 distinct games: the seed does not move the dice, #647; before the floor): 17/18 won, base 18/18. First clean
   attempt 6, 5, none on both.
   - Seed 2, attempt 4 was **lost**: Eirika (0x01) died on turn 9 to a unit the board never
     showed (`unrevealed_killer`, 0% read).

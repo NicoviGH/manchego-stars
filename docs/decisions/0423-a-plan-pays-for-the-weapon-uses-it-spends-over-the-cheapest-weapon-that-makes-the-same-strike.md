@@ -47,7 +47,7 @@ of 41 dropped Twin strikes where the priced plan was over the death cap and the 
 it: the beam cut the strike before the judge read the life it saved. On the spare step, 292
 decisions, none.
 
-**Measured (Ch17 from `bag1-heal4-heal1-lap4e-cs-s4006`, `attempts`, dice seeds 1-3, 18 games):**
+**Measured (Ch17 from `bag1-heal4-heal1-lap4e-cs-s4006`, `attempts`, style seeds 1-3, 18 games):** (the seed draws the style, not the dice: some of the 18 repeat another seed's game, 13 distinct in #641's reruns, #647)
 price off 15 won, 7 player deaths, 34 Twin strikes; this rule 18 won, 8 deaths, 15 Twin strikes.
 300 and 600 play the same 18 games. With the review's amendments (the unpriced weapon over the
 dearest shop weapon, unbreakable items free, the all-swapped plan's cheapest spares; 73ef1d5a)
