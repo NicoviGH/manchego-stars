@@ -16,8 +16,9 @@ is needed; no plan priced a use.
   same strike (same target, same tile) rides along as a *spare*.
 - The beam never sees the price. After the judge reads the best plan, a spare step (`planner.lua`)
   judges it again with each spare swapped in; the price is charged there only, in gold through
-  `W.gold`: the expected uses spent (`sight` `attackOf.uses`: blows × the 2RN hit chance, every
-  blow for a weapon that does not miss) × the weapon's charge per use over the cheapest weapon
+  `W.gold`: the expected uses spent (as first written, `sight` `attackOf.uses`: blows × the 2RN
+  hit chance, every blow for a weapon that does not miss; since 2026-11-18 the uses the game
+  spends, below) × the weapon's charge per use over the cheapest weapon
   that makes the strike (`Bot.useCharge`).
 - A shop weapon's price per use is the game's `costPerUse`; between two shop weapons the charge
   is the difference. An unbreakable item (`IA_UNBREAKABLE`: `GetItemAfterUse` takes no use)
@@ -57,3 +58,14 @@ strike weighed before), 20.1 → 17.3 s a player phase on the same 6 games.
 seats strikers that deal 0 (#641's "found instead"). In E_20 the price barely saved Excalibur
 (9 strikes at 600). Prices under 300, and whether 300 keeps enough of Ch17's 30 Siegmund uses
 for Morva, are untested.
+
+**Amended (2026-11-18, PR #645 review, Nicolas): the price counts the uses the game would
+spend.** `attackOf.uses` counted every blow as thrown, so a blow the target's death cuts off was
+paid for; ADR 0424's `wear` reads the same uses off the game's played ways (ADR 0377: a game
+fact comes from the game's code), and two counts of one quantity is one too many. The price
+now reads `wear`: an act's `useCharge` (gold a use over the cheapest weapon that makes the
+strike) times the uses its exchange spends at the HP the plan leaves the target
+(`Planner.wearAt`), charged by the judge (`st.priced`). `useCost`, the same at the target's own
+HP, orders the spares. The unit tests keep the price's cases (the cheaper use, the dear kill
+that saves a life, the spares); the fake game's attack spends a use on each blow it lands while
+the target stands.
