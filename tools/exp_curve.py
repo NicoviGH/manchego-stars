@@ -17,6 +17,8 @@ curve falls out of the enemy force it eats.
 
     python3 tools/exp_curve.py                 # the per-chapter table
     python3 tools/exp_curve.py --write         # regenerate the block in the pacing doc
+    python3 tools/exp_curve.py --route eirika|ephraim [--promote-at 10|20]
+                                               # FE8's own party band to the game's end (#639)
 
 WHAT IT MODELS, AND WHAT IT DOES NOT. Every body on a chapter's roster dies once, to one
 member of the deployed party, and the chapter's exp is then split evenly across the deploy
@@ -38,6 +40,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import chapter_schema
 import inject.cast
+import inject.class_ids
 import inject.decomp
 import inject.hosting
 import inject.hosts
@@ -176,42 +179,53 @@ def class_kill_exp_bonus(target):
     return result
 
 
-def kill_exp_bonus(actor, target):
-    """GetUnitKillExpBonus on the COMMON route -- the only branch our campaign can reach.
+def kill_exp_bonus(actor, target, mode=d.CHAPTER_MODE_COMMON):
+    """GetUnitKillExpBonus, for `mode` = `gPlaySt.chapterModeIndex`.
 
-    The function has two: `(gBmSt.gameStateBits & 0x40) || (gPlaySt.chapterModeIndex != 1)`
-    takes the plain `target - actor` penalty, and the else -- chapterModeIndex == 1, the
-    common route -- HALVES the actor's power when the target is the weaker of the two. That
-    generosity is not an option we picked: `savemenu.c:537` starts every new game at mode 1,
-    and only `ch8-eventscript.h` (the Eirika/Ephraim route split, which we have no world map
-    to reach) ever writes another value. 0x40 is BM_FLAG_LINKARENA. So mode 1 is our whole
-    campaign -- and it is also FE8's own Prologue-Ch8, which is every twin we measure
-    against."""
-    result = 20
+    The function has two branches. `(gBmSt.gameStateBits & 0x40) || (chapterModeIndex != 1)`
+    takes `target power + 20 - actor power`, no halving: that is every chapter from Ch9 on,
+    because `ch8-eventscript.h` writes mode 2 (Eirika) or 3 (Ephraim) when the route is chosen.
+    The else -- mode 1, the common route -- HALVES the actor's power when the target is the
+    weaker of the two. `savemenu.c:537` starts every new game at mode 1, so that generosity is
+    FE8's own Prologue-Ch8 and every hosted Manchego Stars chapter (ch00-ch07 never leave mode 1).
+    0x40 is BM_FLAG_LINKARENA, not modelled. The default is mode 1, so every caller that
+    predates the route walk is unchanged."""
     tp, ap = power_level(target), power_level(actor)
-    if tp <= ap:
-        result += tp - ap // 2
+    if mode != d.CHAPTER_MODE_COMMON:
+        result = tp + 20 - ap
     else:
-        result += tp - ap
+        result = 20
+        if tp <= ap:
+            result += tp - ap // 2
+        else:
+            result += tp - ap
     result += class_kill_exp_bonus(target)
     if result < 0:
         result = 0
     return result
 
 
-def battle_exp_gain(actor, target):
+@functools.lru_cache(maxsize=None)
+def battle_exp_gain(actor, target, mode=d.CHAPTER_MODE_COMMON):
     """GetBattleUnitExpGain for a KILLING round: round exp + kill bonus, clamped to 1..100.
+    Memoised on the two frozen Fighters: the route walk prices the same body for the same
+    career level thousands of times.
 
-    The no-damage path (a flat 1) and ModifyUnitSpecialExp's special cases (gorgon egg 50,
-    Demon King 0, Phantom actor 0) are not modelled -- none of those classes appears in
-    ch00-ch06 or in their twins, and `unmodelled_special_exp_bodies` fails loudly if one
-    ever does."""
-    result = round_exp(actor, target) + kill_exp_bonus(actor, target)
+    ModifyUnitSpecialExp's two target cases are applied (a gorgon egg pays 50, the Demon King
+    0: bmbattle.c:1773). Not modelled: the no-damage path (a flat 1) and a Phantom actor (0,
+    never a player career). Hosted chapters still refuse those classes outright
+    (`unmodelled_special_exp_bodies`): only the vanilla route walk fields them."""
+    if target.class_enum in ('CLASS_GORGONEGG', 'CLASS_GORGONEGG2'):
+        return 50
+    if target.class_enum == 'CLASS_DEMON_KING':
+        return 0
+    result = round_exp(actor, target) + kill_exp_bonus(actor, target, mode)
     return max(1, min(100, result))
 
 
-# Classes whose exp ModifyUnitSpecialExp overrides outright. If a roster ever fields one,
-# this model is quietly wrong about it, so the simulation refuses to be quiet.
+# Classes whose exp ModifyUnitSpecialExp overrides outright. If a HOSTED roster ever fields one,
+# the simulation refuses to be quiet (battle_exp_gain applies the two target cases for the
+# vanilla route walk, which fields both).
 # Both egg classes: UNIT_IS_GORGON_EGG (bmunit.h) tests CLASS_GORGONEGG *and*
 # CLASS_GORGONEGG2, and a guard that knows only the first still mis-prices half of them.
 SPECIAL_EXP_CLASSES = ('CLASS_GORGONEGG', 'CLASS_GORGONEGG2', 'CLASS_DEMON_KING',
@@ -259,12 +273,24 @@ def chapter_bodies(chap):
     return out
 
 
-def vanilla_bodies(parity_ref):
-    """Every RED body the twin fields, as Fighters. None when the reference is uncurated."""
-    units = d.vanilla_red_units(parity_ref)
+def _class_enum(token):
+    """A UnitDefinition's `.classIndex` as a CLASS_* name: Ch21 places three bodies by number
+    (0x3, Ephraim's Master Lord class) where the decomp has no name for the slot."""
+    if token.startswith('CLASS_'):
+        return token
+    names = {v: k for k, v in inject.class_ids.vanilla_class_values().items()}
+    return names[int(token, 0)]
+
+
+@functools.lru_cache(maxsize=None)
+def vanilla_bodies(parity_ref, derive=False):
+    """Every RED body the twin fields, as Fighters. None when the reference is uncurated
+    (`derive`: a chain ref off the registry reads `difficulty.derive_red_arrays`). MEMOISED:
+    the route walk fights each chapter three times over; the list is shared, do not mutate it."""
+    units = d.vanilla_red_units(parity_ref, derive)
     if units is None:
         return None
-    return [Fighter(u['charIndex'] or u['classIndex'], u['classIndex'], u['level'],
+    return [Fighter(u['charIndex'] or u['classIndex'], _class_enum(u['classIndex']), u['level'],
                     'CA_BOSS' in character_attributes(u['charIndex']))
             for u in units]
 
@@ -363,8 +389,9 @@ LEVEL_CAP = 20
 class Career:
     """One unit's exp ledger across the campaign. Levels at 100 exp, as the engine does."""
 
-    def __init__(self, name, class_enum, share=1.0, joins=0, level=1):
+    def __init__(self, name, class_enum, share=1.0, joins=0, level=1, promote_at=None):
         self.name = name
+        self.promote_at = promote_at
         self.class_enum = class_enum
         self.share = share
         self.joins = joins          # first chapter_number this unit can earn in
@@ -376,19 +403,24 @@ class Career:
     def fighter(self):
         return Fighter(self.name, self.class_enum, self.level)
 
-    def chapter_pot(self, bodies):
+    @property
+    def exp_level(self):
+        """GetUnitExpLevel: the level a promoted unit is compared at (level + 20)."""
+        return exp_level(self.fighter)
+
+    def chapter_pot(self, bodies, mode=d.CHAPTER_MODE_COMMON):
         """What this chapter pays THIS unit if it kills every body itself, at today's level.
 
         Resolved once per chapter rather than per kill: the unit's level moves during a
         chapter and modelling that would be a precision the rest of the model does not have
         (nothing here knows which body dies to whom, or in what order)."""
         me = self.fighter
-        return sum(battle_exp_gain(me, body) for body in bodies)
+        return sum(battle_exp_gain(me, body, mode) for body in bodies)
 
-    def fight(self, bodies, deploy_cap, chapter_number=None):
+    def fight(self, bodies, deploy_cap, chapter_number=None, mode=d.CHAPTER_MODE_COMMON):
         if chapter_number is not None and chapter_number < self.joins:
             return 0
-        gained = int(self.chapter_pot(bodies) * self.share / deploy_cap)
+        gained = int(self.chapter_pot(bodies, mode) * self.share / deploy_cap)
         self.bank(gained)
         return gained
 
@@ -399,6 +431,22 @@ class Career:
             self.level += 1
         if self.level >= LEVEL_CAP:
             self.exp = 0
+        self.promote()
+
+    def promote(self):
+        """The promotion item, spent the chapter a unit reaches `promote_at` (None: never, the
+        unit holds at LEVEL_CAP as before). ApplyUnitPromotion (bmbattle.c:1477) sets level 1 and
+        exp 0 in the promoted class (`class_promotion` of an unpromoted class). A unit that cannot
+        spend one holds at LEVEL_CAP: a class already promoted; one with no `.promotion` of its
+        own (the trainees, whose three choices are the game's own; the Monk, whose Guiding Ring
+        target `data_itemuse.c` lists per item); Myrrh's, whose `.promotion` is not a promoted
+        class (a Divine Stone changes her, a seal does not)."""
+        if self.promote_at is None or self.level < self.promote_at:
+            return
+        into = class_promotion(self.class_enum)
+        if (into and 'CA_PROMOTED' not in class_attributes(self.class_enum)
+                and 'CA_PROMOTED' in class_attributes(into)):
+            self.class_enum, self.level, self.exp = into, 1, 0
 
 
 def field_cap(chap):
@@ -588,6 +636,58 @@ def simulate(campaign='rime-of-the-frostmaiden'):
     return rows
 
 
+def hosted_caps(campaign):
+    """{parity_reference: field cap} over the hosted chapters, the first to name a twin
+    winning. The cap is the parity, so this is the field vanilla's own chapter splits its exp
+    across."""
+    caps = {}
+    for chapter in inject.hosts.hosted_chapters():
+        chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
+        caps.setdefault(chap.get('parity_reference'), field_cap(chap))
+    return caps
+
+
+def _vanilla_careers(chain, share=1.0, promote_at=None, slot_order=True):
+    return [Career(r.char, r.class_enum, share, r.fields_from, r.level, promote_at)
+            for r in d.vanilla_recruits(chain, slot_order)]
+
+
+def _roster_chapter(ref, careers, index):
+    """The careers a FIXED-ROSTER chapter fields, else None: the chapter whose own
+    `playerUnitsInNormal` list names only characters that join in it (the Prologue's Eirika and
+    Seth; Ch5x's Ephraim, Forde and Kyle, a band Eirika's party never meets until the routes
+    reunite). Nobody else fights it, so nobody else earns from it."""
+    listed = {u['charIndex'] for u in d.chapter_ally_udefs(d.ref_stem(ref))}
+    here = {c.name for c in careers if c.name in listed}
+    return here if here and all(c.joins == index for c in careers if c.name in listed) else None
+
+
+def walk_vanilla(chain, careers, cap_of, away_of=lambda index: ()):
+    """FE8's party walking `chain`, one row per chapter reached: {'index', 'ref', 'entering':
+    {name: level on entering}, and, once `cap_of(ref)` names a field, 'cap', 'bodies' and
+    'after': {name: exp level after}}. Each chapter's exp is split across its cap, each twin
+    fought once, in `chain`'s order, in the chapter's own `chapterModeIndex` (`d.ref_mode`). A
+    chain chapter `cap_of` returns None for has no field, so the walk stops there; a cap of 0
+    (Ephraim's Ch21x, a scripted fight with no player units) pays nobody. `away_of(index)`: the
+    names off the field that chapter."""
+    rows = []
+    for index, ref in enumerate(chain):
+        row = {'index': index, 'ref': ref, 'entering': {c.name: c.level for c in careers}}
+        rows.append(row)
+        cap = cap_of(ref)
+        if cap is None:
+            break
+        bodies = vanilla_bodies(ref, derive=True)
+        away = set(away_of(index))
+        roster = _roster_chapter(ref, careers, index)
+        for career in careers:
+            if cap and career.name not in away and (roster is None or career.name in roster):
+                career.fight(bodies, cap, index, d.ref_mode(ref))
+        row.update(cap=cap, bodies=len(bodies),
+                   after={c.name: c.exp_level for c in careers})
+    return rows
+
+
 @functools.lru_cache(maxsize=None)
 def vanilla_arrivals(campaign):
     """FE8's OWN party walking its own route: {VANILLA_CHAIN index: {CHARACTER_*: level on
@@ -595,23 +695,79 @@ def vanilla_arrivals(campaign):
 
     Each recruit starts at the level and chapter the decomp recruits it
     (`difficulty.vanilla_recruits`) and earns from vanilla's own force, chapter by chapter, in
-    FE8's order. Each twin is fought ONCE: ch07 reuses FE8 Ch6 as its bar, and FE8's party does
-    not play Ch6 twice. The field each chapter splits its exp across is our chapter's cap,
-    because the cap is the parity. A chain chapter no hosted chapter names has no cap, so the
-    walk stops there."""
-    caps = {}
-    for chapter in inject.hosts.hosted_chapters():
-        chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
-        caps.setdefault(chap.get('parity_reference'), field_cap(chap))
-    careers = [Career(r.char, r.class_enum, 1.0, r.fields_from, r.level)
-               for r in d.vanilla_recruits()]
-    out = {}
-    for index, ref in enumerate(d.VANILLA_CHAIN):
-        out[index] = {c.name: c.level for c in careers}
-        if ref not in caps:
-            break
-        for career in careers:
-            career.fight(vanilla_bodies(ref), caps[ref], index)
+    FE8's order (`walk_vanilla`). Each twin is fought ONCE: ch07 reuses FE8 Ch6 as its bar, and
+    FE8's party does not play Ch6 twice. The field each chapter splits its exp across is our
+    chapter's cap, because the cap is the parity. A chain chapter no hosted chapter names has
+    no cap, so the walk stops there."""
+    caps = hosted_caps(campaign)
+    rows = walk_vanilla(d.VANILLA_CHAIN, _vanilla_careers(d.VANILLA_CHAIN), caps.get)
+    return {r['index']: r['entering'] for r in rows}
+
+
+def route_cap_of(campaign):
+    """`cap_of` for a route walk: Manchego Stars' where a hosted chapter names the twin (the cap is the
+    parity), vanilla's own `playerUnitsInNormal` length everywhere else. Ch1 is where they part:
+    the list holds Eirika and Seth, and the chapter's scene stands Franz and Gilliam up beside
+    them, which our cap of 4 counts."""
+    hosted = hosted_caps(campaign)
+    return lambda ref: hosted[ref] if ref in hosted else d.vanilla_deploy_cap(ref)
+
+
+ROUTE_LORD = {'eirika': 'CHARACTER_EIRIKA', 'ephraim': 'CHARACTER_EPHRAIM'}
+
+
+def route_away(route, chain, recruits):
+    """`away_of` for `route`: who is NOT on the field from the route split until the lords
+    reunite. The other lord's band is away: Eirika alone on Ephraim's route, and on Eirika's the
+    units that first field in Ch5x (Ephraim, Forde, Kyle). They return in the first chapter that
+    stands the other lord up armed and BLUE (Ch15 on both routes today), and the walk does not
+    take them back in earlier: it holds their levels meanwhile. Seth, Franz and the rest of
+    the army are on both routes' ally lists (ch9a/ch9b), so they fight throughout."""
+    split = next(i for i, ref in enumerate(chain) if ref.startswith('CHAPTER_'))
+    other = 'ephraim' if route == 'eirika' else 'eirika'
+    band = ({r.char for r in recruits if chain[r.fields_from] == 'FE8 Ch5x'}
+            if other == 'ephraim' else {ROUTE_LORD['eirika']})
+    reunion = next((i for i in range(split, len(chain))
+                    if any(u['charIndex'] == ROUTE_LORD[other] and u['items']
+                           and u['allegiance'] == 'FACTION_ID_BLUE'
+                           for _a, u in d._chapter_udef_pairs(d.ref_stem(chain[i])))), len(chain))
+    return lambda index: band if split <= index < reunion else frozenset()
+
+
+@functools.lru_cache(maxsize=None)
+def route_band(route, promote_at=None, campaign='rime-of-the-frostmaiden'):
+    """The vanilla party-level band along one route to the game's end: a row per chain chapter
+    that has a field, with the chapter's index, title, deploy cap, enemy bodies and the exp level
+    (GetUnitExpLevel) of the army's LORD after it, as low / typical / high: a lord taking half,
+    one and twice the even share of each chapter's exp, the three shares `simulate` runs. The
+    lord is Eirika to the route split and the route's own lord from it (Ephraim joins in Ch5x
+    and fights from there). Not the founding pair: Seth is a promoted Paladin from the
+    Prologue, so a mean over him and Eirika is a number no unit has. `lowest_recruit` is the
+    lowest exp level among the recruits on the field. The cap is Manchego Stars' where a hosted chapter
+    names the twin (the parity) and vanilla's own `playerUnitsInNormal` length elsewhere.
+    `promote_at` (10, 20 or None = hold at LEVEL_CAP) is every career's promotion rule, #639
+    Part A's open question. Memoised; the rows are shared, do not mutate them."""
+    chain = d.route_chain(route)
+    recruits = d.vanilla_recruits(chain, slot_order=False)
+    away_of = route_away(route, chain, recruits)
+    split = next(i for i, ref in enumerate(chain) if ref.startswith('CHAPTER_'))
+    cap_of = route_cap_of(campaign)
+    walks = {share: walk_vanilla(chain, _vanilla_careers(chain, share, promote_at, False),
+                                 cap_of, away_of)
+             for share in (SHARE_TAIL, 1.0, SHARE_LEAD)}
+    out = []
+    for tail, mid, lead in zip(walks[SHARE_TAIL], walks[1.0], walks[SHARE_LEAD]):
+        away = set(away_of(mid['index']))
+        lord = ROUTE_LORD['eirika' if mid['index'] < split else route]
+        recruit_lv = [mid['after'][r.char] for r in recruits
+                      if r.fields_from and r.fields_from <= mid['index'] and r.char not in away
+                      and r.char != lord]
+        out.append({
+            'index': d.ref_index(mid['ref']), 'ref': mid['ref'], 'title': d.ref_title(mid['ref']),
+            'cap': mid['cap'], 'bodies': mid['bodies'],
+            'low': tail['after'][lord], 'typical': mid['after'][lord], 'high': lead['after'][lord],
+            'lowest_recruit': min(recruit_lv) if recruit_lv else None,
+            'away': sorted(d._ally_name(n) for n in away)})
     return out
 
 
@@ -697,7 +853,7 @@ def _join_levels_phrase(campaign):
 def render(rows=None, campaign='rime-of-the-frostmaiden'):
     """The generated block, fences included. Everything it states is a column of `simulate`
     -- there is no prose here that the model cannot recompute."""
-    rows = simulate(campaign) if rows is None else rows
+    rows = _simulated(campaign) if rows is None else rows
     out = [BEGIN, '',
            '<!-- Derived from FE8\'s own exp formulas over the real rosters. Do not hand-edit:',
            '     the next regen silently discards it, and tools/test_exp_curve.py fails the',
@@ -773,13 +929,40 @@ def print_table(rows):
                  '' if r['banks'] else '   (fixed roster -- handed to the founding party, ADR 0320)'))
 
 
+def print_route(route, rows):
+    print('FE8 PARTY-LEVEL BAND, %s route -- exp level (level +20 once promoted) after each chapter'
+          % route)
+    print('  %-4s %-22s %4s %6s   %-13s %-7s %s'
+          % ('idx', 'chapter', 'cap', 'bodies', 'lord lo/ty/hi', 'recruit', 'away'))
+    for r in rows:
+        print('  %-4d %-22s %4d %6d   %-13s %-7s %s'
+              % (r['index'], r['title'].split(': ')[-1][:22] if r['ref'].startswith('CHAPTER_')
+                 else r['ref'][4:], r['cap'], r['bodies'],
+                 '%d/%d/%d' % (r['low'], r['typical'], r['high']),
+                 r['lowest_recruit'] if r['lowest_recruit'] is not None else '--',
+                 ','.join(r['away'])))
+    print('\n  armed RED arrays loaded in a scene that fights or removes their units (check by hand):')
+    for r in rows:
+        for array, script, why in d.scene_suspects(r['ref']):
+            print('    %-14s %s in %s: %s' % (r['ref'].replace('CHAPTER_', ''), array, script, why))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
+    ap.add_argument('--route', choices=sorted(d.ROUTE_SIDE),
+                    help="print FE8's own party-level band along this route to the game's end "
+                         "instead of the campaign table")
+    ap.add_argument('--promote-at', type=int, choices=(10, 20), default=None,
+                    help='with --route: every career promotes at this level (default: none, '
+                         'held at LEVEL_CAP)')
     ap.add_argument('--write', action='store_true',
                     help='rewrite the generated party-level block in %s'
                          % os.path.relpath(PACING_DOC, REPO))
     args = ap.parse_args()
+    if args.route:
+        print_route(args.route, route_band(args.route, args.promote_at, args.campaign))
+        return
     rows = simulate(args.campaign)
     print_table(rows)
     if args.write:

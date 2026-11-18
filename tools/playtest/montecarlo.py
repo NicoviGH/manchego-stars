@@ -1703,8 +1703,8 @@ def vanilla_label(index):
     for name, i in vanilla_rows().items():
         if i == index:
             return name.split()[-1]   # twin_rows' 'FE8 Ch3'
-    import campaign_env
-    for k, v in campaign_env._chapter_enum().items():
+    import inject.decomp
+    for k, v in inject.decomp.chapter_enum().items():
         if v == index:
             return k[len('CHAPTER_'):]
     return 'chapter %s' % index

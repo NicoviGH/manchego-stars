@@ -214,6 +214,21 @@ def enum_values(text, prefix):
     return out
 
 
+def chapter_enum():
+    """{CHAPTER_E_9: 10, CHAPTER_I_11: 62, ...}: every vanilla chapter's index, read from
+    include/constants/chapters.h at HEAD. THE chapter-name -> index table: chapter_settings'
+    `internalName` is not it (its E-names run one behind the chapter number from Ch12 on,
+    because Ch11 sits at 0x3D). Callers that need a route chapter resolve it here."""
+    return enum_values(vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_')
+
+
+def chapter_titles():
+    """{CHAPTER_E_9: 'Ch9: Distant Blade', ...}: the game's own name for each chapter, the
+    comment after its chapters.h enumerator."""
+    return dict(re.findall(r'(CHAPTER_\w+)\s*=\s*0x[0-9A-Fa-f]+,\s*//\s*(.+?)\s*$',
+                           vanilla_decomp_text('include/constants/chapters.h'), re.M))
+
+
 def asset_table_names(text):
     """The labels of `gChapterDataAssetTable` (data/data_8B363C.s), in order, from `text`: an
     asset id (a chapter's `mainLayerId`, `tileConfigId`, `mapEventDataId`...) indexes this
@@ -226,8 +241,9 @@ def asset_table_names(text):
 # 6,361-file decomp, and the cap is what a sweep can pin in memory. Size it to the largest
 # real working set with room to spare: `difficulty.curve_report` reads 94 files since #510
 # step 8 (every twin chapter's event and interlude scripts for the kits, plus the world map),
-# and a set larger than the cap thrashes (test_decomp_read_cache fails).
-@functools.lru_cache(maxsize=160)
+# and both vanilla routes' walks (#639) read 88 more; a set larger than the cap thrashes
+# (test_decomp_read_cache fails).
+@functools.lru_cache(maxsize=256)
 def vanilla_decomp_text(relpath):
     """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
     the build applies to PATCHED_DECOMP_FILES (e.g. data_characters.c portrait slots get

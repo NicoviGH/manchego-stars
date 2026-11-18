@@ -15,8 +15,10 @@ import collections
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import difficulty as d
 import exp_curve as ec
 
 
@@ -437,6 +439,171 @@ class Entering(unittest.TestCase):
                             and r['exp_to_date'] >= r['twin_exp_to_date'] * 0.88
                             for r in ec._simulated('rime-of-the-frostmaiden')
                             if r['twin_exp_to_date']))
+
+
+class KillExpModes(unittest.TestCase):
+    """GetUnitKillExpBonus (bmbattle.c:1739) in both chapter modes. Hand-computed from it:
+    a Fighter (relative power 3) at L10 has power 30, at L5 power 15."""
+
+    def setUp(self):
+        self.strong = ec.Fighter('a', 'CLASS_FIGHTER', 10)
+        self.weak = ec.Fighter('b', 'CLASS_FIGHTER', 5)
+
+    def test_mode_one_halves_the_actors_power_against_a_weaker_target(self):
+        self.assertEqual(20, ec.kill_exp_bonus(self.strong, self.weak))          # 20 + 15 - 30//2
+        self.assertEqual(20, ec.kill_exp_bonus(self.strong, self.weak, 1))
+
+    def test_any_other_mode_takes_the_plain_difference(self):
+        self.assertEqual(5, ec.kill_exp_bonus(self.strong, self.weak, 2))        # 15 + 20 - 30
+        self.assertEqual(5, ec.kill_exp_bonus(self.strong, self.weak, 3))
+
+    def test_the_modes_agree_against_a_stronger_target(self):
+        self.assertEqual(35, ec.kill_exp_bonus(self.weak, self.strong, 1))       # 20 + 30 - 15
+        self.assertEqual(35, ec.kill_exp_bonus(self.weak, self.strong, 2))       # 30 + 20 - 15
+
+    def test_the_mode_reaches_the_gain_of_a_kill(self):
+        # round exp (31 - 5) // 3 = 8, plus the bonus
+        self.assertEqual(28, ec.battle_exp_gain(self.strong, self.weak))
+        self.assertEqual(13, ec.battle_exp_gain(self.strong, self.weak, 2))
+
+    def test_a_gorgon_egg_pays_fifty_and_the_demon_king_nothing(self):
+        # ModifyUnitSpecialExp (bmbattle.c:1773)
+        self.assertEqual(50, ec.battle_exp_gain(self.strong, ec.Fighter('e', 'CLASS_GORGONEGG', 1)))
+        self.assertEqual(0, ec.battle_exp_gain(self.strong, ec.Fighter('k', 'CLASS_DEMON_KING', 1), 2))
+
+
+class Promotion(unittest.TestCase):
+    """`Career.promote_at`: the promotion item spent when a unit reaches that level
+    (ApplyUnitPromotion, bmbattle.c:1477, sets level 1 and exp 0 in the promoted class)."""
+
+    def career(self, cls='CLASS_MERCENARY', promote_at=None):
+        return ec.Career('x', cls, promote_at=promote_at)
+
+    def test_no_rule_holds_at_the_level_cap_as_before(self):
+        c = self.career()
+        c.bank(99999)
+        self.assertEqual(('CLASS_MERCENARY', 20, 0), (c.class_enum, c.level, c.exp))
+
+    def test_promoting_at_ten_resets_to_level_one_in_the_promoted_class(self):
+        c = self.career(promote_at=10)
+        c.bank(900)                                   # L1 -> L10
+        self.assertEqual(('CLASS_HERO', 1, 0), (c.class_enum, c.level, c.exp))
+        self.assertEqual(21, c.exp_level)             # GetUnitExpLevel: level + 20
+
+    def test_a_unit_below_the_level_has_not_promoted(self):
+        c = self.career(promote_at=10)
+        c.bank(800)
+        self.assertEqual(('CLASS_MERCENARY', 9), (c.class_enum, c.level))
+
+    def test_promoting_at_twenty_waits_for_the_cap(self):
+        c = self.career(promote_at=20)
+        c.bank(1800)
+        self.assertEqual(('CLASS_MERCENARY', 19), (c.class_enum, c.level))
+        c.bank(100)
+        self.assertEqual(('CLASS_HERO', 1), (c.class_enum, c.level))
+
+    def test_a_promoted_career_keeps_climbing_and_holds_at_its_own_cap(self):
+        c = self.career(promote_at=10)
+        c.bank(900)
+        c.bank(99999)
+        self.assertEqual(('CLASS_HERO', 20, 40), (c.class_enum, c.level, c.exp_level))
+
+    def test_a_trainee_and_myrrh_hold_for_no_seal_promotes_them(self):
+        for cls in ('CLASS_JOURNEYMAN', 'CLASS_MANAKETE_MYRRH'):
+            c = self.career(cls, promote_at=10)
+            c.bank(99999)
+            self.assertEqual((cls, 20), (c.class_enum, c.level), cls)
+
+
+class RouteBand(unittest.TestCase):
+    """#639 Part B: FE8's own party walking each route to the end of the game."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.bands = {r: {row['ref']: row for row in ec.route_band(r)} for r in ('eirika', 'ephraim')}
+
+    def test_every_chapter_of_the_chain_has_a_row_to_the_last(self):
+        for route, last in (('eirika', 'CHAPTER_E_21X'), ('ephraim', 'CHAPTER_I_21X')):
+            self.assertEqual(list(d.route_chain(route)), list(self.bands[route]))
+            self.assertIn(last, self.bands[route])
+
+    def test_the_routes_share_the_road_to_ch8(self):
+        for ref in d.route_chain('eirika')[:10]:
+            self.assertEqual(self.bands['eirika'][ref], self.bands['ephraim'][ref], ref)
+
+    def test_the_shared_road_is_the_old_walk_for_everyone_but_ephraims_band(self):
+        """Ch5x is Ephraim, Forde and Kyle's alone: nobody else earns from it, so Eirika's
+        party enters Ch8 as the VANILLA_CHAIN walk has it."""
+        chain = d.route_chain('eirika')
+        careers = ec._vanilla_careers(chain, slot_order=False)
+        rows = ec.walk_vanilla(chain, careers, ec.route_cap_of('rime-of-the-frostmaiden'))
+        old = ec.vanilla_arrivals('rime-of-the-frostmaiden')[8]
+        entering = rows[chain.index('FE8 Ch8')]['entering']
+        band = {'CHARACTER_EPHRAIM', 'CHARACTER_FORDE', 'CHARACTER_KYLE'}
+        self.assertEqual({k: v for k, v in old.items() if k not in band},
+                         {k: v for k, v in entering.items() if k in old and k not in band})
+
+    def test_ch5x_pays_only_the_units_it_fields(self):
+        chain = d.route_chain('eirika')
+        i = chain.index('FE8 Ch5x')
+        rows = ec.walk_vanilla(chain, ec._vanilla_careers(chain, slot_order=False),
+                               ec.route_cap_of('rime-of-the-frostmaiden'))
+        before, after = rows[i]['entering'], rows[i + 1]['entering']
+        self.assertEqual(before['CHARACTER_EIRIKA'], after['CHARACTER_EIRIKA'])
+        self.assertEqual(before['CHARACTER_SETH'], after['CHARACTER_SETH'])
+
+    def test_the_other_lords_band_is_away_until_the_lords_reunite(self):
+        eirika = d.route_chain('eirika')
+        away = ec.route_away('eirika', eirika, d.vanilla_recruits(eirika, False))
+        self.assertEqual({'CHARACTER_EPHRAIM', 'CHARACTER_FORDE', 'CHARACTER_KYLE'},
+                         set(away(eirika.index('CHAPTER_E_9'))))
+        self.assertEqual(set(), set(away(eirika.index('CHAPTER_E_15'))))
+        ephraim = d.route_chain('ephraim')
+        away = ec.route_away('ephraim', ephraim, d.vanilla_recruits(ephraim, False))
+        self.assertEqual({'CHARACTER_EIRIKA'}, set(away(ephraim.index('CHAPTER_I_12'))))
+        self.assertEqual(set(), set(away(ephraim.index('CHAPTER_I_15'))))
+        self.assertEqual(set(), set(away(3)))
+
+    def test_the_band_orders_low_typical_high_and_never_falls_for_one_lord(self):
+        """The lord changes once, at the route split (Eirika to the route's own), so each side of
+        it is one career's curve."""
+        for route, rows in self.bands.items():
+            refs = list(rows)
+            for segment in (refs[:10], refs[10:]):
+                typical = [rows[r]['typical'] for r in segment]
+                self.assertEqual(sorted(typical), typical, route)
+                for r in segment:
+                    self.assertLessEqual(rows[r]['low'], rows[r]['typical'], (route, r))
+                    self.assertLessEqual(rows[r]['typical'], rows[r]['high'], (route, r))
+
+    def test_a_route_chapter_is_fought_in_its_route_mode_and_the_shared_road_in_mode_one(self):
+        """chapterModeIndex is 1 to Ch8 and 2 or 3 from Ch9 (ch8-eventscript.h): the walk hands
+        each chapter's mode to the kill-exp formula."""
+        modes = {}
+        original = ec.Career.fight
+
+        def spy(self, bodies, cap, chapter_number=None, mode=1):
+            modes[chapter_number] = mode
+            return original(self, bodies, cap, chapter_number, mode)
+        for route, mode in (('eirika', 2), ('ephraim', 3)):
+            chain = d.route_chain(route)
+            with mock.patch.object(ec.Career, 'fight', spy):
+                ec.walk_vanilla(chain[:12], ec._vanilla_careers(chain, slot_order=False),
+                                ec.route_cap_of('rime-of-the-frostmaiden'))
+            self.assertEqual({1}, {modes[i] for i in range(10)}, route)
+            self.assertEqual({mode}, {modes[10], modes[11]}, route)
+
+    def test_the_caps_are_the_lists_where_nothing_is_hosted(self):
+        self.assertEqual(11, self.bands['ephraim']['CHAPTER_I_9']['cap'])
+        self.assertEqual(4, self.bands['eirika']['FE8 Ch5x']['cap'])
+        self.assertEqual(0, self.bands['ephraim']['CHAPTER_I_21X']['cap'])
+
+    def test_promote_at_none_is_the_default_and_a_rule_raises_the_exp_level(self):
+        held = {r['ref']: r for r in ec.route_band('eirika', None)}
+        self.assertEqual(self.bands['eirika'], held)
+        early = {r['ref']: r for r in ec.route_band('eirika', 10)}
+        self.assertGreaterEqual(early['CHAPTER_E_21']['high'], 21)       # promoted: level + 20
+        self.assertLessEqual(held['CHAPTER_E_21']['high'], 20)
 
 
 class GeneratedBlock(unittest.TestCase):

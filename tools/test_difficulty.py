@@ -1424,6 +1424,104 @@ class VanillaLoaded(unittest.TestCase):
                           if d.get('charIndex') == 'CHARACTER_CAELLACH'])
 
 
+class VanillaRoutes(unittest.TestCase):
+    """#639 Part B: both of FE8's routes as chains, their enemy forces derived by the registry's
+    own rule, their deploy caps and their recruits."""
+
+    def test_the_derivation_reproduces_every_curated_entry(self):
+        """`derive_red_arrays` is the rule the PARITY_REFERENCE_UDEFS comments state. It must give
+        back the hand-curated Ch1-Ch8 and Ch13 entries (after the scene filter every reader
+        applies) EXACTLY before it is trusted on a chapter nobody curated."""
+        for ref, stem in df.PARITY_REFERENCE_STEM.items():
+            if ref == 'FE8 Prologue':
+                continue
+            curated = {a for a, _i, _d in df._vanilla_red_defs(ref)}
+            self.assertEqual(curated, set(df.derive_red_arrays(stem)), ref)
+
+    def test_the_prologue_stays_curated_because_valter_is_a_scripted_fight(self):
+        """The rule keeps the Prologue's Valter group (armed, RED); the curated entry drops it
+        because the throne-room scene has Seth fight him and the map never holds him."""
+        extra = set(df.derive_red_arrays('prologue')) - set(
+            df.PARITY_REFERENCE_UDEFS['FE8 Prologue'][1])
+        self.assertEqual({'UnitDef_Event_PrologueValterGroup'}, extra)
+
+    def test_an_array_loaded_only_in_the_ending_scene_is_not_a_chapter_enemy(self):
+        """Ch13's ending stands Caellach up (armed, Silver Axe) on the next chapter's map after
+        the chapter is won; no hand ever fights him there."""
+        self.assertIn('UnitDef_088BBA58', df.ending_only_udefs('ch13a'))
+        self.assertNotIn('UnitDef_088BBA58', df.derive_red_arrays('ch13a'))
+        self.assertNotIn('UnitDef_088BAA4C', df.ending_only_udefs('ch13a'))   # the main force
+
+    def test_the_vanilla_chain_is_what_the_parity_reads_were_built_on(self):
+        self.assertEqual(('FE8 Prologue', 'FE8 Ch1', 'FE8 Ch2', 'FE8 Ch3', 'FE8 Ch4', 'FE8 Ch5',
+                          'FE8 Ch6', 'FE8 Ch7', 'FE8 Ch8'), df.VANILLA_CHAIN)
+
+    def test_a_route_chain_names_chapters_by_constant_and_keeps_ch11(self):
+        eirika, ephraim = df.route_chain('eirika'), df.route_chain('ephraim')
+        self.assertEqual(df.VANILLA_CHAIN[:5] + ('FE8 Ch5x',) + df.VANILLA_CHAIN[5:],
+                         eirika[:10])
+        self.assertEqual(eirika[:10], ephraim[:10])
+        self.assertEqual(['CHAPTER_E_9', 'CHAPTER_E_10', 'CHAPTER_E_11', 'CHAPTER_E_12'],
+                         list(eirika[10:14]))      # Ch11 is chapter 0x3D, between Ch10 and Ch12
+        self.assertEqual(['CHAPTER_I_9', 'CHAPTER_I_10', 'CHAPTER_I_11', 'CHAPTER_I_12'],
+                         list(ephraim[10:14]))
+        self.assertEqual(('CHAPTER_E_21', 'CHAPTER_E_21X'), eirika[-2:])
+        self.assertEqual(('CHAPTER_I_21', 'CHAPTER_I_21X'), ephraim[-2:])
+
+    def test_a_route_chapter_resolves_by_constant_not_by_internal_name(self):
+        """chapter_settings' `internalName` runs one behind the chapter number from Ch12 on
+        (`E11` is Ch12); chapters.h does not."""
+        self.assertEqual('ch13a', df.ref_stem('CHAPTER_E_13'))
+        self.assertEqual('ch11b', df.ref_stem('CHAPTER_I_11'))
+        self.assertEqual('ch5x', df.ref_stem('FE8 Ch5x'))
+        self.assertEqual('Ch13: Hamill Canyon', df.ref_title('CHAPTER_E_13'))
+        self.assertEqual(2, df.ref_mode('CHAPTER_E_9'))
+        self.assertEqual(3, df.ref_mode('CHAPTER_I_9'))
+        self.assertEqual(1, df.ref_mode('FE8 Ch8'))
+
+    def test_the_deploy_cap_is_the_length_of_the_ally_list(self):
+        """GetChapterAllyUnitCount (eventscr3.c:432) counts `.playerUnitsInNormal` to the first
+        entry with no charIndex. Ch5x's list is Ephraim, Forde, Kyle and Orson. Lap records of
+        the bot read 12 for Eirika's Ch17 and Ephraim's Ch14, the lists' own length; the lap's
+        Ephraim Ch9 read 9 where the list is 11, a run that owns fewer units than the list holds."""
+        self.assertEqual(4, df.vanilla_deploy_cap('FE8 Ch5x'))
+        self.assertEqual(9, df.vanilla_deploy_cap('FE8 Ch5'))
+        self.assertEqual(11, df.vanilla_deploy_cap('CHAPTER_I_9'))
+        self.assertEqual(12, df.vanilla_deploy_cap('CHAPTER_E_17'))
+        self.assertEqual(12, df.vanilla_deploy_cap('CHAPTER_I_14'))
+        self.assertEqual(0, df.vanilla_deploy_cap('CHAPTER_I_21X'))     # `{ 0 }`: no player units
+
+    def test_a_route_recruit_order_the_player_decides_is_refused_unless_asked_past(self):
+        """Ch10's talk recruits have no fixed order (Eirika's Gerik and Tethys talk to each other;
+        Ephraim's Duessel and Cormag are independent). The slot order is the player's, so the
+        default refuses; a reader that only needs who joins when says so."""
+        with self.assertRaisesRegex(ValueError, 'CHAPTER_E_10'):
+            df.vanilla_recruits(df.route_chain('eirika'))
+        with self.assertRaisesRegex(ValueError, 'CHAPTER_I_10'):
+            df.vanilla_recruits(df.route_chain('ephraim'))
+        chain = df.route_chain('eirika')
+        joined = {r.char: chain[r.fields_from] for r in df.vanilla_recruits(chain, False)}
+        self.assertEqual('CHAPTER_E_11', joined['CHARACTER_GERIK'])
+        self.assertEqual('CHAPTER_E_11', joined['CHARACTER_TETHYS'])
+
+    def test_ephraims_band_joins_in_ch5x_on_a_route_chain(self):
+        chain = df.route_chain('ephraim')
+        joined = {r.char: chain[r.fields_from] for r in df.vanilla_recruits(chain, False)}
+        for who in ('EPHRAIM', 'FORDE', 'KYLE'):
+            self.assertEqual('FE8 Ch5x', joined['CHARACTER_' + who])
+        self.assertNotIn('CHARACTER_ORSON_CH5X', joined)     # a guest, not a playable slot
+
+    def test_the_default_recruits_still_start_ephraims_band_in_ch8(self):
+        joins = {r.char: df.VANILLA_CHAIN[r.fields_from] for r in df.vanilla_recruits()}
+        self.assertEqual('FE8 Ch8', joins['CHARACTER_FORDE'])
+
+    def test_a_scene_that_fights_or_removes_a_kept_array_is_listed_for_a_reader(self):
+        found = {(a, why.split('(')[0]) for a, _s, why in df.scene_suspects('FE8 Ch1')}
+        self.assertIn(('UnitDef_Event_Ch1Enemy', 'FIGHT'), found)
+        self.assertIn(('UnitDef_088B44AC', 'removes CHARACTER_BAZBA'),
+                      {(a, why) for a, _s, why in df.scene_suspects('FE8 Ch2')})
+
+
 class VanillaEnemies(unittest.TestCase):
     """Integration: extract a parity reference's red enemy force from the decomp (HEAD)."""
 

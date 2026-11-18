@@ -69,11 +69,6 @@ import team_groups  # noqa: E402
 VANILLA_LAST = ('CHAPTER_E_21X', 'CHAPTER_I_21X')
 
 
-def _chapter_enum():
-    return inject.decomp.enum_values(
-        inject.decomp.vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_')
-
-
 def twin_index(ref, route):
     """The vanilla chapter a twin_strategy key names on `route` (1 Eirika, 2 Ephraim), or None
     when that key belongs to the other route. Up to Ch8 the routes share chapters
@@ -82,7 +77,7 @@ def twin_index(ref, route):
     shared = inject.chapter_settings.twin_rows()
     if ref in shared:
         return shared[ref]
-    enum = _chapter_enum()
+    enum = inject.decomp.chapter_enum()
     tail = ref.split(' ', 1)[1]
     side = 'E' if route == 1 else 'I'
     if tail.endswith(' Ephraim'):
@@ -209,7 +204,7 @@ def village_gifts(macro='Village'):
 
 
 def vanilla_env(route=1):
-    enum = _chapter_enum()
+    enum = inject.decomp.chapter_enum()
     return dict(team_groups.env(), last=[enum[n] for n in VANILLA_LAST], route=route,
                 claims=twin_claims_env(route), village_gifts=village_gifts(),
                 house_gifts=village_gifts('House'))
