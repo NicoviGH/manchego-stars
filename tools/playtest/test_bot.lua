@@ -4343,6 +4343,102 @@ do
     o.objective = { kind = "boss" }
 end
 
+-- test_planner_assault_baits (#641, vanilla E_20's Morva, charId 0x41): a Guard Tile boss X
+-- (62 HP) strikes from its tile at range 1-2 for 36, its counter the same, at the unit in
+-- range it can kill first (the game's AI prefers a kill); one tile beside it. E (51 HP) deals
+-- 30 twice at 81% from there: 60, short of the kill, and E at 15 HP meets X's own strike. A, C
+-- and D (30 HP) reach it from range 2 and deal 0. The assault seats none of them (a
+-- blow that cannot hurt X buys its counter and nothing else); with E alone short of the kill,
+-- the bait is judged: E waits on the tile, X strikes and meets E's counter, and the army's
+-- reply finishes it at 81% (the lookahead's win). The bait is played, everyone else out of
+-- X's range.
+do
+    local function units()
+        return blue(0x01, 0, 5, 6, { hp = 51 }),
+               blue(0x02, 1, 2, 6, { hp = 30, minRange = 1, maxRange = 2 }),
+               blue(0x03, 2, 8, 6, { hp = 30, minRange = 1, maxRange = 2 }),
+               blue(0x04, 3, 5, 9, { hp = 30, minRange = 1, maxRange = 2 }),
+               red(0x81, 5, 2, { isBoss = true, hp = 62, minRange = 1, maxRange = 2 })
+    end
+    local function near(x, y) local d = Board.distance(x, y, 5, 2) return d >= 1 and d <= 2 end
+    local heavy = fc { hit = 81, dmg = 30, hits = 2, counters = true, counterHit = 100,
+                       counterDmg = 36, counterHits = 1, takenHit = 100, takenDmg = 36,
+                       takenHits = 1, takenCrit = 2 }
+    local naught = fc { hit = 81, dmg = 0, hits = 1, counters = true, counterHit = 100,
+                        counterDmg = 36, counterHits = 1, takenHit = 100, takenDmg = 36,
+                        takenHits = 1 }
+    -- X's strike on the unit in its range with the least HP (one it kills, before E), E's
+    -- counter 30 twice at 81%
+    local function strikes(plan)
+        if plan.gone[0x81] then return {} end
+        local b
+        for _, x in ipairs(plan.blues) do
+            if near(x.x, x.y) and (not b or x.hp < b.hp) then b = x end
+        end
+        if not b then return {} end
+        local e = b.unit.id == 0x01
+        return { { enemy = 0x81, target = b.unit.id, takenHit = 100, takenDmg = 36,
+                   takenHits = 1, takenCrit = e and 2 or 0, counterHit = 81,
+                   counterDmg = e and 30 or 0, counterHits = e and 2 or 1,
+                   counterCrit = 0, strikerHp = (plan.reds or {})[0x81] or 62 } }
+    end
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 5, 6 }, { 5, 3 }, { 4, 6 }),
+                  [0x02] = tiles({ 2, 6 }, { 4, 3 }, { 1, 6 }),
+                  [0x03] = tiles({ 8, 6 }, { 6, 3 }, { 9, 6 }),
+                  [0x04] = tiles({ 5, 9 }, { 5, 4 }, { 4, 9 }),
+                  [0x81] = tiles({ 5, 2 }) },
+        danger = { ["5,3"] = 1, ["4,3"] = 1, ["6,3"] = 1, ["5,4"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["5,3"] = heavy } }, [0x02] = { [0x81] = { ["4,3"] = naught } },
+               [0x03] = { [0x81] = { ["6,3"] = naught } }, [0x04] = { [0x81] = { ["5,4"] = naught } } },
+        enemyPhase = strikes,
+        -- the reply: E, beside a wounded X, kills it at 81%; the second phase is X's (or none)
+        nextPhase = function(plan)
+            local out = strikes(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.x == 5 and b.y == 3 then
+                    out = {}
+                    out.reply = { kills = { { unit = 0x01, enemy = 0x81, x = 5, y = 3, p = 0.81,
+                                              lost = 0 } }, steps = {} }
+                end
+            end
+            return out
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(units()), sightOf(o), style("even"))
+    local seated = {}
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "assault" then
+            for _, k in ipairs(c.acts) do
+                if k:match("attack") then seated[#seated + 1] = k end
+            end
+        end
+    end
+    for _, k in ipairs(seated) do
+        check(k:match("^1>") ~= nil, true,
+              "bait: no 0-damage striker seated in the assault (" .. k .. ")")
+    end
+    check(plan and plan.kind, "bait", "bait: the bait is the plan played")
+    check(a and a.unitId == 0x01 and a.act .. "@" .. at(a), "wait@5,3",
+          "bait: E waits on the tile beside the boss")
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.unitId ~= 0x01 then
+            check(near(x.move.x, x.move.y), false,
+                  "bait: unit " .. x.unitId .. " waits out of the boss's range")
+        end
+    end
+    -- the reply's kill is the win a turn later: the objective's chance rises by GAMMA of it
+    check(plan and plan.secondWin, 0.81, "bait: the lookahead reads the reply's kill as the win")
+    local win
+    for _, r in ipairs(plan and plan.goalWorth or {}) do
+        if r.kind == "win" then win = r end
+    end
+    local g = dofile(here .. "goals.lua").GAMMA
+    check(win and math.abs(win.after - (g * 0.81 + (1 - g * 0.81) * g)) < 1e-9, true,
+          "bait: the win's row is the first phase's, with GAMMA of the later kill")
+end
+
 -- test_a_remembered_boss_is_the_march_goal (#510, ADR 0401; vanilla Ch6 retries): on a Defeat
 -- Boss map the boss is the march goal once the party knows where it stands -- in sight, or
 -- in fog and remembered by a retry (sight.knows, ADR 0399) -- and it is the unit the objective
@@ -7067,6 +7163,20 @@ do
     local second, lost, over = Planner.secondRead(r, { { id = 0x01, charId = 1 } }, struck)
     check(lost[0x01], 10, "secondRead: the reply's counter (7) and the second phase's strikes (3)")
     check(second[0x01] .. "/" .. over, "0/0", "secondRead: no death read from the counter alone")
+    -- #641: the win the second phase reads, for the enemy `ends` names only: killed by the
+    -- reply at its chance, or felled by our counter to its own strike in the second phase
+    local function boss(id) return id == 0x81 end
+    r.reply.kills[1].p = 0.81
+    check(select(4, Planner.secondRead(r, { { id = 0x01, charId = 1 } }, struck)), 0,
+          "secondRead: no win when no enemy's death ends the chapter")
+    check(select(4, Planner.secondRead(r, { { id = 0x01, charId = 1 } }, struck, nil, boss)),
+          0.81, "secondRead: the reply's kill of the boss is the win at its chance")
+    local felled = { hp = { [0x01] = 13 },
+                     outcomes = { { p = 0.5, strikes = { { enemy = 0x81, felled = 0.6 } } },
+                                  { p = 0.5, strikes = { { enemy = 0x82, felled = 1 } } } } }
+    local won = select(4, Planner.secondRead(felled, { { id = 0x01, charId = 1 } }, struck, nil,
+                                             boss))
+    check(math.abs(won - 0.3) < 1e-9, true, "secondRead: the boss felled by our counter in the second phase, over its ways")
 end
 
 -- test_over_the_cap_this_phase_comes_first (#510 T100b, Manchego Stars ch03 careful seed 3010 turn

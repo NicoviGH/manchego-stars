@@ -1834,6 +1834,13 @@ function M.mendAt(ctx, u, tile)
     return m and exposed(ctx, u, { healAct(u, m, tile) })[1] or nil
 end
 
+-- The planner's bait (#641): unit `u`'s wait on `tile`, told its tile's ally and its exposure as
+-- every offered act is (exposed). The assault asks it on a strike tile beside the boss, which
+-- no march or hold offers (vanilla E_20: Ephraim, charId 0x0F, never offered 11,12 to wait on).
+function M.waitAt(ctx, u, tile)
+    return exposed(ctx, u, { action(u, tile, "wait") })[1]
+end
+
 -- The old clear-bot through decide: the first unit in slot order, pickTarget's pick, else
 -- pickMove toward the goal over sight.field when there is one. With no field pickMove's cork
 -- rule sends it at the nearest enemy, which is the charge the greedy bot has always made.
