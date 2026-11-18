@@ -453,8 +453,10 @@ local function score(act, st, W, style, odds)
         local hp = st.walls[at] or act.obstacle.hp
         v = v + W.breach
         fx.wall = { at = at, hp = hp - act.obstacle.blow.dealt }
-        -- the uses the strike spends (#644 review): every blow on a wall lands
-        fx.wear = { slot = act.obstacle.blow.wearSlot, uses = act.obstacle.blow.wear }
+        -- the uses the strike spends (#644 review): every blow on a wall lands, and a blow
+        -- thrown once the wall is broken is never thrown, at the HP the plan leaves the wall
+        -- (the forecast was played at its own: sight.strikeWall's wearAt)
+        fx.wear = { slot = act.obstacle.blow.wearSlot, uses = M.wearAt(act.obstacle.blow.wearAt, hp) }
         fx.blocked = hp <= 0
         if fx.wall.hp <= 0 then fx.opened = at end
     elseif act.act == "supply" then

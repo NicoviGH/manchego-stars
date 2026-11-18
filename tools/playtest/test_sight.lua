@@ -920,9 +920,11 @@ do
         check(body ~= nil and body:find("stagePhase(call, plan)", 1, true) ~= nil, true,
               "equip: " .. name .. " stages through stagePhase")
     end
-    -- the phase's staging arms each unit through M.armAsPlanned, which equips through it (#644)
+    -- the phase's staging arms each unit through M.stageWear and M.armAsPlanned, which equips
+    -- through it (#644)
     for name, via in pairs({ ["s.strike"] = "M.equip(api, call, S, ",
-                             stagePhase = "M.armAsPlanned(api, call, S, ",
+                             stagePhase = "M.stageWear(api, call, S, ",
+                             ["M.stageWear"] = "M.armAsPlanned(api, call, S, ",
                              ["M.armAsPlanned"] = "M.equip(api, call, S, " }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n%s*function ", at + 1) or #src))
@@ -1956,11 +1958,10 @@ do
     local reply = ra and sightSrc:sub(ra, sightSrc:find("\n    end\n", ra, true)) or ""
     local _, factions = reply:gsub("api%.write8%(S%.gPlaySt %+ PLAY_FACTION", "")
     check(factions, 2, "armyReply: writes the faction for the danger read and puts it back")
-    -- (M.armAsPlanned equips it, then takes the uses the kill spends off it: #644 review,
-    -- the reply's kills wear their weapons on the ledger the second phase starts from)
-    check(reply:find("wearing.base = M.armAsPlanned(api, call, S, wearing.base, u, k.slot, "
-                     .. "kill.wearSlot,", 1, true) ~= nil, true,
-          "armyReply: a killer equips the weapon it killed with, less the uses the kill spent")
+    -- (M.replyArm: the weapon equipped, less the uses the kill spends, on the ledger the second
+    -- phase starts from; its behaviour is tested with #644's wear below)
+    check(reply:find("wearing.base = M.replyArm(api, call, S, wearing.base, u, k, kill)", 1, true)
+          ~= nil, true, "armyReply: a killer is armed as its kill leaves it (M.replyArm)")
     -- the wiring: the heal list is read with the healer as the menu finds it (M.asActive)
     local ha = sightSrc:find("    function s.heals(u, x, y, hurt)", 1, true)
     local heals = ha and sightSrc:sub(ha, sightSrc:find("\n    end\n", ha, true)) or ""
@@ -2024,12 +2025,16 @@ do
     local bytes = {}
     -- gItemData reads 0 attributes for every item here: each one breakable (Board.itemAfterUse)
     local S = { EquipUnitItemSlot = 0x08016C3C, UnitRemoveInvalidItems = 0x08017A58,
-                gItemData = 0x10000 }
+                gItemData = 0x10000, sTrapPool = 0x5000, gActionData = 0x6000,
+                InitObstacleBattleUnit = 0x08030001, BattleGenerateSimulation = 0x08030003,
+                gBattleActor = 0x7000, gBattleTarget = 0x7100, gBattleHitArray = 0x7200 }
     local mem = { u8 = function(a) return bytes[a] or 0 end,
                   u16 = function(a) return bytes[a] or 0 end,
-                  u32 = function(a) return bytes[a] or 0 end }
+                  u32 = function(a) return bytes[a] or 0 end,
+                  s8 = function(a) return bytes[a] or 0 end }
     -- the Board the harness binds (Board.bind's shape: its reads take the item alone)
-    local bound = setmetatable({ itemAfterUse = function(item) return Board.itemAfterUse(mem, S, item) end },
+    local bound = setmetatable({ itemAfterUse = function(item) return Board.itemAfterUse(mem, S, item) end,
+                                 hits = function() return Board.hits(mem, S) end },
                                { __index = Board })
     local outer = { cpu = fakeCpu(1), mem = mem,
                     write8 = function(a, v) bytes[a] = v end,
@@ -2188,6 +2193,113 @@ do
         end)
     end)
     check(seen, "36C,36C,0,0,0", "wear: an enemy's strike from slot 2 spends its slot-2 weapon")
+
+    -- PR #645 re-review (2): the staged phase wears an enemy's bag from plan.redWear, the
+    -- counters it gave our planned attacks: its slot-1 javelin's last use spent, the bag packed
+    local SWORD = 0x01 | (20 << 8)
+    fill(red.addr, { SWORD, 0x1C | (1 << 8) })
+    sandbox(function()
+        sandbox(function()
+            Sight.stageWear(api, call, S, { blues = {}, redWear = { [0x81] = { [1] = 1 } } },
+                            { [0x81] = red })
+            seen = bag(red.addr)
+        end)
+    end)
+    check(seen, "1401,0,0,0,0", "stageWear: the enemy's counter spent its javelin's last use")
+
+    -- PR #645 re-review (3, 4): the army reply's killer, armed from slot 2 (a javelin, 2 uses)
+    -- for a kill that spends 1, the first phase's counter having already counted 0.45 on its
+    -- sword in slot 0. The equip brings the javelin to the front; the sword's row follows the
+    -- sword (M.equipRows), so the javelin loses the kill's 1 use and the sword none.
+    local killer = { addr = 0x600 }
+    local JAV2 = 0x1C | (2 << 8)
+    fill(killer.addr, { SWORD, VULNERARY, JAV2 })
+    local counted = Sight.tally({}, killer.addr, 0, 0.45)
+    local rows
+    sandbox(function()
+        sandbox(function()
+            local l = Sight.replyArm(api, call, S, counted, killer, { slot = 2 },
+                                     { wearSlot = 2, wear = 1 })
+            seen, rows = bag(killer.addr), l[killer.addr]
+        end)
+    end)
+    check(seen, "11C,1401,36C,0,0", "replyArm: the kill's use is off the javelin it was made with")
+    check(rows[1] and rows[1].total, 0.45, "replyArm: the sword's counted 0.45 moved with it to slot 1")
+    -- and a kill expected to spend 0.1 takes nothing: 0.1, not the sword's 0.45 + 0.1
+    sandbox(function()
+        sandbox(function()
+            Sight.replyArm(api, call, S, counted, killer, { slot = 2 }, { wearSlot = 2, wear = 0.1 })
+            seen = bag(killer.addr)
+        end)
+    end)
+    check(seen, "21C,1401,36C,0,0", "replyArm: a row on the sword never wears the javelin")
+
+    -- PR #645 re-review (7): the ledger threads through a split phase's ways (M.phaseWays,
+    -- M.strikeLedger, M.ledgerAfter). Two enemies' strikes each draw a counter from Myrrh's
+    -- stone (1 use) expected to spend 0.45; our counter may fell the first striker (0.5), and
+    -- the second strikes only where it stood (its own decision, read off the board: the
+    -- sandbox's write). Where it stood, 0.9 spends the stone; where it fell, 0.45 keeps it.
+    fill(myrrh.addr, { STONE, VULNERARY })
+    local FELL = 0x6100
+    local after, inside = setmetatable({}, { __mode = "k" }), {}
+    local outcomes
+    sandbox(function() sandbox(function() outcomes = Sight.phaseWays(2, function(k, done)
+        if k == 2 and (bytes[FELL] or 0) ~= 0 then return nil end
+        local t = { felled = k == 1 and 0.5 or 0, wear = 0, counterWear = 0.45, counterSlot = 0 }
+        local now = {}
+        for i = 1, #done do now[i] = done[i] end
+        now[#now + 1] = t
+        Sight.strikeLedger(api, call, S, after, {}, done, t, { slot = 0 }, red.addr, myrrh.addr)
+        if k == 2 then inside[#inside + 1] = bag(myrrh.addr) end
+        return t, now, function() api.write8(FELL, 1) end
+    end, sandbox, 0) end) end)
+    local ways = {}
+    for _, o in ipairs(outcomes) do
+        -- a spent item's row is dropped with it (M.packed)
+        local row = Sight.ledgerAfter(after, {}, o.strikes)[myrrh.addr][0]
+        ways[#ways + 1] = #o.strikes .. ":" .. (row and (row.total .. "/" .. row.taken) or "spent")
+    end
+    table.sort(ways)
+    check(table.concat(ways, " "), "1:0.45/0 2:spent", "phaseWays: each way keeps the ledger its own strikes left")
+    check(inside[1], "36C,0,0,0,0", "phaseWays: the second strike wore on the first's ledger")
+    check(bag(myrrh.addr), "1AA,36C,0,0,0", "phaseWays: the board is as it was after")
+
+    -- the ballista strike's call site: its trap is the rider's (sTrapPool[ballistaIndex]) and
+    -- its use comes off that, never the rider's bag
+    local rider = { addr = 0x700 }
+    fill(rider.addr, { SWORD })
+    bytes[rider.addr + Sight.UNIT_BALLISTA] = 2
+    local trapUses = S.sTrapPool + 2 * Sight.TRAP_SIZE + Sight.TRAP_BLST_USES
+    bytes[trapUses] = 3
+    sandbox(function()
+        sandbox(function()
+            local shot = { wear = 1, counterWear = 0 }
+            Sight.strikeLedger(api, call, S, {}, {}, {}, shot, { slot = 0xFF }, rider.addr, myrrh.addr)
+            seen = bytes[trapUses] .. "|" .. bag(rider.addr)
+        end)
+    end)
+    check(seen, "2|1401,0,0,0,0", "strikeLedger: a ballista shot spends its rider's trap, not its bag")
+
+    -- (7) strikeWall's read (M.strikeWallIn): the game's forecast of two blows on a 10-HP wall
+    -- (6, then 4) with an axe in slot 1, 3 uses before and 1 after
+    local A_, T_ = S.gBattleActor, S.gBattleTarget
+    local function wallCall(fn, args)
+        if fn == S.BattleGenerateSimulation then
+            bytes[A_ + 0x4A], bytes[A_ + 0x48] = 0x1F | (3 << 8), 0x1F | (1 << 8)
+            bytes[A_ + 0x51], bytes[A_ + 0x52], bytes[A_ + 0x4C] = 1, 1, 0x1
+            bytes[T_ + 0x72], bytes[T_ + 0x13] = 10, 0
+            bytes[S.gBattleHitArray] = 6 << 24
+            bytes[S.gBattleHitArray + 4] = 4 << 24
+            bytes[S.gBattleHitArray + 8] = Board.HIT_END << 19
+        end
+    end
+    local w
+    sandbox(function()
+        w = Sight.strikeWallIn(api, wallCall, S, { addr = 0x800 }, { x = 2, y = 0, hp = 10 }, 1, 0, 1)
+    end)
+    check(string.format("%d/%d/%d/%s,%s", w.dealt, w.wear, w.wearSlot, tostring((w.wearAt or {})[0]),
+                        tostring((w.wearAt or {})[6])), "10/2/1/1,1",
+          "strikeWallIn: the HP it takes, the uses it spends off slot 1, by the wall's HP lost")
 
     -- test_worn_reads_the_uses_a_battle_spent (M.worn on a battle unit)
     local bu, m = 0x800, {}

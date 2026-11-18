@@ -190,8 +190,9 @@
 --                            plays its next act on this word, not its own (Planner.surprise).
 --   strikeWall(u, o, x, y)   `u`'s strike from (x, y) on the wall o = { x, y, hp }, as the
 --                            Attack menu forecasts it (InitObstacleBattleUnit, then
---                            BattleGenerateSimulation): { dmg, hits }. A wall is always hit
---                            and never crit (ComputeBattleObstacleStats).
+--                            BattleGenerateSimulation): { dealt, wear, wearSlot, wearAt }
+--                            (M.strikeWallIn). A wall is always hit and never crit
+--                            (ComputeBattleObstacleStats).
 --   doors()                  the door tiles still closed: a tile whose command is Door
 --                            (read with the Seize tile) and whose terrain is still a door.
 --   mapChange(x, y)          the tiles opening the door or breaking the wall at (x, y) opens:
@@ -716,15 +717,30 @@ end
 -- bag slot its uses come off (M.wearSlotOf).
 M.SPENDS_MISS = 0x82   -- IA_MAGIC (1 << 1) | IA_UNCOUNTERABLE (1 << 7), include/bmitem.h
 M.IA_UNBREAKABLE = 1 << 3
+-- How a battle unit's weapon spends its uses (its weaponAttributes): spendsMiss, unbreakable.
+function M.spendRule(mem, bu)
+    local attributes = mem.u32(bu + BU.weaponAttributes)
+    return { spendsMiss = (attributes & M.SPENDS_MISS) ~= 0,
+             unbreakable = (attributes & M.IA_UNBREAKABLE) ~= 0 }
+end
 function M.side(mem, me, other, proc, hitsAt)
     local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
-    local attributes = mem.u32(me + BU.weaponAttributes)
+    local rule = M.spendRule(mem, me)
     return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
-             spendsMiss = (attributes & M.SPENDS_MISS) ~= 0,
-             unbreakable = (attributes & M.IA_UNBREAKABLE) ~= 0,
+             spendsMiss = rule.spendsMiss, unbreakable = rule.unbreakable,
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
              armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0,
              wearSlot = M.wearSlotOf(mem, me) }
+end
+
+-- The HP a battle unit lost in the simulation just run. A blow that petrifies ends the battle
+-- as a death does (BattleGenerateHit), and a petrified unit is out of the fight, so the bot
+-- counts it as every HP lost: our pricing, not the game's.
+function M.lost(mem, bu)
+    local initial = mem.s8(bu + BU.hpInitial)
+    local status = mem.s8(bu + BU.statusOut)
+    if status == STATUS_PETRIFY or status == STATUS_13 then return initial end
+    return initial - mem.u8(bu + UNIT_HP)
 end
 
 -- The bag slot (0-based) whose item a battle unit's spent uses come off, or nil when they come
@@ -1711,6 +1727,29 @@ function M.equip(api, call, S, u, slot)
     call(S.EquipUnitItemSlot, { u.addr, slot })
 end
 
+-- Inside a sandbox: `u`'s strike from (x, y) on the wall `o` ({ x, y, hp }), as the Attack
+-- menu forecasts it (AttackMapSelect_SwitchIn: the wall's place and HP in gActionData, then
+-- InitObstacleBattleUnit and BattleGenerateSimulation with no target unit) -> { dealt = the HP
+-- it takes off the wall, wear = the uses it spends (M.worn), wearSlot (M.wearSlotOf), wearAt =
+-- the same uses by the HP the wall had lost before each blow (M.wornBy) }. A wall never
+-- counters and every blow on it lands (ComputeBattleObstacleStats: hit 100, crit 0), so the
+-- forecast's one way is the strike's only one; a planner reads its wear at the HP an earlier
+-- blow of its plan leaves the wall (Planner.wearAt), as for a unit.
+function M.strikeWallIn(api, call, S, u, o, x, y, slot)
+    local mem = api.mem
+    api.write8(S.gActionData + ACTION_X_OTHER, o.x)
+    api.write8(S.gActionData + ACTION_Y_OTHER, o.y)
+    api.write8(S.gActionData + ACTION_TRAP_TYPE, o.hp)
+    call(S.InitObstacleBattleUnit, {})
+    call(S.BattleGenerateSimulation, { u.addr, 0, x, y, slot or M.ISLOT_AUTO })
+    local worn = M.worn(mem, S.gBattleActor)
+    local at = M.wornBy(api.Board.hits(), { actor = M.spendRule(mem, S.gBattleActor),
+                                            target = { unbreakable = true } },
+                        { actor = worn, target = 0 })
+    return { dealt = M.lost(mem, S.gBattleTarget), wear = worn,
+             wearSlot = M.wearSlotOf(mem, S.gBattleActor), wearAt = at.actor }
+end
+
 -- The phase's wear ledger (#644 review): per unit (its struct's address) and bag slot, the
 -- uses the phase is expected to have taken off that item so far (`total`) and the whole uses
 -- already written off it (`taken`). Each strike adds its expected wear to the total, and the
@@ -1818,9 +1857,75 @@ end
 -- is expected to spend (`wear`) off the item the battle used (`wearSlot`, the bag slot before
 -- the equip: an attack the game armed itself, slot nil, used its first usable weapon, which
 -- need not be slot 0), #644. -> the ledger after it (M.wear).
+-- The ledger's rows of the unit at `addr` after EquipUnitItemSlot(`slot`) moved its bag
+-- (M.afterEquip): each row follows its item, so a use the phase already counted on the sword
+-- stays on the sword when a javelin is brought to the front (PR #645 re-review). Pure.
+function M.equipRows(ledger, addr, slot)
+    if not slot or slot <= 0 or not ledger[addr] then return ledger end
+    local rows = {}
+    for k, row in pairs(ledger[addr]) do rows[M.afterEquip(slot, k)] = row end
+    local out = {}
+    for k, v in pairs(ledger) do out[k] = v end
+    out[addr] = rows
+    return out
+end
+
 function M.armAsPlanned(api, call, S, ledger, u, slot, wearSlot, wear)
     M.equip(api, call, S, u, slot)
+    ledger = M.equipRows(ledger, u.addr, slot)
     return M.wear(api, call, S, ledger, u.addr, M.afterEquip(slot, wearSlot), wear)
+end
+
+-- Inside a sandbox: the wear a staged plan starts its phase with (stagePhase), -> the ledger
+-- (M.tally). Our units armed as the plan leaves them (M.armAsPlanned: `blues`' slot, wearSlot,
+-- wear), and each enemy's weapon worn by its counters to the plan's attacks (#644 review: one
+-- whose counter spent its last javelin struck with it in the phase): `redWear` = { [id] =
+-- { [slot] = uses } }, each slot as the board's bag has it, so the highest slot first (a
+-- packed bag moves only the slots after the one emptied). `byId` = the board's units by id.
+function M.stageWear(api, call, S, plan, byId)
+    local ledger = {}
+    for _, b in ipairs(plan.blues) do
+        ledger = M.armAsPlanned(api, call, S, ledger, b.unit, b.slot, b.wearSlot, b.wear)
+    end
+    for id, slots in pairs(plan.redWear or {}) do
+        local e = byId[id]
+        local order = {}
+        for slot in pairs(slots) do order[#order + 1] = slot end
+        table.sort(order, function(a, b) return a > b end)
+        for _, slot in ipairs(order) do
+            if e then ledger = M.wear(api, call, S, ledger, e.addr, slot, slots[slot]) end
+        end
+    end
+    return ledger
+end
+
+-- The ledger the strikes `done` of a phase's way leave: the last one's (`after`, keyed by the
+-- strike), or the phase's `base` when none struck. Pure.
+function M.ledgerAfter(after, base, done)
+    local last = done[#done]
+    return last and after[last] or base
+end
+
+-- Inside a sandbox: phase strike `t` (M.strikeAt's, of `side`, the enemy at `strikerAddr` on the
+-- unit at `targetAddr`) wears its weapons on the ledger the way's earlier strikes `done` left
+-- (M.ledgerAfter), and the ledger it leaves is kept as after[t] for the strikes after it in its
+-- way (M.phaseWays splits a phase; each way carries its own). A ballista's strike (its slot
+-- BALLISTA_SLOT) wears the trap its rider sits on (sTrapPool[ballistaIndex], M.wearBallista).
+function M.strikeLedger(api, call, S, after, base, done, t, side, strikerAddr, targetAddr)
+    local ledger = M.ledgerAfter(after, base, done)
+    if side.slot == BALLISTA_SLOT then
+        ledger = M.wearBallista(api, ledger,
+            S.sTrapPool + api.mem.u8(strikerAddr + M.UNIT_BALLISTA) * M.TRAP_SIZE, t.wear)
+    end
+    after[t] = M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr)
+    return after[t]
+end
+
+-- Inside a sandbox: the army reply's killer `u` armed as its kill `k` (M.replyKills', its weapon
+-- `k.slot`) leaves it: that weapon equipped, less the uses the kill's exchange (`kill`, its
+-- side as `exchange` reads it: wear, wearSlot) is expected to spend, on `ledger`. -> the ledger.
+function M.replyArm(api, call, S, ledger, u, k, kill)
+    return M.armAsPlanned(api, call, S, ledger, u, k.slot, kill.wearSlot, kill.wear)
 end
 
 -- Sight.fullInfo(sandbox, open, api, S, isolate, fn): FR-019's full-information diagnostic
@@ -2256,15 +2361,7 @@ function M.new(outer)
         return mine("seize", u, function() return M.canSeize(api, u, sandbox) end) or false
     end
 
-    -- The HP a battle unit lost in the simulation just run. A blow that petrifies ends the
-    -- battle as a death does (BattleGenerateHit), and a petrified unit is out of the fight, so
-    -- the bot counts it as every HP lost: our pricing, not the game's.
-    local function lost(bu)
-        local initial = mem.s8(bu + BU.hpInitial)
-        local status = mem.s8(bu + BU.statusOut)
-        if status == STATUS_PETRIFY or status == STATUS_13 then return initial end
-        return initial - mem.u8(bu + UNIT_HP)
-    end
+    local function lost(bu) return M.lost(mem, bu) end
 
     -- One exchange as the forecast window reads it (`sim`, then InitBattleForecastBattleStats)
     -- and as it plays: the actor's side (M.side) with .counter the target's, .killsTarget the
@@ -2344,17 +2441,8 @@ function M.new(outer)
     function s.strikeWall(u, o, x, y, slot)
         -- the wall's HP is in the key: the read is HP lost, which the wall's HP caps
         return mine("wall@" .. o.x .. "," .. o.y .. "/" .. tostring(slot) .. "#" .. o.hp, u,
-                    function() return sandbox(function(call, proc)
-            api.write8(S.gActionData + ACTION_X_OTHER, o.x)
-            api.write8(S.gActionData + ACTION_Y_OTHER, o.y)
-            api.write8(S.gActionData + ACTION_TRAP_TYPE, o.hp)
-            call(S.InitObstacleBattleUnit, {})
-            call(S.BattleGenerateSimulation, { u.addr, 0, x, y, slot or M.ISLOT_AUTO })
-            -- and the uses it spends (#644 review): a wall never counters and every blow on it
-            -- lands (ComputeBattleObstacleStats: hit 100, crit 0), so the forecast's one way is
-            -- the strike's only one
-            return { dealt = lost(S.gBattleTarget), wear = M.worn(mem, S.gBattleActor),
-                     wearSlot = M.wearSlotOf(mem, S.gBattleActor) }
+                    function() return sandbox(function(call)
+            return M.strikeWallIn(api, call, S, u, o, x, y, slot)
         end) end)
     end
 
@@ -2521,29 +2609,14 @@ function M.new(outer)
     local function stagePhase(call, plan)
         local byId = {}
         for _, o in ipairs(units()) do byId[o.id] = o end
-        local ledger = {}
         for _, b in ipairs(plan.blues) do
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
-            ledger = M.armAsPlanned(api, call, S, ledger, b.unit, b.slot, b.wearSlot, b.wear)
         end
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
         end
-        -- an enemy's weapon worn by its counters to the plan's attacks (#644 review: one whose
-        -- counter spent its last javelin struck with it in the phase): `redWear` = { [id] =
-        -- { [slot] = uses } }, each slot as the board's bag has it, so the highest slot first:
-        -- a packed bag moves only the slots after the one emptied
-        for id, slots in pairs(plan.redWear or {}) do
-            local e = byId[id]
-            local order = {}
-            for slot in pairs(slots) do order[#order + 1] = slot end
-            table.sort(order, function(a, b) return a > b end)
-            for _, slot in ipairs(order) do
-                if e then ledger = M.wear(api, call, S, ledger, e.addr, slot, slots[slot]) end
-            end
-        end
-        local wearing = { base = ledger }
+        local wearing = { base = M.stageWear(api, call, S, plan, byId) }
         stageCarry(byId, plan.carry)
         local function remove(e, x, y)
             M.liftOff(api, x, y, e.id)
@@ -2587,20 +2660,11 @@ function M.new(outer)
             -- a red target: only a berserked enemy strikes its own side
             wound(addr, t.targetHp - math.floor(mean + 0.5),
                   byId[target] ~= nil and byId[target].faction == "red")
-            local last = done[#done]
-            local ledger = last and after[last] or wearing.base
-            if side.slot == BALLISTA_SLOT then
-                ledger = M.wearBallista(api, ledger,
-                    S.sTrapPool + mem.u8(e.addr + M.UNIT_BALLISTA) * M.TRAP_SIZE, t.wear)
-            end
-            after[t] = M.strikeWear(api, call, S, ledger, t, e.addr, addr)
+            M.strikeLedger(api, call, S, after, wearing.base, done, t, side, e.addr, addr)
             return t, now, addr
         end
         -- the ledger the strikes `done` leave (the base when none)
-        function wearing.after(done)
-            local last = done[#done]
-            return last and after[last] or wearing.base
-        end
+        function wearing.after(done) return M.ledgerAfter(after, wearing.base, done) end
         return byId, order, decides, strike, remove, gone, wearing
     end
 
@@ -2704,8 +2768,7 @@ function M.new(outer)
             local _, back = M.odds({ kill.back }, hp)
             remove(e, at(e))
             standOn(u, k.tile.x, k.tile.y)
-            wearing.base = M.armAsPlanned(api, call, S, wearing.base, u, k.slot, kill.wearSlot,
-                                          kill.wear)
+            wearing.base = M.replyArm(api, call, S, wearing.base, u, k, kill)
             local left = math.max(1, hp - math.floor(back + 0.5))
             wound(u.addr, left, false)
             acted[u.id] = true

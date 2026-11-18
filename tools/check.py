@@ -92,6 +92,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by PR #645's review (ADR 0423's 2026-11-18 note, ADR 0424): #642's price reads
+    # the uses the game's played ways spend (sight's `wear`); the blows x hit count is gone
+    r'\battackOf\.uses\b', r'\battackOf`\s*\.uses\b',
     # retired by ADR 0418 (#510, lap3p's Ch13 crash): a booster is what the game's Use routes to
     # CanUnitUseStatGainItem (INSPECT.BAG.USE), no longer any item with a stat-bonus pointer
     r'\bK\.ITEM_STAT_BONUSES\b', r'\ban item with stat bonuses\b',

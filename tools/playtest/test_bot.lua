@@ -2437,12 +2437,36 @@ do
         return {}
     end
     local sight = sightOf(o)
-    sight.strikeWall = function() return { dealt = 10, wear = 2, wearSlot = 1 } end
+    sight.strikeWall = function() return { dealt = 10, wear = 2, wearSlot = 1, wearAt = { [0] = 2 } } end
     Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
     local seen = {}
     for k in pairs(worn) do seen[#seen + 1] = k end
     worn = table.concat(seen, ",")
     check(worn, "1:2", "wall: the striker's weapon is staged less the uses the strike spends")
+
+    -- PR #645 re-review (5): a second striker on a wall spends what the HP the first leaves
+    -- allows. The forecast (at the wall's own 10 HP) is two blows of 4, a use each; the first
+    -- striker spends 2 and leaves 2 HP, so the second's first blow breaks it: 1 use.
+    local pairsSeen = {}
+    o.enemyPhase = function(plan)
+        local uses = {}
+        for _, b in ipairs(plan.blues) do
+            if b.wear then uses[#uses + 1] = b.wear end
+        end
+        table.sort(uses)
+        if #uses == 2 then pairsSeen[table.concat(uses, ",")] = true end
+        return {}
+    end
+    sight = sightOf(o)
+    sight.strikeWall = function()
+        return { dealt = 8, wear = 2, wearSlot = 0, wearAt = { [0] = 1, [4] = 1 } }
+    end
+    Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
+    local seenPairs = {}
+    for k in pairs(pairsSeen) do seenPairs[#seenPairs + 1] = k end
+    table.sort(seenPairs)
+    check(table.concat(seenPairs, " "), "1,2",
+          "wall: the second striker's blow after the wall breaks is never thrown")
 end
 
 -- test_the_assault_seats_every_striker: the boss E sits in the corner (0,0); (1,0) is the one

@@ -28,7 +28,9 @@ took a use off a weapon. So she kept the stone (+15 Def, +20 Res, a counter) for
   so it wears no item of its rider's bag; its uses come off the ballista's trap
   (`BattleApplyBallistaUpdates`, `M.wearBallista`). An attack the game armed itself (no slot
   asked) may use slot 2 behind two Vulneraries; the uses come off that item, wherever the equip
-  moves it (`M.armAsPlanned`, `M.afterEquip`).
+  moves it (`M.armAsPlanned`, `M.afterEquip`); the uses the phase has already counted on that
+  unit's items move with them (`M.equipRows`: the army reply's killer brings a javelin to the
+  front without the 0.45 its sword's counter left).
 - **The phase takes the expected uses as a running total, rounded** (PR #645 review): each
   strike adds its expected wear to a ledger per unit and slot, and the item has lost the
   rounded total (`M.tally`). Three strikes at 0.45 on a 1-use stone spend it (1.35; it is
@@ -41,7 +43,8 @@ took a use off a weapon. So she kept the stone (+15 Def, +20 Res, a counter) for
   off the game's hit array by the HP the target had lost before them (`M.wornBy`, which must
   count what `M.worn` counted, or it raises). The planner reads that at the target's HP in the
   plan (`Planner.wearAt`): a second attacker whose first blow kills a target the first attacker
-  left on 4 HP spends 1 use, not the 2 it spends at the target's own HP.
+  left on 4 HP spends 1 use, not the 2 it spends at the target's own HP. A wall's second striker
+  likewise (`M.strikeWallIn`'s `wearAt`, read at the HP the plan leaves the wall).
 - Where it applies: our unit's planned attack (`M.armAsPlanned`), the counter it draws off the
   enemy's weapon (`plan.redWear`: an enemy whose counter spent its last javelin strikes without
   it), each phase strike on both weapons (`M.strikeWear`), a planned wall strike (every blow on
@@ -67,6 +70,14 @@ Attempts 1 and 2 play main's games (same `acts_hash`); attempt 3 differs. Myrrh 
 and no player death read at 0% was a unit that had lost a weapon. CPU back to back on attempt 1
 (the same play): 173.9 s on main, 174.6 s here, 24.85 against 24.95 s a player phase (+0.4%);
 `BattleGenerateSimulation` 75,438 against 76,139 (battle keys now differ by uses).
+
+The wiring is tested off the emulator: the staging (`M.stageWear`), each strike's ledger
+through a split phase's ways (`M.strikeLedger`, `M.ledgerAfter`, `M.phaseWays`), the ballista's
+trap, the reply's killer (`M.replyArm`) and the wall's read (`M.strikeWallIn`). The one line no
+unit test reaches is `s.nextPhase` chaining its first phase's strikes (`first = now`), which
+needs the game's AI to decide; its ledger becomes the second phase's start through the tested
+`M.ledgerAfter`, and the Ch19 run plays it (207 lookahead wear calls an attempt). The PR #645
+re-review's fixes left the Ch19 games as they were (the same `acts_hash` on all three).
 
 **Not covered by it.** Nothing the phase plays strikes without its wear. `s.strike`, the one
 strike a fog or exposure read asks, plays no phase after it, so no use it spends is read again.
