@@ -247,8 +247,8 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- unit be sent to an 82% death to dodge another's second-phase 90% (ADR 0389, amended
 -- 2026-11-08; careful seed 3010 turn 18, replayed). Then the admitted order: fewer goals forfeited
 -- (the completion ledger's), the likelier win (only one likelier than not: M.GONE), more
--- progress. Allied greens' summed death chance breaks ties among the plans within a turn of the most progress judged (FR-012: only
--- there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
+-- progress. Allied greens' summed death chance breaks ties among the plans within a turn of
+-- the most progress judged (FR-012: only there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
 -- is short of the best's, comes first, then the greens. Measured from the best rather than
 -- between each two plans, it is an order a sort can keep: "within a turn of each other" is
 -- not one (0, 0.8 and 1.6 would each tie their neighbour). `behind` is set by M.plan once
