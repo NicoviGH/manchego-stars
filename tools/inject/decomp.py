@@ -241,8 +241,9 @@ def asset_table_names(text):
 # 6,361-file decomp, and the cap is what a sweep can pin in memory. Size it to the largest
 # real working set with room to spare: `difficulty.curve_report` reads 94 files since #510
 # step 8 (every twin chapter's event and interlude scripts for the kits, plus the world map),
-# and both vanilla routes' walks (#639) read 88 more; a set larger than the cap thrashes
-# (test_decomp_read_cache fails).
+# and both vanilla routes' walks (#639) read 88 more (103 distinct files between them, 3.3 MB
+# resident, measured with sys.getsizeof; `src/events_udefs.c` is 1.8 MB of it); a set larger than
+# the cap thrashes (test_decomp_read_cache fails).
 @functools.lru_cache(maxsize=256)
 def vanilla_decomp_text(relpath):
     """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
@@ -264,6 +265,12 @@ def vanilla_decomp_text(relpath):
     # GIT_DIR overrides the -C discovery -- so `show HEAD:...` resolves against the
     # superproject and fails (128). Bit us committing from a content/pipeline worktree,
     # whose submodule gitdir is separate from the superproject's.
+    if relpath.startswith('src/events/'):
+        # One batched read serves every event file (`vanilla_event_files`: 119 files in 76 ms,
+        # against ~24 ms a `git show` each), and the same str object comes back every time.
+        files = vanilla_event_files()
+        if relpath in files:
+            return files[relpath]
     env = git_env()
     return subprocess.check_output(['git', '-C', SUBMODULE, 'show', 'HEAD:' + relpath],
                                    encoding='utf-8', env=env)

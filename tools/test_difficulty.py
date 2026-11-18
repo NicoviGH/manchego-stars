@@ -1515,6 +1515,36 @@ class VanillaRoutes(unittest.TestCase):
         joins = {r.char: df.VANILLA_CHAIN[r.fields_from] for r in df.vanilla_recruits()}
         self.assertEqual('FE8 Ch8', joins['CHARACTER_FORDE'])
 
+    def test_an_ally_list_that_is_not_there_names_its_chapter(self):
+        with mock.patch.object(inject.decomp, 'vanilla_decomp_text', lambda rel: 'no list here'):
+            with self.assertRaisesRegex(ValueError, 'ch99-eventinfo'):
+                df.chapter_ally_udefs.__wrapped__('ch99')
+
+    def test_the_route_splits_at_ch9(self):
+        for route in ('eirika', 'ephraim'):
+            chain = df.route_chain(route)
+            self.assertEqual(10, df.route_split(chain))
+            self.assertEqual('FE8 Ch8', chain[9])
+            self.assertTrue(chain[10].startswith('CHAPTER_'))
+
+    def test_ch1_fields_four_though_its_ally_list_names_two(self):
+        """The list is Eirika and Seth; the turn event `Ch1_Turn_AllyReinforceArrive` loads
+        Franz and Gilliam. No other chapter of either route has such an arrival."""
+        self.assertEqual(2, df.vanilla_deploy_cap('FE8 Ch1'))
+        self.assertEqual(4, df.vanilla_field('FE8 Ch1'))
+        for route in ('eirika', 'ephraim'):
+            for ref in df.route_chain(route):
+                if ref != 'FE8 Ch1':
+                    self.assertEqual(df.vanilla_deploy_cap(ref), df.vanilla_field(ref), ref)
+
+    def test_a_suspect_says_only_what_was_searched(self):
+        found = df.scene_suspects('FE8 Ch1') + df.scene_suspects('CHAPTER_E_20')
+        self.assertTrue(found)
+        for _array, _script, why in found:
+            self.assertNotIn('elsewhere', why)
+        self.assertIn('a CLEE later in the same script',
+                      ' '.join(w for _a, _s, w in df.scene_suspects('CHAPTER_E_20')))
+
     def test_a_scene_that_fights_or_removes_a_kept_array_is_listed_for_a_reader(self):
         found = {(a, why.split('(')[0]) for a, _s, why in df.scene_suspects('FE8 Ch1')}
         self.assertIn(('UnitDef_Event_Ch1Enemy', 'FIGHT'), found)

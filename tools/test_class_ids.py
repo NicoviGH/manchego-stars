@@ -97,5 +97,23 @@ class EnumValues(unittest.TestCase):
         self.assertEqual(enum_values(text, 'US_'), {'US_HIDDEN': 1, 'US_UNDER_A_ROOF': 0x80})
 
 
+class ClassTokens(unittest.TestCase):
+    """`vanilla_class_for_token`: a UnitDefinition's `.classIndex`, by name or by number."""
+
+    def test_a_number_names_its_class_and_a_name_stays(self):
+        self.assertEqual('CLASS_EPHRAIM_MASTER_LORD', class_ids.vanilla_class_for_token('0x3'))
+        self.assertEqual('CLASS_FIGHTER', class_ids.vanilla_class_for_token('CLASS_FIGHTER'))
+
+    def test_an_unknown_id_raises(self):
+        with self.assertRaisesRegex(ValueError, '0x7777'):
+            class_ids.vanilla_class_for_token('0x7777')
+
+    def test_two_enumerators_sharing_an_id_raise(self):
+        with mock.patch.object(class_ids, 'vanilla_class_values',
+                               lambda: {'CLASS_A': 1, 'CLASS_B': 1}):
+            with self.assertRaisesRegex(ValueError, 'CLASS_A and CLASS_B'):
+                class_ids.vanilla_class_by_id.__wrapped__()
+
+
 if __name__ == '__main__':
     unittest.main()

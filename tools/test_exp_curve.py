@@ -12,6 +12,9 @@ says today.
 Run:  python3 tools/test_exp_curve.py
 """
 import collections
+import contextlib
+import inspect
+import io
 import os
 import sys
 import unittest
@@ -270,7 +273,7 @@ class Simulation(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.rows = ec.simulate('rime-of-the-frostmaiden')
+        cls.rows = ec._simulated('rime-of-the-frostmaiden')
 
     def test_a_fixed_roster_chapter_splits_its_exp_across_the_units_it_FIELDS(self):
         """ch00 has no deploy cap because it has no Pick Units -- it fields Hlin and
@@ -396,13 +399,13 @@ class Entering(unittest.TestCase):
     """`entering` is the party a chapter receives: the previous chapter's closing levels."""
 
     def test_the_first_chapter_receives_join_levels(self):
-        first = ec.simulate()[0]['chapter_number']
+        first = ec._simulated('rime-of-the-frostmaiden')[0]['chapter_number']
         party = ec.entering('rime-of-the-frostmaiden', first)['party']
         self.assertTrue(party)
         self.assertTrue(all(level == joined for joined, level in party.values()))
 
     def test_a_chapter_receives_the_previous_rows_levels_and_only_who_has_joined(self):
-        rows = ec.simulate()
+        rows = ec._simulated('rime-of-the-frostmaiden')
         prior, row = rows[-2], rows[-1]
         got = ec.entering('rime-of-the-frostmaiden', row['chapter_number'])
         joins = {uid: j for uid, _c, j, _l in ec.party_classes('rime-of-the-frostmaiden')}
@@ -536,7 +539,7 @@ class RouteBand(unittest.TestCase):
         party enters Ch8 as the VANILLA_CHAIN walk has it."""
         chain = d.route_chain('eirika')
         careers = ec._vanilla_careers(chain, slot_order=False)
-        rows = ec.walk_vanilla(chain, careers, ec.route_cap_of('rime-of-the-frostmaiden'))
+        rows = ec.walk_vanilla(chain, careers, ec.route_cap_of())
         old = ec.vanilla_arrivals('rime-of-the-frostmaiden')[8]
         entering = rows[chain.index('FE8 Ch8')]['entering']
         band = {'CHARACTER_EPHRAIM', 'CHARACTER_FORDE', 'CHARACTER_KYLE'}
@@ -547,7 +550,7 @@ class RouteBand(unittest.TestCase):
         chain = d.route_chain('eirika')
         i = chain.index('FE8 Ch5x')
         rows = ec.walk_vanilla(chain, ec._vanilla_careers(chain, slot_order=False),
-                               ec.route_cap_of('rime-of-the-frostmaiden'))
+                               ec.route_cap_of())
         before, after = rows[i]['entering'], rows[i + 1]['entering']
         self.assertEqual(before['CHARACTER_EIRIKA'], after['CHARACTER_EIRIKA'])
         self.assertEqual(before['CHARACTER_SETH'], after['CHARACTER_SETH'])
@@ -557,11 +560,13 @@ class RouteBand(unittest.TestCase):
         away = ec.route_away('eirika', eirika, d.vanilla_recruits(eirika, False))
         self.assertEqual({'CHARACTER_EPHRAIM', 'CHARACTER_FORDE', 'CHARACTER_KYLE'},
                          set(away(eirika.index('CHAPTER_E_9'))))
-        self.assertEqual(set(), set(away(eirika.index('CHAPTER_E_15'))))
+        self.assertEqual(3, len(away(eirika.index('CHAPTER_E_15'))))      # a cameo, not on the ally list
+        self.assertEqual(set(), set(away(eirika.index('CHAPTER_E_16'))))
         ephraim = d.route_chain('ephraim')
         away = ec.route_away('ephraim', ephraim, d.vanilla_recruits(ephraim, False))
         self.assertEqual({'CHARACTER_EIRIKA'}, set(away(ephraim.index('CHAPTER_I_12'))))
-        self.assertEqual(set(), set(away(ephraim.index('CHAPTER_I_15'))))
+        self.assertEqual({'CHARACTER_EIRIKA'}, set(away(ephraim.index('CHAPTER_I_15'))))
+        self.assertEqual(set(), set(away(ephraim.index('CHAPTER_I_16'))))
         self.assertEqual(set(), set(away(3)))
 
     def test_the_band_orders_low_typical_high_and_never_falls_for_one_lord(self):
@@ -589,7 +594,7 @@ class RouteBand(unittest.TestCase):
             chain = d.route_chain(route)
             with mock.patch.object(ec.Career, 'fight', spy):
                 ec.walk_vanilla(chain[:12], ec._vanilla_careers(chain, slot_order=False),
-                                ec.route_cap_of('rime-of-the-frostmaiden'))
+                                ec.route_cap_of())
             self.assertEqual({1}, {modes[i] for i in range(10)}, route)
             self.assertEqual({mode}, {modes[10], modes[11]}, route)
 
@@ -599,11 +604,56 @@ class RouteBand(unittest.TestCase):
         self.assertEqual(0, self.bands['ephraim']['CHAPTER_I_21X']['cap'])
 
     def test_promote_at_none_is_the_default_and_a_rule_raises_the_exp_level(self):
-        held = {r['ref']: r for r in ec.route_band('eirika', None)}
-        self.assertEqual(self.bands['eirika'], held)
+        self.assertIsNone(inspect.signature(ec.route_band).parameters['promote_at'].default)
         early = {r['ref']: r for r in ec.route_band('eirika', 10)}
         self.assertGreaterEqual(early['CHAPTER_E_21']['high'], 21)       # promoted: level + 20
-        self.assertLessEqual(held['CHAPTER_E_21']['high'], 20)
+        self.assertLessEqual(self.bands['eirika']['CHAPTER_E_21']['high'], 20)
+
+    def test_a_walk_that_stops_before_the_end_is_refused_not_read_past(self):
+        """`walk_vanilla` stops at a chapter `cap_of` has no field for and leaves that row
+        keyless; the band must say which chapter, not die on a KeyError."""
+        with mock.patch.object(ec, 'route_cap_of',
+                               lambda: lambda ref: None if ref == 'CHAPTER_E_9' else 5):
+            with self.assertRaisesRegex(ValueError, 'CHAPTER_E_9'):
+                ec.route_band.__wrapped__('eirika')
+
+    def test_a_recruit_that_joins_above_promote_at_is_promoted_though_it_earns_nothing(self):
+        """Gerik joins L10. With every field 0 nobody earns, yet the seal is spent on him the
+        chapter he is on the field."""
+        chain = d.route_chain('eirika')
+        careers = ec._vanilla_careers(chain, 1.0, 10, False)
+        rows = ec.walk_vanilla(chain, careers, lambda ref: 0)
+        gerik = 'CHARACTER_GERIK'
+        joined = next(c.joins for c in careers if c.name == gerik)
+        self.assertEqual(10, rows[joined - 1]['entering'][gerik])
+        self.assertEqual(21, rows[joined]['after'][gerik])             # CLASS_HERO L1: 1 + 20
+
+    def test_the_vanilla_field_is_the_hosted_cap_wherever_a_chapter_is_hosted(self):
+        """The band's own field (vanilla's) and the parity's (the hosted cap) are one number
+        on every chapter both name: the shared road's old walk is unchanged by the switch."""
+        for ref, cap in ec.hosted_caps('rime-of-the-frostmaiden').items():
+            self.assertEqual(cap, d.vanilla_field(ref), ref)
+
+
+class BodyClasses(unittest.TestCase):
+    def test_an_unknown_class_id_names_the_chapter_and_unit(self):
+        unit = {'charIndex': '0xae', 'classIndex': '0x7777', 'level': 5}
+        with mock.patch.object(d, 'vanilla_red_units', lambda ref, derive=False: [unit]):
+            with self.assertRaisesRegex(ValueError, 'CHAPTER_E_21.*0xae.*0x7777'):
+                ec.vanilla_bodies.__wrapped__('CHAPTER_E_21', True)
+
+    def test_ch21s_numbered_bodies_are_ephraims_master_lord(self):
+        classes = {b.class_enum for b in ec.vanilla_bodies('CHAPTER_E_21', True)}
+        self.assertIn('CLASS_EPHRAIM_MASTER_LORD', classes)
+
+
+class RouteCli(unittest.TestCase):
+    def test_promote_at_without_a_route_is_refused(self):
+        with mock.patch.object(sys, 'argv', ['exp_curve.py', '--promote-at', '10']):
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    ec.main()
+        self.assertEqual(2, raised.exception.code)
 
 
 class GeneratedBlock(unittest.TestCase):
@@ -622,7 +672,7 @@ class GeneratedBlock(unittest.TestCase):
         """Every hosted chapter has a curated `parity_reference` today. The next one may
         land before its twin is curated, and the failure then must be a row that says so --
         not a TypeError out of the renderer that takes the whole test module with it."""
-        rows = [dict(r) for r in ec.simulate()]
+        rows = [dict(r) for r in ec._simulated('rime-of-the-frostmaiden')]
         rows[-1].update(reference='FE8 Ch7', twin_bodies=None, twin_pot=None,
                         yield_ratio=None, twin_level_after=None)
         self.assertIn('--', ec.render(rows))

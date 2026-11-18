@@ -42,27 +42,35 @@ Kyle and a guest, Orson) names only characters who join in it, so it is a fixed-
 a route chain Ephraim's band therefore joins in Ch5x at the levels its own load places them
 (4, 6, 5), where `VANILLA_CHAIN` has them join in Ch8 at the same levels.
 
-**The deploy cap is the length of the chapter's `playerUnitsInNormal` list**
-(`GetChapterAllyUnitCount`, eventscr3.c:432, which `prepscreen.c` reads), counted to the first entry
-with no charIndex. A run reads fewer where it owns fewer units: the bot's lap read 9 for Ephraim's
-Ch9, where the list is 11, and 17 for Eirika's Ch20, where it is 18; its Eirika Ch17 and Ephraim
-Ch14 read 12, the list's length. Where a hosted chapter names the twin, the walk keeps our
-cap (the cap is the parity): that is Ch1, where the list is 2 (Eirika, Seth) and the scene
-stands Franz and Gilliam beside them, which our 4 counts.
+**The field is vanilla's own, for the whole walk** (`difficulty.vanilla_field`, what the walk splits
+exp across; `vanilla_arrivals` and `simulate` keep the hosted caps, so the parity reads do not move).
+It is the length of the chapter's `playerUnitsInNormal` list (`GetChapterAllyUnitCount`,
+eventscr3.c:432, which `prepscreen.c` reads), counted to the first entry with no charIndex, plus the
+armed BLUE playable units its turn events bring in that the list does not name. Only Ch1 has any:
+its list is Eirika and Seth, and `EventScr_Ch1_Turn_AllyReinforceArrive` loads Franz and Gilliam,
+so four fight. The two readings agree on every chapter a hosted chapter names (a test). Checked
+against the bot's own vanilla laps (`team.cap` in each trace's start line, 23 chapter indexes with
+data): 22 read the list's length exactly, across Ch4-Ch19 on both routes and Ch11 on both; Eirika's
+Ch20 reads 17 where the list is 18 and the team owned 17 units (`min(list, owned)`). Ephraim's Ch9
+reads 11 in 41 runs. (An earlier note that it read 9 was Ch8's 9, recorded under route 2.) The
+store has no start data for the Prologue, Ch1-Ch3, Ch5x or Ch21 on, so those rest on the lists.
 
 **Kill exp from Ch9 on.** `GetUnitKillExpBonus`'s other branch (`chapterModeIndex != 1`: target
 power + 20 - actor power, no halving) applies to every route chapter; `ch8-eventscript.h` writes
 mode 2 or 3 at the split. A gorgon egg pays 50 and the Demon King 0 (`ModifyUnitSpecialExp`),
 both on the routes (Ch18, Ch21x).
 
-**Away units.** From the split until the first chapter that stands the other lord up armed and
-BLUE (Ch15 on both routes), the other lord's band is off the field and earns nothing: Eirika on
-Ephraim's route, Ephraim, Forde and Kyle on Eirika's. Seth, Franz and the rest are on both
+**Away units.** From the split until the first chapter whose ally list names the other lord (Ch16
+on both routes; the lords meet in Ch15 as a cameo load that is not deployable), the other lord's
+band is off the field and earns nothing: Eirika on Ephraim's route, Ephraim, Forde and Kyle on
+Eirika's. Seth, Franz and the rest are on both
 routes' ally lists (ch9a, ch9b).
 
 **The band is read over the lord**, not the founding pair: Seth is a promoted Paladin from the
 Prologue, so a mean over him and Eirika (L1 and 21) is a level no unit has. The lord is Eirika
-to the split and the route's own from it; the step at the split is the change of lord.
+to the split and the route's own from it; the step at the split is the change of lord. This is a
+different reading from `simulate`'s founding-careers band (Manchego Stars' own unpromoted party);
+the two measure different things and are not meant to agree.
 
 **Recruits.** `vanilla_recruits(chain, slot_order=True)` walks any chain. Both routes' Ch10 recruit
 orders are the player's (Eirika's Gerik and Tethys talk to each other; Ephraim's Duessel and
@@ -75,4 +83,13 @@ the default until Part A's laps decide). A unit promotes after the chapter in wh
 (ApplyUnitPromotion: level 1, exp 0, in `class_promotion`'s class) and is compared at its exp
 level (`GetUnitExpLevel`: level + 20). Units with no single `.promotion` hold: the trainees, the
 Monk (its Guiding Ring target is in `data_itemuse.c`, not the class), and Myrrh, whose
-`.promotion` is not a promoted class. This is a model limit, not the game's rule.
+`.promotion` is not a promoted class. This is a model limit, not the game's rule: those units stay
+at level 20 whatever `promote_at` is. A recruit that joins at `promote_at` or above is promoted the
+chapter it is on the field, whether or not it earns anything in it.
+
+**Known undercount: repeated reinforcement arrays.** An array a counter loop reloads is counted
+once. Ch21's three RED bodies of class 0x3 (Ephraim Master Lord, L5, `UnitDef_088C1CE0` /
+`088CB524`) are fought, not a scene: `EventScr_089F9448` (ch21a-eventscript.h:194) loads them with
+`EventScr_LoadReinforce` inside a `COUNTER_DEC(0x2)` loop that `COUNTER_SET(0x2, 10)` starts at ten,
+so up to thirty bodies arrive where the walk counts three. The class is named through
+`inject.class_ids.vanilla_class_for_token`, which raises on an unknown or ambiguous id.

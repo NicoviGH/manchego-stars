@@ -59,6 +59,30 @@ def vanilla_class_values():
 
 
 @functools.lru_cache(maxsize=None)
+def vanilla_class_by_id():
+    """{id: CLASS_X}, the inverse of `vanilla_class_values`. Raises when two enumerators share
+    an id, because a reader that names a class by number could not say which."""
+    out = {}
+    for name, value in vanilla_class_values().items():
+        if value in out:
+            raise ValueError('classes.h gives id 0x%X to both %s and %s' % (value, out[value], name))
+        out[value] = name
+    return out
+
+
+def vanilla_class_for_token(token):
+    """A UnitDefinition `.classIndex` token as a CLASS_X name: a name stays, a number (Ch21
+    places three bodies as 0x3) is looked up. Raises ValueError on an id no vanilla class has;
+    the caller adds the chapter and unit it was reading."""
+    if str(token).startswith('CLASS_'):
+        return token
+    try:
+        return vanilla_class_by_id()[int(token, 0)]
+    except (KeyError, ValueError):
+        raise ValueError('class token %r is neither a CLASS_ name nor a vanilla class id' % (token,))
+
+
+@functools.lru_cache(maxsize=None)
 def slayer_classes():
     """The classes `IsUnitEffectiveAgainst` (bmitem.c) makes x3 against the Monsters list. It
     switches on raw class ids (0x2B, 0x2C), named here through include/constants/classes.h."""

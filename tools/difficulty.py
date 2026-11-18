@@ -1196,7 +1196,11 @@ def _vanilla_internal_name(parity_ref):
 
 
 def _vanilla_chapter_index(parity_ref):
-    """The chapter_settings index of the vanilla chapter `parity_ref` names, else None."""
+    """The chapter_settings index of the vanilla chapter `parity_ref` names, else None.
+
+    Resolves by `internalName`, which reads `FE8 Ch13` as Ch14 (the separate issue on the
+    route chapters' names). `ref_index` is the reader that is right (chapters.h); two survive
+    only because the parity reads must not move until that issue switches them to it."""
     name = _vanilla_internal_name(parity_ref)
     chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
     names = [c.get('internalName') for c in chapters['chapters']]
@@ -1425,6 +1429,12 @@ def route_chain(route):
     return tuple(sorted(rows, key=rows.get)) + tuple(own)
 
 
+def route_split(chain):
+    """The index in `chain` (a `route_chain`) of the first chapter of the route proper, Ch9:
+    the chain's first CHAPTER_* constant. The chapters before it are shared."""
+    return next(i for i, ref in enumerate(chain) if ref.startswith('CHAPTER_'))
+
+
 def ref_index(ref):
     """The chapter index of a chain ref: a shared-route twin name or a CHAPTER_* constant."""
     rows = inject.chapter_settings.twin_rows()
@@ -1477,13 +1487,32 @@ def chapter_ally_udefs(stem):
     """A chapter's `.playerUnitsInNormal` list as `GetChapterAllyUnitCount` (eventscr3.c) reads
     it: the entries up to the first with no charIndex. Memoised; the list is shared."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-    name = re.search(r'\.playerUnitsInNormal\s*=\s*(\w+)', info).group(1)
+    m = re.search(r'\.playerUnitsInNormal\s*=\s*(\w+)', info)
+    if m is None:
+        raise ValueError('%s-eventinfo.h has no .playerUnitsInNormal, so the chapter has no '
+                         'ally list to count' % stem)
+    name = m.group(1)
     out = []
     for u in vanilla_udefs_named(stem, name):
         if not u['charIndex'] or _character_number(u['charIndex']) == 0:
             break
         out.append(u)
     return out
+
+
+def vanilla_field(ref):
+    """How many player units FIGHT `ref`: its `vanilla_deploy_cap`, plus the armed BLUE playable
+    units its turn events bring in that the ally list does not name. Only Ch1 has any: Eirika
+    and Seth are its list, and `EventScr_Ch1_Turn_AllyReinforceArrive` loads Franz and Gilliam,
+    so four fight where the prep screen would say two."""
+    stem = ref_stem(ref)
+    listed = {u['charIndex'] for u in chapter_ally_udefs(stem)}
+    turns = {a for n, a, _s in _load_sites(stem) if '_Turn_' in n}
+    arrivals = {u['charIndex'] for n, u in _chapter_udef_pairs(stem)
+                if n in turns and u['allegiance'] == 'FACTION_ID_BLUE' and u['items']
+                and _character_number(u['charIndex'] or '0') in PLAYABLE_PIDS
+                and u['charIndex'] not in listed}
+    return len(chapter_ally_udefs(stem)) + len(arrivals)
 
 
 def vanilla_deploy_cap(ref):
@@ -1495,10 +1524,11 @@ def vanilla_deploy_cap(ref):
 
 def scene_suspects(ref):
     """[(array, script, why)] for the armed RED arrays `ref` KEEPS (the ones `_vanilla_red_defs`
-    walks, derived or curated) that a script also fights or removes: a FIGHT after the load in
-    the same script, a DISA of one of the array's named units, or a CLEE after the load while the
-    array is loaded live elsewhere. The loads a reader should check by hand: the rule neither
-    drops them nor can vouch for them."""
+    walks, derived or curated) that a script loads and then, later in the same script, runs a
+    FIGHT, a DISA of one of the array's named units, or a CLEE. The text after the load is
+    searched; it is not shown that the FIGHT involves the array's units (a FIGHT between two
+    other units reads the same), nor that a CLEE removes this array. A reader checks each by
+    hand: the rule neither drops these loads nor can vouch for them."""
     stem = ref_stem(ref)
     kept = {a for a, _i, _d in _vanilla_red_defs(ref, derive=True)}
     named = {a: {u['charIndex'] for u in vanilla_udefs_named(stem, a)
@@ -1515,7 +1545,7 @@ def scene_suspects(ref):
             why += [('removes %s' % c) for c in sorted(named[array])
                     if re.search(r'DISA\w*\(\s*%s\b' % c, after)]
             if re.search(r'^\s*CLEE\b', after, re.M):
-                why.append('CLEE after the load (array also loaded live elsewhere)')
+                why.append('a CLEE later in the same script')
             if why:
                 out.append((array, script, '; '.join(why)))
     return list(dict.fromkeys(out))

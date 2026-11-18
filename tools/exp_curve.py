@@ -31,6 +31,7 @@ Stat GROWTH is not modelled HERE: a level is this module's answer. `difficulty.g
 level into the median stat line for the absolute readings (ADR 0310).
 """
 import argparse
+import collections
 import dataclasses
 import functools
 import os
@@ -273,15 +274,6 @@ def chapter_bodies(chap):
     return out
 
 
-def _class_enum(token):
-    """A UnitDefinition's `.classIndex` as a CLASS_* name: Ch21 places three bodies by number
-    (0x3, Ephraim's Master Lord class) where the decomp has no name for the slot."""
-    if token.startswith('CLASS_'):
-        return token
-    names = {v: k for k, v in inject.class_ids.vanilla_class_values().items()}
-    return names[int(token, 0)]
-
-
 @functools.lru_cache(maxsize=None)
 def vanilla_bodies(parity_ref, derive=False):
     """Every RED body the twin fields, as Fighters. None when the reference is uncurated
@@ -290,9 +282,15 @@ def vanilla_bodies(parity_ref, derive=False):
     units = d.vanilla_red_units(parity_ref, derive)
     if units is None:
         return None
-    return [Fighter(u['charIndex'] or u['classIndex'], _class_enum(u['classIndex']), u['level'],
-                    'CA_BOSS' in character_attributes(u['charIndex']))
-            for u in units]
+    out = []
+    for u in units:
+        try:
+            cls = inject.class_ids.vanilla_class_for_token(u['classIndex'])
+        except ValueError as e:
+            raise ValueError('%s, unit %s: %s' % (parity_ref, u['charIndex'], e))
+        out.append(Fighter(u['charIndex'] or u['classIndex'], cls, u['level'],
+                           'CA_BOSS' in character_attributes(u['charIndex'])))
+    return out
 
 
 _UNSET = object()
@@ -329,6 +327,7 @@ def join_level(campaign, uid, unit=None, recruited=_UNSET):
     return int((unit.get('fe_stats') or {}).get('level') or 1)
 
 
+@functools.lru_cache(maxsize=None)
 def party_classes(campaign):
     """(uid, class enum, first chapter number this unit can earn in, join level) for the cast
     whose levels this band describes.
@@ -415,7 +414,8 @@ class Career:
         chapter and modelling that would be a precision the rest of the model does not have
         (nothing here knows which body dies to whom, or in what order)."""
         me = self.fighter
-        return sum(battle_exp_gain(me, body, mode) for body in bodies)
+        return sum(battle_exp_gain(me, body, mode) * n
+                   for body, n in collections.Counter(bodies).items())
 
     def fight(self, bodies, deploy_cap, chapter_number=None, mode=d.CHAPTER_MODE_COMMON):
         if chapter_number is not None and chapter_number < self.joins:
@@ -679,6 +679,9 @@ def walk_vanilla(chain, careers, cap_of, away_of=lambda index: ()):
             break
         bodies = vanilla_bodies(ref, derive=True)
         away = set(away_of(index))
+        for career in careers:
+            if career.joins <= index and career.name not in away:
+                career.promote()          # a recruit that joins at `promote_at` or above
         roster = _roster_chapter(ref, careers, index)
         for career in careers:
             if cap and career.name not in away and (roster is None or career.name in roster):
@@ -704,13 +707,12 @@ def vanilla_arrivals(campaign):
     return {r['index']: r['entering'] for r in rows}
 
 
-def route_cap_of(campaign):
-    """`cap_of` for a route walk: Manchego Stars' where a hosted chapter names the twin (the cap is the
-    parity), vanilla's own `playerUnitsInNormal` length everywhere else. Ch1 is where they part:
-    the list holds Eirika and Seth, and the chapter's scene stands Franz and Gilliam up beside
-    them, which our cap of 4 counts."""
-    hosted = hosted_caps(campaign)
-    return lambda ref: hosted[ref] if ref in hosted else d.vanilla_deploy_cap(ref)
+def route_cap_of():
+    """`cap_of` for a route walk: vanilla's own field for every chapter, the shared road
+    included (`difficulty.vanilla_field`: the `playerUnitsInNormal` length, and Ch1's two turn-
+    event arrivals). The band is a vanilla band, so no hosted Manchego Stars cap enters it;
+    `vanilla_arrivals` keeps those, as the parity reads need."""
+    return d.vanilla_field
 
 
 ROUTE_LORD = {'eirika': 'CHARACTER_EIRIKA', 'ephraim': 'CHARACTER_EPHRAIM'}
@@ -720,43 +722,50 @@ def route_away(route, chain, recruits):
     """`away_of` for `route`: who is NOT on the field from the route split until the lords
     reunite. The other lord's band is away: Eirika alone on Ephraim's route, and on Eirika's the
     units that first field in Ch5x (Ephraim, Forde, Kyle). They return in the first chapter that
-    stands the other lord up armed and BLUE (Ch15 on both routes today), and the walk does not
-    take them back in earlier: it holds their levels meanwhile. Seth, Franz and the rest of
+    names the other lord on its ally list (`chapter_ally_udefs`, the units the player may
+    deploy; Ch16 on both routes: the lords meet in Ch15 as a cameo load, not a deployable unit), and the walk does not take them back in earlier: it holds
+    their levels meanwhile. A cameo load does not move it. Seth, Franz and the rest of
     the army are on both routes' ally lists (ch9a/ch9b), so they fight throughout."""
-    split = next(i for i, ref in enumerate(chain) if ref.startswith('CHAPTER_'))
+    split = d.route_split(chain)
     other = 'ephraim' if route == 'eirika' else 'eirika'
     band = ({r.char for r in recruits if chain[r.fields_from] == 'FE8 Ch5x'}
             if other == 'ephraim' else {ROUTE_LORD['eirika']})
     reunion = next((i for i in range(split, len(chain))
-                    if any(u['charIndex'] == ROUTE_LORD[other] and u['items']
-                           and u['allegiance'] == 'FACTION_ID_BLUE'
-                           for _a, u in d._chapter_udef_pairs(d.ref_stem(chain[i])))), len(chain))
+                    if ROUTE_LORD[other] in {u['charIndex']
+                                             for u in d.chapter_ally_udefs(d.ref_stem(chain[i]))}),
+                   len(chain))
     return lambda index: band if split <= index < reunion else frozenset()
 
 
 @functools.lru_cache(maxsize=None)
-def route_band(route, promote_at=None, campaign='rime-of-the-frostmaiden'):
+def route_band(route, promote_at=None):
     """The vanilla party-level band along one route to the game's end: a row per chain chapter
     that has a field, with the chapter's index, title, deploy cap, enemy bodies and the exp level
     (GetUnitExpLevel) of the army's LORD after it, as low / typical / high: a lord taking half,
     one and twice the even share of each chapter's exp, the three shares `simulate` runs. The
     lord is Eirika to the route split and the route's own lord from it (Ephraim joins in Ch5x
     and fights from there). Not the founding pair: Seth is a promoted Paladin from the
-    Prologue, so a mean over him and Eirika is a number no unit has. `lowest_recruit` is the
-    lowest exp level among the recruits on the field. The cap is Manchego Stars' where a hosted chapter
-    names the twin (the parity) and vanilla's own `playerUnitsInNormal` length elsewhere.
-    `promote_at` (10, 20 or None = hold at LEVEL_CAP) is every career's promotion rule, #639
-    Part A's open question. Memoised; the rows are shared, do not mutate them."""
+    Prologue, so a mean over him and Eirika is a number no unit has. This is a different reading
+    from `simulate`'s founding-careers band, which measures Manchego Stars' own party, and the
+    two are not meant to agree. `lowest_recruit` is the lowest exp level among the recruits on
+    the field. The cap is vanilla's own field (`route_cap_of`). `promote_at` (10, 20 or None =
+    hold at LEVEL_CAP) is every career's promotion rule, #639 Part A's open question; the
+    trainees, the Monk and Myrrh hold at 20 whatever it is (`Career.promote`: a model limit).
+    Memoised, so call it as `route_band(route)` or `route_band(route, promote_at)` the same way
+    each time; the rows are shared, do not mutate them."""
     chain = d.route_chain(route)
     recruits = d.vanilla_recruits(chain, slot_order=False)
     away_of = route_away(route, chain, recruits)
-    split = next(i for i, ref in enumerate(chain) if ref.startswith('CHAPTER_'))
-    cap_of = route_cap_of(campaign)
+    split = d.route_split(chain)
+    cap_of = route_cap_of()
     walks = {share: walk_vanilla(chain, _vanilla_careers(chain, share, promote_at, False),
                                  cap_of, away_of)
              for share in (SHARE_TAIL, 1.0, SHARE_LEAD)}
     out = []
     for tail, mid, lead in zip(walks[SHARE_TAIL], walks[1.0], walks[SHARE_LEAD]):
+        if 'cap' not in mid:
+            raise ValueError('the %s route walk stopped at %s: cap_of gave it no field'
+                             % (route, mid['ref']))
         away = set(away_of(mid['index']))
         lord = ROUTE_LORD['eirika' if mid['index'] < split else route]
         recruit_lv = [mid['after'][r.char] for r in recruits
@@ -960,8 +969,10 @@ def main():
                     help='rewrite the generated party-level block in %s'
                          % os.path.relpath(PACING_DOC, REPO))
     args = ap.parse_args()
+    if args.promote_at is not None and not args.route:
+        ap.error('--promote-at needs --route')
     if args.route:
-        print_route(args.route, route_band(args.route, args.promote_at, args.campaign))
+        print_route(args.route, route_band(args.route, args.promote_at))
         return
     rows = simulate(args.campaign)
     print_table(rows)
