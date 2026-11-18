@@ -180,7 +180,8 @@
 -- Bot.supply(party, convoy, benched) -> acts: before the shop, what the roster (benched units
 --   too) gives the convoy because it cannot use it this chapter, and the weapons the fielded
 --   units take from it. Bot.uses(party, convoy, style) -> acts: after the shop, the
---   seals and boosters they take and use. Their docstrings have the rules.
+--   seals and boosters they take and use; style.sealAt is the level a seal is used at (#639).
+--   Their docstrings have the rules.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
 -- Bot.fullBag(held, new, convoyFull) -> slot, why: a unit given an item with no room (FE8's
 --   chooser, convoymenu.c) sends one item to the convoy -- or discards it when the convoy is
@@ -3097,15 +3098,15 @@ function M.supply(party, convoy, benched)
     return L.acts
 end
 
--- Bot.uses(party, convoy, style) -> acts, after the shop (the same shapes as Bot.supply's): the seals
--- and boosters the fielded units use, each taken from the convoy first when not in the bag.
+-- Bot.uses(party, convoy, style) -> acts, after the shop (the same shapes as Bot.supply's): the
+-- seals and boosters the fielded units use, each taken from the convoy first when not in the bag.
 --   3. A seal for each fielded unit the game says one promotes, the highest level first (ties
 --      by party order). One use a unit a chapter, since each costs the unit its first turn
 --      (api.use is the Item command); what a promotion opens (a stat whose cap rose) is asked
 --      of the game again at the next chapter's start, from the unit's new class. A unit below
---      style.sealAt (nil: none, so the game's own L10 floor) is skipped and its seal stays in the bag or
---      convoy (#639: the L10-or-L20 promotion comparison; cannotUseNow keeps a seal the game
---      says promotes the holder, so nothing sells or gives it away meanwhile).
+--      style.sealAt (nil: none, so the game's own L10 floor) is skipped and its seal stays in
+--      the bag or convoy (#639: the L10-or-L20 promotion comparison; cannotUseNow keeps a
+--      seal the game says promotes the holder, so nothing sells or gives it away meanwhile).
 --   4. A booster for each fielded unit left that the game says gains from one: the units the
 --      game forces onto the map first (the lord), then the lowest level (ties by party order).
 -- Its own first, else the convoy's (a full bag gives first what Bot.fullBag would send).

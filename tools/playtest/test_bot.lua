@@ -2078,6 +2078,8 @@ do
     -- since the game says it promotes the holder.
     local ownSeal = armedUnit(6, 12, { items = { lance(), item(0x64, nil, { promotes = true, use = "seal" }) } })
     local convoySeal = item(0x65, { [7] = { promotes = true } })
+    -- nil is "no floor of ours": the game's own L10 check decides. The suites' fake units sit
+    -- under L10 with seals the fake game says promote them, so a literal 10 would skip them.
     check(acts(B.uses({ ownSeal }, {})), "use 6:64", "sealAt nil: a L12 unit uses its seal")
     check(acts(B.uses({ ownSeal }, {}, { sealAt = 10 })), "use 6:64", "sealAt 10: a L12 unit uses its seal")
     check(acts(B.uses({ ownSeal }, {}, { sealAt = 20 })), "", "sealAt 20: a L12 unit keeps its seal")
@@ -2282,6 +2284,16 @@ do
           "bag: a usable booster is kept, the beaten lance goes")
     check(F({ lance(1), heal(), key, { kind = "other", use = "seal" }, lance(2) }, lance(4)), 4,
           "bag: a seal it cannot use still goes first")
+    -- #639: at sealAt 20 a seal is held for many chapters, so a held seal the game says
+    -- promotes its holder is never what leaves, convoy full or not: the new key goes instead
+    -- (0) and a beaten lance leaves before it
+    local held = { lance(1, { maxRange = 2 }), { kind = "other", use = "seal", promotes = true }, heal(),
+                   lance(3, { effective = "armour" }), lance(3) }
+    check(F(held, key), 0, "bag: a held seal that promotes stays, the new key goes (convoy not full)")
+    check(F(held, key, true), 0, "bag: a held seal that promotes stays, the new key goes (convoy full)")
+    local withBeaten = { lance(1), { kind = "other", use = "seal", promotes = true }, heal(), key, lance(2) }
+    check(F(withBeaten, lance(4)), 1, "bag: the beaten lance leaves, not the held seal (convoy not full)")
+    check(F(withBeaten, lance(4), true), 1, "bag: the beaten lance leaves, not the held seal (convoy full)")
     -- an item that is neither a seal nor a booster (Pure Water) is never sent as one; the
     -- beaten lance goes instead (review of #626: the test asked only `kind == "other"`)
     check(F({ lance(1), heal(), key, { kind = "other", id = 0x6E }, lance(2) }, lance(4)), 1,

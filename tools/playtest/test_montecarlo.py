@@ -1484,6 +1484,27 @@ class Suite(unittest.TestCase):
             mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'sa3', vanilla=True, seal_at=15)
         self.assertFalse(os.path.exists(os.path.join(store, 'states', 'sa3-cs-s4001')))
 
+    def test_resume_seal_at_marks_the_campaign_and_a_later_resume_inherits_it(self):
+        """A `--seal-at 20` lap's states folder is marked with its level (#639): a later resume
+        of it without the flag plays 20 again, the same flag is fine, a different level is
+        refused before any copy, and an unmarked campaign stays unmarked without the flag."""
+        store, pins = self.resume_store()
+        mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'm1', vanilla=True, seal_at=20)
+        folder = os.path.join(store, 'states', 'm1-cs-s4001')
+        self.assertEqual(mc.marked_seal_at(folder), 20)
+        self.assertIsNone(mc.marked_seal_at(os.path.join(store, 'states', 'cs-s4001')))
+        inherit = mc.resume_tasks(store, {}, ['m1-cs-s4001'], {}, 'm2', vanilla=True)
+        self.assertEqual(inherit[0]['campaign']['sealAt'], 20)
+        self.assertEqual(mc.marked_seal_at(os.path.join(store, 'states', 'm2-m1-cs-s4001')), 20)
+        same = mc.resume_tasks(store, {}, ['m1-cs-s4001'], {}, 'm3', vanilla=True, seal_at=20)
+        self.assertEqual(same[0]['campaign']['sealAt'], 20)
+        with self.assertRaisesRegex(ValueError, r'was played with --seal-at 20'):
+            mc.resume_tasks(store, {}, ['m1-cs-s4001'], {}, 'm4', vanilla=True, seal_at=10)
+        self.assertFalse(os.path.exists(os.path.join(store, 'states', 'm4-m1-cs-s4001')))
+        plain = mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'm5', vanilla=True)
+        self.assertNotIn('sealAt', plain[0]['campaign'])
+        self.assertFalse(os.path.exists(os.path.join(store, 'states', 'm5-cs-s4001', mc.SEAL_AT_MARK)))
+
     def test_resume_scout_and_route_reach_the_campaign_env(self):
         """`resume --scout --route 2` (the scout lap, #510 comment 6872554917): each task's env
         carries `scout` and `route` (harness.lua's cfg), the route in place of the env's; neither

@@ -2788,6 +2788,18 @@ def max_attempts(path=os.path.join(HERE, 'campaign.lua')):
 
 # the file a scout lap's states folder holds, so its starts are never carried on as clean ones
 SCOUT_MARK = 'SCOUT'
+# the file a `--seal-at` lap's states folder holds (#639): the level it promoted at, so a later
+# resume of it plays the same policy on the party it built, never silently policy 10
+SEAL_AT_MARK = 'SEALAT'
+
+
+def marked_seal_at(folder):
+    """The promotion level a campaign's states folder is marked with (SEAL_AT_MARK), or None."""
+    try:
+        with open(os.path.join(folder, SEAL_AT_MARK)) as fh:
+            return int(fh.read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return None
 
 
 def stale_start(bots, instrument):
@@ -2835,7 +2847,9 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     scout lap, campaign.lua M.SCOUT_PATIENCE); `route` (1 Eirika, 2 Ephraim) is the branch it
     takes at vanilla's Ch8 split, in place of the env's; `seal_at` (10 or 20, #639) is the level
     the bot uses a promotion item at (bot.lua Bot.uses; unset plays 10), written into each run's
-    style so every record says which policy it played. Each task runs under `instrument`
+    style (campaign.lua stamps 10 when unset) so every record says which policy it played. A
+    campaign a `seal_at` lap made is marked (SEAL_AT_MARK): resuming it without `seal_at`
+    inherits the level, a different one is refused. Each task runs under `instrument`
     (instrument_id() unless given); its records say whether their start was stale (records_of).
     """
     if route is not None and not vanilla:
@@ -2865,14 +2879,19 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
         if seed is None:
             raise ValueError('%s: no pin and no -s<seed> in its id, so its seed is unknown' % name)
         new = '%s-%s' % (tag, name)
+        marked = marked_seal_at(src)
+        if marked is not None and seal_at is not None and seal_at != marked:
+            raise ValueError('%s was played with --seal-at %d, so --seal-at %d would play a party '
+                             'built under one policy with another' % (name, marked, seal_at))
+        level = seal_at if seal_at is not None else marked
         if not scout and os.path.exists(os.path.join(src, SCOUT_MARK)):
             raise ValueError('%s is a scout lap (ADR 0409): its party is not a clean one\'s, so '
                              'it is carried on only with --scout' % name)
         if os.path.exists(os.path.join(store, 'states', new)):
             raise ValueError('%s already exists: pick another --tag' % new)
-        plan.append((name, new, at, seed))
+        plan.append((name, new, at, seed, level))
     tasks, copied = [], []
-    for name, new, at, seed in plan:
+    for name, new, at, seed, level in plan:
         try:
             shutil.copytree(os.path.join(store, 'states', name), os.path.join(store, 'states', new))
         except OSError:
@@ -2893,8 +2912,10 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['scout'] = True
         if route is not None:
             camp['route'] = route
-        if seal_at is not None:
-            camp['sealAt'] = seal_at
+        if level is not None:
+            camp['sealAt'] = level
+            with open(os.path.join(store, 'states', new, SEAL_AT_MARK), 'w') as fh:
+                fh.write('%d\n' % level)
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'instrument': instrument,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
@@ -4009,7 +4030,9 @@ def main(argv=None):
                          '(default: the suite\'s)')
     ru.add_argument('--seal-at', type=int, dest='seal_at',
                     help='the level the bot uses a promotion item at, 10 or 20 (default 10, the '
-                         'game\'s own floor; #639); each record\'s style says sealAt')
+                         'game\'s own floor; #639); each record\'s style says sealAt. Unlike --route '
+                         '(vanilla\'s Ch8 split) both games have promotion items; a campaign a '
+                         '--seal-at lap made keeps its level on a later resume')
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,

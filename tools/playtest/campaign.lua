@@ -161,14 +161,13 @@ local function pick(random, list) return list[math.floor(random() * #list) + 1] 
 
 -- A style for one attempt, never one already tried since `tried` was last emptied: the aggression
 -- uniform over Bot.STYLES, each claim the bot can play followed with p = 0.5, the campaign's
--- route and its promotion level (sealAt, #639: nil is 10; every record's style says which policy
--- it played). A claim Bot.unplayed names plays the same followed or not, so it is no part of a style
--- (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is the keys drawn so
--- far. Returns the style and the claims followed, or nil when every style has been tried (the
+-- route. A claim Bot.unplayed names plays the same followed or not, so it is no part of a
+-- style (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is the keys
+-- drawn so far. Returns the style and the claims followed, or nil when every style has been tried (the
 -- loop then empties `tried` and draws again; one attempt alone says no_style).
 local function styleKey(aggression, ids) return aggression .. "|" .. table.concat(ids, ",") end
 
-function M.drawStyle(Bot, random, claims, route, tried, sealAt)
+function M.drawStyle(Bot, random, claims, route, tried)
     local unplayed, playable = {}, {}
     for _, id in ipairs(Bot.unplayed(claims)) do unplayed[id] = true end
     for _, c in ipairs(claims) do
@@ -190,7 +189,7 @@ function M.drawStyle(Bot, random, claims, route, tried, sealAt)
         local key = styleKey(aggression, ids)
         if not tried[key] then
             tried[key] = true
-            return { aggression = aggression, claims = ids, route = route, sealAt = sealAt }, followed
+            return { aggression = aggression, claims = ids, route = route }, followed
         end
     end
 end
@@ -454,12 +453,21 @@ function M.run(api)
                                                             classId = classId }
                 end
             end
+            -- #639: the promotion level is stamped on every style drawn, here and nowhere else.
+            -- A record always says 10 or 20 (no sealAt on the campaign is policy 10) so a reader
+            -- tells the arms apart; Bot.uses alone reads a missing sealAt as "no floor of ours"
+            -- (its unit tests), which this default never reaches.
+            local function draw()
+                local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                if style then style.sealAt = info.sealAt or 10 end
+                return style, followed
+            end
             while true do
-                local style, followed = M.drawStyle(Bot, api.random, claims, route, tried, info.sealAt)
+                local style, followed = draw()
                 -- one attempt alone: the styles before it are drawn, never played
                 while style and api.only and entry.attempts + 1 < api.only do
                     entry.attempts = entry.attempts + 1
-                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried, info.sealAt)
+                    style, followed = draw()
                 end
                 if not style and api.only then
                     entry.outcome = "no_style"
@@ -470,7 +478,7 @@ function M.run(api)
                 if not style then
                     -- every style tried: draw them again (ADR 0399); a retry has its own dice
                     tried = {}
-                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried, info.sealAt)
+                    style, followed = draw()
                 end
                 entry.attempts = entry.attempts + 1
                 local team, bwhy, partial = between(api, style, followed, need, carried)
