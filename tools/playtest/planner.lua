@@ -1321,9 +1321,13 @@ function M.plan(Bot, board, sight, style, opts)
         for _, u in ipairs(ctx.blues) do
             local a = at[u.id]
             local at = a and endTile(a)
+            local attacks = a and a.act == "attack"
+            -- wear: the weapon uses its attack is expected to spend (sight's, over the game's
+            -- played ways), so the phase reads it with what is left (#644)
             planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
-                                      slot = a and a.act == "attack" and a.slot or nil }
+                                      slot = attacks and a.slot or nil,
+                                      wear = attacks and a.f and a.f.wear or nil }
         end
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end

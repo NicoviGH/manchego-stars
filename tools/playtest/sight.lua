@@ -302,7 +302,8 @@ M.LAST_EVENT_TURN = 0xFF     -- eventinfo.c EvCheck02_TURN: turns are a byte (0x
 M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
 
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
-local BU = { weapon = 0x48, weaponAttributes = 0x4C, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
+local BU = { weapon = 0x48, weaponBefore = 0x4A, weaponAttributes = 0x4C, weaponSlotIndex = 0x51,
+             attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
              statusOut = 0x6F, hpInitial = 0x72, nonZeroDamage = 0x7C, weaponBroke = 0x7D }
 -- include/bmunit.h UNIT_STATUS_PETRIFY and UNIT_STATUS_13: the two statuses a blow sets that
 -- end the battle like a death (BattleGenerateHit)
@@ -716,7 +717,21 @@ function M.side(mem, me, other, proc, hitsAt)
     return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
              spendsMiss = (mem.u32(me + BU.weaponAttributes) & M.SPENDS_MISS) ~= 0,
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
-             armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0 }
+             armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0,
+             wearSlot = mem.u8(me + BU.weaponSlotIndex) }
+end
+
+-- The uses the battle just run took off one battle unit's weapon (#644): BattleGenerateHitEffects
+-- (bmbattle.c) spends them with GetItemAfterUse, from weaponBefore, the weapon as the battle took
+-- it up (SetBattleUnitWeapon). A weapon that broke (weaponBroke) spent all it had; one the
+-- battle set to 0 without breaking was never swung (out of range: SetBattleUnitWeapon) and
+-- spent none. An unbreakable one keeps its uses, so it reads 0.
+function M.worn(mem, bu)
+    local before = mem.u16(bu + BU.weaponBefore) >> 8
+    if mem.s8(bu + BU.weaponBroke) ~= 0 then return before end
+    local after = mem.u16(bu + BU.weapon)
+    if after == 0 then return 0 end
+    return before - (after >> 8)
 end
 
 -- The chance one of the game's rolls passes (rng.c): Roll1RN draws one NextRN_100, Roll2RN
@@ -759,12 +774,16 @@ end
 -- two distributions { [hp lost] = probability }: the target's (dealt) and the actor's (back),
 -- and the two together (joint: { { p, dealt, back } }, one per pair that can happen, in
 -- dealt-then-back order): whether a counter lands depends on whether our blow killed first,
--- and the planner plays the enemy phase on each pair (T100b).
+-- and the planner plays the enemy phase on each pair (T100b). wear = { actor, target }: the
+-- weapon uses each side is expected to spend, over the same ways (a leaf's `wear` and
+-- `counterWear`, M.worn's; a leaf without them spent none), #644.
 function M.exchangeOf(leaves)
-    local dealt, back, pair = {}, {}, {}
+    local dealt, back, pair, wear = {}, {}, {}, { actor = 0, target = 0 }
     for _, l in ipairs(leaves) do
         dealt[l.dealt] = (dealt[l.dealt] or 0) + l.p
         back[l.back] = (back[l.back] or 0) + l.p
+        wear.actor = wear.actor + l.p * (l.wear or 0)
+        wear.target = wear.target + l.p * (l.counterWear or 0)
         local k = l.dealt .. ":" .. l.back
         pair[k] = pair[k] or { p = 0, dealt = l.dealt, back = l.back }
         pair[k].p = pair[k].p + l.p
@@ -775,7 +794,7 @@ function M.exchangeOf(leaves)
         if a.dealt ~= b.dealt then return a.dealt < b.dealt end
         return a.back < b.back
     end)
-    return dealt, back, joint
+    return dealt, back, joint, wear
 end
 
 -- What the exchange just simulated teaches one side of it, by the game's own count
@@ -838,8 +857,9 @@ end
 -- at S.BattleRoll1RN/S.BattleRoll2RN's entry (M.withBreaks) and its simResult (r1, which a
 -- simulation returns in place of rolling) forced, depth first: pass where it can, then fail. A roll
 -- that cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
--- target and the actor lost in the run just made. -> { { p, dealt, back } }. Inside a sandbox; the
--- breakpoints are set only for these calls (mGBA steps while one is set).
+-- target and the actor lost in the run just made, then the weapon uses the actor and the target
+-- spent in it (M.worn; optional). -> { { p, dealt, back, wear, counterWear } }. Inside a
+-- sandbox; the breakpoints are set only for these calls (mGBA steps while one is set).
 function M.played(cpu, call, sim, S, lost)
     local path, odds, at = {}, {}, 0
     local function catch(numbers)
@@ -860,8 +880,9 @@ function M.played(cpu, call, sim, S, lost)
             call(sim[1], sim[2])
             local p = 1
             for i = 1, at do p = p * (path[i] and odds[i] or 1 - odds[i]) end
-            local dealt, back = lost()
-            leaves[#leaves + 1] = { p = p, dealt = dealt, back = back }
+            local dealt, back, wear, counterWear = lost()
+            leaves[#leaves + 1] = { p = p, dealt = dealt, back = back, wear = wear,
+                                    counterWear = counterWear }
             -- the next outcome: the deepest roll forced to pass that can also fail
             split = at
             while split > 0 and not (path[split] and odds[split] < 1) do split = split - 1 end
@@ -934,7 +955,7 @@ function M.attackOf(ours, eHp, uHp)
     -- our own death cuts off is still counted: never fewer than the game spends.
     local uses = (ours.hits or 0) * (ours.spendsMiss and 1 or M.rollChance(2, ours.hit or 0))
     return { hit = ours.hit, dmg = ours.dmg, crit = ours.crit, hits = ours.hits,
-             spendsMiss = ours.spendsMiss, uses = uses, counters = counters,
+             spendsMiss = ours.spendsMiss, uses = uses, wear = ours.wear, counters = counters,
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
              killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
@@ -1011,7 +1032,10 @@ function M.strikeOf(t)
              takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil,
              takenDist = dealt, takenWorst = M.worst(dealt),
              counterDist = t and t.back or { [0] = 1 },
-             joint = t and t.joint or nil, taught = t and t.exp or nil }
+             joint = t and t.joint or nil, taught = t and t.exp or nil,
+             wear = t and t.wear or 0, wearSlot = t and t.wearSlot or nil,
+             counterWear = t and t.counter and t.counter.wear or 0,
+             counterSlot = t and t.counter and t.counter.wearSlot or nil }
 end
 
 -- Whether our attack ANSWERS its target, and how hard: the game's own simulation kills it
@@ -1631,6 +1655,48 @@ function M.equip(api, call, S, u, slot)
     call(S.EquipUnitItemSlot, { u.addr, slot })
 end
 
+-- Inside a sandbox: the unit at `addr` after a battle that is expected to take `expected` uses
+-- off the item in its bag slot `slot` (0-based), as the game leaves it (#644): one
+-- GetItemAfterUse a use (Board.itemAfterUse: an IA_UNBREAKABLE item keeps its uses, the last
+-- use leaves 0), the item written back to its slot (BattleApplyUnitUpdates) and the bag packed
+-- (UpdateUnitFromBattle's UnitRemoveInvalidItems), so a weapon spent to 0 is gone and the unit
+-- fights the rest of the phase unarmed (vanilla Ch19: Myrrh, charId 0x1E, read at 0% death
+-- with the Divinestone she had spent). The uses taken are the expected ones rounded, as a
+-- strike takes its expected damage rounded: the phase is played along its expected way. A
+-- slot past the bag (a ballista's, BALLISTA_SLOT) is no item of the unit's. The packing is a
+-- game write no journal sees, so the bag is kept first (M.equip's reason).
+function M.wear(api, call, S, addr, slot, expected)
+    local n = math.floor((expected or 0) + 0.5)
+    local Board = api.Board
+    if n <= 0 or not slot or slot < 0 or slot >= Board.ITEM_COUNT then return end
+    local at = addr + Board.UNIT_ITEMS + slot * 2
+    local item = api.mem.u16(at)
+    for _ = 1, n do
+        if item == 0 then break end
+        item = Board.itemAfterUse(item)
+    end
+    api.write16(at, item)
+    if item == 0 then
+        api.keep16(addr + Board.UNIT_ITEMS, Board.ITEM_COUNT)
+        call(S.UnitRemoveInvalidItems, { addr })
+    end
+end
+
+-- Inside a sandbox: a phase strike `t` (M.strikeOf's) leaves both weapons at the uses it is
+-- expected to spend: the striker's at `strikerAddr`, the target's counter's at `targetAddr`.
+function M.strikeWear(api, call, S, t, strikerAddr, targetAddr)
+    M.wear(api, call, S, strikerAddr, t.wearSlot, t.wear)
+    M.wear(api, call, S, targetAddr, t.counterSlot, t.counterWear)
+end
+
+-- Inside a sandbox: our unit `u` holding what the plan leaves it to fight the enemy phase with:
+-- the weapon of its attack's `slot` equipped (M.equip puts it in slot 0), less the uses that
+-- attack is expected to spend (`wear`, M.wear), #644.
+function M.armAsPlanned(api, call, S, u, slot, wear)
+    M.equip(api, call, S, u, slot)
+    if slot then M.wear(api, call, S, u.addr, 0, wear) end
+end
+
 -- Sight.fullInfo(sandbox, open, api, S, isolate, fn): FR-019's full-information diagnostic
 -- (R-7), never production. fn(board) runs in one outermost sandbox with the fog off -- the
 -- vision range (gPlaySt +0D) written 0 through the journaled api, then the game's own
@@ -2118,11 +2184,15 @@ function M.new(outer)
         local known = M.known(playedBy, battleKey(), teaches,
             function() return M.expOf(api, call, S, teaches) end,
             function()
-                return { M.exchangeOf(M.played(api.cpu, call, sim, S, function()
-                    return lost(S.gBattleTarget), lost(S.gBattleActor)
-                end)) }
+                local dealt, back, joint, wear = M.exchangeOf(M.played(api.cpu, call, sim, S,
+                    function()
+                        return lost(S.gBattleTarget), lost(S.gBattleActor),
+                               M.worn(mem, S.gBattleActor), M.worn(mem, S.gBattleTarget)
+                    end))
+                return { dealt, back, joint, wear = wear }
             end)
         side.dealt, side.back, side.joint, side.exp = known[1], known[2], known[3], known[4]
+        side.wear, side.counter.wear = known.wear.actor, known.wear.target
         return side
     end
 
@@ -2318,7 +2388,7 @@ function M.new(outer)
         for _, b in ipairs(plan.blues) do
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
-            M.equip(api, call, S, b.unit, b.slot)
+            M.armAsPlanned(api, call, S, b.unit, b.slot, b.wear)
         end
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
@@ -2348,7 +2418,9 @@ function M.new(outer)
             if not e or gone[id] then return false end
             return M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) and e
         end
-        -- e strikes as it decided: stood on its tile, its expected damage off the target
+        -- e strikes as it decided: stood on its tile, its expected damage off the target, and
+        -- the uses the exchange is expected to spend off both weapons (M.wear): a counter that
+        -- spends the target's last use leaves it unarmed for the next enemy (#644)
         local function strike(e, id, target, side, done)
             local addr = mem.u32(S.gUnitLookup + target * 4)
             local t = M.strikeAt(side, id, target, mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP),
@@ -2361,6 +2433,7 @@ function M.new(outer)
             -- a red target: only a berserked enemy strikes its own side
             wound(addr, t.targetHp - math.floor(mean + 0.5),
                   byId[target] ~= nil and byId[target].faction == "red")
+            M.strikeWear(api, call, S, t, e.addr, addr)
             return t, now, addr
         end
         return byId, order, decides, strike, remove, gone

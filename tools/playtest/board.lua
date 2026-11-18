@@ -66,6 +66,7 @@ Board.ITEMDATA_STRIDE = 0x24
 Board.ITEMDATA_NUMBER = 0x06    -- bmitem.h ItemData +06 number: the row's own id (data_items.c)
 local IA_WEAPON = 1 << 0
 local IA_STAFF = 1 << 2    -- include/bmitem.h
+local IA_UNBREAKABLE = 1 << 3
 -- include/bmunit.h: struct Unit +0x1E u16 items[UNIT_ITEM_COUNT] (id | uses << 8)
 Board.UNIT_ITEMS, Board.ITEM_COUNT = 0x1E, 5
 Board.CONVOY_ITEM_COUNT = 100                   -- bmcontainer.h: the convoy's slots
@@ -113,6 +114,18 @@ function Board.itemData(mem, SYM, item)
     if item == 0 then return nil end
     local data = SYM.gItemData + item * Board.ITEMDATA_STRIDE
     return mem.u32(data + 0x08), mem.u8(data + 0x19)
+end
+
+-- `item` (id | uses << 8) after one use, as bmitem.c GetItemAfterUse makes it: an
+-- IA_UNBREAKABLE item as it was, else one use less, 0 once none is left. Read here, not asked of
+-- the game: the enemy phase's wear (sight.wear, #644) takes thousands of uses a chapter, and a
+-- call each cost CPU the bot's reading does not need (the function reads only the attributes).
+function Board.itemAfterUse(mem, SYM, item)
+    local attributes = Board.itemData(mem, SYM, item)
+    if not attributes or (attributes & IA_UNBREAKABLE) ~= 0 then return item end
+    item = item - (1 << 8)
+    if item < (1 << 8) then return 0 end
+    return item
 end
 
 -- A staff's reach, GetItemMaxRange (encodedRange & 0xF): 0 is its holder's Mag/2, which the
@@ -614,6 +627,7 @@ function Board.bind(mem, SYM)
         find = function(faction, charId) return Board.find(mem, SYM, faction, charId) end,
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         staffRange = function(item) return Board.staffRange(mem, SYM, item) end,
+        itemAfterUse = function(item) return Board.itemAfterUse(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         items = function(addr) return Board.items(mem, addr) end,
         convoyItems = function() return Board.convoyItems(mem, SYM) end,

@@ -44,6 +44,7 @@ local function defineItems(m)
     item(3, 0x4, 1, 1)
     item(4, 0x4, 1, 0)    -- Physic's reach: 0, its holder's Mag/2
     item(5, 0, 0, 0)      -- a Vulnerary: neither weapon nor staff
+    item(6, IA_WEAPON | 0x8, 1, 1)   -- IA_UNBREAKABLE (include/bmitem.h)
 end
 
 -- Put a unit in `faction`'s array at `slot`. o: charId, classId, x, y, hp, maxhp, level,
@@ -124,6 +125,11 @@ do
     check(Board.staffRange(mem, SYM, 5), nil, "a Vulnerary is no staff")
     check(Board.staffRange(mem, SYM, 2), nil, "a bow is no staff")
     check(Board.staffRange(mem, SYM, 0), nil, "no item, no staff")
+    -- Board.itemAfterUse (bmitem.c GetItemAfterUse, #644): one use less, 0 at the last, an
+    -- unbreakable item as it was
+    check(Board.itemAfterUse(mem, SYM, 1 | (46 << 8)), 1 | (45 << 8), "a use spent")
+    check(Board.itemAfterUse(mem, SYM, 1 | (1 << 8)), 0, "the last use leaves no item")
+    check(Board.itemAfterUse(mem, SYM, 6 | (0 << 8)), 6, "an unbreakable item keeps its uses")
     check(Board.unit(b, "blue", 2).minRange, nil, "the board read carries no reach")
     local items = Board.unit(b, "blue", 2).items
     check(#items, 2, "items lists only the held slots")
