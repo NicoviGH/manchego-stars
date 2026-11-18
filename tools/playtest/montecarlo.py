@@ -8,7 +8,8 @@
 `attempts` plays attempts 1..N of the chapter at the env's `from` start side by side (env
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
 Over several style seeds it plays each in turn and ends with how many of the games were
-different (distinct_games, #647): a seed moves the style, never the dice.
+different (distinct_games, #647): the style seed changes the bot's play, never the dice. More
+dice means more attempts (retries within the chapter) or more campaigns (`cell --starts K`).
 Each is an independent attempt: every attempt loads the same start state, and the styles are
 drawn without reading a result, so attempt k alone plays the k-th style with no memory, and
 with the dice the campaign's attempt k has: the game's RNG advanced k - 1 strides of draws from the start
@@ -640,10 +641,12 @@ def attempt_line(r, said):
 
 
 def distinct_games(records):
-    """How many games `records` played and how many were different: a game is its `acts_hash`
-    (every act the bot played). `--seed` draws only the style (ADR 0385); the dice are the
-    start's and the attempt number's (ADR 0404), so two seeds that draw one style at one attempt
-    play the same game move for move (#647: Ch17's 18 games over seeds 1-3 were 13)."""
+    """How many games `records` played and how many were different (a game is its `acts_hash`,
+    every act the bot played). Three things vary a game: the campaign seed sets a playthrough's
+    dice once, at New Game (ADR 0370); a retry within a chapter gets fresh dice, the RNG moved on
+    by the attempt number (ADR 0404); the style seed (`--seed`) changes only the bot's play
+    (ADR 0385). So two style seeds at the same attempt roll the same dice, and when they draw
+    the same style they play the same game twice (#647: 18 Ch17 games were 13 different ones)."""
     games = [r for r in records if is_bot(r) and r.get('acts_hash')]
     return '%d games, %d distinct' % (len(games), len({r['acts_hash'] for r in games}))
 
@@ -3890,7 +3893,7 @@ def main(argv=None):
     a.add_argument('--jobs', type=int, default=4)
     a.add_argument('--out', default='runs.jsonl')
     a.add_argument('--seed', type=seed_list, default=[1],
-                   help='style seeds: 1, 1,2,3 or 1-3 (the dice do not move with it, #647)')
+                   help="style seeds: 1, 1,2,3 or 1-3; they change the bot's play, not the dice (#647)")
     a.add_argument('--vanilla', action='store_true')
     ca = sub.add_parser('calibration', help="the judged enemy phase against the played one, "
                         'from kept traces (#510 PR A)')
