@@ -27,8 +27,14 @@ is needed; no plan priced a use.
   weapon that makes the same strike, so over any spare at least 300, whatever that spare's shop
   price (PR #643 review: a flat 300 made a Siegmund cheaper than a 600-gold Spear, and the
   legendary rode as its spare). 300 (Nicolas, 2026-11-18, on the investigation's
-  recommendation): the highest price tested where one use stays under one death's weight in
-  every style (12 / 24 / 45 points careful / even / bold, against a death's 1000 / 300 / 60).
+  recommendation): the highest price tested where one use over a cheap spare stays under one
+  death's weight in every style (12 / 24 / 45 points careful / even / bold, against a death's
+  1000 / 300 / 60). That bound holds only when the strike's dearest shop weapon is cheap (a
+  Steel or Silver weapon, tens of gold a use). Beside a dear one it does not: with a Spear
+  (600 a use) and an Iron Lance, a Siegmund use over the Iron Lance costs 892 gold, about 134
+  points under bold, more than a death. No rule that keeps the unpriced weapon the dearest can
+  stay under bold's death weight there, since the Spear alone over the Iron Lance is already
+  592. Untested in play; the cap still reads survival first.
   `PT_USEPRICE=off|<gold>` overrides it; `off` is the bot before #642.
 - With two or more strikes that have spares, the spare step also judges each one's cheapest
   spare swapped in at once.
@@ -42,9 +48,9 @@ decisions, none.
 
 **Measured (Ch17 from `bag1-heal4-heal1-lap4e-cs-s4006`, `attempts`, dice seeds 1-3, 18 games):**
 price off 15 won, 7 player deaths, 34 Twin strikes; this rule 18 won, 8 deaths, 15 Twin strikes.
-300 and 600 play the same 18 games. These runs predate the review's amendments (the
-unpriced weapon over the dearest shop weapon, unbreakable items free, the all-swapped plan's
-cheapest spares); those were proven by unit tests only, no run. CPU: the item's full uses are memoised (one game call per
+300 and 600 play the same 18 games. With the review's amendments (the unpriced weapon over the
+dearest shop weapon, unbreakable items free, the all-swapped plan's cheapest spares; 73ef1d5a)
+the same 18 games: 18 won, 7 deaths, 13 Twin strikes. CPU: the item's full uses are memoised (one game call per
 strike weighed before), 20.1 → 17.3 s a player phase on the same 6 games.
 
 **Not settled by it.** E_20's boss: the saved Siegmund did not break Morva; every throne assault
