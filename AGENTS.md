@@ -118,8 +118,6 @@ id in engine sources; chapter numbers and plot events are a review call.
 - **One checkout, one writer** (ADR 0390): no worktree without Nicolas's say-so, never two ROM
   builds in one tree.
 - Keep the gitignored `.agents/`, `map-review/`, `review/` folders; stage paths explicitly.
-  `.agents/skills` links to `.claude/skills` for Codex, which works here between Claude sessions
-  and leaves a HANDOFF entry (changes, branch/PR, verification, next step).
 - Pre-commit runs `tools/check.py` and only the unit tests a staged path reaches (ADR 0394);
   `make check`, `make test` and CI run them all.
 - The engine/content invariant and the patch series (applies whole or fails) are hard gates;
@@ -155,6 +153,24 @@ re-ask.
 - **No table record past Revel's End (ch08).** The book and vanilla FE8 are both inspiration and
   the best story wins: "the book doesn't have it" rules nothing out; say which parts are
   invented.
+
+## Models and subagents
+
+**Every subagent is started with its model set explicitly; never let one inherit the session's
+model.** Opus only where the table says so, with the reason in one line (Nicolas, 2026-11-18:
+all-Opus subagents burned the usage limit).
+
+| Task | Model |
+|---|---|
+| Review, re-review, read-only diagnosis, reading records and traces | Sonnet |
+| A review's fix wave, a single-area bot or C change (~200 LOC) | Sonnet |
+| Cross-cutting engine or bot change (8+ files, design calls); a root cause Sonnet missed | Opus |
+| Lookups, file sweeps; dialogue, YAML, item descriptions | Haiku |
+| ROM build smoke-test / mGBA memory reads | Script, no LLM |
+
+- **A subagent runs long commands in the foreground** (a suite, a build, a matrix scenario): it is
+  never woken when its own background task ends, so it stalls. Say so in every brief that runs
+  one (#510 step 9).
 
 ## Design placement test
 
