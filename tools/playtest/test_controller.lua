@@ -201,6 +201,10 @@ check((action(itemSub, "use_item") or {}).key, "A", "A on Use when it is highlig
 itemSub.menu.current = 2
 local nav = action(itemSub, "use_item")
 check(nav and nav.key, nil, "Use is legal but needs the cursor first")
+-- Equip (0x35), by its id (#641: a bait equips its weapon before the Wait)
+itemSub.menu.items[2] = { slot = 1, override_id = 0x35, availability = 1, on_selected = "0x0804" }
+itemSub.menu.current = 1
+check((action(itemSub, "equip_item") or {}).key, "A", "A on Equip when it is highlighted")
 
 -- The world map's free cursor.
 local wm = { procs = { world_map = { idle = "world_map_input" } },

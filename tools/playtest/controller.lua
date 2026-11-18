@@ -35,6 +35,7 @@ local MENU_CONVOY_SEND_LAST = 0x2F
 -- gItemSubMenuItems: what a chosen inventory item offers -- Use, Equip, Trade, Discard
 -- (menu_def.c).
 local MENU_ITEM_USE = 0x34
+local MENU_ITEM_EQUIP = 0x35
 local MENU_ITEM_SUB_LAST = 0x37
 -- gStaffItemSelectMenuItems: the Staff command's list, one row per staff slot (menu_def.c).
 local MENU_STAFF_SLOT_FIRST = 0x3E
@@ -830,6 +831,9 @@ function M.legalActions(observation)
     elseif state == "item_submenu" then
         addMenuNavigation(actions, observation)
         addMenuCommand(actions, observation, MENU_ITEM_USE, "use_item")
+        -- Equip (ItemSubMenu_EquipItem: EquipUnitItemSlot, then back to the inventory list),
+        -- named by its id as Use is: a bait holds its weapon before the Wait (#641)
+        addMenuCommand(actions, observation, MENU_ITEM_EQUIP, "equip_item")
     elseif state == "generic_menu" then
         addMenuNavigation(actions, observation)
         for _, item in ipairs(enabledMenuItems(observation)) do

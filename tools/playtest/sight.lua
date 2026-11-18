@@ -2817,14 +2817,15 @@ function M.new(outer)
     -- (knows(), ADR 0399), and no arrival is placed (one not yet loaded is no unit to play).
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
-    -- and .moved = the enemies the first phase moved, { { id, x, y } }.
+    -- and .moved = the enemies the first phase moved, { { id, x, y } }, .fell = the ids of the
+    -- strikers our counters removed in it (a Rout's count, Planner.secondRead).
     -- `reply` (#510 comment 6906859807, ADR 0389's amendment of 2026-11-17): our units play
     -- armyReply's turn between the two phases in place of the hold; .reply = what they played.
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
             local byId, order, decides, strike, remove, _, wearing = stagePhase(call, plan)
-            local moved = {}
+            local moved, fell = {}, {}
             -- the first phase's strikes in order: each wears on what the last left (M.tally)
             local first = {}
             for _, id in ipairs(order()) do
@@ -2841,6 +2842,7 @@ function M.new(outer)
                         end
                         if t.felled >= 0.5 then
                             remove(e, side.tile.x, side.tile.y)
+                            fell[#fell + 1] = id
                         else
                             -- it lives: our counter's expected damage stays on it, as a
                             -- strike's stays on its target
@@ -2870,7 +2872,7 @@ function M.new(outer)
             -- enemy that walked out of it is seen, one that walked into it is not
             M.refresh(api, call, S, byId)
             local out = playPhase(call, proc, byId, order(), decides, strike, remove)
-            out.hp, out.moved, out.reply = hp, moved, played
+            out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
             return out
         end) end)
     end

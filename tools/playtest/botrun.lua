@@ -1657,7 +1657,8 @@ function M.run(api)
                                 ledger = plan and plan.ledger,
                                 nearest = plan and plan.nearest,
                                 lookahead = plan and plan.lookahead,
-                                win_fell = plan and plan.winFell })
+                                win_fell = plan and plan.winFell,
+                                look_win = plan and plan.lookWin })
                         playing, nextAct = a and plan, 2
                         if plan and a then
                             local said = {}

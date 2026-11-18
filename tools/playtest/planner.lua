@@ -81,9 +81,10 @@
 -- `strikers` the ids of the enemies that strike it in the judged phase, sorted; and each
 -- recruit our counter may kill: `recruit` marks one, `die` that chance, `struck` the ids of
 -- player units it strikes, sorted),
--- kind = "beam"|"assault"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal"|"spare",
+-- kind = "beam"|"assault"|"bait"|"advance"|"seize"|"goal"|"lone"|"noseize"|"unstall"|"mend"|"rest"|"heal"|"spare",
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
--- seizes, extended (it met the lookahead's second phase), played (the one played), rejected (why
+-- seizes, extended (it met the lookahead's second phase), lookWin (that phase's win, below),
+-- played (the one played), rejected (why
 -- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
 -- rank = what plans are compared by (M.outranks): { admitted,
 -- forfeits (how many ledger goals it closes for good), complete (its chance to end the
@@ -119,7 +120,9 @@
 -- nearest = the progress record's near half (botrun's rec.progress), sorted by id: { id, turns }
 -- for "objective" (its nearest unit's turns) and each feasible or stalled visit, chest or
 -- recruit row of the ledger (its best taker's turns), in ctx.turnsTo turns,
--- winFell = the judged phase's chance our counter ends the chapter, talks = the charIds any
+-- winFell = the judged phase's chance our counter ends the chapter, lookWin = the lookahead's
+-- second phase's win (#641, M.secondRead's `won`) when it read one: { won, gain (what it adds to
+-- the rank's value, never to `judged`), worth (goalWorth's rows with it) }, talks = the charIds any
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
@@ -171,6 +174,21 @@ M.BRANCH = 8
 M.AUDIT_WAYS = 4  -- the judged phase's ways whose chances a plan's audit record keeps
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
 
+-- On a Seize map, the enemy standing on the seize tile (sight.objective.tile): the game offers
+-- the Seize to no one while it holds the tile, so its death is the win's one step, as a Defeat
+-- Boss map's boss's is (vanilla I_14, campaign 4006's Ephraim lap, 2026-11-15: Vigarde, charId
+-- 0x6B, on the throne; twelve attempts never struck him together and stalled). The assault
+-- strikes it; its HP is weighed as any enemy's (BOSS_WORTH stays the Defeat Boss map's). Its
+-- id, or nil. Pure.
+function M.throne(objective, enemies)
+    local tile = objective and objective.kind == "seize" and objective.tile
+    if not tile then return nil end
+    for _, e in ipairs(enemies) do
+        if e.x == tile.x and e.y == tile.y then return e.id end
+    end
+    return nil
+end
+
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
 -- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
 -- whose death ends it (a lord's); exp: per experience point our unit's attack teaches it, the
@@ -199,6 +217,10 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 -- Whether death chance `d` is within `cap`: a sum of branch products can land a few ulps over a
 -- chance that is at the cap, and that is not an excess.
 M.DUST = Goals.DUST
+-- the chance at which a kill or a win counts as done: `score` counts a target gone at a kill of
+-- this much, the judge a composed kill, the assault a lone strike's, and the rank a plan's win
+-- (M.outranks). One line, so what the planner calls "gone" and what it ranks as "won" agree
+M.GONE = 0.5
 -- the lookahead's budget (FR-018): extra judged calls (sight.nextPhase, one a finalist) per
 -- decision and per attempt. 128 an attempt, not 32: 32 ran out before the boss fight on
 -- Manchego Stars ch03 and two vanilla starts, so the decisive turns were judged one phase deep
@@ -224,9 +246,9 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- came true 0 of 8 times where the next phase's were about right, so ranking by both let a
 -- unit be sent to an 82% death to dodge another's second-phase 90% (ADR 0389, amended
 -- 2026-11-08; careful seed 3010 turn 18, replayed). Then the admitted order: fewer goals forfeited
--- (the completion ledger's), the likelier win, more progress. Allied greens' summed death
--- chance breaks ties among the plans within a turn of the most progress judged (FR-012: only
--- there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
+-- (the completion ledger's), the likelier win (only one likelier than not: M.GONE), more
+-- progress. Allied greens' summed death chance breaks ties among the plans within a turn of
+-- the most progress judged (FR-012: only there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
 -- is short of the best's, comes first, then the greens. Measured from the best rather than
 -- between each two plans, it is an order a sort can keep: "within a turn of each other" is
 -- not one (0, 0.8 and 1.6 would each tie their neighbour). `behind` is set by M.plan once
@@ -263,6 +285,14 @@ function M.outranks(a, b)
     end
     for _, o in ipairs(order) do
         local x, y = a[o[1]], b[o[1]]
+        -- the win ranks first only where it is likelier than not (M.GONE, the line `score` counts
+        -- a target gone at). Below it the chance still counts, through `value` (goalTerm's
+        -- objective worth and its win term): a 0.09% chance outranked plans worth 340 more in
+        -- `value` and cost Ch17 seed 2 its Eirika (#641, ADR 0425)
+        if o[1] == "complete" then
+            if x < M.GONE then x = 0 end
+            if y < M.GONE then y = 0 end
+        end
         -- a chance summed in another order differs by float dust, which is no difference
         local differ = x ~= y
         if type(x) == "number" and type(y) == "number" then differ = math.abs(x - y) > M.DUST end
@@ -399,7 +429,7 @@ local function score(act, st, W, style, odds)
         -- what the blow does, for the judge to play the kill both ways (its odds composed with
         -- the plan's other blows on the target, at the target's own HP)
         fx.kill = { id = e.id, dist = f.dealt }
-        if kill >= 0.5 then fx.gone = e.id end
+        if kill >= M.GONE then fx.gone = e.id end
         -- the boss's death is the win: its worth is the goals' (goalTerm), what it completes
         -- less what it closes, never a sum of its own, or no goal could ever wait for it
         if e.isBoss and st.objective == "boss" then fx.win = kill end
@@ -584,14 +614,62 @@ function M.staged(st)
              opened = ph.opened, carry = ph.carry }
 end
 
+-- The chance either of two independent events happens: 1 - (1 - a)(1 - b). The one fold of
+-- chances: the plan's win and its counters' (winOf), a later phase's win and deaths (the
+-- lookahead's), a protected unit's deaths over the plan's (overAll).
+function M.either(a, b) return 1 - (1 - a) * (1 - b) end
+
+-- Whether the death of enemy `id` ends the chapter, on a board with `left` red units (a Rout's
+-- count, the plan's: sight.redCount less the plan's kills), `byId` the board's units:
+-- -> ends(id, gone), `gone` (optional) the ids dead since that count. The boss on a Defeat Boss
+-- map; on a Rout map the last red unit standing. Not a Seize map's throne holder: its death
+-- opens the Seize and ends nothing (ADR 0405: the Seize is the win). The judge's `fell` and
+-- the lookahead's second phase (M.secondRead's `won`) read it alike. Pure.
+function M.endsIn(objective, left, byId)
+    return function(id, gone)
+        local e = byId[id]
+        if e == nil or (gone and gone[id]) then return false end
+        if objective == "boss" then return e.isBoss == true end
+        if objective ~= "rout" then return false end
+        local n = left
+        for g in pairs(gone or {}) do
+            if byId[g] and byId[g].faction == "red" then n = n - 1 end
+        end
+        return n == 1
+    end
+end
+
+-- The chance a counter in `strikes` (an enemy phase's, sight's: enemy, target, felled) fells an
+-- enemy `ends(id, gone)` names, each counter weighted by the chance its unit is there to make
+-- it (`alive[target]`, 1 when not given) -> that chance, and the targets whose counter can.
+-- The judge's `fell` and the second phase's (M.secondRead) both. Pure.
+function M.fellBy(strikes, ends, gone, alive)
+    local stands, by = 1, {}
+    for _, s in ipairs(strikes) do
+        if ends(s.enemy, gone) then
+            local p = (s.felled or 0) * (alive and alive[s.target] or 1)
+            stands = stands * (1 - p)
+            if p > 0 then by[#by + 1] = s.target end
+        end
+    end
+    return 1 - stands, by
+end
+
 -- What a lookahead's second phase `r` (sight.nextPhase's) reads of the units the first phase
 -- may strike (`hit`), each alive at its start at the HP r.hp gives it -> second (each one's
 -- death chance in it), lost (its HP lost in it, and to a counter in the army's reply), over
 -- (the chance any unit not in `worn` dies, as struckIn's `none` reads it: the game over's
--- share). `struckIn` is the judge's; `worn` the units the wear read (ADR 0421), whose later
--- phases are its reading. Pure given struckIn.
-function M.secondRead(r, hit, struckIn, worn)
+-- share), won (the chance the chapter ends there, M.endsIn's `ends` naming the enemy: killed
+-- by the army's reply, or felled by our counter to its own strike in the second phase). The
+-- enemies the first phase's counters removed (r.fell) and the reply's kills, each taken as
+-- made as nextPhase takes them, are gone before the next is read (a Rout's last enemy). A kill
+-- or a counter counts only as far as its unit lives the first phase (`alive`, the judge's:
+-- nextPhase plays that phase along its expected way, so a unit it leaves standing may still
+-- die there). `struckIn` is the judge's; `worn` the units the wear read (ADR 0421), whose
+-- later phases are its reading. Pure given struckIn and ends.
+function M.secondRead(r, hit, struckIn, worn, ends, alive)
     worn = worn or {}
+    ends = ends or function() return false end
     local live, unworn = {}, {}
     for _, u in ipairs(hit) do
         local hp = r.hp and r.hp[u.id] or 0
@@ -600,12 +678,22 @@ function M.secondRead(r, hit, struckIn, worn)
             if not worn[u.id] then unworn[#unworn + 1] = live[#live] end
         end
     end
+    local gone = {}
+    for _, id in ipairs(r.fell or {}) do gone[id] = true end
     local second, lost, over = {}, {}, 0
     -- the counter each killer took in the army's reply (sight.nextPhase's .reply): HP the
-    -- plan loses between the phases, as the first phase's strikes are
+    -- plan loses between the phases, as the first phase's strikes are. A kill there of the
+    -- enemy whose death ends the chapter is the win at the kill's chance (#641: Morva, charId
+    -- 0x41, wounded by a bait's counters, dies to the next turn's blow)
+    local won = 0
     for _, k in ipairs((r.reply or {}).kills or {}) do
         lost[k.unit] = (lost[k.unit] or 0) + (k.lost or 0)
+        if ends(k.enemy, gone) then
+            won = M.either(won, (k.p or 0) * (alive and alive[k.unit] or 1))
+        end
+        gone[k.enemy] = true
     end
+    local fell = 0
     for _, o in ipairs(r.outcomes or { { p = 1, strikes = r } }) do
         local res, none = struckIn(o.strikes, live)
         for _, u in ipairs(live) do
@@ -614,14 +702,19 @@ function M.secondRead(r, hit, struckIn, worn)
         end
         if #unworn < #live then none = select(2, struckIn(o.strikes, unworn)) end
         over = over + o.p * (1 - none)
+        fell = fell + o.p * M.fellBy(o.strikes, ends, gone, alive)
     end
-    return second, lost, over
+    return second, lost, over, M.either(won, fell)
 end
 
 -- What makes a decision irreversible enough to look a second enemy phase ahead (FR-017), over
 -- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
 -- struck ("breach"); a unit stepping into a boss's reach from outside it ("boss": its
--- end tile under sight.threat, its start tile not). No arrival trigger: the second phase
+-- end tile under sight.threat, its start tile not); a finalist with the assault's bait in it
+-- ("bait", #641: its worth is the next turn's kill, which only the second phase reads, and
+-- reads as a win only where that kill ends the chapter (endsIn: not a Seize map's holder); vanilla
+-- E_20's Ephraim, charId 0x0F, baited Morva from inside her danger zone, so no "boss" fired and
+-- the bait ranked on progress alone). No arrival trigger: the second phase
 -- cannot place the wave yet, so it would learn nothing about it (ADR 0389, Nicolas
 -- 2026-11-03). `enemies` are the ones in sight and those a retry remembers (Bot.candidates'
 -- ctx.threats, ADR 0399): a remembered boss in fog is a boss whose reach a unit steps into.
@@ -635,6 +728,7 @@ function M.triggers(fin, byId, enemies, sight)
     for _, st in ipairs(fin) do
         for _, a in ipairs(st.acts) do
             if a.act == "door" or a.obstacle then hit.breach = true end
+            if a.why == "bait" then hit.bait = true end
             local u = byId[a.unitId]
             for _, reach in ipairs(u and bosses or {}) do
                 local at = endTile(a)
@@ -841,7 +935,11 @@ function M.plan(Bot, board, sight, style, opts)
     -- the phase (the boss, or a Rout's last enemy, striking and dying: vanilla Ch5 attempt 8's
     -- boss died so on turn 5 with (5,1) still open); `rows` (optional) gets each goal's { id,
     -- kind, gold, worth, before, after }, the plan record's goalWorth
-    local function winOf(st, fell) return 1 - (1 - winChance(st)) * (1 - (fell or 0)) end
+    local function winOf(st, fell) return M.either(winChance(st), fell or 0) end
+    -- M.endsIn on the board plan `st` leaves (a Rout's count less the plan's kills)
+    local function endsIn(st)
+        return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId)
+    end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
         local pWin = winOf(st, fell)
@@ -1114,25 +1212,38 @@ function M.plan(Bot, board, sight, style, opts)
     end
 
     -- The assault (Nicolas, 2026-10-28): on a Defeat Boss map, every unit that can strike the
-    -- boss this phase does, the heaviest expected blow first, until the plan counts it dead.
+    -- boss this phase does, the heaviest expected blow first, until the plan counts it dead. On
+    -- a Seize map, the enemy holding the seize tile (M.throne) is that boss.
     -- One unit's strike alone rarely beats holding -- the counter, then the boss's own phase
     -- -- so the beam cuts it, and the combination is never tried; this plan is that
     -- combination, and the judge weighs it like any other. While too few units reach the boss
     -- it judges badly, and holding out of reach wins: the rounds of no combat while backup
     -- arrives.
+    -- Only a striker that deals damage is seated (#641): a blow that cannot hurt the boss buys
+    -- its counter and nothing else (vanilla E_20: three javelins and hand axes on Morva, charId
+    -- 0x41, each a whole death in every plan). When the strikers do not count the boss dead
+    -- this phase, the bait is judged beside it: the heaviest striker waits, holding that
+    -- strike's weapon, on the first of its strike tiles (heaviest first) the boss is read to
+    -- strike and its counter to hurt (Bot.baitAt), the rest holding, so the boss's own strike
+    -- meets the counter and the next turn finishes it (the lookahead's win, M.secondRead). It is
+    -- one more plan for the rank: no ban and no weight beyond its outcomes (ADR 0396). The boss
+    -- is the enemy whose death ends the chapter (M.endsIn), or the throne's holder.
+    -- -> the assault (nil with fewer than two strikers: one is a plan the beam has), the bait
+    -- (nil when the strike counts the boss dead, or no tile offers it)
     local function assault()
         local boss
+        local throne, ends = M.throne(sight.objective, ctx.enemies), endsIn(start)
         for _, e in ipairs(ctx.enemies) do
-            if e.isBoss then boss = e end
+            if ends(e.id) or e.id == throne then boss = e end
         end
-        if objective ~= "boss" or not boss then return nil end
+        if not boss then return nil end
         local strikers = {}
         for _, c in ipairs(cands) do
             local opts = {}
             for _, a in ipairs(c.acts) do
                 if a.act == "attack" and a.targetId == boss.id and a.f then
-                    local _, dealt = odds({ a.f.dealt }, boss.hp)
-                    opts[#opts + 1] = { a = a, dealt = dealt }
+                    local kill, dealt = odds({ a.f.dealt }, boss.hp)
+                    if dealt > M.DUST then opts[#opts + 1] = { a = a, dealt = dealt, kill = kill } end
                 end
             end
             table.sort(opts, function(x, y)
@@ -1141,46 +1252,66 @@ function M.plan(Bot, board, sight, style, opts)
             end)
             if #opts > 0 then strikers[#strikers + 1] = { uid = c.unit.id, opts = opts } end
         end
-        if #strikers < 2 then return nil end   -- one striker is a plan the beam already has
+        if #strikers == 0 then return nil end
         table.sort(strikers, function(x, y)
             if x.opts[1].dealt ~= y.opts[1].dealt then return x.opts[1].dealt > y.opts[1].dealt end
             return x.uid < y.uid
         end)
-        -- each tile's takers; a striker takes, of its heaviest blows, the tile the fewest of
-        -- those after it could use -- a 1-2 range unit leaves the boss's side to the melee
-        local takers = {}
-        for i, sk in ipairs(strikers) do
-            for _, o in ipairs(sk.opts) do
-                local t = o.a.move.x .. "," .. o.a.move.y
-                takers[t] = takers[t] or {}
-                takers[t][i] = true
+        local plan, dead
+        if #strikers == 1 then
+            -- no assault to build: whether the lone strike counts the boss dead is its own
+            -- kill chance, as extend reads it (score's fx.gone)
+            for _, o in ipairs(strikers[1].opts) do dead = dead or o.kill >= M.GONE end
+        else
+            -- each tile's takers; a striker takes, of its heaviest blows, the tile the fewest
+            -- of those after it could use -- a 1-2 range unit leaves the boss's side to the melee
+            local takers = {}
+            for i, sk in ipairs(strikers) do
+                for _, o in ipairs(sk.opts) do
+                    local t = o.a.move.x .. "," .. o.a.move.y
+                    takers[t] = takers[t] or {}
+                    takers[t][i] = true
+                end
+            end
+            local function contention(t, after)
+                local n = 0
+                for j in pairs(takers[t]) do
+                    if j > after then n = n + 1 end
+                end
+                return n
+            end
+            for i, sk in ipairs(strikers) do
+                local c = {}
+                for _, o in ipairs(sk.opts) do c[o] = contention(o.a.move.x .. "," .. o.a.move.y, i) end
+                table.sort(sk.opts, function(x, y)
+                    if x.dealt ~= y.dealt then return x.dealt > y.dealt end
+                    if c[x] ~= c[y] then return c[x] < c[y] end
+                    return key(x.a) < key(y.a)
+                end)
+            end
+            local st = start
+            for _, sk in ipairs(strikers) do
+                if st.gone[boss.id] then break end
+                for _, o in ipairs(sk.opts) do
+                    local n = extend(st, o.a, sk.uid)
+                    if n then st = n break end
+                end
+            end
+            plan, dead = complete(st), st.gone[boss.id]
+        end
+        local bait
+        local heavy = strikers[1]
+        local u = byId[heavy.uid]
+        for _, o in ipairs((not dead and u and Bot.baitAt) and heavy.opts or {}) do
+            local w = Bot.baitAt(ctx, u, boss, o.a.move, o.a.slot)
+            if w then
+                w.why = "bait"
+                annotate(w, u)
+                bait = extend(start, w, u.id)
+                if bait then break end
             end
         end
-        local function contention(t, after)
-            local n = 0
-            for j in pairs(takers[t]) do
-                if j > after then n = n + 1 end
-            end
-            return n
-        end
-        for i, sk in ipairs(strikers) do
-            local c = {}
-            for _, o in ipairs(sk.opts) do c[o] = contention(o.a.move.x .. "," .. o.a.move.y, i) end
-            table.sort(sk.opts, function(x, y)
-                if x.dealt ~= y.dealt then return x.dealt > y.dealt end
-                if c[x] ~= c[y] then return c[x] < c[y] end
-                return key(x.a) < key(y.a)
-            end)
-        end
-        local st = start
-        for _, sk in ipairs(strikers) do
-            if st.gone[boss.id] then break end
-            for _, o in ipairs(sk.opts) do
-                local n = extend(st, o.a, sk.uid)
-                if n then st = n break end
-            end
-        end
-        return complete(st)
+        return plan, bait
     end
 
     -- The advance (FR-016): each unit in turn takes the act that gains it the most turns toward
@@ -1360,13 +1491,15 @@ function M.plan(Bot, board, sight, style, opts)
             local w = st.wear[u.id]
             planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
-                                      slot = attacks and a.slot or nil,
+                                      -- a strike's weapon, or a bait's (Bot.baitAt): the
+                                      -- one its counter answers the boss with
+                                      slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
                                       wearSlot = w and w.slot, wear = w and w.uses }
         end
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
         -- each uncertain kill, and each counter that can leave its attacker on more than one
-        -- HP, played every way it goes: the average (an enemy gone at a kill >= 0.5, else
+        -- HP, played every way it goes: the average (an enemy gone at a kill >= M.GONE, else
         -- standing at its mean HP; our attacker on its mean HP after the counter) hides the
         -- way the rolls go otherwise. Vanilla Ch5 turn 5: Eirika's attack killed an enemy the
         -- plan kept standing, and Joshua's AI turned on her. Manchego Stars ch03 (T100b): Wolfram's
@@ -1392,7 +1525,7 @@ function M.plan(Bot, board, sight, style, opts)
             -- damage is capped at its HP, so the dead share is hp * p)
             local hp = byId[id].hp
             local p, mean = odds(blows, hp)
-            gone[id] = p >= 0.5 or nil
+            gone[id] = p >= M.GONE or nil
             local uid = only[id]
             if p > 0 and p < 1 and uid then
                 local pairsOf, list = {}, {}
@@ -1610,6 +1743,7 @@ function M.plan(Bot, board, sight, style, opts)
             unhealed[id] = n
             return n
         end
+        local ends = endsIn(st)
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             for _, u in ipairs(hitOf[o.way]) do
@@ -1623,16 +1757,9 @@ function M.plan(Bot, board, sight, style, opts)
             end
             overAll = overAll + o.p * (1 - none)
             -- the strikers our counters fell (felled): the boss, or a Rout's last enemy, is the win
-            local left = objective == "rout" and redsLeft(st) or 0
-            local lives = 1
-            for _, s in ipairs(o.strikes) do
-                local e = byId[s.enemy]
-                if e and ((objective == "boss" and e.isBoss) or (objective == "rout" and left == 1)) then
-                    lives = lives * (1 - (s.felled or 0))
-                    if (s.felled or 0) > 0 then winStruck[s.target] = true end
-                end
-            end
-            fell = fell + o.p * (1 - lives)
+            local p, by = M.fellBy(o.strikes, ends)
+            for _, t in ipairs(by) do winStruck[t] = true end
+            fell = fell + o.p * p
             -- what our units' counters learn in this way of the phase: each strike's own
             -- exchange, played at the HPs the phase had left when it came (ADR 0414)
             for _, s in ipairs(o.strikes) do
@@ -1698,7 +1825,9 @@ function M.plan(Bot, board, sight, style, opts)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.goalWorth = {}
-        judged = judged + goalTerm(st, alive, felled, st.goalWorth, fell) + W.exp * learnt
+        st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
+        st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)
+        judged = judged + st.goalNow + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
         -- each way the phase went and its units' HP there, for the wear's later phases
         st.outcomes, st.hitOf = outcomes, hitOf
@@ -1781,7 +1910,7 @@ function M.plan(Bot, board, sight, style, opts)
                     branches[#branches + 1] = { p = p, die = mine / p }
                 end
             end
-            if gameOver[u.charId] and o > 0 then overAll = 1 - (1 - overAll) * (1 - o) end
+            if gameOver[u.charId] and o > 0 then overAll = M.either(overAll, o) end
             st.protected[#st.protected + 1] = { id = u.id, charId = u.charId, die = d,
                                                 branches = branches, cap = cap }
             rank.hp_left = rank.hp_left + (hp - (taken[u.id] or 0))
@@ -1801,7 +1930,7 @@ function M.plan(Bot, board, sight, style, opts)
     local stalled = opts and opts.stalled
     local finals = {}
     for i = 1, math.min(M.FINAL, #beam) do finals[#finals + 1] = { st = beam[i], kind = "beam" } end
-    local a = assault()
+    local a, bait = assault()
     if a then finals[#finals + 1] = { st = a, kind = "assault" } end
     local have = {}
     for _, f in ipairs(finals) do have[table.concat(keysOf(f.st), " ")] = true end
@@ -1814,6 +1943,7 @@ function M.plan(Bot, board, sight, style, opts)
         have[k] = true
         finals[#finals + 1] = { st = st, kind = kind }
     end
+    if bait then offer(bait, "bait") end
     local adv = advance(have)
     if adv then finals[#finals + 1] = { st = adv, kind = "advance" } end
     -- the rest of the plan in hand (opts.rest, botrun's on a replan): its acts as this board
@@ -2245,7 +2375,8 @@ function M.plan(Bot, board, sight, style, opts)
                     -- the same second phase on each way's HP and the third, already in their
                     -- death and the game over
                     local wornRead = st.wornRead or {}
-                    local second, lost, over = M.secondRead(r, st.phase.hit, struckIn, wornRead)
+                    local second, lost, over, won = M.secondRead(r, st.phase.hit, struckIn,
+                                                                 wornRead, endsIn(st), st.alive)
                     -- what the army's reply played there (sight.nextPhase's .reply): the
                     -- played plan's goes in its trace, so a death read safe can be checked
                     -- against the turn the read assumed
@@ -2261,7 +2392,7 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, pr in ipairs(st.protected) do
                         protected[pr.id] = true
                         pr.second = second[pr.id] or 0
-                        if not wornRead[pr.id] then pr.die = 1 - (1 - pr.die) * (1 - pr.second) end
+                        if not wornRead[pr.id] then pr.die = M.either(pr.die, pr.second) end
                         rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end
                     for _, u in ipairs(st.phase.hit) do
@@ -2274,7 +2405,21 @@ function M.plan(Bot, board, sight, style, opts)
                             rank.green_die = rank.green_die + more
                         end
                     end
-                    rank.game_over = 1 - (1 - rank.game_over) * (1 - over)
+                    rank.game_over = M.either(rank.game_over, over)
+                    -- the win the second phase reads (#641): a turn later, so worth GAMMA of
+                    -- the first phase's, through the goals' own term (goalTerm) on the
+                    -- chance the first phase leaves the chapter open. Without it a bait whose
+                    -- counters only wound the boss is worth its HP lost and nothing more.
+                    -- `judged` and `goalWorth` stay the first phase's (they add up: botrun
+                    -- grades them on the phase that follows); the record keeps this one apart
+                    -- (`lookWin`), its rows and what it adds to the rank's value
+                    if won > M.DUST then
+                        local rows = {}
+                        local later = goalTerm(st, st.alive, st.felled, rows,
+                                               M.either(st.winFell, Goals.GAMMA * won))
+                        rank.value = rank.value + later - st.goalNow
+                        st.lookWin = { won = won, gain = later - st.goalNow, worth = rows }
+                    end
                     admit(st)
                     st.extended = true
                 end
@@ -2294,7 +2439,7 @@ function M.plan(Bot, board, sight, style, opts)
                 look.reply = best.replied
                 for _, c in ipairs(considered) do
                     for _, st in ipairs(fin) do
-                        if c.rank == st.rank then c.extended = true end
+                        if c.rank == st.rank then c.extended, c.lookWin = true, st.lookWin end
                     end
                 end
             end
