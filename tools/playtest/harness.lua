@@ -13,7 +13,7 @@
 --   PLAYTEST_SEED     -- fuzz/llm seed (PT_SEED)
 --   PLAYTEST_LLMDIR   -- #63 sidecar handshake dir (PT_LLM_DIR)
 --   PLAYTEST_REPLY    -- "hold": second phases read with our units holding, the old control
---   PLAYTEST_USEPRICE -- "off" | gold: what a plan pays per weapon use (#642, Bot.usePrice)
+--   PLAYTEST_USEPRICE -- "off" | gold: what a plan pays per weapon use (#642, Bot.RARE_USE)
 --   PLAYTEST_SHADOW   -- a PT_USEPRICE value: each decision's shadow plan at it (#642, botrun)
 --                        (api.reply)
 --   PLAYTEST_DIAG     -- a diagnostic replay (PT_DIAG, JSON; INSPECT.diag, botrun.lua's api.diag)

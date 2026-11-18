@@ -567,6 +567,16 @@ M.QUIET_BOUND = 16
 -- per-decision numbers to tighten it.
 M.DECISION_FRAMES = 4000000
 
+-- A decision's own frames at frame `now`, from `from` (its first): less what PT_SHADOW's plan
+-- ran (#642; `d` the decision's `deciding`: `discount` the shadow's frames once it is done,
+-- `shadowFrom` its first frame while it runs). The watch, the "decided" trace and
+-- plans.slowest read this one count: a diagnostic neither times an attempt out nor doubles
+-- what a decision reports.
+function M.decisionFrames(now, from, d)
+    local shadow = d and d.shadowFrom and now - d.shadowFrom or 0
+    return now - from - (d and d.discount or 0) - shadow
+end
+
 -- Readings in a row without a new low of its own after which a ledger goal's row is stalled (the
 -- win stops waiting for it). FR-007's stall is three player phases in a row without a move that
 -- changes the chapter, and #510 call 3 (comment 6810567866) asked for the same three here.
@@ -1292,11 +1302,9 @@ function M.run(api)
         -- else built from the key (an act never offered, kept in pin.unoffered); nil when its
         -- unit cannot act any more
         local function forcedAct(board, k, opts)
-            for _, c in ipairs(Bot.candidates(board, sight, style, opts)) do
-                for _, a in ipairs(c.acts) do
-                    if api.Planner.key(a) == k then return a end
-                end
-            end
+            -- a strike's spare (#642) is offered under its own key too (Planner.offeredByKey)
+            local o = api.Planner.offeredByKey(Bot.candidates(board, sight, style, opts))[k]
+            if o then return o.a end
             local a = api.Planner.unkey(k)
             local byIdNow = byId(board)
             local u = byIdNow[a.unitId]
@@ -1538,9 +1546,13 @@ function M.run(api)
                             local sopts = {}
                             for k, v in pairs(opts) do sopts[k] = v end
                             sopts.usePrice, sopts.at = api.shadow, nil
-                            local f0 = api.frames()
+                            -- the watch reads `shadowFrom` while the shadow plans, so its
+                            -- frames never time the attempt out (M.decisionFrames)
+                            deciding.shadowFrom = api.frames()
                             local _, splan = api.Planner.plan(Bot, board, sight, style, sopts)
-                            deciding.discount = (deciding.discount or 0) + api.frames() - f0
+                            deciding.discount = (deciding.discount or 0) + api.frames()
+                                - deciding.shadowFrom
+                            deciding.shadowFrom = nil
                             shadow = M.shadowOf(api.Planner, style, plan, splan, api.shadow, board)
                         end
                         stalled = false   -- one changed act is the change; the rest plans freely
@@ -1672,7 +1684,7 @@ function M.run(api)
                 deciding = { turn = turn, at = {} }
                 if sight.watch then
                     sight.watch(function()
-                        local spent = api.frames() - from - (deciding.discount or 0)
+                        local spent = M.decisionFrames(api.frames(), from, deciding)
                         if spent > M.DECISION_FRAMES then
                             error({ timeout = true, frames = spent }, 0)
                         end
@@ -1692,7 +1704,7 @@ function M.run(api)
                     error(got, 0)
                 end
                 action = got
-                local spent = api.frames() - from
+                local spent = M.decisionFrames(api.frames(), from, deciding)
                 -- every decision's frames, for the trace (#510, the cheap screen's test): the
                 -- slowest alone says nothing of what a shortlist would save
                 trace({ t = "decided", turn = turn, frames = spent })

@@ -439,11 +439,26 @@ end
 M.memoryKey = Board.memoryKey
 
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
--- The gold one use of a weapon the game gives no price costs a plan (#642): a Sacred Twin,
--- Excalibur, the legendaries (ItemData costPerUse 0). A shop weapon's use costs its own
--- costPerUse (sight.usePrice). PT_USEPRICE overrides it ("off": no price and no spares, the
--- bot before #642). 300: one use stays under one death's weight in every style (ADR 0423).
+-- The gold one use of a weapon the game gives no price costs a plan over the cheapest weapon
+-- that makes the same strike (#642): a Sacred Twin, Excalibur, the legendaries (ItemData
+-- costPerUse 0). PT_USEPRICE overrides it ("off": no price and no spares, the bot before
+-- #642). 300: one use stays under one death's weight in every style (ADR 0423).
 M.RARE_USE = 300
+
+-- What one use of a strike's weapon costs a plan over the cheapest weapon the unit makes the
+-- same strike with (#642, ADR 0423), in gold. `price` is the weapon's own price per use
+-- (sight.usePrice; nil: the game gives it none), `least` and `most` the lowest and highest of
+-- the priced ones there (nil: none is priced), `rare` M.RARE_USE or its knob. A weapon with no
+-- price is always the dearest: it costs `rare` a use over the dearest shop weapon there, so
+-- over any one spare it costs `rare` at least, whatever that spare's shop price. Priced at a
+-- flat `rare`, a shop weapon dearer per use than `rare` (a Spear 600, Eclipse 800:
+-- data_items.c) made the legendary the cheaper weapon, and it rode as that one's spare.
+-- Between shop weapons the charge is the difference in price; with no priced weapon there,
+-- nothing (the price never decides whether to strike).
+function M.useCharge(price, least, most, rare)
+    if price == nil then return most and most + rare - least or 0 end
+    return price - least
+end
 
 -- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
 -- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit on
@@ -1786,6 +1801,9 @@ local function exposed(ctx, u, acts)
         for _, s in ipairs(exposure(ctx, u, at.x, at.y, held)) do
             a.exposure[#a.exposure + 1] = { id = s.by.id, dist = s.f.takenDist }
         end
+        -- a strike's spares (#642) too: what strikes the unit next phase depends on the weapon
+        -- it holds, and a spare is played in its strike's place
+        if a.spares then exposed(ctx, u, a.spares) end
     end
     return acts
 end
@@ -2078,6 +2096,19 @@ function M.explain(board, sight, style)
     return lines
 end
 
+-- `a` moved on to tile `t` after it (a Canto variant): a copy, its spares (#642) moving on
+-- with it, so a spare stays the same strike with another weapon, canto and all
+local function cantoOf(a, t)
+    local v = {}
+    for k, x in pairs(a) do v[k] = x end
+    v.canto = { x = t.x, y = t.y }
+    if a.spares then
+        v.spares = {}
+        for i, b in ipairs(a.spares) do v.spares[i] = cantoOf(b, t) end
+    end
+    return v
+end
+
 -- Canto (playerphase.c TryMakeCantoUnit): per act in `acts` after which the game hands `u` a
 -- second move (sight.cantoTiles: a Canto unit's Rescue, Drop, Visit, Chest or Talk with Mov
 -- left), variants that move on (`canto`, the tile): the M.HOLDS safest tiles the game's map
@@ -2116,12 +2147,7 @@ local function cantoMoves(ctx, u, acts, gain)
             if g > 0 and (not fg or g > fg) then front, fg = t, g end
         end
         if front then pick[#pick + 1] = front end
-        for _, t in ipairs(pick) do
-            local v = {}
-            for k, x in pairs(a) do v[k] = x end
-            v.canto = { x = t.x, y = t.y }
-            out[#out + 1] = v
-        end
+        for _, t in ipairs(pick) do out[#out + 1] = cantoOf(a, t) end
     end
     return out
 end
@@ -2176,14 +2202,18 @@ local function proposeOne(ctx, u)
     -- drop the other's best (PR #585 review and re-review).
     local best, safe, guard = {}, {}, {}
     -- the unit's weapons that make each strike, by target and tile (#642): a strike is
-    -- priced over the cheapest of them, and carries the cheaper ones as its spares
+    -- priced over the cheapest of them (M.useCharge), and carries the cheaper ones as spares.
+    -- One list of options: the boss's tiles below read the same, and each option keeps its
+    -- price and charge (`at`, `price`, `charge`) for every strike made of it.
+    local options = attackOptions(ctx, u, open, true)
     local others = {}
-    for _, c in ipairs(attackOptions(ctx, u, open, true)) do
+    for _, c in ipairs(options) do
         local e = c.target
         if ctx.priceUse then
-            local k = e.id .. "@" .. c.tile.x .. "," .. c.tile.y
-            others[k] = others[k] or {}
-            table.insert(others[k], c)
+            local it = u.items and u.items[c.slot + 1]
+            c.at, c.price = e.id .. "@" .. c.tile.x .. "," .. c.tile.y, it and ctx.sight.usePrice(it.id)
+            others[c.at] = others[c.at] or {}
+            table.insert(others[c.at], c)
         end
         if not best[e] or betterAttack(c, best[e]) then best[e] = c end
         c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
@@ -2193,39 +2223,40 @@ local function proposeOne(ctx, u)
             guard[e] = c
         end
     end
-    -- a weapon's price per use: the game's own (sight.usePrice), else ctx.priceUse's
-    local function perUse(slot)
-        local it = u.items and u.items[slot + 1]
-        return it and ctx.sight.usePrice(it.id) or ctx.priceUse
+    for _, here in pairs(others) do   -- each group alone: no order between groups matters
+        local least, most
+        for _, o in ipairs(here) do
+            if o.price then
+                least, most = math.min(least or o.price, o.price), math.max(most or o.price, o.price)
+            end
+        end
+        for _, o in ipairs(here) do o.charge = M.useCharge(o.price, least, most, ctx.priceUse) end
     end
-    local function offer(c)
+    -- option `c`'s strike: its act, and what it spends of its weapon over the cheapest weapon
+    -- that makes the same strike (#642), in gold: its expected uses at its charge per use. A
+    -- unit with no cheaper weapon there pays nothing, so the price chooses the weapon and never
+    -- whether to strike (a Manakete's Divinestone is its only weapon: Ch17, #642 comment).
+    local function strike(c)
         local a = strikeAct(u, c)
         a.f, a.spent, a.first = c.f, c.spent, c.first
-        -- what the strike spends of its weapon over the cheapest weapon that makes the same
-        -- strike (#642), in gold: its expected uses at the difference in price per use. A unit
-        -- with no cheaper weapon there pays nothing, so the price chooses the weapon and never
-        -- whether to strike (a Manakete's Divinestone is its only weapon: Ch17, #642 comment)
-        -- The strike keeps the weapon expected damage picked (betterAttack), as with the price
-        -- off: the beam never sees the price (an act it cuts on its own score is never judged,
-        -- and a Twin's kill that keeps a unit alive was cut that way: #642's shadow runs).
-        -- Each cheaper weapon that makes the same strike rides along as a `spare`: the planner
-        -- judges the plan with it in this one's place (Planner's spare step), where the cap and
-        -- the judge read what the swap costs beside what it saves.
-        if ctx.priceUse then
-            local here = others[c.target.id .. "@" .. c.tile.x .. "," .. c.tile.y] or {}
-            local least = perUse(c.slot)
-            for _, o in ipairs(here) do least = math.min(least, perUse(o.slot)) end
-            a.useCost = (c.f.uses or 0) * (perUse(c.slot) - least)
-            for _, o in ipairs(here) do
-                if perUse(o.slot) < perUse(c.slot) then
-                    local b = strikeAct(u, o)
-                    b.f, b.spent, b.first = o.f, o.spent, o.first
-                    b.useCost = (o.f.uses or 0) * (perUse(o.slot) - least)
-                    -- another weapon, another act: its slot tells the key apart (Planner.key)
-                    b.slotKey, b.why = true, "attack"
-                    a.spares = a.spares or {}
-                    a.spares[#a.spares + 1] = b
-                end
+        if c.charge then a.useCost = (c.f.uses or 0) * c.charge end
+        return a
+    end
+    -- The strike keeps the weapon expected damage picked (betterAttack), as with the price off:
+    -- the beam never sees the price (an act it cuts on its own score is never judged, and a
+    -- Twin's kill that keeps a unit alive was cut that way: #642's shadow runs). Each cheaper
+    -- weapon that makes the same strike rides along as a `spare`: the planner judges the plan
+    -- with it in this one's place (Planner's spare step), where the cap and the judge read what
+    -- the swap costs beside what it saves.
+    local function offer(c)
+        local a = strike(c)
+        for _, o in ipairs(c.charge and others[c.at] or {}) do
+            if o.charge < c.charge then
+                local b = strike(o)
+                -- another weapon, another act: its slot tells the key apart (Planner.key)
+                b.slotKey, b.why = true, "attack"
+                a.spares = a.spares or {}
+                a.spares[#a.spares + 1] = b
             end
         end
         add(a, "attack")
@@ -2238,7 +2269,7 @@ local function proposeOne(ctx, u)
     -- the boss from every tile: the planner's assault seats several strikers around it,
     -- and two tiles per unit gave them all the same one (Manchego Stars ch03's corner Mogall: three
     -- of six strikers dropped, the rest of its tiles empty)
-    for _, c in ipairs(attackOptions(ctx, u, open, true)) do
+    for _, c in ipairs(options) do
         if c.target.isBoss then offer(c) end
     end
     add(breach(ctx, u, open, objective), "breach")

@@ -691,6 +691,19 @@ end
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 local function s32(v) return v >= 0x80000000 and v - 0x100000000 or v end
 
+-- What one use of an item costs, from its price `cost` at its full `uses` (GetItemCost on
+-- GetItemMaxUses, bmitem.c), in gold (#642): 0 for an unbreakable item, which never wears out
+-- (IA_UNBREAKABLE: GetItemAfterUse takes no use, and GetItemMaxUses reads 0xFF for it, a count
+-- no breakable item has in data_items.c; GetItemCost then gives costPerUse alone, which would
+-- read as a 255th of its price); its price over its uses (ItemData costPerUse) otherwise; nil
+-- when the game gives it no price (costPerUse 0: a Sacred Twin, Excalibur).
+M.UNBREAKABLE_USES = 0xFF
+function M.usePriceOf(cost, uses)
+    if uses == M.UNBREAKABLE_USES then return 0 end
+    if not cost or cost <= 0 or not uses or uses <= 0 then return nil end
+    return cost / uses
+end
+
 -- One side of a simulated exchange, as the forecast window shows it (bksel.c): hit, crit,
 -- damage (the window's own sum: battleAttack less the other side's battleDefense, bksel.c
 -- :233), how many blows (the proc's hit count for that side), and whether it is armed (a
@@ -1829,14 +1842,11 @@ function M.new(outer)
         end
         return prices[id]
     end
-    -- What one use of an item costs: its price over its full uses (GetItemCost / GetItemMaxUses,
-    -- i.e. ItemData costPerUse), nil when the game gives it no price (a Sacred Twin,
-    -- Excalibur: costPerUse 0). #642's weapon-use price.
+    -- What one use of an item costs (M.usePriceOf on the game's own two numbers). #642's
+    -- weapon-use price.
     function s.usePrice(id)
         local cost = s.itemCost(id)
-        if not cost or cost <= 0 then return nil end
-        local uses = maxUses[id]
-        return uses > 0 and cost / uses or nil
+        return M.usePriceOf(cost, maxUses[id])
     end
 
     local raced = {}   -- village id -> the fastest red unit's turns (false: none reaches)

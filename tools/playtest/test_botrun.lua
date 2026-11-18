@@ -507,6 +507,56 @@ do
           "timeout: the record keeps the slowest decision's frames and turn")
 end
 
+-- #642 review (PR #643, findings 7, 8): PT_SHADOW's plan is a diagnostic, judged and never
+-- played. Its frames are not the decision's: a shadow that alone runs past M.DECISION_FRAMES
+-- never times the attempt out, and the decision's reported frames (plans.slowest, the
+-- "decided" trace) leave it out. Before, the watch counted it while it ran, and the reports
+-- never took it off.
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = rout() }
+    local watch
+    local sight = g.api.sight
+    g.api.sight = function()
+        local s = sight()
+        s.watch = function(fn) watch = fn end
+        return s
+    end
+    -- `n` frames of game code, the watch asked before each thousand
+    local function spend(n)
+        for _ = 1, n // 1000 do
+            if watch then watch() end
+            g.frame = g.frame + 1000
+        end
+    end
+    local decided = {}
+    g.api.trace = function(ev) if ev.t == "decided" then decided[#decided + 1] = ev.frames end end
+    g.api.shadow = "off"
+    g.api.Planner = {
+        surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf,
+        WEIGHTS = Planner.WEIGHTS,
+        plan = function(_, board, _, _, opts)
+            spend(opts.usePrice == "off" and Botrun.DECISION_FRAMES + 1000 or 1000)
+            for _, u in ipairs(board.units) do
+                if u.id == 0x01 and u.onField and not u.acted then
+                    local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                                     targetId = 0x81, move = { x = 0, y = 0 } } }
+                    return acts[1], { acts = acts, expect = { { hp = 20 } },
+                                      enemies = { [0x81] = true } }, { phases = 1, averaged = 0 }
+                end
+            end
+            return nil, nil, { phases = 0, averaged = 0 }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "won", "#642: a shadow plan over the frame budget never times the attempt out")
+    check(r.plans.slowest.frames < 100000, true, "#642: the slowest decision leaves the shadow's frames out")
+    local most = 0
+    for _, f in ipairs(decided) do most = math.max(most, f) end
+    check(#decided > 0 and most < 100000, true, "#642: and so does each decision's trace")
+end
+
 -- PT_LEAKGUARD: a run whose sandboxes leaked plays on to its game result, then fails with
 -- every leak in its record and what the game ended as in its why; the log is asked once.
 do
@@ -1908,7 +1958,7 @@ end
 local function attacker(seen)
     return {
         surprise = Planner.surprise, key = Planner.key, keysOf = Planner.keysOf,
-        unkey = Planner.unkey,
+        unkey = Planner.unkey, offeredByKey = Planner.offeredByKey,
         plan = function(_, board, _, _, opts)
             if seen then seen[#seen + 1] = opts and opts.diag or "baseline" end
             for _, u in ipairs(board.units) do
@@ -1998,6 +2048,25 @@ do
     check(d.chosen and #d.chosen, 1, "chosen holds the acts played, not the forced list")
     check(d.chosen and d.chosen[1], "1>wait@0,1>nil", "the first forced act was played")
     check(d.broken, "3>wait@4,4>nil", "the key that could not be played is named")
+end
+
+-- #642 review (PR #643, finding 1): a decision that played a strike's spare names it by its key,
+-- the weapon's slot last ("#1"); a forced replay of that key plays the strike with that weapon.
+-- It raised before ("not an act key": unkey read no slot), and the slot would have been lost.
+do
+    local played
+    local diags = replay({ ref = 1, mode = "force", force = { "1>attack@0,0>129#1" },
+                           failure = failure, run = run, original = original() }, nil,
+                         function(g)
+                             local act = g.api.act
+                             g.api.act = function(a, ...)
+                                 played = played or a
+                                 return act(a, ...)
+                             end
+                         end)
+    local d = diags[1] or {}
+    check(d.chosen and d.chosen[1], "1>attack@0,0>129#1", "#642: a spare's forced key is played")
+    check(played and played.slot, 1, "#642: with the weapon its key names")
 end
 
 -- test_a_forced_act_with_no_unit_witnesses_nothing: the replay stops at the pin, nothing was

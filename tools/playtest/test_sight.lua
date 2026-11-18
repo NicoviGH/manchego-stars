@@ -1184,6 +1184,17 @@ do
         "uses: one blow, spent only if it lands (the 2RN hit roll)")
 end
 
+-- #642 review (PR #643, finding 4): one use's price, from the game's GetItemCost at the item's
+-- GetItemMaxUses. An unbreakable item (IA_UNBREAKABLE: GetItemMaxUses 0xFF, GetItemAfterUse
+-- takes no use) never wears out, so a use costs nothing: neither its costPerUse over 255 (a
+-- Hoplon Shield's 5000) nor the price of a weapon the game gives none (a monster's claw).
+do
+    check(Sight.usePriceOf(5000, 0xFF), 0, "an unbreakable item with a price: no use costs anything")
+    check(Sight.usePriceOf(0, 0xFF), 0, "an unbreakable weapon with no price: nothing either")
+    check(Sight.usePriceOf(480, 30), 16, "a Steel Lance: its price over its uses")
+    check(Sight.usePriceOf(0, 30), nil, "a Siegmund: the game gives it no price")
+end
+
 -- #642: a weapon that spends a use on a miss (IA_MAGIC, IA_UNCOUNTERABLE) spends every blow.
 do
     local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 2, armed = true,
