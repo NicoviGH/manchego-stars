@@ -11,6 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.chapters.ch01
 import inject.class_ids
+import inject.decomp
 import inject.reskins
 
 
@@ -222,7 +223,7 @@ class ClonesPlayAsTheirBase(unittest.TestCase):
         listed = subprocess.check_output(
             ['git', '-C', decomp, 'grep', '-l', '-E',
              r'(==|!=) *CLASS_[A-Z]|case CLASS_[A-Z]|CLASS_[A-Z0-9_]+ *(==|!=)',
-             'HEAD', '--', 'src/*.c'], encoding='utf-8')
+             'HEAD', '--', 'src/*.c'], encoding='utf-8', env=inject.decomp.git_env())
         found = {line.split(':', 1)[1] for line in listed.split()}
         patches = os.path.join(inject.reskins.REPO, 'engine', 'patches')
         for root, _, names in os.walk(patches):

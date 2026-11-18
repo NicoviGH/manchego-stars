@@ -983,24 +983,27 @@ def vanilla_units(parity_ref, allegiance='RED'):
             if d['allegiance'] == want]
 
 
-def vanilla_red_units(parity_ref):
-    """Every RED UnitDefinition in the twin, parsed. None if the reference isn't curated.
+def vanilla_red_units(parity_ref, derive=False):
+    """Every RED UnitDefinition in the twin, parsed. None if the reference isn't curated
+    (`derive`: and not a chain ref whose arrays `derive_red_arrays` can derive).
 
     Unlike vanilla_enemies(), nothing is dropped for carrying no modeled weapon: a
     staff-only healer contributes nothing to the threat math and everything to the map's
     shape -- vanilla Ch6 gives its Troubadour the same delayed charge as the cavalry she
     rides with, and a chapter borrowing her AI needs to find her."""
-    reds = _vanilla_red_defs(parity_ref)
+    reds = _vanilla_red_defs(parity_ref, derive)
     return None if reds is None else [d for _a, _i, d in reds]
 
 
-def _vanilla_red_defs(parity_ref):
+def _vanilla_red_defs(parity_ref, derive=False):
     """(array, index in the array, UnitDefinition dict) for every RED unit in the twin's
     curated arrays, or None if the reference isn't curated. The one walk over them, so the
-    one place scene-only arrays (`_cleared_scene_udefs`) are dropped for every reader."""
+    one place scene-only arrays (`_cleared_scene_udefs`) are dropped for every reader.
+    `derive`: a chain ref the registry does not curate reads its arrays off the eventscript
+    (`derived_red_defs`, #639) instead of None."""
     spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
     if spec is None:
-        return None
+        return derived_red_defs(ref_stem(parity_ref)) if derive else None
     relpath, arrays = spec
     text = inject.decomp.vanilla_decomp_text(relpath)
     scenes = _cleared_scene_udefs(parity_ref)
@@ -1080,26 +1083,58 @@ def vanilla_enemies(parity_ref, mode=None):
     return None if bodies is None else [u for u, _ai in bodies]
 
 
+def _script_blocks(stem):
+    """[(name, text)] for every EventListScr a vanilla chapter's eventscript defines:
+    `EventScr_Ch13a_EndingScene`, `EventScr_089F59CC`, ..."""
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    return [(block.split('[]', 1)[0].strip(), block)
+            for block in re.split(r'CONST_DATA EventListScr', script)[1:]]
+
+
+def _load_sites(stem):
+    """[(script name, array, staged)] for every LOAD of a UnitDefinition array in a chapter's
+    scripts. `staged` is true when the LOAD sits before its script's last CLEE
+    (EvtRemoveAllEimies), which strips every enemy from the map afterwards."""
+    sites = []
+    for name, block in _script_blocks(stem):
+        last_clear = [m.start() for m in re.finditer(r'^\s*CLEE\b', block, re.M)][-1:]
+        for m in re.finditer(r'LOAD\w*\(\s*\w+\s*,\s*(UnitDef_\w+)', block):
+            sites.append((name, m.group(1),
+                          bool(last_clear) and m.start() < last_clear[0]))
+    return sites
+
+
 @functools.lru_cache(maxsize=None)
-def _cleared_scene_udefs(parity_ref):
-    """The UnitDefinition arrays the twin loads ONLY to stage a scene: every LOAD of the array
+def scene_only_udefs(stem):
+    """The UnitDefinition arrays a chapter loads ONLY to stage a scene: every LOAD of the array
     in the chapter's scripts sits in an EventListScr that runs CLEE (EvtRemoveAllEimies)
     afterwards, stripping every enemy from the map before the scene ends. Ch8's TowerFall
     loads Caellach this way, has him fight a cutscene battle, and clears him; he is never on
     the player's map. An array that is also loaded live (after the script's last CLEE, or in a
     script with none) stays. The armed counterpart of the unarmed-cutscene rule the curated
     lists apply."""
+    sites = _load_sites(stem)
+    live = {a for _n, a, staged in sites if not staged}
+    return frozenset({a for _n, a, staged in sites if staged} - live)
+
+
+@functools.lru_cache(maxsize=None)
+def ending_only_udefs(stem):
+    """The arrays a chapter loads ONLY in an `*_EndingScene`. The chapter is already won when
+    its ending scene runs, so nothing loaded there is ever fought: Ch13's Caellach (armed, a
+    Silver Axe) is stood up there on the next chapter's map (`LOMA`) for the scene that follows."""
+    sites = _load_sites(stem)
+    elsewhere = {a for n, a, _s in sites if not n.endswith('_EndingScene')}
+    return frozenset({a for n, a, _s in sites if n.endswith('_EndingScene')} - elsewhere)
+
+
+@functools.lru_cache(maxsize=None)
+def _cleared_scene_udefs(parity_ref):
+    """`scene_only_udefs` of the twin's eventscript, found through its chapter_settings index
+    (`_vanilla_chapter_index`; see its note on that name's reach)."""
     index = _vanilla_chapter_index(parity_ref)
     stem = None if index is None else chapter_event_stem(index)
-    if stem is None:
-        return frozenset()
-    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    staged, live = set(), set()
-    for block in re.split(r'CONST_DATA EventListScr', script)[1:]:
-        last_clear = [m.start() for m in re.finditer(r'^\s*CLEE\b', block, re.M)][-1:]
-        for m in re.finditer(r'LOAD\w*\(\s*\w+\s*,\s*(UnitDef_\w+)', block):
-            (staged if last_clear and m.start() < last_clear[0] else live).add(m.group(1))
-    return frozenset(staged - live)
+    return frozenset() if stem is None else scene_only_udefs(stem)
 
 
 def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
@@ -1161,7 +1196,11 @@ def _vanilla_internal_name(parity_ref):
 
 
 def _vanilla_chapter_index(parity_ref):
-    """The chapter_settings index of the vanilla chapter `parity_ref` names, else None."""
+    """The chapter_settings index of the vanilla chapter `parity_ref` names, else None.
+
+    Resolves by `internalName`, which reads `FE8 Ch13` as Ch14 (the separate issue on the
+    route chapters' names). `ref_index` is the reader that is right (chapters.h); two survive
+    only because the parity reads must not move until that issue switches them to it."""
     name = _vanilla_internal_name(parity_ref)
     chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
     names = [c.get('internalName') for c in chapters['chapters']]
@@ -1337,9 +1376,12 @@ def _udef_sources(stem):
     return sources
 
 
+@functools.lru_cache(maxsize=None)
 def vanilla_udefs_named(stem, name):
     """One UnitDefinition array of a vanilla chapter, parsed from wherever the decomp defines
-    it ([] if nowhere)."""
+    it ([] if nowhere). MEMOISED, as `vanilla_decomp_text` is: the route walk reads every
+    chapter's arrays dozens of times, and the list and its dicts are shared, so a caller must
+    not mutate them."""
     text = next((t for t in _udef_sources(stem) if re.search(re.escape(name) + r'\[\]', t)),
                 None)
     return vanilla_unit_defs(text, name) if text is not None else []
@@ -1360,9 +1402,215 @@ def _chapter_udef_pairs(stem):
             yield name, u
 
 
+# ---------------------------------------------------------------------------------------
+# Vanilla's two routes (#639). A chapter is named by a CHAPTER_* constant (include/constants/
+# chapters.h, `inject.decomp.chapter_enum`) or, for the shared route, by its `FE8 ChN` twin
+# name (`inject.chapter_settings.twin_rows`). Never by chapter_settings' `internalName`,
+# whose E-names run one behind the chapter number from Ch12 on.
+# ---------------------------------------------------------------------------------------
+
+ROUTE_SIDE = {'eirika': 'E', 'ephraim': 'I'}
+# chapterModeIndex from Ch9 on (include/types.h; ch8-eventscript.h writes it at the split).
+CHAPTER_MODE_COMMON, CHAPTER_MODE_EIRIKA, CHAPTER_MODE_EPHRAIM = 1, 2, 3
+
+
+def route_chain(route):
+    """A route's chapters in play order: the shared route (Prologue, Ch1-Ch4, Ch5x, Ch5-Ch8, as
+    `FE8 ...` twin names) then its own CHAPTER_E_* / CHAPTER_I_* constants, Ch11 (0x3D / 0x3E)
+    and Ch21x included. `VANILLA_CHAIN` is not this: it is the shared route minus Ch5x, which
+    the parity reads were built on."""
+    side = ROUTE_SIDE[route]
+    rows = inject.chapter_settings.twin_rows()
+
+    def number(name):
+        m = re.fullmatch(r'CHAPTER_%s_(\d+)(X?)' % side, name)
+        return (int(m.group(1)), m.group(2)) if m else None
+    own = sorted((n for n in inject.decomp.chapter_enum() if number(n)), key=number)
+    return tuple(sorted(rows, key=rows.get)) + tuple(own)
+
+
+def route_split(chain):
+    """The index in `chain` (a `route_chain`) of the first chapter of the route proper, Ch9:
+    the chain's first CHAPTER_* constant. The chapters before it are shared."""
+    return next(i for i, ref in enumerate(chain) if ref.startswith('CHAPTER_'))
+
+
+def ref_index(ref):
+    """The chapter index of a chain ref: a shared-route twin name or a CHAPTER_* constant."""
+    rows = inject.chapter_settings.twin_rows()
+    return rows[ref] if ref in rows else inject.decomp.chapter_enum()[ref]
+
+
+def ref_stem(ref):
+    """The event-file stem of a chain ref: PARITY_REFERENCE_STEM where the parity reads name
+    it, else the decomp's own chapter table (`chapter_event_stem`) at its index."""
+    return PARITY_REFERENCE_STEM.get(ref) or chapter_event_stem(ref_index(ref))
+
+
+def ref_title(ref):
+    """'Ch9: Distant Blade' for CHAPTER_E_9; the twin name itself for a shared chapter."""
+    return inject.decomp.chapter_titles().get(ref, ref)
+
+
+def ref_mode(ref):
+    """`chapterModeIndex` while `ref` is played: the route's from Ch9 on (ch8-eventscript.h sets
+    it when the route is chosen), COMMON (1) before."""
+    return {'CHAPTER_E_': CHAPTER_MODE_EIRIKA, 'CHAPTER_I_': CHAPTER_MODE_EPHRAIM}.get(
+        ref[:len('CHAPTER_E_')], CHAPTER_MODE_COMMON)
+
+
+def derive_red_arrays(stem):
+    """The UnitDefinition arrays that ARE a chapter's fightable enemies, by the rule the
+    PARITY_REFERENCE_UDEFS comments state: every array the chapter's eventscript loads whose RED
+    units are armed, minus the arrays it loads only to stage a scene (`scene_only_udefs`,
+    `ending_only_udefs`) and minus the cutscene loads that carry no items. In script order.
+    Reproduces the curated Ch1-Ch8 and Ch13 entries (tests); the Prologue stays curated, its
+    Valter group being a scripted Seth-Valter fight in the opening scene."""
+    by_array = {}
+    for name, u in _chapter_udef_pairs(stem):
+        by_array.setdefault(name, []).append(u)
+    scenes = scene_only_udefs(stem) | ending_only_udefs(stem)
+    return [name for name, units in by_array.items()
+            if name not in scenes and any(
+                u['items'] for u in units if u['allegiance'] == 'FACTION_ID_RED')]
+
+
+def _counter_sets(script_blocks):
+    """{counter: [k, ...]}: every `COUNTER_SET(counter, k)` a chapter's scripts run in NORMAL
+    mode, in script order. One between a CHECK_HARD and the next LABEL is the hard-mode refill
+    (ch9b, ch14b: CHECK_HARD, BEQ past it, COUNTER_SET, LABEL) and is left out. One that follows
+    a CHECK_TUTORIAL, or a CHECK_HARD whose branch a LABEL has already closed, has no Normal value
+    the rule can state from the text, so it is recorded as None (an unsized loop, which raises
+    if a loop uses it)."""
+    sets = {}
+    for _name, block in script_blocks:
+        for m in re.finditer(r'COUNTER_SET\(\s*(\w+)\s*,\s*(\w+)\s*\)', block):
+            before = block[:m.start()]
+            hard = [h.end() for h in re.finditer(r'\bCHECK_HARD\b', before)]
+            if hard and not re.search(r'\bLABEL\(', before[hard[-1]:]):
+                continue
+            k = (None if hard or re.search(r'\bCHECK_TUTORIAL\b', before)
+                 else int(m.group(2), 0))
+            sets.setdefault(m.group(1), []).append(k)
+    return sets
+
+
 @functools.lru_cache(maxsize=None)
-def vanilla_recruits():
-    """Everyone FE8 recruits along VANILLA_CHAIN, assuming every recruit succeeds, in join order.
+def reinforcement_waves(stem):
+    """{array: waves} for the arrays a chapter reloads in a COUNTED loop: a script that stands an
+    array up (`SVAL(EVT_SLOT_2, UnitDef_X)` + `CALL(EventScr_LoadReinforce)`) and then
+    `COUNTER_DEC(n)`s, re-arming itself until `COUNTER_CHECK(n)` reaches 0. The waves are the
+    `COUNTER_SET(n, k)` that starts the counter (Ch21's `UnitDef_088C1CE0`: ten waves of three).
+    Every other array is one wave and is absent here. A counted loop whose counter no single
+    Normal-mode COUNTER_SET sizes raises, naming the chapter and the script: a loud stop, not a
+    silent count of one."""
+    blocks = _script_blocks(stem)
+    sets = _counter_sets(blocks)
+    waves = {}
+    for name, block in blocks:
+        arrays = re.findall(r'SVAL\(\s*EVT_SLOT_2\s*,\s*(UnitDef_\w+)\s*\)', block)
+        for counter in re.findall(r'COUNTER_DEC\(\s*(\w+)\s*\)', block) if arrays else ():
+            ks = sets.get(counter, [])
+            if len(ks) != 1 or ks[0] is None:
+                raise ValueError('%s: script %s reloads %s in a loop counted by %s, which %s -- '
+                                 'the rule cannot size it' % (
+                                     stem, name, ', '.join(arrays), counter,
+                                     'no COUNTER_SET starts' if not ks else
+                                     'COUNTER_SET starts %d ways (%s)' % (len(ks), ks)))
+            for a in arrays:
+                waves[a] = waves.get(a, 0) + ks[0]
+    return waves
+
+
+def derived_red_defs(stem):
+    """`_vanilla_red_defs` for a stem's DERIVED arrays: (array, index, UnitDefinition) per RED
+    unit, an array a counted loop reloads (`reinforcement_waves`) once per wave."""
+    waves = reinforcement_waves(stem)
+    return [(name, i, u) for name in derive_red_arrays(stem)
+            for _wave in range(waves.get(name, 1))
+            for i, u in enumerate(vanilla_udefs_named(stem, name))
+            if u['allegiance'] == 'FACTION_ID_RED']
+
+
+@functools.lru_cache(maxsize=None)
+def chapter_ally_udefs(stem):
+    """A chapter's `.playerUnitsInNormal` list as `GetChapterAllyUnitCount` (eventscr3.c) reads
+    it: the entries up to the first with no charIndex. Memoised; the list is shared."""
+    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    m = re.search(r'\.playerUnitsInNormal\s*=\s*(\w+)', info)
+    if m is None:
+        raise ValueError('%s-eventinfo.h has no .playerUnitsInNormal, so the chapter has no '
+                         'ally list to count' % stem)
+    name = m.group(1)
+    out = []
+    for u in vanilla_udefs_named(stem, name):
+        if not u['charIndex'] or _character_number(u['charIndex']) == 0:
+            break
+        out.append(u)
+    return out
+
+
+def vanilla_field(ref):
+    """How many player units FIGHT `ref`: its `vanilla_deploy_cap`, plus the armed BLUE playable
+    units its turn events bring in that the ally list does not name. Only Ch1 has any: Eirika
+    and Seth are its list, and `EventScr_Ch1_Turn_AllyReinforceArrive` loads Franz and Gilliam,
+    so four fight where the prep screen would say two."""
+    stem = ref_stem(ref)
+    listed = {u['charIndex'] for u in chapter_ally_udefs(stem)}
+    turns = {a for n, a, _s in _load_sites(stem) if '_Turn_' in n}
+    arrivals = {u['charIndex'] for n, u in _chapter_udef_pairs(stem)
+                if n in turns and u['allegiance'] == 'FACTION_ID_BLUE' and u['items']
+                and _character_number(u['charIndex'] or '0') in PLAYABLE_PIDS
+                and u['charIndex'] not in listed}
+    return len(chapter_ally_udefs(stem)) + len(arrivals)
+
+
+def vanilla_deploy_cap(ref):
+    """How many units vanilla lets a player deploy into `ref`: the length of its
+    `playerUnitsInNormal` list (GetChapterAllyUnitCount, eventscr3.c:432, which the prep screen
+    reads for its cap, prepscreen.c). Not the units a run owns, which can be fewer."""
+    return len(chapter_ally_udefs(ref_stem(ref)))
+
+
+def scene_suspects(ref):
+    """[(array, script, why)] for the armed RED arrays `ref` KEEPS (the ones `_vanilla_red_defs`
+    walks, derived or curated) that a script loads and then, later in the same script, runs a
+    FIGHT, a DISA of one of the array's named units, or a CLEE. The text after the load is
+    searched; it is not shown that the FIGHT involves the array's units (a FIGHT between two
+    other units reads the same), nor that a CLEE removes this array. A reader checks each by
+    hand: the rule neither drops these loads nor can vouch for them."""
+    stem = ref_stem(ref)
+    kept = {a for a, _i, _d in _vanilla_red_defs(ref, derive=True)}
+    named = {a: {u['charIndex'] for u in vanilla_udefs_named(stem, a)
+                 if u['allegiance'] == 'FACTION_ID_RED'
+                 and str(u['charIndex']).startswith('CHARACTER_')} for a in kept}
+    out = []
+    for script, block in _script_blocks(stem):
+        for m in re.finditer(r'LOAD\w*\(\s*\w+\s*,\s*(UnitDef_\w+)', block):
+            array = m.group(1)
+            if array not in kept:
+                continue
+            after = block[m.start():]
+            why = ['%s' % f.strip() for f in re.findall(r'\bFIGHT\w*\([^)]*\)', after)]
+            why += [('removes %s' % c) for c in sorted(named[array])
+                    if re.search(r'DISA\w*\(\s*%s\b' % c, after)]
+            if re.search(r'^\s*CLEE\b', after, re.M):
+                why.append('a CLEE later in the same script')
+            if why:
+                out.append((array, script, '; '.join(why)))
+    return list(dict.fromkeys(out))
+
+
+@functools.lru_cache(maxsize=None)
+def vanilla_recruits(chain=VANILLA_CHAIN, slot_order=True):
+    """Everyone FE8 recruits along `chain` (VANILLA_CHAIN, or a `route_chain`), assuming every
+    recruit succeeds, in join order. `fields_from` is an index into `chain`.
+
+    `slot_order=False` is for a reader that needs WHO joins WHEN and not which unit-table slot
+    each takes (the exp walk): a chapter whose recruits' order the player decides (Ch10's
+    Gerik and Tethys, which talk to each other; Duessel and Cormag) then lists them in script
+    order instead of raising, and says nothing about their slots. Every recruit still fields
+    from the chapter after the one that recruits it, whatever order they join in.
 
     Join order is the unit table's slot order: a unit takes the first free blue slot when it
     joins (`GetFreeBlueUnit` for a LOAD, `UnitChangeFaction` -> `GetFreeUnit` for a recruit,
@@ -1379,8 +1627,8 @@ def vanilla_recruits():
     keeps out Ch4's Larachel, Dozla and Rennac, who are armed green cameos there and join much
     later."""
     seen, out = set(), []
-    for index, ref in enumerate(VANILLA_CHAIN):
-        stem = PARITY_REFERENCE_STEM[ref]
+    for index, ref in enumerate(chain):
+        stem = ref_stem(ref)
         talk = _talk_recruits(stem)
         opening = _opening_udefs(stem)
         loaded, later, talked = [], [], []
@@ -1398,8 +1646,9 @@ def vanilla_recruits():
             else:
                 continue
             seen.add(char)
-        out.extend(loaded + later + _in_recruit_order(talked, talk, ref))
-        if later and talked:
+        out.extend(loaded + later + (_in_recruit_order(talked, talk, ref) if slot_order
+                                     else talked))
+        if later and talked and slot_order:
             # A mid-chapter arrival and a talk recruit join in whichever order the player
             # meets them, so their slot order is not the decomp's to give.
             raise ValueError('%s: %s arrive(s) mid-chapter and %s join(s) by talk, so their '
@@ -3422,6 +3671,7 @@ def _event_group_stems():
     return out
 
 
+@functools.lru_cache(maxsize=None)
 def chapter_event_stem(index):
     """The event-file stem of FE8 chapter `index`, through the decomp's own tables: its
     chapter_settings `mapEventDataId` indexes the chapter asset table (data_8B363C.s), whose

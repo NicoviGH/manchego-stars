@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 import campaign_env as ce  # noqa: E402
 import campaign_chapters  # noqa: E402
 import difficulty  # noqa: E402
+import inject.decomp  # noqa: E402
 import inject.hosts  # noqa: E402
 from inject.chapter_settings import twin_rows  # noqa: E402
 
@@ -122,7 +123,7 @@ class Claims(unittest.TestCase):
         self.assertNotIn('unmodelled', {c['kind'] for c in ch3})
 
     def test_routes_split_after_ch8(self):
-        enum = ce._chapter_enum()
+        enum = inject.decomp.chapter_enum()
         self.assertEqual(ce.twin_index('FE8 Ch9', 1), enum['CHAPTER_E_9'])
         self.assertIsNone(ce.twin_index('FE8 Ch9', 2), "Eirika's own Ch9 is not Ephraim's")
         self.assertEqual(ce.twin_index('FE8 Ch9 Ephraim', 2), enum['CHAPTER_I_9'])

@@ -26,5 +26,22 @@ class FeItemEnum(unittest.TestCase):
         self.assertEqual(inject.decomp.fe_item_enum({'id': 'iron-axe'}), 'ITEM_AXE_IRON')
 
 
+class ChapterEnum(unittest.TestCase):
+    """`chapter_enum` / `chapter_titles`: the one reader of include/constants/chapters.h."""
+
+    def test_a_route_chapter_resolves_by_its_constant(self):
+        enum = inject.decomp.chapter_enum()
+        self.assertEqual(0x0A, enum['CHAPTER_E_9'])
+        self.assertEqual(0x0D, enum['CHAPTER_E_13'])      # Hamill Canyon; chapter_settings calls it E12
+        self.assertEqual(0x3D, enum['CHAPTER_E_11'])      # Ch11 sits out of line
+        self.assertEqual(0x3E, enum['CHAPTER_I_11'])
+        self.assertEqual(0x16, enum['CHAPTER_E_21X'])
+
+    def test_a_title_is_the_enumerators_comment(self):
+        titles = inject.decomp.chapter_titles()
+        self.assertEqual('Ch13: Hamill Canyon', titles['CHAPTER_E_13'])
+        self.assertEqual('Ch11: Phantom Ship', titles['CHAPTER_I_11'])
+
+
 if __name__ == '__main__':
     unittest.main()
