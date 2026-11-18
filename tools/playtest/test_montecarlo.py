@@ -112,6 +112,15 @@ class Records(unittest.TestCase):
         crashed = mc.attempt_line(dict(lost, outcome='crashed', why='Lua error'), set())
         self.assertIn('(Lua error) (deaths: lost 0x42', crashed)   # labelled apart
 
+    def test_distinct_games_counts_repeated_games_once(self):
+        # #647: two seeds that draw one style at one attempt play the same game (one acts_hash)
+        recs = [{'attempt': 1, 'acts_hash': 'a'}, {'attempt': 1, 'acts_hash': 'a'},
+                {'attempt': 2, 'acts_hash': 'b'}, {'kind': 'campaign', 'outcome': 'crashed'}]
+        self.assertEqual(mc.distinct_games(recs), '3 games, 2 distinct')
+        self.assertEqual(mc.seed_list('1-3'), [1, 2, 3])
+        self.assertEqual(mc.seed_list('2,5'), [2, 5])
+        self.assertEqual(mc.seed_list('4'), [4])
+
     def test_a_cause_botrun_does_not_name_is_refused(self):
         # the names are botrun.lua's M.CAUSES and M.DETAILS, read from its text
         causes, details = mc.botrun_names()

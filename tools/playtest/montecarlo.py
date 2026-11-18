@@ -3,10 +3,12 @@
 `mgba-headless` each, every record kept.
 
     python3 tools/playtest/montecarlo.py attempts --env <campaign env .json> --attempts 8 \\
-        [--jobs 4] [--out runs.jsonl] [--vanilla] [--seed 1]
+        [--jobs 4] [--out runs.jsonl] [--vanilla] [--seed 1 | 1,2,3 | 1-3]
 
 `attempts` plays attempts 1..N of the chapter at the env's `from` start side by side (env
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
+Over several style seeds it plays each in turn and ends with how many of the games were
+different (distinct_games, #647): a seed moves the style, never the dice.
 Each is an independent attempt: every attempt loads the same start state, and the styles are
 drawn without reading a result, so attempt k alone plays the k-th style with no memory, and
 with the dice the campaign's attempt k has: the game's RNG advanced k - 1 strides of draws from the start
@@ -635,6 +637,24 @@ def attempt_line(r, said):
         ' (%s)' % why if why else '',
         ' [noted: %s]' % noted if noted else '',
         ' [stalls: %s]' % stalls if stalls else '') + taught_line(r) + anomalies
+
+
+def distinct_games(records):
+    """How many games `records` played and how many were different: a game is its `acts_hash`
+    (every act the bot played). `--seed` draws only the style (ADR 0385); the dice are the
+    start's and the attempt number's (ADR 0404), so two seeds that draw one style at one attempt
+    play the same game move for move (#647: Ch17's 18 games over seeds 1-3 were 13)."""
+    games = [r for r in records if is_bot(r) and r.get('acts_hash')]
+    return '%d games, %d distinct' % (len(games), len({r['acts_hash'] for r in games}))
+
+
+def seed_list(text):
+    """`--seed`'s value: one seed, a list (1,2,3) or a range (1-3)."""
+    out = []
+    for part in text.split(','):
+        lo, _, hi = part.partition('-')
+        out.extend(range(int(lo), int(hi or lo) + 1))
+    return out
 
 
 def first_clean(records):
@@ -3869,7 +3889,8 @@ def main(argv=None):
     a.add_argument('--attempts', type=int, required=True)
     a.add_argument('--jobs', type=int, default=4)
     a.add_argument('--out', default='runs.jsonl')
-    a.add_argument('--seed', type=int, default=1)
+    a.add_argument('--seed', type=seed_list, default=[1],
+                   help='style seeds: 1, 1,2,3 or 1-3 (the dice do not move with it, #647)')
     a.add_argument('--vanilla', action='store_true')
     ca = sub.add_parser('calibration', help="the judged enemy phase against the played one, "
                         'from kept traces (#510 PR A)')
@@ -4015,14 +4036,20 @@ def main(argv=None):
     with open(args.env) as fh:
         env = json.load(fh)
     pool = Pool(jobs=args.jobs, out=args.out)
-    records, said = [], set()
-    for r in pool.run(attempt_tasks(env, args.attempts, args.seed, args.vanilla)):
-        records.append(r)
-        line = attempt_line(r, said)
-        if line:
-            print(line, flush=True)
-    k = first_clean(records)
-    print('first clean attempt: %s' % (k if k is not None else 'none'))
+    every = []
+    for seed in args.seed:
+        if len(args.seed) > 1:
+            print('seed %d:' % seed, flush=True)
+        records, said = [], set()
+        for r in pool.run(attempt_tasks(env, args.attempts, seed, args.vanilla)):
+            records.append(r)
+            line = attempt_line(r, said)
+            if line:
+                print(line, flush=True)
+        k = first_clean(records)
+        print('first clean attempt: %s' % (k if k is not None else 'none'))
+        every.extend(records)
+    print(distinct_games(every))
     return 0
 
 
