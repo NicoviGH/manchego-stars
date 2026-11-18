@@ -603,7 +603,8 @@ function M.staged(st)
 end
 
 -- The chance either of two independent events happens: 1 - (1 - a)(1 - b). The one fold of
--- win chances (the plan's win and its counters', winOf; a later phase's, the lookahead's).
+-- chances: the plan's win and its counters' (winOf), a later phase's win and deaths (the
+-- lookahead's), a protected unit's deaths over the plan's (overAll).
 function M.either(a, b) return 1 - (1 - a) * (1 - b) end
 
 -- Whether the death of enemy `id` ends the chapter, on a board with `left` red units (a Rout's
@@ -698,7 +699,8 @@ end
 -- the finalists `fin` (complete plans: acts with unitId, move, act): a door opened or a wall
 -- struck ("breach"); a unit stepping into a boss's reach from outside it ("boss": its
 -- end tile under sight.threat, its start tile not); a finalist with the assault's bait in it
--- ("bait", #641: its worth is the next turn's kill, which only the second phase reads; vanilla
+-- ("bait", #641: its worth is the next turn's kill, which only the second phase reads, and
+-- reads as a win only where that kill ends the chapter (endsIn: not a Seize map's holder); vanilla
 -- E_20's Ephraim, charId 0x0F, baited Morva from inside her danger zone, so no "boss" fired and
 -- the bait ranked on progress alone). No arrival trigger: the second phase
 -- cannot place the wave yet, so it would learn nothing about it (ADR 0389, Nicolas
@@ -1896,7 +1898,7 @@ function M.plan(Bot, board, sight, style, opts)
                     branches[#branches + 1] = { p = p, die = mine / p }
                 end
             end
-            if gameOver[u.charId] and o > 0 then overAll = 1 - (1 - overAll) * (1 - o) end
+            if gameOver[u.charId] and o > 0 then overAll = M.either(overAll, o) end
             st.protected[#st.protected + 1] = { id = u.id, charId = u.charId, die = d,
                                                 branches = branches, cap = cap }
             rank.hp_left = rank.hp_left + (hp - (taken[u.id] or 0))
@@ -2378,7 +2380,7 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, pr in ipairs(st.protected) do
                         protected[pr.id] = true
                         pr.second = second[pr.id] or 0
-                        if not wornRead[pr.id] then pr.die = 1 - (1 - pr.die) * (1 - pr.second) end
+                        if not wornRead[pr.id] then pr.die = M.either(pr.die, pr.second) end
                         rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end
                     for _, u in ipairs(st.phase.hit) do
@@ -2391,7 +2393,7 @@ function M.plan(Bot, board, sight, style, opts)
                             rank.green_die = rank.green_die + more
                         end
                     end
-                    rank.game_over = 1 - (1 - rank.game_over) * (1 - over)
+                    rank.game_over = M.either(rank.game_over, over)
                     -- the win the second phase reads (#641): a turn later, so worth GAMMA of
                     -- the first phase's, through the goals' own term (goalTerm) on the
                     -- chance the first phase leaves the chapter open. Without it a bait whose

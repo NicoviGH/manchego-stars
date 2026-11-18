@@ -470,6 +470,9 @@ end
 -- highest level is asked. -> { die(u, x, y, hp): the chance that strike kills `u` at `hp`, 0
 -- with no free unseen tile in reach or no enemy seen; unseen: every tile the fog hides }. Its
 -- strikes are memoised for the decision.
+-- A sight's odds (sight.odds), or none where a sight carries no odds (a test's bare board).
+local function oddsOf(sight) return sight.odds or function() return 0 end end
+
 function M.fogRead(board, sight, seen)
     local unseen = sight.unseen and sight.unseen() or {}
     local reps, kits, memo = {}, {}, {}
@@ -499,7 +502,7 @@ function M.fogRead(board, sight, seen)
     for _, u in ipairs(board.units) do
         if u.onField and not u.dead then held[tileKey(u.x, u.y)] = u.id end
     end
-    local odds = sight.odds or function() return 0 end
+    local odds = oddsOf(sight)
     local function die(u, x, y, hp)
         if #reps == 0 or hp <= 0 then return 0 end
         local worst = 0
@@ -1826,13 +1829,13 @@ local function mend(ctx, u, gate, m)
     return healAct(u, m, safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u)))
 end
 
--- The planner's heal swap: unit `u`'s own heal on `tile` (ctx: M.candidates' second value).
 -- One act `a` of `u` the planner builds itself (the heal swap's, the bait's), told its tile's
 -- ally and its exposure as every offered act is (exposed): without the `vacate`, the swap's
 -- heal took Kyle's (charId 0x11) tile before he left it, and the harness could not end the
 -- move there (vanilla E_19, 2026-11-16: "could not perform item").
 local function offeredAt(ctx, u, a) return exposed(ctx, u, { a })[1] end
 
+-- The planner's heal swap: unit `u`'s own heal on `tile` (ctx: M.candidates' second value).
 function M.mendAt(ctx, u, tile)
     local m = ownHeal(ctx, u)
     return m and offeredAt(ctx, u, healAct(u, m, tile)) or nil
@@ -1840,10 +1843,11 @@ end
 
 -- The planner's bait (#641): `u`'s wait on `tile` holding the weapon in bag slot `slot` (the
 -- act's `slot`, its key's too: the harness equips it before the Wait, and the judged phase arms
--- the unit with it), where the boss `boss` is read to strike it (its exposure there, with that
--- weapon held) and the counter to take HP off it. nil when it is not: a tile `u` may not strike
--- the boss from (strikeTiles: the throne's rule and the avoid claims, as the strike itself),
--- one the boss does not reach, or a counter that cannot hurt it (a range-2 tile against a
+-- the unit with it), where the boss `boss` reaches it (its exposure there, with that weapon
+-- held; whether the AI picks `u` over another target is the judged phase's read) and the
+-- counter takes HP off it. nil when it is not: a tile `u` may not strike the boss from
+-- (strikeTiles: the throne's rule and the avoid claims, as the strike itself), one the boss
+-- does not reach, or a counter that cannot hurt it (a range-2 tile against a
 -- range-1 boss). No march or hold offers a strike tile (vanilla E_20: Ephraim, charId 0x0F,
 -- never offered 11,12 to wait on), and no style gate is asked: the strikes it stands for are
 -- offered ungated (`priced`, ADR 0396) and the cap judges the plan.
@@ -1855,8 +1859,8 @@ function M.baitAt(ctx, u, boss, tile, slot)
     if not may then return nil end
     for _, s in ipairs(exposure(ctx, u, tile.x, tile.y, slot)) do
         if s.by.id == boss.id and s.f and s.f.counterDist then
-            local _, back = ctx.sight.odds({ s.f.counterDist }, boss.hp)
-            if back > 0 then
+            local _, back = oddsOf(ctx.sight)({ s.f.counterDist }, boss.hp)
+            if back > Goals.DUST then
                 -- slot 0 holds the weapon the unit fights with already (the game equips the
                 -- first usable one, GetUnitEquippedWeapon; the strike proves it usable): a plain
                 -- Wait. Another is equipped first, and is the act's identity (its key)
