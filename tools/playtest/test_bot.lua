@@ -6891,6 +6891,15 @@ do
     check(before(r { progress = 0.9 }, r { progress = 0.2 }), true, "rank: then progress")
     check(before(r { value = 500, max_die = 0.009 }, r { value = 0 }), true,
           "rank: the judged score before the death chance")
+    -- #641: a win chance under M.GONE is no lead, the judged score decides; one at it still is
+    check(before(r { complete = 0.0009, value = 0 }, r { complete = 0, value = 340 }), false,
+          "rank: a 0.09% win chance does not outrank a plan worth more")
+    check(before(r { complete = 0, value = 340 }, r { complete = 0.0009, value = 0 }), true,
+          "rank: the plan worth more outranks a 0.09% win chance")
+    check(before(r { complete = Planner.GONE, value = 0 }, r { complete = 0.4, value = 340 }),
+          true, "rank: a win at M.GONE outranks a plan worth more")
+    check(before(r { complete = 0.9 }, r { complete = 0.6 }), true,
+          "rank: above M.GONE the likelier win first")
     check(before(r { complete = 0.3 }, r { complete = 0.1 + 0.2 }), false,
           "rank: a win chance's float dust is no difference")
     local ok = pcall(before, r {}, { admitted = true })

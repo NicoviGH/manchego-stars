@@ -217,6 +217,10 @@ M.CAPS = { careful = 0.01, even = 0.05, bold = 0.15 }
 -- Whether death chance `d` is within `cap`: a sum of branch products can land a few ulps over a
 -- chance that is at the cap, and that is not an excess.
 M.DUST = Goals.DUST
+-- the chance at which a kill or a win counts as done: `score` counts a target gone at a kill of
+-- this much, the judge a composed kill, the assault a lone strike's, and the rank a plan's win
+-- (M.outranks). One line, so what the planner calls "gone" and what it ranks as "won" agree
+M.GONE = 0.5
 -- the lookahead's budget (FR-018): extra judged calls (sight.nextPhase, one a finalist) per
 -- decision and per attempt. 128 an attempt, not 32: 32 ran out before the boss fight on
 -- Manchego Stars ch03 and two vanilla starts, so the decisive turns were judged one phase deep
@@ -242,7 +246,7 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- came true 0 of 8 times where the next phase's were about right, so ranking by both let a
 -- unit be sent to an 82% death to dodge another's second-phase 90% (ADR 0389, amended
 -- 2026-11-08; careful seed 3010 turn 18, replayed). Then the admitted order: fewer goals forfeited
--- (the completion ledger's), the likelier win, more progress. Allied greens' summed death
+-- (the completion ledger's), the likelier win (only one likelier than not: M.GONE), more progress. Allied greens' summed death
 -- chance breaks ties among the plans within a turn of the most progress judged (FR-012: only
 -- there, and never ahead of a forfeit or the win): `behind`, the whole turns a plan's progress
 -- is short of the best's, comes first, then the greens. Measured from the best rather than
@@ -281,6 +285,14 @@ function M.outranks(a, b)
     end
     for _, o in ipairs(order) do
         local x, y = a[o[1]], b[o[1]]
+        -- the win ranks first only where it is likelier than not (M.GONE, the line `score` counts
+        -- a target gone at). Below it the chance still counts, through `value` (goalTerm's
+        -- objective worth and its win term): a 0.09% chance outranked plans worth 340 more in
+        -- `value` and cost Ch17 seed 2 its Eirika (#641, ADR 0425)
+        if o[1] == "complete" then
+            if x < M.GONE then x = 0 end
+            if y < M.GONE then y = 0 end
+        end
         -- a chance summed in another order differs by float dust, which is no difference
         local differ = x ~= y
         if type(x) == "number" and type(y) == "number" then differ = math.abs(x - y) > M.DUST end
@@ -417,7 +429,7 @@ local function score(act, st, W, style, odds)
         -- what the blow does, for the judge to play the kill both ways (its odds composed with
         -- the plan's other blows on the target, at the target's own HP)
         fx.kill = { id = e.id, dist = f.dealt }
-        if kill >= 0.5 then fx.gone = e.id end
+        if kill >= M.GONE then fx.gone = e.id end
         -- the boss's death is the win: its worth is the goals' (goalTerm), what it completes
         -- less what it closes, never a sum of its own, or no goal could ever wait for it
         if e.isBoss and st.objective == "boss" then fx.win = kill end
@@ -1249,7 +1261,7 @@ function M.plan(Bot, board, sight, style, opts)
         if #strikers == 1 then
             -- no assault to build: whether the lone strike counts the boss dead is its own
             -- kill chance, as extend reads it (score's fx.gone)
-            for _, o in ipairs(strikers[1].opts) do dead = dead or o.kill >= 0.5 end
+            for _, o in ipairs(strikers[1].opts) do dead = dead or o.kill >= M.GONE end
         else
             -- each tile's takers; a striker takes, of its heaviest blows, the tile the fewest
             -- of those after it could use -- a 1-2 range unit leaves the boss's side to the melee
@@ -1487,7 +1499,7 @@ function M.plan(Bot, board, sight, style, opts)
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
         -- each uncertain kill, and each counter that can leave its attacker on more than one
-        -- HP, played every way it goes: the average (an enemy gone at a kill >= 0.5, else
+        -- HP, played every way it goes: the average (an enemy gone at a kill >= M.GONE, else
         -- standing at its mean HP; our attacker on its mean HP after the counter) hides the
         -- way the rolls go otherwise. Vanilla Ch5 turn 5: Eirika's attack killed an enemy the
         -- plan kept standing, and Joshua's AI turned on her. Manchego Stars ch03 (T100b): Wolfram's
@@ -1513,7 +1525,7 @@ function M.plan(Bot, board, sight, style, opts)
             -- damage is capped at its HP, so the dead share is hp * p)
             local hp = byId[id].hp
             local p, mean = odds(blows, hp)
-            gone[id] = p >= 0.5 or nil
+            gone[id] = p >= M.GONE or nil
             local uid = only[id]
             if p > 0 and p < 1 and uid then
                 local pairsOf, list = {}, {}

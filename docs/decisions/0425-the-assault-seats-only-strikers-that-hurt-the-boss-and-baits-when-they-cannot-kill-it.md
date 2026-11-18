@@ -7,7 +7,7 @@ issues: [641, 510]
 ---
 # The assault seats only strikers that hurt the boss, and baits when they cannot kill it
 
-**Accepted (2026-11-18, #641; amended the same day by the review of PR #646).** In vanilla E_20
+**Accepted (2026-11-18, #641; amended the same day by the review of PR #646 and by the win floor below).** In vanilla E_20
 the playtest bot never broke Morva (charId 0x41), who holds the seize tile (E_20 is a Seize
 map). Every judged throne assault seated Ross (0x07), Vanessa (0x06) and Garcia (0x0A) beside
 Ephraim (0x0F). Their blows deal her nothing, and each one cost a whole death (`sum_die` 3.0).
@@ -59,6 +59,17 @@ her strike into the counter) was never judged. The diagnosis and the design are 
   objective's chance should know that the holder blocks the tile is open; it is not modelled
   here.
 - **No counter-damage weight.** The bait is played on what the rank already reads.
+- **The rank's win leads only at `M.GONE`** (`M.outranks`; ADR 0384's `complete`). A plan's win
+  chance ranks ahead of progress and value only where it is at least `M.GONE` (0.5), the one
+  constant `score` counts a target gone at (a kill), the judge a composed kill and the assault
+  a lone strike. Under it the chance does not lead. Derivation: the rank had no floor, so a
+  0.09% win chance (Ch17 seed 2 attempt 4, turn 9) outranked plans worth about 340 more in
+  `value`. The chance is not lost under the floor: `goalTerm` puts `pWin` into `value` (the
+  objective goal's worth, `c = pWin + (1 - pWin) * chance`, and `W.death * pWin * (1 - GAMMA)`),
+  and the lookahead's second-phase win goes in the same way. The floor was taken from the line
+  the planner already draws between "done" and "not done", not fitted: 0.5 fixed the loss and
+  kept E_20, so no lower floor was tried. Two plans both at or above it still order by the
+  likelier win.
 
 **Proof** (vanilla, campaign `bag1-heal4-heal1-lap4e-cs-s4006` unless named; base `ddaae8c5`):
 - **Unit tests** (`test_planner_assault_baits`, the `secondRead`/`endsIn`/`either` checks,
@@ -82,17 +93,26 @@ her strike into the counter) was never judged. The diagnosis and the design are 
   - On attempt 2 Ephraim baits Vigarde (0x6B) on turns 29-31, and the throne's +5 a turn
     outpaces the chip.
   - The attempt-3 harness crash happens on base too.
-- **Ch17** (seeds 1-3, 6 attempts each): 17/18 won, base 18/18. First clean attempt 6, 5, none
-  on both.
-  - Seed 2, attempt 4 is **lost**: Eirika (0x01) dies on turn 9 to a unit the board never
+- **Ch17** (seeds 1-3, 6 attempts each, before the floor): 17/18 won, base 18/18. First clean
+  attempt 6, 5, none on both.
+  - Seed 2, attempt 4 was **lost**: Eirika (0x01) died on turn 9 to a unit the board never
     showed (`unrevealed_killer`, 0% read).
   - That turn, plans built from the bait (charId 0x14 waiting on the boss's tile) outranked
-    plans worth about 340 more in `value`, on a 0.09% first-phase win chance. The rank orders
-    `complete` before progress and value, with no floor (ADR 0384).
-  - Whether a win chance that small should outrank is Nicolas's call; it is on #641.
-  - Here the lookahead's win was read in a real game (`lookWin.won` 0.0008).
+    plans worth about 340 more in `value`, on a 0.09% first-phase win chance
+    (`lookWin.won` 0.0008).
+- **Ch17 with the win floor** (same start, seeds and attempts): **18/18 won**. Seed 2 attempt 4
+  is now won on turn 12 (3 deaths, none of them Eirika; base: won turn 12, 3 deaths). First clean
+  attempt 6, 5, none, as base. Seeds 1 and 3 were rerun and also won 6/6.
+- **E_20** (attempt 2, seed 1) with the floor: **won on turn 42**, 335.3 CPU s (917387 frames).
+  Attempt 1 is lost on turn 3 (`forecast_desync`) as on base.
+- The unit test (`test_bot.lua`, rank block) fails on 6ec00962 and passes with the floor: a
+  0.09% win chance does not outrank a plan worth 340 more, a win at `M.GONE` does, and above
+  `M.GONE` the likelier win still leads.
 - **CPU per player phase**, base and branch back to back (load 2.5-5):
   - E_20 attempt 1, the same game: 13.97 s on the branch, 14.03 s on base.
   - E_20 attempt 2: 331.4 s over 42 phases on the branch, 339.4 s over 46 on base. The
     branch's last turns run the bait's second phase.
   - Ch17 seed 1: 15.95 s on the branch, 17.15 s on base.
+  - With the floor (2026-11-18, load 2-5): E_20 attempt 2 335.3 s (branch before: 331.4 s);
+    Ch17 seed 2 attempts 1-6: 238.7, 128.2, 158.1, 147.3, 124.1, 160.1 s (base 261.5, 149.8, 174.0,
+    170.6, 144.4, 182.7). Load differed between runs, so these are not paired.
