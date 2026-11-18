@@ -1817,12 +1817,14 @@ function M.new(outer)
 
     -- What an item is worth: FE8's own GetItemCost (price per use x uses, bmitem.c) on the
     -- item at its full uses (GetItemMaxUses), the number the game sums for the party's worth.
-    local prices = {}
+    -- Its full uses are memoised beside it (`maxUses`): usePrice reads them on every strike
+    -- the bot weighs, and a game call each time cost #642's price a quarter of its CPU.
+    local prices, maxUses = {}, {}
     function s.itemCost(id)
         if prices[id] == nil then
-            prices[id] = sandbox(function(call)
+            prices[id], maxUses[id] = sandbox(function(call)
                 local uses = call(S.GetItemMaxUses, { id })
-                return call(S.GetItemCost, { id | (uses << 8) })
+                return call(S.GetItemCost, { id | (uses << 8) }), uses
             end)
         end
         return prices[id]
@@ -1833,7 +1835,7 @@ function M.new(outer)
     function s.usePrice(id)
         local cost = s.itemCost(id)
         if not cost or cost <= 0 then return nil end
-        local uses = sandbox(function(call) return call(S.GetItemMaxUses, { id }) end)
+        local uses = maxUses[id]
         return uses > 0 and cost / uses or nil
     end
 

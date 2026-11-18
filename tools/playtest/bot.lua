@@ -2175,24 +2175,22 @@ local function proposeOne(ctx, u)
     -- be the one that matters; the planner weighs both, and ranking one strike by both would
     -- drop the other's best (PR #585 review and re-review).
     local best, safe, guard = {}, {}, {}
+    -- the unit's weapons that make each strike, by target and tile (#642): a strike is
+    -- priced over the cheapest of them, and carries the cheaper ones as its spares
+    local others = {}
     for _, c in ipairs(attackOptions(ctx, u, open, true)) do
         local e = c.target
+        if ctx.priceUse then
+            local k = e.id .. "@" .. c.tile.x .. "," .. c.tile.y
+            others[k] = others[k] or {}
+            table.insert(others[k], c)
+        end
         if not best[e] or betterAttack(c, best[e]) then best[e] = c end
         c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
         if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
         local g = guard[e]
         if not g or c.f.die < g.f.die or (c.f.die == g.f.die and c.worst < g.worst) then
             guard[e] = c
-        end
-    end
-    -- the unit's weapons that make each strike, by target and tile (#642): a strike is
-    -- priced over the cheapest of them, and carries the cheaper ones as its spares
-    local others = {}
-    if ctx.priceUse then
-        for _, c in ipairs(attackOptions(ctx, u, open, true)) do
-            local k = c.target.id .. "@" .. c.tile.x .. "," .. c.tile.y
-            others[k] = others[k] or {}
-            table.insert(others[k], c)
         end
     end
     -- a weapon's price per use: the game's own (sight.usePrice), else ctx.priceUse's
