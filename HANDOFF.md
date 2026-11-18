@@ -9,6 +9,11 @@ operating rules in `CLAUDE.md`/`AGENTS.md`; findings, scope and backlog on GitHu
 here should still be true in a month. Before a context rollover, warn Nicolas, refresh this file,
 and start a fresh instance; don't rely on auto-compaction.
 
+**Where #510's work lives on GitHub (2026-11-17):** #510 is the epic; its step 9 (the bot) is
+#640, a sub-issue, and every step-9 issue is a sub-issue of #640 (#531, #565, #569, #639 open).
+#510's checklist lists each step's PRs; #640 lists step 9's 75 PRs by theme. New step-9 work:
+open its issue as a sub-issue of #640 (`gh api -X POST repos/NicoviGH/manchego-stars/issues/640/sub_issues -F sub_issue_id=<issue id>`) and list its PR on #640.
+
 **Next session starts here (2026-11-17, night; main at this HANDOFF commit, cc102670's code). PR #638 is merged** (Nicolas: "Merge it", 2026-11-17): E_20's crash was a healer listing itself for Physic. The game makes every unit-menu list with the acting unit off the unit map (`UnitBeginAction`), so a staff never heals its holder; the bot's sandbox stood the healer on its tile. `Sight.asActive` now stages the unit as the game does, and `s.heals` and `canAttack` use it. E_20 attempt 1 replayed on the fix (tag `selfheal2`): no crash, 48 turns, ended `stuck`, 6 deaths (not looked into). Before that, **PR #637 was merged** (ADR 0389 amended): the lookahead's and the wear's second phase now read the **army's reply** between the two enemy phases (every kill at even odds or better, then each other unit to its safest free tile) instead of our units holding. `PT_REPLY=hold` is the control. Read #510 comments 6960188976, 6962994569 (results, corrected count) and 6961789474 (the misses, a lead) first.
 
 - **What it did** (same 32 starts, attempts and dice; Ch8 ×6 pinned campaigns, E_15 from `lap4e`,
