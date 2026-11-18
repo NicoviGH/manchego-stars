@@ -159,12 +159,13 @@ function M.diceFor(attempt) return (attempt - 1) * M.DICE_STRIDE end
 
 local function pick(random, list) return list[math.floor(random() * #list) + 1] end
 
--- A style for one attempt, never one already tried since `tried` was last emptied: the aggression
--- uniform over Bot.STYLES, each claim the bot can play followed with p = 0.5, the campaign's
--- route. A claim Bot.unplayed names plays the same followed or not, so it is no part of a
--- style (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is the keys
--- drawn so far. Returns the style and the claims followed, or nil when every style has been tried (the
--- loop then empties `tried` and draws again; one attempt alone says no_style).
+-- A style for one attempt, never one already tried since `tried` was last emptied: the
+-- aggression uniform over Bot.STYLES, each claim the bot can play followed with p = 0.5, the
+-- campaign's route. A claim Bot.unplayed names plays the same followed or not, so it is no
+-- part of a style (vanilla Ch5: four such claims made 48 styles that played as 3). `tried` is
+-- the keys drawn so far. Returns the style and the claims followed, or nil when every style
+-- has been tried (the loop then empties `tried` and draws again; one attempt alone says
+-- no_style).
 local function styleKey(aggression, ids) return aggression .. "|" .. table.concat(ids, ",") end
 
 function M.drawStyle(Bot, random, claims, route, tried)

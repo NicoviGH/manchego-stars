@@ -2901,8 +2901,8 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             raise
         copied.append(os.path.join(store, 'states', new))
         if scout:
-            with open(os.path.join(store, 'states', new, SCOUT_MARK), 'w') as fh:
-                fh.write('a scout lap (ADR 0409): never a clean start\n')
+            write_mark(os.path.join(store, 'states', new), SCOUT_MARK,
+                       'a scout lap (ADR 0409): never a clean start')
         camp = dict(env, id=new, **{'from': at})
         if last is not None:
             camp['last'] = [last]
@@ -2914,12 +2914,18 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['route'] = route
         if level is not None:
             camp['sealAt'] = level
-            with open(os.path.join(store, 'states', new, SEAL_AT_MARK), 'w') as fh:
-                fh.write('%d\n' % level)
+            write_mark(os.path.join(store, 'states', new), SEAL_AT_MARK, '%d' % level)
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'instrument': instrument,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
     return tasks
+
+
+def write_mark(folder, name, text):
+    """A one-line marker file in a campaign's states folder (SCOUT_MARK, SEAL_AT_MARK): what a
+    later resume of that campaign must know about how its starts were played."""
+    with open(os.path.join(folder, name), 'w') as fh:
+        fh.write(text + '\n')
 
 
 def stale_starts(store, starts, instrument):
