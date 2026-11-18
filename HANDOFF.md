@@ -11,18 +11,13 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-18, overnight; main's code is cc102670). #642 (the bot spends its boss-breaking weapons on regular enemies) has a working fix awaiting Nicolas's price call.** Read [the findings](https://github.com/NicoviGH/manchego-stars/issues/642#issuecomment-6970344369) and the design comment (6965656308, edited in place). Code: branch `feat/642-weapon-price` (eff94ca2, pushed, WIP, no PR; dial `PT_USEPRICE`). The investigation ran on an Opus subagent: Fable was refused (the account needs usage credits).
+**Next session starts here (2026-11-18, evening; main is 134bd39d). Next: #639, extend the party-level band past Ch8 and compare the bot's party chapter by chapter.** Three #510 PRs merged today, each after `/code-review`, its fixes and CI:
 
-- **How we got here:** #641 is root-caused ([comment](https://github.com/NicoviGH/manchego-stars/issues/641#issuecomment-6965445710)): Morva's Wretched Air ignores defence, and the bot had used up Siegmund and Excalibur before reaching her.
-- **What #642 found (checked: the Ch17 and E_20 tables recompute from the records; `test_bot.lua`/`test_botrun.lua` pass on eff94ca2):**
-  - The old price did cost lives, confirmed per decision with a new diagnostic (`PT_SHADOW`: each decision also planned at another price, never played). The price lowered a strike's own score in the beam, so the beam dropped the Twin strike before the judge read the life it saved.
-  - Fix (8f845291): the beam never sees the price; cheaper weapons that make the same strike ride along as spares, and a spare step charges the price on the judged plan only. Ch17 seeds 1-3: 18/18 won, 8 deaths, 15 Twin strikes (off: 15/18, 7, 34). 300 and 600 play the same 18 games.
-  - CPU (eff94ca2): `GetItemMaxUses` called per strike weighed is memoised; same 6 games back to back, 20.1 → 17.3 s a player phase.
-  - Boss test (E_20 with the throne assault on top, local branch `probe/642-boss` 4cf39e1b, unpushed): no arm struck Morva. Ephraim kept Siegmund, but every assault seats strikers that deal 0 and die to her counter. **Noticed in the records, not in the comment:** at 600 in E_20 the party still struck 13 times with Twins/Excalibur (9 Excalibur), against 14 and 17 with the price off, so the price barely saved Excalibur there. Not looked into.
-- **Waiting on Nicolas:** the price (subagent recommends 300 gold per use: highest tested where one use stays under one death's weight in every style). Then the PR.
-- **After that:** the throne assault's strikers (#641's "found instead"), then #639.
-- **Runs kept:** `review/642-runs/` (gitignored; readers `arms.py`, `shadow2.py`, `e20.py`). Their trace paths may point at the old session scratchpad.
-- **Seen, not looked into:** the convoy entering E_20 holds full, unused rank-S legendaries (Garm, Gleipnir, Nidhogg, Vidofnir, Ivaldi) nobody can wield. Seed 2 repeats seed 1 in 5 of 18 games (attempts with `--seed`).
+- **#643 (#642, ADR 0423): a plan pays for the weapon uses it spends.** A legendary use costs 300 gold over the dearest shop weapon that makes the same strike; the price is charged on the judged plan only, never in the beam. Ch17 seeds 1-3: 18/18 won, Twin strikes 34 → 13.
+- **#645 (#644, ADR 0424): the simulated enemy phase plays each weapon at the uses it will have** (a weapon that breaks mid-phase is gone for the rest of it). +0.4% CPU.
+- **#646 (#641, ADR 0425): the throne assault seats only strikers that hurt the boss, and baits when they cannot kill it** (the heaviest striker waits on its strike tile holding the weapon, so the boss's attack eats its counter). Also: a plan's win chance ranks it first only at 0.5 or better (`M.GONE`); below that it counts through value. E_20 (Morva) is now **won on turn 42** (Ephraim baits with Siegmund, his counter kills her, Eirika seizes); base was stuck on turn 47. Ch17 18/18. Runs: `review/641-runs/`, `review/642-runs/` (gitignored).
+- **Still open:** I_14 (Ephraim route, Vigarde on the throne): no clear. The bait chips him for less than the throne heals (+5 a turn); a strength wall, which is what #639 checks. A Seize objective's win chance does not count the holder blocking the tile (ADR 0425, open).
+- **AGENTS.md** now holds the model rule: every subagent starts with its model set explicitly, Sonnet by default (Opus burned the usage limit). Codex is retired.
 
 **Before that (same day): PR #638 is merged** (Nicolas: "Merge it", 2026-11-17): E_20's crash was a healer listing itself for Physic. The game makes every unit-menu list with the acting unit off the unit map (`UnitBeginAction`), so a staff never heals its holder; the bot's sandbox stood the healer on its tile. `Sight.asActive` now stages the unit as the game does, and `s.heals` and `canAttack` use it. E_20 attempt 1 replayed on the fix (tag `selfheal2`): no crash, 48 turns, ended `stuck`, 6 deaths (not looked into). Before that, **PR #637 was merged** (ADR 0389 amended): the lookahead's and the wear's second phase now read the **army's reply** between the two enemy phases (every kill at even odds or better, then each other unit to its safest free tile) instead of our units holding. `PT_REPLY=hold` is the control. Read #510 comments 6960188976, 6962994569 (results, corrected count) and 6961789474 (the misses, a lead) first.
 
@@ -43,8 +38,8 @@ and start a fresh instance; don't rely on auto-compaction.
   Eirika L3. At I_13 (Ephraim route) Ephraim/Seth L12, Kyle L11, the rest L8-9 or below,
   only Lute promoted. The band stops at Ch8, so "under-strength later" is a lead. Likely cause,
   untested: Seth (promoted) takes the kills.
-- **Next, in order:** (1) #642 (above); (2) #639, extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
-  party chapter by chapter, who takes the experience; (3) laps again from the prologue.
+- **Next, in order:** (1) #639, extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
+  party chapter by chapter, who takes the experience; (2) laps again from the prologue.
 - **CI:** the runner's default Python moved to 3.13 today and dropped `aifc`; main's `tests` job
   had failed since. #637 pins 3.12 on the `tests` and `verdict-diff` jobs (the ROM build keeps
   the system Python its decomp scripts' `#!/bin/python3` runs).
