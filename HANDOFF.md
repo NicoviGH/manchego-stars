@@ -11,7 +11,18 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-17, night; main at this HANDOFF commit, cc102670's code). PR #638 is merged** (Nicolas: "Merge it", 2026-11-17): E_20's crash was a healer listing itself for Physic. The game makes every unit-menu list with the acting unit off the unit map (`UnitBeginAction`), so a staff never heals its holder; the bot's sandbox stood the healer on its tile. `Sight.asActive` now stages the unit as the game does, and `s.heals` and `canAttack` use it. E_20 attempt 1 replayed on the fix (tag `selfheal2`): no crash, 48 turns, ended `stuck`, 6 deaths (not looked into). Before that, **PR #637 was merged** (ADR 0389 amended): the lookahead's and the wear's second phase now read the **army's reply** between the two enemy phases (every kill at even odds or better, then each other unit to its safest free tile) instead of our units holding. `PT_REPLY=hold` is the control. Read #510 comments 6960188976, 6962994569 (results, corrected count) and 6961789474 (the misses, a lead) first.
+**Next session starts here (2026-11-17, late night; main's code is cc102670). Work #642 (the bot spends its boss-breaking weapons on regular enemies) with a Fable subagent** (Nicolas: start the next instance with a Fable subagent that investigates and comes up with a solution, with autonomy to start cheaper subagents and run experiments). Brief it from #642's three comments: the design (edited in place), and [the experiments](https://github.com/NicoviGH/manchego-stars/issues/642#issuecomment-6968218642). Code: branch `feat/642-weapon-price` (e7ce13ba, pushed, WIP, not for merge; the dial is `PT_USEPRICE`).
+
+- **How we got here:** #641 is root-caused ([comment](https://github.com/NicoviGH/manchego-stars/issues/641#issuecomment-6965445710)). E_20's assault reads every striker dead because Morva's Wretched Air ignores defence (36 per counter at 100 hit), not because of a judge or sight error. The bot had used up Siegmund and Excalibur on lesser enemies before reaching her.
+- **Where #642 stands:** a price per weapon use, charged over the cheapest weapon that makes the same strike, cuts Sacred Twin strikes in Ch17 from 34 to 3-7. The corrected price still lost more in 18 Ch17 games (12 wins and 16 deaths, against 15 and 7 with the price off). The cause isn't found, and at 13 distinct games it's within chance. The boss test (E_20 with `feat/510-throne-assault` on top: does a saved Twin break Morva?) has not run.
+- **Open for the Fable pass, in order:**
+  1. Whether the price costs lives, and why. Use a sample big enough to tell, or a per-decision measure that doesn't hang on chaotic games.
+  2. The boss test.
+  3. A price number, with the reasoning, for Nicolas to choose.
+  4. The cost per turn (+25%, not controlled) is parked by Nicolas for later.
+- **Seen, not looked into:** the convoy entering E_20 holds full, unused rank-S legendaries (Garm, Gleipnir, Nidhogg, Vidofnir, Ivaldi) nobody can wield. Seed 2 repeats seed 1 in 5 of 18 games (attempts with `--seed`).
+
+**Before that (same day): PR #638 is merged** (Nicolas: "Merge it", 2026-11-17): E_20's crash was a healer listing itself for Physic. The game makes every unit-menu list with the acting unit off the unit map (`UnitBeginAction`), so a staff never heals its holder; the bot's sandbox stood the healer on its tile. `Sight.asActive` now stages the unit as the game does, and `s.heals` and `canAttack` use it. E_20 attempt 1 replayed on the fix (tag `selfheal2`): no crash, 48 turns, ended `stuck`, 6 deaths (not looked into). Before that, **PR #637 was merged** (ADR 0389 amended): the lookahead's and the wear's second phase now read the **army's reply** between the two enemy phases (every kill at even odds or better, then each other unit to its safest free tile) instead of our units holding. `PT_REPLY=hold` is the control. Read #510 comments 6960188976, 6962994569 (results, corrected count) and 6961789474 (the misses, a lead) first.
 
 - **What it did** (same 32 starts, attempts and dice; Ch8 ×6 pinned campaigns, E_15 from `lap4e`,
   I_13 from `lap4p`): won 17 → 20, lost 2 → 0, deaths 38 → 30, fallback plans 182 → 98. One
@@ -30,8 +41,7 @@ and start a fresh instance; don't rely on auto-compaction.
   Eirika L3. At I_13 (Ephraim route) Ephraim/Seth L12, Kyle L11, the rest L8-9 or below,
   only Lute promoted. The band stops at Ch8, so "under-strength later" is a lead. Likely cause,
   untested: Seth (promoted) takes the kills.
-- **Next, in order:** (1) #641, root-cause E_20's throne assault (cheap subagents until a
-  true cause); (2) #639, extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
+- **Next, in order:** (1) #642 (above); (2) #639, extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
   party chapter by chapter, who takes the experience; (3) laps again from the prologue.
 - **CI:** the runner's default Python moved to 3.13 today and dropped `aifc`; main's `tests` job
   had failed since. #637 pins 3.12 on the `tests` and `verdict-diff` jobs (the ROM build keeps
@@ -39,7 +49,8 @@ and start a fresh instance; don't rely on auto-compaction.
 - **Where the laps stopped** (states in the vanilla store):
   - Eirika: `bag1-heal4-heal1-lap4e-cs-s4006`, E_20. The turn-24 crash is fixed (PR #638);
     attempt 1 replayed as `selfheal2-…` ends `stuck` after 48 turns with 6 deaths (no
-    progress in 16 player phases), not looked into.
+    progress in 16 player phases). Its throne assault is root-caused in #641 (Morva's counter;
+    the Twins already spent).
   - Ephraim: `lap4p-cs-s4006`, **I_14 (Seize, Vigarde charId 0x6B on the throne): no clear in
     12 attempts.** A strength wall, not a missing plan: `feat/510-throne-assault` (unshipped)
     builds the assault on the throne's holder, and every assault reads a unit dying at about
