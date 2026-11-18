@@ -2,6 +2,7 @@
 cell driver (Task 12)."""
 import contextlib
 import io
+import argparse
 import json
 import multiprocessing
 import os
@@ -111,6 +112,44 @@ class Records(unittest.TestCase):
         self.assertIn('deaths: lost 0x42', mc.attempt_line(lost, set()))
         crashed = mc.attempt_line(dict(lost, outcome='crashed', why='Lua error'), set())
         self.assertIn('(Lua error) (deaths: lost 0x42', crashed)   # labelled apart
+
+    def test_distinct_games_counts_repeated_games_once(self):
+        # #647: two seeds that draw one style at one attempt play the same game (one acts_hash);
+        # a campaign end is no game even with a hash, so the BOTRUN filter is what drops it
+        recs = [{'attempt': 1, 'acts_hash': 'a'}, {'attempt': 1, 'acts_hash': 'a'},
+                {'attempt': 2, 'acts_hash': 'b'},
+                {'kind': 'campaign', 'outcome': 'played', 'acts_hash': 'c'}]
+        self.assertEqual(mc.distinct_games(recs), '3 games, 2 distinct')
+
+    def test_distinct_games_says_attempts_that_left_no_game(self):
+        recs = [{'attempt': 1, 'acts_hash': 'a'}, {'attempt': 2, 'outcome': 'crashed'}]
+        self.assertEqual(mc.distinct_games(recs), '1 games, 1 distinct, 1 attempts left no game')
+
+    def test_seed_list_reads_a_seed_a_list_and_a_range(self):
+        self.assertEqual(mc.seed_list('1-3'), [1, 2, 3])
+        self.assertEqual(mc.seed_list('2,5'), [2, 5])
+        self.assertEqual(mc.seed_list('4'), [4])
+
+    def test_seed_list_refuses_what_would_play_nothing_or_twice(self):
+        for bad in ('3-1', '1-', '-1', 'x', '1,1', '1-3,2'):
+            with self.assertRaises(argparse.ArgumentTypeError, msg=bad):
+                mc.seed_list(bad)
+
+    def test_play_attempts_says_each_seed_apart_and_counts_over_all(self):
+        # two style seeds over attempts 1-2: attempt 1 plays one game under both (#647)
+        def launch(task, tag, log_path):
+            k, seed = task['campaign']['attempt'], task['seed']
+            h = 'a1' if k == 1 else 'a2-s%d' % seed
+            return ('BOTRUN {"attempt": %d, "seed": %d, "outcome": "won", "clean": %s, '
+                    '"acts_hash": "%s"}\n' % (k, seed, 'true' if k == 2 else 'false', h)), '/tmp/x'
+        d = tempfile.mkdtemp()
+        said = []
+        pool = mc.Pool(jobs=1, out=os.path.join(d, 'runs.jsonl'), launch=launch)
+        every = mc.play_attempts(pool, {'from': 4}, 2, [1, 2], False, say=said.append)
+        self.assertEqual(len([r for r in every if mc.is_bot(r)]), 4)
+        self.assertEqual([l for l in said if l.startswith(('seed', 'first'))],
+                         ['seed 1:', 'first clean attempt: 2', 'seed 2:', 'first clean attempt: 2'])
+        self.assertEqual(said[-1], '4 games, 3 distinct')
 
     def test_a_cause_botrun_does_not_name_is_refused(self):
         # the names are botrun.lua's M.CAUSES and M.DETAILS, read from its text
