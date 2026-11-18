@@ -1471,6 +1471,19 @@ class Suite(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(store, 'states', 'bad-cs-s4001')),
                          'a refusal copies nothing')
 
+    def test_resume_seal_at_reaches_the_campaign_env(self):
+        """`resume --seal-at 20` (#639): each task's campaign carries `sealAt` (harness.lua's cfg,
+        into every run's style); unset leaves it out; a level other than 10 or 20 is refused
+        before any copy, as --route is."""
+        store, pins = self.resume_store()
+        tasks = mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'sa1', vanilla=True, seal_at=20)
+        self.assertEqual(tasks[0]['campaign']['sealAt'], 20)
+        none = mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'sa2', vanilla=True)
+        self.assertNotIn('sealAt', none[0]['campaign'])
+        with self.assertRaisesRegex(ValueError, r'--seal-at is 15'):
+            mc.resume_tasks(store, {}, ['cs-s4001'], pins, 'sa3', vanilla=True, seal_at=15)
+        self.assertFalse(os.path.exists(os.path.join(store, 'states', 'sa3-cs-s4001')))
+
     def test_resume_scout_and_route_reach_the_campaign_env(self):
         """`resume --scout --route 2` (the scout lap, #510 comment 6872554917): each task's env
         carries `scout` and `route` (harness.lua's cfg), the route in place of the env's; neither

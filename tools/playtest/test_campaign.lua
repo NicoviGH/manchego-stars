@@ -36,7 +36,7 @@ end
 -- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"|"timeout"... },
 -- options = n (a route split before it), needs = Bot.team's demands/answers/strength } };
 -- "dead" is a win with a death, "spoiled" a win with a recruit missed. o.route = the
--- campaign's route setting, o.game the game (default "fake"). ch.seen = { [attempt] =
+-- campaign's route setting, o.sealAt its promotion level (#639), o.game the game (default "fake"). ch.seen = { [attempt] =
 -- arrivals_seen } (the record's reinforcements seen on screen, ADR 0386).
 local function fakeGame(o)
     local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, used = {}, calls = {},
@@ -44,7 +44,7 @@ local function fakeGame(o)
     g.api = {
         Bot = Bot, Json = Json,
         info = { game = o.game or "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1",
-                 route = o.route },
+                 route = o.route, sealAt = o.sealAt },
         random = o.random or cycle({ 0.1, 0.6, 0.3, 0.9, 0.5 }),
         arrive = function(route)
             g.at = g.at + 1
@@ -247,6 +247,32 @@ local function test_route_is_the_campaign_setting()
     check(why:find("route") ~= nil, true, "naming the route")
 end
 test_route_is_the_campaign_setting()
+
+-- #639: the campaign's sealAt reaches every attempt's style (the record says which policy it
+-- played) and Bot.uses: unit 3 (level 9) holds a seal the fake game says promotes it, so it is
+-- used with no setting and kept at 20.
+local function test_seal_at_is_the_campaign_setting()
+    local function run(sealAt)
+        local g = fakeGame({ cap = 2, sealAt = sealAt, random = cycle({ 0.1 }),
+                             chapters = { { id = 1, needs = { demands = { { id = "s", kind = "sustain", need = 1 } },
+                                                              answers = { [0x03] = { s = true } }, strength = {} } } } })
+        local base = g.api.roster
+        g.api.roster = function()
+            local r = base()
+            r[3].items = { { id = 0x88, kind = "other", uses = 1, promotes = true } }
+            return r
+        end
+        Campaign.run(g.api)
+        return g
+    end
+    local g = run(nil)
+    check(table.concat(g.used, ","), "3", "no sealAt: the seal is used")
+    check(g.plays[1].style.sealAt, nil, "and the style says nothing")
+    g = run(20)
+    check(table.concat(g.used, ","), "", "sealAt 20: a L9 unit's seal is kept")
+    for _, p in ipairs(g.plays) do check(p.style.sealAt, 20, "every attempt's style carries sealAt") end
+end
+test_seal_at_is_the_campaign_setting()
 
 local function test_crash_is_never_retried()
     local g = fakeGame({ chapters = { { id = 1, outcomes = { "crashed", "won" } }, { id = 2 } } })

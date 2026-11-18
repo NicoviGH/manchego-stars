@@ -2821,7 +2821,7 @@ def start_bots(store, name, at, instrument):
 
 
 def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=False,
-                 attempts=None, scout=False, route=None, instrument=None):
+                 attempts=None, scout=False, route=None, instrument=None, seal_at=None):
     """One task per campaign in `names`: carried on from a chapter start it saved (`chapter`,
     else its latest) under the new id `<tag>-<name>`, its start states copied there first.
     Resuming re-saves the start it loads, and cell-starts.json pins the original by its sha1;
@@ -2833,13 +2833,17 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     seed is unknown, or the new id is taken; a copy that fails removes every copy this call
     made, then raises. `scout` carries each campaign on past a chapter it cannot clear clean (the
     scout lap, campaign.lua M.SCOUT_PATIENCE); `route` (1 Eirika, 2 Ephraim) is the branch it
-    takes at vanilla's Ch8 split, in place of the env's. Each task runs under `instrument`
+    takes at vanilla's Ch8 split, in place of the env's; `seal_at` (10 or 20, #639) is the level
+    the bot uses a promotion item at (bot.lua Bot.uses; unset plays 10), written into each run's
+    style so every record says which policy it played. Each task runs under `instrument`
     (instrument_id() unless given); its records say whether their start was stale (records_of).
     """
     if route is not None and not vanilla:
         raise ValueError('--route is vanilla\'s (the branch at its Ch8 split)')
     if route is not None and route not in (1, 2):
         raise ValueError('--route is %d, and vanilla has routes 1 and 2' % route)
+    if seal_at is not None and seal_at not in (10, 20):
+        raise ValueError('--seal-at is %d, and the bot promotes at 10 or 20' % seal_at)
     if attempts is not None and not 1 <= attempts <= max_attempts():
         raise ValueError('--attempts is %d, and a chapter start gets 1 to %d attempts'
                          % (attempts, max_attempts()))
@@ -2889,6 +2893,8 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
             camp['scout'] = True
         if route is not None:
             camp['route'] = route
+        if seal_at is not None:
+            camp['sealAt'] = seal_at
         tasks.append({'campaign': camp, 'seed': seed, 'vanilla': vanilla,
                       'instrument': instrument,
                       'stamp': {'resumed_from': '%s/%d' % (name, at)}})
@@ -2945,7 +2951,8 @@ def resume_main(args, pool=None):
     from matrix import ManifestError
     try:
         tasks = resume_tasks(store, envs()[args.game], names, pins, args.tag, args.chapter,
-                             args.last, vanilla, args.attempts, args.scout, args.route)
+                             args.last, vanilla, args.attempts, args.scout, args.route,
+                             seal_at=args.seal_at)
     except (ValueError, ManifestError) as err:
         print('refused: %s' % err)
         return 1
@@ -4000,6 +4007,9 @@ def main(argv=None):
     ru.add_argument('--route', type=int,
                     help='the branch taken at vanilla\'s Ch8 split: 1 Eirika, 2 Ephraim '
                          '(default: the suite\'s)')
+    ru.add_argument('--seal-at', type=int, dest='seal_at',
+                    help='the level the bot uses a promotion item at, 10 or 20 (default 10, the '
+                         'game\'s own floor; #639); each record\'s style says sealAt')
     ru.add_argument('--jobs', type=int, default=8)
     rr = sub.add_parser('report', help="one instrument's cells in sentences (FR-031)")
     rr.add_argument('cells', nargs='?', default=CELLS_FILE,

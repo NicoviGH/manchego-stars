@@ -2071,6 +2071,29 @@ do
                                               item(0x5C, nil, { gains = true }) } })
     check(acts(B.uses({ both }, {})), "use 4:64", "uses: one use a unit, the seal first")
 
+    -- #639: style.sealAt is the level a promotion item is used at (nil: 10, the game's floor).
+    -- A L12 unit's own seal and a convoy's seal are both used at 10 and neither at 20; a L20
+    -- unit uses one at 20. The seal is kept where it is: no take from the convoy, and Bot.supply
+    -- (which runs before the shop and never reads the style) does not give the bag's seal away,
+    -- since the game says it promotes the holder.
+    local ownSeal = armedUnit(6, 12, { items = { lance(), item(0x64, nil, { promotes = true, use = "seal" }) } })
+    local convoySeal = item(0x65, { [7] = { promotes = true } })
+    check(acts(B.uses({ ownSeal }, {})), "use 6:64", "sealAt nil: a L12 unit uses its seal")
+    check(acts(B.uses({ ownSeal }, {}, { sealAt = 10 })), "use 6:64", "sealAt 10: a L12 unit uses its seal")
+    check(acts(B.uses({ ownSeal }, {}, { sealAt = 20 })), "", "sealAt 20: a L12 unit keeps its seal")
+    check(acts(B.uses({ armedUnit(7, 12) }, { convoySeal })), "take 7:65, use 7:65",
+        "sealAt nil: the convoy's seal goes to a L12 unit")
+    check(acts(B.uses({ armedUnit(7, 12) }, { convoySeal }, { sealAt = 20 })), "",
+        "sealAt 20: the convoy's seal stays in the convoy")
+    check(acts(B.uses({ armedUnit(7, 20) }, { convoySeal }, { sealAt = 20 })), "take 7:65, use 7:65",
+        "sealAt 20: a L20 unit takes and uses it")
+    check(acts(B.uses({ armedUnit(7, 19), armedUnit(8, 20) },
+            { item(0x65, { [7] = { promotes = true }, [8] = { promotes = true } }) }, { sealAt = 20 })),
+        "take 8:65, use 8:65", "sealAt 20: only the L20 unit of two promotes")
+    check(acts(B.supply({ ownSeal }, {})), "", "sealAt 20: supply keeps a seal that promotes its holder")
+    check(acts(B.supply({ ownSeal }, { convoySeal })), "",
+        "sealAt 20: supply neither gives the bag's seal away nor takes a seal from the convoy")
+
     -- 4. a booster: the forced unit first, then the lowest level; nobody when the game says no
     -- stat gains
     local lord = armedUnit(1, 5, { forced = true })
