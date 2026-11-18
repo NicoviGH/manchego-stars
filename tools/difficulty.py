@@ -1477,16 +1477,20 @@ def derive_red_arrays(stem):
 
 def _counter_sets(script_blocks):
     """{counter: [k, ...]}: every `COUNTER_SET(counter, k)` a chapter's scripts run in NORMAL
-    mode, in script order. One that follows a CHECK_HARD in its script is the hard-mode refill
-    and is left out. One that follows only a CHECK_TUTORIAL has no Normal value the rule can
-    state, so it is recorded as None (an unsized loop)."""
+    mode, in script order. One between a CHECK_HARD and the next LABEL is the hard-mode refill
+    (ch9b, ch14b: CHECK_HARD, BEQ past it, COUNTER_SET, LABEL) and is left out. One that follows
+    a CHECK_TUTORIAL, or a CHECK_HARD whose branch a LABEL has already closed, has no Normal value
+    the rule can state from the text, so it is recorded as None (an unsized loop, which raises
+    if a loop uses it)."""
     sets = {}
     for _name, block in script_blocks:
         for m in re.finditer(r'COUNTER_SET\(\s*(\w+)\s*,\s*(\w+)\s*\)', block):
             before = block[:m.start()]
-            if re.search(r'\bCHECK_HARD\b', before):
+            hard = [h.end() for h in re.finditer(r'\bCHECK_HARD\b', before)]
+            if hard and not re.search(r'\bLABEL\(', before[hard[-1]:]):
                 continue
-            k = None if re.search(r'\bCHECK_TUTORIAL\b', before) else int(m.group(2), 0)
+            k = (None if hard or re.search(r'\bCHECK_TUTORIAL\b', before)
+                 else int(m.group(2), 0))
             sets.setdefault(m.group(1), []).append(k)
     return sets
 

@@ -89,10 +89,14 @@ chapter it is on the field, whether or not it earns anything in it.
 
 **Counted reinforcement loops.** An array a script reloads under `COUNTER_DEC(n)` (re-arming until
 `COUNTER_CHECK(n)` reaches 0) arrives once per wave; the waves are the Normal-mode `COUNTER_SET(n, k)`
-that starts the counter (`difficulty.reinforcement_waves`; a set after a `CHECK_HARD` is the hard
-refill and is not counted). Ch21's three RED bodies of class 0x3 (Ephraim Master Lord, L5,
+that starts the counter (`difficulty.reinforcement_waves`; a set between a `CHECK_HARD` and the
+next `LABEL` is the hard refill and is not counted; a set past that label, or after a
+`CHECK_TUTORIAL`, is unsized and raises if a loop uses it). Ch21's three RED bodies of class 0x3 (Ephraim Master Lord, L5,
 `UnitDef_088C1CE0` / `088CB524`) are fought: `EventScr_089F9448` (ch21a-eventscript.h:194) loads
 them in a loop that `COUNTER_SET(0x2, 10)` starts, so thirty arrive. Chapters with counted loops
-today: Ch9b, Ch14a/b, Ch16b, Ch17a/b, Ch20a/b, Ch21a/b. A loop no single Normal-mode set sizes
+today: Ch9b, Ch14a/b, Ch16b, Ch17a/b, Ch20a/b, Ch21a/b. So those chapters' body totals in the route
+band count every wave: Eirika Ch14 57 -> 59, Ch17 36 -> 44, Ch20 77 -> 147, Ch21 48 -> 75; Ephraim
+Ch9 48 -> 51, Ch14 68 -> 70, Ch17 36 -> 44, Ch20 77 -> 147, Ch21 48 -> 75 (one wave each before).
+The curated parity references (Prologue to Ch8, Ch13) have no counted loop and do not move. A loop no single Normal-mode set sizes
 (none, two, or a tutorial-only one) raises naming the chapter and script. The class is named through
 `inject.class_ids.vanilla_class_for_token`, which raises on an unknown or ambiguous id.

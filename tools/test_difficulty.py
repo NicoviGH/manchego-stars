@@ -1547,6 +1547,18 @@ class VanillaRoutes(unittest.TestCase):
         with mock.patch.object(df, '_script_blocks', lambda stem: blocks):
             self.assertEqual({'UnitDef_X': 2}, df.reinforcement_waves.__wrapped__('ch77'))
 
+    def test_a_set_after_the_hard_branch_closes_is_unsized_not_dropped(self):
+        """A COUNTER_SET past the LABEL that ends a CHECK_HARD branch runs in every mode; the
+        rule cannot tell its Normal value from the text, so a loop on it raises."""
+        loop = 'SVAL(EVT_SLOT_2, UnitDef_X)\n CALL(EventScr_LoadReinforce)\n COUNTER_DEC(0x5)\n'
+        blocks = [('EventScr_Loop', loop),
+                  ('EventScr_A', 'COUNTER_SET(0x5, 2)\n CHECK_HARD\n'
+                                 ' BEQ(0x0, EVT_SLOT_C, EVT_SLOT_0)\n COUNTER_SET(0x5, 4)\n'
+                                 'LABEL(0x0)\n COUNTER_SET(0x5, 7)')]
+        with mock.patch.object(df, '_script_blocks', lambda stem: blocks):
+            with self.assertRaisesRegex(ValueError, 'ch77.*EventScr_Loop'):
+                df.reinforcement_waves.__wrapped__('ch77')
+
     def test_every_chapter_of_both_routes_has_loops_the_rule_can_size(self):
         for route in ('eirika', 'ephraim'):
             for ref in df.route_chain(route):
