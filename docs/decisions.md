@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-423 decisions. Read this index, then open the two or three you need — the whole
+424 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -268,6 +268,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0421` | [A struck unit no heal reaches is judged on three enemy phases](decisions/0421-a-struck-unit-no-heal-reaches-is-judged-on-three-enemy-phases.md) | 2026-11-15 | #510 |
 | `0422` | [A unit on the tile a teammate's act needs is offered a free tile](decisions/0422-a-unit-on-the-tile-a-teammates-act-needs-is-offered-a-free-tile.md) | 2026-11-15 | #510 |
 | `0423` | [A plan pays for the weapon uses it spends, over the cheapest weapon that makes the same strike](decisions/0423-a-plan-pays-for-the-weapon-uses-it-spends-over-the-cheapest-weapon-that-makes-the-same-strike.md) | 2026-11-18 | #642 #510 |
+| `0424` | [The simulated enemy phase plays each weapon at the uses it will have](decisions/0424-the-simulated-enemy-phase-plays-each-weapon-at-the-uses-it-will-have.md) | 2026-11-18 | #644 #510 |
 
 ---
 

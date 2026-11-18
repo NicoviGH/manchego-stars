@@ -298,28 +298,26 @@ function M.events(before, after)
 end
 
 -- PT_SHADOW's record (#642): the played plan and the shadow's, side by side. `priced` is
--- what each plan paid for its weapon uses (W.gold x useCost, in points); `free` its judged
--- value with that price given back, so the two compare on what the judge alone reads.
+-- what each plan paid for its weapon uses (the judge's st.priced, in points); `free` its
+-- judged value with that price given back, so the two compare on what the judge alone reads.
 local SHADOW_RANK = { "admitted", "max_die", "sum_die", "game_over", "green_die", "forfeits",
                       "complete", "progress", "value" }
 -- `weapons` the item each attack strikes with ("unit id:item id"), from `board`'s bags.
-function M.shadowOf(Planner, style, plan, splan, knob, board)
-    local W = Planner.WEIGHTS[style.aggression]
+function M.shadowOf(Planner, plan, splan, knob, board)
     local bags = {}
     for _, u in ipairs(board and board.units or {}) do bags[u.id] = u.items end
     local function side(p)
         if not p then return nil end
-        local out, priced, rare = { keys = Planner.keysOf(p), fallback = p.fallback }, 0, 0
+        local out, rare = { keys = Planner.keysOf(p), fallback = p.fallback }, 0
         out.weapons = {}
         for _, a in ipairs(p.acts or {}) do
-            priced = priced + W.gold * (a.useCost or 0)
             if (a.useCost or 0) > 0 then rare = rare + 1 end
             local it = a.act == "attack" and a.slot and (bags[a.unitId] or {})[a.slot + 1]
             if it then out.weapons[#out.weapons + 1] = a.unitId .. ":" .. it.id end
         end
         for _, k in ipairs(SHADOW_RANK) do out[k] = p.rank and p.rank[k] end
-        out.priced, out.priced_acts = priced, rare
-        out.free = out.value and out.value + priced
+        out.priced, out.priced_acts = p.priced or 0, rare
+        out.free = out.value and out.value + out.priced
         return out
     end
     local played, shadow = side(plan), side(splan)
@@ -1553,7 +1551,7 @@ function M.run(api)
                             deciding.discount = (deciding.discount or 0) + api.frames()
                                 - deciding.shadowFrom
                             deciding.shadowFrom = nil
-                            shadow = M.shadowOf(api.Planner, style, plan, splan, api.shadow, board)
+                            shadow = M.shadowOf(api.Planner, plan, splan, api.shadow, board)
                         end
                         stalled = false   -- one changed act is the change; the rest plans freely
                         rec.plans.made = rec.plans.made + 1

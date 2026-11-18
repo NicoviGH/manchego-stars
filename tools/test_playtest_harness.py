@@ -644,6 +644,73 @@ class TestPillageNamesTheVillage(unittest.TestCase):
         self.assertEqual(m.group(1), '{ x = cur.dest.x, y = cur.dest.y }')
 
 
+class TestItemAfterUse(unittest.TestCase):
+    def test_board_lua_item_after_use_is_the_games(self):
+        # Board.itemAfterUse copies bmitem.c GetItemAfterUse (#644: a game call a use cost the
+        # bot ~3% CPU). PR #645 review: prove the copy is the game's. The game's own function,
+        # compiled on the host from the decomp's source with GetItemAttributes reading
+        # data_items.c's attributes, and the copy, reading the same attributes off an ItemData
+        # table laid out as Board.itemData reads it, are run on every item at the use counts
+        # that tell them apart (none, one, a few, its full uses, 0xFF) and must agree.
+        import shutil
+        import subprocess
+        import tempfile
+        cc, lua = shutil.which('cc'), shutil.which('lua')
+        if not (cc and lua):
+            self.skipTest('needs a host C compiler and lua')
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        ia = enum_values(vanilla_decomp_text('include/bmitem.h'), 'IA_')
+        ids = enum_values(vanilla_decomp_text('include/constants/items.h'), 'ITEM_')
+        src = vanilla_decomp_text('src/bmitem.c')
+        fn = src[src.index('u16 GetItemAfterUse(int item) {'):]
+        fn = fn[:fn.index('\n}\n') + 3]
+        items = {}
+        for name, body in re.findall(r'\[(ITEM_\w+)\] = \{(.*?)\n\t\}',
+                                     vanilla_decomp_text('src/data_items.c'), re.S):
+            m = re.search(r'\.attributes = ([^,]+),', body)
+            attrs = 0
+            for flag in (m.group(1).split('|') if m else []):
+                attrs |= ia[flag.strip()]
+            uses = re.search(r'\.maxUses = (\d+),', body)
+            items[ids[name]] = (attrs, int(uses.group(1)) if uses else 0)
+        self.assertGreater(len(items), 100, 'data_items.c read')
+        self.assertTrue(any(a & ia['IA_UNBREAKABLE'] for a, _ in items.values()),
+                        'the table holds unbreakable items, the case the copy tells apart')
+        cases = sorted({(i, u) for i, (_, full) in items.items()
+                        for u in (0, 1, 2, 3, full, 0xFF)})
+        with tempfile.TemporaryDirectory() as tmp:
+            c = os.path.join(tmp, 'after.c')
+            with open(c, 'w', encoding='utf-8') as fh:
+                fh.write('#include <stdio.h>\ntypedef unsigned short u16;\n')
+                fh.write('#define IA_UNBREAKABLE %d\n' % ia['IA_UNBREAKABLE'])
+                fh.write('static const unsigned attrs[256] = {%s};\n' % ', '.join(
+                    str(items.get(i, (0, 0))[0]) for i in range(256)))
+                fh.write('static int GetItemAttributes(int item) { return attrs[item & 0xFF]; }\n')
+                fh.write(fn)
+                fh.write('int main(void) { int i, u; while (scanf("%d %d", &i, &u) == 2) '
+                         'printf("%d\\n", GetItemAfterUse(i | (u << 8))); return 0; }\n')
+            exe = os.path.join(tmp, 'after')
+            subprocess.run([cc, '-o', exe, c], check=True, capture_output=True)
+            stdin = ''.join('%d %d\n' % k for k in cases)
+            game = subprocess.run([exe], input=stdin, capture_output=True, text=True,
+                                  check=True).stdout.split()
+        probe = ('local Board = dofile(%r) '
+                 'local attrs = {%s} '
+                 'local SYM = { gItemData = 0x10000 } '
+                 'local mem = { u32 = function(a) return attrs[(a - 0x10000 - 8) // '
+                 'Board.ITEMDATA_STRIDE] or 0 end, u8 = function() return 0 end } '
+                 'for i, u in io.read("a"):gmatch("(%%d+) (%%d+)") do '
+                 'print(Board.itemAfterUse(mem, SYM, tonumber(i) | (tonumber(u) << 8))) end'
+                 % (os.path.join(REPO, 'tools/playtest/board.lua'),
+                    ', '.join('[%d] = %d' % (i, a) for i, (a, _) in items.items())))
+        ours = subprocess.run([lua, '-e', probe], input=stdin, capture_output=True, text=True,
+                              check=True).stdout.split()
+        self.assertEqual(len(game), len(cases))
+        diverged = [(k, g, o) for k, g, o in zip(cases, game, ours) if g != o]
+        self.assertEqual(diverged, [], '(item, uses), the game, the copy')
+
+
 class TestFullBagItems(unittest.TestCase):
     def test_bag_item_ids_are_the_decomps(self):
         # INSPECT.BAG names each key and passive item it lists (Bot.fullBag's kinds); a wrong id

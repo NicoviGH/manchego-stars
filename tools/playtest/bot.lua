@@ -2233,13 +2233,16 @@ local function proposeOne(ctx, u)
         for _, o in ipairs(here) do o.charge = M.useCharge(o.price, least, most, ctx.priceUse) end
     end
     -- option `c`'s strike: its act, and what it spends of its weapon over the cheapest weapon
-    -- that makes the same strike (#642), in gold: its expected uses at its charge per use. A
-    -- unit with no cheaper weapon there pays nothing, so the price chooses the weapon and never
-    -- whether to strike (a Manakete's Divinestone is its only weapon: Ch17, #642 comment).
+    -- that makes the same strike (#642), in gold: its charge per use (useCharge), and useCost,
+    -- the uses the game's played ways spend at the target's own HP (sight's `wear`, ADR 0423's
+    -- 2026-11-18 note) at that charge. The judge charges the uses at the HP the plan leaves the
+    -- target (Planner's st.wear); useCost orders the spares. A unit with no cheaper weapon there
+    -- pays nothing, so the price chooses the weapon and never whether to strike (a Manakete's
+    -- Divinestone is its only weapon: Ch17, #642 comment).
     local function strike(c)
         local a = strikeAct(u, c)
         a.f, a.spent, a.first = c.f, c.spent, c.first
-        if c.charge then a.useCost = (c.f.uses or 0) * c.charge end
+        if c.charge then a.useCharge, a.useCost = c.charge, (c.f.wear or 0) * c.charge end
         return a
     end
     -- The strike keeps the weapon expected damage picked (betterAttack), as with the price off:
