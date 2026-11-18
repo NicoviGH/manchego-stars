@@ -337,10 +337,40 @@ local function attackPlayed(f, uHp, tHp)
         end
     end
     local _, _, joint = Sight.exchangeOf(leaves)
+    -- the weapon uses our blows spend (the ROM's are sight's M.worn / M.wornBy): each blow
+    -- thrown while the target stands, a use if it lands (every blow for a weapon that spends on
+    -- a miss), by the HP the target had lost when it came
+    local blows, wearAt, wear = blowsOf(f.hit, f.dmg, f.hits, f.crit), {}, 0
+    local spend = f.spendsMiss and 1 or Sight.rollChance(2, f.hit or 0)
+    for i = 1, #blows do
+        local before = {}
+        for j = 1, i - 1 do before[j] = blows[j] end
+        for lost, q in pairs(Sight.damage(before, tHp)) do
+            if lost < tHp and q > 0 then
+                wearAt[lost] = (wearAt[lost] or 0) + q * spend
+                wear = wear + q * spend
+            end
+        end
+    end
+    -- the counter's (a fixture with a counterSlot): its blows after the attacker's, each
+    -- thrown while the target stands, a use if it lands
+    local counterAt, counterWear = {}, 0
+    if f.counters and f.counterSlot then
+        local spent = (f.counterHits or 0) * Sight.rollChance(2, f.counterHit or 0)
+        for lost, q in pairs(dealt) do
+            if lost < tHp and q > 0 then
+                counterAt[lost] = (counterAt[lost] or 0) + q * spent
+                counterWear = counterWear + q * spent
+            end
+        end
+    end
     return Sight.attackOf({ hit = f.hit, dmg = f.dmg, crit = f.crit, hits = f.hits,
+                            spendsMiss = f.spendsMiss, wear = wear, wearAt = wearAt,
+                            wearSlot = f.wearSlot,
                             counter = { armed = f.counters, hit = f.counterHit,
                                         dmg = f.counterDmg, crit = f.counterCrit,
-                                        hits = f.counterHits },
+                                        hits = f.counterHits, wear = counterWear,
+                                        wearAt = counterAt, wearSlot = f.counterSlot },
                             killsTarget = f.killsTarget, dealt = dealt, back = back,
                             joint = joint, exp = f.exp }, tHp, uHp)
 end
@@ -931,6 +961,67 @@ do
     a = Planner.plan(B, boardOf(M, E), sightOf(chip), style("careful"), { usePrice = "100000" })
     check(a and a.act, free and free.act, "one weapon: the price does not stop its strike")
     check(a and a.act, "attack", "and the chip is struck")
+end
+
+-- #644 review (PR #645, finding 8): a second attacker's wear follows the HP the plan leaves
+-- its target. E has 10 HP; A's blow takes 6 for sure, B's two blows 4 each. Played at E's own
+-- 10 HP, B throws both blows (2 uses); after A's blow E stands on 4, B's first blow kills it and
+-- the second is never thrown: 1 use, as the game spends it. The plan's attacks both strike E;
+-- whichever comes second spends what the HP the first leaves allows.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local Bu = blue(0x02, 1, 2, 1, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local E = red(0x81, 1, 1, { hp = 10, minRange = false })
+    local staged
+    local o = {
+        reach = { [0x01] = tiles({ 0, 1 }), [0x02] = tiles({ 2, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["0,1"] = fc { hit = 100, dmg = 6, hits = 1, wearSlot = 0 } } },
+               [0x02] = { [0x81] = { ["2,1"] = fc { hit = 100, dmg = 4, hits = 2, wearSlot = 0 } } } },
+        enemyPhase = function(plan)
+            staged = staged or plan
+            return {}
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, Bu, E), sightOf(o), style("careful"))
+    local order = {}
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.act == "attack" then order[#order + 1] = a.unitId end
+    end
+    check(#order, 2, "#644 wear: both strike E")
+    local wear = {}
+    for _, b in ipairs(staged and staged.blues or {}) do wear[b.unit.id] = b.wear end
+    -- first A (6, then B's first 4 kills: B 1 use) or first B (both its blows: 2; A's lands: 1)
+    check((wear[0x01] or 0) .. ":" .. (wear[0x02] or 0),
+          order[1] == 0x01 and "1:1" or "1:2",
+          "#644 wear: the second attacker spends only the blows the HP left allows")
+    check(Planner.wearAt({ [0] = 1, [4] = 1 }, 10), 2, "wearAt: both blows at the target's own HP")
+    check(Planner.wearAt({ [0] = 1, [4] = 1 }, 4), 1, "wearAt: the second blow cut off at 4 HP")
+end
+
+-- #644 review (PR #645, finding 7): an enemy's weapon worn by countering our planned attack.
+-- A's chip leaves E standing and E's counter throws a javelin from its bag slot 1, a use a
+-- landed blow: the judged phase is told (plan.redWear) so E strikes with what it has left.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local E = red(0x81, 0, 1, { hp = 20, minRange = false })
+    local staged
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 5, hits = 1, wearSlot = 0,
+                                                     counters = true, counterHit = 100,
+                                                     counterDmg = 1, counterHits = 1,
+                                                     counterSlot = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.slot then staged = plan end
+            end
+            return {}
+        end,
+    }
+    local a = Planner.plan(B, boardOf(A, E), sightOf(o), style("bold"))
+    check(a and a.act, "attack", "#644 counter wear: A chips E")
+    local slots = staged and staged.redWear and staged.redWear[0x81] or {}
+    check(slots[1], 1, "#644 counter wear: E's counter spent one use of its slot-1 weapon")
 end
 
 -- #642's shadow runs: the price never reaches the beam. A's Siegmund kill on E is the only
@@ -2325,6 +2416,33 @@ do
     end
     check(strikes(10), 1, "wall: a blow that breaks it is the only strike planned")
     check(strikes(4), 2, "wall: a wall the first blow leaves standing is struck again")
+    -- #644 review (finding 10): a wall strike spends its weapon's uses as any blow does
+    -- (BattleApplyUnitUpdates writes the actor's weapon back), so the judged phase arms the
+    -- striker with what the strike leaves: the forecast's wear (sight.strikeWall's M.worn)
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }, { 2, 1 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["4,0"] = 2, ["0,1"] = 3, ["1,1"] = 2, ["2,1"] = 1 } },
+        obstacles = { { x = 2, y = 0, hp = 10 } },
+    }
+    -- each judged plan's wall striker (the one blue it stages with an act's wear): every
+    -- plan here strikes the wall with one unit or the other
+    local worn = {}
+    o.enemyPhase = function(plan)
+        for _, b in ipairs(plan.blues) do
+            if b.wearSlot or b.wear then worn[tostring(b.wearSlot) .. ":" .. tostring(b.wear)] = true end
+        end
+        return {}
+    end
+    local sight = sightOf(o)
+    sight.strikeWall = function() return { dealt = 10, wear = 2, wearSlot = 1 } end
+    Planner.plan(B, boardOf(A, C, E), sight, style("careful"))
+    local seen = {}
+    for k in pairs(worn) do seen[#seen + 1] = k end
+    worn = table.concat(seen, ",")
+    check(worn, "1:2", "wall: the striker's weapon is staged less the uses the strike spends")
 end
 
 -- test_the_assault_seats_every_striker: the boss E sits in the corner (0,0); (1,0) is the one
@@ -7010,8 +7128,8 @@ do
 end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
--- alone -- our units, the enemies gone, the enemies' HP, the doors and walls it opens, the
--- units it carries (Rescue) -- and
+-- alone -- our units, the enemies gone, the enemies' HP and the weapon uses their counters
+-- spent (#644), the doors and walls it opens, the units it carries (Rescue) -- and
 -- nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.
 do
@@ -7020,7 +7138,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,opened,reds", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds", "lookahead: the staged board, nothing more")
 end
 
 -- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers

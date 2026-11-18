@@ -258,8 +258,9 @@ M.EVFLAG_GAMEOVER = 101      -- the same; RunWaitEvents ends the game when it is
 M.DEFEAT_TALK_FLAG = 0x04
 M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
 -- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
--- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
-M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
+-- TRAP_NONE; TRAP_OBSTACLE = walls and snags. A ballista's uses are its data[2]
+-- (TRAP_EXTDATA_BLST_ITEMUSES), at +06.
+M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE, M.TRAP_BLST_USES = 8, 64, 2, 6
 -- bmunit.h: US_IN_BALLISTA, and ballistaIndex at 0x1C (its trap's index in sTrapPool; the
 -- halfword's other byte is movBonus) and pMapSpriteHandle at 0x3C, what M.keepRide keeps
 M.US_IN_BALLISTA, M.UNIT_BALLISTA, M.UNIT_SPRITE = 1 << 11, 0x1C, 0x3C
@@ -303,7 +304,7 @@ M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
 
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
 local BU = { weapon = 0x48, weaponBefore = 0x4A, weaponAttributes = 0x4C, weaponSlotIndex = 0x51,
-             attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
+             canCounter = 0x52, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
              statusOut = 0x6F, hpInitial = 0x72, nonZeroDamage = 0x7C, weaponBroke = 0x7D }
 -- include/bmunit.h UNIT_STATUS_PETRIFY and UNIT_STATUS_13: the two statuses a blow sets that
 -- end the battle like a death (BattleGenerateHit)
@@ -711,14 +712,30 @@ end
 -- weapon, or one that broke). Display only, for the logs: what an exchange DOES is `played`.
 -- spendsMiss: the weapon spends a use on a miss too (bmbattle.c BattleGenerateHitEffects: a
 -- use goes on a hit, or on every blow of an IA_MAGIC or IA_UNCOUNTERABLE weapon; #642).
+-- unbreakable: the weapon never loses a use (IA_UNBREAKABLE, GetItemAfterUse). wearSlot: the
+-- bag slot its uses come off (M.wearSlotOf).
 M.SPENDS_MISS = 0x82   -- IA_MAGIC (1 << 1) | IA_UNCOUNTERABLE (1 << 7), include/bmitem.h
+M.IA_UNBREAKABLE = 1 << 3
 function M.side(mem, me, other, proc, hitsAt)
     local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
+    local attributes = mem.u32(me + BU.weaponAttributes)
     return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
-             spendsMiss = (mem.u32(me + BU.weaponAttributes) & M.SPENDS_MISS) ~= 0,
+             spendsMiss = (attributes & M.SPENDS_MISS) ~= 0,
+             unbreakable = (attributes & M.IA_UNBREAKABLE) ~= 0,
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
              armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0,
-             wearSlot = mem.u8(me + BU.weaponSlotIndex) }
+             wearSlot = M.wearSlotOf(mem, me) }
+end
+
+-- The bag slot (0-based) whose item a battle unit's spent uses come off, or nil when they come
+-- off none of its items (#644 review): BattleApplyUnitUpdates writes the battle's weapon back to
+-- unit.items[weaponSlotIndex] only when canCounter. A ballista's strike
+-- (SetBattleUnitWeaponBallista) sets canCounter FALSE and leaves weaponSlotIndex as the last
+-- battle left it, so its slot names whatever item that battle used. A borrowed item's slot is
+-- 0xFF (SetBattleUnitWeapon), past the bag: M.wear takes nothing there.
+function M.wearSlotOf(mem, bu)
+    if mem.s8(bu + BU.canCounter) == 0 then return nil end
+    return mem.u8(bu + BU.weaponSlotIndex)
 end
 
 -- The uses the battle just run took off one battle unit's weapon (#644): BattleGenerateHitEffects
@@ -732,6 +749,35 @@ function M.worn(mem, bu)
     local after = mem.u16(bu + BU.weapon)
     if after == 0 then return 0 end
     return before - (after >> 8)
+end
+
+-- The uses each side's weapon spent in one played way, by the HP the target had lost when each
+-- blow came (#644 review): { actor = { [lost] = uses }, target = { [lost] = uses } }. The way
+-- was played at the target's own HP; an earlier blow of a plan can leave it on less, and there
+-- its death comes sooner and the blows after it are never thrown (Planner.wearAt reads it so).
+-- `hits` = the way's blows in order (Board.hits); `sides` = { actor, target }, each M.side's
+-- (spendsMiss, unbreakable). As BattleGenerateHitEffects spends them: a use on a hit, or on any
+-- blow of a weapon that spends on a miss, none of an IA_UNBREAKABLE one (GetItemAfterUse). The
+-- target loses HP to the actor's hits, and to its own Devil Axe's (a devil blow strikes its own
+-- wielder). `worn` = { actor, target }: the uses the game took (M.worn). This reading of the
+-- hit array must count the same, else it is wrong and fails loudly. Pure.
+function M.wornBy(hits, sides, worn)
+    local out, spent, lost = { actor = {}, target = {} }, { actor = 0, target = 0 }, 0
+    for _, h in ipairs(hits) do
+        local side = sides[h.by]
+        if not side.unbreakable and (not h.miss or side.spendsMiss) then
+            out[h.by][lost] = (out[h.by][lost] or 0) + 1
+            spent[h.by] = spent[h.by] + 1
+        end
+        if not h.miss and (h.by == "actor") ~= (h.devil == true) then lost = lost + h.dmg end
+    end
+    for _, by in ipairs({ "actor", "target" }) do
+        if spent[by] ~= worn[by] then
+            error(string.format("sight: the hit array reads %d uses spent by the %s, the game "
+                .. "took %d (weaponBefore less weapon)", spent[by], by, worn[by]))
+        end
+    end
+    return out
 end
 
 -- The chance one of the game's rolls passes (rng.c): Roll1RN draws one NextRN_100, Roll2RN
@@ -774,16 +820,23 @@ end
 -- two distributions { [hp lost] = probability }: the target's (dealt) and the actor's (back),
 -- and the two together (joint: { { p, dealt, back } }, one per pair that can happen, in
 -- dealt-then-back order): whether a counter lands depends on whether our blow killed first,
--- and the planner plays the enemy phase on each pair (T100b). wear = { actor, target }: the
--- weapon uses each side is expected to spend, over the same ways (a leaf's `wear` and
--- `counterWear`, M.worn's; a leaf without them spent none), #644.
+-- and the planner plays the enemy phase on each pair (T100b). wear = { actor, target,
+-- actorAt, targetAt }: the weapon uses each side is expected to spend, over the same ways (a
+-- leaf's `wear` and `counterWear`, M.worn's; a leaf without them spent none), and the same by
+-- the HP the target had lost when each blow came (a leaf's `wornAt`, M.wornBy's), #644.
 function M.exchangeOf(leaves)
-    local dealt, back, pair, wear = {}, {}, {}, { actor = 0, target = 0 }
+    local dealt, back, pair = {}, {}, {}
+    local wear = { actor = 0, target = 0, actorAt = {}, targetAt = {} }
     for _, l in ipairs(leaves) do
         dealt[l.dealt] = (dealt[l.dealt] or 0) + l.p
         back[l.back] = (back[l.back] or 0) + l.p
         wear.actor = wear.actor + l.p * (l.wear or 0)
         wear.target = wear.target + l.p * (l.counterWear or 0)
+        for by, at in pairs({ actor = wear.actorAt, target = wear.targetAt }) do
+            for lost, n in pairs(l.wornAt and l.wornAt[by] or {}) do
+                at[lost] = (at[lost] or 0) + l.p * n
+            end
+        end
         local k = l.dealt .. ":" .. l.back
         pair[k] = pair[k] or { p = 0, dealt = l.dealt, back = l.back }
         pair[k].p = pair[k].p + l.p
@@ -858,8 +911,9 @@ end
 -- simulation returns in place of rolling) forced, depth first: pass where it can, then fail. A roll
 -- that cannot go the other way (threshold 0, or 100 and up) is not split. `lost()` -> the HP the
 -- target and the actor lost in the run just made, then the weapon uses the actor and the target
--- spent in it (M.worn; optional). -> { { p, dealt, back, wear, counterWear } }. Inside a
--- sandbox; the breakpoints are set only for these calls (mGBA steps while one is set).
+-- spent in it (M.worn) and the same by the target's HP lost (M.wornBy); all optional.
+-- -> { { p, dealt, back, wear, counterWear, wornAt } }. Inside a sandbox; the breakpoints are
+-- set only for these calls (mGBA steps while one is set).
 function M.played(cpu, call, sim, S, lost)
     local path, odds, at = {}, {}, 0
     local function catch(numbers)
@@ -880,9 +934,9 @@ function M.played(cpu, call, sim, S, lost)
             call(sim[1], sim[2])
             local p = 1
             for i = 1, at do p = p * (path[i] and odds[i] or 1 - odds[i]) end
-            local dealt, back, wear, counterWear = lost()
+            local dealt, back, wear, counterWear, wornAt = lost()
             leaves[#leaves + 1] = { p = p, dealt = dealt, back = back, wear = wear,
-                                    counterWear = counterWear }
+                                    counterWear = counterWear, wornAt = wornAt }
             -- the next outcome: the deepest roll forced to pass that can also fail
             split = at
             while split > 0 and not (path[split] and odds[split] < 1) do split = split - 1 end
@@ -949,13 +1003,15 @@ function M.attackOf(ours, eHp, uHp)
     local c = ours.counter
     local counters = c.armed and c.hits > 0
     local kill, expected = M.odds({ ours.dealt }, eHp)
-    -- uses: the weapon uses the attack is expected to spend (#642): each blow, or each blow
-    -- that lands (the hit roll is Roll2RN, BattleGenerateHitAttributes) unless the
-    -- weapon spends on a miss. Every blow is counted as thrown, so a blow the target's death or
-    -- our own death cuts off is still counted: never fewer than the game spends.
-    local uses = (ours.hits or 0) * (ours.spendsMiss and 1 or M.rollChance(2, ours.hit or 0))
+    -- wear: the weapon uses the attack is expected to spend, as the game's played ways spent
+    -- them (M.worn, exchangeOf; #644), at the target's own HP; wearAt the same by the HP the
+    -- target had lost when each blow came (M.wornBy), wearSlot the bag slot they come off
+    -- (M.wearSlotOf). #642's price and #644's phase both read it (ADR 0423's 2026-11-18 note).
+    -- counterWear / counterWearAt / counterSlot: the same for the target's counter.
     return { hit = ours.hit, dmg = ours.dmg, crit = ours.crit, hits = ours.hits,
-             spendsMiss = ours.spendsMiss, uses = uses, wear = ours.wear, counters = counters,
+             spendsMiss = ours.spendsMiss, wear = ours.wear or 0, wearAt = ours.wearAt,
+             wearSlot = ours.wearSlot, counterWear = c.wear or 0, counterWearAt = c.wearAt,
+             counterSlot = c.wearSlot, counters = counters,
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
              killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
@@ -1655,20 +1711,69 @@ function M.equip(api, call, S, u, slot)
     call(S.EquipUnitItemSlot, { u.addr, slot })
 end
 
+-- The phase's wear ledger (#644 review): per unit (its struct's address) and bag slot, the
+-- uses the phase is expected to have taken off that item so far (`total`) and the whole uses
+-- already written off it (`taken`). Each strike adds its expected wear to the total, and the
+-- item has lost the rounded total: three strikes at 0.45 on a 1-use stone spend it (1.35, and
+-- the stone is gone 83% of the time), where rounding each strike alone never would. A ledger is
+-- never changed in place: the phase splits into ways (M.phaseWays) and each way keeps the
+-- ledger its own strikes left. -> the ledger with `expected` more on (addr, slot), and the
+-- uses to take off the item now. Pure.
+function M.tally(ledger, addr, slot, expected)
+    local rows = {}
+    for k, row in pairs(ledger[addr] or {}) do rows[k] = row end
+    local row = rows[slot] or { total = 0, taken = 0 }
+    local total = row.total + expected
+    local n = math.floor(total + 0.5) - row.taken
+    rows[slot] = { total = total, taken = row.taken + n }
+    local out = {}
+    for k, v in pairs(ledger) do out[k] = v end
+    out[addr] = rows
+    return out, n
+end
+
+-- The ledger after the item in `slot` of the unit at `addr` is gone and its bag packed
+-- (UnitRemoveInvalidItems): the item's row dropped, the rows of the slots after it one slot
+-- down, as their items are. Pure.
+function M.packed(ledger, addr, slot)
+    local rows = {}
+    for k, row in pairs(ledger[addr] or {}) do
+        if k < slot then rows[k] = row elseif k > slot then rows[k - 1] = row end
+    end
+    local out = {}
+    for k, v in pairs(ledger) do out[k] = v end
+    out[addr] = rows
+    return out
+end
+
+-- Where the item of bag slot `k` is after EquipUnitItemSlot(`slot`) (bmitem.c: the item of
+-- `slot` to the front, the ones before it each one slot back). Pure.
+function M.afterEquip(slot, k)
+    if not k or not slot or slot <= 0 then return k end
+    if k == slot then return 0 end
+    if k < slot then return k + 1 end
+    return k
+end
+
 -- Inside a sandbox: the unit at `addr` after a battle that is expected to take `expected` uses
--- off the item in its bag slot `slot` (0-based), as the game leaves it (#644): one
--- GetItemAfterUse a use (Board.itemAfterUse: an IA_UNBREAKABLE item keeps its uses, the last
--- use leaves 0), the item written back to its slot (BattleApplyUnitUpdates) and the bag packed
--- (UpdateUnitFromBattle's UnitRemoveInvalidItems), so a weapon spent to 0 is gone and the unit
--- fights the rest of the phase unarmed (vanilla Ch19: Myrrh, charId 0x1E, read at 0% death
--- with the Divinestone she had spent). The uses taken are the expected ones rounded, as a
--- strike takes its expected damage rounded: the phase is played along its expected way. A
--- slot past the bag (a ballista's, BALLISTA_SLOT) is no item of the unit's. The packing is a
--- game write no journal sees, so the bag is kept first (M.equip's reason).
-function M.wear(api, call, S, addr, slot, expected)
-    local n = math.floor((expected or 0) + 0.5)
+-- off the item in its bag slot `slot` (0-based), as the game leaves it (#644): the uses the
+-- ledger's rounded total now takes (M.tally), one GetItemAfterUse each (Board.itemAfterUse: an
+-- IA_UNBREAKABLE item keeps its uses, the last use leaves 0), the item written back to its slot
+-- (BattleApplyUnitUpdates) and the bag packed (UpdateUnitFromBattle's UnitRemoveInvalidItems),
+-- so a weapon spent to 0 is gone and the unit fights the rest of the phase unarmed (vanilla
+-- Ch19: Myrrh, charId 0x1E, read at 0% death with the Divinestone she had spent). The phase is
+-- played along its expected way, as a strike takes its expected damage rounded. No slot (a
+-- ballista's strike, or a counter that wrote nothing back: M.wearSlotOf) or one past the bag (a
+-- borrowed item's 0xFF) is no item of the unit's. The packing is a game write no journal sees,
+-- so the bag is kept first (M.equip's reason). -> the ledger after it.
+function M.wear(api, call, S, ledger, addr, slot, expected)
     local Board = api.Board
-    if n <= 0 or not slot or slot < 0 or slot >= Board.ITEM_COUNT then return end
+    if not expected or expected <= 0 or not slot or slot < 0 or slot >= Board.ITEM_COUNT then
+        return ledger
+    end
+    local n
+    ledger, n = M.tally(ledger, addr, slot, expected)
+    if n <= 0 then return ledger end
     local at = addr + Board.UNIT_ITEMS + slot * 2
     local item = api.mem.u16(at)
     for _ = 1, n do
@@ -1679,22 +1784,43 @@ function M.wear(api, call, S, addr, slot, expected)
     if item == 0 then
         api.keep16(addr + Board.UNIT_ITEMS, Board.ITEM_COUNT)
         call(S.UnitRemoveInvalidItems, { addr })
+        ledger = M.packed(ledger, addr, slot)
     end
+    return ledger
+end
+
+-- Inside a sandbox: a ballista's strike spends the ballista's own uses, which live on its trap
+-- (BattleApplyBallistaUpdates writes the battle weapon's uses to TRAP_EXTDATA_BLST_ITEMUSES),
+-- never its rider's bag (M.wearSlotOf). At 0 GetBallistaItemAt gives no weapon, so a phase
+-- after (the lookahead's second) finds it spent. `trap` = its sTrapPool entry, its own row in
+-- the ledger (M.tally). -> the ledger after it.
+function M.wearBallista(api, ledger, trap, expected)
+    if not expected or expected <= 0 then return ledger end
+    local n
+    ledger, n = M.tally(ledger, trap, 0, expected)
+    if n > 0 then
+        local at = trap + M.TRAP_BLST_USES
+        api.write8(at, math.max(0, api.mem.u8(at) - n))
+    end
+    return ledger
 end
 
 -- Inside a sandbox: a phase strike `t` (M.strikeOf's) leaves both weapons at the uses it is
 -- expected to spend: the striker's at `strikerAddr`, the target's counter's at `targetAddr`.
-function M.strikeWear(api, call, S, t, strikerAddr, targetAddr)
-    M.wear(api, call, S, strikerAddr, t.wearSlot, t.wear)
-    M.wear(api, call, S, targetAddr, t.counterSlot, t.counterWear)
+-- -> the ledger after it (M.wear).
+function M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr)
+    ledger = M.wear(api, call, S, ledger, strikerAddr, t.wearSlot, t.wear)
+    return M.wear(api, call, S, ledger, targetAddr, t.counterSlot, t.counterWear)
 end
 
 -- Inside a sandbox: our unit `u` holding what the plan leaves it to fight the enemy phase with:
--- the weapon of its attack's `slot` equipped (M.equip puts it in slot 0), less the uses that
--- attack is expected to spend (`wear`, M.wear), #644.
-function M.armAsPlanned(api, call, S, u, slot, wear)
+-- the weapon of its act's `slot` equipped (M.equip puts it in slot 0), less the uses that act
+-- is expected to spend (`wear`) off the item the battle used (`wearSlot`, the bag slot before
+-- the equip: an attack the game armed itself, slot nil, used its first usable weapon, which
+-- need not be slot 0), #644. -> the ledger after it (M.wear).
+function M.armAsPlanned(api, call, S, ledger, u, slot, wearSlot, wear)
     M.equip(api, call, S, u, slot)
-    if slot then M.wear(api, call, S, u.addr, 0, wear) end
+    return M.wear(api, call, S, ledger, u.addr, M.afterEquip(slot, wearSlot), wear)
 end
 
 -- Sight.fullInfo(sandbox, open, api, S, isolate, fn): FR-019's full-information diagnostic
@@ -2184,15 +2310,19 @@ function M.new(outer)
         local known = M.known(playedBy, battleKey(), teaches,
             function() return M.expOf(api, call, S, teaches) end,
             function()
+                local sides = { actor = side, target = side.counter }
                 local dealt, back, joint, wear = M.exchangeOf(M.played(api.cpu, call, sim, S,
                     function()
-                        return lost(S.gBattleTarget), lost(S.gBattleActor),
-                               M.worn(mem, S.gBattleActor), M.worn(mem, S.gBattleTarget)
+                        local worn = { actor = M.worn(mem, S.gBattleActor),
+                                       target = M.worn(mem, S.gBattleTarget) }
+                        return lost(S.gBattleTarget), lost(S.gBattleActor), worn.actor,
+                               worn.target, M.wornBy(Board.hits(), sides, worn)
                     end))
                 return { dealt, back, joint, wear = wear }
             end)
         side.dealt, side.back, side.joint, side.exp = known[1], known[2], known[3], known[4]
-        side.wear, side.counter.wear = known.wear.actor, known.wear.target
+        side.wear, side.wearAt = known.wear.actor, known.wear.actorAt
+        side.counter.wear, side.counter.wearAt = known.wear.target, known.wear.targetAt
         return side
     end
 
@@ -2220,7 +2350,11 @@ function M.new(outer)
             api.write8(S.gActionData + ACTION_TRAP_TYPE, o.hp)
             call(S.InitObstacleBattleUnit, {})
             call(S.BattleGenerateSimulation, { u.addr, 0, x, y, slot or M.ISLOT_AUTO })
-            return { dealt = lost(S.gBattleTarget) }
+            -- and the uses it spends (#644 review): a wall never counters and every blow on it
+            -- lands (ComputeBattleObstacleStats: hit 100, crit 0), so the forecast's one way is
+            -- the strike's only one
+            return { dealt = lost(S.gBattleTarget), wear = M.worn(mem, S.gBattleActor),
+                     wearSlot = M.wearSlotOf(mem, S.gBattleActor) }
         end) end)
     end
 
@@ -2381,18 +2515,35 @@ function M.new(outer)
     end
 
     -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
-    -- our units stood and their HP set, the reds' HP, the gone off the map
+    -- our units stood and their HP set, armed as the plan leaves them, the reds' HP and the
+    -- uses their counters to our planned attacks spent, the gone off the map. `wearing.base` is
+    -- the wear ledger (M.tally) the phase starts from: the plan's own wear on it.
     local function stagePhase(call, plan)
         local byId = {}
         for _, o in ipairs(units()) do byId[o.id] = o end
+        local ledger = {}
         for _, b in ipairs(plan.blues) do
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
-            M.armAsPlanned(api, call, S, b.unit, b.slot, b.wear)
+            ledger = M.armAsPlanned(api, call, S, ledger, b.unit, b.slot, b.wearSlot, b.wear)
         end
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
         end
+        -- an enemy's weapon worn by its counters to the plan's attacks (#644 review: one whose
+        -- counter spent its last javelin struck with it in the phase): `redWear` = { [id] =
+        -- { [slot] = uses } }, each slot as the board's bag has it, so the highest slot first:
+        -- a packed bag moves only the slots after the one emptied
+        for id, slots in pairs(plan.redWear or {}) do
+            local e = byId[id]
+            local order = {}
+            for slot in pairs(slots) do order[#order + 1] = slot end
+            table.sort(order, function(a, b) return a > b end)
+            for _, slot in ipairs(order) do
+                if e then ledger = M.wear(api, call, S, ledger, e.addr, slot, slots[slot]) end
+            end
+        end
+        local wearing = { base = ledger }
         stageCarry(byId, plan.carry)
         local function remove(e, x, y)
             M.liftOff(api, x, y, e.id)
@@ -2420,7 +2571,10 @@ function M.new(outer)
         end
         -- e strikes as it decided: stood on its tile, its expected damage off the target, and
         -- the uses the exchange is expected to spend off both weapons (M.wear): a counter that
-        -- spends the target's last use leaves it unarmed for the next enemy (#644)
+        -- spends the target's last use leaves it unarmed for the next enemy (#644). The ledger
+        -- it adds to is the one the way's last strike (`done`'s) left, or the phase's base; the
+        -- strike's own is kept beside it (`after`, weak: never on the strike, which is logged)
+        local after = setmetatable({}, { __mode = "k" })
         local function strike(e, id, target, side, done)
             local addr = mem.u32(S.gUnitLookup + target * 4)
             local t = M.strikeAt(side, id, target, mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP),
@@ -2433,10 +2587,21 @@ function M.new(outer)
             -- a red target: only a berserked enemy strikes its own side
             wound(addr, t.targetHp - math.floor(mean + 0.5),
                   byId[target] ~= nil and byId[target].faction == "red")
-            M.strikeWear(api, call, S, t, e.addr, addr)
+            local last = done[#done]
+            local ledger = last and after[last] or wearing.base
+            if side.slot == BALLISTA_SLOT then
+                ledger = M.wearBallista(api, ledger,
+                    S.sTrapPool + mem.u8(e.addr + M.UNIT_BALLISTA) * M.TRAP_SIZE, t.wear)
+            end
+            after[t] = M.strikeWear(api, call, S, ledger, t, e.addr, addr)
             return t, now, addr
         end
-        return byId, order, decides, strike, remove, gone
+        -- the ledger the strikes `done` leave (the base when none)
+        function wearing.after(done)
+            local last = done[#done]
+            return last and after[last] or wearing.base
+        end
+        return byId, order, decides, strike, remove, gone, wearing
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
@@ -2483,8 +2648,10 @@ function M.new(outer)
     -- enemies left reach (M.safest), the most threatened first. Greens are the AI's and hold.
     -- Inside nextPhase's sandbox, after its first phase; `remove` is stagePhase's. The faction
     -- written for the danger read is put back, so the turn after reads the phase as the hold's.
+    -- A killer's weapon loses the uses its kill is expected to spend (#644 review), on
+    -- `wearing.base`, stagePhase's ledger, which the second phase then starts from.
     -- -> { kills = { { unit, enemy, x, y, p, lost } }, steps = { { unit, x, y } } }
-    local function armyReply(call, proc, byId, remove)
+    local function armyReply(call, proc, byId, remove, wearing)
         local ours, reds = {}, {}
         for _, o in pairs(byId) do
             local st = mem.u32(o.addr + UNIT_STATE)
@@ -2533,10 +2700,12 @@ function M.new(outer)
         for _, k in ipairs(M.replyKills(options)) do
             local u, e = byId[k.unit], byId[k.enemy]
             local hp = mem.u8(u.addr + UNIT_HP)
-            local _, back = M.odds({ strike(u, e, k.tile, k.slot).back }, hp)
+            local kill = strike(u, e, k.tile, k.slot)
+            local _, back = M.odds({ kill.back }, hp)
             remove(e, at(e))
             standOn(u, k.tile.x, k.tile.y)
-            M.equip(api, call, S, u, k.slot)
+            wearing.base = M.armAsPlanned(api, call, S, wearing.base, u, k.slot, kill.wearSlot,
+                                          kill.wear)
             local left = math.max(1, hp - math.floor(back + 0.5))
             wound(u.addr, left, false)
             acted[u.id] = true
@@ -2591,14 +2760,17 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove = stagePhase(call, plan)
+            local byId, order, decides, strike, remove, _, wearing = stagePhase(call, plan)
             local moved = {}
+            -- the first phase's strikes in order: each wears on what the last left (M.tally)
+            local first = {}
             for _, id in ipairs(order()) do
                 local e = decides(id)
                 if e then
                     local target, side = aiDecide(call, proc, e, byId)
                     if target then
-                        local t, _, addr = strike(e, id, target, side, {})
+                        local t, now, addr = strike(e, id, target, side, first)
+                        first = now
                         moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
                         if mem.u8(addr + UNIT_HP) == 0 then
                             local u = byId[target]
@@ -2619,7 +2791,9 @@ function M.new(outer)
                     end
                 end
             end
-            local played = reply and armyReply(call, proc, byId, remove) or nil
+            -- the second phase wears on what the first and the reply left
+            wearing.base = wearing.after(first)
+            local played = reply and armyReply(call, proc, byId, remove, wearing) or nil
             -- player units and the greens: a green whose death ends the game is protected too
             local hp = {}
             for id, o in pairs(byId) do

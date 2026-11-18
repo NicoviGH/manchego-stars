@@ -121,8 +121,11 @@ end
 -- the game: the enemy phase's wear (sight.wear, #644) takes thousands of uses a chapter, and a
 -- call each cost CPU the bot's reading does not need (the function reads only the attributes).
 function Board.itemAfterUse(mem, SYM, item)
-    local attributes = Board.itemData(mem, SYM, item)
-    if not attributes or (attributes & IA_UNBREAKABLE) ~= 0 then return item end
+    -- id 0 (no item) reads no ItemData here; the game reads its row, which has no attributes
+    -- (data_items.c), so it loses a use as any breakable item (the parity test,
+    -- test_playtest_harness.py TestItemAfterUse, found the two apart there)
+    local attributes = Board.itemData(mem, SYM, item) or 0
+    if (attributes & IA_UNBREAKABLE) ~= 0 then return item end
     item = item - (1 << 8)
     if item < (1 << 8) then return 0 end
     return item
@@ -492,11 +495,11 @@ end
 -- arrays). struct BattleUnit (0x80): +00 the Unit (its +13 curHP is the HP AFTER the battle,
 -- +08 its level after, +04 pClassData), +48 weapon, +52 canCounter, +5A attack, +5C defense, +64 effective hit, +6A effective
 -- crit, +6E exp gained, +70 level before, +72 HP before, +7D weapon broke. struct BattleHit
--- (u32, 7 of them): bits 0-18 attributes (CRIT 1 << 0, MISS 1 << 1), 19-23 info (FINISHES 1 << 1,
+-- (u32, 7 of them): bits 0-18 attributes (CRIT 1 << 0, MISS 1 << 1, DEVIL 1 << 7), 19-23 info (FINISHES 1 << 1,
 -- RETALIATION 1 << 3 = the target's blow, END 1 << 4), 24-31 the signed HP change it dealt.
 Board.BATTLE_REAL = 1 << 0
 Board.BATTLE_HIT_MAX = 7
-Board.HIT_CRIT, Board.HIT_MISS = 1 << 0, 1 << 1
+Board.HIT_CRIT, Board.HIT_MISS, Board.HIT_DEVIL = 1 << 0, 1 << 1, 1 << 7
 Board.HIT_FINISHES, Board.HIT_RETALIATION, Board.HIT_END = 1 << 1, 1 << 3, 1 << 4
 
 -- include/types.h UNIT_ACTION_*: what gActionData +11 (ACTION_KIND, its offset) says an act
@@ -588,22 +591,31 @@ local function battleSide(mem, b)
              broke = mem.s8(b + 0x7D) ~= 0 }
 end
 
--- { actor, target, hits = { { by = "actor"|"target", miss, crit, dmg, finishes } } } of the
--- last real battle, or nil when the last battle generated was a simulation.
-function Board.battle(mem, SYM)
-    if (mem.u16(SYM.gBattleStats) & Board.BATTLE_REAL) == 0 then return nil end
-    local out = { actor = battleSide(mem, SYM.gBattleActor),
-                  target = battleSide(mem, SYM.gBattleTarget), hits = {} }
+-- The blows of the last battle generated, real or simulated, in order (gBattleHitArray, up to
+-- its BATTLE_HIT_INFO_END): { { by = "actor"|"target", miss, crit, devil, dmg, finishes } }.
+-- dmg is the blow's hpChange (gBattleStats.damage, capped at its victim's HP); devil = a Devil
+-- Axe's blow that struck its own wielder (BATTLE_HIT_ATTR_DEVIL, BattleGenerateHitEffects).
+function Board.hits(mem, SYM)
+    local out = {}
     for i = 0, Board.BATTLE_HIT_MAX - 1 do
         local w = mem.u32(SYM.gBattleHitArray + i * 4)
         local attr, info, dmg = w & 0x7FFFF, (w >> 19) & 0x1F, (w >> 24) & 0xFF
         if (info & Board.HIT_END) ~= 0 then break end
-        out.hits[#out.hits + 1] = {
+        out[#out + 1] = {
             by = (info & Board.HIT_RETALIATION) ~= 0 and "target" or "actor",
             miss = (attr & Board.HIT_MISS) ~= 0, crit = (attr & Board.HIT_CRIT) ~= 0,
+            devil = (attr & Board.HIT_DEVIL) ~= 0,
             dmg = dmg >= 0x80 and dmg - 0x100 or dmg, finishes = (info & Board.HIT_FINISHES) ~= 0 }
     end
     return out
+end
+
+-- { actor, target, hits = Board.hits' } of the last real battle, or nil when the last battle
+-- generated was a simulation.
+function Board.battle(mem, SYM)
+    if (mem.u16(SYM.gBattleStats) & Board.BATTLE_REAL) == 0 then return nil end
+    return { actor = battleSide(mem, SYM.gBattleActor),
+             target = battleSide(mem, SYM.gBattleTarget), hits = Board.hits(mem, SYM) }
 end
 
 -- The battle unit the Staff command last set up (gBattleActor, BattleInitItemEffect): who used
@@ -628,6 +640,7 @@ function Board.bind(mem, SYM)
         itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         staffRange = function(item) return Board.staffRange(mem, SYM, item) end,
         itemAfterUse = function(item) return Board.itemAfterUse(mem, SYM, item) end,
+        hits = function() return Board.hits(mem, SYM) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         items = function(addr) return Board.items(mem, addr) end,
         convoyItems = function() return Board.convoyItems(mem, SYM) end,

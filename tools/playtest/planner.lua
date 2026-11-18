@@ -388,6 +388,14 @@ local function score(act, st, W, style, odds)
             if f.joint then fx.exchange = { target = e.id, joint = f.joint } end
         end
         fx.enemyHp = { id = e.id, hp = hp - dealt }
+        -- the weapon uses the exchange spends at the HP the plan leaves the target (#644
+        -- review): a blow its sooner death cuts off spends none. The attacker's, for the judged
+        -- phase to arm it with, and the counter's off the enemy's weapon (its slot as the
+        -- board's)
+        fx.wear = { slot = f.wearSlot, uses = M.wearAt(f.wearAt, hp) }
+        if f.counterSlot then
+            fx.redWear = { id = e.id, slot = f.counterSlot, uses = M.wearAt(f.counterWearAt, hp) }
+        end
         -- what the blow does, for the judge to play the kill both ways (its odds composed with
         -- the plan's other blows on the target, at the target's own HP)
         fx.kill = { id = e.id, dist = f.dealt }
@@ -445,6 +453,8 @@ local function score(act, st, W, style, odds)
         local hp = st.walls[at] or act.obstacle.hp
         v = v + W.breach
         fx.wall = { at = at, hp = hp - act.obstacle.blow.dealt }
+        -- the uses the strike spends (#644 review): every blow on a wall lands
+        fx.wear = { slot = act.obstacle.blow.wearSlot, uses = act.obstacle.blow.wear }
         fx.blocked = hp <= 0
         if fx.wall.hp <= 0 then fx.opened = at end
     elseif act.act == "supply" then
@@ -552,11 +562,24 @@ end
 
 local copy = Board.copy
 
+-- The weapon uses an exchange spends when its target stands on `hp` (#644 review): `at` =
+-- { [HP the target had lost when the blow came] = expected uses } (sight's wearAt, M.wornBy over
+-- the game's played ways). The ways were played at the target's own HP; an earlier blow of the
+-- plan leaves it on less, its death comes sooner, and a blow thrown once it had lost `hp` or
+-- more is never thrown. Nothing when the exchange gives no count. Pure.
+function M.wearAt(at, hp)
+    local n = 0
+    for lost, uses in pairs(at or {}) do
+        if lost < hp then n = n + uses end
+    end
+    return n
+end
+
 -- A finalist's staged board for sight.nextPhase: its first phase as the judge played it.
 function M.staged(st)
     local ph = st.phase
-    return { blues = ph.blues, gone = ph.gone, reds = ph.reds, opened = ph.opened,
-             carry = ph.carry }
+    return { blues = ph.blues, gone = ph.gone, reds = ph.reds, redWear = ph.redWear,
+             opened = ph.opened, carry = ph.carry }
 end
 
 -- What a lookahead's second phase `r` (sight.nextPhase's) reads of the units the first phase
@@ -658,7 +681,7 @@ function M.plan(Bot, board, sight, style, opts)
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     fought = {}, healed = {},
                     walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
-                    gameOver = gameOver, kill = {}, carry = {} }
+                    gameOver = gameOver, kill = {}, carry = {}, wear = {}, redWear = {} }
     -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
     -- { x, y } once dropped (score's fx.carry, fx.drop); the board's carries to start
     for _, u in ipairs(board.units) do
@@ -964,7 +987,8 @@ function M.plan(Bot, board, sight, style, opts)
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
                     opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
-                    kill = copy(st.kill), carry = copy(st.carry) }
+                    kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
+                    redWear = copy(st.redWear) }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
@@ -996,6 +1020,12 @@ function M.plan(Bot, board, sight, style, opts)
         end
         if fx.win then n.win = math.max(n.win, fx.win) end
         if fx.wall then n.walls[fx.wall.at] = fx.wall.hp end
+        if fx.wear then n.wear[uid] = fx.wear end
+        if fx.redWear and fx.redWear.uses > 0 then
+            local slots = copy(n.redWear[fx.redWear.id] or {})
+            slots[fx.redWear.slot] = (slots[fx.redWear.slot] or 0) + fx.redWear.uses
+            n.redWear[fx.redWear.id] = slots
+        end
         if fx.opened then n.opened[fx.opened] = true end
         if fx.carry then n.carry[fx.carry.id] = { by = fx.carry.by } end
         if fx.drop then
@@ -1322,12 +1352,14 @@ function M.plan(Bot, board, sight, style, opts)
             local a = at[u.id]
             local at = a and endTile(a)
             local attacks = a and a.act == "attack"
-            -- wear: the weapon uses its attack is expected to spend (sight's, over the game's
-            -- played ways), so the phase reads it with what is left (#644)
+            -- wear: the weapon uses its act is expected to spend off the item in bag slot
+            -- wearSlot, at the HP the plan leaves its target (score's fx.wear), so the phase
+            -- reads it with what is left (#644)
+            local w = st.wear[u.id]
             planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
                                       slot = attacks and a.slot or nil,
-                                      wear = attacks and a.f and a.f.wear or nil }
+                                      wearSlot = w and w.slot, wear = w and w.uses }
         end
         local reds = {}
         for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
@@ -1403,7 +1435,8 @@ function M.plan(Bot, board, sight, style, opts)
             return x.key < y.key
         end)
         -- the phase as the average leaves it: what the lookahead plays on (nextPhase)
-        st.phase = { blues = planned, gone = gone, reds = reds, opened = st.opened, carry = st.carry }
+        st.phase = { blues = planned, gone = gone, reds = reds, redWear = st.redWear,
+                     opened = st.opened, carry = st.carry }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
         st.branched, st.floored = 0, 0
         for _, d in ipairs(dims) do
@@ -1494,7 +1527,7 @@ function M.plan(Bot, board, sight, style, opts)
             if phase then cost.phases = cost.phases + 1 end
             if now then now.phases = cost.phases end
             local s = phase and phase({ blues = bluesIn(w), gone = w.gone, reds = w.reds,
-                                        mass = w.p,
+                                        redWear = st.redWear, mass = w.p,
                                         opened = st.opened, carry = st.carry }) or {}
             unsplit = unsplit + (s.unsplit or 0)
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
@@ -1676,9 +1709,16 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         -- what the plan's strikes spend of their weapons, at the gold's points (#642, Bot's
-        -- useCost): charged here, on the judged plan, and never on an act's own score, so the
-        -- beam builds the plan a dear weapon's kill makes safe and the cap reads it first
-        for _, a in ipairs(st.acts) do judged = judged - W.gold * (a.useCost or 0) end
+        -- useCharge): the uses each spends at the HP the plan leaves its target (st.wear, the
+        -- game's played ways), charged here, on the judged plan, and never on an act's own
+        -- score, so the beam builds the plan a dear weapon's kill makes safe and the cap reads
+        -- it first
+        st.priced = 0
+        for _, a in ipairs(st.acts) do
+            local w = st.wear[a.unitId]
+            st.priced = st.priced + W.gold * (a.useCharge or 0) * (w and w.uses or 0)
+        end
+        judged = judged - st.priced
         st.judged = judged
         st.strikes = strikes
         -- the protected units (FR-009): every blue, and any unit whose death ends the game; an
