@@ -1424,6 +1424,23 @@ INSPECT.itemSubmenu = function(slot)
     return true
 end
 
+-- Item -> inventory `slot` -> Equip (#641: a bait waits holding the weapon its counter answers
+-- the boss with). ItemSubMenu_EquipItem (bmmenu.c) calls EquipUnitItemSlot, which moves the
+-- item to the bag's front, and goes back to the inventory list; B there starts the unit menu
+-- again (ItemMenu_ButtonBPressed), where the Wait follows. -> true, or nil, why.
+INSPECT.equipSlot = function(slot)
+    local opened, why = INSPECT.itemSubmenu(slot)
+    if not opened then return nil, why end
+    if not selectSemantic("equip_item", "Equip puts the weapon in front", function(after)
+        return controllerState(after) == "item_list"
+    end, 120) then return nil, "the item's submenu offered no Equip" end
+    if not guardedInput("cancel_menu", "B", "the inventory list returns to the unit menu",
+        function(after)
+            return controllerState(after) == "unit_command_menu"
+        end, 120) then return nil, "the inventory list never returned to the unit menu" end
+    return true
+end
+
 -- March a unit toward (tx,ty) using the game's own pathing: selecting the
 -- unit fills gBmMapMovement (include/bmmap.h; cost < 120 = reachable this
 -- turn), so we read it and pick the reachable free tile closest to the target.
@@ -3799,6 +3816,12 @@ INSPECT.botApi = function(game)
                 return won() or procActive(SYM.ProcScr_StdEventEngine)
             end, 900) then return false end
             return waitFor(won, 9000, true)
+        end
+        -- a bait's wait holds its weapon (Bot.baitAt's `slot`): equipped first, as the judged
+        -- phase armed it
+        if a.act == "wait" and a.slot and a.slot > 0 then
+            local equipped, why = INSPECT.equipSlot(a.slot)
+            if not equipped then return false, why end
         end
         return chooseWait(function() return won() or lost() end)
     end
