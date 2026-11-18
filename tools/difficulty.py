@@ -1475,9 +1475,55 @@ def derive_red_arrays(stem):
                 u['items'] for u in units if u['allegiance'] == 'FACTION_ID_RED')]
 
 
+def _counter_sets(script_blocks):
+    """{counter: [k, ...]}: every `COUNTER_SET(counter, k)` a chapter's scripts run in NORMAL
+    mode, in script order. One that follows a CHECK_HARD in its script is the hard-mode refill
+    and is left out. One that follows only a CHECK_TUTORIAL has no Normal value the rule can
+    state, so it is recorded as None (an unsized loop)."""
+    sets = {}
+    for _name, block in script_blocks:
+        for m in re.finditer(r'COUNTER_SET\(\s*(\w+)\s*,\s*(\w+)\s*\)', block):
+            before = block[:m.start()]
+            if re.search(r'\bCHECK_HARD\b', before):
+                continue
+            k = None if re.search(r'\bCHECK_TUTORIAL\b', before) else int(m.group(2), 0)
+            sets.setdefault(m.group(1), []).append(k)
+    return sets
+
+
+@functools.lru_cache(maxsize=None)
+def reinforcement_waves(stem):
+    """{array: waves} for the arrays a chapter reloads in a COUNTED loop: a script that stands an
+    array up (`SVAL(EVT_SLOT_2, UnitDef_X)` + `CALL(EventScr_LoadReinforce)`) and then
+    `COUNTER_DEC(n)`s, re-arming itself until `COUNTER_CHECK(n)` reaches 0. The waves are the
+    `COUNTER_SET(n, k)` that starts the counter (Ch21's `UnitDef_088C1CE0`: ten waves of three).
+    Every other array is one wave and is absent here. A counted loop whose counter no single
+    Normal-mode COUNTER_SET sizes raises, naming the chapter and the script: a loud stop, not a
+    silent count of one."""
+    blocks = _script_blocks(stem)
+    sets = _counter_sets(blocks)
+    waves = {}
+    for name, block in blocks:
+        arrays = re.findall(r'SVAL\(\s*EVT_SLOT_2\s*,\s*(UnitDef_\w+)\s*\)', block)
+        for counter in re.findall(r'COUNTER_DEC\(\s*(\w+)\s*\)', block) if arrays else ():
+            ks = sets.get(counter, [])
+            if len(ks) != 1 or ks[0] is None:
+                raise ValueError('%s: script %s reloads %s in a loop counted by %s, which %s -- '
+                                 'the rule cannot size it' % (
+                                     stem, name, ', '.join(arrays), counter,
+                                     'no COUNTER_SET starts' if not ks else
+                                     'COUNTER_SET starts %d ways (%s)' % (len(ks), ks)))
+            for a in arrays:
+                waves[a] = waves.get(a, 0) + ks[0]
+    return waves
+
+
 def derived_red_defs(stem):
-    """`_vanilla_red_defs` for a stem's DERIVED arrays: (array, index, UnitDefinition) per RED unit."""
+    """`_vanilla_red_defs` for a stem's DERIVED arrays: (array, index, UnitDefinition) per RED
+    unit, an array a counted loop reloads (`reinforcement_waves`) once per wave."""
+    waves = reinforcement_waves(stem)
     return [(name, i, u) for name in derive_red_arrays(stem)
+            for _wave in range(waves.get(name, 1))
             for i, u in enumerate(vanilla_udefs_named(stem, name))
             if u['allegiance'] == 'FACTION_ID_RED']
 

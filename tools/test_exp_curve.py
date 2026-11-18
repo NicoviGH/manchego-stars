@@ -642,9 +642,10 @@ class BodyClasses(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'CHAPTER_E_21.*0xae.*0x7777'):
                 ec.vanilla_bodies.__wrapped__('CHAPTER_E_21', True)
 
-    def test_ch21s_numbered_bodies_are_ephraims_master_lord(self):
-        classes = {b.class_enum for b in ec.vanilla_bodies('CHAPTER_E_21', True)}
-        self.assertIn('CLASS_EPHRAIM_MASTER_LORD', classes)
+    def test_ch21s_numbered_bodies_are_ephraims_master_lord_and_arrive_ten_waves_of_three(self):
+        bodies = [b for b in ec.vanilla_bodies('CHAPTER_E_21', True)
+                  if b.class_enum == 'CLASS_EPHRAIM_MASTER_LORD']
+        self.assertEqual(30, len(bodies))
 
 
 class RouteCli(unittest.TestCase):

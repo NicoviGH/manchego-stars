@@ -87,9 +87,12 @@ Monk (its Guiding Ring target is in `data_itemuse.c`, not the class), and Myrrh,
 at level 20 whatever `promote_at` is. A recruit that joins at `promote_at` or above is promoted the
 chapter it is on the field, whether or not it earns anything in it.
 
-**Known undercount: repeated reinforcement arrays.** An array a counter loop reloads is counted
-once. Ch21's three RED bodies of class 0x3 (Ephraim Master Lord, L5, `UnitDef_088C1CE0` /
-`088CB524`) are fought, not a scene: `EventScr_089F9448` (ch21a-eventscript.h:194) loads them with
-`EventScr_LoadReinforce` inside a `COUNTER_DEC(0x2)` loop that `COUNTER_SET(0x2, 10)` starts at ten,
-so up to thirty bodies arrive where the walk counts three. The class is named through
+**Counted reinforcement loops.** An array a script reloads under `COUNTER_DEC(n)` (re-arming until
+`COUNTER_CHECK(n)` reaches 0) arrives once per wave; the waves are the Normal-mode `COUNTER_SET(n, k)`
+that starts the counter (`difficulty.reinforcement_waves`; a set after a `CHECK_HARD` is the hard
+refill and is not counted). Ch21's three RED bodies of class 0x3 (Ephraim Master Lord, L5,
+`UnitDef_088C1CE0` / `088CB524`) are fought: `EventScr_089F9448` (ch21a-eventscript.h:194) loads
+them in a loop that `COUNTER_SET(0x2, 10)` starts, so thirty arrive. Chapters with counted loops
+today: Ch9b, Ch14a/b, Ch16b, Ch17a/b, Ch20a/b, Ch21a/b. A loop no single Normal-mode set sizes
+(none, two, or a tutorial-only one) raises naming the chapter and script. The class is named through
 `inject.class_ids.vanilla_class_for_token`, which raises on an unknown or ambiguous id.

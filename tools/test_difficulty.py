@@ -1515,6 +1515,43 @@ class VanillaRoutes(unittest.TestCase):
         joins = {r.char: df.VANILLA_CHAIN[r.fields_from] for r in df.vanilla_recruits()}
         self.assertEqual('FE8 Ch8', joins['CHARACTER_FORDE'])
 
+    def test_a_counted_reinforcement_loop_is_sized_by_its_counter(self):
+        """Ch21: `COUNTER_SET(0x2, 10)` starts the counter and `EventScr_089F9448` reloads
+        `UnitDef_088C1CE0` (three RED bodies) until it hits 0: ten waves."""
+        self.assertEqual({'UnitDef_088C1C04': 1, 'UnitDef_088C1C7C': 1, 'UnitDef_088C1CE0': 10},
+                         df.reinforcement_waves('ch21a'))
+        reds = [u for a, _i, u in df.derived_red_defs('ch21a') if a == 'UnitDef_088C1CE0']
+        self.assertEqual(30, len(reds))
+
+    def test_the_hard_mode_refill_of_a_counter_is_not_normal_mode(self):
+        """ch9b's counter 0x3 is set to 1, then to 3 only after CHECK_HARD."""
+        self.assertEqual(1, df.reinforcement_waves('ch9b')['UnitDef_088C27C8'])
+
+    def test_a_loop_nothing_sizes_raises_naming_the_chapter_and_script(self):
+        loop = 'SVAL(EVT_SLOT_2, UnitDef_X)\n CALL(EventScr_LoadReinforce)\n COUNTER_DEC(0x5)\n'
+        cases = {'no set': [('EventScr_Loop', loop)],
+                 'two sets': [('EventScr_Loop', loop),
+                              ('EventScr_A', 'COUNTER_SET(0x5, 2)'),
+                              ('EventScr_B', 'COUNTER_SET(0x5, 3)')],
+                 'tutorial only': [('EventScr_Loop', loop),
+                                   ('EventScr_A', 'CHECK_TUTORIAL\n COUNTER_SET(0x5, 2)')]}
+        for label, blocks in cases.items():
+            with mock.patch.object(df, '_script_blocks', lambda stem, b=blocks: b):
+                with self.assertRaisesRegex(ValueError, 'ch77.*EventScr_Loop', msg=label):
+                    df.reinforcement_waves.__wrapped__('ch77')
+
+    def test_a_loop_with_one_normal_set_is_counted_not_refused(self):
+        loop = 'SVAL(EVT_SLOT_2, UnitDef_X)\n CALL(EventScr_LoadReinforce)\n COUNTER_DEC(0x5)\n'
+        blocks = [('EventScr_Loop', loop),
+                  ('EventScr_A', 'COUNTER_SET(0x5, 2)\n CHECK_HARD\n COUNTER_SET(0x5, 4)')]
+        with mock.patch.object(df, '_script_blocks', lambda stem: blocks):
+            self.assertEqual({'UnitDef_X': 2}, df.reinforcement_waves.__wrapped__('ch77'))
+
+    def test_every_chapter_of_both_routes_has_loops_the_rule_can_size(self):
+        for route in ('eirika', 'ephraim'):
+            for ref in df.route_chain(route):
+                df.reinforcement_waves(df.ref_stem(ref))      # raises on an unsized loop
+
     def test_an_ally_list_that_is_not_there_names_its_chapter(self):
         with mock.patch.object(inject.decomp, 'vanilla_decomp_text', lambda rel: 'no list here'):
             with self.assertRaisesRegex(ValueError, 'ch99-eventinfo'):
