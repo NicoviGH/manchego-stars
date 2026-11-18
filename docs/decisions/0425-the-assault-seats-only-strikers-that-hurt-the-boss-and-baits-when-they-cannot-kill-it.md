@@ -7,52 +7,92 @@ issues: [641, 510]
 ---
 # The assault seats only strikers that hurt the boss, and baits when they cannot kill it
 
-**Accepted (2026-11-18, #641).** In vanilla E_20 the playtest bot never broke Morva (charId
-0x41). Every judged throne assault seated Ross (0x07), Vanessa (0x06) and Garcia (0x0A) beside
+**Accepted (2026-11-18, #641; amended the same day by the review of PR #646).** In vanilla E_20
+the playtest bot never broke Morva (charId 0x41), who holds the seize tile (E_20 is a Seize
+map). Every judged throne assault seated Ross (0x07), Vanessa (0x06) and Garcia (0x0A) beside
 Ephraim (0x0F). Their blows deal her nothing, and each one cost a whole death (`sum_die` 3.0).
-No unit was offered a wait on her strike tile, so the plan the guide plays (stand there, let
-her strike, finish her the next turn) was never judged. The diagnosis and the design are on
-#641 (comments 6979929417 and 6980453726).
+No unit was offered a wait on her strike tile, so the plan the guide plays (stand there and let
+her strike into the counter) was never judged. The diagnosis and the design are on #641
+(comments 6979929417 and 6980453726).
 
-**The rule** (`tools/playtest/planner.lua`, the assault; `bot.lua` `M.waitAt`).
+**The rule** (`tools/playtest/planner.lua`, the assault; `bot.lua` `M.baitAt`).
+- **The boss.** The assault's boss is the enemy whose death ends the chapter (`M.endsIn`: a
+  Defeat Boss map's boss, a Rout's last red unit) or the seize tile's holder (`M.throne`).
 - **A striker is seated only when it deals damage:** its expected damage on the boss is above
   `M.DUST`. A blow that cannot hurt the boss buys its counter and nothing else.
-- **When the seated strikers do not count the boss dead this phase, the bait is judged too.**
-  The heaviest striker waits on its heaviest strike tile, and every other unit holds
-  (`complete`). The plan has kind `bait`. It is one more plan for the rank, judged like any
-  other: no ban, and no weight beyond its outcomes (ADR 0396). No march or hold offers that
-  tile, so the planner asks `Bot.waitAt` for the wait. That wait is told its tile's ally and its
-  exposure, as `Bot.mendAt`'s heal is (ADR 0408). With a single striker there is no assault
-  (the beam already has that plan), but there can still be a bait.
-- **The lookahead's second phase reads the win** (`M.secondRead`'s fourth value). The win is
-  the boss killed by the army's reply, at the kill's chance, or felled by our counter to its own
-  strike in the second phase. The same predicate as the judge's `fell` names the boss (`endsIn`:
-  a Defeat Boss map's boss, or a Rout's last red unit). The win goes into the goals' own term
-  (`goalTerm`) at `GAMMA` of a first-phase win: `fell' = 1 - (1 - fell)(1 - GAMMA * won)`. It
-  is one owner and no new formula. `rank.complete` stays the first phase's chance.
-- **No counter-damage weight.** The brief allowed one if the bait could not reach the
-  lookahead. The runs did not need it. In E_20 the bait ranked first on progress (0.29 against
-  0 for every hold) with no lookahead at all: Ephraim already stood inside Morva's danger zone,
-  so no `boss` trigger fired. Nothing here weights counter damage.
+- **When the strikers do not count the boss dead, the bait is judged too** (kind `bait`). The
+  heaviest striker waits on one of its strike tiles, holding that strike's weapon. The rest hold.
+  It is one more plan for the rank, judged like any other: no ban, and no weight beyond its
+  outcomes (ADR 0396). With a single striker there is no assault (the beam already has that
+  plan). That striker's own kill chance (`kill >= 0.5`, as `score` counts a target gone) decides
+  whether there is a bait.
+- **The tile** is the first of the striker's strike tiles, heaviest first, that `Bot.baitAt`
+  accepts. The unit must be allowed to strike the boss from it (`strikeTiles`: the throne's rule
+  and the avoid claims, as for the strike itself). The boss must be read to strike it (the
+  unit's exposure there, with that weapon held), and the counter to take HP off the boss. This
+  rules out a range-2 tile against a range-1 boss. No style gate is asked: the strikes the bait
+  stands for are offered ungated (`priced`, ADR 0396), and the cap judges the plan.
+- **The weapon** is the strike's bag slot. It is the act's `slot` and part of its key (`#n`); a
+  slot 0 weapon is already the one the unit fights with, so that is a plain Wait. The judged
+  phase arms the unit with it (`stageWear`, as for a planned attack). The harness equips it
+  before the Wait (`INSPECT.equipSlot`: Item, the weapon, Equip — `ItemSubMenu_EquipItem` calls
+  `EquipUnitItemSlot` and goes back to the inventory list — then B to the unit menu, as
+  `ItemMenu_ButtonBPressed` does). The controller names Equip by its menu id 0x35 (`equip_item`).
+  Without it, Ephraim countered Morva with the lance in front of his bag (item 25, 15 a blow),
+  not Siegmund (item 146).
+- **A plan with the bait meets the lookahead's second phase** (trigger `bait`, beside ADR 0389's
+  `boss` and `breach`). Its worth is the next turn, and in E_20 Ephraim baited from inside
+  Morva's danger zone, so no `boss` trigger fired.
+- **The second phase reads the win** (`M.secondRead`'s fourth value). It is the boss killed by
+  the army's reply at the kill's chance, or felled by our counter to its own strike. Each counts
+  only as far as its unit lives the first phase (`alive`, the judge's). The enemies the first
+  phase's counters removed (`sight.nextPhase`'s new `.fell`) and the reply's kills are gone
+  before the next is read, so a Rout's last enemy is counted on the board the second phase has.
+  The win goes into the goals' own term (`goalTerm`) at `GAMMA` of a first-phase win:
+  `M.either(fell, GAMMA * won)`, where `M.either` is the one owner of `1 - (1 - a)(1 - b)` and
+  `winOf` uses it too. It adds to the rank's `value` only. `judged` and `goalWorth` stay the
+  first phase's, as botrun grades them. The record keeps the second phase's win apart
+  (`lookWin = { won, gain, worth }` on the plan, its `considered` entry and the trace's
+  `look_win`). The judge's `fell` and this read share `M.fellBy` and `M.endsIn`.
+- **A Seize map's holder is not a win** (ADR 0405: the Seize is the win). Its death opens the
+  Seize and ends nothing, so on E_20 and I_14 the lookahead credits no win for it. Whether the
+  objective's chance should know that the holder blocks the tile is open; it is not modelled
+  here.
+- **No counter-damage weight.** The bait is played on what the rank already reads.
 
 **Proof** (vanilla, campaign `bag1-heal4-heal1-lap4e-cs-s4006` unless named; base `ddaae8c5`):
-- Unit test `test_planner_assault_baits` (`test_bot.lua`): a Guard Tile boss, one striker that
-  falls short of the kill, three range-2 units that deal 0. No 0-damage unit is seated, the bait
-  is played, and the win row carries GAMMA of the reply's kill. It fails on `4cf39e1b` and on the
-  unfixed branch, and so do the new `secondRead` checks. With the fold removed, the bait is still
-  played in the test, on progress; only the win's checks fail.
-- E_20, attempts 1-2, seed 1. Attempt 1 is lost on turn 3 on both (`forecast_desync`). Attempt 2
-  is the same game on base and branch up to turn 41. On turn 41 the branch plays the bait:
-  Ephraim waits on 11,12 at 51 HP and Morva strikes him (51 to 15, she 62 to 42). He withdraws
-  and heals, and on turn 44 his Siegmund kills her at 54 HP. The branch **wins on turn 45**; base
-  is `stuck` on turn 47. Both had 7 deaths. No assault was judged at `sum_die` 3.0.
-- I_14 (`lap4p-cs-s4006`, from 27, attempts 1-3; only three styles exist): unchanged, no clear on
-  either. On attempt 2 Ephraim baits Vigarde (0x6B) three times. Vigarde loses 17 HP, then 0, then
-  17, and the throne heals 5 a turn. Every assault reads a death at 0.87-0.96. The attempt-3 crash
-  (`could not perform attack`, turn 10) happens on base too.
-- Ch17, seeds 1-3, 6 attempts each: 18/18 won on both. The first clean attempt is 6, 5 and none
-  on both. The bait was played 5 times. Blue deaths were 6 on base and 8 on the branch. The two
-  extra deaths are one game (attempt 1 has the same dice on seeds 1 and 3): Myrrh (0x1E) baits the
-  boss under `bold` and dies to it at a 2.2% read (`rng_tail`).
-- CPU per player phase, base and branch run back to back (load 4-6): Ch17 16.62 s and 16.62 s
-  over 200 and 202 player phases. E_20 7.59 s and 7.90 s; I_14 12.32 s and 11.97 s.
+- **Unit tests** (`test_planner_assault_baits`, the `secondRead`/`endsIn`/`either` checks,
+  `test_controller`'s Equip). Each check of a fix fails on the commit before it (57fc75a4);
+  the two-striker check makes the seating test assert something, and passes there too.
+  - The bait is played, and no 0-damage unit is seated.
+  - A second damaging striker makes an assault that seats exactly those two.
+  - The bait holds slot 2, in the act and in the judged phase.
+  - Against a range-1 boss the bait takes the tile the boss strikes.
+  - The bait triggers the second phase.
+  - The reply's win is discounted by the killer's survival, and `goalWorth` stays the first
+    phase's.
+  - A Rout's last enemy counts the first phase's removals.
+- **E_20** (attempts 1-2, seed 1):
+  - Attempt 1 is lost on turn 3 on both (`forecast_desync`).
+  - Attempt 2 is the same game on both up to turn 41.
+  - On turn 41 Ephraim equips Siegmund and waits on 11,12. Morva strikes him (51 to 15). His
+    counter crits her dead (62 to 0); the judged phase read the counter kill as sure. Eirika
+    (0x01) seizes on turn 42: **won on turn 42**. Base is `stuck` on turn 47.
+- **I_14** (`lap4p-cs-s4006` from 27, attempts 1-3): unchanged, no clear on either.
+  - On attempt 2 Ephraim baits Vigarde (0x6B) on turns 29-31, and the throne's +5 a turn
+    outpaces the chip.
+  - The attempt-3 harness crash happens on base too.
+- **Ch17** (seeds 1-3, 6 attempts each): 17/18 won, base 18/18. First clean attempt 6, 5, none
+  on both.
+  - Seed 2, attempt 4 is **lost**: Eirika (0x01) dies on turn 9 to a unit the board never
+    showed (`unrevealed_killer`, 0% read).
+  - That turn, plans built from the bait (charId 0x14 waiting on the boss's tile) outranked
+    plans worth about 340 more in `value`, on a 0.09% first-phase win chance. The rank orders
+    `complete` before progress and value, with no floor (ADR 0384).
+  - Whether a win chance that small should outrank is Nicolas's call; it is on #641.
+  - Here the lookahead's win was read in a real game (`lookWin.won` 0.0008).
+- **CPU per player phase**, base and branch back to back (load 2.5-5):
+  - E_20 attempt 1, the same game: 13.97 s on the branch, 14.03 s on base.
+  - E_20 attempt 2: 331.4 s over 42 phases on the branch, 339.4 s over 46 on base. The
+    branch's last turns run the bait's second phase.
+  - Ch17 seed 1: 15.95 s on the branch, 17.15 s on base.
