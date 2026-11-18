@@ -299,7 +299,9 @@ end
 
 local function actOf(a)
     return { unit = a.unit, act = a.act, x = a.move.x, y = a.move.y, target = a.target,
-             why = a.why, canto = a.canto }
+             why = a.why, canto = a.canto,
+             -- an attack's weapon and what it was priced to spend (#642)
+             slot = a.act == "attack" and a.slot or nil, useCost = a.useCost }
 end
 
 -- Units on the field before and gone after, with the fighter that downed them. A player-phase
@@ -1435,7 +1437,9 @@ function M.run(api)
                                      seen = seenReds,
                                      quietGoals = quietGoals,
                                      -- PT_REPLY=hold: the second phases' old control
-                                     reply = api.reply }
+                                     reply = api.reply,
+                                     -- PT_USEPRICE (#642): the weapon-use price's knob
+                                     usePrice = api.usePrice }
                         end
                         if playing and playing.forced then
                             -- a forced plan plays its keys in turn, each read on this board

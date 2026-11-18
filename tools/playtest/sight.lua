@@ -302,7 +302,7 @@ M.LAST_EVENT_TURN = 0xFF     -- eventinfo.c EvCheck02_TURN: turns are a byte (0x
 M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
 
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
-local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
+local BU = { weapon = 0x48, weaponAttributes = 0x4C, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
              statusOut = 0x6F, hpInitial = 0x72, nonZeroDamage = 0x7C, weaponBroke = 0x7D }
 -- include/bmunit.h UNIT_STATUS_PETRIFY and UNIT_STATUS_13: the two statuses a blow sets that
 -- end the battle like a death (BattleGenerateHit)
@@ -695,9 +695,13 @@ local function s32(v) return v >= 0x80000000 and v - 0x100000000 or v end
 -- damage (the window's own sum: battleAttack less the other side's battleDefense, bksel.c
 -- :233), how many blows (the proc's hit count for that side), and whether it is armed (a
 -- weapon, or one that broke). Display only, for the logs: what an exchange DOES is `played`.
+-- spendsMiss: the weapon spends a use on a miss too (bmbattle.c BattleGenerateHitEffects: a
+-- use goes on a hit, or on every blow of an IA_MAGIC or IA_UNCOUNTERABLE weapon; #642).
+M.SPENDS_MISS = 0x82   -- IA_MAGIC (1 << 1) | IA_UNCOUNTERABLE (1 << 7), include/bmitem.h
 function M.side(mem, me, other, proc, hitsAt)
     local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
     return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
+             spendsMiss = (mem.u32(me + BU.weaponAttributes) & M.SPENDS_MISS) ~= 0,
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
              armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0 }
 end
@@ -911,8 +915,13 @@ function M.attackOf(ours, eHp, uHp)
     local c = ours.counter
     local counters = c.armed and c.hits > 0
     local kill, expected = M.odds({ ours.dealt }, eHp)
+    -- uses: the weapon uses the attack is expected to spend (#642): each blow, or each blow
+    -- that lands (the hit roll is Roll2RN, BattleGenerateHitAttributes) unless the
+    -- weapon spends on a miss. Every blow is counted as thrown, so a blow the target's death or
+    -- our own death cuts off is still counted: never fewer than the game spends.
+    local uses = (ours.hits or 0) * (ours.spendsMiss and 1 or M.rollChance(2, ours.hit or 0))
     return { hit = ours.hit, dmg = ours.dmg, crit = ours.crit, hits = ours.hits,
-             counters = counters,
+             spendsMiss = ours.spendsMiss, uses = uses, counters = counters,
              counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
              counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
              killsTarget = ours.killsTarget, dealt = ours.dealt, counterDist = ours.back,
@@ -1817,6 +1826,15 @@ function M.new(outer)
             end)
         end
         return prices[id]
+    end
+    -- What one use of an item costs: its price over its full uses (GetItemCost / GetItemMaxUses,
+    -- i.e. ItemData costPerUse), nil when the game gives it no price (a Sacred Twin,
+    -- Excalibur: costPerUse 0). #642's weapon-use price.
+    function s.usePrice(id)
+        local cost = s.itemCost(id)
+        if not cost or cost <= 0 then return nil end
+        local uses = sandbox(function(call) return call(S.GetItemMaxUses, { id }) end)
+        return uses > 0 and cost / uses or nil
     end
 
     local raced = {}   -- village id -> the fastest red unit's turns (false: none reaches)

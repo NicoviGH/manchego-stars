@@ -439,6 +439,11 @@ end
 M.memoryKey = Board.memoryKey
 
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
+-- The gold one use of a weapon the game gives no price costs a plan (#642): a Sacred Twin,
+-- Excalibur, the legendaries (ItemData costPerUse 0). A shop weapon's use costs its own
+-- costPerUse (sight.usePrice). PT_USEPRICE overrides it ("off": no price, one weapon an
+-- attack as before). Being tuned: #642.
+M.RARE_USE = 600
 
 -- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
 -- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit on
@@ -2153,8 +2158,14 @@ local function proposeOne(ctx, u)
             .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
             .. (a.dropAt and ("/" .. a.dropAt.x .. "," .. a.dropAt.y) or "")
             .. (a.canto and ("~" .. a.canto.x .. "," .. a.canto.y) or "")
+        -- the same strike with another weapon is another act (#642): the first weapon offered
+        -- keeps the plain key, each other one is told apart by its slot (the planner's key too)
+        if seen[k] and a.act == "attack" and ctx.priceUse and seen[k] ~= a.slot then
+            k = k .. "#" .. tostring(a.slot)
+            a.slotKey = true
+        end
         if seen[k] then return end
-        seen[k] = true
+        seen[k] = a.slot or true
         a.why = why
         acts[#acts + 1] = a
     end
@@ -2180,14 +2191,46 @@ local function proposeOne(ctx, u)
             guard[e] = c
         end
     end
+    -- each pick with the unit's other weapons from the same tile (#642): which weapon
+    -- strikes is the planner's to weigh against what each use costs, not expected damage's
+    local others = {}
+    if ctx.priceUse then
+        for _, c in ipairs(attackOptions(ctx, u, open, true)) do
+            local k = c.target.id .. "@" .. c.tile.x .. "," .. c.tile.y
+            others[k] = others[k] or {}
+            table.insert(others[k], c)
+        end
+    end
+    -- a weapon's price per use: the game's own (sight.usePrice), else ctx.priceUse's
+    local function perUse(slot)
+        local it = u.items and u.items[slot + 1]
+        return it and ctx.sight.usePrice(it.id) or ctx.priceUse
+    end
     local function offer(c)
         local a = strikeAct(u, c)
         a.f, a.spent, a.first = c.f, c.spent, c.first
+        -- what the strike spends of its weapon over the cheapest weapon that makes the same
+        -- strike (#642), in gold: its expected uses at the difference in price per use. A unit
+        -- with no cheaper weapon there pays nothing, so the price chooses the weapon and never
+        -- whether to strike (a Manakete's Divinestone is its only weapon: Ch17, #642 comment)
+        if ctx.priceUse then
+            local least = perUse(c.slot)
+            for _, o in ipairs(others[c.target.id .. "@" .. c.tile.x .. "," .. c.tile.y] or {}) do
+                least = math.min(least, perUse(o.slot))
+            end
+            a.useCost = (c.f.uses or 0) * (perUse(c.slot) - least)
+        end
         add(a, "attack")
     end
     for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
         for _, list in ipairs({ best, safe, guard }) do
-            if list[e] then offer(list[e]) end
+            local c = list[e]
+            if c then
+                offer(c)
+                for _, o in ipairs(others[e.id .. "@" .. c.tile.x .. "," .. c.tile.y] or {}) do
+                    if o.slot ~= c.slot then offer(o) end
+                end
+            end
         end
     end
     -- the boss from every tile: the planner's assault seats several strikers around it,
@@ -2384,6 +2427,10 @@ function M.candidates(board, sight, style, opts)
     ctx.seen = opts and opts.seen
     ctx.lost = opts and opts.lost or {}
     ctx.stalled = opts and opts.stalled
+    -- the weapon-use price (#642): the gold a use of an unpriced weapon costs, or nil (off:
+    -- PT_USEPRICE=off, or a sight that cannot price an item)
+    local knob = opts and opts.usePrice
+    if knob ~= "off" and sight.usePrice then ctx.priceUse = tonumber(knob) or M.RARE_USE end
     ctx.quietGoals = opts and opts.quietGoals or {}
     -- memoised for the decision (turnsFor's ctx.keyTurns, obstacleTurns' ctx.ways): the planner
     -- asks it per goal, taker and partial plan, and a unit cut off goes through breachFor and

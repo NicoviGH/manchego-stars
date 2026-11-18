@@ -279,6 +279,7 @@ local function unit(o)
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons, level = o.level,
+        items = o.items,   -- { { id, uses } }: what a weapon use costs is read by its id (#642)
         mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
         carrying = o.carrying, carriedBy = o.carriedBy,   -- a Rescue pair (board.lua)
     }
@@ -391,6 +392,8 @@ local function sightOf(o)
         cache = o.cache,
         terrain = o.terrain,
         weapons = weapons,
+        -- The game's price per use (sight.usePrice; nil: no price), when the test prices uses
+        usePrice = o.usePrice,
         -- The game's CanUnitSeize, modelled by the objective's lord (anyone, when none is named).
         canSeize = function(u)
             local lord = (o.objective or {}).lord
@@ -889,6 +892,45 @@ do
     local swordOnly = blue(0x01, 0, 0, 0)
     check(B.decide(boardOf(swordOnly, far), sight, style("careful")).act, "wait",
           "a sword alone does not reach two tiles")
+end
+
+-- #642: a plan pays for the weapon uses it spends. Two weapons make the same sure kill: the
+-- plan strikes with the one whose use costs less (a Steel Lance at its own 16 gold, not a
+-- Siegmund, which the game gives no price); with the price off (PT_USEPRICE=off) it keeps the
+-- one expected damage picked. Where only the dear weapon kills, the kill is still worth it.
+do
+    local SIEGMUND, STEEL = 0x92, 0x16
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 1, min = 1, max = 1 } },
+                                    items = { { id = SIEGMUND, uses = 20 },
+                                              { id = STEEL, uses = 30 } } })
+    local E = red(0x81, 0, 1, { hp = 20 })
+    local function priced(steel)
+        return { reach = { [0x01] = tiles({ 0, 0 }) },
+                 usePrice = function(id) return id == STEEL and 16 or nil end,
+                 fc = { [0x01] = { [0x81] = {
+                     ["0,0/0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true },
+                     ["0,0/1"] = steel } } } }
+    end
+    local same = priced(fc { hit = 100, dmg = 30, hits = 1, killsTarget = true })
+    local a = Planner.plan(B, boardOf(A, E), sightOf(same), style("careful"))
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/1", "the same kill: the cheaper use")
+    a = Planner.plan(B, boardOf(A, E), sightOf(same), style("careful"), { usePrice = "off" })
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/0", "price off: expected damage's pick")
+    local weak = priced(fc { hit = 100, dmg = 10, hits = 1 })
+    a = Planner.plan(B, boardOf(A, E), sightOf(weak), style("careful"))
+    check(a and a.act .. "/" .. tostring(a.slot), "attack/0", "only the dear weapon kills: it strikes")
+    -- a unit whose only weapon has no price pays nothing for it: the price picks the weapon,
+    -- never whether to strike (a chip the planner takes at no price is taken at any)
+    local M = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 } },
+                                    items = { { id = SIEGMUND, uses = 20 } } })
+    local chip = { reach = { [0x01] = tiles({ 0, 0 }) },
+                   usePrice = function(id) return id == STEEL and 16 or nil end,
+                   fc = { [0x01] = { [0x81] = { ["0,0/0"] = fc { hit = 100, dmg = 5, hits = 1 } } } } }
+    local free = Planner.plan(B, boardOf(M, E), sightOf(chip), style("careful"), { usePrice = "off" })
+    a = Planner.plan(B, boardOf(M, E), sightOf(chip), style("careful"), { usePrice = "100000" })
+    check(a and a.act, free and free.act, "one weapon: the price does not stop its strike")
+    check(a and a.act, "attack", "and the chip is struck")
 end
 
 -- test_objective_seize: the lord with the seize tile in reach and danger 0 there seizes,

@@ -387,6 +387,8 @@ local function score(act, st, W, style, odds)
             -- them, for the judge to play the enemy phase on the HP each pair leaves (T100b)
             if f.joint then fx.exchange = { target = e.id, joint = f.joint } end
         end
+        -- what the strike spends of its weapon, at the gold's points (#642, Bot's useCost)
+        v = v - W.gold * (act.useCost or 0)
         fx.enemyHp = { id = e.id, hp = hp - dealt }
         -- what the blow does, for the judge to play the kill both ways (its odds composed with
         -- the plan's other blows on the target, at the target's own HP)
@@ -469,6 +471,8 @@ local function key(act)
     -- a Drop is told apart by where it sets the unit down, a Canto move by where it ends
     if act.dropAt then k = k .. "/" .. act.dropAt.x .. "," .. act.dropAt.y end
     if act.canto then k = k .. "~" .. act.canto.x .. "," .. act.canto.y end
+    -- the same strike with another of the unit's weapons (#642): its slot
+    if act.slotKey then k = k .. "#" .. tostring(act.slot) end
     return k
 end
 
