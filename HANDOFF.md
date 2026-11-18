@@ -30,8 +30,8 @@ and start a fresh instance; don't rely on auto-compaction.
   Eirika L3. At I_13 (Ephraim route) Ephraim/Seth L12, Kyle L11, the rest L8-9 or below,
   only Lute promoted. The band stops at Ch8, so "under-strength later" is a lead. Likely cause,
   untested: Seth (promoted) takes the kills.
-- **Next, in order (Claude's recommendation):** (1) done: E_20's crash (PR #638);
-  (2) extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
+- **Next, in order:** (1) #641, root-cause E_20's throne assault (cheap subagents until a
+  true cause); (2) #639, extend the level band (`tools/exp_curve.py`) to the route chapters and compare the bot's
   party chapter by chapter, who takes the experience; (3) laps again from the prologue.
 - **CI:** the runner's default Python moved to 3.13 today and dropped `aifc`; main's `tests` job
   had failed since. #637 pins 3.12 on the `tests` and `verdict-diff` jobs (the ROM build keeps
