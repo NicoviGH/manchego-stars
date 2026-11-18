@@ -442,8 +442,8 @@ M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strik
 -- The gold one use of a weapon the game gives no price costs a plan (#642): a Sacred Twin,
 -- Excalibur, the legendaries (ItemData costPerUse 0). A shop weapon's use costs its own
 -- costPerUse (sight.usePrice). PT_USEPRICE overrides it ("off": no price and no spares, the
--- bot before #642). Being tuned: #642.
-M.RARE_USE = 600
+-- bot before #642). 300: one use stays under one death's weight in every style (ADR 0423).
+M.RARE_USE = 300
 
 -- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
 -- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit on

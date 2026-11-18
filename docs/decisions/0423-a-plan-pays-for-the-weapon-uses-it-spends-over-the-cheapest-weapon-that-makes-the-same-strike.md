@@ -1,0 +1,43 @@
+---
+id: 423
+title: "A plan pays for the weapon uses it spends, over the cheapest weapon that makes the same strike"
+date: "2026-11-18"
+section: "Combat System"
+issues: [642, 510]
+---
+# A plan pays for the weapon uses it spends, over the cheapest weapon that makes the same strike
+
+**Accepted (2026-11-18, #642).** Found by #641: in vanilla E_20 the bot had spent Siegmund and
+Excalibur on lesser enemies before reaching Morva. A player saves a weapon like that for when it
+is needed; no plan priced a use.
+
+**The rule (ADR 0396: a price, not a ban).**
+- A strike keeps the weapon expected damage picks. Each cheaper weapon of the unit that makes the
+  same strike (same target, same tile) rides along as a *spare*.
+- The beam never sees the price. After the judge reads the best plan, a spare step (`planner.lua`)
+  judges it again with each spare swapped in; the price is charged there only, in gold through
+  `W.gold`: the expected uses spent (`sight` `attackOf.uses`: blows × the 2RN hit chance, every
+  blow for a weapon that does not miss) × (the weapon's price per use − the spare's).
+- A shop weapon's price per use is the game's `costPerUse`. A weapon the game gives no price (a
+  Sacred Twin, Excalibur, the legendaries) costs `Bot.RARE_USE` = **300 gold** a use (Nicolas,
+  2026-11-18, on the investigation's recommendation): the highest price tested where one use
+  stays under one death's weight in every style (12 / 24 / 45 points careful / even / bold,
+  against a death's 1000 / 300 / 60). `PT_USEPRICE=off|<gold>` overrides it; `off` is the bot
+  before #642.
+
+**Why the beam never sees it (confirmed, #642 comment 6970344369).** The first cut took the
+price off a strike's own score in the beam, which keeps each unit's four best acts by that
+score. `PT_SHADOW` (each decision also planned at another price, judged, never played) found 5
+of 41 dropped Twin strikes where the priced plan was over the death cap and the Twin plan under
+it: the beam cut the strike before the judge read the life it saved. On the spare step, 292
+decisions, none.
+
+**Measured (Ch17 from `bag1-heal4-heal1-lap4e-cs-s4006`, `attempts`, dice seeds 1-3, 18 games):**
+price off 15 won, 7 player deaths, 34 Twin strikes; this rule 18 won, 8 deaths, 15 Twin strikes.
+300 and 600 play the same 18 games. CPU: the item's full uses are memoised (one game call per
+strike weighed before), 20.1 → 17.3 s a player phase on the same 6 games.
+
+**Not settled by it.** E_20's boss: the saved Siegmund did not break Morva; every throne assault
+seats strikers that deal 0 (#641's "found instead"). In E_20 the price barely saved Excalibur
+(9 strikes at 600). Prices under 300, and whether 300 keeps enough of Ch17's 30 Siegmund uses
+for Morva, are untested.
