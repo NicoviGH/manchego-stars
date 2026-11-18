@@ -8,7 +8,8 @@
 `attempts` plays attempts 1..N of the chapter at the env's `from` start side by side (env
 `attempt = k` per worker; campaign.lua) and names the lowest that cleared with everyone alive.
 Over several style seeds it plays each in turn and ends with how many of the games were
-different (distinct_games, #647): the style seed changes the bot's play, never the dice. More
+different (distinct_games, #647): the style seed changes the bot's play, not the dice (each
+attempt rolls the same dice under every style seed). More
 dice means more attempts (retries within the chapter) or more campaigns (`cell --starts K`).
 Each is an independent attempt: every attempt loads the same start state, and the styles are
 drawn without reading a result, so attempt k alone plays the k-th style with no memory, and
@@ -648,16 +649,47 @@ def distinct_games(records):
     (ADR 0385). So two style seeds at the same attempt roll the same dice, and when they draw
     the same style they play the same game twice (#647: 18 Ch17 games were 13 different ones)."""
     games = [r for r in records if is_bot(r) and r.get('acts_hash')]
-    return '%d games, %d distinct' % (len(games), len({r['acts_hash'] for r in games}))
+    line = '%d games, %d distinct' % (len(games), len({r['acts_hash'] for r in games}))
+    # an attempt that left no game is said, never dropped: a crash, or a worker that left no
+    # record (Pool records it as crashed), is a BOTRUN record with no acts_hash
+    none = sum(1 for r in records if is_bot(r) and not r.get('acts_hash'))
+    return line + (', %d attempts left no game' % none if none else '')
 
 
 def seed_list(text):
-    """`--seed`'s value: one seed, a list (1,2,3) or a range (1-3)."""
+    """`--seed`'s value: one seed, a list (1,2,3) or a range (1-3). A reversed or open range,
+    a seed that is not a number, or one named twice is refused: a mistyped value would play
+    nothing, or the same games twice and count them as more evidence."""
     out = []
     for part in text.split(','):
-        lo, _, hi = part.partition('-')
+        lo, dash, hi = part.partition('-')
+        if not lo.isdigit() or (dash and not hi.isdigit()) or (dash and int(hi) < int(lo)):
+            raise argparse.ArgumentTypeError('seed %r: one seed, a list 1,2,3 or a range 1-3'
+                                             % part)
         out.extend(range(int(lo), int(hi or lo) + 1))
+    if len(set(out)) != len(out):
+        raise argparse.ArgumentTypeError('seed %r names a seed twice' % text)
     return out
+
+
+def play_attempts(pool, env, n, seeds, vanilla, say=print):
+    """`attempts`: attempts 1..n of `env`'s start under each style seed in turn, each seed's
+    lines and first clean attempt said apart, then how many games were distinct over all."""
+    every = []
+    for seed in seeds:
+        if len(seeds) > 1:
+            say('seed %d:' % seed)
+        records, said = [], set()
+        for r in pool.run(attempt_tasks(env, n, seed, vanilla)):
+            records.append(r)
+            line = attempt_line(r, said)
+            if line:
+                say(line)
+        k = first_clean(records)
+        say('first clean attempt: %s' % (k if k is not None else 'none'))
+        every.extend(records)
+    say(distinct_games(every))
+    return every
 
 
 def first_clean(records):
@@ -3893,7 +3925,7 @@ def main(argv=None):
     a.add_argument('--jobs', type=int, default=4)
     a.add_argument('--out', default='runs.jsonl')
     a.add_argument('--seed', type=seed_list, default=[1],
-                   help="style seeds: 1, 1,2,3 or 1-3; they change the bot's play, not the dice (#647)")
+                   help="style seeds: 1, 1,2,3 or 1-3; they change the bot's play, not an attempt's dice (#647)")
     a.add_argument('--vanilla', action='store_true')
     ca = sub.add_parser('calibration', help="the judged enemy phase against the played one, "
                         'from kept traces (#510 PR A)')
@@ -4038,21 +4070,8 @@ def main(argv=None):
         return 0
     with open(args.env) as fh:
         env = json.load(fh)
-    pool = Pool(jobs=args.jobs, out=args.out)
-    every = []
-    for seed in args.seed:
-        if len(args.seed) > 1:
-            print('seed %d:' % seed, flush=True)
-        records, said = [], set()
-        for r in pool.run(attempt_tasks(env, args.attempts, seed, args.vanilla)):
-            records.append(r)
-            line = attempt_line(r, said)
-            if line:
-                print(line, flush=True)
-        k = first_clean(records)
-        print('first clean attempt: %s' % (k if k is not None else 'none'))
-        every.extend(records)
-    print(distinct_games(every))
+    play_attempts(Pool(jobs=args.jobs, out=args.out), env, args.attempts, args.seed,
+                  args.vanilla, say=lambda line: print(line, flush=True))
     return 0
 
 
