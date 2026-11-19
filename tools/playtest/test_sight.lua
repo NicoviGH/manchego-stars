@@ -826,10 +826,12 @@ do
           true, "aiPhaseStart: aiOrder builds the order in the phase start's own list")
     local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
     local started = decide:find("M%.aiPhaseStart%(api, call, S, all, setup, known%)")
-    local guard = decide:find("assert%(mem%.u8%(S%.gPlaySt %+ PLAY_FACTION%) == M%.PHASES%[3%]")
+    -- red, or the player's for a berserked player unit in the berserk phase (#660)
+    local guard = decide:find('local phase = e%.faction == "blue" and M%.PHASES%[1%] or M%.PHASES%[3%]%s+'
+                              .. "assert%(mem%.u8%(S%.gPlaySt %+ PLAY_FACTION%) == phase,")
     local stale = decide:find("M%.decisionCalls%(S, e%.addr, healStale,")
     check(started ~= nil and guard ~= nil and stale ~= nil and started < guard and guard < stale, true,
-          "aiPhaseStart: a decision starts its phase, or is inside a red one and is told "
+          "aiPhaseStart: a decision starts its phase, or is inside a red one (the player's for a berserker) and is told "
           .. "whether an enemy's HP was written since the heal flags were read")
     check(decide:find("local key = M%.phaseKey%(mem, all%)%s+local known = seen%.phaseStart%[key%]") ~= nil
           and decide:find("seen%.phaseStart%[key%] = known or M%.phaseStarted%(mem, S, all%)") ~= nil,
@@ -891,8 +893,15 @@ do
     check(ride ~= nil and ride < write, true,
           "keepRide: aiDecide keeps the rider's ballista before its first write")
     local _, keeps = src:gsub("\n +M%.keepAi%(", "")
-    -- aiPhaseStart's own keep comes before its call: its test above runs under the guard
-    check(keeps, 2, "keepAi: aiDecide and aiPhaseStart are its two callers")
+    -- aiPhaseStart's own keep comes before its call: its test above runs under the guard;
+    -- berserkPhaseStart's (#660) likewise
+    check(keeps, 3, "keepAi: aiDecide, aiPhaseStart and berserkPhaseStart are its callers")
+    -- the berserk phase starts only where our berserked units decide: playPhase and nextPhase
+    local _, bstarts = src:gsub("if #berserk > 0 then M%.berserkPhaseStart%(api, call, S, byId%)", "")
+    -- its definition, nextPhase's guarded start and playPhase's (inside its own `#berserk > 0`)
+    local _, bany = src:gsub("M%.berserkPhaseStart%(api,", "")
+    check(bstarts .. "/" .. bany, "1/3",
+          "berserkPhaseStart: nextPhase's start and playPhase's are its only two")
     local calls, withUnits = 0, 0
     for args in src:gmatch("[^%w]aiDecide(%b())") do
         if not args:find("^%(e%)") and not args:find("before, starts%)$") then
@@ -1755,7 +1764,7 @@ end
 -- judged strike takes its level from the board unit.
 do
     local src = sightSrc
-    check(src:find('exchange(call, proc, sim, learning and target < 0x40 and "target" or nil)', 1, true) ~= nil,
+    check(src:find('learning and target < 0x40 and e.faction ~= "blue" and "target" or nil)', 1, true) ~= nil,
           true, "learning: a strike on a player unit counts only while learning")
     local _, sets = src:gsub("learning = [%a]+", "")
     check(sets, 3, "learning: set only by its declaration and learningAs (set, put back)")
@@ -2357,6 +2366,85 @@ do
                                              { p = 0.75, dealt = 5, back = 0, wear = 2, counterWear = 0 } })
     check(wear.actor, 1.5, "exchangeOf: the actor's expected wear")
     check(wear.target, 0.25, "exchangeOf: the target's expected wear")
+end
+
+-- #660: the berserk phase. After our player phase the game moves our berserked units itself
+-- (bm.c gProcScr_BerserkCpPhase, cp_order.c CpOrderBerserkInit), before the enemy phase: vanilla
+-- Ch14's Garcia (charId 0x0A), berserked by a Bishop's staff, killed Eirika at a plan's 0%.
+do
+    local m = fakeMem()
+    local STATE = 0x0C
+    local function unit(id, faction, status, state)
+        local o = { id = id, faction = faction, addr = 0x02030000 + id * Board.UNIT_SIZE }
+        m.w8(o.addr + Board.UNIT_STATUS, status)
+        m.w32(o.addr + STATE, state or 0)
+        return o
+    end
+    local units = {
+        unit(5, "blue", 0x54),                          -- berserked, 5 phases left
+        unit(2, "blue", 0x14),                          -- berserked, its last phase
+        unit(3, "blue", 0x52),                          -- asleep: no berserk phase
+        unit(7, "blue", 0x54, Board.US_RESCUED),        -- carried: the order skips it
+        unit(8, "blue", 0x54, 1 << 10),                 -- US_HAS_MOVED_AI: skipped
+        unit(0x81, "red", 0x54),                        -- an enemy's: its own phase's
+    }
+    check(table.concat(Sight.berserkers(m, Board, units, 0), ","), "2,5",
+          "berserkers: our berserked units the order takes, in unit-index order")
+    check(table.concat(Sight.berserkers(m, Board, units, 1), ","), "5",
+          "berserkers: after one more player phase's start, those whose status outlives the tick")
+
+    -- the phase's start: AiPhaseBerserkInit's writes, our faction, then its two calls
+    local AI, PLAY, TABLE = 0x0203AA04, 0x0202BCF0, 0x080D8178
+    local S = { gAiState = AI, gPlaySt = PLAY, gAiItemConfigTable = TABLE,
+                UpdateAllPhaseHealingAIStatus = 0x0803E640, SetupUnitInventoryAIFlags = 0x0803C064 }
+    m.w8(PLAY + 0x0F, Sight.PHASES[3])
+    m.w32(TABLE + 5 * 4, 0x80000003)
+    m.w8(AI + 0x78, 2); m.w8(AI + 0x7B, 1); m.w8(AI + 0x7E, 3); m.w8(AI + 0x84, 9)
+    for k = 0, 7 do m.w8(AI + 0x86 + k, 0x10 + k) end
+    local kept, ran = 0, {}
+    local api = { mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32,
+                  keep16 = function() kept = kept + 1 end, chapter = function() return 5 end }
+    Sight.berserkPhaseStart(api, function(list)
+        for _, c in ipairs(list) do ran[#ran + 1] = c[1] end
+    end, S, { units[1], units[2] })
+    local cmd = {}
+    for k = 0, 7 do cmd[#cmd + 1] = m.u8(AI + 0x86 + k) end
+    check(table.concat({ m.u8(PLAY + 0x0F), m.u8(AI + 0x7B), m.u8(AI + 0x7E), m.u32(AI + 0x80),
+                         table.concat(cmd, ".") }, ","),
+          table.concat({ Sight.PHASES[1], 4, 0xFF, 0x80000003, "0.0.0.0.0.0.0.0" }, ","),
+          "berserkPhaseStart: our faction, AI_FLAG_BERSERKED, AiPhaseBerserkInit's fields")
+    check(m.u8(AI + 0x78) .. "," .. m.u8(AI + 0x84), "2,9",
+          "berserkPhaseStart: orderState and unk84 left as they were (AiPhaseInit's only)")
+    check(table.concat(ran, ","), S.UpdateAllPhaseHealingAIStatus .. "," .. S.SetupUnitInventoryAIFlags,
+          "berserkPhaseStart: the heal statuses, then the inventory flags")
+    check(kept, 4, "berserkPhaseStart: each unit's AI bytes kept for the sandbox to put back")
+
+    -- phaseWays' tail: each way of the berserk phase ends in its own enemy phase, played on
+    -- that way's board after its strikes; a split in either is one more way of the whole
+    local function sandbox(fn) return fn() end
+    local tails = {}
+    local out = Sight.phaseWays(1, function(_, done)
+        local t = { enemy = 5, felled = 0.5 }
+        local now = { table.unpack(done) }
+        now[#now + 1] = t
+        return t, now, function() end
+    end, sandbox, nil, 1, function(done, mass)
+        tails[#tails + 1] = #done .. "@" .. mass
+        return Sight.phaseWays(1, function(_, d)
+            local t = { enemy = 0x81, felled = 0 }
+            local now = { table.unpack(d) }
+            now[#now + 1] = t
+            return t, now, function() end
+        end, sandbox, nil, mass, nil, done)
+    end)
+    local p, ok = 0, true
+    for _, o in ipairs(out) do
+        p = p + o.p
+        ok = ok and #o.strikes == 2 and o.strikes[1].enemy == 5 and o.strikes[2].enemy == 0x81
+    end
+    check(#out .. "/" .. p, "2/1.0", "phaseWays tail: a berserker's uncertain death is two ways")
+    check(ok, true, "phaseWays tail: each way's strikes are the berserk phase's, then the enemies'")
+    check(table.concat(tails, " "), "1@0.5 1@0.5", "phaseWays tail: played once a way, at its mass")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

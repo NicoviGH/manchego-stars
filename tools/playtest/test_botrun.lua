@@ -1343,6 +1343,30 @@ do
     check(d.flags.player_phase, false, "enemy phase")
 end
 
+-- test_grade_a_berserk_phase_death (#660): vanilla Ch14's Garcia (charId 0x0A, id 5),
+-- berserked, killed Eirika in the berserk phase that ends our phase. The watch names him the
+-- killer and the game counts the phase the player's; the record graded it a `reinforcement` (no red
+-- killer) with no prediction. It is a berserk death, read off the plan's predict (sight's
+-- playPhase judges the berserk phase with the enemy phase), whose striker he is.
+do
+    local snap = { { id = 0x01, charId = 0x01, faction = "blue" },
+                   { id = 0x05, charId = 0x0A, faction = "blue" },
+                   { id = 0x81, charId = 0x81, faction = "red" } }
+    local d = Botrun.grade(death { killer = 0x0A, killerId = 0x05, phase = "player" },
+        committed { snapshot = snap, predict = { { id = 0x01, die = 0.3, strikers = { 0x05 } } } },
+        { unitId = 0x04, die = 0 }, nil, {})
+    check(d.flags.berserk, true, "berserk: the killer is a player unit")
+    check(d.flags.reinforcement or d.flags.fog or d.flags.player_phase, false,
+          "berserk: no arrival, no fog, no counter to our act")
+    check(d.predicted, 0.3, "berserk: the plan's predict, not the last act's counter")
+    check(d.cause, "rng_tail", "berserk: a death the plan read, lost on the roll")
+    d = Botrun.grade(death { killer = 0x0A, killerId = 0x05, phase = "player" },
+        committed { snapshot = snap, predict = { { id = 0x01, die = 0, strikers = {} } } },
+        { unitId = 0x04, die = 0 }, nil, {})
+    check(d.cause .. "/" .. d.detail, "other/unrevealed_killer",
+          "berserk: unread at 0%, a striker the judged phase never sent")
+end
+
 -- test_cause_precedence (FR-005)
 do
     local all = { over_cap = true, predicted = 0.3, killer = 0x81,

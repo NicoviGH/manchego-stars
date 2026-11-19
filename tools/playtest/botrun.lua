@@ -662,18 +662,12 @@ function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
         local at = diedAt and diedAt[u.id]
         if not (at and at >= plan.ref) then snap[u.id] = u end
     end
-    local judged
-    if playerPhase then
-        if action and action.unitId == d.id then d.predicted = action.die end
-    else
-        for _, p in ipairs(plan and plan.predict or {}) do
-            if p.id == d.id then judged = p; d.predicted = p.die end
-        end
-    end
     -- the killer: by unit index when the watch read one, and by charId -- FE8 reloads a freed
-    -- slot, so an arrival can hold the index of a unit the snapshot saw die
+    -- slot, so an arrival can hold the index of a unit the snapshot saw die. Of any side: our
+    -- own berserked unit kills in the berserk phase (#660; vanilla Ch14's Garcia, charId 0x0A,
+    -- killed Eirika), and is no arrival
     local function isKiller(u)
-        return u.faction == "red" and (not d.killerId or u.id == d.killerId)
+        return (not d.killerId or u.id == d.killerId)
             and (not d.killer or u.charId == d.killer) and (d.killerId or d.killer) and true
     end
     local killers = {}
@@ -685,15 +679,34 @@ function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
     for _, u in ipairs(board and board.units or {}) do
         if isKiller(u) and u.isBoss then boss = true end
     end
-    local hidden = #killers > 0
+    local hidden, berserk = false, false
+    for _, u in ipairs(killers) do
+        if u.faction == "red" then hidden = true end
+        if u.faction == "blue" then berserk = true end
+    end
     for _, u in ipairs(killers) do
         if plan.enemies and plan.enemies[u.id] then hidden = false end
     end
+    -- what the plan read of it: a player-phase death the counter to its own act; an enemy-phase
+    -- one, or one in the berserk phase that ends our phase (the game counts it the player's; the plan
+    -- judged it with the enemy phase, sight's playPhase), the plan's predict
+    local judged
+    if playerPhase and not berserk then
+        if action and action.unitId == d.id then d.predicted = action.die end
+    else
+        for _, p in ipairs(plan and plan.predict or {}) do
+            if p.id == d.id then judged = p; d.predicted = p.die end
+        end
+    end
     local fought = (d.killer or d.killerId) and true or false
-    d.flags = { player_phase = playerPhase, boss = boss }
+    -- player_phase: a counter to our own act; the berserk phase is none (M.cause)
+    d.flags = { player_phase = playerPhase and not berserk, boss = boss }
     if known then
         d.flags.reinforcement = fought and #killers == 0
         d.flags.fog = hidden
+        -- the killer is a player unit: the berserk phase's. Its cause stays the plan's reading
+        -- of it (over the cap, a lost roll, or unseen), as any enemy-phase death's
+        d.flags.berserk = berserk
     end
     -- the cap is on the protected units only (FR-009): blue, or one whose death ends the game
     local endsGame = (lords or {})[d.charId] == true

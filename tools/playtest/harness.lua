@@ -4963,6 +4963,54 @@ scenarios.sightprobe = function()
     return result("PASS", "sight read; check the log by eye against the map")
 end
 
+-- berserkprobe (#660): the judged enemy phase plays the berserk phase first. On the retail
+-- Prologue Seth (charId 2) is berserked (status BERSERK, 5 phases: +30 = 0x54) and Eirika
+-- (charId 1) is stood beside him on 5 HP; sight.enemyPhase must have Seth strike her, as the
+-- game's berserk phase (cp_order.c CpOrderBerserkInit) would. The control: the same board with
+-- Seth's status cleared has no strike of his. Vanilla Ch14: Garcia, berserked, killed Eirika at
+-- a plan's 0%. PT_VANILLA=1 only.
+scenarios.berserkprobe = function()
+    if PLAYTEST_VANILLA ~= "1" then return result("FAIL", "berserkprobe reads the retail Prologue") end
+    INSPECT.retailFastText()
+    if not bootToMap(nil, 0) then return result("FAIL", "never reached the Prologue map") end
+    INSPECT.settle("phase", 6000, true)
+    local sapi = INSPECT.sightApi()
+    local sight = INSPECT.Sight.new(sapi)
+    local board = BOARD.read()
+    local eirika, seth
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.charId == 1 then eirika = u elseif u.charId == 2 then seth = u end
+    end
+    if not (eirika and seth) then return result("FAIL", "no Eirika or Seth on the Prologue") end
+    local taken = {}
+    for _, u in ipairs(board.units) do
+        if u.onField then taken[u.x .. "," .. u.y] = true end
+    end
+    local side
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local x, y = seth.x + d[1], seth.y + d[2]
+        if not side and x >= 0 and y >= 0 and not taken[x .. "," .. y] then side = { x = x, y = y } end
+    end
+    if not side then return result("FAIL", "no free tile beside Seth") end
+    local plan = { blues = { { unit = eirika, x = side.x, y = side.y, hp = 5 } }, reds = {}, gone = {} }
+    local function sethStrikes(status)
+        sapi.write8(seth.addr + BOARD.UNIT_STATUS, status)
+        sight.refresh()
+        local out, n = sight.enemyPhase(plan), 0
+        for _, t in ipairs(out) do
+            log(string.format("status 0x%02X: strike 0x%02X -> 0x%02X takenWorst=%s felled=%.3f",
+                status, t.enemy, t.target, tostring(t.takenWorst), t.felled or 0))
+            if t.enemy == seth.id and t.target == eirika.id then n = n + 1 end
+        end
+        return n
+    end
+    local berserked = sethStrikes(0x54)
+    local control = sethStrikes(0x00)
+    log(string.format("berserkprobe: Seth strikes Eirika berserked=%d control=%d", berserked, control))
+    if berserked == 1 and control == 0 then return result("PASS", "the berserk phase is judged") end
+    return result("FAIL", string.format("berserked=%d control=%d", berserked, control))
+end
+
 -- ---- stability fuzzer (#49): SEEDED random inputs over the same I/O layer, hunting the
 -- crashes/soft-locks the DIRECTED smoke/clear bots can't -- they only ever drive clean,
 -- scripted input orderings. A "smart monkey": broad in-chapter key surface (incl START/

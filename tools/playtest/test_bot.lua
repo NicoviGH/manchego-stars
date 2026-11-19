@@ -5624,6 +5624,39 @@ do
     check(pcall(Json.encode, plan and plan.predict), true, "planner: the predictions encode")
 end
 
+-- test_planner_reads_the_berserk_phase (#660): G (0x05) is berserked (held: no act) and the
+-- judged phase plays it first, as the game's berserk phase does (sight's playPhase): it strikes
+-- the lord L (18 HP) for 20, and L's counter can kill it. Vanilla Ch14: Garcia, berserked, killed
+-- Eirika at a plan's 0%. L's death is read; so is G's to L's counter, and G is no enemy whose
+-- death ends a Rout.
+do
+    local L = blue(0x01, 0, 0, 0, { hp = 18, minRange = false })
+    local G = blue(0x05, 1, 1, 0, { hp = 10, held = true, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        enemyPhase = function()
+            return { { enemy = 0x05, target = 0x01, takenHit = 100, takenDmg = 20, takenHits = 1,
+                       takenCrit = 0, targetHp = 18, counterHit = 100, counterDmg = 10,
+                       counterHits = 1, counterCrit = 0, strikerHp = 10, felled = 0 } }
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(L, G, X), sightOf(o), style("careful"))
+    local die = {}
+    for _, p in ipairs(plan and plan.predict or {}) do die[p.id] = p end
+    check(die[0x01] and die[0x01].die, 1, "berserk phase: the lord's death to our berserker is read")
+    check(die[0x01] and table.concat(die[0x01].strikers, ","), tostring(0x05),
+          "berserk phase: the berserker is named its striker")
+    check(die[0x05] and die[0x05].die, 1, "berserk phase: the berserker's death to the counter is read")
+    check(die[0x05] and table.concat(die[0x05].strikers, ","), tostring(0x01),
+          "berserk phase: struck by its target's counter")
+    local byId = { [0x05] = { id = 0x05, faction = "blue" }, [0x81] = { id = 0x81, faction = "red" } }
+    check(Planner.endsIn("rout", 1, byId)(0x05), false,
+          "endsIn: our berserker felled is no Rout's last enemy")
+    check(Planner.endsIn("rout", 1, byId)(0x81), true, "endsIn: the last red is")
+end
+
 -- test_planner_pays_a_recruit_our_counter_kills: R (red) is a recruit, since the game lets A
 -- Talk to it, but stands out of A's reach this turn. It strikes A at (0,0) and A's counter
 -- kills it; at (1,0) A is out of its reach, which costs ground toward a village worth 10000
