@@ -190,7 +190,8 @@ function M.throne(objective, enemies)
 end
 
 -- death: one unit's death; taken: per HP short at the phase's end; dealt: per HP; kill: per
--- enemy removed; heal: per HP restored; breach: a way opened; win: the game lost, for a unit
+-- enemy removed; heal: per HP restored; breach: a door opened or the convoy's key taken (a
+-- wall strike is worth its turns, #655); win: the game lost, for a unit
 -- whose death ends it (a lord's); exp: per experience point our unit's attack teaches it, the
 -- game's own count (a full level is 100: about one kill), so the blow that trains the unit
 -- that needs it most ranks first among blows of the same risk and progress; gold: points per gold
@@ -481,7 +482,9 @@ local function score(act, st, W, style, odds)
         -- the plan has already broken is no act -- a second strike planned on it was a crash
         local at = act.obstacle.x .. "," .. act.obstacle.y
         local hp = st.walls[at] or act.obstacle.hp
-        v = v + W.breach
+        -- no flat `breach` worth (#655, Nicolas 2026-11-18): the HP it takes off is worth the
+        -- turns it takes off every way through the wall (the goals' read, turnsOn); a flat
+        -- reward on top counted the same thing twice
         fx.wall = { at = at, hp = hp - act.obstacle.blow.dealt }
         -- the uses the strike spends (#644 review): every blow on a wall lands, and a blow
         -- thrown once the wall is broken is never thrown, at the HP the plan leaves the wall
@@ -497,7 +500,9 @@ local function score(act, st, W, style, odds)
         fx.took = "convoy:" .. act.item .. "x" .. act.uses
         fx.blocked = st.took[fx.took] == true
     elseif act.obstacle or act.act == "door" then
-        v = v + W.breach
+        -- a wall strike with no forecast earns nothing flat either (above); a door keeps
+        -- `breach` (#658)
+        if act.act == "door" then v = v + W.breach end
         if act.door then fx.opened = act.door.x .. "," .. act.door.y end
     elseif act.act == "seize" then
         fx.win = 1   -- the win, scored as the boss's death is (goalTerm)
@@ -804,8 +809,16 @@ function M.plan(Bot, board, sight, style, opts)
     -- full speed keeps a goal's chance, holding back loses a turn of it, a Visit or a Talk
     -- takes it; the win closes every other goal still open, so it costs what they were worth.
     local goals = Goals.list(board, sight, style, ctx)
-    -- the goals' turns: the game's own, through the breach when a door or wall cuts a unit off
+    -- the goals' turns: the game's own, through a door or wall where that is the shorter way
     local turnsTo = ctx.turnsTo
+    -- the same read on the board plan `st` leaves, its units at `pos` (positions): a wall it
+    -- struck has the HP the plan leaves it (st.walls), and each unit that can strike a wall
+    -- stands where the plan puts it, so a strike, or a striker brought into reach, is worth the
+    -- turns it takes off every way through that wall, and a striker led away costs them (#655;
+    -- bot.lua's ctx.turnsOn)
+    local function turnsOn(st, pos)
+        return ctx.turnsOn and ctx.turnsOn(st.walls, pos) or turnsTo
+    end
     local function positions(st, alive)
         local pos = {}
         for _, u in ipairs(ctx.blues) do
@@ -823,16 +836,17 @@ function M.plan(Bot, board, sight, style, opts)
     -- a goal's chance on the board a plan leaves. A carried recruit is talked to only once set
     -- down (TalkCommandUsability lists units on the map), so its goal is at its carrier's tile
     -- and a turn later (GAMMA) while carried; at the drop tile once dropped
-    local function chanceOf(st, g, pos)
+    local function chanceOf(st, g, pos, read)
         local c = g.kind == "recruit" and (st.carry or {})[g.unitId]
-        if not c then return Goals.chance(g, pos, Goals.GAMMA, turnsTo) end
+        read = read or turnsOn(st, pos)
+        if not c then return Goals.chance(g, pos, Goals.GAMMA, read) end
         local at, late = c, 1
         if c.by then
             at, late = pos[c.by] or byId[c.by] or g.tile, Goals.GAMMA
         end
         local moved = copy(g)
         moved.tile = { x = at.x, y = at.y }
-        return Goals.chance(moved, pos, Goals.GAMMA, turnsTo) * late
+        return Goals.chance(moved, pos, Goals.GAMMA, read) * late
     end
     local before = {}
     do
@@ -877,7 +891,7 @@ function M.plan(Bot, board, sight, style, opts)
     end
     -- each unit's assigned goal as the decision starts (FR-016): the recruit, village or chest
     -- it was sent to, else its way to the objective, and its turns there now. Progress is what a
-    -- plan cuts from those turns, the game's own (sight.turnsTo, through a breach when cut off)
+    -- plan cuts from those turns, the game's own (sight.turnsTo, or through a door or wall)
     local assigned, goalOf = {}, {}
     for _, u in ipairs(ctx.blues) do
         local tile = (ctx.exploreGoal or {})[u.id] or (ctx.objectiveTile and ctx.objectiveTile(u))
@@ -889,8 +903,9 @@ function M.plan(Bot, board, sight, style, opts)
     end
     local function progress(st)
         local pos, out = positions(st), 0
+        local read = turnsOn(st, pos)
         for _, a in ipairs(assigned) do
-            local t = turnsTo(a.u, a.tile, pos[a.u.id])
+            local t = read(a.u, a.tile, pos[a.u.id])
             if t then out = out + (a.turns - t) end
         end
         return out
@@ -942,15 +957,16 @@ function M.plan(Bot, board, sight, style, opts)
     end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
+        local read = turnsOn(st, pos)
         local pWin = winOf(st, fell)
         for _, g in ipairs(goals) do
             local c
             if st.took[g.id] then
                 c = 1
             elseif g.kind == "objective" then
-                c = pWin + (1 - pWin) * Goals.chance(g, pos, Goals.GAMMA, turnsTo)
+                c = pWin + (1 - pWin) * Goals.chance(g, pos, Goals.GAMMA, read)
             else
-                c = chanceOf(st, g, pos) * (1 - pWin)
+                c = chanceOf(st, g, pos, read) * (1 - pWin)
                 if g.kind == "recruit" then
                     c = c * (1 - (st.recruitHit[g.unitId] or 0))
                         * (1 - (felled and felled[g.unitId] or 0))

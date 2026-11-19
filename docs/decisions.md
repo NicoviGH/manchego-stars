@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-426 decisions. Read this index, then open the two or three you need — the whole
+427 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -271,6 +271,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0424` | [The simulated enemy phase plays each weapon at the uses it will have](decisions/0424-the-simulated-enemy-phase-plays-each-weapon-at-the-uses-it-will-have.md) | 2026-11-18 | #644 #510 |
 | `0425` | [The assault seats only strikers that hurt the boss, and baits when they cannot kill it](decisions/0425-the-assault-seats-only-strikers-that-hurt-the-boss-and-baits-when-they-cannot-kill-it.md) | 2026-11-18 | #641 #510 |
 | `0426` | [The vanilla party band runs both routes to the end and reads chapters by constant](decisions/0426-the-vanilla-party-band-runs-both-routes-to-the-end-and-reads-chapters-by-constant.md) | 2026-11-18 | #639 #510 |
+| `0427` | [A wall falls to the strikers a plan stands at it, and a strike is worth the turns it takes off a way](decisions/0427-a-wall-falls-to-the-strikers-a-plan-stands-at-it-and-a-strike-is-worth-the-turns-it-takes-off-a-way.md) | 2026-11-18 | #655 #510 |
 
 ---
 
