@@ -571,6 +571,16 @@ class TestUnitStateBits(unittest.TestCase):
             self.assertEqual(1 << int(shift), decomp.get(name), name)
 
 
+class TestStepTargetSaysWhy(unittest.TestCase):
+    def test_every_act_that_steps_a_target_hands_the_reason_up(self):
+        # The wording is unit-tested in test_controller.lua (Controller.targetNotOffered); only
+        # the emulator runs stepTarget, so this is the wiring: the four callers (talk, attack,
+        # staff, rescue/drop) go through stepThen, none calls stepTarget bare (#654).
+        text = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua')).read()
+        self.assertEqual(text.count('INSPECT.stepThen('), 4)
+        self.assertEqual(text.count('INSPECT.stepTarget('), 1, 'only stepThen calls it')
+
+
 class TestHealStaves(unittest.TestCase):
     def test_sight_lua_heal_staves_are_the_ones_doitemuse_heals_with(self):
         # sight.staves offers a staff as a heal; the harness then plays gSelectInfo_Heal's

@@ -1251,14 +1251,18 @@ function M.liftOff(api, x, y, id)
 end
 -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
 -- Its id off the struct (+0B, as Board.unitAt reads it): harness.lua hands canAttack a lean unit
--- (Board.leanAt), which has none.
+-- (Board.leanAt), which has none. A staged plan moves a unit onto a tile whose ally it moves
+-- off later (stagePhase, the plan's own order), so by default the new unit takes the cell and
+-- the ally's later liftOff then finds it is not the ally's. `keepOccupant` (asActive) leaves a
+-- cell another unit holds as it is: the actor is only a struct there, off the map.
 local UNIT_INDEX = 0x0B
-function M.standOn(api, u, x, y)
+function M.standOn(api, u, x, y, keepOccupant)
     -- where it stands now, not u.x/u.y: a sandbox may have moved it already
     local cx, cy = api.mem.u8(u.addr + UNIT_X), api.mem.u8(u.addr + UNIT_Y)
     local id = api.mem.u8(u.addr + UNIT_INDEX)
     M.liftOff(api, cx, cy, id)
-    M.putOn(api, x, y, id)
+    local held = grid(api.mem, api.SYM.gBmMapUnit, x, y)
+    if not (keepOccupant and held ~= 0 and held ~= id) then M.putOn(api, x, y, id) end
     api.write8(u.addr + UNIT_X, x)
     api.write8(u.addr + UNIT_Y, y)
 end
@@ -1276,7 +1280,11 @@ end
 function M.asActive(api, u, x, y, asIs)
     local S = api.SYM
     local id = api.mem.u8(u.addr + UNIT_INDEX)
-    M.standOn(api, u, x, y)
+    -- A wait tile may be an ally's (the plan may vacate it): the actor's struct stands there but
+    -- the ally keeps its cell, so no read may ask the map who stands on the actor's tile. Zeroing
+    -- it erased the ally for every later read in the sandbox, and the Drop list offered its tile
+    -- (vanilla Ch2 seed 4005, turn 5, #654).
+    M.standOn(api, u, x, y, true)
     M.liftOff(api, x, y, id)
     if not asIs then
         api.write32(u.addr + UNIT_STATE, api.mem.u32(u.addr + UNIT_STATE) & ~api.Board.US_HAS_MOVED)
