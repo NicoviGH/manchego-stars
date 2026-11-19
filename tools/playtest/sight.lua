@@ -1276,8 +1276,13 @@ end
 function M.asActive(api, u, x, y, asIs)
     local S = api.SYM
     local id = api.mem.u8(u.addr + UNIT_INDEX)
+    -- an ally standing on the tile (a wait tile the plan may vacate) keeps its cell: standOn
+    -- overwrites it and liftOff then zeroes it, so every later read in the sandbox saw the ally
+    -- gone and the Drop list offered its tile (vanilla Ch2 seed 4005, turn 5, #654)
+    local was = grid(api.mem, S.gBmMapUnit, x, y)
     M.standOn(api, u, x, y)
     M.liftOff(api, x, y, id)
+    if was ~= 0 and was ~= id then M.putOn(api, x, y, was) end
     if not asIs then
         api.write32(u.addr + UNIT_STATE, api.mem.u32(u.addr + UNIT_STATE) & ~api.Board.US_HAS_MOVED)
     end

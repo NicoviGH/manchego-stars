@@ -1998,6 +1998,14 @@ do
     check(m.u8(0x1000 + 0 * 32 + 8), 5, "asActive: the ally stays on the map")
     check(m.u32(saleh.addr + 0x0C) & (1 << 6), 0, "asActive: not yet acted")
     check(m.u32(S.gActiveUnit) .. "/" .. m.u8(S.gActiveUnitId), "16384/2", "asActive: the active unit")
+    -- #654: a unit staged ON an ally's tile (a wait tile the plan may vacate) must not erase
+    -- the ally, here or after it stages elsewhere (vanilla Ch2 seed 4005: the Drop list then
+    -- offered Eirika's tile)
+    m.w8(0x1000 + 3 * 32 + 3, 7)              -- an ally on (3,3)
+    Sight.asActive(api, saleh, 3, 3)
+    check(m.u8(0x1000 + 3 * 32 + 3), 7, "asActive: an ally on the tile keeps its cell")
+    Sight.asActive(api, saleh, 4, 3)
+    check(m.u8(0x1000 + 3 * 32 + 3), 7, "asActive: and keeps it once the unit stages elsewhere")
     -- Sight.canAttack (harness.lua's clear loop) asks the game with the unit staged the same way
     m.w8(0x1000 + 1 * 32 + 6, saleh.id); m.w8(saleh.addr + 0x10, 6); m.w8(saleh.addr + 0x11, 1)
     m.w32(S.gActiveUnit, 0)

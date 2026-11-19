@@ -1257,6 +1257,14 @@ end
 -- `targetTile` an obstacle by its tile (bmtarget.c TryAddTrapsToTargetList lists it with uid 0);
 -- neither = the selector's first. At most one step per target the selector can hold (bmunit.h:
 -- red[50]); a target it never reaches is a fault.
+-- What a failed INSPECT.stepTarget says (the act's crash record carries it): the target wanted,
+-- and the one the selector stands on.
+INSPECT.targetNotOffered = function(targetId, targetTile, at)
+    local want = targetTile and string.format("the tile (%d,%d)", targetTile.x, targetTile.y)
+        or string.format("unit 0x%02X", targetId or 0)
+    return string.format("the selector never offered %s; it stands on %s", want,
+        at and string.format("(%d,%d) uid 0x%02X", at.x or -1, at.y or -1, at.uid or 0) or "no target")
+end
 INSPECT.stepTarget = function(targetId, targetTile)
     local function wanted(t)
         if targetTile then return t ~= nil and t.x == targetTile.x and t.y == targetTile.y end
@@ -1269,7 +1277,11 @@ INSPECT.stepTarget = function(targetId, targetTile)
                 return after.target ~= nil and before.target ~= nil
                     and (after.target.uid ~= before.target.uid or after.target.x ~= before.target.x
                          or after.target.y ~= before.target.y)
-            end, 30) then return false end
+            end, 30) then
+            -- the selector did not move: it holds one target (or none), and it is not the wanted
+            -- one (vanilla Ch2 seed 4005 asked for a Drop tile the game never listed, #654)
+            return false, INSPECT.targetNotOffered(targetId, targetTile, observeController().target)
+        end
         -- the step re-centres the camera, blocking the selector until the scroll ends
         if not awaitControllerState("target_selection", 120) then return false end
     end
@@ -1278,7 +1290,7 @@ INSPECT.stepTarget = function(targetId, targetTile)
         and string.format("the selector reaches the obstacle at (%d,%d)", targetTile.x, targetTile.y)
         or string.format("the selector reaches unit 0x%02X", targetId),
         "fail:target-not-offered", nil, "controller-target-not-offered")
-    return false
+    return false, INSPECT.targetNotOffered(targetId, targetTile, observeController().target)
 end
 
 -- Confirm the selector's target, then wait until the act resolved: the actor greyed out, or
@@ -3765,9 +3777,8 @@ INSPECT.botApi = function(game)
                         and after.target and after.target.kind == a.act
                 end, 300) then return false end
             local tile = a.act == "drop" and a.dropAt or nil
-            if not INSPECT.stepTarget(a.act == "rescue" and a.targetId or nil, tile) then
-                return false
-            end
+            local stepped, why = INSPECT.stepTarget(a.act == "rescue" and a.targetId or nil, tile)
+            if not stepped then return false, why end
             if not guardedInput("confirm_target", "A", "the " .. a.act .. " is chosen", function(after)
                 return controllerState(after) ~= "target_selection"
             end, 120) then return false end

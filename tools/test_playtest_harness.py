@@ -571,6 +571,20 @@ class TestUnitStateBits(unittest.TestCase):
             self.assertEqual(1 << int(shift), decomp.get(name), name)
 
 
+class TestStepTargetSaysWhy(unittest.TestCase):
+    def test_a_target_the_selector_never_offers_crashes_with_a_reason(self):
+        # The emulator is the only thing that runs stepTarget, so this reads the wiring: both of
+        # its failures return INSPECT.targetNotOffered's text, and the rescue/drop act hands it
+        # to botrun's "could not perform <act>: <why>" (vanilla Ch2 seed 4005 crashed with no
+        # reason, #654).
+        text = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua')).read()
+        start = text.index('INSPECT.stepTarget = function')
+        body = text[start:text.index('\nend\n', start)]
+        self.assertEqual(body.count('return false, INSPECT.targetNotOffered('), 2, body)
+        self.assertIn('local stepped, why = INSPECT.stepTarget(', text)
+        self.assertIn('if not stepped then return false, why end', text)
+
+
 class TestHealStaves(unittest.TestCase):
     def test_sight_lua_heal_staves_are_the_ones_doitemuse_heals_with(self):
         # sight.staves offers a staff as a heal; the harness then plays gSelectInfo_Heal's
