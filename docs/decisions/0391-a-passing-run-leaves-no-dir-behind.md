@@ -20,7 +20,7 @@ Every tagged run (`run.sh` with `PT_RUN_TAG`, set by `montecarlo.py`'s Pool) mad
   the 20).
 - **Every other run keeps its dir**, marked `FAILED`: a crash, a stall, an environment fault, a
   campaign that crashed or ran out of styles. Its record names `run_dir` as the evidence. **A COUNT, not an
-  age, bounds them: the newest 20** (`KEEP_FAILED`, ~15 MB of logs each at most). An age limit
+  age, bounds them: the newest 20** (`KEEP_FAILED`; a campaign's dir is ~160 MB, so up to ~3 GB: amended by ADR 0429, which bounds the worker logs the same way). An age limit
   would not bound the disk: 640 failing runs in one day is 9.6 GB under a one-day rule. Pruning
   runs at the start of every Pool and after each failure, so old ones go on the next run. A
   cleanup error (a full disk) is printed and dropped: it never costs a run's records.

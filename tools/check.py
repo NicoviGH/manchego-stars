@@ -92,6 +92,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0429 (#667): a kept failing run is a campaign's ~160 MB dir and its log,
+    # not a single chapter's 15 MB; a worker log's end is its read-only mark, not its age
+    r'~15 MB of logs each', r'\bLIVE_S\b', r'\brun_playing\b',
     # retired by ADR 0427 (#655): a wall costs its fall to the strikers at it, not the walk; any
     # unit that can hurt it is offered the strike; a wall strike earns no flat `breach`
     r'\bbreach: a way opened\b', r"\bcut-off unit's strike on its breach\b",

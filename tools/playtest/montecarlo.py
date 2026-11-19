@@ -190,13 +190,15 @@ def append_record(path, rec, prefix=None):
 
 RUN_ROOT = '/tmp'     # where run.sh puts a tagged run's dir (its `out`)
 # failing runs' dirs kept at once, newest first, and as many failing worker logs (#667). A
-# campaign's dir is ~160 MB and its log as much, so this bounds each at ~3 GB, not the "~15 MB
-# each" a single-chapter run takes.
+# campaign's dir is ~160 MB and its log as much, so this bounds each at ~3 GB; a single-chapter
+# run's is far smaller.
 KEEP_FAILED = 20
 STALE_S = 24 * 3600   # an unmarked run dir idle this long is a dead process's, never a live run
-# a worker log with no run dir, written this recently, may be a run whose dir is not made yet
-LIVE_S = 600
 FAILED_MARK = 'FAILED'
+# a failing run's worker log is made read-only as the run settles: the mark that it has ended
+# (run.sh writes nothing to a log while its run plays, and makes the run dir only once the
+# emulator starts, after any checkpoint build, so neither age nor dir can tell)
+ENDED_MODE = 0o444
 
 
 def run_dir(scenario, tag, root=None):
@@ -234,15 +236,21 @@ def last_touched(path):
     return newest
 
 
-def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
+def surplus(stamped, keep):
+    """The paths of (mtime, path) pairs past the `keep` newest: what a bound deletes."""
+    return [p for _, p in sorted(stamped, reverse=True)[keep:]]
+
+
+def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None, dirs=None):
     """Bound the tagged run dirs under `root` (#574). A failing run's dir carries FAILED_MARK
     and is kept for its report, but only the `keep` newest; an unmarked dir is a run still
     playing (left alone) or one whose process died (deleted once idle `stale_s`). A passing
-    run's dir is never here: its Pool deletes it the moment the run ends."""
+    run's dir is never here: its Pool deletes it the moment the run ends. `dirs` is the
+    root's tagged_dirs when the caller already listed them."""
     root = root or RUN_ROOT
     now = time.time() if now is None else now
     failed, gone = [], []
-    for d in tagged_dirs(root):
+    for d in tagged_dirs(root) if dirs is None else dirs:
         mark = os.path.join(d, FAILED_MARK)
         try:
             if os.path.exists(mark):
@@ -251,8 +259,7 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None):
                 gone.append(d)
         except OSError:
             continue   # another pool removed it between the listing and the look
-    failed.sort(reverse=True)
-    gone += [d for _, d in failed[keep:]]
+    gone += surplus(failed, keep)
     for d in gone:
         shutil.rmtree(d, ignore_errors=True)
     return sorted(gone)
@@ -281,43 +288,44 @@ def passing(recs):
     return bool(recs)
 
 
-def run_playing(tag, dirs, mtime, now):
-    """Whether the run with worker log tag `tag` may still be playing: its run dir is there
-    unmarked (a passing run's is deleted and a failing one's marked as it ends), or it has no
-    dir yet and its log was written in the last LIVE_S (run.sh makes the dir first thing).
-    `dirs` is the run root's tagged dirs (tagged_dirs), listed once per prune."""
-    dirs = [d for d in dirs if os.path.basename(d).endswith('@' + tag)]
-    if dirs:
-        return any(not os.path.exists(os.path.join(d, FAILED_MARK)) for d in dirs)
-    return now - mtime < LIVE_S
+def log_ended(path, mtime, dirs, now):
+    """Whether a worker log's run is over: settled failing (ENDED_MODE), or dead -- written
+    STALE_S ago with no tagged run dir left (a killed pool never settles its runs, and
+    prune_runs reaps their dirs once idle that long). Anything else may still be playing.
+    `dirs` is the run root's tagged_dirs."""
+    if not os.stat(path).st_mode & 0o222:
+        return True
+    tag = '@' + os.path.basename(path)[:-len('.log')]
+    return now - mtime > STALE_S and not any(os.path.basename(d).endswith(tag) for d in dirs)
 
 
-def prune_logs(log_dir, root=None, keep=KEEP_FAILED, now=None):
+def prune_logs(log_dir, root=None, keep=KEEP_FAILED, now=None, dirs=None):
     """Bound a pool's worker logs (#667, ADR 0429). Each holds run.sh's stdout, the emulator's
     whole log, and nothing pruned them: 11.5 GB nobody read had piled up. A passing run's log is
-    deleted as it ends (settle_run_dir), so the ended runs' logs left are failing runs': only
-    the `keep` newest stay. A log whose run may still be playing (run_playing) is neither
-    counted nor touched: run.sh writes nothing to it while the run plays."""
+    deleted as it ends and a failing one's marked ended (settle_run_dir), so only the `keep`
+    newest ended logs stay. A log whose run may still be playing is neither counted nor
+    touched (log_ended)."""
     root = root or RUN_ROOT
     now = time.time() if now is None else now
+    dirs = tagged_dirs(root) if dirs is None else dirs
     try:
         names = [n for n in os.listdir(log_dir) if n.endswith('.log')]
     except OSError:
         return []
-    ended, dirs = [], tagged_dirs(root)
+    ended = []
     for n in names:
+        path = os.path.join(log_dir, n)
         try:
-            mtime = os.path.getmtime(os.path.join(log_dir, n))
+            mtime = os.path.getmtime(path)
+            if log_ended(path, mtime, dirs, now):
+                ended.append((mtime, path))
         except OSError:
             continue   # another pool removed it between the listing and the look
-        if not run_playing(n[:-len('.log')], dirs, mtime, now):
-            ended.append((mtime, n))
-    ended.sort(reverse=True)
     gone = []
-    for _, n in ended[keep:]:
+    for path in surplus(ended, keep):
         try:
-            os.remove(os.path.join(log_dir, n))
-            gone.append(n)
+            os.remove(path)
+            gone.append(os.path.basename(path))
         except OSError:
             continue
     return sorted(gone)
@@ -338,11 +346,13 @@ def settle_run_dir(where, passed, root=None, keep=KEEP_FAILED, log=None):
             return
         if mine:
             open(os.path.join(where, FAILED_MARK), 'w').close()
-        # the logs first: a log whose dir is pruned first would look like a run not yet begun
+        dirs = tagged_dirs(root)   # listed once for both bounds
         if log:
-            prune_logs(os.path.dirname(log), root, keep)
+            if os.path.exists(log):
+                os.chmod(log, ENDED_MODE)
+            prune_logs(os.path.dirname(log), root, keep, dirs=dirs)
         if mine:
-            prune_runs(root, keep)
+            prune_runs(root, keep, dirs=dirs)
     except OSError as err:
         print('montecarlo: could not settle %s: %s' % (where or log, err), file=sys.stderr)
 
@@ -531,9 +541,9 @@ class Pool:
         run's dir and worker log are deleted as it ends; a failing one's are kept, the newest
         `keep_failed` of each."""
         os.makedirs(self.log_dir, exist_ok=True)
-        # the logs first, while the dirs that say which runs ended are still there
-        prune_logs(self.log_dir, self.run_root, self.keep_failed)
-        prune_runs(self.run_root, self.keep_failed)
+        dirs = tagged_dirs(self.run_root)   # listed once for both bounds
+        prune_logs(self.log_dir, self.run_root, self.keep_failed, dirs=dirs)
+        prune_runs(self.run_root, self.keep_failed, dirs=dirs)
         base = unique_tag('pool')   # one base a batch, each worker `<base>-<i>`
 
         def one(i, task):

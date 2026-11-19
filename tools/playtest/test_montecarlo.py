@@ -299,38 +299,64 @@ class RunDirs(unittest.TestCase):
     def logs(self):
         return sorted(os.listdir(os.path.join(self.d, 'workers')))
 
-    def old_log(self, name, age):
+    def old_log(self, name, age, ended=False):
         os.makedirs(os.path.join(self.d, 'workers'), exist_ok=True)
         path = os.path.join(self.d, 'workers', name)
         open(path, 'w').close()
         then = time.time() - age
         os.utime(path, (then, then))
+        if ended:
+            os.chmod(path, mc.ENDED_MODE)
         return name
 
-    def test_a_passing_runs_log_goes_and_a_failing_ones_stays(self):
+    def test_a_passing_runs_log_goes_and_a_failing_ones_stays_marked_ended(self):
         # #667: every worker log was kept, 11.5 GB of them, read by nobody
         self.pool('won', n=3)
         self.assertEqual(self.logs(), [])
         recs = self.pool('crashed')
         self.assertEqual(self.logs(), [os.path.basename(recs[0]['log'])])
+        self.assertFalse(os.stat(recs[0]['log']).st_mode & 0o222, 'marked ended')
 
     def test_only_the_newest_failing_logs_are_kept(self):
         self.pool('crashed', n=5, keep=2)
         self.assertEqual(len(self.logs()), 2)
 
-    def test_the_next_pool_prunes_old_logs_but_never_a_live_runs(self):
-        old = [self.old_log('pool-1-a-%d.log' % i, age=3600 + i) for i in range(4)]
-        playing = self.old_log('pool-2-b-0.log', age=7200)   # run.sh writes nothing mid-run
-        self.make('playtest-campaign@pool-2-b-0', age=60)    # its unmarked dir: still playing
-        fresh = self.old_log('pool-3-c-0.log', age=5)        # its dir not made yet
-        self.pool('won', keep=1)
-        self.assertEqual(self.logs(), sorted([old[0], playing, fresh]))
+    def test_a_launch_that_died_before_its_run_dir_is_bounded_too(self):
+        # no dir is ever marked for it: its log's own mark says it ended (review of #668)
+        def launch(task, tag, log_path):
+            with open(log_path, 'w') as fh:
+                fh.write('refused\n')
+            raise RuntimeError('run.sh refused')
+        list(mc.Pool(jobs=1, out=self.out, launch=launch, run_root=self.root,
+                     keep_failed=2).run([{'seed': s} for s in range(1, 6)]))
+        self.assertEqual(len(self.logs()), 2)
 
-    def test_a_settled_launch_outside_a_pool_takes_its_log_too(self):
+    def test_the_next_pool_prunes_ended_and_dead_logs_but_never_a_live_runs(self):
+        ended = [self.old_log('pool-1-a-%d.log' % i, age=3600 + i, ended=True)
+                 for i in range(3)]
+        dead = self.old_log('pool-4-d-0.log', age=2 * mc.STALE_S)   # a killed pool's, no dir
+        playing = self.old_log('pool-2-b-0.log', age=2 * mc.STALE_S)  # silent while it plays
+        self.make('playtest-campaign@pool-2-b-0', age=60)             # its unmarked dir
+        building = self.old_log('pool-3-c-0.log', age=1200)   # a checkpoint build: no dir yet
+        self.pool('won', keep=1)
+        self.assertEqual(self.logs(), sorted([ended[0], playing, building]))
+        self.assertNotIn(dead, self.logs())
+
+    def test_a_failing_launch_outside_a_pool_marks_its_log_and_a_passing_one_takes_it(self):
         log = os.path.join(self.d, 'x.log')
         open(log, 'w').close()
+        mc.settle_run_dir(None, False, self.root, log=log)
+        self.assertFalse(os.stat(log).st_mode & 0o222)
         mc.settle_run_dir(None, True, self.root, log=log)
         self.assertFalse(os.path.exists(log))
+
+    def test_a_log_that_cannot_be_deleted_never_costs_the_run(self):
+        log = os.path.join(self.d, 'y.log')
+        open(log, 'w').close()
+        with mock.patch.object(mc.os, 'remove', side_effect=OSError(1, 'Operation not permitted')), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            mc.settle_run_dir(None, True, self.root, log=log)
+        self.assertIn('Operation not permitted', err.getvalue())
 
     def test_two_pools_never_share_a_tag(self):
         """`cell` makes a Pool per look: a reused tag would overwrite a kept failing dir."""
@@ -2497,9 +2523,10 @@ class Frozen(unittest.TestCase):
         tags = []
         launch = lambda task, tag, log: tags.append((tag, log)) or ('', None)
         d = tempfile.mkdtemp()
-        mc.launch_tagged({}, 'pinned', d, launch)
+        got = mc.launch_tagged({}, 'pinned', d, launch)
         mc.launch_tagged({}, 'pinned', d, launch)
         self.assertNotEqual(tags[0], tags[1])
+        self.assertEqual(got, ('', None, tags[0][1]), 'it hands back the log to settle')
         self.assertTrue(all(t.startswith('pinned-') and l.endswith(t + '.log') for t, l in tags))
 
     def test_kept_runs_are_judged_without_playing_again(self):
