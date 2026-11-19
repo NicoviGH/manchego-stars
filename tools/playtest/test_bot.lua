@@ -483,6 +483,18 @@ local function sightOf(o)
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
     -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
     s.mapKey = function() return o.mapKey or "-" end
+    -- fn() on the map a plan leaves (sight.opened, #661): o.open(set) gives the fixture's
+    -- fields as that map has them (a reach through the door, the door gone), each put back after
+    if o.open then
+        s.opened = function(set, fn)
+            local was = {}
+            for k, v in pairs(o.open(set)) do was[k] = { v = o[k] }; o[k] = v end
+            local out = table.pack(fn())
+            for k, w in pairs(was) do o[k] = w.v end
+            s.openedAsked = (s.openedAsked or 0) + 1
+            return table.unpack(out, 1, out.n)
+        end
+    end
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     -- a retry's memory (sight.knows, ADR 0399): the red unit ids it remembers
     if o.known then s.knows = function(u) return o.known[u.id] == true end end
@@ -2378,6 +2390,56 @@ do
     local a = Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"))
     check(a and a.act, "door", "opened: the plan opens the door")
     check(seen["2,0"], true, "opened: its enemy phase is judged with the door open")
+end
+
+-- test_a_plan_steps_through_the_door_it_opens (#661): K, beside the door at (2,0), holds the
+-- key; the boss E stands behind it at (3,0). D, at (1,1), can reach the doorway only once it is
+-- open. A plan that opens the door and leaves the doorway empty lets E strike K dead; one where
+-- D steps into the doorway after the door (holding it, or striking E from it) has E strike D,
+-- who stands it. Each unit's acts were
+-- listed once, on the shut map, so no plan ever had D in the doorway (vanilla Ch8, seed 4002:
+-- 101 plans opened (20,7), none with an act on or past it, every one over the cap). The units a
+-- plan has not used get their acts listed again on the map it leaves (sight.opened).
+do
+    local K = blue(0x01, 0, 1, 0)
+    local D = blue(0x02, 1, 1, 1)
+    local E = red(0x81, 3, 0, { isBoss = true })
+    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }) }
+    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 2, 0 }) }
+    local o = {
+        objective = { kind = "boss" }, reach = shut,
+        field = fieldsOf { ["3,0"] = { ["3,0"] = 0 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["0,1"] = 3, ["1,1"] = 2 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+        open = function(set)
+            if set["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
+            return {}
+        end,
+        enemyPhase = function(plan)
+            if not (plan.opened or {})["2,0"] then return {} end
+            for _, b in ipairs(plan.blues) do
+                if b.x == 2 and b.y == 0 then
+                    return { { enemy = 0x81, target = b.unit.id, takenHit = 100, takenDmg = 3,
+                               takenHits = 1, strikerHp = 20 } }
+                end
+            end
+            return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99,
+                       takenHits = 1, strikerHp = 20 } }
+        end,
+    }
+    local sight = sightOf(o)
+    local _, plan = Planner.plan(B, boardOf(K, D, E), sight, style("careful"))
+    local order = {}
+    for _, a in ipairs(plan and plan.acts or {}) do
+        order[#order + 1] = a.unitId .. ">" .. a.act .. "@" .. at(a)
+    end
+    order = table.concat(order, " ")
+    -- D in the doorway: holding it, or striking E from it
+    local door, block = order:find("1>door@1,0", 1, true), order:find("2>%a+@2,0")
+    check(door ~= nil and block ~= nil and door < block, true,
+          "relist: K opens the door, then D acts from the doorway (" .. order .. ")")
+    check(sight.openedAsked, 1, "relist: one re-listing for the one door, however many plans open it")
 end
 
 -- test_a_key_no_one_can_reach_opens_nothing: the same cut, A holds no key, and the one Door
