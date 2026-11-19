@@ -254,7 +254,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0406` | [A probe plays only the runs it names, and the leak guard lists every leak](decisions/0406-a-probe-plays-only-the-runs-it-names-and-the-leak-guard-lists-every-leak.md) | 2026-11-13 | #510 |
 | `0407` | [A simulated enemy phase starts as the game's does](decisions/0407-a-simulated-enemy-phase-starts-as-the-games-does.md) | 2026-11-13 | #510 |
 | `0408` | [A hurt unit is offered its own heal at any HP below max, and a held unit weighs it](decisions/0408-a-hurt-unit-is-offered-its-own-heal-at-any-hp-below-max-and-a-held-unit-weighs-it.md) | 2026-11-13 | #510 |
-| `0409` | [The scout lap carries a campaign past a chapter it cannot clear clean](decisions/0409-the-scout-lap-carries-a-campaign-past-a-chapter-it-cannot-clear-clean.md) | 2026-11-13 | #510 |
+| `0409` | [The scout lap carries a campaign past a chapter it cannot clear clean](decisions/0409-the-scout-lap-carries-a-campaign-past-a-chapter-it-cannot-clear-clean.md) | 2026-11-13 | #510 #664 |
 | `0410` | [A door opens its whole map change, and a way may run through several doors](decisions/0410-a-door-opens-its-whole-map-change-and-a-way-runs-through-several.md) | 2026-11-14 | #510 |
 | `0411` | [A judged enemy phase splits on a counter kill only above a floor, and a decision that runs away ends its attempt timeout](decisions/0411-a-judged-phase-splits-on-a-counter-kill-only-above-a-floor-and-a-runaway-decision-times-out.md) | 2026-11-14 | #510 |
 | `0412` | [The shop arms a unit by the game's own can-use and uses left, and the pick reads it holding what the shop will buy](decisions/0412-the-shop-arms-every-fielded-unit-by-the-games-can-use-and-uses-left-and-the-pick-reads-it-holding-the-item.md) | 2026-11-14 | #510 |

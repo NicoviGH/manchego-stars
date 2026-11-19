@@ -4221,7 +4221,7 @@ INSPECT.campaignApi = function(game)
     -- cfg.attempts: the retry cap for this run (montecarlo.py `resume --attempts`); the bound
     -- is campaign.lua's to check
     api.attempts = cfg.attempts
-    -- cfg.scout: carry on past a chapter with no clean clear (campaign.lua M.SCOUT_PATIENCE)
+    -- cfg.scout: carry on past a chapter with no clean clear, from its best win (campaign.lua)
     api.scout = cfg.scout
     -- cfg.start_only: stop once that chapter's start is saved (montecarlo.py `starts`, T100e)
     api.startOnly = cfg.start_only
@@ -4493,6 +4493,28 @@ INSPECT.campaignApi = function(game)
     api.load = function(ch)
         if not states[ch] then return nil, "no state for chapter " .. ch end
         emu:loadStateBuffer(states[ch])
+        shops = nil
+        wait(2)
+        return true
+    end
+    -- The scout lap's kept win (campaign.lua, #664): the state at a won attempt's end, in memory
+    -- only, put back at the cap to carry on from as api.load puts back a start. The token also
+    -- holds the turn and the dice read at the keep: the restore refuses a state that does not
+    -- read them back (the attempts after it end on other turns and other dice), so carrying on
+    -- from the wrong game is a crash, never a quiet lap
+    local function mark()
+        local d = INSPECT.Sight.dice(INSPECT.sightApi())
+        return string.format("turn %d, dice %d %d %d", turn(), d[1], d[2], d[3])
+    end
+    api.keep = function() return { buffer = emu:saveStateBuffer(), mark = mark() } end
+    api.restore = function(kept)
+        if not kept then return nil, "no kept state" end
+        emu:loadStateBuffer(kept.buffer)
+        local now = mark()
+        log(string.format("campaign: restored the kept win (%s; kept at %s)", now, kept.mark))
+        if now ~= kept.mark then
+            return nil, string.format("the restored state reads %s, kept at %s", now, kept.mark)
+        end
         shops = nil
         wait(2)
         return true
