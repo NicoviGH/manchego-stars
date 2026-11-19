@@ -209,6 +209,8 @@ class RunDirs(unittest.TestCase):
         def launch(task, tag, log_path):
             where = os.path.join(self.root, 'playtest-campaign@' + tag)
             os.makedirs(where)
+            with open(log_path, 'w') as fh:   # run.sh's stdout
+                fh.write('RESULT: done\n')
             with open(os.path.join(where, 'fireemblem8.gba'), 'wb') as fh:
                 fh.write(b'rom')
             with open(os.path.join(where, 'trace-1.jsonl'), 'w') as fh:
@@ -262,7 +264,7 @@ class RunDirs(unittest.TestCase):
 
     def test_a_cleanup_error_never_costs_the_run(self):
         """A full disk while marking a failing run is said, and the Pool goes on."""
-        where = self.launch(None)({'seed': 1}, 'z', '/x.log')[1]
+        where = self.launch(None)({'seed': 1}, 'z', os.path.join(self.d, 'z.log'))[1]
         with mock.patch.object(mc, 'prune_runs', side_effect=OSError(28, 'No space left')), \
                 contextlib.redirect_stderr(io.StringIO()) as err:
             mc.settle_run_dir(where, False, self.root)
@@ -293,6 +295,42 @@ class RunDirs(unittest.TestCase):
         left = set(os.path.join(self.root, n) for n in os.listdir(self.root))
         self.assertEqual(left, {live, deep, old[0], old[1], other})
         self.assertFalse(os.path.exists(dead))
+
+    def logs(self):
+        return sorted(os.listdir(os.path.join(self.d, 'workers')))
+
+    def old_log(self, name, age):
+        os.makedirs(os.path.join(self.d, 'workers'), exist_ok=True)
+        path = os.path.join(self.d, 'workers', name)
+        open(path, 'w').close()
+        then = time.time() - age
+        os.utime(path, (then, then))
+        return name
+
+    def test_a_passing_runs_log_goes_and_a_failing_ones_stays(self):
+        # #667: every worker log was kept, 11.5 GB of them, read by nobody
+        self.pool('won', n=3)
+        self.assertEqual(self.logs(), [])
+        recs = self.pool('crashed')
+        self.assertEqual(self.logs(), [os.path.basename(recs[0]['log'])])
+
+    def test_only_the_newest_failing_logs_are_kept(self):
+        self.pool('crashed', n=5, keep=2)
+        self.assertEqual(len(self.logs()), 2)
+
+    def test_the_next_pool_prunes_old_logs_but_never_a_live_runs(self):
+        old = [self.old_log('pool-1-a-%d.log' % i, age=3600 + i) for i in range(4)]
+        playing = self.old_log('pool-2-b-0.log', age=7200)   # run.sh writes nothing mid-run
+        self.make('playtest-campaign@pool-2-b-0', age=60)    # its unmarked dir: still playing
+        fresh = self.old_log('pool-3-c-0.log', age=5)        # its dir not made yet
+        self.pool('won', keep=1)
+        self.assertEqual(self.logs(), sorted([old[0], playing, fresh]))
+
+    def test_a_settled_launch_outside_a_pool_takes_its_log_too(self):
+        log = os.path.join(self.d, 'x.log')
+        open(log, 'w').close()
+        mc.settle_run_dir(None, True, self.root, log=log)
+        self.assertFalse(os.path.exists(log))
 
     def test_two_pools_never_share_a_tag(self):
         """`cell` makes a Pool per look: a reused tag would overwrite a kept failing dir."""
