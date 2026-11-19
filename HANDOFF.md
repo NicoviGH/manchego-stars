@@ -28,7 +28,7 @@ and start a fresh instance; don't rely on auto-compaction.
   - `review/639-laps/` holds the logs, the saved chapter lines and `partial-verdict.txt`.
   - `review/639-strength/` holds the party-strength scripts.
   - The records are in `references/sim/vanilla/c25b145e3745/resume-runs.jsonl`, under tags `t639`, `r639b`, `e639`, `es639`, `is639`, `s20` and `k10`.
-- **Unexplained:** both overnight scout laps ended together at 05:44 without their closing lines (on #639).
+- **#665, fix before any lap:** `PT_MAX_WALL_S=7200` cuts a whole campaign run at 2 hours, and `resume` reports nothing. 19 of the 20 overnight L10 campaigns were cut, not walled, at E_15 / I_14.
 
 **2026-11-18, late. In flight then: #639, "is the bot's party strong enough past Ch8? Vanilla band to Ch20, and promote at L10 or L20."** Read #639's plan comment (6992662334) and its progress comment (6998840930) first; they hold everything below in full.
 
