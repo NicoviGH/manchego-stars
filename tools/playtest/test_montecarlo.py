@@ -346,7 +346,9 @@ class Workers(unittest.TestCase):
         # end, so resume printed and counted nothing and the lap looked finished
         cut = 'RESULT: ERROR -- exceeded PT_MAX_WALL_S=7200s at frame 9'
         with tempfile.NamedTemporaryFile('w', suffix='.log', delete=False) as log:
-            log.write('running\n%s\n' % cut)
+            # run.sh renders a failing run's inspector AFTER its verdict, past any line tail
+            log.write('running\n%s\n%s\n%s' % (cut, mc.INSPECTOR_BANNER,
+                                                 'RESULT: render row\n' * 40))
         self.addCleanup(os.unlink, log.name)
         task = {'campaign': {'id': 'es-s1', 'scout': True, 'route': 1}, 'seed': 1}
         recs = mc.records_of(task, 'BOTRUN {"outcome": "won", "chapter": 9, "attempt": 1}\n'
@@ -354,7 +356,8 @@ class Workers(unittest.TestCase):
         end = recs[-1]
         self.assertEqual((end['kind'], end['campaign'], end['outcome'], end['why'],
                           end['scout'], end['route'], end['chapters']),
-                         ('campaign', 'es-s1', 'crashed', cut, True, 1, 1))
+                         ('campaign', 'es-s1', 'crashed',
+                          'the campaign left no end line; run.sh said: ' + cut, True, 1, 1))
         self.assertNotIn('env_status', end, 'the bot had played: the environment held')
         self.assertFalse(mc.passing(recs), 'its run dir is kept as evidence')
         # a later chapter is withheld in the cut's words, never "no record" (FR-027)
@@ -364,8 +367,8 @@ class Workers(unittest.TestCase):
         # cut before the bot's first record (a chapter line, no BOTRUN): still the campaign's
         # end, in run.sh's words, and an environment that did not hold
         early = mc.records_of(task, 'CAMPAIGN {"chapter": 9, "attempts": 0}', '/tmp/w', log.name)
-        self.assertEqual([(r['kind'], r['why'], r['env_status']) for r in early],
-                         [('campaign', cut, mc.unread())])
+        self.assertEqual([(r['kind'], r['why'].endswith(cut), r['env_status']) for r in early],
+                         [('campaign', True, mc.unread())])
         # a diagnostic replay writes no CAMPAIGN line by design: nothing is made up for it
         diag = mc.records_of(dict(task, diag={'turn': 3}),
                              'BOTRUN {"outcome": "won", "chapter": 9}', '/tmp/w', log.name)

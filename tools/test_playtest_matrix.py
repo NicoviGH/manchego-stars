@@ -1355,11 +1355,20 @@ class WallNet(unittest.TestCase):
 
     def test_a_scenario_that_declares_more_work_than_the_net_keeps_its_deadline(self):
         self.assertEqual(self.net(86400), 86400)
-        self.assertEqual(self.net(86400, '7200'), 86400, 'unset and 7200 are one run')
+        self.assertNotIn('PT_MAX_WALL_S', mx.RUN_SH_DEFAULTS, 'unset is not 7200 any more')
 
-    def test_a_short_scenario_keeps_the_net(self):
-        self.assertEqual(self.net(600), int(mx.RUN_SH_DEFAULTS['PT_MAX_WALL_S']))
+    def test_a_short_scenario_keeps_the_net_and_a_set_cap_is_honoured(self):
+        self.assertEqual(self.net(600), 7200)
         self.assertEqual(self.net(600, '9000'), 9000)
+        self.assertEqual(self.net(86400, '300'), 300, 'a deliberate cap is a cap')
+
+    def test_run_mgba_kills_on_the_net_it_computes(self):
+        # the function alone proves nothing if run_mgba still reads PT_MAX_WALL_S itself
+        with open(mx.RUN_SH) as fh:
+            text = fh.read()
+        self.assertIn('max_wall=$(wall_net "$deadline")', text)
+        self.assertEqual(re.findall(r'PT_MAX_WALL_S:-', text), ['PT_MAX_WALL_S:-'],
+                         'only wall_net reads PT_MAX_WALL_S')
 
     def test_the_verdict_line_is_the_last_one_said(self):
         text = 'x\n[f001] RESULT: PASS -- harness\nRESULT: ERROR -- STALLED: no frame progress\n'

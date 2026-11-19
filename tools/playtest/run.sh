@@ -279,14 +279,18 @@ ROMHASH=$(shasum "$ROM" | cut -c1-12)
 # FAIL classify as a pass (#308).
 verdict_passed() { case "$VERDICT" in *"RESULT: PASS"*) return 0 ;; *) return 1 ;; esac; }
 
-# wall_net <deadline_s>: the last-resort wall limit (PT_MAX_WALL_S, default 7200s), never under
-# the scenario's own declared work budget. The flat 2 hours cut a campaign -- declared 86400s,
-# "a whole game is hours" -- mid-chapter while it was still playing: 19 of #639's 20 overnight
+# wall_net <deadline_s>: the last-resort wall limit. Unset, it is 7200s, never under the
+# scenario's own declared work budget: the flat 2 hours cut a campaign -- declared 86400s,
+# "a whole game is hours" -- mid-chapter while it was still playing, 19 of #639's 20 overnight
 # laps (#665). A net is for a pathology OVERRUN and STALL miss, not for a run doing the work it
-# declared. Unset and an explicit 7200 still name the same run (matrix.py RUN_SH_DEFAULTS).
+# declared. An explicit PT_MAX_WALL_S is a deliberate cap and is honoured as given, so unset is
+# no longer the same run as 7200 (it is absent from matrix.py RUN_SH_DEFAULTS).
 wall_net() {
-    local net=${PT_MAX_WALL_S:-7200}
-    [ "$net" -ge "$1" ] || net=$1
+    local net=${PT_MAX_WALL_S:-}
+    if [ -z "$net" ]; then
+        net=7200
+        [ "$net" -ge "$1" ] || net=$1
+    fi
     echo "$net"
 }
 

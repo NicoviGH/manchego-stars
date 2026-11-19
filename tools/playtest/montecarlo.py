@@ -335,6 +335,25 @@ def log_tail(path, n=30):
         return []
 
 
+# run.sh prints a failing run's inspector render AFTER its verdict (run_mgba): the verdict is
+# the last RESULT line before this banner, and the render can be longer than any line tail
+INSPECTOR_BANNER = '---------------- inspector ----------------'
+
+
+def run_verdict(log_path, tail_bytes=1 << 20):
+    """run.sh's verdict line in a worker's log (matrix.verdict_line), read from its last
+    `tail_bytes` (the log holds the emulator's whole log, hundreds of MB), else None."""
+    from matrix import verdict_line
+    try:
+        with open(log_path, 'rb') as fh:
+            fh.seek(max(0, os.path.getsize(log_path) - tail_bytes))
+            text = fh.read().decode('utf-8', 'replace')
+    except OSError:
+        return None
+    head, banner, _ = text.rpartition(INSPECTOR_BANNER)
+    return verdict_line(head if banner else text)
+
+
 def records_of(task, text, where, log_path):
     """A worker's records: its BOTRUN lines, and its campaign's last CAMPAIGN line (the one
     without a chapter: how the campaign ended, and why) as a record of kind `campaign`; each
@@ -370,9 +389,8 @@ def records_of(task, text, where, log_path):
             c['prep'] = [dict(p, chapter=ch) for (ch, _), p in sorted(prep.items(),
                                                                     key=lambda kv: str(kv[0]))]
         recs.append(c)
-    from matrix import verdict_line
     camp = task.get('campaign')
-    said = verdict_line('\n'.join(log_tail(log_path)))
+    said = run_verdict(log_path)
     # a diagnostic replay writes no CAMPAIGN line by design (campaign.lua api.diag)
     if camp is not None and not task.get('diag') and (recs or chapters) and not ends:
         # run.sh cut the campaign (its wall net, an OVERRUN, a STALL) after it had begun and
@@ -381,7 +399,7 @@ def records_of(task, text, where, log_path):
         # carrying what campaign.lua's own end carries.
         end = {'kind': 'campaign', 'campaign': camp.get('id'), 'outcome': 'crashed',
                'seed': task.get('seed'), 'route': camp.get('route'), 'chapters': len(chapters),
-               'why': said or 'the campaign left no end line'}
+               'why': 'the campaign left no end line; run.sh said: %s' % said}
         if camp.get('scout'):
             end['scout'] = True
         recs.append(end)

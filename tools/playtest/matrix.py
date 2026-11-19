@@ -1001,7 +1001,9 @@ def scenario_driver_text(entry, files=None, source=None):
 # matrix.py sets it FROM the manifest entry, which `export_env` already covers.
 # What run.sh falls back to when a knob is unset. Unset and the explicit default describe the
 # SAME run, so they must hash the same or the cache pays for it twice (#358 review).
-RUN_SH_DEFAULTS = {'PT_DIFFICULTY': 'normal', 'PT_STALL_S': '1800', 'PT_MAX_WALL_S': '7200'}
+# PT_MAX_WALL_S has no entry: unset, run.sh floors it at the scenario's deadline (wall_net,
+# ADR 0428), so unset and an explicit 7200 are different runs for a long scenario.
+RUN_SH_DEFAULTS = {'PT_DIFFICULTY': 'normal', 'PT_STALL_S': '1800'}
 
 PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
