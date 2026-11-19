@@ -2953,9 +2953,9 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     is the branch it takes at vanilla's Ch8 split, in place of the env's; `seal_at` (10 or 20,
     #639) is the level the bot uses a promotion item at (bot.lua Bot.uses; unset plays 10),
     written into each run's style (campaign.lua stamps 10 when unset) so every record says
-    which policy it played. A
-    campaign a `seal_at` lap made is marked (SEAL_AT_MARK): resuming it without `seal_at`
-    inherits the level, a different one is refused. Each task runs under `instrument`
+    which policy it played. A campaign a `seal_at` lap made is marked (SEAL_AT_MARK):
+    resuming it without `seal_at` inherits the level, a different one is refused. Each task
+    runs under `instrument`
     (instrument_id() unless given); its records say whether their start was stale (records_of).
     """
     if route is not None and not vanilla:

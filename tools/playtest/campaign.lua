@@ -481,6 +481,16 @@ function M.run(api)
                 if style then style.sealAt = info.sealAt or 10 end
                 return style, followed
             end
+            -- the chapter is passed with an attempt's team: its fielded units, less its dead,
+            -- are carried into the next chapter's pick
+            local function carryOn(outcome, r, t, dead)
+                entry.outcome, entry.turns = outcome, r.turns
+                entry.team = teamLine(t)
+                carried = {}
+                for _, charId in ipairs(t.deploy) do
+                    if not dead[charId] then carried[charId] = true end
+                end
+            end
             while true do
                 local style, followed = draw()
                 -- one attempt alone: the styles before it are drawn, never played
@@ -545,16 +555,6 @@ function M.run(api)
                     line(entry)
                     return "played", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, tostring(rec.outcome))
-                end
-                -- the chapter is passed with this attempt's team: its fielded units, less its
-                -- dead, are carried into the next chapter's pick
-                local function carryOn(outcome, r, t, dead)
-                    entry.outcome, entry.turns = outcome, r.turns
-                    entry.team = teamLine(t)
-                    carried = {}
-                    for _, charId in ipairs(t.deploy) do
-                        if not dead[charId] then carried[charId] = true end
-                    end
                 end
                 if rec.clean == true then
                     carryOn("cleared", rec, team, {})
