@@ -5011,8 +5011,8 @@ scenarios.berserkprobe = function()
     -- the lookahead's first phase (nextPhase) plays the berserk phase too: Seth moves first,
     -- Eirika takes his expected blow (below her 5 HP when the second phase begins; the phase
     -- plays its expected way, so a blow short of sure leaves her standing; the control leaves
-    -- her whole), and Seth is never one of the
-    -- enemies our counters removed (`fell`, a Rout's count)
+    -- her whole), and Seth is never one of the enemies our counters removed (`fell`, a Rout's
+    -- count)
     local function lookahead(status)
         sapi.write8(seth.addr + BOARD.UNIT_STATUS, status)
         sight.refresh()

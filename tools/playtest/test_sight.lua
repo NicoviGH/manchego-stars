@@ -2432,6 +2432,21 @@ do
           "berserkPhaseStart: the heal statuses, then the inventory flags")
     check(kept, 4, "berserkPhaseStart: each unit's AI bytes kept for the sandbox to put back")
 
+    -- the enemy order reads the red units' fog bits as the phase found them: the berserk
+    -- decisions' refreshes under the player's faction rewrite them (review of PR #673)
+    local r1, r2 = unit(0x81, "red", 0), unit(0x82, "red", 0)
+    m.w32(r1.addr + STATE, (1 << 9) | 0x40); m.w32(r2.addr + STATE, 0)
+    local kept = Sight.keptFog(m, Board, { units[1], r1, r2 })
+    check(kept[units[1].addr], nil, "keptFog: the red units' bits only")
+    m.w32(r1.addr + STATE, (1 << 8) | 0x40 | 0x1); m.w32(r2.addr + STATE, (1 << 9))
+    Sight.putFog(api, Board, kept)
+    check(string.format("%x,%x", m.u32(r1.addr + STATE), m.u32(r2.addr + STATE)), "241,0",
+          "putFog: the fog bits put back, every other bit as it is now")
+    -- a berserk strike's expected kill is off the map for those after it; an enemy's is not
+    check(tostring(Sight.berserkKills({ berserk = true }, 0)) .. tostring(Sight.berserkKills({}, 0))
+          .. tostring(Sight.berserkKills({ berserk = true }, 2)), "truefalsefalse",
+          "berserkKills: only a berserk strike that leaves its target at 0 HP")
+
     -- phaseWays' tail: each way of the berserk phase ends in its own enemy phase, played on
     -- that way's board after its strikes; a split in either is one more way of the whole
     local function sandbox(fn) return fn() end

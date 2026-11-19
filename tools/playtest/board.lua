@@ -59,6 +59,8 @@ Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 -- the same refresh that rebuilds gBmMapFog (bmmap.c), so it is the game's own word on which
 -- enemies the player sees. Never set without fog.
 Board.US_BIT9 = 1 << 9
+Board.US_BIT8 = 1 << 8   -- "seen": RefreshUnitsOnBmMap clears US_BIT9 for it (bmmap.c)
+Board.FOG_BITS = Board.US_BIT9 | Board.US_BIT8
 Board.US_HAS_MOVED_AI = 1 << 10   -- the AI has moved it this phase (cp_order.c skips it)
 Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that downs it (bmmind.c)
 -- "On the field" has no one test in FE8, so this is the union of the two the game uses.
@@ -658,7 +660,7 @@ function Board.bind(mem, SYM)
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,
         statusOf = Board.statusOf, STATUS_BERSERK = Board.STATUS_BERSERK,
-        US_HAS_MOVED_AI = Board.US_HAS_MOVED_AI,
+        US_HAS_MOVED_AI = Board.US_HAS_MOVED_AI, FOG_BITS = Board.FOG_BITS,
         UNIT_STATUS = Board.UNIT_STATUS, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,

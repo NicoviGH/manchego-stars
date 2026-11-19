@@ -1744,6 +1744,29 @@ function M.berserkPhaseStart(api, call, S, units)
     call(phaseFields(api, S, units, M.PHASES[1], AI_FLAG_BERSERKED))
 end
 
+-- The red units' fog bits (US_BIT9, and US_BIT8 the refresh clears) as they stand, which the
+-- berserk phase's refreshes under the player's faction rewrite (bmmap.c RefreshUnitsOnBmMap):
+-- `units` as M.berserkers', `Board` its too (Board.FOG_BITS) -> { [addr] = bits }, for M.putFog
+function M.keptFog(mem, Board, units)
+    local out = {}
+    for _, o in pairs(units) do
+        if o.faction == "red" then out[o.addr] = mem.u32(o.addr + UNIT_STATE) & Board.FOG_BITS end
+    end
+    return out
+end
+-- ... put back on each unit's state word, its other bits as they are now (`kept` may be nil)
+function M.putFog(api, Board, kept)
+    for addr, bits in pairs(kept or {}) do
+        api.write32(addr + UNIT_STATE, (api.mem.u32(addr + UNIT_STATE) & ~Board.FOG_BITS) | bits)
+    end
+end
+
+-- Whether a berserk strike (t.berserk) kills its target on the phase's expected way: its HP
+-- `left` after the strike's expected damage. Such a target is taken off the map for the units
+-- after it, as nextPhase takes one; an enemy's own strike keeps its target (the judged phase
+-- reads it on the target's whole odds).
+function M.berserkKills(t, left) return t.berserk == true and left <= 0 end
+
 -- What a phase start's two calls left on the board, for M.aiPhaseStart's `known`:
 -- gAiState.bestBlueMov and every unit's aiFlags. Read inside the sandbox that started the
 -- phase, before any decision (a decision writes its own unit's flags).
@@ -2768,26 +2791,18 @@ function M.new(outer)
         -- after reads them as the phase found them (`fogWas`, put back by order()), so `decides`
         -- sees what it sees with no berserked unit (sight's keepFog: the seen read is before any
         -- refresh). The bits are kept per phase, every way of it alike.
-        local FOG_BITS = Board.US_BIT9 | (1 << 8)   -- US_BIT9, and US_BIT8 the refresh clears
         local fogWas
         local function berserkFirst(after)
             local ids = M.berserkers(mem, Board, byId, after)
             fogWas = nil
             if #ids == 0 then return ids end
-            fogWas = {}
-            for _, o in pairs(byId) do
-                if o.faction == "red" then
-                    fogWas[o.addr] = mem.u32(o.addr + UNIT_STATE) & FOG_BITS
-                end
-            end
+            fogWas = M.keptFog(mem, Board, byId)
             M.berserkPhaseStart(api, call, S, byId)
             healStale = false   -- the start's own heal statuses read every HP
             return ids
         end
         local function order()
-            for addr, bits in pairs(fogWas or {}) do
-                api.write32(addr + UNIT_STATE, (mem.u32(addr + UNIT_STATE) & ~FOG_BITS) | bits)
-            end
+            M.putFog(api, Board, fogWas)
             return aiOrder(call, byId)
         end
         -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog) or
@@ -2821,10 +2836,7 @@ function M.new(outer)
             -- a strike by the player's berserked unit (#660), marked for the planner: its
             -- striker is one of the player's, whose death to the counter is a loss
             t.berserk = e.faction == "blue" or nil
-            -- one the berserk phase's strike kills on its expected way is gone from the map
-            -- for the units after it, as nextPhase takes one (the enemies' own strikes keep
-            -- theirs: the judged phase reads them on the target's whole odds)
-            if t.berserk and left <= 0 and byId[target] then
+            if M.berserkKills(t, left) and byId[target] then
                 local o = byId[target]
                 remove(o, mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y))
             end
