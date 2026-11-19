@@ -5041,6 +5041,104 @@ scenarios.berserkprobe = function()
         tostring(hpCtl), tostring(blueFell)))
 end
 
+-- staffprobe (#674): the judged enemy phase plays an enemy's status staff. On the retail
+-- Prologue the enemy nearest Eirika (charId 1) is handed a Berserk staff (constants/items.h
+-- 0x53) and the staff rank to use it (struct Unit +0x28 ranks[], ITYPE_STAFF 4), and Eirika is
+-- stood beside it. The game's own AI then decides the staff (cp_staff.c AiStaffSleepBerserk).
+-- With its Power at Eirika's Resistance + 4, its hit is an even-ish chance
+-- (GetOffensiveStaffAccuracy): sight.enemyPhase must split on it, one way at the hit's chance,
+-- with no strike of the caster's in either. At Power 30 its hit is sure:
+-- sight.nextPhase's first phase must land it, so Eirika moves in the second phase's berserk
+-- phase and the army's reply between them leaves her be. The control: the same board, the
+-- staff taken away. PT_VANILLA=1 only.
+scenarios.staffprobe = function()
+    if PLAYTEST_VANILLA ~= "1" then
+        return result("FAIL", "staffprobe reads the retail Prologue")
+    end
+    local sapi, sight = INSPECT.probeMap()
+    if not sapi then return end
+    local board = BOARD.read()
+    local eirika
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.charId == 1 then eirika = u end
+    end
+    if not eirika then return result("FAIL", "no Eirika on the Prologue") end
+    local caster, best
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        local d = BOARD.distance(e.x, e.y, eirika.x, eirika.y)
+        if e.onField and not e.isBoss and (not best or d < best) then caster, best = e, d end
+    end
+    if not caster then return result("FAIL", "no enemy on the Prologue") end
+    local sx, sy = INSPECT.freeBeside(caster)
+    if not sx then return result("FAIL", "no free tile beside the enemy") end
+    local slot = 0
+    while slot < 4 and sapi.mem.u16(caster.addr + 0x1E + slot * 2) ~= 0 do slot = slot + 1 end
+    local POW, RES, STAFF_RANK = 0x14, 0x18, 0x28 + 4
+    sapi.write8(caster.addr + STAFF_RANK, 251)
+    local plan = { blues = { { unit = eirika, x = sx, y = sy, hp = eirika.hp } }, reds = {},
+                   gone = {} }
+    local function arm(staff, pow)
+        sapi.write16(caster.addr + 0x1E + slot * 2, staff and (0x53 | (15 << 8)) or 0)
+        sapi.write8(caster.addr + POW, pow)
+        sight.refresh()
+    end
+    local res = sapi.mem.u8(eirika.addr + RES)
+    -- -> whether a way is the hit's chance, and whether the caster strikes in any way. The hit
+    -- by hand (bmbattle.c GetOffensiveStaffAccuracy: (Pow - Res) * 5 + 30 + Skl, less 2 a tile;
+    -- neither unit holds a stat item) checks the game's read the phase splits on. The tile is
+    -- the one the AI casts from, the lookahead's first move of the caster (the same decision).
+    local function ways(staff)
+        arm(staff, res + 4)
+        local from = { x = caster.x, y = caster.y }
+        for _, m in ipairs(sight.nextPhase(plan, false).moved) do
+            if m.id == caster.id then from = m end
+        end
+        local acc = (4 * 5 + 30 + sapi.mem.u8(caster.addr + 0x15)
+            - 2 * BOARD.distance(sx, sy, from.x, from.y)) / 100
+        local out = sight.enemyPhase(plan)
+        local ps, hitWay, strikes = {}, false, false
+        for _, o in ipairs(out.outcomes) do
+            ps[#ps + 1] = string.format("%.3f", o.p)
+            hitWay = hitWay or math.abs(o.p - acc) < 1e-6
+            for _, t in ipairs(o.strikes) do strikes = strikes or t.enemy == caster.id end
+        end
+        log(string.format("enemyPhase staff=%s: %d ways %s (hit by hand %.2f), the caster "
+            .. "strikes=%s", tostring(staff), #out.outcomes, table.concat(ps, " "), acc,
+            tostring(strikes)))
+        return hitWay, strikes
+    end
+    local function lookahead(staff)
+        arm(staff, 30)
+        local out = sight.nextPhase(plan, true)
+        local cast, berserks, replied = false, 0, false
+        for _, m in ipairs(out.moved) do cast = cast or m.id == caster.id end
+        for _, t in ipairs(out) do
+            if t.enemy == eirika.id and t.berserk then berserks = berserks + 1 end
+        end
+        for _, k in ipairs(out.reply.kills) do replied = replied or k.unit == eirika.id end
+        for _, st in ipairs(out.reply.steps) do replied = replied or st.unit == eirika.id end
+        log(string.format("nextPhase staff=%s: caster moved=%s, Eirika's berserk strikes %d, "
+            .. "Eirika in the reply=%s", tostring(staff), tostring(cast), berserks,
+            tostring(replied)))
+        return berserks, replied
+    end
+    local split, struck = ways(true)
+    local splitCtl, struckCtl = ways(false)
+    local berserks, replied = lookahead(true)
+    local berserksCtl = lookahead(false)
+    log(string.format("staffprobe: a way at the hit's chance %s (control %s), the caster strikes "
+        .. "%s (control %s); second phase: Eirika's berserk strikes %d (control %d), in the reply "
+        .. "%s", tostring(split), tostring(splitCtl), tostring(struck), tostring(struckCtl),
+        berserks, berserksCtl, tostring(replied)))
+    if split and not splitCtl and not struck and struckCtl and berserks > 0 and berserksCtl == 0
+            and not replied then
+        return result("PASS", "an enemy's status staff is judged, in both judged phases")
+    end
+    return result("FAIL", string.format("hitWay=%s/%s struck=%s/%s berserks=%d/%d replied=%s",
+        tostring(split), tostring(splitCtl), tostring(struck), tostring(struckCtl), berserks,
+        berserksCtl, tostring(replied)))
+end
+
 -- ---- stability fuzzer (#49): SEEDED random inputs over the same I/O layer, hunting the
 -- crashes/soft-locks the DIRECTED smoke/clear bots can't -- they only ever drive clean,
 -- scripted input orderings. A "smart monkey": broad in-chapter key surface (incl START/
