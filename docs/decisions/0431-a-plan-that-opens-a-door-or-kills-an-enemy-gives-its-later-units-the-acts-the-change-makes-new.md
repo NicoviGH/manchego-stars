@@ -148,3 +148,13 @@ The door: Lute (charId 12) opened (20,7) on turn 5, then Garcia (charId 10) and 
 struck from (20,5) and (20,4); 19 of 26 judged door plans had a later act on or past the
 doorway (main: 0 of 179). Kills: 33 of 278 judged plans had a later act on a tile an earlier
 act's red target stood on (main: 0 of 567), and 5 of those were played. No leak was logged.
+
+**Second review (2026-11-19), four more fixes, each with a test that fails without it.**
+- A unit whose act follows an unplayed one and ends on that unit's board tile stays put too in
+  a way where a needed kill missed (`bluesIn`, in plan order), so two blues never share a tile.
+- The heal swap's act inherits `map` and `needs` from the re-listed wait it replaces.
+- A force replay of a re-listed act is read like a `full_info` one: no verdict, with a note
+  (the DIAG `relisted` keys), not a missing action.
+- The mend puts a re-listed act in right after the act that completes the changes it needs, the
+  rest of the plan after it, and last only if it does not fit there, so another unit cannot take
+  its tile first.

@@ -1789,15 +1789,25 @@ function M.plan(Bot, board, sight, style, opts)
         -- not the planned one, which may be the living enemy's own (the phase's standOn would
         -- take the enemy's cell). That unit has no counter to play either (`unacted`); its
         -- `hit` entry (below) keeps the HP the planned act left it, a pessimism ADR 0431 names.
+        -- A unit whose act comes after one not played, and ends on that unit's board tile, could
+        -- move there only once the other had left: it stays put too (else two blues share a tile
+        -- and the phase's standOn overwrites one). The plan's order, one pass, so a chain follows.
         local function bluesIn(w)
-            local list = planned
-            for i, p in ipairs(planned) do
-                local a = at[p.unit.id]
+            local back, held = {}, {}
+            for _, a in ipairs(st.acts) do
                 local lost = false
-                for id in pairs(a and a.needs and a.needs.gone or {}) do
+                for id in pairs(a.needs and a.needs.gone or {}) do
                     lost = lost or not w.gone[id]
                 end
-                if lost then
+                local e = endTile(a)
+                if lost or held[e.x .. "," .. e.y] then
+                    local u = byId[a.unitId]
+                    back[a.unitId], held[u.x .. "," .. u.y] = true, true
+                end
+            end
+            local list = planned
+            for i, p in ipairs(planned) do
+                if back[p.unit.id] then
                     if list == planned then list = copy(planned) end
                     list[i] = { unit = p.unit, x = p.unit.x, y = p.unit.y, hp = p.unit.hp,
                                 unacted = true }
@@ -2479,9 +2489,18 @@ function M.plan(Bot, board, sight, style, opts)
                 local st
                 if k ~= mine[t.uid] and not tried[k] then
                     if t.a.needs then
-                        -- a re-listed act needs the plan's changes held before it
-                        st = rebuild(start, base.acts, leave(t.uid))
-                        st = extend(st, t.a, t.uid)
+                        -- a re-listed act goes in right after the act that completes the
+                        -- changes it needs, the rest of the plan after it (another unit may
+                        -- take its tile otherwise); last only if it does not fit there
+                        local cur, put = start, false
+                        for _, x in ipairs(base.acts) do
+                            cur = rebuild(cur, { x }, leave(t.uid))
+                            if not put and holds(cur, t.a.needs) then
+                                local n = extend(cur, t.a, t.uid)
+                                if n then cur, put = n, true end
+                            end
+                        end
+                        st = put and cur or extend(cur, t.a, t.uid)
                     else
                         st = extend(start, t.a, t.uid)
                         st = st and rebuild(st, base.acts, leave(t.uid))
@@ -2515,6 +2534,8 @@ function M.plan(Bot, board, sight, style, opts)
             local h = u and Bot.mendAt(ctx, u, x.move) or nil
             if not h then return nil end
             h.why = "mend"
+            -- the board and changes the wait it replaces was read on (menusFor)
+            h.map, h.needs = x.map, x.needs
             annotate(h, u)
             local gain = math.min(h.amount, h.unitMaxHp - (now.hp[h.unitId] or h.unitHp))
             return score(h, now, W, style, odds) + W.taken * gain > 0 and h or nil

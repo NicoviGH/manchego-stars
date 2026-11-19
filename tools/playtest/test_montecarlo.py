@@ -2794,7 +2794,11 @@ class Audit(unittest.TestCase):
         [f] = self.audit([_rec(_death())], [d])
         self.assertEqual(f['labels'], [])
         self.assertIn('re-listed acts (2>wait@2,0)', ' '.join(f['notes']))
-        # a force replay offers its own acts, and a line with none is read as before
+        # a force replay of a re-listed act is no missing action either; one of another act is
+        # read as before
+        [f] = self.audit([_rec(_death())], [dict(_diag(), relisted=['b'])])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('re-listed acts (b)', ' '.join(f['notes']))
         [f] = self.audit([_rec(_death())], [dict(_diag(), relisted=['2>wait@2,0'])])
         self.assertEqual(f['labels'], ['mis_scored'])
         [f] = self.audit([_rec(_death())], [_diag(mode='full_info')])

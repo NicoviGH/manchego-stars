@@ -130,8 +130,9 @@
 -- diagnostic's plan played whole, the failure's unit alive at the end of its turn, and no other
 -- blue or green unit lost in its place: `traded`), outcome, why, unoffered (forced keys never
 -- offered), relisted (the baseline plan's acts the planner re-listed on the board an earlier
--- act leaves, #661: a full_info replay cannot re-propose them, so montecarlo's audit reads no
--- verdict off one that names any), pinned_board, trace }.
+-- act leaves, #661: a full_info replay cannot re-propose them, nor Bot.candidates on the pinned
+-- board a force replay of one, so montecarlo's audit reads no verdict off either),
+-- pinned_board, trace }.
 --
 -- The TRACE (#510 step 9 F3, Nicolas 2026-10-27: "I want to be able to understand everything
 -- about how it went"): one event per api.trace call, each with `t` its kind and `turn`:
