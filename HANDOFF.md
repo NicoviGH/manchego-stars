@@ -11,7 +11,22 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-18, evening; main is 134bd39d). Next: #639, extend the party-level band past Ch8 and compare the bot's party chapter by chapter.** Three #510 PRs merged today, each after `/code-review`, its fixes and CI:
+**Next session starts here (2026-11-18, late; main is ebe4ad8e). In flight: #639, "is the bot's party strong enough past Ch8? Vanilla band to Ch20, and promote at L10 or L20."** Read #639's plan comment (6992662334) and its progress comment (6998840930) first; they hold everything below in full.
+
+- **Merged today for #639:** PR #650 (`resume --seal-at`), PR #653 (the vanilla band to Ch21 on both routes, ADR 0426), PR #656 (#654: the Ch2 Drop crash; `Sight.asActive` no longer erases an ally).
+- **In progress: #655, vanilla Ch8's chests** (every trunk lap stopped at Ch8 on them). The design and Nicolas's two calls are on #655 (comment 6996120769):
+  - the wall's fall time counts strikers where the plan puts them;
+  - wall strikes lose the flat breach weight.
+  - The work is on `feat/655-walls-costed-by-the-army` (WIP 59ae1304, not for merge), built by an Opus subagent that stopped at the usage limit.
+  - Next on it: check the new tests fail on main's code, make the "goal looks barred" rule (`stepsToward`) honest about a wall still waiting to fall, the ADR, the Ch8 replays (`t639-cs-s4003`, `-s4001` and `-s4007` attempt 1), `suite --only vanilla-ch3/1001,scout-ch10/1001,scout-ch13/1001,scout-ch14/1001` beside main, then the PR, `/code-review medium`, CI and merge. Nicolas allowed merging #655's fix after review and CI.
+- **Then:**
+  1. The frozen suite on main. The last run (704bf738) refused promotion on 3 stall regressions; the vanilla one is bisected to #628 and filed as #652.
+  2. Resume the forks from the trunk's saved Ch8 starts (`t639-cs-s40NN`, index 9): `--tag e639 --route 1` and `--tag i639 --route 2`, plus campaign 4005 from its saved Ch2 start.
+  3. The L20 forks from each branch's first seal.
+  4. The table and the verdict: 15 of 20 pairs.
+- **Filed today:** #651 (the Ch13 mis-index; on hold, Manchego Stars only), #652, #654, #655, #657 (a legality check on freshly planned first acts), #658 (the door and key double reward). All are under #640.
+
+**Earlier the same day.** Three #510 PRs merged, each after `/code-review`, its fixes and CI:
 
 - **#643 (#642, ADR 0423): a plan pays for the weapon uses it spends.** A legendary use costs 300 gold over the dearest shop weapon that makes the same strike; the price is charged on the judged plan only, never in the beam. Ch17 seeds 1-3: 18/18 won, Twin strikes 34 → 13.
 - **#645 (#644, ADR 0424): the simulated enemy phase plays each weapon at the uses it will have** (a weapon that breaks mid-phase is gone for the rest of it). +0.4% CPU.
