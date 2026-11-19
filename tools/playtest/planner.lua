@@ -596,14 +596,14 @@ local function seizesIn(st)
 end
 
 -- An enemy phase outcome's strikes, by the unit struck: the blows it takes (takenDist each).
--- A striker with a player unit's index (below 0x40: our berserked unit in the berserk phase,
--- #660) takes its target's counter (counterDist) as a blow too: a player unit's death.
+-- A berserk strike's striker (t.berserk, sight's: the player's berserked unit in the berserk
+-- phase, #660) takes its target's counter (counterDist) as a blow too: a player unit's death.
 local function blowsOn(strikes)
     local out = {}
     for _, s in ipairs(strikes) do
         out[s.target] = out[s.target] or {}
         table.insert(out[s.target], s.takenDist)
-        if s.enemy and s.enemy < 0x40 and s.counterDist then
+        if s.berserk and s.counterDist then
             out[s.enemy] = out[s.enemy] or {}
             table.insert(out[s.enemy], s.counterDist)
         end
@@ -647,10 +647,10 @@ function M.either(a, b) return 1 - (1 - a) * (1 - b) end
 function M.endsIn(objective, left, byId)
     return function(id, gone)
         local e = byId[id]
-        if e == nil or (gone and gone[id]) then return false end
+        -- a red unit only: the player's berserked unit strikes in a phase too (#660)
+        if e == nil or e.faction ~= "red" or (gone and gone[id]) then return false end
         if objective == "boss" then return e.isBoss == true end
-        -- a red unit only: our berserked unit strikes in a phase too (#660)
-        if objective ~= "rout" or e.faction ~= "red" then return false end
+        if objective ~= "rout" then return false end
         local n = left
         for g in pairs(gone or {}) do
             if byId[g] and byId[g].faction == "red" then n = n - 1 end
@@ -2001,8 +2001,8 @@ function M.plan(Bot, board, sight, style, opts)
             end
             for _, s in ipairs(o.strikes) do
                 if strikers[s.target] and s.enemy then strikers[s.target][s.enemy] = true end
-                -- our berserked striker is struck by its target's counter (blowsOn)
-                if s.enemy and s.enemy < 0x40 and strikers[s.enemy] then
+                -- a berserk strike's striker is struck by its target's counter (blowsOn)
+                if s.berserk and strikers[s.enemy] then
                     strikers[s.enemy][s.target] = true
                 end
                 if st.recruits[s.enemy] then

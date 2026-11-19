@@ -688,8 +688,8 @@ function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
         if plan.enemies and plan.enemies[u.id] then hidden = false end
     end
     -- what the plan read of it: a player-phase death the counter to its own act; an enemy-phase
-    -- one, or one in the berserk phase that ends our phase (the game counts it the player's; the plan
-    -- judged it with the enemy phase, sight's playPhase), the plan's predict
+    -- one, or one in the berserk phase that ends the player phase (the game counts it the
+    -- player's; the plan judged it with the enemy phase, sight's playPhase), the plan's predict
     local judged
     if playerPhase and not berserk then
         if action and action.unitId == d.id then d.predicted = action.die end

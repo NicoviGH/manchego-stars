@@ -341,9 +341,8 @@ local AI_WEIGHT_SHIFT, AI_WEIGHT_MASK = 3, 0x1F << 3
 local AI_ORDER_STATE, AI_FLAGS, AI_UNK7E, AI_ITEM_FLAGS, AI_UNK84, AI_BEST_MOV, AI_CMD_RESULT =
     0x78, 0x7B, 0x7E, 0x80, 0x84, 0x85, 0x86
 local AI_FLAG_0, AI_CMD_RESULTS = 1, 8
--- cp_phase.c AiPhaseBerserkInit's gAiState.flags (AI_FLAG_BERSERKED), and the unit status it
--- plays (include/bmunit.h UNIT_STATUS_BERSERK: +30's low nibble, its duration the high one)
-local AI_FLAG_BERSERKED, STATUS_BERSERK = 4, 4
+-- cp_phase.c AiPhaseBerserkInit's gAiState.flags (AI_FLAG_BERSERKED)
+local AI_FLAG_BERSERKED = 4
 -- gAiDecision's itemSlot for the ballista (AiAttemptBallistaCombat's -1); its layout is
 -- board.lua's (Board.AI_DEC).
 local BALLISTA_SLOT = 0xFF
@@ -1683,23 +1682,32 @@ end
 -- read off them was seen to change (ADR 0407: the same acts on four runs with the calls on
 -- every strike and with them once a board). Called for every strike they cost vanilla Ch14
 -- seed 1001 47.8 CPU s against main's 46.2.
-function M.aiPhaseStart(api, call, S, units, after, known)
+-- What both phase starts (AiPhaseInit, AiPhaseBerserkInit) write alike, after keeping the units'
+-- AI bytes for the sandbox to hand back: the phase's faction and AI flags, unk7E, cmd_result and
+-- the chapter's specialItemFlags. -> their two calls, then `after`'s, as one list.
+local function phaseFields(api, S, units, faction, flags, after)
     local mem, A = api.mem, S.gAiState
     M.keepAi(api, units)
-    api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
-    api.write8(A + AI_FLAGS, AI_FLAG_0)
+    api.write8(S.gPlaySt + PLAY_FACTION, faction)
+    api.write8(A + AI_FLAGS, flags)
     api.write8(A + AI_UNK7E, 0xFF)
-    api.write8(A + AI_ORDER_STATE, 0)
     for k = 0, AI_CMD_RESULTS - 1 do api.write8(A + AI_CMD_RESULT + k, 0) end
     api.write32(A + AI_ITEM_FLAGS, mem.u32(S.gAiItemConfigTable + api.chapter() * 4))
+    local list = { { S.UpdateAllPhaseHealingAIStatus, {} }, { S.SetupUnitInventoryAIFlags, {} } }
+    for _, c in ipairs(after or {}) do list[#list + 1] = c end
+    return list
+end
+
+function M.aiPhaseStart(api, call, S, units, after, known)
+    local A = S.gAiState
+    local list = phaseFields(api, S, units, M.PHASES[3], AI_FLAG_0, after)
+    api.write8(A + AI_ORDER_STATE, 0)
     api.write16(A + AI_UNK84, 0)
     if known then
         api.write8(A + AI_BEST_MOV, known.mov)
         for _, o in pairs(units) do api.write8(o.addr + M.UNIT_AI_FLAGS, known.flags[o.addr]) end
         return call(after)
     end
-    local list = { { S.UpdateAllPhaseHealingAIStatus, {} }, { S.SetupUnitInventoryAIFlags, {} } }
-    for _, c in ipairs(after) do list[#list + 1] = c end
     return call(list)
 end
 
@@ -1711,14 +1719,15 @@ end
 -- before the one this phase follows (0: this turn's; 1: the lookahead's second phase): each
 -- start ticks the status down once and clears it at 0 (bmunit.c TickActiveFactionTurn), so a
 -- unit berserks then only while its duration is above `after`. `Board` = api.Board (its
--- UNIT_STATUS). -> the ids, in the game's order
-M.BERSERK_SKIPS = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 5) | (1 << 10)
+-- status and state bits). -> the ids, in the game's order
 function M.berserkers(mem, Board, units, after)
+    local skips = Board.US_HIDDEN | Board.US_UNSELECTABLE | Board.US_DEAD | Board.US_RESCUED
+        | Board.US_HAS_MOVED_AI
     local out = {}
     for _, o in pairs(units) do
-        local status = mem.u8(o.addr + Board.UNIT_STATUS)
-        if o.faction == "blue" and (status & 0xF) == STATUS_BERSERK and (status >> 4) > (after or 0)
-                and (mem.u32(o.addr + UNIT_STATE) & M.BERSERK_SKIPS) == 0 then
+        local status, left = Board.statusOf(mem.u8(o.addr + Board.UNIT_STATUS))
+        if o.faction == "blue" and status == Board.STATUS_BERSERK and left > (after or 0)
+                and (mem.u32(o.addr + UNIT_STATE) & skips) == 0 then
             out[#out + 1] = o.id
         end
     end
@@ -1726,19 +1735,13 @@ function M.berserkers(mem, Board, units, after)
     return out
 end
 
--- Inside a sandbox, the berserk phase's start for our side (cp_phase.c AiPhaseBerserkInit):
--- its field writes as they stand, the faction the player's (the phase runs inside the player phase), then
--- its two calls, as M.aiPhaseStart's. Unlike AiPhaseInit it leaves orderState and unk84 alone.
--- What follows is our berserked units' decisions; the enemy phase after starts anew (aiOrder).
+-- Inside a sandbox, the berserk phase's start for the player's side (cp_phase.c
+-- AiPhaseBerserkInit): the fields both starts write (phaseFields), the faction the player's (the
+-- phase runs inside the player phase) and AI_FLAG_BERSERKED, then its two calls. Unlike
+-- AiPhaseInit it leaves orderState and unk84 alone. What follows is the berserked units'
+-- decisions; the enemy phase after starts anew (aiOrder).
 function M.berserkPhaseStart(api, call, S, units)
-    local mem, A = api.mem, S.gAiState
-    M.keepAi(api, units)
-    api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[1])
-    api.write8(A + AI_FLAGS, AI_FLAG_BERSERKED)
-    api.write8(A + AI_UNK7E, 0xFF)
-    for k = 0, AI_CMD_RESULTS - 1 do api.write8(A + AI_CMD_RESULT + k, 0) end
-    api.write32(A + AI_ITEM_FLAGS, mem.u32(S.gAiItemConfigTable + api.chapter() * 4))
-    call({ { S.UpdateAllPhaseHealingAIStatus, {} }, { S.SetupUnitInventoryAIFlags, {} } })
+    call(phaseFields(api, S, units, M.PHASES[1], AI_FLAG_BERSERKED))
 end
 
 -- What a phase start's two calls left on the board, for M.aiPhaseStart's `known`:
@@ -2631,7 +2634,8 @@ function M.new(outer)
             M.aiPhaseStart(api, call, S, all, setup, known)
             seen.phaseStart[key] = known or M.phaseStarted(mem, S, all)
         else
-            -- our berserked unit decides in the berserk phase (M.berserkPhaseStart's, the player's faction)
+            -- the player's berserked unit decides in the berserk phase (M.berserkPhaseStart's,
+            -- the player's faction)
             local phase = e.faction == "blue" and M.PHASES[1] or M.PHASES[3]
             assert(mem.u8(S.gPlaySt + PLAY_FACTION) == phase,
                    "sight: a unit decides inside a phase aiOrder or berserkPhaseStart started, "
@@ -2654,8 +2658,8 @@ function M.new(outer)
         -- a player unit struck (a blue index) learns from its counter: its side is read too.
         -- Not by our own berserked unit: a battle between two player units awards none
         -- (BattleApplyExpGains, M.taughtMiss)
-        local side = exchange(call, proc, sim,
-                              learning and target < 0x40 and e.faction ~= "blue" and "target" or nil)
+        local teaches = learning and target < 0x40 and e.faction ~= "blue" and "target" or nil
+        local side = exchange(call, proc, sim, teaches)
         side.slot, side.tile = slot, { x = sx, y = sy }
         return target, side
     end
@@ -2757,7 +2761,35 @@ function M.new(outer)
         -- them reach through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed
         -- him at 0%)
         M.openAll(api, call, S, plan.opened)
-        local function order() return aiOrder(call, byId) end
+        -- The berserk phase (#660): the player's berserked units (M.berserkers, `after` as its)
+        -- on a phase start of their own (M.berserkPhaseStart) -> their ids, in the game's order.
+        -- Its decisions refresh the maps under the player's faction, which rewrites a red unit's
+        -- fog bits (bmmap.c RefreshUnitsOnBmMap) to what the plan's units see; the enemy order
+        -- after reads them as the phase found them (`fogWas`, put back by order()), so `decides`
+        -- sees what it sees with no berserked unit (sight's keepFog: the seen read is before any
+        -- refresh). The bits are kept per phase, every way of it alike.
+        local FOG_BITS = Board.US_BIT9 | (1 << 8)   -- US_BIT9, and US_BIT8 the refresh clears
+        local fogWas
+        local function berserkFirst(after)
+            local ids = M.berserkers(mem, Board, byId, after)
+            fogWas = nil
+            if #ids == 0 then return ids end
+            fogWas = {}
+            for _, o in pairs(byId) do
+                if o.faction == "red" then
+                    fogWas[o.addr] = mem.u32(o.addr + UNIT_STATE) & FOG_BITS
+                end
+            end
+            M.berserkPhaseStart(api, call, S, byId)
+            healStale = false   -- the start's own heal statuses read every HP
+            return ids
+        end
+        local function order()
+            for addr, bits in pairs(fogWas or {}) do
+                api.write32(addr + UNIT_STATE, (mem.u32(addr + UNIT_STATE) & ~FOG_BITS) | bits)
+            end
+            return aiOrder(call, byId)
+        end
         -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog) or
         -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399)
         -- (or our berserked unit, M.berserkers, never fogged), and alive: a berserk strike's
@@ -2782,22 +2814,35 @@ function M.new(outer)
             now[#now + 1] = t
             standOn(e, side.tile.x, side.tile.y)
             local _, mean = M.odds({ t.takenDist }, t.targetHp)
-            -- a red target: only a berserked enemy strikes its own side
-            wound(addr, t.targetHp - math.floor(mean + 0.5),
-                  byId[target] ~= nil and byId[target].faction == "red")
+            -- the target's heal flag is stale when it is of the deciding side (the faction whose
+            -- heal statuses the phase reads): a red struck by the player's berserked unit is not
+            local left = t.targetHp - math.floor(mean + 0.5)
+            wound(addr, left, byId[target] ~= nil and byId[target].faction == e.faction)
+            -- a strike by the player's berserked unit (#660), marked for the planner: its
+            -- striker is one of the player's, whose death to the counter is a loss
+            t.berserk = e.faction == "blue" or nil
+            -- one the berserk phase's strike kills on its expected way is gone from the map
+            -- for the units after it, as nextPhase takes one (the enemies' own strikes keep
+            -- theirs: the judged phase reads them on the target's whole odds)
+            if t.berserk and left <= 0 and byId[target] then
+                local o = byId[target]
+                remove(o, mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y))
+            end
             M.strikeLedger(api, call, S, after, wearing.base, done, t, side, e.addr, addr)
             return t, now, addr
         end
         -- the ledger the strikes `done` leave (the base when none)
         function wearing.after(done) return M.ledgerAfter(after, wearing.base, done) end
-        return byId, order, decides, strike, remove, gone, wearing
+        return byId, order, decides, strike, remove, gone, wearing, berserkFirst
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
     -- may kill the striker) -> the likeliest outcome's strikes, with .outcomes and .unsplit.
-    -- `berserk` = our units the berserk phase moves first (M.berserkers), each way of which
-    -- ends in the enemy phase `order()` lists on that way's board (#660); `order` = stagePhase's.
-    local function playPhase(call, proc, byId, berserk, order, decides, strike, remove, mass0)
+    -- The berserk phase first (#660): `berserkFirst(after)` (stagePhase's) starts it and names
+    -- the units it moves; each of its ways ends in the enemy phase `order()` lists on that way's
+    -- board. `order` = stagePhase's.
+    local function playPhase(call, proc, byId, berserkFirst, after, order, decides, strike, remove,
+                             mass0)
         local function ways(list, mass, tail, done0)
             return M.phaseWays(#list, function(k, done)
                 local id = list[k]
@@ -2810,8 +2855,8 @@ function M.new(outer)
             end, sandbox, nil, mass, tail, done0)
         end
         local outcomes, unsplit
+        local berserk = berserkFirst(after)
         if #berserk > 0 then
-            M.berserkPhaseStart(api, call, S, byId)
             local enemy = 0
             outcomes, unsplit = ways(berserk, mass0, function(done, mass)
                 local o, u = ways(order(), mass, nil, done)
@@ -2835,9 +2880,9 @@ function M.new(outer)
 
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove = stagePhase(call, plan)
-            return playPhase(call, proc, byId, M.berserkers(mem, Board, byId, 0), order, decides,
-                             strike, remove, plan.mass)
+            local byId, order, decides, strike, remove, _, _, berserkFirst = stagePhase(call, plan)
+            return playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
+                             plan.mass)
         end) end)
     end
 
@@ -2960,21 +3005,20 @@ function M.new(outer)
     -- (knows(), ADR 0399), and no arrival is placed (one not yet loaded is no unit to play).
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
-    -- and .moved = the units the first phase moved (enemies, and our berserked units, #660),
-    -- { { id, x, y } }, .fell = the ids of the
+    -- and .moved = the units the first phase moved (enemies, and the player's berserked units,
+    -- #660), { { id, x, y } }, .fell = the ids of the
     -- strikers our counters removed in it (a Rout's count, Planner.secondRead).
     -- `reply` (#510 comment 6906859807, ADR 0389's amendment of 2026-11-17): our units play
     -- armyReply's turn between the two phases in place of the hold; .reply = what they played.
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing = stagePhase(call, plan)
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst =
+                stagePhase(call, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
             -- wears on what the last left (M.tally)
             local first = {}
-            local berserk = M.berserkers(mem, Board, byId, 0)
-            if #berserk > 0 then M.berserkPhaseStart(api, call, S, byId) end
             local function decideAll(ids)
                 for _, id in ipairs(ids) do
                     local e = decides(id)
@@ -2984,14 +3028,17 @@ function M.new(outer)
                             local t, now, addr = strike(e, id, target, side, first)
                             first = now
                             moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
-                            if mem.u8(addr + UNIT_HP) == 0 then
+                            -- (a berserk strike's kill: strike() took it off already)
+                            if mem.u8(addr + UNIT_HP) == 0 and not t.berserk then
                                 local u = byId[target]
-                                if u then remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y)) end
+                                if u then
+                                    remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y))
+                                end
                             end
                             if t.felled >= 0.5 then
                                 remove(e, side.tile.x, side.tile.y)
-                                -- a Rout's count: our berserked unit is none of it
-                                if e.faction == "red" then fell[#fell + 1] = id end
+                                -- a Rout's count: the player's berserked unit is none of it
+                                if not t.berserk then fell[#fell + 1] = id end
                             else
                                 -- it lives: our counter's expected damage stays on it, as a
                                 -- strike's stays on its target
@@ -3006,7 +3053,7 @@ function M.new(outer)
                     end
                 end
             end
-            decideAll(berserk)
+            decideAll(berserkFirst(0))
             decideAll(order())
             -- the second phase wears on what the first and the reply left
             wearing.base = wearing.after(first)
@@ -3024,8 +3071,8 @@ function M.new(outer)
             -- enemy that walked out of it is seen, one that walked into it is not
             M.refresh(api, call, S, byId)
             -- our berserked units again, those the next player phase's start leaves berserked
-            local out = playPhase(call, proc, byId, M.berserkers(mem, Board, byId, 1), order,
-                                  decides, strike, remove)
+            local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
+                                  remove)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
             return out
         end) end)

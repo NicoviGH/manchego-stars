@@ -5639,19 +5639,23 @@ do
         enemyPhase = function()
             return { { enemy = 0x05, target = 0x01, takenHit = 100, takenDmg = 20, takenHits = 1,
                        takenCrit = 0, targetHp = 18, counterHit = 100, counterDmg = 10,
-                       counterHits = 1, counterCrit = 0, strikerHp = 10, felled = 0 } }
+                       counterHits = 1, counterCrit = 0, strikerHp = 10, felled = 0,
+                       berserk = true } }
         end,
     }
     local _, plan = Planner.plan(B, boardOf(L, G, X), sightOf(o), style("careful"))
     local die = {}
     for _, p in ipairs(plan and plan.predict or {}) do die[p.id] = p end
-    check(die[0x01] and die[0x01].die, 1, "berserk phase: the lord's death to our berserker is read")
+    check(die[0x01] and die[0x01].die, 1,
+          "berserk phase: the lord's death to the player's berserker is read")
     check(die[0x01] and table.concat(die[0x01].strikers, ","), tostring(0x05),
           "berserk phase: the berserker is named its striker")
-    check(die[0x05] and die[0x05].die, 1, "berserk phase: the berserker's death to the counter is read")
+    check(die[0x05] and die[0x05].die, 1,
+          "berserk phase: the berserker's death to the counter is read")
     check(die[0x05] and table.concat(die[0x05].strikers, ","), tostring(0x01),
           "berserk phase: struck by its target's counter")
-    local byId = { [0x05] = { id = 0x05, faction = "blue" }, [0x81] = { id = 0x81, faction = "red" } }
+    local byId = { [0x05] = { id = 0x05, faction = "blue" },
+                   [0x81] = { id = 0x81, faction = "red" } }
     check(Planner.endsIn("rout", 1, byId)(0x05), false,
           "endsIn: our berserker felled is no Rout's last enemy")
     check(Planner.endsIn("rout", 1, byId)(0x81), true, "endsIn: the last red is")
@@ -8020,10 +8024,14 @@ do
     check(math.abs(won - 0.5) < 1e-9, true,
           "secondRead: a Rout's last enemy, the first phase's kill counted gone")
     -- a Seize map: the throne's holder's death opens the Seize and ends nothing (ADR 0405)
-    check(Planner.endsIn("seize", 0, { [0x81] = { id = 0x81, isBoss = true } })(0x81), false,
+    local boss = { [0x81] = { id = 0x81, faction = "red", isBoss = true } }
+    check(Planner.endsIn("seize", 0, boss)(0x81), false,
           "endsIn: on a Seize map no death ends the chapter")
-    check(Planner.endsIn("boss", 0, { [0x81] = { id = 0x81, isBoss = true } })(0x81), true,
+    check(Planner.endsIn("boss", 0, boss)(0x81), true,
           "endsIn: a Defeat Boss map's boss")
+    local lordBoss = { [0x05] = { id = 0x05, faction = "blue", isBoss = true } }
+    check(Planner.endsIn("boss", 0, lordBoss)(0x05), false,
+          "endsIn: never a player unit, whatever its boss attribute (#660)")
     check(math.abs(Planner.either(0.5, 0.2) - 0.6) < 1e-9, true, "either: 1 - (1 - a)(1 - b)")
 end
 

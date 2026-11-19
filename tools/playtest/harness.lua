@@ -4877,14 +4877,25 @@ end
 -- own strike on the lead (its AI's pick of weapon and tile), and one player attack in range.
 -- Manchego Stars: ch01. PT_VANILLA=1: the retail Prologue, the first map New Game reaches (Ch1 is
 -- only reached by playing it, which `bot` does).
-scenarios.sightprobe = function()
+-- The probes' map (sightprobe, berserkprobe): retail's Prologue (PT_VANILLA=1) or Manchego
+-- Stars' ch01, settled on the player phase -> the sight api and a sight on it, or nil (the
+-- failure is reported).
+function INSPECT.probeMap()
     if PLAYTEST_VANILLA == "1" then
         INSPECT.retailFastText()
-        if not bootToMap(nil, 0) then return result("FAIL", "never reached the Prologue map") end
-    elseif not reachCh01Map() then return end
+        if not bootToMap(nil, 0) then
+            result("FAIL", "never reached the Prologue map")
+            return nil
+        end
+    elseif not reachCh01Map() then return nil end
     INSPECT.settle("phase", 6000, true)
     local sapi = INSPECT.sightApi()
-    local sight = INSPECT.Sight.new(sapi)
+    return sapi, INSPECT.Sight.new(sapi)
+end
+
+scenarios.sightprobe = function()
+    local sapi, sight = INSPECT.probeMap()
+    if not sapi then return end
     local w, h = mapSize()
     for y = 0, h - 1 do
         local row = {}
@@ -4970,29 +4981,22 @@ end
 -- Seth's status cleared has no strike of his. Vanilla Ch14: Garcia, berserked, killed Eirika at
 -- a plan's 0%. PT_VANILLA=1 only.
 scenarios.berserkprobe = function()
-    if PLAYTEST_VANILLA ~= "1" then return result("FAIL", "berserkprobe reads the retail Prologue") end
-    INSPECT.retailFastText()
-    if not bootToMap(nil, 0) then return result("FAIL", "never reached the Prologue map") end
-    INSPECT.settle("phase", 6000, true)
-    local sapi = INSPECT.sightApi()
-    local sight = INSPECT.Sight.new(sapi)
+    if PLAYTEST_VANILLA ~= "1" then
+        return result("FAIL", "berserkprobe reads the retail Prologue")
+    end
+    local sapi, sight = INSPECT.probeMap()
+    if not sapi then return end
     local board = BOARD.read()
     local eirika, seth
     for _, u in ipairs(BOARD.live(board, "blue")) do
         if u.charId == 1 then eirika = u elseif u.charId == 2 then seth = u end
     end
     if not (eirika and seth) then return result("FAIL", "no Eirika or Seth on the Prologue") end
-    local taken = {}
-    for _, u in ipairs(board.units) do
-        if u.onField then taken[u.x .. "," .. u.y] = true end
-    end
-    local side
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-        local x, y = seth.x + d[1], seth.y + d[2]
-        if not side and x >= 0 and y >= 0 and not taken[x .. "," .. y] then side = { x = x, y = y } end
-    end
+    local sx, sy = INSPECT.freeBeside(seth)
+    local side = sx and { x = sx, y = sy }
     if not side then return result("FAIL", "no free tile beside Seth") end
-    local plan = { blues = { { unit = eirika, x = side.x, y = side.y, hp = 5 } }, reds = {}, gone = {} }
+    local plan = { blues = { { unit = eirika, x = side.x, y = side.y, hp = 5 } }, reds = {},
+                   gone = {} }
     local function sethStrikes(status)
         sapi.write8(seth.addr + BOARD.UNIT_STATUS, status)
         sight.refresh()
@@ -5004,11 +5008,37 @@ scenarios.berserkprobe = function()
         end
         return n
     end
+    -- the lookahead's first phase (nextPhase) plays the berserk phase too: Seth moves first,
+    -- Eirika takes his expected blow (below her 5 HP when the second phase begins; the phase
+    -- plays its expected way, so a blow short of sure leaves her standing; the control leaves
+    -- her whole), and Seth is never one of the
+    -- enemies our counters removed (`fell`, a Rout's count)
+    local function lookahead(status)
+        sapi.write8(seth.addr + BOARD.UNIT_STATUS, status)
+        sight.refresh()
+        local out = sight.nextPhase(plan, false)
+        local blueFell = false
+        for _, id in ipairs(out.fell or {}) do blueFell = blueFell or id < 0x40 end
+        local first = out.moved[1] and out.moved[1].id
+        log(string.format("lookahead status 0x%02X: first mover %s, Eirika hp %s, fell %s",
+            status, tostring(first), tostring(out.hp[eirika.id]),
+            table.concat(out.fell or {}, ",")))
+        return first == seth.id, out.hp[eirika.id], blueFell
+    end
     local berserked = sethStrikes(0x54)
     local control = sethStrikes(0x00)
-    log(string.format("berserkprobe: Seth strikes Eirika berserked=%d control=%d", berserked, control))
-    if berserked == 1 and control == 0 then return result("PASS", "the berserk phase is judged") end
-    return result("FAIL", string.format("berserked=%d control=%d", berserked, control))
+    local leads, hp, blueFell = lookahead(0x54)
+    local leadsCtl, hpCtl = lookahead(0x00)
+    log(string.format("berserkprobe: Seth strikes Eirika berserked=%d control=%d; lookahead: "
+        .. "Seth first=%s (control %s), Eirika hp=%s, a blue in fell=%s", berserked, control,
+        tostring(leads), tostring(leadsCtl), tostring(hp), tostring(blueFell)))
+    if berserked == 1 and control == 0 and leads and not leadsCtl and hp < 5 and hpCtl == 5
+            and not blueFell then
+        return result("PASS", "the berserk phase is judged, in both judged phases")
+    end
+    return result("FAIL", string.format("berserked=%d control=%d lookahead first=%s/%s hp=%s/%s "
+        .. "blueFell=%s", berserked, control, tostring(leads), tostring(leadsCtl), tostring(hp),
+        tostring(hpCtl), tostring(blueFell)))
 end
 
 -- ---- stability fuzzer (#49): SEEDED random inputs over the same I/O layer, hunting the
