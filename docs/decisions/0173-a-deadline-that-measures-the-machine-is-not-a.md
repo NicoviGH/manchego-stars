@@ -31,7 +31,8 @@ override -- watching a run at 60fps must not quarter its work allowance.
 **A frame budget alone would hang forever**, because a wedged emulator emits no frames and so never
 reaches any budget. Two kill paths, and both name a real fault rather than a busy laptop:
 **OVERRUN** (more frames than budgeted -- genuinely not finishing) and **STALL** (the frame counter
-stopped -- mGBA is wedged). `PT_MAX_WALL_S` stays as a last-resort net for neither.
+stopped -- mGBA is wedged). `PT_MAX_WALL_S` stays as a last-resort net for neither, never under
+the scenario's own deadline (amended by ADR 0428, #665).
 
 **STALL is the one piece that is still a wall clock, and the first cut set it wrong.** Progress is
 read from stamped log lines, but the harness goes deliberately silent inside long waits -- the

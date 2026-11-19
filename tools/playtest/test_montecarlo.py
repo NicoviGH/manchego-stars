@@ -341,6 +341,47 @@ class Workers(unittest.TestCase):
                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
         self.assertEqual([r.get('env_status') for r in both], ['clean', None])
 
+    def test_a_campaign_run_sh_cut_short_ends_crashed_in_its_words(self):
+        # #665: run.sh's wall net cut 19 of 20 laps mid-chapter; campaign.lua never wrote its
+        # end, so resume printed and counted nothing and the lap looked finished
+        cut = 'RESULT: ERROR -- exceeded PT_MAX_WALL_S=7200s at frame 9'
+        with tempfile.NamedTemporaryFile('w', suffix='.log', delete=False) as log:
+            # run.sh renders a failing run's inspector AFTER its verdict, past any line tail
+            log.write('running\n%s\n%s\n%s' % (cut, mc.INSPECTOR_BANNER,
+                                                 'RESULT: render row\n' * 40))
+        self.addCleanup(os.unlink, log.name)
+        task = {'campaign': {'id': 'es-s1', 'scout': True, 'route': 1}, 'seed': 1}
+        recs = mc.records_of(task, 'BOTRUN {"outcome": "won", "chapter": 9, "attempt": 1}\n'
+                             'CAMPAIGN {"chapter": 9, "attempts": 1}', '/tmp/w', log.name)
+        end = recs[-1]
+        self.assertEqual((end['kind'], end['campaign'], end['outcome'], end['why'],
+                          end['scout'], end['route'], end['chapters']),
+                         ('campaign', 'es-s1', 'crashed',
+                          'the campaign left no end line; run.sh said: ' + cut, True, 1, 1))
+        self.assertNotIn('env_status', end, 'the bot had played: the environment held')
+        self.assertFalse(mc.passing(recs), 'its run dir is kept as evidence')
+        # a later chapter is withheld in the cut's words, never "no record" (FR-027)
+        later = mc.chapter_result(recs, 10)
+        self.assertEqual(later['status'], 'reach_unresolved')
+        self.assertIn(cut, later['why'])
+        # cut before the bot's first record (a chapter line, no BOTRUN): still the campaign's
+        # end, in run.sh's words, and an environment that did not hold
+        early = mc.records_of(task, 'CAMPAIGN {"chapter": 9, "attempts": 0}', '/tmp/w', log.name)
+        self.assertEqual([(r['kind'], r['why'].endswith(cut), r['env_status']) for r in early],
+                         [('campaign', True, mc.unread())])
+        # a diagnostic replay writes no CAMPAIGN line by design: nothing is made up for it
+        diag = mc.records_of(dict(task, diag={'turn': 3}),
+                             'BOTRUN {"outcome": "won", "chapter": 9}', '/tmp/w', log.name)
+        self.assertEqual([r.get('kind') for r in diag], [None])
+        # a worker that left nothing names its campaign and run.sh's words
+        none = mc.records_of(task, '', '/tmp/w', log.name)[0]
+        self.assertEqual((none['campaign'], none['outcome']), ('es-s1', 'crashed'))
+        self.assertIn(cut, none['why'])
+        # a campaign that wrote its own end keeps it
+        done = mc.records_of(task, 'BOTRUN {"outcome": "won"}\nCAMPAIGN {"outcome": "played"}',
+                             '/tmp/w', log.name)
+        self.assertEqual([r.get('outcome') for r in done], ['won', 'played'])
+
     def test_each_attempts_prep_lands_on_its_bot_record(self):
         # ADR 0413 said the record keeps the supply; it was only in the worker log, since
         # records_of dropped every chapter line (#510 comment 6896261936)
@@ -405,9 +446,12 @@ class Workers(unittest.TestCase):
             if task['campaign']['attempt'] == 2:
                 raise RuntimeError('mgba-headless exited early')
             k = task['campaign']['attempt']
-            return 'BOTRUN {"attempt": %d, "outcome": "won", "clean": true}\n' % k, '/tmp/x'
+            # campaign.lua's last line, without a chapter: a campaign with none was cut (#665)
+            return ('BOTRUN {"attempt": %d, "outcome": "won", "clean": true}\n'
+                    'CAMPAIGN {"outcome": "played"}' % k, '/tmp/x')
         recs, kept = self.run_pool(launch, mc.attempt_tasks({'from': 4}, 3))
-        self.assertEqual(len(kept), 3, 'every worker leaves one record')
+        self.assertEqual(sorted(r['attempt'] for r in kept if mc.is_bot(r)), [1, 2, 3],
+                         'every worker leaves its record')
         dead = [r for r in kept if r['outcome'] == 'crashed']
         self.assertEqual(len(dead), 1)
         self.assertEqual(dead[0]['attempt'], 2)

@@ -335,12 +335,33 @@ def log_tail(path, n=30):
         return []
 
 
+# run.sh prints a failing run's inspector render AFTER its verdict (run_mgba): the verdict is
+# the last RESULT line before this banner, and the render can be longer than any line tail
+INSPECTOR_BANNER = '---------------- inspector ----------------'
+
+
+def run_verdict(log_path, tail_bytes=1 << 20):
+    """run.sh's verdict line in a worker's log (matrix.verdict_line), read from its last
+    `tail_bytes` (the log holds the emulator's whole log, hundreds of MB), else None."""
+    from matrix import verdict_line
+    try:
+        with open(log_path, 'rb') as fh:
+            fh.seek(max(0, os.path.getsize(log_path) - tail_bytes))
+            text = fh.read().decode('utf-8', 'replace')
+    except OSError:
+        return None
+    head, banner, _ = text.rpartition(INSPECTOR_BANNER)
+    return verdict_line(head if banner else text)
+
+
 def records_of(task, text, where, log_path):
     """A worker's records: its BOTRUN lines, and its campaign's last CAMPAIGN line (the one
     without a chapter: how the campaign ended, and why) as a record of kind `campaign`; each
-    names its run dir. Each attempt's prep (a chapter line's `prep`: what the convoy gave and
-    took and the shop bought) goes on that attempt's BOTRUN record as `supply` and `buys`. A
-    worker that left neither says why it has none, from its log."""
+    names its run dir. A campaign the bot played that left no end line was cut by run.sh: its
+    end is a `crashed` record in run.sh's words (#665). Each attempt's prep (a chapter line's
+    `prep`: what the convoy gave and took and the shop bought) goes on that attempt's BOTRUN
+    record as `supply` and `buys`. A worker that left neither says why it has none, from its
+    log."""
     recs = parse_lines(text, BOTRUN)
     lines = parse_lines(text, CAMPAIGN)
     chapters = [c for c in lines if c.get('chapter') is not None]
@@ -368,7 +389,21 @@ def records_of(task, text, where, log_path):
             c['prep'] = [dict(p, chapter=ch) for (ch, _), p in sorted(prep.items(),
                                                                     key=lambda kv: str(kv[0]))]
         recs.append(c)
-    attempt = (task.get('campaign') or {}).get('attempt')
+    camp = task.get('campaign')
+    said = run_verdict(log_path)
+    # a diagnostic replay writes no CAMPAIGN line by design (campaign.lua api.diag)
+    if camp is not None and not task.get('diag') and (recs or chapters) and not ends:
+        # run.sh cut the campaign (its wall net, an OVERRUN, a STALL) after it had begun and
+        # before campaign.lua said how it ended. Without an end, `resume` printed and counted
+        # nothing and the lap looked finished (#665): the end is a crash, in run.sh's words,
+        # carrying what campaign.lua's own end carries.
+        end = {'kind': 'campaign', 'campaign': camp.get('id'), 'outcome': 'crashed',
+               'seed': task.get('seed'), 'route': camp.get('route'), 'chapters': len(chapters),
+               'why': 'the campaign left no end line; run.sh said: %s' % said}
+        if camp.get('scout'):
+            end['scout'] = True
+        recs.append(end)
+    attempt = (camp or {}).get('attempt')
     bot = any(is_bot(r) for r in recs)
     for r in recs:
         r['run_dir'] = where
@@ -381,8 +416,10 @@ def records_of(task, text, where, log_path):
     if recs:
         return recs
     return [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'), 'run_dir': where,
-             'log': log_path, 'log_tail': log_tail(log_path), 'env_status': unread(),
-             'why': 'the worker left no BOTRUN or CAMPAIGN record'}]
+             'campaign': (camp or {}).get('id'), 'log': log_path, 'log_tail': log_tail(log_path),
+             'env_status': unread(),
+             'why': 'the worker left no BOTRUN or CAMPAIGN record%s'
+                    % (' (%s)' % said if said else '')}]
 
 
 def unread():
