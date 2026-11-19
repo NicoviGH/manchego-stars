@@ -370,16 +370,18 @@ def records_of(task, text, where, log_path):
             c['prep'] = [dict(p, chapter=ch) for (ch, _), p in sorted(prep.items(),
                                                                     key=lambda kv: str(kv[0]))]
         recs.append(c)
+    from matrix import verdict_line
     camp = task.get('campaign')
+    said = verdict_line('\n'.join(log_tail(log_path)))
     # a diagnostic replay writes no CAMPAIGN line by design (campaign.lua api.diag)
-    if camp is not None and not task.get('diag') and recs and not ends:
-        # run.sh cut the campaign (its wall net, an OVERRUN, a STALL) after the bot had played
-        # and before campaign.lua said how it ended. Without an end, `resume` printed and counted
-        # nothing and the lap looked finished (#665): the end is a crash, in run.sh's words.
-        said = [line.strip() for line in log_tail(log_path) if 'RESULT:' in line]
+    if camp is not None and not task.get('diag') and (recs or chapters) and not ends:
+        # run.sh cut the campaign (its wall net, an OVERRUN, a STALL) after it had begun and
+        # before campaign.lua said how it ended. Without an end, `resume` printed and counted
+        # nothing and the lap looked finished (#665): the end is a crash, in run.sh's words,
+        # carrying what campaign.lua's own end carries.
         end = {'kind': 'campaign', 'campaign': camp.get('id'), 'outcome': 'crashed',
-               'seed': task.get('seed'),
-               'why': said[-1] if said else 'the campaign left no end line'}
+               'seed': task.get('seed'), 'route': camp.get('route'), 'chapters': len(chapters),
+               'why': said or 'the campaign left no end line'}
         if camp.get('scout'):
             end['scout'] = True
         recs.append(end)
@@ -396,8 +398,10 @@ def records_of(task, text, where, log_path):
     if recs:
         return recs
     return [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'), 'run_dir': where,
-             'log': log_path, 'log_tail': log_tail(log_path), 'env_status': unread(),
-             'why': 'the worker left no BOTRUN or CAMPAIGN record'}]
+             'campaign': (camp or {}).get('id'), 'log': log_path, 'log_tail': log_tail(log_path),
+             'env_status': unread(),
+             'why': 'the worker left no BOTRUN or CAMPAIGN record%s'
+                    % (' (%s)' % said if said else '')}]
 
 
 def unread():

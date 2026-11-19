@@ -348,13 +348,32 @@ class Workers(unittest.TestCase):
         with tempfile.NamedTemporaryFile('w', suffix='.log', delete=False) as log:
             log.write('running\n%s\n' % cut)
         self.addCleanup(os.unlink, log.name)
-        task = {'campaign': {'id': 'es-s1', 'scout': True}, 'seed': 1}
+        task = {'campaign': {'id': 'es-s1', 'scout': True, 'route': 1}, 'seed': 1}
         recs = mc.records_of(task, 'BOTRUN {"outcome": "won", "chapter": 9, "attempt": 1}\n'
                              'CAMPAIGN {"chapter": 9, "attempts": 1}', '/tmp/w', log.name)
         end = recs[-1]
         self.assertEqual((end['kind'], end['campaign'], end['outcome'], end['why'],
-                          end['scout']), ('campaign', 'es-s1', 'crashed', cut, True))
+                          end['scout'], end['route'], end['chapters']),
+                         ('campaign', 'es-s1', 'crashed', cut, True, 1, 1))
+        self.assertNotIn('env_status', end, 'the bot had played: the environment held')
         self.assertFalse(mc.passing(recs), 'its run dir is kept as evidence')
+        # a later chapter is withheld in the cut's words, never "no record" (FR-027)
+        later = mc.chapter_result(recs, 10)
+        self.assertEqual(later['status'], 'reach_unresolved')
+        self.assertIn(cut, later['why'])
+        # cut before the bot's first record (a chapter line, no BOTRUN): still the campaign's
+        # end, in run.sh's words, and an environment that did not hold
+        early = mc.records_of(task, 'CAMPAIGN {"chapter": 9, "attempts": 0}', '/tmp/w', log.name)
+        self.assertEqual([(r['kind'], r['why'], r['env_status']) for r in early],
+                         [('campaign', cut, mc.unread())])
+        # a diagnostic replay writes no CAMPAIGN line by design: nothing is made up for it
+        diag = mc.records_of(dict(task, diag={'turn': 3}),
+                             'BOTRUN {"outcome": "won", "chapter": 9}', '/tmp/w', log.name)
+        self.assertEqual([r.get('kind') for r in diag], [None])
+        # a worker that left nothing names its campaign and run.sh's words
+        none = mc.records_of(task, '', '/tmp/w', log.name)[0]
+        self.assertEqual((none['campaign'], none['outcome']), ('es-s1', 'crashed'))
+        self.assertIn(cut, none['why'])
         # a campaign that wrote its own end keeps it
         done = mc.records_of(task, 'BOTRUN {"outcome": "won"}\nCAMPAIGN {"outcome": "played"}',
                              '/tmp/w', log.name)

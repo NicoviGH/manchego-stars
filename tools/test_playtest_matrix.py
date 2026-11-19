@@ -1361,6 +1361,11 @@ class WallNet(unittest.TestCase):
         self.assertEqual(self.net(600), int(mx.RUN_SH_DEFAULTS['PT_MAX_WALL_S']))
         self.assertEqual(self.net(600, '9000'), 9000)
 
+    def test_the_verdict_line_is_the_last_one_said(self):
+        text = 'x\n[f001] RESULT: PASS -- harness\nRESULT: ERROR -- STALLED: no frame progress\n'
+        self.assertEqual(mx.verdict_line(text), 'RESULT: ERROR -- STALLED: no frame progress')
+        self.assertIsNone(mx.verdict_line('no verdict'))
+
 
 class VerdictCacheStore(unittest.TestCase):
     def setUp(self):

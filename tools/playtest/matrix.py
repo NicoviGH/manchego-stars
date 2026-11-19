@@ -1422,6 +1422,13 @@ class VerdictCache(object):
         return discard_passing_run(scenario, outcome, kept)
 
 
+def verdict_line(text):
+    """run.sh's verdict line in its captured output, stripped: the last line holding `RESULT:`
+    (the harness stamps it `[fNNN] RESULT: ...`, and run.sh echoes its own last), else None."""
+    said = [line.strip() for line in text.splitlines() if 'RESULT:' in line]
+    return said[-1] if said else None
+
+
 def parse_verdict(text, returncode):
     """Read run.sh's verdict out of its captured output.
 
@@ -1438,19 +1445,14 @@ def parse_verdict(text, returncode):
     broken. Every one passed when re-run serially -- but not before the FAILs had been chased as
     real.
 
-    Since #345 run.sh no longer kills on WALL time at all: the deadline is a FRAME budget, so
-    contention changes how long a run takes and not whether it passes. The ERROR arm still
-    matters -- `OVERRAN its frame budget` and `STALLED: no frame progress` are both real, and
-    both are findings about the run rather than about the game."""
-    verdict = None
-    for line in text.splitlines():
-        if 'RESULT:' in line:
-            if 'RESULT: PASS' in line:
-                verdict = 'PASS'
-            elif 'RESULT: ERROR' in line:
-                verdict = 'ERROR'
-            else:
-                verdict = 'FAIL'
+    Since #345 the deadline is a FRAME budget, so contention changes how long a run takes and
+    not whether it passes. The ERROR arm still matters -- `OVERRAN its frame budget` and
+    `STALLED: no frame progress` are both real, and both are findings about the run rather
+    than about the game. Wall time still kills a run only past PT_MAX_WALL_S, a last-resort net
+    never under the scenario's own deadline (run.sh wall_net, ADR 0428)."""
+    line = verdict_line(text)
+    verdict = None if line is None else 'PASS' if 'RESULT: PASS' in line \
+        else 'ERROR' if 'RESULT: ERROR' in line else 'FAIL'
     if verdict is None:
         return 'ERROR'          # no verdict at all: crash, or a refused run
     if verdict == 'ERROR':

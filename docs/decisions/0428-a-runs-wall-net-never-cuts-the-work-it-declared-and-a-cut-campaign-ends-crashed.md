@@ -24,10 +24,18 @@ counted no crash, and the partial chapters were read as where the campaigns stop
    7200 still name the same run (`matrix.py` `RUN_SH_DEFAULTS`).
 2. **A campaign the bot played that left no end line ends `crashed`, in run.sh's words**
    (`montecarlo.py` `records_of`). Its `why` is run.sh's last `RESULT:` line, so `resume`
-   prints it and counts it under "N crashed", and its run dir is kept. A diagnostic replay
-   writes no CAMPAIGN line by design and is left alone.
+   prints it and counts it under "N crashed", and its run dir is kept. It carries what
+   campaign.lua's own end carries (`route`, `chapters`), and it is made for a campaign cut
+   before the bot's first record too. A diagnostic replay writes no CAMPAIGN line by design and
+   is left alone. run.sh's verdict line is read by `matrix.py` `verdict_line`, the one reader
+   `parse_verdict` also uses.
 
 **Why not size the net on the lap (chapters × the attempt cap).** An attempt's length is not
 known ahead, so any multiplier is a guess that cuts the slow lap. The declared deadline is the
 one budget the scenario already owns; OVERRUN and STALL still stop a run that is genuinely not
 finishing or wedged, and rule 2 makes any cut that does happen visible.
+
+**What bounds a looping campaign now.** Not the wall net. A bot that loops inside a decision
+ends the attempt `timeout` (botrun.lua `M.DECISION_FRAMES`, ADR 0411), and one that plays
+without progress ends it `stuck` (the two no-progress rules). Each chapter has at most
+`MAX_ATTEMPTS` (12) attempts. OVERRUN at the declared 86400s of work is the backstop past those.
