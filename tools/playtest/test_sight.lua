@@ -2011,7 +2011,8 @@ do
     check(m.u8(0x1000 + 3 * 32 + 4), 0, "asActive: his own cell is off the map, as the menu has him")
     -- the game's Drop list (bmtarget.c TryAddToDropTargetList) offers an adjacent tile only
     -- while gBmMapUnit is empty there: asked from the actor's tile after it has been staged on
-    -- the ally's, the ally's tile is not offered
+    -- the ally's, the ally's tile is not offered. The fake has no game to ask, so dropTiles
+    -- mirrors that one rule over the raw cells.
     local function dropTiles(x, y)
         local out = {}
         for _, d in ipairs({ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }) do

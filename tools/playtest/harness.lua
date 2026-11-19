@@ -1277,8 +1277,8 @@ INSPECT.stepTarget = function(targetId, targetTile)
         end
         -- the step re-centres the camera, blocking the selector until the scroll ends
         if not awaitControllerState("target_selection", 120) then
-            return false, "the selector never settled after stepping toward "
-                .. Controller.targetNotOffered(targetId, targetTile, observeController().target)
+            return false, "the selector never settled after a step ("
+                .. Controller.targetNotOffered(targetId, targetTile, observeController().target) .. ")"
         end
     end
     if wanted(observeController().target) then return true end

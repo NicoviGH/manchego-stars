@@ -1025,7 +1025,7 @@ tail(nil, false, "no observation is no end")
 
 
 -- Controller.targetNotOffered: what a failed target step tells the crash record (#654)
-check(C.targetNotOffered(nil, { x = 5, y = 5 }, { x = 6, y = 4, uid = 0 }), 
+check(C.targetNotOffered(nil, { x = 5, y = 5 }, { x = 6, y = 4, uid = 0 }),
     "the selector never offered the tile (5,5); it stands on (6,4) uid 0x00", "a tile wanted: its coordinates")
 check(C.targetNotOffered(0x42, nil, { x = 3, y = 2, uid = 0x41 }),
     "the selector never offered unit 0x42; it stands on (3,2) uid 0x41", "a unit wanted: its index byte")
