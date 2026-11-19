@@ -42,7 +42,8 @@ end
 -- is level 10 or more, as the game's own check needs).
 local function fakeGame(o)
     local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, used = {}, calls = {},
-                plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0, dice = {} }
+                plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0, dice = {},
+                kept = 0, restored = {} }
     g.api = {
         Bot = Bot, Json = Json,
         info = { game = o.game or "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1",
@@ -71,6 +72,16 @@ local function fakeGame(o)
             return true
         end,
         load = function() g.loads = g.loads + 1; return true end,
+        -- a won attempt's end state, named chapter/attempt; restore records the name
+        keep = function()
+            g.kept = g.kept + 1
+            return o.chapters[g.at].id .. "/" .. g.attempt
+        end,
+        restore = function(st)
+            g.restored[#g.restored + 1] = st
+            if o.restoreFails then return nil, "the restored state reads turn 12" end
+            return true
+        end,
         roster = roster,
         cap = function() return o.cap end,
         teamGroups = function()
@@ -331,47 +342,85 @@ local function test_infeasible_after_max_attempts()
 end
 test_infeasible_after_max_attempts()
 
--- the scout lap (api.scout, #510 comment 6872554917): a vanilla chapter with no clean clear is
--- carried on past from its first win with no player unit lost, and from M.SCOUT_PATIENCE on,
--- from any win; the chapter line says scouted, every line says scout, and the dead are not
--- carried
-local function test_the_scout_lap_carries_on_past_an_unclean_chapter()
+-- the scout lap (api.scout, ADR 0409 as #664 amends it): a chapter keeps every attempt for a
+-- clean clear; a win that is not clean is kept (api.keep) and carried on from only at the cap.
+-- Today's rule (the first win with no unit lost) would have carried on from attempt 1 here
+local function test_the_scout_lap_tries_every_attempt_for_a_clean_clear()
     local g = fakeGame({ game = "vanilla", chapters = {
-        { id = 5, outcomes = { "lost", "spoiled" } },
-        { id = 6, outcomes = { "dead", "dead", "lost", "dead" } }, { id = 7 } } })
+        { id = 5, outcomes = { "spoiled", "dead", "won" } }, { id = 6 } } })
     g.api.scout = true
-    local ok = Campaign.run(g.api)
+    check(Campaign.run(g.api), true, "scout: the lap reaches the game's end")
     local ls = lines(g)
-    check(ok, true, "scout: the lap reaches the game's end")
-    check(ls[1].outcome .. " " .. ls[1].attempts, "scouted 2",
-          "scout: a win with a recruit missed and no death is carried on from")
-    check(ls[2].outcome .. " " .. ls[2].attempts, "scouted 4",
-          "scout: a win with a death only from the patience on")
+    check(ls[1].outcome .. " " .. ls[1].attempts, "cleared 3",
+          "scout: a later clean clear is played for, not passed up for an unclean win")
+    check(#g.restored, 0, "scout: a clean clear carries on from itself, no kept win restored")
+    for _, l in ipairs(ls) do check(l.scout, true, "scout: every line says scout") end
+end
+test_the_scout_lap_tries_every_attempt_for_a_clean_clear()
+
+-- at the cap the lap carries on from the best win: the fewest player units lost, then the
+-- earliest; its state is restored, the line says which attempt, and the dead are not carried
+local function test_the_scout_lap_carries_on_from_the_best_win_at_the_cap()
+    local g = fakeGame({ game = "vanilla", chapters = {
+        { id = 5, outcomes = { "dead", "lost", "spoiled", "spoiled", "lost" } },
+        { id = 6, outcomes = { "lost", "dead", "lost", "dead", "lost" } }, { id = 7 } } })
+    g.api.scout, g.api.attempts = true, 5
+    check(Campaign.run(g.api), true, "scout, cap 5: the lap goes on")
+    local ls = lines(g)
+    check(ls[1].outcome .. " " .. ls[1].attempts .. " " .. ls[1].scouted_from, "scouted 5 3",
+          "scout: no unit lost beats a death, and the first such win is taken")
+    check(ls[1].deaths and #ls[1].deaths, 0, "scout: the line keeps that win's deaths (none)")
+    check(ls[1].missed.recruits[1], 0x30, "scout: and what that win missed")
+    check(ls[2].outcome .. " " .. ls[2].attempts .. " " .. ls[2].scouted_from, "scouted 5 2",
+          "scout: with a death in every win, the first win is taken")
     check(ls[2].deaths[1].charId, 0x02, "scout: the line keeps who died")
+    check(table.concat(g.restored, ","), "5/3,6/2", "scout: each chapter's kept win is restored")
     check(g.carriedSaved[7] and table.concat(g.carriedSaved[7], ","), "1,3,4",
           "scout: the dead are not carried")
     check(ls[3].outcome, "cleared", "scout: a clean chapter is still cleared")
-    for _, l in ipairs(ls) do check(l.scout, true, "scout: every line says scout") end
-    -- without the flag the same game stops at the first chapter, as before
+    -- with no win in the cap the lap still stops, and without the flag a win is never kept
+    local none = fakeGame({ game = "vanilla", chapters = {
+        { id = 5, outcomes = { "lost", "lost" } }, { id = 6 } } })
+    none.api.scout, none.api.attempts = true, 2
+    check(Campaign.run(none.api), false, "scout: no win in the cap stops the lap")
     local plain = fakeGame({ game = "vanilla", chapters = {
-        { id = 5, outcomes = { "lost", "spoiled", "lost", "lost", "lost", "lost", "lost",
-                               "lost", "lost", "lost", "lost", "lost" } }, { id = 6 } } })
+        { id = 5, outcomes = { "spoiled", "dead" } }, { id = 6 } } })
+    plain.api.attempts = 2
     check(Campaign.run(plain.api), false, "no scout: no clean clear stops the campaign")
     check(lines(plain)[1].scout, nil, "no scout: no line says scout")
+    check(plain.kept, 0, "no scout: no win's state is kept")
 end
-test_the_scout_lap_carries_on_past_an_unclean_chapter()
+test_the_scout_lap_carries_on_from_the_best_win_at_the_cap()
 
--- a cap lowered under the patience (`resume --scout --attempts 2`): the last attempt's win is
--- taken, death or not, rather than the lap stopping at the chapter it exists to pass
-local function test_the_scout_patience_never_outlasts_a_lowered_cap()
-    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = { "dead", "dead" } },
-                                                        { id = 6 } } })
-    g.api.scout, g.api.attempts = true, 2
-    check(Campaign.run(g.api), true, "scout, cap 2: the lap goes on")
-    check(lines(g)[1].outcome .. " " .. lines(g)[1].attempts, "scouted 2",
-          "scout, cap 2: a win with a death on the last attempt is taken")
+-- of two wins that lost as many units, the one that missed fewer recruits and rewards is kept;
+-- a kept state the harness cannot put back stops the lap as a crash (a harness fault)
+local function test_the_scout_lap_breaks_a_tie_on_misses_and_a_failed_restore_crashes()
+    local g = fakeGame({ game = "vanilla", chapters = {
+        { id = 5, outcomes = { "spoiled", "lost", "won" } }, { id = 6 } } })
+    -- attempt 3: won, not clean (a green died), nothing missed and no player unit lost
+    local play = g.api.play
+    g.api.play = function(...)
+        local r = play(...)
+        if g.attempt == 3 then
+            r.clean = false
+            r.deaths = { { id = 9, charId = 0x50, faction = "green", turn = 2 } }
+            r.clear = { won = true, lost = r.deaths, recruits_missing = {}, rewards_missing = {} }
+        end
+        return r
+    end
+    g.api.scout, g.api.attempts = true, 3
+    check(Campaign.run(g.api), true, "scout, tie: the lap goes on")
+    check(lines(g)[1].scouted_from, 3, "scout: the win that missed nothing beats the earlier one")
+    local bad = fakeGame({ game = "vanilla", restoreFails = true, chapters = {
+        { id = 5, outcomes = { "dead", "lost" } }, { id = 6 } } })
+    bad.api.scout, bad.api.attempts = true, 2
+    local ok, why = Campaign.run(bad.api)
+    check(ok, false, "scout: a kept state that does not read back stops the lap")
+    check(lines(bad)[1].outcome, "crashed", "scout: as a crash, the harness failing")
+    check(why:find("restore: the restored state reads turn 12", 1, true) ~= nil, true,
+          "scout: with the harness's reason")
 end
-test_the_scout_patience_never_outlasts_a_lowered_cap()
+test_the_scout_lap_breaks_a_tie_on_misses_and_a_failed_restore_crashes()
 
 -- test_a_won_attempt_that_spoiled_a_part_is_retried: attempt 1 is won with a recruit missed,
 -- attempt 2 is clean; the failure keeps what spoiled it and the attempt's trace.

@@ -53,8 +53,9 @@
 --   capped      api.attempts is below MAX_ATTEMPTS and a chapter used them without a clean clear:
 --               the run was cut short on purpose, so it says nothing of the chapter or the bot
 --               (never infeasible or bot_fault)
---   (api.scout, the scout lap: a chapter with no clean clear is passed from a win, its chapter
---   line `scouted`, and every line carries `scout = true`; a chapter with no win still stops it)
+--   (api.scout, the scout lap: a chapter with no clean clear in its attempts is passed from its
+--   best win, its chapter line `scouted` with `scouted_from` = that attempt, and every line
+--   carries `scout = true`; a chapter with no win still stops it)
 --   timeout     an attempt's decision ran past its frame budget (botrun's outcome,
 --               M.DECISION_FRAMES): the bot failing to decide. Never retried: the next
 --               attempt meets the same board and would spend the same budget
@@ -114,7 +115,10 @@
 --   attempts              OPTIONAL: an integer in 1..MAX_ATTEMPTS bounding a chapter's attempts
 --                         in place of MAX_ATTEMPTS (montecarlo.py `resume --attempts`)
 --   scout                 OPTIONAL: true for the scout lap (montecarlo.py `resume --scout`,
---                         M.SCOUT_PATIENCE, ADR 0409)
+--                         ADR 0409 as #664 amends it)
+--   keep()                the game's state now (the end of a won attempt), held in memory: a
+--                         token for restore; the scout lap only
+--   restore(token)        put that state back, to carry on from it; true | nil, why
 --   advanceDice(n)        advance the game's RNG n draws (Sight.advance) and return how many
 --                         were advanced: the count the record keeps as `dice_advanced`
 --   startOnly             OPTIONAL: a chapter index; the campaign stops once that chapter's start
@@ -135,13 +139,25 @@ M.PREFIX = "CAMPAIGN "
 -- restarts, so styles are drawn again once every one has been tried (each retry has its own
 -- dice, ADR 0404)
 M.MAX_ATTEMPTS = 12
--- The scout lap (api.scout, montecarlo.py `resume --scout`; #510 comment 6872554917): a
+-- The scout lap (api.scout, montecarlo.py `resume --scout`; ADR 0409 as #664 amends it): a
 -- campaign that carries on past a chapter it cannot clear clean, so the walls after it can be
--- seen at all. It takes the first win with no player unit lost, and from this attempt on the
--- first win of any kind. Its chapter lines say `scouted`, never `cleared`: a scout lap finds
--- harness faults and missing abilities; it never says how hard a chapter is (its party is
--- smaller than a clean one's).
-M.SCOUT_PATIENCE = 4
+-- seen at all. A chapter still gets every attempt for a clean clear (a clean clear on a later
+-- attempt is a clean clear: Nicolas, 2026-11-19); each win that is not clean is kept (api.keep,
+-- only the best so far), and at the cap the lap carries on from it (scoutBetter). Its chapter
+-- line's `attempts` is then the cap (every attempt was played) and `scouted_from` the attempt
+-- carried on from; `failures` lists every attempt that was not a clean clear, that one too.
+-- Its chapter lines say `scouted`, never `cleared`: a scout lap finds harness faults and
+-- missing abilities; it never says how hard a chapter is (its party is smaller than a clean
+-- one's).
+-- The better of two unclean wins: the fewer player units lost (the party the lap carries on
+-- with), then the fewer recruits and rewards missed (what the later chapters lose for good).
+-- Strict on both, so of two equal wins the earlier stays kept and no state is saved for nothing.
+-- `win` and `kept` are { dead = count, missed = count }; kept is nil before any win
+function M.scoutBetter(win, kept)
+    if kept == nil then return true end
+    if win.dead ~= kept.dead then return win.dead < kept.dead end
+    return win.missed < kept.missed
+end
 
 -- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE.
 -- Measured: run call1b (stride 1), campaign 4001 attempt 2 started one draw ahead, drew 59 in
@@ -441,6 +457,8 @@ function M.run(api)
             end
             entry.demands = need and need.demands or nil
             local tried, remembered, known = {}, {}, {}
+            -- the scout lap's best unclean win so far (M.scoutBetter): its state, record, team
+            local kept
             local attemptCap = api.attempts or M.MAX_ATTEMPTS
             -- a retry's memory of the enemy (ADR 0399): style.memory
             local memory, memoryKeys = { enemies = {} }, {}
@@ -462,6 +480,16 @@ function M.run(api)
                 local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
                 if style then style.sealAt = info.sealAt or 10 end
                 return style, followed
+            end
+            -- the chapter is passed with an attempt's team: its fielded units, less its dead,
+            -- are carried into the next chapter's pick
+            local function carryOn(outcome, r, t, dead)
+                entry.outcome, entry.turns = outcome, r.turns
+                entry.team = teamLine(t)
+                carried = {}
+                for _, charId in ipairs(t.deploy) do
+                    if not dead[charId] then carried[charId] = true end
+                end
             end
             while true do
                 local style, followed = draw()
@@ -529,30 +557,22 @@ function M.run(api)
                         entry.attempts, tostring(rec.outcome))
                 end
                 if rec.clean == true then
-                    entry.outcome, entry.turns = "cleared", rec.turns
-                    entry.team = teamLine(team)
-                    carried = {}
-                    for _, charId in ipairs(team.deploy) do carried[charId] = true end
+                    carryOn("cleared", rec, team, {})
                     break
                 end
-                -- the scout lap carries on from a win that was not clean (M.SCOUT_PATIENCE)
-                local lost = {}
+                -- the scout lap keeps a win that was not clean, to carry on from at the cap
+                local deadSet, nDead = {}, 0
                 for _, d in ipairs(rec.deaths or {}) do
-                    if d.faction == "blue" then lost[d.charId] = true end
-                end
-                -- the patience never outlasts a lowered cap (`resume --scout --attempts 2`)
-                if api.scout and rec.outcome == "won" and (next(lost) == nil
-                        or entry.attempts >= math.min(M.SCOUT_PATIENCE, attemptCap)) then
-                    entry.outcome, entry.turns = "scouted", rec.turns
-                    entry.deaths = rec.deaths
-                    entry.missed = rec.clear and { recruits = rec.clear.recruits_missing,
-                                                   rewards = rec.clear.rewards_missing }
-                    entry.team = teamLine(team)
-                    carried = {}
-                    for _, charId in ipairs(team.deploy) do
-                        if not lost[charId] then carried[charId] = true end
+                    if d.faction == "blue" and not deadSet[d.charId] then
+                        deadSet[d.charId], nDead = true, nDead + 1
                     end
-                    break
+                end
+                local missed = rec.clear and (#(rec.clear.recruits_missing or {})
+                                              + #(rec.clear.rewards_missing or {})) or 0
+                local win = { dead = nDead, missed = missed }
+                if api.scout and rec.outcome == "won" and M.scoutBetter(win, kept) then
+                    kept = { state = api.keep(), attempt = entry.attempts, dead = nDead,
+                             missed = missed, deadSet = deadSet, rec = rec, team = team }
                 end
                 entry.failures[#entry.failures + 1] = { attempt = entry.attempts, style = style,
                     team = team.deploy, outcome = rec.outcome, deaths = rec.deaths,
@@ -579,7 +599,25 @@ function M.run(api)
                 for _, e in ipairs(rec.enemies_seen or {}) do
                     rememberEnemy(e.id, e.charId, e.classId)
                 end
-                if entry.attempts >= attemptCap then return noClean(entry) end
+                if entry.attempts >= attemptCap then
+                    if not kept then return noClean(entry) end
+                    -- a state that does not read back as kept is the harness failing (the
+                    -- emulator's load), never the bot: a crash, as a failed api.load is
+                    local rok, rwhy = api.restore(kept.state)
+                    if not rok then
+                        entry.outcome = "crashed"
+                        line(entry)
+                        return "crashed", "restore: " .. tostring(rwhy)
+                    end
+                    local r = kept.rec
+                    carryOn("scouted", r, kept.team, kept.deadSet)
+                    entry.scouted_from = kept.attempt
+                    entry.deaths = r.deaths
+                    entry.missed = r.clear and { recruits = r.clear.recruits_missing,
+                                                 rewards = r.clear.rewards_missing }
+                    kept = nil   -- the state buffer and the trace are not held into the next chapter
+                    break
+                end
                 local lok, lwhy = api.load(ch)
                 if not lok then
                     entry.outcome = "crashed"
