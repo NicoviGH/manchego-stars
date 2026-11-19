@@ -28,7 +28,8 @@ and start a fresh instance; don't rely on auto-compaction.
   - `review/639-laps/` holds the logs, the saved chapter lines and `partial-verdict.txt`.
   - `review/639-strength/` holds the party-strength scripts.
   - The records are in `references/sim/vanilla/c25b145e3745/resume-runs.jsonl`, under tags `t639`, `r639b`, `e639`, `es639`, `is639`, `s20` and `k10`.
-- **#665, fix before any lap:** `PT_MAX_WALL_S=7200` cuts a whole campaign run at 2 hours, and `resume` reports nothing. 19 of the 20 overnight L10 campaigns were cut, not walled, at E_15 / I_14.
+- **#665, fix before any lap: PR #666 is ready and waits on Nicolas's "merge"** (reviewed twice, every finding fixed; ADR 0428). The 2-hour `PT_MAX_WALL_S` cut 19 of the 20 overnight L10 campaigns (and the 8 05:49 forks) mid-chapter, not walled, and `resume` reported nothing. Earlier laps were never cut (#665 comment).
+- **Playtest data piles up:** worker logs (a full emulator log copy per run) and `/tmp/playtest-*` run dirs are never pruned; 2026-11-19 they had filled the disk (11.5 GB of unreferenced logs, 3.3 GB of run dirs, deleted). A retention rule is owed before the next lap.
 
 **2026-11-18, late. In flight then: #639, "is the bot's party strong enough past Ch8? Vanilla band to Ch20, and promote at L10 or L20."** Read #639's plan comment (6992662334) and its progress comment (6998840930) first; they hold everything below in full.
 
