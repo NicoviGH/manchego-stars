@@ -2544,7 +2544,7 @@ do
     check(turns(20, { A, E }, {}), nil, "wall cost: a wall no one can hurt is no way")
     -- C two steps off at (3,1), on no tile its weapon reaches the wall from: a striker only
     -- once a plan stands it there (Nicolas, 2026-11-18); counted from its walk, the wall fell
-    -- on turn 1 and no strike was ever worth making (Ch8's)
+    -- on turn 1 and no strike was ever worth making (vanilla Ch8's)
     check(near(turns(20, { A, blue(0x02, 1, 3, 1), E }, { [0x01] = 5, [0x02] = 20 }), 4.4), true,
           "wall cost: a striker that could come but stands off is not counted")
 end
@@ -2609,7 +2609,7 @@ end
 -- at (3,1), stands on no tile it strikes the wall from. Open, the wall would be 0.8 turns, so C,
 -- who can reach (2,1) beside it, is offered the strike, and the board it leaves takes A's way
 -- to 0.8. Fails where a strike was offered only on the cheapest way, priced with no striker at
--- the wall: no one ever came (Ch8's wall, the thief's door round the cheaper way).
+-- the wall: no one ever came (vanilla Ch8's wall, the thief's door round the cheaper way).
 do
     local A = blue(0x01, 0, 0, 0)
     local C = blue(0x02, 1, 3, 1)
@@ -2655,6 +2655,71 @@ do
     local stays, led = read(2, 1, { [0x02] = { x = 2, y = 5, acted = true } })
     check(near(stays, 1.4) and near(led, 4.4), true,
           "wall plan: a striker the plan leads away costs the way its blows")
+    -- the judged enemy phase kills C there (positions' alive 0): its blows count for nothing
+    -- (#659 review: a plan leaving a striker to die at the wall read the wall as falling)
+    local _, dies = read(2, 5, { [0x02] = { x = 2, y = 1, acted = true, alive = 0 } })
+    check(near(dies, 4.4), true, "wall plan: a striker the plan leaves to die at the wall does not break it")
+end
+
+-- #659 review. (1) A two-tile wall's tiles share their trap's HP (sight.obstacles' `trap`): a
+-- strike on the trap's tile is read through the other tile too, and its strike act carries
+-- that key (`at`) for the planner's st.walls. (2) A striker whose first side tile's forecast
+-- takes nothing is tried from the next: here C's blow from (3,0) is 0 and from (1,0) is 20.
+-- (3) With no forecast of a blow, no strike is offered to a unit whose own way it is not.
+-- (4) A read on a plan's board that errors leaves no plan state behind.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local goal = { x = 4, y = 0 }
+    -- (1): the way's tile (2,0) belongs to the trap at (2,9)
+    local C = blue(0x02, 1, 3, 0)
+    local reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 3, 0 }) }
+    local s = wallSight(BOSS_SIDE, 20, { [0x01] = 5, [0x02] = 20 }, reach)
+    s.obstacles = function() return { { x = 2, y = 0, hp = 20, trap = "2,9" } } end
+    local cands, ctx = B.candidates(boardOf(A, C, E), s, style("careful"))
+    check(near(ctx.turnsOn({ ["2,9"] = 0 })(A, goal), 0.8), true,
+          "two-tile wall: a strike on its trap's tile opens the other tile's way")
+    local at
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
+            if a.obstacle then at = a.obstacle.at end
+        end
+    end
+    check(at, "2,9", "two-tile wall: the strike carries its trap's key")
+    -- (2)
+    C = blue(0x02, 1, 2, 1)
+    s = wallSight(BOSS_SIDE, 20, {})
+    s.strikeWall = function(u, o, x, y)
+        if u.id == 0x01 then return { dealt = 5 } end
+        return { dealt = (x == 3 and y == 0) and 0 or 20 }
+    end
+    _, ctx = B.candidates(boardOf(A, C, E), s, style("careful"))
+    check(near(ctx.turnsTo(A, goal), 1.4), true,
+          "wall blow: a side whose forecast takes nothing is not the striker's last try")
+    -- (3)
+    C = blue(0x02, 1, 3, 1)
+    local field = { ["3,1"] = 2 }
+    for k, v in pairs(LONG_WAY) do field[k] = field[k] or v end
+    s = wallSight(field, 20, {}, { [0x01] = tiles({ 0, 0 }, { 0, 1 }), [0x02] = tiles({ 3, 1 }, { 2, 1 }) })
+    s.strikeWall = nil
+    cands = B.candidates(boardOf(A, C, E), s, style("careful"))
+    local offered = false
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
+            if a.obstacle then offered = true end
+        end
+    end
+    check(offered, false, "wall strike: none offered off the striker's own way with no forecast")
+    -- (4)
+    C = blue(0x02, 1, 2, 5)
+    s = wallSight(BOSS_SIDE, 20, { [0x01] = 5, [0x02] = 20 })
+    local turnsTo = s.turnsTo
+    _, ctx = B.candidates(boardOf(A, C, E), s, style("careful"))
+    s.turnsTo = function() error("boom") end
+    local ok = pcall(ctx.turnsOn({ ["2,0"] = 3 }), A, { x = 4, y = 1 })
+    s.turnsTo = turnsTo
+    check(not ok and ctx.wallSig == nil and ctx.wallHp == nil, true,
+          "plan read: an error leaves no plan's walls behind")
 end
 
 -- test_a_wall_strike_earns_only_the_turns_it_takes_off (#655, Nicolas 2026-11-18: no flat
@@ -2685,7 +2750,7 @@ end
 -- test_a_unit_waiting_on_the_wall_is_not_stuck (#655): A, sent to the chest at (4,0), waits
 -- beside the wall at (2,0) with no tile nearer. Its own 5-damage blow on the 20-HP wall
 -- shortens its way this turn, so the goal is not recorded as blocked (main recorded it either
--- way: Ch8's thief waiting at the wall lost its chests to this rule). A unit that cannot hurt
+-- way: vanilla Ch8's thief waiting at the wall lost its chests to this rule). A unit that cannot hurt
 -- the wall, with the one striker (C, 20 a blow) beside it already acted, has no strike to wait
 -- on this turn: its goal is recorded, to be tested again next turn, when C can strike.
 do

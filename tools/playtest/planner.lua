@@ -480,7 +480,10 @@ local function score(act, st, W, style, odds)
     elseif act.obstacle and act.obstacle.blow then
         -- a wall takes what the game's forecast of the strike deals (sight.strikeWall); one
         -- the plan has already broken is no act -- a second strike planned on it was a crash
-        local at = act.obstacle.x .. "," .. act.obstacle.y
+        -- its HP is its trap's (`at`, bot.lua wallKey: a two-tile wall's tiles share one; the
+        -- tile struck on an act built without one), and its fall opens the tile struck
+        local tile = act.obstacle.x .. "," .. act.obstacle.y
+        local at = act.obstacle.at or tile
         local hp = st.walls[at] or act.obstacle.hp
         -- no flat `breach` worth (#655, Nicolas 2026-11-18): the HP it takes off is worth the
         -- turns it takes off every way through the wall (the goals' read, turnsOn); a flat
@@ -491,7 +494,7 @@ local function score(act, st, W, style, odds)
         -- (the forecast was played at its own: sight.strikeWall's wearAt)
         fx.wear = { slot = act.obstacle.blow.wearSlot, uses = M.wearAt(act.obstacle.blow.wearAt, hp) }
         fx.blocked = hp <= 0
-        if fx.wall.hp <= 0 then fx.opened = at end
+        if fx.wall.hp <= 0 then fx.opened = tile end
     elseif act.act == "supply" then
         -- the convoy's door key taken when no one fielded can open the door on the way
         -- (bot.lua supplyKey): the act that opens the way, as a door's opening or a wall's
@@ -500,9 +503,10 @@ local function score(act, st, W, style, odds)
         fx.took = "convoy:" .. act.item .. "x" .. act.uses
         fx.blocked = st.took[fx.took] == true
     elseif act.obstacle or act.act == "door" then
-        -- a wall strike with no forecast earns nothing flat either (above); a door keeps
-        -- `breach` (#658)
-        if act.act == "door" then v = v + W.breach end
+        -- a door keeps `breach` (#658). So does a wall strike with no forecast of its blow: the
+        -- goals then cost the wall by the walk alone (bot.lua strikersOf), so the turns can
+        -- never price it, and only the unit whose own way it is was offered it (breach)
+        v = v + W.breach
         if act.door then fx.opened = act.door.x .. "," .. act.door.y end
     elseif act.act == "seize" then
         fx.win = 1   -- the win, scored as the boss's death is (goalTerm)

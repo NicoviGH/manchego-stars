@@ -535,7 +535,7 @@ end
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
-    local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
+    local ctx = { sight = sight, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
                   talkTiles = {}, openers = {}, rescueTiles = {}, carried = {} }
@@ -1184,31 +1184,35 @@ end
 -- A wall's HP as this read sees it: the plan's (ctx.wallHp, set by ctx.turnsTo from the
 -- planner's st.walls) or the board's (sight.obstacles). Every strike lowers it, so every way
 -- through the wall reads shorter after one (#655).
+-- The key of a wall's HP: its trap's tile (sight.obstacles' `trap`), which a two-tile wall's
+-- tiles share, so a strike on either takes HP off both; its own tile where the sight gives none.
+local function wallKey(o) return o.trap or tileKey(o.x, o.y) end
+
 local function wallHp(ctx, o)
-    local hp = ctx.wallHp and ctx.wallHp[tileKey(o.x, o.y)]
+    local hp = ctx.wallHp and ctx.wallHp[wallKey(o)]
     return hp or o.hp
 end
 
--- What one strike of `m` takes off the wall `o`, the game's forecast (sight.strikeWall) from a
--- tile its weapon reaches the wall from (the four beside it, then two away for a bow); nil
--- when it holds no weapon that reaches or its blow takes nothing.
+-- What one strike of `m` takes off the wall `o`, the game's forecast (sight.strikeWall) from the
+-- first tile on the map its weapon reaches the wall from and its blow takes something there
+-- (the four beside it, then two away for a bow); nil when there is none.
 local WALL_SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 2, 0 }, { -2, 0 }, { 0, 2 }, { 0, -2 } }
 local function wallBlow(ctx, m, o)
     local weapons = ctx.sight.weapons(m)
     for _, d in ipairs(WALL_SIDES) do
         local x, y = o.x + d[1], o.y + d[2]
-        local w = x >= 0 and y >= 0 and Board.weaponFor(weapons, x, y, o.x, o.y)
-        if w then
-            local blow = ctx.sight.strikeWall(m, o, x, y, w.slot)
-            return blow and blow.dealt > 0 and blow.dealt or nil
-        end
+        local map = ctx.map or { w = math.huge, h = math.huge }
+        local w = Board.inMap(x, y, map.w, map.h) and Board.weaponFor(weapons, x, y, o.x, o.y)
+        local blow = w and ctx.sight.strikeWall(m, o, x, y, w.slot)
+        if blow and blow.dealt > 0 then return blow.dealt end
     end
     return nil
 end
 
 -- The units that can break the wall `o` (#655): each living blue whose blow takes something
--- off it (wallBlow), with that blow. Read once a decision; nil with no forecast of a blow (a
--- sight with no strikeWall): the wall is then costed by the walk alone.
+-- off it (wallBlow), with that blow and its weapons (every plan's read asks them). Read once
+-- a decision; nil with no forecast of a blow (a sight with no strikeWall): the wall is then
+-- costed by the walk alone.
 local function strikersOf(ctx, o)
     local s = ctx.sight
     if not (s.strikeWall and s.weapons) then return nil end
@@ -1218,29 +1222,31 @@ local function strikersOf(ctx, o)
     local out = {}
     for _, m in ipairs(ctx.blues or {}) do
         local dmg = not m.dead and wallBlow(ctx, m, o)
-        if dmg then out[#out + 1] = { unit = m, dmg = dmg } end
+        if dmg then out[#out + 1] = { unit = m, dmg = dmg, weapons = ctx.sight.weapons(m) } end
     end
     ctx.strikers[k] = out
     return out
 end
 
--- The turn a striker `m` (strikersOf) first strikes the wall `o` on this read: only where the
--- read stands it (`p`, default the plan's tile, ctx.wallPos, else the board's) on a tile its
+-- The turn a striker `m` (a strikersOf entry) first strikes the wall `o` on this read: only
+-- where the read stands it (`p`, default the plan's tile, ctx.wallPos, else the board's) on a tile its
 -- weapon reaches the wall from: this turn, or the next once it has acted. nil anywhere else
 -- (Nicolas, 2026-11-18): counted from its walk there, every unit that could reach the wall was
--- a striker, so Ch8's wall always fell on turn 2 while the army marched past it to the throne,
--- and no strike was ever worth making (#655). A striker the plan brings to the wall is counted;
--- one that only could come is not.
+-- a striker, so vanilla Ch8's wall always fell on turn 2 while the army marched past it to the
+-- throne, and no strike was ever worth making (#655). A striker the plan brings to the wall is
+-- counted; one that only could come is not. Second: its chance to be alive to strike (`alive`,
+-- the planner's positions after the judged enemy phase; 1 on the board), which its blows are
+-- counted at: a striker the plan leaves to die at the wall does not break it.
 local function firstStrike(ctx, m, o, p)
-    p = p or ctx.wallPos and ctx.wallPos[m.id] or m
-    if not Board.weaponFor(ctx.sight.weapons(m), p.x, p.y, o.x, o.y) then return nil end
-    return p.acted and 2 or 1
+    p = p or ctx.wallPos and ctx.wallPos[m.unit.id] or m.unit
+    if not Board.weaponFor(m.weapons, p.x, p.y, o.x, o.y) then return nil end
+    return p.acted and 2 or 1, p.alive or 1
 end
 
 -- The turn the wall `o` falls on this read (#655): every striker (strikersOf) the read stands
--- at the wall strikes once a turn from its first (firstStrike), `u` from its arrival `n` on
--- this read; the wall falls on the
--- first turn the blows summed by then reach its HP (wallHp). `late` 1 reads from a tile `u`
+-- at the wall strikes once a turn from its first (firstStrike), its blow counted at its chance
+-- to be alive, `u` from its arrival `n` on this read; the wall falls on the first turn the
+-- blows summed by then reach its HP (wallHp). `late` 1 reads from a tile `u`
 -- has already acted from: the read's turns start next turn. -> priced, turn: priced false with
 -- no forecast (strikersOf nil); turn nil when no one can break it, else in the read's turns (0
 -- for a wall the plan has broken).
@@ -1251,13 +1257,15 @@ local function fallTurn(ctx, o, u, n, late)
     if hp <= 0 then return true, 0 end
     local starts = {}
     for _, m in ipairs(list) do
-        local first
+        -- u's own chance to live is the goals' (Goals.chance's `alive`), not counted again here
+        local first, alive = nil, 1
         if m.unit.id == u.id then
             first = math.max(1, math.ceil(n - Goals.DUST)) + late
         else
-            first = firstStrike(ctx, m.unit, o)
+            first, alive = firstStrike(ctx, m, o)
         end
-        if first then starts[#starts + 1] = { first = first, dmg = m.dmg } end
+        local dmg = m.dmg * (alive or 0)
+        if first and dmg > 0 then starts[#starts + 1] = { first = first, dmg = dmg } end
     end
     if #starts == 0 then return true, nil end
     table.sort(starts, function(a, b) return a.first < b.first end)
@@ -1483,7 +1491,7 @@ local function openAct(ctx, u, b, gate)
             end
             local a = action(u, t, "attack", nil, can.slot)
             -- its HP and the strike's blow (the game's forecast): the planner tracks the wall
-            a.obstacle = { x = b.x, y = b.y, hp = b.hp, blow = ctx.sight.strikeWall
+            a.obstacle = { x = b.x, y = b.y, hp = b.hp, at = wallKey(b), blow = ctx.sight.strikeWall
                            and ctx.sight.strikeWall(u, b, t.x, t.y, can.slot) }
             return a
         end
@@ -1507,8 +1515,8 @@ end
 -- steps on to the goal's ground, stepsOnto). A strike on one is offered to every unit that can
 -- hurt it (proposeOne), not only to the unit whose way it is: the strike lowers the wall's HP,
 -- and the goals' turns through it (fallTurn) are how the judge prices it. The cheapest way
--- alone never named Ch8's wall: priced with no striker at it, the thief's 9 a blow made the
--- door round the cheaper way, and with no strike offered no striker ever came.
+-- alone never named vanilla Ch8's wall: priced with no striker at it, the thief's 9 a blow
+-- made the door round the cheaper way, and with no strike offered no striker ever came.
 local function wallsOnWays(ctx, objective)
     if ctx.wallWays then return ctx.wallWays end
     local out, seen, s = {}, {}, ctx.sight
@@ -1533,13 +1541,15 @@ local function wallsOnWays(ctx, objective)
     return out
 end
 
--- `u`'s strikes on the walls on the army's ways (wallsOnWays) that its blow hurts (wallBlow,
--- the game's forecast; any blow where the sight has none).
+-- `u`'s strikes on the walls on the army's ways (wallsOnWays) that its blow hurts: it is one
+-- of the wall's strikers (strikersOf, the game's forecast read once a decision). None where
+-- the sight forecasts no blow: such a strike is worth no turns to anyone (a wall is then
+-- costed by the walk), so only the unit whose own way it is strikes it (breach).
 local function wallStrikes(ctx, u, gate, objective)
     local out = {}
     for _, w in ipairs(wallsOnWays(ctx, objective)) do
-        if not ctx.sight.strikeWall or wallBlow(ctx, u, w) then
-            local a = openAct(ctx, u, w, gate)
+        for _, m in ipairs(strikersOf(ctx, w) or {}) do
+            local a = m.unit.id == u.id and openAct(ctx, u, w, gate)
             if a then out[#out + 1] = a end
         end
     end
@@ -1671,6 +1681,9 @@ end
 
 -- The march from `u` to `t` by the game's field from `t`, or the way through an obstacle where
 -- that is shorter (breachFor), counted as turnsFor counts it (movesFor); nil = no way at all.
+-- Both are movement cost: the field's is the march's cost grid, movesFor's is u's own grid
+-- (sight.turnsTo is cost / MOV), so units are ranked on one count. A wall's wait is in the
+-- second because that march is that long: running ahead of the wall's fall gains nothing.
 local function marchLength(ctx, u, t)
     if breachFor(ctx, u, t) then return movesFor(ctx, u, t) end
     return walkFrom(ctx, t, u.x, u.y)
@@ -2625,9 +2638,13 @@ turnsOn = function(ctx, walls, pos)
     for _, o in ipairs(pos and ctx.sight.obstacles and ctx.sight.obstacles() or {}) do
         for _, m in ipairs(isWall(o) and strikersOf(ctx, o) or {}) do
             local p = pos[m.unit.id]
-            local f = p and firstStrike(ctx, m.unit, o, p)
-            if p and f ~= firstStrike(ctx, m.unit, o, m.unit) then
+            local f, alive = nil, nil
+            if p then f, alive = firstStrike(ctx, m, o, p) end
+            -- the board's own, kept on the entry: every plan's read compares with it
+            if m.board == nil then m.board = { firstStrike(ctx, m, o, m.unit) } end
+            if p and (f ~= m.board[1] or alive ~= m.board[2]) then
                 keys[#keys + 1] = m.unit.id .. ">" .. tileKey(o.x, o.y) .. "=" .. tostring(f)
+                    .. "@" .. tostring(alive)
             end
         end
     end
@@ -2636,8 +2653,11 @@ turnsOn = function(ctx, walls, pos)
     local sig = table.concat(keys, ";")
     return function(u, tile, from)
         ctx.wallHp, ctx.wallPos, ctx.wallSig = walls, pos, sig
-        local n = turnsFor(ctx, u, tile, from)
+        -- cleared whatever happens: an error left inside it would key every later read as this
+        -- plan's board
+        local ok, n = pcall(turnsFor, ctx, u, tile, from)
         ctx.wallHp, ctx.wallPos, ctx.wallSig = nil, nil, nil
+        if not ok then error(n, 0) end
         return n
     end
 end
@@ -2646,8 +2666,8 @@ end
 -- through a wall is passed when the wall falls (fallTurn), so a unit waiting on the fall has
 -- no step nearer of its own, and is held only while some unit able to act (u too) can strike
 -- that wall this turn and the strike shortens u's way: for each striker (strikersOf) of each
--- wall on the way (chainTo), the first tile it may end on that its weapon reaches the wall
--- from, and the read (turnsOn) with its blow taken off and it standing there, against `now`,
+-- wall on the way (chainTo), each tile it may end on that its weapon reaches the wall from,
+-- and the read (turnsOn) with its blow taken off and it standing there, against `now`,
 -- u's turns on the board as it stands. No one able to strike it this turn, the goal is barred
 -- like any other: a wall's fall is never assumed.
 strikersNear = function(ctx, u, g, now)
@@ -2660,11 +2680,10 @@ strikersNear = function(ctx, u, g, now)
                 for _, t in ipairs(endTiles(ctx, a)) do
                     if Board.weaponFor(weapons, t.x, t.y, w.x, w.y) then
                         local p = { x = t.x, y = t.y, acted = true }
-                        local read = turnsOn(ctx, { [tileKey(w.x, w.y)] = math.max(0, hp - m.dmg) },
+                        local read = turnsOn(ctx, { [wallKey(w)] = math.max(0, hp - m.dmg) },
                                              { [a.id] = p })
                         local n = read(u, g, a.id == u.id and p or nil)
                         if n and n < now - Goals.DUST then return true end
-                        break
                     end
                 end
             end
@@ -2678,9 +2697,9 @@ end
 -- tile no player unit ends on), it may end beside it, where a Talk is made. A unit with no tile
 -- but its own is boxed in, and counts as able: no other goal would get it anywhere either. The
 -- turns are the terrain's alone, so what stops a unit with moves is a unit in its way. A unit
--- whose way waits on a wall's fall is able while a plan can bring that fall sooner
--- (strikersNear, #655): Ch8's thief, waiting at the wall, read as stuck and its chests were
--- dropped.
+-- whose way waits on a wall's fall is able while a strike on it can come this turn
+-- (strikersNear, #655): vanilla Ch8's thief, waiting at the wall, read as stuck and its chests
+-- were dropped.
 local function stepsToward(ctx, u, g)
     local now = ctx.turnsTo(u, g)
     if now and now <= Goals.DUST then return true end

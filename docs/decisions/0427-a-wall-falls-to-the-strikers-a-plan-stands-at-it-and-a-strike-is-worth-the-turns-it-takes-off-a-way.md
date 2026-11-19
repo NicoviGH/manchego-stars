@@ -27,7 +27,10 @@ Three faults were measured:
    from its arrival. It also counts each striker the read stands on a tile its weapon reaches
    the wall from (`firstStrike`): it strikes this turn, or next turn once it has acted. Each
    striker deals the game's own forecast (`sight.strikeWall`) once a turn against the wall's
-   current HP. A wall no one at it can hurt is no way. The planner's read moves with the plan
+   current HP, counted at its chance to be alive after the judged enemy phase (the planner's
+   positions): a striker the plan leaves to die at the wall does not break it. A two-tile
+   wall's tiles share their trap's HP (`sight.obstacles`' `trap`, `wallKey`), so a strike on
+   either is read through both. A wall no one at it can hurt is no way. The planner's read moves with the plan
    (`turnsOn`): it uses the HP the plan leaves the wall (`st.walls`) and stands each striker
    where the plan puts it.
    - **Rejected: every striker that could walk to the wall** (the first build). With 8 to 11
@@ -46,7 +49,8 @@ Three faults were measured:
    striker came. The judge prices each strike like any act. There is no new weight.
 4. **No flat `breach` for a wall strike.** Its worth is the turns it takes off the ways through
    the wall. The flat 25 counted that twice. Doors and the convoy key keep `breach` for now
-   (#658).
+   (#658). So does a strike with no forecast of its blow: the wall is then costed by the walk,
+   so no turns price the strike, and it is offered only to the unit whose own way it is.
 5. **The stuck rule waits on a wall only while a strike can come.** A unit with no nearer tile
    is not stuck when a unit able to act (itself included) can strike a wall on its way this
    turn and shorten it (`strikersNear`). Otherwise the goal is recorded like any blocked goal,

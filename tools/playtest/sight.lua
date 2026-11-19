@@ -215,7 +215,8 @@
 --                            TryAddTrapsToTargetList (bmtarget.c) lists them from the trap pool:
 --                            a TRAP_OBSTACLE's damaged wall at its tile, or the tile below where
 --                            two are stacked (InitMapObstacles traps the top one only), or its
---                            snag. { x, y, hp } -- hp = the trap's `extra`.
+--                            snag. { x, y, hp, trap } -- hp = the trap's `extra`, trap = its
+--                            tile ("x,y"): a two-tile wall's tiles share it, and its HP.
 --   nextTurnEvent(turn)      the first later turn at which a turn event the game would fire is
 --                            not already firing now (SearchAvailableEvent over the chapter's
 --                            turnBasedEvents, the turn and phase set to each), or nil.
@@ -3412,11 +3413,14 @@ function M.new(outer)
                 if kind == M.TRAP_OBSTACLE then
                     local x, y, hp = mem.u8(t), mem.u8(t + 1), mem.u8(t + 3)
                     local here = s.terrain(x, y)
+                    -- `trap`: the one trap both tiles of a two-tile wall share, and so one HP
+                    -- (a strike on either takes it off both: bot.lua's wallKey)
+                    local trap = x .. "," .. y
                     if here == M.TERRAIN_WALL_DAMAGED or here == M.TERRAIN_SNAG then
-                        out[#out + 1] = { x = x, y = y, hp = hp }
+                        out[#out + 1] = { x = x, y = y, hp = hp, trap = trap }
                     end
                     if y + 1 < h and s.terrain(x, y + 1) == M.TERRAIN_WALL_DAMAGED then
-                        out[#out + 1] = { x = x, y = y + 1, hp = hp }
+                        out[#out + 1] = { x = x, y = y + 1, hp = hp, trap = trap }
                     end
                 end
             end
