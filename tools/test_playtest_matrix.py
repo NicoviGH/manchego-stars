@@ -16,6 +16,7 @@ Run:
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -1336,6 +1337,29 @@ class DriverSource(unittest.TestCase):
         self.assertTrue(used)
         self.assertEqual(used - set(mx.PLAYTEST_ENV_KEYS), set(),
                          'run.sh reads a PT_ knob the verdict key does not see')
+
+
+class WallNet(unittest.TestCase):
+    """run.sh's last-resort wall limit (#665): the flat 2 hours cut a campaign, declared
+    86400s of work, mid-chapter while it was still playing."""
+
+    def net(self, deadline, env_net=None):
+        with open(mx.RUN_SH) as fh:
+            fn = re.search(r'^wall_net\(\) \{.*?^\}', fh.read(), re.S | re.M).group(0)
+        env = {k: v for k, v in os.environ.items() if k != 'PT_MAX_WALL_S'}
+        if env_net is not None:
+            env['PT_MAX_WALL_S'] = env_net
+        out = subprocess.run(['bash', '-c', fn + '\nwall_net %d' % deadline], env=env,
+                             capture_output=True, text=True, check=True)
+        return int(out.stdout)
+
+    def test_a_scenario_that_declares_more_work_than_the_net_keeps_its_deadline(self):
+        self.assertEqual(self.net(86400), 86400)
+        self.assertEqual(self.net(86400, '7200'), 86400, 'unset and 7200 are one run')
+
+    def test_a_short_scenario_keeps_the_net(self):
+        self.assertEqual(self.net(600), int(mx.RUN_SH_DEFAULTS['PT_MAX_WALL_S']))
+        self.assertEqual(self.net(600, '9000'), 9000)
 
 
 class VerdictCacheStore(unittest.TestCase):

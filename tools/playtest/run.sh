@@ -279,6 +279,17 @@ ROMHASH=$(shasum "$ROM" | cut -c1-12)
 # FAIL classify as a pass (#308).
 verdict_passed() { case "$VERDICT" in *"RESULT: PASS"*) return 0 ;; *) return 1 ;; esac; }
 
+# wall_net <deadline_s>: the last-resort wall limit (PT_MAX_WALL_S, default 7200s), never under
+# the scenario's own declared work budget. The flat 2 hours cut a campaign -- declared 86400s,
+# "a whole game is hours" -- mid-chapter while it was still playing: 19 of #639's 20 overnight
+# laps (#665). A net is for a pathology OVERRUN and STALL miss, not for a run doing the work it
+# declared. Unset and an explicit 7200 still name the same run (matrix.py RUN_SH_DEFAULTS).
+wall_net() {
+    local net=${PT_MAX_WALL_S:-7200}
+    [ "$net" -ge "$1" ] || net=$1
+    echo "$net"
+}
+
 # run_mgba <scenario> <fps> <vsync> <deadline_s> [headless|headed] [budget_fps]
 #   -> echoes log, sets global VERDICT. The engine is an ARGUMENT because a checkpoint
 #      builder must stay headed even when the scenario that needs it is headless.
@@ -389,7 +400,8 @@ EOF
     #   STALL    the frame counter stopped moving: mGBA is wedged, so no budget would ever be
     #            reached and waiting for one is waiting forever.
     #
-    # PT_MAX_WALL_S remains as a last-resort net for a pathology neither of those describes.
+    # PT_MAX_WALL_S remains as a last-resort net for a pathology neither of those describes,
+    # never shorter than the deadline itself (wall_net, #665).
     # The budget is sized on the DECLARED rate, never on PT_FPS. PT_FPS=60 to watch a run at
     # real speed must not quarter its work allowance and OVERRUN a scenario that passes by
     # default (#358 review).
@@ -402,7 +414,8 @@ EOF
     # while contention can only make the budget LARGER, never smaller. The bad direction is
     # the one that cannot happen.
     local stall=${PT_STALL_S:-1800}
-    local max_wall=${PT_MAX_WALL_S:-7200}
+    local max_wall
+    max_wall=$(wall_net "$deadline")
     local started=$SECONDS
     local last_frame=0 last_progress=$SECONDS frame=0
     VERDICT=""

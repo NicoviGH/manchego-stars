@@ -338,9 +338,11 @@ def log_tail(path, n=30):
 def records_of(task, text, where, log_path):
     """A worker's records: its BOTRUN lines, and its campaign's last CAMPAIGN line (the one
     without a chapter: how the campaign ended, and why) as a record of kind `campaign`; each
-    names its run dir. Each attempt's prep (a chapter line's `prep`: what the convoy gave and
-    took and the shop bought) goes on that attempt's BOTRUN record as `supply` and `buys`. A
-    worker that left neither says why it has none, from its log."""
+    names its run dir. A campaign the bot played that left no end line was cut by run.sh: its
+    end is a `crashed` record in run.sh's words (#665). Each attempt's prep (a chapter line's
+    `prep`: what the convoy gave and took and the shop bought) goes on that attempt's BOTRUN
+    record as `supply` and `buys`. A worker that left neither says why it has none, from its
+    log."""
     recs = parse_lines(text, BOTRUN)
     lines = parse_lines(text, CAMPAIGN)
     chapters = [c for c in lines if c.get('chapter') is not None]
@@ -368,7 +370,20 @@ def records_of(task, text, where, log_path):
             c['prep'] = [dict(p, chapter=ch) for (ch, _), p in sorted(prep.items(),
                                                                     key=lambda kv: str(kv[0]))]
         recs.append(c)
-    attempt = (task.get('campaign') or {}).get('attempt')
+    camp = task.get('campaign')
+    # a diagnostic replay writes no CAMPAIGN line by design (campaign.lua api.diag)
+    if camp is not None and not task.get('diag') and recs and not ends:
+        # run.sh cut the campaign (its wall net, an OVERRUN, a STALL) after the bot had played
+        # and before campaign.lua said how it ended. Without an end, `resume` printed and counted
+        # nothing and the lap looked finished (#665): the end is a crash, in run.sh's words.
+        said = [line.strip() for line in log_tail(log_path) if 'RESULT:' in line]
+        end = {'kind': 'campaign', 'campaign': camp.get('id'), 'outcome': 'crashed',
+               'seed': task.get('seed'),
+               'why': said[-1] if said else 'the campaign left no end line'}
+        if camp.get('scout'):
+            end['scout'] = True
+        recs.append(end)
+    attempt = (camp or {}).get('attempt')
     bot = any(is_bot(r) for r in recs)
     for r in recs:
         r['run_dir'] = where

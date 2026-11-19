@@ -341,6 +341,25 @@ class Workers(unittest.TestCase):
                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
         self.assertEqual([r.get('env_status') for r in both], ['clean', None])
 
+    def test_a_campaign_run_sh_cut_short_ends_crashed_in_its_words(self):
+        # #665: run.sh's wall net cut 19 of 20 laps mid-chapter; campaign.lua never wrote its
+        # end, so resume printed and counted nothing and the lap looked finished
+        cut = 'RESULT: ERROR -- exceeded PT_MAX_WALL_S=7200s at frame 9'
+        with tempfile.NamedTemporaryFile('w', suffix='.log', delete=False) as log:
+            log.write('running\n%s\n' % cut)
+        self.addCleanup(os.unlink, log.name)
+        task = {'campaign': {'id': 'es-s1', 'scout': True}, 'seed': 1}
+        recs = mc.records_of(task, 'BOTRUN {"outcome": "won", "chapter": 9, "attempt": 1}\n'
+                             'CAMPAIGN {"chapter": 9, "attempts": 1}', '/tmp/w', log.name)
+        end = recs[-1]
+        self.assertEqual((end['kind'], end['campaign'], end['outcome'], end['why'],
+                          end['scout']), ('campaign', 'es-s1', 'crashed', cut, True))
+        self.assertFalse(mc.passing(recs), 'its run dir is kept as evidence')
+        # a campaign that wrote its own end keeps it
+        done = mc.records_of(task, 'BOTRUN {"outcome": "won"}\nCAMPAIGN {"outcome": "played"}',
+                             '/tmp/w', log.name)
+        self.assertEqual([r.get('outcome') for r in done], ['won', 'played'])
+
     def test_each_attempts_prep_lands_on_its_bot_record(self):
         # ADR 0413 said the record keeps the supply; it was only in the worker log, since
         # records_of dropped every chapter line (#510 comment 6896261936)
@@ -405,9 +424,12 @@ class Workers(unittest.TestCase):
             if task['campaign']['attempt'] == 2:
                 raise RuntimeError('mgba-headless exited early')
             k = task['campaign']['attempt']
-            return 'BOTRUN {"attempt": %d, "outcome": "won", "clean": true}\n' % k, '/tmp/x'
+            # campaign.lua's last line, without a chapter: a campaign with none was cut (#665)
+            return ('BOTRUN {"attempt": %d, "outcome": "won", "clean": true}\n'
+                    'CAMPAIGN {"outcome": "played"}' % k, '/tmp/x')
         recs, kept = self.run_pool(launch, mc.attempt_tasks({'from': 4}, 3))
-        self.assertEqual(len(kept), 3, 'every worker leaves one record')
+        self.assertEqual(sorted(r['attempt'] for r in kept if mc.is_bot(r)), [1, 2, 3],
+                         'every worker leaves its record')
         dead = [r for r in kept if r['outcome'] == 'crashed']
         self.assertEqual(len(dead), 1)
         self.assertEqual(dead[0]['attempt'], 2)
