@@ -1269,12 +1269,16 @@ local function fallTurn(ctx, o, u, n, late)
     end
     if #starts == 0 then return true, nil end
     table.sort(starts, function(a, b) return a.first < b.first end)
+    -- turn by turn at the summed rate, counted a span at a time between strikers' first turns:
+    -- a striker counted at a small chance to live deals a small blow, and a 50-HP wall would
+    -- take thousands of turns of the loop one at a time (#659 re-review)
     local i, rate, dealt, turn = 1, 0, 0, starts[1].first
     while true do
         while starts[i] and starts[i].first <= turn do rate, i = rate + starts[i].dmg, i + 1 end
-        dealt = dealt + rate
-        if dealt >= hp then return true, turn - late end
-        turn = turn + 1
+        local need = math.max(1, math.ceil((hp - dealt) / rate - Goals.DUST))
+        local nextAt = starts[i] and starts[i].first
+        if not nextAt or turn + need - 1 < nextAt then return true, turn + need - 1 - late end
+        dealt, turn = dealt + rate * (nextAt - turn), nextAt
     end
 end
 
@@ -1489,11 +1493,15 @@ local function openAct(ctx, u, b, gate)
                 a.door = { x = b.x, y = b.y }
                 return a
             end
-            local a = action(u, t, "attack", nil, can.slot)
-            -- its HP and the strike's blow (the game's forecast): the planner tracks the wall
-            a.obstacle = { x = b.x, y = b.y, hp = b.hp, at = wallKey(b), blow = ctx.sight.strikeWall
-                           and ctx.sight.strikeWall(u, b, t.x, t.y, can.slot) }
-            return a
+            -- its HP and the strike's blow (the game's forecast): the planner tracks the wall. A
+            -- tile the forecast says takes nothing is no strike: the next is tried (#659
+            -- re-review: a strike with no blow read earned the flat `breach` of an unforecast one)
+            local blow = ctx.sight.strikeWall and ctx.sight.strikeWall(u, b, t.x, t.y, can.slot)
+            if blow and blow.dealt > 0 or not ctx.sight.strikeWall then
+                local a = action(u, t, "attack", nil, can.slot)
+                a.obstacle = { x = b.x, y = b.y, hp = b.hp, at = wallKey(b), blow = blow }
+                return a
+            end
         end
     end
     return nil

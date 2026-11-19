@@ -2696,6 +2696,18 @@ do
     _, ctx = B.candidates(boardOf(A, C, E), s, style("careful"))
     check(near(ctx.turnsTo(A, goal), 1.4), true,
           "wall blow: a side whose forecast takes nothing is not the striker's last try")
+    -- and no strike is offered from such a side: C, reaching (3,0) and (1,0), strikes from (1,0)
+    C = blue(0x02, 1, 3, 0)
+    local s2 = wallSight(BOSS_SIDE, 20, {}, { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 3, 0 }, { 1, 0 }) })
+    s2.strikeWall = s.strikeWall
+    cands = B.candidates(boardOf(A, C, E), s2, style("careful"))
+    local from
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
+            if a.obstacle then from = from or (a.move.x .. "," .. a.move.y) end
+        end
+    end
+    check(from, "1,0", "wall strike: never from a tile whose forecast takes nothing")
     -- (3)
     C = blue(0x02, 1, 3, 1)
     local field = { ["3,1"] = 2 }
