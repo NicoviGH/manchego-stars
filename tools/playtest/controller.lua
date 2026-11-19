@@ -957,6 +957,16 @@ function M.engineIsWorking(observation)
     return false
 end
 
+-- What a failed target step says (harness INSPECT.stepTarget; the act's crash record carries it):
+-- the target wanted (`targetTile` an obstacle's tile, else unit `targetId`) and where the
+-- selector stands (`at`, its live target, or nil for none).
+function M.targetNotOffered(targetId, targetTile, at)
+    local want = targetTile and string.format("the tile (%d,%d)", targetTile.x, targetTile.y)
+        or string.format("unit 0x%02X", targetId or 0)
+    return string.format("the selector never offered %s; it stands on %s", want,
+        at and string.format("(%d,%d) uid 0x%02X", at.x or -1, at.y or -1, at.uid or 0) or "no target")
+end
+
 --- Whether the tail of a unit's action is over, read from one observation after its command
 --- menu closed. The game checks AREA events when an action ends, Wait included, and the
 --- event runs after the menu is gone: vanilla Ch15's hidden treasure (ch15a-eventinfo.h AREA

@@ -572,17 +572,13 @@ class TestUnitStateBits(unittest.TestCase):
 
 
 class TestStepTargetSaysWhy(unittest.TestCase):
-    def test_a_target_the_selector_never_offers_crashes_with_a_reason(self):
-        # The emulator is the only thing that runs stepTarget, so this reads the wiring: both of
-        # its failures return INSPECT.targetNotOffered's text, and the rescue/drop act hands it
-        # to botrun's "could not perform <act>: <why>" (vanilla Ch2 seed 4005 crashed with no
-        # reason, #654).
+    def test_every_act_that_steps_a_target_hands_the_reason_up(self):
+        # The wording is unit-tested in test_controller.lua (Controller.targetNotOffered); only
+        # the emulator runs stepTarget, so this is the wiring: the four callers (talk, attack,
+        # staff, rescue/drop) go through stepThen, none calls stepTarget bare (#654).
         text = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua')).read()
-        start = text.index('INSPECT.stepTarget = function')
-        body = text[start:text.index('\nend\n', start)]
-        self.assertEqual(body.count('return false, INSPECT.targetNotOffered('), 2, body)
-        self.assertIn('local stepped, why = INSPECT.stepTarget(', text)
-        self.assertIn('if not stepped then return false, why end', text)
+        self.assertEqual(text.count('INSPECT.stepThen('), 4)
+        self.assertEqual(text.count('INSPECT.stepTarget('), 1, 'only stepThen calls it')
 
 
 class TestHealStaves(unittest.TestCase):

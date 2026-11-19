@@ -1247,24 +1247,17 @@ local function chooseTalk(targetId)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "talk"
     end, 300) then return false end
-    if not INSPECT.stepTarget(targetId, nil) then return false end
-    return guardedInput("confirm_target", "A", "Talk reaches FE8's dialogue input wait", function(after)
-        return controllerState(after) == "dialogue_wait"
-    end, 600)
+    return INSPECT.stepThen(targetId, nil, function()
+        return guardedInput("confirm_target", "A", "Talk reaches FE8's dialogue input wait", function(after)
+            return controllerState(after) == "dialogue_wait"
+        end, 600)
+    end)
 end
 
 -- The open target selector stepped to the wanted target: `targetId` a unit's index byte, or
 -- `targetTile` an obstacle by its tile (bmtarget.c TryAddTrapsToTargetList lists it with uid 0);
 -- neither = the selector's first. At most one step per target the selector can hold (bmunit.h:
 -- red[50]); a target it never reaches is a fault.
--- What a failed INSPECT.stepTarget says (the act's crash record carries it): the target wanted,
--- and the one the selector stands on.
-INSPECT.targetNotOffered = function(targetId, targetTile, at)
-    local want = targetTile and string.format("the tile (%d,%d)", targetTile.x, targetTile.y)
-        or string.format("unit 0x%02X", targetId or 0)
-    return string.format("the selector never offered %s; it stands on %s", want,
-        at and string.format("(%d,%d) uid 0x%02X", at.x or -1, at.y or -1, at.uid or 0) or "no target")
-end
 INSPECT.stepTarget = function(targetId, targetTile)
     local function wanted(t)
         if targetTile then return t ~= nil and t.x == targetTile.x and t.y == targetTile.y end
@@ -1280,17 +1273,28 @@ INSPECT.stepTarget = function(targetId, targetTile)
             end, 30) then
             -- the selector did not move: it holds one target (or none), and it is not the wanted
             -- one (vanilla Ch2 seed 4005 asked for a Drop tile the game never listed, #654)
-            return false, INSPECT.targetNotOffered(targetId, targetTile, observeController().target)
+            return false, Controller.targetNotOffered(targetId, targetTile, observeController().target)
         end
         -- the step re-centres the camera, blocking the selector until the scroll ends
-        if not awaitControllerState("target_selection", 120) then return false end
+        if not awaitControllerState("target_selection", 120) then
+            return false, "the selector never settled after stepping toward "
+                .. Controller.targetNotOffered(targetId, targetTile, observeController().target)
+        end
     end
     if wanted(observeController().target) then return true end
     traceFailure("select_target", targetTile
         and string.format("the selector reaches the obstacle at (%d,%d)", targetTile.x, targetTile.y)
         or string.format("the selector reaches unit 0x%02X", targetId),
         "fail:target-not-offered", nil, "controller-target-not-offered")
-    return false, INSPECT.targetNotOffered(targetId, targetTile, observeController().target)
+    return false, Controller.targetNotOffered(targetId, targetTile, observeController().target)
+end
+
+-- stepTarget, then `next()` (the caller's confirm); a step that fails hands its reason up with
+-- the false, so every act's crash record says why (botrun: "could not perform <act>: <why>").
+INSPECT.stepThen = function(targetId, targetTile, nextStep)
+    local stepped, why = INSPECT.stepTarget(targetId, targetTile)
+    if not stepped then return false, why end
+    return nextStep()
 end
 
 -- Confirm the selector's target, then wait until the act resolved: the actor greyed out, or
@@ -1387,8 +1391,9 @@ local function chooseAttack(actorAddr, stopWhen, targetId, targetTile, slot)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "attack"
     end, 300) then return false end
-    if not INSPECT.stepTarget(targetId, targetTile) then return false end
-    return INSPECT.commitTarget(actorAddr, stopWhen, "attack")
+    return INSPECT.stepThen(targetId, targetTile, function()
+        return INSPECT.commitTarget(actorAddr, stopWhen, "attack")
+    end)
 end
 
 -- From the open menu `state`, the row whose override id is `id`: DOWN until it is current.
@@ -1417,8 +1422,9 @@ INSPECT.chooseStaff = function(actorAddr, slot, targetId, stopWhen)
     if not selectSemantic("select_staff", "the staff opens its target selector", function(after)
         return controllerState(after) == "target_selection"
     end, 300) then return false end
-    if not INSPECT.stepTarget(targetId, nil) then return false end
-    return INSPECT.commitTarget(actorAddr, stopWhen, "staff")
+    return INSPECT.stepThen(targetId, nil, function()
+        return INSPECT.commitTarget(actorAddr, stopWhen, "staff")
+    end)
 end
 INSPECT.MENU_STAFF_SLOT, INSPECT.MENU_ITEM_SLOT = 0x3E, 0x43   -- menu_def.c, slot 0's row
 
@@ -3752,11 +3758,12 @@ INSPECT.botApi = function(game)
                 return won() or lost() or dead() or INSPECT.greyed(u.addr)
                     or faction() ~= 0
             end
-            if not chooseAttack(u.addr, function()
+            local struck, why = chooseAttack(u.addr, function()
                 return won() or lost() or dead() or procActive(SYM.ProcScr_StdEventEngine)
-            end, a.targetId, a.obstacle, a.slot) then
-                return false, a.obstacle and "the strike on the wall did not play out"
-                    or "the attack did not play out"
+            end, a.targetId, a.obstacle, a.slot)
+            if not struck then
+                return false, why or (a.obstacle and "the strike on the wall did not play out"
+                    or "the attack did not play out")
             end
             if not settled() and not waitFor(function()
                 return settled() or controllerState() == "player_map_idle"
@@ -3765,7 +3772,8 @@ INSPECT.botApi = function(game)
             end
             return true
         elseif a.act == "talk" then
-            if not chooseTalk(a.targetId) then return false end
+            local talked, why = chooseTalk(a.targetId)
+            if not talked then return false, why end
             return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
         elseif a.act == "rescue" or a.act == "drop" then
             -- the command's own selector (RescueEffect, DropEffect), stepped to the unit or the
@@ -3777,12 +3785,12 @@ INSPECT.botApi = function(game)
                         and after.target and after.target.kind == a.act
                 end, 300) then return false end
             local tile = a.act == "drop" and a.dropAt or nil
-            local stepped, why = INSPECT.stepTarget(a.act == "rescue" and a.targetId or nil, tile)
-            if not stepped then return false, why end
-            if not guardedInput("confirm_target", "A", "the " .. a.act .. " is chosen", function(after)
-                return controllerState(after) ~= "target_selection"
-            end, 120) then return false end
-            return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
+            return INSPECT.stepThen(a.act == "rescue" and a.targetId or nil, tile, function()
+                if not guardedInput("confirm_target", "A", "the " .. a.act .. " is chosen", function(after)
+                    return controllerState(after) ~= "target_selection"
+                end, 120) then return false end
+                return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
+            end)
         elseif a.act == "door" then
             if not selectSemantic("open_door", "the Door command opens the door", function(after)
                 return after.menu == nil
