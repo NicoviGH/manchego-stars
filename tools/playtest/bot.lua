@@ -2742,12 +2742,21 @@ end
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
 -- claim gives way); `quietGoals`, the ledger goal ids no unit has neared over GOAL_QUIET waiting player
 -- phases (goals.lua's ledger marks their rows stalled); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
--- each goal a unit was found with no step toward, and the turn it was first found so).
+-- each goal a unit was found with no step toward, and the turn it was first found so); `only`
+-- ({ [unit id] = true }, the planner's re-listing, #661): only those units' acts are listed,
+-- every other unit standing as it is.
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
 -- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    if opts and opts.only then
+        local kept = {}
+        for _, u in ipairs(ctx.actors) do
+            if opts.only[u.id] then kept[#kept + 1] = u end
+        end
+        ctx.actors = kept
+    end
     ctx.explored = opts and opts.explored or {}
     ctx.seen = opts and opts.seen
     ctx.lost = opts and opts.lost or {}

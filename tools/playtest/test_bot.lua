@@ -2399,13 +2399,17 @@ end
 -- who stands it. Each unit's acts were
 -- listed once, on the shut map, so no plan ever had D in the doorway (vanilla Ch8, seed 4002:
 -- 101 plans opened (20,7), none with an act on or past it, every one over the cap). The units a
--- plan has not used get their acts listed again on the map it leaves (sight.opened).
+-- plan has not used and whose reach the door changes (D, not F) get their acts listed again on
+-- the map it leaves (sight.opened).
 do
     local K = blue(0x01, 0, 1, 0)
     local D = blue(0x02, 1, 1, 1)
+    local F = blue(0x03, 2, 0, 2)
     local E = red(0x81, 3, 0, { isBoss = true })
-    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }) }
-    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 2, 0 }) }
+    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }),
+                   [0x03] = tiles({ 0, 2 }) }
+    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 2, 0 }),
+                   [0x03] = shut[0x03] }
     local o = {
         objective = { kind = "boss" }, reach = shut,
         field = fieldsOf { ["3,0"] = { ["3,0"] = 0 },
@@ -2429,7 +2433,7 @@ do
         end,
     }
     local sight = sightOf(o)
-    local _, plan = Planner.plan(B, boardOf(K, D, E), sight, style("careful"))
+    local _, plan = Planner.plan(B, boardOf(K, D, F, E), sight, style("careful"))
     local order = {}
     for _, a in ipairs(plan and plan.acts or {}) do
         order[#order + 1] = a.unitId .. ">" .. a.act .. "@" .. at(a)
@@ -2440,6 +2444,14 @@ do
     check(door ~= nil and block ~= nil and door < block, true,
           "relist: K opens the door, then D acts from the doorway (" .. order .. ")")
     check(sight.openedAsked, 1, "relist: one re-listing for the one door, however many plans open it")
+    -- F's reach is the same with the door open: it keeps its board menu (the cost, ADR 0431)
+    local fAct, dAct
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x03 then fAct = a end
+        if a.unitId == 0x02 then dAct = a end
+    end
+    check(fAct ~= nil and fAct.map == nil and dAct ~= nil and dAct.map ~= nil, true,
+          "relist: only D, whose reach the door changes, is listed again")
 end
 
 -- test_a_key_no_one_can_reach_opens_nothing: the same cut, A holds no key, and the one Door

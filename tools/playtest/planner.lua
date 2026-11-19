@@ -1097,13 +1097,27 @@ function M.plan(Bot, board, sight, style, opts)
     -- were listed once, on the board before anyone acts; a plan that opens a door or breaks a
     -- wall (st.opened) changes that map, and no act was ever listed on the tiles it opens: in
     -- vanilla Ch8 (seed 4002) 101 plans opened (20,7) and none had a unit step into the
-    -- doorway or strike past it. So on such a plan the units it has not used get their acts
-    -- listed again (Bot.candidates) with every change applied (sight.opened), once per set of
-    -- changes this decision; extend still keeps a used unit or a taken tile out. Each re-listed
-    -- act carries its map (`map`), so the exposure memo tells it from the same act on the shut
-    -- map. An offered replay (opts.offer) reads its acts on another board, and a sight without
-    -- the read (test fakes) has none: both keep the board's menus.
+    -- doorway or strike past it. So on such a plan, each unit whose reach the change alters
+    -- (sight.reach on the map with every change applied, sight.opened) gets its acts listed
+    -- again there (Bot.candidates, opts.only), once per set of changes this decision. A unit
+    -- whose reach is the same keeps its board menu: its acts end on the same tiles, and a
+    -- strike's targets are its end tiles and its weapon's range, which no terrain cuts
+    -- (MapAddInRange); only its exposure there is the shut map's, and the judged phase plays
+    -- the open one (ADR 0431, the cost). extend still keeps a used unit or a taken tile out.
+    -- Each re-listed act carries its map (`map`), so the exposure memo tells it from the same
+    -- act on the shut map. An offered replay (opts.offer) reads its acts on another board, and
+    -- a sight without the read (test fakes) has none: both keep the board's menus.
     local relisted = {}
+    local function tilesOf(list, u)
+        local set = { [u.x .. "," .. u.y] = true }
+        for _, t in ipairs(list or {}) do set[t.x .. "," .. t.y] = true end
+        return set
+    end
+    local function sameTiles(a, b)
+        for k in pairs(a) do if not b[k] then return false end end
+        for k in pairs(b) do if not a[k] then return false end end
+        return true
+    end
     local function menusFor(st)
         if offer or not sight.opened or next(st.opened) == nil then return menus end
         local ks = {}
@@ -1111,8 +1125,25 @@ function M.plan(Bot, board, sight, style, opts)
         table.sort(ks)
         local mk = table.concat(ks, ";")
         if not relisted[mk] then
+            -- the units whose reach the changes alter: the board's reach (Bot.candidates' own,
+            -- ctx.reaches) against the opened map's
+            local shut = {}
+            for _, m in ipairs(menus) do
+                local u = m.unit
+                shut[u.id] = tilesOf((ctx.reaches or {})[u.id] or sight.reach(u, true), u)
+            end
             local list = sight.opened(st.opened, function()
-                return (Bot.candidates(board, sight, style, opts))
+                local only, any = {}, false
+                for _, m in ipairs(menus) do
+                    if not sameTiles(shut[m.unit.id], tilesOf(sight.reach(m.unit, true), m.unit)) then
+                        only[m.unit.id], any = true, true
+                    end
+                end
+                if not any then return {} end
+                local o = {}
+                for k, v in pairs(opts or {}) do o[k] = v end
+                o.only = only
+                return (Bot.candidates(board, sight, style, o))
             end)
             -- the tiles the changes open: a door's or wall's whole change where the sight says
             -- (sight.mapChange: a gate two tiles deep), else its own tile
@@ -1127,7 +1158,11 @@ function M.plan(Bot, board, sight, style, opts)
             for _, c in ipairs(list) do
                 for _, a in ipairs(c.acts) do a.map = mk end
             end
-            relisted[mk] = menusOf(list, opens)
+            local again = {}
+            for _, m in ipairs(menusOf(list, opens)) do again[m.unit.id] = m end
+            local out = {}
+            for _, m in ipairs(menus) do out[#out + 1] = again[m.unit.id] or m end
+            relisted[mk] = out
         end
         return relisted[mk]
     end
