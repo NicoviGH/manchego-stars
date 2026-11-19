@@ -105,10 +105,12 @@
 --   fullInfo(fn)             batch(), the fog off (M.fullInfo): fn(board), the board read with
 --                            no unit fogged. A diagnostic's (FR-019), in place of batch, never
 --                            inside a sandbox; nothing it reads outlives the call.
---   opened(set, fn)          fn() on the map a plan leaves: each door opened and wall broken in
---                            set ({ ["x,y"] = true }) applied as enemyPhase applies them
---                            (M.openMap), in one sandbox; the board's answers read inside are
---                            dropped after it (M.opened). The planner's re-listing (#661).
+--   changed(change, fn)      fn() on the board a plan leaves: each door opened and wall broken
+--                            in change.opened ({ ["x,y"] = true }) and each enemy killed in
+--                            change.gone ({ [id] = true }) applied as enemyPhase applies them
+--                            (M.openMap, M.takeOff), in one sandbox; the board's answers read
+--                            inside are dropped after it (M.changed). The planner's re-listing
+--                            (#661, #670).
 --   enemyPhase(plan)        the enemy phase the AI would play against a planned board, in
 --                            one batch. plan = { blues = { { unit, x, y, hp } }, gone =
 --                            { [enemy id] = true } }: our units stand where the plan leaves
@@ -1208,7 +1210,7 @@ end
 -- map. A looter killed or moved, a player unit moved, a tile taken, a door opened is a new key.
 function M.closingsKey(turn, k, waves, looters, open, blockers, map)
     -- the map (sight.mapKey): a looter walks through a door the planner's re-listing opened
-    -- (sight.opened, #661), and that read must not answer for the shut map
+    -- (sight.changed, #661), and that read must not answer for the shut map
     local parts = { "m" .. tostring(map or "-") }
     for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
     -- our units are hidden from the AI but still block its walk
@@ -1966,8 +1968,8 @@ end
 
 -- Sight.isolated(sandbox, isolate, fn): fn(call) in a sandbox, the caller's board answers
 -- swapped for fresh ones for it: isolate() swaps them and returns their restore, run however
--- fn ends. A read on a board the sandbox changed (fullInfo's fog off, opened's map) must not be
--- kept for the board as it is. fullInfo's and Sight.opened's one shape.
+-- fn ends. A read on a board the sandbox changed (fullInfo's fog off, changed's board) must not be
+-- kept for the board as it is. fullInfo's and Sight.changed's one shape.
 function M.isolated(sandbox, isolate, fn)
     local restore = isolate()
     local ok, a, b = pcall(sandbox, fn)
@@ -1977,7 +1979,7 @@ function M.isolated(sandbox, isolate, fn)
 end
 
 -- Inside a sandbox: every map change in `set` ({ ["x,y"] = true }: the doors a plan opens and
--- the walls it breaks) applied, M.openMap's. The judged phase's (enemyPhase) and opened's.
+-- the walls it breaks) applied, M.openMap's. The judged phase's (enemyPhase) and changed's.
 function M.openAll(api, call, S, set)
     for at in pairs(set or {}) do
         local x, y = at:match("^(%d+),(%d+)$")
@@ -1985,15 +1987,29 @@ function M.openAll(api, call, S, set)
     end
 end
 
--- Sight.opened(sandbox, api, S, isolate, set, fn): fn() run on the map `set`'s changes leave
--- (M.openAll), in one sandbox whose journal shuts them again when it returns: the planner's
--- re-listing (#661) asks Bot.candidates there what the units still to act can do once a door
--- is open. Every write is journaled (openMap), so unlike fullInfo it may run inside a batch.
--- isolate() as M.isolated's: a reach, path or danger read through the opened door must not be
--- kept for the shut one.
-function M.opened(sandbox, api, S, isolate, set, fn)
+-- Inside a sandbox: unit `e`, standing on (x, y), off the map as a death takes it -- off
+-- gBmMapUnit, and US_HIDDEN, which RefreshUnitsOnBmMap skips (bmmap.c) -- every write
+-- journaled. The judged phase's (a kill, a counter's) and Sight.changed's.
+function M.takeOff(api, e, x, y)
+    M.liftOff(api, x, y, e.id)
+    api.write32(e.addr + UNIT_STATE, api.mem.u32(e.addr + UNIT_STATE) | api.Board.US_HIDDEN)
+end
+
+-- Sight.changed(sandbox, api, S, isolate, change, byId, fn): fn() run on the board a plan's
+-- changes leave, in one sandbox whose journal undoes them when it returns: change.opened
+-- ({ ["x,y"] = true }, the doors it opens and walls it breaks, M.openAll) and change.gone
+-- ({ [id] = true }, the enemies it kills, M.takeOff; byId: the units by id, where each stands).
+-- The planner's re-listing (#661, #670) asks there which tiles the units still to act now
+-- reach, and their acts from those. Every write is journaled, so unlike fullInfo it may run
+-- inside a batch. isolate() as M.isolated's: a read on the changed board must not be kept for
+-- the board as it is.
+function M.changed(sandbox, api, S, isolate, change, byId, fn)
     return M.isolated(sandbox, isolate, function(call)
-        M.openAll(api, call, S, set)
+        M.openAll(api, call, S, change.opened)
+        for id in pairs(change.gone or {}) do
+            local e = byId[id]
+            if e then M.takeOff(api, e, e.x, e.y) end
+        end
         return fn()
     end)
 end
@@ -2280,20 +2296,28 @@ function M.new(outer)
     -- fn(board) with the fog off (M.fullInfo): the board's answers and the phase's cache are
     -- fresh for the call and the fogged ones come back after it
     -- the board's answers fresh for a changed board's read, and the phase's cache too unless
-    -- `keepCache` (its memos key on the map, ctx.mapKey); -> their restore (M.isolated)
-    local function fresh(keepCache)
+    -- `keepCache` (its memos key on the map, ctx.mapKey); the march cost grids too unless
+    -- `keepGrids` (they are the terrain's alone: no unit blocks them, costGrid); -> their
+    -- restore (M.isolated)
+    local function fresh(keepCache, keepGrids)
         local keptSeen, keptCache = seen, s.cache
-        seen = { threats = {}, grids = {} }
+        seen = { threats = {}, grids = keepGrids and keptSeen.grids or {} }
         if not keepCache then s.cache = {} end
         return function() seen, s.cache = keptSeen, keptCache end
     end
     function s.fullInfo(fn)
         return M.fullInfo(sandbox, open, api, S, fresh, fn)
     end
-    -- fn() with the map `set` changes applied (M.opened). The phase's cache is kept: its
-    -- memos (bot.lua's attacks and strikes) key on mapKey, which reads the opened map
-    function s.opened(set, fn)
-        return M.opened(sandbox, api, S, function() return fresh(true) end, set, fn)
+    -- fn() on the board `change` leaves (M.changed). The phase's cache is kept: its memos
+    -- (bot.lua's attacks and strikes) key on mapKey, which reads the opened map, and on every
+    -- unit standing (a kill's board is another key). The cost grids are kept when no map
+    -- changes: a kill moves no terrain
+    function s.changed(change, fn)
+        local byId = {}
+        for _, o in ipairs(units()) do byId[o.id] = o end
+        local keepGrids = next(change.opened or {}) == nil
+        return M.changed(sandbox, api, S, function() return fresh(true, keepGrids) end, change,
+                         byId, fn)
     end
 
     function s.remember(enemies)
@@ -2672,10 +2696,7 @@ function M.new(outer)
         end
         local wearing = { base = M.stageWear(api, call, S, plan, byId) }
         stageCarry(byId, plan.carry)
-        local function remove(e, x, y)
-            M.liftOff(api, x, y, e.id)
-            api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN)
-        end
+        local function remove(e, x, y) M.takeOff(api, e, x, y) end
         local gone = {}
         for id in pairs(plan.gone or {}) do
             gone[id] = true

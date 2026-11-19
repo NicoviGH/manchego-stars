@@ -483,15 +483,17 @@ local function sightOf(o)
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
     -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
     s.mapKey = function() return o.mapKey or "-" end
-    -- fn() on the map a plan leaves (sight.opened, #661): o.open(set) gives the fixture's
-    -- fields as that map has them (a reach through the door, the door gone), each put back after
-    if o.open then
-        s.opened = function(set, fn)
+    -- fn() on the board a plan leaves (sight.changed, #661, #670): o.change(change) gives the
+    -- fixture's fields as that board has them (a reach through the door or the dead enemy's
+    -- tile, the door gone), each put back after; every change read is kept in `changes`
+    if o.change then
+        s.changed = function(change, fn)
             local was = {}
-            for k, v in pairs(o.open(set)) do was[k] = { v = o[k] }; o[k] = v end
+            for k, v in pairs(o.change(change)) do was[k] = { v = o[k] }; o[k] = v end
             local out = table.pack(fn())
             for k, w in pairs(was) do o[k] = w.v end
-            s.openedAsked = (s.openedAsked or 0) + 1
+            s.changes = s.changes or {}
+            s.changes[#s.changes + 1] = change
             return table.unpack(out, 1, out.n)
         end
     end
@@ -2399,16 +2401,17 @@ end
 -- who stands it. Each unit's acts were
 -- listed once, on the shut map, so no plan ever had D in the doorway (vanilla Ch8, seed 4002:
 -- 101 plans opened (20,7), none with an act on or past it, every one over the cap). The units a
--- plan has not used and whose reach the door changes (D, not F) get their acts listed again on
--- the map it leaves (sight.opened).
+-- plan has not used and whose reach the door changes (D, not F) gain the acts from their new
+-- tiles, read on the map it leaves (sight.changed).
 do
     local K = blue(0x01, 0, 1, 0)
     local D = blue(0x02, 1, 1, 1)
     local F = blue(0x03, 2, 0, 2)
     local E = red(0x81, 3, 0, { isBoss = true })
-    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }),
+    -- D's reach holds K's tile (sight.reach with friends: an ally's tile is passed through)
+    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 1, 0 }),
                    [0x03] = tiles({ 0, 2 }) }
-    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 2, 0 }),
+    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 1, 0 }, { 2, 0 }),
                    [0x03] = shut[0x03] }
     local o = {
         objective = { kind = "boss" }, reach = shut,
@@ -2416,8 +2419,8 @@ do
                            ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
                                        ["0,1"] = 3, ["1,1"] = 2 } },
         obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
-        open = function(set)
-            if set["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
+        change = function(c)
+            if c.opened["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
             return {}
         end,
         enemyPhase = function(plan)
@@ -2443,7 +2446,7 @@ do
     local door, block = order:find("1>door@1,0", 1, true), order:find("2>%a+@2,0")
     check(door ~= nil and block ~= nil and door < block, true,
           "relist: K opens the door, then D acts from the doorway (" .. order .. ")")
-    check(sight.openedAsked, 1, "relist: one re-listing for the one door, however many plans open it")
+    check(#(sight.changes or {}), 1, "relist: one re-listing for the one door, however many plans open it")
     -- F's reach is the same with the door open: it keeps its board menu (the cost, ADR 0431)
     local fAct, dAct
     for _, a in ipairs(plan and plan.acts or {}) do
@@ -2451,7 +2454,75 @@ do
         if a.unitId == 0x02 then dAct = a end
     end
     check(fAct ~= nil and fAct.map == nil and dAct ~= nil and dAct.map ~= nil, true,
-          "relist: only D, whose reach the door changes, is listed again")
+          "relist: only D, whose reach the door changes, gains acts")
+end
+
+-- test_a_relisted_unit_with_only_an_allys_tile_does_not_crash: a re-listing (opts.tiles) can
+-- leave a unit only a tile an ally stands on (its reach passes through allies); its march then
+-- has no tile, and building an act on none crashed vanilla Ch8 (relist661c, turn 16)
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 1, 0)
+    local E = red(0x81, 4, 0)
+    local sight = sightOf({ reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) } })
+    local ok, cands = pcall(B.candidates, boardOf(A, C, E), sight, style("careful"),
+                            { only = { [0x01] = true }, tiles = { [0x01] = { ["1,0"] = true } } })
+    local off = true
+    for _, c in ipairs(ok and cands or {}) do
+        for _, a in ipairs(c.acts) do off = off and a.move.x == 1 and a.move.y == 0 end
+    end
+    check(ok and off, true, "relist: a unit left only an ally's tile lists acts on it alone ("
+          .. tostring(ok and "" or cands) .. ")")
+    -- and none at all (every tile it reached filtered out), on a boss map with a staff, a
+    -- Vulnerary and a village to read
+    local H = blue(0x03, 2, 0, 1)
+    local boss = red(0x82, 6, 0, { isBoss = true })
+    local s2 = sightOf({ objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }),
+                         [0x03] = tiles({ 0, 1 }) }, staves = { [0x03] = { { slot = 0 } } },
+                         heals = { [0x03] = {} }, mend = { [0x01] = { slot = 1, amount = 10 } },
+                         explorable = { { x = 0, y = 0, kind = "visit" } }, closings = {} })
+    local A2 = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20 })
+    local ok2, err2 = pcall(B.candidates, boardOf(A2, C, H, E, boss), s2, style("careful"),
+                            { only = { [0x01] = true, [0x03] = true },
+                              tiles = { [0x01] = {}, [0x03] = {} } })
+    check(ok2, true, "relist: a unit left no tile lists without a crash (" .. tostring(ok2 or err2) .. ")")
+end
+
+-- test_a_plan_steps_onto_the_tile_its_kill_frees (#670): E1 holds the one tile, (1,0), between
+-- D at (0,0) and the boss E2 at (3,0). K, at (1,1), kills E1 for sure. D reaches (2,0), beside
+-- the boss, only through E1's tile, so only once the kill is in the plan. Each unit's acts were
+-- listed on the board before anyone acts, where E1 stands: no plan in ~1,300 (4 traces) moved
+-- a unit onto a tile an earlier act's kill freed. The plan's kills change the board as a door
+-- does (sight.changed's gone).
+do
+    local K = blue(0x01, 0, 1, 1)
+    local D = blue(0x02, 1, 0, 0)
+    local E1 = red(0x81, 1, 0)
+    local E2 = red(0x82, 3, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 1 }), [0x02] = tiles({ 0, 0 }, { 0, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["1,1"] = fc { hit = 100, dmg = 99, hits = 1 } } },
+               [0x02] = { [0x82] = { ["2,0"] = fc { hit = 100, dmg = 8, hits = 1 } } } },
+        change = function(c)
+            if c.gone[0x81] then
+                return { reach = { [0x01] = tiles({ 1, 1 }),
+                                   [0x02] = tiles({ 0, 0 }, { 0, 1 }, { 1, 0 }, { 2, 0 }) } }
+            end
+            return {}
+        end,
+        enemyPhase = function() return {} end,
+    }
+    local sight = sightOf(o)
+    local _, plan = Planner.plan(B, boardOf(K, D, E1, E2), sight, style("careful"))
+    local order = {}
+    for _, a in ipairs(plan and plan.acts or {}) do
+        order[#order + 1] = a.unitId .. ">" .. a.act .. "@" .. at(a)
+    end
+    order = table.concat(order, " ")
+    local kill, step = order:find("1>attack@1,1", 1, true), order:find("2>attack@2,0", 1, true)
+    check(kill ~= nil and step ~= nil and kill < step, true,
+          "relist: K kills E1, then D strikes the boss through its tile (" .. order .. ")")
 end
 
 -- test_a_key_no_one_can_reach_opens_nothing: the same cut, A holds no key, and the one Door

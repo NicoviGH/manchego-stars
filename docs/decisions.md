@@ -273,7 +273,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0425` | [The assault seats only strikers that hurt the boss, and baits when they cannot kill it](decisions/0425-the-assault-seats-only-strikers-that-hurt-the-boss-and-baits-when-they-cannot-kill-it.md) | 2026-11-18 | #641 #510 |
 | `0426` | [The vanilla party band runs both routes to the end and reads chapters by constant](decisions/0426-the-vanilla-party-band-runs-both-routes-to-the-end-and-reads-chapters-by-constant.md) | 2026-11-18 | #639 #510 |
 | `0427` | [A wall falls to the strikers a plan stands at it, and a strike is worth the turns it takes off a way](decisions/0427-a-wall-falls-to-the-strikers-a-plan-stands-at-it-and-a-strike-is-worth-the-turns-it-takes-off-a-way.md) | 2026-11-18 | #655 #510 |
-| `0431` | [A plan that opens the map lists its later units' acts again on the map it leaves](decisions/0431-a-plan-that-opens-the-map-lists-its-later-units-acts-again-on-the-map-it-leaves.md) | 2026-11-19 | #661 #510 |
+| `0431` | [A plan that opens a door or kills an enemy gives its later units the acts the change makes new](decisions/0431-a-plan-that-opens-a-door-or-kills-an-enemy-gives-its-later-units-the-acts-the-change-makes-new.md) | 2026-11-19 | #661 #670 #671 #510 |
 
 ---
 

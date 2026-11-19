@@ -19,9 +19,10 @@
 --      does not; the HP is the plan's).
 --      Without it the beam ranked only what a unit does, and every plan it kept was the
 --      exposed one: the judge then had nothing safe to pick (ch03, 2026-10-27).
---      A plan that opens a door or breaks a wall offers its later units their acts listed
---      again on the map it leaves (menusFor, sight.opened; ADR 0431): the doorway and the
---      room behind it are tiles the board's own listing never had.
+--      A plan that opens a door, breaks a wall or kills an enemy gives its later units the acts
+--      from the tiles that change adds to their reach, read on the board it leaves (menusFor,
+--      sight.changed; ADR 0431): the doorway, the room behind it and a dead enemy's tile are
+--      tiles the board's own listing never had.
 --   3. Judge: the best FINAL complete plans each meet the enemy phase the game's own AI would
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
 --      for each unit's chance to die there (a green one's too: it spoils the clear; a recruit
@@ -1034,10 +1035,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- each unit's acts, its own best first (its score with what it does to the goals),
     -- PER_UNIT of them; every Visit and Chest offered,
     -- with its standing chance to die, for the run's trace (the rule's experiment).
-    -- menusOf(list, opens): the menus of Bot.candidates' `list`. `opens` (a re-listed board's,
-    -- menusFor's): the tiles its map change opened ("x,y" -> true), every act ending on one kept
-    -- past the cut as an aside is: what standing in a doorway is worth is the opener it shields,
-    -- which only the judged phase reads (#661). The board's own menus (no `opens`) also record
+    -- menusOf(list, opens): the menus of Bot.candidates' `list`. `opens` (the acts a plan's
+    -- changes add, menusFor's): the tiles the changes freed ("x,y" -> true), every act ending on
+    -- one kept past the cut as an aside is: what standing in a doorway or a dead guard's gap is
+    -- worth is the unit it shields, which only the judged phase reads (#661). The board's own menus (no `opens`) also record
     -- every Visit, Chest, Talk and Seize offered.
     local offered, talks, seizable = {}, {}, false   -- every Talk and Seize the candidates offered
     local function menusOf(list, opens)
@@ -1093,78 +1094,119 @@ function M.plan(Bot, board, sight, style, opts)
     end
     local menus = menusOf(cands)
 
-    -- The menus a plan's later units choose from on the map it leaves (#661). Each unit's acts
-    -- were listed once, on the board before anyone acts; a plan that opens a door or breaks a
-    -- wall (st.opened) changes that map, and no act was ever listed on the tiles it opens: in
-    -- vanilla Ch8 (seed 4002) 101 plans opened (20,7) and none had a unit step into the
-    -- doorway or strike past it. So on such a plan, each unit whose reach the change alters
-    -- (sight.reach on the map with every change applied, sight.opened) gets its acts listed
-    -- again there (Bot.candidates, opts.only), once per set of changes this decision. A unit
-    -- whose reach is the same keeps its board menu: its acts end on the same tiles, and a
-    -- strike's targets are its end tiles and its weapon's range, which no terrain cuts
-    -- (MapAddInRange); only its exposure there is the shut map's, and the judged phase plays
-    -- the open one (ADR 0431, the cost). extend still keeps a used unit or a taken tile out.
-    -- Each re-listed act carries its map (`map`), so the exposure memo tells it from the same
-    -- act on the shut map. An offered replay (opts.offer) reads its acts on another board, and
-    -- a sight without the read (test fakes) has none: both keep the board's menus.
+    -- The menus a plan's later units choose from on the board it leaves (#661, #670). Each
+    -- unit's acts were listed once, on the board before anyone acts; a plan that opens a door
+    -- or breaks a wall (st.opened), or kills an enemy (st.gone), frees tiles no act was listed
+    -- on: in vanilla Ch8 (seed 4002) 101 plans opened (20,7) and none had a unit step into the
+    -- doorway or strike past it, and no plan in ~1,300 ever moved a unit onto a tile an earlier
+    -- act's kill freed. So each unit keeps its board menu, and gains the acts from the tiles the
+    -- plan's changes add to its reach: read on the board with every change applied
+    -- (sight.changed), and listed over those tiles alone (Bot.candidates' opts.only and
+    -- opts.tiles). Only a unit whose board reach comes beside a changed tile is read at all: a
+    -- freed tile is entered from one beside it. A unit's other acts keep their board exposure;
+    -- the judged phase plays the changed board (ADR 0431, the cost). Once per set of changes
+    -- this decision; extend keeps a used unit or a taken tile out. Each added act carries its
+    -- board (`map`), so the exposure memo tells it apart. An offered replay (opts.offer) reads
+    -- its acts on another board, and a sight without the read (test fakes) has none: both keep
+    -- the board's menus.
     local relisted = {}
-    local function tilesOf(list, u)
-        local set = { [u.x .. "," .. u.y] = true }
-        for _, t in ipairs(list or {}) do set[t.x .. "," .. t.y] = true end
-        return set
-    end
-    local function sameTiles(a, b)
-        for k in pairs(a) do if not b[k] then return false end end
-        for k in pairs(b) do if not a[k] then return false end end
-        return true
+    local function sorted(set)
+        local ks = {}
+        for k in pairs(set) do ks[#ks + 1] = tostring(k) end
+        table.sort(ks)
+        return ks
     end
     local function menusFor(st)
-        if offer or not sight.opened or next(st.opened) == nil then return menus end
-        local ks = {}
-        for k in pairs(st.opened) do ks[#ks + 1] = k end
-        table.sort(ks)
-        local mk = table.concat(ks, ";")
-        if not relisted[mk] then
-            -- the units whose reach the changes alter: the board's reach (Bot.candidates' own,
-            -- ctx.reaches) against the opened map's
-            local shut = {}
-            for _, m in ipairs(menus) do
-                local u = m.unit
-                shut[u.id] = tilesOf((ctx.reaches or {})[u.id] or sight.reach(u, true), u)
+        if offer or not sight.changed then return menus end
+        local gone = {}
+        for id in pairs(st.gone) do
+            if byId[id] and byId[id].faction == "red" then gone[id] = true end
+        end
+        if next(st.opened) == nil and next(gone) == nil then return menus end
+        local mk = table.concat(sorted(st.opened), ";") .. "|" .. table.concat(sorted(gone), ";")
+        if relisted[mk] then return relisted[mk] end
+        -- the changed tiles: each door's or wall's whole change where the sight says
+        -- (sight.mapChange: a gate two tiles deep), else its own tile; each dead enemy's
+        local changed = {}
+        for k in pairs(st.opened) do
+            changed[k] = true
+            local x, y = k:match("^(%d+),(%d+)$")
+            for _, t in ipairs(sight.mapChange and sight.mapChange(tonumber(x), tonumber(y)) or {}) do
+                changed[t.x .. "," .. t.y] = true
             end
-            local list = sight.opened(st.opened, function()
-                local only, any = {}, false
-                for _, m in ipairs(menus) do
-                    if not sameTiles(shut[m.unit.id], tilesOf(sight.reach(m.unit, true), m.unit)) then
-                        only[m.unit.id], any = true, true
+        end
+        for id in pairs(gone) do changed[byId[id].x .. "," .. byId[id].y] = true end
+        -- each unit's board reach, and whether it comes beside a changed tile
+        local shut, near = {}, {}
+        for _, m in ipairs(menus) do
+            local u = m.unit
+            local set = { [u.x .. "," .. u.y] = true }
+            for _, t in ipairs((ctx.reaches or {})[u.id] or {}) do set[t.x .. "," .. t.y] = true end
+            shut[u.id] = set
+            for k in pairs(set) do
+                local x, y = k:match("^(%d+),(%d+)$")
+                x, y = tonumber(x), tonumber(y)
+                if changed[k] or changed[(x + 1) .. "," .. y] or changed[(x - 1) .. "," .. y]
+                        or changed[x .. "," .. (y + 1)] or changed[x .. "," .. (y - 1)] then
+                    near[#near + 1] = u
+                    break
+                end
+            end
+        end
+        local list = {}
+        if #near > 0 then
+            local b = {}
+            for k, v in pairs(board) do b[k] = v end
+            b.units = {}
+            for _, u in ipairs(board.units) do
+                if not gone[u.id] then b.units[#b.units + 1] = u end
+            end
+            list = sight.changed({ opened = st.opened, gone = gone }, function()
+                local only, tiles, any = {}, {}, false
+                for _, u in ipairs(near) do
+                    for _, t in ipairs(sight.reach(u, true) or {}) do
+                        local k = t.x .. "," .. t.y
+                        if not shut[u.id][k] then
+                            tiles[u.id] = tiles[u.id] or {}
+                            tiles[u.id][k], only[u.id], any = true, true, true
+                        end
                     end
                 end
                 if not any then return {} end
                 local o = {}
                 for k, v in pairs(opts or {}) do o[k] = v end
-                o.only = only
-                return (Bot.candidates(board, sight, style, o))
-            end)
-            -- the tiles the changes open: a door's or wall's whole change where the sight says
-            -- (sight.mapChange: a gate two tiles deep), else its own tile
-            local opens = {}
-            for _, k in ipairs(ks) do
-                opens[k] = true
-                local x, y = k:match("^(%d+),(%d+)$")
-                for _, t in ipairs(sight.mapChange and sight.mapChange(tonumber(x), tonumber(y)) or {}) do
-                    opens[t.x .. "," .. t.y] = true
+                o.only, o.tiles = only, tiles
+                local out = Bot.candidates(b, sight, style, o)
+                -- an act whose own tile is a new one (a Vulnerary in place is the board's)
+                for _, c in ipairs(out) do
+                    local kept = {}
+                    for _, a in ipairs(c.acts) do
+                        if tiles[c.unit.id][a.move.x .. "," .. a.move.y] then
+                            a.map = mk
+                            kept[#kept + 1] = a
+                        end
+                    end
+                    c.acts = kept
                 end
-            end
-            for _, c in ipairs(list) do
-                for _, a in ipairs(c.acts) do a.map = mk end
-            end
-            local again = {}
-            for _, m in ipairs(menusOf(list, opens)) do again[m.unit.id] = m end
-            local out = {}
-            for _, m in ipairs(menus) do out[#out + 1] = again[m.unit.id] or m end
-            relisted[mk] = out
+                return out
+            end)
         end
-        return relisted[mk]
+        local added = {}
+        for _, m in ipairs(menusOf(list, changed)) do added[m.unit.id] = m.acts end
+        local out = {}
+        for _, m in ipairs(menus) do
+            local more = added[m.unit.id]
+            if more and #more > 0 then
+                local acts = {}
+                for i, a in ipairs(m.acts) do acts[i] = a end
+                for _, a in ipairs(more) do acts[#acts + 1] = a end
+                out[#out + 1] = { unit = m.unit, acts = acts }
+            else
+                out[#out + 1] = m
+            end
+        end
+        relisted[mk] = out
+        return out
     end
 
     -- `st` with `a` (unit `uid`'s act) added, the board the plan leaves updated; nil when the
