@@ -11,27 +11,30 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19, evening; main is c9e82bab). Nothing is running. #639 (promote at L10 or L20) is on hold.** Its reason and what reopens it are in comment 7011738055. The party is shaped by who earns the experience: Seth (charId 2) takes 25-35% of the kills, and the bench is 3-10 levels under vanilla's levels. The unit-by-unit tables are on #662.
+**Next session starts here (2026-11-19, night; main is 1cf686b6). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
-- **Merged overnight:** PR #659 (#655, ADR 0427). A wall falls to the strikers a plan stands at it; any unit that can hurt it may strike. Vanilla Ch8's wall now breaks; the chests are still missed (#663).
+- **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
+  - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
+  - Timings only when a change adds planning work to every turn, or touches tests or CI.
+  - Fixes land back to back. Games are played when a batch of fixes has a real chance of a better result.
+  - Correctness first: a slowdown may go to its own issue (#671), by Nicolas's call.
+  - Clean still means every chest, village and recruit, with no loss. No line of work is parked for lack of movement.
+- **Merged tonight: PR #669 (ADR 0431), which closes #661 and #670.**
+  - When a plan opens a door, breaks a wall or kills an enemy, the units still to act gain the acts that change makes new.
+  - #661's first diagnosis was wrong. The unit on the door tile was Lute (charId 12), who holds a Door Key. Every plan that opened the door was over the cap, because no later unit could step into the doorway or strike past it (101 door plans, 0 follow-ups). Comments 7019945016 and 7020038218 have the details.
+  - Vanilla Ch8, `e639-t639-cs-s4002/9` attempt 1: main won in 57 turns, not clean. The branch won clean in 16 and 17 turns, with no deaths (`relist661e`, `relist661g`). These were the first clean Ch8 clears; 48 earlier games had none. One game only.
+  - The review (7 findings) and the scoped re-review (4 findings) were all fixed. One finding was answered with evidence instead of built: staging the plan's moved units on the re-list board cost 54.9 s per phase.
+- **Cost (#671):** 8.1 s of CPU per player phase, against main's 2.24 s. Turn 1's first decision is 10,043 frames against 7,127. Most of it is the kill trigger. The lead and the numbers are on #671.
 - **Work in order (all under #640):**
-  1. **#662, who earns the experience.** How much a plan values experience is a weight, so it is Nicolas's call. The fix needs a measure per chapter and per unit against #662's tables.
-  2. **#661:** a unit with no way to open the door blocks the opener's only tile (13 of 48 Ch8 games stuck).
-  3. **#663:** Ch8's west chests. First one instrumented replay of why no wall strike is offered (s4003 a9, s4002 a10).
-  4. **#660** (under #510): the bot doesn't model its own berserked units' phase. The fix is written on the issue.
-  5. **#664:** a chapter gets all its attempts for a clean clear before the scout lap carries on (amends ADR 0409).
-  6. **Then:** one fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean (Nicolas, 2026-11-19). The frozen suite on main also still owes a run.
-- **Still open from before:**
-  - #652, the vanilla-ch3 stall from #628. `suite --only vanilla-ch3/1001` won clean on #659's branch, but this was not re-checked as fixed.
-  - #657, #658 (a weight call), #651 (on hold).
-- **Lap data** (gitignored):
-  - `review/639-laps/` holds the logs, the saved chapter lines and `partial-verdict.txt`.
-  - `review/639-strength/` holds the party-strength scripts.
-  - The records are in `references/sim/vanilla/c25b145e3745/resume-runs.jsonl`, under tags `t639`, `r639b`, `e639`, `es639`, `is639`, `s20` and `k10`.
-- **Merged this evening:**
-  - PR #666 (#665, ADR 0428): run.sh's wall net is never under a scenario's declared deadline (a campaign gets its 86400s), and a campaign cut before its end line ends `crashed` in run.sh's words, so `resume` prints and counts it. The 2-hour net had cut 19 of the 20 overnight L10 campaigns and the 8 forks; earlier laps were never cut (#665 comment). The #639 lap data past each cut is partial.
-  - PR #668 (#667, ADR 0429): a passing run's worker log is deleted with its run dir; a failing one's is made read-only and only the newest 20 are kept. 11.5 GB of unread logs and 3.3 GB of run dirs had filled the disk (deleted by hand 2026-11-19).
-- **Disk:** about 22 GB free after the cleanup. The `mac-storage-cleanup` skill is installed in `~/.claude/skills`.
+  1. #664: a chapter gets all its attempts for a clean clear before the scout lap carries on (amends ADR 0409).
+  2. #660: the bot doesn't model its own berserked units' phase. The fix is written on the issue.
+  3. #662: who earns the experience. Recommend a weight from the per-unit tables and measure it.
+  4. #663: Ch8's west chests. Re-check them on #669's code first: both clean replays took them.
+  5. #671: the re-list cost, if laps are too slow.
+  6. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
+- **Kept, not merged:** stash `661 escort price (unproven, kept)` and the local branch `feat/661-escort-leaves-the-openers-tile`. It is the price for an escort with no key standing on the opener's tile. It did not stop Eirika's squat in `fix661` a4, and why is untested. Drop it if Ch8's squats are gone on #669's code.
+- **Also open:** #652 (the vanilla Ch3 stall, not re-checked), #657, #658 (a weight call), #651 (on hold). The Dance act is missing from the bot (Tethys); no issue is filed yet.
+- **Disk:** about 22 GB free after the 2026-11-19 cleanup.
 
 **2026-11-18, late. In flight then: #639, "is the bot's party strong enough past Ch8? Vanilla band to Ch20, and promote at L10 or L20."** Read #639's plan comment (6992662334) and its progress comment (6998840930) first; they hold everything below in full.
 
