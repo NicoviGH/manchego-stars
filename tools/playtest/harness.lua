@@ -4490,12 +4490,23 @@ INSPECT.campaignApi = function(game)
         f:close()
         return true
     end
-    api.load = function(ch)
-        if not states[ch] then return nil, "no state for chapter " .. ch end
-        emu:loadStateBuffer(states[ch])
+    -- put a state buffer back and drop what was cached from the game before it: the one way a
+    -- chapter's start (api.load) and the scout lap's kept win (api.restore) are put back
+    -- `check`, when given, reads the loaded state before any frame runs (a frame may draw dice)
+    -- and returns nil, why to refuse it
+    local function put(buffer, check)
+        emu:loadStateBuffer(buffer)
+        if check then
+            local ok, why = check()
+            if not ok then return nil, why end
+        end
         shops = nil
         wait(2)
         return true
+    end
+    api.load = function(ch)
+        if not states[ch] then return nil, "no state for chapter " .. ch end
+        return put(states[ch])
     end
     -- The scout lap's kept win (campaign.lua, #664): the state at a won attempt's end, in memory
     -- only, put back at the cap to carry on from as api.load puts back a start. The token also
@@ -4507,17 +4518,20 @@ INSPECT.campaignApi = function(game)
         return string.format("turn %d, dice %d %d %d", turn(), d[1], d[2], d[3])
     end
     api.keep = function() return { buffer = emu:saveStateBuffer(), mark = mark() } end
+    -- The mark is read at once on both sides, keep and restore, with no frame between: the
+    -- turn and dice can only match if both are read at the same point. Two end states on the
+    -- same turn and dice would pass; the attempts' dice are DICE_STRIDE draws apart
+    -- (campaign.lua), so that is a coincidence the check does not cover
     api.restore = function(kept)
         if not kept then return nil, "no kept state" end
-        emu:loadStateBuffer(kept.buffer)
-        local now = mark()
-        log(string.format("campaign: restored the kept win (%s; kept at %s)", now, kept.mark))
-        if now ~= kept.mark then
-            return nil, string.format("the restored state reads %s, kept at %s", now, kept.mark)
-        end
-        shops = nil
-        wait(2)
-        return true
+        return put(kept.buffer, function()
+            local now = mark()
+            log(string.format("campaign: restored the kept win (%s; kept at %s)", now, kept.mark))
+            if now ~= kept.mark then
+                return nil, string.format("the restored state reads %s, kept at %s", now, kept.mark)
+            end
+            return true
+        end)
     end
 
     -- The prep screen's cap, read off Pick Units itself (ProcPrepUnit.max_counter): opening it

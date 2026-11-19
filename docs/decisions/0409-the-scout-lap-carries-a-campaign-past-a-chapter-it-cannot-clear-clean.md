@@ -15,11 +15,12 @@ Eirika's route (#510 comment 6872554917).
 
 **Decision.** `montecarlo.py resume --scout` carries a campaign on past such a chapter. A
 chapter first gets every attempt for a clean clear (the cap, `--attempts` or 12); only then
-does the lap carry on, from its best win: the fewest player units lost, then the earliest
-(amended 2026-11-19, #664; below). A win that lost only a green (an ally the player does not
+does the lap carry on, from its best win: the fewest player units lost, then the fewest
+recruits and rewards missed, then the earliest (amended 2026-11-19, #664; below). A win that lost only a green (an ally the player does not
 control) counts as one with no player unit lost. A chapter so passed says `scouted`, never
-`cleared`, and `scouted_from` names the attempt carried on from; every line of the campaign
-says `scout`; the dead are not carried. A chapter with no win in the cap still stops
+`cleared`. Its `attempts` is then the cap (every attempt was played) and `scouted_from` names
+the attempt carried on from; its `failures` list every attempt that was not a clean clear, that
+one too. Every line of the campaign says `scout`; the dead are not carried. A chapter with no win in the cap still stops
 it. `resume --route 1|2` picks the branch at Ch8's split (Ephraim's route had no way in).
 
 **Amended 2026-11-19 (#664, Nicolas): every attempt for a clean clear, then the best win.**
@@ -34,11 +35,15 @@ scout laps undercounted them (#639's laps hit this).
   the emulator's state buffer; only the best so far, so at most one held) and put back at the
   cap (`api.restore`), as `api.load` puts back a chapter's start. Nothing is played again.
 - Best = fewest player units lost, because the lap carries on with the survivors; then the
-  earliest, so a tie never saves a state for nothing. A chapter's line keeps that win's turns,
-  deaths, misses and team.
+  fewest recruits and rewards missed, which the later chapters lose for good; then the
+  earliest, so a tie never saves a state for nothing. Which unit died is not weighed: no rule
+  ranks one unit's worth over another's, and a lord's death loses the chapter. A chapter's line
+  keeps that win's turns, deaths, misses and team.
 - Cost: a chapter the bot cannot clear clean now plays the whole cap (12) where it played 1 to
   4. That is the price of counting clean clears on later attempts.
-- Test: `test_campaign.lua`'s two scout tests; both fail on the first version's rule.
+- Tests: `test_campaign.lua`'s scout tests. The first two fail on the first version's rule;
+  the third fails without the tie on misses, and also pins that a refused restore ends the lap
+  `crashed` (a harness fault, as a failed `api.load` is).
 - Proof in the game (2026-11-19): `resume --scout --attempts 2 --route 1` from
   `t639-cs-s4003/9` (vanilla Ch8). Both attempts won with one unit lost (attempt 1 in 18 turns,
   attempt 2 in 12). The lap kept attempt 1 (the tie goes to the earlier), restored it at the cap

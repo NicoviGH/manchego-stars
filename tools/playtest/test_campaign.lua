@@ -77,7 +77,11 @@ local function fakeGame(o)
             g.kept = g.kept + 1
             return o.chapters[g.at].id .. "/" .. g.attempt
         end,
-        restore = function(st) g.restored[#g.restored + 1] = st; return true end,
+        restore = function(st)
+            g.restored[#g.restored + 1] = st
+            if o.restoreFails then return nil, "the restored state reads turn 12" end
+            return true
+        end,
         roster = roster,
         cap = function() return o.cap end,
         teamGroups = function()
@@ -387,6 +391,36 @@ local function test_the_scout_lap_carries_on_from_the_best_win_at_the_cap()
     check(plain.kept, 0, "no scout: no win's state is kept")
 end
 test_the_scout_lap_carries_on_from_the_best_win_at_the_cap()
+
+-- of two wins that lost as many units, the one that missed fewer recruits and rewards is kept;
+-- a kept state the harness cannot put back stops the lap as a crash (a harness fault)
+local function test_the_scout_lap_breaks_a_tie_on_misses_and_a_failed_restore_crashes()
+    local g = fakeGame({ game = "vanilla", chapters = {
+        { id = 5, outcomes = { "spoiled", "lost", "won" } }, { id = 6 } } })
+    -- attempt 3: won, not clean (a green died), nothing missed and no player unit lost
+    local play = g.api.play
+    g.api.play = function(...)
+        local r = play(...)
+        if g.attempt == 3 then
+            r.clean = false
+            r.deaths = { { id = 9, charId = 0x50, faction = "green", turn = 2 } }
+            r.clear = { won = true, lost = r.deaths, recruits_missing = {}, rewards_missing = {} }
+        end
+        return r
+    end
+    g.api.scout, g.api.attempts = true, 3
+    check(Campaign.run(g.api), true, "scout, tie: the lap goes on")
+    check(lines(g)[1].scouted_from, 3, "scout: the win that missed nothing beats the earlier one")
+    local bad = fakeGame({ game = "vanilla", restoreFails = true, chapters = {
+        { id = 5, outcomes = { "dead", "lost" } }, { id = 6 } } })
+    bad.api.scout, bad.api.attempts = true, 2
+    local ok, why = Campaign.run(bad.api)
+    check(ok, false, "scout: a kept state that does not read back stops the lap")
+    check(lines(bad)[1].outcome, "crashed", "scout: as a crash, the harness failing")
+    check(why:find("restore: the restored state reads turn 12", 1, true) ~= nil, true,
+          "scout: with the harness's reason")
+end
+test_the_scout_lap_breaks_a_tie_on_misses_and_a_failed_restore_crashes()
 
 -- test_a_won_attempt_that_spoiled_a_part_is_retried: attempt 1 is won with a recruit missed,
 -- attempt 2 is clean; the failure keeps what spoiled it and the attempt's trace.

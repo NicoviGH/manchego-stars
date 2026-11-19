@@ -2948,10 +2948,12 @@ def resume_tasks(store, env, names, pins, tag, chapter=None, last=None, vanilla=
     under 1 or over the cap, a campaign has no such start, its pinned start was rewritten, its
     seed is unknown, or the new id is taken; a copy that fails removes every copy this call
     made, then raises. `scout` carries each campaign on past a chapter it cannot clear clean (the
-    scout lap: every attempt for a clean clear, then on from the best win, ADR 0409); `route` (1 Eirika, 2 Ephraim) is the branch it
-    takes at vanilla's Ch8 split, in place of the env's; `seal_at` (10 or 20, #639) is the level
-    the bot uses a promotion item at (bot.lua Bot.uses; unset plays 10), written into each run's
-    style (campaign.lua stamps 10 when unset) so every record says which policy it played. A
+    scout lap, ADR 0409: every attempt up to the cap for a clean clear, then on from the best
+    win; so a chapter it cannot clear clean plays the whole cap); `route` (1 Eirika, 2 Ephraim)
+    is the branch it takes at vanilla's Ch8 split, in place of the env's; `seal_at` (10 or 20,
+    #639) is the level the bot uses a promotion item at (bot.lua Bot.uses; unset plays 10),
+    written into each run's style (campaign.lua stamps 10 when unset) so every record says
+    which policy it played. A
     campaign a `seal_at` lap made is marked (SEAL_AT_MARK): resuming it without `seal_at`
     inherits the level, a different one is refused. Each task runs under `instrument`
     (instrument_id() unless given); its records say whether their start was stale (records_of).
@@ -4146,7 +4148,8 @@ def main(argv=None):
                          '(default: the cap)')
     ru.add_argument('--scout', action='store_true',
                     help='the scout lap: a chapter with no clean clear in its attempts is '
-                         'carried on past from its best win (ADR 0409); its chapters say scouted')
+                         'carried on past from its best win (ADR 0409), so it plays every '
+                         'attempt first; its chapters say scouted')
     ru.add_argument('--route', type=int,
                     help='the branch taken at vanilla\'s Ch8 split: 1 Eirika, 2 Ephraim '
                          '(default: the suite\'s)')

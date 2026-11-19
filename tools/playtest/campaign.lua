@@ -144,12 +144,19 @@ M.MAX_ATTEMPTS = 12
 -- seen at all. A chapter still gets every attempt for a clean clear (a clean clear on a later
 -- attempt is a clean clear: Nicolas, 2026-11-19); each win that is not clean is kept (api.keep,
 -- only the best so far), and at the cap the lap carries on from it (scoutBetter). Its chapter
--- lines say `scouted`, never `cleared`: a scout lap finds harness faults and missing abilities;
--- it never says how hard a chapter is (its party is smaller than a clean one's).
+-- line's `attempts` is then the cap (every attempt was played) and `scouted_from` the attempt
+-- carried on from; `failures` lists every attempt that was not a clean clear, that one too.
+-- Its chapter lines say `scouted`, never `cleared`: a scout lap finds harness faults and
+-- missing abilities; it never says how hard a chapter is (its party is smaller than a clean
+-- one's).
 -- The better of two unclean wins: the fewer player units lost (the party the lap carries on
--- with), then the earlier (a tie keeps what is already kept, so no state is saved for nothing)
-function M.scoutBetter(lost, kept)
-    return kept == nil or lost < kept.lost
+-- with), then the fewer recruits and rewards missed (what the later chapters lose for good).
+-- Strict on both, so of two equal wins the earlier stays kept and no state is saved for nothing.
+-- `win` and `kept` are { dead = count, missed = count }; kept is nil before any win
+function M.scoutBetter(win, kept)
+    if kept == nil then return true end
+    if win.dead ~= kept.dead then return win.dead < kept.dead end
+    return win.missed < kept.missed
 end
 
 -- Draws of the game's RNG each retry moves on: attempt k advances (k - 1) * DICE_STRIDE.
@@ -539,23 +546,33 @@ function M.run(api)
                     return "played", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, tostring(rec.outcome))
                 end
-                if rec.clean == true then
-                    entry.outcome, entry.turns = "cleared", rec.turns
-                    entry.team = teamLine(team)
+                -- the chapter is passed with this attempt's team: its fielded units, less its
+                -- dead, are carried into the next chapter's pick
+                local function carryOn(outcome, r, t, dead)
+                    entry.outcome, entry.turns = outcome, r.turns
+                    entry.team = teamLine(t)
                     carried = {}
-                    for _, charId in ipairs(team.deploy) do carried[charId] = true end
+                    for _, charId in ipairs(t.deploy) do
+                        if not dead[charId] then carried[charId] = true end
+                    end
+                end
+                if rec.clean == true then
+                    carryOn("cleared", rec, team, {})
                     break
                 end
                 -- the scout lap keeps a win that was not clean, to carry on from at the cap
-                local lost, nLost = {}, 0
+                local deadSet, nDead = {}, 0
                 for _, d in ipairs(rec.deaths or {}) do
-                    if d.faction == "blue" and not lost[d.charId] then
-                        lost[d.charId], nLost = true, nLost + 1
+                    if d.faction == "blue" and not deadSet[d.charId] then
+                        deadSet[d.charId], nDead = true, nDead + 1
                     end
                 end
-                if api.scout and rec.outcome == "won" and M.scoutBetter(nLost, kept) then
-                    kept = { state = api.keep(), attempt = entry.attempts, lost = nLost,
-                             dead = lost, rec = rec, team = team }
+                local missed = rec.clear and (#(rec.clear.recruits_missing or {})
+                                              + #(rec.clear.rewards_missing or {})) or 0
+                local win = { dead = nDead, missed = missed }
+                if api.scout and rec.outcome == "won" and M.scoutBetter(win, kept) then
+                    kept = { state = api.keep(), attempt = entry.attempts, dead = nDead,
+                             missed = missed, deadSet = deadSet, rec = rec, team = team }
                 end
                 entry.failures[#entry.failures + 1] = { attempt = entry.attempts, style = style,
                     team = team.deploy, outcome = rec.outcome, deaths = rec.deaths,
@@ -584,6 +601,8 @@ function M.run(api)
                 end
                 if entry.attempts >= attemptCap then
                     if not kept then return noClean(entry) end
+                    -- a state that does not read back as kept is the harness failing (the
+                    -- emulator's load), never the bot: a crash, as a failed api.load is
                     local rok, rwhy = api.restore(kept.state)
                     if not rok then
                         entry.outcome = "crashed"
@@ -591,15 +610,12 @@ function M.run(api)
                         return "crashed", "restore: " .. tostring(rwhy)
                     end
                     local r = kept.rec
-                    entry.outcome, entry.turns, entry.scouted_from = "scouted", r.turns, kept.attempt
+                    carryOn("scouted", r, kept.team, kept.deadSet)
+                    entry.scouted_from = kept.attempt
                     entry.deaths = r.deaths
                     entry.missed = r.clear and { recruits = r.clear.recruits_missing,
                                                  rewards = r.clear.rewards_missing }
-                    entry.team = teamLine(kept.team)
-                    carried = {}
-                    for _, charId in ipairs(kept.team.deploy) do
-                        if not kept.dead[charId] then carried[charId] = true end
-                    end
+                    kept = nil   -- the state buffer and the trace are not held into the next chapter
                     break
                 end
                 local lok, lwhy = api.load(ch)
