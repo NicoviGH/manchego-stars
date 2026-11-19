@@ -626,6 +626,16 @@ local function reachOf(ctx, u)
         if t.x == u.x and t.y == u.y then own = true end
     end
     if not own then r[#r + 1] = { x = u.x, y = u.y } end
+    -- a re-listing's unit (M.candidates' opts.tiles): only the tiles the plan's changes opened
+    -- to it, so every act built over its reach is one its board menu could not hold
+    local only = ctx.tiles and ctx.tiles[u.id]
+    if only then
+        local kept = {}
+        for _, t in ipairs(r) do
+            if only[tileKey(t.x, t.y)] then kept[#kept + 1] = t end
+        end
+        r = kept
+    end
     ctx.reaches[u.id] = r
     return r
 end
@@ -2006,7 +2016,9 @@ local function mend(ctx, u, gate, m)
     m = m or ownHeal(ctx, u)
     if not m then return nil end
     local allowed = gated(ctx, u, waitTiles(ctx, u), gate)
-    return healAct(u, m, safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u)))
+    -- no tile at all only for a re-listing's unit (M.candidates' opts.tiles)
+    local tile = safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u))
+    return tile and healAct(u, m, tile) or nil
 end
 
 -- One act `a` of `u` the planner builds itself (the heal swap's, the bait's), told its tile's
@@ -2544,9 +2556,15 @@ local function proposeOne(ctx, u)
     -- the march over every tile, and over free tiles only: a tile an ally may vacate is
     -- an extra way forward, never the only one (vanilla Ch3: Eirika held behind the army
     -- for five turns, the throne open, every forward tile an ally's who stayed put)
-    add(action(u, march(ctx, u, open, objective), "wait"), "march")
+    -- (no tile at all only for a re-listing's unit, M.candidates' opts.tiles: its new tiles
+    -- may all be allies')
+    local function marched()
+        local t = march(ctx, u, open, objective)
+        add(t and action(u, t, "wait"), "march")
+    end
+    marched()
     ctx.freeOnly = true
-    add(action(u, march(ctx, u, open, objective), "wait"), "march")
+    marched()
     ctx.freeOnly = nil
     local holds = bySafety(ctx, u, waitTiles(ctx, u))
     add(holds[1] and action(u, holds[1], "wait"), "hold")
@@ -2742,12 +2760,23 @@ end
 -- them ("x,y" -> kind; a reward needing one is gone); `stalled`, the board repeats (an avoid
 -- claim gives way); `quietGoals`, the ledger goal ids no unit has neared over GOAL_QUIET waiting player
 -- phases (goals.lua's ledger marks their rows stalled); `stuck`, the last call's ctx.stuck ("unit id>x,y" -> { id, x, y, since }:
--- each goal a unit was found with no step toward, and the turn it was first found so).
+-- each goal a unit was found with no step toward, and the turn it was first found so); `only`
+-- ({ [unit id] = true }) and `tiles` ({ [unit id] = { ["x,y"] = true } }), the planner's
+-- re-listing (#661, #670): only those units' acts are listed, each over those tiles of its
+-- reach alone, every other unit standing as it is.
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
 -- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    if opts and opts.only then
+        local kept = {}
+        for _, u in ipairs(ctx.actors) do
+            if opts.only[u.id] then kept[#kept + 1] = u end
+        end
+        ctx.actors = kept
+    end
+    ctx.tiles = opts and opts.tiles
     ctx.explored = opts and opts.explored or {}
     ctx.seen = opts and opts.seen
     ctx.lost = opts and opts.lost or {}

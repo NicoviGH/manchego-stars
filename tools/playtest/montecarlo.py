@@ -3892,6 +3892,15 @@ def witness_label(diag, plan):
         # the pin then read avoided, and a full-information plan could use acts only the
         # fog-off board offered (ADR 0392)
         return None, '%s: a line from before `planned` was recorded; re-run it' % mode
+    # the played plan held acts the planner read on the board an earlier act leaves (#661, ADR
+    # 0431). A full_info replay's acts are the fogged board's, so it cannot re-propose them; a
+    # force replay of one is offered nothing by Bot.candidates on the pinned board, which would
+    # read as a missing action. Either way the plan differs for that reason alone
+    held = [k for k in diag.get('relisted') or []
+            if mode == 'full_info' or (mode == 'force' and k in (diag.get('planned') or []))]
+    if held:
+        return None, ('%s: the plan held re-listed acts (%s) the replay cannot offer on the '
+                      'pinned board; its verdict says nothing' % (mode, ', '.join(held)))
     if diag.get('outcome') in NO_RESULT:
         # the replay stopped on an error of its own after it matched: the unit fell, if it
         # did, because the run stopped, which says nothing about the plan. Every replay that

@@ -2786,6 +2786,24 @@ class Audit(unittest.TestCase):
                                                  why="the failure's turn is over")])
         self.assertEqual(f['labels'], ['mis_scored'])
 
+    def test_a_full_info_replay_of_a_plan_with_relisted_acts_is_no_witness(self):
+        # #661: the played plan's door-and-doorway acts are read on the board an earlier act
+        # leaves; the offered replay cannot re-propose them, so its different plan is no
+        # information_unavailable witness, and the line says why
+        d = dict(_diag(mode='full_info'), relisted=['2>wait@2,0'])
+        [f] = self.audit([_rec(_death())], [d])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('re-listed acts (2>wait@2,0)', ' '.join(f['notes']))
+        # a force replay of a re-listed act is no missing action either; one of another act is
+        # read as before
+        [f] = self.audit([_rec(_death())], [dict(_diag(), relisted=['b'])])
+        self.assertEqual(f['labels'], [])
+        self.assertIn('re-listed acts (b)', ' '.join(f['notes']))
+        [f] = self.audit([_rec(_death())], [dict(_diag(), relisted=['2>wait@2,0'])])
+        self.assertEqual(f['labels'], ['mis_scored'])
+        [f] = self.audit([_rec(_death())], [_diag(mode='full_info')])
+        self.assertEqual(f['labels'], ['information_unavailable'])
+
     def test_a_broken_replay_is_no_witness(self):
         # the replay could not play the plan it chose to the end (`broken`): `chosen` is what it
         # did play, and a plan cut short avoided nothing on its own

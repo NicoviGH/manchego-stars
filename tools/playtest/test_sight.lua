@@ -1441,6 +1441,8 @@ do
         "closingsKey: a wave's units, not only how many waves")
     check(Sight.closingsKey(3, 8, nil, { a, b }, open, { { x = 4, y = 4 } }) ~= key, true,
         "closingsKey: one of ours blocking")
+    check(Sight.closingsKey(3, 8, nil, { a, b }, open, nil, "1;30") ~= key, true,
+        "closingsKey: the map (a door the planner's re-listing opened, #661)")
 end
 
 -- sackedTerrain: a taken chest is emptied, a taken village closed; neither is on the AI's loot
