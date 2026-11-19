@@ -1343,6 +1343,69 @@ do
     check(d.flags.player_phase, false, "enemy phase")
 end
 
+-- test_grade_a_berserk_phase_death (#660): vanilla Ch14's Garcia (charId 0x0A, id 5),
+-- berserked, killed Eirika in the berserk phase that ends our phase. The watch names him the
+-- killer and the game counts the phase the player's; the record graded it a `reinforcement` (no red
+-- killer) with no prediction. It is a berserk death, read off the plan's predict (sight's
+-- playPhase judges the berserk phase with the enemy phase), whose striker he is.
+do
+    local snap = { { id = 0x01, charId = 0x01, faction = "blue" },
+                   { id = 0x05, charId = 0x0A, faction = "blue" },
+                   { id = 0x81, charId = 0x81, faction = "red" } }
+    local d = Botrun.grade(death { killer = 0x0A, killerId = 0x05, phase = "player" },
+        committed { snapshot = snap, predict = { { id = 0x01, die = 0.3, strikers = { 0x05 } } } },
+        { unitId = 0x04, die = 0 }, nil, {})
+    check(d.flags.berserk, true, "berserk: the killer is a player unit")
+    check(d.flags.reinforcement or d.flags.fog or d.flags.player_phase, false,
+          "berserk: no arrival, no fog, no counter to our act")
+    check(d.predicted, 0.3, "berserk: the plan's predict, not the last act's counter")
+    check(d.cause, "rng_tail", "berserk: a death the plan read, lost on the roll")
+    d = Botrun.grade(death { killer = 0x0A, killerId = 0x05, phase = "player" },
+        committed { snapshot = snap, predict = { { id = 0x01, die = 0, strikers = {} } } },
+        { unitId = 0x04, die = 0 }, nil, {})
+    check(d.cause .. "/" .. d.detail, "other/unrevealed_killer",
+          "berserk: unread at 0%, a striker the judged phase never sent")
+end
+
+-- test_a_berserk_phase_death_through_the_record (#660): the watch reports Eirika (0x01) killed
+-- by the player's own berserked 0x05 in the berserk phase, which the game counts the player's.
+-- The record keeps it, read off the plan that judged the phase (its 30%, 0x05 its striker):
+-- berserk, a lost roll, no arrival, and no enemy class remembered for its killer.
+do
+    local X = unit(0x81, 0, "red", 9, 9, 20)
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x05, 1, "blue", 0, 1, 20),
+                                   unit(0x02, 2, "blue", 0, 2, 20), X },
+                         enemy = function(g, find)
+                             local u = find(0x01)
+                             u.hp, u.dead, u.onField = 0, true, false
+                             return {}
+                         end }
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x05, killerId = 0x05,
+                   phase = "player" } }
+    end
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 0, y = 2 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                        predict = { { id = 0x01, charId = 0x01, x = 0, y = 0, hp = 20, die = 0.3,
+                                      taken = 20, strikes = 1, strikers = { 0x05 } } } }
+        end,
+    }
+    Botrun.run(g.api)
+    local d = recordOf(g).deaths[1]
+    check(d and d.flags.berserk, true, "record berserk: the killer is a player unit")
+    check(d and d.flags.reinforcement, false, "record berserk: no arrival")
+    check(d and d.cause, "rng_tail", "record berserk: the judged phase's 30% was the roll")
+    check(d and d.killerClass, nil, "record berserk: no enemy remembered for it")
+end
+
 -- test_cause_precedence (FR-005)
 do
     local all = { over_cap = true, predicted = 0.3, killer = 0x81,

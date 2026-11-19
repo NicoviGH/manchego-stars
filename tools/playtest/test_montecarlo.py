@@ -108,6 +108,8 @@ class Records(unittest.TestCase):
         other = dict(_GRADED[0], cause='other', detail='unrevealed_killer', predicted=0,
                      flags={})
         self.assertIn('other (blindspot: unrevealed_killer) at 0.0%', mc.death(other))
+        # a player unit's berserk-phase strike (#660, ADR 0432): the flag is shown
+        self.assertTrue(mc.death(dict(other, flags={'berserk': True})).endswith(', berserk'))
         lost = dict(V2, outcome='lost', deaths=[other])
         self.assertIn('deaths: lost 0x42', mc.attempt_line(lost, set()))
         crashed = mc.attempt_line(dict(lost, outcome='crashed', why='Lua error'), set())
@@ -3460,12 +3462,13 @@ class Calibration(unittest.TestCase):
     the plan that moved its unit; a play kept twice counts once."""
 
     @staticmethod
-    def trace(style='careful', moved_die=0.3, last_die=0.9, chapter=6, dies=True, carried=False):
+    def trace(style='careful', moved_die=0.3, last_die=0.9, chapter=6, dies=True, carried=False,
+              flags=None):
         blue = [{'id': 1, 'charId': 1, 'faction': 'blue'}, {'id': 2, 'charId': 2, 'faction': 'blue'}]
         if carried:
             blue = blue[1:]
         dead = [{'faction': 'blue', 'phase': 'enemy', 'turn': 1, 'id': 1, 'charId': 1,
-                 'flags': {}}] if dies else []
+                 'flags': flags or {}}] if dies else []
         return [
             {'t': 'start', 'info': {'game': 'vanilla', 'chapter': chapter, 'instrument': 'i'},
              'style': {'aggression': style}},
@@ -3491,9 +3494,10 @@ class Calibration(unittest.TestCase):
             t(style='bold', moved_die=0.1),                      # mover under 15%, last 90%
             t(style='bold', moved_die=0.1, last_die=0.1),
             t(style='bold', moved_die=0.0, last_die=0.0),
-            t(style='greedy'))]
+            t(style='greedy'),
+            t(style='bold', moved_die=0.0, last_die=0.0, flags={'berserk': True}))]
         self.assertEqual(kinds, ['moved under, over by the phase end', 'under: dice',
-                                 'under: blind spot', 'no cap'])
+                                 'under: blind spot', 'no cap', 'under: berserk'])
         c = mc.calibration([t(carried=True, dies=False)])
         self.assertEqual(sum(n for n, _, _ in c['bins'].values()), 1,
                          'a unit off the field in the phase is no unit-phase')

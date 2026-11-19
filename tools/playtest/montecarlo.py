@@ -648,7 +648,8 @@ def death(d, who=hex_id):
         out += ' (%s: %s)' % (details[d['detail']], d['detail'])
     if d.get('predicted') is not None:
         out += ' at %.1f%%' % (100 * d['predicted'])
-    flags = [f for f in ('boss',) if (d.get('flags') or {}).get(f)]
+    # berserk: the killer was a player unit, in the berserk phase (#660, ADR 0432)
+    flags = [f for f in ('boss', 'berserk') if (d.get('flags') or {}).get(f)]
     if d.get('escort'):
         flags.append('escort')
     return out + ''.join(', %s' % f for f in flags)
@@ -3667,6 +3668,8 @@ def calibration(traces):
                 kind = 'under: fog'
             elif flags.get('reinforcement'):
                 kind = 'under: arrival'
+            elif flags.get('berserk'):
+                kind = 'under: berserk'   # a player unit's berserk-phase strike (ADR 0432)
             else:
                 kind = 'under: blind spot'
             deaths[name][kind] += 1

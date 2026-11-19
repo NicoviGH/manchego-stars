@@ -39,7 +39,12 @@ Board.UNIT_SIZE = 0x48
 -- A unit the player cannot select for its status (playerphase.c: BERSERK and SLEEP are refused
 -- the cursor; the game moves a berserked unit itself). Its +30 low nibble is the status.
 Board.UNIT_STATUS = 0x30
-function Board.statusHeld(status) return status == 2 or status == 4 end
+Board.STATUS_SLEEP, Board.STATUS_BERSERK = 2, 4   -- include/bmunit.h UNIT_STATUS_*
+function Board.statusHeld(status)
+    return status == Board.STATUS_SLEEP or status == Board.STATUS_BERSERK
+end
+-- The +30 byte split as the struct's bitfields: statusIndex (low nibble), statusDuration (high)
+function Board.statusOf(byte) return byte & 0xF, byte >> 4 end
 -- Unit state bits, include/bmunit.h.
 Board.US_HIDDEN = 1 << 0
 Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
@@ -54,6 +59,9 @@ Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 -- the same refresh that rebuilds gBmMapFog (bmmap.c), so it is the game's own word on which
 -- enemies the player sees. Never set without fog.
 Board.US_BIT9 = 1 << 9
+Board.US_BIT8 = 1 << 8   -- "seen": RefreshUnitsOnBmMap clears US_BIT9 for it (bmmap.c)
+Board.FOG_BITS = Board.US_BIT9 | Board.US_BIT8
+Board.US_HAS_MOVED_AI = 1 << 10   -- the AI has moved it this phase (cp_order.c skips it)
 Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that downs it (bmmind.c)
 -- "On the field" has no one test in FE8, so this is the union of the two the game uses.
 -- RefreshUnitsOnBmMap places every unit without US_HIDDEN (bmmap.c), and the phase's can-act
@@ -277,7 +285,7 @@ function Board.unitAt(mem, SYM, base, slot)
     -- asleep or berserked: on the board, never an actor (vanilla Ch14, the scout lap of
     -- 2026-11-14: a berserked Cormag was planned an attack and the harness's move failed).
     -- Here, not in leanAt: the lean read is per-frame and counted (test_board)
-    u.held = Board.statusHeld(mem.u8(a + Board.UNIT_STATUS) & 0xF) or nil
+    u.held = Board.statusHeld((Board.statusOf(mem.u8(a + Board.UNIT_STATUS)))) or nil
     u.id = mem.u8(a + 0x0B)
     -- the Rescue pair (bmunit.c UnitRescue): `carrying` the id it carries, `carriedBy` the id
     -- that carries it. A carried unit is off the field (onField) but alive, at its carrier's
@@ -651,6 +659,8 @@ function Board.bind(mem, SYM)
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,
+        statusOf = Board.statusOf, STATUS_BERSERK = Board.STATUS_BERSERK,
+        US_HAS_MOVED_AI = Board.US_HAS_MOVED_AI, FOG_BITS = Board.FOG_BITS,
         UNIT_STATUS = Board.UNIT_STATUS, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
