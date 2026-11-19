@@ -2056,17 +2056,6 @@ do
     -- Sight.standOn leaves a unit ON the map: the enemy phase's and the reply's moves
     Sight.standOn(api, saleh, 6, 1)
     check(m.u8(0x1000 + 1 * 32 + 6), saleh.id, "standOn: on the unit map")
-    -- Sight.changed stages the plan's moved units on their planned tiles for the read inside
-    -- (the planner's re-listing, #661), and the dead enemy off its tile
-    local inside, hidden = nil, api.Board.US_HIDDEN
-    api.Board.US_HIDDEN = hidden or 1 << 9
-    Sight.changed(function(fn) return fn(function() end) end, api, S, function() return function() end end,
-                  { blues = { { unit = A, x = 16, y = 16 } }, gone = { [9] = true } },
-                  { [9] = { id = 9, addr = B.addr, x = 14, y = 12 } }, function()
-        inside = m.u8(0x1000 + 16 * 32 + 16) .. "/" .. m.u8(0x1000 + 12 * 32 + 14)
-    end)
-    api.Board.US_HIDDEN = hidden
-    check(inside, "8/0", "changed: a moved unit stands on its planned tile and a dead enemy's cell is empty")
 end
 
 -- #644: the simulated enemy phase plays each weapon at the uses it will have. The game spends a

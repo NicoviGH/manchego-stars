@@ -1105,8 +1105,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- opts.tiles). Only a unit whose board reach comes beside a changed tile is read at all: a
     -- freed tile is entered from one beside it. A unit's other acts keep their board exposure;
     -- the judged phase plays the changed board (ADR 0431, the cost). The read is on the board
-    -- the plan leaves: its changes, and the units it already moved on their planned tiles. Once
-    -- per board (the changes' key, extend's `changeKey`, and those units' tiles) this decision;
+    -- the plan's changes leave, the units it moved still on their board tiles. Once per set of
+    -- changes (extend's `changeKey`) this decision;
     -- extend keeps a used unit or a taken tile out. Each added act carries its board (`map`),
     -- so the exposure memo tells it apart, and the changes it needs (`needs`), which extend
     -- holds a plan to: a mend, heal swap or assault rebuilds a plan with one act swapped. An
@@ -1137,28 +1137,11 @@ function M.plan(Bot, board, sight, style, opts)
         if next(opened) == nil and next(dead) == nil then return nil end
         return table.concat(sorted(opened), ";") .. "|" .. table.concat(sorted(dead), ";")
     end
-    -- The plan's blue units that end an act off the tile they stand on now, as { unit, x, y }
-    -- (the judged phase's staging shape): the board a re-listed act is read on has them there.
-    local function movedBlues(st)
-        local out = {}
-        local pos = positions(st)
-        for _, u in ipairs(ctx.blues) do
-            local p = pos[u.id]
-            if p.acted and (p.x ~= u.x or p.y ~= u.y) then
-                out[#out + 1] = { unit = u, x = p.x, y = p.y }
-            end
-        end
-        return out
-    end
     local function menusFor(st)
         if offer or not sight.changed or not st.changeKey then return menus end
-        local gone = deadReds(st.gone)
-        local shifted = movedBlues(st)
-        local at = {}
-        for _, m in ipairs(shifted) do at[#at + 1] = m.unit.id .. "@" .. m.x .. "," .. m.y end
-        table.sort(at)
-        local mk = st.changeKey .. "|" .. table.concat(at, ";")
+        local mk = st.changeKey
         if relisted[mk] then return relisted[mk] end
+        local gone = deadReds(st.gone)
         -- the changed tiles: each door's or wall's whole change where the sight says
         -- (sight.mapChange: a gate two tiles deep), else its own tile; each dead enemy's
         local changed = {}
@@ -1189,27 +1172,19 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local list = {}
         if #near > 0 then
-            -- the board the read is on: the dead gone, and the units the plan already moved on
-            -- the tiles it moved them to (sight.changed stages them in the game too), so a new
-            -- act's reach and exposure see them
+            -- the board the read is on: the dead gone. The units the plan already moved stay on
+            -- their board tiles (ADR 0431: an ally never blocks a march, extend rejects a tile
+            -- the plan filled, and the judged phase stages every moved unit where the plan puts
+            -- it, so the stale tiles only order a unit's new acts for the PER_UNIT cut)
             local b = {}
             for k, v in pairs(board) do b[k] = v end
             b.units = {}
-            local at = {}
-            for _, m in ipairs(shifted) do at[m.unit.id] = m end
             for _, u in ipairs(board.units) do
-                if not gone[u.id] then
-                    local m = at[u.id]
-                    if m then
-                        u = copy(u)
-                        u.x, u.y = m.x, m.y
-                    end
-                    b.units[#b.units + 1] = u
-                end
+                if not gone[u.id] then b.units[#b.units + 1] = u end
             end
             -- what each act of this read needs of the plan: all of its changes
             local needs = { opened = copy(st.opened), gone = gone }
-            list = sight.changed({ opened = st.opened, gone = gone, blues = shifted }, function()
+            list = sight.changed({ opened = st.opened, gone = gone }, function()
                 local only, tiles, any = {}, {}, false
                 for _, u in ipairs(near) do
                     for _, t in ipairs(sight.reach(u, true) or {}) do

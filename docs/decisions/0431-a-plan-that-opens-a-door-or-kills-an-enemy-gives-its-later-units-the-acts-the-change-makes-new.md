@@ -43,13 +43,11 @@ outcomes, no new rule or weight.
    `fullInfo`). Its march cost grids are kept when no terrain changed. The phase cache is kept,
    since its memos key on `mapKey` and on every unit standing. `closings`' memo now keys on the
    map too.
-5. **Memo and limits.** The read is made once per board per decision: the plan's changes
-   (`extend` keeps their key, `changeKey`, as it adds a door, a wall or a kill) and the tiles of
-   the units the plan already moved (see Review below). `extend` still keeps out a used unit and
-   a taken tile. An added act carries its board (`a.map`), so the exposure memo tells it apart
-   from a board act, and what it needs of the plan (`a.needs`: the doors and walls opened, the
-   enemies dead). Nothing is added for an offered replay (`opts.offer`) or for a sight without
-   the read.
+5. **Memo and limits.** The read is made once per set of changes per decision (`extend` keeps
+   its key, `changeKey`, as it adds a door, a wall or a kill). `extend` still keeps out a used
+   unit and a taken tile. An added act carries its board (`a.map`) and what it needs of the plan
+   (`a.needs`: the doors and walls opened, the enemies dead). Nothing is added for an offered
+   replay (`opts.offer`) or for a sight without the read.
 6. **The trade.** A unit's board acts keep their exposure read on the unchanged board. The judged
    enemy phase plays the changed board, so the ranking stays honest. Re-listing every act on the
    changed board was the first build (below), and it cost more.
@@ -119,34 +117,34 @@ A code review found six gaps; each is fixed, with a test that fails without its 
   re-listed acts), and `montecarlo.py`'s audit reads no verdict off a `full_info` replay whose
   plan names any, saying so in its notes (before, its different plan would have read as
   `information_unavailable`).
-- **The re-list board ignored units the plan already moved.** `sight.changed` now stages each
-  moved blue unit on its planned tile (`change.blues`, `M.standOn`, the judged phase's own
-  staging), and the same units stand there in the board `Bot.candidates` reads, so a new act's
-  reach and exposure see them. The memo key now includes those tiles (sorted `id@x,y`), so a
-  board is read once per set of changes and moves.
+- **The re-list board ignores units the plan already moved: kept, by evidence (Nicolas, after
+  a first build that staged them cost 54.9 s per phase, 25x main).** The read leaves a moved unit
+  on its board tile. That changes nothing about legality or the final ranking: an ally never
+  blocks a unit's march in FE8 (allies are passable), a tile the plan filled is rejected by
+  `extend` (`st.tiles`), and the judged phase stages every moved unit where the plan puts it. A
+  stale tile only affects how a unit's new acts are ordered for the `PER_UNIT` cut (their
+  exposure read on the board). The staging (`sight.changed`'s `blues`) and its memo key were
+  removed, so there is one board per set of changes again.
 - **`menusFor` rebuilt its key per beam state.** `extend` keeps `n.changeKey` as it adds to
   `opened` or `gone`; `menusFor` reads it, and builds the moved-units part only when a change
   exists.
 
-**Cost of the review (#671; correctness first).** Staging the moved units multiplies the boards
-that are read, since the plans' moves now split the memo. One replay of the same start
-(`relist661f`, vanilla Ch8 from `e639-t639-cs-s4002/9`, attempt 1, `PT_LEAKGUARD=1`):
+**Replays of the same start** (vanilla Ch8 from `e639-t639-cs-s4002/9`, attempt 1,
+`PT_LEAKGUARD=1`): `relist661f` is the build that staged moved units (dropped above);
+`relist661g` is the final one.
 
-| | main (`base661`) | before review (`relist661e`) | after review (`relist661f`) |
-|---|---|---|---|
-| Result | won, 57 turns, 0 deaths, not clean (2 west chests) | won, 16 turns, 0 deaths, clean | won, 13 turns, 0 deaths, not clean (the same 2 chests) |
-| Turn 1's first decision | 7,127 frames | 10,141 | 38,305 |
-| Turn 3's first decision | 4,667 | 13,480 | 85,481 |
-| Turn 3, all decisions | 6,864 | 21,690 | 115,537 |
-| In-game CPU per player phase | 2.24 s | 8.27 s | 54.9 s |
-| Whole chapter | 127.9 s, 57 phases | 132.4 s, 16 phases | 713.3 s, 13 phases |
-| `BattleGenerateSimulation` per phase | 387 | 2,688 | 9,818 |
-| `AiDecideMain` per phase | 519 | 1,549 | 8,896 |
+| | main (`base661`) | `relist661e` | `relist661f` | `relist661g` |
+|---|---|---|---|---|
+| Result | won, 57 turns, 0 deaths, not clean (2 west chests) | won clean, 16 turns, 0 deaths | won, 13 turns, 0 deaths, not clean (same chests) | won clean, 17 turns, 0 deaths |
+| Turn 1's first decision | 7,127 frames | 10,141 | 38,305 | 10,043 |
+| Turn 3's first decision | 4,667 | 13,480 | 85,481 | 13,480 |
+| Turn 3, all decisions | 6,864 | 21,690 | 115,537 | 21,690 |
+| CPU per player phase | 2.24 s | 8.27 s | 54.9 s | 8.1 s (137.7 s, 17 phases) |
+| `BattleGenerateSimulation` per phase | 387 | 2,688 | 9,818 | 2,644 |
+| `AiDecideMain` per phase | 519 | 1,549 | 8,896 | 1,496 |
 
-The door still works: Lute (charId 12) opened (20,7) on turn 5 and Garcia (charId 10) struck
-past it from (20,5); 25 of 32 judged door plans had a later act on or past the doorway (main:
-0 of 179 by the same count). Kills: 37 of 187 judged plans had a later act on a tile an earlier
-act's red target stood on (main: 0 of 567), and 2 of those were played. No leak was logged.
-Which of the six changes pays the 6.6x per phase over `relist661e` is untested: the likeliest is
-the moved units in the memo key, which splits each set of changes into one board per
-arrangement of the plan's moves. It is #671's to measure.
+The review's other fixes cost nothing measurable (`relist661g` sits on `relist661e`'s numbers).
+The door: Lute (charId 12) opened (20,7) on turn 5, then Garcia (charId 10) and Seth (charId 2)
+struck from (20,5) and (20,4); 19 of 26 judged door plans had a later act on or past the
+doorway (main: 0 of 179). Kills: 33 of 278 judged plans had a later act on a tile an earlier
+act's red target stood on (main: 0 of 567), and 5 of those were played. No leak was logged.
