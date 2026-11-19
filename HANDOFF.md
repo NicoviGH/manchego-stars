@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19; main is 11c3ad78). Nothing is running. #639 (promote at L10 or L20) is on hold.** Its reason and what reopens it are in comment 7011738055. The party is shaped by who earns the experience: Seth (charId 2) takes 25-35% of the kills, and the bench is 3-10 levels under vanilla's levels. The unit-by-unit tables are on #662.
+**Next session starts here (2026-11-19, evening; main is c9e82bab). Nothing is running. #639 (promote at L10 or L20) is on hold.** Its reason and what reopens it are in comment 7011738055. The party is shaped by who earns the experience: Seth (charId 2) takes 25-35% of the kills, and the bench is 3-10 levels under vanilla's levels. The unit-by-unit tables are on #662.
 
 - **Merged overnight:** PR #659 (#655, ADR 0427). A wall falls to the strikers a plan stands at it; any unit that can hurt it may strike. Vanilla Ch8's wall now breaks; the chests are still missed (#663).
 - **Work in order (all under #640):**
@@ -28,8 +28,10 @@ and start a fresh instance; don't rely on auto-compaction.
   - `review/639-laps/` holds the logs, the saved chapter lines and `partial-verdict.txt`.
   - `review/639-strength/` holds the party-strength scripts.
   - The records are in `references/sim/vanilla/c25b145e3745/resume-runs.jsonl`, under tags `t639`, `r639b`, `e639`, `es639`, `is639`, `s20` and `k10`.
-- **#665, fix before any lap: PR #666 is ready and waits on Nicolas's "merge"** (reviewed twice, every finding fixed; ADR 0428). The 2-hour `PT_MAX_WALL_S` cut 19 of the 20 overnight L10 campaigns (and the 8 05:49 forks) mid-chapter, not walled, and `resume` reported nothing. Earlier laps were never cut (#665 comment).
-- **Playtest data piles up:** worker logs (a full emulator log copy per run) and `/tmp/playtest-*` run dirs are never pruned; 2026-11-19 they had filled the disk (11.5 GB of unreferenced logs, 3.3 GB of run dirs, deleted). A retention rule is owed before the next lap.
+- **Merged this evening:**
+  - PR #666 (#665, ADR 0428): run.sh's wall net is never under a scenario's declared deadline (a campaign gets its 86400s), and a campaign cut before its end line ends `crashed` in run.sh's words, so `resume` prints and counts it. The 2-hour net had cut 19 of the 20 overnight L10 campaigns and the 8 forks; earlier laps were never cut (#665 comment). The #639 lap data past each cut is partial.
+  - PR #668 (#667, ADR 0429): a passing run's worker log is deleted with its run dir; a failing one's is made read-only and only the newest 20 are kept. 11.5 GB of unread logs and 3.3 GB of run dirs had filled the disk (deleted by hand 2026-11-19).
+- **Disk:** about 22 GB free after the cleanup. The `mac-storage-cleanup` skill is installed in `~/.claude/skills`.
 
 **2026-11-18, late. In flight then: #639, "is the bot's party strong enough past Ch8? Vanilla band to Ch20, and promote at L10 or L20."** Read #639's plan comment (6992662334) and its progress comment (6998840930) first; they hold everything below in full.
 
