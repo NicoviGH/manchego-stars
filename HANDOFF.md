@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19, night; main is 1cf686b6). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
+**Next session starts here (2026-11-19, late night; main is cdb4b466). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
 - **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
   - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
@@ -19,22 +19,29 @@ and start a fresh instance; don't rely on auto-compaction.
   - Fixes land back to back. Games are played when a batch of fixes has a real chance of a better result.
   - Correctness first: a slowdown may go to its own issue (#671), by Nicolas's call.
   - Clean still means every chest, village and recruit, with no loss. No line of work is parked for lack of movement.
-- **Merged tonight: PR #669 (ADR 0431), which closes #661 and #670.**
-  - When a plan opens a door, breaks a wall or kills an enemy, the units still to act gain the acts that change makes new.
-  - #661's first diagnosis was wrong. The unit on the door tile was Lute (charId 12), who holds a Door Key. Every plan that opened the door was over the cap, because no later unit could step into the doorway or strike past it (101 door plans, 0 follow-ups). Comments 7019945016 and 7020038218 have the details.
-  - Vanilla Ch8, `e639-t639-cs-s4002/9` attempt 1: main won in 57 turns, not clean. The branch won clean in 16 and 17 turns, with no deaths (`relist661e`, `relist661g`). These were the first clean Ch8 clears; 48 earlier games had none. One game only.
-  - The review (7 findings) and the scoped re-review (4 findings) were all fixed. One finding was answered with evidence instead of built: staging the plan's moved units on the re-list board cost 54.9 s per phase.
-- **Cost (#671):** 8.1 s of CPU per player phase, against main's 2.24 s. Turn 1's first decision is 10,043 frames against 7,127. Most of it is the kill trigger. The lead and the numbers are on #671.
+- **Merged tonight: PR #672, which closes #664 (ADR 0409 amended).**
+  - A scout lap gives a chapter every attempt up to the cap (12) for a clean clear. Only then does it carry on, from its best unclean win: the fewest player units lost, then the fewest recruits and rewards missed, then the earliest.
+  - Each unclean win's end state is kept in memory (harness `api.keep`, only the best so far) and put back at the cap (`api.restore`). Nothing is played again. The restore checks the turn and dice it kept and refuses a mismatch as a crash.
+  - A scouted chapter's line has `attempts` = the cap and `scouted_from` = the attempt carried on from.
+  - Proof: the unit tests fail on the old rule. Replays `p664c` and `p664d` (vanilla Ch8 from `t639-cs-s4003/9`, `--attempts 2`): both attempts won with one unit lost, attempt 1 was restored, and the run ended `done`.
+  - Cost: a chapter the bot cannot clear clean now plays 12 attempts in a scout lap, where it played 1 to 4.
+  - Review: 12 findings and a scoped re-review (2 notes), all fixed; the PR body lists them.
 - **Work in order (all under #640):**
-  1. #664: a chapter gets all its attempts for a clean clear before the scout lap carries on (amends ADR 0409).
-  2. #660: the bot doesn't model its own berserked units' phase. The fix is written on the issue.
-  3. #662: who earns the experience. Recommend a weight from the per-unit tables and measure it.
-  4. #663: Ch8's west chests. Re-check them on #669's code first: both clean replays took them.
-  5. #671: the re-list cost, if laps are too slow.
-  6. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
+  1. #660: the Berserk staff. An enemy Bishop berserks our units. In the game's berserk phase, right after our player phase, they attack the nearest unit of either side. The bot does not model that phase, so it parks Eirika next to a berserked ally and reads her at 0% death (vanilla Ch14). The fix is written on the issue: play our berserked units in the judged phase with the game's berserked AI, grade the death `berserk`, and add a guard test.
+  2. #662: who earns the experience. Recommend a weight from the per-unit tables and measure it.
+  3. #663: Ch8's west chests. Re-check them on #669's code first: both clean replays took them. The `p664` replays of `t639-cs-s4003/9` missed both west chests (`never_offered`) in both attempts.
+  4. #671: the re-list cost, if laps are too slow.
+  5. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
 - **Kept, not merged:** stash `661 escort price (unproven, kept)` and the local branch `feat/661-escort-leaves-the-openers-tile`. It is the price for an escort with no key standing on the opener's tile. It did not stop Eirika's squat in `fix661` a4, and why is untested. Drop it if Ch8's squats are gone on #669's code.
 - **Also open:** #652 (the vanilla Ch3 stall, not re-checked), #657, #658 (a weight call), #651 (on hold). The Dance act is missing from the bot (Tethys); no issue is filed yet.
 - **Disk:** about 22 GB free after the 2026-11-19 cleanup.
+
+**2026-11-19, night (main was 1cf686b6). Merged: PR #669 (ADR 0431), which closes #661 and #670.**
+
+- When a plan opens a door, breaks a wall or kills an enemy, the units still to act gain the acts that change makes new.
+- #661's first diagnosis was wrong. The unit on the door tile was Lute (charId 12), who holds a Door Key. Every plan that opened the door was over the cap, because no later unit could step into the doorway or strike past it (101 door plans, 0 follow-ups). Comments 7019945016 and 7020038218 have the details.
+- Vanilla Ch8, `e639-t639-cs-s4002/9` attempt 1: main won in 57 turns, not clean. The branch won clean in 16 and 17 turns, with no deaths (`relist661e`, `relist661g`). These were the first clean Ch8 clears; 48 earlier games had none. One game only.
+- **Cost (#671):** 8.1 s of CPU per player phase, against main's 2.24 s. Turn 1's first decision is 10,043 frames against 7,127. Most of it is the kill trigger. The lead and the numbers are on #671.
 
 **2026-11-18, late. In flight then: #639, "is the bot's party strong enough past Ch8? Vanilla band to Ch20, and promote at L10 or L20."** Read #639's plan comment (6992662334) and its progress comment (6998840930) first; they hold everything below in full.
 
