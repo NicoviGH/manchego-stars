@@ -50,6 +50,12 @@ For our own conventions (prep, caps, objectives, economy, class mapping, art) **
 > (`suite --only <start>/<seed>`). The suite runs only before the bot's reading is relied on (a
 > chapter's difficulty verdict, a refreeze), over every change since the last one; a regression
 > it finds is bisected over those commits with `--only` on the run that got worse.
+>
+> **A bot PR stays light (Nicolas, 2026-11-19, ADR 0430).** Its proof is a unit test that fails
+> without the fix plus **one replay** of the game that showed the problem. No batch of games on
+> main and on the branch, and no extra `--only` suite games, unless the change moves how every
+> plan is scored. Fixes land back to back; games are played when a batch of fixes has a real
+> chance of a better result (then one lap or one `attempts` set over the batch).
 
 ## Searching and context
 
@@ -138,11 +144,14 @@ re-ask.
   the brainstorming skill's spec file.
 - **Never make tests, the parity read or CI slower** without fixing the cost in the same PR;
   report before/after timings, base and branch timed back to back with `uptime` and CPU time.
+  A bot PR is timed only when it adds work to every turn's planning (a new search, sandbox or
+  simulated phase), or touches tests or CI; a rule change is not (ADR 0430).
 - **No loose threads.** Before a handoff, prove every "unproven" or "assumed" claim (decomp
   citation, probe, test) or turn it into a guard that fails loudly; a docstring caveat is not
   enough.
 - **Run the proof a change needs without asking.** The run-cost rule forbids pointless runs, not
-  proof; never ask for a run budget, nor for the obvious application of a standing rule.
+  proof; never ask for a run budget, nor for the obvious application of a standing rule. A bot
+  PR's proof is the light one above (ADR 0430).
 - **#510's north star is a trustworthy difficulty model.** Recommend and act; test each call by
   whether it makes the bot's reading more trustworthy; say so before a rabbit hole if you
   disagree.
