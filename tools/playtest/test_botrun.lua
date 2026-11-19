@@ -2175,6 +2175,30 @@ do
     check(inBatch, false, "never inside a batch")
 end
 
+-- test_a_diagnostic_names_the_relisted_acts_of_the_plan_it_replays (#661 review): a re-listed
+-- act (Planner.menusFor, its `map`) is read on the board a plan leaves, which an offered
+-- full-information replay (opts.offer: the fogged board's acts) cannot re-propose, so the
+-- DIAG line says which acts of the played plan those were, and the audit reads no verdict off it
+do
+    local function relisting(g)
+        local plan = g.api.Planner.plan
+        g.api.Planner.plan = function(B, board, sgt, st, opts)
+            local a, p, c = plan(B, board, sgt, st, opts)
+            if p and not (opts and opts.offer) then
+                for _, x in ipairs(p.acts) do x.map = "2,0|" end
+            end
+            return a, p, c
+        end
+    end
+    local diags = replay({ ref = 1, mode = "full_info", failure = failure, run = run,
+                           original = original() }, nil, relisting)
+    check(diags[1] and diags[1].relisted and diags[1].relisted[1], "1>attack@0,0>129",
+          "the DIAG line names the played plan's re-listed acts")
+    diags = replay({ ref = 1, mode = "full_info", failure = failure, run = run,
+                     original = original() })
+    check(diags[1] and #(diags[1].relisted or { 1 }), 0, "a plan with none names none")
+end
+
 -- test_a_death_moved_onto_another_unit_is_not_avoided: the forced wait saves A, but the enemy
 -- phase kills B instead; the failure's unit lives, yet nothing was avoided (ours-ch03 seed
 -- 1002's force replay, 2026-11-07: unit 3 lived and unit 5 fell to the same boss)

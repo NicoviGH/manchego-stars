@@ -1104,11 +1104,15 @@ function M.plan(Bot, board, sight, style, opts)
     -- (sight.changed), and listed over those tiles alone (Bot.candidates' opts.only and
     -- opts.tiles). Only a unit whose board reach comes beside a changed tile is read at all: a
     -- freed tile is entered from one beside it. A unit's other acts keep their board exposure;
-    -- the judged phase plays the changed board (ADR 0431, the cost). Once per set of changes
-    -- this decision; extend keeps a used unit or a taken tile out. Each added act carries its
-    -- board (`map`), so the exposure memo tells it apart. An offered replay (opts.offer) reads
-    -- its acts on another board, and a sight without the read (test fakes) has none: both keep
-    -- the board's menus.
+    -- the judged phase plays the changed board (ADR 0431, the cost). The read is on the board
+    -- the plan leaves: its changes, and the units it already moved on their planned tiles. Once
+    -- per board (the changes' key, extend's `changeKey`, and those units' tiles) this decision;
+    -- extend keeps a used unit or a taken tile out. Each added act carries its board (`map`),
+    -- so the exposure memo tells it apart, and the changes it needs (`needs`), which extend
+    -- holds a plan to: a mend, heal swap or assault rebuilds a plan with one act swapped. An
+    -- offered replay (opts.offer) reads its acts on the fogged board, which it cannot do on the
+    -- changed one (botrun's DIAG `relisted` says so), and a sight without the read (test fakes)
+    -- has none: both keep the board's menus.
     local relisted = {}
     local function sorted(set)
         local ks = {}
@@ -1116,14 +1120,44 @@ function M.plan(Bot, board, sight, style, opts)
         table.sort(ks)
         return ks
     end
-    local function menusFor(st)
-        if offer or not sight.changed then return menus end
-        local gone = {}
-        for id in pairs(st.gone) do
-            if byId[id] and byId[id].faction == "red" then gone[id] = true end
+    -- The enemies a plan's changes count dead: the reds of its `gone` (a Talk's recruit is one
+    -- too, red until it joins); the board's units are looked up here for both menusFor and
+    -- extend's key.
+    local function deadReds(gone)
+        local out = {}
+        for id in pairs(gone) do
+            if byId[id] and byId[id].faction == "red" then out[id] = true end
         end
-        if next(st.opened) == nil and next(gone) == nil then return menus end
-        local mk = table.concat(sorted(st.opened), ";") .. "|" .. table.concat(sorted(gone), ";")
+        return out
+    end
+    -- A plan's change set as one key: its doors and walls, then its dead reds; nil for none.
+    -- extend keeps it (`changeKey`) as it adds either, so menusFor never rebuilds it per state.
+    local function changeKeyOf(opened, gone)
+        local dead = deadReds(gone)
+        if next(opened) == nil and next(dead) == nil then return nil end
+        return table.concat(sorted(opened), ";") .. "|" .. table.concat(sorted(dead), ";")
+    end
+    -- The plan's blue units that end an act off the tile they stand on now, as { unit, x, y }
+    -- (the judged phase's staging shape): the board a re-listed act is read on has them there.
+    local function movedBlues(st)
+        local out = {}
+        local pos = positions(st)
+        for _, u in ipairs(ctx.blues) do
+            local p = pos[u.id]
+            if p.acted and (p.x ~= u.x or p.y ~= u.y) then
+                out[#out + 1] = { unit = u, x = p.x, y = p.y }
+            end
+        end
+        return out
+    end
+    local function menusFor(st)
+        if offer or not sight.changed or not st.changeKey then return menus end
+        local gone = deadReds(st.gone)
+        local shifted = movedBlues(st)
+        local at = {}
+        for _, m in ipairs(shifted) do at[#at + 1] = m.unit.id .. "@" .. m.x .. "," .. m.y end
+        table.sort(at)
+        local mk = st.changeKey .. "|" .. table.concat(at, ";")
         if relisted[mk] then return relisted[mk] end
         -- the changed tiles: each door's or wall's whole change where the sight says
         -- (sight.mapChange: a gate two tiles deep), else its own tile; each dead enemy's
@@ -1155,13 +1189,27 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local list = {}
         if #near > 0 then
+            -- the board the read is on: the dead gone, and the units the plan already moved on
+            -- the tiles it moved them to (sight.changed stages them in the game too), so a new
+            -- act's reach and exposure see them
             local b = {}
             for k, v in pairs(board) do b[k] = v end
             b.units = {}
+            local at = {}
+            for _, m in ipairs(shifted) do at[m.unit.id] = m end
             for _, u in ipairs(board.units) do
-                if not gone[u.id] then b.units[#b.units + 1] = u end
+                if not gone[u.id] then
+                    local m = at[u.id]
+                    if m then
+                        u = copy(u)
+                        u.x, u.y = m.x, m.y
+                    end
+                    b.units[#b.units + 1] = u
+                end
             end
-            list = sight.changed({ opened = st.opened, gone = gone }, function()
+            -- what each act of this read needs of the plan: all of its changes
+            local needs = { opened = copy(st.opened), gone = gone }
+            list = sight.changed({ opened = st.opened, gone = gone, blues = shifted }, function()
                 local only, tiles, any = {}, {}, false
                 for _, u in ipairs(near) do
                     for _, t in ipairs(sight.reach(u, true) or {}) do
@@ -1177,12 +1225,15 @@ function M.plan(Bot, board, sight, style, opts)
                 for k, v in pairs(opts or {}) do o[k] = v end
                 o.only, o.tiles = only, tiles
                 local out = Bot.candidates(b, sight, style, o)
-                -- an act whose own tile is a new one (a Vulnerary in place is the board's)
+                -- an act whose own tile is a new one (a Vulnerary in place is the board's); it
+                -- and its spares carry the board they were read on (`map`, the exposure memo's)
+                -- and what they need of the plan (`needs`, extend's)
                 for _, c in ipairs(out) do
                     local kept = {}
                     for _, a in ipairs(c.acts) do
                         if tiles[c.unit.id][a.move.x .. "," .. a.move.y] then
-                            a.map = mk
+                            a.map, a.needs = mk, needs
+                            for _, sp in ipairs(a.spares or {}) do sp.map, sp.needs = mk, needs end
                             kept[#kept + 1] = a
                         end
                     end
@@ -1212,6 +1263,19 @@ function M.plan(Bot, board, sight, style, opts)
     -- `st` with `a` (unit `uid`'s act) added, the board the plan leaves updated; nil when the
     -- act cannot follow the plan (its tile taken, its target gone, a heal on a moved unit or
     -- on no one hurt)
+    -- Whether the plan holds every change a re-listed act (menusFor) was read on: its doors and
+    -- walls open, its enemies dead. A mend, heal swap or assault rebuilds a plan with one act
+    -- swapped; a doorway act whose door was swapped out must not follow.
+    local function holds(st, needs)
+        for k in pairs(needs.opened) do
+            if not st.opened[k] then return false end
+        end
+        for id in pairs(needs.gone) do
+            if not st.gone[id] then return false end
+        end
+        return true
+    end
+
     local function extend(st, a, uid)
         -- the tile it ends on (a Canto move's), which the plan then holds; the act's own tile
         -- must be free too, when it moves on from it
@@ -1219,6 +1283,7 @@ function M.plan(Bot, board, sight, style, opts)
         local tile = at.x .. "," .. at.y
         if st.used[uid] or st.tiles[tile] or st.tiles[a.move.x .. "," .. a.move.y]
                 or (a.targetId and st.gone[a.targetId])
+                or (a.needs and not holds(st, a.needs))
                 or (a.act == "staff" and moved(st, a.targetId))
                 -- an ally's tile, until the plan has moved that ally off it
                 or (a.vacate and not st.used[a.vacate])
@@ -1239,7 +1304,7 @@ function M.plan(Bot, board, sight, style, opts)
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
                     opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
-                    redWear = copy(st.redWear) }
+                    redWear = copy(st.redWear), changeKey = st.changeKey }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
@@ -1278,6 +1343,8 @@ function M.plan(Bot, board, sight, style, opts)
             n.redWear[fx.redWear.id] = slots
         end
         if fx.opened then n.opened[fx.opened] = true end
+        -- the change set's key, kept as either grows (menusFor's memo reads it)
+        if fx.opened or fx.gone then n.changeKey = changeKeyOf(n.opened, n.gone) end
         if fx.carry then n.carry[fx.carry.id] = { by = fx.carry.by } end
         if fx.drop then
             n.carry[fx.drop.id] = { x = fx.drop.x, y = fx.drop.y }
@@ -1721,7 +1788,50 @@ function M.plan(Bot, board, sight, style, opts)
             return x.key < y.key
         end)
         -- the phase as the average leaves it: what the lookahead plays on (nextPhase)
-        st.phase = { blues = planned, gone = gone, reds = reds, redWear = st.redWear,
+        -- `list`'s units as way `w` leaves them: one its counter killed gone (that death is
+        -- score()'s, never the phase's), one it played the counter on at the HP it left, with
+        -- field `clear` dropped (what that HP already holds); `idOf` reads a unit's id
+        local function inWay(list, w, idOf, clear)
+            local out = {}
+            for _, x in ipairs(list) do
+                local id = idOf(x)
+                if not w.dead[id] then
+                    if w.hp[id] then
+                        local q = copy(x)
+                        q.hp = w.hp[id]
+                        if clear then q[clear] = nil end
+                        out[#out + 1] = q
+                    else
+                        out[#out + 1] = x
+                    end
+                end
+            end
+            return out
+        end
+        -- The blues as way `w` leaves them. A re-listed act (menusFor) needs enemies dead; where
+        -- a kill missed in this way (w.gone lacks one the act needs), that act is not played:
+        -- M.surprise replans before the next act, so its unit still stands on its board tile,
+        -- not the planned one, which may be the living enemy's own (the phase's standOn would
+        -- take the enemy's cell). That unit has no counter to play either (`unacted`); its
+        -- `hit` entry (below) keeps the HP the planned act left it, a pessimism ADR 0431 names.
+        local function bluesIn(w)
+            local list = planned
+            for i, p in ipairs(planned) do
+                local a = at[p.unit.id]
+                local lost = false
+                for id in pairs(a and a.needs and a.needs.gone or {}) do
+                    lost = lost or not w.gone[id]
+                end
+                if lost then
+                    if list == planned then list = copy(planned) end
+                    list[i] = { unit = p.unit, x = p.unit.x, y = p.unit.y, hp = p.unit.hp,
+                                unacted = true }
+                end
+            end
+            return inWay(list, w, function(p) return not p.unacted and p.unit.id or nil end)
+        end
+        st.phase = { blues = bluesIn({ gone = gone, dead = {}, hp = {} }), gone = gone, reds = reds,
+                     redWear = st.redWear,
                      opened = st.opened, carry = st.carry }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
         st.branched, st.floored = 0, 0
@@ -1778,27 +1888,6 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         st.averaged = #dims - st.branched
-        -- `list`'s units as way `w` leaves them: one its counter killed gone (that death is
-        -- score()'s, never the phase's), one it played the counter on at the HP it left, with
-        -- field `clear` dropped (what that HP already holds); `idOf` reads a unit's id
-        local function inWay(list, w, idOf, clear)
-            local out = {}
-            for _, x in ipairs(list) do
-                local id = idOf(x)
-                if not w.dead[id] then
-                    if w.hp[id] then
-                        local q = copy(x)
-                        q.hp = w.hp[id]
-                        if clear then q[clear] = nil end
-                        out[#out + 1] = q
-                    else
-                        out[#out + 1] = x
-                    end
-                end
-            end
-            return out
-        end
-        local function bluesIn(w) return inWay(planned, w, function(p) return p.unit.id end) end
         local strikes, outcomes, top, total = {}, {}, nil, 0
         -- a plan that takes the Seize ends the chapter there: the game plays no enemy phase
         -- after it, so none is judged (ADR 0405). Read against one, the Seize was over the cap
@@ -2352,7 +2441,11 @@ function M.plan(Bot, board, sight, style, opts)
     for round = 1, M.MEND_ROUNDS do
         if not best or (round > 1 and best.rank.admitted) then break end
         local base, menuOf, risky = best, {}, {}
-        for _, m in ipairs(menus) do
+        -- the menus on the board the plan being mended leaves (menusFor): a unit at risk may
+        -- try a doorway or a freed tile its plan's door or kill opens; extend's `needs` check
+        -- drops such an act once the rebuild no longer holds that change
+        local baseMenus = menusFor(base)
+        for _, m in ipairs(baseMenus) do
             local mine = {}
             for _, a in ipairs(m.acts) do mine[#mine + 1] = { uid = m.unit.id, a = a } end
             menuOf[m.unit.id] = mine
@@ -2370,7 +2463,7 @@ function M.plan(Bot, board, sight, style, opts)
             if not p.green then return menuOf[p.id] or {} end
             local striker, out = {}, {}
             for _, id in ipairs(p.strikers) do striker[id] = true end
-            for _, m in ipairs(menus) do
+            for _, m in ipairs(baseMenus) do
                 for _, a in ipairs(m.acts) do
                     if Bot.distance(a.move.x, a.move.y, p.x, p.y) == 1
                         or (a.act == "attack" and a.targetId and striker[a.targetId]) then
@@ -2400,15 +2493,28 @@ function M.plan(Bot, board, sight, style, opts)
         -- the same one again, and each try plays a whole enemy phase
         local mine, tried = {}, {}
         for _, a in ipairs(base.acts) do mine[a.unitId] = key(a) end
+        local function leave(uid)
+            return function(x)
+                if x.unitId == uid then return false end
+            end
+        end
         for _, p in ipairs(risky) do
             for _, t in ipairs(tries(p)) do
                 local k = key(t.a)
-                local st = k ~= mine[t.uid] and not tried[k] and extend(start, t.a, t.uid)
+                local st
+                if k ~= mine[t.uid] and not tried[k] then
+                    if t.a.needs then
+                        -- a re-listed act needs the plan's changes held before it
+                        st = rebuild(start, base.acts, leave(t.uid))
+                        st = extend(st, t.a, t.uid)
+                    else
+                        st = extend(start, t.a, t.uid)
+                        st = st and rebuild(st, base.acts, leave(t.uid))
+                    end
+                end
                 tried[k] = true
                 if st then
-                    st = complete(rebuild(st, base.acts, function(x)
-                        if x.unitId == t.uid then return false end
-                    end))
+                    st = complete(st)
                     -- a later round: new with #510 PR A
                     st.newer = round > 1 or base.newer or nil
                     consider(st, "mend")

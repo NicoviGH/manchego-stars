@@ -43,10 +43,13 @@ outcomes, no new rule or weight.
    `fullInfo`). Its march cost grids are kept when no terrain changed. The phase cache is kept,
    since its memos key on `mapKey` and on every unit standing. `closings`' memo now keys on the
    map too.
-5. **Memo and limits.** The read is made once per set of changes per decision. `extend` still
-   keeps out a used unit and a taken tile. An added act carries its board (`a.map`), so the
-   exposure memo tells it apart from a board act. Nothing is added for an offered replay
-   (`opts.offer`) or for a sight without the read. The mend still tries the board's menus.
+5. **Memo and limits.** The read is made once per board per decision: the plan's changes
+   (`extend` keeps their key, `changeKey`, as it adds a door, a wall or a kill) and the tiles of
+   the units the plan already moved (see Review below). `extend` still keeps out a used unit and
+   a taken tile. An added act carries its board (`a.map`), so the exposure memo tells it apart
+   from a board act, and what it needs of the plan (`a.needs`: the doors and walls opened, the
+   enemies dead). Nothing is added for an offered replay (`opts.offer`) or for a sight without
+   the read.
 6. **The trade.** A unit's board acts keep their exposure read on the unchanged board. The judged
    enemy phase plays the changed board, so the ranking stays honest. Re-listing every act on the
    changed board was the first build (below), and it cost more.
@@ -89,3 +92,61 @@ outcomes, no new rule or weight.
   door alone, the first build re-listed every unit on the opened map: per phase 3.74 s, turn 3's
   first decision 7,252 frames. Re-listing only the units whose reach the door changes gave
   3.62 s and 6,102 frames (`relist661`, `relist661b`).
+
+## Review of PR #669 (2026-11-19): what changed and why
+
+A code review found six gaps; each is fixed, with a test that fails without its fix.
+- **A rebuilt plan kept a stale re-listed act.** The mend, heal swap and assault rebuild a plan
+  with one unit's act swapped, so a doorway act could outlive the door act it was read on. A
+  re-listed act now carries `needs = { opened, gone }` (all the changes of the board it was read
+  on), and `extend` rejects it unless the plan holds each one. It is the one check, in `extend`.
+  Its spares carry `map` and `needs` too.
+- **An uncertain kill staged a unit onto a living enemy.** A kill at chance >= `M.GONE` counts
+  as dead for the beam. In a judged way where that blow missed, the enemy still stands, and the
+  plan's later unit would be staged on its tile, overwriting the enemy's cell in the game's map.
+  In play, `M.surprise` replans after a miss before the next act, so that unit never moves. In
+  such a way (`w.gone` lacks an enemy the act `needs`), `bluesIn` now stages the unit on the tile
+  it stands on now, not acted, with no counter to play. The average way the lookahead reads uses
+  the same helper. Left as it was: the unit's entry in the judge's `hit` list keeps the HP its
+  planned act would have left it, which is a pessimism in that way, not an overwrite.
+- **The mend tried only board menus.** It reads `menusFor(base)`, so a unit at risk can try a
+  doorway or freed-tile act its plan's door or kill makes. Such an act is built after the rest
+  of the plan (it needs the door held first); the `needs` check keeps a rebuild honest.
+- **An offered full-information replay cannot reproduce re-listed plans.** Its acts are the
+  fogged board's, and a re-listing would read them on the fog-off board it plans on, which the
+  fogged game never offered. Supporting it would hand the replay powers it lacks, so it keeps the
+  board's menus, and the gap is loud: the `DIAG` line carries `relisted` (the baseline plan's
+  re-listed acts), and `montecarlo.py`'s audit reads no verdict off a `full_info` replay whose
+  plan names any, saying so in its notes (before, its different plan would have read as
+  `information_unavailable`).
+- **The re-list board ignored units the plan already moved.** `sight.changed` now stages each
+  moved blue unit on its planned tile (`change.blues`, `M.standOn`, the judged phase's own
+  staging), and the same units stand there in the board `Bot.candidates` reads, so a new act's
+  reach and exposure see them. The memo key now includes those tiles (sorted `id@x,y`), so a
+  board is read once per set of changes and moves.
+- **`menusFor` rebuilt its key per beam state.** `extend` keeps `n.changeKey` as it adds to
+  `opened` or `gone`; `menusFor` reads it, and builds the moved-units part only when a change
+  exists.
+
+**Cost of the review (#671; correctness first).** Staging the moved units multiplies the boards
+that are read, since the plans' moves now split the memo. One replay of the same start
+(`relist661f`, vanilla Ch8 from `e639-t639-cs-s4002/9`, attempt 1, `PT_LEAKGUARD=1`):
+
+| | main (`base661`) | before review (`relist661e`) | after review (`relist661f`) |
+|---|---|---|---|
+| Result | won, 57 turns, 0 deaths, not clean (2 west chests) | won, 16 turns, 0 deaths, clean | won, 13 turns, 0 deaths, not clean (the same 2 chests) |
+| Turn 1's first decision | 7,127 frames | 10,141 | 38,305 |
+| Turn 3's first decision | 4,667 | 13,480 | 85,481 |
+| Turn 3, all decisions | 6,864 | 21,690 | 115,537 |
+| In-game CPU per player phase | 2.24 s | 8.27 s | 54.9 s |
+| Whole chapter | 127.9 s, 57 phases | 132.4 s, 16 phases | 713.3 s, 13 phases |
+| `BattleGenerateSimulation` per phase | 387 | 2,688 | 9,818 |
+| `AiDecideMain` per phase | 519 | 1,549 | 8,896 |
+
+The door still works: Lute (charId 12) opened (20,7) on turn 5 and Garcia (charId 10) struck
+past it from (20,5); 25 of 32 judged door plans had a later act on or past the doorway (main:
+0 of 179 by the same count). Kills: 37 of 187 judged plans had a later act on a tile an earlier
+act's red target stood on (main: 0 of 567), and 2 of those were played. No leak was logged.
+Which of the six changes pays the 6.6x per phase over `relist661e` is untested: the likeliest is
+the moved units in the memo key, which splits each set of changes into one board per
+arrangement of the plan's moves. It is #671's to measure.

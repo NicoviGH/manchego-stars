@@ -129,7 +129,9 @@
 -- actually played), broken (its first act not played), differs, failure, avoided (the
 -- diagnostic's plan played whole, the failure's unit alive at the end of its turn, and no other
 -- blue or green unit lost in its place: `traded`), outcome, why, unoffered (forced keys never
--- offered), pinned_board, trace }.
+-- offered), relisted (the baseline plan's acts the planner re-listed on the board an earlier
+-- act leaves, #661: a full_info replay cannot re-propose them, so montecarlo's audit reads no
+-- verdict off one that names any), pinned_board, trace }.
 --
 -- The TRACE (#510 step 9 F3, Nicolas 2026-10-27: "I want to be able to understand everything
 -- about how it went"): one event per api.trace call, each with `t` its kind and `turn`:
@@ -1244,7 +1246,8 @@ function M.run(api)
                 avoided = matched and #pin.chosen > 0 and not pin.broken and not died
                     and #traded == 0 and outcome ~= "crashed" or false,
                 traded = traded,
-                unoffered = pin and pin.unoffered or {}, broken = pin and pin.broken,
+                unoffered = pin and pin.unoffered or {}, relisted = pin and pin.relisted or {},
+                broken = pin and pin.broken,
                 pinned_board = pinnedBoard,
                 outcome = outcome, why = why, trace = api.info.trace }))
             api.log(string.format("botrun: diagnostic %s at decision %d: %s (%s)", diag.mode,
@@ -1320,7 +1323,12 @@ function M.run(api)
             local P = api.Planner
             local a, plan, cost = batched(function() return P.plan(Bot, board, sight, style, opts) end)
             pin = { baseline = plan and P.keysOf(plan) or {}, unoffered = {}, chosen = {},
-                    turn = turn }
+                    relisted = {}, turn = turn }
+            -- the acts the planner re-listed on the board a plan leaves (Planner's `map`): an
+            -- offered replay's acts are the fogged board's, so it cannot re-propose these
+            for _, x in ipairs(plan and plan.acts or {}) do
+                if x.map then pin.relisted[#pin.relisted + 1] = P.key(x) end
+            end
             pin.matched = watch.at(a and actOf(a))
             pin.board = M.snapshot(board)
             if api.pinned then pin.file = api.pinned(diag.ref, pin.board) end

@@ -108,7 +108,9 @@
 --   changed(change, fn)      fn() on the board a plan leaves: each door opened and wall broken
 --                            in change.opened ({ ["x,y"] = true }) and each enemy killed in
 --                            change.gone ({ [id] = true }) applied as enemyPhase applies them
---                            (M.openMap, M.takeOff), in one sandbox; the board's answers read
+--                            (M.openMap, M.takeOff) and each unit in change.blues
+--                            ({ { unit, x, y } }) stood on its planned tile (M.standOn), in
+--                            one sandbox; the board's answers read
 --                            inside are dropped after it (M.changed). The planner's re-listing
 --                            (#661, #670).
 --   enemyPhase(plan)        the enemy phase the AI would play against a planned board, in
@@ -1998,13 +2000,16 @@ end
 -- Sight.changed(sandbox, api, S, isolate, change, byId, fn): fn() run on the board a plan's
 -- changes leave, in one sandbox whose journal undoes them when it returns: change.opened
 -- ({ ["x,y"] = true }, the doors it opens and walls it breaks, M.openAll) and change.gone
--- ({ [id] = true }, the enemies it kills, M.takeOff; byId: the units by id, where each stands).
+-- ({ [id] = true }, the enemies it kills, M.takeOff; byId: the units by id, where each stands)
+-- and change.blues ({ { unit, x, y } }, the units it already moved, M.standOn: the judged
+-- phase's own staging, so a read sees them on their planned tiles).
 -- The planner's re-listing (#661, #670) asks there which tiles the units still to act now
 -- reach, and their acts from those. Every write is journaled, so unlike fullInfo it may run
 -- inside a batch. isolate() as M.isolated's: a read on the changed board must not be kept for
 -- the board as it is.
 function M.changed(sandbox, api, S, isolate, change, byId, fn)
     return M.isolated(sandbox, isolate, function(call)
+        for _, b in ipairs(change.blues or {}) do M.standOn(api, b.unit, b.x, b.y) end
         M.openAll(api, call, S, change.opened)
         for id in pairs(change.gone or {}) do
             local e = byId[id]

@@ -2446,7 +2446,20 @@ do
     local door, block = order:find("1>door@1,0", 1, true), order:find("2>%a+@2,0")
     check(door ~= nil and block ~= nil and door < block, true,
           "relist: K opens the door, then D acts from the doorway (" .. order .. ")")
-    check(#(sight.changes or {}), 1, "relist: one re-listing for the one door, however many plans open it")
+    -- a board (the door, the units the plan moved) is read once, however many plans reach it
+    local boards, reads = {}, 0
+    for _, c in ipairs(sight.changes or {}) do
+        local at = {}
+        for _, b in ipairs(c.blues or {}) do at[#at + 1] = b.unit.id .. "@" .. b.x .. "," .. b.y end
+        table.sort(at)
+        boards[table.concat(at, ";")] = true
+        reads = reads + 1
+    end
+    local distinct = 0
+    for _ in pairs(boards) do distinct = distinct + 1 end
+    check(reads > 0 and reads == distinct, true,
+          "relist: each board the door leaves is read once, however many plans reach it (" .. reads
+          .. " reads, " .. distinct .. " boards)")
     -- F's reach is the same with the door open: it keeps its board menu (the cost, ADR 0431)
     local fAct, dAct
     for _, a in ipairs(plan and plan.acts or {}) do
@@ -2455,6 +2468,84 @@ do
     end
     check(fAct ~= nil and fAct.map == nil and dAct ~= nil and dAct.map ~= nil, true,
           "relist: only D, whose reach the door changes, gains acts")
+end
+
+-- test_a_rebuilt_plan_drops_a_doorway_act_whose_door_it_swapped_out (#661 review): the door
+-- fixture, but E's strike on K lands 30% whenever the door is open, so the best plan (K opens,
+-- D holds the doorway) leaves K at risk and the mend tries K's other acts, the rest rebuilt.
+-- A rebuilt plan without the door act still held D's doorway act, which no map opened: D on a
+-- wall's tile. Re-listed acts carry what they need of the plan (`needs`); extend rejects one
+-- the plan does not hold.
+do
+    local K = blue(0x01, 0, 1, 0)
+    local D = blue(0x02, 1, 1, 1)
+    local E = red(0x81, 3, 0, { isBoss = true })
+    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 1, 0 }) }
+    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 1, 0 }, { 2, 0 }) }
+    local judged, ghost = 0, 0
+    local o = {
+        objective = { kind = "boss" }, reach = shut,
+        field = fieldsOf { ["3,0"] = { ["3,0"] = 0 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["0,1"] = 3, ["1,1"] = 2 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+        change = function(c)
+            if c.opened["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
+            return {}
+        end,
+        enemyPhase = function(plan)
+            judged = judged + 1
+            local opened = (plan.opened or {})["2,0"]
+            for _, b in ipairs(plan.blues) do
+                if b.x == 2 and b.y == 0 and not opened then ghost = ghost + 1 end
+            end
+            if not opened then return {} end
+            return { { enemy = 0x81, target = 0x01, takenHit = 30, takenDmg = 99, takenHits = 1,
+                       strikerHp = 20 } }
+        end,
+    }
+    Planner.plan(B, boardOf(K, D, E), sightOf(o), style("careful"))
+    check(judged > 0 and ghost, 0, "rebuild: no judged plan stands a unit on the doorway its door never opened ("
+          .. ghost .. " of " .. judged .. ")")
+end
+
+-- test_the_mend_offers_a_unit_at_risk_the_acts_its_plans_door_opens (#661 review): the door
+-- fixture, with E's strike landing on D 30% whenever the door is open, so D is at risk in the
+-- best plan and the mend tries D's other acts. D's acts on the doorway exist only on the map
+-- the plan's door leaves (menusFor), so a mend that tries the board's menus never plays D
+-- there: a plan of kind "mend" with D on (2,0) is judged only when the mend reads the plan's
+-- own menus.
+do
+    local K = blue(0x01, 0, 1, 0)
+    local D = blue(0x02, 1, 1, 1)
+    local E = red(0x81, 3, 0, { isBoss = true })
+    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 1, 0 }) }
+    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 1, 0 }, { 2, 0 }) }
+    local o = {
+        objective = { kind = "boss" }, reach = shut,
+        field = fieldsOf { ["3,0"] = { ["3,0"] = 0 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["0,1"] = 3, ["1,1"] = 2 } },
+        fc = { [0x02] = { [0x81] = { ["2,0"] = fc { hit = 100, dmg = 3, hits = 1 } } } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+        change = function(c)
+            if c.opened["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
+            return {}
+        end,
+        enemyPhase = function(plan)
+            if not (plan.opened or {})["2,0"] then return {} end
+            return { { enemy = 0x81, target = 0x02, takenHit = 30, takenDmg = 99, takenHits = 1,
+                       strikerHp = 20 } }
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(K, D, E), sightOf(o), style("careful"))
+    local mended = {}
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if c.kind == "mend" and table.concat(c.acts, " "):find("2>%a+@2,0") then
+            mended[#mended + 1] = table.concat(c.acts, " ")
+        end
+    end
+    check(#mended > 0, true, "mend: a unit at risk tries the doorway acts its plan's door opens")
 end
 
 -- test_a_relisted_unit_with_only_an_allys_tile_does_not_crash: a re-listing (opts.tiles) can
@@ -2523,6 +2614,55 @@ do
     local kill, step = order:find("1>attack@1,1", 1, true), order:find("2>attack@2,0", 1, true)
     check(kill ~= nil and step ~= nil and kill < step, true,
           "relist: K kills E1, then D strikes the boss through its tile (" .. order .. ")")
+end
+
+-- test_a_missed_kill_leaves_the_unit_that_needed_it_where_it_stands (#670 review): K's blow
+-- kills E1 at 60% (a kill at >= M.GONE counts gone for the beam), and D then steps onto E1's
+-- tile or strikes the boss through it. In the way where the blow missed, E1 still stands there;
+-- the game plays M.surprise before D's act, so D never moves. The judged phase stages D on its
+-- board tile there: staged on E1's tile it overwrote the living enemy's cell. K starts off its
+-- striking tile, so the read also sees K where the plan puts it (sight.changed's blues).
+do
+    local K = blue(0x01, 0, 1, 2)
+    local D = blue(0x02, 1, 0, 0)
+    local E1 = red(0x81, 1, 0)
+    local E2 = red(0x82, 3, 0, { isBoss = true, minRange = false })
+    local judged, ghost, played = 0, 0, 0
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 1, 2 }, { 1, 1 }), [0x02] = tiles({ 0, 0 }, { 0, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["1,1"] = fc { hit = 60, dmg = 99, hits = 1 } } },
+               [0x02] = { [0x82] = { ["2,0"] = fc { hit = 100, dmg = 8, hits = 1 } } } },
+        change = function(c)
+            if c.gone[0x81] then
+                return { reach = { [0x01] = tiles({ 1, 2 }, { 1, 1 }),
+                                   [0x02] = tiles({ 0, 0 }, { 0, 1 }, { 1, 0 }, { 2, 0 }) } }
+            end
+            return {}
+        end,
+        enemyPhase = function(plan)
+            judged = judged + 1
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x02 and (b.x == 1 or b.x == 2) and b.y == 0 then
+                    if plan.gone[0x81] then played = played + 1 else ghost = ghost + 1 end
+                end
+            end
+            return {}
+        end,
+    }
+    local sight = sightOf(o)
+    Planner.plan(B, boardOf(K, D, E1, E2), sight, style("careful"))
+    check(played > 0, true, "missed kill: some judged way has D through E1's tile (the kill landed)")
+    check(ghost, 0, "missed kill: no way where E1 lives has D on its tile or past it (" .. ghost
+          .. " of " .. judged .. " phases)")
+    -- the read of the board after K's blow has K on the tile it struck from
+    local kAt = false
+    for _, c in ipairs(sight.changes or {}) do
+        for _, b in ipairs(c.blues or {}) do
+            kAt = kAt or (b.unit.id == 0x01 and b.x == 1 and b.y == 1)
+        end
+    end
+    check(kAt, true, "relist: the read stages the unit the plan already moved on its planned tile")
 end
 
 -- test_a_key_no_one_can_reach_opens_nothing: the same cut, A holds no key, and the one Door
