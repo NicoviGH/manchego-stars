@@ -17,6 +17,7 @@ and start a fresh instance; don't rely on auto-compaction.
   - PR #677: the board is read once per re-list, the Talk check is reused, and the danger grids are kept on a kill. −16% CPU on Ch8 turns 1-3.
   - PR #678: a strike is keyed only by the reds the game's AI can read, ADR 0431. −13% more. Guard `PT_STRIKECHECK=1` (no mismatch on two chapters).
   - Skipping used units in the re-list was measured (−14%) but not shipped: not provably the same plans (risk raised by Nicolas 2026-11-20; stash kept). Next: the batch run (step 4).
+- **The batch lap starts without the frozen suite first** (recommended 2026-11-20, Nicolas asked why the suite should go first): L10 vs L20 is paired on one bot, and every failure is traced to its cause. The suite runs before the L10/L20 verdict is drawn or acted on, over every change since 704bf738.
 
 - **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
   - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
