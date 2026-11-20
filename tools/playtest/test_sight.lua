@@ -23,6 +23,13 @@ local function check(got, want, msg)
     end
 end
 
+-- Memory that reads 0 at every address and width, for a batching sandbox whose game code never
+-- reads RAM the test cares about.
+local function zeroMem()
+    local zero = function() return 0 end
+    return { u8 = zero, u16 = zero, u32 = zero, s8 = zero }
+end
+
 -- A CPU whose "game function" at 0x08001000 returns r0 + r1 after `cost` frames (to the
 -- loop lr names), and at 0x08002000 never returns.
 local function fakeCpu(cost)
@@ -228,9 +235,7 @@ end
 -- call's own writes are never journaled, so Sight.new keeps no units() read made while it is.
 do
     local cpu = fakeCpu(1)
-    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
-                  u32 = function() return 0 end }
-    local nop = function() end
+    local mem, nop = zeroMem(), function() end
     local sandbox, _, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
                                               write16 = nop, write32 = nop })
     check(open(), false, "open: no sandbox yet")
@@ -2576,9 +2581,7 @@ end
 -- remembered enemy's death does not.
 do
     local cpu = fakeCpu(1)
-    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
-                  u32 = function() return 0 end }
-    local nop = function() end
+    local mem, nop = zeroMem(), function() end
     local sandbox, api, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
                                                 write16 = nop, write32 = nop })
     local reads, primed, openAtRead = 0, nil, nil
@@ -2611,9 +2614,7 @@ end
 -- kill is of an enemy the retry remembers (liftRemembered then changes what the grid counts).
 do
     local cpu = fakeCpu(1)
-    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
-                  u32 = function() return 0 end, s8 = function() return 0 end }
-    local nop = function() end
+    local mem, nop = zeroMem(), function() end
     local GAME = 0x08001000   -- fakeCpu's one game function; every S entry is it
     local calls = 0
     local counted = setmetatable({ write = function(r, v)
