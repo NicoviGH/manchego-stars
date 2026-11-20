@@ -3031,38 +3031,47 @@ end
 -- 20-HP wall needs 10 turns, so its way is the walk round to the door (20 steps, 4 turns).
 -- C (20 a blow) stands in the door's room at (3,2), a step off the wall (as Seth stood off it,
 -- bound for the throne): its own way is the door, never the wall, yet it is offered the strike
--- from (2,2), and the board it leaves takes A's way through the wall. Fails where a wall was read only against the goal's
--- own field: no wall opens onto a room behind a door, so none was on any way and the thief
--- walked round to the west chests' door for 9 turns.
+-- from (2,2), and the board it leaves takes A's way through the wall. Fails where a wall was
+-- read only against the goal's own field: no wall opens onto a room behind a door, so none
+-- was on any way and the thief walked round to the west chests' door for 9 turns. The guard:
+-- with a walk round of 2 steps (0.4 turns) the wall, stood open, is no sooner to the door
+-- (0.2 + 4 steps = 1 turn), so no strike is offered.
 do
-    local A = blue(0x01, 0, 0, 2)
-    local C = blue(0x02, 1, 3, 2)
-    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
-    local toDoor = { ["4,1"] = 0, ["4,2"] = 1, ["3,2"] = 2, ["2,2"] = 3, ["0,2"] = 20,
-                     ["0,1"] = 21, ["1,1"] = 22 }
-    local toWall = { ["1,2"] = 0, ["0,2"] = 1, ["2,2"] = 1, ["1,1"] = 1, ["0,1"] = 2 }
-    local s = sightOf {
-        objective = { kind = "boss" },
-        reach = { [0x01] = tiles({ 0, 2 }), [0x02] = tiles({ 3, 2 }, { 2, 2 }) },
-        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["4,1"] = toDoor, ["1,2"] = toWall },
-        obstacles = { { x = 1, y = 2, hp = 20 } }, doors = { { x = 4, y = 1 } },
-        openers = { [0x01] = true, [0x02] = true },
-    }
-    local blows = { [0x01] = 2, [0x02] = 20 }
-    s.strikeWall = function(u) return { dealt = blows[u.id] or 0 } end
-    local cands, ctx = B.candidates(boardOf(A, C, E), s, style("careful"))
-    local struck
-    for _, c in ipairs(cands) do
-        for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
-            if a.obstacle then struck = a.move.x .. "," .. a.move.y .. ">" .. a.obstacle.x .. "," .. a.obstacle.y end
+    local function read(round)
+        local A = blue(0x01, 0, 0, 2)
+        local C = blue(0x02, 1, 3, 2)
+        local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+        local toDoor = { ["4,1"] = 0, ["4,2"] = 1, ["3,2"] = 2, ["2,2"] = 3, ["0,2"] = round,
+                         ["0,1"] = round + 1, ["1,1"] = round + 2 }
+        local toWall = { ["1,2"] = 0, ["0,2"] = 1, ["2,2"] = 1, ["1,1"] = 1, ["0,1"] = 2 }
+        local s = sightOf {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 0, 2 }), [0x02] = tiles({ 3, 2 }, { 2, 2 }) },
+            field = fieldsOf { ["4,0"] = BOSS_SIDE, ["4,1"] = toDoor, ["1,2"] = toWall },
+            obstacles = { { x = 1, y = 2, hp = 20 } }, doors = { { x = 4, y = 1 } },
+            openers = { [0x01] = true, [0x02] = true },
+        }
+        local blows = { [0x01] = 2, [0x02] = 20 }
+        s.strikeWall = function(u) return { dealt = blows[u.id] or 0 } end
+        local cands, ctx = B.candidates(boardOf(A, C, E), s, style("careful"))
+        local struck
+        for _, c in ipairs(cands) do
+            for _, a in ipairs(c.unit.id == 0x02 and c.acts or {}) do
+                if a.obstacle then
+                    struck = a.move.x .. "," .. a.move.y .. ">" .. a.obstacle.x .. "," .. a.obstacle.y
+                end
+            end
         end
+        return struck, ctx, A
     end
+    local struck, ctx, A = read(20)
     check(struck, "2,2>1,2", "wall strike: offered on a wall that opens onto a door's side")
     local now = ctx.turnsTo(A, { x = 4, y = 0 })
     local after = ctx.turnsOn({ ["1,2"] = 0 }, { [0x02] = { x = 2, y = 2, acted = true } })(A, { x = 4, y = 0 })
     check(now ~= nil and after ~= nil and after < now - 1, true,
           "wall strike: and the board it leaves takes the wall to the door (" .. tostring(now)
           .. " -> " .. tostring(after) .. ")")
+    check(read(2), nil, "wall strike: none on a wall no sooner to the door than the walk round")
 end
 
 -- test_a_wall_falls_with_the_strikers_where_the_plan_puts_them (#655, Nicolas 2026-11-18): C
