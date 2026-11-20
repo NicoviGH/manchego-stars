@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19, late night; main is a583cae4). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
+**Next session starts here (2026-11-19, late night; main is 672bc21c). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
 - **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
   - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
@@ -19,9 +19,13 @@ and start a fresh instance; don't rely on auto-compaction.
   - Fixes land back to back. Games are played when a batch of fixes has a real chance of a better result.
   - Correctness first: a slowdown may go to its own issue (#671), by Nicolas's call.
   - Clean still means every chest, village and recruit, with no loss. No line of work is parked for lack of movement.
-- **Merged tonight: PR #673, which closes #660 (ADR 0432).** The judged enemy phase now plays the game's berserk phase first: the player's berserked units decide with the game's berserked AI, then the enemy phase is ordered on the board they leave. A death to a berserked player unit is flagged `berserk` (not a separate cause, unlike the issue's wording: the cause still says whether the plan read it).
+- **Merged last: PR #675, which closes #674 (ADR 0433).** The judged enemy phase now plays an enemy's status staff (Berserk, Sleep, Silence). The game's AI decides the cast; the bot reads the hit chance with the game's `GetOffensiveStaffAccuracy` on the tile the AI casts from.
+  - In the judged phase the hit is a way of its own, split like a counter kill. One turn ahead (`nextPhase`) a hit of even odds or better lands, so a unit berserked in the first phase moves in the second phase's berserk phase. The army's reply between the phases leaves a sleeping or berserked unit where it stands (`Sight.heldAtReply`).
+  - Proof: unit tests that fail on main, and the manual probe `PT_VANILLA=1 tools/playtest/run.sh staffprobe` (Prologue, an enemy handed a Berserk staff beside Eirika): PASS, FAIL on main. Sleep and Silence share the same path but are not probed in the emulator; ADR 0433 says why. The Ch14 game could not be replayed (old instrument).
+  - Review: 8 findings and a scoped re-review, all fixed.
+- **Merged before it: PR #673, which closes #660 (ADR 0432).** The judged enemy phase now plays the game's berserk phase first: the player's berserked units decide with the game's berserked AI, then the enemy phase is ordered on the board they leave. A death to a berserked player unit is flagged `berserk` (not a separate cause, unlike the issue's wording: the cause still says whether the plan read it).
   - Proof: unit tests that fail on main, and the manual emulator probe `PT_VANILLA=1 tools/playtest/run.sh berserkprobe` (Prologue, Seth berserked beside Eirika): PASS, FAIL on main. The Ch14 game itself could not be replayed (old instrument). `suite --only scout-ch14/1001` on the fix: won on turn 21, no deaths; the staff missed, so the berserk phase was not exercised there.
-  - Review: 15 findings and a scoped re-review, all fixed; the PR body lists them. Filed #674 (an enemy's status staff is not played in the judged phase).
+  - Review: 15 findings and a scoped re-review, all fixed; the PR body lists them. The gap it left, #674, is closed by PR #675 above.
 - **Merged earlier tonight: PR #672, which closes #664 (ADR 0409 amended).**
   - A scout lap gives a chapter every attempt up to the cap (12) for a clean clear. Only then does it carry on, from its best unclean win: the fewest player units lost, then the fewest recruits and rewards missed, then the earliest.
   - Each unclean win's end state is kept in memory (harness `api.keep`, only the best so far) and put back at the cap (`api.restore`). Nothing is played again. The restore checks the turn and dice it kept and refuses a mismatch as a crash.
@@ -33,8 +37,7 @@ and start a fresh instance; don't rely on auto-compaction.
   1. #662: who earns the experience. Recommend a weight from the per-unit tables and measure it.
   2. #663: Ch8's west chests. Re-check them on #669's code first: both clean replays took them. The `p664` replays of `t639-cs-s4003/9` missed both west chests (`never_offered`) in both attempts.
   3. #671: the re-list cost, if laps are too slow.
-  4. #674: an enemy's Berserk or Sleep staff in the judged phase (Ch14's Bishop).
-  5. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
+  4. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
 - **Kept, not merged:** stash `661 escort price (unproven, kept)` and the local branch `feat/661-escort-leaves-the-openers-tile`. It is the price for an escort with no key standing on the opener's tile. It did not stop Eirika's squat in `fix661` a4, and why is untested. Drop it if Ch8's squats are gone on #669's code.
 - **Also open:** #652 (the vanilla Ch3 stall, not re-checked), #657, #658 (a weight call), #651 (on hold). The Dance act is missing from the bot (Tethys); no issue is filed yet.
 - **Disk:** about 22 GB free after the 2026-11-19 cleanup.
