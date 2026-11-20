@@ -1032,6 +1032,14 @@ check(C.targetNotOffered(0x42, nil, { x = 3, y = 2, uid = 0x41 }),
 check(C.targetNotOffered(0x42, nil, nil),
     "the selector never offered unit 0x42; it stands on no target", "no live target")
 
+-- Controller.waitAnswer: what a wait answers on its own (#679: a talk's question went
+-- unanswered, vanilla E_14's Eirika and Rennac, and the run crashed)
+check(C.waitAnswer("yes_no_choice", { talk = true }), "answer_yes", "a talk's question takes Yes")
+check(C.waitAnswer("yes_no_choice", {}), nil, "a question outside a talk is the caller's")
+check(C.waitAnswer("dialogue_wait", {}), "advance_dialogue", "a box is pressed through")
+check(C.waitAnswer("send_to_convoy", { fullBag = true }), "full_bag", "the bot's chooser answers a full bag")
+check(C.waitAnswer("send_to_convoy", {}), nil, "no chooser installed: the caller waits")
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests))
     os.exit(1)

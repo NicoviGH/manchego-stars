@@ -1061,13 +1061,20 @@ local function waitFor(pred, frames, tapA)
 end
 
 -- Answer a wait the game puts to the player outside any menu the caller drives: a dialogue
--- box, or the full-bag chooser when the bot set INSPECT.onFullBag (a scenario without one
--- waits as before). FE8 raises the chooser in the ENEMY phase too, when a kill's drop lands on
--- a full bag (vanilla Ch3 t7, Colm's counter). true = answered, false = the press failed,
--- nil = nothing to answer here (the caller yields).
+-- box, the full-bag chooser when the bot set INSPECT.onFullBag (a scenario without one
+-- waits as before), or a talk's yes/no question while INSPECT.inTalk is set (the Talk act;
+-- Controller.waitAnswer says which and why, #679). FE8 raises the chooser in the ENEMY phase
+-- too, when a kill's drop lands on a full bag (vanilla Ch3 t7, Colm's counter). true =
+-- answered, false = the press failed, nil = nothing to answer here (the caller yields).
 function INSPECT.answerWait(state)
-    if state == "dialogue_wait" then return INSPECT.advanceDialogue(60) end
-    if state == "send_to_convoy" and INSPECT.onFullBag then return INSPECT.onFullBag() end
+    local answer = Controller.waitAnswer(state,
+        { fullBag = INSPECT.onFullBag ~= nil, talk = INSPECT.inTalk })
+    if answer == "advance_dialogue" then return INSPECT.advanceDialogue(60) end
+    if answer == "full_bag" then return INSPECT.onFullBag() end
+    if answer == "answer_yes" then
+        log(string.format("talk: the talk's question takes Yes (turn %d)", turn()))
+        return selectSemantic("answer_yes", "the talk's question takes Yes", INSPECT.promptClosed, 120)
+    end
     return nil
 end
 
@@ -3794,7 +3801,11 @@ INSPECT.botApi = function(game)
         elseif a.act == "talk" then
             local talked, why = chooseTalk(a.targetId)
             if not talked then return false, why end
-            return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
+            -- the talk may ask a question (a paid recruit): answerWait takes Yes while this is set
+            INSPECT.inTalk = true
+            local acted = INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
+            INSPECT.inTalk = nil
+            return acted
         elseif a.act == "rescue" or a.act == "drop" then
             -- the command's own selector (RescueEffect, DropEffect), stepped to the unit or the
             -- tile, then A; the act's animation plays, and Canto (playerphase.c) moves the unit

@@ -967,6 +967,21 @@ function M.targetNotOffered(targetId, targetTile, at)
         at and string.format("(%d,%d) uid 0x%02X", at.x or -1, at.y or -1, at.uid or 0) or "no target")
 end
 
+-- What a wait answers on its own (harness INSPECT.answerWait), or nil when the caller yields:
+-- a dialogue box is always pressed through; the full-bag chooser only when the bot installed
+-- one (`o.fullBag`); a yes/no question only inside a Talk act (`o.talk`). A talk can ask: the
+-- paid recruit (common-events.h EventScr_9EEB00, vanilla E_14's Eirika and Rennac, charIds
+-- 0x01 and 0x1C) asks once the party holds the price, and Yes pays it and recruits the unit,
+-- so a talk the bot chose is answered Yes. With no answer the wait timed out and the run
+-- crashed (#679).
+function M.waitAnswer(state, o)
+    o = o or {}
+    if state == "dialogue_wait" then return "advance_dialogue" end
+    if state == "send_to_convoy" and o.fullBag then return "full_bag" end
+    if state == "yes_no_choice" and o.talk then return "answer_yes" end
+    return nil
+end
+
 --- Whether the tail of a unit's action is over, read from one observation after its command
 --- menu closed. The game checks AREA events when an action ends, Wait included, and the
 --- event runs after the menu is gone: vanilla Ch15's hidden treasure (ch15a-eventinfo.h AREA
