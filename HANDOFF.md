@@ -15,7 +15,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 - **What is running** (started from this checkout; logs in `review/640-batch/`, gitignored):
   - `b640e`: `resume --game vanilla --tag b640e --chapter 0 --scout --route 1 --seal-at 10`, all 10 pinned campaigns, 8 workers, started 06:49. Log `b640e.log` prints a campaign's lines only when it ends. Live per-attempt lines are in each worker's `/tmp/playtest-campaign@pool-75378-ae97a92b-N/playtest.log` (BOTRUN/CAMPAIGN JSON). A reader: `lapstat.py` in the old session's scratchpad. Rewrite it if gone: it tallies BOTRUN `outcome`/`clean`/`clear` per chapter.
-  - `f679`: 4001 carried on from its Ch14 start on the first #679 fix (`f679-4001.log`), because 4001's lap crashed there.
+  - `f679` (ENDED): 4001 carried on from its Ch14 start on the first #679 fix (`f679-4001.log`). It cleared E_14 clean on attempt 7, then ended at E_15 like 4004: no win in 12 attempts (11 `stuck`, 1 lost).
   - 4010 started just before #680 merged, on the branch code (has the fix). The other campaigns run main 0f063e6c's bot.
 - **Ended so far:** 4001 crashed at E_14 attempt 7 (#679, now fixed; carried on as `f679`). 4004 ended at E_15: no win in 12 attempts (11 `stuck`, 1 lost), so the scout lap cannot carry on. Not looked into. The #639 notes say every L10 campaign walled at E_15 or I_14 before too.
 - **Patterns so far** (Eirika route, L10; #640 comment 7039954068 has the start):
