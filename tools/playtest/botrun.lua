@@ -775,9 +775,18 @@ function M.run(api)
                   taught_unchecked = { attack = 0, counter_level = 0, counter_unplanned = 0,
                                        staff = 0 } }
     local explore = M.exploreLog()
-    -- the Talks this attempt that recruited no one, "<talker charId>><target charId>" -> true
-    -- (#679): Bot's talks offers them no more
+    -- the Talks this attempt that recruited no one, "<talker charId>><target charId>" -> the
+    -- party's gold then (true when it could not be read), #679. unpaidNow() is what Bot's talks
+    -- skips: every pair but those the party now holds more gold for (it may pay now)
     local unpaid = {}
+    local function unpaidNow()
+        local gold = api.gold and api.gold()
+        local out = {}
+        for k, then_ in pairs(unpaid) do
+            if not (gold and type(then_) == "number" and gold > then_) then out[k] = true end
+        end
+        return out
+    end
     -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
     -- baseline and chosen keys once it is reached; `halt`, why the replay stops early
     local diag = api.diag
@@ -1505,7 +1514,7 @@ function M.run(api)
                             end
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
-                                     unpaid = unpaid,
+                                     unpaid = unpaidNow(),
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
@@ -1703,7 +1712,7 @@ function M.run(api)
                         end
                         return a
                     end
-                    local a = Bot.decide(board, sight, style, { unpaid = unpaid })
+                    local a = Bot.decide(board, sight, style, { unpaid = unpaidNow() })
                     trace({ t = "plan", choice = a and actOf(a), policy = style.aggression })
                     return a
                 end
@@ -1759,19 +1768,30 @@ function M.run(api)
                 -- "trapped": the game halted the move on a unit the fog hid (FE8's ambush,
                 -- harness api.act); the unit's turn is over where it stopped, its act not made
                 local trapped = done == "trapped"
-                -- a Talk that left its target out of the party recruited no one (a paid
-                -- recruit the party cannot pay, #679): no progress, and not offered again
-                -- this attempt (Bot's talks reads `unpaid`)
+                -- a Talk to an owed recruit that left it out of the party recruited no one (a
+                -- paid recruit the party cannot pay, #679): no progress, and not offered again
+                -- this attempt until the party's gold rises (Bot's talks reads `unpaid`). A talk
+                -- to anyone else (a boss's, an item's) is not judged, nor one whose party read
+                -- failed: that is unknown, not a refusal
                 local unrecruited = false
                 if not trapped and action.act == "talk" and action.target then
-                    local ok, list = pcall(api.party or function() return {} end)
-                    unrecruited = true
-                    for _, c in ipairs(ok and list or {}) do
-                        if c == action.target then unrecruited = false end
+                    local isOwed = false
+                    for _, c in ipairs(owed or {}) do
+                        if c == action.target then isOwed = true end
                     end
-                    if unrecruited then unpaid[action.unit .. ">" .. action.target] = true end
+                    local ok, list = false, nil
+                    if isOwed and api.party then ok, list = pcall(api.party) end
+                    if ok and type(list) == "table" then
+                        unrecruited = true
+                        for _, c in ipairs(list) do
+                            if c == action.target then unrecruited = false end
+                        end
+                    end
+                    if unrecruited then
+                        unpaid[action.unit .. ">" .. action.target] = api.gold and api.gold() or true
+                    end
                     for _, t in ipairs(api.talks and api.talks() or {}) do
-                        t.joined = not unrecruited
+                        if ok then t.joined = not unrecruited end
                         rec.talks[#rec.talks + 1] = t
                     end
                 end

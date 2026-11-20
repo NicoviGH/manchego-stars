@@ -29,10 +29,12 @@ Larachel's talk to Rennac (`EventScr_089F619C`) recruits him with no question.
   `INSPECT.answerWait` in the wait `INSPECT.awaitActed` runs for a talk). The bot chose the talk
   to recruit, and a clean clear needs every recruit; gold is not part of clean. A question
   outside a talk is still the caller's, as before.
-- A Talk that leaves its target out of the party recruited no one (the party could not pay).
-  It is not progress, and it is not offered again that attempt (botrun's `unpaid`, read by
-  Bot's `talks`). The game's Talk check knows no gold, so without this the talker would spend
-  its act on the same talk every turn.
+- A Talk to an owed recruit that leaves it out of the party recruited no one (the party could
+  not pay). It is not progress, and it is not offered again that attempt until the party's gold
+  rises above what it held then (botrun's `unpaid`, read by Bot's `talks`). The game's Talk check
+  knows no gold, so without this the talker would spend its act on the same talk every turn. A
+  talk to a unit not owed (a boss's, an item's) is not judged, nor one whose party read failed:
+  that is unknown, not a refusal.
 - Every Talk is in the chapter record (`talks`: turn, talker, target, whether a question was
   asked, the gold it took, whether the target joined).
 - The price is not weighed against what the gold would buy later: the planner gives a talk no

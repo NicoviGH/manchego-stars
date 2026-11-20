@@ -3706,6 +3706,9 @@ INSPECT.botApi = function(game)
         bag = function() return unread(INSPECT.bagLog) end,
         -- every Talk made since the last call (INSPECT.talkLog)
         talks = function() return unread(INSPECT.talkLog) end,
+        -- the party's gold, the PlaySt field (a memory read, cheap per decision): botrun offers
+        -- an unpaid Talk again once it rises (#679)
+        gold = INSPECT.partyGold,
         -- every drop the game gave a player unit since the last call (INSPECT.watchDrops, kept
         -- while an act or an enemy phase plays: the only times a battle resolves)
         drops = function() return unread(dropLog) end,
