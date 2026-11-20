@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19, late night; main is 672bc21c). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
+**Next session starts here (2026-11-19, late night; main is c47dfc7a). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
 - **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
   - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
@@ -19,7 +19,10 @@ and start a fresh instance; don't rely on auto-compaction.
   - Fixes land back to back. Games are played when a batch of fixes has a real chance of a better result.
   - Correctness first: a slowdown may go to its own issue (#671), by Nicolas's call.
   - Clean still means every chest, village and recruit, with no loss. No line of work is parked for lack of movement.
-- **Merged last: PR #675, which closes #674 (ADR 0433).** The judged enemy phase now plays an enemy's status staff (Berserk, Sleep, Silence). The game's AI decides the cast; the bot reads the hit chance with the game's `GetOffensiveStaffAccuracy` on the tile the AI casts from.
+- **Merged last: PR #676, which closes #663 (ADR 0427 amended).** Vanilla Ch8's west chests sit behind the (1,5) door; `wallsOnWays` read a wall only against the goal's own field, which stops at a door, so the cracked wall at (4,8) left every strike list once Colm (charId 9) turned for the chests. It now also reads each wall against each obstacle on the unit's cheapest chain.
+  - Proof: the new unit test (and its guard) fail without the fix. One replay of `t639-cs-s4003` Ch8 a1 (`fix663-…`): won clean in 19 turns, no deaths; Forde (0x10) broke the wall, Colm took both chests. Main: Colm dead, both chests missed. One game only.
+  - Review: 3 findings (a guard case, a comment wrap, the ADR's proof wording) and a scoped re-review, all fixed.
+- **Merged before it: PR #675, which closes #674 (ADR 0433).** The judged enemy phase now plays an enemy's status staff (Berserk, Sleep, Silence). The game's AI decides the cast; the bot reads the hit chance with the game's `GetOffensiveStaffAccuracy` on the tile the AI casts from.
   - In the judged phase the hit is a way of its own, split like a counter kill. One turn ahead (`nextPhase`) a hit of even odds or better lands, so a unit berserked in the first phase moves in the second phase's berserk phase. The army's reply between the phases leaves a sleeping or berserked unit where it stands (`Sight.heldAtReply`).
   - Proof: unit tests that fail on main, and the manual probe `PT_VANILLA=1 tools/playtest/run.sh staffprobe` (Prologue, an enemy handed a Berserk staff beside Eirika): PASS, FAIL on main. Sleep and Silence share the same path but are not probed in the emulator; ADR 0433 says why. The Ch14 game could not be replayed (old instrument).
   - Review: 8 findings and a scoped re-review, all fixed.
@@ -35,7 +38,7 @@ and start a fresh instance; don't rely on auto-compaction.
   - Review: 12 findings and a scoped re-review (2 notes), all fixed; the PR body lists them.
 - **Work in order (all under #640):**
   1. ~~#662~~ done for now (2026-11-19): three planner experiments (rank order, chip-then-finish, a price on forgone experience) did not raise the bench's levels, and two lost Ephraim in Ch5x. None merges (local branches `exp/662-*`). Nicolas: the bench's levels matter only if they cost a clean clear. #662 stays open on that question, answered by step 4's failures. Comments 7027586654, 7028056654, 7028303067.
-  2. #663: Ch8's west chests. Re-check them on #669's code first: both clean replays took them. The `p664` replays of `t639-cs-s4003/9` missed both west chests (`never_offered`) in both attempts.
+  2. ~~#663~~ done (PR #676).
   3. #671: the re-list cost, if laps are too slow.
   4. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
 - **Kept, not merged:** stash `661 escort price (unproven, kept)` and the local branch `feat/661-escort-leaves-the-openers-tile`. It is the price for an escort with no key standing on the opener's tile. It did not stop Eirika's squat in `fix661` a4, and why is untested. Drop it if Ch8's squats are gone on #669's code.
