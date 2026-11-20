@@ -11,7 +11,12 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19, late night; main is c47dfc7a). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
+**Next session starts here (2026-11-19, night; main is ea12724e). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
+
+- **#671 (re-list cost): two PRs merged, both listing the same plans as before** (#671 comments 7029490721, 7031190932).
+  - PR #677: the board is read once per re-list, the Talk check is reused, and the danger grids are kept on a kill. −16% CPU on Ch8 turns 1-3.
+  - PR #678: a strike is keyed only by the reds the game's AI can read, ADR 0431. −13% more. Guard `PT_STRIKECHECK=1` (no mismatch on two chapters).
+  - Still well above main's pre-#669 cost per phase. The leads left are on the issue. Waiting on Nicolas: more #671 work, or the batch run (step 4) now.
 
 - **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
   - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
@@ -39,7 +44,7 @@ and start a fresh instance; don't rely on auto-compaction.
 - **Work in order (all under #640):**
   1. ~~#662~~ done for now (2026-11-19): three planner experiments (rank order, chip-then-finish, a price on forgone experience) did not raise the bench's levels, and two lost Ephraim in Ch5x. None merges (local branches `exp/662-*`). Nicolas: the bench's levels matter only if they cost a clean clear. #662 stays open on that question, answered by step 4's failures. Comments 7027586654, 7028056654, 7028303067.
   2. ~~#663~~ done (PR #676).
-  3. #671: the re-list cost, if laps are too slow.
+  3. ~~#671~~ two PRs merged (#677, #678); open with leads, Nicolas's call whether to go on.
   4. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
 - **Kept, not merged:** stash `661 escort price (unproven, kept)` and the local branch `feat/661-escort-leaves-the-openers-tile`. It is the price for an escort with no key standing on the opener's tile. It did not stop Eirika's squat in `fix661` a4, and why is untested. Drop it if Ch8's squats are gone on #669's code.
 - **Also open:** #652 (the vanilla Ch3 stall, not re-checked), #657, #658 (a weight call), #651 (on hold). The Dance act is missing from the bot (Tethys); no issue is filed yet.
