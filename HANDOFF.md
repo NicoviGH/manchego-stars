@@ -34,7 +34,7 @@ and start a fresh instance; don't rely on auto-compaction.
   - Cost: a chapter the bot cannot clear clean now plays 12 attempts in a scout lap, where it played 1 to 4.
   - Review: 12 findings and a scoped re-review (2 notes), all fixed; the PR body lists them.
 - **Work in order (all under #640):**
-  1. #662: who earns the experience. Recommend a weight from the per-unit tables and measure it.
+  1. ~~#662~~ done for now (2026-11-19): three planner experiments (rank order, chip-then-finish, a price on forgone experience) did not raise the bench's levels, and two lost Ephraim in Ch5x. None merges (local branches `exp/662-*`). Nicolas: the bench's levels matter only if they cost a clean clear. #662 stays open on that question, answered by step 4's failures. Comments 7027586654, 7028056654, 7028303067.
   2. #663: Ch8's west chests. Re-check them on #669's code first: both clean replays took them. The `p664` replays of `t639-cs-s4003/9` missed both west chests (`never_offered`) in both attempts.
   3. #671: the re-list cost, if laps are too slow.
   4. Then one batch run: an `attempts` set or a fresh lap from the prologue, L10 and L20, measured on clean clears at any attempt plus attempts to clean. The frozen suite on main still owes a run before the bot's reading is relied on.
