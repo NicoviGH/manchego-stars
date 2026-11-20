@@ -16,7 +16,7 @@ and start a fresh instance; don't rely on auto-compaction.
 - **#671 (re-list cost): two PRs merged, both listing the same plans as before** (#671 comments 7029490721, 7031190932).
   - PR #677: the board is read once per re-list, the Talk check is reused, and the danger grids are kept on a kill. −16% CPU on Ch8 turns 1-3.
   - PR #678: a strike is keyed only by the reds the game's AI can read, ADR 0431. −13% more. Guard `PT_STRIKECHECK=1` (no mismatch on two chapters).
-  - Still well above main's pre-#669 cost per phase. The leads left are on the issue. Waiting on Nicolas: more #671 work, or the batch run (step 4) now.
+  - Skipping used units in the re-list was measured (−14%) but not shipped: not provably the same plans (Nicolas, 2026-11-20; stash kept). Next: the batch run (step 4).
 
 - **How we work now (Nicolas, 2026-11-19; AGENTS.md, ADR 0430):**
   - A bot PR proves its fix with a unit test that fails without it, plus ONE replay of the game that showed the problem.
