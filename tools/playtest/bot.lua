@@ -548,7 +548,7 @@ local function context(board, sight)
     local ctx = { sight = sight, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
-                  talkTiles = {}, openers = {}, scopes = {}, rescueTiles = {}, carried = {} }
+                  talkTiles = {}, openers = {}, scopes = {}, floods = {}, rescueTiles = {}, carried = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     -- the map the phase memos are kept on (sight.mapKey): a door or wall the phase opened
@@ -634,6 +634,11 @@ local function strikeScope(ctx, e)
 end
 
 -- The widest weapon reach of any unit that is not red: what AiFillDangerMap takes for each.
+-- ctx.onField holds every unit the game's loop counts: it skips US_HIDDEN, US_DEAD,
+-- US_NOT_DEPLOYED and US_BIT16 (cp_0803E2F4.c AiFillDangerMap), onField drops US_HIDDEN,
+-- US_NOT_DEPLOYED, US_RESCUED and US_DEAD (board.lua OFF_FIELD), and a rescue sets US_HIDDEN
+-- with US_RESCUED and a drop clears both (bmunit.c UnitRescue, UnitDrop). So the
+-- key's units are the game's or more, never fewer.
 local function dangerReach(ctx)
     local far = ctx.dangerFar
     if far then return far end
@@ -652,16 +657,22 @@ local function strikeKey(ctx, u, e, x, y, slot)
     local scope = strikeScope(ctx, e)
     local flooders
     if scope then
-        -- the non-red units whose danger can reach this strike's tiles, with their flood's radius
-        flooders = {}
-        local reach = dangerReach(ctx) + scope.range
-        for _, o in ipairs(ctx.onField) do
-            if o.faction ~= "red" then
-                local mov = ctx.sight.mov(o)
-                if mov + reach >= manhattan(o.x, o.y, x, y) then
-                    flooders[#flooders + 1] = { o = o, mov = mov }
+        -- the non-red units whose danger can reach this strike's tiles, with their flood's radius:
+        -- the same for every strike on this tile at this range, so read once per board (ctx)
+        local fk = scope.range .. ":" .. tileKey(x, y)
+        flooders = ctx.floods[fk]
+        if not flooders then
+            flooders = {}
+            local reach = dangerReach(ctx) + scope.range
+            for _, o in ipairs(ctx.onField) do
+                if o.faction ~= "red" then
+                    local mov = ctx.sight.mov(o)
+                    if mov + reach >= manhattan(o.x, o.y, x, y) then
+                        flooders[#flooders + 1] = { o = o, mov = mov }
+                    end
                 end
             end
+            ctx.floods[fk] = flooders
         end
     end
     for _, o in ipairs(ctx.onField) do

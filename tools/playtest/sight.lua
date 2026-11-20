@@ -2646,7 +2646,7 @@ function M.new(outer)
 
     -- The widest max range of any weapon item in `u`'s bag (0: none): a superset of what the game
     -- counts (AiAttemptOffensiveAction's CanUnitUseWeapon, less ITEM_NIGHTMARE; `weapons` also
-    -- drops a magic seal), for the bot's strike memo key (bot.lua strikeReach).
+    -- drops a magic seal), for the bot's strike memo key (bot.lua strikeScope, strikeKey).
     function s.itemReach(u)
         local far = 0
         for _, it in ipairs(u.items or {}) do
