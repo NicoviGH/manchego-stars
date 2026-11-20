@@ -2103,21 +2103,36 @@ function M.takeOff(api, e, x, y)
     api.write32(e.addr + UNIT_STATE, api.mem.u32(e.addr + UNIT_STATE) | api.Board.US_HIDDEN)
 end
 
--- Sight.changed(sandbox, api, S, isolate, change, byId, fn): fn() run on the board a plan's
+-- The answers a changed board starts from (s.changed): none of `kept`'s, but the march cost
+-- grids when `keepGrids` (terrain's alone: no unit blocks them) and the danger and threat grids
+-- when `keepDanger` (no door opened and nothing remembered died). A kill changes neither
+-- grid: GenerateDangerZoneRange counts a hidden unit (bmidoten.c skips only the roofed and the
+-- fogged), and a red's movement is blocked by no red, so the dead enemy's reach stays. The
+-- threat table is shared, not copied, so a grid read on that board stays for the next.
+function M.freshSeen(kept, keepGrids, keepDanger)
+    return { threats = keepDanger and kept.threats or {},
+             danger = keepDanger and kept.danger or nil,
+             grids = keepGrids and kept.grids or {} }
+end
+
+-- Sight.changed(sandbox, api, S, isolate, change, byId, fn, prime): fn() run on the board a plan's
 -- changes leave, in one sandbox whose journal undoes them when it returns: change.opened
 -- ({ ["x,y"] = true }, the doors it opens and walls it breaks, M.openAll) and change.gone
 -- ({ [id] = true }, the enemies it kills, M.takeOff; byId: the units by id, where each stands).
 -- The planner's re-listing (#661, #670) asks there which tiles the units still to act now
 -- reach, and their acts from those. Every write is journaled, so unlike fullInfo it may run
 -- inside a batch. isolate() as M.isolated's: a read on the changed board must not be kept for
--- the board as it is.
-function M.changed(sandbox, api, S, isolate, change, byId, fn)
+-- the board as it is; prime(units), when given, is handed the units read once there.
+function M.changed(sandbox, api, S, isolate, change, byId, fn, prime)
     return M.isolated(sandbox, isolate, function(call)
         M.openAll(api, call, S, change.opened)
         for id in pairs(change.gone or {}) do
             local e = byId[id]
             if e then M.takeOff(api, e, e.x, e.y) end
         end
+        -- prime(units): the board's units read once, on the board the changes leave, for every
+        -- read fn makes (a sandbox open keeps no read of its own: keptRead)
+        if prime then prime(api.board().units) end
         return fn()
     end)
 end
@@ -2176,8 +2191,9 @@ function M.new(outer)
 
     -- The board's units, read once per board like every other answer: kept only from a read
     -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
-    -- it there). One read inside a sandbox may see its writes -- a unit stood elsewhere, its HP
-    -- set, a bag a game call reordered -- so it is read fresh and dropped.
+    -- it there), or from s.changed's prime (one read on the changed board). One read inside a
+    -- sandbox may see its writes -- a unit stood elsewhere, its HP set, a bag a game call
+    -- reordered -- so it is read fresh and dropped.
     local function units()
         return M.keptRead(seen, "units", function() return api.board().units end, open)
     end
@@ -2389,7 +2405,7 @@ function M.new(outer)
     end
 
     function s.refresh()
-        seen = { threats = {}, grids = {} }
+        seen = M.freshSeen({}, false, false)
         units()
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
@@ -2405,11 +2421,11 @@ function M.new(outer)
     -- fresh for the call and the fogged ones come back after it
     -- the board's answers fresh for a changed board's read, and the phase's cache too unless
     -- `keepCache` (its memos key on the map, ctx.mapKey); the march cost grids too unless
-    -- `keepGrids` (they are the terrain's alone: no unit blocks them, costGrid); -> their
-    -- restore (M.isolated)
-    local function fresh(keepCache, keepGrids)
+    -- `keepGrids` (they are the terrain's alone: no unit blocks them, costGrid), the danger and
+    -- threat grids too when `keepDanger` (M.freshSeen); -> their restore (M.isolated)
+    local function fresh(keepCache, keepGrids, keepDanger)
         local keptSeen, keptCache = seen, s.cache
-        seen = { threats = {}, grids = keepGrids and keptSeen.grids or {} }
+        seen = M.freshSeen(keptSeen, keepGrids, keepDanger)
         if not keepCache then s.cache = {} end
         return function() seen, s.cache = keptSeen, keptCache end
     end
@@ -2419,13 +2435,20 @@ function M.new(outer)
     -- fn() on the board `change` leaves (M.changed). The phase's cache is kept: its memos
     -- (bot.lua's attacks and strikes) key on mapKey, which reads the opened map, and on every
     -- unit standing (a kill's board is another key). The cost grids are kept when no map
-    -- changes: a kill moves no terrain
+    -- changes: a kill moves no terrain. The units are read once on the changed board (prime):
+    -- every nested sandbox in it already finds the board's read cached, as on the live board
     function s.changed(change, fn)
         local byId = {}
         for _, o in ipairs(units()) do byId[o.id] = o end
         local keepGrids = next(change.opened or {}) == nil
-        return M.changed(sandbox, api, S, function() return fresh(true, keepGrids) end, change,
-                         byId, fn)
+        -- a kill-only change keeps the danger and threat grids too (M.freshSeen), unless a
+        -- killed enemy is one the retry remembers: liftRemembered lifts only a unit not hidden
+        local keepDanger = keepGrids
+        for id in pairs(change.gone or {}) do
+            if byId[id] and s.knows(byId[id]) then keepDanger = false end
+        end
+        return M.changed(sandbox, api, S, function() return fresh(true, keepGrids, keepDanger) end,
+                         change, byId, fn, function(list) seen.units = list end)
     end
 
     function s.remember(enemies)

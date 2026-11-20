@@ -23,6 +23,13 @@ local function check(got, want, msg)
     end
 end
 
+-- Memory that reads 0 at every address and width, for a batching sandbox whose game code never
+-- reads RAM the test cares about.
+local function zeroMem()
+    local zero = function() return 0 end
+    return { u8 = zero, u16 = zero, u32 = zero, s8 = zero }
+end
+
 -- A CPU whose "game function" at 0x08001000 returns r0 + r1 after `cost` frames (to the
 -- loop lr names), and at 0x08002000 never returns.
 local function fakeCpu(cost)
@@ -228,9 +235,7 @@ end
 -- call's own writes are never journaled, so Sight.new keeps no units() read made while it is.
 do
     local cpu = fakeCpu(1)
-    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
-                  u32 = function() return 0 end }
-    local nop = function() end
+    local mem, nop = zeroMem(), function() end
     local sandbox, _, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
                                               write16 = nop, write32 = nop })
     check(open(), false, "open: no sandbox yet")
@@ -2569,6 +2574,84 @@ do
           "staff: nextPhase's expected way lands a hit of even odds or better")
     check(src:find("if not M.heldAtReply(mem, Board, o) then", 1, true) ~= nil, true,
           "staff: the army's reply moves no unit M.heldAtReply holds")
+end
+
+-- #671: a changed board reads the units once (Sight.changed's prime, after the changes) and a
+-- kill-only change keeps the danger and threat grids (M.freshSeen); a door's change or a
+-- remembered enemy's death does not.
+do
+    local cpu = fakeCpu(1)
+    local mem, nop = zeroMem(), function() end
+    local sandbox, api, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
+                                                write16 = nop, write32 = nop })
+    local reads, primed, openAtRead = 0, nil, nil
+    api.board = function()
+        reads = reads + 1
+        openAtRead = open()
+        return { units = { { id = 1 } } }
+    end
+    local out = Sight.changed(sandbox, api, {}, function() return function() end end, {}, {},
+                              function() return "ran" end, function(list) primed = list end)
+    check(out, "ran", "changed: fn's answer comes back")
+    check(reads, 1, "changed: the board is read once, for every read fn makes")
+    check(openAtRead, true, "changed: the read is made inside the changed board's sandbox")
+    check(primed ~= nil and primed[1].id, 1, "changed: prime is handed the units")
+
+    local kept = { threats = { [5] = "t" }, danger = "d", grids = "g" }
+    local kill = Sight.freshSeen(kept, true, true)
+    check(kill.threats == kept.threats and kill.danger == "d" and kill.grids == "g", true,
+          "freshSeen: a kill-only change keeps the danger, threat and cost grids")
+    local door = Sight.freshSeen(kept, false, false)
+    check(door.threats ~= kept.threats and door.danger == nil and door.grids ~= "g", true,
+          "freshSeen: a door's change keeps none")
+    local mixed = Sight.freshSeen(kept, true, false)
+    check(mixed.grids == "g" and mixed.danger == nil and mixed.threats ~= kept.threats, true,
+          "freshSeen: a remembered enemy's death keeps only the cost grids")
+end
+
+-- #671, through Sight.new: s.changed reads the board once for every units() read inside it (the
+-- prime wrapper), and keeps the danger grid across a kill-only change but rebuilds it when the
+-- kill is of an enemy the retry remembers (liftRemembered then changes what the grid counts).
+do
+    local cpu = fakeCpu(1)
+    local mem, nop = zeroMem(), function() end
+    local GAME = 0x08001000   -- fakeCpu's one game function; every S entry is it
+    local calls = 0
+    local counted = setmetatable({ write = function(r, v)
+        if r == "pc" and v == GAME then calls = calls + 1 end
+        cpu.write(r, v)
+    end }, { __index = cpu })
+    local S = setmetatable({}, { __index = function() return GAME end })
+    local boardReads = 0
+    local sight = Sight.new({ cpu = counted, mem = mem, write8 = nop, write16 = nop,
+                              write32 = nop, SYM = S, Board = Board,
+                              map = function() return 1, 1 end,
+                              chapter = function() return 1 end, turn = function() return 1 end,
+                              board = function()
+                                  boardReads = boardReads + 1
+                                  return { units = { { id = 1, addr = 0x100, x = 0, y = 0 } } }
+                              end })
+    local function dangerReads(change)
+        sight.danger(0, 0)   -- the live board's read, kept
+        local before = calls
+        sight.changed(change, function() sight.danger(0, 0) end)
+        return calls - before
+    end
+    check(dangerReads({ gone = { [1] = true } }), 0,
+          "changed: a kill-only change keeps the danger grid (no new read)")
+    sight.remember({ { id = 1 } })
+    check(dangerReads({ gone = { [1] = true } }) > 0, true,
+          "changed: a remembered enemy's death rebuilds the danger grid")
+
+    sight.refresh()
+    local before = boardReads
+    sight.changed({ gone = {} }, function()
+        sight.mov({ addr = 0x100 })   -- no board read of its own
+        sight.demands()
+        sight.demands()
+    end)
+    -- refresh() kept the live read, so the one read counted is the prime's, inside the change
+    check(boardReads - before, 1, "changed: several units() reads inside cost one board read")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
