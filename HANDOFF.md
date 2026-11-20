@@ -11,7 +11,25 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-19, night; main is ea12724e). Nothing is running. #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
+**Next session starts here (2026-11-20, afternoon; main is 0f7d772f). The batch lap (step 4 under #640) is RUNNING.** Check it before anything else: `ps -Ao etime,pcpu,command | grep mgba-headless`.
+
+- **What is running** (started from this checkout; logs in `review/640-batch/`, gitignored):
+  - `b640e`: `resume --game vanilla --tag b640e --chapter 0 --scout --route 1 --seal-at 10`, all 10 pinned campaigns, 8 workers, started 06:49. Log `b640e.log` prints a campaign's lines only when it ends. Live per-attempt lines are in each worker's `/tmp/playtest-campaign@pool-75378-ae97a92b-N/playtest.log` (BOTRUN/CAMPAIGN JSON). A reader: `lapstat.py` in the old session's scratchpad. Rewrite it if gone: it tallies BOTRUN `outcome`/`clean`/`clear` per chapter.
+  - `f679`: 4001 carried on from its Ch14 start on the first #679 fix (`f679-4001.log`), because 4001's lap crashed there.
+  - 4010 started just before #680 merged, on the branch code (has the fix). The other campaigns run main 0f063e6c's bot.
+- **Ended so far:** 4001 crashed at E_14 attempt 7 (#679, now fixed; carried on as `f679`). 4004 ended at E_15: no win in 12 attempts (11 `stuck`, 1 lost), so the scout lap cannot carry on. Not looked into. The #639 notes say every L10 campaign walled at E_15 or I_14 before too.
+- **Patterns so far** (Eirika route, L10; #640 comment 7039954068 has the start):
+  - E_9: 0 clean clears in 96 games over 8 campaigns. The village at (11,15) is closed by generic enemy charId 167 in 91 of 96. Amelia (0x12) is not recruited in 64; Eirika or Franz must talk to her (`ch9a-eventinfo.h:17-18`). Untested why the bot doesn't.
+  - E_10: Marisa (0x16) is missed in 51 games; only Gerik can recruit her (`ch10a-eventinfo.h:18`).
+  - E_13: Cormag (0x0E) is missed in 37 games; only Eirika can recruit him (`ch13a-eventinfo.h:16`).
+- **Next, when the lap ends:**
+  1. Tabulate clean clears and attempts-to-clean per campaign and chapter.
+  2. Root-cause E_9 (why no talker goes to Amelia; whether the village can be reached first) and E_15's stalls.
+  3. The Ephraim route (`--route 2`) from each campaign's Ch8 start (index 9), and the L20 forks (`--seal-at 20`) from each campaign's first chapter with a seal use (#639 plan comment 6992662334). One cheap check: replay one campaign's L20 from the prologue to its first seal use and `inspect_state.py diff` it against L10, to prove the shared chapters are the same game.
+  4. The frozen suite before any L10/L20 verdict is drawn.
+- **Merged today: PR #680, which closes #679 (ADR 0434).** A talk's yes/no question (vanilla E_14, Eirika to Rennac, a 9,980-gold hire) is answered Yes. A talk to an owed recruit that recruits no one is not repeated until the gold rises. Every talk goes in the record (`talks`). Nicolas: the price is not weighed; safety comes first. Proof: 4001 Ch14 attempts 1-6 have the same acts as the lap; attempt 7 won clean with Rennac recruited (`f679d`).
+
+**2026-11-19, night (main was ea12724e). #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
 - **#671 (re-list cost): two PRs merged, both listing the same plans as before** (#671 comments 7029490721, 7031190932).
   - PR #677: the board is read once per re-list, the Talk check is reused, and the danger grids are kept on a kill. −16% CPU on Ch8 turns 1-3.
