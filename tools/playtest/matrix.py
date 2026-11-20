@@ -1023,6 +1023,9 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SYMDIR', 'PT_SEED', 'PT_STATE',
                      # The sight's leak guard (sight.lua M.leaks): a run that passes plays the
                      # same game, but one that leaks fails: a different result of the same start.
                      'PT_LEAKGUARD',
+                     # The bot's strike-memo guard (bot.lua strike): the same, a run that
+                     # passes plays the same game, one the guard fails is another result.
+                     'PT_STRIKECHECK',
                      # The second phases' old control (PT_REPLY=hold): the bot plays another game.
                      'PT_REPLY',
                      # The weapon-use price's knob (#642): the bot plays another game.

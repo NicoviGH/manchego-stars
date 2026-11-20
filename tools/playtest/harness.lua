@@ -21,6 +21,8 @@
 --   PLAYTEST_BENCH    -- an experiment's benched charIds (PT_BENCH, JSON; botApi's api.bench)
 --   PLAYTEST_LEAKGUARD -- "1": sight.lua's sandboxes log every unit struct word they leave
 --                        changed (PT_LEAKGUARD; INSPECT.leakLog); the run fails at its end
+--   PLAYTEST_STRIKECHECK -- "1": the bot re-runs every strike its memo answers and logs one that
+--                        differs (PT_STRIKECHECK; INSPECT.strikeLog); fails the run as a leak does
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -162,11 +164,19 @@ local INSPECT = {}
 -- takeLeaks() -> the leaks logged since the last take, as lines (Sight.leakLine), the log
 -- emptied: botApi's leaks (an attempt's) and result() (any left over) both take them here.
 INSPECT.leakLog = PLAYTEST_LEAKGUARD == "1" and {} or nil
+-- PT_STRIKECHECK=1: lines the bot's strike memo guard logged (bot.lua strike), taken with the
+-- leaks: either one fails the attempt the same way.
+INSPECT.strikeLog = PLAYTEST_STRIKECHECK == "1" and {} or nil
 function INSPECT.takeLeaks()
     local log, out = INSPECT.leakLog, {}
-    if not log then return out end
-    for _, l in ipairs(log) do out[#out + 1] = INSPECT.Sight.leakLine(l) end
-    for k in pairs(log) do log[k] = nil end
+    if log then
+        for _, l in ipairs(log) do out[#out + 1] = INSPECT.Sight.leakLine(l) end
+        for k in pairs(log) do log[k] = nil end
+    end
+    local checks = INSPECT.strikeLog
+    if checks then
+        for k, l in ipairs(checks) do out[#out + 1] = l; checks[k] = nil end
+    end
     return out
 end
 -- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
@@ -3220,6 +3230,7 @@ INSPECT.sightApi = function()
         turn = turn,
         board = BOARD.read,
         leakGuard = INSPECT.leakLog,
+        strikeCheck = INSPECT.strikeLog,
     }
 end
 

@@ -1389,6 +1389,69 @@ do
     check(bare.attacks(), 2, "without a cache each call asks for itself")
 end
 
+-- A strike's key holds every unit that is not red, and only the reds the enemy's strike can read
+-- (#671, ADR 0431): within its weapon's max range + 3 of the tile it strikes on (it skips a tile a
+-- unit stands on and counts the units within 3 of a tile). A re-listed board (a plan's kill) is
+-- the same board but for a red that is gone: it shares the memo when that red is out of reach.
+do
+    local function strikesFor(rangeOfE, R)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 1, 0, { hp = 30, minRange = rangeOfE and 1 or false, maxRange = rangeOfE or false })
+        local o = {
+            cache = {},
+            danger = { ["0,0"] = 1 },
+            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 1, 0 }), [0x82] = tiles({ 12, 9 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+        }
+        local sight = sightOf(o)
+        B.decide(boardOf(A, E, R), sight, style("careful"))
+        local first = sight.strikes()
+        B.decide(boardOf(A, E), sight, style("careful"))   -- R is dead
+        return sight.strikes() - first, first
+    end
+    local far = red(0x82, 9, 0, { hp = 30 })
+    local again, first = strikesFor(1, far)
+    check(first > 0, true, "the strike is read at all")
+    check(again, 0, "a dead red beyond range + 3 shares the strike memo")
+    local near = red(0x82, 4, 0, { hp = 30 })
+    again, first = strikesFor(1, near)
+    check(again, first, "a dead red within range + 3 is a board of its own: every strike asked again")
+    -- a range-2 enemy reads a red one tile further: 5 from the tile is outside range 1 + 3, inside 2 + 3
+    local five = red(0x82, 5, 0, { hp = 30 })
+    again = strikesFor(1, five)
+    check(again, 0, "a red at distance 5 is outside a reach-1 enemy's zone")
+    again, first = strikesFor(2, five)
+    check(again, first, "a red at distance 5 is inside a reach-2 enemy's zone")
+    -- an enemy with no weapon on the list (a dancer, a ballista's rider) or a staff reads any red
+    again, first = strikesFor(nil, far)
+    check(again, first, "an enemy with no known range keys the whole board")
+end
+
+-- PT_STRIKECHECK (sight.strikeCheck, bot.lua strike): a memo hit also runs the strike, and a read
+-- that differs is logged. Here the far red's death changes the fake's strike, as a unit the key
+-- left out would in the game; with the game's own behaviour (no change) the log stays empty.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 1, 0, { hp = 30 })
+    local R = red(0x82, 9, 0, { hp = 30 })
+    for _, changes in ipairs({ false, true }) do
+        local o = {
+            cache = {}, danger = { ["0,0"] = 1 },
+            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 1, 0 }), [0x82] = tiles({ 12, 9 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+        }
+        local sight = sightOf(o)
+        sight.strikeCheck = {}
+        B.decide(boardOf(A, E, R), sight, style("careful"))
+        check(#sight.strikeCheck, 0, "a miss runs no check")
+        if changes then o.fc[0x01][0x81]["0,0"] = fc { hit = 80, dmg = 9, hits = 1 } end
+        B.decide(boardOf(A, E), sight, style("careful"))
+        check(#sight.strikeCheck, changes and 1 or 0,
+              changes and "a memo hit whose strike reads differently is logged"
+                  or "a memo hit whose strike reads the same is not")
+    end
+end
+
 -- Every unit has acted (or is off the field): nil, the phase is over.
 do
     local board = boardOf(blue(0x01, 0, 0, 0, { acted = true }),

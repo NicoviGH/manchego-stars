@@ -40,8 +40,8 @@
 --              AI a turn event rewrote between phases is in no key). Attacks are kept in it
 --              keyed by what FE8's simulation reads -- both fighters (id, HP, level, every item
 --              and its uses), both tiles, and every other unit within support range (3,
---              bmreliance.h) of either; strikes keyed by the exchange AND the whole board,
---              because the AI's pick of weapon and tile can be changed by any unit anywhere.
+--              bmreliance.h) of either; strikes keyed by the exchange, every unit that is not
+--              red and the reds within the enemy's weapon range + 3 of the tile (strikeKey).
 --              Reach and worst case are per call only.
 --            terrain(x, y) -> FE8 terrain id, OPTIONAL: only a terrain claim reads it; without
 --              it that claim is a no-op.
@@ -538,7 +538,7 @@ local function context(board, sight)
     local ctx = { sight = sight, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
-                  talkTiles = {}, openers = {}, rescueTiles = {}, carried = {} }
+                  talkTiles = {}, openers = {}, radii = {}, rescueTiles = {}, carried = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     -- the map the phase memos are kept on (sight.mapKey): a door or wall the phase opened
@@ -583,23 +583,64 @@ local function attackKey(ctx, u, e, x, y, slot)
     return table.concat(parts, ";")
 end
 
--- A strike's key: the exchange and the WHOLE board, its map too (ctx.mapKey). The strike is the enemy AI's own pick of
--- weapon and tile (sight.lua), and any unit anywhere can block or open its path.
+-- How far from the struck tile a red can change an enemy's strike on it (#671, ADR 0431): the
+-- AI picks the tile it strikes from among those within its weapon's range of the target, skipping
+-- one a unit stands on (cp_battle.c AiSimulateBestBattleAgainstTarget), and scores each tile
+-- with the units within 3 of it (AiGetFriendZoneCombatPositionScoreComponent, called by
+-- AiGetCombatPositionScore). Its danger map counts only units that are not its allies
+-- (cp_0803E2F4.c AiFillDangerMap). So a red beyond range + 3 changes nothing. math.huge where
+-- the enemy's decision reads reds elsewhere or its range is unknown: a staff of its own
+-- (a heal reaches an ally anywhere in its movement), no weapon (a dancer, a ballista's rider,
+-- whose branch takes a ballista tile anywhere in its movement).
+local STRIKE_ZONE = 3
+local function strikeRadius(ctx, e)
+    local r = ctx.radii[e.id]
+    if r then return r end
+    r = math.huge
+    local weapons = ctx.sight.weapons(e)
+    local staves = ctx.sight.staves and ctx.sight.staves(e)
+    if weapons and #weapons > 0 and not (staves and #staves > 0) then
+        local far = 0
+        for _, w in ipairs(weapons) do far = math.max(far, w.max) end
+        r = far + STRIKE_ZONE
+    end
+    ctx.radii[e.id] = r
+    return r
+end
+
+-- A strike's key: the exchange, the map (ctx.mapKey), every unit that is not red, and the reds
+-- the enemy's strike can read (strikeRadius); `e` itself is always in it.
 local function strikeKey(ctx, u, e, x, y, slot)
     local parts = { unitKey(u), x, y, slot or "-", unitKey(e), e.x, e.y, ctx.mapKey, "board" }
+    local radius = strikeRadius(ctx, e)
     for _, o in ipairs(ctx.onField) do
-        parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
+        if o.faction ~= "red" or o == e or manhattan(o.x, o.y, x, y) <= radius then
+            parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
+        end
     end
     return table.concat(parts, ";")
 end
 
-local function remembered(memo, k, ask)
+local function remembered(memo, k, ask, onHit)
     local v = memo[k]
     if v == nil then
         v = ask() or false
         memo[k] = v
+    elseif onHit then
+        onHit(v or nil)
     end
     return v or nil
+end
+
+-- A read (a strike: numbers and tables) as text, keys sorted, and whether two are the same.
+local function readText(v)
+    if type(v) ~= "table" then return tostring(v) end
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    local parts = {}
+    for _, k in ipairs(keys) do parts[#parts + 1] = tostring(k) .. "=" .. readText(v[k]) end
+    return "{" .. table.concat(parts, ",") .. "}"
 end
 
 -- Our attack from (x, y) on `e` with the weapon in item `slot` (nil when it does not reach),
@@ -610,8 +651,20 @@ local function attack(ctx, u, e, x, y, slot)
         function() return ctx.sight.attack(u, e, x, y, slot) end)
 end
 local function strike(ctx, u, e, x, y, slot)
-    return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y, slot),
-        function() return ctx.sight.strike(u, e, x, y, slot) end)
+    local ask = function() return ctx.sight.strike(u, e, x, y, slot) end
+    -- PT_STRIKECHECK=1 (sight.strikeCheck, the run's log): a memo hit also runs the strike on
+    -- this board, as the whole-board key did, and logs a read that differs: the failure of the
+    -- run, as a sandbox leak's (harness takeLeaks)
+    local log = ctx.sight.strikeCheck
+    return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y, slot), ask, log and function(kept)
+        local kt, ft = readText(kept), readText(ask())
+        if kt ~= ft then
+            log[#log + 1] = ("strike memo: enemy %s striking %s at %d,%d (slot %s) read %s from "
+                .. "the memo and %s on this board: strikeKey left out a unit the AI reads "
+                .. "(bot.lua strikeRadius)"):format(tostring(e.id), tostring(u.id), x, y,
+                tostring(slot), kt, ft)
+        end
+    end)
 end
 
 -- sight.reach, with the unit's own tile always in it (attacking or waiting where it stands),

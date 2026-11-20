@@ -2181,7 +2181,9 @@ function M.new(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
-    local s = { cache = {}, odds = M.odds, splitFloor = M.SPLIT_FLOOR }
+    -- outer.strikeCheck (PT_STRIKECHECK=1): the run's log for the bot's strike-memo guard
+    -- (bot.lua strike), which reads it as s.strikeCheck
+    local s = { cache = {}, odds = M.odds, splitFloor = M.SPLIT_FLOOR, strikeCheck = outer.strikeCheck }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     -- watch() is asked before every game call from now on (nil: no longer): M.watched.

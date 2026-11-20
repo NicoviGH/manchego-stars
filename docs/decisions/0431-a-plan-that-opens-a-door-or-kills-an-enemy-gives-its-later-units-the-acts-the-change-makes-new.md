@@ -180,3 +180,25 @@ Talk scan per change key. Each change leaves the listed plans as they were:
 Proof: all 125 decision records of turns 1-3 equal main's but for `frames` (turn 1's first
 decision 10,041 to 7,995); the whole chapter with `PT_LEAKGUARD=1` won clean in 17 turns with no
 leak, as `relist661g` did. CPU for turns 1-3: 28.2 s to 23.6 s (-16%).
+
+**Amendment 2026-11-19 (#671): a strike is keyed by the reds it can read.** The strike memo
+keyed every on-field unit, so each re-listed board (a plan's kills) missed every strike. A strike
+read is the game's own AI for enemy `e` against our unit on a tile. Diagnosed on vanilla Ch8
+(`e639-t639-cs-s4002/9`, 12,908 reads): with the map and every non-red unit equal, reads differed
+only by which reds were present, and the game's code explains each difference:
+- the AI skips a candidate strike tile with a unit on it (`AiSimulateBestBattleAgainstTarget`,
+  cp_battle.c), and the candidates are within `e`'s weapon range of the target;
+- the tile's score counts units within 3 of it (`AiGetFriendZoneCombatPositionScoreComponent`,
+  called by `AiGetCombatPositionScore`);
+- its danger map skips allies, so reds do not enter it (`AiFillDangerMap`, cp_0803E2F4.c; the
+  player's `GenerateDangerZoneRange` counting a hidden unit is the bot's own grid, not this read).
+
+So a red beyond `e`'s max weapon range + 3 of the struck tile cannot change the strike. The key
+(`strikeKey`, `strikeRadius`) holds every unit that is not red, `e`, and the reds within that
+distance. An enemy whose range is unknown (no weapon on the list: a dancer, a ballista's rider),
+or with a staff of its own (a heal reaches an ally anywhere in its movement), keys the whole
+board as before. Radius 3 gave 3 wrong merges in the diagnosis, radius 4 with reach-1 enemies 0.
+
+`PT_STRIKECHECK=1` (run.sh) is the guard: each memo hit also runs the strike and logs a read that
+differs, which fails the attempt as a leak does. Unproven: a rank-locked or magic-sealed weapon
+the AI counts and `sight.weapons` does not (the guard is the check on the replays we run).
