@@ -2604,9 +2604,53 @@ do
     local mixed = Sight.freshSeen(kept, true, false)
     check(mixed.grids == "g" and mixed.danger == nil and mixed.threats ~= kept.threats, true,
           "freshSeen: a remembered enemy's death keeps only the cost grids")
-    -- the one caller: s.changed holds the danger back for a map change or a remembered kill
-    check(sightSrc:find("if byId[id] and s.knows(byId[id]) then keepDanger = false end", 1, true)
-          ~= nil, true, "changed: a remembered enemy's death rebuilds the danger grids")
+end
+
+-- #671, through Sight.new: s.changed reads the board once for every units() read inside it (the
+-- prime wrapper), and keeps the danger grid across a kill-only change but rebuilds it when the
+-- kill is of an enemy the retry remembers (liftRemembered then changes what the grid counts).
+do
+    local cpu = fakeCpu(1)
+    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
+                  u32 = function() return 0 end, s8 = function() return 0 end }
+    local nop = function() end
+    local GAME = 0x08001000   -- fakeCpu's one game function; every S entry is it
+    local calls = 0
+    local counted = setmetatable({ write = function(r, v)
+        if r == "pc" and v == GAME then calls = calls + 1 end
+        cpu.write(r, v)
+    end }, { __index = cpu })
+    local S = setmetatable({}, { __index = function() return GAME end })
+    local boardReads = 0
+    local sight = Sight.new({ cpu = counted, mem = mem, write8 = nop, write16 = nop,
+                              write32 = nop, SYM = S, Board = Board,
+                              map = function() return 1, 1 end,
+                              chapter = function() return 1 end, turn = function() return 1 end,
+                              board = function()
+                                  boardReads = boardReads + 1
+                                  return { units = { { id = 1, addr = 0x100, x = 0, y = 0 } } }
+                              end })
+    local function dangerReads(change)
+        sight.danger(0, 0)   -- the live board's read, kept
+        local before = calls
+        sight.changed(change, function() sight.danger(0, 0) end)
+        return calls - before
+    end
+    check(dangerReads({ gone = { [1] = true } }), 0,
+          "changed: a kill-only change keeps the danger grid (no new read)")
+    sight.remember({ { id = 1 } })
+    check(dangerReads({ gone = { [1] = true } }) > 0, true,
+          "changed: a remembered enemy's death rebuilds the danger grid")
+
+    sight.refresh()
+    local before = boardReads
+    sight.changed({ gone = {} }, function()
+        sight.mov({ addr = 0x100 })   -- no board read of its own
+        sight.demands()
+        sight.demands()
+    end)
+    -- refresh() kept the live read, so the one read counted is the prime's, inside the change
+    check(boardReads - before, 1, "changed: several units() reads inside cost one board read")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

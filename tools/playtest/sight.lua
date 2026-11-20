@@ -2191,8 +2191,9 @@ function M.new(outer)
 
     -- The board's units, read once per board like every other answer: kept only from a read
     -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
-    -- it there). One read inside a sandbox may see its writes -- a unit stood elsewhere, its HP
-    -- set, a bag a game call reordered -- so it is read fresh and dropped.
+    -- it there), or from s.changed's prime (one read on the changed board). One read inside a
+    -- sandbox may see its writes -- a unit stood elsewhere, its HP set, a bag a game call
+    -- reordered -- so it is read fresh and dropped.
     local function units()
         return M.keptRead(seen, "units", function() return api.board().units end, open)
     end
@@ -2404,7 +2405,7 @@ function M.new(outer)
     end
 
     function s.refresh()
-        seen = { threats = {}, grids = {} }
+        seen = M.freshSeen({}, false, false)
         units()
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
