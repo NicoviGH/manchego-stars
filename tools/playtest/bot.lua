@@ -2780,6 +2780,11 @@ end
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    -- the board's Talk memo (#671): a re-list's read asks the same pairs again (recruitsOf, 224
+    -- CheckForCharacterEvents per change key), and a pair's answer is its charIds and the event
+    -- flags, which no door or kill moves. A dead enemy is out of the re-list's board, so its pairs
+    -- are never asked, whatever the memo holds
+    if opts and opts.talks then ctx.talks = opts.talks end
     if opts and opts.only then
         local kept = {}
         for _, u in ipairs(ctx.actors) do

@@ -2419,6 +2419,7 @@ do
                            ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
                                        ["0,1"] = 3, ["1,1"] = 2 } },
         obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+        talk = {},
         change = function(c)
             if c.opened["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
             return {}
@@ -2436,7 +2437,20 @@ do
         end,
     }
     local sight = sightOf(o)
+    -- #671: the game's Talk check, counted per pair: the re-list reads the same blue-red pairs
+    -- the board's read did, and takes the board's answers from its memo
+    local asked, canTalk = {}, sight.canTalk
+    sight.canTalk = function(u, t)
+        local k = u.id .. ">" .. t.id
+        asked[k] = (asked[k] or 0) + 1
+        return canTalk(u, t)
+    end
     local _, plan = Planner.plan(B, boardOf(K, D, F, E), sight, style("careful"))
+    local askedTwice = {}
+    for k, n in pairs(asked) do if n > 1 then askedTwice[#askedTwice + 1] = k end end
+    check(next(asked) ~= nil and #(sight.changes or {}) == 1, true,
+          "relist talks: the pairs are asked, and a re-list ran")
+    check(table.concat(askedTwice, ","), "", "relist talks: no pair is asked twice (the memo is shared)")
     local order = {}
     for _, a in ipairs(plan and plan.acts or {}) do
         order[#order + 1] = a.unitId .. ">" .. a.act .. "@" .. at(a)

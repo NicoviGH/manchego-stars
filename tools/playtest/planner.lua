@@ -1206,6 +1206,7 @@ function M.plan(Bot, board, sight, style, opts)
                 local o = {}
                 for k, v in pairs(opts or {}) do o[k] = v end
                 o.only, o.tiles = only, tiles
+                o.talks = ctx.talks   -- the board's Talk memo (Bot.candidates)
                 local out = Bot.candidates(b, sight, style, o)
                 -- an act whose own tile is a new one (a Vulnerary in place is the board's); it
                 -- and its spares carry the board they were read on (`map`, the exposure memo's)

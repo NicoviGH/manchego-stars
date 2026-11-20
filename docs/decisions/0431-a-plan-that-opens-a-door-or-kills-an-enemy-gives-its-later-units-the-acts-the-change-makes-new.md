@@ -158,3 +158,25 @@ act's red target stood on (main: 0 of 567), and 5 of those were played. No leak 
 - The mend puts a re-listed act in right after the act that completes the changes it needs, the
   rest of the plan after it, and last only if it does not fit there, so another unit cannot take
   its tile first.
+
+**Amendment 2026-11-19 (#671): the same plans for less CPU, three changes.** A profile of turns
+1-3 (vanilla Ch8, `e639-t639-cs-s4002/9`, attempt 1) put 35% of the re-list in board reads and a
+Talk scan per change key. Each change leaves the listed plans as they were:
+- **The board is read once per changed board.** `Sight.changed` reads the units after its
+  doors and kills are applied and hands them to `seen.units`; `keptRead` kept no read inside a
+  sandbox, so `fieldUnit`, `mapChange`, strike, `keySources`, `retreatOver`, `wallsOnWays` and
+  `march` read the whole board per call (6,834 reads). A nested sandbox is no new risk: on the live
+  board every nested sandbox already finds `refresh()`'s read cached, and `fullInfo` takes a fresh
+  `seen` of its own.
+- **The re-list shares the board's Talk memo** (`opts.talks` into `Bot.candidates`). A pair's answer
+  is its two charIds and the event flags, which no door or kill moves. A dead red is not on the
+  re-list's board (`menusFor` drops `gone` from it), so none of its pairs is asked.
+- **A kill-only change keeps the danger and threat grids** (`Sight.freshSeen`), as it keeps
+  the march cost grids. `GenerateDangerZoneRange` skips only a fogged or roofed unit, not a hidden
+  one (bmidoten.c), and no red blocks a red, so a kill moves neither grid. One exception: a killed
+  enemy the retry remembers. `liftRemembered` lifts only a unit that is not hidden, so its death
+  changes the grid on a fogged tile; that change rebuilds them.
+
+Proof: all 125 decision records of turns 1-3 equal main's but for `frames` (turn 1's first
+decision 10,041 to 7,995); the whole chapter with `PT_LEAKGUARD=1` won clean in 17 turns with no
+leak, as `relist661g` did. CPU for turns 1-3: 28.2 s to 23.6 s (-16%).

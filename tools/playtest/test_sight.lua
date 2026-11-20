@@ -2571,5 +2571,43 @@ do
           "staff: the army's reply moves no unit M.heldAtReply holds")
 end
 
+-- #671: a changed board reads the units once (Sight.changed's prime, after the changes) and a
+-- kill-only change keeps the danger and threat grids (M.freshSeen); a door's change or a
+-- remembered enemy's death does not.
+do
+    local cpu = fakeCpu(1)
+    local mem = { u8 = function() return 0 end, u16 = function() return 0 end,
+                  u32 = function() return 0 end }
+    local nop = function() end
+    local sandbox, api, open = Sight.batching({ cpu = cpu, mem = mem, write8 = nop,
+                                                write16 = nop, write32 = nop })
+    local reads, primed, openAtRead = 0, nil, nil
+    api.board = function()
+        reads = reads + 1
+        openAtRead = open()
+        return { units = { { id = 1 } } }
+    end
+    local out = Sight.changed(sandbox, api, {}, function() return function() end end, {}, {},
+                              function() return "ran" end, function(list) primed = list end)
+    check(out, "ran", "changed: fn's answer comes back")
+    check(reads, 1, "changed: the board is read once, for every read fn makes")
+    check(openAtRead, true, "changed: the read is made inside the changed board's sandbox")
+    check(primed ~= nil and primed[1].id, 1, "changed: prime is handed the units")
+
+    local kept = { threats = { [5] = "t" }, danger = "d", grids = "g" }
+    local kill = Sight.freshSeen(kept, true, true)
+    check(kill.threats == kept.threats and kill.danger == "d" and kill.grids == "g", true,
+          "freshSeen: a kill-only change keeps the danger, threat and cost grids")
+    local door = Sight.freshSeen(kept, false, false)
+    check(door.threats ~= kept.threats and door.danger == nil and door.grids ~= "g", true,
+          "freshSeen: a door's change keeps none")
+    local mixed = Sight.freshSeen(kept, true, false)
+    check(mixed.grids == "g" and mixed.danger == nil and mixed.threats ~= kept.threats, true,
+          "freshSeen: a remembered enemy's death keeps only the cost grids")
+    -- the one caller: s.changed holds the danger back for a map change or a remembered kill
+    check(sightSrc:find("if byId[id] and s.knows(byId[id]) then keepDanger = false end", 1, true)
+          ~= nil, true, "changed: a remembered enemy's death rebuilds the danger grids")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
