@@ -5,9 +5,11 @@
 -- what a fight does and what the chapter asks for are read from the game's memory by the
 -- caller and handed in as `sight`. This file only chooses.
 --
--- ── Bot.decide(board, sight, style) -> action | nil ────────────────────────────────────────
+-- ── Bot.decide(board, sight, style, opts) -> action | nil ──────────────────────────────────
 --   board: Board.read's shape (board.lua). Blue units on the field that have not acted are the
 --          ones that can act; on-field reds are the enemies.
+--   opts (optional): { unpaid = { ["<talker charId>><target charId>"] = true } }, the Talks
+--          this attempt that recruited no one (botrun's, #679), offered no more.
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
 --            claims = {claim ids}, route = 1|2 }, plus the fields the claim behaviours add
 --          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
@@ -1751,6 +1753,10 @@ end
 
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
 local function talks(ctx, u, t)
+    -- a Talk that recruited no one this attempt is not offered again: the game re-arms a paid
+    -- recruit the party cannot pay (common-events.h EventScr_9EEB00, ENUF), and its check knows
+    -- no gold, so the same Talk would spend the talker's act every turn (#679; botrun's unpaid)
+    if ctx.unpaid and ctx.unpaid[u.charId .. ">" .. t.charId] then return false end
     local k = u.id .. ">" .. t.id
     if ctx.talks[k] == nil then
         ctx.talks[k] = ctx.sight.canTalk ~= nil and ctx.sight.canTalk(u, t) or false
@@ -2228,7 +2234,7 @@ local function benchedWait(ctx, u)
     end
 end
 
-function M.decide(board, sight, style)
+function M.decide(board, sight, style, opts)
     local aggression = style and style.aggression
     local gate = GATES[aggression]
     if not gate and aggression ~= "greedy" then
@@ -2240,6 +2246,7 @@ function M.decide(board, sight, style)
     end
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    ctx.unpaid = opts and opts.unpaid
     if #ctx.actors == 0 then return nil end
     for _, u in ipairs(ctx.actors) do
         local held = benchedWait(ctx, u)
@@ -2906,6 +2913,7 @@ function M.candidates(board, sight, style, opts)
     -- kill moves. A dead enemy is out of the re-list's board, so its pairs are never asked,
     -- whatever the memo holds
     if opts and opts.talks then ctx.talks = opts.talks end
+    ctx.unpaid = opts and opts.unpaid
     if opts and opts.only then
         local kept = {}
         for _, u in ipairs(ctx.actors) do

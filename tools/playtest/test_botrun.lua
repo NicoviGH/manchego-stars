@@ -113,6 +113,11 @@ local function fakeGame(o)
                 s.explorable = function() return o.explorable end
                 s.canExplore = function() return true end
             end
+            -- o.talk: every blue may Talk to every green unit, from any wait tile
+            if o.talk then
+                s.canTalk = function(u, t) return t.faction == "green" end
+                s.offers = function(_, tiles, kind) return kind == "talk" and tiles or {} end
+            end
             s.refresh = function()
                 g.refreshes = (g.refreshes or 0) + 1
                 s.objective.turnsLeft = g.turnsLeft
@@ -1121,6 +1126,59 @@ do
     local r = judged { units = units, recruits = { 0x30 } }
     check(#r.recruits.owed, 0, "already blue: not owed")
     check(r.clean, true, "already blue: clean")
+end
+
+-- test_a_talk_that_recruits_no_one_is_not_made_again (#679): the game re-arms a paid recruit
+-- the party cannot pay, and its Talk check knows no gold. The Talk leaves the owed green unit
+-- green; the bot makes it once, not every turn, until the party's gold rises. A talk to a unit
+-- that is not owed, or one whose party read fails, is not judged. The red unit steps each
+-- phase, as a real enemy phase changes the board: an unchanged board would end the run `stuck`.
+local function unpaidRun(o)
+    local g = fakeGame { talk = true, move = 1, recruits = o.recruits,
+        enemy = function(game)
+            local r = game.units[3]
+            if r.y > 5 then r.y = r.y - 1 end
+            return {}, nil
+        end,
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x41, 0, "green", 1, 0, 15),
+                  unit(0x81, 0, "red", 9, 9, 10) } }
+    g.units[2].charId = 0x30
+    local talks, act, logged = 0, g.api.act, {}
+    g.api.act = function(a)
+        if a.act == "talk" then
+            talks = talks + 1
+            g.talks = talks
+            logged[#logged + 1] = { turn = g.turn, unit = a.unit, target = a.target, asked = false, spent = 0 }
+        end
+        return act(a)
+    end
+    g.api.talks = function() local out = logged; logged = {} return out end
+    if o.gold then g.api.gold = function() return o.gold(g) end end
+    if o.party then
+        local party = g.api.party
+        g.api.party = function()
+            if o.party(g) then return party() end
+            error("party read failed")
+        end
+    end
+    Botrun.run(g.api)
+    return talks, recordOf(g).talks or {}
+end
+do
+    local talks, rec = unpaidRun { recruits = { 0x30 } }
+    check(talks, 1, "unpaid talk: made once, not every turn")
+    check(#rec == 1 and rec[1].target == 0x30 and rec[1].joined, false,
+          "unpaid talk: the record has it, and says the target did not join")
+    check(#rec, 1, "unpaid talk: recorded once")
+    -- the gold rises on turn 4: the party may pay now, and the talk is offered again
+    talks = unpaidRun { recruits = { 0x30 }, gold = function(g) return g.turn >= 4 and 10000 or 100 end }
+    check(talks, 2, "unpaid talk: offered again once the party's gold rises")
+    -- not owed (a boss's talk, an item's): never judged unpaid, so not blocked
+    talks = unpaidRun {}
+    check(talks > 1, true, "a talk to a unit not owed is not blocked")
+    -- the party read fails after the start: unknown, not a refusal
+    talks, rec = unpaidRun { recruits = { 0x30 }, party = function(g) return (g.talks or 0) == 0 end }
+    check(talks > 1, true, "a failed party read blocks no talk")
 end
 
 -- test_a_talked_recruit_joins: the green unit turns blue on the first act.

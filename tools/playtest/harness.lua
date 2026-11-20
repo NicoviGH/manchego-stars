@@ -265,6 +265,9 @@ end
 local function chapter() return ru8(SYM.gPlaySt + 0x0E) end
 local function faction() return ru8(SYM.gPlaySt + 0x0F) end
 local function turn() return ru16(SYM.gPlaySt + 0x10) end
+-- PlaySt +08 partyGoldAmount, the field itself (the shop asks GetPartyGoldAmount, which is 0
+-- in Ch5x; campaignApi's api.gold)
+function INSPECT.partyGold() return ru32(SYM.gPlaySt + 0x08) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
 local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
@@ -1049,25 +1052,44 @@ local function cursorTo(tx, ty)
     return false
 end
 
+-- `tapA`: answer what the game waits on (INSPECT.answerWait) instead of only yielding; "talk"
+-- is the Talk act's wait, where a yes/no question is answered too (#679)
 local function waitFor(pred, frames, tapA)
     for _ = 1, frames do
         if pred() then return true end
         local pressed = nil
-        if tapA then pressed = INSPECT.answerWait(controllerState()) end
+        if tapA then pressed = INSPECT.answerWait(controllerState(), tapA == "talk") end
         if pressed == false then return false end
         if pressed == nil then yield() end
     end
     return false
 end
 
+-- Yes on the yes/no prompt that is up, `expected` the trace's label: the one way a prompt is
+-- answered Yes where the bot or a scenario has decided it
+function INSPECT.answerYes(expected)
+    return selectSemantic("answer_yes", expected, INSPECT.promptClosed, 120)
+end
+
+-- How many talk questions INSPECT.answerWait has answered: the Talk act reads it before and
+-- after its wait, to record whether the talk asked (#679)
+INSPECT.talkQuestions = 0
+
 -- Answer a wait the game puts to the player outside any menu the caller drives: a dialogue
--- box, or the full-bag chooser when the bot set INSPECT.onFullBag (a scenario without one
--- waits as before). FE8 raises the chooser in the ENEMY phase too, when a kill's drop lands on
--- a full bag (vanilla Ch3 t7, Colm's counter). true = answered, false = the press failed,
--- nil = nothing to answer here (the caller yields).
-function INSPECT.answerWait(state)
-    if state == "dialogue_wait" then return INSPECT.advanceDialogue(60) end
-    if state == "send_to_convoy" and INSPECT.onFullBag then return INSPECT.onFullBag() end
+-- box, the full-bag chooser when the bot set INSPECT.onFullBag (a scenario without one
+-- waits as before), or, in a Talk act's wait (`talk`), the talk's yes/no question
+-- (Controller.waitAnswer says which and why, #679). FE8 raises the chooser in the ENEMY phase
+-- too, when a kill's drop lands on a full bag (vanilla Ch3 t7, Colm's counter). true =
+-- answered, false = the press failed, nil = nothing to answer here (the caller yields).
+function INSPECT.answerWait(state, talk)
+    local answer = Controller.waitAnswer(state, { fullBag = INSPECT.onFullBag ~= nil, talk = talk })
+    if answer == "advance_dialogue" then return INSPECT.advanceDialogue(60) end
+    if answer == "full_bag" then return INSPECT.onFullBag() end
+    if answer == "answer_yes" then
+        INSPECT.talkQuestions = INSPECT.talkQuestions + 1
+        log(string.format("talk: the talk's question takes Yes (turn %d)", turn()))
+        return INSPECT.answerYes("the talk's question takes Yes")
+    end
     return nil
 end
 
@@ -1352,7 +1374,9 @@ INSPECT.greyed = function(addr) return (ru32(addr + 0x0C) & BOARD.US_UNSELECTABL
 -- `canto` (optional, the planner's a.canto): the tile a Canto unit moves on to after the act
 -- (playerphase.c TryMakeCantoUnit hands it a second move, then only Wait). Without one, the
 -- second move is spent where the unit stands.
-INSPECT.awaitActed = function(actorAddr, stopWhen, canto)
+-- `talk` (optional): the act is a Talk, whose scene may ask a yes/no question before the unit
+-- is done (a paid recruit, #679); the wait answers it (INSPECT.answerWait).
+INSPECT.awaitActed = function(actorAddr, stopWhen, canto, talk)
     -- US_UNSELECTABLE alone is no proof: the act sets it BEFORE TryMakeCantoUnit runs, which
     -- clears it and hands a Canto unit its second move (playerphase.c). Read in that window, a
     -- Rescue looked done 37 frames after its confirm, the bot replanned, and the next unit's
@@ -1365,7 +1389,7 @@ INSPECT.awaitActed = function(actorAddr, stopWhen, canto)
     end
     local done = waitFor(function()
         return acted() or controllerState() == "unit_selected"
-    end, TUNE.combatFrames, true)
+    end, TUNE.combatFrames, talk and "talk" or true)
     if done and not acted() then
         if canto and not cursorTo(canto.x, canto.y) then return false end
         if not guardedInput("confirm_move", "A", canto
@@ -2442,7 +2466,7 @@ scenarios.vanillagold = function()
     local PROLOGUE, CH1, CH2 = 0, 1, 2
     INSPECT.retailFastText()
     local EIRIKA, SETH, ONEILL, BREGUET = 0x01, 0x02, 0x68, 0x46
-    local function gold() return ru32(SYM.gPlaySt + 0x08) end
+    local gold = INSPECT.partyGold
     local seen = {}
     local function note(tag)
         local line = string.format("%s: chapter %d, gold %d", tag, chapter(), gold())
@@ -3680,6 +3704,11 @@ INSPECT.botApi = function(game)
         itemUser = BOARD.itemUser,   -- the Staff command's user and its experience (ADR 0414)
         -- every full-bag answer since the last call (INSPECT.answerFullBag's log)
         bag = function() return unread(INSPECT.bagLog) end,
+        -- every Talk made since the last call (INSPECT.talkLog)
+        talks = function() return unread(INSPECT.talkLog) end,
+        -- the party's gold, the PlaySt field (a memory read, cheap per decision): botrun offers
+        -- an unpaid Talk again once it rises (#679)
+        gold = INSPECT.partyGold,
         -- every drop the game gave a player unit since the last call (INSPECT.watchDrops, kept
         -- while an act or an enemy phase plays: the only times a battle resolves)
         drops = function() return unread(dropLog) end,
@@ -3794,7 +3823,13 @@ INSPECT.botApi = function(game)
         elseif a.act == "talk" then
             local talked, why = chooseTalk(a.targetId)
             if not talked then return false, why end
-            return INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto)
+            -- the talk may ask a question (a paid recruit), answered Yes in its wait; whether it
+            -- asked and the gold it took go to the record (INSPECT.talkLog, #679)
+            local asked, goldBefore = INSPECT.talkQuestions, INSPECT.partyGold()
+            local acted = INSPECT.awaitActed(u.addr, function() return won() or lost() end, a.canto, true)
+            INSPECT.talkLog[#INSPECT.talkLog + 1] = { turn = turn(), unit = a.unit, target = a.target,
+                asked = INSPECT.talkQuestions > asked, spent = goldBefore - INSPECT.partyGold() }
+            return acted
         elseif a.act == "rescue" or a.act == "drop" then
             -- the command's own selector (RescueEffect, DropEffect), stepped to the unit or the
             -- tile, then A; the act's animation plays, and Canto (playerphase.c) moves the unit
@@ -3918,7 +3953,6 @@ INSPECT.CAMPAIGN = {
     ITEM_TYPE = 0x07, ITEM_ATTRIBUTES = 0x08, IA_WEAPON = 1,
     WEAPON_TYPES = { [0] = "sword", "lance", "axe", "bow", "staff", "anima", "light", "dark" },
     PREP_COUNT = 0x100,                         -- PrepUnitList.max_num, after units[0x40]
-    PLAY_GOLD = 0x08,                           -- PlaySt +08 partyGoldAmount
     shopSteps = 4000,                           -- frames one purchase may take, fades included
 }
 
@@ -3953,6 +3987,9 @@ INSPECT.BAG = {
             [0xC1] = "seal" },
 }
 INSPECT.bagLog = {}
+-- every Talk the bot made: { turn, unit, target (charIds), asked (a yes/no question was
+-- answered Yes), spent (the party's gold it took) }, for the run's record (#679)
+INSPECT.talkLog = {}
 
 -- The bot hash and suite version montecarlo.py ran this under (PT_INSTRUMENT), nil when run by
 -- hand: botrun's record and the campaign's start lineage (ADR 0417) both read it here.
@@ -4130,7 +4167,7 @@ INSPECT.answerFullBag = function()
         return controllerState(after) ~= "send_to_convoy" or after.choice ~= nil
     end, 120) then return false end
     if controllerState() == "yes_no_choice" then
-        return selectSemantic("answer_yes", "the discard is confirmed", INSPECT.promptClosed, 120)
+        return INSPECT.answerYes("the discard is confirmed")
     end
     return true
 end
@@ -4169,7 +4206,7 @@ INSPECT.campaignApi = function(game)
     local id = cfg.id or string.format("%s-s%d", mode, seed)
     local dir = PLAYTEST_SIMDIR .. "/states/" .. id
     local states, played, shops, menuPicked = {}, nil, nil, nil
-    local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
+    local gold = INSPECT.partyGold
 
     -- The world map shops open now: vanilla's from its own world map; Manchego Stars has none yet,
     -- so the twin's at the same point, as the vanilla campaign recorded them (cfg.shops).
@@ -4438,7 +4475,7 @@ INSPECT.campaignApi = function(game)
                 menuPicked = picked
             elseif state == "yes_no_choice" and menuPicked ~= nil then
                 -- the pick's confirmation: "Will <lead> lead the party?", or the route's
-                if not selectSemantic("answer_yes", "the pick's prompt takes Yes", INSPECT.promptClosed, 120) then
+                if not INSPECT.answerYes("the pick's prompt takes Yes") then
                     return nil, "the pick's prompt refused Yes"
                 end
                 menuPicked = nil
@@ -4812,7 +4849,7 @@ INSPECT.campaignApi = function(game)
                 ok = INSPECT.awaitActed(u.addr)
             elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
             elseif state == "yes_no_choice" then
-                ok = selectSemantic("answer_yes", "the item's prompt takes Yes", INSPECT.promptClosed, 120)
+                ok = INSPECT.answerYes("the item's prompt takes Yes")
             elseif state == "generic_menu" then
                 ok = guardedInput("select_current_menu_item", "A", "the first class is chosen",
                     function(after) return controllerState(after) ~= "generic_menu" end, 120)

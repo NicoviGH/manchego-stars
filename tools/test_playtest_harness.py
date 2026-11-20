@@ -199,6 +199,23 @@ class TestAwaitControllerState(unittest.TestCase):
         camp = _block(harness, 'INSPECT.campaignApi = function(game)', 'local seed = ')
         self.assertIn('INSPECT.onFullBag = INSPECT.answerFullBag', camp)
 
+    def test_a_talks_question_is_answered_in_the_talk_acts_wait(self):
+        # #679: vanilla E_14's Eirika-Rennac talk asks a yes/no question (the paid recruit) and
+        # the wait never answered it. The Talk act passes `talk` to awaitActed, whose wait hands
+        # it to answerWait, which asks Controller.waitAnswer; no global flag can outlive the act.
+        harness = _read_harness()
+        talk = _block(harness, 'elseif a.act == "talk" then', 'elseif a.act == "rescue"')
+        self.assertRegex(talk, r'INSPECT\.awaitActed\([^\n]*,\s*a\.canto,\s*true\)')
+        self.assertRegex(talk, r'INSPECT\.talkLog\[#INSPECT\.talkLog \+ 1\]')
+        acted = _block(harness, 'INSPECT.awaitActed = function(', 'if done and not acted() then')
+        self.assertIn('function(actorAddr, stopWhen, canto, talk)', acted)
+        self.assertIn('talk and "talk" or true', acted)
+        wait = _block(harness, 'local function waitFor(', '\nend\n')
+        self.assertIn('INSPECT.answerWait(controllerState(), tapA == "talk")', wait)
+        answer = _block(harness, 'function INSPECT.answerWait(state, talk)', '\nend\n')
+        self.assertRegex(answer, r'Controller\.waitAnswer\(state,[^\n]*talk = talk')
+        self.assertNotIn('INSPECT.inTalk', harness)
+
     def test_every_yes_no_prompt_closes_by_one_predicate(self):
         # PR #632 review: the "prompt has closed" predicate had six hand-rolled copies.
         harness = _read_harness()
