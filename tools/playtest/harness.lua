@@ -22,7 +22,7 @@
 --   PLAYTEST_LEAKGUARD -- "1": sight.lua's sandboxes log every unit struct word they leave
 --                        changed (PT_LEAKGUARD; INSPECT.leakLog); the run fails at its end
 --   PLAYTEST_STRIKECHECK -- "1": the bot re-runs every strike its memo answers and logs one that
---                        differs (PT_STRIKECHECK; INSPECT.strikeLog); fails the run as a leak does
+--                        differs (PT_STRIKECHECK; INSPECT.strikeLog); fails the run (its record's strikeChecks)
 --
 -- Design: one coroutine resumed once per emulated frame; every wait is a
 -- yield loop over real memory state (closed loop, no frame-perfect timing).
@@ -164,19 +164,20 @@ local INSPECT = {}
 -- takeLeaks() -> the leaks logged since the last take, as lines (Sight.leakLine), the log
 -- emptied: botApi's leaks (an attempt's) and result() (any left over) both take them here.
 INSPECT.leakLog = PLAYTEST_LEAKGUARD == "1" and {} or nil
--- PT_STRIKECHECK=1: lines the bot's strike memo guard logged (bot.lua strike), taken with the
--- leaks: either one fails the attempt the same way.
-INSPECT.strikeLog = PLAYTEST_STRIKECHECK == "1" and {} or nil
 function INSPECT.takeLeaks()
     local log, out = INSPECT.leakLog, {}
-    if log then
-        for _, l in ipairs(log) do out[#out + 1] = INSPECT.Sight.leakLine(l) end
-        for k in pairs(log) do log[k] = nil end
-    end
-    local checks = INSPECT.strikeLog
-    if checks then
-        for k, l in ipairs(checks) do out[#out + 1] = l; checks[k] = nil end
-    end
+    if not log then return out end
+    for _, l in ipairs(log) do out[#out + 1] = INSPECT.Sight.leakLine(l) end
+    for k in pairs(log) do log[k] = nil end
+    return out
+end
+-- PT_STRIKECHECK=1: the lines the bot's strike memo guard logged (bot.lua strike). takeStrikeChecks()
+-- -> them, the log emptied: botApi's strikeChecks (an attempt's) and result() (any left over).
+INSPECT.strikeLog = PLAYTEST_STRIKECHECK == "1" and {} or nil
+function INSPECT.takeStrikeChecks()
+    local log, out = INSPECT.strikeLog, {}
+    if not log then return out end
+    for k, l in ipairs(log) do out[#out + 1] = l; log[k] = nil end
     return out
 end
 -- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
@@ -198,6 +199,13 @@ local function result(verdict, why)
     if #leaks > 0 then
         for _, line in ipairs(leaks) do log(line) end
         verdict, why = "FAIL", #leaks .. " sandbox leak(s), each logged above (scenario reached: "
+            .. why .. ")"
+    end
+    -- PT_STRIKECHECK: the same for a strike memo mismatch no bot run reported
+    local checks = INSPECT.takeStrikeChecks()
+    if #checks > 0 then
+        for _, line in ipairs(checks) do log(line) end
+        verdict, why = "FAIL", #checks .. " strike-memo mismatch(es), each logged above (scenario reached: "
             .. why .. ")"
     end
     if verdict == "PASS" and controllerFault then
@@ -3712,6 +3720,7 @@ INSPECT.botApi = function(game)
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
     api.leaks = INSPECT.takeLeaks   -- the attempt's sandbox leaks (PT_LEAKGUARD)
+    api.strikeChecks = INSPECT.takeStrikeChecks   -- its strike memo mismatches (PT_STRIKECHECK)
     -- PT_REPLY=hold (Planner's opts.reply): every second phase read with our units holding, the
     -- control the army's reply replaced (ADR 0389's amendment of 2026-11-17)
     api.reply = PLAYTEST_REPLY == "hold" and "hold" or nil

@@ -277,8 +277,8 @@ function M.riding(state) return ((state or 0) & M.US_IN_BALLISTA) ~= 0 end
 -- include/cp_script.h: struct AiScr is 0x10 bytes, `cmd` at +00; AI_CMD_PILLAGE runs
 -- AiScriptCmd_10_DoLooting, and a script loops back with AI_CMD_GOTO.
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
--- include/constants/items.h; include/bmunit.h CA_STEAL
-M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL = 0x69, 0x6B, 0x04
+-- include/constants/items.h; include/bmunit.h CA_STEAL, CA_BALLISTAE
+M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL, M.CA_BALLISTAE = 0x69, 0x6B, 0x04, 1 << 7
 -- The staves the game heals one ally with: bmitemuse.c DoItemUse sends Heal, Mend and Recover
 -- (0x4B-0x4D) and Physic (0x4E) to DoUseHealStaff, gSelectInfo_Heal's target selection, the one
 -- the harness plays. GetUnitItemHealAmount (bmitem.c) is no test of it: it adds its holder's
@@ -1197,6 +1197,85 @@ function M.loots(mem, scripts, index)
         local cmd = mem.u8(at + i * M.AI_SCR_SIZE)
         if cmd == M.AI_CMD_PILLAGE then return true end
         if cmd == M.AI_CMD_GOTO then return false end
+    end
+    return false
+end
+
+-- Whether an enemy's AI script (gpAi1Table's or gpAi2Table's address `scripts`, index `index`)
+-- can decide on anything outside its own reach, for the bot's strike memo (bot.lua strikeKey,
+-- ADR 0431): the strike is the unit's whole decision, so a step that runs before the combat
+-- step can pre-empt it, and the memo keys the reds such a step reads.
+-- Read off cp_script.c's commands, each classed by what it reads of a red (an ally):
+--   * neutral: conditional (its left side is a counter or a result of a function call, and
+--     any call is `unsafe`), goto, label, nop, the staff actions (a unit with a staff is whole-
+--     board anyway, bot.lua), the no-ops;
+--   * an action (05, 07): AiAttemptOffensiveAction reads only the units it may attack and, for a
+--     thief, the tiles beside them, all within the unit's movement and weapon range;
+--   * a move (0C, 0D, 0F, 10, 11, 12, 13, 16-1A): tile occupancy anywhere on the map (a looter
+--     walks 0x7c, a march picks the free tile nearest its goal). It pre-empts a strike only when
+--     it runs before the action: after one that always runs (chance 99+: NextRN_N(100) <= it)
+--     it is reached only when the action found nothing, so the strike is nil either way;
+--   * unsafe: a function call (01: a leader's script, a summon, a unit looked up by id), a
+--     script change (02), an action on a character or a class (04, 08), a command the game does
+--     not know. Any of them reachable = true.
+-- A script with no action step cannot produce a strike at all. The walk follows every branch
+-- (a conditional's label and its fall-through), and an unreadable one (a label that is not
+-- there, a script past M.AI_SCR_LIMIT commands) counts as reading.
+M.AI_SCR_LIMIT = 64
+local SCRIPT_CMD = { neutral = {}, action = { [0x05] = true, [0x07] = true }, move = {} }
+for _, c in ipairs({ 0x00, 0x03, 0x06, 0x09, 0x0A, 0x0B, 0x0E, 0x14, 0x15, 0x1B, 0x1C }) do
+    SCRIPT_CMD.neutral[c] = true
+end
+for _, c in ipairs({ 0x0C, 0x0D, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x16, 0x17, 0x18, 0x19, 0x1A }) do
+    SCRIPT_CMD.move[c] = true
+end
+function M.scriptReadsReds(mem, scripts, index)
+    local base = mem.u32(mem.u32(scripts) + index * 4)
+    local function field(i, off) return mem.u8(base + i * M.AI_SCR_SIZE + off) end
+    -- the commands that can run after command `i`; nil when a label is not there
+    local function after(i)
+        local cmd, target = field(i, 0), field(i, 3)
+        if cmd ~= 0x03 and cmd ~= 0x00 then return { i + 1 } end
+        local jump = 0   -- a label id of 0 starts the script over (AiScriptCmd_03_Goto)
+        if target ~= 0 then
+            jump = nil
+            for j = 0, M.AI_SCR_LIMIT - 1 do
+                if field(j, 0) == 0x1C and field(j, 3) == target then jump = j + 1; break end
+            end
+        end
+        if jump == nil then return nil end
+        if cmd == 0x03 then return { jump } end
+        return { i + 1, jump }
+    end
+    -- every command the script can reach, and whether one of them is an action
+    local reach, queue, hasAction = {}, { 0 }, false
+    while #queue > 0 do
+        local i = table.remove(queue)
+        if not reach[i] then
+            if i >= M.AI_SCR_LIMIT then return true end
+            reach[i] = true
+            local cmd = field(i, 0)
+            if SCRIPT_CMD.action[cmd] then hasAction = true
+            elseif not SCRIPT_CMD.neutral[cmd] and not SCRIPT_CMD.move[cmd] then return true end
+            local nexts = after(i)
+            if not nexts then return true end
+            for _, n in ipairs(nexts) do queue[#queue + 1] = n end
+        end
+    end
+    if not hasAction then return false end
+    -- a move is harmless once an action that always runs has found nothing
+    local seen, stack = {}, { { 0, false } }
+    while #stack > 0 do
+        local top = table.remove(stack)
+        local i, acted = top[1], top[2]
+        local k = i * 2 + (acted and 1 or 0)
+        if not seen[k] then
+            seen[k] = true
+            local cmd = field(i, 0)
+            if SCRIPT_CMD.move[cmd] and not acted then return true end
+            if SCRIPT_CMD.action[cmd] and field(i, 1) >= 99 then acted = true end
+            for _, n in ipairs(after(i)) do stack[#stack + 1] = { n, acted } end
+        end
     end
     return false
 end
@@ -2563,6 +2642,36 @@ function M.new(outer)
 
     function s.weapons(u)
         return mine("weapons", u, function() return M.weapons(api, u, sandbox) end)
+    end
+
+    -- The widest max range of any weapon item in `u`'s bag (0: none): a superset of what the game
+    -- counts (AiAttemptOffensiveAction's CanUnitUseWeapon, less ITEM_NIGHTMARE; `weapons` also
+    -- drops a magic seal), for the bot's strike memo key (bot.lua strikeReach).
+    function s.itemReach(u)
+        local far = 0
+        for _, it in ipairs(u.items or {}) do
+            local _, mx = api.Board.itemRange(itemOf(it))
+            if mx and mx > far then far = mx end
+        end
+        return far
+    end
+
+    -- Whether `e`'s decision can read reds that are not near it or its target, which the bot's
+    -- strike memo keys whole-board: a ballista class or rider (AiAttemptBallistaCombat takes a
+    -- ballista tile anywhere in its movement, cp_battle.c), a staff in its bag (AiTryDoStaff: a
+    -- heal reaches an ally anywhere in its movement; Fortify counts every red with a flag,
+    -- sub_803C364), or an AI script that can decide on one (M.scriptReadsReds).
+    function s.readsReds(e)
+        if M.riding(e.state) then return true end
+        local chptr, clptr = mem.u32(e.addr), mem.u32(e.addr + UNIT_CLASS)
+        local attrs = chptr ~= 0 and clptr ~= 0
+            and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
+        if (attrs & M.CA_BALLISTAE) ~= 0 then return true end
+        for _, it in ipairs(e.items or {}) do
+            if api.Board.staffRange(itemOf(it)) then return true end
+        end
+        return M.scriptReadsReds(mem, S.gpAi1Table, mem.u8(e.addr + UNIT_AI1))
+            or M.scriptReadsReds(mem, S.gpAi2Table, mem.u8(e.addr + UNIT_AI2))
     end
 
     -- fn(copy) with each of `values` (id | uses << 8) in the first empty slots of `u`'s bag: M.holding.

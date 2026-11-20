@@ -706,6 +706,13 @@ def anomaly_detail(a):
     return ''
 
 
+def strike_note(r):
+    """What a record says of PT_STRIKECHECK (bot.lua strike): ' [N strike-memo mismatch(es)]' when
+    the guard logged any (the game's result stands, `env_status.fault` is strike_memo), else ''."""
+    n = len(r.get('strikeChecks') or [])
+    return ' [%d strike-memo mismatch(es), the record\'s strikeChecks]' % n if n else ''
+
+
 def attempt_line(r, said):
     """The line `attempts` prints for record `r`, or None. `said` = the attempts already
     printed. A worker's CAMPAIGN end is printed only when no BOTRUN of its attempt was: a run
@@ -735,7 +742,7 @@ def attempt_line(r, said):
         a['kind'], a.get('turn'), anomaly_detail(a),
         ' -> %s' % a['narrate'] if a.get('narrate') else '')
         for a in r.get('anomalies') or [])
-    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s%s%s%s' % (
+    return 'attempt %s: %s%s, turn %s, %d deaths%s%s%s%s%s%s%s' % (
         r.get('attempt'), r.get('outcome'), ' clean' if r.get('clean') is True else '',
         r.get('turns', '-'), len(r.get('deaths') or []),
         '' if r.get('frames') is None else ', %d frames' % r['frames'],
@@ -743,7 +750,7 @@ def attempt_line(r, said):
         ' (%s)' % r.get('why') if r.get('outcome') in NO_RESULT else '',
         ' (%s)' % why if why else '',
         ' [noted: %s]' % noted if noted else '',
-        ' [stalls: %s]' % stalls if stalls else '') + taught_line(r) + anomalies
+        ' [stalls: %s]' % stalls if stalls else '', strike_note(r)) + taught_line(r) + anomalies
 
 
 def distinct_games(records):
@@ -3100,10 +3107,10 @@ def resume_main(args, pool=None):
     crashed = timed_out = 0
     for rec in pool.run(tasks):
         if rec.get('chapter') is not None:
-            print('  %s chapter %s attempt %s: %s%s, %s turns, %d deaths'
+            print('  %s chapter %s attempt %s: %s%s, %s turns, %d deaths%s'
                   % (rec.get('campaign'), rec.get('chapter'), rec.get('attempt'),
                      rec.get('outcome'), ' clean' if rec.get('clean') else '', rec.get('turns'),
-                     len(rec.get('deaths') or [])), flush=True)
+                     len(rec.get('deaths') or []), strike_note(rec)), flush=True)
             continue
         crashed += rec.get('outcome') == 'crashed'
         timed_out += rec.get('outcome') == 'timeout'

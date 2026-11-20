@@ -96,6 +96,13 @@ check(J.decode(nil), nil, "non-string input returns nil")
 check(J.decode('{"a" 1}'), nil, "missing colon returns nil")
 check(J.decode("[1,2,"), nil, "unclosed array returns nil")
 
+-- same: deep equality, number keys included (a damage distribution, which encode refuses)
+check(J.same({ [0] = 0.5, [3] = 0.5 }, { [3] = 0.5, [0] = 0.5 }), true, "same: equal tables, number keys")
+check(J.same({ a = { 1, 2 } }, { a = { 1, 3 } }), false, "same: a nested value differs")
+check(J.same({ a = 1 }, { a = 1, b = 2 }), false, "same: an extra key")
+check(J.same(nil, nil), true, "same: two nils")
+check(J.same({}, nil), false, "same: a table and nil")
+
 if fails == 0 then
     print(string.format("ok -- %d assertions", tests))
     os.exit(0)

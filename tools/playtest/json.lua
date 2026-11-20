@@ -75,6 +75,19 @@ end
 
 function M.encode(v) return encodeValue(v) end
 
+-- Deep equality of two plain values (decoded JSON, or a read with number keys that encode
+-- refuses): the same keys, each holding the same value.
+function M.same(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+    for k, v in pairs(a) do
+        if not M.same(v, b[k]) then return false end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then return false end
+    end
+    return true
+end
+
 -- ---------------------------------------------------------------- decode
 -- Recursive descent over a position index. Each parser returns (value, nextPos) or
 -- raises via error(msg, 0); M.decode wraps that into the (nil, reason) convention.

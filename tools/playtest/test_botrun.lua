@@ -580,6 +580,30 @@ do
     check(recordOf(g).outcome, "won", "an empty log changes nothing")
     check(recordOf(g).leaks, nil, "and leaves no leaks in the record")
 
+    -- PT_STRIKECHECK: a strike-memo mismatch is not a leak and not a crash: the game's result
+    -- stays, the lines are the record's strikeChecks, the record is not clean and the run fails
+    g = fakeGame { units = rout() }
+    local askedChecks = 0
+    g.api.strikeChecks = function()
+        askedChecks = askedChecks + 1
+        return { "strike memo: enemy 129 striking 1 at 0,0 (slot 0) read differently" }
+    end
+    g.api.leaks = function() return {} end
+    ok = Botrun.run(g.api)
+    check(ok, false, "a run with a strike-memo mismatch is not a finished run")
+    r = recordOf(g)
+    check(r.outcome, "won", "the game's result stands")
+    check(r.strikeChecks and #r.strikeChecks, 1, "the lines are in the record's strikeChecks")
+    check(r.leaks, nil, "and none is a leak")
+    check(r.why:find("^1 strike%-memo mismatch%(es%) %(the record's strikeChecks%); the game ended won") ~= nil,
+          true, "its why says what the game ended as: " .. tostring(r.why))
+    check(type(r.env_status) == "table" and r.env_status.fault, "strike_memo", "the record is not clean")
+    check(askedChecks, 1, "the log is asked once, at the attempt's end")
+    g = fakeGame { units = rout() }
+    g.api.strikeChecks = function() return {} end
+    check(Botrun.run(g.api), true, "an empty log changes nothing")
+    check(recordOf(g).strikeChecks, nil, "and leaves no strikeChecks in the record")
+
     -- a leak from finish's own reads (the party read at the end) is this attempt's, and a
     -- fault play() named (a wedged enemy phase: "timeout") is kept beside the leaks
     g = fakeGame { move = 0, units = standoff() }

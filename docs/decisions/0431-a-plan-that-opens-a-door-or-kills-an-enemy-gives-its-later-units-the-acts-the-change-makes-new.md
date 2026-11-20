@@ -183,22 +183,54 @@ leak, as `relist661g` did. CPU for turns 1-3: 28.2 s to 23.6 s (-16%).
 
 **Amendment 2026-11-19 (#671): a strike is keyed by the reds it can read.** The strike memo
 keyed every on-field unit, so each re-listed board (a plan's kills) missed every strike. A strike
-read is the game's own AI for enemy `e` against our unit on a tile. Diagnosed on vanilla Ch8
-(`e639-t639-cs-s4002/9`, 12,908 reads): with the map and every non-red unit equal, reads differed
-only by which reds were present, and the game's code explains each difference:
-- the AI skips a candidate strike tile with a unit on it (`AiSimulateBestBattleAgainstTarget`,
-  cp_battle.c), and the candidates are within `e`'s weapon range of the target;
-- the tile's score counts units within 3 of it (`AiGetFriendZoneCombatPositionScoreComponent`,
-  called by `AiGetCombatPositionScore`);
-- its danger map skips allies, so reds do not enter it (`AiFillDangerMap`, cp_0803E2F4.c; the
-  player's `GenerateDangerZoneRange` counting a hidden unit is the bot's own grid, not this read).
+read is the game's own AI for enemy `e` against our unit on a tile (`AiDecideMain`, run whole), so
+the key holds every unit that is not red and only the reds the game can read there. Diagnosed on
+vanilla Ch8 (`e639-t639-cs-s4002/9`, 12,908 reads), then audited against the code:
+- **The strike tile (cp_battle.c).** A candidate tile is in `e`'s movement and within its weapon's
+  range of the struck tile, and one a unit stands on is skipped
+  (`AiSimulateBestBattleAgainstTarget`). Its score counts the units within 3
+  (`AiGetFriendZoneCombatPositionScoreComponent`, via `AiGetCombatPositionScore`). Key: a red within
+  range + 3 of the struck tile. Radius 3 gave 3 wrong merges in the diagnosis, radius 4 with
+  reach-1 enemies 0.
+- **The danger flood (cp_0803E2F4.c `AiFillDangerMap`).** The same score subtracts
+  `gBmMapOther / 8` (also `AiGetDangerScoreComponent`). `AiInitDangerMap` fills it for every
+  decision (cp_decide.c, no AI config gate). It floods each unit that is not `e`'s ally from its
+  own tile over its movement (`GenerateMovementMap`, bmidoten.c), and the flood stops at a unit of
+  the other side, so a red blocks a blue's flood far from the struck tile. A hidden unit is not on
+  the unit map (`RefreshUnitsOnBmMap`, bmmap.c), so a hidden red blocks nothing. The weapon whose
+  reach it adds is the strongest seen so far by any unit (`item` is never reset, the file's own
+  BUG comment), so the reach used is the widest of every non-red unit's. Key: a red within
+  mov(b) of a non-red unit b with mov(b) + widest reach + range(`e`) >= its distance to the
+  struck tile. (Superset: the game also needs `AiCouldReachByBirdsEyeDistance`.) A red hidden by
+  `M.takeOff` is in the key if near, which only costs a hit.
+- **Before the script (cp_decide.c).** `DecideHealOrEscape` runs first: a wounded `e` takes the
+  nearest heal point, which reads the allies on tiles in its movement
+  (cp_0803E2F4.c, ~149-190), and a thief steals beside a target (`AiAttemptOffensiveAction`,
+  cp_battle.c). Key: a red within mov(`e`) + 1 of `e`. Nothing there reads a red farther: the
+  flood from `e` passes allies, and every read is on a tile of its movement map.
+- **The script (cp_script.c).** The strike is `e`'s whole decision, so a step before the combat
+  step can pre-empt it. `sight.readsReds(e)` is true, and the key is the whole board as before,
+  when `e` has a staff in its bag (`AiTryDoStaff` takes a heal anywhere in its movement; Fortify
+  counts every red with a flag, `sub_803C364`), is a ballista rider or has `CA_BALLISTAE`
+  (cp_battle.c, `AiAttemptBallistaCombat` takes a ballista tile anywhere in its movement; the
+  branch is gated on the class attribute), or its AI1 or AI2 script (`Sight.scriptReadsReds`)
+  holds a step that reads a red anywhere before the action: a function call (a leader's script, a
+  summon, a unit looked up by id: `AiUnitWithCharIdExists`), a script change, an action on a
+  character or class, or a move step (a looter walks 0x7c; a march picks the free tile nearest
+  its goal) that can run before an action. A move after an action that always runs (chance 99+)
+  is reached only when the action found nothing, so the strike is nil either way. A script with
+  no action cannot strike. Of vanilla's scripts (read off the built ROM) 13 of 27 AI1 and 22 of
+  46 AI2 are plain, among them the common ones (AI1 0, AI2 0-3).
+- **The range (cp_battle.c).** The candidates are every weapon the game's `CanUnitUseWeapon`
+  allows less `ITEM_NIGHTMARE`, not `sight.weapons` (`CanUnitUseWeaponNow` also drops a magic
+  weapon on a seal tile). The radius is `sight.itemReach(e)`: the widest max range of any
+  weapon item in the bag, a superset. An enemy with no weapon (a dancer) keys the whole board.
 
-So a red beyond `e`'s max weapon range + 3 of the struck tile cannot change the strike. The key
-(`strikeKey`, `strikeRadius`) holds every unit that is not red, `e`, and the reds within that
-distance. An enemy whose range is unknown (no weapon on the list: a dancer, a ballista's rider),
-or with a staff of its own (a heal reaches an ally anywhere in its movement), keys the whole
-board as before. Radius 3 gave 3 wrong merges in the diagnosis, radius 4 with reach-1 enemies 0.
-
-`PT_STRIKECHECK=1` (run.sh) is the guard: each memo hit also runs the strike and logs a read that
-differs, which fails the attempt as a leak does. Unproven: a rank-locked or magic-sealed weapon
-the AI counts and `sight.weapons` does not (the guard is the check on the replays we run).
+A red beyond all of these cannot change the strike; the memo returns what a fresh strike read
+would. `PT_STRIKECHECK=1` (run.sh) is the guard in a real run: each memo hit also runs the
+strike, and a read that differs is logged once (the memo then holds the fresh read), listed in the
+record's `strikeChecks`, and fails the attempt: the game's result stays in `outcome`,
+`env_status.fault` is `strike_memo` and the run returns false. It is not a leak and not a crash.
+Not changed by this amendment: `gAiState.cmd_result`, which a script's conditions read, is cleared
+at the phase start only (cp_phase.c) and was in no key before either; a plain script has no
+function call, and a move step that writes it before an action makes the script read reds.

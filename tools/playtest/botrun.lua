@@ -30,7 +30,9 @@
 --            the game's CanUnitSeize allowed it, or any Lua error (a sight call that never
 --            returned, a policy fault), or a sandbox leak the guard logged (api.leaks: the
 --            record's `leaks`, its `why` saying what the game ended as). The record is still
---            emitted.
+--            emitted. (A strike-memo mismatch, api.strikeChecks, is not one: the game's result
+--            stays, `strikeChecks` lists the lines, `env_status.fault` is "strike_memo" and the
+--            run returns false.)
 --   timeout  one decision ran more than M.DECISION_FRAMES frames of game code in its
 --            simulations (sight.watch asks before each game call): the record's `timeout` =
 --            { turn, frames, limit, stage, plans_judged, phases } (the last three the
@@ -62,6 +64,8 @@
 --   seed(s)            seed the game's RNG (Sight.seed)
 --   board()            Board.read
 --   sight()            Sight.new, called once
+--   strikeChecks()     OPTIONAL: the strike memo mismatches logged since the last ask, as lines,
+--                      the log emptied (PT_STRIKECHECK; bot.lua strike): any fails the attempt
 --   leaks()            OPTIONAL: the sandbox leaks logged since the last ask, as lines, the log
 --                      emptied (PT_LEAKGUARD; sight.lua M.leaks): any fails the attempt
 --   act(action)        perform Bot.decide's or the planner's action (a Visit or Chest
@@ -166,18 +170,6 @@ M.PREFIX = "BOTRUN "
 M.DIAG_PREFIX = "DIAG "
 M.PINNED_PREFIX = "PINNED "
 
--- Deep equality of two decoded JSON values (the replay's events against the original trace's)
-local function same(a, b)
-    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
-    for k, v in pairs(a) do
-        if not same(v, b[k]) then return false end
-    end
-    for k in pairs(b) do
-        if a[k] == nil then return false end
-    end
-    return true
-end
-
 -- What a replay must reproduce of its original trace before the pinned decision `ref`: every
 -- phase snapshot, every act, and every decision's choice (its other fields are the planner's
 -- working, which a newer planner may add to without changing the play). Returns the watch:
@@ -204,7 +196,7 @@ function M.matcher(original, ref, Json)
         if not exp then
             w.why = string.format("event %d (%s) is past the original's decision %d", w.seen,
                 ev.t, ref)
-        elseif not same(got, exp) then
+        elseif not Json.same(got, exp) then
             w.why = string.format("event %d (%s, turn %s) differs from the original's", w.seen,
                 ev.t, tostring(ev.turn))
         end
@@ -215,7 +207,7 @@ function M.matcher(original, ref, Json)
         elseif not w.why and w.seen ~= #want then
             w.why = string.format("the replay reached decision %d after %d events, the original "
                 .. "after %d", ref, w.seen, #want)
-        elseif not w.why and not same(Json.decode(Json.encode({ c = choice })).c, pinned.choice) then
+        elseif not w.why and not Json.same(Json.decode(Json.encode({ c = choice })).c, pinned.choice) then
             w.why = "the baseline's choice at the pinned decision differs from the original's"
         end
         w.done = true   -- past the pin the replay is meant to differ
@@ -1221,8 +1213,18 @@ function M.run(api)
             outcome = "crashed"
             rec.outcome, rec.why = outcome, why
         end
+        -- PT_STRIKECHECK: a strike the bot's memo answered differently from a fresh read is the
+        -- instrument's fault (bot.lua strikeScope left a unit out), not a leak and not a crash:
+        -- the game's result stands in `outcome`, the record is not clean, and the run fails.
+        local checks = api.strikeChecks and api.strikeChecks() or {}
+        if #checks > 0 then
+            rec.strikeChecks = checks
+            why = ("%d strike-memo mismatch(es) (the record's strikeChecks); the game ended %s: %s")
+                :format(#checks, tostring(outcome), tostring(why))
+            rec.why = why
+        end
         fault = fault or (outcome == "crashed" and "crash") or (outcome == "timeout" and "timeout")
-            or (#rec.watch_faults > 0 and "watch") or nil
+            or (#checks > 0 and "strike_memo") or (#rec.watch_faults > 0 and "watch") or nil
         rec.env_status = fault and { fault = fault, outcome_dependent = #rec.deployed > 0 }
             or "clean"
         rec.instrument = api.info.instrument   -- the bot and suite version (montecarlo.py)
@@ -1249,7 +1251,7 @@ function M.run(api)
             local pinnedBoard
             if pin and pin.file and api.reload then
                 local ok, b = pcall(api.reload, pin.file)
-                pinnedBoard = ok and same(Json.decode(Json.encode(M.snapshot(b))),
+                pinnedBoard = ok and Json.same(Json.decode(Json.encode(M.snapshot(b))),
                                           Json.decode(Json.encode(pin.board))) or false
             end
             api.emit(M.DIAG_PREFIX .. Json.encode({ run = diag.run, ref = diag.ref, mode = diag.mode,
@@ -1275,7 +1277,8 @@ function M.run(api)
         end)
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
-        return outcome == "won" or outcome == "lost" or outcome == "stuck", why, rec
+        return (outcome == "won" or outcome == "lost" or outcome == "stuck") and not rec.strikeChecks,
+            why, rec
     end
 
     local function play()
@@ -1378,7 +1381,7 @@ function M.run(api)
             -- `planned` is the diagnostic's plan; `chosen` grows by each of its acts actually
             -- played, and `broken` names the first that was not (pinPlayed)
             pin.planned = diag.mode == "force" and diag.force or (dplan and P.keysOf(dplan) or {})
-            pin.differs = not same(pin.planned, pin.baseline)
+            pin.differs = not Json.same(pin.planned, pin.baseline)
             pin.plan = dplan
             if da then pin.chosen[1] = P.key(da) end
             return da, dplan, cost
