@@ -37,8 +37,12 @@ Larachel's talk to Rennac (`EventScr_089F619C`) recruits him with no question.
   that is unknown, not a refusal.
 - Every Talk is in the chapter record (`talks`: turn, talker, target, whether a question was
   asked, the gold it took, whether the target joined).
-- The price is not weighed against what the gold would buy later: the planner gives a talk no
-  cost, so two talks that recruit the same unit (Larachel's free one, Eirika's paid one) tie.
+- The price is not weighed (Nicolas, 2026-11-20): safety comes before gold. The planner gives a
+  talk no cost, so two talks that recruit the same unit (Larachel's free one, Eirika's paid one)
+  tie, and the plan's risk decides between them. Larachel's is taken when she gets there
+  without danger; no unit is put at risk to save the payment. A gold price on the talk was
+  weighed and refused: at the styles' gold weights, `even` and `bold` would never pay and so
+  never clear Ch14 clean.
 
 **Proof.** The unit tests fail without the fix: `test_controller.lua` (`Controller.waitAnswer`),
 `test_bot.lua` (an unpaid talk is not offered, to the habit or the planner), `test_botrun.lua`
