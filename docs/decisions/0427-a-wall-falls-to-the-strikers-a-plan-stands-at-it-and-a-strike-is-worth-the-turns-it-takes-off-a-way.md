@@ -102,8 +102,8 @@ chests were left. `wallsOnWays` now asks the same question of each obstacle on t
 cheapest chain (`chainTo`): a wall that brings it to that door sooner, stood open, is on its way.
 - Proof: `test_a_strike_is_offered_on_a_wall_on_the_way_to_a_door`, run against main's
   `bot.lua`, fails (no strike offered: got nil, want `2,2>1,2`); its guard (a wall no sooner to
-  the door than the walk round is offered no strike) fails with the "sooner" test removed.
-  One replay of that game (`fix663-t639-cs-s4003`, attempt 1): won clean in 19 turns, no deaths. Forde
-  (0x10) struck the wall from (5,8) on turns 10, 11 and 13; Colm opened the door on turn 17
-  and took both chests. On main the same attempt won in 18 turns with Colm dead and both
+  the door than the walk round is offered no strike) fails with the "sooner" test removed. One
+  replay of that game (`fix663-t639-cs-s4003`, attempt 1): won clean in 19 turns, no deaths.
+  Forde (0x10) struck the wall from (5,8) on turns 10, 11 and 13; Colm opened the door on turn
+  17 and took both chests. On main the same attempt won in 18 turns with Colm dead and both
   chests missed.
