@@ -1535,6 +1535,11 @@ end
 -- and the goals' turns through it (fallTurn) are how the judge prices it. The cheapest way
 -- alone never named vanilla Ch8's wall: priced with no striker at it, the thief's 9 a blow
 -- made the door round the cheaper way, and with no strike offered no striker ever came.
+-- Each way is read to its goal and to each obstacle on it (chainTo) (#663): a goal behind a
+-- door has a field that stops at the door (a door is no ground to walk), so a wall that
+-- opens onto the door's side was never on a way to the goal. Vanilla Ch8's west chests sit
+-- behind the (1,5) door; the cracked wall at (4,8) opens onto that door's room, and the thief
+-- walked the south route round to it for 9 turns, never striking or waiting for a strike.
 local function wallsOnWays(ctx, objective)
     if ctx.wallWays then return ctx.wallWays end
     local out, seen, s = {}, {}, ctx.sight
@@ -1544,16 +1549,22 @@ local function wallsOnWays(ctx, objective)
             out[#out + 1] = o
         end
     end
-    for _, h in ipairs(ctx.blues) do
-        local goal = not h.dead and goalFor(ctx, h, objective)
-        for _, o in ipairs(goal and chainTo(ctx, h, goal) or {}) do put(o) end
-        local field = goal and s.turnsTo and fieldFor(ctx, goal)
-        local now = field and turnsFor(ctx, h, goal)
+    -- the walls that would bring `h` to `to` sooner than its way there now, stood open
+    local function shorter(h, to)
+        local field = s.turnsTo and fieldFor(ctx, to)
+        local now = field and turnsFor(ctx, h, to)
         for _, o in ipairs(field and s.obstacles and s.obstacles() or {}) do
             local walk = isWall(o) and not seen[tileKey(o.x, o.y)] and s.turnsTo(h, o, h)
-            local steps = walk and stepsOnto(ctx, goal, field, o)
+            local steps = walk and stepsOnto(ctx, to, field, o)
             if steps and (not now or walk + steps / s.mov(h) < now - Goals.DUST) then put(o) end
         end
+    end
+    for _, h in ipairs(ctx.blues) do
+        local goal = not h.dead and goalFor(ctx, h, objective)
+        local chain = goal and chainTo(ctx, h, goal) or {}
+        for _, o in ipairs(chain) do put(o) end
+        if goal then shorter(h, goal) end
+        for _, o in ipairs(chain) do shorter(h, o) end
     end
     ctx.wallWays = out
     return out
