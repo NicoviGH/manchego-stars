@@ -281,6 +281,7 @@ local function unit(o)
         isBoss = o.isBoss or false, classId = o.classId, weapons = o.weapons, level = o.level,
         items = o.items,   -- { { id, uses } }: what a weapon use costs is read by its id (#642)
         mov = o.mov,   -- the fake sight's MOV (turnsTo, mov); 5 when unset
+        itemReach = o.itemReach,   -- the widest weapon in the bag when it is wider than `weapons` lists
         carrying = o.carrying, carriedBy = o.carriedBy,   -- a Rescue pair (board.lua)
     }
 end
@@ -419,6 +420,15 @@ local function sightOf(o)
             return (d or Board.distance(from.x, from.y, tile.x, tile.y)) / (u.mov or 5)
         end,
         mov = function(u) return u.mov or 5 end,
+        -- the game's widest weapon reach in the bag (sight.itemReach), the unit's own `itemReach`
+        -- when a test has a weapon the Weapon Select list leaves out
+        itemReach = function(u)
+            local far = u.itemReach or 0
+            for _, w in ipairs(weapons(u)) do far = math.max(far, w.max) end
+            return far
+        end,
+        -- whether the unit's decision reads reds anywhere (sight.readsReds: a staff, a ballista, a script)
+        readsReds = function(e) return (o.reads or {})[e.id] or false end,
         cache = o.cache,
         terrain = o.terrain,
         weapons = weapons,
@@ -1387,6 +1397,108 @@ do
     B.decide(boardOf(A, Bu, E), bare, style("careful"))
     B.decide(boardOf(A, Bu, E), bare, style("careful"))
     check(bare.attacks(), 2, "without a cache each call asks for itself")
+end
+
+-- A strike's key holds every unit that is not red, and only the reds the enemy's strike can read
+-- (#671, ADR 0431): within its weapon's max range + 3 of the tile it strikes on (it skips a tile a
+-- unit stands on and counts the units within 3 of a tile), within its movement + 1 (it heals,
+-- escapes and steals there), or within the flood of a blue whose danger can reach those tiles (a
+-- red blocks the flood). A re-listed board (a plan's kill) is the same board but for a red that is
+-- gone: it shares the memo when that red can read nothing.
+do
+    -- Plays the board with `R` (and any `others`) and then the same board without it, as a plan's
+    -- kill leaves it; the strikes the second asks again, and the first's. `o` tunes the fake: E's
+    -- range and MOV, the blues' MOV, `reads` (sight.readsReds), `others` (units on both boards).
+    local function strikesFor(o, R, R2)
+        o = o or {}
+        local A = blue(0x01, 0, 0, 0, { mov = o.blueMov or 1 })
+        local E = red(0x81, 1, 0, { hp = 30, minRange = o.range ~= false and 1 or false,
+            maxRange = o.range or false, mov = o.mov or 1, itemReach = o.itemReach })
+        local fake = {
+            cache = {},
+            danger = { ["0,0"] = 1 },
+            reads = o.reads,
+            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 1, 0 }), [0x82] = tiles({ 12, 9 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+        }
+        local sight = sightOf(fake)
+        local units = { A, E, R }
+        for _, x in ipairs(o.others or {}) do units[#units + 1] = x end
+        B.decide(boardOf(table.unpack(units)), sight, style("careful"))
+        local first = sight.strikes()
+        units[3] = R2 or false   -- R is dead (or moved to R2)
+        local rest = {}
+        for _, x in ipairs(units) do if x then rest[#rest + 1] = x end end
+        B.decide(boardOf(table.unpack(rest)), sight, style("careful"))
+        return sight.strikes() - first, first
+    end
+    local at = function(x, y) return red(0x82, x, y, { hp = 30 }) end
+    local again, first = strikesFor({ range = 1 }, at(9, 0))
+    check(first > 0, true, "the strike is read at all")
+    check(again, 0, "a dead red beyond range + 3 shares the strike memo")
+    -- range 1: range + 3 = 4 from the tile it strikes on
+    again, first = strikesFor({ range = 1 }, at(4, 0))
+    check(again, first, "a dead red at exactly range + 3 is a board of its own: every strike asked again")
+    again = strikesFor({ range = 1 }, at(5, 0))
+    check(again, 0, "a dead red at range + 4 shares the memo")
+    again, first = strikesFor({ range = 2 }, at(5, 0))
+    check(again, first, "a range-2 enemy reads a red at distance 5")
+    -- an enemy with no weapon (a dancer) or one whose decision reads reds anywhere (a staff, a ballista)
+    again, first = strikesFor({ range = false }, at(9, 0))
+    check(again, first, "an enemy with no weapon keys the whole board")
+    again, first = strikesFor({ range = 1, reads = { [0x81] = true } }, at(9, 0))
+    check(again, first, "an enemy whose decision reads reds anywhere keys the whole board")
+    -- the game's candidate loop counts a weapon the Weapon Select list leaves out (a magic seal)
+    again, first = strikesFor({ range = 1, itemReach = 2 }, at(5, 0))
+    check(again, first, "a weapon only the game counts widens the zone")
+    -- a red alive on both boards: moving inside the zone is another board, moving outside it is not
+    again = strikesFor({ range = 1 }, at(9, 0), at(8, 0))
+    check(again, 0, "a red that moves between two tiles beyond range + 3 shares the memo")
+    again, first = strikesFor({ range = 1 }, at(9, 0), at(4, 0))
+    check(again, first, "a red that moves into range + 3 is a board of its own")
+    -- it heals, escapes and steals on tiles in its movement: a red within MOV + 1 of it
+    again = strikesFor({ range = 1, mov = 1 }, at(6, 0))
+    check(again, 0, "a dead red beyond MOV + 1 of the enemy and range + 3 of the tile shares the memo")
+    again, first = strikesFor({ range = 1, mov = 5 }, at(6, 0))
+    check(again, first, "a dead red within MOV + 1 of the enemy is a board of its own")
+    -- the danger map: a blue's flood is blocked by a red, so a far red inside it reads. The blue B
+    -- (MOV 3, reach 1, five tiles out) can reach the tiles E strikes from (3 + 1 + 1 >= 5)
+    local B5 = blue(0x03, 2, 5, 0, { mov = 3, acted = true })
+    again, first = strikesFor({ range = 1, others = { B5 } }, at(8, 0))
+    check(again, first, "a red inside a blue's flood whose danger reaches the strike is a board of its own")
+    again = strikesFor({ range = 1, others = { B5 } }, at(9, 0))
+    check(again, 0, "a red beyond that blue's flood shares the memo")
+    local Bfar = blue(0x03, 2, 7, 0, { mov = 3, acted = true })   -- 3 + 1 + 1 < 7: its danger stops short
+    again = strikesFor({ range = 1, others = { Bfar } }, at(9, 0))
+    check(again, 0, "a blue whose danger cannot reach the strike keys no red")
+end
+
+-- PT_STRIKECHECK (sight.strikeCheck, bot.lua strike): a memo hit also runs the strike, and a read
+-- that differs is logged, once: the memo takes the fresh read. Here the far red's death changes the
+-- fake's strike, as a unit the key left out would in the game; with the game's own behaviour (no
+-- change) the log stays empty.
+do
+    local A = blue(0x01, 0, 0, 0, { mov = 1 })
+    local E = red(0x81, 1, 0, { hp = 30, mov = 1 })
+    local R = red(0x82, 9, 0, { hp = 30 })
+    for _, changes in ipairs({ false, true }) do
+        local o = {
+            cache = {}, danger = { ["0,0"] = 1 },
+            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 1, 0 }), [0x82] = tiles({ 12, 9 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+        }
+        local sight = sightOf(o)
+        sight.strikeCheck = {}
+        B.decide(boardOf(A, E, R), sight, style("careful"))
+        check(#sight.strikeCheck, 0, "a miss runs no check")
+        if changes then o.fc[0x01][0x81]["0,0"] = fc { hit = 80, dmg = 9, hits = 1 } end
+        B.decide(boardOf(A, E), sight, style("careful"))
+        check(#sight.strikeCheck, changes and 1 or 0,
+              changes and "a memo hit whose strike reads differently is logged"
+                  or "a memo hit whose strike reads the same is not")
+        B.decide(boardOf(A, E), sight, style("careful"))
+        check(#sight.strikeCheck, changes and 1 or 0, "the memo holds the fresh read: the same mismatch is logged once")
+    end
 end
 
 -- Every unit has acted (or is off the field): nil, the phase is over.

@@ -105,6 +105,10 @@ class Records(unittest.TestCase):
         self.assertIn('experience checked: 5 attacks, 9 counters, 1 heals (unchecked: 1 attacks, '
                       '2 counters at another level, 3 counters the plan never read, 0 heals)',
                       mc.attempt_line(checked, set()))
+        # PT_STRIKECHECK: the guard's mismatches are said beside the game's result (bot.lua strike)
+        self.assertNotIn('strike-memo', mc.attempt_line(V2, set()))
+        self.assertIn('[2 strike-memo mismatch(es), the record\'s strikeChecks]',
+                      mc.attempt_line(dict(V2, strikeChecks=['a', 'b']), set()))
         other = dict(_GRADED[0], cause='other', detail='unrevealed_killer', predicted=0,
                      flags={})
         self.assertIn('other (blindspot: unrevealed_killer) at 0.0%', mc.death(other))

@@ -78,6 +78,11 @@
 #                           does not is logged, put back and played on, and the attempt fails
 #                           at its end listing them all (sight.lua's M.leaks). Slower: set it
 #                           for one run after a change to what a sandbox calls.
+#                           PT_STRIKECHECK=1: a diagnostic. Every strike the bot's memo answers
+#                           is also read on the board as it stands (bot.lua strikeKey keeps
+#                           only the reds an enemy's strike can read); one that differs is
+#                           logged and the attempt fails at its end, as a leak does. Slower:
+#                           set it for one run after a change to strikeKey.
 #                           PT_REPLY=hold: a control. Every second phase (the lookahead's and
 #                           the wear's) is read with our units holding between the two enemy
 #                           phases, as before ADR 0389's amendment of 2026-11-17, in place of
@@ -354,6 +359,7 @@ PLAYTEST_DIAG = os.getenv("PT_DIAG") or ""
 PLAYTEST_PINNED = os.getenv("PT_PINNED") or ""
 PLAYTEST_BENCH = os.getenv("PT_BENCH") or ""
 PLAYTEST_LEAKGUARD = os.getenv("PT_LEAKGUARD") or ""
+PLAYTEST_STRIKECHECK = os.getenv("PT_STRIKECHECK") or ""
 PLAYTEST_REPLY = os.getenv("PT_REPLY") or ""
 PLAYTEST_USEPRICE = os.getenv("PT_USEPRICE") or ""
 PLAYTEST_SHADOW = os.getenv("PT_SHADOW") or ""

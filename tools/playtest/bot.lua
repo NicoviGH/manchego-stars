@@ -40,9 +40,16 @@
 --              AI a turn event rewrote between phases is in no key). Attacks are kept in it
 --              keyed by what FE8's simulation reads -- both fighters (id, HP, level, every item
 --              and its uses), both tiles, and every other unit within support range (3,
---              bmreliance.h) of either; strikes keyed by the exchange AND the whole board,
---              because the AI's pick of weapon and tile can be changed by any unit anywhere.
+--              bmreliance.h) of either; strikes keyed by the exchange, every unit that is not
+--              red and the reds the enemy's strike can read (strikeScope: range + 3 of the
+--              tile, MOV + 1 of the enemy, a blue's flood; the whole board for a staff, a
+--              ballista or a script that reads reds).
 --              Reach and worst case are per call only.
+--            itemReach(unit) -> the widest max range of a weapon item in its bag, and
+--              readsReds(unit) -> bool (a staff, a ballista or a script that reads reds anywhere),
+--              OPTIONAL: both keep the strike memo narrow; without either it keys the whole board.
+--              strikeCheck = {}|nil: PT_STRIKECHECK's log (a memo hit is also read and a read
+--              that differs is appended as a line).
 --            terrain(x, y) -> FE8 terrain id, OPTIONAL: only a terrain claim reads it; without
 --              it that claim is a no-op.
 --            explorable() -> {{x, y, kind = "visit"|"chest"}...}, canExplore(unit, x, y, kind)
@@ -221,6 +228,9 @@ local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
 
 local manhattan = Board.distance   -- FE8's RECT_DISTANCE
+
+-- json.lua, beside this file: the strike memo's guard compares and prints two reads with it
+local Json = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "json.lua")
 
 -- A reachable tile from which one of `weapons` strikes `e` (so a bow, min 2, won't pick an
 -- adjacent tile it can't fire from), and that weapon; nil when none does.
@@ -538,7 +548,7 @@ local function context(board, sight)
     local ctx = { sight = sight, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
-                  talkTiles = {}, openers = {}, rescueTiles = {}, carried = {} }
+                  talkTiles = {}, openers = {}, scopes = {}, floods = {}, rescueTiles = {}, carried = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     -- the map the phase memos are kept on (sight.mapKey): a door or wall the phase opened
@@ -583,12 +593,98 @@ local function attackKey(ctx, u, e, x, y, slot)
     return table.concat(parts, ";")
 end
 
--- A strike's key: the exchange and the WHOLE board, its map too (ctx.mapKey). The strike is the enemy AI's own pick of
--- weapon and tile (sight.lua), and any unit anywhere can block or open its path.
+-- Which reds can change an enemy's strike, as strikeKey keeps them (#671, ADR 0431). The strike is
+-- the AI's whole decision for `e` against our unit `u` on a tile (sight.strike), and the game
+-- reads a red three ways there:
+--  * A tile in `e`'s movement and within its weapon's range of the struck tile is a candidate
+--    unless a unit stands on it, and its score counts the units within 3 of it
+--    (cp_battle.c AiSimulateBestBattleAgainstTarget, AiGetFriendZoneCombatPositionScoreComponent
+--    via AiGetCombatPositionScore). So a red within range + 3 of the struck tile.
+--  * The score also takes the danger map (gBmMapOther / 8, filled for every decision by
+--    AiInitDangerMap, cp_decide.c, no config gate) from AiFillDangerMap (cp_0803E2F4.c): the
+--    movement flood and weapon reach of each unit that is not `e`'s ally (a blue or a green;
+--    GenerateMovementMap, bmidoten.c, stops at a unit of the other side, so a red blocks it;
+--    a hidden unit is not on the unit map, RefreshUnitsOnBmMap, bmmap.c). The weapon it takes
+--    is the strongest seen so far by ANY unit (its `item` is never reset), so the reach used
+--    here is the widest of every non-red unit's. A red changes a candidate tile's danger only
+--    if it is within mov(b) of such a unit b, and b's flood plus reach can reach a tile within
+--    range of the struck tile: mov(b) + reach + range(e) >= its distance to that tile.
+--  * Before the script, `e` heals or escapes (DecideHealOrEscape: the nearest heal point reads
+--    the allies on tiles in its movement), and a script action may steal from a tile beside a
+--    target: allies within its movement, so a red within mov(e) + 1 of `e`.
+-- A red beyond all three cannot change the strike. `e` reads reds elsewhere through a staff, a
+-- ballista, or an AI script that decides on one (sight.readsReds), and its range is unknown
+-- with no weapon: those key the whole board (`false`). The range is sight.itemReach's, every
+-- weapon item in the bag, not `sight.weapons` (a seal on the tile drops a magic weapon there,
+-- which the game's candidate loop still counts).
+local STRIKE_ZONE = 3
+local function strikeScope(ctx, e)
+    local scope = ctx.scopes[e.id]
+    if scope ~= nil then return scope end
+    local s = ctx.sight
+    scope = false
+    if s.itemReach and s.readsReds then
+        local range = s.itemReach(e)
+        if range > 0 and not s.readsReds(e) then
+            scope = { range = range, near = s.mov(e) + 1 }
+        end
+    end
+    ctx.scopes[e.id] = scope
+    return scope
+end
+
+-- The widest weapon reach of any unit that is not red: what AiFillDangerMap takes for each.
+-- ctx.onField holds every unit the game's loop counts: it skips US_HIDDEN, US_DEAD,
+-- US_NOT_DEPLOYED and US_BIT16 (cp_0803E2F4.c AiFillDangerMap), onField drops US_HIDDEN,
+-- US_NOT_DEPLOYED, US_RESCUED and US_DEAD (board.lua OFF_FIELD), and a rescue sets US_HIDDEN
+-- with US_RESCUED and a drop clears both (bmunit.c UnitRescue, UnitDrop). So the
+-- key's units are the game's or more, never fewer.
+local function dangerReach(ctx)
+    local far = ctx.dangerFar
+    if far then return far end
+    far = 0
+    for _, o in ipairs(ctx.onField) do
+        if o.faction ~= "red" then far = math.max(far, ctx.sight.itemReach(o)) end
+    end
+    ctx.dangerFar = far
+    return far
+end
+
+-- A strike's key: the exchange, the map (ctx.mapKey), every unit that is not red, and the reds
+-- the enemy's strike can read (strikeScope); `e` itself is always in it.
 local function strikeKey(ctx, u, e, x, y, slot)
     local parts = { unitKey(u), x, y, slot or "-", unitKey(e), e.x, e.y, ctx.mapKey, "board" }
+    local scope = strikeScope(ctx, e)
+    local flooders
+    if scope then
+        -- the non-red units whose danger can reach this strike's tiles, with their flood's radius:
+        -- the same for every strike on this tile at this range, so read once per board (ctx)
+        local fk = scope.range .. ":" .. tileKey(x, y)
+        flooders = ctx.floods[fk]
+        if not flooders then
+            flooders = {}
+            local reach = dangerReach(ctx) + scope.range
+            for _, o in ipairs(ctx.onField) do
+                if o.faction ~= "red" then
+                    local mov = ctx.sight.mov(o)
+                    if mov + reach >= manhattan(o.x, o.y, x, y) then
+                        flooders[#flooders + 1] = { o = o, mov = mov }
+                    end
+                end
+            end
+            ctx.floods[fk] = flooders
+        end
+    end
     for _, o in ipairs(ctx.onField) do
-        parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
+        local keep = o.faction ~= "red" or o == e or not scope
+            or manhattan(o.x, o.y, x, y) <= scope.range + STRIKE_ZONE
+            or manhattan(o.x, o.y, e.x, e.y) <= scope.near
+        if not keep then
+            for _, f in ipairs(flooders) do
+                if manhattan(o.x, o.y, f.o.x, f.o.y) <= f.mov then keep = true; break end
+            end
+        end
+        if keep then parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y) end
     end
     return table.concat(parts, ";")
 end
@@ -610,8 +706,32 @@ local function attack(ctx, u, e, x, y, slot)
         function() return ctx.sight.attack(u, e, x, y, slot) end)
 end
 local function strike(ctx, u, e, x, y, slot)
-    return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y, slot),
-        function() return ctx.sight.strike(u, e, x, y, slot) end)
+    local ask = function() return ctx.sight.strike(u, e, x, y, slot) end
+    local k = strikeKey(ctx, u, e, x, y, slot)
+    -- PT_STRIKECHECK=1 only (sight.strikeCheck is the run's log, nil otherwise): a memo hit
+    -- also runs the strike on this board, as the whole-board key did, and a read that differs
+    -- is logged and replaced by the fresh one, so it is logged once
+    local log, kept = ctx.sight.strikeCheck, ctx.strikes[k]
+    if log and kept ~= nil then
+        local fresh = ask()
+        if not Json.same(kept or nil, fresh) then
+            -- the fields that differ: a read is numbers and tables, with number keys Json.encode refuses
+            local fields, all = {}, {}
+            for f in pairs(kept or {}) do all[f] = true end
+            for f in pairs(fresh or {}) do all[f] = true end
+            for f in pairs(all) do
+                if not Json.same((kept or {})[f], (fresh or {})[f]) then fields[#fields + 1] = tostring(f) end
+            end
+            table.sort(fields)
+            log[#log + 1] = ("strike memo: enemy %s striking %s at %d,%d (slot %s) read differently "
+                .. "from the memo and on this board (%s): strikeKey left out a unit the AI reads "
+                .. "(bot.lua strikeScope)"):format(tostring(e.id), tostring(u.id), x, y,
+                tostring(slot), #fields > 0 and table.concat(fields, ",") or "one read is nil")
+            ctx.strikes[k] = fresh or false
+        end
+        return fresh
+    end
+    return remembered(ctx.strikes, k, ask)
 end
 
 -- sight.reach, with the unit's own tile always in it (attacking or waiting where it stands),

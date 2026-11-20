@@ -1430,6 +1430,38 @@ do
     check(Sight.loots(mem, 0x100, 1), false, "loots: nothing past the script's GOTO counts")
 end
 
+-- scriptReadsReds: whether an AI script can decide on a red outside the unit's own reach (the bot's
+-- strike memo, ADR 0431). Each script is a list of { cmd, chance, label id } at 0x300 + 0x10 * i.
+do
+    local function readsReds(script)
+        local ram = {}
+        local mem = { u32 = function(a) return ram[a] or 0 end, u8 = function(a) return ram[a] or 0 end }
+        ram[0x100], ram[0x200] = 0x200, 0x300
+        for i, c in ipairs(script) do
+            local at = 0x300 + (i - 1) * 0x10
+            ram[at], ram[at + 1], ram[at + 3] = c[1], c[2] or 0, c[3] or 0
+        end
+        return Sight.scriptReadsReds(mem, 0x100, 0)
+    end
+    local ACTION, MOVE, GOTO, LABEL, COND = 0x05, 0x12, 0x03, 0x1C, 0x00
+    check(readsReds({ { ACTION, 100 }, { GOTO } }), false, "scriptReadsReds: a plain attack script reads none")
+    check(readsReds({ { ACTION, 100 }, { MOVE }, { GOTO } }), false,
+          "scriptReadsReds: a march after an action that always runs reads none")
+    check(readsReds({ { MOVE }, { ACTION, 100 }, { GOTO } }), true,
+          "scriptReadsReds: a march before the action can pre-empt it")
+    check(readsReds({ { ACTION, 50 }, { MOVE }, { ACTION, 100 }, { GOTO } }), true,
+          "scriptReadsReds: an action that may be skipped does not clear the march after it")
+    check(readsReds({ { MOVE }, { GOTO } }), false, "scriptReadsReds: a script with no action never strikes")
+    check(readsReds({ { 0x01 }, { ACTION, 100 }, { GOTO } }), true, "scriptReadsReds: a function call (a leader's script, a summon)")
+    check(readsReds({ { ACTION, 100 }, { 0x04 }, { GOTO } }), true, "scriptReadsReds: an action on a character")
+    check(readsReds({ { ACTION, 100 }, { 0x7F }, { GOTO } }), true, "scriptReadsReds: a command the game does not know")
+    -- a conditional's label: both branches are walked, so the march behind the jump counts
+    check(readsReds({ { COND, 1, 7 }, { ACTION, 100 }, { GOTO }, { LABEL, 0, 7 }, { MOVE }, { ACTION, 100 }, { GOTO } }),
+          true, "scriptReadsReds: a conditional that jumps to a march before an action")
+    check(readsReds({ { COND, 1, 7 }, { ACTION, 100 }, { GOTO }, { LABEL, 0, 8 }, { ACTION, 100 }, { GOTO } }),
+          true, "scriptReadsReds: a label that is not there is unreadable")
+end
+
 -- opensChests: AiGetChestUnlockItemSlot's rule -- a Chest Key, or a Lockpick on a CA_STEAL
 -- class, and never with a full bag.
 do
@@ -2652,6 +2684,49 @@ do
     end)
     -- refresh() kept the live read, so the one read counted is the prime's, inside the change
     check(boardReads - before, 1, "changed: several units() reads inside cost one board read")
+end
+
+-- #671, through Sight.new: itemReach is the widest weapon in the bag (a staff counts for nothing),
+-- and readsReds says when a unit's decision reads reds beyond its reach: a ballista class or rider, a
+-- staff in the bag, or a script that can (scriptReadsReds).
+do
+    local ram = {}
+    local function put(a, v) ram[a] = v end
+    local mem = { u8 = function(a) return ram[a] or 0 end, u32 = function(a) return ram[a] or 0 end,
+                  u16 = function(a) return ram[a] or 0 end, s8 = function(a) return ram[a] or 0 end }
+    local items = { [1] = { 1, 1 }, [2] = { 1, 2 }, [3] = false }   -- id -> { min, max }; false: a staff
+    local B2 = setmetatable({
+        itemRange = function(item) local r = items[item & 0xFF]; if r then return r[1], r[2] end end,
+        staffRange = function(item) if items[item & 0xFF] == false then return 1 end end,
+    }, { __index = Board })
+    local nop = function() end
+    local S2 = setmetatable({ gpAi1Table = 0x500, gpAi2Table = 0x520 },
+                            { __index = function() return 0x08001000 end })
+    local sight = Sight.new({ cpu = fakeCpu(1), mem = mem, write8 = nop, write16 = nop, write32 = nop,
+        SYM = S2, Board = B2,
+        map = function() return 1, 1 end, chapter = function() return 1 end,
+        turn = function() return 1 end, board = function() return { units = {} } end })
+    -- a unit at 0x100: class 0x200, character 0x400; ai1 script 0 and ai2 script 0 are one attack
+    put(0x104, 0x200); put(0x100, 0x400)
+    put(0x500, 0x600); put(0x600, 0x700); put(0x520, 0x640); put(0x640, 0x740)
+    put(0x700, 0x05); put(0x701, 100); put(0x710, 0x03)    -- ai1: action, goto
+    put(0x740, 0x12); put(0x750, 0x03)                      -- ai2: march, goto
+    local function unitWith(list, state)
+        return { addr = 0x100, state = state or 0, items = list }
+    end
+    check(sight.itemReach(unitWith({ { id = 1, uses = 5 }, { id = 2, uses = 5 } })), 2, "itemReach: the widest weapon")
+    check(sight.itemReach(unitWith({ { id = 3, uses = 5 } })), 0, "itemReach: a staff is no weapon")
+    check(sight.readsReds(unitWith({ { id = 1, uses = 5 } })), false, "readsReds: a plain archer reads none")
+    check(sight.readsReds(unitWith({ { id = 1, uses = 5 }, { id = 3, uses = 5 } })), true,
+          "readsReds: a staff in the bag")
+    check(sight.readsReds(unitWith({ { id = 1, uses = 5 } }, Sight.US_IN_BALLISTA)), true, "readsReds: a ballista's rider")
+    put(0x228, Sight.CA_BALLISTAE)
+    check(sight.readsReds(unitWith({ { id = 1, uses = 5 } })), true, "readsReds: a ballista class")
+    put(0x228, 0); put(0x428, Sight.CA_BALLISTAE)
+    check(sight.readsReds(unitWith({ { id = 1, uses = 5 } })), true, "readsReds: a ballista character attribute")
+    put(0x428, 0)
+    put(0x700, 0x12); put(0x710, 0x05); put(0x711, 100); put(0x720, 0x03)   -- ai1: march, action, goto
+    check(sight.readsReds(unitWith({ { id = 1, uses = 5 } })), true, "readsReds: a script that marches before it strikes")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))
