@@ -4052,6 +4052,19 @@ do
     check(at(a), "2,0", "recruit: from beside it")
     -- no claim: the habit still takes the offered Talk
     check(B.decide(boardOf(A, T, E), sightOf(o), style("careful")).act, "talk", "talk habit")
+    -- #679: a Talk that recruited no one this attempt (the party could not pay) is offered no
+    -- more, to the habit or to the planner's candidates; another talker's is still offered
+    local unpaid = { unpaid = { [string.format("%d>%d", 0x01, 0x30)] = true } }
+    check(B.decide(boardOf(A, T, E), sightOf(o), style("careful"), unpaid).act ~= "talk", true,
+          "talk: not again once it recruited no one")
+    local listed = false
+    for _, c in ipairs(B.candidates(boardOf(A, T, E), sightOf(o), style("careful"), unpaid)) do
+        for _, x in ipairs(c.acts) do listed = listed or x.act == "talk" end
+    end
+    check(listed, false, "talk: the planner's candidates leave it out too")
+    local other = { unpaid = { [string.format("%d>%d", 0x02, 0x30)] = true } }
+    check(B.decide(boardOf(A, T, E), sightOf(o), style("careful"), other).act, "talk",
+          "talk: another talker's failure leaves this one's Talk offered")
     -- beside it but the game's Talk command does not list it (silenced, say): no Talk
     local mute = sightOf(o)
     mute.offers = function() return {} end

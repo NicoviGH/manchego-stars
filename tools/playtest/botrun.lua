@@ -753,6 +753,9 @@ function M.run(api)
                   -- turn (what M.DECISION_FRAMES is sized from)
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0, unsplit = 0, floored = 0,
                             slowest = { frames = 0 } }, bag = {},
+                  -- every Talk made: the harness's entry (turn, unit, target, asked, spent: a
+                  -- paid recruit's question and its gold, #679) and whether the target joined
+                  talks = {},
                   board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
@@ -772,6 +775,9 @@ function M.run(api)
                   taught_unchecked = { attack = 0, counter_level = 0, counter_unplanned = 0,
                                        staff = 0 } }
     local explore = M.exploreLog()
+    -- the Talks this attempt that recruited no one, "<talker charId>><target charId>" -> true
+    -- (#679): Bot's talks offers them no more
+    local unpaid = {}
     -- a diagnostic replay (diag): the watch on its original trace; `pin`, the pinned decision's
     -- baseline and chosen keys once it is reached; `halt`, why the replay stops early
     local diag = api.diag
@@ -1499,6 +1505,7 @@ function M.run(api)
                             end
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
+                                     unpaid = unpaid,
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
@@ -1696,7 +1703,7 @@ function M.run(api)
                         end
                         return a
                     end
-                    local a = Bot.decide(board, sight, style)
+                    local a = Bot.decide(board, sight, style, { unpaid = unpaid })
                     trace({ t = "plan", choice = a and actOf(a), policy = style.aggression })
                     return a
                 end
@@ -1752,16 +1759,32 @@ function M.run(api)
                 -- "trapped": the game halted the move on a unit the fog hid (FE8's ambush,
                 -- harness api.act); the unit's turn is over where it stopped, its act not made
                 local trapped = done == "trapped"
+                -- a Talk that left its target out of the party recruited no one (a paid
+                -- recruit the party cannot pay, #679): no progress, and not offered again
+                -- this attempt (Bot's talks reads `unpaid`)
+                local unrecruited = false
+                if not trapped and action.act == "talk" and action.target then
+                    local ok, list = pcall(api.party or function() return {} end)
+                    unrecruited = true
+                    for _, c in ipairs(ok and list or {}) do
+                        if c == action.target then unrecruited = false end
+                    end
+                    if unrecruited then unpaid[action.unit .. ">" .. action.target] = true end
+                    for _, t in ipairs(api.talks and api.talks() or {}) do
+                        t.joined = not unrecruited
+                        rec.talks[#rec.talks + 1] = t
+                    end
+                end
                 if playing then movers[action.unitId] = playing end
                 if not trapped and (action.act == "visit" or action.act == "chest") then
                     explore.visited(action, turn)
                 end
-                if not trapped and (action.act == "visit" or action.act == "chest"
+                if not trapped and not unrecruited and (action.act == "visit" or action.act == "chest"
                         or action.act == "talk" or action.act == "rescue" or action.act == "drop"
                         or action.act == "supply") then
                     progressed = true
                 end
-                if not trapped then
+                if not trapped and not unrecruited then
                     if action.act == "visit" or action.act == "chest" or action.act == "talk"
                         or action.act == "door" or action.act == "seize" or action.act == "supply" then
                         markEvent(action.act)
