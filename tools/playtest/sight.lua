@@ -474,9 +474,12 @@ local function writeRegisters(cpu, regs)
     end
 end
 -- An enemy phase's outcomes, { { p, strikes } } (p sums to 1), and how many uncertain counter
--- kills it left unsplit. strikeAt(k, done) plays the k-th enemy of `n` after `done`'s strikes:
--- nil when it does not strike, else its strike `t` (t.felled: the played chance the target's
--- counter kills it), `done` with t added, and free(), which takes the striker off its tile.
+-- kills and status staves it left unsplit. strikeAt(k, done) plays the k-th enemy of `n` after
+-- `done`'s strikes: nil when it neither strikes nor casts a status staff; for a strike, `t`
+-- (t.felled: the played chance the target's counter kills it), `done` with t added, and free(),
+-- which takes the striker off its tile. A status staff (#674) is no strike: `t` = { lands = its
+-- hit's chance }, `done` as it was, and free() its hit. Either splits the phase alike, and one
+-- left unsplit takes its likelier side (a hit at even odds or better lands).
 -- A striker the counter may kill splits the phase: the enemies after it decide once with it
 -- standing and once with its tile free (each in a nested `sandbox`, so neither sees the
 -- other's board), the second as likely as the counter kills it (ch02: a Brigand Marty killed
@@ -503,7 +506,7 @@ function M.phaseWays(n, strikeAt, sandbox, floor, mass0, tail, done0)
             local t, now, free = strikeAt(k, done)
             if t then
                 done = now
-                local q = t.felled
+                local q = t.lands or t.felled
                 if q > 0 and q < 1 and mass * math.min(q, 1 - q) >= floor then
                     local out = {}
                     local stood = sandbox(function() return play(k + 1, done, mass * (1 - q)) end)
@@ -1725,8 +1728,9 @@ function M.berserkers(mem, Board, units, after)
         | Board.US_HAS_MOVED_AI
     local out = {}
     for _, o in pairs(units) do
-        local status, left = Board.statusOf(mem.u8(o.addr + Board.UNIT_STATUS))
-        if o.faction == "blue" and status == Board.STATUS_BERSERK and left > (after or 0)
+        if o.faction == "blue"
+                and Board.statusAfter(mem.u8(o.addr + Board.UNIT_STATUS), after)
+                    == Board.STATUS_BERSERK
                 and (mem.u32(o.addr + UNIT_STATE) & skips) == 0 then
             out[#out + 1] = o.id
         end
@@ -1766,6 +1770,39 @@ end
 -- after it, as nextPhase takes one; an enemy's own strike keeps its target (the judged phase
 -- reads it on the target's whole odds).
 function M.berserkKills(t, left) return t.berserk == true and left <= 0 end
+
+-- An enemy's status staff (#674) as its decision names it: AI_ACTION_STAFF (cp_staff.c
+-- AiStaffSleepBerserk, AiStaffSilence: AiSetDecision's target and item slot) with a staff whose
+-- hit sets a status (Board.STATUS_STAVES) in the decided slot of the unit at `actor`. `D` =
+-- gAiDecision. -> { target = its id, status, tile = { x, y } }, or nil for any other act (a
+-- heal staff's included: it sets no status, and the judged phase does not play it)
+function M.staffAct(mem, Board, D, actor)
+    local DEC = Board.AI_DEC
+    if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_STAFF then return nil end
+    local item = mem.u16(actor + Board.UNIT_ITEMS + mem.u8(D + DEC.SLOT) * 2) & 0xFF
+    local status = Board.STATUS_STAVES[item]
+    if not status then return nil end
+    return { target = mem.u8(D + DEC.TARGET), status = status,
+             tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- Whether the player's unit `o` (Board.read's) is asleep or berserked once the next player
+-- phase's start ticks it (Board.statusAfter, one start): the army's reply between the
+-- lookahead's phases leaves it where it stands, as the planner's own `held` (Board.statusHeld)
+-- leaves it on the player's turn. A berserked one moves in the berserk phase instead.
+function M.heldAtReply(mem, Board, o)
+    return Board.statusHeld(Board.statusAfter(mem.u8(o.addr + Board.UNIT_STATUS), 1))
+end
+-- A status staff's hit on the unit at `addr`: the status for SetUnitStatus's turns (bmbattle.c
+-- BattleApplyUnitUpdates writes statusOut through it). The AI casts only on a living unit with no
+-- status (AiStaffSleepBerserk), so a unit an earlier strike of the way killed, or that has a
+-- status already, takes none.
+function M.setStatus(api, Board, addr, status)
+    local mem = api.mem
+    if mem.u8(addr + UNIT_HP) == 0 or Board.statusOf(mem.u8(addr + Board.UNIT_STATUS)) ~= 0 then
+        return
+    end
+    api.write8(addr + Board.UNIT_STATUS, status | (Board.STATUS_TURNS << 4))
+end
 
 -- What a phase start's two calls left on the board, for M.aiPhaseStart's `known`:
 -- gAiState.bestBlueMov and every unit's aiFlags. Read inside the sandbox that started the
@@ -2624,7 +2661,8 @@ function M.new(outer)
     -- gAiState again). Its calls are M.decisionCalls's, the heal flags read again first when
     -- a staged phase wrote an enemy's HP since (`healStale`: wound() sets it).
     -- -> the struck unit's id and the strike as
-    -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack.
+    -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack;
+    -- then, when it casts a status staff instead, the act (M.staffAct) as a third value.
     local healStale = false
     -- A simulated phase's own HP write, on the unit at `addr`: `decides` = it is of the side
     -- deciding, whose heal flags the next decision must read again.
@@ -2671,7 +2709,9 @@ function M.new(outer)
         if decide then call(decide) end
         local D = S.gAiDecision
         local DEC = Board.AI_DEC
-        if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then return nil end
+        if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then
+            return nil, nil, M.staffAct(mem, Board, D, e.addr)
+        end
         local target = mem.u8(D + DEC.TARGET)
         local addr = mem.u32(S.gUnitLookup + target * 4)
         local sx, sy, slot = mem.u8(D + DEC.X), mem.u8(D + DEC.Y), mem.u8(D + DEC.SLOT)
@@ -2845,22 +2885,38 @@ function M.new(outer)
         end
         -- the ledger the strikes `done` leave (the base when none)
         function wearing.after(done) return M.ledgerAfter(after, wearing.base, done) end
-        return byId, order, decides, strike, remove, gone, wearing, berserkFirst
+        -- e casts the status staff it decided (#674, M.staffAct): stood on its tile, the hit's
+        -- chance read there (GetOffensiveStaffAccuracy reads the distance; bmusemind.c
+        -- ExecStatusStaff rolls it once) -> the chance, and land(), which sets the status. The
+        -- statuses a hit sets act through the game's own reads: a sleeping unit gives no counter
+        -- (the simulation), and a berserked one moves in the berserk phase (M.berserkers)
+        local function cast(e, act)
+            standOn(e, act.tile.x, act.tile.y)
+            local addr = mem.u32(S.gUnitLookup + act.target * 4)
+            local q = call(S.GetOffensiveStaffAccuracy, { e.addr, addr }) / 100
+            return q, function() M.setStatus(api, Board, addr, act.status) end
+        end
+        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
     -- may kill the striker) -> the likeliest outcome's strikes, with .outcomes and .unsplit.
     -- The berserk phase first (#660): `berserkFirst(after)` (stagePhase's) starts it and names
     -- the units it moves; each of its ways ends in the enemy phase `order()` lists on that way's
-    -- board. `order` = stagePhase's.
+    -- board. `order` = stagePhase's, and `cast` (a status staff's, #674).
     local function playPhase(call, proc, byId, berserkFirst, after, order, decides, strike, remove,
-                             mass0)
+                             mass0, cast)
         local function ways(list, mass, tail, done0)
             return M.phaseWays(#list, function(k, done)
                 local id = list[k]
                 local e = decides(id)
                 if not e then return nil end
-                local target, side = aiDecide(call, proc, e, byId)
+                local target, side, act = aiDecide(call, proc, e, byId)
+                if act then
+                    -- a status staff (#674): no strike, its hit a way of its own
+                    local q, land = cast(e, act)
+                    return { lands = q }, done, land
+                end
                 if not target then return nil end
                 local t, now = strike(e, id, target, side, done)
                 return t, now, function() remove(e, side.tile.x, side.tile.y) end
@@ -2892,9 +2948,10 @@ function M.new(outer)
 
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, _, berserkFirst = stagePhase(call, plan)
+            local byId, order, decides, strike, remove, _, _, berserkFirst, cast =
+                stagePhase(call, plan)
             return playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
-                             plan.mass)
+                             plan.mass, cast)
         end) end)
     end
 
@@ -2921,7 +2978,10 @@ function M.new(outer)
             local st = mem.u32(o.addr + UNIT_STATE)
             if (st & US_HIDDEN) == 0 and mem.u8(o.addr + UNIT_HP) > 0 then
                 if o.faction == "blue" then
-                    ours[#ours + 1] = o
+                    -- one asleep or berserked once the player phase's start ticks it (#674: the
+                    -- enemy's staff) is the player's to move no more: it stands (bot.lua's
+                    -- `held`, Board.statusHeld)
+                    if not M.heldAtReply(mem, Board, o) then ours[#ours + 1] = o end
                 elseif o.faction == "red" and M.playsAsSeen(Board, st, s.knows(o)) then
                     reds[#reds + 1] = o
                 end
@@ -3025,7 +3085,7 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing, berserkFirst =
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast =
                 stagePhase(call, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
@@ -3035,8 +3095,14 @@ function M.new(outer)
                 for _, id in ipairs(ids) do
                     local e = decides(id)
                     if e then
-                        local target, side = aiDecide(call, proc, e, byId)
-                        if target then
+                        local target, side, act = aiDecide(call, proc, e, byId)
+                        if act then
+                            -- a status staff (#674): it lands on the expected way when its hit
+                            -- is even odds or better, as a counter kill is taken
+                            local q, land = cast(e, act)
+                            if q >= 0.5 then land() end
+                            moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
+                        elseif target then
                             local t, now, addr = strike(e, id, target, side, first)
                             first = now
                             moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
@@ -3084,7 +3150,7 @@ function M.new(outer)
             M.refresh(api, call, S, byId)
             -- our berserked units again, those the next player phase's start leaves berserked
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
-                                  remove)
+                                  remove, nil, cast)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
             return out
         end) end)

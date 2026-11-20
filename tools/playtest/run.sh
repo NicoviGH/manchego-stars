@@ -92,6 +92,9 @@
 #                           for a check by eye: danger grid, objective, reach, a forecast
 #   berserkprobe         -- PT_VANILLA=1: the judged enemy phase plays the berserk phase
 #                           (#660): a berserked Seth strikes Eirika, and not unberserked
+#   staffprobe           -- PT_VANILLA=1: the judged enemy phase plays an enemy's status
+#                           staff (#674): a Berserk staff splits the phase on its hit, and a
+#                           sure one berserks Eirika for the lookahead's second phase
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
 #                           handshakes with an EXTERNAL sidecar over PT_LLM_DIR (default
 #                           /tmp/playtest-llm-handshake). Start the sidecar first:

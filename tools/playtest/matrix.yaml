@@ -137,6 +137,7 @@ scenarios:
   sightprobe: {rom: any, manual: true, deadline: 900}
   # #660: the judged phase plays the berserk phase (PT_VANILLA=1), by hand only
   berserkprobe: {rom: any, manual: true, deadline: 900}
+  staffprobe: {rom: any, manual: true, deadline: 900}
   campaign: {rom: any, manual: true, deadline: 86400}
   goodberry: {}
   ch01: {}

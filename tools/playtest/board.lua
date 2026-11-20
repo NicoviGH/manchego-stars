@@ -39,12 +39,26 @@ Board.UNIT_SIZE = 0x48
 -- A unit the player cannot select for its status (playerphase.c: BERSERK and SLEEP are refused
 -- the cursor; the game moves a berserked unit itself). Its +30 low nibble is the status.
 Board.UNIT_STATUS = 0x30
-Board.STATUS_SLEEP, Board.STATUS_BERSERK = 2, 4   -- include/bmunit.h UNIT_STATUS_*
+Board.STATUS_SLEEP, Board.STATUS_SILENCED, Board.STATUS_BERSERK = 2, 3, 4   -- include/bmunit.h UNIT_STATUS_*
 function Board.statusHeld(status)
     return status == Board.STATUS_SLEEP or status == Board.STATUS_BERSERK
 end
 -- The +30 byte split as the struct's bitfields: statusIndex (low nibble), statusDuration (high)
 function Board.statusOf(byte) return byte & 0xF, byte >> 4 end
+-- The status the +30 `byte` leaves once `after` more of its faction's phase starts tick it
+-- (bmunit.c TickActiveFactionTurn: each start takes one off a duration that is not 0 and clears
+-- the status at 0; a duration of 0 is never ticked) -> the status, or 0 when it has cleared
+function Board.statusAfter(byte, after)
+    local status, left = Board.statusOf(byte)
+    if left ~= 0 and left <= (after or 0) then return 0 end
+    return status
+end
+-- The status staves and what a hit sets (bmusemind.c ExecStatusStaff, on one roll of
+-- GetOffensiveStaffAccuracy), for SetUnitStatus's turns (bmunit.c). Item ids:
+-- include/constants/items.h ITEM_STAFF_SILENCE, _SLEEP, _BERSERK.
+Board.STATUS_STAVES = { [0x51] = Board.STATUS_SILENCED, [0x52] = Board.STATUS_SLEEP,
+                        [0x53] = Board.STATUS_BERSERK }
+Board.STATUS_TURNS = 5
 -- Unit state bits, include/bmunit.h.
 Board.US_HIDDEN = 1 << 0
 Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
@@ -528,6 +542,7 @@ Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, 
 -- (AiPillageAction) set no action type of their own.
 Board.AI_ACTION_COMBAT, Board.AI_ACTION_ESCAPE, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE =
     1, 2, 3, 4
+Board.AI_ACTION_STAFF = 5
 
 -- What became of a unit the death watch saw on the field (`was` = { charId, faction }), read off
 -- what the game wrote to its slot at `addr` this frame; nil = it is still there.
@@ -660,6 +675,8 @@ function Board.bind(mem, SYM)
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,
         statusOf = Board.statusOf, STATUS_BERSERK = Board.STATUS_BERSERK,
+        statusAfter = Board.statusAfter, STATUS_STAVES = Board.STATUS_STAVES,
+        STATUS_TURNS = Board.STATUS_TURNS, AI_ACTION_STAFF = Board.AI_ACTION_STAFF,
         US_HAS_MOVED_AI = Board.US_HAS_MOVED_AI, FOG_BITS = Board.FOG_BITS,
         UNIT_STATUS = Board.UNIT_STATUS, live = Board.live, inPhase = Board.inPhase,
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,

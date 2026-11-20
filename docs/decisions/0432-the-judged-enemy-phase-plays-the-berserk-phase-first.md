@@ -67,8 +67,8 @@ Garcia (charId 0x0A) killed Eirika, both berserked. The record graded both death
 **Not covered.** An enemy berserked by the player's staff moves in a berserk phase after the
 enemy phase. The bot casts heal staves only (`Sight.healStaves`, `M.HEAL_STAVES`: the one owner
 of its Staff acts), so no enemy is ever berserked and the judged phase does not play it.
-Nor does the judged phase play an enemy's status staff (`aiDecide` keeps combat only). A unit
-the Bishop would berserk in the first phase is not berserked in the lookahead's second: #674.
+An enemy's status staff, which a unit berserked in the first phase needs for the lookahead's
+second, is played since ADR 0433 (#674).
 
 **Proof (2026-11-19).**
 - Unit tests, each failing on main's code: `test_sight.lua` (`berserkers`, `berserkPhaseStart`,

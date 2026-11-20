@@ -2404,6 +2404,10 @@ do
           "berserkers: our berserked units the order takes, in unit-index order")
     check(table.concat(Sight.berserkers(m, Board, units, 1), ","), "5",
           "berserkers: after one more player phase's start, those whose status outlives the tick")
+    -- a duration of 0 is never ticked (TickActiveFactionTurn) and the order lists any BERSERK
+    -- (CpOrderBerserkInit reads no duration): such a unit berserks every phase (PR #675 review)
+    check(table.concat(Sight.berserkers(m, Board, { unit(6, "blue", 0x04) }, 1), ","), "6",
+          "berserkers: a berserk of duration 0 lasts")
 
     -- the phase's start: AiPhaseBerserkInit's writes, our faction, then its two calls
     local AI, PLAY, TABLE = 0x0203AA04, 0x0202BCF0, 0x080D8178
@@ -2482,6 +2486,89 @@ do
         return t, now, function() end
     end, sandbox, nil, 1, function() return { { p = 1, strikes = {} } } end)
     check(unsplit, 1, "phaseWays tail: a berserker's rare death left unsplit is counted once")
+end
+
+-- #674: an enemy's status staff. A Bishop's Berserk or Sleep staff (cp_staff.c
+-- AiStaffSleepBerserk) is a decision of its own, AI_ACTION_STAFF; the judged phase played combat
+-- only, so a unit the staff would berserk was never berserked for the lookahead's second phase.
+do
+    local m = fakeMem()
+    -- the status a phase start's tick leaves (bmunit.c TickActiveFactionTurn)
+    check(table.concat({ Board.statusAfter(0x54, 0), Board.statusAfter(0x54, 4),
+                         Board.statusAfter(0x54, 5), Board.statusAfter(0x14, 1),
+                         Board.statusAfter(0x04, 3) }, ","), "4,4,0,0,4",
+          "statusAfter: each start ticks once and clears at 0; a duration of 0 never ticks")
+    -- the decision read: AiSetDecision's target and slot, the slot's item the staff
+    local D, actor = 0x0203AA90, 0x02030100
+    local DEC = Board.AI_DEC
+    local function decide(action, item)
+        m.w8(D + DEC.ACTION, action); m.w8(D + DEC.TARGET, 3); m.w8(D + DEC.SLOT, 1)
+        m.w8(D + DEC.X, 7); m.w8(D + DEC.Y, 9)
+        m.w16(actor + Board.UNIT_ITEMS + 2, item)
+        return Sight.staffAct(m, Board, D, actor)
+    end
+    local act = decide(Board.AI_ACTION_STAFF, 0x0553)
+    check(act and table.concat({ act.target, act.status, act.tile.x, act.tile.y }, ","),
+          "3,4,7,9", "staffAct: the Berserk staff's target, its status and the tile it casts from")
+    check(decide(Board.AI_ACTION_STAFF, 0x0252).status, Board.STATUS_SLEEP,
+          "staffAct: the Sleep staff puts its target to sleep")
+    check(decide(Board.AI_ACTION_STAFF, 0x1E4B), nil, "staffAct: a heal staff sets no status")
+    check(decide(Board.AI_ACTION_COMBAT, 0x0553), nil, "staffAct: an attack is no staff act")
+    -- a hit: the status for SetUnitStatus's five turns
+    local api = { mem = m, write8 = m.w8 }
+    m.w8(actor + 0x13, 20)
+    Sight.setStatus(api, Board, actor, Board.STATUS_BERSERK)
+    check(m.u8(actor + Board.UNIT_STATUS), 0x54, "setStatus: berserked for 5 turns")
+    Sight.setStatus(api, Board, actor, Board.STATUS_SLEEP)
+    check(m.u8(actor + Board.UNIT_STATUS), 0x54, "setStatus: a unit with a status takes none")
+    m.w8(actor + Board.UNIT_STATUS, 0); m.w8(actor + 0x13, 0)
+    Sight.setStatus(api, Board, actor, Board.STATUS_SLEEP)
+    check(m.u8(actor + Board.UNIT_STATUS), 0, "setStatus: a unit a strike killed takes none")
+
+    -- phaseWays: the staff's hit is a way of its own, its strikes the phase's as they were
+    local function sandbox(fn) return fn() end
+    local landed
+    local function staffPhase(q, mass)
+        landed = false
+        return Sight.phaseWays(2, function(k, done)
+            if k == 1 then return { lands = q }, done, function() landed = true end end
+            local t = { enemy = 0x82, felled = 0, hit = landed }
+            local now = { table.unpack(done) }
+            now[#now + 1] = t
+            return t, now, function() end
+        end, sandbox, nil, mass)
+    end
+    local out, unsplit = staffPhase(0.6, 1)
+    local ways = {}
+    for _, o in ipairs(out) do
+        ways[#ways + 1] = o.p .. ":" .. #o.strikes .. ":" .. tostring(o.strikes[1].hit)
+    end
+    check(table.concat(ways, " ") .. "/" .. unsplit, "0.4:1:false 0.6:1:true/0",
+          "phaseWays: a status staff splits the phase on its hit; the enemy after sees each way")
+    out, unsplit = staffPhase(0.995, 1)
+    check(#out .. ":" .. tostring(landed) .. "/" .. unsplit, "1:true/1",
+          "phaseWays: a near-certain hit lands unsplit, counted")
+    out, unsplit = staffPhase(0.3, 1 / 128)
+    check(#out .. ":" .. tostring(landed) .. "/" .. unsplit, "1:false/1",
+          "phaseWays: under the floor a likely miss stays missed, counted")
+
+    -- the army's reply holds a unit asleep or berserked after the next start's tick, whatever
+    -- berserked it: a staff in the first phase (0x54) or a status the plan began with
+    local held = {}
+    for _, b in ipairs({ 0x54, 0x24, 0x14, 0x52, 0x53, 0x00 }) do
+        m.w8(actor + Board.UNIT_STATUS, b)
+        held[#held + 1] = tostring(Sight.heldAtReply(m, Board, { addr = actor }))
+    end
+    check(table.concat(held, ","), "true,true,false,true,false,false",
+          "heldAtReply: asleep or berserked past one tick; a last turn, Silence or none moves")
+    -- where the judged phases play it (source): both phases cast what the decision names
+    local src = sightSrc
+    check(select(2, src:gsub("local target, side, act = aiDecide%(call, proc, e, byId%)", "")), 2,
+          "staff: playPhase's ways and nextPhase's first phase both read the act")
+    check(src:find("if q >= 0.5 then land() end", 1, true) ~= nil, true,
+          "staff: nextPhase's expected way lands a hit of even odds or better")
+    check(src:find("if not M.heldAtReply(mem, Board, o) then", 1, true) ~= nil, true,
+          "staff: the army's reply moves no unit M.heldAtReply holds")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

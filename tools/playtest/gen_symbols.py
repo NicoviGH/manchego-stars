@@ -327,6 +327,7 @@ WANTED = [
     'gTilesetTerrainLookup',    # u8*: a metatile's terrain, RefreshTerrainBmMap's table (bmmap.c)
     'GetUnitFogViewRange',      # how far a unit sees in fog: a thief's +5, a torch (bmunit.c)
     'CanUnitUseStaff',          # whether a unit can use a staff it holds (bmitem.c)
+    'GetOffensiveStaffAccuracy',  # a status staff's hit chance, rolled once (bmbattle.c; #674)
     # The bot's heals (#510 step 9 PR E): what a staff or a Vulnerary would do, by the game.
     'CanUnitUseItem',           # usable now; for a staff it builds the targets (bmitemuse.c)
     'GetUnitItemHealAmount',    # the HP an item restores for this unit (bmitem.c)
