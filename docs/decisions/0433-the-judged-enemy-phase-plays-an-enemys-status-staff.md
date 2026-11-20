@@ -34,13 +34,15 @@ berserked before the plan. Vanilla Ch14 (`scout-ch14/1001`): the Bishop (class 6
    sets no status and is still not played.
 2. **Its hit.** `stagePhase`'s `cast` stands the caster on its tile and reads
    `GetOffensiveStaffAccuracy` there (it reads the distance). `land()` writes the status for
-   five turns (`Sight.setStatus`).
+   five turns (`Sight.setStatus`), on a living unit with no status only, as the AI picks its
+   targets.
 3. **The judged phase.** In `playPhase` the act is a way of its own: `phaseWays` splits on the
    hit as it splits on a counter kill, at the same floor, and one left unsplit lands when the
    hit is even odds or better (it is counted in `unsplit`). The staff strikes no one, so no
    strike is added.
 4. **The lookahead.** `nextPhase`'s first phase plays its expected way: the status lands when
-   the hit is even odds or better. The second phase's berserk phase then lists the unit
+   the hit is even odds or better, as a counter kill is taken there, and neither is counted in
+   `unsplit` (that phase never splits). The second phase's berserk phase then lists the unit
    (`Sight.berserkers`), and the army's reply between the phases leaves a unit asleep or
    berserked where it stands. Both read the status after one more player-phase tick
    (`Board.statusAfter`), as the planner's own `held` does.
@@ -64,3 +66,8 @@ berserked before the plan. Vanilla Ch14 (`scout-ch14/1001`): the Bishop (class 6
   leaves her be; control: no berserk strike of hers. On main's `sight.lua` and `board.lua`:
   `FAIL -- hitWay=false/false struck=false/true berserks=0/0 replied=true` (one way, and the
   reply moves her).
+- **Sleep and Silence in the emulator: not probed.** They take the same act, hit and
+  `setStatus` path the probe proves with Berserk; the unit tests pin their item mapping and the
+  reply's hold of a sleeping unit. What the status does after is the game's own code, cited in
+  point 5. A Sleep probe on the Prologue was tried (PR #675 review): the enemy that would strike
+  the sleeping Eirika chose another target, so the check measured the AI's pick, not the bot.

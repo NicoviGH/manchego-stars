@@ -5071,14 +5071,18 @@ scenarios.staffprobe = function()
     if not caster then return result("FAIL", "no enemy on the Prologue") end
     local sx, sy = INSPECT.freeBeside(caster)
     if not sx then return result("FAIL", "no free tile beside the enemy") end
+    local ITEMS = BOARD.UNIT_ITEMS
     local slot = 0
-    while slot < 4 and sapi.mem.u16(caster.addr + 0x1E + slot * 2) ~= 0 do slot = slot + 1 end
-    local POW, RES, STAFF_RANK = 0x14, 0x18, 0x28 + 4
+    while slot < 4 and sapi.mem.u16(caster.addr + ITEMS + slot * 2) ~= 0 do slot = slot + 1 end
+    -- struct Unit +14 pow, +15 skl, +18 res, +28 ranks[] (ITYPE_STAFF 4); constants/items.h
+    local POW, SKL, RES, STAFF_RANK = 0x14, 0x15, 0x18, 0x28 + 4
+    local BERSERK = 0x53   -- ITEM_STAFF_BERSERK
     sapi.write8(caster.addr + STAFF_RANK, 251)
     local plan = { blues = { { unit = eirika, x = sx, y = sy, hp = eirika.hp } }, reds = {},
                    gone = {} }
+    -- `staff` = the item id, or nil for the control
     local function arm(staff, pow)
-        sapi.write16(caster.addr + 0x1E + slot * 2, staff and (0x53 | (15 << 8)) or 0)
+        sapi.write16(caster.addr + ITEMS + slot * 2, staff and (staff | (15 << 8)) or 0)
         sapi.write8(caster.addr + POW, pow)
         sight.refresh()
     end
@@ -5088,12 +5092,12 @@ scenarios.staffprobe = function()
     -- neither unit holds a stat item) checks the game's read the phase splits on. The tile is
     -- the one the AI casts from, the lookahead's first move of the caster (the same decision).
     local function ways(staff)
-        arm(staff, res + 4)
+        arm(staff and BERSERK, res + 4)
         local from = { x = caster.x, y = caster.y }
         for _, m in ipairs(sight.nextPhase(plan, false).moved) do
             if m.id == caster.id then from = m end
         end
-        local acc = (4 * 5 + 30 + sapi.mem.u8(caster.addr + 0x15)
+        local acc = (4 * 5 + 30 + sapi.mem.u8(caster.addr + SKL)
             - 2 * BOARD.distance(sx, sy, from.x, from.y)) / 100
         local out = sight.enemyPhase(plan)
         local ps, hitWay, strikes = {}, false, false
@@ -5108,7 +5112,7 @@ scenarios.staffprobe = function()
         return hitWay, strikes
     end
     local function lookahead(staff)
-        arm(staff, 30)
+        arm(staff and BERSERK, 30)
         local out = sight.nextPhase(plan, true)
         local cast, berserks, replied = false, 0, false
         for _, m in ipairs(out.moved) do cast = cast or m.id == caster.id end
