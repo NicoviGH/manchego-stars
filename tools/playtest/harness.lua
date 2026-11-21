@@ -3686,11 +3686,11 @@ INSPECT.botApi = function(game)
         -- --bench-vanilla`): each only waits where it stands (Bot.candidates)
         bench = decode(PLAYTEST_BENCH, nil),
         board = BOARD.read,
-        -- the charIds the chapter's talks would bring over: each talk the game would run now
-        -- (Sight talks), its target, once
+        -- the charIds the chapter's talks would bring over: each recruit talk the game would run
+        -- now (Sight.recruitTalks), its target, once
         recruits = function()
             local out, seen = {}, {}
-            for _, t in ipairs(Sight.talks(sightApi)) do
+            for _, t in ipairs(Sight.recruitTalks(Sight.talks(sightApi))) do
                 if not seen[t.b] then seen[t.b] = true; out[#out + 1] = t.b end
             end
             return out

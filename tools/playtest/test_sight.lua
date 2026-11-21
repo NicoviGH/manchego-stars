@@ -172,7 +172,8 @@ do
     local u8, u32, w8, w32 = m.u8, m.u32, m.w8, m.w32
     local INFO, LIST, GROUP = 0x03000000, 0x08100000, 0x08200000
     w32(GROUP + 4, LIST)
-    w8(LIST + 0x08, 0x01); w8(LIST + 0x09, 0x0E)        -- Eirika -> Ross
+    w32(LIST + 0x04, 0x089F0000)
+    w8(LIST + 0x08, 0x01); w8(LIST + 0x09, 0x0E)        -- Eirika -> Cormag
     w8(LIST + 0x18, 0x00); w8(LIST + 0x19, 0x0A)        -- anyone -> Garcia, asm-gated
     local S = { GetChapterEventDataPointer = 1, SearchAvailableEvent = 2, EvCheck03_CHAR = 3,
                 EvCheck04_CHARASM = 4, CheckForCharacterEvents = 5 }
@@ -199,9 +200,25 @@ do
     check(#talks, 1, "talks: only the available one is kept")
     check(talks[1] and talks[1].a, 0x01, "talks: its pidA")
     check(talks[1] and talks[1].b, 0x0E, "talks: its pidB")
+    check(talks[1] and talks[1].script, 0x089F0000, "talks: its script")
     check(asked and asked[1] == 0xFF and asked[2] == 0xFF, true, "talks: the walk matches no entry")
     check(at[S.EvCheck03_CHAR] == nil and at[S.EvCheck04_CHARASM] == nil, true,
           "talks: the breakpoints are cleared")
+end
+
+-- test_recruit_talks_drop_a_both_ways_pair: E_15's Duessel-Cormag talk is in the table both
+-- ways with one script (CharacterEventBothWays, a conversation); one-way talks, even two in
+-- opposite directions with their own scripts, are recruits (#699).
+do
+    local talks = Sight.recruitTalks({ { a = 0x1D, b = 0x0E, script = 0x10 },
+                                       { a = 0x0E, b = 0x1D, script = 0x10 },
+                                       { a = 0x01, b = 0x30, script = 0x20 },
+                                       { a = 0x30, b = 0x01, script = 0x30 },
+                                       { a = 0, b = 0x20, script = 0x40 } })
+    check(#talks, 3, "recruitTalks: the both-ways pair is dropped")
+    check(talks[1] and talks[1].b, 0x30, "recruitTalks: a one-way talk stays")
+    check(talks[2] and talks[2].b, 0x01, "recruitTalks: the other way with its own script stays")
+    check(talks[3] and talks[3].b, 0x20, "recruitTalks: an anyone talk stays")
 end
 
 -- test_odds_compose_exchanges: two 50/50 exchanges of 6 on a 10 HP unit kill a quarter of the
