@@ -130,16 +130,16 @@ landed but left the unit in kill range (125 of them the unit's own Vulnerary).
 
 **The rule now (`planner.lua` `cover()` in `judge()`).** A heal counts toward a unit's exemption
 only when the game lets it happen and it is enough:
-- **One staff use per healer per turn.** The plan's healers are dealt to its struck units, most
-  expected damage (`taken`) first (id breaks a tie), one unit each, the weakest staff that is
-  enough first. A struck unit left without one carries the wear. A salve is its holder's own and
-  covers only it.
+- **One action per unit per turn.** A unit's action is its own salve or one staff use, never both.
+  Struck units are matched to actions by augmenting paths (most expected damage first, id breaks a
+  tie, the weakest enough staff tried first), so a healer reaching two units is not spent on the
+  wrong one. A struck unit left unmatched carries the wear. A salve covers only its holder.
 - **Enough** means: the HP the plan leaves, less the phase's expected damage, plus the heal (the
   staff's `amount` from `sight.staves`, the salve's best from `sight.salve`, which now returns that
-  amount instead of a yes), held to max HP, is above one more phase of that damage. The heal's
+  amount instead of a yes), held to max HP, is above one more phase of that damage. A unit whose max HP is unread is not capped. The heal's
   amount is the game's (`GetUnitItemHealAmount`); the damage is the judged phase's own.
-- **A healer the phase kills** with chance above the cap (its death in the phase, its counter's
-  included) heals no one.
+- **A healer the phase kills** with chance above the cap (its death in the phase and its
+  counter's, joined by `M.either`) heals no one.
 - Reach is unchanged (`healsNext`). No weight is added; the cost is one assignment per judged plan
   that strikes a unit, run once and only when a struck unit asks.
 

@@ -8889,31 +8889,60 @@ do
     -- reaches them both. It covers A (the lower id, the damage equal) and Bo carries the wear:
     -- its three blows kill it in every plan, so the march into reach is over the cap. A second
     -- healer covers Bo too
-    local function twoStruck(...)
-        local Bo = blue(0x03, 1, 0, 1, { hp = 27, minRange = false })
-        local function blows(plan)
-            local out = strikes12(plan)
-            out[#out + 1] = { target = 0x03, takenHit = 100, takenDmg = 12, takenHits = 1, takenCrit = 0 }
+    -- which units carry the wear in the plan chosen, `struck` the ids hit for 12 wherever they stand (its `protected` entries read on M.WEAR
+    -- phases), as "id,id"; `healers` are blue units added, `staves` their staves, `reach` theirs
+    local function carriers(extra, so, ...)
+        local blows = {}
+        local function strikesOn(plan)
+            local out = {}
+            for _, id in ipairs(extra) do
+                out[#out + 1] = { target = id, takenHit = 100, takenDmg = 12, takenHits = 1, takenCrit = 0 }
+            end
             return out
         end
-        local so = { enemyPhase = blows, nextPhase = blows,
-                     reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x03] = tiles({ 0, 1 }),
-                               [0x02] = tiles({ 0, 2 }), [0x04] = tiles({ 1, 2 }) },
-                     staves = { [0x02] = { { slot = 0, amount = 20 } },
-                                [0x04] = { { slot = 0, amount = 20 } } } }
-        local units = { ... }
-        local board, sight, st = wears(27, so, Bo, table.unpack(units))
+        so.enemyPhase, so.nextPhase = strikesOn, strikesOn
+        local board, sight, st = wears(27, so, ...)
         local _, plan = Planner.plan(B, board, sight, st)
-        local admitted = false
-        for _, c in ipairs(plan.considered) do
-            if c.acts[1] == "1>wait@1,0>nil" and c.rank.admitted then admitted = true end
+        for _, pr in ipairs(plan.protected or {}) do
+            if (pr.phases or 1) > 1 then blows[#blows + 1] = pr.id end
         end
-        return admitted
+        table.sort(blows)
+        return table.concat(blows, ",")
     end
-    check(twoStruck(blue(0x02, 1, 0, 2, { minRange = false })), false,
-          "wear (#699): two struck units and one healer, one of them still carries the wear")
-    check(twoStruck(blue(0x02, 1, 0, 2, { minRange = false }), blue(0x04, 1, 1, 2, { minRange = false })),
-          true, "wear (#699): a healer each, none does")
+    local function bo(y) return blue(0x03, 1, 0, y or 1, { hp = 27, minRange = false }) end
+    local function heal(id, x, y) return blue(id, 1, x, y, { minRange = false }) end
+    local function reachOf(boY, ...)
+        local r = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x03] = tiles({ 0, boY }) }
+        for _, h in ipairs({ ... }) do r[h[1]] = tiles({ h[2], h[3] }) end
+        return r
+    end
+    local function stavesOf(t)
+        local o = {}
+        for id, amount in pairs(t) do o[id] = { { slot = 0, amount = amount } } end
+        return o
+    end
+    -- one healer, two units struck alike: it takes A (the lower id) and Bo (3) carries
+    check(carriers({ 0x01, 0x03 }, { reach = reachOf(1, { 0x02, 0, 2 }), staves = stavesOf({ [0x02] = 20 }) },
+                   bo(), heal(0x02, 0, 2)), "3",
+          "wear (#699): two struck units and one healer, the second carries the wear")
+    -- a healer each: none carries
+    check(carriers({ 0x01, 0x03 }, { reach = reachOf(1, { 0x02, 0, 2 }, { 0x04, 1, 2 }),
+                               staves = stavesOf({ [0x02] = 20, [0x04] = 20 }) },
+                   bo(), heal(0x02, 0, 2), heal(0x04, 1, 2)), "",
+          "wear (#699): a healer each, none carries")
+    -- the matching, not the first fit: 0x02 (Heal 10, the weakest, dealt first) reaches A and Bo,
+    -- 0x04 (20) reaches A only (Bo is 9 tiles down, out of its MOV). Dealt A first, 0x02 is gone
+    -- and Bo is bare; matched, 0x04 takes A and 0x02 takes Bo
+    check(carriers({ 0x01, 0x03 }, { reach = reachOf(9, { 0x02, 0, 5 }, { 0x04, 6, 0 }),
+                                     staves = stavesOf({ [0x02] = 10, [0x04] = 20 }) },
+                   bo(9), heal(0x02, 0, 5), heal(0x04, 6, 0)), "",
+          "wear (#699): a healer reaching two and one reaching one cover both units")
+    -- a struck healer's one action is its own Vulnerary or a staff use, not both: A (lower id,
+    -- damage equal) gets it, the healer carries the wear
+    check(carriers({ 0x01, 0x02 }, { reach = reachOf(1, { 0x02, 0, 2 }), salve = { [0x02] = 20 },
+                               staves = stavesOf({ [0x02] = 20 }) },
+                   heal(0x02, 0, 2)), "2",
+          "wear (#699): a healer's one action is its salve or its staff, not both")
 
     -- a staff's own reach (#629 review): from (8,0) on MOV 5 the healer gets to (3,0), two
     -- tiles from A on (1,0). A reach of 1 is no heal next turn; a staff reach of 3 is

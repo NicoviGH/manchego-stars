@@ -2012,12 +2012,16 @@ function M.plan(Bot, board, sight, style, opts)
         for _, p in ipairs(planned) do plannedBy[p.unit.id] = p end
         local function enough(p, amount)
             local id = p.unit.id
-            local left = math.min(p.unit.maxhp or p.hp, p.hp - (taken[id] or 0) + amount)
+            local left = p.hp - (taken[id] or 0) + amount
+            -- the cap is the game's (sight.maxHps); a unit whose max HP is unread is not capped
+            if p.unit.maxhp then left = math.min(p.unit.maxhp, left) end
             return left > (taken[id] or 0)
         end
-        -- the struck units a heal covers: { [id] = true }, dealt once per judged plan
+        -- the struck units a heal covers: { [id] = true }, dealt once per judged plan. Each unit
+        -- acts once a turn, so its action is one heal: its own salve or a staff use on another.
+        -- A matching of struck units to actions, by augmenting paths (the sets are a handful)
         local function cover()
-            local order, used, out = {}, {}, {}
+            local order, out = {}, {}
             for _, p in ipairs(planned) do
                 if (struck[p.unit.id] or 0) > 0 then order[#order + 1] = p end
             end
@@ -2026,34 +2030,51 @@ function M.plan(Bot, board, sight, style, opts)
                 if tx ~= ty then return tx > ty end
                 return x.unit.id < y.unit.id
             end)
+            -- a healer's best staff (the game's amount) and whether it likely lives (`die` holds
+            -- the phase's strikes only; the counter's death is st.fought's, protect() adds them)
             local healers = {}
             for _, q in ipairs(planned) do
                 local amount = 0
                 for _, sv in ipairs(sight.staves and sight.staves(q.unit) or {}) do
                     amount = math.max(amount, sv.amount or 0)
                 end
-                local dies = (die[q.unit.id] or 0) + (st.fought[q.unit.id] and st.fought[q.unit.id].die or 0)
+                local dies = M.either(die[q.unit.id] or 0,
+                                      st.fought[q.unit.id] and st.fought[q.unit.id].die or 0)
                 if amount > 0 and M.admits(dies, cap) then
                     healers[#healers + 1] = { q = q, amount = amount }
                 end
             end
-            -- the weakest staff that is enough, so a stronger one stays for a harder-hit unit
+            -- the weakest staff that is enough first, so a stronger one stays for a harder hit
             table.sort(healers, function(x, y)
                 if x.amount ~= y.amount then return x.amount < y.amount end
                 return x.q.unit.id < y.q.unit.id
             end)
+            local edges = {}   -- per struck unit, the ids of the units whose action can heal it
             for _, p in ipairs(order) do
-                local own = sight.salve(p.unit)
-                if own and enough(p, own) then
-                    out[p.unit.id] = true
-                else
-                    for i, h in ipairs(healers) do
-                        if not used[i] and h.q ~= p and enough(p, h.amount) and healsNext(h.q, p) then
-                            used[i], out[p.unit.id] = true, true
-                            break
+                local es, own = {}, sight.salve(p.unit)
+                if own and enough(p, own) then es[1] = p.unit.id end
+                for _, h in ipairs(healers) do
+                    if h.q ~= p and enough(p, h.amount) and healsNext(h.q, p) then
+                        es[#es + 1] = h.q.unit.id
+                    end
+                end
+                edges[p.unit.id] = es
+            end
+            local taker = {}   -- action (unit id) -> the struck unit it heals
+            local function try(id, seen)
+                for _, act in ipairs(edges[id]) do
+                    if not seen[act] then
+                        seen[act] = true
+                        if taker[act] == nil or try(taker[act], seen) then
+                            taker[act] = id
+                            return true
                         end
                     end
                 end
+                return false
+            end
+            for _, p in ipairs(order) do
+                if try(p.unit.id, {}) then out[p.unit.id] = true end
             end
             return out
         end
