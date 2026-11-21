@@ -25,11 +25,11 @@ scripted arrival agrees anyway). `botrun.lua` passes to the planner those the ga
 has no `recruits()` cannot say what is owed, so a memory it is given is a fault and fails loudly.
 `bot.lua`'s `recruitsOf` treats each as a recruit on the board that is not there yet, while no
 live unit of that character is on the field (or carried) and the turn is not past the remembered
-one. The turn is INCLUSIVE: `arrivals_seen` stores the enemy phase's own turn T for a unit that
-acted in it (on the board from player turn T+1) and the player turn a start-of-turn arrival was
-read on (already there on T), and the record keeps the number alone. A unit that never comes in
-this attempt (killed before it, a different route) is therefore a goal through that turn and
-none after: that is the decided bound, not a loose thread.
+one. `arrivals_seen` records `boardTurn`, the first player turn the unit stood on the board:
+T+1 for an enemy-phase arrival of turn T, T itself for a start-of-turn one. The goal holds while
+the turn is before it (a record without it reads `turn + 1`). A unit not on the board by then
+(killed before it, a different route) is not coming this attempt and is no goal after: that is
+the decided bound, not a loose thread.
 
 - its talkers are the units the game's own check lets Talk it (`sight.canTalk`, the Talk
   command's `CheckForCharacterEvents` on the two charIds and the event flags; it reads no unit,
@@ -58,7 +58,7 @@ data.
 attempts 2 (`resume --tag cormag1b`). Before: attempt 2 won on turn 4 with Cormag never reached
 (`cormag1`). After: attempt 2 won clean on turn 7, Eirika talking to Cormag on turn 6. A single
 replay, per ADR 0430. It was played on the first version of the code, before the review's
-changes (the inclusive turn, the latest sighting, the talker's own march field for the meeting
+changes (the board turn, the latest sighting, the talker's own march field for the meeting
 tile, the stall exemption); Cormag's arrival (turn 5) and the Talk (turn 6) are not near any of
 their edges, and each has a unit test that fails without it. A second replay on the final code
 timed out at ten minutes on a machine loaded with eight emulator workers and gave no result. The same may help Amelia (E_9) and Marisa (E_10); untested.

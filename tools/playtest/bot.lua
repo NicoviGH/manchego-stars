@@ -1872,6 +1872,7 @@ end
 -- reading order, so the choice is the same every read.
 local function meetingTile(ctx, talkers, x, y)
     local best, bestD
+    if not ctx.map then error("meetingTile: the board has no map (board.map)", 0) end
     for _, u in ipairs(talkers) do
         local field = ctx.sight.march(u, { x = u.x, y = u.y })
         for ty = 0, ctx.map.h - 1 do
@@ -1891,10 +1892,10 @@ end
 -- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
 -- Then those a retry saw arrive and that are not on the board yet (ctx.pending: botrun's
 -- pendingRecruits, ADR 0436): an owed recruit not on it counts as one at the tile it arrived on,
--- under the id "arrival:<charId>", from the turn it is read on until its remembered turn
--- INCLUSIVE (an enemy-phase arrival of turn T is on the board from T+1, a start-of-turn one on T
--- itself, and the record keeps only the number; a unit that never comes this attempt is a goal to
--- that turn and none after). Its talkers are the units the game's own check (mayTalkOver) lets
+-- under the id "arrival:<charId>", from the turn it is read on until the first player turn it
+-- stood on the board (boardTurn: T+1 after an enemy-phase arrival of turn T, T itself for a
+-- start-of-turn one; a record without it reads turn + 1): a unit not there by then is not coming
+-- this attempt, and its goal is none after. Its talkers are the units the game's own check (mayTalkOver) lets
 -- Talk its charId -- that check reads the two charIds and the event flags, never the unit. The
 -- goal is the tile a talker can reach nearest to where it arrived (meetingTile), none when no
 -- talker reaches anywhere.
@@ -1922,7 +1923,7 @@ local function recruitsOf(ctx)
     for _, t in ipairs(ctx.onField) do here[t.charId] = true end
     for id, t in pairs(ctx.carried or {}) do here[t.charId] = true end
     for _, p in ipairs(ctx.pending or {}) do
-        if not here[p.charId] and (ctx.turn or 0) <= p.turn then
+        if not here[p.charId] and (ctx.turn or 0) < (p.boardTurn or p.turn + 1) then
             local t = { id = "arrival:" .. p.charId, charId = p.charId, faction = "red", x = p.x,
                         y = p.y }
             local by = {}

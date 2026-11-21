@@ -6475,6 +6475,14 @@ do
     check(a and a.act ~= "seize", true, "on its remembered turn: still a goal (an enemy-phase arrival is on the board from the next)")
     a = run(owed, 6)
     check(a and a.act, "seize", "past its remembered turn: it never came this attempt, no goal, the Seize is played")
+    -- boardTurn, the first player turn it stood on the board, bounds the goal when the record has it
+    local startOfTurn = { { charId = 14, x = 9, y = 9, turn = 5, boardTurn = 5 } }
+    a = run(startOfTurn, 4)
+    check(a and a.act ~= "seize", true, "a start-of-turn arrival on turn 5: a goal on turn 4")
+    a = run(startOfTurn, 5)
+    check(a and a.act, "seize", "a start-of-turn arrival not there on its own turn: not coming, no goal")
+    a = run({ { charId = 14, x = 9, y = 9, turn = 5, boardTurn = 6 } }, 5)
+    check(a and a.act ~= "seize", true, "an enemy-phase arrival of turn 5 (on the board from 6): a goal on 5")
     a = run(owed, 1, red(0x84, 9, 9, { charId = 14, minRange = false, onField = false }))
     check(a and a.act ~= "seize", true, "a unit of that character that is off the map (dead, carried off) is not 'here': still a goal")
     a = run(owed, 1, red(0x84, 9, 9, { charId = 14, minRange = false }))

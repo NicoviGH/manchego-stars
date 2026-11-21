@@ -1020,7 +1020,11 @@ function M.run(api)
                 -- act reads as the next turn's)
                 if e.kind == "arrive" and e.faction == "red" and not now[e.id].fogged then
                     local inPhase = actedIn and actedIn.ids[e.id] and actedIn.turn
+                    -- boardTurn: the first player turn it stands on the board (ADR 0436's goal
+                    -- holds before it): the next one after an enemy-phase arrival, this one else
                     rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = inPhase or after.turn or turn,
+                                                                  boardTurn = inPhase and inPhase + 1
+                                                                      or after.turn or turn,
                                                                   x = e.x, y = e.y,
                                                                   charId = e.charId }
                 end
