@@ -24,9 +24,9 @@ backlog (#526, #543, #547 mention #510 and are roster/lord design, not bot work)
 resolves...", #707 "Tidy check: ...", both children of the #510 tree) are NOT checked for a
 parent; name a bot issue with a BOT_TITLE prefix to have it guarded.
 
-The fetch is two paginated GraphQL queries (open issues, open PRs), plus one follow-up query per issue with more than a page of
-comments, never a call per issue otherwise; the
-checks are pure functions of the parsed data, unit-tested on tools/testdata/gh_tidy.json.
+The fetch is two paginated GraphQL queries (open issues, open PRs), plus one follow-up query
+for each issue with more than a page of comments, never a call per issue otherwise; the checks
+are pure functions of the parsed data, unit-tested on tools/testdata/gh_tidy.json.
 """
 import json
 import re
@@ -157,7 +157,9 @@ def check_pr_links(prs, open_numbers=frozenset()):
     out = []
     for p in prs:
         for c in p['closingIssuesReferences']['nodes']:
-            if c['number'] not in open_numbers and _orphan_wanted(c['number'], c['title'], c['parent']):
+            if c['number'] in open_numbers:
+                continue
+            if _orphan_wanted(c['number'], c['title'], c['parent']):
                 out.append('PR #%d (%s): closes #%d (%s), a bot issue with no parent. Fix: link '
                            '#%d under #640 or its umbrella before merging'
                            % (p['number'], p['title'], c['number'], c['title'], c['number']))

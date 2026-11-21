@@ -70,10 +70,12 @@ class StatusTest(unittest.TestCase):
         self.assertIn('comment 12 ', msgs[0])
 
     def test_a_quoted_marker_mid_line_is_not_a_status_comment(self):
-        self.assertFalse(any(m.startswith('#922') for m in gh_tidy.check_stale_status(DATA['issues'])))
+        msgs = gh_tidy.check_stale_status(DATA['issues'])
+        self.assertFalse(any(m.startswith('#922') for m in msgs))
 
     def test_status_edited_after_the_last_comment_is_fresh(self):
-        self.assertFalse(any(m.startswith('#921') for m in gh_tidy.check_stale_status(DATA['issues'])))
+        msgs = gh_tidy.check_stale_status(DATA['issues'])
+        self.assertFalse(any(m.startswith('#921') for m in msgs))
 
 
 class MainTest(unittest.TestCase):
