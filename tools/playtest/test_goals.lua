@@ -179,7 +179,7 @@ do
     local sight = fakeSight({ closings = { ["unit:144"] = 1 } })
     function sight.closings(_, _, watch)
         watched = watch
-        return { ["unit:144"] = 1 }
+        return { ["unit:144"] = 1 }, {}
     end
     local goals = Goals.list(board, sight, {}, { recruitTalkers = { [0x90] = { 1 } } })
     local g = find(goals, "recruit:144")
@@ -207,8 +207,9 @@ do
     local board = { units = { blue(1, 0, 0), joshua }, turn = 1 }
     local pos = { [1] = { x = 0, y = 0, acted = false, alive = 1 } }
     local sight = fakeSight()
-    local path = { { x = 12, y = 0 }, { x = 16, y = 0 }, { x = 20, y = 0 } }
-    function sight.closings() return { ["unit:144"] = 3, ["path:144"] = path } end
+    -- gone after phase 3: the path holds phases 1 and 2 (sight.carryPaths leaves the escape out)
+    local path = { { x = 12, y = 0 }, { x = 16, y = 0 } }
+    function sight.closings() return { ["unit:144"] = 3 }, { [0x90] = path } end
     local ctx = { recruitTalkers = { [0x90] = { 1 } } }
     local g = find(Goals.list(board, sight, {}, ctx), "recruit:144")
     check(g.path, path, "recruit path: the goal carries the projected tiles")

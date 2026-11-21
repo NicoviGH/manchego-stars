@@ -1305,11 +1305,13 @@ end
 -- closings()' cache key: what its read depends on -- the turn, the horizon, each looter as it
 -- stands (id, tile, HP), the tiles our units block, the open tiles, each wave's units and the
 -- map. A looter killed or moved, a player unit moved, a tile taken, a door opened is a new key.
-function M.closingsKey(turn, k, waves, looters, open, blockers, map)
+function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
     -- the map (sight.mapKey): a looter walks through a door the planner's re-listing opened
     -- (sight.changed, #661), and that read must not answer for the shut map
     local parts = { "m" .. tostring(map or "-") }
     for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
+    -- the units watched (their paths are in the answer): a watched looter reads as an unwatched one
+    for id in pairs(watch or {}) do parts[#parts + 1] = "v" .. id end
     -- our units are hidden from the AI but still block its walk
     for _, o in ipairs(blockers or {}) do parts[#parts + 1] = "b" .. o.x .. "," .. o.y end
     for key in pairs(open) do parts[#parts + 1] = key end
@@ -1320,6 +1322,19 @@ function M.closingsKey(turn, k, waves, looters, open, blockers, map)
     end
     table.sort(parts)
     return turn .. "|" .. k .. "|" .. table.concat(parts, ";")
+end
+
+-- A watched unit's path (closings' second answer): paths[id][phase] = the tile it stands on after
+-- enemy phase `phase`. `at` = { [id] = tile } holds each unit's latest tile; a unit that decided
+-- nothing this phase (not played as seen, or no move) keeps the tile it had, so no phase is a
+-- hole; one in `gone` (it escaped) is not written: the phase it leaves on has no tile.
+function M.carryPaths(paths, at, phase, gone)
+    for id, tile in pairs(at) do
+        if not gone[id] then
+            paths[id] = paths[id] or {}
+            paths[id][phase] = tile
+        end
+    end
 end
 
 -- The terrain closings() leaves on a tile a looter took, `t` its explorable() entry: an emptied
@@ -3355,10 +3370,13 @@ function M.new(outer)
     -- recruits) is played the same way, and when the game's AI decides to escape with it
     -- (AI_ACTION_ESCAPE: AiTryMoveTowardsEscape, set only when the escape point is within its
     -- move, and AiEscapeAction then clears the unit) the answer holds "unit:<id>" -> that enemy
-    -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699), and
-    -- "path:<id>" -> { [enemy phase] = {x, y} }, where it stands after each phase it plays (the
-    -- escape phase's tile is left out: it is gone). A
-    -- scripted removal (a turn event's) is not read: nothing reads what a script does.
+    -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699). The
+    -- second answer is { [unit id] = { [enemy phase] = {x, y} } }, where each watched unit stands
+    -- after each phase before it is gone (M.carryPaths: the escape phase is left out, so a path
+    -- is as long as its deadline less one). A scripted removal (a turn event's) is not read:
+    -- nothing reads what a script does. Both are estimates, as the chest closings are: the replay
+    -- hides our units, so a recruit's moves and its escape phase are the ones he makes when
+    -- no player unit is near; the planner uses them as the deadline it is.
     -- closings() by what it reads: the turn, k, the waves, and each looter or watched unit as it
     -- stands (one our act kills or moves is a new read). newPhase() runs before every decision.
     local closingsAt = {}
@@ -3378,9 +3396,9 @@ function M.new(outer)
                 blockers[#blockers + 1] = o
             end
         end
-        local ck = M.closingsKey(turn0, k, waves, looters, open, blockers, s.mapKey())
-        if closingsAt[ck] then return closingsAt[ck] end
-        local out = {}
+        local ck = M.closingsKey(turn0, k, waves, looters, open, blockers, s.mapKey(), watch)
+        if closingsAt[ck] then return closingsAt[ck].out, closingsAt[ck].paths end
+        local out, paths = {}, {}
         local function close(x, y, phase)
             local key = x .. "," .. y
             if open[key] and (not out[key] or phase < out[key]) then out[key] = phase end
@@ -3402,6 +3420,12 @@ function M.new(outer)
                 end
             end
             local D, DEC = S.gAiDecision, Board.AI_DEC
+            -- each watched unit's tile now (path[0] is the goal's own), and those that escaped
+            local at, gone = {}, {}
+            for id in pairs(watch or {}) do
+                local e = looter[id] and byId[id]
+                if e then at[id] = { x = e.x, y = e.y } end
+            end
             for phase = 1, next(looter) and k or 0 do
                 api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
                 for _, id in ipairs(aiOrder(call, all)) do
@@ -3410,17 +3434,11 @@ function M.new(outer)
                         aiDecide(call, proc, e, all)
                         local x, y = followMove(e)
                         if x then
-                            if (watch or {})[id] then
-                                -- where it stands for the player phase after enemy phase
-                                -- `phase`: the tile a Talk to it must meet it on (#699)
-                                local key = "path:" .. id
-                                out[key] = out[key] or {}
-                                out[key][phase] = { x = x, y = y }
-                            end
+                            if at[id] then at[id] = { x = x, y = y } end
                             if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_ESCAPE then
                                 -- gone this phase: it plays no more and holds no tile
                                 out["unit:" .. id] = out["unit:" .. id] or phase
-                                looter[id] = nil
+                                looter[id], gone[id] = nil, true
                             elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                 close(x, y, phase)
                                 -- the tile is taken: AiPillageAction opens a chest (it empties)
@@ -3434,6 +3452,7 @@ function M.new(outer)
                         end
                     end
                 end
+                M.carryPaths(paths, at, phase, gone)
             end
             -- a wave: its class's costs, on a stand-in unit struct (any on the board)
             local stand = all[1]
@@ -3461,8 +3480,8 @@ function M.new(outer)
                 end
             end
         end)
-        closingsAt[ck] = out
-        return out
+        closingsAt[ck] = { out = out, paths = paths }
+        return out, paths
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end

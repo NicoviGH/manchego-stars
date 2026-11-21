@@ -120,23 +120,24 @@ local function voided(reward, lost)
     return false
 end
 
--- sight.closings for this board: when a looter has each open tile, and, for each recruit on the
+-- sight.closings for this board: when a looter has each open tile and, for each recruit on the
 -- field (ctx.recruitTalkers), "unit:<id>" -> the enemy phase the game's own AI escapes with it
--- (#699). One read for openTiles and list, so sight's cache answers the second.
+-- (#699); and the paths of those recruits, { [unit id] = { [enemy phase] = tile } }.
 function M.closings(sight, style, ctx)
-    if not sight.closings then return {} end
+    if not sight.closings then return {}, {} end
     local watch = {}
     for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
-    return sight.closings(nil, style.waves, watch)
+    local out, paths = sight.closings(nil, style.waves, watch)
+    return out, paths or {}
 end
 
 -- The villages and chests still open, each with its worth in gold and when it closes:
 -- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
 -- is sent where by it.
-function M.openTiles(sight, style, ctx)
+function M.openTiles(sight, style, ctx, closings)
     local cost = sight.itemCost or function() return 0 end
     local explored = ctx.explored or {}
-    local closings = M.closings(sight, style, ctx)
+    closings = closings or M.closings(sight, style, ctx)
     local worth, house, out = prior(cost, style.villageGifts), prior(cost, style.houseGifts), {}
     for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
         local k = key(t.x, t.y)
@@ -174,7 +175,8 @@ function M.list(board, sight, style, ctx)
         end
         return out
     end
-    for _, g in ipairs(M.openTiles(sight, style, ctx)) do
+    local closings, paths = M.closings(sight, style, ctx)
+    for _, g in ipairs(M.openTiles(sight, style, ctx, closings)) do
         g.takerUnits = takers(function(u)
             if sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind) then
                 return true
@@ -186,7 +188,6 @@ function M.list(board, sight, style, ctx)
         end)
         goals[#goals + 1] = g
     end
-    local closings = M.closings(sight, style, ctx)
     for id, talkers in pairs(ctx.recruitTalkers or {}) do
         local t = byId[id] or (ctx.pendingRecruits or {})[id]
         if t then
@@ -198,7 +199,7 @@ function M.list(board, sight, style, ctx)
             end
             goals[#goals + 1] = { id = "recruit:" .. id, kind = "recruit", unitId = id,
                                   tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us,
-                                  closes = closings["unit:" .. id], path = closings["path:" .. id] }
+                                  closes = closings["unit:" .. id], path = paths[id] }
         end
     end
     for _, u in ipairs(ctx.objectiveTile and blues or {}) do
@@ -281,10 +282,11 @@ function M.worth(goal, W)
     return v
 end
 
--- The turns a taker needs to meet a recruit the game's AI moves (goal.path, sight.closings'
--- "path:<id>": the tile it stands on after each enemy phase), or nil: the earliest player phase
+-- The turns a taker needs to meet a recruit the game's AI moves (goal.path, sight.closings' second
+-- answer: the tile it stands on after each enemy phase, one fewer than goal.closes), or nil: the earliest player phase
 -- f, up to the one it is removed after (goal.closes), in which the taker can be at the tile the
--- recruit stands on then (the current tile in phase 1, path[f - 1] after) within f turns. Past
+-- recruit stands on then (the current tile in phase 1, path[f - 1] after) within f turns, by the
+-- same turnsTo the stationary price uses: to the recruit's own tile. Past
 -- the path's last phase, with no removal, it stays where it ended.
 local function meet(goal, u, p, late, turnsTo)
     local path = goal.path
