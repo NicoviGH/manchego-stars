@@ -1040,6 +1040,55 @@ check(C.waitAnswer("dialogue_wait", {}), "advance_dialogue", "a box is pressed t
 check(C.waitAnswer("send_to_convoy", { fullBag = true }), "full_bag", "the bot's chooser answers a full bag")
 check(C.waitAnswer("send_to_convoy", {}), nil, "no chooser installed: the caller waits")
 
+-- #696: the last chapter's win never moves the chapter index (MNC4 sets no next chapter), only
+-- the post-chapter save menu comes up; the chapter index moving on is still a win.
+check(C.won(22, 22, false), false, "the chapter unchanged and no finished game: not won")
+check(C.won(22, 23, false), true, "the chapter index moved on: won")
+check(C.won(22, 22, true), true, "the game finished on the same chapter index: won")
+check(C.won(22, 22, nil), false, "no finished read: not won")
+
+-- save_menu_type is gPlaySt +0x4A bits 1-3 (types.h)
+check(C.saveMenuType(0x06), 3, "type 3 is 0x06 (bit 0 is unk4A_1)")
+check(C.saveMenuType(0x07), 3, "bit 0 does not leak into the type")
+check(C.saveMenuType(0x16), 3, "the high nibble (tutorial_exec_type) does not leak in")
+check(C.saveMenuType(0x04), 2, "type 2 (prep save, MNC2)")
+check(C.saveMenuType(0x08), 4, "type 4 (prep save, skirmish)")
+check(C.SAVE_MENU_TYPE_OFFSET, 0x4A, "the byte offset in PlaySt")
+
+local function reads(o)
+    return {
+        chapter = function() return o.chapter end,
+        menuUp = function() return o.menuUp end,
+        menuByte = function() return o.menuByte or 0 end,
+    }
+end
+local PLAYED_THROUGH = 0x06
+
+check(C.chapterWon(22, reads({ chapter = 22, menuUp = true, menuByte = PLAYED_THROUGH })), true,
+    "the played-through save menu up on the same chapter index: the game's end, won")
+check(C.chapterWon(22, reads({ chapter = 22, menuUp = true, menuByte = 0x04 })), false,
+    "the PREP screen's save menu (type 2) on the chapter's own index is not a win")
+check(C.chapterWon(22, reads({ chapter = 22, menuUp = true, menuByte = 0x08 })), false,
+    "a skirmish prep save menu (type 4) is not a win")
+check(C.chapterWon(22, reads({ chapter = 22, menuUp = true, menuByte = 0 })), false,
+    "a save menu of no type is not a win")
+check(C.chapterWon(22, reads({ chapter = 22, menuUp = false, menuByte = PLAYED_THROUGH })), false,
+    "type 3 left in PlaySt with no menu up is not a win")
+check(C.chapterWon(22, reads({ chapter = 23, menuUp = false })), true, "the chapter moved on: won")
+-- the enemy phase's early exit asks the same owner with its own start (runEnemyPhase, the
+-- final boss dying to a counter)
+check(C.chapterWon(31, reads({ chapter = 31, menuUp = true, menuByte = PLAYED_THROUGH })), true,
+    "an enemy phase ended by the game's end")
+check(C.chapterWon(31, reads({ chapter = 31, menuUp = false })), false, "an enemy phase still running")
+
+-- a start sampled while the game is already finished is loud, not a win from the first call
+check(C.sampleStart(reads({ chapter = 22, menuUp = false })), 22, "the start is the chapter index")
+check(C.sampleStart(reads({ chapter = 22, menuUp = true, menuByte = 0x04 })), 22,
+    "a prep screen's save menu at the start is an ordinary start")
+local ok, err = pcall(C.sampleStart, reads({ chapter = 22, menuUp = true, menuByte = PLAYED_THROUGH }))
+check(ok, false, "a finished game where the start is sampled raises")
+check(tostring(err):find("already finished", 1, true) ~= nil, true, "and says why")
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests))
     os.exit(1)

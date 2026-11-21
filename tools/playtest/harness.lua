@@ -271,6 +271,25 @@ function INSPECT.partyGold() return ru32(SYM.gPlaySt + 0x08) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
 local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
+-- The game has been played through (#696): the last chapter's boss kill ends in MNC4, which sets
+-- no next chapter and brings up the post-chapter save menu with save_menu_type 3
+-- (Controller.gameFinished says why the type and not the menu proc alone). The one owner of "the
+-- chapter is won" (Controller.won, through these reads): every waiter that asks `won` goes
+-- through INSPECT.chapterWon, and every start sample through INSPECT.startChapter.
+INSPECT.finishReads = {
+    chapter = chapter,
+    menuUp = function() return procActive(SYM.gProcScr_SaveMenuPostChapter) end,
+    menuByte = function() return ru8(SYM.gPlaySt + Controller.SAVE_MENU_TYPE_OFFSET) end,
+}
+function INSPECT.chapterWon(start) return Controller.chapterWon(start, INSPECT.finishReads) end
+function INSPECT.gameFinished() return Controller.readFinished(INSPECT.finishReads) end
+function INSPECT.startChapter() return Controller.sampleStart(INSPECT.finishReads) end
+-- Won, or back at the title: a chapter whose next chapter is not hosted ends on the title with
+-- the chapter index unchanged (clear_ch02, clearCh04; a game-over also reaches the title, so the
+-- callers check the loss first).
+function INSPECT.chapterWonOrTitle(start)
+    return INSPECT.chapterWon(start) or procActive(SYM.gProcScr_TitleScreen)
+end
 -- The menu taking input. A submenu (StartMenuAt with a parent menu: an item's Use/Equip/
 -- Trade/Discard, uimenu.c) LOCKS its parent (+0x28) and reads the keys itself, and the pool
 -- gives it whichever slot is free, so it can sit ABOVE the parent. The lowest-slot menu is
@@ -461,12 +480,12 @@ local function recordCutscene(o)
     elseif o.afterPre then
         o.afterPre()
     end
-    local startCh = chapter()
+    local startCh = INSPECT.startChapter()
     local doneFn
     if type(o.until_) == "function" then doneFn = o.until_
     elseif o.until_ == "prep" then doneFn = function() return procActive(SYM.gProcScr_SALLYCURSOR) end
     elseif o.until_ == "title" then doneFn = function() return procActive(SYM.gProcScr_TitleScreen) end
-    elseif o.until_ == "chapter" then doneFn = function() return chapter() ~= startCh end
+    elseif o.until_ == "chapter" then doneFn = function() return INSPECT.chapterWon(startCh) end
     else doneFn = function() return false end end
     local maxFrames = o.maxFrames or 6000
     -- PT_SHOTEVERY overrides any scenario's cadence; 0 films nothing.
@@ -1558,7 +1577,7 @@ end
 
 -- `alreadyWon` is an optional predicate for callers that end a turn in order to FIRE a win
 -- condition. A clear-bot that kills the final enemy can fire DefeatAll with that kill, and the
--- ending then plays INSIDE the old chapter slot -- so the caller's `chapter() ~= start` guard
+-- ending then plays INSIDE the old chapter slot -- so the caller's INSPECT.chapterWon guard
 -- is still false while the map is already gone. Ending the turn there makes the wait below
 -- chase a player_map_idle this chapter will never show again: it meets the post-chapter save
 -- prompt and the next chapter's title card and fails the run on those, on a chapter it just
@@ -1624,7 +1643,9 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
     -- Won while endTurn waited: chapter() below would already be the NEXT chapter's, and no
     -- player phase of this one is coming back to wait for.
     if alreadyWon and alreadyWon() then return "ended" end
-    local startedIn = chapter()
+    -- the game's end may already be up (the final boss died to the last action's counter)
+    if INSPECT.gameFinished() then return "ended" end
+    local startedIn = INSPECT.startChapter()
     for _ = 1, TUNE.enemyPhaseFrames do
         if gameOverActive() then return "gameover" end
         -- The chapter can END during the enemy phase: a DefeatAll win fires the ending right
@@ -1634,7 +1655,7 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
         -- what failed clear_ch04_parley, a run that went on to reach chapter 6 (#335).
         -- A chapter ending under us is a normal exit, not a wedge, so it returns its own
         -- value and leaves no controller fault behind for the verdict to trip over.
-        if chapter() ~= startedIn then return "ended" end
+        if INSPECT.chapterWon(startedIn) then return "ended" end
         -- One observation per frame, classified once: nothing runs between the two questions.
         local state = controllerState()
         if faction() == 0 and not menuOpen() and state == "player_map_idle" then
@@ -2308,7 +2329,8 @@ local function smokeDrive(startChapter)
             lastPhase = phase
         end
         local over = gameOverActive()
-        local won = (not over) and chapter() ~= startChapter and chapter() ~= 0
+        -- chapter() == 0 (a reset to the prologue/title) and a game over are not wins
+        local won = (not over) and chapter() ~= 0 and INSPECT.chapterWon(startChapter)
         snaps[#snaps + 1] = {
             frame = emu:currentFrame(), turn = turn(), faction = faction(),
             hpsum = hpSum(), procfp = procFingerprint(),
@@ -2362,7 +2384,7 @@ end
 -- (smoke_ch02 loads the ch02start state).
 scenarios.smoke = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    return smokeDrive(chapter())
+    return smokeDrive(INSPECT.startChapter())
 end
 
 -- Play ch00 to the boss kill and wait out the ending scene. Returns true once the chapter
@@ -2485,8 +2507,8 @@ scenarios.vanillagold = function()
             if not sx or not INSPECT.place(seth, sx, sy) then return false end
             seth = blue(SETH)
             if not moveUnit(seth.x, seth.y, seth.x, seth.y) then return false end
-            chooseAttack(seth.addr, function() return isDead(red(pid)) or chapter() ~= here end)
-            if isDead(red(pid)) or chapter() ~= here then return true end
+            chooseAttack(seth.addr, function() return isDead(red(pid)) or INSPECT.chapterWon(here) end)
+            if isDead(red(pid)) or INSPECT.chapterWon(here) then return true end
             if runEnemyPhase() ~= "player" then return false end
         end
         return false
@@ -2814,7 +2836,7 @@ end
 -- ch01 map via the prologue-clear lead-in, then idle-drive it to a clean terminal.
 scenarios.smoke_ch01 = function()
     if not reachCh01Map() then return end
-    return smokeDrive(chapter())
+    return smokeDrive(INSPECT.startChapter())
 end
 
 -- clearprobe: confirm generic boss detection (CA_BOSS) finds the prologue boss with no
@@ -2950,7 +2972,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     local budgetTurns = 18
     -- A real win ADVANCES the chapter. The title screen WITHOUT an advance means game-over ->
     -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
-    local function won() return chapter() ~= startChapter end
+    local function won() return INSPECT.chapterWon(startChapter) end
     local lost = INSPECT.chapterLost
     -- progress = the nearest candidate's path-distance to the target (lower is better): the
     -- boss while it lives, then the seize tile, measured only from units the game lets Seize.
@@ -3158,7 +3180,7 @@ end
 -- clear: the prologue (DefeatBoss), reachable straight from New Game.
 scenarios.clear = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    return clearDrive(chapter(), 14, 9)
+    return clearDrive(INSPECT.startChapter(), 14, 9)
 end
 
 -- clear_ch01: the first authored chapter (#21) -- a Seize objective on a 25x16 map with a
@@ -3167,7 +3189,7 @@ end
 scenarios.clear_ch01 = function()
     if not reachCh01Map() then return end
     pokeFastConfig() -- many-combat enemy phases: map-anim battles + fast speed
-    return clearDrive(chapter(), 24, 15, CH01_PARK)
+    return clearDrive(INSPECT.startChapter(), 24, 15, CH01_PARK)
 end
 
 -- ---- the bot plays the game (#510 step 9 PR D). botrun.lua and sight.lua are their own
@@ -3643,8 +3665,8 @@ INSPECT.botApi = function(game)
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
-    local start = chapter()
-    local function won() return chapter() ~= start end
+    local start = INSPECT.startChapter()
+    local function won() return INSPECT.chapterWon(start) end
     local lost = INSPECT.chapterLost
     local function decode(s, default)
         if s == nil or s == "" then return default end
@@ -5269,7 +5291,8 @@ local function fuzzDrive(startChapter)
                 "left the battle map cleanly on seed %d, no crash/soft-lock", seed))
         else
             local over = gameOverActive()
-            local won = (not over) and chapter() ~= startChapter and chapter() ~= 0
+            -- chapter() == 0 (a reset to the prologue/title) and a game over are not wins
+            local won = (not over) and chapter() ~= 0 and INSPECT.chapterWon(startChapter)
             snaps[#snaps + 1] = {
                 frame = emu:currentFrame(), turn = turn(), faction = faction(),
                 hpsum = hpSum(), procfp = fuzzFingerprint(),
@@ -5306,14 +5329,14 @@ end
 -- fuzz: the prologue, reachable straight from New Game.
 scenarios.fuzz = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    return fuzzDrive(chapter())
+    return fuzzDrive(INSPECT.startChapter())
 end
 
 -- fuzz_ch01: the first authored chapter -- same random soak on a bigger map with combat.
 scenarios.fuzz_ch01 = function()
     if not reachCh01Map() then return end
     pokeFastConfig() -- keep enemy phases quick if random End-Turns roll into them
-    return fuzzDrive(chapter())
+    return fuzzDrive(INSPECT.startChapter())
 end
 
 -- ---- LLM-player commander (#63 M2): the sidecar file-handshake. Once per player
@@ -5459,7 +5482,7 @@ end
 -- The LLM-commander loop body (no verdict): per player phase export the board, ask the
 -- sidecar, execute the orders, end the turn. Same terminal detection as the clear-bot.
 local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
-    local function won() return chapter() ~= startChapter end
+    local function won() return INSPECT.chapterWon(startChapter) end
     local lost = INSPECT.chapterLost
     local budgetTurns = 18
     local seed = math.floor(tonumber(PLAYTEST_SEED) or 1)
@@ -5521,7 +5544,7 @@ end
 scenarios.llm = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     pokeFastConfig()
-    return llmDrive(chapter(), "DefeatBoss", 14, 9)
+    return llmDrive(INSPECT.startChapter(), "DefeatBoss", 14, 9)
 end
 
 -- The ch01 chief-march (#531 audit 7): frail the chief, then each player phase frail+harmless
@@ -7294,7 +7317,7 @@ end
 -- Run: PT_HOST_CHAPTER=4 tools/playtest/run.sh smoke_ch03 (needs a CH03BOOT=1 ROM).
 scenarios.smoke_ch03 = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
-    return smokeDrive(chapter())
+    return smokeDrive(INSPECT.startChapter())
 end
 
 -- smoke_ch04: stability net on the ch04 map (#24 Stage 5) -- boot the CH04BOOT map (bootToMap
@@ -7304,7 +7327,7 @@ end
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh smoke_ch04 (needs a CH04BOOT=1 ROM).
 scenarios.smoke_ch04 = function()
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
-    return smokeDrive(chapter())
+    return smokeDrive(INSPECT.startChapter())
 end
 
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
@@ -7368,7 +7391,7 @@ end
 scenarios.smoke_ch02 = function()
     local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
     if not booted then return result("FAIL", why or "never reached the ch02 map") end
-    return smokeDrive(chapter())
+    return smokeDrive(INSPECT.startChapter())
 end
 
 -- ch02baxby (#23 recruit-persist): prove the ch01-ending CUTSCENE recruit Baxby (CHARACTER_FORDE
@@ -7529,8 +7552,8 @@ scenarios.clear_ch02 = function()
     local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
     if not booted then return result("FAIL", why or "never reached the ch02 map") end
     pokeFastConfig()
-    local start = chapter()
-    local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local start = INSPECT.startChapter()
+    local function advanced() return INSPECT.chapterWonOrTitle(start) end
     local best = {}
     local function snapCharms()
         local d = CH02.deliveredCharms(collectedItems(), CAMPAIGN.CH02_CHARMS)
@@ -9013,12 +9036,12 @@ local function clearCh04(parley)
         shot(tag .. "-fog-stuck")
         return result("FAIL", "fog lifted but no enemy reached gBmMapUnit -- nothing is attackable")
     end
-    local start = chapter()
+    local start = INSPECT.startChapter()
     -- ch05 is not hosted, so ch04's ending chains into dev_placeholder_scene(), whose MNTS(0x0)
     -- lands on the TITLE -- the chapter index never changes. Gating the win on chapter() alone
     -- therefore FAILs a run that ended perfectly (#204); the title is the terminal here, exactly
     -- as clear_ch02 treats it. A game-over also reaches the title, so that stays checked first.
-    local function won() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local function won() return INSPECT.chapterWonOrTitle(start) end
     -- The PARLEY arm: Marty talks the pack down FIRST, which raises the recruit flag the ending's
     -- CHECK_EVENTID reads -- so the rout that follows lands on the AUTHORED Lupin ending instead of
     -- the no-Lupin fallback. Same rout either way; the flag is the whole difference between the two
