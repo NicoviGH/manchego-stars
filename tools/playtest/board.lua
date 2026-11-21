@@ -702,6 +702,9 @@ function Board.bind(mem, SYM)
         fate = function(addr, was) return Board.fate(mem, SYM, addr, was) end,
         killer = function(uid, fighting) return Board.killer(mem, SYM, uid, fighting) end,
         AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
+        -- sight.closings reads it off api.Board: without it the compare was nil == action, never
+        -- true, and no recruit's escape was ever seen (#699)
+        AI_ACTION_ESCAPE = Board.AI_ACTION_ESCAPE,
     }
 end
 

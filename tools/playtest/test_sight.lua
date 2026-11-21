@@ -1571,6 +1571,19 @@ do
     check(Sight.waveCloses(8, 4, nil), nil, "waveCloses: a tile it never reaches")
 end
 
+-- carryPaths (#699): a watched unit that decided nothing in a phase keeps its tile, so its path has
+-- no hole; one that escaped has no entry for the phase it left on.
+do
+    local paths, at = {}, { [7] = { x = 1, y = 1 }, [8] = { x = 5, y = 5 } }
+    Sight.carryPaths(paths, at, 1, {})
+    at[7] = { x = 2, y = 1 }          -- 7 moved in phase 2, 8 decided nothing
+    Sight.carryPaths(paths, at, 2, {})
+    Sight.carryPaths(paths, at, 3, { [8] = true })   -- 8 escaped in phase 3
+    check(#paths[7], 3, "carryPaths: an entry every phase")
+    check(paths[8][2].x .. "," .. paths[8][2].y, "5,5", "carryPaths: a unit that did not move keeps its tile")
+    check(#paths[8], 2, "carryPaths: the escape phase has no entry")
+end
+
 -- closingsKey: a looter killed, moved or hurt, a tile taken, or other waves is a new read; the
 -- same board is the same key whatever order the units come in.
 do
@@ -1579,6 +1592,8 @@ do
     local key = Sight.closingsKey(3, 8, nil, { a, b }, open)
     check(Sight.closingsKey(3, 8, nil, { b, a }, open), key, "closingsKey: order-free")
     check(Sight.closingsKey(3, 8, nil, { a }, open) ~= key, true, "closingsKey: a looter gone")
+    check(Sight.closingsKey(3, 8, nil, { a, b }, open, nil, nil, { [0x81] = true }) ~= key, true,
+        "closingsKey: a watched call is not an unwatched one's (its answer holds paths)")
     check(Sight.closingsKey(3, 8, nil, { a, { id = 0x82, x = 8, y = 9, hp = 20 } }, open) ~= key,
         true, "closingsKey: a looter moved")
     check(Sight.closingsKey(3, 8, nil, { a, b }, { ["1,2"] = {} }) ~= key, true,
