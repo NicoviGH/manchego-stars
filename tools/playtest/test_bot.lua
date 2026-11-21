@@ -8889,8 +8889,9 @@ do
     -- reaches them both. It covers A (the lower id, the damage equal) and Bo carries the wear:
     -- its three blows kill it in every plan, so the march into reach is over the cap. A second
     -- healer covers Bo too
-    -- which units carry the wear in the plan chosen, `struck` the ids hit for 12 wherever they stand (its `protected` entries read on M.WEAR
-    -- phases), as "id,id"; `healers` are blue units added, `staves` their staves, `reach` theirs
+    -- which units carry the wear in the plan chosen, `struck` the ids hit for 12 wherever they
+    -- stand (its `protected` entries read on M.WEAR phases), as "id,id"; `healers` are blue
+    -- units added, `staves` their staves, `reach` theirs
     local function carriers(extra, so, ...)
         local blows = {}
         local function strikesOn(plan)
