@@ -3351,17 +3351,24 @@ function M.new(outer)
     -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
     -- as its moves reach the tile (M.waveCloses). Read once per board.
-    -- closings() by what it reads: the turn, k, the waves, and each looter as it stands (a
-    -- looter our act kills or moves is a new read). newPhase() runs before every decision.
+    -- A unit the caller watches (`watch` = { [unit id] = true }: Goals.closings names the field's
+    -- recruits) is played the same way, and when the game's AI decides to escape with it
+    -- (AI_ACTION_ESCAPE: AiTryMoveTowardsEscape, set only when the escape point is within its
+    -- move, and AiEscapeAction then clears the unit) the answer holds "unit:<id>" -> that enemy
+    -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699). A
+    -- scripted removal (a turn event's) is not read: nothing reads what a script does.
+    -- closings() by what it reads: the turn, k, the waves, and each looter or watched unit as it
+    -- stands (one our act kills or moves is a new read). newPhase() runs before every decision.
     local closingsAt = {}
-    function s.closings(k, waves)
+    function s.closings(k, waves, watch)
         k = k or M.CLOSE_HORIZON
         local turn0 = mem.u16(S.gPlaySt + PLAY_TURN)
         local open, all = {}, units()
         for _, t in ipairs(s.explorable()) do open[t.x .. "," .. t.y] = t end
         local looter, looters, blockers = {}, {}, {}
         for _, o in ipairs(all) do
-            if o.faction == "red" and o.onField and (M.loots(mem, S.gpAi1Table, mem.u8(o.addr + UNIT_AI1))
+            if o.faction == "red" and o.onField and ((watch or {})[o.id]
+                    or M.loots(mem, S.gpAi1Table, mem.u8(o.addr + UNIT_AI1))
                     or M.loots(mem, S.gpAi2Table, mem.u8(o.addr + UNIT_AI2))) then
                 looter[o.id] = true
                 looters[#looters + 1] = o
@@ -3401,7 +3408,11 @@ function M.new(outer)
                         aiDecide(call, proc, e, all)
                         local x, y = followMove(e)
                         if x then
-                            if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
+                            if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_ESCAPE then
+                                -- gone this phase: it plays no more and holds no tile
+                                out["unit:" .. id] = out["unit:" .. id] or phase
+                                looter[id] = nil
+                            elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                 close(x, y, phase)
                                 -- the tile is taken: AiPillageAction opens a chest (it empties)
                                 -- or runs the village's tile change, which the replay does not

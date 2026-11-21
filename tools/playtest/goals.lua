@@ -29,7 +29,8 @@
 --   a recruit: its items' sight.itemCost;
 --   a reward (style.rewards, a guide's claim): its item's itemCost shared evenly over the open
 --     goals its `needs` names, none of it once one of them is lost (ctx.lost).
--- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it.
+-- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it, or
+-- the game's AI escapes with the recruit (Goals.closings).
 --
 -- Goals.worth(goal, W) -> points: gold x W.gold, plus W.death for a recruit (a unit), and for
 -- the objective's way there one W.death shared over the army (`share`): no style walks into a
@@ -119,13 +120,23 @@ local function voided(reward, lost)
     return false
 end
 
+-- sight.closings for this board: when a looter has each open tile, and, for each recruit on the
+-- field (ctx.recruitTalkers), "unit:<id>" -> the enemy phase the game's own AI escapes with it
+-- (#699). One read for openTiles and list, so sight's cache answers the second.
+function M.closings(sight, style, ctx)
+    if not sight.closings then return {} end
+    local watch = {}
+    for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
+    return sight.closings(nil, style.waves, watch)
+end
+
 -- The villages and chests still open, each with its worth in gold and when it closes:
 -- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
 -- is sent where by it.
 function M.openTiles(sight, style, ctx)
     local cost = sight.itemCost or function() return 0 end
     local explored = ctx.explored or {}
-    local closings = sight.closings and sight.closings(nil, style.waves) or {}
+    local closings = M.closings(sight, style, ctx)
     local worth, house, out = prior(cost, style.villageGifts), prior(cost, style.houseGifts), {}
     for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
         local k = key(t.x, t.y)
@@ -175,6 +186,7 @@ function M.list(board, sight, style, ctx)
         end)
         goals[#goals + 1] = g
     end
+    local closings = M.closings(sight, style, ctx)
     for id, talkers in pairs(ctx.recruitTalkers or {}) do
         local t = byId[id] or (ctx.pendingRecruits or {})[id]
         if t then
@@ -185,7 +197,8 @@ function M.list(board, sight, style, ctx)
                 if byId[uid] then us[#us + 1] = byId[uid] end
             end
             goals[#goals + 1] = { id = "recruit:" .. id, kind = "recruit", unitId = id,
-                                  tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us }
+                                  tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us,
+                                  closes = closings["unit:" .. id] }
         end
     end
     for _, u in ipairs(ctx.objectiveTile and blues or {}) do
@@ -248,7 +261,7 @@ function M.forfeited(ledger, goals, closes)
         if g.kind ~= "objective" and not took[g.id] then
             shut[g.id] = wins
                 or (g.kind == "recruit" and (lost[g.unitId] or 0) > M.DUST)
-                or (g.kind ~= "recruit" and g.closes ~= nil and g.closes <= 1)
+                or (g.closes ~= nil and g.closes <= 1)
         end
     end
     local out = {}
