@@ -864,8 +864,14 @@ function M.run(api)
     -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
     local function pendingRecruits()
         local out, owedSet = {}, {}
+        local arrivals = style.memory and style.memory.arrivals or {}
+        -- owed is read in changes() before the first decision, from api.recruits: a harness with
+        -- no api.recruits cannot tell which arrivals are owed, so a memory it was given is a fault
+        if #arrivals > 0 and owed == nil then
+            error("style.memory.arrivals was given to a run whose api has no recruits()")
+        end
         for _, c in ipairs(owed or {}) do owedSet[c] = true end
-        for _, a in ipairs(style.memory and style.memory.arrivals or {}) do
+        for _, a in ipairs(arrivals) do
             if owedSet[a.charId] then out[#out + 1] = a end
         end
         return out

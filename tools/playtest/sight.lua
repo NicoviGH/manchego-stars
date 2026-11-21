@@ -2426,6 +2426,10 @@ function M.new(outer)
         return cost / movOf(u)
     end
 
+    -- The march field from `tile` on `u`'s costs (costGrid, memoised per class and tile): from
+    -- where a unit stands, the cost to every tile it could march to; dist[y][x], nil = never.
+    function s.march(u, tile) return costGrid(u, tile) end
+
     -- What an item is worth: FE8's own GetItemCost (price per use x uses, bmitem.c) on the
     -- item at its full uses (GetItemMaxUses), the number the game sums for the party's worth.
     -- Its full uses are memoised beside it (`maxUses`): usePrice reads them on every strike

@@ -18,22 +18,31 @@ came.
 
 **The rule.** From attempt 2 on, `campaign.lua` hands the play `style.memory.arrivals`: each unit
 an earlier failed attempt of this chapter start saw arrive, once (`charId`, tile, turn: botrun's
-`arrivals_seen`, which stays the screen's own record, never a fogged arrival). `botrun.lua`
-passes to the planner those the game still owes us (the record's `owed`, the game's own Talk
-list less the party) as `opts.pending`. `bot.lua`'s `recruitsOf` treats each as a recruit on the
-board that is not there yet, while no unit of that character is on the board and the turn is
-before the remembered one:
+`arrivals_seen`, which stays the screen's own record, never a fogged arrival). A unit seen by
+more than one failed attempt keeps the LATEST attempt's sighting: the freshest evidence (a
+scripted arrival agrees anyway). `botrun.lua` passes to the planner those the game still owes us
+(the record's `owed`, the game's own Talk list less the party) as `opts.pending`; a run whose api
+has no `recruits()` cannot say what is owed, so a memory it is given is a fault and fails loudly.
+`bot.lua`'s `recruitsOf` treats each as a recruit on the board that is not there yet, while no
+live unit of that character is on the field (or carried) and the turn is not past the remembered
+one. The turn is INCLUSIVE: `arrivals_seen` stores the enemy phase's own turn T for a unit that
+acted in it (on the board from player turn T+1) and the player turn a start-of-turn arrival was
+read on (already there on T), and the record keeps the number alone. A unit that never comes in
+this attempt (killed before it, a different route) is therefore a goal through that turn and
+none after: that is the decided bound, not a loose thread.
 
 - its talkers are the units the game's own check lets Talk it (`sight.canTalk`, the Talk
   command's `CheckForCharacterEvents` on the two charIds and the event flags; it reads no unit,
   so asking it before the unit exists is the same question the game answers once it does);
-- its tile is the tile a talker can walk to that is nearest where it arrived (the game's own
-  movement field, `sight.turnsTo`): a wyvern rider lands over a cliff no one walks to (E_13's
-  arrival tile is unreachable for every foot unit), and a goal on such a tile has no chance, so
-  no pull;
+- its tile is the tile a talker can walk to that is nearest where it arrived (one march field
+  per talker from where it stands, `sight.march`, the game's own movement field, memoised by the
+  sight per class and tile): a wyvern rider lands over a cliff no one walks to (E_13's arrival
+  tile is unreachable for every foot unit), and a goal on such a tile has no chance, so no pull;
 - `goals.lua` lists it as `recruit:arrival:<charId>`; the ledger, the forfeits and the Seize
   skip then treat it as any open recruit, so the win is put off by the quantity the rank already
-  reads (the goal forfeited), with no new rule.
+  reads (the goal forfeited). ADR 0403's stall rule does not apply to it: a pending goal cannot
+  close before its turn, so a quiet count of it (nobody can near a tile before the unit comes)
+  never marks its row stalled (`goals.lua`'s ledger); the turn bound above is its end.
 
 Attempt 1, and any attempt played alone, has no memory and is unchanged (ADR 0385: verdicts
 measure attempt 1 only).
@@ -48,4 +57,8 @@ data.
 **Measured (2026-11-20).** Vanilla E_13, campaign `cs-s4008` from its chapter-13 start,
 attempts 2 (`resume --tag cormag1b`). Before: attempt 2 won on turn 4 with Cormag never reached
 (`cormag1`). After: attempt 2 won clean on turn 7, Eirika talking to Cormag on turn 6. A single
-replay, per ADR 0430. The same may help Amelia (E_9) and Marisa (E_10); untested.
+replay, per ADR 0430. It was played on the first version of the code, before the review's
+changes (the inclusive turn, the latest sighting, the talker's own march field for the meeting
+tile, the stall exemption); Cormag's arrival (turn 5) and the Talk (turn 6) are not near any of
+their edges, and each has a unit test that fails without it. A second replay on the final code
+timed out at ten minutes on a machine loaded with eight emulator workers and gave no result. The same may help Amelia (E_9) and Marisa (E_10); untested.

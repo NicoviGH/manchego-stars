@@ -210,7 +210,10 @@ function M.ledger(goals, sight, style, ctx, chances)
         if g.kind ~= "objective" and (chances[g.id] or 0) > M.DUST then
             local known = g.kind == "recruit" or reads
             local status = known and "feasible" or "unknown"
-            if known and (ctx.quietGoals or {})[g.id] then status = "stalled" end
+            -- a pending recruit (ctx.pendingRecruits, ADR 0436) cannot close before its turn, so
+            -- no quiet count of it is a stall: it holds the win until it is there or its turn is past
+            local pending = g.kind == "recruit" and (ctx.pendingRecruits or {})[g.unitId]
+            if known and not pending and (ctx.quietGoals or {})[g.id] then status = "stalled" end
             local row = { id = g.id, kind = g.kind, status = status, closes_on = g.closes }
             rows[#rows + 1], byId[g.id] = row, row
         end

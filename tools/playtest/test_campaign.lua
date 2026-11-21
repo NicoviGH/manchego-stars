@@ -855,6 +855,15 @@ local function test_a_retry_remembers_the_arrivals_it_saw()
           "attempt 3: each unit seen arrive, its tile and turn (ADR 0436)")
     check(g.plays[2].style.memory.arrivals[1].charId, 0x82, "attempt 2: attempt 1's arrival")
     check(g.plays[1].style.memory, nil, "attempt 1 has no memory")
+    -- the same unit seen again by a later failure: the latest sighting replaces the older (ADR 0436)
+    local again = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
+        seen = { [1] = { { turn = 4, x = 9, y = 9, charId = 0x82 } },
+                 [2] = { { turn = 5, x = 7, y = 2, charId = 0x82 } } } } } }
+    Campaign.run(again.api)
+    local latest = again.plays[3].style.memory.arrivals
+    check(#latest, 1, "the same unit seen twice is one memory")
+    check(latest[1].x .. "," .. latest[1].y .. " t" .. latest[1].turn, "7,2 t5",
+          "the latest failed attempt's sighting wins")
     local alone = fakeGame { chapters = { { id = 1, seen = seen } } }
     alone.api.only = 1
     Campaign.run(alone.api)

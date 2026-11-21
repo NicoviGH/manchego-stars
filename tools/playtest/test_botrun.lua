@@ -1851,6 +1851,18 @@ do
           "48@9,9 t5", "pending: its tile and turn")
 end
 
+-- A memory of arrivals given to a run whose api cannot say who is owed (no recruits()) is a fault,
+-- not "no pending recruits" (ADR 0436).
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) } }
+    g.api.style.memory = { enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 5 } } }
+    g.api.Planner = { surprise = function() return "the plan is played out" end,
+                      plan = function() return nil end }
+    local ok = Botrun.run(g.api)
+    check(ok, false, "arrivals without recruits(): not a finished run")
+    check(recordOf(g).outcome, "crashed", "arrivals without recruits(): recorded as crashed")
+end
+
 -- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
 -- graded by the plan that moved it, not by a later replan that found it over the cap; a unit
 -- no plan moved this turn falls back to the phase's last plan.

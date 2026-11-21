@@ -30,7 +30,8 @@
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
 -- { enemies, arrivals }: every red unit a board showed out of fog and every killer a fight showed
 -- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is
--- remembered through its killer: where our units stood is the play's, not the game's. Never a
+-- remembered through its killer: where our units stood is the play's, not the game's. An
+-- arrival is kept once per character, the latest failed attempt's sighting (ADR 0436). Never a
 -- dice result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
@@ -462,7 +463,7 @@ function M.run(api)
             local attemptCap = api.attempts or M.MAX_ATTEMPTS
             -- a retry's memory of the enemy (ADR 0399): style.memory
             local memory, memoryKeys = { enemies = {}, arrivals = {} }, {}
-            local arrived = {}   -- charId -> true: each unit's first sighting is kept
+            local arrived = {}   -- charId -> its place in memory.arrivals: the latest sighting wins
             -- a unit whose class was not read cannot be told from another in its slot (its key
             -- would match nothing, and grow the memory with nothing learned): not kept
             local function rememberEnemy(id, charId, classId)
@@ -598,10 +599,13 @@ function M.run(api)
                         known[a.turn] = true
                         remembered[#remembered + 1] = a.turn
                     end
-                    -- the unit and its tile too (ADR 0436), once each: an owed recruit's goal
-                    if a.charId and not arrived[a.charId] then
-                        arrived[a.charId] = true
-                        memory.arrivals[#memory.arrivals + 1] = a
+                    -- the unit and its tile too (ADR 0436), once each: an owed recruit's goal.
+                    -- The most recent failed attempt's sighting replaces an older one: the
+                    -- freshest evidence (a scripted arrival agrees anyway)
+                    if a.charId then
+                        local at = arrived[a.charId] or #memory.arrivals + 1
+                        arrived[a.charId] = at
+                        memory.arrivals[at] = a
                     end
                 end
                 table.sort(remembered)

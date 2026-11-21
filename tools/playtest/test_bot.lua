@@ -410,6 +410,8 @@ local function sightOf(o)
     local s = {
         objective = o.objective or { kind = "rout" },
         field = o.field,
+        -- the march field from a tile (sight.march): the test's field, none when it has none
+        march = function(u, tile) return o.field and o.field(tile) or {} end,
         -- The game's march cost to a goal over MOV (sight.turnsTo, not rounded): the test's
         -- field when it gives one, else Manhattan; MOV 5 unless the unit says.
         turnsTo = function(u, tile, from)
@@ -6448,6 +6450,15 @@ do
             objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
             reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }) },
             talk = { [0x01] = { ["arrival:14"] = true } },
+            -- the march from a tile: the map's every tile, Manhattan away
+            field = function(t)
+                local f = {}
+                for y = 0, 15 do
+                    f[y] = {}
+                    for x = 0, 15 do f[y][x] = math.abs(x - t.x) + math.abs(y - t.y) end
+                end
+                return f
+            end,
             enemyPhase = function() return {} end,
         }
         return Planner.plan(B, board, sightOf(o), gifted("bold", 100), { pending = pending })
@@ -6461,7 +6472,11 @@ do
     a, plan = run(nil)
     check(a and a.act, "seize", "no memory (attempt 1): the Seize is played")
     a = run(owed, 5)
-    check(a and a.act, "seize", "past its remembered turn: no goal, the Seize is played")
+    check(a and a.act ~= "seize", true, "on its remembered turn: still a goal (an enemy-phase arrival is on the board from the next)")
+    a = run(owed, 6)
+    check(a and a.act, "seize", "past its remembered turn: it never came this attempt, no goal, the Seize is played")
+    a = run(owed, 1, red(0x84, 9, 9, { charId = 14, minRange = false, onField = false }))
+    check(a and a.act ~= "seize", true, "a unit of that character that is off the map (dead, carried off) is not 'here': still a goal")
     a = run(owed, 1, red(0x84, 9, 9, { charId = 14, minRange = false }))
     check(a and a.act, "seize", "already on the board: a goal of the board's own unit, not a pending one")
 end
