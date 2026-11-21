@@ -3355,7 +3355,9 @@ function M.new(outer)
     -- recruits) is played the same way, and when the game's AI decides to escape with it
     -- (AI_ACTION_ESCAPE: AiTryMoveTowardsEscape, set only when the escape point is within its
     -- move, and AiEscapeAction then clears the unit) the answer holds "unit:<id>" -> that enemy
-    -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699). A
+    -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699), and
+    -- "path:<id>" -> { [enemy phase] = {x, y} }, where it stands after each phase it plays (the
+    -- escape phase's tile is left out: it is gone). A
     -- scripted removal (a turn event's) is not read: nothing reads what a script does.
     -- closings() by what it reads: the turn, k, the waves, and each looter or watched unit as it
     -- stands (one our act kills or moves is a new read). newPhase() runs before every decision.
@@ -3408,6 +3410,13 @@ function M.new(outer)
                         aiDecide(call, proc, e, all)
                         local x, y = followMove(e)
                         if x then
+                            if (watch or {})[id] then
+                                -- where it stands for the player phase after enemy phase
+                                -- `phase`: the tile a Talk to it must meet it on (#699)
+                                local key = "path:" .. id
+                                out[key] = out[key] or {}
+                                out[key][phase] = { x = x, y = y }
+                            end
                             if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_ESCAPE then
                                 -- gone this phase: it plays no more and holds no tile
                                 out["unit:" .. id] = out["unit:" .. id] or phase

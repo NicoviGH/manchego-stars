@@ -198,7 +198,7 @@ function M.list(board, sight, style, ctx)
             end
             goals[#goals + 1] = { id = "recruit:" .. id, kind = "recruit", unitId = id,
                                   tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us,
-                                  closes = closings["unit:" .. id] }
+                                  closes = closings["unit:" .. id], path = closings["path:" .. id] }
         end
     end
     for _, u in ipairs(ctx.objectiveTile and blues or {}) do
@@ -281,18 +281,40 @@ function M.worth(goal, W)
     return v
 end
 
+-- The turns a taker needs to meet a recruit the game's AI moves (goal.path, sight.closings'
+-- "path:<id>": the tile it stands on after each enemy phase), or nil: the earliest player phase
+-- f, up to the one it is removed after (goal.closes), in which the taker can be at the tile the
+-- recruit stands on then (the current tile in phase 1, path[f - 1] after) within f turns. Past
+-- the path's last phase, with no removal, it stays where it ended.
+local function meet(goal, u, p, late, turnsTo)
+    local path = goal.path
+    for f = 1, goal.closes or math.huge do
+        local beyond = f - 1 > #path
+        if beyond and goal.closes then return nil end
+        local tile = f == 1 and goal.tile or path[math.min(f - 1, #path)] or goal.tile
+        local t = turnsTo(u, tile, p)
+        if t and (beyond or math.max(math.ceil(t), 1) + late <= f) then return t end
+        if beyond then return nil end
+    end
+end
+
 function M.chance(goal, pos, gamma, turnsTo)
     local options = {}
     for _, u in ipairs(goal.takerUnits) do
         local p = pos[u.id]
         if p and (p.alive or 1) > 0 then
-            local t = turnsTo(u, goal.tile, p)
+            local late = p.acted and 1 or 0
+            local t
+            if goal.path and #goal.path > 0 then
+                -- the deadline is in the meeting's phase (meet), so no closes test after it
+                t = meet(goal, u, p, late, turnsTo)
+            else
+                t = turnsTo(u, goal.tile, p)
+                if t and goal.closes and goal.closes < math.max(math.ceil(t), 1) + late then t = nil end
+            end
             if t then
-                local late = p.acted and 1 or 0
-                if not goal.closes or goal.closes >= math.max(math.ceil(t), 1) + late then
-                    options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
-                                              alive = p.alive or 1 }
-                end
+                options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
+                                          alive = p.alive or 1 }
             end
         end
     end
