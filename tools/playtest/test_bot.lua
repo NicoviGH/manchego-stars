@@ -2345,7 +2345,8 @@ do
         "supply: a fielded opener already holds one, so nothing is taken")
     check(acts(B.supply({ solo }, { chestKey }, nil, {})), "",
         "supply: a chapter with no chests takes no key")
-    check(acts(B.supply({ solo }, { chestKey }, nil, { { id = "doors", kind = "doors", need = 1 } })),
+    local doorsOnly = { { id = "doors", kind = "doors", need = 1 } }
+    check(acts(B.supply({ solo }, { chestKey }, nil, doorsOnly)),
         "", "supply: a Chest Key is no door's key")
     -- a full bag gives first what Bot.fullBag would send (money), as the other takes do
     local packed = armedUnit(1, 5, { items = { lance(), lance(30), { kind = "heal", uses = 3 },
@@ -2376,7 +2377,8 @@ do
     check(acts(B.supply({ keeper }, {}, nil, { { id = "doors", kind = "doors", need = 1 } })),
         "give 2:69", "supply: ... nor does a door demand keep a Chest Key")
     check(acts(B.supply({ keeper }, {}, nil, chests)), "", "supply: a chest demand keeps its key")
-    check(acts(B.supply({ keeper }, {}, nil, nil)), "", "supply: with no demands known nothing is given")
+    check(acts(B.supply({ keeper }, {}, nil, nil)), "",
+          "supply: with no demands known nothing is given")
 
     -- Rule B: a unit is short of a type below one full weapon of it, so a spare comes before
     -- the last one breaks. Fails on the lackedTypes that asked only "holds none with uses left".
@@ -4063,7 +4065,8 @@ do
     check(a and a.terrain ~= nil, true, "chest key: the Take says the lock it is for")
     check(take({ convoyChestKey = key, chestOpeners = { [0x02] = true } }, A, K, E), nil,
           "chest key: not while a fielded unit opens chests")
-    check(take({ convoyChestKey = {} }, A, E), nil, "chest key: not with no chest key in the convoy")
+    check(take({ convoyChestKey = {} }, A, E), nil,
+          "chest key: not with no chest key in the convoy")
     check(take({ convoyKey = key }, A, E), nil, "chest key: a door key is no chest's")
     -- the convoy's key is a way to the chest only where Supply can be taken this turn (the same
     -- supplyTiles supplyKey offers from): with none, the unit would reach the chest with no key
@@ -4077,9 +4080,11 @@ do
         return ctx.turnsTo(A, { x = 4, y = 0 }), ctx.exploreGoal[0x01]
     end
     local t, goal = chestTurns({ convoyChestKey = key, supplyAt = { ["1,0"] = true } })
-    check(t ~= nil and goal ~= nil, true, "chest key: with Supply reachable the chest is a way and a goal")
+    check(t ~= nil and goal ~= nil, true,
+          "chest key: with Supply reachable the chest is a way and a goal")
     t, goal = chestTurns({ convoyChestKey = key })
-    check(t == nil and goal == nil, true, "chest key: with no Supply tile in reach the chest is no way")
+    check(t == nil and goal == nil, true,
+          "chest key: with no Supply tile in reach the chest is no way")
     -- the Take's key names its lock, so a replay takes the chest key the plan took
     local k = Planner.key({ unitId = 1, act = "supply", move = { x = 1, y = 0 }, terrain = 33 })
     local back = Planner.unkey(k)
@@ -4087,7 +4092,8 @@ do
           "Take key: a chest Take reads back as one (" .. k .. ")")
     check(Planner.key({ unitId = 1, act = "supply", move = { x = 1, y = 0 } }) ~= k, true,
           "Take key: a door's Take is another key")
-    check(Planner.unkey(Planner.key({ unitId = 1, act = "supply", move = { x = 1, y = 0 } })).terrain,
+    local doorTake = { unitId = 1, act = "supply", move = { x = 1, y = 0 } }
+    check(Planner.unkey(Planner.key(doorTake)).terrain,
           nil, "Take key: a door's Take reads back with no terrain")
     -- the Take's own item is read for the lock it names
     local sight = sightOf({ convoyChestKey = key })
@@ -4106,9 +4112,9 @@ do
     local K = blue(0x01, 0, 0, 0)
     local G = blue(0x02, 1, 0, 1)
     local E = red(0x81, 6, 6, { isBoss = true, minRange = false })
-    local function run(openers)
+    local function run(openers, objective, opts)
         local o = {
-            objective = { kind = "boss" },
+            objective = objective or { kind = "boss" },
             reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 0 }) },
             field = fieldsOf {
                 ["4,0"] = { ["4,0"] = 0, ["3,0"] = 1 },
@@ -4120,7 +4126,7 @@ do
             explorable = { { x = 4, y = 0, kind = "chest" } },
             canExplore = { [0x01] = { ["4,0"] = "chest" } },
         }
-        local cands, ctx = B.candidates(boardOf(K, G, E), sightOf(o), style("careful"))
+        local cands, ctx = B.candidates(boardOf(K, G, E), sightOf(o), style("careful"), opts)
         local door
         for _, c in ipairs(cands) do
             for _, a in ipairs(c.acts) do
@@ -4130,12 +4136,34 @@ do
         return ctx.exploreGoal, door
     end
     local goals, door = run({ [0x02] = true })
-    check(goals[0x01] and goals[0x01].x .. "," .. goals[0x01].y, "4,0", "door mate: K keeps the chest")
+    check(goals[0x01] and goals[0x01].x .. "," .. goals[0x01].y, "4,0",
+          "door mate: K keeps the chest")
     check(goals[0x02] and goals[0x02].x .. "," .. goals[0x02].y, "2,0",
           "door mate: G, who holds the Door Key, is sent to the door")
-    check(door and door.move.x .. "," .. door.move.y, "1,0", "door mate: G is offered the Door command")
+    check(door and door.move.x .. "," .. door.move.y, "1,0",
+          "door mate: G is offered the Door command")
     goals = run({})
     check(goals[0x02], nil, "door mate: no unit opens doors, so no one is sent to the door")
+    -- the only opener is the lord (its death ends the game), on a seize map: it stays on the
+    -- objective and the taker's plan is as it was
+    goals = run({ [0x02] = true },
+                { kind = "seize", tile = { x = 6, y = 6 }, lord = 0x02, gameOver = { 0x02 } })
+    check(goals[0x02], nil, "door mate: the lord is never pulled off the objective to a door")
+    check(goals[0x01] and goals[0x01].x .. "," .. goals[0x01].y, "4,0",
+          "door mate: the taker keeps the chest when the lord is not sent")
+    -- a unit whose game-over list names it is not sent even with no seize tile
+    goals = run({ [0x02] = true }, { kind = "boss", gameOver = { 0x02 } })
+    check(goals[0x02], nil, "door mate: a unit whose loss ends the game is not sent")
+    -- the goal barred for G (the stuck record assign reads) is skipped the same way
+    G.acted = true
+    goals = run({ [0x02] = true }, nil,
+                { stuck = { ["2>2,0"] = { id = 0x02, x = 2, y = 0, since = 0 } } })
+    check(goals[0x02], nil, "door mate: a door barred for G is not G's goal")
+    goals = run({ [0x02] = true }, nil, { stuck = {} })
+    check(goals[0x02] and goals[0x02].door, true, "door mate: unbarred, G that acted is sent")
+    G.acted = false
+    goals = run({ [0x02] = true }, nil, { stuck = {} })
+    check(goals[0x02] and goals[0x02].door, true, "door mate: unbarred, the same G is sent")
 end
 
 -- test_goal_turns_are_read_once_per_decision: the planner asks the same unit, tile and start

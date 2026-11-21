@@ -166,7 +166,8 @@
 --   opens(u, terrain)        `u` holds what opens that terrain (TERRAIN_DOOR, TERRAIN_CHEST_FULL):
 --                            GetUnitKeyItemSlotForTerrain, a key or a thief's lockpick.
 --   convoyKey(u, terrain)    the convoy's first item that opens `terrain` (a door's by default) for
---                            `u`, { id, uses }; nil with a full bag or none (what Supply's Take hands).
+--                            `u`, { id, uses }; nil with a full bag or none (what Supply's Take
+--                            hands).
 --   opensChest(u)            opens() for a chest (#699: a chest key is the convoy's to give).
 --   isChestLock(terrain)     whether a locked() terrain is a chest's (a door's is the other).
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim

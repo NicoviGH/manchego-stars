@@ -1373,7 +1373,8 @@ function M.run(api)
             -- names the lock). A Take with no convoy key left to name is no act to drop quietly:
             -- the board is not the one the plan was made on
             if a.act == "supply" and not Bot.takeItem(sight, u, a) then
-                error("botrun.lua: forced Take " .. k .. " finds no key in the convoy for the unit", 0)
+                error("botrun.lua: forced Take " .. k .. " finds no key in the convoy for the unit",
+                      0)
             end
             pin.unoffered[#pin.unoffered + 1] = k
             a.unit = u.charId

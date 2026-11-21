@@ -2443,23 +2443,31 @@ local function sendWorth(ctx, u, t)
     return t.gold * c, c
 end
 
+-- Whether the goal tile `t` is barred for unit `id` (the goals units are blocked from).
+local function isBarred(barred, id, t) return barred[goalKey(id, t)] end
+
 -- The door a taker's trip waits on gets its opener (#699: vanilla Ch21's two chests sit behind
 -- doors, a Door Key and a Chest Key in the convoy, taken at prep by two units: the chest's taker
 -- waited for an opener (escortTurns) whose goal was the boss, so no unit ever went to a door and
 -- no chest was reached). For each unit sent to a tile whose first obstacle is a door locked to
 -- it, the teammate that opens doors (doorMates) with the fewest turns to that door (matesTo; it
 -- gets there first, so the taker's wait is shortest) and no goal of its own is sent to the door
--- itself, which breach() opens from where the Door command offers it. Once open the door is no
+-- itself (unless the goal is barred for it, as assign reads), which breach() opens from where
+-- the Door command offers it. Once open the door is no
 -- obstacle, and the taker walks on alone. One opener a door, however many units wait on it.
-local function sendOpeners(ctx)
-    local sentTo = {}
+local function sendOpeners(ctx, barred)
+    local sentTo, lords = {}, M.gameOver(ctx.sight)
     for _, u in ipairs(ctx.blues) do
         local g = ctx.exploreGoal[u.id]
         local first = g and not g.door and chainTo(ctx, u, g)[1]
         if first and first.door and lockAt(ctx, u, first.x, first.y)
             and not sentTo[tileKey(first.x, first.y)] then
             for _, c in ipairs(matesTo(ctx, u, first)) do
-                if not ctx.exploreGoal[c.m.id] then
+                -- never one whose loss ends the game, nor the seizer (its goal is the seize
+                -- tile): a lord pulled to a door leaves the objective
+                local free = not (ctx.exploreGoal[c.m.id] or lords[c.m.charId]
+                    or ctx.seizeTile and canSeize(ctx, c.m))
+                if free and not isBarred(barred, c.m.id, first) then
                     ctx.exploreGoal[c.m.id] = { x = first.x, y = first.y, door = true }
                     sentTo[tileKey(first.x, first.y)] = true
                     break
@@ -2490,7 +2498,7 @@ local function exploring(ctx, sent, barred)
         for _, p in ipairs(pairs_) do
             local k = key(p.t)
             if not taken[k] and not ctx.exploreGoal[p.u.id]
-                and not barred[goalKey(p.u.id, p.t)] then
+                and not isBarred(barred, p.u.id, p.t) then
                 taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
             end
         end
@@ -2522,7 +2530,7 @@ local function exploring(ctx, sent, barred)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and not barred[goalKey(u.id, t)]
+            and not isBarred(barred, u.id, t)
             and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
@@ -2539,7 +2547,7 @@ local function exploring(ctx, sent, barred)
         end
     end
     assign(pairs_, function(t) return tileKey(t.x, t.y) end)
-    sendOpeners(ctx)
+    sendOpeners(ctx, barred)
 end
 
 function M.explain(board, sight, style)

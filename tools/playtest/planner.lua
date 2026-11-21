@@ -554,7 +554,8 @@ local function keysOf(st)
 end
 
 -- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt, canto,
--- slot (a spare's: slotKey), terrain (a chest Take's) } read back, for a forced replay's act no candidate offered
+-- slot (a spare's: slotKey), terrain (a chest Take's) } read back, for a forced replay's act no
+-- candidate offered
 -- (botrun). It raises on a string no key gave.
 local function unkey(k)
     local id, act, x, y, tgt = k:match("^(%-?%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")

@@ -2155,9 +2155,12 @@ do
         local o = Sight.keyOpens(mio, call, S, Board, addr, value)
         return tostring(o.doors) .. "/" .. tostring(o.chests)
     end
-    check(opens(100, 0x69 | (1 << 8)), "false/true", "keyOpens: a Chest Key opens a chest, not a door")
-    check(opens(100, 0x6B | (1 << 8)), "true/false", "keyOpens: a Door Key opens a door, not a chest")
-    check(opens(100, 0x6C | (1 << 8)), "false/false", "keyOpens: a Lockpick opens nothing for a non-thief")
+    check(opens(100, 0x69 | (1 << 8)), "false/true",
+          "keyOpens: a Chest Key opens a chest, not a door")
+    check(opens(100, 0x6B | (1 << 8)), "true/false",
+          "keyOpens: a Door Key opens a door, not a chest")
+    check(opens(100, 0x6C | (1 << 8)), "false/false",
+          "keyOpens: a Lockpick opens nothing for a non-thief")
     check(opens(THIEF, 0x6C | (1 << 8)), "true/true", "keyOpens: a Lockpick opens both for a thief")
     check(opens(100, 0x14 | (30 << 8)), "false/false", "keyOpens: a weapon opens nothing")
     -- a bag read and written back: the unit's own items are as they were
@@ -2175,8 +2178,10 @@ do
     local a = read(100, { id = 0x69, uses = 1 })
     local b = read(100, { id = 0x69, uses = 3 })
     check(asked, 2, "keyReader: one read (a door's and a chest's) serves every copy of the item")
-    check(a == b and a.chests and not a.doors, true, "keyReader: the chest key opens chests for a unit")
-    check(read(THIEF, { id = 0x6C, uses = 20 }).doors, true, "keyReader: a thief's Lockpick opens doors")
+    check(a == b and a.chests and not a.doors, true,
+          "keyReader: the chest key opens chests for a unit")
+    check(read(THIEF, { id = 0x6C, uses = 20 }).doors, true,
+          "keyReader: a thief's Lockpick opens doors")
     check(read(100, { id = 0x6C, uses = 20 }).doors, false, "keyReader: not a non-thief's")
     -- harness.lua is not loadable outside mGBA: it asks these reads and no other copy of them
     local hf = assert(io.open(here .. "harness.lua"))
