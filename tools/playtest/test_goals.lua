@@ -312,5 +312,34 @@ do
     check(g and #g.takerUnits, 0, "keys: no key on the board, no taker")
 end
 
+-- TestPendingRecruitGoal (#683, ADR 0436): a recruit not on the board yet that ctx.pendingRecruits
+-- names is a goal at its remembered tile, taken by the talkers; none for one nobody may Talk.
+do
+    local board = { units = { blue(1, 0, 0) }, turn = 1 }
+    local pending = { ["arrival:14"] = { id = "arrival:14", charId = 14, x = 8, y = 4 } }
+    local goals = Goals.list(board, fakeSight(), {}, { recruitTalkers = { ["arrival:14"] = { 1 } },
+                                                       pendingRecruits = pending })
+    local g = find(goals, "recruit:arrival:14")
+    check(g and g.tile.x .. "," .. g.tile.y, "8,4", "pending recruit: a goal at its remembered tile")
+    check(g and g.takerUnits[1] and g.takerUnits[1].id, 1, "pending recruit: its talker takes it")
+    check(find(Goals.list(board, fakeSight(), {}, { recruitTalkers = {} }), "recruit:arrival:14"), nil,
+          "no talker, no goal")
+    -- a pending recruit cannot close before its turn: a quiet count never stalls its row (ADR 0403's
+    -- stall rule, exempted by ADR 0436), where a board recruit's row stalls as any goal's does
+    local ctx = { recruitTalkers = { ["arrival:14"] = { 1 } }, pendingRecruits = pending,
+                  quietGoals = { ["recruit:arrival:14"] = true } }
+    local sight = fakeSight()
+    local goals2 = Goals.list(board, sight, {}, ctx)
+    local rows = Goals.ledger(goals2, sight, {}, ctx, { ["recruit:arrival:14"] = 1 })
+    check(rows[1] and rows[1].id .. " " .. rows[1].status, "recruit:arrival:14 feasible",
+          "pending recruit: quiet readings do not stall it")
+    ctx.pendingRecruits = nil
+    ctx.recruitTalkers = { ["arrival:14"] = { 1 } }
+    local listed = { { id = "recruit:arrival:14", kind = "recruit", unitId = "arrival:14",
+                       tile = { x = 8, y = 4 }, takerUnits = {} } }
+    rows = Goals.ledger(listed, sight, {}, ctx, { ["recruit:arrival:14"] = 1 })
+    check(rows[1] and rows[1].status, "stalled", "a recruit that is not pending stalls on quiet readings")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

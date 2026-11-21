@@ -860,6 +860,22 @@ function M.run(api)
     -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
     -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
     local owed = nil
+    -- the owed recruits an earlier attempt of this chapter saw arrive (style.memory.arrivals,
+    -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
+    local function pendingRecruits()
+        local out, owedSet = {}, {}
+        local arrivals = style.memory and style.memory.arrivals or {}
+        -- owed is read in changes() before the first decision, from api.recruits: a harness with
+        -- no api.recruits cannot tell which arrivals are owed, so a memory it was given is a fault
+        if #arrivals > 0 and owed == nil then
+            error("style.memory.arrivals was given to a run whose api has no recruits()")
+        end
+        for _, c in ipairs(owed or {}) do owedSet[c] = true end
+        for _, a in ipairs(arrivals) do
+            if owedSet[a.charId] then out[#out + 1] = a end
+        end
+        return out
+    end
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
@@ -1004,7 +1020,11 @@ function M.run(api)
                 -- act reads as the next turn's)
                 if e.kind == "arrive" and e.faction == "red" and not now[e.id].fogged then
                     local inPhase = actedIn and actedIn.ids[e.id] and actedIn.turn
+                    -- boardTurn: the first player turn it stands on the board (ADR 0436's goal
+                    -- holds before it): the next one after an enemy-phase arrival, this one else
                     rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = inPhase or after.turn or turn,
+                                                                  boardTurn = inPhase and inPhase + 1
+                                                                      or after.turn or turn,
                                                                   x = e.x, y = e.y,
                                                                   charId = e.charId }
                 end
@@ -1515,6 +1535,7 @@ function M.run(api)
                             return { stalled = stalled, sent = sent, stuck = stuck,
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
+                                     pending = pendingRecruits(),
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
