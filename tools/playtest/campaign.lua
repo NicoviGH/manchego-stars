@@ -340,7 +340,7 @@ local function between(api, style, followed, need, carried)
     end
     local fielded, convoy, benched = fieldedNow(true)
     if convoy then
-        local ok, why = apply(Bot.supply(fielded, convoy, benched))
+        local ok, why = apply(Bot.supply(fielded, convoy, benched, need and need.demands))
         if not ok then return nil, "supply: " .. why, team end
         fielded = fieldedNow(false)   -- the shop weighs the bags only
     end

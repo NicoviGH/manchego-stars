@@ -2262,6 +2262,18 @@ do
     check(d.broken, "3>wait@4,4>nil", "its key is named")
 end
 
+-- #699 review: a forced Take that finds no key in the convoy for the unit raises, naming the key,
+-- instead of being dropped as an act no unit can play (the replay would go on from the wrong
+-- board). A chest's Take is told from a door's by its key ("lock33"), so it is read as a chest's.
+do
+    local _, _, _, _, ok, why = replay({ ref = 1, mode = "force",
+                                         force = { "1>supply@0,1>lock33" },
+                                         failure = failure, run = run, original = original() })
+    check(ok, false, "a forced Take with no convoy key fails the run")
+    check(tostring(why):find("forced Take 1>supply@0,1>lock33 finds no key", 1, true) ~= nil, true,
+          "and names the key: " .. tostring(why))
+end
+
 -- test_a_kept_act_builds_no_planner_memory: the memory a plan call reads (the lookahead budget
 -- left: Planner.LOOK_ATTEMPT) is read only when the planner is asked, never for a kept act
 do

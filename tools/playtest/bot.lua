@@ -1239,6 +1239,36 @@ local function keySources(ctx, u, lock)
     return ctx.keySrc[k]
 end
 
+-- The chest lock at (x, y) `u` holds nothing to open (lockAt), never a door's: a door's convoy
+-- key is supplyKey's own way (lockedOnWay), and doorOpens must not count it.
+local function chestLockAt(ctx, u, x, y)
+    local lock = lockAt(ctx, u, x, y)
+    return lock and ctx.sight.isChestLock and ctx.sight.isChestLock(lock) and lock or nil
+end
+
+-- The wait tiles where the game's Supply command is enabled for `u` (sight.offers), read once a
+-- decision: where a key can be taken from the convoy this turn.
+local function supplyTiles(ctx, u)
+    ctx.supplyAt = ctx.supplyAt or {}
+    if ctx.supplyAt[u.id] == nil then
+        ctx.supplyAt[u.id] = ctx.sight.offers and ctx.sight.offers(u, waitTiles(ctx, u), "supply")
+            or {}
+    end
+    return ctx.supplyAt[u.id]
+end
+
+-- The key the convoy holds for the chest at `tile` that `u` could take now (sight.convoyKey:
+-- a free bag slot, a key its class or character may use) and a wait tile where Supply is
+-- offered this turn (supplyTiles: the take is this turn's act, so a unit that cannot reach one
+-- would arrive at the chest with no key), or nil. Vanilla Ch21's two chests
+-- (ch21a-eventinfo.h) have no key in the army, only in the convoy: with no taker the goals
+-- dropped them and 134 of 135 recorded attempts missed one (#699).
+local function convoyChestKey(ctx, u, tile)
+    local lock = chestLockAt(ctx, u, tile.x, tile.y)
+    if not (lock and ctx.sight.convoyKey) or #supplyTiles(ctx, u) == 0 then return nil end
+    return ctx.sight.convoyKey(u, lock)
+end
+
 local keyWay, turnsFor, turnsOn, strikersNear
 
 -- Whether `u` can open the door `d`: it holds a key, or it has a way to an enemy whose fall
@@ -1257,24 +1287,40 @@ local obstacleTurns
 -- opens its whole map change for every unit (ApplyMapChangesById), so it is a way for `u`
 -- too, escorting its opener (escortTurns). Only those who hold the means: one fetching a key
 -- from an enemy is that key's way, and asking it here would ask `u`'s way back. An opener's
--- own way never asks this (no door is locked to it), so the read cannot cycle.
-local function doorMates(ctx, u)
+-- own way never asks this (no door is locked to it), so the read cannot cycle. `chests`: the
+-- teammates who open chests instead (sight.opensChest; supplyKey's test that the chest is
+-- already someone's).
+local function doorMates(ctx, u, chests)
     local out = {}
     for _, m in ipairs(ctx.blues or {}) do
-        if m.id ~= u.id and not m.dead and opener(ctx, m) then out[#out + 1] = m end
+        local opens = chests and ctx.sight.opensChest and ctx.sight.opensChest(m)
+            or not chests and opener(ctx, m)
+        if m.id ~= u.id and not m.dead and opens then out[#out + 1] = m end
     end
+    return out
+end
+
+-- The teammates of `u` (doorMates) that have a way to the door `d`, through what they open on
+-- the way, with their turns there: soonest first, slot order on a tie. A key holder cut off
+-- from the door opens nothing, so it is not listed.
+local function matesTo(ctx, u, d)
+    local out = {}
+    for _, m in ipairs(doorMates(ctx, u)) do
+        local n = obstacleTurns(ctx, m, m)[obstacleKey(d)]
+        if n then out[#out + 1] = { m = m, n = n } end
+    end
+    table.sort(out, function(a, b)
+        if a.n ~= b.n then return a.n < b.n end
+        return (a.m.slot or 0) < (b.m.slot or 0)
+    end)
     return out
 end
 
 -- The soonest turns a teammate of `u` (doorMates) needs to the door `d`, through what it opens
 -- on its way; nil when none has a way there (a key holder cut off from it opens nothing).
 local function mateTurns(ctx, u, d)
-    local soonest
-    for _, m in ipairs(doorMates(ctx, u)) do
-        local n = obstacleTurns(ctx, m, m)[obstacleKey(d)]
-        if n and (not soonest or n < soonest) then soonest = n end
-    end
-    return soonest
+    local first = matesTo(ctx, u, d)[1]
+    return first and first.n
 end
 
 -- The doors `u` can open, then the walls (sight.obstacles): what may open a way, in the order
@@ -1547,6 +1593,12 @@ turnsFor = function(ctx, u, tile, from, seeking, keyed)
     local lock = not keyed and lockAt(ctx, u, tile.x, tile.y)
     if lock then
         n = select(2, keyWay(ctx, u, tile, from, lock, seeking))
+        -- a chest key in the convoy is a way too (#699): taken with Supply (supplyKey), after
+        -- which the chest is the walk alone, so the walk with the key is its turns
+        if from == u and convoyChestKey(ctx, u, tile) then
+            local c = turnsFor(ctx, u, tile, from, seeking, true)
+            if c and (not n or c < n) then n = c end
+        end
     else
         n = s.turnsTo and s.turnsTo(u, tile, from)
         local via = viaObstacle(ctx, u, tile, from, seeking)
@@ -1724,33 +1776,42 @@ local function lockedOnWay(ctx, u, goal)
     return nil
 end
 
--- A Take `a` (a "supply" act) with the item it takes filled in: the convoy's door key for `u`
--- now (sight.convoyKey), or nil with none. An act's key does not carry the item, so a Take
--- built from a key (botrun's forced act) is filled here too.
+-- A Take `a` (a "supply" act) with the item it takes filled in: the convoy's key for `u` now
+-- (sight.convoyKey), for the door or, with `a.terrain`, the chest lock it is taken for, or nil
+-- with none. An act's key does not carry the item, so a Take built from a key (botrun's forced
+-- act) is filled here too; the terrain is in the key (Planner.key), so a chest's Take replays
+-- as one.
 function M.takeItem(sight, u, a)
-    local key = sight.convoyKey and sight.convoyKey(u)
+    local key = sight.convoyKey and sight.convoyKey(u, a.terrain)
     if not key then return nil end
     a.item, a.uses = key.id, key.uses
     return a
 end
 
--- The convoy's door key, taken with the Supply command (#510, vanilla Ch10 on Eirika's route:
--- the one key holder died, the dropped key sat in the convoy, and every unit read no way to
--- the throne). Offered when a door locked to `u` stands on its way to its goal (lockedOnWay),
--- no fielded unit opens doors (with one, the door is already every unit's way: doorMates),
--- and the convoy holds what lets `u` open it (sight.convoyKey): from the safest wait tile the
--- gate allows where the game's Supply command is enabled (the lord's, or beside the lord). The
--- game would let it act on after the Take (SupplyCommandEffect returns to the unit menu); the
--- act ends with a Wait, the one act the plan models after it.
+-- The convoy's key, taken with the Supply command (#510, vanilla Ch10 on Eirika's route: the
+-- one key holder died, the dropped key sat in the convoy, and every unit read no way to the
+-- throne). Offered for a door locked to `u` on its way to its goal (lockedOnWay) when no fielded
+-- unit opens doors (with one, the door is already every unit's way: doorMates); and, for the
+-- chest `u` is sent to (#699: vanilla Ch21's two chests, no key in the army), when no fielded
+-- unit opens chests (with one, the chest is that unit's). Either way the convoy must hold what
+-- lets `u` open it (sight.convoyKey): from the safest wait tile the gate allows where the
+-- game's Supply command is enabled (the lord's, or beside the lord). The game would let it act
+-- on after the Take (SupplyCommandEffect returns to the unit menu); the act ends with a Wait,
+-- the one act the plan models after it.
 local function supplyKey(ctx, u, gate, objective)
     local s = ctx.sight
-    if not (s.convoyKey and s.offers and s.locked) or opener(ctx, u)
-            or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goalFor(ctx, u, objective)) then
-        return nil
+    if not (s.convoyKey and s.offers and s.locked) then return nil end
+    local goal = goalFor(ctx, u, objective)
+    local terrain
+    if opener(ctx, u) or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goal) then
+        terrain = goal and chestLockAt(ctx, u, goal.x, goal.y)
+        if not terrain or #doorMates(ctx, u, true) > 0 then return nil end
     end
-    local best = safest(ctx, u, gated(ctx, u, s.offers(u, waitTiles(ctx, u), "supply"), gate))
+    local best = safest(ctx, u, gated(ctx, u, supplyTiles(ctx, u), gate))
     if not best then return nil end
-    return M.takeItem(s, u, action(u, best, "supply", nil))
+    local a = action(u, best, "supply", nil)
+    a.terrain = terrain
+    return M.takeItem(s, u, a)
 end
 
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
@@ -2382,6 +2443,40 @@ local function sendWorth(ctx, u, t)
     return t.gold * c, c
 end
 
+-- Whether the goal tile `t` is barred for unit `id` (the goals units are blocked from).
+local function isBarred(barred, id, t) return barred[goalKey(id, t)] end
+
+-- The door a taker's trip waits on gets its opener (#699: vanilla Ch21's two chests sit behind
+-- doors, a Door Key and a Chest Key in the convoy, taken at prep by two units: the chest's taker
+-- waited for an opener (escortTurns) whose goal was the boss, so no unit ever went to a door and
+-- no chest was reached). For each unit sent to a tile whose first obstacle is a door locked to
+-- it, the teammate that opens doors (doorMates) with the fewest turns to that door (matesTo; it
+-- gets there first, so the taker's wait is shortest) and no goal of its own is sent to the door
+-- itself (unless the goal is barred for it, as assign reads), which breach() opens from where
+-- the Door command offers it. Once open the door is no
+-- obstacle, and the taker walks on alone. One opener a door, however many units wait on it.
+local function sendOpeners(ctx, barred)
+    local sentTo, lords = {}, M.gameOver(ctx.sight)
+    for _, u in ipairs(ctx.blues) do
+        local g = ctx.exploreGoal[u.id]
+        local first = g and not g.door and chainTo(ctx, u, g)[1]
+        if first and first.door and lockAt(ctx, u, first.x, first.y)
+            and not sentTo[tileKey(first.x, first.y)] then
+            for _, c in ipairs(matesTo(ctx, u, first)) do
+                -- never one whose loss ends the game, nor the seizer (its goal is the seize
+                -- tile): a lord pulled to a door leaves the objective
+                local free = not (ctx.exploreGoal[c.m.id] or lords[c.m.charId]
+                    or ctx.seizeTile and canSeize(ctx, c.m))
+                if free and not isBarred(barred, c.m.id, first) then
+                    ctx.exploreGoal[c.m.id] = { x = first.x, y = first.y, door = true }
+                    sentTo[tileKey(first.x, first.y)] = true
+                    break
+                end
+            end
+        end
+    end
+end
+
 local function exploring(ctx, sent, barred)
     ctx.exploreGoal = {}
     barred = barred or {}
@@ -2403,7 +2498,7 @@ local function exploring(ctx, sent, barred)
         for _, p in ipairs(pairs_) do
             local k = key(p.t)
             if not taken[k] and not ctx.exploreGoal[p.u.id]
-                and not barred[goalKey(p.u.id, p.t)] then
+                and not isBarred(barred, p.u.id, p.t) then
                 taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
             end
         end
@@ -2435,7 +2530,7 @@ local function exploring(ctx, sent, barred)
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
         if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and not barred[goalKey(u.id, t)]
+            and not isBarred(barred, u.id, t)
             and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
@@ -2452,6 +2547,7 @@ local function exploring(ctx, sent, barred)
         end
     end
     assign(pairs_, function(t) return tileKey(t.x, t.y) end)
+    sendOpeners(ctx, barred)
 end
 
 function M.explain(board, sight, style)
@@ -3473,9 +3569,12 @@ local function ledger(party, convoy, swap, benched)
         return true
     end
     -- the convoy's i-th item into the unit's bag; false when there is no room for it
-    function L.take(charId, i, why)
+    -- `kind`: what the bag holds it as when the convoy's read has none (a key is "other" there,
+    -- and Bot.fullBag keeps a key it is handed: "key")
+    function L.take(charId, i, why, kind)
         local it, bag = L.pool[i], L.bags[charId]
         local h = asHeld(it, charId)
+        h.kind = kind or h.kind
         if #bag >= Board.ITEM_COUNT then
             if not swap then return false end
             local slot, swhy = M.fullBag(bag, h, false)
@@ -3531,6 +3630,44 @@ local function takeWeapons(L, party)
     end
 end
 
+-- The keys a chapter's chests and doors need (#699: vanilla Ch21's two chests, a Chest Key in
+-- the convoy and nobody holding one -- 134 of 135 recorded attempts missed a chest). For each
+-- `demands` entry of kind chests or doors that no fielded unit's bag opens, one fielded unit
+-- takes from the convoy an item the game says opens it for that unit (`for[charId].opens`:
+-- GetUnitKeyItemSlotForTerrain, so a Lockpick counts only for a thief; no id lives here). The
+-- taker is the unit with the most free slots, ties to party order: the take costs it nothing,
+-- and a full bag gives first what Bot.fullBag would send, so the next in order is tried when
+-- that gives nothing up. A key is one use, so one is taken per kind; the next arrives mid-map
+-- (bot.lua supplyKey).
+local function takeKeys(L, party, demands)
+    for _, d in ipairs(demands or {}) do
+        if d.kind == "chests" or d.kind == "doors" then
+            local function opens(u, it) return (forUnit(it, u.charId).opens or {})[d.kind] end
+            local held = false
+            for _, u in ipairs(party) do
+                for _, it in ipairs(L.bags[u.charId]) do held = held or opens(u, it) or false end
+            end
+            local order = {}
+            for i, u in ipairs(party) do
+                order[#order + 1] = { u = u, i = i, free = Board.ITEM_COUNT - #L.bags[u.charId] }
+            end
+            table.sort(order, function(a, b)
+                if a.free ~= b.free then return a.free > b.free end
+                return a.i < b.i
+            end)
+            local done = held
+            for _, o in ipairs(order) do
+                for i, it in ipairs(L.pool) do
+                    if not done and opens(o.u, it) then
+                        done = L.take(o.u.charId, i, "the " .. d.kind .. " key", "key")
+                        if done then break end
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- Why a unit gives an item to the convoy before the shop, or nil when it keeps it: what it
 -- cannot use this chapter (rule A of #510 comment 6896261936). A weapon or staff the game says
 -- it cannot use (cannotUseWeapon, Bot.fullBag's own test); a seal or booster (the item's `use`)
@@ -3547,24 +3684,41 @@ local function cannotUseNow(it, fielded)
     return nil
 end
 
+-- Why a unit gives back the key it holds: the chapter's demands (api.needs') name no lock it
+-- opens (#699: takeKeys took it for an earlier chapter's chests, and a key left in the bag costs
+-- a slot for good). `opens` is the game's read for the holder (api.convoy's `for`); nil without
+-- demands (no prep screen: nothing is known), for a non-key, or for a key a demand names.
+local function unneededKey(it, charId, demands)
+    local opens = demands and it.kind == "key" and forUnit(it, charId).opens
+    if not opens then return nil end
+    for _, d in ipairs(demands) do
+        if opens[d.kind] then return nil end
+    end
+    return "a key no lock of this chapter needs"
+end
+
 -- Bot.supply(party, convoy, benched) -> acts, before the shop: what the roster gives the convoy
 -- and what the fielded units take from it (the party plan's PR 2; comment 6872948037's rules,
 -- widened by comment 6896261936's rule A). party = the fielded units in roster order, benched =
 -- the roster's other units, each item with the game's facts and its kind (api.convoy's read);
 -- convoy = its items, each with `for` over every roster unit.
---   1. Every roster unit gives what it cannot use this chapter (cannotUseNow).
+--   1. Every roster unit gives what it cannot use this chapter (cannotUseNow), and a key no
+--      demand of the chapter names (unneededKey).
 --   2. Weapons and staves from the convoy, the unarmed first (takeWeapons), so the shop buys
 --      only what storage cannot give.
+--   3. The key a chapter's chests or doors need when no fielded unit holds one (takeKeys;
+--      `demands` = api.needs', nil without a prep screen).
 -- A full bag gives first what Bot.fullBag would send. acts = { act = "give" | "take" | "use",
 -- unit = charId, item = id, uses, seal = true (a use that promotes) | nil, why }.
-function M.supply(party, convoy, benched)
+function M.supply(party, convoy, benched, demands)
     local L = ledger(party, convoy, true, benched)
     local function giveBack(list, fielded)
         for _, u in ipairs(list or {}) do
             -- from the last slot down, so a give (which packs the bag) never moves an item not
             -- yet looked at
             for i = #L.bags[u.charId], 1, -1 do
-                local why = cannotUseNow(L.bags[u.charId][i], fielded)
+                local it = L.bags[u.charId][i]
+                local why = cannotUseNow(it, fielded) or unneededKey(it, u.charId, demands)
                 if why then L.give(u.charId, i, why) end   -- false: the convoy is full
             end
         end
@@ -3572,6 +3726,7 @@ function M.supply(party, convoy, benched)
     giveBack(party, true)
     giveBack(benched, false)
     takeWeapons(L, party)
+    takeKeys(L, party, demands)
     return L.acts
 end
 

@@ -1369,8 +1369,13 @@ function M.run(api)
             local byIdNow = byId(board)
             local u = byIdNow[a.unitId]
             if not (u and u.faction == "blue" and u.onField and not u.acted) then return nil end
-            -- a Take names its item, which a key does not carry (Bot.takeItem), or is no act
-            if a.act == "supply" and not Bot.takeItem(sight, u, a) then return nil end
+            -- a Take names its item, which a key does not carry (Bot.takeItem; the key's terrain
+            -- names the lock). A Take with no convoy key left to name is no act to drop quietly:
+            -- the board is not the one the plan was made on
+            if a.act == "supply" and not Bot.takeItem(sight, u, a) then
+                error("botrun.lua: forced Take " .. k .. " finds no key in the convoy for the unit",
+                      0)
+            end
             pin.unoffered[#pin.unoffered + 1] = k
             a.unit = u.charId
             if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end

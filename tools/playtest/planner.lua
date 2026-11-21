@@ -533,8 +533,11 @@ local function score(act, st, W, style, odds)
 end
 
 local function key(act)
+    -- a Take's target is the lock its key is for ("lock" .. terrain, #699): a chest's Take told
+    -- from a door's (no terrain), so a replay takes the chest key the plan took
     local k = string.format("%d>%s@%d,%d>%s", act.unitId, act.act, act.move.x, act.move.y,
-        tostring(act.targetId or (act.obstacle and (act.obstacle.x .. "," .. act.obstacle.y))))
+        tostring(act.targetId or (act.obstacle and (act.obstacle.x .. "," .. act.obstacle.y))
+                 or (act.terrain and "lock" .. tostring(act.terrain))))
     -- a Drop is told apart by where it sets the unit down, a Canto move by where it ends
     if act.dropAt then k = k .. "/" .. act.dropAt.x .. "," .. act.dropAt.y end
     if act.canto then k = k .. "~" .. act.canto.x .. "," .. act.canto.y end
@@ -551,7 +554,8 @@ local function keysOf(st)
 end
 
 -- key(act)'s inverse: the act's identity { unitId, act, move, targetId | obstacle, dropAt, canto,
--- slot (a spare's: slotKey) } read back, for a forced replay's act no candidate offered
+-- slot (a spare's: slotKey), terrain (a chest Take's) } read back, for a forced replay's act no
+-- candidate offered
 -- (botrun). It raises on a string no key gave.
 local function unkey(k)
     local id, act, x, y, tgt = k:match("^(%-?%d+)>([%w_]+)@(%-?%d+),(%-?%d+)>(.*)$")
@@ -570,7 +574,10 @@ local function unkey(k)
         tgt, a.dropAt = rest, { x = tonumber(dx), y = tonumber(dy) }
     end
     local ox, oy = tgt:match("^(%-?%d+),(%-?%d+)$")
-    if ox then
+    local lock = tgt:match("^lock(.+)$")
+    if lock then
+        a.terrain = tonumber(lock) or lock
+    elseif ox then
         a.obstacle = { x = tonumber(ox), y = tonumber(oy) }
     elseif tgt ~= "nil" then
         a.targetId = tonumber(tgt) or error("planner.lua: not an act key: " .. k)

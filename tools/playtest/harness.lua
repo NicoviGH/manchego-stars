@@ -4104,15 +4104,15 @@ end
 -- is a key only to a thief), a passive item (each one the engine tests by id),
 -- a heal (GetUnitItemHealAmount > 0), money (no use effect at all: gems, gold), else other
 -- (seals, boosters, Pure Water...).
--- Whether the game takes `value` (id | uses << 8) for a key of the unit's, to a door or a chest
--- (Sight.keyItemOpens, in the sandbox `call` runs in).
-INSPECT.isKey = function(call, unitAddr, value)
+-- The sight.lua key reads (Sight.keyOpens, Sight.keyReader) in the sandbox `call` runs in:
+-- the lock each item opens for a unit, { doors, chests }; isKey: whether it opens any.
+INSPECT.keyIo = function()
     INSPECT.loadSight()
-    local io = { read16 = ru16, write16 = function(at, v) emu:write16(at, v) end }
-    for _, terrain in ipairs({ INSPECT.Sight.TERRAIN_DOOR, INSPECT.Sight.TERRAIN_CHEST_FULL }) do
-        if INSPECT.Sight.keyItemOpens(io, call, SYM, BOARD, unitAddr, value, terrain) then return true end
-    end
-    return false
+    return { read16 = ru16, write16 = function(at, v) emu:write16(at, v) end }
+end
+INSPECT.isKey = function(call, unitAddr, value)
+    local S = INSPECT.loadSight()
+    return S.opensAnyLock(S.keyOpens(INSPECT.keyIo(), call, SYM, BOARD, unitAddr, value))
 end
 
 -- `rosterRead` (the roster's read: Bot.armed, the shop, the supply) asks only the weapon's
@@ -4756,7 +4756,8 @@ INSPECT.campaignApi = function(game)
     -- (a copy; the one handed in is not changed), or nil when the game gives the party no
     -- convoy (HasConvoyAccess: bmcontainer.c, by chapter). Every convoy item gets the game's
     -- facts for every unit of the whole roster (MakePrepUnitList's, benched units included, on
-    -- the map too) as `for[charId] = { usable, promotes, gains }`; in the copy every non-weapon
+    -- the map too) as `for[charId] = { usable, promotes, gains, opens = { doors, chests } }`
+    -- (`opens`: a non-weapon's key read, Sight.keyReader); in the copy every non-weapon
     -- bag item gets the same `for` and its full kind (unitItemFacts: the key, heal and money
     -- reads Bot.fullBag weighs when a full bag gives first). A convoy item is only ever taken as
     -- a weapon, a seal or a booster, so a non-weapon's kind there is "other", as in a bag.
@@ -4792,11 +4793,17 @@ INSPECT.campaignApi = function(game)
                 if memo[key] == nil then memo[key] = INSPECT.unitItemFacts(call, addr, it, not full) end
                 return memo[key]
             end
+            local keys = INSPECT.Sight.keyReader(INSPECT.keyIo(), call, SYM, BOARD)
             local function forAll(it)
                 local f = {}
                 for _, u in ipairs(all) do
                     local x = facts(u.addr, it)
                     f[u.charId] = { usable = x.usable, promotes = x.promotes, gains = x.gains }
+                    -- which lock the item opens for this unit (Bot.supply's key take, #699);
+                    -- a weapon is never a key
+                    if INSPECT.itemFacts(it.id).kind ~= "weapon" then
+                        f[u.charId].opens = keys(u.addr, it)
+                    end
                 end
                 return f
             end

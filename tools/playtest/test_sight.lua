@@ -2121,6 +2121,78 @@ do
     local branch = at and sightSrc:sub(at, sightSrc:find("elseif", at + 10, true)) or ""
     check(branch:find("key.id == a.item", 1, true) ~= nil and branch:find("key.uses == a.uses", 1, true) ~= nil,
           true, "legal: a Take is legal only while the key it names is the convoy's")
+    -- #699: a chest's Take is asked for the chest lock it names, not the door's default
+    check(branch:find("s.convoyKey(u, a.terrain)", 1, true) ~= nil, true,
+          "legal: the Take's key is read for the lock the act names")
+    local chestOpens = function(id) return id == 0x69 end
+    convoy = { { id = 0x6A, uses = 1 }, { id = 0x69, uses = 1 } }
+    local ck = Sight.convoyKey(Bd, nil, {}, u, chestOpens)
+    check(ck and ck.id, 0x69, "convoyKey: the first item that opens a chest")
+    check(Sight.convoyKey(Bd, nil, {}, { items = { {}, {}, {}, {}, {} } }, chestOpens), nil,
+          "convoyKey: no chest key into a full bag")
+end
+
+-- keyOpens / keyReader / opensAnyLock (#699): the game's key check read for both locks, on a
+-- mocked bag. The game answers GetUnitKeyItemSlotForTerrain with slot 0 for a key in the first
+-- slot, as the real one does: a Chest Key (0x69) opens a chest, a Door Key (0x6B) a door, and a
+-- Lockpick (0x6C) both -- for the thief at 200 alone. The bag is put back after each read.
+do
+    local S = { GetUnitKeyItemSlotForTerrain = 0x4242 }
+    local bytes, asked = {}, 0
+    local mio = { read16 = function(a) return bytes[a] or 0 end,
+                 write16 = function(a, v) bytes[a] = v end }
+    local THIEF = 200
+    local call = function(fn, args)
+        assert(fn == S.GetUnitKeyItemSlotForTerrain)
+        asked = asked + 1
+        local id, terrain = bytes[args[1] + Board.UNIT_ITEMS] & 0xFF, args[2]
+        local ok = id == 0x69 and terrain == Sight.TERRAIN_CHEST_FULL
+            or id == 0x6B and terrain == Sight.TERRAIN_DOOR
+            or id == 0x6C and args[1] == THIEF
+        return ok and 0 or -1
+    end
+    local function opens(addr, value)
+        local o = Sight.keyOpens(mio, call, S, Board, addr, value)
+        return tostring(o.doors) .. "/" .. tostring(o.chests)
+    end
+    check(opens(100, 0x69 | (1 << 8)), "false/true",
+          "keyOpens: a Chest Key opens a chest, not a door")
+    check(opens(100, 0x6B | (1 << 8)), "true/false",
+          "keyOpens: a Door Key opens a door, not a chest")
+    check(opens(100, 0x6C | (1 << 8)), "false/false",
+          "keyOpens: a Lockpick opens nothing for a non-thief")
+    check(opens(THIEF, 0x6C | (1 << 8)), "true/true", "keyOpens: a Lockpick opens both for a thief")
+    check(opens(100, 0x14 | (30 << 8)), "false/false", "keyOpens: a weapon opens nothing")
+    -- a bag read and written back: the unit's own items are as they were
+    bytes[100 + Board.UNIT_ITEMS], bytes[100 + Board.UNIT_ITEMS + 2] = 0x0114, 0x0169
+    opens(100, 0x69 | (1 << 8))
+    check(bytes[100 + Board.UNIT_ITEMS] .. "/" .. bytes[100 + Board.UNIT_ITEMS + 2], "276/361",
+          "keyOpens: the bag is put back")
+    -- isKey (unitItemFacts' kind = "key") is any lock: a mistake in the read changes both
+    check(Sight.opensAnyLock({ doors = false, chests = true }), true, "opensAnyLock: a chest's key")
+    check(Sight.opensAnyLock({ doors = true, chests = false }), true, "opensAnyLock: a door's key")
+    check(Sight.opensAnyLock({ doors = false, chests = false }), false, "opensAnyLock: no lock")
+    -- the convoy's read: asked once per unit and item id, whatever the uses; the kinds as keys
+    local read = Sight.keyReader(mio, call, S, Board)
+    asked = 0
+    local a = read(100, { id = 0x69, uses = 1 })
+    local b = read(100, { id = 0x69, uses = 3 })
+    check(asked, 2, "keyReader: one read (a door's and a chest's) serves every copy of the item")
+    check(a == b and a.chests and not a.doors, true,
+          "keyReader: the chest key opens chests for a unit")
+    check(read(THIEF, { id = 0x6C, uses = 20 }).doors, true,
+          "keyReader: a thief's Lockpick opens doors")
+    check(read(100, { id = 0x6C, uses = 20 }).doors, false, "keyReader: not a non-thief's")
+    -- harness.lua is not loadable outside mGBA: it asks these reads and no other copy of them
+    local hf = assert(io.open(here .. "harness.lua"))
+    local harnessSrc = hf:read("a")
+    hf:close()
+    check(harnessSrc:find("S.opensAnyLock(S.keyOpens(INSPECT.keyIo()", 1, true) ~= nil, true,
+          "keyOpens: isKey (a bag item's kind) is the sight.lua read")
+    check(harnessSrc:find("INSPECT.Sight.keyReader(INSPECT.keyIo()", 1, true) ~= nil, true,
+          "keyReader: api.convoy's `opens` is the sight.lua read")
+    check(harnessSrc:find("TERRAIN_CHEST_FULL, ", 1, true), nil,
+          "LOCK_TERRAIN: harness.lua carries no kind-to-terrain table of its own")
 end
 
 -- replyKills / safest: the army's reply between the lookahead's two enemy phases (#510 comment
