@@ -6433,6 +6433,65 @@ do
           "visit:4,2 feasible", "visit before win: the ledger the plan leaves")
 end
 
+-- test_an_owed_recruit_an_earlier_attempt_saw_arrive_holds_the_win (#683, ADR 0436): the lord can
+-- Seize now, and a recruit that is not on the board yet arrived at (9,9) on turn 5 in an earlier
+-- attempt (opts.pending). The game's Talk check lets the lord Talk it, so the recruit is a goal
+-- the Seize would close and the win waits. With no memory (attempt 1), or the recruit already
+-- on the board, joined or past its turn, there is no such goal.
+do
+    local function run(pending, turn, extra)
+        local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+        local Z = red(0x83, 14, 14, { minRange = false })
+        local board = boardOf(L, Z, extra)
+        board.turn = turn or 1
+        local o = {
+            objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+            reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }, { 4, 2 }) },
+            talk = { [0x01] = { ["arrival:14"] = true } },
+            enemyPhase = function() return {} end,
+        }
+        return Planner.plan(B, board, sightOf(o), gifted("bold", 100), { pending = pending })
+    end
+    local owed = { { charId = 14, x = 9, y = 9, turn = 5 } }
+    local a, plan = run(owed)
+    check(a and a.act ~= "seize" and plan and not plan.seizes, true,
+          "pending recruit: the Seize is put off")
+    check(plan and plan.ledger[1] and plan.ledger[1].id .. " " .. plan.ledger[1].status,
+          "recruit:arrival:14 feasible", "pending recruit: its goal is in the ledger")
+    a, plan = run(nil)
+    check(a and a.act, "seize", "no memory (attempt 1): the Seize is played")
+    a = run(owed, 5)
+    check(a and a.act, "seize", "past its remembered turn: no goal, the Seize is played")
+    a = run(owed, 1, red(0x84, 9, 9, { charId = 14, minRange = false }))
+    check(a and a.act, "seize", "already on the board: a goal of the board's own unit, not a pending one")
+end
+
+-- test_a_pending_recruit_is_met_at_the_tile_nearest_its_arrival_a_talker_can_reach (#683, ADR 0436):
+-- a recruit that lands where no talker can walk (ch13's Cormag, over a cliff) is a goal at the
+-- tile nearest it the talker's own field reaches, and none when the talker reaches nothing.
+do
+    local function meet(reach)
+        local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+        local o = {
+            talk = { [0x01] = { ["arrival:14"] = true } },
+            field = function(t)
+                local f = {}
+                for y = 0, 9 do
+                    f[y] = {}
+                    for x = 0, reach do f[y][x] = 1 end
+                end
+                return f
+            end,
+        }
+        local _, ctx = B.candidates(boardOf(L), sightOf(o), style("bold"),
+                                    { pending = { { charId = 14, x = 9, y = 9, turn = 5 } } })
+        local t = ctx.pendingRecruits["arrival:14"]
+        return t and (t.x .. "," .. t.y)
+    end
+    check(meet(6), "6,9", "pending recruit: the reachable tile nearest where it arrived")
+    check(meet(-1), nil, "pending recruit: no talker can walk anywhere, no goal")
+end
+
 -- test_a_stalled_goal_does_not_hold_the_win (#510 fwd1 item C, call 3, ADR 0403): the same board
 -- as the visit above, but botrun reports the village's id in opts.quietGoals (no unit neared it
 -- for a while). Its row is stalled, the Seize forfeits nothing, and it is played; the plan's

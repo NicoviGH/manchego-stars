@@ -9,7 +9,9 @@
 --   board: Board.read's shape (board.lua). Blue units on the field that have not acted are the
 --          ones that can act; on-field reds are the enemies.
 --   opts (optional): { unpaid = { ["<talker charId>><target charId>"] = true } }, the Talks
---          this attempt that recruited no one (botrun's, #679), offered no more.
+--          this attempt that recruited no one (botrun's, #679), offered no more; and, for
+--          Bot.candidates, pending = { { charId, x, y, turn } }: owed recruits an earlier attempt
+--          saw arrive (botrun's pendingRecruits, ADR 0436).
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
 --            claims = {claim ids}, route = 1|2 }, plus the fields the claim behaviours add
 --          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
@@ -547,7 +549,7 @@ end
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
-    local ctx = { sight = sight, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
+    local ctx = { sight = sight, board = board, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
                   worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
                   talkTiles = {}, openers = {}, scopes = {}, floods = {}, rescueTiles = {}, carried = {} }
@@ -1867,7 +1869,29 @@ end
 -- the clear (botrun's recruits_missing), as a green unit's death does. Every blue counts, one
 -- that has acted too: it Talks next turn, so its recruit is no less one after a replan.
 -- -> out[id] = true, and talkers[id] = the player units' ids that may Talk it over (goals.lua's
--- takers).
+-- takers). Then the units a retry saw arrive (ctx.pending, botrun's pendingRecruits, ADR 0436):
+-- an owed recruit not on the board yet counts as one at the tile it arrived on, under the id
+-- "arrival:<charId>" (a third result, id -> { id, charId, x, y }), its talkers the units the game's own
+-- check (talks) lets Talk its charId -- that check reads the two charIds and the event flags,
+-- never the unit. Where it arrived may be a tile no talker can walk to (a wyvern rider lands
+-- over a cliff: ch13's Cormag), so the goal is the tile a talker can reach nearest to it
+-- (meetingTile).
+local function meetingTile(ctx, talkers, x, y)
+    local sight, best, bestD = ctx.sight, nil, nil
+    if not sight.turnsTo or not ctx.map then return { x = x, y = y } end
+    for _, u in ipairs(talkers) do
+        for ty = 0, ctx.map.h - 1 do
+            for tx = 0, ctx.map.w - 1 do
+                local d = manhattan(tx, ty, x, y)
+                if (not bestD or d < bestD) and sight.turnsTo(u, { x = u.x, y = u.y }, { x = tx, y = ty }) then
+                    best, bestD = { x = tx, y = ty }, d
+                end
+            end
+        end
+    end
+    return best
+end
+
 local function recruitsOf(ctx)
     local out, talkers = {}, {}
     -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to
@@ -1886,7 +1910,28 @@ local function recruitsOf(ctx)
             end
         end
     end
-    return out, talkers
+    local pending = {}
+    for _, p in ipairs(ctx.pending or {}) do
+        local here = false
+        for _, t in ipairs(ctx.board.units) do
+            here = here or t.charId == p.charId
+        end
+        if not here and (ctx.turn or 0) < p.turn then
+            local t = { id = "arrival:" .. p.charId, charId = p.charId, faction = "red", x = p.x,
+                        y = p.y }
+            local by = {}
+            for _, u in ipairs(ctx.blues) do
+                if mayTalkOver(ctx, u, t) then by[#by + 1] = u end
+            end
+            local at = #by > 0 and meetingTile(ctx, by, p.x, p.y)
+            if at then
+                t.x, t.y = at.x, at.y
+                out[t.id], pending[t.id], talkers[t.id] = true, t, {}
+                for _, u in ipairs(by) do table.insert(talkers[t.id], u.id) end
+            end
+        end
+    end
+    return out, talkers, pending
 end
 
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
@@ -2937,7 +2982,8 @@ function M.candidates(board, sight, style, opts)
     ctx.keyTurns, ctx.ways = {}, {}
     ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
-    ctx.recruits, ctx.recruitTalkers = recruitsOf(ctx)
+    ctx.pending = opts and opts.pending
+    ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     -- A unit sent where it has had no step nearer since an earlier turn is sent again,

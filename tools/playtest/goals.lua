@@ -14,7 +14,9 @@
 --                  one stands (sight.locked, sight.keySources): its turns run by way of that
 --                  enemy (Bot's turnsTo).
 --   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the player units that
---                  may Talk it over); its takers are those talkers.
+--                  may Talk it over); its takers are those talkers. A recruit a retry saw
+--                  arrive and that is not on the board yet (ctx.pendingRecruits, ADR 0436) is
+--                  one too, at the tile it arrived on.
 --   objective      each unit's own way to the objective (ctx.objectiveTile: the Seize tile,
 --                  the boss, or on Rout the nearest enemy -- where its march heads), the unit
 --                  its one taker. None on Survive, whose way there is holding.
@@ -174,7 +176,7 @@ function M.list(board, sight, style, ctx)
         goals[#goals + 1] = g
     end
     for id, talkers in pairs(ctx.recruitTalkers or {}) do
-        local t = byId[id]
+        local t = byId[id] or (ctx.pendingRecruits or {})[id]
         if t then
             local gold = 0
             for _, it in ipairs(t.items or {}) do gold = gold + cost(it.id) end

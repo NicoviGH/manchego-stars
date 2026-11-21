@@ -1826,6 +1826,31 @@ do
     check(got and got[0x82], nil, "seen: not one only remembered")
 end
 
+-- test_the_planner_is_told_the_owed_recruits_a_retry_saw_arrive (#683, ADR 0436): opts.pending
+-- holds the remembered arrivals (style.memory.arrivals) of units the game owes us, and no other.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) },
+                         recruits = { 0x30 } }
+    g.api.style.memory = { enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 5 },
+                                                      { charId = 0x82, x = 8, y = 8, turn = 3 } } }
+    local got
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board, _, _, opts)
+            got = got or opts.pending
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true } }
+        end,
+    }
+    Botrun.run(g.api)
+    check(got and #got, 1, "pending: only the owed one of the remembered arrivals")
+    check(got and got[1].charId .. "@" .. got[1].x .. "," .. got[1].y .. " t" .. got[1].turn,
+          "48@9,9 t5", "pending: its tile and turn")
+end
+
 -- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
 -- graded by the plan that moved it, not by a later replan that found it over the cap; a unit
 -- no plan moved this turn falls back to the phase's last plan.

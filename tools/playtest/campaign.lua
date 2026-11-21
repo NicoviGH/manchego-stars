@@ -28,7 +28,7 @@
 -- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
--- { enemies }: every red unit a board showed out of fog and every killer a fight showed
+-- { enemies, arrivals }: every red unit a board showed out of fog and every killer a fight showed
 -- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is
 -- remembered through its killer: where our units stood is the play's, not the game's. Never a
 -- dice result.
@@ -461,7 +461,8 @@ function M.run(api)
             local kept
             local attemptCap = api.attempts or M.MAX_ATTEMPTS
             -- a retry's memory of the enemy (ADR 0399): style.memory
-            local memory, memoryKeys = { enemies = {} }, {}
+            local memory, memoryKeys = { enemies = {}, arrivals = {} }, {}
+            local arrived = {}   -- charId -> true: each unit's first sighting is kept
             -- a unit whose class was not read cannot be told from another in its slot (its key
             -- would match nothing, and grow the memory with nothing learned): not kept
             local function rememberEnemy(id, charId, classId)
@@ -532,12 +533,15 @@ function M.run(api)
                 -- (style.arrivals); attempt 1, and any attempt alone, has none
                 if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
                 -- and every enemy they showed (ADR 0399), from attempt 2
-                if #memory.enemies > 0 then
-                    local copy = {}   -- each attempt its own copy
+                if #memory.enemies > 0 or #memory.arrivals > 0 then
+                    local copy, arrivals = {}, {}   -- each attempt its own copy
                     for i, e in ipairs(memory.enemies) do
                         copy[i] = { id = e.id, charId = e.charId, classId = e.classId }
                     end
-                    style.memory = { enemies = copy }
+                    for i, a in ipairs(memory.arrivals) do
+                        arrivals[i] = { turn = a.turn, x = a.x, y = a.y, charId = a.charId }
+                    end
+                    style.memory = { enemies = copy, arrivals = arrivals }
                 end
                 -- after the prep screen and before the first move, so the draws land on the
                 -- play's dice whatever the screens above drew (they run the same every attempt)
@@ -593,6 +597,11 @@ function M.run(api)
                     if not known[a.turn] then
                         known[a.turn] = true
                         remembered[#remembered + 1] = a.turn
+                    end
+                    -- the unit and its tile too (ADR 0436), once each: an owed recruit's goal
+                    if a.charId and not arrived[a.charId] then
+                        arrived[a.charId] = true
+                        memory.arrivals[#memory.arrivals + 1] = a
                     end
                 end
                 table.sort(remembered)

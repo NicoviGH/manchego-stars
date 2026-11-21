@@ -845,8 +845,16 @@ local function test_a_retry_remembers_the_arrivals_it_saw()
     local keys = {}
     for k in pairs(g.plays[3].style) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "aggression,arrivals,claims,sealAt",
-          "the arrival turns; no enemy was shown, so no memory (ADR 0399)")
+    check(table.concat(keys, ","), "aggression,arrivals,claims,memory,sealAt",
+          "the arrival turns, and the arrivals as memory (ADR 0436)")
+    local m = g.plays[3].style.memory
+    check(#m.enemies, 0, "no enemy was shown, so none remembered (ADR 0399)")
+    local got = {}
+    for _, a in ipairs(m.arrivals) do got[#got + 1] = string.format("%X@%d,%d t%d", a.charId, a.x, a.y, a.turn) end
+    check(table.concat(got, " "), "82@9,9 t4 83@8,9 t4 84@9,0 t6",
+          "attempt 3: each unit seen arrive, its tile and turn (ADR 0436)")
+    check(g.plays[2].style.memory.arrivals[1].charId, 0x82, "attempt 2: attempt 1's arrival")
+    check(g.plays[1].style.memory, nil, "attempt 1 has no memory")
     local alone = fakeGame { chapters = { { id = 1, seen = seen } } }
     alone.api.only = 1
     Campaign.run(alone.api)
