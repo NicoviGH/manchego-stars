@@ -3,14 +3,10 @@
   {
    "number": 510,
    "title": "Parity model fidelity, then re-evaluate every chapter",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": null,
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": []
    }
@@ -18,13 +14,11 @@
   {
    "number": 640,
    "title": "#510 step 9: a bot plays vanilla FE8 clean",
-   "url": "u",
    "labels": {
     "nodes": []
    },
-   "parent": null,
-   "subIssues": {
-    "totalCount": 0
+   "parent": {
+    "number": 510
    },
    "comments": {
     "nodes": []
@@ -33,14 +27,10 @@
   {
    "number": 900,
    "title": "Bot: orphaned crash",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": null,
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": []
    }
@@ -48,15 +38,11 @@
   {
    "number": 901,
    "title": "Bot: parented crash",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": {
     "number": 640
-   },
-   "subIssues": {
-    "totalCount": 0
    },
    "comments": {
     "nodes": []
@@ -65,14 +51,10 @@
   {
    "number": 902,
    "title": "harness.lua audit: not bot work",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": null,
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": []
    }
@@ -80,14 +62,10 @@
   {
    "number": 903,
    "title": "Ch9 - map + events",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": null,
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": []
    }
@@ -95,7 +73,6 @@
   {
    "number": 910,
    "title": "Bot: held without a why",
-   "url": "u",
    "labels": {
     "nodes": [
      {
@@ -106,14 +83,10 @@
    "parent": {
     "number": 640
    },
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": [
      {
       "databaseId": 1,
-      "url": "u",
       "body": "On hold (no bold)",
       "createdAt": "2026-11-18T00:00:00Z",
       "updatedAt": "2026-11-18T00:00:00Z"
@@ -124,7 +97,6 @@
   {
    "number": 911,
    "title": "Bot: held with a why",
-   "url": "u",
    "labels": {
     "nodes": [
      {
@@ -135,14 +107,10 @@
    "parent": {
     "number": 640
    },
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": [
      {
       "databaseId": 2,
-      "url": "u",
       "body": "**ON HOLD (Nicolas, 2026-11-03).** why",
       "createdAt": "2026-11-03T00:00:00Z",
       "updatedAt": "2026-11-03T00:00:00Z"
@@ -153,35 +121,28 @@
   {
    "number": 920,
    "title": "Bot: stale status",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": {
     "number": 640
    },
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": [
      {
       "databaseId": 10,
-      "url": "u",
       "body": "### Status (edited in place, 2026-11-21)\nrows",
       "createdAt": "2026-11-21T10:00:00Z",
       "updatedAt": "2026-11-21T12:00:00Z"
      },
      {
       "databaseId": 11,
-      "url": "u",
       "body": "later evidence",
       "createdAt": "2026-11-21T13:00:00Z",
       "updatedAt": "2026-11-21T13:00:00Z"
      },
      {
       "databaseId": 12,
-      "url": "u",
       "body": "even later",
       "createdAt": "2026-11-21T14:00:00Z",
       "updatedAt": "2026-11-21T14:00:00Z"
@@ -192,31 +153,51 @@
   {
    "number": 921,
    "title": "Bot: fresh status",
-   "url": "u",
    "labels": {
     "nodes": []
    },
    "parent": {
     "number": 640
    },
-   "subIssues": {
-    "totalCount": 0
-   },
    "comments": {
     "nodes": [
      {
       "databaseId": 20,
-      "url": "u",
       "body": "evidence",
       "createdAt": "2026-11-21T10:00:00Z",
       "updatedAt": "2026-11-21T10:00:00Z"
      },
      {
       "databaseId": 21,
-      "url": "u",
       "body": "### Status (edited in place, 2026-11-21)",
       "createdAt": "2026-11-21T09:00:00Z",
       "updatedAt": "2026-11-21T12:00:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "number": 922,
+   "title": "Bot: quoted status marker",
+   "labels": {
+    "nodes": []
+   },
+   "parent": {
+    "number": 640
+   },
+   "comments": {
+    "nodes": [
+     {
+      "databaseId": 30,
+      "body": "I quoted the line ### Status (edited in place, 2026-11-21) mid-sentence",
+      "createdAt": "2026-11-21T09:00:00Z",
+      "updatedAt": "2026-11-21T09:00:00Z"
+     },
+     {
+      "databaseId": 31,
+      "body": "later evidence",
+      "createdAt": "2026-11-21T13:00:00Z",
+      "updatedAt": "2026-11-21T13:00:00Z"
      }
     ]
    }
@@ -226,7 +207,6 @@
   {
    "number": 950,
    "title": "fix an orphan",
-   "url": "u",
    "closingIssuesReferences": {
     "nodes": [
      {
@@ -240,7 +220,6 @@
   {
    "number": 951,
    "title": "fix a parented",
-   "url": "u",
    "closingIssuesReferences": {
     "nodes": [
      {
@@ -256,12 +235,24 @@
   {
    "number": 952,
    "title": "content",
-   "url": "u",
    "closingIssuesReferences": {
     "nodes": [
      {
       "number": 903,
       "title": "Ch9 - map + events",
+      "parent": null
+     }
+    ]
+   }
+  },
+  {
+   "number": 953,
+   "title": "fix a closed-elsewhere orphan",
+   "closingIssuesReferences": {
+    "nodes": [
+     {
+      "number": 905,
+      "title": "Bot: orphan not in the open list",
       "parent": null
      }
     ]

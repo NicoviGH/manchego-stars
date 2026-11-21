@@ -60,8 +60,7 @@ python-bin:
 check:
 	@python3 tools/check.py
 
-# GitHub record guard (#707): orphan bot issues, holds without a why, stale status comments.
-# Exit 1 on a finding, 2 if `gh` could not answer.
+# GitHub record guard (#707); checks and exit codes: tools/gh_tidy.py docstring.
 tidy:
 	@python3 tools/gh_tidy.py
 

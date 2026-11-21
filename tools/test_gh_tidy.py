@@ -6,6 +6,7 @@ one deliberate drift per check and a clean twin beside it.
 
 Run: python3 tools/test_gh_tidy.py
 """
+import copy
 import json
 import os
 import sys
@@ -26,9 +27,15 @@ class OrphanTest(unittest.TestCase):
         self.assertEqual(len(msgs), 1, msgs)
         self.assertTrue(msgs[0].startswith('#900 '), msgs)
 
-    def test_roots_and_non_bot_titles_are_exempt(self):
+    def test_the_root_and_non_bot_titles_are_exempt(self):
         self.assertFalse(any(m.startswith(p) for m in gh_tidy.check_orphans(DATA['issues'])
                              for p in ('#510 ', '#640 ', '#902 ', '#903 ')))
+
+    def test_640_losing_its_parent_is_reported(self):
+        data = copy.deepcopy(DATA)
+        next(i for i in data['issues'] if i['number'] == 640)['parent'] = None
+        msgs = gh_tidy.check_orphans(data['issues'])
+        self.assertEqual(sorted(m[:5] for m in msgs), ['#640 ', '#900 '], msgs)
 
 
 class HoldTest(unittest.TestCase):
@@ -42,10 +49,17 @@ class HoldTest(unittest.TestCase):
 
 
 class PrLinkTest(unittest.TestCase):
-    def test_pr_closing_an_orphan_bot_issue(self):
-        msgs = gh_tidy.check_pr_links(DATA['pullRequests'])
+    OPEN = {i['number'] for i in DATA['issues']}
+
+    def test_pr_closing_an_orphan_not_in_the_open_list(self):
+        msgs = gh_tidy.check_pr_links(DATA['pullRequests'], self.OPEN)
         self.assertEqual(len(msgs), 1, msgs)
-        self.assertTrue(msgs[0].startswith('PR #950 '), msgs)
+        self.assertTrue(msgs[0].startswith('PR #953 '), msgs)
+
+    def test_open_orphan_is_reported_once_not_twice(self):
+        # PR #950 closes open orphan #900: the orphan check owns it, the pr-link check skips it.
+        found = gh_tidy.findings(DATA)
+        self.assertEqual([k for k, m in found if '#900' in m], ['orphan'], found)
 
 
 class StatusTest(unittest.TestCase):
@@ -54,6 +68,9 @@ class StatusTest(unittest.TestCase):
         self.assertEqual(len(msgs), 1, msgs)
         self.assertTrue(msgs[0].startswith('#920: status comment 10 '), msgs)
         self.assertIn('comment 12 ', msgs[0])
+
+    def test_a_quoted_marker_mid_line_is_not_a_status_comment(self):
+        self.assertFalse(any(m.startswith('#922') for m in gh_tidy.check_stale_status(DATA['issues'])))
 
     def test_status_edited_after_the_last_comment_is_fresh(self):
         self.assertFalse(any(m.startswith('#921') for m in gh_tidy.check_stale_status(DATA['issues'])))
@@ -75,6 +92,33 @@ class MainTest(unittest.TestCase):
         def boom():
             raise gh_tidy.GhError('no network')
         self.assertEqual(self._run(boom), 2)
+
+    def test_comments_past_the_first_page_are_all_read(self):
+        # #911's why-comment sits on the second page: a first-page-only read would call the
+        # hold unexplained, and miss an old status comment the same way.
+        issue = {'number': 911, 'title': 'Bot: held', 'parent': {'number': 640},
+                 'labels': {'nodes': [{'name': 'on-hold'}]},
+                 'comments': {'pageInfo': {'hasNextPage': True, 'endCursor': 'c1'},
+                              'nodes': [{'databaseId': 1, 'body': 'x', 'createdAt': 'a',
+                                         'updatedAt': 'a'}]}}
+        page2 = {'pageInfo': {'hasNextPage': False, 'endCursor': None},
+                 'nodes': [{'databaseId': 2, 'body': '**On hold (Nicolas).** why',
+                            'createdAt': 'b', 'updatedAt': 'b'}]}
+        seen = []
+
+        def graphql(query, **variables):
+            seen.append((query, variables))
+            if query is gh_tidy.ISSUES_QUERY:
+                return {'issues': {'pageInfo': {'hasNextPage': False}, 'nodes': [issue]}}
+            if query is gh_tidy.COMMENTS_QUERY:
+                return {'issue': {'comments': page2}}
+            return {'pullRequests': {'pageInfo': {'hasNextPage': False}, 'nodes': []}}
+        with mock.patch.object(gh_tidy, '_graphql', graphql):
+            data = gh_tidy.fetch()
+        self.assertEqual([c['databaseId'] for c in data['issues'][0]['comments']['nodes']], [1, 2])
+        self.assertEqual(gh_tidy.check_holds(data['issues']), [])
+        follow = [v for q, v in seen if q is gh_tidy.COMMENTS_QUERY]
+        self.assertEqual(follow, [{'number': 911, 'after': 'c1'}], seen)
 
     def test_gh_nonzero_exit_raises(self):
         done = mock.Mock(returncode=1, stderr='HTTP 401', stdout='')
