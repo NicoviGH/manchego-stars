@@ -265,12 +265,12 @@ class TestAwaitControllerState(unittest.TestCase):
         # General guard: a start-chapter sample compared with `chapter() ~=` anywhere else in
         # harness.lua is a copy of the old rule (hosted-chapter constants are not start samples).
         harness = _read_harness()
-        copies = re.findall(r'chapter\(\) *(?:~=|==) *(?:start\w*|started\w*)\b', harness)
+        copies = re.findall(r'chapter\(\) *(?:~=|==) *(?:start\w*|started\w*|here)\b', harness)
         self.assertEqual(copies, [],
                          'a won/ended check that compares the chapter index to a start sample '
                          'misses the last chapter; ask INSPECT.chapterWon')
         # a start sample goes through the guard that refuses a finished game
-        self.assertEqual(re.findall(r'local (start\\w*) *= *chapter\\(\\)', harness), [],
+        self.assertEqual(re.findall(r'local (start\w*) *= *chapter\(\)', harness), [],
                          'a start sample must be INSPECT.startChapter()')
         self.assertEqual(re.findall(r'\w+Drive\(chapter\(\)', harness), [],
                          'the drivers take INSPECT.startChapter()')

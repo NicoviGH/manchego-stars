@@ -1645,7 +1645,7 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
     if alreadyWon and alreadyWon() then return "ended" end
     -- the game's end may already be up (the final boss died to the last action's counter)
     if INSPECT.gameFinished() then return "ended" end
-    local startedIn = chapter()
+    local startedIn = INSPECT.startChapter()
     for _ = 1, TUNE.enemyPhaseFrames do
         if gameOverActive() then return "gameover" end
         -- The chapter can END during the enemy phase: a DefeatAll win fires the ending right
@@ -2507,8 +2507,8 @@ scenarios.vanillagold = function()
             if not sx or not INSPECT.place(seth, sx, sy) then return false end
             seth = blue(SETH)
             if not moveUnit(seth.x, seth.y, seth.x, seth.y) then return false end
-            chooseAttack(seth.addr, function() return isDead(red(pid)) or chapter() ~= here end)
-            if isDead(red(pid)) or chapter() ~= here then return true end
+            chooseAttack(seth.addr, function() return isDead(red(pid)) or INSPECT.chapterWon(here) end)
+            if isDead(red(pid)) or INSPECT.chapterWon(here) then return true end
             if runEnemyPhase() ~= "player" then return false end
         end
         return false
@@ -5292,7 +5292,7 @@ local function fuzzDrive(startChapter)
         else
             local over = gameOverActive()
             -- chapter() == 0 (a reset to the prologue/title) and a game over are not wins
-        local won = (not over) and chapter() ~= 0 and INSPECT.chapterWon(startChapter)
+            local won = (not over) and chapter() ~= 0 and INSPECT.chapterWon(startChapter)
             snaps[#snaps + 1] = {
                 frame = emu:currentFrame(), turn = turn(), faction = faction(),
                 hpsum = hpSum(), procfp = fuzzFingerprint(),
