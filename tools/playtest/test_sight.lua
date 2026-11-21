@@ -618,7 +618,7 @@ do
     local m = fakeMem()
     local mapSYM, cell = bmUnitMap(m)
     local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16,
-                    write32 = m.w32, Board = Board, SYM = mapSYM }
+                    write32 = m.w32, Board = Board.bind(m, mapSYM), SYM = mapSYM }
     local S, STATE = { RefreshEntityBmMaps = 0x0801A2D8 }, 0x0C
     local red = { addr = 0x02030200 }
     m.w32(red.addr + STATE, Board.US_BIT9 | 0x00010000)
@@ -662,15 +662,19 @@ do
     local spans = {}
     local oddM = fakeMem()
     local oddSYM = bmUnitMap(oddM, 3, 3)
-    Sight.keepMapPools({ mem = oddM, SYM = oddSYM, Board = Board,
+    Sight.keepMapPools({ mem = oddM, SYM = oddSYM, Board = Board.bind(oddM, oddSYM),
                          keep16 = function(a, n) spans[#spans + 1] = n end })
     check(table.concat(spans, ","), "17,17,17", "keepMapPools: an odd-sized map keeps the floor, as BmMapFill clears")
     -- a missing symbol or a pool not built raises, naming it (a refresh runs on a loaded map)
-    local okMiss, whyMiss = pcall(Sight.keepMapPools, { mem = oddM, Board = Board, SYM = { gBmMapSize = 0x2000 }, keep16 = function() end })
+    local okSize, whySize = pcall(Sight.keepMapPools, { mem = oddM, Board = Board.bind(oddM, {}), SYM = {}, keep16 = function() end })
+    check(okSize == false and whySize:find("gBmMapSize is missing", 1, true) ~= nil, true,
+          "keepMapPools: a missing map size is named: " .. tostring(whySize))
+    local sizeOnly = { gBmMapSize = oddSYM.gBmMapSize }
+    local okMiss, whyMiss = pcall(Sight.keepMapPools, { mem = oddM, Board = Board.bind(oddM, sizeOnly), SYM = sizeOnly, keep16 = function() end })
     check(okMiss == false and whyMiss:find("gBmMapUnit is missing", 1, true) ~= nil, true,
           "keepMapPools: a missing symbol is named, not skipped: " .. tostring(whyMiss))
     oddM.w32(oddSYM.gBmMapFog, 0)
-    local okNull, whyNull = pcall(Sight.keepMapPools, { mem = oddM, Board = Board, SYM = oddSYM, keep16 = function() end })
+    local okNull, whyNull = pcall(Sight.keepMapPools, { mem = oddM, Board = Board.bind(oddM, oddSYM), SYM = oddSYM, keep16 = function() end })
     check(okNull == false and whyNull:find("gBmMapFog is not built", 1, true) ~= nil, true,
           "keepMapPools: a null map pointer is named: " .. tostring(whyNull))
 

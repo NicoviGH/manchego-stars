@@ -1719,7 +1719,7 @@ M.REFRESHED_MAPS = { "gBmMapUnit", "gBmMapHidden", "gBmMapFog" }
 function M.keepMapPools(api)
     local mem, S = api.mem, api.SYM
     if not S.gBmMapSize then error("keepMapPools: SYM.gBmMapSize is missing", 0) end
-    local w, h = api.Board.mapSize(mem, S)
+    local w, h = api.Board.mapSize()   -- the bound reader (Board.bind)
     local words = ((w + 2) * (h + 4)) // 2
     for _, name in ipairs(M.REFRESHED_MAPS) do
         if not S[name] then error("keepMapPools: SYM." .. name .. " is missing (gen_symbols.py)", 0) end
