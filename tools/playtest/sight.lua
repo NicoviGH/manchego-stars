@@ -4042,6 +4042,19 @@ function M.talks(api, sandbox)
     end)
 end
 
+-- The talks of `talks` (M.talks) that would bring a unit over: a pair the table also holds the
+-- other way round is the game's CharacterEventBothWays, a conversation between two of our units
+-- (E_15's Duessel and Cormag, ch15a-eventinfo.h), never a recruit (#699). -> the recruit talks.
+function M.recruitTalks(talks)
+    local pair = {}
+    for _, t in ipairs(talks) do pair[t.a .. ">" .. t.b] = true end
+    local out = {}
+    for _, t in ipairs(talks) do
+        if not pair[t.b .. ">" .. t.a] then out[#out + 1] = t end
+    end
+    return out
+end
+
 -- What each stolen item costs a clean clear (ADR 0379): its AiGetItemStealRank, and whether
 -- that ranks it above ITEM_BOOSTER_SKL in the game's own list. -> { [item] = { rank, spoils } }
 function M.stealRanks(api, items)

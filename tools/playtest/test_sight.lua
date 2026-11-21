@@ -204,6 +204,16 @@ do
           "talks: the breakpoints are cleared")
 end
 
+-- test_recruit_talks_drop_a_both_ways_pair: E_15's Duessel-Cormag talk is in the table both
+-- ways (CharacterEventBothWays, a conversation); only the one-way talk is a recruit (#699).
+do
+    local talks = Sight.recruitTalks({ { a = 0x1D, b = 0x0E }, { a = 0x0E, b = 0x1D },
+                                       { a = 0x01, b = 0x30 }, { a = 0, b = 0x20 } })
+    check(#talks, 2, "recruitTalks: the both-ways pair is dropped")
+    check(talks[1] and talks[1].b, 0x30, "recruitTalks: a one-way talk stays")
+    check(talks[2] and talks[2].b, 0x20, "recruitTalks: an anyone talk stays")
+end
+
 -- test_odds_compose_exchanges: two 50/50 exchanges of 6 on a 10 HP unit kill a quarter of the
 -- time; the damage is capped at the HP; worst and least read a distribution's ends.
 do
