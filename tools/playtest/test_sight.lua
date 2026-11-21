@@ -6,6 +6,7 @@ local here = (arg[0]:match("(.*/)")) or "./"
 local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
 local fakeMem = dofile(here .. "fakemem.lua")
+local Json = dofile(here .. "json.lua")
 -- sight.lua's own text, for the tests that read a call's place off the source
 local sightSrc
 do
@@ -1535,6 +1536,8 @@ do
     local ids = {}
     for _, x in ipairs(Sight.demandsOf({}, {}, 0, free)) do ids[#ids + 1] = x.id end
     check(table.concat(ids, " "), "talk:28 sustain", "demandsOf: a free talk is a demand")
+    -- the record encodes every demand (campaign.lua's pick): no number-keyed object
+    check(pcall(Json.encode, Sight.demandsOf({}, {}, 0, free)), true, "demandsOf: a talk demand encodes")
 end
 
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO

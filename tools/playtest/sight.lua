@@ -1179,8 +1179,12 @@ function M.demandsOf(units, commands, fog, freeTalks)
     for recruit in pairs(freeTalks or {}) do recruits[#recruits + 1] = recruit end
     table.sort(recruits)
     for _, recruit in ipairs(recruits) do
+        -- a list: the demand goes into the run's record, whose objects take string keys only
+        local talkers = {}
+        for talker in pairs(freeTalks[recruit]) do talkers[#talkers + 1] = talker end
+        table.sort(talkers)
         out[#out + 1] = { id = string.format("talk:%d", recruit), kind = "talk", need = 1,
-                          talkers = freeTalks[recruit] }
+                          talkers = talkers }
     end
     out[#out + 1] = { id = "sustain", kind = "sustain", need = 1 }
     return out
@@ -2558,7 +2562,10 @@ function M.new(outer)
                 return call(S.GetUnitFogViewRange, { u.addr })
             end) > mem.u8(S.gPlaySt + PLAY_VISION), 0
         elseif d.kind == "talk" then
-            return d.talkers[u.charId] == true, 0
+            for _, talker in ipairs(d.talkers) do
+                if talker == u.charId then return true, 0 end
+            end
+            return false, 0
         elseif d.kind == "sustain" then
             return #s.staves(u) > 0, 0
         elseif d.kind == "village" then
