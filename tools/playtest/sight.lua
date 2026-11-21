@@ -351,12 +351,13 @@ local BALLISTA_SLOT = 0xFF
 -- the Attack menu forecasts a strike on it).
 local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 -- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script, +1A pidA, +1B pidB;
--- 0x1C bytes. A talk entry (EvtListTalk, struct EvCheck03/04) holds pidA +08, pidB +09.
+-- 0x1C bytes. A talk entry (EvtListTalk, struct EvCheck03/04) holds script +04, pidA +08,
+-- pidB +09.
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
 -- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
 local EVENT_FLAG, EVENT_X, EVENT_Y = 0x08, 0x18, 0x19
 local CHAPTER_TURNS, CHAPTER_LOCATIONS = 0x00, 0x08
-local TALK_PID_A, TALK_PID_B, NO_PID = 0x08, 0x09, 0xFF
+local TALK_SCRIPT, TALK_PID_A, TALK_PID_B, NO_PID = 0x04, 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
 local CHAPTER_TALKS = 0x04
 -- struct PlaySt: +0D chapterVisionRange (0 = no fog), +0F faction, +10 u16 chapterTurnNumber.
@@ -4020,7 +4021,7 @@ end
 -- recruits): SearchAvailableEvent walks the chapter's characterBasedEvents asking for a pair no
 -- entry names, a breakpoint on each talk check (EvCheck03_CHAR, EvCheck04_CHARASM) reads the
 -- entry it is handed, and CheckForCharacterEvents(a, b) keeps the ones available (flag unset,
--- condition met). -> { { a = pidA, b = pidB } }, a = 0 being anyone.
+-- condition met). -> { { a = pidA, b = pidB, script } }, a = 0 being anyone.
 function M.talks(api, sandbox)
     local mem, S = api.mem, api.SYM
     return (sandbox or M.machine(api.cpu))(function(call, info)
@@ -4030,7 +4031,8 @@ function M.talks(api, sandbox)
         local seen = {}
         local function entry()
             local at = mem.u32(info)
-            seen[#seen + 1] = { a = mem.u8(at + TALK_PID_A), b = mem.u8(at + TALK_PID_B) }
+            seen[#seen + 1] = { a = mem.u8(at + TALK_PID_A), b = mem.u8(at + TALK_PID_B),
+                                script = mem.u32(at + TALK_SCRIPT) }
         end
         M.withBreaks(api.cpu, { { S.EvCheck03_CHAR, entry }, { S.EvCheck04_CHARASM, entry } },
             function() call(S.SearchAvailableEvent, { info }) end)
@@ -4043,14 +4045,16 @@ function M.talks(api, sandbox)
 end
 
 -- The talks of `talks` (M.talks) that would bring a unit over: a pair the table also holds the
--- other way round is the game's CharacterEventBothWays, a conversation between two of our units
--- (E_15's Duessel and Cormag, ch15a-eventinfo.h), never a recruit (#699). -> the recruit talks.
+-- other way round with the same script is the game's CharacterEventBothWays (two entries, one
+-- script), a conversation between two of our units (E_15's Duessel and Cormag,
+-- ch15a-eventinfo.h), never a recruit (#699). Two one-way talks with their own scripts both
+-- stay. -> the recruit talks.
 function M.recruitTalks(talks)
     local pair = {}
-    for _, t in ipairs(talks) do pair[t.a .. ">" .. t.b] = true end
+    for _, t in ipairs(talks) do pair[t.a .. ">" .. t.b .. ">" .. tostring(t.script)] = true end
     local out = {}
     for _, t in ipairs(talks) do
-        if not pair[t.b .. ">" .. t.a] then out[#out + 1] = t end
+        if not pair[t.b .. ">" .. t.a .. ">" .. tostring(t.script)] then out[#out + 1] = t end
     end
     return out
 end
