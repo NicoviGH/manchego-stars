@@ -30,6 +30,17 @@ local function zeroMem()
     return { u8 = zero, u16 = zero, u32 = zero, s8 = zero }
 end
 
+-- The game's own gBmMapUnit layout (bmmap.c BmMapInit) over `m`, 3 x 2 tiles: gBmMapSize, then
+-- h + 4 row pointers, then the (w + 2)-wide rows, the handle on the third pointer. -> the SYM
+-- fields, and cell(x, y), the address of the unit map's (x, y).
+local function bmUnitMap(m)
+    local SYM, W, H, ROWS, DATA = { gBmMapSize = 0x2000, gBmMapUnit = 0x2008 }, 3, 2, 0x2100, 0x2200
+    m.w16(SYM.gBmMapSize, W); m.w16(SYM.gBmMapSize + 2, H)
+    for i = 0, H + 3 do m.w32(ROWS + i * 4, DATA + i * (W + 2)) end
+    m.w32(SYM.gBmMapUnit, ROWS + 8)
+    return SYM, function(x, y) return DATA + (y + 2) * (W + 2) + x end
+end
+
 -- A CPU whose "game function" at 0x08001000 returns r0 + r1 after `cost` frames (to the
 -- loop lr names), and at 0x08002000 never returns.
 local function fakeCpu(cost)
@@ -595,8 +606,9 @@ end
 -- plan revealed stayed seen for the rest of the batch). The fake call is bmmap.c's write.
 do
     local m = fakeMem()
+    local mapSYM, cell = bmUnitMap(m)
     local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16,
-                    write32 = m.w32, Board = Board }
+                    write32 = m.w32, Board = Board, SYM = mapSYM }
     local S, STATE = { RefreshEntityBmMaps = 0x0801A2D8 }, 0x0C
     local red = { addr = 0x02030200 }
     m.w32(red.addr + STATE, Board.US_BIT9 | 0x00010000)
@@ -611,13 +623,21 @@ do
                  { TRAPS, Sight.TRAP_MAX * Sight.TRAP_SIZE, "trap pool" } }
     end, log)
     local seen = {}
+    -- the refresh of a board whose blue units are hidden (the AI's decision, closings) clears
+    -- the unit map and refills it without them (bmmap.c RefreshEntityBmMaps): our unit at (1,1)
+    m.w8(cell(1, 1), 7)
+    local function wipe() m.w8(cell(1, 1), 0) end
     local ok, why = pcall(sandbox, function()
         sandbox(function()
-            Sight.refresh(api, call, S, { [130] = red })
+            Sight.refresh(api, function(fn, ...) wipe(); return call(fn, ...) end, S, { [130] = red })
             seen[1] = m.u32(red.addr + STATE)
+            seen[5] = m.u8(cell(1, 1))
         end)
         seen[2] = m.u32(red.addr + STATE)
+        seen[6] = m.u8(cell(1, 1))
     end)
+    check(seen[5], 0, "refresh: the plan's own read sees the unit map as its refresh left it")
+    check(seen[6], 7, "refresh: the next plan finds our unit on the map (#681: Drop offered an ally's tile)")
     check(ok and #log == 0, true, "refresh: the guard finds nothing left changed: " .. tostring(why))
     check(seen[1], 0x00010100, "refresh: the plan's own read sees the enemy revealed")
     check(seen[2], Board.US_BIT9 | 0x00010000, "refresh: the next plan finds it in fog again")

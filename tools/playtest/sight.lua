@@ -1690,8 +1690,24 @@ end
 -- Found by PT_LEAKGUARD on vanilla Ch6, turn 2 (#510). `units` as M.keepAi's.
 -- M.refresh is that keep and the call; aiDecide, whose refresh rides in its one call list,
 -- keeps and lists it itself. Every refresh inside a sandbox is one of the two.
+-- The unit map is kept the same way (M.keepUnitMap): the refresh clears gBmMapUnit and refills
+-- it from the structs as the sandbox stands them, a unit it hides left out, and the journal
+-- puts only the structs back. The AI's own decision hides our units (closings, onlyTarget), so
+-- the refresh in it wiped every blue unit off the map for the plans read after it in the
+-- batch: Drop's list offered the tile of an ally standing there and the game refused it
+-- (vanilla Ch19, campaign 4002 attempt 2 turn 12, #681).
 function M.keepFog(api, units)
     for _, o in pairs(units) do api.keep16(o.addr + UNIT_STATE, 2) end
+    M.keepUnitMap(api)
+end
+-- gBmMapUnit's cells, put back when the sandbox returns: BmMapInit lays the map out as
+-- (w + 2) * (h + 4) bytes from the first of its h + 4 row pointers (the handle points at the
+-- third), the span BmMapFill clears. Halfwords: the pool starts on a word.
+function M.keepUnitMap(api)
+    local mem, S = api.mem, api.SYM
+    local w, h = mem.u16(S.gBmMapSize), mem.u16(S.gBmMapSize + 2)
+    local rows = mem.u32(S.gBmMapUnit)
+    api.keep16(mem.u32(rows - 8), ((w + 2) * (h + 4) + 1) // 2)
 end
 function M.refresh(api, call, S, units)
     M.keepFog(api, units)
