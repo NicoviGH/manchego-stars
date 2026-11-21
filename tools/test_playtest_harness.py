@@ -258,20 +258,40 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertEqual(harness.count('endTurn(nil, advanced)'), 1,
                          'clear_ch02 must pass the win predicate')
 
-    def test_every_won_check_goes_through_the_one_owner_that_sees_the_games_end(self):
+    def test_no_won_check_outside_the_owner_compares_a_start_chapter(self):
         # #696. The final boss's kill ends in MNC4: no next chapter is set, the post-chapter save
-        # menu comes up, and `chapter() ~= start` never fires, so api.act's wait ran out and the
-        # run of a game the bot had beaten crashed. The rule is Controller.won (unit-tested in
-        # test_controller.lua), read through INSPECT.chapterWon; no waiter may keep its own copy.
+        # menu comes up, and `chapter() ~= start` never fires. The rule is Controller.won (behaviour
+        # unit-tested in test_controller.lua, with stubbed reads), read through INSPECT.chapterWon.
+        # General guard: a start-chapter sample compared with `chapter() ~=` anywhere else in
+        # harness.lua is a copy of the old rule (hosted-chapter constants are not start samples).
         harness = _read_harness()
-        owner = _block(harness, 'function INSPECT.chapterWon(', '\nend\n')
-        self.assertIn('Controller.won(start, chapter(), procActive(SYM.gProcScr_SaveMenuPostChapter))',
-                      owner, 'the game ended is the post-chapter save menu on the same chapter index')
-        self.assertNotRegex(harness, r'local function won\(\) return chapter\(\) ~= \w+',
-                            'a won check that compares only the chapter index misses the last chapter')
-        self.assertEqual(len(re.findall(r'local function won\(\) return INSPECT\.chapterWon\(',
-                                        harness)), 4,
-                         'the bot api, the clear drivers and the commander loop ask the one owner')
+        copies = re.findall(r'chapter\(\) *(?:~=|==) *(?:start\w*|started\w*)\b', harness)
+        self.assertEqual(copies, [],
+                         'a won/ended check that compares the chapter index to a start sample '
+                         'misses the last chapter; ask INSPECT.chapterWon')
+        # a start sample goes through the guard that refuses a finished game
+        self.assertEqual(re.findall(r'local (start\\w*) *= *chapter\\(\\)', harness), [],
+                         'a start sample must be INSPECT.startChapter()')
+        self.assertEqual(re.findall(r'\w+Drive\(chapter\(\)', harness), [],
+                         'the drivers take INSPECT.startChapter()')
+
+    def test_the_games_end_is_the_menu_entered_by_mnc4_not_any_post_chapter_save_menu(self):
+        # gProcScr_SaveMenuPostChapter is also the prep screen's Save (type 2/4) on the chapter's
+        # own index; only MNC4 sets save_menu_type 3. The offset comes from types.h struct PlaySt.
+        with open(os.path.join(REPO, 'tools/playtest/controller.lua'), encoding='utf-8') as f:
+            controller = f.read()
+        with open(os.path.join(REPO, 'fireemblem8u/include/types.h'), encoding='utf-8') as f:
+            types_h = f.read()
+        self.assertRegex(types_h, r'u16 unk48;\s*\n\s*u8 unk4A_1 : 1;\s*\n\s*u8 save_menu_type : 3;',
+                         'the PlaySt layout the harness reads changed')
+        self.assertIn('M.SAVE_MENU_TYPE_OFFSET = 0x4A', controller)
+        harness = _read_harness()
+        owner = _block(harness, 'INSPECT.finishReads = {', '\n}\n')
+        self.assertIn('SYM.gProcScr_SaveMenuPostChapter', owner)
+        self.assertIn('Controller.SAVE_MENU_TYPE_OFFSET', owner)
+        enemy = _block(harness, 'local function runEnemyPhase(', '\n-- Detecting an on-screen')
+        self.assertIn('INSPECT.chapterWon(startedIn)', enemy,
+                      'the enemy phase must end on the game finishing too')
 
     def test_a_chapter_ending_mid_phase_is_an_exit_not_a_wedge(self):
         # #335. A DefeatAll win fires the ending from INSIDE the enemy phase, and from there

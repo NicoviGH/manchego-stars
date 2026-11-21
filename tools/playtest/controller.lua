@@ -1028,11 +1028,50 @@ M.MENU_END_PHASE = MENU_END_PHASE
 
 -- Whether the chapter that began as `start` has been won. The game's usual win moves the chapter
 -- index on (a next chapter is set); the last chapter's does not: its boss's DefeatBoss script
--- ends in MNC4, which sets no next chapter and hands the game to the post-chapter save menu
--- (eventscr.c EVSUBCMD_MNC4, gamecontrol.c), so `finished` -- that menu is up -- is the other
--- way a chapter is won (#696). The one owner of the rule: harness.lua reads the two facts.
+-- ends in MNC4, which sets no next chapter, `save_menu_type = 3` and GAME_ACTION_PLAYED_THROUGH
+-- (eventscr.c EVSUBCMD_MNC4) and hands the game to the post-chapter save menu (gamecontrol.c,
+-- label 16), so `finished` is the other way a chapter is won (#696). The one owner of the rule:
+-- harness.lua supplies the reads (`reads`, injectable so a test stubs them).
 function M.won(start, now, finished)
     return now ~= start or finished == true
+end
+
+-- gPlaySt +0x4A: `u8 unk4A_1:1; u8 save_menu_type:3; u8 tutorial_exec_type:4` (types.h struct
+-- PlaySt; offset checked by compiling the struct, 0x4C bytes, config at 0x40, unk48 at 0x48).
+-- GBA bitfields fill from the low bit, so the type is bits 1-3.
+M.SAVE_MENU_TYPE_OFFSET = 0x4A
+M.SAVE_MENU_PLAYED_THROUGH = 3
+function M.saveMenuType(byte)
+    return (byte // 2) % 8
+end
+
+-- The game is finished: the post-chapter save menu is up AND it was entered by MNC4. The menu
+-- proc alone is not the end: gProcScr_SaveMenuPostChapter is also the prep screen's Save
+-- (prep_sallycursor.c StartPrepSaveScreen, type 2 or 4, on the chapter's own index), the
+-- world-map and between-chapter saves, and a debug command (bmmenu.c, bmdebug.c). Only MNC4
+-- sets type 3 (eventscr.c: MNCH 1, MNC2 2, worldmap_main.c 1, prep 2/4, bmdebug 2).
+function M.gameFinished(menuUp, menuByte)
+    return menuUp == true and M.saveMenuType(menuByte) == M.SAVE_MENU_PLAYED_THROUGH
+end
+
+-- reads = { chapter = fn() -> the chapter index, menuUp = fn() -> bool, menuByte = fn() -> u8 }
+function M.readFinished(reads)
+    if not reads.menuUp() then return false end
+    return M.gameFinished(true, reads.menuByte())
+end
+
+function M.chapterWon(start, reads)
+    return M.won(start, reads.chapter(), M.readFinished(reads))
+end
+
+-- The chapter a run starts in. A finished game on the first sample would read as won from the
+-- first call, so it is loud, not a silent win.
+function M.sampleStart(reads)
+    if M.readFinished(reads) then
+        error("the game is already finished (the played-through save menu is up) where a "
+            .. "chapter's start is sampled; the run would read as won at once", 0)
+    end
+    return reads.chapter()
 end
 
 return M
