@@ -1198,6 +1198,8 @@ end
 -- LABEL, so an END stops the walk only when every label a GOTO/branch named is already behind it.
 -- Bounded: EV_SCRIPT_LIMIT commands a script, and a pointer is followed only inside the ROM
 -- (a script in RAM, or garbage, is not read). `seen` guards a loop. Pure over mem.
+-- Every ENQUEUE_CALL is followed, whatever its subcommand: an enqueued paid script reads as paid,
+-- which only withholds a free-talker demand, never adds a wrong one.
 local EV_CMD_LABEL, EV_CMD_GOTO, EV_CMD_CALL, EV_CMD_ENQUEUE_CALL, EV_CMD_BRANCH, EV_CMD_END =
     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x01
 M.EV_SCRIPT_LIMIT = 512
