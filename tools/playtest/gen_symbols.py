@@ -62,6 +62,7 @@ Symbol = namedtuple('Symbol', 'name type addr')
 # Symbols the harness reads/scans. Struct offsets live in harness.lua next to
 # the decomp header they came from.
 WANTED = [
+    'EventScr_9EEB00',          # the paid-recruit script: a talk reaching it is a paid hire (sight.lua freeTalks)
     'gPlaySt',                  # chapter index / phase / turn (include/types.h)
     'gArenaState',              # accepted wager/opponent state (include/bmarena.h)
     'gFaces',                   # four struct FaceProc* slots; faceId is u16 at +0x3E.

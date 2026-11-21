@@ -1916,6 +1916,20 @@ local function test_team_covers_the_scarcest_demand_first()
 end
 test_team_covers_the_scarcest_demand_first()
 
+-- #699: the only free talker of an owed recruit, last in slot order and never carried, takes the
+-- seat a carried healer would otherwise fill by habit.
+local function test_team_seats_the_only_free_talker()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "healer"),
+                     teamUnit(3, 0x19, "healer") }
+    local demands = { { id = "talk:28", kind = "talk", need = 1 }, { id = "sustain", need = 1 } }
+    local answers = { [0x02] = { sustain = true }, [0x19] = { ["talk:28"] = true, sustain = true } }
+    local p = team({ roster = roster, cap = 1, demands = demands, answers = answers,
+                     carried = { [0x02] = true } })
+    check(csv(p.deploy), "25", "the free talker is seated, not the carried healer")
+    check(p.reasons[0x19].why, "covers", "reason: covers the talk")
+end
+test_team_seats_the_only_free_talker()
+
 local function test_team_ties_carried_then_earlier_joiner()
     local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "magic"),
                      teamUnit(3, 0x03, "magic") }

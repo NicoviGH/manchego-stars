@@ -230,7 +230,8 @@
 --   cache                    {} for ONE player phase (bot.lua keeps attacks and strikes there).
 --   demands()                what the map asks of a team (M.demandsOf), at the prep screen:
 --                            the board's red units and the chapter's tile commands (read once,
---                            with the Seize tile), fog from gPlaySt.chapterVisionRange.
+--                            with the Seize tile), fog from gPlaySt.chapterVisionRange, and a
+--                            `talk` demand per recruit a unit brings over for free (M.freeTalks).
 --   answer(u, d) -> answered, strength: how `u` answers demand `d`, by the game's own checks.
 --                            enemy: attack() on d.rep from r.max away (N, E, S, W, the first on
 --                            the map), answered when it kills in one round and outlives the
@@ -1148,7 +1149,9 @@ end
 -- chapter's tile commands; fog = gPlaySt.chapterVisionRange. One demand per red class on the
 -- field (need = how many stand there, rep = the first), one per village tile, one for chests
 -- and one for doors when there are any, fog when the chapter has it, and sustain always.
-function M.demandsOf(units, commands, fog)
+-- `freeTalks` (M.freeTalks) adds one `talk` demand per recruit a unit may bring over for free:
+-- answered only by those talkers, so Bot.team seats one of them (#699).
+function M.demandsOf(units, commands, fog, freeTalks)
     local out, byClass, once = {}, {}, {}
     for _, u in ipairs(units) do
         if u.faction == "red" and u.onField and u.classId then
@@ -1172,7 +1175,52 @@ function M.demandsOf(units, commands, fog)
         end
     end
     if fog > 0 then out[#out + 1] = { id = "fog", kind = "fog", need = 1 } end
+    local recruits = {}
+    for recruit in pairs(freeTalks or {}) do recruits[#recruits + 1] = recruit end
+    table.sort(recruits)
+    for _, recruit in ipairs(recruits) do
+        out[#out + 1] = { id = string.format("talk:%d", recruit), kind = "talk", need = 1,
+                          talkers = freeTalks[recruit] }
+    end
     out[#out + 1] = { id = "sustain", kind = "sustain", need = 1 }
+    return out
+end
+
+-- Whether the event script at `script` CALLs `target` (EV_CMD_CALL, direct), following its own
+-- CALLs: Eirika's E_14 talk reaches the paid-recruit script through a second one. A command's
+-- length is its first halfword's second nibble, in halfwords (event.c); it ends at its first
+-- END (EV_CMD_END). `seen` guards a loop. Pure over mem.
+local EV_CMD_CALL, EV_CMD_END = 0x0A, 0x01
+function M.callsScript(mem, script, target, seen)
+    seen = seen or {}
+    if script == target then return true end
+    if seen[script] then return false end
+    seen[script] = true
+    local at = script
+    while true do
+        local head = mem.u16(at)
+        local cmd, len = head >> 8, (head >> 4) & 0xF
+        if cmd == EV_CMD_END or len == 0 then return false end
+        if cmd == EV_CMD_CALL and (head & 0xF) == 0 then
+            if M.callsScript(mem, mem.u32(at + 4), target, seen) then return true end
+        end
+        at = at + len * 2
+    end
+end
+
+-- The recruits a unit brings over for FREE: of `talks` (M.recruitTalks), the talks to a unit not
+-- yet in the party (`joined`, a set of charIds) whose script never reaches the paid-recruit
+-- script `paid` (common-events.h EventScr_9EEB00: it asks the price; E_14's Eirika and Rennac).
+-- The game marks no talk free or paid, so the script is read. a = 0 is anyone: no demand.
+-- -> { [recruit] = { [talker] = true } }
+function M.freeTalks(mem, talks, paid, joined)
+    local out = {}
+    for _, t in ipairs(talks) do
+        if t.a ~= 0 and not (joined or {})[t.b] and not M.callsScript(mem, t.script, paid) then
+            out[t.b] = out[t.b] or {}
+            out[t.b][t.a] = true
+        end
+    end
     return out
 end
 
@@ -2398,7 +2446,13 @@ function M.new(outer)
     end)
 
     function s.demands()
-        return M.demandsOf(units(), commands, mem.u8(S.gPlaySt + PLAY_VISION))
+        local us, joined = units(), {}
+        for _, u in ipairs(us) do
+            if u.faction == "blue" then joined[u.charId] = true end
+        end
+        local free = M.freeTalks(mem, M.recruitTalks(M.talks(api, sandbox)),
+                                 S.EventScr_9EEB00, joined)
+        return M.demandsOf(us, commands, mem.u8(S.gPlaySt + PLAY_VISION), free)
     end
 
     -- FE8's own march distance to `tile`: GenerateExtendedMovementMap from it, out to
@@ -2503,6 +2557,8 @@ function M.new(outer)
             return sandbox(function(call)
                 return call(S.GetUnitFogViewRange, { u.addr })
             end) > mem.u8(S.gPlaySt + PLAY_VISION), 0
+        elseif d.kind == "talk" then
+            return d.talkers[u.charId] == true, 0
         elseif d.kind == "sustain" then
             return #s.staves(u) > 0, 0
         elseif d.kind == "village" then

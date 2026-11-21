@@ -1509,6 +1509,34 @@ do
     check(table.concat(ids, " "), "doors fog sustain", "demandsOf: doors, fog when the range is set")
 end
 
+-- freeTalks (#699): E_14's Rennac is hired by Eirika for a price (her script CALLs a second
+-- one that CALLs the paid-recruit script) and by L'Arachel for free (a script with no CALL).
+-- Only the free talker answers the demand; a paid-only recruit, a joined one and "anyone" ask
+-- nothing.
+do
+    local m = fakeMem()
+    local PAID, MID, EIRIKA, LARACHEL = 0x2000, 0x2100, 0x2200, 0x2300
+    local function call(at, to) m.w16(at, 0x0A40); m.w32(at + 4, to) end
+    local function enda(at) m.w16(at, 0x0120) end
+    m.w16(PAID, 0x0020); enda(PAID + 4)
+    m.w16(MID, 0x0020); call(MID + 4, PAID); enda(MID + 12)
+    m.w16(EIRIKA, 0x0020); call(EIRIKA + 4, MID); enda(EIRIKA + 12)
+    m.w16(LARACHEL, 0x0020); enda(LARACHEL + 4)
+    check(Sight.callsScript(m, EIRIKA, PAID), true, "callsScript: reached through a second CALL")
+    check(Sight.callsScript(m, LARACHEL, PAID), false, "callsScript: a script with no CALL")
+    local talks = { { a = 0x01, b = 0x1C, script = EIRIKA }, { a = 0x19, b = 0x1C, script = LARACHEL },
+                    { a = 0x01, b = 0x30, script = EIRIKA }, { a = 0, b = 0x31, script = LARACHEL } }
+    local free = Sight.freeTalks(m, talks, PAID, {})
+    check(free[0x1C][0x19], true, "freeTalks: L'Arachel's talk is free")
+    check(free[0x1C][0x01], nil, "freeTalks: Eirika's is the paid hire")
+    check(free[0x30], nil, "freeTalks: a paid-only recruit asks nothing")
+    check(free[0x31], nil, "freeTalks: anyone asks nothing")
+    check(Sight.freeTalks(m, talks, PAID, { [0x1C] = true })[0x1C], nil, "freeTalks: a joined recruit")
+    local ids = {}
+    for _, x in ipairs(Sight.demandsOf({}, {}, 0, free)) do ids[#ids + 1] = x.id end
+    check(table.concat(ids, " "), "talk:28 sustain", "demandsOf: a free talk is a demand")
+end
+
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
 -- (cp_script.h; the scripts loop back with a GOTO, so a scan past it reads the next script).
 do
@@ -2759,7 +2787,7 @@ do
     local counted = setmetatable({ write = function(r, v)
         if r == "pc" and v == GAME then calls = calls + 1 end
         cpu.write(r, v)
-    end }, { __index = cpu })
+    end, breakpoint = function() return 1 end, unbreak = function() end }, { __index = cpu })
     local S = setmetatable({}, { __index = function() return GAME end })
     local boardReads = 0
     local sight = Sight.new({ cpu = counted, mem = mem, write8 = nop, write16 = nop,
