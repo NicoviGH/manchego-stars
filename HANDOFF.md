@@ -11,41 +11,15 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21; main is c0f0709a). Runs are still going; check them first:** `ps -Ao etime,pcpu,command | grep -E "mgba-headless|montecarlo"`.
+**Next session starts here (2026-11-21, morning; main is a9a3bff2). No runs are going.**
 
-- **Worktrees (Nicolas allowed them for this work, 2026-11-20).** They exist so that no edit touches code a running game loads. Each has symlinks to the gitignored assets: `references`, `tools/emulator`, `tools/playtest/states`, `build/vanilla-fe8`. Never stage those. Remove each worktree when its runs end: `git worktree remove --force`.
-  - `../manchego-stars-wt`: detached at main c0f0709a. It runs the `f685` carry-ons.
-  - `../manchego-stars-wt3`: branch fix/brave-last-use (merged). It runs `f684`.
-  - `../manchego-stars-wt2`: branch fix/convoy-chest-key. **#687's work is there UNCOMMITTED** and is being ported into #688; drop it once #688's PR lands.
-  - `../manchego-stars-wt4`: branch feat/688-trade. An Opus subagent is building Trade step 1 there.
-- **Running** (logs in `review/640-batch/`, gitignored; per-attempt lines are in each worker's `/tmp/playtest-campaign@pool-*/playtest.log` BOTRUN lines; a tally script is `lapstat.py` in the session scratchpad, rewrite it if gone):
-  - `b640e`: the main lap, from this checkout on OLD code (main 0f063e6c's bot). It lacks #682, #685 and #686, so its later crashes are the fixed bugs. Last seen: 4005, 4007 and 4009 on E_21, 4010 on E_19.
-  - `f685` (from wt, main with all three fixes): 4002 and 4008 carried on from E_19; 4003 from E_21.
-  - `f684` (from wt3): 4006 carried on from E_19.
-- **Results so far (Eirika route, L10):**
-  - **The bot played the whole route.** 4003 won E_21, the final chapter, 3 times. It was never clean: every win missed the two chests (#687).
-  - 4007 cleared E_20 clean on attempt 7; 4009 cleared E_20 clean on attempt 1.
-  - E_15 cleared clean for the first time ever: 4002 on attempt 2, 4008 on attempt 6.
-  - Walls:
-    - E_15's two stationary bosses (Caellach, Valter), a strength wall. Party level does NOT predict who beats it; both clean campaigns had Cormag.
-    - E_19: even wins lose 11-16 units and miss 6 rewards.
-    - E_21's chests (#687).
-  - **Lap-table labels:** in lapstat's `w(L R M)`, L is units lost, R recruits missed and M rewards missed.
-- **Merged since the last HANDOFF:**
-  - PR #682 (#681, ADR 0435): a sandbox's map refresh wiped our units off the unit map; Drop offered an occupied tile (E_19 crash). The unit, hidden and fog maps are now kept.
-  - PR #685 (#684): a Brave weapon on its last use breaks on its first blow and throws the second for free; `wornBy` capped at the uses the weapon had (E_19 and E_21 crash).
-  - PR #686 (#683, ADR 0436): an owed recruit an earlier attempt saw arrive is a goal before it arrives, met at the reachable tile nearest its arrival. Replay: 4008 E_13 a2, Cormag recruited turn 6, clean turn 7.
-- **In flight: #688, Trade.** Read the issue's design comment first. Step 1: a key from a teammate's bag, through keyWay. It also ports #687's convoy chest key and the honest door pricing (a door counts on a way only when an opener is actually sent), but NOT #687's lord-pairing: that replay sent both lords off alone and Ephraim died. One PR closes #687 and step 1 of #688. Proof bar: the E_21 replay of `b640e-cs-s4003` must match or beat the baseline (won, 26 turns, 1 death). Then review-to-clean, CI and merge (#510 step-9 PRs may merge after review and CI).
-- **Open, to file or look into:**
-  - Ephraim's over-cap death in #687's `chest2` replay: a risk-model misread.
-  - E_21's deploy benched Colm (0x09, a thief) as answering no demand.
-  - The deploy record lists Joshua (0x20) in the "thief" group.
-  - Amelia (E_9) and Marisa (E_10) may be the same shape as Cormag's miss; untested.
-  - Friendly fire on Cormag in 6 games.
-- **When the runs end:**
-  1. Tabulate clean clears and attempts-to-clean per campaign and chapter.
-  2. Carry on, on main, whatever ended on a fixed crash.
-  3. Then the Ephraim route, the L20 forks and the frozen suite, as before (#640, #639 plan comment 6992662334).
+- **The batch lap `b640e` is done; the full table is on #640** (comment after 7058512354). 6 of 10 campaigns finished the vanilla Eirika route (03, 06, 07, 08, 09, 10); 3 cleared the final chapter clean (06 a3, 07 a10, 10 a1). **No campaign was clean in every chapter**: the scout lap carries on from a chapter's best win. Walls by the lap's chapter index: 10 (9 of 10 never clean), 13 (2 of 10 clean), 14, 19 and 21 (none clean; 21 mostly `stuck`). Stopped: 01 at 14/15, 04 at 15, 05 at 21 (11 of 12 stuck), 02 at 22 (8 of 12 stuck).
+- **Merged: PR #697 (#696, ADR 0438).** The final boss's kill runs MNC4: no next chapter, the post-chapter save menu with `save_menu_type` 3. `Controller.won` / `INSPECT.chapterWon` count that as won, one owner for every waiter. Replays `f696b`, `f696c`: 4007 Ch21x a3 won, lap `done`.
+- **Waiting on Nicolas: #688 (Trade).** Step 1 is built and UNCOMMITTED in `../manchego-stars-wt4` (feat/688-trade; it also holds #687's port from wt2). Its Ch21 replay of 4003 traded keys and opened a door and chest the baseline missed, but ended `stuck` (48 turns) where the baseline won in 26. Cause: the key holder never steps toward a guarded chest; killing the boss would close it, so no plan attacks the boss; the stuck bar lifts a goal only when no step toward it is possible. **Recommended call (#688 comment):** drive the stuck bar by the taker's actual progress (turns since its distance to the goal last fell). It changes every goal's pricing, so it waits for his yes. The same stall is likely behind the `stuck` attempts at index 21 and 22.
+- **New epic: #689, every choice a human player has** (audit table in its body), sub-issues #688 Trade, #690 world-map skirmishes and towers, #691 prep positions, #692 staves and items beyond healing, #693 shop policy, #694 Dance/Steal/Pick/Support/Arena, #695 ballistae and Take/Give. #690 and #694 need his calls (what a skirmish does to a lap's meaning; Arena risk).
+- **Worktrees:** `../manchego-stars-wt` (detached, idle), `../manchego-stars-wt3` (fix/brave-last-use, merged, idle), `../manchego-stars-wt5` (detached at main, idle): remove all three (`git worktree remove --force`). `../manchego-stars-wt2` holds #687's uncommitted work, already ported into wt4: drop it once #688 lands. Each worktree needs `tools/emulator` copied in (it is gitignored) to run games.
+- **Open, to file or look into:** Ephraim's over-cap death in #687's `chest2` replay; E_21's deploy benching Colm (0x09); Joshua (0x20) listed as a thief in the deploy record; Amelia and Marisa may share Cormag's miss (untested); friendly fire on Cormag. A reviewer subagent once checked out a PR in this checkout (detached HEAD at bf8b41e9) while runs went from it; reviewers must use a worktree.
+- **Next:** Nicolas's call on #688's stuck rule; then the walls (index 10, 14, 19, 21) by cause; then the Ephraim route, the L20 forks and the frozen suite (#640, #639 plan comment 6992662334).
 
 **2026-11-19, night (main was ea12724e). #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
