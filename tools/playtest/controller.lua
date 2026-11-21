@@ -1026,4 +1026,13 @@ M.MENU_WAIT = MENU_WAIT
 M.MENU_STATUS = MENU_STATUS
 M.MENU_END_PHASE = MENU_END_PHASE
 
+-- Whether the chapter that began as `start` has been won. The game's usual win moves the chapter
+-- index on (a next chapter is set); the last chapter's does not: its boss's DefeatBoss script
+-- ends in MNC4, which sets no next chapter and hands the game to the post-chapter save menu
+-- (eventscr.c EVSUBCMD_MNC4, gamecontrol.c), so `finished` -- that menu is up -- is the other
+-- way a chapter is won (#696). The one owner of the rule: harness.lua reads the two facts.
+function M.won(start, now, finished)
+    return now ~= start or finished == true
+end
+
 return M

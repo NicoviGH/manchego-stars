@@ -1040,6 +1040,13 @@ check(C.waitAnswer("dialogue_wait", {}), "advance_dialogue", "a box is pressed t
 check(C.waitAnswer("send_to_convoy", { fullBag = true }), "full_bag", "the bot's chooser answers a full bag")
 check(C.waitAnswer("send_to_convoy", {}), nil, "no chooser installed: the caller waits")
 
+-- #696: the last chapter's win never moves the chapter index (MNC4 sets no next chapter), only
+-- the post-chapter save menu comes up; the chapter index moving on is still a win.
+check(C.won(22, 22, false), false, "the chapter unchanged and no finished game: not won")
+check(C.won(22, 23, false), true, "the chapter index moved on: won")
+check(C.won(22, 22, true), true, "the game finished on the same chapter index: won")
+check(C.won(22, 22, nil), false, "no finished read: not won")
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests))
     os.exit(1)

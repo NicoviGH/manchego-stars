@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-436 decisions. Read this index, then open the two or three you need — the whole
+437 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -119,6 +119,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0390` | [One checkout, one writer; a branch's HANDOFF drift is undone, never synced](decisions/0390-one-checkout-one-writer-and-handoff-drift-is-undone.md) | 2026-11-04 | #572 |
 | `0393` | [Agent teams: only for a named reason, one writer per slice, seams agreed first, models by judgement](decisions/0393-agent-teams-only-for-a-named-reason.md) | 2026-11-07 | #577 #510 |
 | `0430` | [A bot PR proves its fix with one failing test and one replay; games are played per batch of fixes](decisions/0430-a-bot-pr-proves-its-fix-with-one-failing-test-and-one-replay.md) | 2026-11-19 | #640 #510 |
+| `0438` | [The game's end is a won chapter](decisions/0438-the-games-end-is-a-won-chapter.md) | 2026-11-21 | #696 #510 |
 
 ---
 

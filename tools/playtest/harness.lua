@@ -271,6 +271,14 @@ function INSPECT.partyGold() return ru32(SYM.gPlaySt + 0x08) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
 local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
+-- The game has been played through (#696): the last chapter's boss kill ends in MNC4, which sets
+-- no next chapter and brings up the post-chapter save menu (the post-chapter menu between other
+-- chapters comes up only after the chapter index has moved on, so on the chapter's own index it
+-- is the end of the game). The one owner of "the chapter is won" (Controller.won): every
+-- waiter that asks `won` goes through it.
+function INSPECT.chapterWon(start)
+    return Controller.won(start, chapter(), procActive(SYM.gProcScr_SaveMenuPostChapter))
+end
 -- The menu taking input. A submenu (StartMenuAt with a parent menu: an item's Use/Equip/
 -- Trade/Discard, uimenu.c) LOCKS its parent (+0x28) and reads the keys itself, and the pool
 -- gives it whichever slot is free, so it can sit ABOVE the parent. The lowest-slot menu is
@@ -2950,7 +2958,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     local budgetTurns = 18
     -- A real win ADVANCES the chapter. The title screen WITHOUT an advance means game-over ->
     -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
-    local function won() return chapter() ~= startChapter end
+    local function won() return INSPECT.chapterWon(startChapter) end
     local lost = INSPECT.chapterLost
     -- progress = the nearest candidate's path-distance to the target (lower is better): the
     -- boss while it lives, then the seize tile, measured only from units the game lets Seize.
@@ -3644,7 +3652,7 @@ INSPECT.botApi = function(game)
     local sightApi = INSPECT.sightApi()
     local Sight = INSPECT.Sight
     local start = chapter()
-    local function won() return chapter() ~= start end
+    local function won() return INSPECT.chapterWon(start) end
     local lost = INSPECT.chapterLost
     local function decode(s, default)
         if s == nil or s == "" then return default end
@@ -5459,7 +5467,7 @@ end
 -- The LLM-commander loop body (no verdict): per player phase export the board, ask the
 -- sidecar, execute the orders, end the turn. Same terminal detection as the clear-bot.
 local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
-    local function won() return chapter() ~= startChapter end
+    local function won() return INSPECT.chapterWon(startChapter) end
     local lost = INSPECT.chapterLost
     local budgetTurns = 18
     local seed = math.floor(tonumber(PLAYTEST_SEED) or 1)
@@ -7530,7 +7538,7 @@ scenarios.clear_ch02 = function()
     if not booted then return result("FAIL", why or "never reached the ch02 map") end
     pokeFastConfig()
     local start = chapter()
-    local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local function advanced() return INSPECT.chapterWon(start) or procActive(SYM.gProcScr_TitleScreen) end
     local best = {}
     local function snapCharms()
         local d = CH02.deliveredCharms(collectedItems(), CAMPAIGN.CH02_CHARMS)
@@ -9018,7 +9026,7 @@ local function clearCh04(parley)
     -- lands on the TITLE -- the chapter index never changes. Gating the win on chapter() alone
     -- therefore FAILs a run that ended perfectly (#204); the title is the terminal here, exactly
     -- as clear_ch02 treats it. A game-over also reaches the title, so that stays checked first.
-    local function won() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local function won() return INSPECT.chapterWon(start) or procActive(SYM.gProcScr_TitleScreen) end
     -- The PARLEY arm: Marty talks the pack down FIRST, which raises the recruit flag the ending's
     -- CHECK_EVENTID reads -- so the rout that follows lands on the AUTHORED Lupin ending instead of
     -- the no-Lupin fallback. Same rout either way; the flag is the whole difference between the two

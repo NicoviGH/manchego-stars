@@ -258,6 +258,21 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertEqual(harness.count('endTurn(nil, advanced)'), 1,
                          'clear_ch02 must pass the win predicate')
 
+    def test_every_won_check_goes_through_the_one_owner_that_sees_the_games_end(self):
+        # #696. The final boss's kill ends in MNC4: no next chapter is set, the post-chapter save
+        # menu comes up, and `chapter() ~= start` never fires, so api.act's wait ran out and the
+        # run of a game the bot had beaten crashed. The rule is Controller.won (unit-tested in
+        # test_controller.lua), read through INSPECT.chapterWon; no waiter may keep its own copy.
+        harness = _read_harness()
+        owner = _block(harness, 'function INSPECT.chapterWon(', '\nend\n')
+        self.assertIn('Controller.won(start, chapter(), procActive(SYM.gProcScr_SaveMenuPostChapter))',
+                      owner, 'the game ended is the post-chapter save menu on the same chapter index')
+        self.assertNotRegex(harness, r'local function won\(\) return chapter\(\) ~= \w+',
+                            'a won check that compares only the chapter index misses the last chapter')
+        self.assertEqual(len(re.findall(r'local function won\(\) return INSPECT\.chapterWon\(',
+                                        harness)), 4,
+                         'the bot api, the clear drivers and the commander loop ask the one owner')
+
     def test_a_chapter_ending_mid_phase_is_an_exit_not_a_wedge(self):
         # #335. A DefeatAll win fires the ending from INSIDE the enemy phase, and from there
         # FE8 goes to the post-chapter save prompt and the next chapter -- no player phase is
