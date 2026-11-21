@@ -60,5 +60,9 @@ attempts 2 (`resume --tag cormag1b`). Before: attempt 2 won on turn 4 with Corma
 replay, per ADR 0430. It was played on the first version of the code, before the review's
 changes (the board turn, the latest sighting, the talker's own march field for the meeting
 tile, the stall exemption); Cormag's arrival (turn 5) and the Talk (turn 6) are not near any of
-their edges, and each has a unit test that fails without it. A second replay on the final code
-timed out at ten minutes on a machine loaded with eight emulator workers and gave no result. The same may help Amelia (E_9) and Marisa (E_10); untested.
+their edges, and each has a unit test that fails without it. A replay on the reviewed code
+(`cormag3`, same start, attempts 2) gave the same: attempt 2 won clean on turn 7, Eirika talked
+to Cormag on turn 6 and he joined. (An earlier try timed out with no result on the loaded
+machine. The last fix, the board turn, cannot change this game: Cormag arrives at the start of
+turn 5 and is on the board from then.) The same may help Amelia (E_9) and Marisa (E_10);
+untested.
