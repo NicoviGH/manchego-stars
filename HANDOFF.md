@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, afternoon).** The work is #699: its plan comment (7066011205), Nicolas's calls after it, and the progress comment (7067278347). #700-#703 are merged. #704 is held for a measurement; its status and the approved batch are on the PR.
+**Next session starts here (2026-11-21, afternoon).** The work is #699: its plan comment (7066011205), Nicolas's calls after it, and the progress comment (7067278347). #700-#703 are merged. #704 was measured and closed; the result and the next lead (Ch21 chests never offered) are on #699 (comment 7068474932).
 
 
 
