@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, late): the GitHub tidy-up #706 is done** except deleting `../manchego-stars-wt2`, which waits on Nicolas's OK. #699's plan comment (7066011205) now opens with a status table. The work is the measurement on #699 (comment 7069149395).
+**Next session starts here (2026-11-21, late): the GitHub tidy-up #706 is done**; its guard `make tidy` (#707) is PR #708, reviewed, awaiting CI and Nicolas's merge. #699's plan comment (7066011205) now opens with a status table. The work is the measurement on #699 (comment 7069149395).
 
 *Before that (2026-11-21, afternoon):* The work is #699: its plan comment (7066011205), Nicolas's calls after it, and the progress comment (7067278347). #700-#703 are merged. #704 was measured and closed; #705 (chest keys and door openers) is merged. The state is on #699's latest comments.
 
@@ -30,7 +30,7 @@ and start a fresh instance; don't rely on auto-compaction.
 - **Usage (Nicolas, 2026-11-21): no fan-outs of Opus or Fable subagents.** Use one strong agent at most, and have it send cheap subagents for the details. Fable was out of credits on 2026-11-21.
 - **Closed:** #662 (strength does not predict clean clears). **Merged:** PR #697 (#696, ADR 0438): the game's end counts as a won chapter.
 - **#689** is the parent issue for every choice a human player has, with sub-issues #688 and #690-#695. #690 and #694 need his calls.
-- **Worktrees:** `../manchego-stars-wt2` holds #687's uncommitted work, already ported to wt4; drop it once #688 lands. Each worktree needs `tools/emulator` copied in to run games. Reviewers must work in a worktree, never in this checkout (one once left it detached at a PR head while runs went from it).
+- **Worktrees:** `../manchego-stars-wt2` is deleted (2026-11-21). Each worktree needs `tools/emulator` copied in to run games. Reviewers must work in a worktree, never in this checkout (one once left it detached at a PR head while runs went from it).
 - **Open, to file or look into:** E_21's deploy benches Colm (0x09); Joshua (0x20) listed as a thief in the deploy record; friendly fire on Cormag; Ephraim's over-cap death in #687's `chest2` replay (folds into cause 5).
 
 **2026-11-19, night (main was ea12724e). #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
