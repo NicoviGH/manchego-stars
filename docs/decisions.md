@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-434 decisions. Read this index, then open the two or three you need — the whole
+435 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -277,6 +277,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0432` | [The judged enemy phase plays the berserk phase first](decisions/0432-the-judged-enemy-phase-plays-the-berserk-phase-first.md) | 2026-11-19 | #660 #510 |
 | `0433` | [The judged enemy phase plays an enemy's status staff](decisions/0433-the-judged-enemy-phase-plays-an-enemys-status-staff.md) | 2026-11-19 | #674 #660 #510 |
 | `0434` | [A talk the bot chose answers its question Yes](decisions/0434-a-talk-the-bot-chose-answers-its-question-yes.md) | 2026-11-20 | #679 #640 #510 |
+| `0435` | [A sandbox that refreshes the maps puts the unit map back](decisions/0435-a-sandbox-that-refreshes-the-maps-puts-the-unit-map-back.md) | 2026-11-20 | #681 #640 #510 |
 
 ---
 

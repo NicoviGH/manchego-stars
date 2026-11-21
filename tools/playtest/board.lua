@@ -313,6 +313,12 @@ function Board.unitAt(mem, SYM, base, slot)
     return u
 end
 
+-- The live map's size (gBmMapSize, a struct Vec2 of two s16): -> w, h. The one reader of it:
+-- Board.read, harness.lua's mapSize and Sight.keepMaps (the map pools' span) all use it.
+function Board.mapSize(mem, SYM)
+    return mem.u16(SYM.gBmMapSize), mem.u16(SYM.gBmMapSize + 2)
+end
+
 function Board.header(mem, SYM)
     return { turn = mem.u16(SYM.gPlaySt + 0x10), phase = PHASE[mem.u8(SYM.gPlaySt + 0x0F)] }
 end
@@ -327,7 +333,8 @@ function Board.read(mem, SYM)
         end
     end
     local board = Board.header(mem, SYM)
-    board.map = { w = mem.u16(SYM.gBmMapSize), h = mem.u16(SYM.gBmMapSize + 2) }
+    local w, h = Board.mapSize(mem, SYM)
+    board.map = { w = w, h = h }
     board.units = units
     return board
 end
@@ -652,6 +659,7 @@ function Board.bind(mem, SYM)
     return {
         read = function() return Board.read(mem, SYM) end,
         header = function() return Board.header(mem, SYM) end,
+        mapSize = function() return Board.mapSize(mem, SYM) end,
         unitAt = function(base, slot) return Board.unitAt(mem, SYM, base, slot) end,
         leanAt = function(base, slot) return Board.leanAt(mem, SYM, base, slot) end,
         each = function(faction) return Board.each(mem, SYM, faction) end,

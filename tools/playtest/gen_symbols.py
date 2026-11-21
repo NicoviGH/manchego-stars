@@ -116,6 +116,8 @@ WANTED = [
     'gBmMapFog',                # u8** fog map (include/bmmap.h): non-zero = the player can SEE
                                 # that tile this turn. A red unit standing on a zero tile is not
                                 # drawn at all -- which looks exactly like a broken map sprite.
+    'gBmMapHidden',             # u8** hidden map (include/bmmap.h): RefreshEntityBmMaps rewrites
+                                # it; Sight.keepMaps puts it back after a sandbox's refresh
     'sMsgString',               # struct MsgBuffer (src/msg.c): buffer1 (offset 0) holds the
                                 # text GetStringFromIndex last decoded (casthelp reads it)
     'sActiveMsg',               # int (src/msg.c): the message index GetStringFromIndex last

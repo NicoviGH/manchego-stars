@@ -30,6 +30,27 @@ local function zeroMem()
     return { u8 = zero, u16 = zero, u32 = zero, s8 = zero }
 end
 
+-- The game's own map layout (bmmap.c BmMapInit) over `m` for the three maps a refresh rebuilds
+-- (gBmMapUnit, gBmMapHidden, gBmMapFog), W x H tiles (3 x 2 unless given): gBmMapSize, then per
+-- pool the h + 4 row pointers and the (w + 2)-wide rows, the handle on the third pointer. -> the
+-- SYM fields, and cell(x, y, name), the address of that map's (x, y) (the unit map's by default).
+local function bmUnitMap(m, W, H)
+    W, H = W or 3, H or 2
+    local SYM = { gBmMapSize = 0x2000, gBmMapUnit = 0x2008, gBmMapHidden = 0x200C,
+                  gBmMapFog = 0x2010 }
+    m.w16(SYM.gBmMapSize, W); m.w16(SYM.gBmMapSize + 2, H)
+    local data = {}
+    for i, name in ipairs({ "gBmMapUnit", "gBmMapHidden", "gBmMapFog" }) do
+        local rows = 0x2100 + (i - 1) * 0x400
+        data[name] = rows + 0x100
+        for r = 0, H + 3 do m.w32(rows + r * 4, data[name] + r * (W + 2)) end
+        m.w32(SYM[name], rows + 8)
+    end
+    return SYM, function(x, y, name)
+        return data[name or "gBmMapUnit"] + (y + 2) * (W + 2) + x
+    end
+end
+
 -- A CPU whose "game function" at 0x08001000 returns r0 + r1 after `cost` frames (to the
 -- loop lr names), and at 0x08002000 never returns.
 local function fakeCpu(cost)
@@ -595,8 +616,9 @@ end
 -- plan revealed stayed seen for the rest of the batch). The fake call is bmmap.c's write.
 do
     local m = fakeMem()
+    local mapSYM, cell = bmUnitMap(m)
     local outer = { cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16,
-                    write32 = m.w32, Board = Board }
+                    write32 = m.w32, Board = Board.bind(m, mapSYM), SYM = mapSYM }
     local S, STATE = { RefreshEntityBmMaps = 0x0801A2D8 }, 0x0C
     local red = { addr = 0x02030200 }
     m.w32(red.addr + STATE, Board.US_BIT9 | 0x00010000)
@@ -611,16 +633,50 @@ do
                  { TRAPS, Sight.TRAP_MAX * Sight.TRAP_SIZE, "trap pool" } }
     end, log)
     local seen = {}
+    -- the refresh of a board whose blue units are hidden (the AI's decision, closings) clears
+    -- the unit map and refills it without them (bmmap.c RefreshEntityBmMaps): our unit at (1,1)
+    m.w8(cell(1, 1), 7)
+    m.w8(cell(2, 0, "gBmMapHidden"), 1); m.w8(cell(0, 1, "gBmMapFog"), 1)
+    local function wipe()
+        m.w8(cell(1, 1), 0); m.w8(cell(2, 0, "gBmMapHidden"), 0); m.w8(cell(0, 1, "gBmMapFog"), 0)
+    end
     local ok, why = pcall(sandbox, function()
         sandbox(function()
-            Sight.refresh(api, call, S, { [130] = red })
+            Sight.refresh(api, function(fn, ...) wipe(); return call(fn, ...) end, S, { [130] = red })
             seen[1] = m.u32(red.addr + STATE)
+            seen[5] = m.u8(cell(1, 1))
         end)
         seen[2] = m.u32(red.addr + STATE)
+        seen[6] = m.u8(cell(1, 1))
     end)
+    check(seen[5], 0, "refresh: the plan's own read sees the unit map as its refresh left it")
+    check(seen[6], 7, "refresh: the next plan finds our unit on the map (#681: Drop offered an ally's tile)")
+    check(m.u8(cell(2, 0, "gBmMapHidden")) + m.u8(cell(0, 1, "gBmMapFog")), 2,
+          "refresh: the hidden and fog maps are put back the same way")
     check(ok and #log == 0, true, "refresh: the guard finds nothing left changed: " .. tostring(why))
     check(seen[1], 0x00010100, "refresh: the plan's own read sees the enemy revealed")
     check(seen[2], Board.US_BIT9 | 0x00010000, "refresh: the next plan finds it in fog again")
+
+    -- keepMapPools: BmMapFill clears (h + 4) * (w + 2) bytes less an odd count's last one, so an
+    -- odd-sized map (3 x 3: 35 bytes) keeps 17 halfwords, not 18 (which would write past the pool)
+    local spans = {}
+    local oddM = fakeMem()
+    local oddSYM = bmUnitMap(oddM, 3, 3)
+    Sight.keepMapPools({ mem = oddM, SYM = oddSYM, Board = Board.bind(oddM, oddSYM),
+                         keep16 = function(a, n) spans[#spans + 1] = n end })
+    check(table.concat(spans, ","), "17,17,17", "keepMapPools: an odd-sized map keeps the floor, as BmMapFill clears")
+    -- a missing symbol or a pool not built raises, naming it (a refresh runs on a loaded map)
+    local okSize, whySize = pcall(Sight.keepMapPools, { mem = oddM, Board = Board.bind(oddM, {}), SYM = {}, keep16 = function() end })
+    check(okSize == false and whySize:find("gBmMapSize is missing", 1, true) ~= nil, true,
+          "keepMapPools: a missing map size is named: " .. tostring(whySize))
+    local sizeOnly = { gBmMapSize = oddSYM.gBmMapSize }
+    local okMiss, whyMiss = pcall(Sight.keepMapPools, { mem = oddM, Board = Board.bind(oddM, sizeOnly), SYM = sizeOnly, keep16 = function() end })
+    check(okMiss == false and whyMiss:find("gBmMapUnit is missing", 1, true) ~= nil, true,
+          "keepMapPools: a missing symbol is named, not skipped: " .. tostring(whyMiss))
+    oddM.w32(oddSYM.gBmMapFog, 0)
+    local okNull, whyNull = pcall(Sight.keepMapPools, { mem = oddM, Board = Board.bind(oddM, oddSYM), SYM = oddSYM, keep16 = function() end })
+    check(okNull == false and whyNull:find("gBmMapFog is not built", 1, true) ~= nil, true,
+          "keepMapPools: a null map pointer is named: " .. tostring(whyNull))
 
     -- keepRide: a ballista's rider that decides to strike with its own weapon steps off it
     -- (bmarch.c TryRemoveUnitFromBallista, written here as the game writes it); the next plan
@@ -645,7 +701,7 @@ do
     end
     ok, why = pcall(sandbox, function()
         sandbox(function()
-            Sight.keepFog(api, { red })
+            Sight.keepMaps(api, { red })
             Sight.keepRide(api, S2, red, { red })
             stepsOff()
             seen[3] = ride()
@@ -657,7 +713,7 @@ do
     check(seen[4], riding, "keepRide: the next plan finds it riding, the ballista where it was")
     sandbox(function()
         sandbox(function()
-            Sight.keepFog(api, { red })
+            Sight.keepMaps(api, { red })
             m.w8(trap + 5, 0)
         end)
     end)
@@ -874,7 +930,7 @@ end
 -- off the source, aiDecide calls Sight.keepAi before its first write, nothing else does, and
 -- every call of aiDecide hands it the board's units. And every map refresh in a sandbox keeps
 -- the fog bits: RefreshEntityBmMaps is called from Sight.refresh, from fullInfo (the outermost
--- sandbox, whose load undoes it) and in aiDecide's call list, after its keepFog.
+-- sandbox, whose load undoes it) and in aiDecide's call list, after its keepMaps.
 do
     local src = sightSrc
     local _, refreshes = src:gsub("\n[^\n-]*S%.RefreshEntityBmMaps", "")
@@ -893,9 +949,9 @@ do
     local write = body and body:find("api.write", 1, true)
     check(keep ~= nil and write ~= nil and keep < write, true,
           "keepAi: aiDecide keeps the AI bytes before its first write")
-    local fog = body and body:find("M.keepFog(api, all)", 1, true)
+    local fog = body and body:find("M.keepMaps(api, all)", 1, true)
     check(fog ~= nil and fog < write, true,
-          "refresh: aiDecide keeps the fog bits before its first write")
+          "refresh: aiDecide keeps the fog bits and the maps before its first write")
     local ride = body and body:find("M.keepRide(api, S, e, all)", 1, true)
     check(ride ~= nil and ride < write, true,
           "keepRide: aiDecide keeps the rider's ballista before its first write")
