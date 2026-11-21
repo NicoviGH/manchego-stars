@@ -33,7 +33,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check test matrix difficulty difficulty-gate verdict-diff scene chapter python-bin
+.PHONY: all clean verify check test matrix difficulty difficulty-gate verdict-diff scene chapter tidy python-bin
 
 all: fireemblem8.gba
 
@@ -59,6 +59,10 @@ python-bin:
 # Drift guard: docs/tooling consistency. Same logic CI and the git pre-commit hook run.
 check:
 	@python3 tools/check.py
+
+# GitHub record guard (#707); checks and exit codes: tools/gh_tidy.py docstring.
+tidy:
+	@python3 tools/gh_tidy.py
 
 # Verify the built ROM's text decodes cleanly. (We diverge from vanilla on purpose,
 # so there is no sha1 match to check.)

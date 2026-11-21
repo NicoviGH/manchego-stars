@@ -40,6 +40,7 @@ For our own conventions (prep, caps, objectives, economy, class mapping, art) **
 3. `docs/decisions.md` — the INDEX; open only the two or three records your task needs. Don't re-litigate.
 4. The chapter or feature YAML/source being worked on
 5. `git status` + `git log --oneline -10`
+6. `make tidy` — the GitHub record's drift guard; fix every finding (#707).
 
 > **Playtest runs are the most expensive thing in this repo.**
 > Never run the full `make matrix` gate locally; run only scenarios your change could affect;
@@ -205,6 +206,7 @@ Each tool's docstring is its manual; this table only says when to reach for it.
 | Tool | Use it to… |
 |---|---|
 | `tools/build_campaign.py` | inject campaign content into the decomp before `make` |
+| `tools/gh_tidy.py` (`make tidy`) | fail when the GitHub record drifts: orphan bot issues, holds without a why, stale status comments (#707) |
 | `tools/verify_text.py` | decode the built ROM's message text (regression gate, no mGBA) |
 | `make scene SCENE=chNN[/<n>]` | preview a scene's wrapping and staging from YAML, no build (#311); `docs/scenes/` is the diffed book. Authoring loop only — a scene still gets one real run. |
 | `make chapter [CH=chNN]` | get oriented on a chapter: declared vs built, scenes, art, enemy AI donors, scenario verdicts (#312). Prefer it to HANDOFF prose. |
