@@ -1516,7 +1516,7 @@ end
 -- nothing.
 do
     local m = fakeMem()
-    local PAID, MID, EIRIKA, LARACHEL = 0x2000, 0x2100, 0x2200, 0x2300
+    local PAID, MID, EIRIKA, LARACHEL = 0x08002000, 0x08002100, 0x08002200, 0x08002300
     local function call(at, to) m.w16(at, 0x0A40); m.w32(at + 4, to) end
     local function enda(at) m.w16(at, 0x0120) end
     m.w16(PAID, 0x0020); enda(PAID + 4)
@@ -1525,6 +1525,19 @@ do
     m.w16(LARACHEL, 0x0020); enda(LARACHEL + 4)
     check(Sight.callsScript(m, EIRIKA, PAID), true, "callsScript: reached through a second CALL")
     check(Sight.callsScript(m, LARACHEL, PAID), false, "callsScript: a script with no CALL")
+    -- a paid CALL behind a GOTO that jumps over the END, behind a later LABEL (BEQ the same)
+    local HIDDEN, QUEUED, GARBAGE, TWO = 0x08002400, 0x08002500, 0x08002600, 0x08002700
+    m.w16(HIDDEN, 0x0920); m.w16(HIDDEN + 2, 7); enda(HIDDEN + 4)
+    m.w16(HIDDEN + 8, 0x0820); m.w16(HIDDEN + 10, 7); call(HIDDEN + 12, PAID); enda(HIDDEN + 20)
+    check(Sight.callsScript(m, HIDDEN, PAID), true, "callsScript: a paid CALL behind GOTO and LABEL")
+    m.w16(QUEUED, 0x0B40); m.w32(QUEUED + 4, PAID); enda(QUEUED + 8)
+    check(Sight.callsScript(m, QUEUED, PAID), true, "callsScript: an ENQUEUE_CALL")
+    m.w16(GARBAGE, 0x0A40); m.w32(GARBAGE + 4, 0xDEADBEEF); enda(GARBAGE + 8)
+    check(Sight.callsScript(m, GARBAGE, PAID), false, "callsScript: a pointer outside the ROM is not followed")
+    -- a GOTO to a label that is never there walks to the bound and stops
+    m.w16(TWO, 0x0920); m.w16(TWO + 2, 9)
+    for i = 1, 600 do m.w16(TWO + 4 * i, 0x0020) end
+    check(Sight.callsScript(m, TWO, PAID), false, "callsScript: bounded when a label is never reached")
     local talks = { { a = 0x01, b = 0x1C, script = EIRIKA }, { a = 0x19, b = 0x1C, script = LARACHEL },
                     { a = 0x01, b = 0x30, script = EIRIKA }, { a = 0, b = 0x31, script = LARACHEL } }
     local free = Sight.freeTalks(m, talks, PAID, {})
@@ -1533,6 +1546,12 @@ do
     check(free[0x30], nil, "freeTalks: a paid-only recruit asks nothing")
     check(free[0x31], nil, "freeTalks: anyone asks nothing")
     check(Sight.freeTalks(m, talks, PAID, { [0x1C] = true })[0x1C], nil, "freeTalks: a joined recruit")
+    -- two recruits owed by one talker: both demands, the one talker answers both
+    local both = Sight.freeTalks(m, { { a = 0x19, b = 0x1C, script = LARACHEL },
+                                      { a = 0x19, b = 0x2A, script = LARACHEL } }, PAID, {})
+    local two = Sight.demandsOf({}, {}, 0, both)
+    check(#two, 3, "freeTalks: two recruits, two demands (and sustain)")
+    check(two[1].talkers[1] == 0x19 and two[2].talkers[1] == 0x19, true, "freeTalks: one talker owes both")
     local ids = {}
     for _, x in ipairs(Sight.demandsOf({}, {}, 0, free)) do ids[#ids + 1] = x.id end
     check(table.concat(ids, " "), "talk:28 sustain", "demandsOf: a free talk is a demand")
@@ -2786,11 +2805,11 @@ do
     local cpu = fakeCpu(1)
     local mem, nop = zeroMem(), function() end
     local GAME = 0x08001000   -- fakeCpu's one game function; every S entry is it
-    local calls = 0
+    local calls, searches = 0, 0   -- searches: breakpoints set, two per recruit-talk event search
     local counted = setmetatable({ write = function(r, v)
         if r == "pc" and v == GAME then calls = calls + 1 end
         cpu.write(r, v)
-    end, breakpoint = function() return 1 end, unbreak = function() end }, { __index = cpu })
+    end, breakpoint = function() searches = searches + 1; return 1 end, unbreak = function() end }, { __index = cpu })
     local S = setmetatable({}, { __index = function() return GAME end })
     local boardReads = 0
     local sight = Sight.new({ cpu = counted, mem = mem, write8 = nop, write16 = nop,
@@ -2822,6 +2841,8 @@ do
     end)
     -- refresh() kept the live read, so the one read counted is the prime's, inside the change
     check(boardReads - before, 1, "changed: several units() reads inside cost one board read")
+    -- #699: the chapter's talk search runs once per Sight, not once per demands() (two so far)
+    check(searches, 2, "demands: the talk event search runs once")
 end
 
 -- #671, through Sight.new: itemReach is the widest weapon in the bag (a staff counts for nothing),
