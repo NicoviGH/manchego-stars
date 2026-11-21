@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, evening): FIRST the GitHub tidy-up #706, before any bot work** (Nicolas: cleanup comes first, or the sprawl never improves). Then the measurement on #699 (comment 7069149395).
+**Next session starts here (2026-11-21, late): the GitHub tidy-up #706 is done** except deleting `../manchego-stars-wt2`, which waits on Nicolas's OK. #699's plan comment (7066011205) now opens with a status table. The work is the measurement on #699 (comment 7069149395).
 
 *Before that (2026-11-21, afternoon):* The work is #699: its plan comment (7066011205), Nicolas's calls after it, and the progress comment (7067278347). #700-#703 are merged. #704 was measured and closed; #705 (chest keys and door openers) is merged. The state is on #699's latest comments.
 
