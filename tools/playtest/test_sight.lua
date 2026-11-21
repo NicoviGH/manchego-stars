@@ -1317,6 +1317,13 @@ do
                     { by = "actor", miss = false, dmg = 2 } }
     w = Sight.wornBy(devil, { actor = sword, target = sword }, { actor = 2, target = 0 })
     check(w.actor[0], 2, "wornBy: a Devil Axe's self-blow takes nothing off the target")
+    -- #684: a Brave weapon on its last use breaks on the round's first blow and still throws
+    -- the second, which lands and spends nothing (BattleGenerateRoundHits, GetItemAfterUse)
+    local brave = { { by = "actor", miss = false, dmg = 4 }, { by = "actor", miss = false, dmg = 4 } }
+    w = Sight.wornBy(brave, { actor = { spendsMiss = false, uses = 1 }, target = sword },
+                     { actor = 1, target = 0 })
+    check(w.actor[0], 1, "wornBy: a Brave weapon's last use goes on its first blow")
+    check(w.actor[4], nil, "wornBy: its second blow, the weapon broken, spends none")
     local ok, err = pcall(Sight.wornBy, hits, { actor = sword, target = tome }, { actor = 3, target = 2 })
     check(ok == false and tostring(err):find("the game took 3", 1, true) ~= nil, true,
           "wornBy: a count the game's does not match fails loudly")
