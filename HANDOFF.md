@@ -11,23 +11,41 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-20, afternoon; main is 0f7d772f). The batch lap (step 4 under #640) is RUNNING.** Check it before anything else: `ps -Ao etime,pcpu,command | grep mgba-headless`.
+**Next session starts here (2026-11-21; main is c0f0709a). Runs are still going; check them first:** `ps -Ao etime,pcpu,command | grep -E "mgba-headless|montecarlo"`.
 
-- **What is running** (started from this checkout; logs in `review/640-batch/`, gitignored):
-  - `b640e`: `resume --game vanilla --tag b640e --chapter 0 --scout --route 1 --seal-at 10`, all 10 pinned campaigns, 8 workers, started 06:49. Log `b640e.log` prints a campaign's lines only when it ends. Live per-attempt lines are in each worker's `/tmp/playtest-campaign@pool-75378-ae97a92b-N/playtest.log` (BOTRUN/CAMPAIGN JSON). A reader: `lapstat.py` in the old session's scratchpad. Rewrite it if gone: it tallies BOTRUN `outcome`/`clean`/`clear` per chapter.
-  - `f679` (ENDED): 4001 carried on from its Ch14 start on the first #679 fix (`f679-4001.log`). It cleared E_14 clean on attempt 7, then ended at E_15 like 4004: no win in 12 attempts (11 `stuck`, 1 lost).
-  - 4010 started just before #680 merged, on the branch code (has the fix). The other campaigns run main 0f063e6c's bot.
-- **Ended so far:** 4001 crashed at E_14 attempt 7 (#679, now fixed; carried on as `f679`). 4004 ended at E_15: no win in 12 attempts (11 `stuck`, 1 lost), so the scout lap cannot carry on. Not looked into. The #639 notes say every L10 campaign walled at E_15 or I_14 before too.
-- **Patterns so far** (Eirika route, L10; #640 comment 7039954068 has the start):
-  - E_9: 0 clean clears in 96 games over 8 campaigns. The village at (11,15) is closed by generic enemy charId 167 in 91 of 96. Amelia (0x12) is not recruited in 64; Eirika or Franz must talk to her (`ch9a-eventinfo.h:17-18`). Untested why the bot doesn't.
-  - E_10: Marisa (0x16) is missed in 51 games; only Gerik can recruit her (`ch10a-eventinfo.h:18`).
-  - E_13: Cormag (0x0E) is missed in 37 games; only Eirika can recruit him (`ch13a-eventinfo.h:16`).
-- **Next, when the lap ends:**
+- **Worktrees (Nicolas allowed them for this work, 2026-11-20).** They exist so that no edit touches code a running game loads. Each has symlinks to the gitignored assets: `references`, `tools/emulator`, `tools/playtest/states`, `build/vanilla-fe8`. Never stage those. Remove each worktree when its runs end: `git worktree remove --force`.
+  - `../manchego-stars-wt`: detached at main c0f0709a. It runs the `f685` carry-ons.
+  - `../manchego-stars-wt3`: branch fix/brave-last-use (merged). It runs `f684`.
+  - `../manchego-stars-wt2`: branch fix/convoy-chest-key. **#687's work is there UNCOMMITTED** and is being ported into #688; drop it once #688's PR lands.
+  - `../manchego-stars-wt4`: branch feat/688-trade. An Opus subagent is building Trade step 1 there.
+- **Running** (logs in `review/640-batch/`, gitignored; per-attempt lines are in each worker's `/tmp/playtest-campaign@pool-*/playtest.log` BOTRUN lines; a tally script is `lapstat.py` in the session scratchpad, rewrite it if gone):
+  - `b640e`: the main lap, from this checkout on OLD code (main 0f063e6c's bot). It lacks #682, #685 and #686, so its later crashes are the fixed bugs. Last seen: 4005, 4007 and 4009 on E_21, 4010 on E_19.
+  - `f685` (from wt, main with all three fixes): 4002 and 4008 carried on from E_19; 4003 from E_21.
+  - `f684` (from wt3): 4006 carried on from E_19.
+- **Results so far (Eirika route, L10):**
+  - **The bot played the whole route.** 4003 won E_21, the final chapter, 3 times. It was never clean: every win missed the two chests (#687).
+  - 4007 cleared E_20 clean on attempt 7; 4009 cleared E_20 clean on attempt 1.
+  - E_15 cleared clean for the first time ever: 4002 on attempt 2, 4008 on attempt 6.
+  - Walls:
+    - E_15's two stationary bosses (Caellach, Valter), a strength wall. Party level does NOT predict who beats it; both clean campaigns had Cormag.
+    - E_19: even wins lose 11-16 units and miss 6 rewards.
+    - E_21's chests (#687).
+  - **Lap-table labels:** in lapstat's `w(L R M)`, L is units lost, R recruits missed and M rewards missed.
+- **Merged since the last HANDOFF:**
+  - PR #682 (#681, ADR 0435): a sandbox's map refresh wiped our units off the unit map; Drop offered an occupied tile (E_19 crash). The unit, hidden and fog maps are now kept.
+  - PR #685 (#684): a Brave weapon on its last use breaks on its first blow and throws the second for free; `wornBy` capped at the uses the weapon had (E_19 and E_21 crash).
+  - PR #686 (#683, ADR 0436): an owed recruit an earlier attempt saw arrive is a goal before it arrives, met at the reachable tile nearest its arrival. Replay: 4008 E_13 a2, Cormag recruited turn 6, clean turn 7.
+- **In flight: #688, Trade.** Read the issue's design comment first. Step 1: a key from a teammate's bag, through keyWay. It also ports #687's convoy chest key and the honest door pricing (a door counts on a way only when an opener is actually sent), but NOT #687's lord-pairing: that replay sent both lords off alone and Ephraim died. One PR closes #687 and step 1 of #688. Proof bar: the E_21 replay of `b640e-cs-s4003` must match or beat the baseline (won, 26 turns, 1 death). Then review-to-clean, CI and merge (#510 step-9 PRs may merge after review and CI).
+- **Open, to file or look into:**
+  - Ephraim's over-cap death in #687's `chest2` replay: a risk-model misread.
+  - E_21's deploy benched Colm (0x09, a thief) as answering no demand.
+  - The deploy record lists Joshua (0x20) in the "thief" group.
+  - Amelia (E_9) and Marisa (E_10) may be the same shape as Cormag's miss; untested.
+  - Friendly fire on Cormag in 6 games.
+- **When the runs end:**
   1. Tabulate clean clears and attempts-to-clean per campaign and chapter.
-  2. Root-cause E_9 (why no talker goes to Amelia; whether the village can be reached first) and E_15's stalls.
-  3. The Ephraim route (`--route 2`) from each campaign's Ch8 start (index 9), and the L20 forks (`--seal-at 20`) from each campaign's first chapter with a seal use (#639 plan comment 6992662334). One cheap check: replay one campaign's L20 from the prologue to its first seal use and `inspect_state.py diff` it against L10, to prove the shared chapters are the same game.
-  4. The frozen suite before any L10/L20 verdict is drawn.
-- **Merged today: PR #680, which closes #679 (ADR 0434).** A talk's yes/no question (vanilla E_14, Eirika to Rennac, a 9,980-gold hire) is answered Yes. A talk to an owed recruit that recruits no one is not repeated until the gold rises. Every talk goes in the record (`talks`). Nicolas: the price is not weighed; safety comes first. Proof: 4001 Ch14 attempts 1-6 have the same acts as the lap; attempt 7 won clean with Rennac recruited (`f679d`).
+  2. Carry on, on main, whatever ended on a fixed crash.
+  3. Then the Ephraim route, the L20 forks and the frozen suite, as before (#640, #639 plan comment 6992662334).
 
 **2026-11-19, night (main was ea12724e). #639 (promote at L10 or L20) is on hold** (comment 7011738055 says why and what reopens it).
 
