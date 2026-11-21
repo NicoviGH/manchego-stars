@@ -1668,7 +1668,8 @@ function M.plan(Bot, board, sight, style, opts)
     end
     -- Whether a plan not advancing the level is inadmissible (ADR 0439): opts.idle, the bot's own
     -- stall reading (botrun's GOAL_QUIET), and at least one plan judged that advances. With none,
-    -- every plan ties on `idle`, so it stays off. Set by pick(), which re-admits every plan judged when it moves.
+    -- every plan ties on `idle`, so it stays off. Set by pick(), which re-admits every plan judged
+    -- when it moves.
     local idleOn = false
     local function admit(st)
         local rank = st.rank
