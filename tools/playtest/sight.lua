@@ -168,6 +168,7 @@
 --   convoyKey(u, terrain)    the convoy's first item that opens `terrain` (a door's by default) for
 --                            `u`, { id, uses }; nil with a full bag or none (what Supply's Take hands).
 --   opensChest(u)            opens() for a chest (#699: a chest key is the convoy's to give).
+--   isChestLock(terrain)     whether a locked() terrain is a chest's (a door's is the other).
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
 --   locked(u, x, y)          the terrain at (x, y) when it is a door or a full chest `u` holds
@@ -262,6 +263,8 @@ M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
 M.TERRAIN_VILLAGE_CLOSED, M.TERRAIN_CHEST_EMPTY = 0x04, 0x20
+-- The terrain a demand kind (api.needs' `doors`, `chests`) opens: the one owner of kind -> lock.
+M.LOCK_TERRAIN = { doors = M.TERRAIN_DOOR, chests = M.TERRAIN_CHEST_FULL }
 M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the first booster
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
@@ -1626,6 +1629,37 @@ function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
     return key
 end
 
+-- What the game says `value` (id | uses << 8) opens for the unit, by demand kind
+-- (M.LOCK_TERRAIN): { doors, chests }, each a keyItemOpens read.
+function M.keyOpens(io, call, S, B, unitAddr, value)
+    local out = {}
+    for kind, terrain in pairs(M.LOCK_TERRAIN) do
+        out[kind] = M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
+    end
+    return out
+end
+
+-- Whether a keyOpens read opens any lock: what makes an item a "key" in a bag.
+function M.opensAnyLock(opens)
+    for kind in pairs(M.LOCK_TERRAIN) do
+        if opens[kind] then return true end
+    end
+    return false
+end
+
+-- A keyOpens read kept per unit and item id: the game's key check reads the id, never the uses
+-- (the one value `uses` is taken from, the first copy seen), so one read serves every copy.
+function M.keyReader(io, call, S, B)
+    local memo = {}
+    return function(unitAddr, item)
+        local k = unitAddr .. ":" .. item.id
+        if memo[k] == nil then
+            memo[k] = M.keyOpens(io, call, S, B, unitAddr, item.id | (item.uses << 8))
+        end
+        return memo[k]
+    end
+end
+
 -- fn(copy) with each of `values` (id | uses << 8, in order) in the first empty slots of `u`'s
 -- bag, inside a sandbox: what the game would say of the unit holding those items (what the
 -- prep shop would sell it), asked of the game itself and put back on return, fn's error
@@ -2585,7 +2619,7 @@ function M.new(outer)
             end
             return best or false, strength
         elseif d.kind == "chests" or d.kind == "doors" then
-            return s.opens(u, d.kind == "chests" and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR), 0
+            return s.opens(u, M.LOCK_TERRAIN[d.kind]), 0
         elseif d.kind == "fog" then
             return sandbox(function(call)
                 return call(S.GetUnitFogViewRange, { u.addr })
@@ -3635,7 +3669,9 @@ function M.new(outer)
         return M.convoyKey(Board, mem, S, u, function(id) return opensWith(u, id, terrain) end)
     end
 
-    function s.opensChest(u) return s.opens(u, M.TERRAIN_CHEST_FULL) end
+    -- (like opensDoor: the bot asks the one lock, not the terrain)
+    function s.opensChest(u) return s.opens(u, M.LOCK_TERRAIN.chests) end
+    function s.isChestLock(terrain) return terrain == M.TERRAIN_CHEST_FULL end
 
     function s.locked(u, x, y)
         local t = s.terrain(x, y)
@@ -3643,10 +3679,8 @@ function M.new(outer)
         return nil
     end
 
-    function s.opensDoor(u) return s.opens(u, M.TERRAIN_DOOR) end
-    function s.holdsKey(u)
-        return s.opens(u, M.TERRAIN_DOOR) or s.opens(u, M.TERRAIN_CHEST_FULL)
-    end
+    function s.opensDoor(u) return s.opens(u, M.LOCK_TERRAIN.doors) end
+    function s.holdsKey(u) return s.opensDoor(u) or s.opensChest(u) end
 
     function s.canTalk(u, t)
         return sandbox(function(call)
@@ -4104,9 +4138,10 @@ function M.riderTiles(api, call, u, tiles, from)
 end
 
 -- The convoy's first item that would let `u` open a door or chest (`opens(id)`: sight's
--- opensWith, the game's own key check), { id, uses }; nil when its bag has no room for it or the convoy holds
--- none, or when the convoy is not the game's (Board.convoyFault). What the Supply command's
--- Take would hand it (prep_itemsupply.c: Take refuses a full bag). sight.convoyKey.
+-- opensWith, the game's own key check), { id, uses }; nil when its bag has no room for it or
+-- the convoy holds none, or when the convoy is not the game's (Board.convoyFault). What the
+-- Supply command's Take would hand it (prep_itemsupply.c: Take refuses a full bag).
+-- sight.convoyKey.
 function M.convoyKey(Board, mem, S, u, opens)
     if #(u.items or {}) >= Board.ITEM_COUNT or Board.convoyFault(mem, S) then return nil end
     for _, c in ipairs(Board.convoyItems(mem, S)) do
