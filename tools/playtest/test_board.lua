@@ -489,7 +489,8 @@ end
 do
     local bound = Board.bind({}, {})
     for k, v in pairs(Board) do
-        if type(k) == "string" and k:match("^ACTION_") and type(v) == "number" then
+        if type(k) == "string" and (k:match("^ACTION_") or k:match("^AI_ACTION_"))
+                and type(v) == "number" then
             check(bound[k], v, "bind: " .. k)
         end
     end
