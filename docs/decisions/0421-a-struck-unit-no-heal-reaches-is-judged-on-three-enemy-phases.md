@@ -118,3 +118,32 @@ witness, not a verdict).**
   door at 0.82, `lap3e/9` turn 3 at 0.73.
 - In `scout-ch14`, Colm (charId 9) dies on turn 7 at 24.5% under a labelled fallback, with and
   without the rule.
+
+## Amended (#699, 2026-11-21)
+
+**The fault.** `carries()` exempted a struck unit from the wear whenever any staff user of the
+plan could reach it next turn, or it held a salve. Over 1,601 deaths on turns where every plan was
+over the cap (`review/699/cause5.md`), the unit had been cornered the turn before because that
+exemption was taken for a heal that then did not land: in 410 of 539 cases no heal came next turn
+(the healer healed another unit in 83, acted otherwise in 199, was dead in 128), and in 129 one
+landed but left the unit in kill range (125 of them the unit's own Vulnerary).
+
+**The rule now (`planner.lua` `cover()` in `judge()`).** A heal counts toward a unit's exemption
+only when the game lets it happen and it is enough:
+- **One staff use per healer per turn.** The plan's healers are dealt to its struck units, most
+  expected damage (`taken`) first (id breaks a tie), one unit each, the weakest staff that is
+  enough first. A struck unit left without one carries the wear. A salve is its holder's own and
+  covers only it.
+- **Enough** means: the HP the plan leaves, less the phase's expected damage, plus the heal (the
+  staff's `amount` from `sight.staves`, the salve's best from `sight.salve`, which now returns that
+  amount instead of a yes), held to max HP, is above one more phase of that damage. The heal's
+  amount is the game's (`GetUnitItemHealAmount`); the damage is the judged phase's own.
+- **A healer the phase kills** with chance above the cap (its death in the phase, its counter's
+  included) heals no one.
+- Reach is unchanged (`healsNext`). No weight is added; the cost is one assignment per judged plan
+  that strikes a unit, run once and only when a struck unit asks.
+
+**Open.** The rest of bucket A (a healer could heal and the next turn's planner chose not to, 199
+and 83 cases) is not fixed here: the exemption now stops trusting a heal the game would let the
+bot refuse to take, but no rule makes the next turn take it. A salve and a staff are not added
+together for one unit (the game allows both; no case seen needed it).

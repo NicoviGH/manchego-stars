@@ -216,8 +216,9 @@
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff (IA_STAFF),
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
---   salve(u)                 whether `u` holds such an item at all, whatever its HP (the
---                            planner's wear, ADR 0421): mend() offers none at full HP.
+--   salve(u)                 the most such an item heals `u` by, nil when it holds none,
+--                            whatever its HP (the planner's wear, ADR 0421): mend() offers
+--                            none at full HP.
 --   obstacles()              every obstacle the Attack command can strike, as
 --                            TryAddTrapsToTargetList (bmtarget.c) lists them from the trap pool:
 --                            a TRAP_OBSTACLE's damaged wall at its tile, or the tile below where
@@ -3940,11 +3941,16 @@ function M.new(outer)
         end) end)
     end
 
-    -- Whether `u` holds a heal for itself at all, whatever its HP now: the item s.mend offers
-    -- once it is hurt (CanUnitUseItem refuses one at full HP). One read for every HP.
+    -- What the best heal `u` holds for itself restores, whatever its HP now: the item s.mend
+    -- offers once it is hurt (CanUnitUseItem refuses one at full HP); nil when it holds none.
+    -- One read for every HP.
     function s.salve(u)
         return mine("salve", u, function() return sandbox(function(call)
-            return #M.selfHeals(api.Board, call, S, u) > 0
+            local best
+            for _, h in ipairs(M.selfHeals(api.Board, call, S, u)) do
+                best = math.max(best or 0, h.amount)
+            end
+            return best
         end) end, "-")
     end
 

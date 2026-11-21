@@ -477,7 +477,13 @@ local function sightOf(o)
     if o.mend then s.mend = function(u) return o.mend[u.id] end end
     -- who holds a heal of its own, whatever its HP (sight.salve); a fixture that names none
     -- has no read, and the planner reads no wear
-    if o.salve then s.salve = function(u) return o.salve[u.id] == true end end
+    if o.salve then
+        s.salve = function(u)
+            local v = o.salve[u.id]
+            if v == true then return 10 end   -- a Vulnerary
+            return v or nil
+        end
+    end
     -- the fog read's strike (sight.strike with `from`, the fog's edge): o.fogStrike(u, e, x, y,
     -- fx, fy) answers it; a strike with no `from` is the fake's own
     if o.fogStrike then
@@ -8861,6 +8867,53 @@ do
                                    reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
                                              [0x02] = tiles({ 14, 0 }) } }, H)
     check(at(Planner.plan(B, board, sight, st)), "0,0", "wear: a staff two turns off is no heal in reach")
+
+    -- a heal counts only when it is enough (#699): on 14 HP a blow of 12 leaves 2, a Heal of 10
+    -- makes 12, and the next blow kills; a heal of 20 outlasts it
+    H = blue(0x02, 1, 0, 1, { minRange = false })
+    local function healed(hp, amount)
+        return wears(hp, { staves = { [0x02] = { { slot = 0, amount = amount } } },
+                           reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
+                                     [0x02] = tiles({ 0, 1 }) } }, H)
+    end
+    check(at(Planner.plan(B, healed(14, 10))), "0,0",
+          "wear (#699): a Heal that leaves the unit in the next blow's reach is no heal")
+    check(at(Planner.plan(B, healed(14, 20))), "1,0", "wear (#699): a Heal that outlasts it is")
+    -- a salve the same: 5 HP of it on 14 HP is too small, the Vulnerary's 10 on 27 is enough
+    check(at(Planner.plan(B, wears(14, { salve = { [0x01] = 5 } }))), "0,0",
+          "wear (#699): a salve too small is no heal")
+    check(at(Planner.plan(B, wears(14, { salve = { [0x01] = 20 } }))), "1,0",
+          "wear (#699): a salve that is enough is")
+
+    -- one staff use a turn (#699): A and Bo are both struck for 12 whatever the plan, one Heal
+    -- reaches them both. It covers A (the lower id, the damage equal) and Bo carries the wear:
+    -- its three blows kill it in every plan, so the march into reach is over the cap. A second
+    -- healer covers Bo too
+    local function twoStruck(...)
+        local Bo = blue(0x03, 1, 0, 1, { hp = 27, minRange = false })
+        local function blows(plan)
+            local out = strikes12(plan)
+            out[#out + 1] = { target = 0x03, takenHit = 100, takenDmg = 12, takenHits = 1, takenCrit = 0 }
+            return out
+        end
+        local so = { enemyPhase = blows, nextPhase = blows,
+                     reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x03] = tiles({ 0, 1 }),
+                               [0x02] = tiles({ 0, 2 }), [0x04] = tiles({ 1, 2 }) },
+                     staves = { [0x02] = { { slot = 0, amount = 20 } },
+                                [0x04] = { { slot = 0, amount = 20 } } } }
+        local units = { ... }
+        local board, sight, st = wears(27, so, Bo, table.unpack(units))
+        local _, plan = Planner.plan(B, board, sight, st)
+        local admitted = false
+        for _, c in ipairs(plan.considered) do
+            if c.acts[1] == "1>wait@1,0>nil" and c.rank.admitted then admitted = true end
+        end
+        return admitted
+    end
+    check(twoStruck(blue(0x02, 1, 0, 2, { minRange = false })), false,
+          "wear (#699): two struck units and one healer, one of them still carries the wear")
+    check(twoStruck(blue(0x02, 1, 0, 2, { minRange = false }), blue(0x04, 1, 1, 2, { minRange = false })),
+          true, "wear (#699): a healer each, none does")
 
     -- a staff's own reach (#629 review): from (8,0) on MOV 5 the healer gets to (3,0), two
     -- tiles from A on (1,0). A reach of 1 is no heal next turn; a staff reach of 3 is

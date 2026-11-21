@@ -63,8 +63,9 @@
 --      opts.budget.attempt left of M.LOOK_ATTEMPT, else skipped and tagged. Each protected
 --      unit's death chance becomes that of dying in either phase, and those plans are ranked
 --      again among themselves.
---      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's can
---      reach before the phase after, is read on M.WEAR enemy phases with its HP carried (the
+--      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's that
+--      the game allows (one staff use a healer, #699) and that is enough can reach before the
+--      phase after, is read on M.WEAR enemy phases with its HP carried (the
 --      wear, ADR 0421), within its own budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
@@ -1998,25 +1999,72 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             hitOf[i] = inWay(hit, w, function(u) return u.id end, "back")
         end
-        -- The wear (ADR 0421): whether a heal of the army's can reach a unit of the plan
-        -- before the enemy phase after the next. None can when it holds none of its own
-        -- (sight.salve) and no staff of the army's gets within its reach next turn (healsNext).
-        -- Its HP then carries from phase to phase.
-        local plannedBy, unhealed = {}, {}
+        -- The wear (ADR 0421, amended #699): a unit the phase strikes carries its HP into the later
+        -- phases unless a heal lands next turn that the game allows and that is enough:
+        -- (a) a staff user gets one use a turn, so the plan's healers are dealt to its struck
+        --     units, the most damage expected first, one unit each; a salve is its holder's own and
+        --     covers only it;
+        -- (b) the heal (the staff's amount, sight.staves; the salve's, sight.salve), on the HP the
+        --     phase leaves, outlasts another phase of the damage the judged one deals (`taken`);
+        -- (c) a healer the phase is likely to kill (over the cap) heals no one.
+        -- A staff reaches the unit when healsNext says so.
+        local plannedBy, unhealed, covered = {}, {}, nil
         for _, p in ipairs(planned) do plannedBy[p.unit.id] = p end
+        local function enough(p, amount)
+            local id = p.unit.id
+            local left = math.min(p.unit.maxhp or p.hp, p.hp - (taken[id] or 0) + amount)
+            return left > (taken[id] or 0)
+        end
+        -- the struck units a heal covers: { [id] = true }, dealt once per judged plan
+        local function cover()
+            local order, used, out = {}, {}, {}
+            for _, p in ipairs(planned) do
+                if (struck[p.unit.id] or 0) > 0 then order[#order + 1] = p end
+            end
+            table.sort(order, function(x, y)
+                local tx, ty = taken[x.unit.id] or 0, taken[y.unit.id] or 0
+                if tx ~= ty then return tx > ty end
+                return x.unit.id < y.unit.id
+            end)
+            local healers = {}
+            for _, q in ipairs(planned) do
+                local amount = 0
+                for _, sv in ipairs(sight.staves and sight.staves(q.unit) or {}) do
+                    amount = math.max(amount, sv.amount or 0)
+                end
+                local dies = (die[q.unit.id] or 0) + (st.fought[q.unit.id] and st.fought[q.unit.id].die or 0)
+                if amount > 0 and M.admits(dies, cap) then
+                    healers[#healers + 1] = { q = q, amount = amount }
+                end
+            end
+            -- the weakest staff that is enough, so a stronger one stays for a harder-hit unit
+            table.sort(healers, function(x, y)
+                if x.amount ~= y.amount then return x.amount < y.amount end
+                return x.q.unit.id < y.q.unit.id
+            end)
+            for _, p in ipairs(order) do
+                local own = sight.salve(p.unit)
+                if own and enough(p, own) then
+                    out[p.unit.id] = true
+                else
+                    for i, h in ipairs(healers) do
+                        if not used[i] and h.q ~= p and enough(p, h.amount) and healsNext(h.q, p) then
+                            used[i], out[p.unit.id] = true, true
+                            break
+                        end
+                    end
+                end
+            end
+            return out
+        end
         -- -> the enemy phases the unit meets before a heal of the army's can reach it: 1 when one
-        -- reaches it next turn, M.WEAR at most
+        -- does, M.WEAR at most
         local function carries(id)
             if unhealed[id] ~= nil then return unhealed[id] end
             local p, n = plannedBy[id], 1
-            if p ~= nil and sight.salve ~= nil and sight.turnsTo ~= nil and not sight.salve(p.unit) then
-                n = M.WEAR
-                for _, q in ipairs(planned) do
-                    if q ~= p and healsNext(q, p) then
-                        n = 1
-                        break
-                    end
-                end
+            if p ~= nil and sight.salve ~= nil and sight.turnsTo ~= nil then
+                covered = covered or cover()
+                if not covered[id] then n = M.WEAR end
             end
             unhealed[id] = n
             return n
