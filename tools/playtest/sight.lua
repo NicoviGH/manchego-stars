@@ -734,17 +734,19 @@ end
 -- bag slot its uses come off (M.wearSlotOf).
 M.SPENDS_MISS = 0x82   -- IA_MAGIC (1 << 1) | IA_UNCOUNTERABLE (1 << 7), include/bmitem.h
 M.IA_UNBREAKABLE = 1 << 3
--- How a battle unit's weapon spends its uses (its weaponAttributes): spendsMiss, unbreakable.
+-- How a battle unit's weapon spends its uses (its weaponAttributes): spendsMiss, unbreakable,
+-- and uses, the uses it had as the battle took it up (weaponBefore): no more can be spent.
 function M.spendRule(mem, bu)
     local attributes = mem.u32(bu + BU.weaponAttributes)
     return { spendsMiss = (attributes & M.SPENDS_MISS) ~= 0,
-             unbreakable = (attributes & M.IA_UNBREAKABLE) ~= 0 }
+             unbreakable = (attributes & M.IA_UNBREAKABLE) ~= 0,
+             uses = mem.u16(bu + BU.weaponBefore) >> 8 }
 end
 function M.side(mem, me, other, proc, hitsAt)
     local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
     local rule = M.spendRule(mem, me)
     return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
-             spendsMiss = rule.spendsMiss, unbreakable = rule.unbreakable,
+             spendsMiss = rule.spendsMiss, unbreakable = rule.unbreakable, uses = rule.uses,
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
              armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0,
              wearSlot = M.wearSlotOf(mem, me) }
@@ -789,16 +791,21 @@ end
 -- was played at the target's own HP; an earlier blow of a plan can leave it on less, and there
 -- its death comes sooner and the blows after it are never thrown (Planner.wearAt reads it so).
 -- `hits` = the way's blows in order (Board.hits); `sides` = { actor, target }, each M.side's
--- (spendsMiss, unbreakable). As BattleGenerateHitEffects spends them: a use on a hit, or on any
+-- (spendsMiss, unbreakable, uses; uses nil = no cap, as a wall's unbreakable side). As BattleGenerateHitEffects spends them: a use on a hit, or on any
 -- blow of a weapon that spends on a miss, none of an IA_UNBREAKABLE one (GetItemAfterUse). The
 -- target loses HP to the actor's hits, and to its own Devil Axe's (a devil blow strikes its own
--- wielder). `worn` = { actor, target }: the uses the game took (M.worn). This reading of the
--- hit array must count the same, else it is wrong and fails loudly. Pure.
+-- wielder). A weapon spends no more than the uses it had (side.uses, M.spendRule): a Brave
+-- weapon on its last use breaks on the round's first blow and still throws the second
+-- (BattleGenerateRoundHits tests the weapon once per round; GetItemAfterUse of the broken 0 is
+-- 0), which lands and costs nothing (vanilla Ch19, campaign 4006, #684). `worn` = { actor,
+-- target }: the uses the game took (M.worn). This reading of the hit array must count the
+-- same, else it is wrong and fails loudly. Pure.
 function M.wornBy(hits, sides, worn)
     local out, spent, lost = { actor = {}, target = {} }, { actor = 0, target = 0 }, 0
     for _, h in ipairs(hits) do
         local side = sides[h.by]
-        if not side.unbreakable and (not h.miss or side.spendsMiss) then
+        if not side.unbreakable and (not h.miss or side.spendsMiss)
+                and (side.uses == nil or spent[h.by] < side.uses) then
             out[h.by][lost] = (out[h.by][lost] or 0) + 1
             spent[h.by] = spent[h.by] + 1
         end

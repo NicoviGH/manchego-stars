@@ -1317,6 +1317,25 @@ do
                     { by = "actor", miss = false, dmg = 2 } }
     w = Sight.wornBy(devil, { actor = sword, target = sword }, { actor = 2, target = 0 })
     check(w.actor[0], 2, "wornBy: a Devil Axe's self-blow takes nothing off the target")
+    -- #684: a Brave weapon on its last use breaks on the round's first blow and still throws
+    -- the second, which lands and spends nothing (BattleGenerateRoundHits, GetItemAfterUse)
+    local brave = { { by = "actor", miss = false, dmg = 4 }, { by = "actor", miss = false, dmg = 4 } }
+    w = Sight.wornBy(brave, { actor = { spendsMiss = false, uses = 1 }, target = sword },
+                     { actor = 1, target = 0 })
+    check(w.actor[0], 1, "wornBy: a Brave weapon's last use goes on its first blow")
+    check(w.actor[4], nil, "wornBy: its second blow, the weapon broken, spends none")
+    -- the same on the counter side, and for a weapon that spends on a miss: its missed first
+    -- blow takes the last use, so the second (a hit) spends none
+    local counter = { { by = "actor", miss = true, dmg = 0 }, { by = "target", miss = true, dmg = 0 },
+                      { by = "target", miss = false, dmg = 6 } }
+    w = Sight.wornBy(counter, { actor = sword, target = { spendsMiss = true, uses = 1 } },
+                     { actor = 0, target = 1 })
+    check(w.target[0], 1, "wornBy: a counter's last use goes on its first blow, a miss that spends")
+    check(next(w.actor), nil, "wornBy: the actor's missed sword spends none")
+    local two = { { by = "actor", miss = false, dmg = 4 }, { by = "actor", miss = false, dmg = 4 } }
+    w = Sight.wornBy(two, { actor = { spendsMiss = false, uses = 2 }, target = sword },
+                     { actor = 2, target = 0 })
+    check(w.actor[4], 1, "wornBy: with a use left for it, the second blow spends")
     local ok, err = pcall(Sight.wornBy, hits, { actor = sword, target = tome }, { actor = 3, target = 2 })
     check(ok == false and tostring(err):find("the game took 3", 1, true) ~= nil, true,
           "wornBy: a count the game's does not match fails loudly")
