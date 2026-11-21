@@ -6001,6 +6001,50 @@ do
     check(plan and plan.fallback, "FALLBACK_SACRIFICE", "planner: and labelled")
 end
 
+-- test_planner_idle_is_over_cap (ADR 0439): A kills E (10 HP, sure) from (1,0), where J's strike
+-- kills A 40% of the time, over careful's cap; holding at (0,0) risks nothing. Without
+-- opts.idle the hold is admitted and played. With it (botrun's quiet reached M.GOAL_QUIET) the
+-- hold advances nothing and is not admitted: the kill is played as the fallback, and the hold
+-- is rejected "idle". A game over ranks last, below the hold, still.
+do
+    local function play(idle, gameOver)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = false, hp = 10 })
+        local J = red(0x82, 9, 9, { minRange = false })
+        local o = {
+            objective = { kind = "rout", gameOver = gameOver },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 10, hits = 1 } } } },
+            enemyPhase = function(plan)
+                for _, b in ipairs(plan.blues) do
+                    if b.unit.id == 0x01 and b.x == 1 then
+                        return { { enemy = 0x82, target = 0x01, takenHit = 40, takenDmg = 99,
+                                   takenHits = 1, takenCrit = 0, targetHp = 20 } }
+                    end
+                end
+                return {}
+            end,
+        }
+        local _, plan = Planner.plan(B, boardOf(A, E, J), sightOf(o), style("careful"),
+                                     { idle = idle })
+        local attacks, holdRejected = false, nil
+        for _, x in ipairs(plan and plan.acts or {}) do attacks = attacks or x.act == "attack" end
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if c.acts[1]:find("wait@0,0") then holdRejected = c.rejected or "played" end
+        end
+        return attacks, plan and plan.fallback, holdRejected
+    end
+    local attacks, fallback, held = play(true)
+    check(tostring(attacks) .. " " .. tostring(fallback) .. " " .. tostring(held),
+          "true FALLBACK_SACRIFICE idle", "idle: the kill is played over the cap, the hold rejected")
+    attacks, fallback, held = play(false)
+    check(tostring(attacks) .. " " .. tostring(fallback) .. " " .. tostring(held),
+          "false nil played", "not idle: the hold is played")
+    attacks, fallback, held = play(true, { 0x01 })
+    check(tostring(attacks) .. " " .. tostring(fallback) .. " " .. tostring(held),
+          "false FALLBACK_SACRIFICE played", "idle: a plan that risks the game over still ranks below the hold")
+end
+
 -- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%
 -- of the time. Standing, E holds J off; dead, it frees J to strike L there for sure, and L's
 -- death ends the game. The average keeps E standing (kill < 0.5), so only the branch where the

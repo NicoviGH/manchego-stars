@@ -2721,6 +2721,8 @@ do
                 for _, u in ipairs(board.units) do
                     if u.faction == "blue" and u.acted then return nil end
                 end
+                g.idleAt = g.idleAt or {}
+                if g.idleAt[board.turn] == nil then g.idleAt[board.turn] = opts.idle == true end
                 if not g.quietAt[board.turn] then
                     local ids = {}
                     for id in pairs(opts.quietGoals or {}) do ids[#ids + 1] = id end
@@ -2855,6 +2857,22 @@ do
     for t = 1, 10 do outw[t] = gw.quietAt[t] == "" and "-" or "q" end
     check(table.concat(outw, " "), "- - - - - - - - - q",
           "quiet goals: phases that made progress do not count against a goal")
+
+    -- (idle, ADR 0439) the plan is told the army is idle once `quiet`, the count rule 2 reads,
+    -- has reached GOAL_QUIET: the same three phases that stall a goal's row, no new weight
+    do
+        local _, _, _, gi = shadow(9, {}, nil, { hideTurns = true, moving = true })
+        local got = {}
+        for t = 1, 9 do got[t] = gi.idleAt[t] and "idle" or "-" end
+        check(table.concat(got, " "), "- - - - idle idle idle idle idle",
+              "idle: the plan is told once quiet reaches GOAL_QUIET")
+        local _, _, _, gj = shadow(9, { [3] = { act = "visit" } }, nil,
+                                   { hideTurns = true, moving = true })
+        got = {}
+        for t = 1, 9 do got[t] = gj.idleAt[t] and "idle" or "-" end
+        check(table.concat(got, " "), "- - - - - - - idle idle",
+              "idle: a phase with progress resets the count")
+    end
 
     -- (rule 2) player phases in a row with no progress end the attempt `stuck`. The count lags
     -- a phase, so the run ends at the top of phase 18 with 16 closed quiet phases; one

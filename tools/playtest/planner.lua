@@ -89,8 +89,10 @@
 -- considered = every plan judged, best first: { judged, acts (its key list, M.keysOf), kind, rank,
 -- seizes, extended (it met the lookahead's second phase), lookWin (that phase's win, below),
 -- played (the one played), rejected (why
--- not: "over_cap", "outranked", "stalled"), weights (its judged phase's likeliest ways' chances) },
--- rank = what plans are compared by (M.outranks): { admitted,
+-- not: "over_cap", "outranked", "stalled", "idle"), weights (its judged phase's likeliest ways'
+-- chances) },
+-- rank = what plans are compared by (M.outranks): { admitted, idle (opts.idle only: 1 for a plan
+-- that does not advance the level, 0 for one that does; ADR 0439),
 -- forfeits (how many ledger goals it closes for good), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
@@ -114,7 +116,8 @@
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
--- to the average, opts = { stalled = bool, sent, explored (both Bot.candidates'), quietGoals = the ledger ids
+-- to the average, opts = { stalled = bool, idle (botrun's quiet reached M.GOAL_QUIET), sent,
+-- explored (both Bot.candidates'), quietGoals = the ledger ids
 -- no unit has neared for M.GOAL_QUIET readings (botrun's rule 1, ADR 0403) } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
@@ -244,7 +247,9 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
 -- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
--- among others, it ends the chapter (Nicolas, 2026-11-01); then the smallest largest excess,
+-- among others, it ends the chapter (Nicolas, 2026-11-01); then, once the bot's own stall
+-- reading has fired (opts.idle, ADR 0439), a plan that advances the level before one that
+-- only holds or marches (`idle`); then the smallest largest excess,
 -- then summed excess, then largest death chance. Each of those is read on the next enemy
 -- phase first (`first_*`) and on both phases only to break its ties: the lookahead's second
 -- phase has our units stand still another round, and over Manchego Stars ch03's pilots its readings
@@ -278,7 +283,8 @@ function M.outranks(a, b)
                     { "key", 1 } }
     local lead = {}
     if not a.admitted then
-        lead = { { "first_game_over", 1 }, { "first_max_exceed", 1 }, { "first_sum_exceed", 1 },
+        lead = { { "first_game_over", 1 }, { "idle", 1 }, { "first_max_exceed", 1 },
+                 { "first_sum_exceed", 1 },
                  { "game_over", 1 }, { "max_exceed", 1 }, { "sum_exceed", 1 }, { "max_die", 1 } }
     end
     for _, o in ipairs(ADMITTED) do lead[#lead + 1] = o end
@@ -970,6 +976,31 @@ function M.plan(Bot, board, sight, style, opts)
     local function endsIn(st)
         return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId)
     end
+    -- Whether a plan advances the level (ADR 0439): it kills a red unit (our blows, or our
+    -- counters in the judged phase: a bait counts), takes a goal (a visit, chest, talk or
+    -- rescue), ends the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
+    -- chapter, any red of a Rout). A march nearer a goal does not: nearing is what the stall
+    -- reading found idle, and a blow that deals nothing wounds nothing. `counters`: each red
+    -- enemy's chance our counters kill it in the judged phase.
+    local function advances(st, fell, counters)
+        for id in pairs(st.took) do
+            if id:sub(1, 7) ~= "convoy:" then return true end
+        end
+        if next(st.carry) or winOf(st, fell) > M.DUST then return true end
+        for _, p in pairs(counters) do
+            if p > M.DUST then return true end
+        end
+        for id, blows in pairs(st.kill) do
+            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.DUST then return true end
+        end
+        for id, hp in pairs(st.enemyHp) do
+            local e = byId[id]
+            local needed = e and not st.recruits[id]
+                and (objective == "rout" or (objective == "boss" and e.isBoss))
+            if needed and e.hp - hp > M.DUST then return true end
+        end
+        return false
+    end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
         local read = turnsOn(st, pos)
@@ -1630,6 +1661,11 @@ function M.plan(Bot, board, sight, style, opts)
         end
         return healReach[k]
     end
+    -- Whether a plan not advancing the level is inadmissible (ADR 0439): opts.idle, the bot's own
+    -- stall reading (botrun's GOAL_QUIET), and at least one plan judged that advances. With none,
+    -- every plan ties on `idle` and the fallback would only be flagged for holding, so it stays
+    -- off. Set by pick(), which re-admits every plan judged when it moves.
+    local idleOn = false
     local function admit(st)
         local rank = st.rank
         local firstCall = rank.first_game_over == nil
@@ -1645,6 +1681,9 @@ function M.plan(Bot, board, sight, style, opts)
             rank.max_die = math.max(rank.max_die, pr.die)
             rank.sum_die = rank.sum_die + pr.die
         end
+        -- a plan that does not advance is no plan once the stall reading fired (ADR 0439)
+        rank.idle = idleOn and (st.advances and 0 or 1) or nil
+        rank.admitted = rank.admitted and rank.idle ~= 1
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
     -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, fought?,
@@ -1934,6 +1973,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- on the player's side it strikes, whose other acts may save it (vanilla Ch5: Joshua,
         -- killed by Seth's counter on turn 3, the planner paying nothing for it)
         local felled, struckBy, fell, winStruck = {}, {}, 0, {}
+        local countered = {}   -- per red enemy, the chance our counters kill it in the phase
         local learnt = 0   -- the experience our counters are expected to earn in the phase
         -- the units the phase may strike: the player's as the plan leaves them (its counter
         -- chained), then the greens where they stand; kept for the lookahead's second phase
@@ -2001,6 +2041,10 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
             for _, s in ipairs(o.strikes) do
+                local striker = s.enemy and byId[s.enemy]
+                if striker and striker.faction == "red" and not st.recruits[s.enemy] then
+                    countered[s.enemy] = (countered[s.enemy] or 0) + o.p * (s.felled or 0)
+                end
                 if strikers[s.target] and s.enemy then strikers[s.target][s.enemy] = true end
                 -- a berserk strike's striker is struck by its target's counter (blowsOn)
                 if s.berserk and strikers[s.enemy] then
@@ -2066,6 +2110,7 @@ function M.plan(Bot, board, sight, style, opts)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)
         judged = judged + st.goalNow + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
+        st.advances = advances(st, fell, countered)
         -- each way the phase went and its units' HP there, for the wear's later phases
         st.outcomes, st.hitOf = outcomes, hitOf
         -- the units the phase strikes that no heal of the army's reaches after it, in id order
@@ -2299,6 +2344,14 @@ function M.plan(Bot, board, sight, style, opts)
     -- the plans themselves, with whether a stalled board lets each be played
     local considered, judgedPlans, playable = {}, {}, {}
     local function pick()
+        local was = idleOn
+        idleOn = false
+        for _, j in ipairs(judgedPlans) do
+            if opts and opts.idle and j.ok and j.st.advances then idleOn = true end
+        end
+        if idleOn ~= was then
+            for _, j in ipairs(judgedPlans) do admit(j.st) end
+        end
         local ranks = {}
         for i, j in ipairs(judgedPlans) do ranks[i] = j.st.rank end
         local i = M.rebase(ranks, function(k) return judgedPlans[k].ok end)
@@ -2737,7 +2790,8 @@ function M.plan(Bot, board, sight, style, opts)
         elseif not playable[c] then
             c.rejected = "stalled"
         else
-            c.rejected = c.rank.admitted and "outranked" or "over_cap"
+            c.rejected = c.rank.admitted and "outranked"
+                or c.rank.idle == 1 and "idle" or "over_cap"
         end
     end
     local offeredN, seen, fogged = 0, 0, 0

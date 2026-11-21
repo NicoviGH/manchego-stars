@@ -1532,7 +1532,11 @@ function M.run(api)
                             for id, n in pairs(goalQuiet) do
                                 if n >= M.GOAL_QUIET then quietGoals[id] = true end
                             end
+                            -- the army has made no progress for as long as a goal is
+                            -- stalled on: holding is then no plan (planner.lua, ADR 0439). The
+                            -- `quiet` the stuck abort reads, so the bot's two readings agree
                             return { stalled = stalled, sent = sent, stuck = stuck,
+                                     idle = quiet >= M.GOAL_QUIET,
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(),
