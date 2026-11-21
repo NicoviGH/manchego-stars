@@ -791,7 +791,7 @@ end
 -- was played at the target's own HP; an earlier blow of a plan can leave it on less, and there
 -- its death comes sooner and the blows after it are never thrown (Planner.wearAt reads it so).
 -- `hits` = the way's blows in order (Board.hits); `sides` = { actor, target }, each M.side's
--- (spendsMiss, unbreakable). As BattleGenerateHitEffects spends them: a use on a hit, or on any
+-- (spendsMiss, unbreakable, uses; uses nil = no cap, as a wall's unbreakable side). As BattleGenerateHitEffects spends them: a use on a hit, or on any
 -- blow of a weapon that spends on a miss, none of an IA_UNBREAKABLE one (GetItemAfterUse). The
 -- target loses HP to the actor's hits, and to its own Devil Axe's (a devil blow strikes its own
 -- wielder). A weapon spends no more than the uses it had (side.uses, M.spendRule): a Brave
