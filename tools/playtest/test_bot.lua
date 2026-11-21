@@ -539,7 +539,13 @@ local function sightOf(o)
         return out
     end
     -- the convoy's door key for each unit (sight.convoyKey): { id, uses }
-    if o.convoyKey then s.convoyKey = function(u) return o.convoyKey[u.id] end end
+    -- (a chest's, when the lock is asked for: o.convoyChestKey, #699; o.chestOpeners hold one)
+    if o.convoyKey or o.convoyChestKey then
+        s.convoyKey = function(u, lock)
+            return ((lock == nil) and (o.convoyKey or {}) or (o.convoyChestKey or {}))[u.id]
+        end
+        s.opensChest = function(u) return (o.chestOpeners or {})[u.id] == true end
+    end
     -- the Drop list (MakeDropTargetList): from each tile, its neighbours o.dropOn holds ("x,y")
     if o.dropOn then
         s.drops = function(_, tiles)
@@ -2322,6 +2328,31 @@ do
     check(acts(B.supply({ keeper }, full, { bench })), "",
         "supply: a full convoy takes no give from the benched either")
 
+    -- #699 (vanilla Ch21's chests): a key from the convoy when the chapter has chests (or
+    -- doors) and no fielded unit opens them. `opens` is the game's read per unit.
+    local chestKey = item(0x69, { [1] = { opens = { chests = true } },
+                                  [2] = { opens = { chests = true } } })
+    local chests = { { id = "chests", kind = "chests", need = 1 } }
+    local solo = armedUnit(1, 5)
+    local roomy = armedUnit(2, 5, { items = { lance(), lance(30), lance(20), lance(10) } })
+    solo.items = { lance() }
+    check(acts(B.supply({ roomy, solo }, { chestKey }, nil, chests)), "take 1:69",
+        "supply: chests and no opener, so the unit with the most free slots takes the Chest Key")
+    local held = item(0x69, { [2] = { opens = { chests = true } } }, { kind = "key" })
+    local opener = armedUnit(2, 5, { items = { lance(), held } })
+    check(acts(B.supply({ opener, solo }, { chestKey }, nil, chests)), "",
+        "supply: a fielded opener already holds one, so nothing is taken")
+    check(acts(B.supply({ solo }, { chestKey }, nil, {})), "",
+        "supply: a chapter with no chests takes no key")
+    check(acts(B.supply({ solo }, { chestKey }, nil, { { id = "doors", kind = "doors", need = 1 } })),
+        "", "supply: a Chest Key is no door's key")
+    -- a full bag gives first what Bot.fullBag would send (money), as the other takes do
+    local packed = armedUnit(1, 5, { items = { lance(), lance(30), { kind = "heal", uses = 3 },
+                                               { kind = "other", id = 0x20, uses = 1 },
+                                               { kind = "money", id = 0xBC, uses = 1 } } })
+    check(acts(B.supply({ packed }, { chestKey }, nil, chests)), "give 1:BC, take 1:69",
+        "supply: a full bag gives its gem first, then takes the key")
+
     -- Rule B: a unit is short of a type below one full weapon of it, so a spare comes before
     -- the last one breaks. Fails on the lackedTypes that asked only "holds none with uses left".
     local function bow(uses, maxUses, users)
@@ -3973,6 +4004,47 @@ do
     o.keySources = { door = { D } }
     _, ctx = B.candidates(boardOf(A, C, D), sightOf(o), style("careful"))
     check(ctx.turnsTo(A, { x = 4, y = 0 }), nil, "keys: no Chest Key to take, no way to the chest")
+end
+
+-- test_supply_takes_the_convoys_chest_key (#699, vanilla Ch21's two chests): the chest at (4,0)
+-- is locked to A, no enemy drops a key and none is held, but the convoy holds a Chest Key. The
+-- chest is A's goal (the convoy key counts as a way), and A takes the key with Supply. Not while
+-- a fielded unit opens chests (it is that unit's chest), and not when the convoy has none (or A's
+-- bag is full: sight.convoyKey answers nil).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local K = blue(0x02, 1, 0, 5)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local key = { [0x01] = { id = 0x69, uses = 1 } }
+    local function take(o, ...)
+        o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
+        o.field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["4,0"] = 0 } }
+        o.doors, o.obstacles = {}, {}
+        o.explorable = { { x = 4, y = 0, kind = "chest" } }
+        o.canExplore, o.locked = {}, { [0x01] = { ["4,0"] = "chest" } }
+        o.supplyAt = { ["1,0"] = true }
+        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), style("careful"))) do
+            if c.unit.id == 0x01 then
+                for _, a in ipairs(c.acts) do
+                    if a.act == "supply" then return a end
+                end
+            end
+        end
+        return nil
+    end
+    local a = take({ convoyChestKey = key }, A, E)
+    check(a and (a.move.x .. "," .. a.move.y .. " " .. a.item .. "x" .. a.uses), "1,0 105x1",
+          "chest key: the convoy's Chest Key, taken from the tile Supply is offered on")
+    check(a and a.terrain ~= nil, true, "chest key: the Take says the lock it is for")
+    check(take({ convoyChestKey = key, chestOpeners = { [0x02] = true } }, A, K, E), nil,
+          "chest key: not while a fielded unit opens chests")
+    check(take({ convoyChestKey = {} }, A, E), nil, "chest key: not with no chest key in the convoy")
+    check(take({ convoyKey = key }, A, E), nil, "chest key: a door key is no chest's")
+    -- the Take's own item is read for the lock it names
+    local sight = sightOf({ convoyChestKey = key })
+    local taken = B.takeItem(sight, A, { act = "supply", terrain = "chest" })
+    check(taken and taken.item, 0x69, "takeItem: a chest Take fills in the chest key")
+    check(B.takeItem(sight, A, { act = "supply" }), nil, "takeItem: a door Take wants a door key")
 end
 
 -- test_goal_turns_are_read_once_per_decision: the planner asks the same unit, tile and start

@@ -2121,6 +2121,15 @@ do
     local branch = at and sightSrc:sub(at, sightSrc:find("elseif", at + 10, true)) or ""
     check(branch:find("key.id == a.item", 1, true) ~= nil and branch:find("key.uses == a.uses", 1, true) ~= nil,
           true, "legal: a Take is legal only while the key it names is the convoy's")
+    -- #699: a chest's Take is asked for the chest lock it names, not the door's default
+    check(branch:find("s.convoyKey(u, a.terrain)", 1, true) ~= nil, true,
+          "legal: the Take's key is read for the lock the act names")
+    local chestOpens = function(id) return id == 0x69 end
+    convoy = { { id = 0x6A, uses = 1 }, { id = 0x69, uses = 1 } }
+    local ck = Sight.convoyKey(Bd, nil, {}, u, chestOpens)
+    check(ck and ck.id, 0x69, "convoyKey: the first item that opens a chest")
+    check(Sight.convoyKey(Bd, nil, {}, { items = { {}, {}, {}, {}, {} } }, chestOpens), nil,
+          "convoyKey: no chest key into a full bag")
 end
 
 -- replyKills / safest: the army's reply between the lookahead's two enemy phases (#510 comment

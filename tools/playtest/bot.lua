@@ -1239,6 +1239,26 @@ local function keySources(ctx, u, lock)
     return ctx.keySrc[k]
 end
 
+-- The chest lock at (x, y) `u` holds nothing to open (lockAt), never a door's: a door's convoy
+-- key is supplyKey's own way (lockedOnWay), and doorOpens must not count it.
+local function chestLockAt(ctx, u, x, y)
+    local lock = lockAt(ctx, u, x, y)
+    if not lock then return nil end
+    for _, d in ipairs(ctx.sight.doors and ctx.sight.doors() or {}) do
+        if d.x == x and d.y == y then return nil end
+    end
+    return lock
+end
+
+-- The key the convoy holds for the chest at `tile` that `u` could take now (sight.convoyKey:
+-- a free bag slot, a key its class or character may use), or nil. Vanilla Ch21's two chests
+-- (ch21a-eventinfo.h) have no key in the army, only in the convoy: with no taker the goals
+-- dropped them and 134 of 135 recorded attempts missed one (#699).
+local function convoyChestKey(ctx, u, tile)
+    local lock = chestLockAt(ctx, u, tile.x, tile.y)
+    return lock and ctx.sight.convoyKey and ctx.sight.convoyKey(u, lock) or nil
+end
+
 local keyWay, turnsFor, turnsOn, strikersNear
 
 -- Whether `u` can open the door `d`: it holds a key, or it has a way to an enemy whose fall
@@ -1547,6 +1567,12 @@ turnsFor = function(ctx, u, tile, from, seeking, keyed)
     local lock = not keyed and lockAt(ctx, u, tile.x, tile.y)
     if lock then
         n = select(2, keyWay(ctx, u, tile, from, lock, seeking))
+        -- a chest key in the convoy is a way too (#699): taken with Supply (supplyKey), after
+        -- which the chest is the walk alone, so the walk with the key is its turns
+        if convoyChestKey(ctx, u, tile) then
+            local c = turnsFor(ctx, u, tile, from, seeking, true)
+            if c and (not n or c < n) then n = c end
+        end
     else
         n = s.turnsTo and s.turnsTo(u, tile, from)
         local via = viaObstacle(ctx, u, tile, from, seeking)
@@ -1724,33 +1750,45 @@ local function lockedOnWay(ctx, u, goal)
     return nil
 end
 
--- A Take `a` (a "supply" act) with the item it takes filled in: the convoy's door key for `u`
--- now (sight.convoyKey), or nil with none. An act's key does not carry the item, so a Take
--- built from a key (botrun's forced act) is filled here too.
+-- A Take `a` (a "supply" act) with the item it takes filled in: the convoy's key for `u` now
+-- (sight.convoyKey), for the door or, with `a.terrain`, the chest lock it is taken for, or nil
+-- with none. An act's key does not carry the item or the terrain, so a Take built from a key
+-- (botrun's forced act) is filled here too, as a door's: a chest's Take is replayed only as
+-- Bot.candidates offers it (forcedAct tries that first).
 function M.takeItem(sight, u, a)
-    local key = sight.convoyKey and sight.convoyKey(u)
+    local key = sight.convoyKey and sight.convoyKey(u, a.terrain)
     if not key then return nil end
     a.item, a.uses = key.id, key.uses
     return a
 end
 
--- The convoy's door key, taken with the Supply command (#510, vanilla Ch10 on Eirika's route:
--- the one key holder died, the dropped key sat in the convoy, and every unit read no way to
--- the throne). Offered when a door locked to `u` stands on its way to its goal (lockedOnWay),
--- no fielded unit opens doors (with one, the door is already every unit's way: doorMates),
--- and the convoy holds what lets `u` open it (sight.convoyKey): from the safest wait tile the
--- gate allows where the game's Supply command is enabled (the lord's, or beside the lord). The
--- game would let it act on after the Take (SupplyCommandEffect returns to the unit menu); the
--- act ends with a Wait, the one act the plan models after it.
+-- The convoy's key, taken with the Supply command (#510, vanilla Ch10 on Eirika's route: the
+-- one key holder died, the dropped key sat in the convoy, and every unit read no way to the
+-- throne). Offered for a door locked to `u` on its way to its goal (lockedOnWay) when no fielded
+-- unit opens doors (with one, the door is already every unit's way: doorMates); and, for the
+-- chest `u` is sent to (#699: vanilla Ch21's two chests, no key in the army), when no fielded
+-- unit opens chests (with one, the chest is that unit's). Either way the convoy must hold what
+-- lets `u` open it (sight.convoyKey): from the safest wait tile the gate allows where the
+-- game's Supply command is enabled (the lord's, or beside the lord). The game would let it act
+-- on after the Take (SupplyCommandEffect returns to the unit menu); the act ends with a Wait,
+-- the one act the plan models after it.
 local function supplyKey(ctx, u, gate, objective)
     local s = ctx.sight
-    if not (s.convoyKey and s.offers and s.locked) or opener(ctx, u)
-            or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goalFor(ctx, u, objective)) then
-        return nil
+    if not (s.convoyKey and s.offers and s.locked) then return nil end
+    local goal = goalFor(ctx, u, objective)
+    local terrain
+    if opener(ctx, u) or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goal) then
+        terrain = goal and chestLockAt(ctx, u, goal.x, goal.y)
+        if not terrain or not s.opensChest then return nil end
+        for _, m in ipairs(ctx.blues or {}) do
+            if m.id ~= u.id and not m.dead and s.opensChest(m) then return nil end
+        end
     end
     local best = safest(ctx, u, gated(ctx, u, s.offers(u, waitTiles(ctx, u), "supply"), gate))
     if not best then return nil end
-    return M.takeItem(s, u, action(u, best, "supply", nil))
+    local a = action(u, best, "supply", nil)
+    a.terrain = terrain
+    return M.takeItem(s, u, a)
 end
 
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
@@ -3473,9 +3511,12 @@ local function ledger(party, convoy, swap, benched)
         return true
     end
     -- the convoy's i-th item into the unit's bag; false when there is no room for it
-    function L.take(charId, i, why)
+    -- `kind`: what the bag holds it as when the convoy's read has none (a key is "other" there,
+    -- and Bot.fullBag keeps a key it is handed: "key")
+    function L.take(charId, i, why, kind)
         local it, bag = L.pool[i], L.bags[charId]
         local h = asHeld(it, charId)
+        h.kind = kind or h.kind
         if #bag >= Board.ITEM_COUNT then
             if not swap then return false end
             local slot, swhy = M.fullBag(bag, h, false)
@@ -3531,6 +3572,44 @@ local function takeWeapons(L, party)
     end
 end
 
+-- The keys a chapter's chests and doors need (#699: vanilla Ch21's two chests, a Chest Key in
+-- the convoy and nobody holding one -- 134 of 135 recorded attempts missed a chest). For each
+-- `demands` entry of kind chests or doors that no fielded unit's bag opens, one fielded unit
+-- takes from the convoy an item the game says opens it for that unit (`for[charId].opens`:
+-- GetUnitKeyItemSlotForTerrain, so a Lockpick counts only for a thief; no id lives here). The
+-- taker is the unit with the most free slots, ties to party order: the take costs it nothing,
+-- and a full bag gives first what Bot.fullBag would send, so the next in order is tried when
+-- that gives nothing up. A key is one use, so one is taken per kind; the next arrives mid-map
+-- (bot.lua supplyKey).
+local function takeKeys(L, party, demands)
+    for _, d in ipairs(demands or {}) do
+        if d.kind == "chests" or d.kind == "doors" then
+            local function opens(u, it) return (forUnit(it, u.charId).opens or {})[d.kind] end
+            local held = false
+            for _, u in ipairs(party) do
+                for _, it in ipairs(L.bags[u.charId]) do held = held or opens(u, it) or false end
+            end
+            local order = {}
+            for i, u in ipairs(party) do
+                order[#order + 1] = { u = u, i = i, free = Board.ITEM_COUNT - #L.bags[u.charId] }
+            end
+            table.sort(order, function(a, b)
+                if a.free ~= b.free then return a.free > b.free end
+                return a.i < b.i
+            end)
+            local done = held
+            for _, o in ipairs(order) do
+                for i, it in ipairs(L.pool) do
+                    if not done and opens(o.u, it) then
+                        done = L.take(o.u.charId, i, "the " .. d.kind .. " key", "key")
+                        if done then break end
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- Why a unit gives an item to the convoy before the shop, or nil when it keeps it: what it
 -- cannot use this chapter (rule A of #510 comment 6896261936). A weapon or staff the game says
 -- it cannot use (cannotUseWeapon, Bot.fullBag's own test); a seal or booster (the item's `use`)
@@ -3555,9 +3634,11 @@ end
 --   1. Every roster unit gives what it cannot use this chapter (cannotUseNow).
 --   2. Weapons and staves from the convoy, the unarmed first (takeWeapons), so the shop buys
 --      only what storage cannot give.
+--   3. The key a chapter's chests or doors need when no fielded unit holds one (takeKeys;
+--      `demands` = api.needs', nil without a prep screen).
 -- A full bag gives first what Bot.fullBag would send. acts = { act = "give" | "take" | "use",
 -- unit = charId, item = id, uses, seal = true (a use that promotes) | nil, why }.
-function M.supply(party, convoy, benched)
+function M.supply(party, convoy, benched, demands)
     local L = ledger(party, convoy, true, benched)
     local function giveBack(list, fielded)
         for _, u in ipairs(list or {}) do
@@ -3572,6 +3653,7 @@ function M.supply(party, convoy, benched)
     giveBack(party, true)
     giveBack(benched, false)
     takeWeapons(L, party)
+    takeKeys(L, party, demands)
     return L.acts
 end
 

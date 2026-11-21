@@ -165,6 +165,9 @@
 --                            `target` (a unit for Talk, a door's tile for Door), in one sandbox.
 --   opens(u, terrain)        `u` holds what opens that terrain (TERRAIN_DOOR, TERRAIN_CHEST_FULL):
 --                            GetUnitKeyItemSlotForTerrain, a key or a thief's lockpick.
+--   convoyKey(u, terrain)    the convoy's first item that opens `terrain` (a door's by default) for
+--                            `u`, { id, uses }; nil with a full bag or none (what Supply's Take hands).
+--   opensChest(u)            opens() for a chest (#699: a chest key is the convoy's to give).
 --   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
 --   locked(u, x, y)          the terrain at (x, y) when it is a door or a full chest `u` holds
@@ -3626,9 +3629,13 @@ function M.new(outer)
         return out
     end
 
-    function s.convoyKey(u)
-        return M.convoyKey(Board, mem, S, u, function(id) return opensWith(u, id, M.TERRAIN_DOOR) end)
+    -- the convoy's key for `terrain` (a door's by default; a chest's for the chest goals, #699)
+    function s.convoyKey(u, terrain)
+        terrain = terrain or M.TERRAIN_DOOR
+        return M.convoyKey(Board, mem, S, u, function(id) return opensWith(u, id, terrain) end)
     end
+
+    function s.opensChest(u) return s.opens(u, M.TERRAIN_CHEST_FULL) end
 
     function s.locked(u, x, y)
         local t = s.terrain(x, y)
@@ -3847,7 +3854,7 @@ function M.new(outer)
                 return it ~= nil and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0
             elseif a.act == "supply" then
                 -- the key the act names is still the convoy's for this unit
-                local key = s.convoyKey(u)
+                local key = s.convoyKey(u, a.terrain)
                 return menuOffers(call, "supply") and key ~= nil and key.id == a.item
                     and key.uses == a.uses
             elseif a.act == "drop" then
@@ -4096,8 +4103,8 @@ function M.riderTiles(api, call, u, tiles, from)
     return out
 end
 
--- The convoy's first item that would let `u` open a door (`opens(id)`: sight's opensWith, the
--- game's own key check), { id, uses }; nil when its bag has no room for it or the convoy holds
+-- The convoy's first item that would let `u` open a door or chest (`opens(id)`: sight's
+-- opensWith, the game's own key check), { id, uses }; nil when its bag has no room for it or the convoy holds
 -- none, or when the convoy is not the game's (Board.convoyFault). What the Supply command's
 -- Take would hand it (prep_itemsupply.c: Take refuses a full bag). sight.convoyKey.
 function M.convoyKey(Board, mem, S, u, opens)
