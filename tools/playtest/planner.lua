@@ -243,6 +243,14 @@ M.LOOK_ATTEMPT = 128
 M.WEAR = 3
 M.WEAR_DECISION = 64
 M.WEAR_ATTEMPT = 256
+-- Whether a plan's `took` ids hold a goal (a visit, chest or talk). A convoy use is no goal: the
+-- plan only moves an item. Pure.
+function M.tookGoal(took)
+    for id in pairs(took) do
+        if id:sub(1, 7) ~= "convoy:" then return true end
+    end
+    return false
+end
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
@@ -983,10 +991,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- reading found idle, and a blow that deals nothing wounds nothing. `counters`: each red
     -- enemy's chance our counters kill it in the judged phase.
     local function advances(st, fell, counters)
-        for id in pairs(st.took) do
-            if id:sub(1, 7) ~= "convoy:" then return true end
-        end
-        if next(st.carry) or winOf(st, fell) > M.DUST then return true end
+        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true end
         for _, p in pairs(counters) do
             if p > M.DUST then return true end
         end
@@ -1663,8 +1668,7 @@ function M.plan(Bot, board, sight, style, opts)
     end
     -- Whether a plan not advancing the level is inadmissible (ADR 0439): opts.idle, the bot's own
     -- stall reading (botrun's GOAL_QUIET), and at least one plan judged that advances. With none,
-    -- every plan ties on `idle` and the fallback would only be flagged for holding, so it stays
-    -- off. Set by pick(), which re-admits every plan judged when it moves.
+    -- every plan ties on `idle`, so it stays off. Set by pick(), which re-admits every plan judged when it moves.
     local idleOn = false
     local function admit(st)
         local rank = st.rank
@@ -1682,7 +1686,7 @@ function M.plan(Bot, board, sight, style, opts)
             rank.sum_die = rank.sum_die + pr.die
         end
         -- a plan that does not advance is no plan once the stall reading fired (ADR 0439)
-        rank.idle = idleOn and (st.advances and 0 or 1) or nil
+        rank.idle = (idleOn and not st.advances) and 1 or 0
         rank.admitted = rank.admitted and rank.idle ~= 1
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
@@ -2812,7 +2816,9 @@ function M.plan(Bot, board, sight, style, opts)
                    mend_rounds = { before = oldUnder, now = best.rank.admitted == true } }
     -- no plan under the cap: the least likely to end the game, then the least over it, is
     -- played, and says so (FR-011, ADR 0384 amended)
-    best.fallback = not best.rank.admitted and "FALLBACK_SACRIFICE" or nil
+    -- (a plan inadmissible only for being idle, a hold the game-over plans lost to, is no sacrifice)
+    best.fallback = (not best.rank.admitted and best.rank.max_exceed > 0)
+        and "FALLBACK_SACRIFICE" or nil
     -- the rule's record: each Visit or Chest offered, and whether the plan played it credited
     -- (its standing chance 0 and the judged phase's 0 too)
     for _, o in ipairs(offered) do

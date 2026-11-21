@@ -43,3 +43,18 @@ board offers nothing to advance), `idle` is left off every rank, so the hold is 
 and no fallback is flagged. `pick()` makes that call over the plans that may be played and
 re-admits every plan judged when it moves, so `M.rebase` and the lookahead's finalists compare
 ranks read alike.
+
+**Guards.** `idle` carries the `stuck` abort's own guards, through one predicate in `botrun.lua`
+(`waitIsPlay`) that both read: it is off while `sight.nextTurnEvent(turn)` has an event due (a
+scripted wait may change the board), and off when the objective counts turns down
+(`turnsLeft`: a Survive or Defend chapter, where holding IS the play). A fallback is flagged
+`FALLBACK_SACRIFICE` only for a plan over the cap: a hold that is inadmissible only for being
+idle, because every advancing plan risks the game, is played unflagged.
+
+**The lookahead.** Its second phase does not recompute `advances`: a plan advances on the first
+judged phase's kills, goals and wounds only. A kill the army's reply makes in the second phase
+does not count, so a plan whose only gain is a second-phase kill reads idle. It matters little:
+such a plan ranked after the plans that kill now, and when none does, `idleOn` stays off and the
+rank is as before.
+
+**Measure.** The effect is measured in #699's batch `attempts` set, not per PR (ADR 0430).

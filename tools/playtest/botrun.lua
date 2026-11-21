@@ -845,6 +845,13 @@ function M.run(api)
     -- phase did (on a Rout chapter the objective is the nearest enemy, and an enemy walking in is
     -- a new low); the trace's `near` names the ids, so a reader tells "objective" from the rest.
     local lows, quiet, eventsQuiet = {}, 0, 0   -- goal id -> least turns read; the phases in a row
+    -- whether waiting is the play, so no quiet count may end or hurry the run: a turn event still
+    -- to fire may change the board, and a Survive or Defend chapter's wait IS the play (the
+    -- objective counts turns down). The one reading the `stuck` abort and the planner's `idle`
+    -- (ADR 0439) both take, so the two cannot drift.
+    local function waitIsPlay(sight, turn)
+        return sight.nextTurnEvent(turn) or (sight.objective and sight.objective.turnsLeft)
+    end
     local curPhase, prevPhase                   -- { turn, events = set, read }; prev awaits its reading
     local goalQuiet = {}                        -- goal id -> readings in a row without a new low of its own
     local goalReads = {}                        -- goal id -> its last M.GOAL_QUIET readings (turns)
@@ -1469,8 +1476,7 @@ function M.run(api)
             -- (16+ quiet phases ahead of its pin) would otherwise end `stuck` short of the
             -- witness. Rule 1 stays on: it changes the plans, and a replay of a run made WITH it
             -- must make the same plans to match its trace (a mismatch is `matched = false`).
-            if planned and not diag and quiet >= M.QUIET_BOUND and not sight.nextTurnEvent(turn)
-                and not (sight.objective and sight.objective.turnsLeft) then
+            if planned and not diag and quiet >= M.QUIET_BOUND and not waitIsPlay(sight, turn) then
                 for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
                 return "stuck", string.format("no progress in %d player phases in a row, and no "
                     .. "turn event is left to change that", quiet)
@@ -1536,7 +1542,7 @@ function M.run(api)
                             -- stalled on: holding is then no plan (planner.lua, ADR 0439). The
                             -- `quiet` the stuck abort reads, so the bot's two readings agree
                             return { stalled = stalled, sent = sent, stuck = stuck,
-                                     idle = quiet >= M.GOAL_QUIET,
+                                     idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(),

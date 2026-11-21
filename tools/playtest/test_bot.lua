@@ -6042,7 +6042,99 @@ do
           "false nil played", "not idle: the hold is played")
     attacks, fallback, held = play(true, { 0x01 })
     check(tostring(attacks) .. " " .. tostring(fallback) .. " " .. tostring(held),
-          "false FALLBACK_SACRIFICE played", "idle: a plan that risks the game over still ranks below the hold")
+          "false nil played", "idle: a plan that risks the game over still ranks below the hold, and the hold is no sacrifice")
+end
+
+-- test_planner_advances (ADR 0439): which plans advance the level under opts.idle. Each fixture
+-- puts A on (0,0) holding or on (1,0) doing the thing; the plan's `rank.idle` says whether the
+-- planner read it as advancing (0) or not (1). With no plan that advances, idleOn stays off and
+-- every plan reads 0.
+do
+    local function idles(units, o, st, extra)
+        local opts = { idle = true }
+        local _, plan = Planner.plan(B, boardOf(table.unpack(units)), sightOf(o), st or style("careful"), opts)
+        local out = {}
+        for _, c in ipairs(plan and plan.considered or {}) do
+            local k = c.acts[1]:match("%d>(%a+@[%d,]+)")
+            out[k] = c.rank.idle
+        end
+        return out
+    end
+    local function show(t) return string.format("hold %s there %s", tostring(t["wait@0,0"]), tostring(t["there"])) end
+    -- a bait: A waits on (1,0), where J strikes it and A's counter kills J half the time
+    local function bait(felled)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local J = red(0x82, 9, 9, { minRange = false })
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            enemyPhase = function(plan)
+                for _, b in ipairs(plan.blues) do
+                    if b.unit.id == 0x01 and b.x == 1 then
+                        return { { enemy = 0x82, target = 0x01, takenHit = 40, takenDmg = 99,
+                                   takenHits = 1, takenCrit = 0, targetHp = 20, felled = felled } }
+                    end
+                end
+                return {}
+            end,
+        }
+        local t = idles({ A, J }, o)
+        t.there = t["wait@1,0"]
+        return show(t)
+    end
+    check(bait(0.5), "hold 1 there 0", "advances: a counter that may kill is a bait, and advances")
+    check(bait(0), "hold 0 there 0", "advances: a counter that kills nothing advances nothing")
+    -- a blow on the boss of a Defeat-boss chapter
+    local function boss(dmg)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = false, hp = 30, isBoss = true })
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = dmg, hits = 1 } } } },
+            enemyPhase = function() return {} end,
+        }
+        local t = idles({ A, E }, o)
+        t.there = t["attack@1,0"]
+        return show(t)
+    end
+    check(boss(10), "hold 1 there 0", "advances: a wound on the boss advances")
+    check(boss(0), "hold 0 there 0", "advances: a blow that deals 0 advances nothing")
+    -- a goal taken: a village A visits from (1,0)
+    do
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local X = red(0x81, 14, 14, { minRange = false })
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            explorable = { { x = 1, y = 0, kind = "visit" } },
+            canExplore = { [0x01] = { ["1,0"] = "visit" } },
+            enemyPhase = function() return {} end,
+        }
+        local t = idles({ A, X }, o, gifted("careful", 1000))
+        t.there = t["visit@1,0"]
+        check(show(t), "hold 1 there 0", "advances: a goal taken advances")
+    end
+    -- a carry: A carries G out of the phase that kills it
+    do
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local G = blue(0x30, 5, 3, 0, { faction = "green", hp = 5, minRange = false })
+        local X = red(0x81, 9, 0, { minRange = false })
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+            rescue = { [0x01] = { [0x30] = true } },
+            enemyPhase = function(plan)
+                if plan.carry and plan.carry[0x30] then return {} end
+                return { { enemy = 0x81, target = 0x30, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 5 } }
+            end,
+        }
+        local t = idles({ A, G, X }, o)
+        t.there = t["rescue@2,0"]
+        check(show(t), "hold 1 there 0", "advances: a rescue advances")
+    end
+    -- a convoy take is no goal; a visit, chest or talk is
+    check(tostring(Planner.tookGoal({ ["convoy:101x1"] = true })) .. " "
+          .. tostring(Planner.tookGoal({ ["convoy:101x1"] = true, ["chest:1,2"] = true })) .. " "
+          .. tostring(Planner.tookGoal({})), "false true false", "advances: a convoy take is no goal")
 end
 
 -- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%

@@ -2866,6 +2866,18 @@ do
         for t = 1, 9 do got[t] = gi.idleAt[t] and "idle" or "-" end
         check(table.concat(got, " "), "- - - - idle idle idle idle idle",
               "idle: the plan is told once quiet reaches GOAL_QUIET")
+        -- a Survive or Defend chapter's wait is the play, and so is one a turn event is due
+        -- to change: the abort's two guards, shared with it
+        local function never(o)
+            local _, _, _, gk = shadow(9, {}, nil, o)
+            local out = {}
+            for t = 1, 9 do out[t] = gk.idleAt[t] and "idle" or "-" end
+            return table.concat(out, " ")
+        end
+        check(never({ moving = true }), "- - - - - - - - -",
+              "idle: never in a chapter that counts turns down")
+        check(never({ hideTurns = true, moving = true, eventTurn = 20 }), "- - - - - - - - -",
+              "idle: never while a turn event is due")
         local _, _, _, gj = shadow(9, { [3] = { act = "visit" } }, nil,
                                    { hideTurns = true, moving = true })
         got = {}
