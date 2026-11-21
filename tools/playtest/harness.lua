@@ -504,7 +504,7 @@ local function tileOccupied(x, y) return BOARD.occupied(x, y) end
 local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
 local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
 local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
-local function mapSize() return rs16(SYM.gBmMapSize), rs16(SYM.gBmMapSize + 2) end
+local function mapSize() return BOARD.mapSize() end
 
 -- THE ONE PLACE A UNIT IS STOOD ON A TILE (#531 audit 4; the logic is board.lua's Board.place).
 -- Bounds come from the LIVE map size, never a literal, and an off-map tile is REFUSED: it logs,

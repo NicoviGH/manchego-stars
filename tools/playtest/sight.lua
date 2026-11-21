@@ -21,15 +21,16 @@
 -- equip reorders the bag) needs api.keep16 first, or one judged plan leaks into the next (#554:
 -- found in one instrumented run that logged every enemy decision and the target's bag). The
 -- AI's own decision is one: it advances the unit's scripts (M.keepAi, #510). The map refresh
--- is another: it rewrites each red's fog bits for where our units stand (M.refresh, #510).
+-- is another: it rewrites each red's fog bits, and the unit, hidden and fog maps, for where
+-- our units stand (M.refresh, M.keepMaps, #510, #681).
 -- And a ballista's rider that decides to strike with its own weapon steps off it (M.keepRide).
 -- PT_LEAKGUARD=1 (run.sh) logs every word of a unit struct a nested sandbox leaves changed,
 -- puts it back and plays on; the run fails at its end, listing them all (M.leaks; botrun's
 -- `leaks`): run one after changing what a sandbox calls.
 -- A game-backed read gets its unit test (test_sight.lua) through a pure helper beside it:
--- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh, M.keepRide,
--- M.aiPhaseStart, M.phaseStarted, M.phaseKey, M.decisionCalls, M.battleWord, M.phaseWays,
--- M.watched.
+-- M.loots, M.opensChests, M.closingsKey, M.sackedTerrain, M.waveCloses, M.keepAi, M.refresh,
+-- M.keepMaps, M.keepRide, M.aiPhaseStart, M.phaseStarted, M.phaseKey, M.decisionCalls,
+-- M.battleWord, M.phaseWays, M.watched.
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
@@ -1421,7 +1422,7 @@ function M.batching(outer, guarded, log)
     -- read cannot leak into the next. A game function's own writes are not journaled. The
     -- ones a read can make fresh (a movement map, the battle structs, gAiDecision) it makes
     -- fresh first. The ones on a unit struct nothing makes fresh, so they are kept before the
-    -- call (keep16: M.equip's bag, M.keepAi's AI bytes, M.keepFog's state word, M.keepRide's
+    -- call (keep16: M.equip's bag, M.keepAi's AI bytes, M.keepMaps's state word, M.keepRide's
     -- ballista) and the journal puts them back.
     local mem0 = outer.mem
     -- kept[depth] = the addresses keep16 holds for the sandbox open at that depth
@@ -1443,6 +1444,12 @@ function M.batching(outer, guarded, log)
         keep16 = function(addr, n)
             if not journal then return end
             local held = kept[#kept]
+            -- a span asked for again in this sandbox (every decision keeps the map pools) is
+            -- already held whole: skip its walk. The memo lives in `held`, so it resets with it.
+            local spans = held.spans
+            if not spans then spans = {}; held.spans = spans end
+            if (spans[addr] or 0) >= n then return end
+            spans[addr] = n
             for k = 0, n - 1 do
                 local at = addr + k * 2
                 if not held[at] then
@@ -1690,27 +1697,39 @@ end
 -- Found by PT_LEAKGUARD on vanilla Ch6, turn 2 (#510). `units` as M.keepAi's.
 -- M.refresh is that keep and the call; aiDecide, whose refresh rides in its one call list,
 -- keeps and lists it itself. Every refresh inside a sandbox is one of the two.
--- The unit map is kept the same way (M.keepUnitMap): the refresh clears gBmMapUnit and refills
--- it from the structs as the sandbox stands them, a unit it hides left out, and the journal
--- puts only the structs back. The AI's own decision hides our units (closings, onlyTarget), so
--- the refresh in it wiped every blue unit off the map for the plans read after it in the
--- batch: Drop's list offered the tile of an ally standing there and the game refused it
--- (vanilla Ch19, campaign 4002 attempt 2 turn 12, #681).
-function M.keepFog(api, units)
+-- The map pools are kept the same way (M.keepMapPools): the refresh clears gBmMapUnit,
+-- gBmMapHidden and gBmMapFog and refills them from the structs as the sandbox stands them, a
+-- unit it hides left out, and the journal puts only the structs back. The AI's own decision
+-- hides our units (closings, onlyTarget), so the refresh in it wiped every blue unit off the
+-- unit map for the plans read after it in the batch: Drop's list offered the tile of an ally
+-- standing there and the game refused it (vanilla Ch19, campaign 4002 attempt 2 turn 12,
+-- #681). The hidden and fog maps are the same refresh's, kept on the same list.
+function M.keepMaps(api, units)
     for _, o in pairs(units) do api.keep16(o.addr + UNIT_STATE, 2) end
-    M.keepUnitMap(api)
+    M.keepMapPools(api)
 end
--- gBmMapUnit's cells, put back when the sandbox returns: BmMapInit lays the map out as
--- (w + 2) * (h + 4) bytes from the first of its h + 4 row pointers (the handle points at the
--- third), the span BmMapFill clears. Halfwords: the pool starts on a word.
-function M.keepUnitMap(api)
+-- The map pools a refresh rebuilds (bmmap.c RefreshEntityBmMaps: BmMapFill on each).
+M.REFRESHED_MAPS = { "gBmMapUnit", "gBmMapHidden", "gBmMapFog" }
+-- Each pool's cells, put back when the sandbox returns. BmMapInit lays a map out as h + 4 row
+-- pointers then (w + 2)-wide rows, the handle on the third pointer; BmMapFill clears
+-- (h + 4) * (w + 2) bytes from the first pointer, an odd count less its last byte (size - 1),
+-- and so does this: halfwords, floor. A missing symbol or a map not built yet is a programming
+-- error (a refresh only runs on a loaded chapter's map; gen_symbols.py must list the pool), so
+-- it raises, naming it, instead of keeping nothing.
+function M.keepMapPools(api)
     local mem, S = api.mem, api.SYM
-    local w, h = mem.u16(S.gBmMapSize), mem.u16(S.gBmMapSize + 2)
-    local rows = mem.u32(S.gBmMapUnit)
-    api.keep16(mem.u32(rows - 8), ((w + 2) * (h + 4) + 1) // 2)
+    if not S.gBmMapSize then error("keepMapPools: SYM.gBmMapSize is missing", 0) end
+    local w, h = api.Board.mapSize(mem, S)
+    local words = ((w + 2) * (h + 4)) // 2
+    for _, name in ipairs(M.REFRESHED_MAPS) do
+        if not S[name] then error("keepMapPools: SYM." .. name .. " is missing (gen_symbols.py)", 0) end
+        local rows = mem.u32(S[name])
+        if rows == 0 then error("keepMapPools: " .. name .. " is not built (no map loaded)", 0) end
+        api.keep16(mem.u32(rows - 8), words)
+    end
 end
 function M.refresh(api, call, S, units)
-    M.keepFog(api, units)
+    M.keepMaps(api, units)
     call(S.RefreshEntityBmMaps, {})
 end
 
@@ -1718,7 +1737,7 @@ end
 -- it when the sandbox returns. The AI's attack decision steps the deciding unit off a ballista
 -- that is spent, or when it picks its own weapon over it (cp_battle.c
 -- AiAttemptOffensiveAction and AiAttemptCombatWithinMovement: bmarch.c
--- TryRemoveUnitFromBallista), which clears US_IN_BALLISTA (the state word: M.keepFog keeps
+-- TryRemoveUnitFromBallista), which clears US_IN_BALLISTA (the state word: M.keepMaps keeps
 -- it), the unit's ballistaIndex, and on the ballista's trap its ridden flag and its tile, set
 -- to the unit's. Without it the rider read as on foot, and the ballista as free and standing
 -- where a judged plan had stood the rider, for every plan judged after. Found by PT_LEAKGUARD
@@ -2822,7 +2841,7 @@ function M.new(outer)
     end
     local function aiDecide(call, proc, e, all, before, starts)
         M.keepAi(api, all)
-        M.keepFog(api, all)   -- `setup` refreshes the maps
+        M.keepMaps(api, all)   -- `setup` refreshes the maps
         M.keepRide(api, S, e, all)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
@@ -2979,7 +2998,7 @@ function M.new(outer)
         -- Its decisions refresh the maps under the player's faction, which rewrites a red unit's
         -- fog bits (bmmap.c RefreshUnitsOnBmMap) to what the plan's units see; the enemy order
         -- after reads them as the phase found them (`fogWas`, put back by order()), so `decides`
-        -- sees what it sees with no berserked unit (sight's keepFog: the seen read is before any
+        -- sees what it sees with no berserked unit (sight's keepMaps: the seen read is before any
         -- refresh). The bits are kept per phase, every way of it alike.
         local fogWas
         local function berserkFirst(after)
