@@ -11,7 +11,9 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, evening; main is a9a3bff2 + HANDOFF). No runs are going. The work is #699: read its plan comment (7066011205) and Nicolas's calls (the comment after it) first.**
+**Next session starts here (2026-11-21, afternoon; main is 107ea8e5 + HANDOFF).** The work is #699. Read its plan comment (7066011205), Nicolas's calls (the comment after it), and the progress comment (7067278347): #700-#703 are merged. **In flight:** #704 (cause 5, the wear), in worktree `../manchego-stars-wt7`; its review and its main-vs-branch replay (tags f699i base / f699j branch, b640e-cs-s4009 Ch21 attempt 1) were running. Its review then goes to review-to-clean, then CI and merge. Next after #704: the open items in the progress comment.
+
+*Earlier (2026-11-21, evening of the lap):* Next session starts here (2026-11-21, evening; main is a9a3bff2 + HANDOFF). No runs are going. The work is #699: read its plan comment (7066011205) and Nicolas's calls (the comment after it) first.**
 
 - **#699 (sub-issue of #640) ranks what stops clean clears**, from the `b640e` lap (6 of 10 campaigns finished the game, none clean throughout; tables on #640, `review/640-batch/analysis-{losses,growth}.md`, gitignored). **Do the work in this order:**
   1. **Fix 3: the recorder error.** A two-way party conversation (Duessel and Cormag) is listed as an owed recruit (`harness.lua` ~3691). It changes no play.
