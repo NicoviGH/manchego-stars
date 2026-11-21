@@ -11,7 +11,7 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, late): the GitHub tidy-up #706 is done**; its guard `make tidy` (#707) is PR #708, reviewed, awaiting CI and Nicolas's merge. #699's plan comment (7066011205) now opens with a status table. The work is the measurement on #699 (comment 7069149395).
+**Next session starts here (2026-11-21, late; main is 062e8801 + HANDOFF): the work is the measurement on #699 (comment 7069149395).** #699's plan comment (7066011205) opens with a status table; keep it current. The GitHub tidy-up #706 is closed. Its guard `make tidy` (#707, PR #708) is in the session-start checklist: run it and fix every finding. `../manchego-stars-wt2` is deleted; `../manchego-stars-wt4` still holds Trade (#688), uncommitted. Bot issues should carry a bot title prefix (`Bot`, `#510`, `Harness`, ...) so the orphan check sees them (`tools/gh_tidy.py` docstring).
 
 *Before that (2026-11-21, afternoon):* The work is #699: its plan comment (7066011205), Nicolas's calls after it, and the progress comment (7067278347). #700-#703 are merged. #704 was measured and closed; #705 (chest keys and door openers) is merged. The state is on #699's latest comments.
 
