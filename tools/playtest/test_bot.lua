@@ -5621,6 +5621,17 @@ do
         check(ids(threats), string.format("%x,82", X.id), "enemiesOf: the threats add the remembered")
         local _, plain = B.enemiesOf(boardOf(A, X, hid, other), sightOf({}))
         check(ids(plain), string.format("%x", X.id), "enemiesOf: no memory, no fogged threat")
+        -- #713 fix 1 (ADR 0455): one seen on turn N and fogged on N+1 is a threat, as a ghost on
+        -- the tile it was last seen on, not its true one; never a target
+        local ghostSight = sightOf({})
+        ghostSight.ghostOf = function(u) return u.id == 0x83 and { x = 9, y = 1 } or nil end
+        local seenG, withGhost = B.enemiesOf(boardOf(A, X, hid, other), ghostSight)
+        check(ids(seenG), string.format("%x", X.id), "enemiesOf: a ghost is no target")
+        check(ids(withGhost), string.format("%x,83", X.id), "enemiesOf: a ghost is a threat")
+        local g = withGhost[2]
+        check(g.x .. "," .. g.y .. "/" .. tostring(g.ghost), "9,1/true",
+              "enemiesOf: the ghost stands on its last-seen tile")
+        check(other.x .. "," .. other.y, "4,4", "enemiesOf: the board's own unit is not moved")
     end
 
     -- test_exploring_keeps_the_sent_unit: A was sent last decision. B is nearer now, but A

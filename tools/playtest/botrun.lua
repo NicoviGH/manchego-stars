@@ -1171,12 +1171,16 @@ function M.run(api)
             end
         end
         stamp(after)
+        local shown = {}
         for _, u in ipairs(after.units or {}) do
             if u.faction == "red" and u.onField and not u.dead and not u.fogged then
                 seenReds[u.id] = u.charId
                 sawEnemy(u.id, u.charId, u.classId, after)
+                shown[#shown + 1] = u
             end
         end
+        -- where each was seen last: a ghost's tile once the fog takes it (#713, ADR 0455)
+        if playSight and playSight.sighted then playSight.sighted(shown) end
         lastBoard, actedIn = after, nil
     end
 
