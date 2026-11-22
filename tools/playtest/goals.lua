@@ -30,7 +30,8 @@
 --   a reward (style.rewards, a guide's claim): its item's itemCost shared evenly over the open
 --     goals its `needs` names, none of it once one of them is lost (ctx.lost).
 -- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it, or
--- the game's AI escapes with the recruit (Goals.closings).
+-- the game's AI escapes with the recruit (Goals.closings), or a turn event removes it (Goals.scriptedCloses,
+-- #724).
 --
 -- Goals.worth(goal, W) -> points: gold x W.gold, plus W.death for a recruit (a unit), and for
 -- the objective's way there one W.death shared over the army (`share`): no style walks into a
@@ -132,6 +133,48 @@ function M.closings(sight, style, ctx)
     return out, paths or {}
 end
 
+-- The scripted removals (#724) folded into M.closings' answer for this board: a turn event's DISA
+-- or KILL (sight.scriptedUnits) closes the recruit the enemy phase before its boardTurn, so
+-- "unit:<id>" is boardTurn - board.turn when that is sooner than the AI's escape, and the
+-- recruit's path (as long as its deadline less one, the closings contract) is cut to match. An
+-- ESTIMATE: the script's guards (CHECK_ALIVE, CHECK_ALLEGIANCE) are not evaluated; for a recruit
+-- not yet joined the removal holds, and a removal whose turn is past is none. `board` names each
+-- recruit's charId (a pending one is ctx.pendingRecruits'); ctx.owedRecruits (a set of charIds)
+-- names the ones owed, and empty or nil asks for no scan. Returns new tables: sight keeps its
+-- answers for the board.
+function M.scriptedCloses(sight, ctx, board, out, paths)
+    assert(board.turn, "Goals.scriptedCloses: the board has no turn")
+    -- only an owed recruit (ctx.owedRecruits, a set of charIds: botrun's) can be removed from a
+    -- goal: recruitTalkers also holds any talk offered, and a scan for those would be asked again
+    -- by every plan's sandbox
+    local watch, owed = ctx.recruitTalkers or {}, ctx.owedRecruits or {}
+    if not sight.scriptedUnits or next(watch) == nil or next(owed) == nil then return out, paths end
+    local gone = sight.scriptedUnits().removals
+    local byId = {}
+    for _, u in ipairs(board.units) do byId[u.id] = u end
+    local outCopy, pathCopy = nil, nil
+    for id in pairs(watch) do
+        local u = byId[id] or (ctx.pendingRecruits or {})[id]
+        local at = u and owed[u.charId] and gone[u.charId] and gone[u.charId] - board.turn
+        if at and at >= 1 and at < (out["unit:" .. id] or math.huge) then
+            if not outCopy then
+                outCopy, pathCopy = {}, {}
+                for k, v in pairs(out) do outCopy[k] = v end
+                for k, v in pairs(paths) do pathCopy[k] = v end
+            end
+            outCopy["unit:" .. id] = at
+            if pathCopy[id] then
+                local cut = {}
+                for phase, tile in pairs(pathCopy[id]) do
+                    if phase < at then cut[phase] = tile end
+                end
+                pathCopy[id] = cut
+            end
+        end
+    end
+    return outCopy or out, pathCopy or paths
+end
+
 -- The villages and chests still open, each with its worth in gold and when it closes:
 -- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
 -- is sent where by it.
@@ -176,7 +219,7 @@ function M.list(board, sight, style, ctx)
         end
         return out
     end
-    local closings, paths = M.closings(sight, style, ctx)
+    local closings, paths = M.scriptedCloses(sight, ctx, board, M.closings(sight, style, ctx))
     for _, g in ipairs(M.openTiles(sight, style, ctx, closings)) do
         g.takerUnits = takers(function(u)
             if sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind) then

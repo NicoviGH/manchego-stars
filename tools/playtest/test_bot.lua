@@ -1034,6 +1034,47 @@ do
     check(Planner.wearAt({ [0] = 1, [4] = 1 }, 4), 1, "wearAt: the second blow cut off at 4 HP")
 end
 
+-- #712: the judged phase is told the waits the plan makes (`waits`): the game runs the chapter's
+-- Misc events (an AREA event that wakes an enemy) after a unit's wait, in the order the units act.
+-- A judged plan's waits are exactly the units of its acts, each with its act's index.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local Idle = blue(0x02, 5, 5, 1, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local E = red(0x81, 1, 1, { hp = 10, minRange = false })
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["0,1"] = fc { hit = 100, dmg = 6, hits = 1, wearSlot = 0 } } } },
+        enemyPhase = function(plan)
+            local waits = {}
+            for _, w in ipairs(plan.waits or {}) do
+                waits[#waits + 1] = w.unit.id .. "@" .. w.x .. "," .. w.y .. "#" .. tostring(w.order)
+            end
+            seen[#seen + 1] = table.concat(waits, " ")
+            return {}
+        end,
+    }
+    Planner.plan(B, boardOf(A, Idle, E), sightOf(o), style("careful"))
+    local anyA, anyOrdered = false, true
+    for _, line in ipairs(seen) do
+        anyA = anyA or line:find("1@", 1, true) ~= nil
+        for w in line:gmatch("%S+") do anyOrdered = anyOrdered and w:find("#%d+$") ~= nil end
+    end
+    check(#seen > 0 and anyA, true, "#712 waits: a plan that acts A tells the judged phase A waits")
+    check(anyOrdered, true, "#712 waits: each wait carries its act's index")
+
+    -- waitsIn: the way's acting blues, then the actors its counters killed (in no blues list)
+    local function p(id, acted, order) return { unit = { id = id }, x = id, y = 0, acted = acted, order = order } end
+    local planned = { p(1, true, 2), p(2, true, 1), p(3, false), p(4, true, 3) }
+    local blues = { planned[1], planned[3], planned[4] }       -- unit 2's counter killed it
+    local ids = {}
+    for _, w in ipairs(Planner.waitsIn(planned, { [2] = true }, blues)) do ids[#ids + 1] = w.unit.id end
+    check(table.concat(ids, ","), "2,1,4", "#712 waitsIn: a dead actor still waits, a unit with no act does not")
+    ids = {}
+    for _, w in ipairs(Planner.waitsIn(planned, {}, { planned[1], planned[3], planned[4] })) do ids[#ids + 1] = w.unit.id end
+    check(table.concat(ids, ","), "1,4", "#712 waitsIn control: with no death, the acting blues alone")
+end
+
 -- #644 review (PR #645, finding 7): an enemy's weapon worn by countering our planned attack.
 -- A's chip leaves E standing and E's counter throws a javelin from its bag slot 1, a use a
 -- landed blow: the judged phase is told (plan.redWear) so E strikes with what it has left.
@@ -3185,6 +3226,90 @@ do
     -- on turn 1 and no strike was ever worth making (vanilla Ch8's)
     check(near(turns(20, { A, blue(0x02, 1, 3, 1), E }, { [0x01] = 5, [0x02] = 20 }), 4.4), true,
           "wall cost: a striker that could come but stands off is not counted")
+end
+
+-- test_a_march_offers_the_nearest_tile_where_a_death_is_impossible (#714, vanilla Ch10): X
+-- reaches (3,0), the tile nearest the goal, for 30 of A's 20 HP, and (2,0) for 5; (1,0) and
+-- (0,0) are out of its reach. The march (nearest) is (3,0) and the retreat (safest that gains
+-- ground) is (1,0); the tile between, (2,0), is under the cap and nearer, and was offered by
+-- neither. Fails without the careful-gated march.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }),
+                  [0x81] = tiles({ 3, 1 }, { 2, 1 }) },
+        danger = { ["3,0"] = 1, ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = {
+            ["3,0"] = fc { takenHit = 100, takenDmg = 30, takenHits = 1 },
+            ["2,0"] = fc { takenHit = 100, takenDmg = 5, takenHits = 1 },
+        } } },
+    }
+    local cands = B.candidates(boardOf(A, X), sightOf(o), style("careful"))
+    local tilesOf = {}
+    for _, a in ipairs(cands[1].acts) do tilesOf[#tilesOf + 1] = a.why .. "@" .. at(a) end
+    local text = " " .. table.concat(tilesOf, " ") .. " "
+    check(text:find(" march@3,0 ", 1, true) ~= nil, true, "careful march: the nearest tile is still offered")
+    check(text:find(" retreat@1,0 ", 1, true) ~= nil, true, "careful march: so is the retreat")
+    check(text:find(" careful@2,0 ", 1, true) ~= nil, true,
+          "careful march: and the nearest tile a death is impossible on")
+end
+
+-- test_the_careful_march_survives_the_per_unit_cut (#714): the same board, with the menu cut to
+-- the unit's one best act (PER_UNIT = 1) and the beam and the judge wide. The careful march
+-- (2,0) ranks below the holds on its own score (the risk it carries, the progress not counted),
+-- so only the planner's exemption for the `careful` label (planner.lua's menu keep) lets it reach
+-- the beam. Fails with that exemption removed.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }),
+                  [0x81] = tiles({ 3, 1 }, { 2, 1 }) },
+        danger = { ["3,0"] = 1, ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = {
+            ["3,0"] = fc { takenHit = 100, takenDmg = 30, takenHits = 1 },
+            ["2,0"] = fc { takenHit = 100, takenDmg = 5, takenHits = 1 },
+        } } },
+    }
+    local per, beam, final = Planner.PER_UNIT, Planner.BEAM, Planner.FINAL
+    Planner.PER_UNIT, Planner.BEAM, Planner.FINAL = 1, 20, 20
+    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.PER_UNIT, Planner.BEAM, Planner.FINAL = per, beam, final
+    local reached = false
+    -- the beam's own plans only: the advance plan is built from the candidates, past the cut
+    for _, c in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(c.kind == "beam" and c.acts or {}) do reached = reached or k == "1>wait@2,0>nil" end
+    end
+    check(reached, true, "careful march: kept through the per-unit cut, a beam plan with it is judged")
+end
+
+-- test_the_careful_march_is_offered_over_free_tiles (#714): X reaches (4,0), the tile nearest
+-- it, for 30 of A's 20 HP, (3,0) for 5 and (2,0) for 8. An ally C stands on (3,0), so over
+-- every tile the careful march is C's (3,0) (it may vacate); over free tiles only it is (2,0),
+-- the nearest careful tile no ally holds. The open march is (4,0) either way, so (2,0) is
+-- offered only by the free-only call of the careful march: fails without it.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local C = blue(0x02, 1, 3, 0, { hp = 20 })
+    local X = red(0x81, 6, 0, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }, { 4, 0 }),
+                  [0x02] = tiles({ 3, 0 }, { 3, 1 }),
+                  [0x81] = tiles({ 5, 0 }, { 4, 1 }, { 3, 1 }, { 2, 1 }) },
+        danger = { ["4,0"] = 1, ["3,0"] = 1, ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = {
+            ["4,0"] = fc { takenHit = 100, takenDmg = 30, takenHits = 1 },
+            ["3,0"] = fc { takenHit = 100, takenDmg = 5, takenHits = 1 },
+            ["2,0"] = fc { takenHit = 100, takenDmg = 8, takenHits = 1 },
+        } } },
+    }
+    local cands = B.candidates(boardOf(A, C, X), sightOf(o), style("careful"))
+    local text = {}
+    for _, a in ipairs(cands[1].acts) do text[#text + 1] = a.why .. "@" .. at(a) end
+    text = " " .. table.concat(text, " ") .. " "
+    check(text:find(" careful@3,0 ", 1, true) ~= nil, true, "free careful march: over every tile it is the ally's tile")
+    check(text:find(" careful@2,0 ", 1, true) ~= nil, true, "free careful march: over free tiles the tile beside it")
 end
 
 -- test_the_march_takes_the_wall_the_army_breaks_soon: the boss also has a long walk round (20
@@ -9017,6 +9142,26 @@ local function looksAhead(boss, replyPhase)
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
 
+-- #712: the lookahead's first phase stages through the same waits, so what its Misc scripts left
+-- unread (CHAI_AT, a walk the budget cut short) is counted in the plan's cost as the judged
+-- phase's is. The control: a lookahead that reports none adds none.
+do
+    local board, sight, st = looksAhead(true)
+    local _, _, cost0 = Planner.plan(B, board, sight, st)
+    check(cost0.area_positional .. "/" .. cost0.area_truncated, "0/0", "#712 lookahead control: nothing unread, nothing counted")
+    board, sight, st = looksAhead(true)
+    local next0, calls = sight.nextPhase, 0
+    sight.nextPhase = function(...)
+        local r = next0(...)
+        calls = calls + 1
+        r.areaPositional, r.areaTruncated = 2, 1
+        return r
+    end
+    local _, _, cost = Planner.plan(B, board, sight, st)
+    check(calls > 0 and cost.area_positional == 2 * calls and cost.area_truncated == calls, true,
+          "#712 lookahead: each nextPhase's unread script parts are summed into the cost")
+end
+
 -- test_lookahead_triggers_on_a_remembered_boss (ADR 0399): a boss in fog that a retry remembers
 -- (sight.knows) is a boss whose reach a step enters, so the lookahead is triggered as for one in
 -- sight; one the fog hides and no attempt showed triggers nothing.
@@ -9280,7 +9425,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds,waits", "lookahead: the staged board, nothing more")
 end
 
 -- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers
@@ -9709,6 +9854,71 @@ do
     check(march and march.extended, true, "wear: the lord's march read by the lookahead")
     check(march and math.abs(march.rank.max_die - 0.5) < 1e-9, true, "wear: its death the wear's half")
     check(march and math.abs(march.rank.game_over - 0.5) < 1e-9, true, "wear: and the game over's")
+end
+
+-- test_a_defeat_boss_boss_is_the_win_on_a_survive_map (#721, ADR 0445): vanilla Ch13's goal
+-- window is a Survive, but its Misc list carries DefeatBoss, so the boss's death ends the chapter
+-- (sight.objective.boss names it). On turn 4 A can kill that boss; a recruit an earlier attempt
+-- saw arrive on turn 5 (opts.pending) is owed. The kill closes the win and forfeits him; the
+-- plan that keeps him ranks above it. A map with no such boss (`boss` nil) reads no win there,
+-- and a Defeat Boss map is as before.
+do
+    local function run(objective, kill)
+        local A = blue(0x01, 0, 1, 0)
+        local E = red(0x81, 2, 0, { hp = kill and 5 or 90, isBoss = true, minRange = false })
+        local Z = red(0x82, 14, 14, { minRange = false })
+        local board = boardOf(A, E, Z)
+        board.turn = 4
+        local o = {
+            objective = objective,
+            reach = { [0x01] = tiles({ 1, 0 }, { 1, 1 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 9, hits = 1 } } } },
+            talk = { [0x01] = { ["arrival:14"] = true } },
+            field = function(t)
+                local f = {}
+                for y = 0, 15 do
+                    f[y] = {}
+                    for x = 0, 15 do f[y][x] = math.abs(x - t.x) + math.abs(y - t.y) end
+                end
+                return f
+            end,
+            enemyPhase = function() return {} end,
+        }
+        local a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 100),
+                                     { pending = { { charId = 14, x = 9, y = 9, turn = 5 } } })
+        local strike
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if c.acts[1] and c.acts[1]:find("attack", 1, true) then strike = c.rank end
+        end
+        return a, strike
+    end
+    local a, strike = run({ kind = "survive", endTurn = 12, boss = 0x81 }, true)
+    -- the named boss is another unit: this CA_BOSS's kill is a plain kill (no win, no forfeit)
+    local _, other = run({ kind = "survive", endTurn = 12, boss = 0x99 }, true)
+    check(other and other.forfeits, 0, "a second CA_BOSS on a survive map: its kill is no win")
+    check(strike and strike.forfeits > 0, true, "defeat boss on a survive map: the kill forfeits the recruit")
+    check(a and a.act ~= "attack", true, "defeat boss on a survive map: the kill is not played with him owed")
+    a, strike = run({ kind = "survive", endTurn = 12 }, true)
+    check(strike and strike.forfeits, 0, "no DefeatBoss boss on a survive map: the kill is no win")
+    a, strike = run({ kind = "boss" }, true)
+    check(strike and strike.forfeits > 0, true, "a Defeat Boss map: the kill forfeits him, as before")
+    check(Planner.winKind({ kind = "survive", boss = 0x81 }), "boss", "winKind: a survive map's DefeatBoss boss")
+    check(Planner.winKind({ kind = "survive" }), "survive", "winKind: a survive map with none")
+    check(Planner.winKind({ kind = "boss" }), "boss", "winKind: a Defeat Boss map with no named boss")
+    check(Planner.winKind({ kind = "rout", boss = 0x81 }), "rout", "winKind: a Rout stays a Rout")
+    check(Planner.winKind({ kind = "seize", boss = 0x81 }), "boss", "winKind: a Seize map's DefeatBoss boss")
+    check(Planner.winKind({ kind = "special" }), "special", "winKind: a special goal with none")
+    check(Planner.winKind({ kind = "special", boss = 0x81 }), "boss", "winKind: a special goal's DefeatBoss boss")
+    -- a second CA_BOSS on the map: only the named one's death is the win (isWinBoss, endsIn)
+    local named = { id = 0x81, charId = 0x81, faction = "red", isBoss = true }
+    local second = { id = 0x82, charId = 0x82, faction = "red", isBoss = true }
+    check(Planner.isWinBoss(named, 0x81) and not Planner.isWinBoss(second, 0x81), true,
+          "isWinBoss: only the named boss")
+    check(Planner.isWinBoss(second, nil), true, "isWinBoss: no name, any CA_BOSS (a Defeat Boss goal with no row)")
+    local byId = { [0x81] = named, [0x82] = second }
+    check(Planner.endsIn("boss", 0, byId, 0x81)(0x81) and not Planner.endsIn("boss", 0, byId, 0x81)(0x82),
+          true, "endsIn: only the named boss's death ends the chapter")
+    check(Planner.winKind(nil), nil, "winKind: no objective")
 end
 
 if fails > 0 then

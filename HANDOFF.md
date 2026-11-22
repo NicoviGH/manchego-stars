@@ -11,7 +11,31 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-22; main is d7892189 + this HANDOFF). Four #699 blockers merged today, one PR each, built by Sonnet subagents and reviewed by them (`review-to-clean`). Next is #714 (a march offers only the nearest and the safest tile).** The status table on #699 (comment 7066011205) is current. After #714 the order is 2a/2b, then #712, #713 and #717. Then one `attempts` set over the batch, on the #699 measurement's starts (`m699c<N>`).
+**Next session starts here (2026-11-23; main is b5bf2fe9 + this HANDOFF). Overnight, unattended: six PRs are reviewed (`review-to-clean`) and green on CI, and none is merged.** This session's permission check blocked `gh pr merge`. Nicolas merges them or allows it. #699's status table (comment 7066011205) is current.
+
+- **Ready to merge, in this order:**
+  1. **PR #722** (#714, ADR 0444, base main): a march also offers the nearest tile where a death is impossible, kept through the per-unit cut. Ch10's village (11,15) is still razed: it can be saved only by turn 4 with no turn to spare.
+  2. **PR #723** (#721, ADR 0445, base main): a DefeatBoss boss is the win on any map. E_13 is a survive map whose boss kill ends it. Only a NEW Misc script with completion flag WIN counts (Ch1's Breguet does not).
+  3. **PR #725** (#724, ADR 0446, base #723): the turn-event scripts are read from the ROM (arrivals: Cormag turn 5; removals: Amelia turn 12) and feed pending recruits and `closes`.
+  4. **PR #726** (ADR 0447, base #725): a recruit on the field is met where his AI takes him. It is a second look with our units visible, only for a recruit who stayed put. On Ch13 the boss kill is now held to turn 11 (main: turn 4). Cormag is still missed: Eirika never reaches the flier, and Marisa (0x16) is killed by him.
+  5. **PR #728** (#712, ADR 0448, base #726): the judged phase plays an AREA event's AI changes. Ch16 s4002 a1 won clean in 21 turns, 0 deaths (one game). Turn-5 planning +16%, because the woken units decide. Positional AI changes (Ch10, 14) are #727.
+  6. **PR #729** (#713 fix 2, ADR 0449, base main): a retry remembers an arrival by class and turn, not slot. Ready: review, re-review and CI green (824c4df5). Independent of the stack.
+  - The stack #723 → #725 → #726 → #728 lands with `--merge`. Retarget each child to main before its parent's branch is deleted. Every PR adds an ADR row, so regenerate the decisions index (`python3 tools/gen_decisions_index.py`) after each merge.
+- **Nicolas's calls, waiting:**
+  - #714's forfeit half: a goal driven to 0 before its deadline counts in `forfeits` (comment 7075363029).
+  - #713 fix 1: a ghost at the last-seen tile vs ADR 0399's live tile (7078483524).
+  - #713 fix 3: sum the unseen strikes (7078468840). **New evidence for it (7079106170):** a bisect shows #711 (PR #718) made vanilla Ch19 `b640e-cs-s4003` a1 lose on turn 7 (Eirika dead); its parent won on turn 13. The prep key makes the fog chests goals, and the advance plan read fog risk 0.001. Main loses Ch19 a1 until fix 3 or a call. #718 is not reverted.
+  - #717 classed: the three Ch15 "0-risk" deaths are a grading artifact (the mover plan's likeliest-way read). Your call: grade by the committed plan's weighted read (#717's last comment).
+- **Lessons from the night (how to work):**
+  - Every issue claim was checked before building, and three were wrong:
+    - #714's "a turn to spare": the village has none.
+    - #713's "last-seen tile": no such tile exists; the board reads every enemy's true tile.
+    - #717's "read at 0": the grader read the wrong plan.
+  - A new candidate act can be offered and still never judged: the planner's per-unit cut (`PER_UNIT`) dropped #722's careful march. Check that an act reaches the beam, not only the candidate list.
+  - A replay that shows no change is not proof that a fix does nothing. Read the trace for why. Ch13 needed three PRs (#723, #725, #726) before Cormag's goal held the win.
+- **Run tags:** `fix714*`, `fix721`, `fix724*`, `fix712*`, `fix713*`, `iso711`, `isomain`, `bis0-2`.
+
+*Before that (2026-11-22; main was d7892189 + HANDOFF).* Four #699 blockers merged today, one PR each, built by Sonnet subagents and reviewed by them (`review-to-clean`). Next was #714 (a march offers only the nearest and the safest tile). The status table on #699 (comment 7066011205) is current. After #714 the order is 2a/2b, then #712, #713 and #717. Then one `attempts` set over the batch, on the #699 measurement's starts (`m699c<N>`).
 
 - **Merged:**
   - **PR #715 (#710, ADR 0440).** A recruit standing on a locked tile is talked to from beside it. The chance, the planner and the march all read it that way.

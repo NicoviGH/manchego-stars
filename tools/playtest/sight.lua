@@ -116,9 +116,13 @@
 --                            inside are dropped after it (M.changed). The planner's re-listing
 --                            (#661, #670).
 --   enemyPhase(plan)        the enemy phase the AI would play against a planned board, in
---                            one batch. plan = { blues = { { unit, x, y, hp } }, gone =
+--                            one batch. plan = { blues = { { unit, x, y, hp } }, waits = { { unit, x, y, order } }, gone =
 --                            { [enemy id] = true } }: our units stand where the plan leaves
---                            them with its HP, the gone are off the map, plan.opened =
+--                            them with its HP (plan.waits, optional: the units the plan acts, each at
+--                            its end tile in act order `order`, a unit its counter killed
+--                            among them; the AI changes the Misc events make at those waits are
+--                            played first, M.areaWake; the result's .areaPositional and
+--                            .areaTruncated count what its scripts left unread), the gone are off the map, plan.opened =
 --                            { ["x,y"] = true } the doors it opens and walls it breaks, each
 --                            map change applied (M.openMap), the game builds its
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
@@ -144,8 +148,9 @@
 --                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
 --                            HP when it begins, 0 if dead) and .moved. See s.nextPhase.
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
---                            boss = on a Defeat Boss map, the charId whose death quote raises
---                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
+--                            boss = where a boss's death ends the chapter (a Defeat Boss goal, or
+--                            a Misc DefeatBoss event beside another goal), the charId whose death
+--                            quote raises EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
 --                            gameOver = the charIds, on any side, whose death sets
 --                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
@@ -243,6 +248,9 @@
 --   nextTurnEvent(turn)      the first later turn at which a turn event the game would fire is
 --                            not already firing now (SearchAvailableEvent over the chapter's
 --                            turnBasedEvents, the turn and phase set to each), or nil.
+--   scriptedUnits()          the units the chapter's turn events load and remove, read once off
+--                            their script bytes (#724): { arrivals = { { charId, x, y, turn,
+--                            boardTurn } }, removals = { [charId] = boardTurn } }.
 --   cache                    {} for ONE player phase (bot.lua keeps attacks and strikes there).
 --   demands()                what the map asks of a team (M.demandsOf), at the prep screen:
 --                            the board's red units and the chapter's tile commands (read once,
@@ -284,6 +292,7 @@ M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the 
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
 M.FACTION_MASK = 0xC0        -- include/bmunit.h: a unit index's faction bits (blue 0x00)
+M.EVFLAG_WIN = 3             -- the same; the completion flag of a win event
 M.EVFLAG_DEFEAT_BOSS = 2     -- include/constants/event-flags.h; DefeatTalkEnt +04 flag
 M.EVFLAG_GAMEOVER = 101      -- the same; RunWaitEvents ends the game when it is set
 M.DEFEAT_TALK_FLAG = 0x04
@@ -325,6 +334,11 @@ function M.carryOf(a, uid)
     return nil
 end
 M.CLOSE_HORIZON = 8   -- enemy phases closings() plays forward
+-- turns s.scriptedUnits() reads the turn events of: a turn an event can name runs to
+-- M.LAST_EVENT_TURN (a byte); the scan stops at 30: the latest start turn any vanilla turn event names is
+-- 19 (grep of src/events/*eventinfo.h TurnEvent*, 255 = open-ended end excluded), and each turn
+-- costs three game calls. A turn event starting later than the horizon is not read
+M.SCRIPT_HORIZON = 30
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
 -- (player_interface.c), so the turns left on turn T are End - T.
@@ -378,7 +392,7 @@ local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
 -- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
 local EVENT_FLAG, EVENT_X, EVENT_Y = 0x08, 0x18, 0x19
-local CHAPTER_TURNS, CHAPTER_LOCATIONS = 0x00, 0x08
+local CHAPTER_TURNS, CHAPTER_LOCATIONS, CHAPTER_MISC = 0x00, 0x08, 0x0C
 local TALK_SCRIPT, TALK_PID_A, TALK_PID_B, NO_PID = 0x04, 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
 local CHAPTER_TALKS = 0x04
@@ -1234,47 +1248,199 @@ function M.demandsOf(units, commands, fog, freeTalks, needed)
     return out
 end
 
--- Whether the event script at `script` CALLs `target` (EV_CMD_CALL or EV_CMD_ENQUEUE_CALL, the
--- script pointer at +4 either way), following the CALLs of its own: Eirika's E_14 talk reaches the
--- paid-recruit script through a second one. A command's length is its first halfword's second
--- nibble, in halfwords (event.c), its label the halfword after it (EvtLabel, EvtGoto, EvtBEQ...).
+-- The walk of an event script's bytes (callsScript, scriptEffects): `visit(at, cmd, sub)` is
+-- called for each command, in order, and the walk stops early when it returns true (walkScript
+-- then returns true). A CALL or ENQUEUE_CALL (the script pointer at +4 either way) is visited
+-- and then walked into, so a called script's commands come in place and a visitor's own state
+-- (the slot 2 SVAL set before a CALL) holds through it: Eirika's E_14 talk reaches the paid-recruit
+-- script through a second CALL. A command's length is its first halfword's second nibble, in
+-- halfwords (event.c), its label the halfword after it (EvtLabel, EvtGoto, EvtBEQ...).
 -- The bytecode is linear and a GOTO or branch can jump over an END to a CALL behind a later
 -- LABEL, so an END stops the walk only when every label a GOTO/branch named is already behind it.
 -- Bounded: EV_SCRIPT_LIMIT commands a script, and a pointer is followed only inside the ROM
--- (a script in RAM, or garbage, is not read). `seen` guards a loop. Pure over mem.
+-- (a script in RAM, or garbage, is not read). `opts`: { memo = true } walks each script once
+-- (a visitor with no state between CALLs, callsScript: a diamond of CALLs is then linear, not
+-- exponential), { budget = n } stops the walk after n commands in all (a visitor with state, as
+-- scriptEffects' slot 2, walks a script CALLed twice twice, so its total is bounded instead).
+-- walkScript returns (stopped, truncated): `truncated` is true when the budget ended a walk.
+-- Without memo the scripts being walked are a stack that guards a loop. Branches are not
+-- evaluated: every command the bytes reach linearly is visited. Pure over mem.
 -- Every ENQUEUE_CALL is followed, whatever its subcommand: an enqueued paid script reads as paid,
 -- which only withholds a free-talker demand, never adds a wrong one.
 local EV_CMD_LABEL, EV_CMD_GOTO, EV_CMD_CALL, EV_CMD_ENQUEUE_CALL, EV_CMD_BRANCH, EV_CMD_END =
     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x01
 M.EV_SCRIPT_LIMIT = 512
+M.EV_WALK_BUDGET = 8 * M.EV_SCRIPT_LIMIT
 -- the cartridge ROM is the 32MB the GBA maps at 0x08 and 0x09 (top byte), so `ptr >> 25 == 4`
 local ROM_REGION, ROM_SHIFT = 4, 25
-function M.callsScript(mem, script, target, seen)
-    seen = seen or {}
-    if script == target then return true end
-    if script >> ROM_SHIFT ~= ROM_REGION or seen[script] then return false end
-    seen[script] = true
-    local at, reached, wanted = script, {}, {}
-    for _ = 1, M.EV_SCRIPT_LIMIT do
-        local head = mem.u16(at)
-        local cmd, len = head >> 8, (head >> 4) & 0xF
-        if len == 0 then return false end
-        if cmd == EV_CMD_LABEL then
-            reached[mem.u16(at + 2)] = true
-        elseif cmd == EV_CMD_GOTO or cmd == EV_CMD_BRANCH then
-            wanted[mem.u16(at + 2)] = true
-        elseif cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL then
-            if M.callsScript(mem, mem.u32(at + 4), target, seen) then return true end
-        elseif cmd == EV_CMD_END then
-            local ahead = false
-            for label in pairs(wanted) do
-                if not reached[label] then ahead = true end
+function M.walkScript(mem, script, visit, opts)
+    opts = opts or {}
+    local stack, left, truncated = {}, opts.budget or math.huge, false
+    local done = opts.memo and {} or nil
+    local function walk(from)
+        if from >> ROM_SHIFT ~= ROM_REGION or stack[from] or (done and done[from]) then return false end
+        stack[from] = true
+        if done then done[from] = true end
+        local at, reached, wanted, stopped = from, {}, {}, false
+        for _ = 1, M.EV_SCRIPT_LIMIT do
+            local head = mem.u16(at)
+            local cmd, len = head >> 8, (head >> 4) & 0xF
+            if len == 0 then break end
+            if left <= 0 then truncated = true; break end
+            left = left - 1
+            if visit(at, cmd, head & 0xF) then stopped = true; break end
+            if cmd == EV_CMD_LABEL then
+                reached[mem.u16(at + 2)] = true
+            elseif cmd == EV_CMD_GOTO or cmd == EV_CMD_BRANCH then
+                wanted[mem.u16(at + 2)] = true
+            elseif cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL then
+                if walk(mem.u32(at + 4)) then stopped = true; break end
+            elseif cmd == EV_CMD_END then
+                local ahead = false
+                for label in pairs(wanted) do
+                    if not reached[label] then ahead = true end
+                end
+                if not ahead then break end
             end
-            if not ahead then return false end
+            at = at + len * 2
         end
-        at = at + len * 2
+        stack[from] = nil
+        return stopped
     end
-    return false
+    local stopped = walk(script)
+    return stopped, truncated
+end
+
+-- Whether the event script at `script` CALLs `target` (EV_CMD_CALL or EV_CMD_ENQUEUE_CALL),
+-- through the CALLs of its own (M.walkScript's walk, each script once).
+function M.callsScript(mem, script, target)
+    if script == target then return true end
+    return M.walkScript(mem, script, function(at, cmd)
+        return (cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL) and mem.u32(at + 4) == target
+    end, { memo = true })
+end
+
+-- What an event script does to the field's units, read from its bytes (#724): the units it loads
+-- and the ones it removes. -> { loads = { { charId, x, y } }, removals = { charId }, truncated }.
+-- Encodings (include/eventscript.h, src/eventscr.c): a command's head halfword is cmd << 8 | len
+-- << 4 | sub (_EvtCmd, eventscript.h:570); SVAL (EvtSetSlot, :591) is slot at +2 and a u32 at +4;
+-- LOAD1-3 (EvtLoadUnit1.., :687, sub 0-2) is a UnitDefinition array at +4, and a pointer < 0
+-- means slot 2 (Event2C_LoadUnits, eventscr.c:2797); LOADSINGLEUNIT (:722, Event32_SpawnSingleUnit,
+-- eventscr.c:3128) is the allegiance in sub, the char at +2 (-3: slot 2), x and y bytes at +4, +5;
+-- CHANGESTATE (EvtKillUnit/EvtRemoveUnit, :720-723, Event34_MessWithUnitState) sub 0xD KILL or
+-- 0xF DISA is the char at +2. DISA_IF (0xE, EvtWaitUnitDeathFade) is not counted: it waits for a
+-- death fade a script began, not a removal of its own. A UnitDefinition (bmunit.h:195) is 0x14
+-- bytes, an array ends at charIndex 0 (GetLoadUnitsAmount), x is the 6 bits and y the next 6 of
+-- the halfword at +4.
+-- Slot 2 is tracked by the walk through its CALLs (SVAL slot 2 then CALL(EventScr_LoadReinforce),
+-- LOAD1(1, -1)). A unit the script loads AND removes (a cutscene cast) is no removal of the
+-- field's: the removal is dropped. An ESTIMATE: the script's guards (CHECK_ALIVE,
+-- CHECK_ALLEGIANCE, a flag) are not evaluated, so a removal that only holds for a unit in some
+-- state reads as always; a REDA walks a loaded unit off the tile read; LOAD_PRECONF's
+-- SETCOUNT and SETCHANCE (eventscript.h:451-453) are not read, so an array is loaded whole. The
+-- walk is bounded to M.EV_WALK_BUDGET commands in all: a read the budget cut short has
+-- `truncated = true` and is an estimate of less than the script does. Pure over mem.
+local EV_CMD_SVAL, EV_CMD_LOADUNIT, EV_CMD_LOADSINGLEUNIT, EV_CMD_CHANGESTATE =
+    0x05, 0x2C, 0x32, 0x34
+local EVSUB_KILL, EVSUB_DISA, EVENT_SLOT_2 = 0xD, 0xF, 2
+local UDEF_SIZE, UDEF_LIMIT = 0x14, 64
+local MAP_COORD_LIMIT = 64   -- x and y are 6-bit fields in a UnitDefinition; a byte's 7th bit is a sign
+function M.scriptEffects(mem, script)
+    local loads, removed, slot2 = {}, {}, 0
+    local _, truncated = M.walkScript(mem, script, function(at, cmd, sub)
+        if cmd == EV_CMD_SVAL then
+            if mem.u16(at + 2) == EVENT_SLOT_2 then slot2 = mem.u32(at + 4) end
+        elseif cmd == EV_CMD_LOADUNIT and sub <= 2 then
+            local ud = mem.u32(at + 4)
+            if ud >= 0x80000000 then ud = slot2 end
+            if ud >> ROM_SHIFT == ROM_REGION then
+                for i = 0, UDEF_LIMIT - 1 do
+                    local d = ud + i * UDEF_SIZE
+                    if mem.u8(d) == 0 then break end
+                    local xy = mem.u16(d + 4)
+                    loads[#loads + 1] = { charId = mem.u8(d), x = xy & 0x3F, y = (xy >> 6) & 0x3F }
+                end
+            end
+        elseif cmd == EV_CMD_LOADSINGLEUNIT then
+            local pid = mem.u16(at + 2)
+            if pid == 0xFFFD then pid = slot2 end
+            local x, y = mem.u8(at + 4), mem.u8(at + 5)
+            if pid > 0 and pid < 0x100 and x < MAP_COORD_LIMIT and y < MAP_COORD_LIMIT then
+                loads[#loads + 1] = { charId = pid, x = x, y = y }
+            end
+        elseif cmd == EV_CMD_CHANGESTATE and (sub == EVSUB_KILL or sub == EVSUB_DISA) then
+            local pid = mem.u16(at + 2)
+            if pid > 0 and pid < 0x100 then removed[#removed + 1] = pid end
+        end
+        return false
+    end, { budget = M.EV_WALK_BUDGET })
+    local cast = {}
+    for _, l in ipairs(loads) do cast[l.charId] = true end
+    local removals = {}
+    for _, c in ipairs(removed) do
+        if not cast[c] then removals[#removals + 1] = c end
+    end
+    return { loads = loads, removals = removals, truncated = truncated }
+end
+
+-- The AI changes an event script makes, read from its bytes (#712): the units it switches to
+-- another AI. -> { changes = { { charId, ai1, ai2 } }, positional, truncated }, in script order.
+-- Encodings: CHAI (EvtChangeAI, include/eventscript.h:729, EV_CMD_CHANGEAI 0x39) is the char at +2
+-- (a negative one: slot 2) and the AI in slot 1, ai1 its low byte and ai2 the next
+-- (Event39_ChangeAiScript, eventscr.c:3604-3623 -> ChangeAiForCharacter, eventscr3.c:61: every
+-- unit of that character in the green and red factions). SVAL (slot at +2, a u32 at +4) is tracked
+-- through the walk's CALLs as scriptEffects tracks slot 2. CHAI_AT (sub 1, EvtChangeAIat :730)
+-- takes its units from a queue and a position slot the script fills (vanilla E_10's and E_14's
+-- AREA scripts, through EventScr_ChangeAIinQueue, events_script_utils.c:523): `positional` counts
+-- them, none is read. An ESTIMATE as scriptEffects is: guards are not evaluated (the
+-- UnTriggerIfNotFaction call at the head of an AREA script ends it for a unit not of the
+-- faction it names, and the player's units are the ones asked). Pure over mem.
+local EV_CMD_CHANGEAI, EVSUB_CHAI_AT, EVENT_SLOT_1 = 0x39, 1, 1
+function M.scriptAiChanges(mem, script)
+    local changes, positional, slot1, slot2 = {}, 0, 0, 0
+    local _, truncated = M.walkScript(mem, script, function(at, cmd, sub)
+        if cmd == EV_CMD_SVAL then
+            local slot = mem.u16(at + 2)
+            if slot == EVENT_SLOT_1 then slot1 = mem.u32(at + 4)
+            elseif slot == EVENT_SLOT_2 then slot2 = mem.u32(at + 4) end
+        elseif cmd == EV_CMD_CHANGEAI then
+            if sub == EVSUB_CHAI_AT then
+                positional = positional + 1
+            else
+                local pid = mem.u16(at + 2)
+                if pid >= 0x8000 then pid = slot2 end
+                changes[#changes + 1] = { charId = pid & 0xFF, ai1 = slot1 & 0xFF,
+                                          ai2 = (slot1 >> 8) & 0xFF }
+            end
+        end
+        return false
+    end, { budget = M.EV_WALK_BUDGET })
+    return { changes = changes, positional = positional, truncated = truncated }
+end
+
+-- The turn events' effects (M.scriptEffects of each, in the order the game offers them: `events`
+-- = { { turn, boardTurn, loads, removals, truncated } }) as s.scriptedUnits' answer: { arrivals = {
+-- { charId, x, y, turn, boardTurn } }, removals = { [charId] = boardTurn }, truncated }. A unit's earliest removal is
+-- kept, and a removal at or before the unit's earliest arrival is dropped: a cast loaded in one
+-- event and removed in an earlier or the same one was never a unit of the field. Pure.
+function M.foldScripted(events)
+    local out, first = { arrivals = {}, removals = {} }, {}
+    for _, e in ipairs(events) do
+        out.truncated = out.truncated or e.truncated
+        for _, l in ipairs(e.loads) do
+            out.arrivals[#out.arrivals + 1] = { charId = l.charId, x = l.x, y = l.y, turn = e.turn,
+                                                boardTurn = e.boardTurn }
+            first[l.charId] = math.min(first[l.charId] or e.boardTurn, e.boardTurn)
+        end
+    end
+    for _, e in ipairs(events) do
+        for _, c in ipairs(e.removals) do
+            if e.boardTurn > (first[c] or 0) then
+                out.removals[c] = math.min(out.removals[c] or e.boardTurn, e.boardTurn)
+            end
+        end
+    end
+    return out
 end
 
 -- The recruits a unit brings over for FREE: of `talks` (M.recruitTalks), the talks to a unit not
@@ -1420,8 +1586,10 @@ function M.opensChests(items, attributes, capacity)
 end
 
 -- closings()' cache key: what its read depends on -- the turn, the horizon, each looter as it
--- stands (id, tile, HP), the tiles our units block, the open tiles, each wave's units and the
--- map. A looter killed or moved, a player unit moved, a tile taken, a door opened is a new key.
+-- stands (id, tile, HP), each of our units (its tile; with a watched unit also id, HP and who it
+-- carries: the second look reads them as the AI's targets, and a carrier's stats halve), the open tiles, each
+-- wave's units and the map. A looter killed or moved, a player unit moved or hurt, a tile taken, a
+-- door opened is a new key.
 function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
     -- the map (sight.mapKey): a looter walks through a door the planner's re-listing opened
     -- (sight.changed, #661), and that read must not answer for the shut map
@@ -1429,8 +1597,15 @@ function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
     for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
     -- the units watched (their paths are in the answer): a watched looter reads as an unwatched one
     for id in pairs(watch or {}) do parts[#parts + 1] = "v" .. id end
-    -- our units are hidden from the AI but still block its walk
-    for _, o in ipairs(blockers or {}) do parts[#parts + 1] = "b" .. o.x .. "," .. o.y end
+    -- our units: the AI's first look hides them (they still block its walk), its second look
+    -- (M.secondLook) reads them as targets, so who stands where and how hurt is in the key
+    -- (HP and what a unit carries only when a unit is watched: with none, no second look runs
+    -- and the tiles are all the first look reads of them)
+    local looked = next(watch or {}) ~= nil
+    for _, o in ipairs(blockers or {}) do
+        parts[#parts + 1] = "b" .. (looked and (o.id or "") or "") .. "@" .. o.x .. "," .. o.y
+            .. (looked and ("/" .. (o.hp or 0) .. "c" .. (o.carrying or 0)) or "")
+    end
     for key in pairs(open) do parts[#parts + 1] = key end
     for _, w in ipairs(waves or {}) do
         for _, u in ipairs(w.units) do
@@ -1452,6 +1627,50 @@ function M.carryPaths(paths, at, phase, gone)
             paths[id][phase] = tile
         end
     end
+end
+
+-- A watched unit that stood on its start tile in every phase of closings()' replay with our units
+-- hidden (#724: Ch13's Cormag, a wyvern in the peaks, has no target then and never leaves them).
+-- The replay is asked again for these with our units as they stand, because the game's own AI
+-- moves a unit toward the units it can see. `starts` = { [id] = tile }, `gone` = the ids that
+-- escaped. -> { [id] = true }. Pure.
+function M.stayedPut(paths, starts, gone)
+    local out = {}
+    for id, start in pairs(starts) do
+        local path = paths[id]
+        if path and next(path) and not gone[id] then
+            local still = true
+            for _, t in pairs(path) do
+                if t.x ~= start.x or t.y ~= start.y then still = false end
+            end
+            if still then out[id] = true end
+        end
+    end
+    return out
+end
+
+-- The second look's paths, `seen` = { [id] = path }, taken where a unit left its start tile or
+-- escaped (`escaped` = { [id] = true }: the path is then the phases before it, as closes' deadline
+-- less one, empty when it went in the first); one that stayed put again keeps the first (the same
+-- stationary path, so a unit the game's AI does not move reads as it did). `paths` is edited. Pure.
+function M.takeSecondLook(paths, seen, starts, escaped)
+    for id, path in pairs(seen) do
+        for _, t in pairs(path) do
+            if t.x ~= starts[id].x or t.y ~= starts[id].y then paths[id] = path; break end
+        end
+    end
+    for id in pairs(escaped or {}) do paths[id] = seen[id] or {} end
+end
+
+-- The second look of closings() (#724), the one place its steps are wired: the watched units that
+-- stayed put in the first (M.stayedPut) are `replayAgain`ed -- a function of the set, run on the
+-- board as it stood, which answers (their second paths, the ids that escaped) -- and their answer
+-- taken (M.takeSecondLook). Asked of nothing when no unit stayed put. `paths` is edited.
+function M.secondLook(paths, starts, gone, replayAgain)
+    local again = M.stayedPut(paths, starts, gone)
+    if next(again) == nil then return end
+    local second, escaped = replayAgain(again)
+    M.takeSecondLook(paths, second, starts, escaped)
 end
 
 -- The terrain closings() leaves on a tile a looter took, `t` its explorable() entry: an emptied
@@ -1546,6 +1765,151 @@ local function eventSearch(api, call, info, offset)
     local events = call(api.SYM.GetChapterEventDataPointer, { api.chapter() })
     for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
     api.write32(info, api.mem.u32(events + offset))
+end
+
+-- Inside a sandbox: the scripts the chapter's event list at `offset` offers now, in the game's
+-- order, { { script, flag (EventInfo +08) } } (availableList), or { [script] = flag }
+-- (availableScripts): the game's SearchAvailableEvent walk.
+local function availableList(api, call, info, offset)
+    eventSearch(api, call, info, offset)
+    local out = {}
+    local found = call(api.SYM.SearchAvailableEvent, { info })
+    while found ~= 0 do
+        out[#out + 1] = { script = api.mem.u32(info + EVENT_SCRIPT),
+                          flag = api.mem.u32(info + EVENT_FLAG) }
+        found = call(api.SYM.SearchNextAvailableEvent, { info })
+    end
+    return out
+end
+local function availableScripts(api, call, info, offset)
+    local out = {}
+    for _, e in ipairs(availableList(api, call, info, offset)) do out[e.script] = e.flag end
+    return out
+end
+
+-- Inside a sandbox: the turn-event scripts the game offers at `turn` and `phase` (gPlaySt's
+-- turn and faction set, then availableScripts over the chapter's turn events): { [script] = flag }.
+-- The one reading of the game's per-phase turn-event check (eventinfo.c), s.nextTurnEvent's and
+-- s.scriptedUnits'.
+function M.turnScripts(api, call, info, turn, phase)
+    api.write16(api.SYM.gPlaySt + PLAY_TURN, turn)
+    api.write8(api.SYM.gPlaySt + PLAY_FACTION, phase)
+    return availableScripts(api, call, info, CHAPTER_TURNS)
+end
+
+-- ChangeUnitAi (eventscr3.c:33-58), inside a sandbox: `e`'s AI scripts switched, as an event's
+-- CHAI does. A hidden or dead unit is left; an ai1 of AI_A_INVALID (0x15, the enumerator after
+-- AI_A_14, cp_common.h:110) or an ai2 of AI_B_INVALID (0x13, after AI_B_12, :135) leaves that
+-- script alone; each script's counter restarts at 0 and an ai2 of AI_B_0C flags the unit
+-- AI_UNIT_FLAG_3 (cp_common.h:58). These are api writes, so the journal puts the board's words
+-- back when the sandbox returns, and the decisions' own keep (M.keepAi: it holds the value it
+-- finds first, here the woken one) unwinds before them, to the board's: no keep16 is
+-- needed (it is for a game call's writes, which no journal sees).
+local AI_A_INVALID, AI_B_INVALID, AI_B_0C, AI_UNIT_FLAG_3 = 0x15, 0x13, 0x0C, 0x08
+local UNIT_AI_A_PC, UNIT_AI_B_PC = 0x43, 0x45
+function M.changeUnitAi(api, e, ai1, ai2)
+    if api.mem.u32(e.addr + UNIT_STATE) & (api.Board.US_HIDDEN | api.Board.US_DEAD) ~= 0 then
+        return false
+    end
+    if ai1 ~= AI_A_INVALID then
+        api.write8(e.addr + UNIT_AI1, ai1)
+        api.write8(e.addr + UNIT_AI_A_PC, 0)
+    end
+    if ai2 ~= AI_B_INVALID then
+        api.write8(e.addr + UNIT_AI2, ai2)
+        api.write8(e.addr + UNIT_AI_B_PC, 0)
+        if ai2 == AI_B_0C then
+            api.write8(e.addr + M.UNIT_AI_FLAGS, api.mem.u8(e.addr + M.UNIT_AI_FLAGS) | AI_UNIT_FLAG_3)
+        end
+    end
+    return true
+end
+
+-- The AI changes the plan's own waits cause, played inside a sandbox before the enemy phase
+-- (#712). The game runs the chapter's Misc events after every unit's wait (RunWaitEvents,
+-- eventinfo.c:1628-1659: SearchAvailableEvent over miscBasedEvents with gActiveUnit the unit that
+-- waited, each script started after SetFlag(flag), StartEventFromInfo, eventinfo.c:71-77), and an
+-- AREA entry (EvCheck0B_AREA, eventinfo.c:1020) offers its script when gActiveUnit stands in its
+-- rectangle and its flag is clear. `waits` = the plan's waits, { { unit, x, y, order } }: for each,
+-- in the order the plan acts them (`order`, the act's index; the game runs the events at each wait
+-- in turn, so two entries sharing a flag fire for the first unit to wait), the unit is stood on
+-- its end tile for the ask (its x and y bytes, journaled and put back: a unit the counter killed is in no board list, and
+-- the game keeps a dead unit's tile, UnitKill, bmunit.c:958, and runs the wait events after the
+-- action whether or not it died, playerphase.c:98-99, cp_perform.c:85-86) and the game is asked
+-- what it offers there; a flag an earlier wait took is not offered again (the game's SetFlag before
+-- the script), and each script's CHAI changes (M.scriptAiChanges) are written into the units of that
+-- character in `byId` (ChangeAiForCharacter: every non-blue unit; M.changeUnitAi).
+-- -> woken { { id, ai1, ai2 } }, and stats { positional, truncated }: the scripts that ran
+-- whose CHAI_AT the walk did not read (#727) and whose walk the budget cut short, for the
+-- planner's cost line (a plan's silent estimate is never silent).
+-- `memo` = { tiles = {}, scripts = {} }, the board's: what the game offers on a tile (the Misc
+-- kinds in vanilla -- AREA, the Defeat flags, AFEV, CauseGameOverIfLordDies -- ask the unit's
+-- tile and the flags, never who it is) and what each script changes (ROM bytes). An ESTIMATE as
+-- M.scriptAiChanges is: not modelled are RunWaitEvents' other work (it sets or clears
+-- EVFLAG_DEFEAT_ALL, and runs nothing when flag 0x65 is set or no blue unit is left) and a
+-- lookahead reply turn (armyReply: its units end elsewhere and wake nothing). `info` is a sandbox's
+-- scratch.
+function M.areaWake(api, call, info, byId, waits, memo)
+    local S, mem = api.SYM, api.mem
+    local fired, woken, stats = {}, {}, { positional = 0, truncated = 0 }
+    local order = {}
+    for i, w in ipairs(waits) do order[i] = w end
+    local rank = {}
+    for i, w in ipairs(waits) do rank[w] = i end
+    table.sort(order, function(x, y)
+        local ox, oy = x.order or math.huge, y.order or math.huge
+        if ox ~= oy then return ox < oy end
+        return rank[x] < rank[y]
+    end)
+    for _, b in ipairs(order) do
+        local key = b.x * 64 + b.y
+        local entries = memo.tiles[key]
+        if not entries then
+            -- stood on its end tile for the ask alone, then back: a dead actor is in no list of
+            -- the phase, and a map refresh would put its struct on the tile it died on
+            local ax, ay = mem.u8(b.unit.addr + UNIT_X), mem.u8(b.unit.addr + UNIT_Y)
+            api.write8(b.unit.addr + UNIT_X, b.x)
+            api.write8(b.unit.addr + UNIT_Y, b.y)
+            api.write32(S.gActiveUnit, b.unit.addr)
+            entries = availableList(api, call, info, CHAPTER_MISC)
+            memo.tiles[key] = entries
+            api.write8(b.unit.addr + UNIT_X, ax)
+            api.write8(b.unit.addr + UNIT_Y, ay)
+        end
+        for _, entry in ipairs(entries) do
+            if entry.flag == 0 or not fired[entry.flag] then
+                fired[entry.flag] = true
+                local fx = memo.scripts[entry.script]
+                if not fx then
+                    fx = M.scriptAiChanges(mem, entry.script)
+                    memo.scripts[entry.script] = fx
+                end
+                stats.positional = stats.positional + fx.positional
+                stats.truncated = stats.truncated + (fx.truncated and 1 or 0)
+                for _, c in ipairs(fx.changes) do
+                    for id, e in pairs(byId) do
+                        if e.faction ~= "blue" and e.charId == c.charId
+                                and M.changeUnitAi(api, e, c.ai1, c.ai2) then
+                            woken[#woken + 1] = { id = id, ai1 = c.ai1, ai2 = c.ai2 }
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return woken, stats
+end
+
+-- Whether a Misc list's scripts `after` a death flag was set hold one `before` did not that
+-- completes EVFLAG_WIN: the chapter's win event (an unconditional entry is in both; a TMP or
+-- DefeatAll flag's is no DefeatBoss win). Scripts are keyed by address, so two entries sharing
+-- one merge; every such pair in vanilla's Misc lists is AREA entries of one TMP flag (checked by
+-- grepping each *-eventinfo.h Misc list for a repeated script), so none hides a WIN. Pure.
+function M.winEvent(before, after)
+    for script, flag in pairs(after) do
+        if not before[script] and flag == M.EVFLAG_WIN then return true end
+    end
+    return false
 end
 
 -- Sight.batching(outer, guarded, log) -> sandbox, api: Sight.machine made re-entrant (the
@@ -2189,16 +2553,20 @@ function M.phaseStarted(mem, S, units)
     return known
 end
 
--- What a kept phase start (M.phaseStarted) is kept by: each unit's HP and state word as they
--- read now, by its address. They are what the two calls read that a sandbox can have staged
+-- What a kept phase start (M.phaseStarted) is kept by: each unit's HP, state word and AI scripts
+-- (ai1, ai2: a plan's wait that wakes an enemy, M.areaWake, writes them, and ChangeUnitAi flags
+-- an ai2 of AI_B_0C, which the start's kept aiFlags would write over) as they read now, by
+-- its address. They are what the two calls read that a sandbox can have staged
 -- (a plan's HP, a unit hidden, carried or off the map), so a strike asked inside a staged
 -- board finds no start kept for it and makes its own; a unit's Mov and bag change only with
 -- the board (`seen`).
 function M.phaseKey(mem, units)
     local parts = {}
     for _, o in pairs(units) do
-        parts[#parts + 1] = ("%x:%d:%x"):format(o.addr, mem.u8(o.addr + UNIT_HP),
-                                                mem.u32(o.addr + UNIT_STATE))
+        parts[#parts + 1] = ("%x:%d:%x:%d:%d"):format(o.addr, mem.u8(o.addr + UNIT_HP),
+                                                      mem.u32(o.addr + UNIT_STATE),
+                                                      mem.u8(o.addr + UNIT_AI1),
+                                                      mem.u8(o.addr + UNIT_AI2))
     end
     table.sort(parts)
     return table.concat(parts, ",")
@@ -2471,12 +2839,21 @@ function M.openAll(api, call, S, set)
     end
 end
 
+-- Inside a sandbox: unit `e` hidden from the AI (US_HIDDEN: its target loops skip it; it keeps its
+-- gBmMapUnit entry, so it still blocks), the write journaled. The one owner of the hide: takeOff,
+-- onlyTarget. -> a function that writes the state word back as it was.
+function M.hideUnit(api, e)
+    local was = api.mem.u32(e.addr + UNIT_STATE)
+    api.write32(e.addr + UNIT_STATE, was | api.Board.US_HIDDEN)
+    return function() api.write32(e.addr + UNIT_STATE, was) end
+end
+
 -- Inside a sandbox: unit `e`, standing on (x, y), off the map as a death takes it -- off
 -- gBmMapUnit, and US_HIDDEN, which RefreshUnitsOnBmMap skips (bmmap.c) -- every write
 -- journaled. The judged phase's (a kill, a counter's) and Sight.changed's.
 function M.takeOff(api, e, x, y)
     M.liftOff(api, x, y, e.id)
-    api.write32(e.addr + UNIT_STATE, api.mem.u32(e.addr + UNIT_STATE) | api.Board.US_HIDDEN)
+    M.hideUnit(api, e)
 end
 
 -- The answers a changed board starts from (s.changed): none of `kept`'s, but the march cost
@@ -2615,39 +2992,44 @@ function M.new(outer)
         local ent = call(S.GetDefeatTalkEntry, { charId })
         return ent ~= 0 and mem.u16(ent + M.DEFEAT_TALK_FLAG) or nil
     end
-    -- On a Defeat Boss map, the boss is the unit whose death raises the goal's flag -- how the
-    -- game itself ends the chapter (EVFLAG_DEFEAT_BOSS), not CA_BOSS, which a boss on a cloned
-    -- generic row (Manchego Stars ch03's grell) does not carry.
-    if goal.kind == "boss" then
-        s.objective.boss = sandbox(function(call)
-            for _, u in ipairs(api.board().units) do
-                if u.faction == "red" and u.onField
-                        and defeatFlag(call, u.charId) == M.EVFLAG_DEFEAT_BOSS then
-                    return u.charId
-                end
-            end
-            return nil
-        end)
-    end
     -- The units whose death ends the game, on any side (an escort's too): the game's own death
     -- step, run in one sandbox. SetPidDefeatedFlag sets the unit's flag -- but never
     -- EVFLAG_GAMEOVER for the chapter's protected unit on a non-story map -- and that flag is
     -- what RunWaitEvents ends the game on. Each unit's flag is cleared after (ClearFlag) before
     -- the next is read: GetDefeatTalkEntry skips a row whose flag is set.
-    s.objective.gameOver = sandbox(function(call)
-        local out = {}
+    -- The same pass finds the boss: the red unit whose death raises EVFLAG_DEFEAT_BOSS (its
+    -- row's flag) -- how the game itself ends the chapter, not CA_BOSS, which a boss on a cloned
+    -- generic row (Manchego Stars ch03's grell) does not carry. On a Defeat Boss goal that flag
+    -- is the win. On any other goal it is the win only when the flag makes the Misc list offer a
+    -- new WIN event (M.winEvent: vanilla Ch13's `DefeatBoss(scr)` = AFEV(EVFLAG_WIN, scr,
+    -- EVFLAG_DEFEAT_BOSS), Main_Code_Helpers.h): a Seize map's boss has the same row (Ch3's
+    -- Bazba) and ends nothing, and Ch1's Misc list offers a TMP flag's event, not a WIN (#721).
+    local read = sandbox(function(call, info)
+        local out, boss = {}, nil
+        local before   -- the Misc list's scripts with no death flag set, read at the first candidate
         for _, u in ipairs(api.board().units) do
             local flag = u.onField and defeatFlag(call, u.charId)
             if flag then
+                local candidate = not boss and u.faction == "red" and flag == M.EVFLAG_DEFEAT_BOSS
+                if candidate and goal.kind ~= "boss" then
+                    before = before or availableScripts(api, call, info, CHAPTER_MISC)
+                end
                 call(S.SetPidDefeatedFlag, { u.charId, flag })
                 if call(S.CheckFlag, { M.EVFLAG_GAMEOVER }) & 0xFF ~= 0 then
                     out[#out + 1] = u.charId
                 end
+                if candidate then
+                    if goal.kind == "boss"
+                            or M.winEvent(before, availableScripts(api, call, info, CHAPTER_MISC)) then
+                        boss = u.charId
+                    end
+                end
                 call(S.ClearFlag, { flag })
             end
         end
-        return out
+        return { gameOver = out, boss = boss }
     end)
+    s.objective.gameOver, s.objective.boss = read.gameOver, read.boss
 
     -- The chapter's recruit talks, searched once per Sight (the search runs the game's event
     -- walk): this Sight is made for one prep screen, as `commands` above is read once.
@@ -3139,9 +3521,7 @@ function M.new(outer)
     -- `all` is units(), read before the sandbox stood `u` elsewhere.
     local function onlyTarget(u, all)
         for _, o in ipairs(all) do
-            if o.faction ~= "red" and o.id ~= u.id and o.onField then
-                api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
-            end
+            if o.faction ~= "red" and o.id ~= u.id and o.onField then M.hideUnit(api, o) end
         end
     end
 
@@ -3171,7 +3551,7 @@ function M.new(outer)
         api.write8(addr + UNIT_HP, hp)
         if decides then healStale = true end
     end
-    local function aiDecide(call, proc, e, all, before, starts)
+    local function aiDecide(call, proc, e, all, before, starts, tileOnly)
         M.keepAi(api, all)
         M.keepMaps(api, all)   -- `setup` refreshes the maps
         M.keepRide(api, S, e, all)
@@ -3208,6 +3588,7 @@ function M.new(outer)
         healStale = false   -- a phase start reads them too
         if before then before() end
         if decide then call(decide) end
+        if tileOnly then return nil, nil end   -- the caller reads the tile (gAiDecision), not the blow
         local D = S.gAiDecision
         local DEC = Board.AI_DEC
         if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then
@@ -3342,13 +3723,17 @@ function M.new(outer)
     -- our units stood and their HP set, armed as the plan leaves them, the reds' HP and the
     -- uses their counters to our planned attacks spent, the gone off the map. `wearing.base` is
     -- the wear ledger (M.tally) the phase starts from: the plan's own wear on it.
-    local function stagePhase(call, plan)
+    local function stagePhase(call, scratch, plan)
         local byId = {}
         for _, o in ipairs(units()) do byId[o.id] = o end
         for _, b in ipairs(plan.blues) do
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
         end
+        -- the waits the plan makes run the chapter's Misc events before the enemy phase: an AREA
+        -- event that wakes an enemy (vanilla Ch16's Sage, #712) has done so by then
+        seen.area = seen.area or { tiles = {}, scripts = {} }
+        local _, area = M.areaWake(api, call, scratch, byId, plan.waits or {}, seen.area)
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
         end
@@ -3439,7 +3824,7 @@ function M.new(outer)
         local function pilfer(call, e, act)
             return M.pilfer(api, call, S, Board, standOn, e, act)
         end
-        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer
+        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer, area
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
@@ -3497,10 +3882,13 @@ function M.new(outer)
 
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer =
-                stagePhase(call, plan)
-            return playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
-                             plan.mass, cast, pilfer)
+            local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer, area =
+                stagePhase(call, proc, plan)
+            local out = playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
+                                  plan.mass, cast, pilfer)
+            -- what the plan's waits' events left unread (M.areaWake's stats), for the cost line
+            out.areaPositional, out.areaTruncated = area.positional, area.truncated
+            return out
         end) end)
     end
 
@@ -3634,8 +4022,8 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer =
-                stagePhase(call, plan)
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer, area =
+                stagePhase(call, proc, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
             -- wears on what the last left (M.tally)
@@ -3718,6 +4106,7 @@ function M.new(outer)
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
                                   remove, nil, cast, pilfer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
+            out.areaPositional, out.areaTruncated = area.positional, area.truncated
             return out
         end) end)
     end
@@ -3725,13 +4114,14 @@ function M.new(outer)
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
     -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`
     -- (default M.CLOSE_HORIZON).
-    -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2)
-    -- play k enemy phases forward with the game's own AI (aiDecide, as enemyPhase plays one),
-    -- in the game's turn order, every other unit held where it stands and the player's hidden from
-    -- the AI (when it falls undefended): a looter's decision is
-    -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
-    -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
-    -- calls (3,787 -> 11,086). Read again only when a looter or an open tile changed. A wave not
+    -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2) and
+    -- the units the caller watches (below) play k enemy phases forward with the game's own AI
+    -- (aiDecide, as enemyPhase plays one), in the game's turn order, every other unit held where
+    -- it stands and the player's hidden from the AI (the question is when a tile falls
+    -- undefended): a looter's decision is AI_ACTION_PILLAGE on the tile, and it is stood where
+    -- it decided to go. Only those decide: replaying every enemy for 8 phases on every decision
+    -- tripled a Ch5 attempt's AI calls (3,787 -> 11,086). Read again only when a looter, a watched
+    -- unit, a player unit or an open tile changed. A wave not
     -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, ai2, items = {ids} } } } },
     -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
@@ -3743,12 +4133,17 @@ function M.new(outer)
     -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699). The
     -- second answer is { [unit id] = { [enemy phase] = {x, y} } }, where each watched unit stands
     -- after each phase before it is gone (M.carryPaths: the escape phase is left out, so a path
-    -- is as long as its deadline less one). A scripted removal (a turn event's) is not read:
-    -- nothing reads what a script does. Both are estimates, as the chest closings are: the replay
-    -- hides our units, so a recruit's moves and its escape phase are the ones he makes when
-    -- no player unit is near; the planner uses them as the deadline it is.
-    -- closings() by what it reads: the turn, k, the waves, and each looter or watched unit as it
-    -- stands (one our act kills or moves is a new read). newPhase() runs before every decision.
+    -- is as long as its deadline less one). A watched unit that never left its tile with our
+    -- units hidden is played again with them visible (M.secondLook, #724): the game's AI then
+    -- moves it toward the units it can see. Our units are taken to stand still for all k
+    -- phases, and only a unit that stayed put is read again. A scripted removal (a turn event's
+    -- DISA or KILL) is not played here: s.scriptedUnits reads it off the script's bytes and
+    -- Goals.closings folds it in (#724). All are estimates, as the chest closings are: a
+    -- recruit's moves and its escape phase are the ones he makes with our units hidden (or, for
+    -- the second look, where they stand now); the planner uses them as the deadline it is.
+    -- closings() by what it reads: the turn, k, the waves, each looter or watched unit, and
+    -- each player unit, as they stand (one an act kills, moves or hurts is a new read). newPhase()
+    -- runs before every decision.
     local closingsAt = {}
     function s.closings(k, waves, watch)
         k = k or M.CLOSE_HORIZON
@@ -3776,79 +4171,109 @@ function M.new(outer)
         sandbox(function(call, proc)
             local byId = {}
             for _, o in ipairs(all) do byId[o.id] = o end
-            -- the question is when a tile falls if no player unit defends it: our units are
-            -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
-            -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
-            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell).
-            -- The phase start skips a hidden unit too (SetupUnitInventoryAIFlags), so the
-            -- replay's gAiState.bestBlueMov is 0: no tile is kept from a looter for a faster
-            -- player unit (cp_utility.c AiTryMoveTowards), the same question asked. Read off
-            -- the decomp; its effect on a closing turn is not measured.
-            for _, o in ipairs(all) do
-                if o.faction ~= "red" and o.onField then
-                    api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
+            local D, DEC = S.gAiDecision, Board.AI_DEC
+            -- The enemy phases played, from the board as the sandbox it runs in found it: the units
+            -- of `who` decide in the game's own order, `at` = each watched one's latest tile (a
+            -- path of it is written to `into`), an escape is gone (`gone`, and out["unit:<id>"]),
+            -- `onPillage(x, y, phase)` is asked of a looter's pillage, and `tileOnly` skips the
+            -- battle simulation a decision to attack would run (only the tile it moves to is read).
+            local function replay(who, at, into, gone, onPillage, tileOnly)
+                for phase = 1, next(who) and k or 0 do
+                    api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
+                    for _, id in ipairs(aiOrder(call, all)) do
+                        local e = who[id] and byId[id]
+                        if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
+                            aiDecide(call, proc, e, all, nil, nil, tileOnly)
+                            local x, y = followMove(e)
+                            if x then
+                                if at[id] then at[id] = { x = x, y = y } end
+                                if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_ESCAPE then
+                                    -- gone this phase: it plays no more and holds no tile
+                                    out["unit:" .. id] = out["unit:" .. id] or phase
+                                    who[id], gone[id] = nil, true
+                                elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE and onPillage then
+                                    onPillage(x, y, phase)
+                                end
+                            end
+                        end
+                    end
+                    M.carryPaths(into, at, phase, gone)
                 end
             end
-            local D, DEC = S.gAiDecision, Board.AI_DEC
             -- each watched unit's tile now (path[0] is the goal's own), and those that escaped
             local at, gone = {}, {}
             for id in pairs(watch or {}) do
                 local e = looter[id] and byId[id]
                 if e then at[id] = { x = e.x, y = e.y } end
             end
-            for phase = 1, next(looter) and k or 0 do
-                api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
-                for _, id in ipairs(aiOrder(call, all)) do
-                    local e = looter[id] and byId[id]
-                    if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
-                        aiDecide(call, proc, e, all)
-                        local x, y = followMove(e)
-                        if x then
-                            if at[id] then at[id] = { x = x, y = y } end
-                            if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_ESCAPE then
-                                -- gone this phase: it plays no more and holds no tile
-                                out["unit:" .. id] = out["unit:" .. id] or phase
-                                looter[id], gone[id] = nil, true
-                            elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
-                                close(x, y, phase)
-                                -- the tile is taken: AiPillageAction opens a chest (it empties)
-                                -- or runs the village's tile change, which the replay does not
-                                -- play; a terrain off the AI's loot lists (cp_utility.c
-                                -- gTerrainList_Lootable*) keeps it from being chosen again,
-                                -- so the looter goes on to its next target
-                                api.write8(cell(mem, S.gBmMapTerrain, x, y),
-                                    M.sackedTerrain(open[x .. "," .. y]))
+            -- The first look, in a sandbox of its own (rolled back when it returns: the second
+            -- look starts from the board as it stood, its AI words, tiles, terrain and fog bits).
+            -- The question is when a tile falls if no player unit defends it: our units are
+            -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
+            -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
+            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell).
+            -- The phase start skips a hidden unit too (SetupUnitInventoryAIFlags), so the
+            -- replay's gAiState.bestBlueMov is 0: no tile is kept from a looter for a faster
+            -- player unit (cp_utility.c AiTryMoveTowards), the same question asked. Read off
+            -- the decomp; its effect on a closing turn is not measured. A wave's reach follows
+            -- in it: its class's costs, on a stand-in unit struct (any on the board).
+            sandbox(function()
+                for _, o in ipairs(all) do
+                    if o.faction ~= "red" and o.onField then M.hideUnit(api, o) end
+                end
+                replay(looter, at, paths, gone, function(x, y, phase)
+                    close(x, y, phase)
+                    -- the tile is taken: AiPillageAction opens a chest (it empties) or runs the
+                    -- village's tile change, which the replay does not play; a terrain off the AI's
+                    -- loot lists (cp_utility.c gTerrainList_Lootable*) keeps it from being chosen
+                    -- again, so the looter goes on to its next target
+                    api.write8(cell(mem, S.gBmMapTerrain, x, y), M.sackedTerrain(open[x .. "," .. y]))
+                end)
+                local stand = all[1]
+                for _, wv in ipairs(waves or {}) do
+                    if wv.turn > turn0 and stand then
+                        for _, wu in ipairs(wv.units) do
+                            local cls = call(S.GetClassData, { wu.class })
+                            local items = {}
+                            for _, id in ipairs(wu.items or {}) do items[#items + 1] = { id = id } end
+                            local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
+                                or M.loots(mem, S.gpAi2Table, wu.ai2)
+                            local chests = villages
+                                and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES), Board.ITEM_COUNT)
+                            for _, t in pairs(open) do
+                                -- a House is never looted (AiLocationIsPillageTarget: no House)
+                                if (t.kind == "visit" and villages and not t.house)
+                                        or (t.kind == "chest" and chests) then
+                                    local cost = costGrid(stand, t, cls)[wu.y][wu.x]
+                                    local turns = cost and math.ceil(cost / mem.s8(cls + CLASS_MOV))
+                                    local at = M.waveCloses(wv.turn, turn0, turns)
+                                    if at then close(t.x, t.y, at) end
+                                end
                             end
                         end
                     end
                 end
-                M.carryPaths(paths, at, phase, gone)
+            end)
+            -- The second look (#724): a watched unit that never left its tile with our units
+            -- hidden is played again, in a sandbox of its own from the board as it stood, our
+            -- units visible and standing where they do for all k phases (an estimate: they will
+            -- move), so the game's AI decides where it goes, toward the units it can see. Only a
+            -- unit that stayed put is read again: every other path is as it was.
+            local starts = {}
+            for id in pairs(watch or {}) do
+                local e = byId[id]
+                if e and at[id] then starts[id] = { x = e.x, y = e.y } end
             end
-            -- a wave: its class's costs, on a stand-in unit struct (any on the board)
-            local stand = all[1]
-            for _, wv in ipairs(waves or {}) do
-                if wv.turn > turn0 and stand then
-                    for _, wu in ipairs(wv.units) do
-                        local cls = call(S.GetClassData, { wu.class })
-                        local items = {}
-                        for _, id in ipairs(wu.items or {}) do items[#items + 1] = { id = id } end
-                        local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
-                            or M.loots(mem, S.gpAi2Table, wu.ai2)
-                        local chests = villages
-                            and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES), Board.ITEM_COUNT)
-                        for _, t in pairs(open) do
-                            -- a House is never looted (AiLocationIsPillageTarget: no House)
-                            if (t.kind == "visit" and villages and not t.house)
-                                    or (t.kind == "chest" and chests) then
-                                local cost = costGrid(stand, t, cls)[wu.y][wu.x]
-                                local turns = cost and math.ceil(cost / mem.s8(cls + CLASS_MOV))
-                                local at = M.waveCloses(wv.turn, turn0, turns)
-                                if at then close(t.x, t.y, at) end
-                            end
-                        end
-                    end
-                end
-            end
+            M.secondLook(paths, starts, gone, function(again)
+                return sandbox(function()
+                    local there, second, escaped = {}, {}, {}
+                    for id in pairs(again) do there[id] = { x = starts[id].x, y = starts[id].y } end
+                    local goneAgain = {}
+                    replay(again, there, second, goneAgain, nil, true)
+                    for id in pairs(goneAgain) do escaped[id] = true end
+                    return second, escaped
+                end)
+            end)
         end)
         closingsAt[ck] = { out = out, paths = paths }
         return out, paths
@@ -4333,18 +4758,7 @@ function M.new(outer)
     -- board repeats, against a chapter's tens of thousands.
     function s.nextTurnEvent(turn)
         return sandbox(function(call, info)
-            local function scriptsAt(t, phase)
-                local out = {}
-                api.write16(S.gPlaySt + PLAY_TURN, t)
-                api.write8(S.gPlaySt + PLAY_FACTION, phase)
-                eventSearch(api, call, info, CHAPTER_TURNS)
-                local found = call(S.SearchAvailableEvent, { info })
-                while found ~= 0 do
-                    out[mem.u32(info + EVENT_SCRIPT)] = true
-                    found = call(S.SearchNextAvailableEvent, { info })
-                end
-                return out
-            end
+            local function scriptsAt(t, phase) return M.turnScripts(api, call, info, t, phase) end
             local now = scriptsAt(turn, M.PHASES[1])
             for _, at in ipairs(M.eventOrder(turn)) do
                 local found = M.firstNewEvent(now, { { turn = at.turn,
@@ -4353,6 +4767,50 @@ function M.new(outer)
             end
             return nil
         end)
+    end
+
+    -- What the chapter's turn events do to the recruits, read once from the built ROM's scripts
+    -- (#724): { arrivals = { { charId, x, y, turn, boardTurn } }, removals = { [charId] =
+    -- boardTurn } }. Each turn event the game offers on turns 1..M.SCRIPT_HORIZON (turnScripts,
+    -- the game's own turn/phase/flag check, each script at the first phase it is offered) has its
+    -- bytes walked (M.scriptEffects: no event is run, nothing is written but the sandbox's turn
+    -- and phase, which it puts back). `boardTurn` is the first player turn its effect is on the
+    -- board: the turn itself for a blue-phase event, the next for a green or red one; `turn` is
+    -- the same, as botrun's arrivals_seen reads an arrival no enemy was seen acting on (the
+    -- board of the next player phase). `truncated` is set when a script's walk hit the budget. A
+    -- unit's earliest arrival and earliest removal are kept, and a removal at or before the
+    -- unit's earliest arrival is dropped (a cast loaded in one event and removed in a later one
+    -- is no removal of a unit that was on the field). About 3 x the horizon game calls once a
+    -- chapter (cached), none a turn.
+    -- An estimate where scriptEffects' is: guards are not evaluated, a load tile is not where a
+    -- REDA leaves the unit. The flags the scan reads are those of its first call (the chapter's
+    -- first plan), so an event a later flag opens is not in it. A read made inside a sandbox (a
+    -- decision's batch) may see flags that sandbox set, so it is returned but not kept.
+    local scripted
+    function s.scriptedUnits()
+        if scripted then return scripted end
+        local read = sandbox(function(call, info)
+            local events, done = {}, {}
+            for t = 1, M.SCRIPT_HORIZON do
+                for _, phase in ipairs(M.PHASES) do
+                    local fresh = {}
+                    for script in pairs(M.turnScripts(api, call, info, t, phase)) do
+                        if not done[script] then fresh[#fresh + 1] = script end
+                    end
+                    table.sort(fresh)   -- pairs() order is no order: a run must replay
+                    for _, script in ipairs(fresh) do
+                        done[script] = true
+                        local fx = M.scriptEffects(mem, script)
+                        local boardTurn = phase == M.PHASES[1] and t or t + 1
+                        events[#events + 1] = { turn = boardTurn, boardTurn = boardTurn,
+                                                loads = fx.loads, removals = fx.removals, truncated = fx.truncated }
+                    end
+                end
+            end
+            return M.foldScripted(events)
+        end)
+        if not open() then scripted = read end
+        return read
     end
 
     return s

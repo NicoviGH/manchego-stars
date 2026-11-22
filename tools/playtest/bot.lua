@@ -11,7 +11,8 @@
 --   opts (optional): { unpaid = { ["<talker charId>><target charId>"] = true } }, the Talks
 --          this attempt that recruited no one (botrun's, #679), offered no more; and, for
 --          Bot.candidates, pending = { { charId, x, y, turn } }: owed recruits an earlier attempt
---          saw arrive (botrun's pendingRecruits, ADR 0436).
+--          saw arrive (botrun's pendingRecruits, ADR 0436); owedRecruits = { [charId] = true }, the
+--          recruits the game still owes (api.recruits less the party), for the scripted removals.
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
 --            claims = {claim ids}, route = 1|2 }, plus the fields the claim behaviours add
 --          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
@@ -2947,14 +2948,18 @@ local function proposeOne(ctx, u)
     -- for five turns, the throne open, every forward tile an ally's who stayed put)
     -- (no tile at all only for a re-listing's unit, M.candidates' opts.tiles: its new tiles
     -- may all be allies')
-    local function marched()
-        local t = march(ctx, u, open, objective)
-        add(t and action(u, t, "wait"), "march")
+    local function marched(gate, why)
+        local t = march(ctx, u, gate, objective)
+        add(t and action(u, t, "wait"), why or "march")
     end
-    marched()
-    ctx.freeOnly = true
-    marched()
-    ctx.freeOnly = nil
+    -- `fn` over every tile, then over free tiles only (ctx.freeOnly)
+    local function bothViews(fn)
+        fn()
+        ctx.freeOnly = true
+        fn()
+        ctx.freeOnly = nil
+    end
+    bothViews(function() marched(open) end)
     local holds = bySafety(ctx, u, waitTiles(ctx, u))
     add(holds[1] and action(u, holds[1], "wait"), "hold")
     local gain = groundFor(ctx, u, objective)
@@ -2971,12 +2976,20 @@ local function proposeOne(ctx, u)
         end
         return retreat
     end
-    local retreat = retreatOver(waitTiles(ctx, u))
-    if retreat then add(action(u, retreat, "wait"), "retreat") end
-    ctx.freeOnly = true
-    retreat = retreatOver(waitTiles(ctx, u))
-    ctx.freeOnly = nil
-    if retreat then add(action(u, retreat, "wait"), "retreat") end
+    bothViews(function()
+        local retreat = retreatOver(waitTiles(ctx, u))
+        if retreat then add(action(u, retreat, "wait"), "retreat") end
+    end)
+    -- the nearest tile where a death is impossible (`careful`'s gate, worst-case sum under HP),
+    -- over every tile and free ones. The nearest tile is often over that cap (vanilla Ch10:
+    -- Tana's, sum 39 against 20 HP) and the retreat gains little, so a deadline goal behind a
+    -- threat had nothing between the two (#714); the risk cap stays, this finds the goalward tile
+    -- under it. The tile carries its own `careful` label, which the planner keeps through the
+    -- per-unit cut (its own score ranked it below PER_UNIT, Ch10 turn 1). It sits after the
+    -- retreat because `add` keeps the first label of a duplicate tile, so a tile both pick stays
+    -- the retreat. Where no tile passes the gate `march` falls back to the safest tile, the
+    -- hold's duplicate, which `add` drops.
+    bothViews(function() marched(GATES.careful, "careful") end)
     -- the next safest holds too: another unit the plan moves first may take the safest,
     -- and with one hold the unit had only exposed tiles left (Manchego Stars ch03: Braulo, at 16
     -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)
@@ -3194,6 +3207,7 @@ function M.candidates(board, sight, style, opts)
     ctx.beside = function(tile) return besideGoal(ctx, tile) end
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
     ctx.pending = opts and opts.pending
+    ctx.owedRecruits = opts and opts.owedRecruits   -- a set of charIds (botrun's owed), Goals.scriptedCloses'
     ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end

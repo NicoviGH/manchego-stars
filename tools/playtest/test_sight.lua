@@ -905,7 +905,7 @@ do
     check(bodyOf("local function aiOrder(call, all)")
               :find("local n = M%.aiPhaseStart%(api, call, S, all,%s*{ { S%.BuildAiUnitList, {} } }%)") ~= nil,
           true, "aiPhaseStart: aiOrder builds the order in the phase start's own list")
-    local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
+    local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts, tileOnly)")
     local started = decide:find("M%.aiPhaseStart%(api, call, S, all, setup, known%)")
     -- red, or the player's for a berserked player unit in the berserk phase (#660)
     local guard = decide:find('local phase = e%.faction == "blue" and M%.PHASES%[1%] or '
@@ -964,7 +964,7 @@ do
         check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
               "refresh: " .. name .. " holds one of the three calls")
     end
-    local at = src:find("local function aiDecide(call, proc, e, all, before, starts)", 1, true)
+    local at = src:find("local function aiDecide(call, proc, e, all, before, starts, tileOnly)", 1, true)
     local body = at and src:sub(at, src:find("\n    end\n", at, true))
     local keep = body and body:find("M.keepAi(api, all)", 1, true)
     local write = body and body:find("api.write", 1, true)
@@ -1019,7 +1019,7 @@ do
     for _, name in ipairs({ "s.enemyPhase", "s.nextPhase" }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
-        check(body ~= nil and body:find("stagePhase(call, plan)", 1, true) ~= nil, true,
+        check(body ~= nil and body:find("stagePhase(call, proc, plan)", 1, true) ~= nil, true,
               "equip: " .. name .. " stages through stagePhase")
     end
     -- the phase's staging arms each unit through M.stageWear and M.armAsPlanned, which equips
@@ -1604,6 +1604,255 @@ do
     check(table.concat(ids, " "), "talk:28 sustain", "demandsOf: a free talk is a demand")
     -- the record encodes every demand (campaign.lua's pick): no number-keyed object
     check(pcall(Json.encode, Sight.demandsOf({}, {}, 0, free)), true, "demandsOf: a talk demand encodes")
+end
+
+-- scriptEffects (#724): a turn event's bytes say who it loads and removes. E_13's turn 5 sets slot 2
+-- to a unit array (SVAL), CALLs the shared reinforcement script (LOAD1(1, -1): the array in slot 2,
+-- EventScr_LoadReinforce) and a DISA removes a char; a LOADSINGLEUNIT is a load of its own.
+do
+    local m = fakeMem()
+    local EV, LOADER, ARR, ARR2 = 0x08003000, 0x08003100, 0x08003200, 0x08003300
+    local function udef(at, char, x, y) m.w8(at, char); m.w16(at + 4, x | (y << 6)) end
+    local function sval2(at, v) m.w16(at, 0x0540); m.w16(at + 2, 2); m.w32(at + 4, v) end
+    local function call(at, to) m.w16(at, 0x0A40); m.w32(at + 4, to) end
+    local function loaded(fx)
+        local got = {}
+        for _, l in ipairs(fx.loads) do got[#got + 1] = string.format("%X@%d,%d", l.charId, l.x, l.y) end
+        return table.concat(got, " ")
+    end
+    udef(ARR, 0x0E, 9, 3); udef(ARR + 0x14, 0x40, 1, 2)   -- two units, then charIndex 0
+    udef(ARR2, 0x55, 5, 6)
+    -- the shared loader: LOAD1 (0x2C, len 4, sub 0) with the pointer -1 = slot 2, then END
+    m.w16(LOADER, 0x2C40); m.w16(LOADER + 2, 1); m.w32(LOADER + 4, 0xFFFFFFFF); m.w16(LOADER + 8, 0x0120)
+    -- the event: SVAL slot 2 = ARR; CALL LOADER; SPAWN_ENEMY char 0x33 at (4,5); DISA 0x12; END
+    sval2(EV, ARR)
+    call(EV + 8, LOADER)
+    m.w16(EV + 16, 0x3242); m.w16(EV + 18, 0x33); m.w8(EV + 20, 4); m.w8(EV + 21, 5)
+    m.w16(EV + 24, 0x342F); m.w16(EV + 26, 0x12)
+    m.w16(EV + 28, 0x0120)
+    local fx = Sight.scriptEffects(m, EV)
+    check(loaded(fx), "E@9,3 40@1,2 33@4,5", "scriptEffects: slot 2 through a CALL, then a single spawn")
+    check(table.concat(fx.removals, ","), "18", "scriptEffects: a DISA is a removal")
+    m.w16(EV + 24, 0x342D)   -- KILL
+    check(Sight.scriptEffects(m, EV).removals[1], 0x12, "scriptEffects: a KILL is one too")
+    m.w16(EV + 24, 0x342E)   -- DISA_IF waits for a death fade: none
+    check(#Sight.scriptEffects(m, EV).removals, 0, "scriptEffects: DISA_IF is no removal")
+    m.w16(EV + 24, 0x3420)   -- CHANGESTATE sub 0 (a state change): none
+    check(#Sight.scriptEffects(m, EV).removals, 0, "scriptEffects: another state change is none")
+    m.w16(EV + 24, 0x342F)
+    -- the same loader CALLed twice with a different slot 2 each time: both arrays load
+    local TWICE = 0x08003400
+    sval2(TWICE, ARR2); call(TWICE + 8, LOADER); sval2(TWICE + 16, ARR + 0x14); call(TWICE + 24, LOADER)
+    m.w16(TWICE + 32, 0x0120)
+    check(loaded(Sight.scriptEffects(m, TWICE)), "55@5,6 40@1,2", "scriptEffects: a script CALLed twice is walked twice")
+    -- a load tile outside the map's 6-bit range, or negative (a slot position) is no load
+    local RANGE = 0x08003500
+    m.w16(RANGE, 0x3242); m.w16(RANGE + 2, 0x33); m.w8(RANGE + 4, 70); m.w8(RANGE + 5, 5)
+    m.w16(RANGE + 8, 0x3242); m.w16(RANGE + 10, 0x34); m.w8(RANGE + 12, 0xFF); m.w8(RANGE + 13, 0xFF)
+    m.w16(RANGE + 16, 0x3242); m.w16(RANGE + 18, 0x35); m.w8(RANGE + 20, 63); m.w8(RANGE + 21, 0)
+    m.w16(RANGE + 24, 0x0120)
+    check(loaded(Sight.scriptEffects(m, RANGE)), "35@63,0", "scriptEffects: a tile outside the map's range is no load")
+    -- a cast: a unit the script loads and removes is no removal of the field's
+    local CAST = 0x08003600
+    m.w16(CAST, 0x3242); m.w16(CAST + 2, 0x12); m.w8(CAST + 4, 3); m.w8(CAST + 5, 4)
+    m.w16(CAST + 8, 0x342F); m.w16(CAST + 10, 0x12)
+    m.w16(CAST + 12, 0x342F); m.w16(CAST + 14, 0x13)
+    m.w16(CAST + 16, 0x0120)
+    fx = Sight.scriptEffects(m, CAST)
+    check(table.concat(fx.removals, ","), "19", "scriptEffects: a unit loaded and removed in one script is a cast")
+    -- a diamond of CALLs, each script CALLing the next twice: the walk is linear, not 2^N
+    local D = 0x08004000
+    local N = 21
+    for i = 0, N - 1 do
+        local at = D + i * 0x40
+        call(at, D + (i + 1) * 0x40); call(at + 8, D + (i + 1) * 0x40); m.w16(at + 16, 0x0120)
+    end
+    m.w16(D + N * 0x40, 0x0120)
+    local visits = 0
+    Sight.walkScript(m, D, function() visits = visits + 1 return false end, { memo = true })
+    check(visits <= 3 * (N + 1), true, "walkScript memo: a diamond of CALLs is walked once a script")
+    check(Sight.callsScript(m, D, 0x08009999), false, "callsScript: a diamond is no blow-up")
+    visits = 0
+    Sight.walkScript(m, D, function() visits = visits + 1 return false end, { budget = 1000 })
+    check(visits, 1000, "walkScript budget: stops after n commands in all")
+    local t0 = os.clock()
+    Sight.scriptEffects(m, D)
+    check(os.clock() - t0 < 1, true, "scriptEffects: a diamond is bounded by its budget")
+    -- a chain of long scripts: the budget ends the walk, a DISA behind it is not read, and the
+    -- read says it was cut short
+    local L = 0x08010000
+    local per = Sight.EV_SCRIPT_LIMIT - 1   -- a script's commands: these and its CALL
+    local links = Sight.EV_WALK_BUDGET // per + 2
+    for i = 0, links - 1 do
+        local at = L + i * 0x1000
+        for k = 0, per - 1 do m.w16(at + k * 4, 0x0020) end   -- NOPs, 4 bytes each
+        call(at + per * 4, L + (i + 1) * 0x1000)
+    end
+    local last = L + links * 0x1000
+    m.w16(last, 0x342F); m.w16(last + 2, 0x12); m.w16(last + 4, 0x0120)
+    local cut = Sight.scriptEffects(m, L)
+    check(cut.truncated, true, "scriptEffects: a walk past the budget is cut short and says so")
+    check(#cut.removals, 0, "scriptEffects: a removal behind the budget is not read")
+    check(Sight.scriptEffects(m, EV).truncated, false, "scriptEffects: a short walk is not truncated")
+    check(Sight.scriptAiChanges(m, L).truncated, true, "scriptAiChanges: a walk past the budget says so (#712)")
+end
+
+-- foldScripted (#724): Amelia is loaded on turn 5 and removed on turn 12 (the removal stays); a cast
+-- unit loaded in turn 2's event and removed by the same or an earlier one is no removal; a unit
+-- never loaded (on the map from the start) keeps its removal; the earliest removal wins.
+do
+    local f = Sight.foldScripted({
+        { turn = 5, boardTurn = 5, loads = { { charId = 0x12, x = 2, y = 23 } }, removals = {} },
+        { turn = 12, boardTurn = 12, loads = {}, removals = { 0x12, 0x1C } },
+        { turn = 1, boardTurn = 2, loads = { { charId = 0x40, x = 1, y = 1 } }, removals = { 0x40 } },
+        { turn = 3, boardTurn = 3, loads = {}, removals = { 0x1C } },
+    })
+    check(f.removals[0x12], 12, "foldScripted: loaded turn 5, removed turn 12 stays")
+    check(f.removals[0x40], nil, "foldScripted: a cast loaded and removed in one event is none")
+    check(f.removals[0x1C], 3, "foldScripted: an unloaded unit's earliest removal")
+    check(#f.arrivals, 2, "foldScripted: every load is an arrival")
+    local g = Sight.foldScripted({
+        { turn = 2, boardTurn = 2, loads = {}, removals = { 0x40 } },
+        { turn = 6, boardTurn = 6, loads = { { charId = 0x40, x = 1, y = 1 } }, removals = {} },
+    })
+    check(g.removals[0x40], nil, "foldScripted: a removal ordered before the arrival is none")
+end
+
+-- stayedPut / takeSecondLook (#724): Ch13's Cormag stands in the peaks at (2,13) and, with our units
+-- hidden, never leaves them: his path is his own tile in every phase, so he is played again with our
+-- units as they stand. A unit that moved the first time is not asked again, an escaped one neither;
+-- the second path is taken only where the unit left its tile, so one the game's AI does not move
+-- (the control) keeps the stationary path.
+do
+    local here0 = { x = 2, y = 13 }
+    local paths = { [1] = { [1] = here0, [2] = here0, [3] = here0 },
+                    [2] = { [1] = { x = 5, y = 5 }, [2] = { x = 6, y = 5 } },
+                    [3] = { [1] = here0 }, [4] = {} }
+    local starts = { [1] = here0, [2] = { x = 4, y = 5 }, [3] = here0, [4] = here0 }
+    local again = Sight.stayedPut(paths, starts, { [3] = true })
+    check(again[1], true, "stayedPut: a unit on its start tile in every phase")
+    check(again[2], nil, "stayedPut: a unit that moved is not asked again")
+    check(again[3], nil, "stayedPut: an escaped unit is not asked again")
+    check(again[4], nil, "stayedPut: no path read, nothing to ask")
+    local second = { [1] = { [1] = { x = 2, y = 9 }, [2] = { x = 2, y = 6 } } }
+    Sight.takeSecondLook(paths, second, starts)
+    check(paths[1][2].y, 6, "takeSecondLook: the unit that moved out takes its second path")
+    local still = { [1] = { [1] = here0 } }
+    local kept = { [1] = { [1] = here0, [2] = here0 } }
+    Sight.takeSecondLook(kept, still, starts)
+    check(#kept[1], 2, "takeSecondLook: a unit that stayed put again keeps the first path")
+end
+
+-- secondLook (#724), the wiring closings() runs: a unit that stayed put is replayed and its second
+-- path replaces the first where it left its tile; a stayer keeps its path; a mover or an escaped
+-- unit is not asked; nothing asks the replay when no unit stayed put; an escape in the second look
+-- cuts the path to the phases before it.
+do
+    local peak = { x = 2, y = 13 }
+    local function run(paths, starts, gone, second, escaped)
+        local asked = {}
+        Sight.secondLook(paths, starts, gone, function(again)
+            for id in pairs(again) do asked[#asked + 1] = id end
+            table.sort(asked)
+            return second, escaped
+        end)
+        return table.concat(asked, ",")
+    end
+    local paths = { [1] = { [1] = peak, [2] = peak }, [2] = { [1] = { x = 5, y = 5 } },
+                    [3] = { [1] = peak }, [4] = { [1] = peak, [2] = peak } }
+    local starts = { [1] = peak, [2] = { x = 4, y = 5 }, [3] = peak, [4] = peak }
+    local asked = run(paths, starts, { [3] = true },
+                      { [1] = { [1] = { x = 2, y = 9 }, [2] = { x = 2, y = 6 } }, [4] = { [1] = peak } }, {})
+    check(asked, "1,4", "secondLook: only the units that stayed put are asked")
+    check(paths[1][2].y, 6, "secondLook: a mover's second path replaces the first")
+    check(#paths[4], 2, "secondLook: a stayer keeps its path")
+    check(paths[2][1].x, 5, "secondLook: a unit that moved the first time is as it was")
+    -- nothing stayed put: the replay is never asked
+    local calls = 0
+    Sight.secondLook({ [1] = { [1] = { x = 3, y = 3 } } }, { [1] = peak }, {}, function() calls = calls + 1 return {} end)
+    check(calls, 0, "secondLook: no unit stayed put, no second replay")
+    -- an escape in the second look: the path is the phases before it (one phase here), then none
+    local esc = { [1] = { [1] = peak, [2] = peak, [3] = peak } }
+    run(esc, { [1] = peak }, {}, { [1] = { [1] = peak } }, { [1] = true })
+    check(#esc[1], 1, "secondLook: an escape cuts the stationary path to the phases before it")
+    local early = { [1] = { [1] = peak, [2] = peak } }
+    run(early, { [1] = peak }, {}, {}, { [1] = true })
+    check(next(early[1]), nil, "secondLook: an escape in the first phase leaves no path")
+end
+
+-- closings() calls M.secondLook and hides our units through M.hideUnit alone: a source pin, since
+-- the sandboxed game calls cannot run here (the call site is not fake-replay tested; the Ch13
+-- replay is its proof)
+do
+    local at = sightSrc:find("function s.closings", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("closingsAt[ck] = {", at, true))
+    check(body ~= nil and body:find("M.secondLook(", 1, true) ~= nil, true,
+          "closings: the second look is wired through M.secondLook")
+    check(body ~= nil and body:find("M.hideUnit(", 1, true) ~= nil
+          and body:find("| US_HIDDEN", 1, true) == nil, true, "closings: our units are hidden by M.hideUnit alone")
+end
+
+-- hideUnit: one owner of the hide, journaled, and its restore puts the word back.
+do
+    local m = fakeMem()
+    m.w32(0x210, 0x20)
+    local api = { mem = m, Board = { US_HIDDEN = 1 }, write32 = function(a, v) m.w32(a, v) end }
+    local restore = Sight.hideUnit(api, { addr = 0x200 })
+    check(m.u32(0x200 + 0x0C), 1, "hideUnit: the unit is hidden")
+    restore()
+    check(m.u32(0x200 + 0x0C), 0, "hideUnit: its restore writes the state back")
+end
+
+-- the closings key reads our units as the AI's targets only for the second look, which runs only
+-- for a watched unit: with one, same tiles and another HP or carrier is another read; with none
+-- (a looters-only chapter), the tiles are all that count.
+do
+    local a = { id = 0x81, x = 8, y = 8, hp = 10 }
+    local mine = { id = 1, x = 3, y = 3, hp = 20 }
+    local watch = { [0x81] = true }
+    local function key(unit, w) return Sight.closingsKey(3, 8, nil, { a }, {}, { unit }, nil, w) end
+    check(key({ id = 1, x = 3, y = 3, hp = 19 }, nil), key(mine, nil),
+          "closingsKey: no watched unit, our unit's HP is not in the key")
+    check(key({ id = 1, x = 3, y = 3, hp = 20, carrying = 4 }, {}), key(mine, {}),
+          "closingsKey: no watched unit, what it carries is not in the key")
+    check(key({ id = 1, x = 4, y = 3, hp = 20 }, nil) ~= key(mine, nil), true,
+          "closingsKey: no watched unit, its tile still is")
+    check(key({ id = 1, x = 3, y = 3, hp = 19 }, watch) ~= key(mine, watch), true,
+          "closingsKey: a watched unit, our unit hurt is a new read")
+    check(key({ id = 1, x = 3, y = 3, hp = 20, carrying = 4 }, watch) ~= key(mine, watch), true,
+          "closingsKey: a watched unit, our unit carrying another is a new read")
+    check(key({ id = 2, x = 3, y = 3, hp = 20 }, watch) ~= key(mine, watch), true,
+          "closingsKey: a watched unit, another unit on the tile is a new read")
+end
+
+-- the second look starts from the board as it stood: closings() runs the first look in a sandbox of
+-- its own, so a word a game call wrote there (not through the journal: keep16 holds it, as keepAi
+-- does the AI words) is back when the second look reads. Run in one sandbox instead, the second
+-- look reads the first look's end word (the control).
+do
+    local function run(nested)
+        local cpu = fakeCpu(1)
+        local bytes = { [0x100] = 7 }
+        local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                           u16 = function(a) return bytes[a] or 0 end,
+                                           u32 = function(a) return bytes[a] or 0 end },
+                        write8 = function(a, v) bytes[a] = v end,
+                        write16 = function(a, v) bytes[a] = v end,
+                        write32 = function(a, v) bytes[a] = v end }
+        local sandbox, api = Sight.batching(outer)
+        local read
+        sandbox(function()
+            local function first()
+                api.keep16(0x100, 1)    -- as aiDecide keeps the AI words before the game call
+                bytes[0x100] = 99       -- the game call's own write, no journal
+            end
+            if nested then sandbox(first) else first() end
+            read = bytes[0x100]
+        end)
+        return read
+    end
+    check(run(true), 7, "second look: starts from the original board, the first look's game write undone")
+    check(run(false), 99, "second look: (control) in one sandbox it would read the first look's end word")
 end
 
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
@@ -3212,7 +3461,7 @@ end
 -- #709: both reds' phases begin with the heal: stagePhase (enemyPhase's, and nextPhase's first) after
 -- the plan's reds HP is written, and nextPhase's second after the army's reply, before it plays.
 do
-    local stage = sightSrc:match("local function stagePhase%(call, plan%).-\n    end\n")
+    local stage = sightSrc:match("local function stagePhase%(call, scratch, plan%).-\n    end\n")
     check(stage ~= nil and stage:find("plan%.reds or {}%) do.-end\n%s+healFaction%(call, byId, \"red\"%)") ~= nil, true,
           "healFaction: the staged phase heals the reds after the plan's HP is written")
     local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
@@ -3262,6 +3511,224 @@ do
     put(0x428, 0)
     put(0x700, 0x12); put(0x710, 0x05); put(0x711, 100); put(0x720, 0x03)   -- ai1: march, action, goto
     check(sight.readsReds(unitWith({ { id = 1, uses = 5 } })), true, "readsReds: a script that marches before it strikes")
+end
+
+-- test_win_event (#721): the Misc list a boss's death flag makes offer a new script whose completion
+-- flag is EVFLAG_WIN is a DefeatBoss win. Vanilla Ch13 offers AFEV(EVFLAG_WIN, ...); vanilla Ch1
+-- offers AFEV(EVFLAG_TMP(7), ...) (a flag-keyed script, not a win) and an unconditional entry
+-- (offered with or without the flag).
+do
+    local WIN, TMP7 = Sight.EVFLAG_WIN, 0x07 + 0x64
+    check(Sight.winEvent({ [0xA] = 0 }, { [0xA] = 0, [0xB] = WIN }), true, "winEvent: a new WIN script")
+    check(Sight.winEvent({ [0xA] = 0 }, { [0xA] = 0, [0xB] = TMP7 }), false, "winEvent: a new TMP script is no win (Ch1)")
+    check(Sight.winEvent({ [0xA] = WIN }, { [0xA] = WIN }), false, "winEvent: a WIN script offered all along is no change")
+    check(Sight.winEvent({}, { [0xB] = 0 }), false, "winEvent: a new flag-0 script is no win")
+    check(Sight.winEvent({}, {}), false, "winEvent: nothing offered")
+end
+
+-- areaWake (#712): vanilla Ch16 (E_16) has two AREA entries in its Misc list (x 2-21 / y 0-11 and
+-- x 1-13 / y 18-22, ch16a-eventinfo.h:27-28) sharing flag TMP(11) and one script
+-- (EventScr_089F7570, ch16a-eventscript.h:563): UnTriggerIfNotFaction, slot 1 = 0x10000, CHAI 0x8f,
+-- slot 1 = 0x10303, CHAI 0x90. A player unit that ends its action in an area wakes both units (the
+-- Sage 0x90 went from DoNothing, ai1 6, to ai1 3 / ai2 3 and killed Eirika, 10 tiles away). The
+-- judged phase reads AI bytes as they stand, so the wake is written before it; a plan whose units
+-- end elsewhere leaves them as they are. The fake game below answers SearchAvailableEvent as
+-- EvCheck0B_AREA does: gActiveUnit's tile against the rectangle, the entry's flag clear.
+do
+    local m = fakeMem()
+    local EV, UNTRIG = 0x08003000, 0x08003100
+    local INFO, LIST, GROUP, ACTIVE = 0x03000000, 0x08100000, 0x08200000, 0x03004000
+    m.w16(UNTRIG, 0x0120)                                           -- ENDA
+    local function sval(at, slot, v) m.w16(at, 0x0540); m.w16(at + 2, slot); m.w32(at + 4, v) end
+    sval(EV, 2, 0)
+    m.w16(EV + 8, 0x0A40); m.w32(EV + 12, UNTRIG)                   -- CALL UnTriggerIfNotFaction
+    sval(EV + 16, 1, 0x10000)
+    m.w16(EV + 24, 0x3920); m.w16(EV + 26, 0x8F)                    -- CHAI 0x8f
+    sval(EV + 28, 1, 0x10303)
+    m.w16(EV + 36, 0x3920); m.w16(EV + 38, 0x90)                    -- CHAI 0x90
+    m.w16(EV + 40, 0x0120)
+    -- the Misc list: two AREA entries (cmd 0x0B, flag << 16 | cmd, script, x1 y1 x2 y2 bytes)
+    local FLAG = 11
+    local function area(at, x1, y1, x2, y2)
+        m.w32(at, 0x0B | (FLAG << 16)); m.w32(at + 4, EV)
+        m.w8(at + 8, x1); m.w8(at + 9, y1); m.w8(at + 10, x2); m.w8(at + 11, y2)
+    end
+    area(LIST, 2, 0, 21, 11); area(LIST + 12, 1, 18, 13, 22)
+    m.w32(GROUP + 0x0C, LIST)
+    local unit = { [0x01] = 0x03000100, [0x90] = 0x03000200, [0x8F] = 0x03000300, [0x50] = 0x03000400,
+                   [0x02] = 0x03000500 }
+    local function unitAt(id, faction, charId, ai1, ai2)
+        return { id = id, addr = unit[charId], faction = faction, charId = charId }
+    end
+    local function board()
+        local eirika = unitAt(1, "blue", 0x01)
+        local sage = unitAt(0x90, "red", 0x90); local lord8f = unitAt(0x8F, "red", 0x8F)
+        local other = unitAt(0x50, "red", 0x50)
+        local joshua = unitAt(2, "blue", 0x02)
+        for _, e in ipairs({ sage, lord8f, other }) do
+            m.w8(e.addr + 0x42, 6); m.w8(e.addr + 0x43, 5); m.w8(e.addr + 0x44, 7); m.w8(e.addr + 0x45, 4)
+            m.w32(e.addr + 0x0C, 0)
+        end
+        return { eirika = eirika, joshua = joshua, sage = sage, lord8f = lord8f, other = other,
+                 byId = { [1] = eirika, [2] = joshua, [0x90] = sage, [0x8F] = lord8f, [0x50] = other } }
+    end
+    local taken, searches = {}, 0
+    local S = { GetChapterEventDataPointer = 1, SearchAvailableEvent = 2, SearchNextAvailableEvent = 3,
+                gActiveUnit = ACTIVE }
+    local api = { SYM = S, mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32, Board = Board,
+                  chapter = function() return 16 end,
+                  keep16 = function() end }
+    local function search(info)
+        searches = searches + 1
+        local x, y = m.u8(m.u32(ACTIVE) + 0x10), m.u8(m.u32(ACTIVE) + 0x11)
+        while m.u32(m.u32(info)) & 0xFFFF == 0x0B do
+            local at = m.u32(info)
+            local flag = m.u32(at) >> 16
+            if not taken[flag] and x >= m.u8(at + 8) and x <= m.u8(at + 10)
+                    and y >= m.u8(at + 9) and y <= m.u8(at + 11) then
+                m.w32(info + 4, m.u32(at + 4)); m.w32(info + 8, flag)
+                return 1
+            end
+            m.w32(info, at + 12)
+        end
+        return 0
+    end
+    local function call(addr)
+        if addr == S.GetChapterEventDataPointer then return GROUP end
+        if addr == S.SearchAvailableEvent then return search(INFO) end
+        if addr == S.SearchNextAvailableEvent then
+            m.w32(INFO, m.u32(INFO) + 12)
+            return search(INFO)
+        end
+    end
+    local function at(b, x, y, order) return { unit = b, x = x, y = y, order = order or 1 } end
+    local function ai(e) return m.u8(e.addr + 0x42) .. "/" .. m.u8(e.addr + 0x44) end
+    local function fresh() return { tiles = {}, scripts = {} } end
+
+    local B = board()
+    local fx = Sight.scriptAiChanges(m, EV)
+    check(#fx.changes, 2, "scriptAiChanges: E_16's script has two CHAIs")
+    check(fx.changes[1].charId .. ":" .. fx.changes[1].ai1 .. ":" .. fx.changes[1].ai2, "143:0:0",
+          "scriptAiChanges: CHAI 0x8f is slot 1's 0x10000: ai1 0, ai2 0")
+    check(fx.changes[2].charId .. ":" .. fx.changes[2].ai1 .. ":" .. fx.changes[2].ai2, "144:3:3",
+          "scriptAiChanges: CHAI 0x90 is slot 1's 0x10303: ai1 3, ai2 3")
+    check(fx.positional, 0, "scriptAiChanges: no CHAI_AT here")
+
+    -- the plan ends Eirika inside the first area (the played plan's unit 5 at (7,10)): the Sage and
+    -- the other CHAI's unit are switched, the unit no event names is not
+    m.w8(B.eirika.addr + 0x10, 7); m.w8(B.eirika.addr + 0x11, 10)
+    local woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, fresh())
+    check(#woke, 2, "areaWake: a unit ending inside the area wakes the two units")
+    check(ai(B.sage), "3/3", "areaWake: the Sage plays ai1 3, ai2 3 (was DoNothing's 6/7)")
+    check(ai(B.lord8f), "0/0", "areaWake: the other CHAI's unit plays ai1 0, ai2 0")
+    check(m.u8(B.sage.addr + 0x43) .. "/" .. m.u8(B.sage.addr + 0x45), "0/0",
+          "areaWake: ChangeUnitAi restarts both script counters")
+    check(ai(B.other), "6/7", "areaWake: a unit the script names not is left as it is")
+
+    -- the control: the plan's units end outside both areas, or do not act: nothing changes
+    B = board()
+    m.w8(B.eirika.addr + 0x10, 15); m.w8(B.eirika.addr + 0x11, 14)
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 15, 14) }, fresh())
+    check(#woke, 0, "areaWake control: a unit ending outside every area wakes none")
+    check(ai(B.sage), "6/7", "areaWake control: the Sage keeps DoNothing")
+    B = board()
+    m.w8(B.eirika.addr + 0x10, 7); m.w8(B.eirika.addr + 0x11, 10)
+    woke = Sight.areaWake(api, call, INFO, B.byId, {}, fresh())
+    check(#woke, 0, "areaWake control: a unit that does not wait triggers nothing, whatever it stands on")
+
+    -- the game takes the flag before the script: a second unit in the area wakes nothing more, and
+    -- a flag already set (the event fired on an earlier turn) offers none
+    B = board()
+    m.w8(B.joshua.addr + 0x10, 3); m.w8(B.joshua.addr + 0x11, 4)
+    m.w8(B.eirika.addr + 0x10, 7); m.w8(B.eirika.addr + 0x11, 20)
+    woke = Sight.areaWake(api, call, INFO, B.byId,
+                          { at(B.eirika, 7, 20, 1), at(B.joshua, 3, 4, 2) }, fresh())
+    check(#woke, 2, "areaWake: the two areas share one flag, the script runs once")
+    B = board()
+    taken[FLAG] = true
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, fresh())
+    taken[FLAG] = nil
+    check(#woke, 0, "areaWake: a flag already set offers no event")
+
+    -- a hidden or dead unit is left (ChangeUnitAi); a blue unit of the same character is not one
+    B = board()
+    m.w32(B.sage.addr + 0x0C, Board.US_DEAD)
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, fresh())
+    check(ai(B.sage) .. " " .. ai(B.lord8f), "6/7 0/0", "areaWake: a dead unit is left, the other woken")
+
+    -- the board's memo: a second plan ending on the same tile asks the game nothing
+    B = board()
+    local memo = fresh()
+    Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, memo)
+    local before = searches
+    B = board()
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, memo)
+    check(searches, before, "areaWake: a tile the board already asked is not asked again")
+    check(#woke, 2, "areaWake: and the memo's answer wakes the same units")
+
+    -- phaseKey: a woken unit is another board for a kept phase start (its aiFlags may differ)
+    local k0 = Sight.phaseKey(m, { B.sage })
+    m.w8(B.sage.addr + 0x42, 9)
+    check(Sight.phaseKey(m, { B.sage }) ~= k0, true, "phaseKey: another ai1 is another board")
+
+    -- CHAI with a negative character is slot 2's; CHAI_AT is counted, not read
+    local SC = 0x08003400
+    sval(SC, 2, 0x44); sval(SC + 8, 1, 0x0705)
+    m.w16(SC + 16, 0x3920); m.w16(SC + 18, 0xFFFF)
+    m.w16(SC + 20, 0x3921); m.w16(SC + 22, 0x0403)
+    m.w16(SC + 24, 0x0120)
+    local fx2 = Sight.scriptAiChanges(m, SC)
+    check(#fx2.changes == 1 and fx2.changes[1].charId, 0x44, "scriptAiChanges: a negative CHAI is slot 2's character")
+    check(fx2.changes[1].ai1 .. ":" .. fx2.changes[1].ai2, "5:7", "scriptAiChanges: ai1 the low byte, ai2 the next")
+    check(fx2.positional, 1, "scriptAiChanges: CHAI_AT is counted as positional, not read")
+
+    -- the game runs the events at each wait in turn: two entries of one flag and different scripts
+    -- (Ch16 has one script for both, but a Misc list may not): the first unit to wait fires its
+    -- script, whatever the roster order. A third list: area 1 (x 0-5) -> EV1 (CHAI 0x8f), area 2
+    -- (x 10-15) -> EV2 (CHAI 0x90), one flag.
+    local EV1, EV2, LIST2 = 0x08003500, 0x08003600, 0x08101000
+    sval(EV1, 1, 0x0000); m.w16(EV1 + 8, 0x3920); m.w16(EV1 + 10, 0x8F); m.w16(EV1 + 12, 0x0120)
+    sval(EV2, 1, 0x0000); m.w16(EV2 + 8, 0x3920); m.w16(EV2 + 10, 0x90); m.w16(EV2 + 12, 0x0120)
+    local function area2(at, script, x1, y1, x2, y2, flag)
+        m.w32(at, 0x0B | ((flag or 12) << 16)); m.w32(at + 4, script)
+        m.w8(at + 8, x1); m.w8(at + 9, y1); m.w8(at + 10, x2); m.w8(at + 11, y2)
+    end
+    area2(LIST2, EV1, 0, 0, 5, 5); area2(LIST2 + 12, EV2, 10, 10, 15, 15)
+    m.w32(GROUP + 0x0C, LIST2)
+    FLAG = 12
+    B = board()
+    -- roster order: Eirika (area 1) before Joshua (area 2); act order: Joshua first
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 2, 2, 2), at(B.joshua, 12, 12, 1) }, fresh())
+    check(#woke == 1 and woke[1].id, 0x90, "areaWake order: the unit that waits first fires its script (0x90's), not the roster's")
+    B = board()
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 2, 2, 1), at(B.joshua, 12, 12, 2) }, fresh())
+    check(#woke == 1 and woke[1].id, 0x8F, "areaWake order: and the other way round, the roster's first is the act's first")
+
+    -- a unit its counter killed still waited (the wait events run after the action whether the actor
+    -- lived, playerphase.c:98-99): its struct is on the tile it stood on before the plan, outside
+    -- every area, yet the end tile wakes; and its struct is put back where it was after the ask
+    B = board()
+    m.w8(B.eirika.addr + 0x10, 20); m.w8(B.eirika.addr + 0x11, 20)
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 2, 2) }, fresh())
+    check(#woke, 1, "areaWake dead actor: the end tile of a unit in no board list wakes the unit")
+    check(m.u8(B.eirika.addr + 0x10) .. "," .. m.u8(B.eirika.addr + 0x11), "20,20",
+          "areaWake dead actor: the struct is put back, a map refresh must not find it on that tile")
+
+    -- the scripts' unread parts are counted, not dropped: a CHAI_AT is positional, a walk the budget
+    -- cut short is truncated
+    local PS = 0x08003700
+    m.w16(PS, 0x3921); m.w16(PS + 2, 0x0403); m.w16(PS + 4, 0x0120)
+    area2(LIST2 + 24, PS, 3, 3, 4, 4, 13)
+    B = board()
+    local _, stats = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 3, 3) }, fresh())
+    check(stats.positional, 1, "areaWake stats: a CHAI_AT in a script that ran is counted")
+    check(stats.truncated, 0, "areaWake stats: a short walk is not truncated")
+    FLAG = 11
+    m.w32(GROUP + 0x0C, LIST)
+
+    -- the judged phase is staged through it
+    check(sightSrc:find("M%.areaWake%(api, call, scratch, byId, plan%.waits or {}, seen%.area%)") ~= nil, true,
+          "stagePhase: the plan's waits run the Misc events' AI changes before the phase")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

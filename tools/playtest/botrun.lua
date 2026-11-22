@@ -749,9 +749,12 @@ function M.run(api)
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   -- unsplit: the counter kills the judged phases left unsplit (sight's
                   -- M.phaseWays); floored: the ways of a plan's uncertain kills left unsplit
-                  -- (the planner's, ADR 0415); slowest: the decision that ran the most frames, and its
+                  -- (the planner's, ADR 0415); area_positional, area_truncated: the Misc
+                  -- scripts' CHAI_AT (#727) and budget-cut walks the judged phases left unread
+                  -- (M.areaWake); slowest: the decision that ran the most frames, and its
                   -- turn (what M.DECISION_FRAMES is sized from)
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0, unsplit = 0, floored = 0,
+                            area_positional = 0, area_truncated = 0,
                             slowest = { frames = 0 } }, bag = {},
                   -- every Talk made: the harness's entry (turn, unit, target, asked, spent: a
                   -- paid recruit's question and its gold, #679) and whether the target joined
@@ -869,8 +872,11 @@ function M.run(api)
     local owed = nil
     -- the owed recruits an earlier attempt of this chapter saw arrive (style.memory.arrivals,
     -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
-    local function pendingRecruits()
-        local out, owedSet = {}, {}
+    -- Then the arrivals the chapter's own turn events script (sight.scriptedUnits, #724: a unit a
+    -- script loads, read off the ROM's bytes), for an owed unit no remembered arrival covers: an
+    -- arrival actually seen wins, and attempt 1 has the scripted ones before any game saw them.
+    local function pendingRecruits(sight)
+        local out, owedSet, have = {}, {}, {}
         local arrivals = style.memory and style.memory.arrivals or {}
         -- owed is read in changes() before the first decision, from api.recruits: a harness with
         -- no api.recruits cannot tell which arrivals are owed, so a memory it was given is a fault
@@ -879,8 +885,21 @@ function M.run(api)
         end
         for _, c in ipairs(owed or {}) do owedSet[c] = true end
         for _, a in ipairs(arrivals) do
-            if owedSet[a.charId] then out[#out + 1] = a end
+            if owedSet[a.charId] then out[#out + 1], have[a.charId] = a, true end
         end
+        -- nothing owed (or not known): no scan of the chapter's scripts is asked
+        if next(owedSet) and sight and sight.scriptedUnits then
+            for _, a in ipairs(sight.scriptedUnits().arrivals) do
+                if owedSet[a.charId] and not have[a.charId] then out[#out + 1], have[a.charId] = a, true end
+            end
+        end
+        return out
+    end
+    -- the owed recruits as a set of charIds, nil when the api cannot say (no recruits())
+    local function owedCharIds()
+        if not owed then return nil end
+        local out = {}
+        for _, c in ipairs(owed) do out[c] = true end
         return out
     end
     local startFrame = api.frames()
@@ -1577,6 +1596,9 @@ function M.run(api)
             end
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
+            -- the chapter's scripted units, read once here with no plan's sandbox open (a read made
+            -- inside one is not kept, so every plan would scan again) and only when a recruit is owed
+            if owed and #owed > 0 and sight.scriptedUnits then sight.scriptedUnits() end
             commit, movers = nil, {}
             for _, u in ipairs(board.units) do
                 if u.onField and u.faction == "green" then
@@ -1639,7 +1661,8 @@ function M.run(api)
                                      idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
-                                     pending = pendingRecruits(),
+                                     pending = pendingRecruits(sight),
+                                     owedRecruits = owedCharIds(),
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
@@ -1726,6 +1749,8 @@ function M.run(api)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         rec.plans.unsplit = rec.plans.unsplit + (cost.unsplit or 0)
                         rec.plans.floored = rec.plans.floored + (cost.floored or 0)
+                        rec.plans.area_positional = rec.plans.area_positional + (cost.area_positional or 0)
+                        rec.plans.area_truncated = rec.plans.area_truncated + (cost.area_truncated or 0)
                         for k, v in pairs(cost.look or {}) do
                             rec.lookahead[k] = rec.lookahead[k] + v
                         end

@@ -134,7 +134,9 @@
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
 -- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
--- left unsplit below sight's SPLIT_FLOOR, summed over them), floored (the ways of the plan's
+-- left unsplit below sight's SPLIT_FLOOR, summed over them), area_positional and area_truncated
+-- (the CHAI_AT commands, #727, and the walks the budget cut short in the Misc scripts the plans'
+-- waits ran, which the judged phase did not play: M.areaWake), floored (the ways of the plan's
 -- uncertain kills left unsplit below that floor of the plan, ADR 0415), look = { decisions, triggered,
 -- extended, skipped_budget, calls, cpu_s, wear, wear_cpu_s, wear_skipped } (the lookahead's and
 -- the wear's; absent when no unit can act) }.
@@ -442,7 +444,8 @@ local function score(act, st, W, style, odds)
             -- rich goal open -- vanilla Ch5 attempt 8: a chip on the boss, credited five times,
             -- crit it dead with three villages open)
             local want = st.bossWant or 1
-            local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
+            local winning = st.objective == "boss" and M.isWinBoss(e, st.winBoss)
+            local target = winning and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             -- only the wound that outlasts the tile's heal: a fort heals it back at the start
             -- of the enemy's phase (#709, M.outlasting); the plan's own HP is the unhealed one
@@ -482,7 +485,7 @@ local function score(act, st, W, style, odds)
         if kill >= M.GONE then fx.gone = e.id end
         -- the boss's death is the win: its worth is the goals' (goalTerm), what it completes
         -- less what it closes, never a sum of its own, or no goal could ever wait for it
-        if e.isBoss and st.objective == "boss" then fx.win = kill end
+        if st.objective == "boss" and M.isWinBoss(e, st.winBoss) then fx.win = kill end
     elseif act.act == "talk" then
         -- the recruit joins us: it is off the enemy side, for the plan's later acts and for the
         -- judged phase, as a kill is; its goal is taken (the goals' term)
@@ -679,10 +682,27 @@ function M.wearAt(at, hp)
     return n
 end
 
+-- The waits a way of a judged plan makes (sight's M.areaWake): `blues` = the way's blues, of
+-- which each that acts waits; and each acting unit in `dead` (its counter killed it): the game
+-- runs the Misc events after the action whether or not the actor lived (playerphase.c:98-99,
+-- cp_perform.c:85-86), and a dead actor is in no board list. `planned` = the plan's entries
+-- ({ unit, x, y, acted, order }); a unit whose act was not played is `unacted` (acted false) and
+-- waits nowhere. Pure.
+function M.waitsIn(planned, dead, blues)
+    local out = {}
+    for _, p in ipairs(planned) do
+        if p.acted and dead[p.unit.id] then out[#out + 1] = p end
+    end
+    for _, p in ipairs(blues) do
+        if p.acted then out[#out + 1] = p end
+    end
+    return out
+end
+
 -- A finalist's staged board for sight.nextPhase: its first phase as the judge played it.
 function M.staged(st)
     local ph = st.phase
-    return { blues = ph.blues, gone = ph.gone, reds = ph.reds, redWear = ph.redWear,
+    return { blues = ph.blues, waits = ph.waits, gone = ph.gone, reds = ph.reds, redWear = ph.redWear,
              opened = ph.opened, carry = ph.carry }
 end
 
@@ -691,18 +711,37 @@ end
 -- lookahead's), a protected unit's deaths over the plan's (overAll).
 function M.either(a, b) return 1 - (1 - a) * (1 - b) end
 
+-- Whether enemy `e` is the unit whose death is the "boss" win: the one `bossId`
+-- (sight.objective.boss) names, else any CA_BOSS unit (a Defeat Boss goal whose boss has no row).
+-- A second CA_BOSS on a map is no win: its death ends nothing. Pure.
+function M.isWinBoss(e, bossId)
+    return e.isBoss == true and (bossId == nil or e.charId == bossId)
+end
+
+-- The kind of win the planner prices for `objective` (sight.objective): "boss" when the boss's
+-- death ends the chapter -- a Defeat Boss goal, or any other goal window beside a Misc
+-- DefeatBoss event (vanilla Ch13: a Survive window, `DefeatBoss(EndingScene)`; sight.objective.boss
+-- names that boss) -- else the goal's own kind. The one owner of "this boss's death is the win"
+-- (#721), with M.isWinBoss. Known gap: a Rout stays a Rout (one kind is priced), so a Rout map
+-- whose boss's death ends it early is priced as a plain kill.
+function M.winKind(objective)
+    if objective == nil then return nil end
+    if objective.kind ~= "rout" and (objective.kind == "boss" or objective.boss) then return "boss" end
+    return objective.kind
+end
+
 -- Whether the death of enemy `id` ends the chapter, on a board with `left` red units (a Rout's
 -- count, the plan's: sight.redCount less the plan's kills), `byId` the board's units:
 -- -> ends(id, gone), `gone` (optional) the ids dead since that count. The boss on a Defeat Boss
 -- map; on a Rout map the last red unit standing. Not a Seize map's throne holder: its death
 -- opens the Seize and ends nothing (ADR 0405: the Seize is the win). The judge's `fell` and
 -- the lookahead's second phase (M.secondRead's `won`) read it alike. Pure.
-function M.endsIn(objective, left, byId)
+function M.endsIn(objective, left, byId, bossId)
     return function(id, gone)
         local e = byId[id]
         -- a red unit only: the player's berserked unit strikes in a phase too (#660)
         if e == nil or e.faction ~= "red" or (gone and gone[id]) then return false end
-        if objective == "boss" then return e.isBoss == true end
+        if objective == "boss" then return M.isWinBoss(e, bossId) end
         if objective ~= "rout" then return false end
         local n = left
         for g in pairs(gone or {}) do
@@ -840,11 +879,13 @@ function M.plan(Bot, board, sight, style, opts)
     else
         cands, ctx = Bot.candidates(board, sight, style, opts)
     end
-    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0, floored = 0 } end
+    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0, floored = 0,
+                                      area_positional = 0, area_truncated = 0 } end
     if now then now.stage = "search" end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
-    local objective = sight.objective and sight.objective.kind
+    local objective = M.winKind(sight.objective)
+    local winBoss = sight.objective and sight.objective.boss
     local gameOver = Bot.gameOver(sight)
     -- the HP a heal tile gives each enemy at its own phase's start (sight.terrainHeal), read once
     -- an enemy for the whole search: its tile and max HP do not move through our phase. Required:
@@ -858,7 +899,8 @@ function M.plan(Bot, board, sight, style, opts)
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     fought = {}, healed = {}, healOf = healOf,
-                    walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
+                    walls = {}, opened = {}, objective = objective, winBoss = winBoss,
+                    recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {}, carry = {}, wear = {}, redWear = {} }
     -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
     -- { x, y } once dropped (score's fx.carry, fx.drop); the board's carries to start
@@ -1035,7 +1077,7 @@ function M.plan(Bot, board, sight, style, opts)
     local function winOf(st, fell) return M.either(winChance(st), fell or 0) end
     -- M.endsIn on the board plan `st` leaves (a Rout's count less the plan's kills)
     local function endsIn(st)
-        return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId)
+        return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId, winBoss)
     end
     -- Whether a plan advances the level (ADR 0439): it kills a red unit (our blows, or our
     -- counters in the judged phase: a bait counts), takes a goal (a visit, chest, talk or
@@ -1060,7 +1102,7 @@ function M.plan(Bot, board, sight, style, opts)
         for id, hp in pairs(st.enemyHp) do
             local e = byId[id]
             local needed = e and not st.recruits[id]
-                and (objective == "rout" or (objective == "boss" and e.isBoss))
+                and (objective == "rout" or (objective == "boss" and M.isWinBoss(e, winBoss)))
             -- no kill share is needed here: a kill chance above DUST returned as progress in the
             -- kill loop above, so `hp` (the plan's expected HP) is a survivor's, to within DUST
             if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
@@ -1182,7 +1224,7 @@ function M.plan(Bot, board, sight, style, opts)
             for i, x in ipairs(scored) do
                 local e = endTile(x.a)
                 if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
-                        or x.a.why == "hold" or x.a.why == "retreat"
+                        or x.a.why == "hold" or x.a.why == "retreat" or x.a.why == "careful"
                         -- what a Rescue or Drop saves or opens is the judged phase's to read, and
                         -- its own score never sees the phase; a step aside's is the teammate's
                         -- act it frees the tile for (Bot.candidates' aside), which its own score
@@ -1382,7 +1424,9 @@ function M.plan(Bot, board, sight, style, opts)
                     enemyHp = copy(st.enemyHp), hp = copy(st.hp), took = copy(st.took),
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
-                    opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
+                    opened = copy(st.opened), objective = objective, winBoss = winBoss,
+                    recruits = st.recruits,
+                    gameOver = st.gameOver,
                     kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
                     redWear = copy(st.redWear), changeKey = st.changeKey, healOf = st.healOf }
         n.acts[#n.acts + 1] = a
@@ -1678,6 +1722,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
+                   area_positional = 0, area_truncated = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
     -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
@@ -1792,8 +1837,8 @@ function M.plan(Bot, board, sight, style, opts)
         return res, none
     end
     local function judge(st)
-        local planned, at = {}, {}
-        for _, a in ipairs(st.acts) do at[a.unitId] = a end
+        local planned, at, nth = {}, {}, {}
+        for i, a in ipairs(st.acts) do at[a.unitId], nth[a.unitId] = a, i end
         for _, u in ipairs(ctx.blues) do
             local a = at[u.id]
             local at = a and endTile(a)
@@ -1804,6 +1849,10 @@ function M.plan(Bot, board, sight, style, opts)
             local w = st.wear[u.id]
             planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
+                                      -- a unit the plan acts ends its action there, the nth
+                                      -- act: the game runs the chapter's Misc events after it
+                                      -- (#712, waitsIn)
+                                      acted = a ~= nil, order = nth[u.id],
                                       -- a strike's weapon, or a bait's (Bot.baitAt): the
                                       -- one its counter answers the boss with
                                       slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
@@ -1930,12 +1979,13 @@ function M.plan(Bot, board, sight, style, opts)
                 if back[p.unit.id] then
                     if list == planned then list = copy(planned) end
                     list[i] = { unit = p.unit, x = p.unit.x, y = p.unit.y, hp = p.unit.hp,
-                                unacted = true }
+                                unacted = true, acted = false }
                 end
             end
             return inWay(list, w, function(p) return not p.unacted and p.unit.id or nil end)
         end
-        st.phase = { blues = bluesIn({ gone = gone, dead = {}, hp = {} }), gone = gone, reds = reds,
+        local blues0 = bluesIn({ gone = gone, dead = {}, hp = {} })
+        st.phase = { blues = blues0, waits = M.waitsIn(planned, {}, blues0), gone = gone, reds = reds,
                      redWear = st.redWear,
                      opened = st.opened, carry = st.carry }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
@@ -2005,10 +2055,14 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             if phase then cost.phases = cost.phases + 1 end
             if now then now.phases = cost.phases end
-            local s = phase and phase({ blues = bluesIn(w), gone = w.gone, reds = w.reds,
+            local blues = bluesIn(w)
+            local s = phase and phase({ blues = blues, waits = M.waitsIn(planned, w.dead, blues), gone = w.gone,
+                                        reds = w.reds,
                                         redWear = st.redWear, mass = w.p,
                                         opened = st.opened, carry = st.carry }) or {}
             unsplit = unsplit + (s.unsplit or 0)
+            cost.area_positional = cost.area_positional + (s.areaPositional or 0)
+            cost.area_truncated = cost.area_truncated + (s.areaTruncated or 0)
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
                 outcomes[#outcomes + 1] = { p = w.p * o.p, strikes = o.strikes, way = i }
                 total = total + w.p * o.p
@@ -2487,6 +2541,8 @@ function M.plan(Bot, board, sight, style, opts)
         local clock = os.clock()
         local r = sight.nextPhase(M.staged(st), replyOn)
         wearCalls = wearCalls + 1
+        cost.area_positional = cost.area_positional + (r.areaPositional or 0)
+        cost.area_truncated = cost.area_truncated + (r.areaTruncated or 0)
         -- the lookahead's second phase for this plan is this same call: kept for it
         st.wearNext = r
         local worn = {}
@@ -2773,6 +2829,8 @@ function M.plan(Bot, board, sight, style, opts)
                     elseif not seizesIn(st) then
                         r = sight.nextPhase(M.staged(st), replyOn)
                         look.calls = look.calls + 1
+                        cost.area_positional = cost.area_positional + (r.areaPositional or 0)
+                        cost.area_truncated = cost.area_truncated + (r.areaTruncated or 0)
                     end
                     -- the units the wear read (ADR 0421): their later phases are its reading,
                     -- the same second phase on each way's HP and the third, already in their
