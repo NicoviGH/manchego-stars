@@ -132,6 +132,7 @@
 -- second phase's win (#641, M.secondRead's `won`) when it read one: { won, gain (what it adds to
 -- the rank's value, never to `judged`), worth (goalWorth's rows with it) }, talks = the charIds any
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
+-- gentle = the recruit-sparing acts the board's menus kept ({ unit, act, slot, x, y, target }; #730),
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
 -- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
@@ -1262,6 +1263,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- worth is the unit it shields, which only the judged phase reads (#661). The board's own menus (no `opens`) also record
     -- every Visit, Chest, Talk and Seize offered.
     local offered, talks, seizable = {}, {}, false   -- every Talk and Seize the candidates offered
+    local gentle = {}   -- every recruit-sparing act the board's menus kept (best.gentle)
     local function menusOf(list, opens)
         local out = {}
         for _, c in ipairs(list) do
@@ -1279,6 +1281,10 @@ function M.plan(Bot, board, sight, style, opts)
                 if a.act == "attack" then a.die = fx.die or 0 end
                 if not opens and a.act == "talk" and a.target then talks[a.target] = true end
                 if not opens and a.act == "seize" then seizable = true end
+                if not opens and a.why == "gentle" then
+                    gentle[#gentle + 1] = { unit = a.unitId, act = a.act, slot = a.slot,
+                                            x = a.move.x, y = a.move.y, target = a.targetId }
+                end
                 local gone = fx.gone and { [fx.gone] = true } or {}
                 -- what the act alone does to the goals: a march toward one earns nothing of its
                 -- own, and ranked without this it was cut from the menu (vanilla Ch2: Eirika's
@@ -1300,8 +1306,9 @@ function M.plan(Bot, board, sight, style, opts)
                 local e = endTile(x.a)
                 if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
                         or x.a.why == "hold" or x.a.why == "retreat" or x.a.why == "careful"
-                        -- the wait that spares a recruit (Bot.candidates' "gentle", #730): its
-                        -- own score never sees the forfeit it avoids, only the judged phase
+                        -- the wait or attack that spares a recruit (Bot.candidates' "gentle",
+                        -- #730): its own score never sees the forfeit it avoids, only the
+                        -- judged phase
                         or x.a.why == "gentle"
                         -- what a Rescue or Drop saves or opens is the judged phase's to read, and
                         -- its own score never sees the phase; a step aside's is the teammate's
@@ -1926,7 +1933,7 @@ function M.plan(Bot, board, sight, style, opts)
                                       -- (#712, waitsIn)
                                       acted = a ~= nil, order = nth[u.id],
                                       -- a strike's weapon, or a wait's held one (a bait's,
-                                      -- a gentle wait's): the one its counter answers with
+                                      -- a gentle wait's or strike's): the one its counter answers with
                                       slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
                                       wearSlot = w and w.slot, wear = w and w.uses }
         end
@@ -2715,8 +2722,8 @@ function M.plan(Bot, board, sight, style, opts)
         local function tries(p)
             if p.recruit then
                 -- a recruit has no player menu: the units it strikes try theirs (out of its
-                -- reach, or waiting holding a weapon whose counter spares it: the "gentle"
-                -- waits, #730)
+                -- reach, or waiting or striking holding a weapon whose counter spares it:
+                -- the "gentle" acts, #730)
                 local out = {}
                 for _, id in ipairs(p.struck) do
                     for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
@@ -3054,6 +3061,7 @@ function M.plan(Bot, board, sight, style, opts)
     for c in pairs(talks) do best.talks[#best.talks + 1] = c end
     table.sort(best.talks)
     best.seizable = seizable
+    best.gentle = gentle
     -- whether the plan takes the Seize offered, whether any plan judged took it, and whether
     -- one did within the cap: a skip is a fault only when a legal Seize under the cap was there
     -- to take (FR-015, botrun's seize skips)

@@ -45,9 +45,11 @@ stale comment there now says so.
 first. The forfeit is yes or no, so a weapon that only lowers the recruit's chance to fall clears
 nothing; it still enters the plan's value through the goals' term (a late tie-break), and a
 chance under `Goals.DUST` clears the forfeit. It does not cover a unit that has acted (it holds the weapon it
-equipped; 46 of the 106 recorded recruit counter deaths were such units, the unit having acted
-earlier in the turn), one that attacks and is then struck (its counter weapon is the attack's;
-34: ADR 0453), or one that uses an item (8), nor a recruit no talker can reach by its deadline (it has no
+equipped). Counted by the act the killing unit executed that turn, over the 102 recorded recruit
+counter deaths with an audit record (#730's "Fix 4 read", 2026-11-22): 60 attacked (ADR 0453), 38
+waited (what this ADR reaches) and 4 used an item. (An earlier count by the plan's act, 46 of 106
+acted earlier, 34 attacks, 8 items, is superseded.) Nor does it cover a recruit no talker can
+reach by its deadline (it has no
 ledger row, so its death forfeits nothing: ADR 0450's reach read; #730 fix 2 is the price for
 that, Nicolas's call). The weaker weapon stays at the bag's front after the wait (the game's
 Equip moves it there); later turns read the real bag, so they price it as it is, but the unit

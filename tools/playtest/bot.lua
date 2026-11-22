@@ -405,7 +405,7 @@ end
 -- (the runner's list). The team is not an axis: Bot.team picks it from the map and the claims.
 -- The route is not one either: a campaign SETTING (#510 plan comment, "Lords").
 M.HOLDS = 3        -- hold tiles offered per unit (candidates), safest first
-M.GENTLE = 2       -- waits holding a recruit-sparing weapon offered per unit (#730), the best first
+M.GENTLE = 2       -- waits, and attacks, holding a recruit-sparing weapon offered per unit, each menu apart (#730), the best first
 
 M.STYLES = {
     aggression = { "careful", "even", "bold" },
@@ -1002,11 +1002,12 @@ end
 -- What our counter does to the enemies `want` names that strike `u` ending on (x, y) holding the
 -- weapon in `slot` (nil: the one it holds): the chance it kills, and the chance it hurts
 -- (sight.odds of the strike's counterDist), summed over them. The one read of a held weapon's
--- counter, as the bait's boss and the sparing wait's recruits ask it (#641, #730).
-local function counterOn(ctx, u, x, y, slot, want)
+-- counter, as the bait's boss and the sparing menus' recruits ask it (#641, #730). `spared`: a
+-- target the attack kills for sure, whose strike never comes.
+local function counterOn(ctx, u, x, y, slot, want, spared)
     local kill, dealt = 0, 0
     for _, s in ipairs(exposure(ctx, u, x, y, slot)) do
-        if want(s.by) and s.f and s.f.counterDist then
+        if s.by ~= spared and want(s.by) and s.f and s.f.counterDist then
             local k, d = oddsOf(ctx.sight)({ s.f.counterDist }, s.by.hp)
             kill, dealt = kill + k, dealt + d
         end
@@ -1014,12 +1015,16 @@ local function counterOn(ctx, u, x, y, slot, want)
     return kill, dealt
 end
 
--- `u`'s chance to die ending on (x, y) holding `slot`, summed over what strikes it there (the
--- strikes' own takenDist; an overcount where two strikes share one death, which only orders).
-local function dieAt(ctx, u, x, y, slot)
+-- `u`'s chance to die ending on (x, y) holding `slot` with `hp` left (nil: its HP now; an attack's
+-- is what its target's counter leaves), summed over what strikes it there (the strikes' own
+-- takenDist; an overcount where two strikes share one death, which only orders). `spared`: a
+-- target the attack kills for sure, whose strike never comes (worstCase's own treatment).
+local function dieAt(ctx, u, x, y, slot, hp, spared)
     local die = 0
     for _, s in ipairs(exposure(ctx, u, x, y, slot)) do
-        if s.f and s.f.takenDist then die = die + (oddsOf(ctx.sight)({ s.f.takenDist }, u.hp)) end
+        if s.by ~= spared and s.f and s.f.takenDist then
+            die = die + (oddsOf(ctx.sight)({ s.f.takenDist }, hp or u.hp))
+        end
     end
     return die
 end
@@ -1038,12 +1043,16 @@ end
 -- priority) and, under a price on uses, the charge its weapon pays over the cheapest one that
 -- makes the same strike (#642). The one owner of that act: proposeOne's picks and its spares, and
 -- sparingStrikes' attacks.
-local function strikeOf(u, c)
+local function strikeActOf(u, c)
     local a = strikeAct(u, c)
     a.f, a.spent, a.first = c.f, c.spent, c.first
     if c.charge then a.useCharge, a.useCost = c.charge, (c.f.wear or 0) * c.charge end
     return a
 end
+
+-- The key of a strike's spot, one target from one tile: what a pick's dedupe, a weapon price's
+-- group (proposeOne's `others`) and the sparing menu's group all read.
+local function spotKey(targetId, x, y) return targetId .. "@" .. tileKey(x, y) end
 
 -- Who the sparing menus protect: the recruits (ctx.recruits, or ctx.looseRecruits, owed with no
 -- talker yet, whose fall is a forfeit all the same), asked of `u` only when it holds two weapons or
@@ -1059,20 +1068,33 @@ end
 -- would fell a recruit striking `u` on (x, y) holding `slot` (nil: the first usable weapon), the
 -- same act holding another of the spot's `slots`, when the recruits' fall plus `u`'s own death
 -- there is less than with the weapon held now by more than Goals.DUST. Per spot the least wins;
--- the M.GENTLE best over all spots are offered, since each is a judged phase in the mend. A
--- range-2 bow against a recruit's melee strike answers nothing: the no-counter choice a player has.
--- spots: { x, y, slot, slots = { slot... }, make = function(slot) -> act }
+-- the M.GENTLE best over all spots are offered (the cap is per menu: waits and strikes each),
+-- since each is a judged phase in the mend. A range-2 bow against a recruit's melee strike
+-- answers nothing: the no-counter choice a player has. A spot no recruit can reach is skipped
+-- before any strike is read (the cost bound: boards with no recruit near cost nothing).
+-- spots: { x, y, slot, slots = { slot... }, make = function(slot) -> act,
+--          after = function(slot) -> the HP `u` enters the enemy phase with, the enemy a sure
+--          kill spares (an attack's: its counter taken; nil: a wait's, `u`'s HP now) }
 -- -> the acts, each labelled "gentle"
 local function sparingPicks(ctx, u, recruit, spots)
-    local function cost(x, y, slot)
-        return (counterOn(ctx, u, x, y, slot, recruit)) + dieAt(ctx, u, x, y, slot)
+    local function reached(x, y)
+        for _, e in ipairs(ctx.threats) do
+            if recruit(e) and reaches(ctx, e, x, y) then return true end
+        end
+        return false
+    end
+    local function cost(p, slot)
+        local hp, spared
+        if p.after then hp, spared = p.after(slot) end
+        return (counterOn(ctx, u, p.x, p.y, slot, recruit, spared))
+            + dieAt(ctx, u, p.x, p.y, slot, hp, spared)
     end
     local picks = {}
     for _, p in ipairs(spots) do
-        if counterOn(ctx, u, p.x, p.y, p.slot, recruit) > Goals.DUST then
-            local base, pick, least = cost(p.x, p.y, p.slot), nil, nil
+        if reached(p.x, p.y) and counterOn(ctx, u, p.x, p.y, p.slot, recruit) > Goals.DUST then
+            local base, pick, least = cost(p, p.slot), nil, nil
             for _, slot in ipairs(p.slots) do
-                local c = cost(p.x, p.y, slot)
+                local c = cost(p, slot)
                 if c < base - Goals.DUST and (not least or c < least) then pick, least = slot, c end
             end
             if pick then
@@ -1117,17 +1139,21 @@ end
 -- a recruit's counter: the unit that struck this turn holds that weapon into the enemy phase. The
 -- judge decides the trade: a weaker weapon may fail the kill. `options`: attackOptions' (priced).
 -- Its own cap, M.GENTLE: a unit strikes or waits, never both, so the two menus do not share a plan.
+-- A strike's own cost is read where the attack leaves the unit: on the HP its target's counter
+-- leaves it (the option's `spent`), the target a sure kill spared; a weapon whose uses the attack
+-- can spend entirely is never the sparing one, since the game equips the next usable after it
+-- breaks and the read would be of the wrong weapon. A wall's strike (no target) is no counter.
 local function sparingStrikes(ctx, u, acts, options)
     local recruit = sparingRecruit(ctx, u)
     if not recruit then return {} end
     local kept, groups, order = {}, {}, {}
     for _, a in ipairs(acts) do
-        if a.act == "attack" and not a.canto then
-            kept[a.targetId .. "@" .. tileKey(a.move.x, a.move.y)] = a
+        if a.act == "attack" and a.targetId then
+            kept[spotKey(a.targetId, a.move.x, a.move.y)] = a
         end
     end
     for _, c in ipairs(options) do
-        local k = c.target.id .. "@" .. tileKey(c.tile.x, c.tile.y)
+        local k = spotKey(c.target.id, c.tile.x, c.tile.y)
         if not groups[k] then groups[k] = {}; order[#order + 1] = k end
         table.insert(groups[k], c)
     end
@@ -1141,10 +1167,17 @@ local function sparingStrikes(ctx, u, acts, options)
         end
         local slots = {}
         for _, c in ipairs(here) do
-            if c.slot ~= held then slots[#slots + 1] = c.slot end
+            local it = u.items and u.items[c.slot + 1]
+            local breaks = it and it.uses and it.uses <= (c.f.hits or 1)
+            if c.slot ~= held and not breaks then slots[#slots + 1] = c.slot end
         end
-        spots[#spots + 1] = { x = here[1].tile.x, y = here[1].tile.y, slot = held, slots = slots,
-                              make = function(slot) return strikeOf(u, byslot[slot]) end }
+        spots[#spots + 1] = {
+            x = here[1].tile.x, y = here[1].tile.y, slot = held, slots = slots,
+            make = function(slot) return strikeActOf(u, byslot[slot]) end,
+            after = function(slot)
+                local c = byslot[slot]
+                return u.hp - (c.spent or 0), c.sure and c.target or nil
+            end }
     end
     local out = sparingPicks(ctx, u, recruit, spots)
     -- the slot is the key's too (Planner.key): another weapon, another act
@@ -2440,7 +2473,7 @@ local function exposed(ctx, u, acts)
         local friend = vacated(ctx, u, a.move.x, a.move.y)
         a.vacate = friend and friend.id
         a.exposure = {}
-        -- a strike's weapon, or the one a wait holds (M.baitAt's, sparingWaits')
+        -- a strike's weapon, or the one a wait holds (M.baitAt's, the sparing menus')
         local held = (a.act == "attack" or a.act == "wait") and a.slot or nil
         local at = Board.endTile(a)
         for _, s in ipairs(exposure(ctx, u, at.x, at.y, held)) do
@@ -2989,7 +3022,7 @@ local function proposeOne(ctx, u)
         local e = c.target
         if ctx.priceUse then
             local it = u.items and u.items[c.slot + 1]
-            c.at, c.price = e.id .. "@" .. c.tile.x .. "," .. c.tile.y, it and ctx.sight.usePrice(it.id)
+            c.at, c.price = spotKey(e.id, c.tile.x, c.tile.y), it and ctx.sight.usePrice(it.id)
             others[c.at] = others[c.at] or {}
             table.insert(others[c.at], c)
         end
@@ -3017,7 +3050,7 @@ local function proposeOne(ctx, u)
     -- target (Planner's st.wear); useCost orders the spares. A unit with no cheaper weapon there
     -- pays nothing, so the price chooses the weapon and never whether to strike (a Manakete's
     -- Divinestone is its only weapon: Ch17, #642 comment).
-    local function strike(c) return strikeOf(u, c) end
+    local function strike(c) return strikeActOf(u, c) end
     -- The strike keeps the weapon expected damage picked (betterAttack), as with the price off:
     -- the beam never sees the price (an act it cuts on its own score is never judged, and a
     -- Twin's kill that keeps a unit alive was cut that way: #642's shadow runs). Each cheaper

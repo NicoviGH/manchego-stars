@@ -1842,6 +1842,7 @@ function M.run(api)
                                 rank = plan and plan.rank, fallback = plan and plan.fallback,
                                 protected = plan and plan.protected,
                                 considered = plan and plan.considered,
+                                gentle = plan and plan.gentle,
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,
                                 worth = plan and plan.goalWorth,

@@ -6537,14 +6537,22 @@ end
 -- target, deduped by tile without a slot), so every plan forfeited R or never struck; the menu now
 -- offers the attack holding slot 2 ("gentle", slotKey), past the per-unit cut. Opts: `tiles` = the
 -- strike tiles (a column (0,y) and T at (1,2): (0,2) alone by default), `counter`/`dmg` = R's
--- strike's counter and its damage on A by slot, `three` = A holds slot 3 too.
+-- strike's counter and its damage on A by slot, `three` = A holds slot 3 too. More: `thp` = T's HP,
+-- `dmgT` = A's damage on T by slot (12 for slot 0, 6 for the rest), `tcounter` = T's counter on A,
+-- `tthreat` = T is a threat that strikes A for `tstrike` by slot, `uses2` = the uses slot 2's
+-- weapon has left (items given), `kept2` etc. are told by the scene's name.
 local function sparingStrikeScene(opt)
     opt = opt or {}
     local weapons = { { slot = 0, min = 1, max = 1 }, { slot = 2, min = 1, max = 1 } }
     if opt.three then weapons[3] = { slot = 3, min = 1, max = 1 } end
     local A = blue(0x01, 0, 0, 5, { weapons = weapons })
     local R = red(0x81, 3, 0, { hp = 20, minRange = 1, maxRange = 1 })
-    local T = red(0x82, 1, 2, { hp = 5, minRange = false })
+    local T = red(0x82, 1, 2, { hp = opt.thp or 5, minRange = opt.tthreat and 1 or false,
+                                 maxRange = opt.tthreat and 1 or nil })
+    if opt.uses2 then
+        A.items = { { id = 1, uses = 40 }, { id = 1, uses = 40 }, { id = 1, uses = opt.uses2 } }
+    end
+    if opt.items then A.items = opt.items end
     local counter = opt.counter or { [0] = 30, [2] = 2 }
     local dmg = opt.dmg or { [0] = 5, [2] = 5 }
     local function strike(slot)
@@ -6558,11 +6566,23 @@ local function sparingStrikeScene(opt)
         local k = t[1] .. "," .. t[2]
         reach[#reach + 1], spare[k], danger[k] = t, true, 1
         fcR[k] = strike(nil)
-        fcT[k .. "/0"] = fc { hit = 100, dmg = 12, hits = 1, killsTarget = true }
+        local function blow(slot)
+            local d = (opt.dmgT or {})[slot] or (slot == 0 and 12 or 6)
+            local f = { hit = 100, dmg = d, hits = 1, killsTarget = d >= T.hp }
+            if opt.tcounter then
+                f.counters, f.counterHit, f.counterHits = true, 100, 1
+                f.counterDmg = type(opt.tcounter) == "table" and opt.tcounter[slot] or opt.tcounter
+            end
+            if opt.tthreat then
+                f.takenHit, f.takenDmg, f.takenHits = 100, (opt.tstrike or {})[slot] or 0, 1
+            end
+            return fc(f)
+        end
+        fcT[k .. "/0"] = blow(0)
         for slot in pairs(counter) do
             if slot > 0 then
                 fcR[k .. "/" .. slot] = strike(slot)
-                fcT[k .. "/" .. slot] = fc { hit = 100, dmg = 6, hits = 1, killsTarget = true }
+                fcT[k .. "/" .. slot] = blow(slot)
             end
         end
     end
@@ -6571,9 +6591,10 @@ local function sparingStrikeScene(opt)
         for y = 0, 5 do sweep[#sweep + 1] = { x, y } end
     end
     local o = {
-        reach = { [0x01] = tiles(table.unpack(reach)), [0x81] = tiles(table.unpack(sweep)) },
+        reach = { [0x01] = tiles(table.unpack(reach)), [0x81] = tiles(table.unpack(opt.rfar and { { 9, 9 } } or sweep)),
+                  [0x82] = tiles({ 1, 2 }) },
         danger = danger,
-        talk = { [0x01] = { [0x81] = true } },
+        talk = { [0x01] = { [opt.recruit or 0x81] = true } },
         fc = { [0x01] = { [0x81] = fcR, [0x82] = fcT } },
         enemyPhase = function(plan)
             local held, at
@@ -6589,9 +6610,11 @@ local function sparingStrikeScene(opt)
     return boardOf(A, R, T), o
 end
 -- the gentle attacks the menu offers A, as "act#slot@x,y"
-local function gentleActs(board, o)
+local function gentleActs(board, o, opts, tweak)
     local out = {}
-    for _, c in ipairs(B.candidates(board, sightOf(o), style("careful"))) do
+    local sight = sightOf(o)
+    if tweak then tweak(sight) end
+    for _, c in ipairs(B.candidates(board, sight, style("careful"), opts)) do
         for _, a in ipairs(c.acts) do
             if a.why == "gentle" and a.act == "attack" then
                 out[#out + 1] = a.act .. "#" .. tostring(a.slot) .. "@" .. at(a)
@@ -6615,6 +6638,12 @@ do
         check(a and a.act .. "#" .. tostring(a.slot) .. "@" .. at(a), "attack#2@0,2",
               "gentle strike: the plan played has A strike holding slot 2 (PER_UNIT " .. cut .. ")")
         check(plan and #(plan.forfeited or {}), 0, "gentle strike: the plan played forfeits no recruit")
+        local named = {}
+        for _, g in ipairs(plan and plan.gentle or {}) do
+            named[#named + 1] = g.act .. "#" .. tostring(g.slot) .. "@" .. g.x .. "," .. g.y
+        end
+        check(table.concat(named, " "), "wait#2@0,2 attack#2@0,2",
+              "gentle strike: the plan's record names the gentle acts offered (PER_UNIT " .. cut .. ")")
     end
     -- A's own death counts: slot 2 spares R but R's strike kills A (25 on 20); slot 3 spares both
     local opt = { three = true, counter = { [0] = 30, [2] = 2, [3] = 2 },
@@ -6642,6 +6671,98 @@ do
     local board, o = sparingStrikeScene()
     board.units[1].weapons = { { slot = 0, min = 1, max = 1 } }
     check(gentleActs(board, o), "", "gentle strike: one weapon, nothing to swap to")
+end
+
+-- The review of PR #735 (#730 fix 4): each case below fails without the line it names.
+do
+    -- C1: a wall's strike is an attack act with no target; it reaches sparingStrikes' `kept` and
+    -- used to index it by a nil targetId (the boss's wall at (2,0), a recruit on the board)
+    local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                { slot = 2, min = 1, max = 1 } } })
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local R = red(0x82, 4, 3, { hp = 20, minRange = 1, maxRange = 1 })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = { { x = 2, y = 0, hp = 20 } }, talk = { [0x01] = { [0x82] = true } },
+    }
+    local ok, cands = pcall(B.candidates, boardOf(A, E, R), sightOf(o), style("careful"))
+    check(ok, true, "gentle strike: a wall's strike (no target) beside a recruit builds the menu")
+    local wall = 0
+    for _, c in ipairs(ok and cands or {}) do
+        for _, x in ipairs(c.acts) do
+            if x.act == "attack" and not x.targetId then wall = wall + 1 end
+        end
+    end
+    check(wall > 0, true, "gentle strike: and the wall's strike is on it")
+
+    -- I1: no recruit reaches a tile: no strike is read for the sparing menu. The same board with
+    -- no recruit at all reads the same strikes (T, a threat, is read either way).
+    local function strikesRead(opt, noTalk)
+        local board, so = sparingStrikeScene(opt)
+        if noTalk then so.talk = {} end
+        local sight = sightOf(so)
+        B.candidates(board, sight, style("careful"))
+        return sight.strikes()
+    end
+    local two = { { 0, 2 }, { 1, 1 } }   -- (1,1): no pick took it, so only the sparing menu reads it
+    check(strikesRead({ rfar = true, tthreat = true, tiles = two }),
+          strikesRead({ rfar = true, tthreat = true, tiles = two }, true),
+          "gentle strike: a recruit out of reach of every tile costs no strike read")
+    check(strikesRead({ tthreat = true, tiles = two }) > strikesRead({ tthreat = true, tiles = two }, true), true,
+          "gentle strike: and one in reach does")
+
+    -- I2: T's counter leaves A 10 HP; slot 2's strike by R deals 15, which kills A at 10 HP
+    -- (not at 20): slot 2 is no sparing weapon. Without T's counter it is.
+    local dmg = { [0] = 5, [2] = 15 }
+    check(gentleActs(sparingStrikeScene({ thp = 30, dmg = dmg })), "attack#2@0,2",
+          "gentle strike: where the target's counter leaves A its HP, slot 2 spares")
+    check(gentleActs(sparingStrikeScene({ thp = 30, dmg = dmg, tcounter = 10 })), "",
+          "gentle strike: the HP A has left after the target's counter is what dies")
+    -- a sure kill is spared its own strike (worstCase's treatment): T (a threat) kills A on slot 2
+    -- alone, and both weapons kill T for sure, so T never strikes
+    check(gentleActs(sparingStrikeScene({ tthreat = true, tstrike = { [2] = 25 } })), "attack#2@0,2",
+          "gentle strike: a target killed for sure strikes nothing")
+    -- ... and a recruit that is the target and dies for sure is not counter-felled either
+    check(gentleActs(sparingStrikeScene({ recruit = 0x82, tthreat = true,
+                                          tcounter = { [0] = 30, [2] = 2 } })), "",
+          "gentle strike: a recruit killed for sure by the attack is not a counter to spare")
+    -- the weapon that breaks on the attack: slot 2 has one use, the blow spends it
+    check(gentleActs(sparingStrikeScene({ uses2 = 1 })), "",
+          "gentle strike: a weapon the attack breaks is not offered as the sparing one")
+    check(gentleActs(sparingStrikeScene({ uses2 = 30 })), "attack#2@0,2",
+          "gentle strike: one with uses to spare is")
+
+    -- I3: the kept pick holds slot 2 (it hits harder: 12 against 6), and slot 0 spares R: the
+    -- weapon held is the kept pick's, not the first usable (then the held weapon spares already)
+    local keptTwo = { thp = 30, dmgT = { [0] = 6, [2] = 12 }, counter = { [0] = 2, [2] = 30 } }
+    check(gentleActs(sparingStrikeScene(keptTwo)), "attack#0@0,2",
+          "gentle strike: the baseline is the kept pick's weapon")
+    -- a tile no pick took: the weapon held there is the one betterAttack picks (slot 2 again)
+    keptTwo.tiles = { { 0, 2 }, { 1, 1 } }
+    check(gentleActs(sparingStrikeScene(keptTwo)), "attack#0@0,2 attack#0@1,1",
+          "gentle strike: on a tile no pick took, the baseline is betterAttack's")
+    -- a Canto unit's acts clone the strike with a move after it: the same offer
+    local cb, co = sparingStrikeScene()
+    check(gentleActs(cb, co, nil, function(sight)
+              sight.cantoTiles = function() return { { x = 0, y = 3 } } end
+          end), "attack#2@0,2", "gentle strike: a Canto unit is offered the same strike")
+    -- a priced spare (#642) carrying slot 2 beside the gentle pick: no act key twice
+    local board, so = sparingStrikeScene({ thp = 30, items = {
+        { id = 0x1A, uses = 30 }, { id = 0x1A, uses = 30 }, { id = 0x14, uses = 30 } } })
+    so.usePrice = function(id) return ({ [0x1A] = 600, [0x14] = 8 })[id] end
+    local seen, dup, spares, gentle = {}, 0, 0, 0
+    for _, c in ipairs(B.candidates(board, sightOf(so), style("careful"), { usePrice = "100000" })) do
+        for _, x in ipairs(c.acts) do
+            local k = Planner.key(x)
+            if seen[k] then dup = dup + 1 end
+            seen[k] = true
+            if x.why == "gentle" and x.act == "attack" then gentle = gentle + 1 end
+            spares = spares + #(x.spares or {})
+        end
+    end
+    check(gentle == 1 and spares >= 1, true, "gentle strike: the priced spare and the gentle pick coexist")
+    check(dup, 0, "gentle strike: no act key is offered twice")
 end
 
 -- test_planner_never_credits_killing_a_recruit: A can kill R from (1,0); C, far off, is the one

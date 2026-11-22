@@ -2306,6 +2306,33 @@ do
     check(left[2], Planner.LOOK_ATTEMPT - 3, "the next what the first left")
 end
 
+-- test_the_trace_names_the_gentle_acts_offered (#730, ADR 0453): the plan's trace record carries
+-- the recruit-sparing acts the menus kept, so a replay shows whether one was offered and which
+-- was played.
+do
+    local g = fakeGame { units = rout() }
+    local gentle = { { unit = 0x01, act = "attack", slot = 2, x = 0, y = 0, target = 0x81 } }
+    g.api.Planner = {
+        surprise = function() return 0 end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "attack", target = 0x81,
+                             targetId = 0x81, move = { x = 0, y = 0 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 } }, enemies = { [0x81] = true },
+                              gentle = gentle }
+        end,
+    }
+    local traced
+    g.api.trace = function(ev)
+        if ev.t == "plan" and ev.gentle then traced = ev.gentle end
+    end
+    Botrun.run(g.api)
+    check(traced and traced[1].act .. "#" .. traced[1].slot, "attack#2",
+          "the plan's trace carries the gentle acts offered")
+end
+
 -- test_an_exhausted_lookahead_is_an_anomaly (#570): a decision the attempt's budget left one
 -- phase deep is visible in the record -- one lookahead_budget anomaly an attempt, on the first
 -- such turn, counting every decision skipped -- not only as a sum in rec.lookahead. The wear's
