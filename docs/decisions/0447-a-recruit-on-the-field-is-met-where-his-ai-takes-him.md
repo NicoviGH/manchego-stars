@@ -42,7 +42,8 @@ source-pinned (it calls `M.secondLook`, hides only through `M.hideUnit`), not fa
 sandboxed game calls cannot run in the unit tests, so the Ch13 replay is its proof. The rollback is a
 behaviour test of the sandbox primitive (a `keep16`'d word a game call wrote in the first look is
 back for the second) with its control. A `PT_LEAKGUARD=1` replay of the same game logged no leak
-(no `leaks` key in the record; the guard's env reaching the emulator is assumed, not shown).
+(no `leaks` key in the record; the guard reaches the emulator: `montecarlo.py` runs `run.sh`
+with the caller's environment, and `run.sh` and `harness.lua` read `PT_LEAKGUARD`).
 
 **Estimates, labelled.** Our units are taken to stand still for all 8 phases (they will move). Only a
 recruit that stayed put in the hidden look is read again: one that moved there keeps the path the
