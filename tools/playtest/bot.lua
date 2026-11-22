@@ -453,8 +453,7 @@ function M.enemiesOf(board, sight)
             if not u.fogged then out[#out + 1] = u end
             local g = u.fogged and sight.ghostOf and sight.ghostOf(u)
             if g then
-                local copy = {}
-                for k, v in pairs(u) do copy[k] = v end
+                local copy = Board.copy(u)
                 copy.x, copy.y, copy.ghost = g.x, g.y, true
                 threats[#threats + 1] = copy
             elseif Board.playsAsSeen(u.fogged, u.fogged and sight.knows and sight.knows(u)) then

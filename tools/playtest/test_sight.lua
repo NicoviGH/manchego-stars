@@ -3433,17 +3433,6 @@ do
         check(refreshes, 1, "arrived: an unchanged stamp refreshes nothing")
         sight.refresh = plain
     end
-    -- #713 (ADR 0455): sighted() keeps the tile a red was last seen on, under its arrival; a
-    -- ghost there is none while another unit (the board's unit 1, at 0,0) stands on that tile
-    do
-        -- (a unit no retry remembers: the remembered class-4 arrivals play where they stand)
-        local fogged = { id = 7, charId = 3, classId = 9, faction = "red", onField = true, fogged = true }
-        sight.sighted({ { id = 7, charId = 3, classId = 9, x = 2, y = 3 } })
-        local g = sight.ghostOf(fogged)
-        check(g and (g.x .. "," .. g.y), "2,3", "sighted: a fogged red's ghost is where it was seen")
-        sight.sighted({ { id = 7, charId = 3, classId = 9, x = 0, y = 0 } })
-        check(sight.ghostOf(fogged), nil, "sighted: no ghost on a tile another unit holds")
-    end
 
     sight.refresh()
     local before = boardReads
@@ -3506,6 +3495,106 @@ do
     check(nextPhase ~= nil and nextPhase:find("healFaction%(call, byId, \"green\"%)%s+healFaction%(call, byId, \"blue\"%)%s+local played = reply and armyReply") ~= nil
           and nextPhase:find("armyReply%(call.-healFaction%(call, byId, \"red\"%).-playPhase%(call, proc, byId, berserkFirst, 1,") ~= nil,
           true, "healFaction: our units heal before the army's reply, the reds after it and before the second phase plays")
+end
+
+-- #713 fix 1 (ADR 0455), through Sight.new on a board the test sets: a ghost plays from its
+-- last-seen tile, which only a unit the player can see takes (a hidden red does not); the
+-- latest sighting wins a shared tile; a danger read places it once per scope, and a scope that
+-- raised is closed (the next read places it again); a kill on a ghost's tile rebuilds danger.
+do
+    local GAME = 0x08001000
+    local ram = {}
+    local function rd(a) return ram[a] or 0 end
+    local mem = { u8 = rd, u16 = rd, u32 = rd, s8 = rd }
+    local calls, placed, raise = 0, 0, false
+    local cpu = fakeCpu(1)
+    local counted = setmetatable({ write = function(r, v)
+        if r == "pc" and v == GAME then calls = calls + 1 end
+        cpu.write(r, v)
+    end, breakpoint = function() return 1 end, unbreak = function() end }, { __index = cpu })
+    local GHOST, BLUE, HIDDEN, SEEN = 0x200, 0x100, 0x300, 0x400
+    local function write8(a, v)
+        if a == GHOST + Sight.UNIT_X and v == 2 then
+            placed = placed + 1
+            if raise then error("raised in the scope") end
+        end
+        ram[a] = v
+    end
+    local nop = function() end
+    local function at(u, x, y) u.x, u.y = x, y; ram[u.addr + Sight.UNIT_X], ram[u.addr + Sight.UNIT_Y] = x, y end
+    local ghost = { id = 7, charId = 3, classId = 9, faction = "red", onField = true, fogged = true, addr = GHOST }
+    local blue = { id = 1, charId = 1, classId = 1, faction = "blue", onField = true, addr = BLUE }
+    local hidden = { id = 8, charId = 4, classId = 9, faction = "red", onField = true, fogged = true, addr = HIDDEN }
+    local seenRed = { id = 9, charId = 5, classId = 9, faction = "red", onField = true, addr = SEEN }
+    at(ghost, 0, 0); at(blue, 1, 1); at(hidden, 2, 1); at(seenRed, 0, 2)
+    local board = { units = { ghost, blue, hidden, seenRed } }
+    local sight = Sight.new({ cpu = counted, mem = mem, write8 = write8, write16 = nop, write32 = nop,
+                              SYM = setmetatable({}, { __index = function() return GAME end }),
+                              Board = Board, map = function() return 3, 3 end,
+                              chapter = function() return 1 end, turn = function() return 1 end,
+                              board = function() return board end })
+    sight.sighted({ { id = 7, charId = 3, classId = 9, x = 2, y = 1 } })
+    local g = sight.ghostOf(ghost)
+    check(g and (g.x .. "," .. g.y), "2,1", "ghost: on its last-seen tile; the hidden red there blocks nothing")
+    -- the outermost sandbox's state load puts memory back (Sight.machine); the fake CPU's
+    -- does not, so the test does: the ghost's struct back on its true tile
+    local function loaded() at(ghost, 0, 0) end
+    sight.danger(0, 0)
+    check(placed, 1, "ghost: a danger read stands it on its tile")
+    check(sight.plays(ghost), false, "ghost: the scope closes with the sandbox")
+    loaded()
+    sight.threat(seenRed)
+    check(placed, 2, "ghost: the threat read places it in its own scope")
+    loaded()
+    sight.refresh()
+    raise = true
+    check(pcall(sight.danger, 0, 0), false, "ghost: a placement that raises ends the read")
+    raise = false
+    sight.refresh()
+    sight.danger(0, 0)
+    check(placed, 4, "ghost: a raised scope is closed: the next read places it again")
+    -- a kill on the ghost's tile frees it for the ghost: the danger grid is read again
+    at(seenRed, 2, 1)
+    sight.refresh()
+    sight.danger(0, 0)
+    local before = calls
+    sight.changed({ gone = { [9] = true } }, function() sight.danger(0, 0) end)
+    check(calls > before, true, "ghost: a kill on its tile rebuilds the danger grid")
+    at(seenRed, 0, 2)
+    sight.refresh()
+    sight.danger(0, 0)
+    before = calls
+    sight.changed({ gone = { [9] = true } }, function() sight.danger(0, 0) end)
+    check(calls - before, 0, "ghost: a kill elsewhere keeps it")
+    -- a unit in sight on the tile takes it; the latest sighting wins a shared one
+    at(blue, 2, 1)
+    sight.refresh()
+    check(sight.ghostOf(ghost), nil, "ghost: none on a tile one of ours holds")
+    at(blue, 1, 1)
+    sight.sighted({ { id = 8, charId = 4, classId = 9, x = 2, y = 1 } })
+    sight.refresh()
+    check(sight.ghostOf(ghost), nil, "ghost: a later sighting on its tile wins it")
+    check(sight.ghostOf(hidden) and "won" or "none", "won", "ghost: the later one plays there")
+end
+
+-- M.ghostsOn (#713): the rule alone. A fogged red a retry remembers blocks (the bot plays it
+-- there); a dead or benched unit does not; a unit off the map (at() nil) does not.
+do
+    local seen = { [7] = { charId = 3, classId = 9, x = 2, y = 1, seq = 1 } }
+    local ghost = { id = 7, charId = 3, classId = 9, faction = "red", onField = true, fogged = true }
+    local function on(other, known)
+        local list = { ghost, other }
+        local out = Sight.ghostsOn(list, seen, function(o) return known == o end,
+                                   function() return nil end,
+                                   function(o) if o.off then return nil end return o.x, o.y end)
+        return out[7] and "plays" or "none"
+    end
+    local red = { id = 8, faction = "red", onField = true, fogged = true, x = 2, y = 1 }
+    check(on(red), "plays", "ghostsOn: a hidden red does not block")
+    check(on(red, red), "none", "ghostsOn: a remembered one does")
+    check(on({ id = 9, faction = "green", onField = true, x = 2, y = 1 }), "none", "ghostsOn: a green does")
+    check(on({ id = 9, faction = "blue", onField = true, dead = true, x = 2, y = 1 }), "plays", "ghostsOn: a dead one does not")
+    check(on({ id = 9, faction = "blue", onField = true, off = true, x = 2, y = 1 }), "plays", "ghostsOn: one off the map does not")
 end
 
 -- #671, through Sight.new: itemReach is the widest weapon in the bag (a staff counts for nothing),

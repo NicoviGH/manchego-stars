@@ -374,6 +374,7 @@ M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the s
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
 -- +40 u16 ai_config. Its state bits are board.lua's (Board.US_*).
 local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_HP, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x13, 0x40
+M.UNIT_STATE, M.UNIT_X, M.UNIT_Y = UNIT_STATE, UNIT_X, UNIT_Y   -- the harness's probes'
 -- struct AiState (include/cp_common.h): +79 decideState, +7A dangerMapFilled, +7C unk7C (the
 -- staff AI's HP threshold), +7D combatWeightTableId; the weight table comes from ai_config
 -- bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*). cp_decide.c's per-unit loop writes these as field
@@ -406,6 +407,7 @@ local TALK_SCRIPT, TALK_PID_A, TALK_PID_B, NO_PID = 0x04, 0x08, 0x09, 0xFF
 local CHAPTER_TALKS = 0x04
 -- struct PlaySt: +0D chapterVisionRange (0 = no fog), +0F faction, +10 u16 chapterTurnNumber.
 local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
+M.PLAY_VISION = PLAY_VISION
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 -- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
@@ -2008,7 +2010,9 @@ function M.batching(outer, guarded, log)
     -- whether a sandbox is open: memory may then hold its writes, journaled or the game's own
     -- (a call's EquipUnitItemSlot reorders a bag; only M.equip keeps it, so call that)
     local function open() return depth > 0 end
-    return sandbox, api, open
+    -- how many sandboxes are open (0 outside one): a ghostly() scope's own depth (#713)
+    local function level() return depth end
+    return sandbox, api, open, level
 end
 
 -- Whether the unit at `unitAddr` opens `terrain` as its bag stands: the game's own check, a key
@@ -2929,6 +2933,37 @@ function M.ghostOf(seen, u, known, arrival)
     return nil
 end
 
+-- The ghosts that play among `list` (#713, ADR 0455): -> { [id] = { x, y } }, each unit's
+-- M.ghostOf tile, when no unit the player can see stands there -- a unit of another faction,
+-- a red in sight, or a fogged one a retry remembers (known(o)) -- and no ghost seen there more
+-- recently (`seq`, s.sighted's order) claims it. A hidden red there blocks nothing: the player
+-- cannot know it is there. at(o) -> x, y where o stands now, nil when it is off the map: the
+-- board's tile, or its struct's inside a sandbox, where a staged plan has stood our units.
+-- The one owner of the rule, for s.ghostOf (the board's) and placeGhosts (a sandbox's).
+function M.ghostsOn(list, seen, known, arrivalOf, at)
+    local cand = {}
+    for _, o in ipairs(list) do
+        local g = M.ghostOf(seen, o, known(o), arrivalOf(o))
+        if g then cand[#cand + 1] = { unit = o, g = g } end
+    end
+    local out = {}
+    for _, c in ipairs(cand) do
+        local g, held = c.g, false
+        for _, b in ipairs(list) do
+            if b.id ~= c.unit.id and b.onField and not b.dead
+                and (b.faction ~= "red" or not b.fogged or known(b)) then
+                local bx, by = at(b)
+                held = held or (bx == g.x and by == g.y)
+            end
+        end
+        for _, d in ipairs(cand) do
+            held = held or (d ~= c and d.g.x == g.x and d.g.y == g.y and d.g.seq > g.seq)
+        end
+        if not held then out[c.unit.id] = { x = g.x, y = g.y } end
+    end
+    return out
+end
+
 -- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
@@ -2959,8 +2994,8 @@ function M.new(outer)
     -- outer.leakGuard (PT_LEAKGUARD=1): the run's leak log. Every nested sandbox hands the
     -- unit structs and the trap pool back as it found them, or what it did not is logged
     -- there and put back (M.leaks). The units are the board's, read each time.
-    local sandbox, api, open
-    sandbox, api, open = M.batching(outer, outer.leakGuard and function()
+    local sandbox, api, open, level
+    sandbox, api, open, level = M.batching(outer, outer.leakGuard and function()
         local spans = { { outer.SYM.sTrapPool, M.TRAP_MAX * M.TRAP_SIZE, "trap pool" } }
         for _, o in ipairs(api.board().units) do
             spans[#spans + 1] = { o.addr, outer.Board.UNIT_SIZE, "unit struct" }
@@ -2982,7 +3017,9 @@ function M.new(outer)
     -- #713 (ADR 0455): where this attempt last saw each red unit, by slot (s.sighted, M.ghostOf),
     -- and the ghosts placed in the sandbox open now: nil outside a ghostly() one, false in one
     -- before placeGhosts ran, { [id] = true } after (the ghosts standing on their tile)
-    local lastSeen, ghosts = {}, nil
+    -- `ghostLevel`: the sandbox depth the open ghostly() scope runs at; `sightings` orders
+    -- the records (M.ghostsOn's `seq`)
+    local lastSeen, ghosts, ghostLevel, sightings = {}, nil, nil, 0
 
     -- The board's units, read once per board like every other answer: kept only from a read
     -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
@@ -3279,14 +3316,16 @@ function M.new(outer)
         -- a kill-only change keeps the danger and threat grids too (M.freshSeen), unless a
         -- killed enemy is one the retry remembers: liftRemembered lifts only a unit not hidden
         local keepDanger = keepGrids
-        -- nor when one stood on a ghost's last-seen tile: its death frees the cell the ghost
-        -- is placed on (placeGhosts, #713)
+        -- nor when one stood on the last-seen tile of a fogged unit (M.ghostOf): its death
+        -- frees the tile for that ghost to play from (M.ghostsOn, #713)
+        local ghostAt = {}
+        for _, o in ipairs(units()) do
+            local g = M.ghostOf(lastSeen, o, s.knows(o), s.arrivalOf(o))
+            if g then ghostAt[g.x .. "," .. g.y] = true end
+        end
         for id in pairs(change.gone or {}) do
             local k = byId[id]
-            if k and s.knows(k) then keepDanger = false end
-            for slot, g in pairs(k and lastSeen or {}) do
-                if slot ~= id and g.x == k.x and g.y == k.y then keepDanger = false end
-            end
+            if k and (s.knows(k) or ghostAt[k.x .. "," .. k.y]) then keepDanger = false end
         end
         return M.changed(sandbox, api, S, function() return fresh(true, keepGrids, keepDanger) end,
                          change, byId, fn, function(list) seen.units = list end)
@@ -3316,7 +3355,8 @@ function M.new(outer)
             if (e.turn > 0 and e.turn or nil) ~= before then changed = true end
             arrivals[e.id] = { charId = e.charId, classId = e.classId, turn = e.turn }
         end
-        if changed and remembered then s.refresh() end
+        -- a ghost is matched by its arrival too (M.ghostOf)
+        if changed and (remembered or next(lastSeen)) then s.refresh() end
     end
     function s.arrivalOf(u)
         local a = arrivals[u.id]
@@ -3325,53 +3365,56 @@ function M.new(outer)
     function s.knows(u) return M.knows(Board, remembered, u, s.arrivalOf(u)) end
     function s.sighted(list)
         for _, u in ipairs(list) do
+            sightings = sightings + 1
             lastSeen[u.id] = { charId = u.charId, classId = u.classId, arrival = s.arrivalOf(u),
-                               x = u.x, y = u.y }
+                               x = u.x, y = u.y, seq = sightings }
         end
+        if seen then seen.ghosts = nil end   -- boardGhosts' answer is read from these
     end
-    -- u's ghost on the board as read (units()): none when another unit stands on its tile -- the
-    -- player sees that it is not there
-    function s.ghostOf(u)
-        local g = M.ghostOf(lastSeen, u, s.knows(u), s.arrivalOf(u))
-        if not g then return nil end
-        for _, o in ipairs(units()) do
-            if o.id ~= u.id and o.onField and not o.dead and o.x == g.x and o.y == g.y then
-                return nil
-            end
-        end
-        return g
+    -- the board's ghosts as read (units(), M.ghostsOn), kept with its other answers
+    local function boardGhosts()
+        return M.keptRead(seen, "ghosts", function()
+            return M.ghostsOn(units(), lastSeen, s.knows, s.arrivalOf,
+                              function(o) return o.x, o.y end)
+        end, open)
     end
+    -- u's ghost tile on the board as read, nil when it has none or its tile is taken
+    function s.ghostOf(u) return boardGhosts()[u.id] end
     function s.plays(u) return s.knows(u) or (ghosts and ghosts[u.id]) == true end
     -- fn(call, proc) as a sandbox's body that may place the ghosts (placeGhosts): they stand on
-    -- their tile until the sandbox returns, whose journal moves them back. A sandbox opened
-    -- inside one that placed them reads them where that one's play left them.
+    -- their tile until that sandbox returns, when M.batching's journal writes their structs and
+    -- cells back. A sandbox opened inside one that placed them reads them where that one's play
+    -- left them, and places none of its own.
     local function ghostly(fn)
         return function(call, proc)
             if ghosts ~= nil then return fn(call, proc) end
-            ghosts = false
+            ghosts, ghostLevel = false, level()
             local ok, a, b = pcall(fn, call, proc)
-            ghosts = nil
+            ghosts, ghostLevel = nil, nil
             if not ok then error(a, 0) end
             return a, b
         end
     end
-    -- Inside a ghostly() sandbox, once: every ghost (M.ghostOf) among `list` stood on its
-    -- last-seen tile (M.standOn: its struct and gBmMapUnit), when that cell is free as the
-    -- sandbox stands (a staged plan may have put a player unit there: then it does not play). The
-    -- moves are journaled writes, so the sandbox puts them back.
+    -- In a ghostly() sandbox's own body (not a sandbox nested in it, whose journal would put the
+    -- ghosts back while `ghosts` still named them), once: every ghost among `list` that plays
+    -- there (M.ghostsOn, each unit where its struct stands: a staged plan's units are already on
+    -- their tiles) stood on its last-seen tile (M.standOn: its struct and gBmMapUnit, journaled).
     local function placeGhosts(list)
         assert(ghosts ~= nil, "placeGhosts outside a ghostly sandbox")
+        assert(level() == ghostLevel, "placeGhosts in a sandbox nested in its ghostly scope")
         if ghosts then return end
         ghosts = {}
+        local tiles = M.ghostsOn(list, lastSeen, s.knows, s.arrivalOf, function(o)
+            if (mem.u32(o.addr + UNIT_STATE) & US_HIDDEN) ~= 0 then return nil end
+            return mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y)
+        end)
         for _, o in ipairs(list) do
-            local g = M.ghostOf(lastSeen, o, s.knows(o), s.arrivalOf(o))
+            local g = tiles[o.id]
             if g then
-                local cx, cy = mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y)
-                local there = cx == g.x and cy == g.y
-                if there or grid(mem, S.gBmMapUnit, g.x, g.y) == 0 then
-                    if not there then M.standOn(api, o, g.x, g.y) end
-                    ghosts[o.id] = true
+                if mem.u8(o.addr + UNIT_X) ~= g.x or mem.u8(o.addr + UNIT_Y) ~= g.y then
+                    M.standOn(api, o, g.x, g.y)
                 end
+                ghosts[o.id] = true
             end
         end
     end
@@ -3859,10 +3902,11 @@ function M.new(outer)
             M.putFog(api, Board, fogWas)
             return aiOrder(call, byId)
         end
-        -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog) or
-        -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399) or a ghost
-        -- on its last-seen tile (plays(), #713, ADR 0455) (or our berserked unit, M.berserkers, never fogged), and alive: a berserk strike's
-        -- expected damage can leave its target at 0 HP on the map
+        -- an enemy in the order that decides: not gone; seen (US_BIT9: hidden by fog), or
+        -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399), or a
+        -- ghost on its last-seen tile (plays(), #713, ADR 0455); or our berserked unit
+        -- (M.berserkers, never fogged); and alive: a berserk strike's expected damage can
+        -- leave its target at 0 HP on the map
         local function decides(id)
             local e = byId[id]
             if not e or gone[id] or mem.u8(e.addr + UNIT_HP) == 0 then return false end

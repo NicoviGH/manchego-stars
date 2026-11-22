@@ -31,9 +31,15 @@ played from the tile it was last seen on, which is what a player knows, never fr
   `decides` and the reply count it as seen (`s.plays`). In the judged phase it then moves and
   strikes from there as the game's AI decides. `Bot.enemiesOf` lists it as a threat, a copy
   standing on the seen tile (`ghost = true`); it is never a target (the game refuses one in fog).
-- **Its cell taken.** A ghost whose tile another unit holds does not play: on the board, the
-  player sees it is not there; in a judged phase, a plan that stands one of ours there has the
-  cell, as our units are placed first.
+- **Its tile taken.** A ghost does not play when a unit the player can see stands on its tile:
+  a unit of another faction, a red in sight, or a fogged red a retry remembers. Then the player
+  sees that the ghost is not there. A hidden red there blocks nothing, since the player cannot
+  know it is there. In a judged phase our units are placed first, so a plan that stands one of
+  ours on that tile has it. When two ghosts were last seen on one tile, the later sighting plays
+  there. `Sight.ghostsOn` is the one owner of this rule, for the board and for the sandbox.
+- **Where it is placed.** Placing happens once per scope, in the ghost-placing sandbox's own
+  body. A sandbox nested in that one would put the moves back while the scope still named
+  them, so `placeGhosts` asserts the depth.
 - **Precedence.** A unit a retry remembers plays where it stands (ADR 0399), so it has no ghost.
 
 **Left out, by the approved scope.** `closings`' looters and `keySources` still ask ADR 0399's
@@ -47,10 +53,22 @@ stands, every turn: more than a player knows, so Ch19 would read easier than a p
 it (comment 7078483524).
 
 **Proof.**
-- Unit tests that fail on main: `test_sight.lua` (`Sight.ghostOf`'s matching; `sighted`/`ghostOf`
-  and a held cell; every ghost-placing sandbox is `ghostly`), `test_bot.lua` (a ghost is a
-  threat on its seen tile, never a target, the board's unit not moved), `test_botrun.lua` (every
-  board tells the sight its reds in sight, never a fogged one).
+- Unit tests. Each new one fails without its fix (run against the reverted code).
+  - `test_sight.lua`, through `Sight.new` on a board the test sets:
+    - the ghost is played from its seen tile, and a hidden red there does not block it, but one
+      of ours does;
+    - the later sighting wins a shared tile;
+    - a danger read and a threat read each place it in their own scope, and that scope is
+      closed when the sandbox returns;
+    - a read that raises closes its scope, so the next read places the ghost again;
+    - a kill on the ghost's tile rebuilds the danger grid, and a kill elsewhere keeps it.
+  - `test_sight.lua`, the pure rules: `Sight.ghostOf`'s matching and `Sight.ghostsOn`'s blockers.
+  - `test_sight.lua`, source-place guards: every caller of `placeGhosts` is in a `ghostly`
+    sandbox. The runtime assert backs this up.
+  - `test_bot.lua`: a ghost is a threat on its seen tile and never a target, and the board's own
+    unit is not moved.
+  - `test_botrun.lua`: every board tells the sight its reds in sight, never a fogged one, and
+    each one's arrival is stamped first.
 - Emulator probe `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh ghostprobe` (retail
   Prologue): the enemy farthest from Eirika (6 tiles off), put in fog and told as last seen
   beside her, threatens her tile, strikes her in `enemyPhase` and moves in `nextPhase`'s first
@@ -62,5 +80,7 @@ it (comment 7078483524).
   knights (0xCD) die as on main. From there on, main lost on turn 7 with four player deaths, three
   of them to unseen enemies read at 0 or near it (Saleh 0x17 on turn 5 to arrival 155, the
   ghost case). The branch lost on turn 12 with three, none to the fog: Knoll (0x1F) on turn 9 read
-  at 0.038 (`rng_tail`), Saleh on turn 11 over the cap (0.449), Franz (0x04) on turn 12 read at 0
-  (`other`, not fog; untested). One game: a lead, not a measurement.
+  at 0.038 (`rng_tail`), Saleh on turn 11 over the cap (0.449), Franz (0x04) on turn 12 read at 0.
+  Franz's death is not the fog: all three enemies near him were in sight. After a replan, the
+  judged enemy phase sent none of them at anyone. That is #739. One game: a lead, not a
+  measurement.

@@ -5291,11 +5291,18 @@ scenarios.ghostprobe = function()
     local gx, gy = INSPECT.freeBeside(eirika)
     if not gx then return result("FAIL", "no free tile beside Eirika") end
     -- the fog: on, and over the enemy's true tile, its state bit as RefreshUnitsOnBmMap sets it
-    local STATE = 0x0C
-    sapi.write8(SYM.gPlaySt + 0x0D, 1)
+    local Sight = INSPECT.Sight
+    local STATE, X, Y = Sight.UNIT_STATE, Sight.UNIT_X, Sight.UNIT_Y
+    sapi.write8(SYM.gPlaySt + Sight.PLAY_VISION, 1)
     sapi.write8(sapi.mem.u32(sapi.mem.u32(SYM.gBmMapFog) + ghost.y * 4) + ghost.x, 0)
     sapi.write32(ghost.addr + STATE, sapi.mem.u32(ghost.addr + STATE) | BOARD.US_BIT9)
     sight.refresh()
+    -- the setup took: the board reads the enemy fogged, so the control's nothing is the fog's
+    local hidden = false
+    for _, u in ipairs(BOARD.read().units) do
+        if u.id == ghost.id then hidden = u.fogged == true end
+    end
+    if not hidden then return result("FAIL", "the enemy does not read fogged on the board") end
     local plan = { blues = { { unit = eirika, x = eirika.x, y = eirika.y, hp = eirika.hp } },
                    waits = {}, reds = {}, gone = {} }
     -- -> what one sight reads of the enemy: its threat on her tile, a strike on her in the
@@ -5328,8 +5335,7 @@ scenarios.ghostprobe = function()
     local threat, struck, moved, listed = reads(sight)
     local control = INSPECT.Sight.new(sapi)
     local threatC, struckC, movedC, listedC = reads(control)
-    -- struct Unit +10 xPos, +11 yPos
-    local back = sapi.mem.u8(ghost.addr + 0x10) == ghost.x and sapi.mem.u8(ghost.addr + 0x11) == ghost.y
+    local back = sapi.mem.u8(ghost.addr + X) == ghost.x and sapi.mem.u8(ghost.addr + Y) == ghost.y
     local cellFree = sapi.mem.u8(sapi.mem.u32(sapi.mem.u32(SYM.gBmMapUnit) + gy * 4) + gx) == 0
     log(string.format("ghostprobe: enemy 0x%02X (class 0x%02X) at (%d,%d), %d tiles from Eirika, "
         .. "last seen at (%d,%d). Ghost: threat %d, strikes her %s, moves %s, listed at %s. "
@@ -6672,7 +6678,7 @@ end
 -- fog map needs no poking. Returns the number of live reds now ON the grid -- 0 means it did not
 -- take, and the caller must not go on to swing at enemies the engine cannot see.
 local function liftFogOntoTheGrid()
-    emu:write8(SYM.gPlaySt + 0x0D, 0)
+    emu:write8(SYM.gPlaySt + INSPECT.loadSight().PLAY_VISION, 0)
     local onGrid = function()
         local n = 0
         for _, r in BOARD.each("red") do

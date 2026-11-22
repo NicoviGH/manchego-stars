@@ -909,16 +909,22 @@ do
             return {}
         end,
     }
-    local shown = {}
+    -- each shown red's arrival is stamped first (M.ghostOf keys the tile by it, s.arrivalOf)
+    local shown, stamped, unstamped = {}, {}, 0
     local make = g.api.sight
     g.api.sight = function()
         local s = make()
+        s.arrived = function(list) for _, e in ipairs(list) do stamped[e.id] = true end end
         s.sighted = function(list)
-            for _, u in ipairs(list) do shown[u.id] = u.x .. "," .. u.y end
+            for _, u in ipairs(list) do
+                shown[u.id] = u.x .. "," .. u.y
+                if not stamped[u.id] then unstamped = unstamped + 1 end
+            end
         end
         return s
     end
     Botrun.run(g.api)
+    check(unstamped, 0, "sighted: every shown red's arrival was stamped before")
     check(shown[0x83], nil, "sighted: a fogged red is never shown")
     for _, u in ipairs(rout()) do
         if u.faction == "red" then
