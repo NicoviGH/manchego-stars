@@ -84,8 +84,6 @@ Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that d
 -- the prep screen un-deploys a unit with US_NOT_DEPLOYED alone (prep_unitselect.c), and an
 -- event kills one with US_DEAD alone (eventscr.c).
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
--- Whether the terrain heal skips `u` (MakeTerrainHealTargetList, bmtarget.c:587-608): a unit
--- dead, not deployed, rescued or with US_BIT16 is never healed.
 -- `hp` after a heal of `gain`, held to `maxhp` as AddUnitHp holds it (bmunit.c): the one owner of
 -- that clamp. A planned staff heal, the plan's heal of a unit that lives and the terrain heal
 -- all go through it, each with its own max (nil: no max to fill to, so no cap).
@@ -93,6 +91,8 @@ function Board.addHp(hp, gain, maxhp)
     return math.min(maxhp or math.huge, hp + gain)
 end
 
+-- Whether the terrain heal skips `u` (MakeTerrainHealTargetList, bmtarget.c:587-608): a unit
+-- dead, not deployed, rescued or with US_BIT16 is never healed.
 function Board.terrainHealSkips(u)
     return (u.state & (Board.US_DEAD | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_BIT16)) ~= 0
 end

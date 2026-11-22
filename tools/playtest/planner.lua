@@ -393,16 +393,25 @@ end
 -- stands on its tile through our phase, so its tile now is the one that heals it (#709). No heal
 -- leaves `hp` as it is; the cap is the unit's max HP (GetUnitMaxHp, bot.lua's context) and never
 -- below the HP it stands on now, so a unit over its max is not credited a wound by the clamp.
-function M.healed(heal, e, hp)
-    if heal == 0 then return hp end
-    return Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp))
+-- `hp` is an expectation over the kill and the survival: a unit that dies heals nothing, so the
+-- heal applies to the share that lives, `1 - kill` (kill: the chance the plan kills it, nil = 0),
+-- and not at all to a unit left at 0 HP.
+function M.healed(heal, e, hp, kill)
+    if heal == 0 or hp <= 0 then return hp end
+    local lives = 1 - (kill or 0)
+    return hp + (Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp)) - hp) * lives
 end
 
--- What a blow of `dealt` on `hp` earns once the heal is counted: the wound that outlasts it
--- (healed(hp) - healed(hp - dealt)), the whole `dealt` where nothing heals.
-function M.outlasting(heal, e, hp, dealt)
-    if heal == 0 then return dealt end
-    return M.healed(heal, e, hp) - M.healed(heal, e, hp - dealt)
+-- What a blow of `dealt` on `hp` earns once the heal is counted (`kill`: its chance to kill). The
+-- kill branch earns what it always did (the dead heal nothing: `dealt` there is the HP it had),
+-- the surviving branch only the wound that outlasts the heal, healed(hp) - healed(hp - its mean
+-- damage); the whole `dealt` where nothing heals.
+function M.outlasting(heal, e, hp, dealt, kill)
+    kill = kill or 0
+    if heal == 0 or kill >= 1 or hp - dealt <= 0 then return dealt end
+    if kill == 0 then return M.healed(heal, e, hp) - M.healed(heal, e, hp - dealt) end
+    local survived = math.max(0, (dealt - kill * hp) / (1 - kill))
+    return kill * hp + (1 - kill) * (M.healed(heal, e, hp) - M.healed(heal, e, hp - survived))
 end
 
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
@@ -437,7 +446,7 @@ local function score(act, st, W, style, odds)
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             -- only the wound that outlasts the tile's heal: a fort heals it back at the start
             -- of the enemy's phase (#709, M.outlasting); the plan's own HP is the unhealed one
-            local earned = M.outlasting(st.healOf(e), e, hp, dealt)
+            local earned = M.outlasting(st.healOf(e), e, hp, dealt, kill)
             v = v + W.dealt * earned * target + W.kill * kill * worth
                 -- at the HP the plan leaves the target: a kill an earlier blow of the plan
                 -- set up is this unit's, so the plan's chip and finish train the finisher
@@ -1051,7 +1060,11 @@ function M.plan(Bot, board, sight, style, opts)
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and e.isBoss))
-            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
+            -- `hp` is the plan's expected HP over the kill and the survival; the kill chance has
+            -- returned above (> DUST), so what is left of it is at most DUST, and only the share
+            -- that lives heals (M.healed's `kill`)
+            local kill = st.kill[id] and odds(st.kill[id], e.hp) or 0
+            if needed and e.hp - M.healed(healOf(e), e, hp, kill) > M.DUST then return true, true end
         end
         return false, false
     end

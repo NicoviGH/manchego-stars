@@ -922,7 +922,7 @@ do
     -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
     -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf).
     -- wound()'s callers: a strike's target, the lookahead's striker, the army reply's killer,
-    -- and healReds (a red's phase start heals it: #709)
+    -- and healFaction (a red's phase start heals it: #709)
     local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
     local at = src:find("function M.expOf(", 1, true)
     local count = at and src:sub(at, src:find("\nend\n", at, true)) or ""
@@ -2945,19 +2945,27 @@ do
     -- the reds' phase start heals each unit the game would, held to its max HP (addr + 1 here):
     -- 30 of 100 gains 20, 190 of 200 is held at 200, a rescued one is skipped
     local a, b, c = red(99, 30), red(199, 190), red(239, 30, Board.US_RESCUED)
-    sight.healReds({ [99] = a, [199] = b, [239] = c })
-    check(m.u8(99 + 0x13) .. " " .. m.u8(199 + 0x13) .. " " .. m.u8(239 + 0x13), "50 200 30", "healReds: a heal tile heals each red to its max HP, a rescued one not")
+    sight.healFaction({ [99] = a, [199] = b, [239] = c }, "red")
+    check(m.u8(99 + 0x13) .. " " .. m.u8(199 + 0x13) .. " " .. m.u8(239 + 0x13), "50 200 30", "healFaction: a heal tile heals each red to its max HP, a rescued one not")
+    -- a faction's phase heals that faction alone: a blue on the fort (max HP 300 here) is healed by "blue", not "red"
+    local bl = red(299, 30)
+    bl.faction = "blue"
+    sight.healFaction({ [299] = bl }, "red")
+    check(m.u8(299 + 0x13), 30, "healFaction: another faction's unit is not healed")
+    sight.healFaction({ [299] = bl }, "blue")
+    check(m.u8(299 + 0x13), 90, "healFaction: our units heal at our phase, as the reds do at theirs")
 end
 
 -- #709: both reds' phases begin with the heal: stagePhase (enemyPhase's, and nextPhase's first) after
 -- the plan's reds HP is written, and nextPhase's second after the army's reply, before it plays.
 do
     local stage = sightSrc:match("local function stagePhase%(call, plan%).-\n    end\n")
-    check(stage ~= nil and stage:find("plan%.reds or {}%) do.-end\n%s+healReds%(call, byId%)") ~= nil, true,
-          "healReds: the staged phase heals the reds after the plan's HP is written")
+    check(stage ~= nil and stage:find("plan%.reds or {}%) do.-end\n%s+healFaction%(call, byId, \"red\"%)") ~= nil, true,
+          "healFaction: the staged phase heals the reds after the plan's HP is written")
     local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
-    check(nextPhase ~= nil and nextPhase:find("armyReply%(call.-healReds%(call, byId%).-playPhase%(call, proc, byId, berserkFirst, 1,") ~= nil,
-          true, "healReds: the second phase heals the reds after the army's reply, before it plays")
+    check(nextPhase ~= nil and nextPhase:find("healFaction%(call, byId, \"green\"%)%s+healFaction%(call, byId, \"blue\"%)%s+local played = reply and armyReply") ~= nil
+          and nextPhase:find("armyReply%(call.-healFaction%(call, byId, \"red\"%).-playPhase%(call, proc, byId, berserkFirst, 1,") ~= nil,
+          true, "healFaction: our units heal before the army's reply, the reds after it and before the second phase plays")
 end
 
 -- #671, through Sight.new: itemReach is the widest weapon in the bag (a staff counts for nothing),

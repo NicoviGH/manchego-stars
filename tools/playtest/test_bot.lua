@@ -6565,6 +6565,12 @@ do
     check(Planner.outlasting(6, full, 30, 4) .. " " .. Planner.outlasting(6, full, 30, 12) .. " "
           .. Planner.outlasting(9, below, 39, 4) .. " " .. Planner.outlasting(0, full, 30, 4),
           "0 6 3 4", "terrain heal: a blow earns the wound that outlasts the heal")
+    -- a kill heals nothing: 18 HP on a +4 fort (max 20) killed by 18 earns all 18, not 16; a half
+    -- kill (9 of the 18, the other half 6 damage) earns 9 + half of (20 - 16); a dead unit gains no heal
+    local e18 = { hp = 18, maxhp = 20 }
+    check(Planner.outlasting(4, e18, 18, 18, 1) .. " " .. Planner.outlasting(4, e18, 18, 18) .. " "
+          .. Planner.outlasting(4, e18, 18, 12, 0.5) .. " " .. Planner.healed(4, e18, 0) .. " " .. Planner.healed(4, e18, 10, 0.5),
+          "18 18 11.0 0 12.0", "terrain heal: the heal is the survivors' alone, a kill earns what it did")
     -- a sight without the heal read is an error where a blow is scored, not a silent no-heal
     do
         local A = blue(0x01, 0, 0, 0)

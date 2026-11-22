@@ -19,9 +19,10 @@ Under ADR 0439's idle rule the bot could not hold, so it chipped a fort boss for
 counter: the chip was healed back before the boss acted (35 of 55 deaths in #699's Ch15 measure).
 
 **Decided.** `sight.terrainHeal(u)` asks the game (`GetTerrainHealAmount`, `GetUnitMaxHp`, ADR 0369)
-for the HP the tile `u` stands on heals it. `Planner.healed(sight, e, hp)` is the one owner of
-"HP after the heal": `min(max HP, hp + heal)`. `advances()` credits a wound on a needed unit only
-as far as it outlasts that heal: `e.hp - healed > DUST`. The enemy stands on its tile through our
+for the HP the tile `u` stands on heals it. `Planner.healed(heal, e, hp, kill)` is the one owner of
+"HP after the heal": `hp` plus `min(max HP, hp + heal) - hp`, for the share that lives (`1 - kill`);
+a unit at 0 HP gains nothing. `advances()` credits a wound on a needed unit only as far as it
+outlasts that heal: `e.hp - healed > DUST`. The enemy stands on its tile through our
 phase and the heal comes before it acts, so its tile now is the one that heals it. A kill chance, a
 bait kill, a goal or a win chance advance as before: the heal does not touch them.
 
@@ -29,17 +30,25 @@ bait kill, a goal or a win chance advance as before: the heal does not touch the
 the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `healAmount`
 (sight.lua, the game's own read), applied at every boundary through one clamp, `Board.addHp`:
 
-- The simulated enemy phase: `healReds` runs in `stagePhase` after the plan's red HP is written,
+- The simulated enemy phase: `healFaction(..., "red")` runs in `stagePhase` after the plan's red HP is written,
   so `enemyPhase` and `nextPhase`'s first phase begin as the game's do, before any enemy acts. The
   planner's `plan.reds` carries the unhealed HP the plan leaves.
-- The lookahead's second phase: `nextPhase` runs `healReds` again after the army's reply and before
-  the second phase plays. The army's reply itself needs none: the game heals at the start of the
-  enemy's phase, so the reply, a player phase, sees the HP the first phase left.
+- The lookahead's second phase: `nextPhase` heals each faction at the start of its own phase, as
+  the game does (`MakeTerrainHealTargetList(gPlaySt.faction)`): the greens and our units on a heal
+  tile before the army's reply, then the reds again after the reply and before the second phase
+  plays. So the reply sees the reds at the HP the first phase left (no heal between a red phase and
+  the player phase) and our units healed. Each phase is healed once: `stagePhase` heals the first
+  red phase, `nextPhase` the rest, and nothing else heals.
 - `W.dealt` in `score()`: a blow is credited only for the wound that outlasts the heal
-  (`Planner.outlasting`, `healed(hp) - healed(hp - dealt)`, the whole blow where nothing heals).
-  `st.healOf` is the plan's one read of each enemy's heal.
-- `advances()` (the idle rule) as before: `e.hp - Planner.healed(...)`. Its rule and the idle
-  ranking are unchanged; what counts as progress against a healing boss is a separate call.
+  (`Planner.outlasting`): the whole blow where nothing heals; with a kill chance `k`, `k * hp` for
+  the kill branch (the dead heal nothing) plus the surviving branch's wound that outlasts the heal,
+  `healed(hp) - healed(hp - its mean damage)`. `st.healOf` is the plan's one read of each enemy's
+  heal. `st.enemyHp` is an expectation over the kill and the survival, so the heal is applied to the
+  surviving share only.
+- `advances()` (the idle rule): `e.hp - Planner.healed(heal, e, hp, kill)` with `kill` the plan's
+  chance to kill that enemy; a kill chance above `DUST` has already returned as progress, so `kill`
+  here is at most `DUST`. The wound loop returns on the first needed enemy that passes, but every
+  such return is the same `(true, true)`, so its result does not depend on `pairs` order.
 
 `plan.reds` and `st.enemyHp` stay the unhealed HP the plan leaves, so no read counts a heal twice.
 
@@ -47,13 +56,16 @@ the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `h
 0439's "the least-risk advancing plan is then played" line. A plan under the death-risk cap
 (`rank.max_exceed == 0`) keeps the rule above: a wound that outlasts the heal advances. A plan over
 the cap counts a wound as progress no more; it advances only by a kill chance above `DUST`, a goal,
-a carry or the win, as before. `advances()` returns `woundOnly` for a plan whose only progress is
-the wound, and `advancing()` in `admit()` and `pick()` reads it against the rank. No new number.
+a carry or the win, as before. Over the cap a wound counts whether or not its target heals (the call as Nicolas made it).
+`advances()` returns `woundOnly` for a plan whose only progress is
+a wound, and `advancing()` in `admit()` and `pick()` reads it against the rank. No new number.
 *Diagnosis:* Caellach 47 HP on a fort (+9 a phase); the seven-unit assault of trace fix709c turn 27
 took his expected HP 36.97 to 45.97 after the heal (nets 1.03), max_die 0.999, while the holds at
 max_die 0 were rejected as idle (diag709b). *Kill chance:* only this phase's is read. A kill chance
 on any red is a return of its own in `advances()`, ahead of the wound read, so a plan that reaches
-the wound read has none. The lookahead's second-phase kill comes from `sight.nextPhase`, a search
+the wound read has none. (`admit()` runs for every plan at the end of `judge()`, before `pick()`
+reads `rank.max_exceed`, and again after the lookahead; `advancing()` reads the rank `admit()` has
+just set.) The lookahead's second-phase kill comes from `sight.nextPhase`, a search
 made for the finalists after the judge, and `advances()` runs for every plan, so reading it would
 be a new search per plan; ADR 0439 already leaves it out.
 
@@ -69,8 +81,9 @@ sight.lua for the names (the first push of this change crashed every emulator ru
 want of one).
 
 **Cost.** The planner side adds one memoised `sight.terrainHeal` read per enemy per search and
-arithmetic in `score()`. The sandbox side adds `healReds` to each judged phase: four memory reads
-a red and, only on a heal tile, one `GetUnitMaxHp` call; the percent is read once a terrain.
+arithmetic in `score()`. The sandbox side adds `healFaction` to each judged phase (three factions in the
+lookahead's): four memory reads a unit and, only on a heal tile, one `GetUnitMaxHp` call; the
+percent is read once a terrain.
 
 **Evidence.** The 35 of 55 deaths and the Caellach count are from #699's measurement (comment
 7071434440), not re-measured here. Replays (ADR 0430's light proof), all on `b640e-cs-s4003`/
