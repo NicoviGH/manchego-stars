@@ -6390,6 +6390,80 @@ do
     check(takes, false, "recruit on a chest: no convoy key is taken for the chest under him")
 end
 
+-- test_exploring_gives_a_chest_to_the_unit_that_opens_it (#719, vanilla Ch16): the chests at (4,0)
+-- and (6,0) are locked to E (and to F), who reach them only through the key D drops; O opens them
+-- itself. Last decision E held (4,0) by that key. O, freed since, takes a chest, and E keeps one
+-- only when there are two (the control: two chests, one opener, one keyless unit, both taken at
+-- once). A sent pair whose goal the ledger marks stalled (quietGoals) is paired fresh.
+do
+    local O = blue(0x01, 0, 0, 0, { minRange = false })
+    local E = blue(0x02, 1, 1, 0, { minRange = false })
+    local D = red(0x81, 0, 9, { minRange = false })
+    local function goals(chests, sent, quiet)
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 1, 0 }, { 2, 0 }) },
+            field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["2,0"] = 2, ["4,0"] = 0, ["0,9"] = 8 },
+                               ["6,0"] = { ["0,0"] = 6, ["1,0"] = 5, ["2,0"] = 4, ["6,0"] = 0, ["0,9"] = 8 },
+                               ["0,9"] = { ["0,0"] = 9, ["1,0"] = 9, ["2,0"] = 9, ["4,0"] = 9,
+                                           ["6,0"] = 9, ["0,9"] = 0 } },
+            doors = {}, obstacles = {},
+            explorable = {}, canExplore = { [0x01] = {} }, locked = { [0x02] = {} },
+            keySources = { chest = { D } },
+        }
+        for _, x in ipairs(chests) do
+            local k = x .. ",0"
+            o.explorable[#o.explorable + 1] = { x = x, y = 0, kind = "chest" }
+            o.canExplore[0x01][k] = "chest"
+            o.locked[0x02][k] = "chest"
+        end
+        local _, ctx = B.candidates(boardOf(O, E, D), sightOf(o), style("careful"),
+                                    { sent = sent, quietGoals = quiet })
+        local function tile(id)
+            local g = ctx.exploreGoal[id]
+            return g and (g.x .. "," .. g.y) or "-"
+        end
+        return tile(0x01), tile(0x02)
+    end
+    local sentE = { { id = 0x02, x = 4, y = 0 } }
+    local o1, e1 = goals({ 4 }, sentE)
+    check(o1 .. " " .. e1, "4,0 -", "openers first: the opener takes the chest the keyless unit held")
+    o1, e1 = goals({ 4 }, nil)
+    check(o1 .. " " .. e1, "4,0 -", "openers first: fresh pairing gives the chest to the opener")
+    o1, e1 = goals({ 4, 6 }, nil)
+    check(o1 ~= "-" and e1 ~= "-" and o1 ~= e1, true,
+          "openers first: two chests, one opener, one keyless unit: both taken at once")
+    o1, e1 = goals({ 4, 6 }, sentE)
+    check(o1 ~= "-" and e1 ~= "-" and o1 ~= e1, true,
+          "openers first: the keyless unit keeps a chest the opener is not sent to")
+    -- a stalled pair is dropped and paired fresh: the opener, not the sticky unit, now gets it
+    local sentKeyless = { { id = 0x02, x = 4, y = 0 } }
+    o1, e1 = goals({ 4 }, sentKeyless, { ["chest:4,0"] = true })
+    check(o1 .. " " .. e1, "4,0 -", "stalled pair: the goal is paired fresh")
+end
+
+-- test_a_stalled_sent_pair_is_paired_fresh (#719): A, sent to the chest at (4,0), opens it itself;
+-- C is nearer. While the ledger holds the chest live A keeps it (the sticky keep, as above);
+-- once its id is in quietGoals the pair is dropped and the nearest pair takes it.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local C = blue(0x02, 1, 2, 0, { minRange = false })
+    local E = red(0x81, 0, 9, { minRange = false })
+    local function who(quiet)
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 2, 0 }, { 3, 0 }) },
+            field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["2,0"] = 2, ["3,0"] = 1, ["4,0"] = 0 } },
+            doors = {}, obstacles = {},
+            explorable = { { x = 4, y = 0, kind = "chest" } },
+            canExplore = { [0x01] = { ["4,0"] = "chest" }, [0x02] = { ["4,0"] = "chest" } },
+        }
+        local _, ctx = B.candidates(boardOf(A, C, E), sightOf(o), style("careful"),
+                                    { sent = { { id = 0x01, x = 4, y = 0 } }, quietGoals = quiet })
+        return ctx.exploreGoal[0x01] and 0x01 or ctx.exploreGoal[0x02] and 0x02 or 0
+    end
+    check(who(nil), 0x01, "stalled pair: a live goal keeps its sent unit")
+    check(who({ ["chest:4,0"] = true }), 0x02, "stalled pair: a stalled goal is paired fresh")
+end
+
 -- test_a_talker_cut_off_by_a_wall_still_marches_on_a_recruit_on_a_chest (#710): A's way to R is
 -- through a wall it strikes (breachFor), counted by movesFor in marchLength; R stands on a chest A
 -- holds no key for. The Talk is beside him, so the wall's way is A's (a pair is made).
