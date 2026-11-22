@@ -7833,6 +7833,77 @@ do
     check(#asked, 0, "fog read: a later turn's arrival is none yet")
 end
 
+-- test_an_arrival_counts_by_the_chance_it_is_in_reach (#713 fix 3, comment 7087475499): an
+-- arrival may be on any tile its moves reach unseen, each alike; counted in full against every
+-- unit, Ch19's waves read 0.66 to 0.88 on every tile Artur was offered. Here 1 of its 4 tiles
+-- reaches A: a quarter of its strike.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local a = { charId = 0xA0, x = 10, y = 0, eventTurn = 2, boardTurn = 2, mov = 5, reach = 1 }
+    local unseen = { { x = 6, y = 0 }, { x = 9, y = 0 }, { x = 10, y = 4 }, { x = 12, y = 3 },
+                     { x = 0, y = 9 } }
+    local region = B.arrivalRegion(a, nil, 3, unseen, {})
+    check(#region, 4, "arrivalRegion: the unseen tiles one move from its load tile")
+    local from, chance = B.arrivalFrom(a, nil, 3, 0, 0, region, {}, {})
+    check(from and (from.x .. "," .. from.y), "6,0", "arrivalFrom: the region's tile in reach")
+    check(chance, 0.25, "arrivalFrom: the share of the region within MOV + reach")
+    local mixed = B.present({ [12] = 1 }, 0.25)
+    check(string.format("%.2f %.2f", mixed[0], mixed[12]), "0.75 0.25", "present: the strike or nothing")
+    -- the fog read takes it so: a strike that kills, from an arrival a quarter likely in reach,
+    -- reads a quarter; a second one finds no free tile in reach and adds nothing
+    local s = sightOf({
+        unseen = unseen,
+        arrivals = { a, { charId = 0xA1, x = 10, y = 0, eventTurn = 2, boardTurn = 2, mov = 5, reach = 1 } },
+        arrivedOn = { [0x81] = 2, [0x82] = 2 },
+        fogStrike = function() return { takenDist = { [99] = 1 } } end,
+    })
+    -- both on the board since turn 2, fogged, never seen
+    local P = red(0x81, 14, 9, { minRange = false, fogged = true, charId = 0xA0 })
+    local Q = red(0x82, 14, 8, { minRange = false, fogged = true, charId = 0xA1 })
+    local board = boardOf(A, P, Q)
+    board.turn = 3
+    check(B.fogRead(board, s, {}).die(A, 0, 0, 25), 0.25, "fog read: an arrival by its chance in reach")
+end
+
+-- test_the_fog_read_never_stands_an_enemy_on_the_units_own_tile (#713, comment 7087475499: 91 of
+-- 4,492 reads in Ch19): the plan moves the unit onto an unseen tile the board leaves empty; the
+-- seen kit strikes from the nearest OTHER unseen tile.
+do
+    local A = blue(0x01, 0, 1, 1, { minRange = false })   -- on (1,1); the plan moves it to (0,0)
+    local X = red(0x81, 9, 9, { minRange = false })
+    local asked = {}
+    local s = sightOf({
+        unseen = { { x = 0, y = 0 }, { x = 2, y = 0 } },
+        fogStrike = function(u, e, x, y, fx, fy)
+            asked[#asked + 1] = fx .. "," .. fy
+            return { takenDist = { [0] = 1 } }
+        end,
+    })
+    B.fogRead(boardOf(A, X), s, { [0x81] = 0x81 }).die(A, 0, 0, 20)
+    check(table.concat(asked, " "), "2,0", "fog read: never from the unit's own tile")
+end
+
+-- test_a_green_meets_the_fog_read (#713, comment 7087475499: the escort Mansel 0xC8 died in fog on
+-- turn 7, unread): every green's loss is paid as a player unit's, so the fog's strike on it is in
+-- the plan's fog sum and its predict entry.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x40, 5, 3, 0, { faction = "green", minRange = false })
+    local X = red(0x81, 14, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        unseen = { { x = 4, y = 0 } },
+        fogStrike = function(u) return { takenDist = { [0] = 0.5, [99] = 0.5 } } end,
+        enemyPhase = function() return {} end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("bold"))
+    local fog
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x40 then fog = p.fog end
+    end
+    check(fog, 0.5, "green fog: the fog's strike on a green is read")
+end
+
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
 -- acts of the plan in hand not yet played (opts.rest). The beam (one plan wide) and the advance
 -- never build U2 holding at (1,1) with U1 marching to (3,0); handed those acts, the planner

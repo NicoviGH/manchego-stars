@@ -2284,6 +2284,17 @@ function M.plan(Bot, board, sight, style, opts)
             local f = fogDie(p.unit, p.x, p.y, p.hp - (taken[p.unit.id] or 0))
             if f > 0 then st.fogBy[p.unit.id], st.fogSum = f, st.fogSum + f end
         end
+        -- a green meets the fog where the plan leaves it (#713): every green's loss is paid as a
+        -- player unit's (below), so its fog read is summed with theirs. A carried one meets none
+        for _, g in ipairs(greens) do
+            local c = (st.carry or {})[g.id]
+            local gx, gy = g.x, g.y
+            if c and c.x then gx, gy = c.x, c.y end
+            if not (c and c.by) and (g.onField or (c and c.x)) then
+                local f = fogDie(g, gx, gy, g.hp - (taken[g.id] or 0))
+                if f > 0 then st.fogBy[g.id], st.fogSum = f, st.fogSum + f end
+            end
+        end
         st.predict = {}
         for _, g in ipairs(greens) do
             judged = judged - loss(W, st, g.charId) * die[g.id]
