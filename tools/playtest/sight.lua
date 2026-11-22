@@ -141,8 +141,9 @@
 --                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
 --                            HP when it begins, 0 if dead) and .moved. See s.nextPhase.
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
---                            boss = on a Defeat Boss map, the charId whose death quote raises
---                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
+--                            boss = where a boss's death ends the chapter (a Defeat Boss goal, or
+--                            a Misc DefeatBoss event beside another goal), the charId whose death
+--                            quote raises EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
 --                            gameOver = the charIds, on any side, whose death sets
 --                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
@@ -281,6 +282,7 @@ M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the 
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
 M.FACTION_MASK = 0xC0        -- include/bmunit.h: a unit index's faction bits (blue 0x00)
+M.EVFLAG_WIN = 3             -- the same; the completion flag of a win event
 M.EVFLAG_DEFEAT_BOSS = 2     -- include/constants/event-flags.h; DefeatTalkEnt +04 flag
 M.EVFLAG_GAMEOVER = 101      -- the same; RunWaitEvents ends the game when it is set
 M.DEFEAT_TALK_FLAG = 0x04
@@ -375,7 +377,7 @@ local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
 -- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
 local EVENT_FLAG, EVENT_X, EVENT_Y = 0x08, 0x18, 0x19
-local CHAPTER_TURNS, CHAPTER_LOCATIONS = 0x00, 0x08
+local CHAPTER_TURNS, CHAPTER_LOCATIONS, CHAPTER_MISC = 0x00, 0x08, 0x0C
 local TALK_SCRIPT, TALK_PID_A, TALK_PID_B, NO_PID = 0x04, 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
 local CHAPTER_TALKS = 0x04
@@ -1545,6 +1547,31 @@ local function eventSearch(api, call, info, offset)
     api.write32(info, api.mem.u32(events + offset))
 end
 
+-- Inside a sandbox: the scripts the chapter's event list at `offset` offers now, { [script] =
+-- its completion flag (EventInfo +08) }: the game's SearchAvailableEvent walk.
+local function availableScripts(api, call, info, offset)
+    eventSearch(api, call, info, offset)
+    local out = {}
+    local found = call(api.SYM.SearchAvailableEvent, { info })
+    while found ~= 0 do
+        out[api.mem.u32(info + EVENT_SCRIPT)] = api.mem.u32(info + EVENT_FLAG)
+        found = call(api.SYM.SearchNextAvailableEvent, { info })
+    end
+    return out
+end
+
+-- Whether a Misc list's scripts `after` a death flag was set hold one `before` did not that
+-- completes EVFLAG_WIN: the chapter's win event (an unconditional entry is in both; a TMP or
+-- DefeatAll flag's is no DefeatBoss win). Scripts are keyed by address, so two entries sharing
+-- one merge; every such pair in vanilla's Misc lists is AREA entries of one TMP flag (checked by
+-- grepping each *-eventinfo.h Misc list for a repeated script), so none hides a WIN. Pure.
+function M.winEvent(before, after)
+    for script, flag in pairs(after) do
+        if not before[script] and flag == M.EVFLAG_WIN then return true end
+    end
+    return false
+end
+
 -- Sight.batching(outer, guarded, log) -> sandbox, api: Sight.machine made re-entrant (the
 -- planner's cost, #510 step 9) over `outer` (Sight.new's api), and an api whose writes it
 -- journals. guarded = nil, or a function -> the spans of memory ({ { addr, bytes, name } }:
@@ -2607,39 +2634,44 @@ function M.new(outer)
         local ent = call(S.GetDefeatTalkEntry, { charId })
         return ent ~= 0 and mem.u16(ent + M.DEFEAT_TALK_FLAG) or nil
     end
-    -- On a Defeat Boss map, the boss is the unit whose death raises the goal's flag -- how the
-    -- game itself ends the chapter (EVFLAG_DEFEAT_BOSS), not CA_BOSS, which a boss on a cloned
-    -- generic row (Manchego Stars ch03's grell) does not carry.
-    if goal.kind == "boss" then
-        s.objective.boss = sandbox(function(call)
-            for _, u in ipairs(api.board().units) do
-                if u.faction == "red" and u.onField
-                        and defeatFlag(call, u.charId) == M.EVFLAG_DEFEAT_BOSS then
-                    return u.charId
-                end
-            end
-            return nil
-        end)
-    end
     -- The units whose death ends the game, on any side (an escort's too): the game's own death
     -- step, run in one sandbox. SetPidDefeatedFlag sets the unit's flag -- but never
     -- EVFLAG_GAMEOVER for the chapter's protected unit on a non-story map -- and that flag is
     -- what RunWaitEvents ends the game on. Each unit's flag is cleared after (ClearFlag) before
     -- the next is read: GetDefeatTalkEntry skips a row whose flag is set.
-    s.objective.gameOver = sandbox(function(call)
-        local out = {}
+    -- The same pass finds the boss: the red unit whose death raises EVFLAG_DEFEAT_BOSS (its
+    -- row's flag) -- how the game itself ends the chapter, not CA_BOSS, which a boss on a cloned
+    -- generic row (Manchego Stars ch03's grell) does not carry. On a Defeat Boss goal that flag
+    -- is the win. On any other goal it is the win only when the flag makes the Misc list offer a
+    -- new WIN event (M.winEvent: vanilla Ch13's `DefeatBoss(scr)` = AFEV(EVFLAG_WIN, scr,
+    -- EVFLAG_DEFEAT_BOSS), Main_Code_Helpers.h): a Seize map's boss has the same row (Ch3's
+    -- Bazba) and ends nothing, and Ch1's Misc list offers a TMP flag's event, not a WIN (#721).
+    local read = sandbox(function(call, info)
+        local out, boss = {}, nil
+        local before   -- the Misc list's scripts with no death flag set, read at the first candidate
         for _, u in ipairs(api.board().units) do
             local flag = u.onField and defeatFlag(call, u.charId)
             if flag then
+                local candidate = not boss and u.faction == "red" and flag == M.EVFLAG_DEFEAT_BOSS
+                if candidate and goal.kind ~= "boss" then
+                    before = before or availableScripts(api, call, info, CHAPTER_MISC)
+                end
                 call(S.SetPidDefeatedFlag, { u.charId, flag })
                 if call(S.CheckFlag, { M.EVFLAG_GAMEOVER }) & 0xFF ~= 0 then
                     out[#out + 1] = u.charId
                 end
+                if candidate then
+                    if goal.kind == "boss"
+                            or M.winEvent(before, availableScripts(api, call, info, CHAPTER_MISC)) then
+                        boss = u.charId
+                    end
+                end
                 call(S.ClearFlag, { flag })
             end
         end
-        return out
+        return { gameOver = out, boss = boss }
     end)
+    s.objective.gameOver, s.objective.boss = read.gameOver, read.boss
 
     -- The chapter's recruit talks, searched once per Sight (the search runs the game's event
     -- walk): this Sight is made for one prep screen, as `commands` above is read once.
@@ -4305,16 +4337,9 @@ function M.new(outer)
     function s.nextTurnEvent(turn)
         return sandbox(function(call, info)
             local function scriptsAt(t, phase)
-                local out = {}
                 api.write16(S.gPlaySt + PLAY_TURN, t)
                 api.write8(S.gPlaySt + PLAY_FACTION, phase)
-                eventSearch(api, call, info, CHAPTER_TURNS)
-                local found = call(S.SearchAvailableEvent, { info })
-                while found ~= 0 do
-                    out[mem.u32(info + EVENT_SCRIPT)] = true
-                    found = call(S.SearchNextAvailableEvent, { info })
-                end
-                return out
+                return availableScripts(api, call, info, CHAPTER_TURNS)
             end
             local now = scriptsAt(turn, M.PHASES[1])
             for _, at in ipairs(M.eventOrder(turn)) do

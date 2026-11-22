@@ -3225,5 +3225,18 @@ do
     check(sight.readsReds(unitWith({ { id = 1, uses = 5 } })), true, "readsReds: a script that marches before it strikes")
 end
 
+-- test_win_event (#721): the Misc list a boss's death flag makes offer a new script whose completion
+-- flag is EVFLAG_WIN is a DefeatBoss win. Vanilla Ch13 offers AFEV(EVFLAG_WIN, ...); vanilla Ch1
+-- offers AFEV(EVFLAG_TMP(7), ...) (a flag-keyed script, not a win) and an unconditional entry
+-- (offered with or without the flag).
+do
+    local WIN, TMP7 = Sight.EVFLAG_WIN, 0x07 + 0x64
+    check(Sight.winEvent({ [0xA] = 0 }, { [0xA] = 0, [0xB] = WIN }), true, "winEvent: a new WIN script")
+    check(Sight.winEvent({ [0xA] = 0 }, { [0xA] = 0, [0xB] = TMP7 }), false, "winEvent: a new TMP script is no win (Ch1)")
+    check(Sight.winEvent({ [0xA] = WIN }, { [0xA] = WIN }), false, "winEvent: a WIN script offered all along is no change")
+    check(Sight.winEvent({}, { [0xB] = 0 }), false, "winEvent: a new flag-0 script is no win")
+    check(Sight.winEvent({}, {}), false, "winEvent: nothing offered")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
