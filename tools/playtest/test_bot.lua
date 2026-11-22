@@ -9748,6 +9748,9 @@ do
         return a, strike
     end
     local a, strike = run({ kind = "survive", endTurn = 12, boss = 0x81 }, true)
+    -- the named boss is another unit: this CA_BOSS's kill is a plain kill (no win, no forfeit)
+    local _, other = run({ kind = "survive", endTurn = 12, boss = 0x99 }, true)
+    check(other and other.forfeits, 0, "a second CA_BOSS on a survive map: its kill is no win")
     check(strike and strike.forfeits > 0, true, "defeat boss on a survive map: the kill forfeits the recruit")
     check(a and a.act ~= "attack", true, "defeat boss on a survive map: the kill is not played with him owed")
     a, strike = run({ kind = "survive", endTurn = 12 }, true)
@@ -9758,6 +9761,18 @@ do
     check(Planner.winKind({ kind = "survive" }), "survive", "winKind: a survive map with none")
     check(Planner.winKind({ kind = "boss" }), "boss", "winKind: a Defeat Boss map with no named boss")
     check(Planner.winKind({ kind = "rout", boss = 0x81 }), "rout", "winKind: a Rout stays a Rout")
+    check(Planner.winKind({ kind = "seize", boss = 0x81 }), "boss", "winKind: a Seize map's DefeatBoss boss")
+    check(Planner.winKind({ kind = "special" }), "special", "winKind: a special goal with none")
+    check(Planner.winKind({ kind = "special", boss = 0x81 }), "boss", "winKind: a special goal's DefeatBoss boss")
+    -- a second CA_BOSS on the map: only the named one's death is the win (isWinBoss, endsIn)
+    local named = { id = 0x81, charId = 0x81, faction = "red", isBoss = true }
+    local second = { id = 0x82, charId = 0x82, faction = "red", isBoss = true }
+    check(Planner.isWinBoss(named, 0x81) and not Planner.isWinBoss(second, 0x81), true,
+          "isWinBoss: only the named boss")
+    check(Planner.isWinBoss(second, nil), true, "isWinBoss: no name, any CA_BOSS (a Defeat Boss goal with no row)")
+    local byId = { [0x81] = named, [0x82] = second }
+    check(Planner.endsIn("boss", 0, byId, 0x81)(0x81) and not Planner.endsIn("boss", 0, byId, 0x81)(0x82),
+          true, "endsIn: only the named boss's death ends the chapter")
     check(Planner.winKind(nil), nil, "winKind: no objective")
 end
 

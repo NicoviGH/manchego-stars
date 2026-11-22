@@ -442,7 +442,8 @@ local function score(act, st, W, style, odds)
             -- rich goal open -- vanilla Ch5 attempt 8: a chip on the boss, credited five times,
             -- crit it dead with three villages open)
             local want = st.bossWant or 1
-            local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
+            local winning = st.objective == "boss" and M.isWinBoss(e, st.winBoss)
+            local target = winning and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
             -- only the wound that outlasts the tile's heal: a fort heals it back at the start
             -- of the enemy's phase (#709, M.outlasting); the plan's own HP is the unhealed one
@@ -482,7 +483,7 @@ local function score(act, st, W, style, odds)
         if kill >= M.GONE then fx.gone = e.id end
         -- the boss's death is the win: its worth is the goals' (goalTerm), what it completes
         -- less what it closes, never a sum of its own, or no goal could ever wait for it
-        if e.isBoss and st.objective == "boss" then fx.win = kill end
+        if st.objective == "boss" and M.isWinBoss(e, st.winBoss) then fx.win = kill end
     elseif act.act == "talk" then
         -- the recruit joins us: it is off the enemy side, for the plan's later acts and for the
         -- judged phase, as a kill is; its goal is taken (the goals' term)
@@ -694,8 +695,16 @@ function M.either(a, b) return 1 - (1 - a) * (1 - b) end
 -- The kind of win the planner prices for `objective` (sight.objective): "boss" when the boss's
 -- death ends the chapter -- a Defeat Boss goal, or any other goal window beside a Misc
 -- DefeatBoss event (vanilla Ch13: a Survive window, `DefeatBoss(EndingScene)`; sight.objective.boss
--- names that boss) -- else the goal's own kind. A Rout stays a Rout: its last red unit ends it
--- too, and one kind is priced. The one owner of "this boss's death is the win" (#721).
+-- names that boss) -- else the goal's own kind. The one owner of "this boss's death is the win"
+-- (#721), with M.isWinBoss. Known gap: a Rout stays a Rout (one kind is priced), so a Rout map
+-- whose boss's death ends it early is priced as a plain kill.
+-- Whether enemy `e` is the unit whose death is the "boss" win: the one `bossId`
+-- (sight.objective.boss) names, else any CA_BOSS unit (a Defeat Boss goal whose boss has no row).
+-- A second CA_BOSS on a map is no win: its death ends nothing. Pure.
+function M.isWinBoss(e, bossId)
+    return e.isBoss == true and (bossId == nil or e.charId == bossId)
+end
+
 function M.winKind(objective)
     if objective == nil then return nil end
     if objective.kind ~= "rout" and (objective.kind == "boss" or objective.boss) then return "boss" end
@@ -708,12 +717,12 @@ end
 -- map; on a Rout map the last red unit standing. Not a Seize map's throne holder: its death
 -- opens the Seize and ends nothing (ADR 0405: the Seize is the win). The judge's `fell` and
 -- the lookahead's second phase (M.secondRead's `won`) read it alike. Pure.
-function M.endsIn(objective, left, byId)
+function M.endsIn(objective, left, byId, bossId)
     return function(id, gone)
         local e = byId[id]
         -- a red unit only: the player's berserked unit strikes in a phase too (#660)
         if e == nil or e.faction ~= "red" or (gone and gone[id]) then return false end
-        if objective == "boss" then return e.isBoss == true end
+        if objective == "boss" then return M.isWinBoss(e, bossId) end
         if objective ~= "rout" then return false end
         local n = left
         for g in pairs(gone or {}) do
@@ -856,6 +865,7 @@ function M.plan(Bot, board, sight, style, opts)
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = M.winKind(sight.objective)
+    local winBoss = sight.objective and sight.objective.boss
     local gameOver = Bot.gameOver(sight)
     -- the HP a heal tile gives each enemy at its own phase's start (sight.terrainHeal), read once
     -- an enemy for the whole search: its tile and max HP do not move through our phase. Required:
@@ -869,7 +879,8 @@ function M.plan(Bot, board, sight, style, opts)
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     fought = {}, healed = {}, healOf = healOf,
-                    walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
+                    walls = {}, opened = {}, objective = objective, winBoss = winBoss,
+                    recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {}, carry = {}, wear = {}, redWear = {} }
     -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
     -- { x, y } once dropped (score's fx.carry, fx.drop); the board's carries to start
@@ -1046,7 +1057,7 @@ function M.plan(Bot, board, sight, style, opts)
     local function winOf(st, fell) return M.either(winChance(st), fell or 0) end
     -- M.endsIn on the board plan `st` leaves (a Rout's count less the plan's kills)
     local function endsIn(st)
-        return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId)
+        return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId, winBoss)
     end
     -- Whether a plan advances the level (ADR 0439): it kills a red unit (our blows, or our
     -- counters in the judged phase: a bait counts), takes a goal (a visit, chest, talk or
@@ -1071,7 +1082,7 @@ function M.plan(Bot, board, sight, style, opts)
         for id, hp in pairs(st.enemyHp) do
             local e = byId[id]
             local needed = e and not st.recruits[id]
-                and (objective == "rout" or (objective == "boss" and e.isBoss))
+                and (objective == "rout" or (objective == "boss" and M.isWinBoss(e, winBoss)))
             -- no kill share is needed here: a kill chance above DUST returned as progress in the
             -- kill loop above, so `hp` (the plan's expected HP) is a survivor's, to within DUST
             if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
@@ -1393,7 +1404,9 @@ function M.plan(Bot, board, sight, style, opts)
                     enemyHp = copy(st.enemyHp), hp = copy(st.hp), took = copy(st.took),
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
-                    opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
+                    opened = copy(st.opened), objective = objective, winBoss = winBoss,
+                    recruits = st.recruits,
+                    gameOver = st.gameOver,
                     kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
                     redWear = copy(st.redWear), changeKey = st.changeKey, healOf = st.healOf }
         n.acts[#n.acts + 1] = a
