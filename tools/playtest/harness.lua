@@ -1503,8 +1503,8 @@ INSPECT.itemSubmenu = function(slot)
     return true
 end
 
--- Item -> inventory `slot` -> Equip (#641: a bait waits holding the weapon its counter answers
--- the boss with). ItemSubMenu_EquipItem (bmmenu.c) calls EquipUnitItemSlot, which moves the
+-- Item -> inventory `slot` -> Equip (a wait's held weapon: #641's bait holds the one its counter
+-- answers the boss with, #730's gentle wait the one whose counter spares a recruit). ItemSubMenu_EquipItem (bmmenu.c) calls EquipUnitItemSlot, which moves the
 -- item to the bag's front, and goes back to the inventory list; B there starts the unit menu
 -- again (ItemMenu_ButtonBPressed), where the Wait follows. -> true, or nil, why.
 INSPECT.equipSlot = function(slot)
@@ -3913,7 +3913,7 @@ INSPECT.botApi = function(game)
             end, 900) then return false end
             return waitFor(won, 9000, true)
         end
-        -- a bait's wait holds its weapon (Bot.baitAt's `slot`): equipped first, as the judged
+        -- a wait holds its weapon (a bait's or a gentle wait's `slot`): equipped first, as the judged
         -- phase armed it
         if a.act == "wait" and a.slot and a.slot > 0 then
             local equipped, why = INSPECT.equipSlot(a.slot)

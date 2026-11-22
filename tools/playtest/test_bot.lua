@@ -6392,52 +6392,81 @@ do
 end
 
 -- test_a_wait_holding_a_sparing_weapon_saves_a_recruit (#730, ADR 0451; vanilla Ch10's Amelia,
--- charId 18): A (20 HP) can only wait on (0,0), where the recruit R (20 HP) strikes it. A's first
--- weapon (slot 0) counters for 30 and fells R; the one in slot 2 counters for 2. No tile is out of
--- R's reach, so on main every plan forfeits R (a counter uses the first usable weapon, and no wait
+-- charId 18): A (20 HP) waits on a column of tiles, each in reach of the recruit R (20 HP), which
+-- strikes for 5. A's first weapon (slot 0) counters for 30 and fells R. On (0,5), the tile
+-- farthest from the march, the weapon in slot 2 counters for 2 and spares R. With every tile in R's
+-- reach, on main every plan forfeits R (a counter uses the first usable weapon, and no wait
 -- carried a slot). The menu now offers the wait holding slot 2 ("gentle"), the judged phase arms A
--- with it, and that plan forfeits nothing: it is the plan played, past the per-unit cut and with the
--- beam cut to one plan (the mend tries the struck unit's menu).
-do
-    local function scene()
-        local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
-                                                    { slot = 2, min = 1, max = 1 } } })
-        local R = red(0x81, 3, 0, { hp = 20, minRange = 1, maxRange = 1 })
-        local function strike(counter)
-            return fc { takenHit = 100, takenDmg = 5, takenHits = 1, counterHit = 100,
-                        counterDmg = counter, counterHits = 1, strikerHp = 20 }
-        end
-        local o = {
-            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 1, 0 }) },
-            danger = { ["0,0"] = 1 },
-            talk = { [0x01] = { [0x81] = true } },
-            fc = { [0x01] = { [0x81] = { ["0,0"] = strike(30), ["0,0/2"] = strike(2) } } },
-            enemyPhase = function(plan)
-                local held
-                for _, b in ipairs(plan.blues) do
-                    if b.unit.id == 0x01 then held = b.slot end
-                end
-                return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 5, takenHits = 1,
-                           targetHp = 20, counterHit = 100, counterDmg = held == 2 and 2 or 30,
-                           counterHits = 1, strikerHp = 20 } }
-            end,
-        }
-        return boardOf(A, R), o
+-- with it, and that plan forfeits nothing: it is the plan played, past the per-unit cut (A's three
+-- holds and its march outrank it by their own score, the same as its hold on (0,5), so at PER_UNIT 3
+-- only the cut's "gentle" line keeps it) and with the beam cut to one plan (the mend tries the struck
+-- unit's menu). Opts: `slots` = the weapons A holds, `strike` = the strike on (0,5) by slot,
+-- `die` = A's HP lost by the strike by slot.
+local function sparingScene(opt)
+    opt = opt or {}
+    local weapons = { { slot = 0, min = 1, max = 1 }, { slot = 2, min = 1, max = 1 } }
+    if opt.three then weapons[3] = { slot = 3, min = 1, max = 1 } end
+    local A = blue(0x01, 0, 0, 5, { weapons = weapons, acted = opt.acted })
+    local R = red(0x81, 3, 0, { hp = 20, minRange = 1, maxRange = 1 })
+    local counter = opt.counter or { [0] = 30, [2] = 2 }
+    local dmg = opt.dmg or { [0] = 5, [2] = 5 }
+    local chit = opt.chit or {}   -- the counter's hit chance by slot (100 unless told)
+    local function strike(slot)
+        local c = counter[slot] or 30
+        return fc { takenHit = 100, takenDmg = dmg[slot] or 5, takenHits = 1,
+                    counterHit = chit[slot] or 100, counterDmg = c, counterHits = 1, strikerHp = 20 }
     end
-    local board, o = scene()
+    local col, reach = {}, {}
+    for y = 0, 5 do
+        col[#col + 1] = { 0, y }
+        reach[#reach + 1] = { 1, y }
+    end
+    local fcs = {}
+    for y = 0, 4 do fcs["0," .. y] = strike(nil) end
+    fcs["0,5"] = strike(nil)
+    -- the tiles where a weapon in another slot answers differently: (0,5), and any `also`
+    local spare = { [5] = true }
+    for _, y in ipairs(opt.also or {}) do spare[y] = true end
+    for y in pairs(spare) do
+        for slot in pairs(counter) do
+            if slot > 0 then fcs["0," .. y .. "/" .. slot] = strike(slot) end
+        end
+    end
+    local danger = {}
+    for y = 0, 5 do danger["0," .. y] = 1 end
+    local o = {
+        reach = { [0x01] = tiles(table.unpack(col)), [0x81] = tiles(table.unpack(reach)) },
+        danger = danger,
+        talk = { [0x01] = { [0x81] = true } },
+        fc = { [0x01] = { [0x81] = fcs } },
+        enemyPhase = function(plan)
+            local held, at
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then held, at = b.slot, b.y end
+            end
+            local slot = spare[at] and held or nil
+            return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = dmg[slot] or 5,
+                       takenHits = 1, targetHp = 20, counterHit = chit[slot] or 100,
+                       counterDmg = counter[slot] or 30, counterHits = 1, strikerHp = 20 } }
+        end,
+    }
+    return boardOf(A, R), o
+end
+do
+    local board, o = sparingScene()
     local cands = B.candidates(board, sightOf(o), style("careful"))
-    local gentle
+    local gentle = {}
     for _, c in ipairs(cands) do
         for _, a in ipairs(c.acts) do
-            if a.why == "gentle" then gentle = a end
+            if a.why == "gentle" then gentle[#gentle + 1] = a end
         end
     end
-    check(gentle and gentle.act .. "#" .. tostring(gentle.slot) .. "@" .. at(gentle), "wait#2@0,0",
-          "gentle: the menu offers A's wait holding the weapon whose counter spares R")
-    for _, cut in ipairs({ 4, 0 }) do
+    check(#gentle == 1 and gentle[1].act .. "#" .. tostring(gentle[1].slot) .. "@" .. at(gentle[1]),
+          "wait#2@0,5", "gentle: the menu offers A's wait holding the weapon whose counter spares R")
+    for _, cut in ipairs({ 3, 0 }) do
         local perUnit = Planner.PER_UNIT
         Planner.PER_UNIT = cut
-        board, o = scene()
+        board, o = sparingScene()
         local beam = Planner.BEAM
         Planner.BEAM = 1
         local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
@@ -6446,11 +6475,55 @@ do
         for _, p in ipairs(plan and plan.predict or {}) do
             if p.recruit then r = p end
         end
-        check(a and a.act .. "#" .. tostring(a.slot), "wait#2",
+        check(a and a.act .. "#" .. tostring(a.slot) .. "@" .. at(a), "wait#2@0,5",
               "gentle: the plan played has A wait holding slot 2 (PER_UNIT " .. cut .. ")")
         check(plan and #(plan.forfeited or {}), 0, "gentle: the plan played forfeits no recruit")
         check(r == nil or r.die < Planner.DUST, true, "gentle: R's chance to fall is about nothing")
     end
+end
+
+-- test_a_gentle_wait_counts_the_units_own_death (#730): slot 2 spares R but its strike kills A (25
+-- HP of damage on 20); slot 3 spares R and A lives. The wait offered and played holds slot 3, not
+-- the weapon that merely spares R (the forfeit is yes or no, so a counter that fells R less but
+-- not never would change no plan).
+do
+    local opt = { three = true, counter = { [0] = 30, [2] = 2, [3] = 2 },
+                  dmg = { [0] = 5, [2] = 25, [3] = 5 } }
+    local board, o = sparingScene(opt)
+    local cands = B.candidates(board, sightOf(o), style("careful"))
+    local slots = {}
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.acts) do
+            if a.why == "gentle" then slots[#slots + 1] = tostring(a.slot) end
+        end
+    end
+    check(table.concat(slots, ","), "3", "gentle: only the weapon that spares R and keeps A alive is offered")
+    board, o = sparingScene(opt)
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a = Planner.plan(B, board, sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(a and a.act .. "#" .. tostring(a.slot), "wait#3", "gentle: A waits holding slot 3")
+    -- the cap: four tiles each sparing R, the best M.GENTLE offered, the lowest tile on a tie
+    board, o = sparingScene({ also = { 1, 2, 3 } })
+    local n = 0
+    for _, c in ipairs(B.candidates(board, sightOf(o), style("careful"))) do
+        for _, x in ipairs(c.acts) do
+            if x.why == "gentle" then n = n + 1 end
+        end
+    end
+    check(n, B.GENTLE, "gentle: no more than M.GENTLE acts a unit are offered")
+    check(B.GENTLE, 2, "gentle: the cap is two")
+    -- a unit that acted already holds the weapon it equipped: no menu, so no gentle wait (46 of
+    -- the 106 recorded recruit counter deaths were such units, #730)
+    board, o = sparingScene({ acted = true })
+    n = 0
+    for _, c in ipairs(B.candidates(board, sightOf(o), style("careful"))) do
+        for _, x in ipairs(c.acts) do
+            if x.why == "gentle" then n = n + 1 end
+        end
+    end
+    check(n, 0, "gentle: a unit that has acted is offered none")
 end
 
 -- test_planner_never_credits_killing_a_recruit: A can kill R from (1,0); C, far off, is the one

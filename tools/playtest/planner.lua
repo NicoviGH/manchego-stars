@@ -1887,8 +1887,8 @@ function M.plan(Bot, board, sight, style, opts)
                                       -- act: the game runs the chapter's Misc events after it
                                       -- (#712, waitsIn)
                                       acted = a ~= nil, order = nth[u.id],
-                                      -- a strike's weapon, or a bait's (Bot.baitAt): the
-                                      -- one its counter answers the boss with
+                                      -- a strike's weapon, or a wait's held one (a bait's,
+                                      -- a gentle wait's): the one its counter answers with
                                       slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
                                       wearSlot = w and w.slot, wear = w and w.uses }
         end
