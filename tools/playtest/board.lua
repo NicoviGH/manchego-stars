@@ -180,12 +180,19 @@ function Board.distance(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
 end
 
--- One unit across attempts at the same chapter start (a retry's memory, ADR 0399): every attempt
--- loads the same start, so a unit keeps its slot (`id`); an arrival can take a slot another unit
--- died out of, so the character and class must match too (most enemies share one generic
--- character id, so the character alone does not tell two soldiers apart). The one owner of the
--- key: campaign.lua's memory and sight's knows() both build it here.
-function Board.memoryKey(id, charId, classId)
+-- One unit across attempts at the same chapter start (a retry's memory, ADR 0399, 0449). A unit
+-- on the field at the start keeps its slot (`id`: every attempt loads the same start, so the slot
+-- is its stable name, and a player recalls it by where it stood, which the slot stands for), with
+-- its character and class (most enemies share one generic character id, so the character alone
+-- does not tell two soldiers apart). An ARRIVAL (`arrival` = the turn it first stood on the
+-- board, > 0) is named the way a player recalls it, by class and wave: arrivals reuse the slots
+-- of units that died, so the slot is not stable between attempts (#713: the Sniper of slot 147
+-- in attempt 2 held a Great Knight and a Warrior in attempt 1). The one owner of the key:
+-- campaign.lua's memory and sight's knows() both build it here.
+function Board.memoryKey(id, charId, classId, arrival)
+    if arrival and arrival > 0 then
+        return "a:" .. tostring(charId) .. ":" .. tostring(classId) .. ":" .. tostring(arrival)
+    end
     return tostring(id) .. ":" .. tostring(charId) .. ":" .. tostring(classId)
 end
 

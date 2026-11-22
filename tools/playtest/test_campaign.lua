@@ -896,6 +896,15 @@ local function test_a_retry_remembers_the_enemies_it_saw()
     for _, e in ipairs(m3.enemies) do ids[#ids + 1] = string.format("%x:%x", e.id, e.charId) end
     check(table.concat(ids, ","), "81:50,82:51,81:52",
           "attempt 3: the union, each enemy once; a slot another unit took is another enemy")
+    -- ADR 0449: an arrival's turn is kept, and keys it apart from the same slot's other units
+    local g2 = fakeGame { chapters = { { id = 1, outcomes = { "lost", "won" },
+        enemies = { [1] = { { id = 0x93, charId = 0x50, classId = 1, arrival = 7 },
+                            { id = 0x93, charId = 0x50, classId = 1 } } } } } }
+    Campaign.run(g2.api)
+    local kept = g2.plays[2].style.memory.enemies
+    check(#kept, 2, "an arrival and a start unit of one slot, class and character are two memories")
+    check(kept[1].arrival, 7, "attempt 2: the arrival's turn is kept")
+    check(kept[2].arrival, nil, "and a start unit has none")
     m2.enemies[1] = nil
     check(#g.plays[3].style.memory.enemies, 3, "each attempt gets its own copy")
     -- a unit whose class was not read is not kept: its key would match nothing

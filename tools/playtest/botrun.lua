@@ -1002,9 +1002,16 @@ function M.run(api)
     -- board showed, kept by its whole key (Board.memoryKey): a unit killed and a reinforcement
     -- later loaded into its slot are both remembered
     local seenReds, enemiesSeen = {}, {}
+    -- the turn each slot's present red unit arrived on (ADR 0449): slot -> { charId, classId,
+    -- turn }; 0 for one on the field at the first board. An enemy is remembered by it
+    -- (Board.memoryKey): the slot an arrival lands in is not the same between attempts
+    local arrivedOn, playSight = {}, nil
     local function sawEnemy(id, charId, classId)
-        enemiesSeen[Bot.memoryKey(id, charId, classId)] = { id = id, charId = charId,
-                                                               classId = classId }
+        local a = arrivedOn[id]
+        local arrival = a and a.charId == charId and a.classId == classId and a.turn > 0
+            and a.turn or nil
+        enemiesSeen[Bot.memoryKey(id, charId, classId, arrival)] = { id = id, charId = charId,
+                                                            classId = classId, arrival = arrival }
     end
     local function changes(after)
         if api.recruits and not owed then
@@ -1034,6 +1041,24 @@ function M.run(api)
                                                                       or after.turn or turn,
                                                                   x = e.x, y = e.y,
                                                                   charId = e.charId }
+                end
+            end
+        end
+        -- every red's arrival turn, fogged or not (the board reads the unit's struct; the turn
+        -- only names it for the retry's memory, ADR 0449). As arrivals_seen's boardTurn: the
+        -- first player turn it stands on
+        local was = lastBoard and byId(lastBoard) or {}
+        for _, u in ipairs(after.units or {}) do
+            local a = arrivedOn[u.id]
+            if u.faction == "red" and u.onField and not u.dead
+                and (not (was[u.id] and was[u.id].onField)
+                     or (a and (a.charId ~= u.charId or a.classId ~= u.classId))
+                     or not a) then
+                local inPhase = lastBoard and actedIn and actedIn.ids[u.id] and actedIn.turn
+                local turn0 = lastBoard and (inPhase and inPhase + 1 or after.turn or turn) or 0
+                arrivedOn[u.id] = { charId = u.charId, classId = u.classId, turn = turn0 }
+                if playSight and playSight.arrived then
+                    playSight.arrived(u.id, u.charId, u.classId, turn0)
                 end
             end
         end
@@ -1315,7 +1340,8 @@ function M.run(api)
         -- every red a board or a fight showed: campaign.lua's memory for the next retry
         for _, e in pairs(enemiesSeen) do rec.enemies_seen[#rec.enemies_seen + 1] = e end
         table.sort(rec.enemies_seen, function(a, b)
-            return Bot.memoryKey(a.id, a.charId, a.classId) < Bot.memoryKey(b.id, b.charId, b.classId)
+            return Bot.memoryKey(a.id, a.charId, a.classId, a.arrival)
+                < Bot.memoryKey(b.id, b.charId, b.classId, b.arrival)
         end)
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
@@ -1327,6 +1353,7 @@ function M.run(api)
         api.seed(api.info.seed)
         rec.dice_start = api.dice and api.dice() or nil   -- right after the campaign's advance
         local sight = api.sight()
+        playSight = sight
         -- a retry's memory (ADR 0399): what earlier attempts at this start showed plays as seen
         if sight.remember then sight.remember(style.memory and style.memory.enemies) end
         -- the units whose death ends the game, as the game says (sight.objective.gameOver)

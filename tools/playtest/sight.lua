@@ -2511,8 +2511,14 @@ function M.changed(sandbox, api, S, isolate, change, byId, fn, prime)
 end
 
 -- Whether red unit `u` is one a retry remembers: `keys` = { [Board.memoryKey] = true } (s.knows).
-function M.knows(Board, keys, u)
-    return keys ~= nil and u ~= nil and keys[Board.memoryKey(u.id, u.charId, u.classId)] == true
+-- `arrival`: the turn `u` arrived on (nil for one on the field at the start). An entry kept
+-- before ADR 0449 has no arrival and is keyed by slot whatever the unit was: the slot key is
+-- tried too, so a memory stored in that form keeps matching (an entry with an arrival has no
+-- slot key, so it never matches by slot).
+function M.knows(Board, keys, u, arrival)
+    if keys == nil or u == nil then return false end
+    return keys[Board.memoryKey(u.id, u.charId, u.classId, arrival)] == true
+        or keys[Board.memoryKey(u.id, u.charId, u.classId)] == true
 end
 
 -- Whether an enemy with unit state `state` counts as seen (Board.playsAsSeen, the game's US_BIT9
@@ -2873,12 +2879,23 @@ function M.new(outer)
         remembered = nil
         for _, e in ipairs(enemies or {}) do
             remembered = remembered or {}
-            remembered[Board.memoryKey(e.id, e.charId, e.classId)] = true
+            remembered[Board.memoryKey(e.id, e.charId, e.classId, e.arrival)] = true
         end
         -- every answer read before is without the memory; attempt 1 (none) keeps them
         if remembered then s.refresh() end
     end
-    function s.knows(u) return M.knows(Board, remembered, u) end
+    -- The turn each slot's present unit arrived on (botrun's changes, ADR 0449): slot -> { charId,
+    -- classId, turn }. A slot another unit holds now has no arrival under this unit's name.
+    local arrivals = {}
+    function s.arrived(id, charId, classId, turn)
+        arrivals[id] = { charId = charId, classId = classId, turn = turn }
+        if remembered then s.refresh() end
+    end
+    function s.arrivalOf(u)
+        local a = arrivals[u.id]
+        return a and a.charId == u.charId and a.classId == u.classId and a.turn or nil
+    end
+    function s.knows(u) return M.knows(Board, remembered, u, s.arrivalOf(u)) end
     -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
     -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen.
     -- Where each stands and its fog bit are read off its unit struct, not the board's snapshot:

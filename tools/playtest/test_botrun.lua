@@ -857,6 +857,44 @@ do
     check(seen[Bot.memoryKey(0x83, 2)], nil, "one only ever fogged is not")
 end
 
+-- ADR 0449: an arrival is remembered by the turn it came on (the board turn arrivals_seen's
+-- boardTurn names), not left as its slot; a red on the field at the start has none; and the
+-- sight is told each arrival's turn as the board shows it, fogged or not.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                g.units[#g.units + 1] = unit(0x82, 1, "red", 9, 9, 10)
+                local hid = unit(0x83, 2, "red", 9, 8, 10)
+                hid.fogged = true
+                g.units[#g.units + 1] = hid
+            end
+            return {}
+        end,
+    }
+    local told = {}
+    local make = g.api.sight
+    g.api.sight = function()
+        local s = make()
+        s.arrived = function(id, charId, classId, turn) told[id] = turn end
+        return s
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local byChar = {}
+    for _, e in ipairs(r.enemies_seen) do byChar[e.charId] = e end
+    check(byChar[0x82].arrival, r.arrivals_seen[1].boardTurn, "an arrival in sight is kept with its turn")
+    check(told[0x82], r.arrivals_seen[1].boardTurn, "the sight is told the arrival's turn")
+    check(told[0x83], told[0x82], "a fogged arrival is told its turn too")
+    for _, u in ipairs(rout()) do
+        if u.faction == "red" then
+            check(byChar[u.charId].arrival, nil, "a red on the field at the start has no arrival")
+            check(told[u.id], 0, "and the sight is told turn 0")
+        end
+    end
+end
+
 -- test_a_retry_starts_from_its_memory (ADR 0399): style.memory reaches the attempt's sight
 -- (remember: what plays as seen); it is not handed back as seen this attempt (campaign.lua keeps
 -- the union) nor given to the fog read's enemies seen; attempt 1 (no memory) tells nothing.

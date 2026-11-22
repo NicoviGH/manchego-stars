@@ -1052,6 +1052,20 @@ do
     local bound = Board.bind({}, {})
     check(Sight.knows(bound, keys, { id = 0x81, charId = 0x80, classId = 0x0A }), true,
           "knows: the bound Board keys it too")
+    -- ADR 0449 (#713): an arrival is named by class and turn, not by the slot it landed in
+    local SNIPER, GREAT_KNIGHT = 0x0A, 0x0B
+    local arrivalKeys = { [Board.memoryKey(147, 0x80, SNIPER, 7)] = true }
+    check(Sight.knows(Board, arrivalKeys, { id = 150, charId = 0x80, classId = SNIPER }, 7), true,
+          "knows: a Sniper arriving on turn 7 in another slot is remembered")
+    check(Sight.knows(Board, arrivalKeys, { id = 147, charId = 0x80, classId = GREAT_KNIGHT }, 7), false,
+          "knows: a Great Knight taking the slot is not")
+    check(Sight.knows(Board, arrivalKeys, { id = 147, charId = 0x80, classId = SNIPER }, 8), false,
+          "knows: the same class on another turn is another wave")
+    check(Sight.knows(Board, arrivalKeys, { id = 147, charId = 0x80, classId = SNIPER }), false,
+          "knows: an arrival's entry does not match a unit that stood there at the start")
+    -- an entry kept before arrivals were keyed (no arrival) still matches by slot
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x80, classId = 0x0A }, 7), true,
+          "knows: an old slot-keyed entry still matches, whatever turn the unit arrived on")
     -- playsAsSeen: in sight always; in fog only when remembered
     local FOG = Board.US_BIT9
     check(Sight.playsAsSeen(bound, 0, false), true, "playsAsSeen: in sight")
