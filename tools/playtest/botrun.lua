@@ -1348,7 +1348,7 @@ function M.run(api)
         -- the tiles units were sent to explore: they outlive the turn's last, empty plan (no
         -- unit left to act returns none), so the next turn keeps the same senders; and the
         -- goals units were found blocked from, since which turn (Bot.candidates' opts.stuck)
-        local sent, stuck
+        local sent, stuck, tried
         -- the plan being played this phase: its next act's index, and the board before the
         -- last act it played (Planner.surprise compares the two)
         local playing, nextAct, before
@@ -1421,7 +1421,7 @@ function M.run(api)
                     return nil, nil, cost
                 end
                 dplan = { acts = { da }, forced = true, goals = plan and plan.goals,
-                          stuck = plan and plan.stuck }
+                          stuck = plan and plan.stuck, tried = plan and plan.tried }
             else
                 error("botrun: no diagnostic mode " .. tostring(diag.mode))
             end
@@ -1546,7 +1546,7 @@ function M.run(api)
                             -- the army has made no progress for as long as a goal is
                             -- stalled on: holding is then no plan (planner.lua, ADR 0439). The
                             -- `quiet` the stuck abort reads, so the bot's two readings agree
-                            return { stalled = stalled, sent = sent, stuck = stuck,
+                            return { stalled = stalled, sent = sent, stuck = stuck, tried = tried,
                                      idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
@@ -1643,7 +1643,7 @@ function M.run(api)
                         overBudget("lookahead_budget", (cost.look or {}).skipped_budget or 0)
                         overBudget("wear_budget", (cost.look or {}).wear_skipped or 0)
                         if plan then
-                            sent, stuck = plan.goals, plan.stuck
+                            sent, stuck, tried = plan.goals, plan.stuck, plan.tried
                             -- the tiles whose goal row this plan's ledger left stalled: a win
                             -- that leaves one of them missing says so (`finish`)
                             stalledRows = {}

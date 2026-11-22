@@ -2511,12 +2511,20 @@ local function sendOpeners(ctx, barred)
     end
 end
 
-local function exploring(ctx, sent, barred)
+local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
+    ctx.tried = {}
     barred = barred or {}
     local taken = {}
+    -- Whether `u` uses `t` on its own: the game's menu check, never asked of a unit that has acted
+    -- (an acted unit keeps its tile on the path alone). Not Goals.list's takerUnits (any unit
+    -- that opens it, or that an enemy's key would let), nor botrun's reading of a goal's takers:
+    -- those ask who could ever take the goal, this who needs no one's key now.
+    local function ownOpener(u, t)
+        return u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)
+    end
     local function reaches(u, t)
-        if u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind) then return marchLength(ctx, u, t) end
+        if ownOpener(u, t) then return marchLength(ctx, u, t) end
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
         return lockAt(ctx, u, t.x, t.y) and movesFor(ctx, u, t) or nil
     end
@@ -2559,30 +2567,89 @@ local function exploring(ctx, sent, barred)
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
     if not ctx.sight.explorable then return end
-    local pairs_ = {}
     local open, blues = {}, {}
     for _, t in ipairs(openTiles(ctx)) do open[tileKey(t.x, t.y)] = t end
     for _, u in ipairs(ctx.blues) do blues[u.id] = u end
-    for _, g in ipairs(sent or {}) do
-        local t, u = open[tileKey(g.x, g.y)], blues[g.id]
-        if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-            and not isBarred(barred, u.id, t)
-            and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0 then
-            taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
+    -- A keyless unit is one that reaches a chest only by way of the key an enemy drops (#719:
+    -- vanilla Ch16, Colm freed by a thief's opening of his chest waited twenty turns at (14,4)
+    -- while Eirika and Seth held the two chests he opens, through a Druid's key).
+    -- Whether a free unit (no goal, not spent on a tile already) opens `t` itself and gets
+    -- there; the one found is spent, so two keyless pairs and one opener drop one pair, not both
+    -- (both dropped could swap chests and walk back: the handoff the sticky keep prevents).
+    local spent = {}
+    local function openerFree(t, but)
+        for _, w in ipairs(ctx.actors) do
+            if w ~= but and not spent[w.id] and not ctx.exploreGoal[w.id]
+                and not isBarred(barred, w.id, t) and ownOpener(w, t) and reaches(w, t)
+                and select(2, sendWorth(ctx, w, t)) > 0 then
+                spent[w.id] = true
+                return true
+            end
+        end
+        return false
+    end
+    -- The sent pairs, openers' first: a keyless pair is dropped while a free opener stands to
+    -- take the chest, and so is a pair of a unit that can act whose goal the ledger marks
+    -- stalled (quietGoals: no unit has neared it over GOAL_QUIET waiting player phases, and the
+    -- sticky keep is what held it there; a village stalls like a chest, nothing about it makes
+    -- standing still fine). An acted unit keeps its tile, as it always did. Both are paired fresh
+    -- below, and the unit a stalled pair dropped comes last for that goal (`dropped`): a stalled
+    -- goal handed back to the same unit would stall on.
+    -- `tried[goal id]` = the units a stalled goal was already given to (triedIn, last decision's,
+    -- carried like `sent`; kept only while the goal stays quiet): a unit is dropped from a
+    -- stalled goal once per quiet spell, so the goal does not swap between two units for ever
+    -- (goalQuiet counts the goal, not the pair, and its nearest reading is a min over all takers)
+    local quiet, tried = ctx.quietGoals or {}, ctx.tried
+    local function triedOn(id)
+        if not tried[id] then
+            tried[id] = {}
+            for k in pairs(triedIn and triedIn[id] or {}) do tried[id][k] = true end
+        end
+        return tried[id]
+    end
+    for id in pairs(triedIn or {}) do
+        if quiet[id] then triedOn(id) end
+    end
+    for _, keyless in ipairs({ false, true }) do
+        for _, g in ipairs(sent or {}) do
+            local t, u = open[tileKey(g.x, g.y)], blues[g.id]
+            if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
+                and ownOpener(u, t) ~= keyless and not isBarred(barred, u.id, t) then
+                if not u.acted and quiet[t.id] and not triedOn(t.id)[u.id] then
+                    triedOn(t.id)[u.id] = true
+                elseif reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0
+                    and not (keyless and openerFree(t, u)) then
+                    taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
+                end
+            end
         end
     end
     -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
-    -- slow one would lose), the nearer on a tie
+    -- slow one would lose), the nearer on a tie; the units that open the tile themselves
+    -- first, then the keyless ones take what is left (a chest only an enemy's key opens for
+    -- them goes to an opener, but two chests still go to two units while one opener is
+    -- free for one: ch23's win took its chests in parallel that way), and last the unit a
+    -- stalled pair just dropped, when no other is left to take its goal
+    local byOpen = { {}, {}, {} }
     for _, t in ipairs(openTiles(ctx)) do
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
             if d then
                 local v, c = sendWorth(ctx, u, t)
-                if c > 0 then pairs_[#pairs_ + 1] = { t = t, u = u, d = d, v = v } end
+                if c > 0 then
+                    local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
+                        or byOpen[ownOpener(u, t) and 1 or 2]
+                    list[#list + 1] = { t = t, u = u, d = d, v = v }
+                end
             end
         end
     end
-    assign(pairs_, function(t) return tileKey(t.x, t.y) end)
+    for _, list in ipairs(byOpen) do assign(list, function(t) return tileKey(t.x, t.y) end) end
+    -- a unit now holding a stalled goal has had its turn with it: the next decision keeps it
+    for uid, g in pairs(ctx.exploreGoal) do
+        local t = open[tileKey(g.x, g.y)]
+        if t and not g.door and quiet[t.id] then triedOn(t.id)[uid] = true end
+    end
     sendOpeners(ctx, barred)
 end
 
@@ -3153,7 +3220,7 @@ function M.candidates(board, sight, style, opts)
             if e.since < turn then barred[k] = true end
         end
         local before = ctx.exploreGoal
-        exploring(ctx, opts and opts.sent, barred)
+        exploring(ctx, opts and opts.sent, barred, opts and opts.tried)
         out = propose(ctx, out, before)
         local more = false
         for _, c in ipairs(out) do

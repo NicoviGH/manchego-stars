@@ -6390,6 +6390,160 @@ do
     check(takes, false, "recruit on a chest: no convoy key is taken for the chest under him")
 end
 
+-- test_exploring_gives_a_chest_to_the_unit_that_opens_it (#719, vanilla Ch16): the chests at (4,0)
+-- and (6,0) are locked to E (and to F), who reach them only through the key D drops; O opens them
+-- itself. Last decision E held (4,0) by that key. O, freed since, takes a chest, and E keeps one
+-- only when there are two (the control: two chests, one opener, one keyless unit, both taken at
+-- once).
+do
+    local O = blue(0x01, 0, 0, 0, { minRange = false })
+    local E = blue(0x02, 1, 1, 0, { minRange = false })
+    local F = blue(0x03, 2, 2, 0, { minRange = false })
+    local D = red(0x81, 0, 9, { minRange = false })
+    -- extra.far: the opener is far from the chests and the keyless units are beside them, so the
+    -- keyless pairs come first by distance and by worth
+    local function goals(chests, sent, extra)
+        extra = extra or {}
+        local far = extra.far
+        local o = {
+            reach = { [0x01] = extra.stuck and tiles({ 0, 0 }, { 0, 1 }) or tiles({ 0, 0 }, { 1, 0 }),
+                      [0x02] = tiles({ 1, 0 }, { 2, 0 }), [0x03] = tiles({ 2, 0 }, { 3, 0 }) },
+            field = fieldsOf { ["4,0"] = { ["0,0"] = far and 40 or 4, ["1,0"] = far and 2 or 3,
+                                           ["2,0"] = 2, ["4,0"] = 0, ["0,9"] = 8 },
+                               ["6,0"] = { ["0,0"] = far and 40 or 6, ["1,0"] = far and 4 or 5,
+                                           ["2,0"] = 4, ["6,0"] = 0, ["0,9"] = 8 },
+                               ["0,9"] = { ["0,0"] = 9, ["1,0"] = far and 1 or 9,
+                                           ["2,0"] = far and 1 or 9, ["4,0"] = 9,
+                                           ["6,0"] = 9, ["0,9"] = 0 } },
+            doors = {}, obstacles = {},
+            explorable = {}, canExplore = { [0x01] = {} }, locked = { [0x02] = {}, [0x03] = {} },
+            keySources = { chest = { D } },
+        }
+        for _, x in ipairs(chests) do
+            local k = x .. ",0"
+            o.explorable[#o.explorable + 1] = { x = x, y = 0, kind = "chest" }
+            o.canExplore[0x01][k] = "chest"
+            o.locked[0x02][k] = "chest"
+            o.locked[0x03][k] = "chest"
+        end
+        local board = extra.units or { O, E, D }
+        local _, ctx = B.candidates(boardOf(table.unpack(board)), sightOf(o), style("careful"),
+                                    { sent = sent, quietGoals = extra.quiet, stuck = extra.stuck })
+        local out = {}
+        for _, u in ipairs(board) do
+            local g = ctx.exploreGoal[u.id]
+            out[u.id] = g and (g.x .. "," .. g.y) or "-"
+        end
+        return out
+    end
+    local sentE = { { id = 0x02, x = 4, y = 0 } }
+    local g = goals({ 4 }, sentE)
+    check(g[0x01] .. " " .. g[0x02], "4,0 -",
+          "openers first: the opener takes the chest the keyless unit held")
+    g = goals({ 4 }, nil)
+    check(g[0x01] .. " " .. g[0x02], "4,0 -", "openers first: fresh pairing gives the chest to the opener")
+    g = goals({ 4 }, nil, { far = true })
+    check(g[0x01] .. " " .. g[0x02], "4,0 -",
+          "openers first: a far opener still gets the chest before a keyless unit beside it")
+    g = goals({ 4, 6 }, nil)
+    check(g[0x01] ~= "-" and g[0x02] ~= "-" and g[0x01] ~= g[0x02], true,
+          "openers first: two chests, one opener, one keyless unit: both taken at once")
+    g = goals({ 4, 6 }, sentE)
+    check(g[0x01] ~= "-" and g[0x02] ~= "-" and g[0x01] ~= g[0x02], true,
+          "openers first: the keyless unit keeps a chest the opener is not sent to")
+    -- an opener barred from the chest (the stuck record) is no free opener: the keyless pair stays
+    g = goals({ 4 }, sentE, { stuck = { ["1>4,0"] = { id = 0x01, x = 4, y = 0, since = 0 } } })
+    check(g[0x01] .. " " .. g[0x02], "- 4,0", "openers first: a barred opener does not take the chest")
+    -- the opener barred from one chest still counts free for the other: E keeps (4,0), F gives
+    -- (6,0) to O
+    g = goals({ 4, 6 }, { { id = 0x02, x = 4, y = 0 }, { id = 0x03, x = 6, y = 0 } },
+              { units = { O, E, F, D }, stuck = { ["1>4,0"] = { id = 0x01, x = 4, y = 0, since = 0 } } })
+    check(g[0x02] .. " " .. g[0x01], "4,0 6,0", "openers first: a barred opener is free for the other chest")
+    -- two keyless sent pairs, one free opener: one pair is dropped for it, the other keeps its
+    -- chest (both dropped could swap chests and walk back)
+    local sentEF = { { id = 0x02, x = 4, y = 0 }, { id = 0x03, x = 6, y = 0 } }
+    g = goals({ 4, 6 }, sentEF, { units = { O, E, F, D } })
+    local kept = (g[0x02] == "4,0" and 1 or 0) + (g[0x03] == "6,0" and 1 or 0)
+    check(kept, 1, "openers first: one opener drops one keyless pair, not both")
+    check(g[0x01] ~= "-" and g[0x01] ~= g[0x02] and g[0x01] ~= g[0x03], true,
+          "openers first: the opener takes the other chest")
+end
+
+-- test_a_stalled_sent_pair_is_paired_fresh (#719): A, sent to the chest (or village) at (4,0),
+-- opens it itself; C is nearer and opens it too. While the ledger holds the goal live A keeps it
+-- (the sticky keep); once its id is in quietGoals the pair is dropped and the nearest pair, C,
+-- takes it. A that has acted keeps its tile (an acted unit is not paired fresh, so dropping its
+-- goal would lose it). The unit the stalled pair dropped is paired last for that goal: when C
+-- cannot go, A, the only one able, keeps it.
+do
+    local E = red(0x81, 0, 9, { minRange = false })
+    local function who(kind, quiet, o)
+        o = o or {}
+        local A = blue(0x01, 0, 0, 0, { minRange = false, acted = o.acted })
+        local C = blue(0x02, 1, 2, 0, { minRange = false })
+        local s = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 2, 0 }, { 3, 0 }) },
+            field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["2,0"] = o.cFar and 9 or 2, ["3,0"] = o.cFar and 8 or 1, ["4,0"] = 0 } },
+            doors = {}, obstacles = {},
+            explorable = { { x = 4, y = 0, kind = kind } },
+            canExplore = { [0x01] = { ["4,0"] = kind }, [0x02] = { ["4,0"] = o.noC and "-" or kind } },
+        }
+        local _, ctx = B.candidates(boardOf(A, C, E), sightOf(s), style("careful"),
+                                    { sent = { { id = 0x01, x = 4, y = 0 } },
+                                      quietGoals = quiet and { [kind .. ":4,0"] = true } or nil })
+        return ctx.exploreGoal[0x01] and 0x01 or ctx.exploreGoal[0x02] and 0x02 or 0
+    end
+    -- the goal does not swap between A and C for ever (#719): decision 1 drops A for C and records
+    -- both as tried; decision 2, C sent, keeps it. Without the record A, nearer, takes it back.
+    -- The record is carried only while the goal stays quiet.
+    local function round(sentId, tried, quiet)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local C = blue(0x02, 1, 2, 0, { minRange = false })
+        local s = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 2, 0 }, { 3, 0 }) },
+            field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["2,0"] = 2, ["3,0"] = 1, ["4,0"] = 0 } },
+            doors = {}, obstacles = {},
+            explorable = { { x = 4, y = 0, kind = "chest" } },
+            canExplore = { [0x01] = { ["4,0"] = "chest" }, [0x02] = { ["4,0"] = "chest" } },
+        }
+        local _, ctx = B.candidates(boardOf(A, C, E), sightOf(s), style("careful"),
+                                    { sent = { { id = sentId, x = 4, y = 0 } }, tried = tried,
+                                      quietGoals = quiet and { ["chest:4,0"] = true } or nil })
+        return ctx.exploreGoal[0x01] and 0x01 or ctx.exploreGoal[0x02] and 0x02 or 0, ctx.tried
+    end
+    local first, tried = round(0x01, nil, true)
+    check(first, 0x02, "swap: decision 1 hands the stalled goal to the nearer unit")
+    check(tried["chest:4,0"] and tried["chest:4,0"][0x01] and tried["chest:4,0"][0x02], true,
+          "swap: both units are recorded as tried")
+    check((round(0x02, tried, true)), 0x02, "swap: decision 2 keeps the unit the goal was handed to")
+    check((round(0x02, nil, true)), 0x01, "swap: without the record the goal goes back to the first unit")
+    local _, cleared = round(0x02, tried, false)
+    check(next(cleared), nil, "swap: the record is dropped once the goal is no longer quiet")
+    -- a quiet goal nobody can take this decision keeps its record for the next one
+    do
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local s = {
+            reach = { [0x01] = tiles({ 0, 0 }) }, field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["4,0"] = 0 } },
+            doors = {}, obstacles = {}, explorable = { { x = 4, y = 0, kind = "chest" } }, canExplore = {},
+        }
+        local _, ctx = B.candidates(boardOf(A, E), sightOf(s), style("careful"),
+                                    { tried = tried, quietGoals = { ["chest:4,0"] = true } })
+        check(ctx.tried["chest:4,0"] and ctx.tried["chest:4,0"][0x02], true,
+              "swap: a quiet goal with no taker keeps its record")
+    end
+
+    for _, kind in ipairs({ "chest", "visit" }) do
+        check(who(kind, false), 0x01, "stalled pair: a live " .. kind .. " keeps its sent unit")
+        check(who(kind, true), 0x02, "stalled pair: a stalled " .. kind .. " is paired fresh")
+        check(who(kind, true, { acted = true }), 0x01,
+              "stalled pair: an acted unit keeps its stalled " .. kind)
+        check(who(kind, true, { cFar = true }), 0x02,
+              "stalled pair: the dropped " .. kind .. " unit is not handed it back, though nearer")
+        check(who(kind, true, { noC = true }), 0x01,
+              "stalled pair: the dropped unit keeps the " .. kind .. " when no other can take it")
+    end
+end
+
 -- test_a_talker_cut_off_by_a_wall_still_marches_on_a_recruit_on_a_chest (#710): A's way to R is
 -- through a wall it strikes (breachFor), counted by movesFor in marchLength; R stands on a chest A
 -- holds no key for. The Talk is beside him, so the wall's way is A's (a pair is made).
