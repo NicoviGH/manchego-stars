@@ -227,6 +227,31 @@ do
         "recruit path: without a path, the current tile is the price")
 end
 
+-- TestRecruitOnALockedTileIsMet (#710, vanilla Ch14's Rennac): his path runs over a chest the
+-- taker holds no key for. A Talk is beside the recruit, so his tile's lock is no way's cost: the
+-- goal asks turnsTo to leave it out (`beside`), for the path and for the stationary price. A
+-- chest goal keeps the lock.
+do
+    local rennac = { id = 0x90, charId = 0x20, x = 8, y = 0, faction = "red", onField = true,
+                     items = {} }
+    local board = { units = { blue(1, 0, 0), rennac }, turn = 1 }
+    local pos = { [1] = { x = 4, y = 0, acted = false, alive = 1 } }
+    local sight = fakeSight()
+    local path = { { x = 12, y = 0 }, { x = 16, y = 0 } }
+    function sight.closings() return { ["unit:144"] = 3 }, { [0x90] = path } end
+    local g = find(Goals.list(board, sight, {}, { recruitTalkers = { [0x90] = { 1 } } }), "recruit:144")
+    local locked = { ["12,0"] = true, ["16,0"] = true, ["8,0"] = true }
+    local function turnsTo(u, tile, from, beside)
+        if locked[tile.x .. "," .. tile.y] and not beside then return nil end
+        return sight.turnsTo(u, tile, from)
+    end
+    check(Goals.chance(g, pos, G, turnsTo) > 0, true, "recruit on a chest: his path is met")
+    g.path = nil
+    check(Goals.chance(g, pos, G, turnsTo) > 0, true, "recruit on a chest: his own tile is met")
+    g.kind = "chest"
+    check(Goals.chance(g, pos, G, turnsTo), 0, "a chest goal keeps its lock")
+end
+
 -- TestObjectiveGoals: each unit's way to the objective (ctx.objectiveTile) is its own goal,
 -- worth one death shared over the army; none where it has no tile (Survive).
 do

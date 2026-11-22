@@ -895,14 +895,15 @@ function M.plan(Bot, board, sight, style, opts)
     -- the progress signal's near half (#510 fwd1 item C; botrun's rules read it): how near the objective's
     -- nearest unit is, and each still-feasible or stalled ledger goal's best taker, in turns (a
     -- stalled row stays read: a new low there makes it feasible again, ADR 0403). Goals.chance
-    -- asked turnsTo for these very (unit, tile, from) above (a unit's own tile is the start
-    -- position, so the memo key matches turnsTo(u, tile)): no new path search.
+    -- asked turnsTo for these very (unit, tile, from, beside) above (a unit's own tile is the
+    -- start position, so the memo key matches turnsTo(u, tile)): no new path search. `beside`
+    -- is the goal's own (Goals.beside), so the read and the chance never disagree on a recruit.
     local nearest = {}
     do
         local function least(g)
             local n
             for _, u in ipairs(g.takerUnits) do
-                local t = turnsTo(u, g.tile)
+                local t = turnsTo(u, g.tile, nil, Goals.beside(g.kind))
                 if t and (not n or t < n) then n = t end
             end
             return n
@@ -931,9 +932,12 @@ function M.plan(Bot, board, sight, style, opts)
     local assigned, goalOf = {}, {}
     for _, u in ipairs(ctx.blues) do
         local tile = (ctx.exploreGoal or {})[u.id] or (ctx.objectiveTile and ctx.objectiveTile(u))
-        local t = tile and turnsTo(u, tile)
+        -- the tile's kind (a Talk assignment, Bot.candidates' exploring) says whether every read
+        -- of it below is beside it
+        local beside = tile and ctx.beside and ctx.beside(tile) or false
+        local t = tile and turnsTo(u, tile, nil, beside)
         if t then
-            assigned[#assigned + 1] = { u = u, tile = tile, turns = t }
+            assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside }
             goalOf[u.id] = assigned[#assigned]
         end
     end
@@ -941,7 +945,7 @@ function M.plan(Bot, board, sight, style, opts)
         local pos, out = positions(st), 0
         local read = turnsOn(st, pos)
         for _, a in ipairs(assigned) do
-            local t = read(a.u, a.tile, pos[a.u.id])
+            local t = read(a.u, a.tile, pos[a.u.id], a.beside)
             if t then out = out + (a.turns - t) end
         end
         return out
@@ -1574,7 +1578,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, c in ipairs(cands) do
             local goal, ranked = goalOf[c.unit.id], {}
             for _, a in ipairs(goal and c.acts or {}) do
-                local t = turnsTo(c.unit, goal.tile, endTile(a))
+                local t = turnsTo(c.unit, goal.tile, endTile(a), goal.beside)
                 if t and goal.turns - t > M.DUST
                     and M.admits((exposed(a, a.unitHp, {}, odds)), cap) then
                     ranked[#ranked + 1] = { a = a, g = goal.turns - t }

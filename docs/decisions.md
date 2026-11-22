@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-438 decisions. Read this index, then open the two or three you need — the whole
+439 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -281,6 +281,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0435` | [A sandbox that refreshes the maps puts the unit map back](decisions/0435-a-sandbox-that-refreshes-the-maps-puts-the-unit-map-back.md) | 2026-11-20 | #681 #640 #510 |
 | `0436` | [An owed recruit a retry saw arrive is a goal before it arrives](decisions/0436-an-owed-recruit-a-retry-saw-arrive-is-a-goal-before-it-arrives.md) | 2026-11-20 | #510 #683 |
 | `0439` | [Holding still is not a plan once the bot stalls](decisions/0439-holding-still-is-not-a-plan-once-the-bot-stalls.md) | 2026-11-21 | #699 #510 |
+| `0440` | [A recruit on a locked tile is talked to beside it](decisions/0440-a-recruit-on-a-locked-tile-is-talked-to-beside-it.md) | 2026-11-21 | #710 #699 #510 |
 
 ---
 

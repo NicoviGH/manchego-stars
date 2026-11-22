@@ -11,6 +11,7 @@
 local here = (arg[0]:match("(.*/)")) or "./"
 local B = dofile(here .. "bot.lua")
 local Planner = dofile(here .. "planner.lua")
+local Goals = dofile(here .. "goals.lua")
 local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
 local Json = dofile(here .. "json.lua")
@@ -4085,6 +4086,48 @@ do
     t, goal = chestTurns({ convoyChestKey = key })
     check(t == nil and goal == nil, true,
           "chest key: with no Supply tile in reach the chest is no way")
+    -- #710: the way is read alike whether `from` is the unit or a planner's position table at its
+    -- tile (the memo key reads coordinates), in either order; a unit that moved on has none. The
+    -- chest read `beside` (a recruit standing on it) leaves the lock out, with no key anywhere.
+    do
+        local o = { convoyChestKey = key, supplyAt = { ["1,0"] = true } }
+        o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
+        o.field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["4,0"] = 0 } }
+        o.doors, o.obstacles = {}, {}
+        o.explorable = { { x = 4, y = 0, kind = "chest" } }
+        o.canExplore, o.locked = {}, { [0x01] = { ["4,0"] = "chest" } }
+        local _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+        local chest = { x = 4, y = 0 }
+        local pos = { x = 0, y = 0, acted = false }
+        ctx.keyTurns = {}   -- candidates already read the unit's own
+        local viaPos = ctx.turnsTo(A, chest, pos)
+        check(viaPos ~= nil and viaPos == ctx.turnsTo(A, chest), true,
+              "chest key: a planner's position at the unit's tile reads as the unit's own")
+        ctx.keyTurns = {}
+        check(ctx.turnsTo(A, chest) == viaPos, true, "chest key: the same read in the other order")
+        check(ctx.turnsTo(A, chest, { x = 1, y = 0, acted = false }), nil,
+              "chest key: a unit that moved on takes no convoy key")
+        -- the start's acted flag is the unit's own for the unit, a copy of it by id and a
+        -- planner position, never another unit's table (a key source standing in as `from`)
+        local function late(from)
+            ctx.keyTurns = {}
+            ctx.turnsTo(A, chest, from)
+            for k in pairs(ctx.keyTurns) do
+                if k:find("!", 1, true) then return true end
+            end
+            return false
+        end
+        check(late({ x = 0, y = 0, acted = true }), true, "late: a position that has acted")
+        check(late({ id = 0x01, x = 0, y = 0, acted = true }), true,
+              "late: a copy of the unit by id that has acted")
+        check(late({ id = 0x81, x = 0, y = 0, acted = true }), false,
+              "late: another unit's acted is not the unit's")
+        o.convoyChestKey = {}
+        _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+        check(ctx.turnsTo(A, chest, { x = 1, y = 0 }), nil, "beside: with no key the chest is shut")
+        check(ctx.turnsTo(A, chest, { x = 1, y = 0 }, true) ~= nil, true,
+              "beside: the lock on the tile is left out")
+    end
     -- the Take's key names its lock, so a replay takes the chest key the plan took
     local k = Planner.key({ unitId = 1, act = "supply", move = { x = 1, y = 0 }, terrain = 33 })
     local back = Planner.unkey(k)
@@ -6148,6 +6191,115 @@ do
         attacks = attacks or (x.act == "attack" and x.targetId == 0x81)
     end
     check(attacks, false, "planner: a recruit whose talker has acted is still one")
+end
+
+-- test_a_recruit_on_a_locked_tile_is_read_beside_it (#710, vanilla Ch14's Rennac): R stands on a
+-- chest A holds no key for and no enemy drops one. A Talk is beside R, so every read of R's tile
+-- leaves the lock out. Covered, each by a mutation that fails it: the talker's assignment (its
+-- goal tile carries the kind), the goal's chance off a position table (the real turnsFor), the
+-- nearest row, the stuck record (stepsToward, both reads), the assigned goal's turns, the
+-- progress read and the advance (the beam kept to one plan).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 0, 1, 1)
+    local R = red(0x81, 4, 0, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }) },
+        field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["4,0"] = 0, ["0,1"] = 5 } },
+        doors = {}, obstacles = {}, locked = { [0x01] = { ["4,0"] = "chest" } },
+        talk = { [0x01] = { [0x81] = true } },
+        enemyPhase = function() return {} end,
+    }
+    local board = boardOf(A, C, R)
+    local cands, ctx = B.candidates(board, sightOf(o), style("careful"))
+    local goal = ctx.exploreGoal[0x01]
+    check(goal and goal.kind, "recruit", "recruit on a chest: the talker's goal tile carries its kind")
+    ctx.keyTurns = {}   -- candidates read the unit's own already
+    local g = { kind = "recruit", tile = { x = 4, y = 0 }, takerUnits = { A } }
+    local pos = { [0x01] = { x = 1, y = 0, acted = false, alive = 1 } }
+    check(Goals.chance(g, pos, Goals.GAMMA, ctx.turnsTo) > 0, true,
+          "recruit on a chest: the chance off a position table is above 0 (real turnsFor)")
+    local _, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+    local near
+    for _, n in ipairs(plan and plan.nearest or {}) do
+        if n.id == "recruit:129" then near = n.turns end
+    end
+    check(near ~= nil, true, "recruit on a chest: the nearest row reads a way to him")
+    -- the stuck record (stepsToward): A can step to (1,0), nearer him, so it is not stuck
+    check(next(ctx.stuck), nil, "recruit on a chest: a talker that can step nearer is not stuck")
+    -- the assignment, the progress read and the advance: the plan steps A to (1,0)
+    local stepped
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.unitId == 0x01 then stepped = x.move and (x.move.x .. "," .. x.move.y) end
+    end
+    check(stepped, "1,0", "recruit on a chest: the plan advances the talker toward him")
+    check(plan and plan.rank and plan.rank.progress > 0, true,
+          "recruit on a chest: the plan's progress toward him is counted")
+    -- the advance (the beam kept to one plan, so the step is the advance's own)
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    _, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    stepped = nil
+    for _, x in ipairs(plan and plan.acts or {}) do
+        if x.unitId == 0x01 then stepped = x.move and (x.move.x .. "," .. x.move.y) end
+    end
+    check(stepped, "1,0", "recruit on a chest: the advance steps the talker toward him")
+end
+
+-- test_the_march_reads_a_recruit_on_a_chest_beside_it (#710): the same board with an enemy K that
+-- drops the chest's key, and a Chest Key in the convoy. The march goes to the recruit, not to K
+-- (stepFor, movesFor), the convoy key is not taken for the chest under him (supplyKey), and the
+-- talker's assignment, the progress read, the advance and stepsToward all read his tile beside it:
+-- each of those is what lets A step to (1,0), the tile nearer him.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local R = red(0x81, 4, 0, { minRange = false })
+    local K = red(0x82, 0, 6, { minRange = false })
+    local function board(o)
+        o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) }
+        o.field = fieldsOf {
+            ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["0,1"] = 5, ["4,0"] = 0, ["0,6"] = 8 },
+            ["0,6"] = { ["0,0"] = 6, ["1,0"] = 7, ["0,1"] = 5, ["0,6"] = 0, ["4,0"] = 8 },
+        }
+        o.doors, o.obstacles = {}, {}
+        o.locked = { [0x01] = { ["4,0"] = "chest" } }
+        o.keySources = { chest = { K } }
+        o.talk = { [0x01] = { [0x81] = true } }
+        o.enemyPhase = function() return {} end
+        return boardOf(A, R, K), sightOf(o)
+    end
+    local b, sg = board({})
+    local march
+    for _, c in ipairs(B.candidates(b, sg, style("careful"))) do
+        for _, x in ipairs(c.acts) do
+            if c.unit.id == 0x01 and x.why == "march" then march = x end
+        end
+    end
+    check(march and at(march), "1,0",
+          "recruit on a chest: the march goes to him, not to the enemy with the key")
+    local o = { convoyChestKey = { [0x01] = { id = 0x69, uses = 1 } }, supplyAt = { ["1,0"] = true } }
+    b, sg = board(o)
+    local takes = false
+    for _, c in ipairs(B.candidates(b, sg, style("careful"))) do
+        for _, x in ipairs(c.acts) do takes = takes or x.act == "supply" end
+    end
+    check(takes, false, "recruit on a chest: no convoy key is taken for the chest under him")
+end
+
+-- test_a_talker_cut_off_by_a_wall_still_marches_on_a_recruit_on_a_chest (#710): A's way to R is
+-- through a wall it strikes (breachFor), counted by movesFor in marchLength; R stands on a chest A
+-- holds no key for. The Talk is beside him, so the wall's way is A's (a pair is made).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local R = red(0x81, 4, 0, { minRange = false })
+    local s = wallSight(BOSS_SIDE, 10, { [0x01] = 20 })
+    s.locked = function(u, x, y) return x == 4 and y == 0 and "chest" or nil end
+    s.canTalk = function() return true end
+    s.talk = { [0x01] = { [0x81] = true } }
+    local _, ctx = B.candidates(boardOf(A, R), s, style("careful"))
+    local g = ctx.exploreGoal[0x01]
+    check(g and g.kind, "recruit", "wall: the talker cut off from a recruit on a chest is sent to him")
 end
 
 -- test_planner_judges_a_talk_with_the_recruit_off_the_enemy_side: A Talks R over from (1,0). R

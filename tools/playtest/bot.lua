@@ -1216,7 +1216,7 @@ end
 
 -- A key on the way (#510, vanilla Ch5x: two chests in a room behind a door, both keys on
 -- enemies). `seeking` = the locks a way is fetching a key for, so a key behind its own lock is
--- no way. A key taken on the way opens the one lock it was fetched for (`keyed`: the tile's
+-- no way. A key taken on the way opens the one lock it was fetched for (`unlocked`: the tile's
 -- own), never a second: a Door Key or Chest Key is one use (FE8's item data).
 local function withLock(set, lock)
     local out = { [lock] = true }
@@ -1270,6 +1270,26 @@ local function convoyChestKey(ctx, u, tile)
 end
 
 local keyWay, turnsFor, turnsOn, strikersNear
+
+-- The goal kind of a recruit a Talk is made to (goals.lua's), carried on the goal tiles the march
+-- reads (Goals.beside).
+local RECRUIT = "recruit"
+
+-- Whether `tile` (a goal tile the march reads: an assigned goal's, carrying its kind, or the
+-- nearest enemy's unit table, which is a recruit's when recruitsOf lists it) is met beside it.
+-- The one answer for every read of a goal tile (Goals.beside).
+local function besideGoal(ctx, tile)
+    local recruit = tile and tile.id and ctx.recruits and ctx.recruits[tile.id]
+    return Goals.beside(tile and tile.kind or recruit and RECRUIT)
+end
+
+-- Whether `from` is a start whose `acted` is `u`'s own, so its turns begin next turn: `u` or a
+-- copy of it by id, or a planner position (no id). Not another unit's table (a key source
+-- standing in as `from`): its acted flag is not `u`'s. By id, not table identity, so a copy of
+-- the unit reads as the unit and the memo keys (turnsFor's, obstacleTurns') agree (#710).
+local function startsLate(u, from)
+    return (from.id == nil or from.id == u.id) and from.acted and true or false
+end
 
 -- Whether `u` can open the door `d`: it holds a key, or it has a way to an enemy whose fall
 -- gives it one and from there to the door (keyWay). A key no one can reach opens nothing, so a
@@ -1481,7 +1501,7 @@ end
 -- stepFor follows so the march walks the way these turns count. Third: the obstacles read.
 obstacleTurns = function(ctx, u, from, seeking)
     ctx.ways = ctx.ways or {}
-    local late = (from == u or from.id == nil) and from.acted and 1 or 0
+    local late = startsLate(u, from) and 1 or 0
     local k = u.id .. "@" .. from.x .. "," .. from.y .. (late == 1 and "!" or "") .. "|"
         .. lockSig(seeking) .. "|" .. (ctx.wallSig or "")
     if ctx.ways[k] then return ctx.ways[k][1], ctx.ways[k][2], ctx.ways[k][3] end
@@ -1579,23 +1599,32 @@ end
 -- opens, the field beyond. Without the way through, vanilla Ch3's throne (behind walls) was
 -- unreachable for every unit, so nothing pulled the army and a run took 22 turns. A chest or
 -- door `u` has no key for is reached by way of the enemy whose fall gives it one (keyWay): the
--- walk to that enemy, then on from its tile with the key (`keyed`). Memoised for the decision
+-- walk to that enemy, then on from its tile with the key. Memoised for the decision
 -- (ctx.keyTurns): the goals ask it per goal, taker and partial plan.
-turnsFor = function(ctx, u, tile, from, seeking, keyed)
+-- `unlocked`: the lock on `tile` is left out of the read, for either of two reasons: the key is
+-- in hand (keyWay's second leg, the convoy way's walk with the key: it opens the one lock it was
+-- fetched for) or a Talk is made beside the tile, never on it (Goals.beside, ctx.turnsTo's 4th
+-- argument). Both read the walk alone, so they share a memo entry.
+turnsFor = function(ctx, u, tile, from, seeking, unlocked)
     from = from or u
     ctx.keyTurns = ctx.keyTurns or {}
-    local late = (from == u or from.id == nil) and from.acted and "!" or ""
+    local late = startsLate(u, from) and "!" or ""
     local mk = u.id .. "@" .. from.x .. "," .. from.y .. late .. ">" .. tile.x .. "," .. tile.y
-        .. "|" .. lockSig(seeking) .. (keyed and "+" or "") .. "|" .. (ctx.wallSig or "")
+        .. "|" .. lockSig(seeking) .. (unlocked and "+" or "") .. "|" .. (ctx.wallSig or "")
     local hit = ctx.keyTurns[mk]
     if hit ~= nil then return hit or nil end
     local s, n = ctx.sight, nil
-    local lock = not keyed and lockAt(ctx, u, tile.x, tile.y)
+    local lock = not unlocked and lockAt(ctx, u, tile.x, tile.y)
     if lock then
         n = select(2, keyWay(ctx, u, tile, from, lock, seeking))
         -- a chest key in the convoy is a way too (#699): taken with Supply (supplyKey), after
         -- which the chest is the walk alone, so the walk with the key is its turns
-        if from == u and convoyChestKey(ctx, u, tile) then
+        -- only from where `u` stands: the take is this turn's act. By coordinates, not table
+        -- identity: a planner position is never `u`, and the memo key above reads coordinates, so
+        -- identical arguments must read alike (#710). `acted` is deliberately not read here, as
+        -- `from == u` did not: the way is offered whether or not `u` has acted, and the walk
+        -- below reads its own late start (viaObstacle, its own memo key)
+        if from.x == u.x and from.y == u.y and convoyChestKey(ctx, u, tile) then
             local c = turnsFor(ctx, u, tile, from, seeking, true)
             if c and (not n or c < n) then n = c end
         end
@@ -1625,7 +1654,7 @@ end
 -- that opens the way (breachFor), else the tile; a door it has no key for, through its key.
 -- turnsFor in moves, as marchLength counts a march (cost, not turns); nil = no way
 local function movesFor(ctx, u, tile)
-    local n = turnsFor(ctx, u, tile)
+    local n = turnsFor(ctx, u, tile, nil, nil, besideGoal(ctx, tile))
     return n and n * ctx.sight.mov(u)
 end
 
@@ -1643,7 +1672,8 @@ end
 -- the march and the goals read one measure (#655: the march walked round while the turns
 -- counted the wall); a door u has no key for, through its key.
 local function stepFor(ctx, u, tile, seeking)
-    local lock = tile and lockAt(ctx, u, tile.x, tile.y)
+    -- a recruit's tile has no lock to fetch a key for: the Talk is beside it (Goals.beside, #710)
+    local lock = tile and not besideGoal(ctx, tile) and lockAt(ctx, u, tile.x, tile.y)
     if lock then
         local e = keyWay(ctx, u, tile, u, lock, seeking)
         return e and stepFor(ctx, u, e, withLock(seeking, lock)) or tile
@@ -1804,7 +1834,7 @@ local function supplyKey(ctx, u, gate, objective)
     local goal = goalFor(ctx, u, objective)
     local terrain
     if opener(ctx, u) or #doorMates(ctx, u) > 0 or not lockedOnWay(ctx, u, goal) then
-        terrain = goal and chestLockAt(ctx, u, goal.x, goal.y)
+        terrain = goal and not besideGoal(ctx, goal) and chestLockAt(ctx, u, goal.x, goal.y)
         if not terrain or #doorMates(ctx, u, true) > 0 then return nil end
     end
     local best = safest(ctx, u, gated(ctx, u, supplyTiles(ctx, u), gate))
@@ -1919,7 +1949,7 @@ local function talkersOf(ctx, t, by)
     local out = {}
     for _, u in ipairs(ctx.actors) do
         if (not by or listed(by, u.charId)) and mayTalkOver(ctx, u, t) then
-            local d = marchLength(ctx, u, t)
+            local d = marchLength(ctx, u, { x = t.x, y = t.y, kind = RECRUIT })
             if d then out[#out + 1] = { u = u, d = d } end
         end
     end
@@ -2487,7 +2517,9 @@ local function exploring(ctx, sent, barred)
         return lockAt(ctx, u, t.x, t.y) and movesFor(ctx, u, t) or nil
     end
     -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
-    local function assign(pairs_, key)
+    -- the goal's `kind` rides on the unit's goal tile (Goals.beside: every read of a recruit's
+    -- tile leaves its lock out)
+    local function assign(pairs_, key, kind)
         table.sort(pairs_, function(a, b)
             if (a.v or 0) ~= (b.v or 0) then return (a.v or 0) > (b.v or 0) end
             if a.d ~= b.d then return a.d < b.d end
@@ -2499,7 +2531,7 @@ local function exploring(ctx, sent, barred)
             local k = key(p.t)
             if not taken[k] and not ctx.exploreGoal[p.u.id]
                 and not isBarred(barred, p.u.id, p.t) then
-                taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y }
+                taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y, kind = kind }
             end
         end
     end
@@ -2521,7 +2553,7 @@ local function exploring(ctx, sent, barred)
             talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
         end
     end
-    assign(talkPairs, function(t) return "talk>" .. t.id end)
+    assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
     if not ctx.sight.explorable then return end
     local pairs_ = {}
     local open, blues = {}, {}
@@ -2963,11 +2995,11 @@ turnsOn = function(ctx, walls, pos)
     if #keys == 0 then return ctx.turnsTo end
     table.sort(keys)
     local sig = table.concat(keys, ";")
-    return function(u, tile, from)
+    return function(u, tile, from, beside)
         ctx.wallHp, ctx.wallPos, ctx.wallSig = walls, pos, sig
         -- cleared whatever happens: an error left inside it would key every later read as this
         -- plan's board
-        local ok, n = pcall(turnsFor, ctx, u, tile, from)
+        local ok, n = pcall(turnsFor, ctx, u, tile, from, nil, beside)
         ctx.wallHp, ctx.wallPos, ctx.wallSig = nil, nil, nil
         if not ok then error(n, 0) end
         return n
@@ -3013,18 +3045,19 @@ end
 -- (strikersNear, #655): vanilla Ch8's thief, waiting at the wall, read as stuck and its chests
 -- were dropped.
 local function stepsToward(ctx, u, g)
-    local now = ctx.turnsTo(u, g)
-    if now and now <= Goals.DUST then return true end
     local there = ctx.standing[tileKey(g.x, g.y)]
     -- a recruit (recruitsOf: one a player unit may Talk over), not any unit: an enemy holding
     -- a village is no goal reached by standing beside it
     local recruit = there and ctx.recruits[there.id]
+    local beside = besideGoal(ctx, g)
+    local now = ctx.turnsTo(u, g, nil, beside)
+    if now and now <= Goals.DUST then return true end
     local boxed = true
     for _, t in ipairs(endTiles(ctx, u)) do
         if recruit and manhattan(t.x, t.y, g.x, g.y) == 1 then return true end
         if t.x ~= u.x or t.y ~= u.y then
             boxed = false
-            local n = now and ctx.turnsTo(u, g, t)
+            local n = now and ctx.turnsTo(u, g, t, beside)
             if n and n < now - Goals.DUST then return true end
         end
     end
@@ -3083,7 +3116,11 @@ function M.candidates(board, sight, style, opts)
     -- asks it per goal, taker and partial plan, and a unit cut off goes through breachFor and
     -- the field again each time
     ctx.keyTurns, ctx.ways = {}, {}
-    ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
+    -- `beside`: the tile's lock is left out (a Talk is beside a recruit, not on his tile)
+    ctx.turnsTo = function(u, tile, from, beside)
+        return turnsFor(ctx, u, tile, from, nil, beside)
+    end
+    ctx.beside = function(tile) return besideGoal(ctx, tile) end
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
     ctx.pending = opts and opts.pending
     ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)

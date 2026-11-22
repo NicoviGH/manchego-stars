@@ -38,8 +38,9 @@
 -- ~111 a unit of nine, a turn closer ~9 against the old 8). The win itself is the planner's W.win.
 --
 -- Goals.chance(goal, pos, gamma, turnsTo) -> 0..1: pos[unit id] = { x, y, acted, alive (0..1) },
--- the board a plan leaves. t = turnsTo(u, tile, pos), its turns there (sight's: cost / MOV, not
--- rounded); one that has acted takes it a turn later. The chance is gamma ^ (max(t, 1) - 1 +
+-- the board a plan leaves. t = turnsTo(u, tile, pos, beside), its turns there (sight's: cost /
+-- MOV, not rounded; `beside` = M.beside(goal.kind), the tile's lock left out); one that has
+-- acted takes it a turn later. The chance is gamma ^ (max(t, 1) - 1 +
 -- late): each turn further is another enemy phase where something can go wrong, and every
 -- step beyond reach counts. Within reach it is 1 for a unit that has not acted and gamma for
 -- one that has, standing on the goal too: taking it now is worth a turn over waiting there.
@@ -275,6 +276,13 @@ function M.forfeited(ledger, goals, closes)
     return out
 end
 
+-- Whether a goal of this kind is met beside its tile, not on it (the one owner of the answer:
+-- chance, the planner's nearest and advance reads, the march's talk assignment). A Talk is made
+-- from a tile beside the recruit, so a lock on the tile he stands on (vanilla Ch14's Rennac walks
+-- over two unopened chests) is no cost of meeting him (#710).
+local BESIDE = { recruit = true }
+function M.beside(kind) return BESIDE[kind] or false end
+
 function M.worth(goal, W)
     local v = goal.gold * W.gold
     if goal.kind == "recruit" then v = v + W.death end
@@ -288,13 +296,15 @@ end
 -- the taker can be at the tile the recruit stands on then (the current tile in phase 1,
 -- path[f - 1] after) within f turns, by the same turnsTo the stationary price uses: to the
 -- recruit's own tile. Past the path's last phase, with no removal, it stays where it ended.
-local function meet(goal, u, p, late, turnsTo)
+-- `beside` (M.beside) asks turnsTo to leave the lock on his tile out: priced through the chests
+-- Rennac walks over, every partial plan read his chance as 0 (#710).
+local function meet(goal, u, p, late, turnsTo, beside)
     local path = goal.path
     for f = 1, goal.closes or math.huge do
         local beyond = f - 1 > #path
         if beyond and goal.closes then return nil end
         local tile = f == 1 and goal.tile or path[math.min(f - 1, #path)] or goal.tile
-        local t = turnsTo(u, tile, p)
+        local t = turnsTo(u, tile, p, beside)
         if t and (beyond or math.max(math.ceil(t), 1) + late <= f) then return t end
         if beyond then return nil end
     end
@@ -306,12 +316,13 @@ function M.chance(goal, pos, gamma, turnsTo)
         local p = pos[u.id]
         if p and (p.alive or 1) > 0 then
             local late = p.acted and 1 or 0
+            local beside = M.beside(goal.kind)
             local t
             if goal.path and #goal.path > 0 then
                 -- the deadline is in the meeting's phase (meet), so no closes test after it
-                t = meet(goal, u, p, late, turnsTo)
+                t = meet(goal, u, p, late, turnsTo, beside)
             else
-                t = turnsTo(u, goal.tile, p)
+                t = turnsTo(u, goal.tile, p, beside)
                 if t and goal.closes and goal.closes < math.max(math.ceil(t), 1) + late then
                     t = nil
                 end
