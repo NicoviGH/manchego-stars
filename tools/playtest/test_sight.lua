@@ -1700,6 +1700,31 @@ do
     check(g.removals[0x40], nil, "foldScripted: a removal ordered before the arrival is none")
 end
 
+-- stayedPut / takeSecondLook (#724): Ch13's Cormag stands in the peaks at (2,13) and, with our units
+-- hidden, never leaves them: his path is his own tile in every phase, so he is played again with our
+-- units as they stand. A unit that moved the first time is not asked again, an escaped one neither;
+-- the second path is taken only where the unit left its tile, so one the game's AI does not move
+-- (the control) keeps the stationary path.
+do
+    local here0 = { x = 2, y = 13 }
+    local paths = { [1] = { [1] = here0, [2] = here0, [3] = here0 },
+                    [2] = { [1] = { x = 5, y = 5 }, [2] = { x = 6, y = 5 } },
+                    [3] = { [1] = here0 }, [4] = {} }
+    local starts = { [1] = here0, [2] = { x = 4, y = 5 }, [3] = here0, [4] = here0 }
+    local again = Sight.stayedPut(paths, starts, { [3] = true })
+    check(again[1], true, "stayedPut: a unit on its start tile in every phase")
+    check(again[2], nil, "stayedPut: a unit that moved is not asked again")
+    check(again[3], nil, "stayedPut: an escaped unit is not asked again")
+    check(again[4], nil, "stayedPut: no path read, nothing to ask")
+    local second = { [1] = { [1] = { x = 2, y = 9 }, [2] = { x = 2, y = 6 } } }
+    Sight.takeSecondLook(paths, second, starts)
+    check(paths[1][2].y, 6, "takeSecondLook: the unit that moved out takes its second path")
+    local still = { [1] = { [1] = here0 } }
+    local kept = { [1] = { [1] = here0, [2] = here0 } }
+    Sight.takeSecondLook(kept, still, starts)
+    check(#kept[1], 2, "takeSecondLook: a unit that stayed put again keeps the first path")
+end
+
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
 -- (cp_script.h; the scripts loop back with a GOTO, so a scan past it reads the next script).
 do

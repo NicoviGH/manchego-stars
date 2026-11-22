@@ -487,5 +487,24 @@ do
     check(owedOnly and owedOnly.closes, nil, "scripted removal: another recruit's owed does not close this one")
 end
 
+-- An on-field recruit the game's AI takes out of unreachable ground (#724: Ch13's Cormag at (2,13) in
+-- the peaks, no tile beside him reachable): his replayed path to a tile a talker reaches is a chance,
+-- the control whose path never leaves the peaks stays 0 and so holds no win.
+do
+    local function chance(path)
+        local goal = { id = "recruit:9", kind = "recruit", tile = { x = 2, y = 13 }, path = path,
+                       takerUnits = { { id = 1 } } }
+        local turnsTo = function(_, tile)   -- the peaks (rows 12 and down): no way beside them
+            if tile.y >= 12 then return nil end
+            return 1.5
+        end
+        return Goals.chance(goal, { [1] = { x = 7, y = 5, acted = false, alive = 1 } }, G, turnsTo)
+    end
+    check(chance({ [1] = { x = 2, y = 13 }, [2] = { x = 2, y = 6 } }) > 0, true,
+          "on-field recruit: the AI takes him to a tile a talker reaches")
+    check(chance({ [1] = { x = 2, y = 13 }, [2] = { x = 2, y = 13 } }), 0,
+          "on-field recruit: one that never leaves the peaks is no chance")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
