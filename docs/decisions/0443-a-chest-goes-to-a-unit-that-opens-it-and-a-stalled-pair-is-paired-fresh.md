@@ -39,19 +39,24 @@ keeps its tile as before.
 phases), is not kept; the goal is paired fresh. It applies to a village as to a chest: nothing about
 a village makes standing still fine, and the ledger marks both the same. An acted unit is the
 exception: it is not in `ctx.actors`, so the fresh pass never re-pairs it, and dropping its pair
-would lose its goal; it keeps the tile until it can act. The unit the stalled pair dropped is
-paired last for that goal, so a stalled goal is not handed back to the unit that stalled it; if no
-other unit can take it, that unit keeps it. `goalQuiet` (botrun) is not reset by a pair change, so
-the new unit's pair is dropped on the next plan too while the goal stays quiet, and the goal passes
-to the next unit (the first one again, if it is the nearest of two) until a unit nears it and the
-count resets. Not tested beyond one drop; no new state was added to stop it.
+would lose its goal; it keeps the tile until it can act. Each unit is tried
+once per quiet spell. `exploring` keeps `tried[goal id]` = the units a stalled goal was given to
+(dropped from it, or paired to it), carried from plan to plan like `sent` (`plan.tried`, botrun's
+`tried`, `opts.tried`; a re-plan within a phase gets the last plan's, as `sent` does, so a goal
+cannot swap twice in a turn). A stalled pair is dropped only if its unit is not yet tried on that
+goal; tried units are paired last for it, so a stalled goal is not handed back to a unit that
+had it; if no other unit can take it, the tried unit keeps it. Without the record the goal
+swapped A, C, A, C: `goalQuiet` counts the goal, not the pair, and its nearest reading is a min
+over all takers, so the goal stayed quiet while units swapped (reproduced in review). An entry
+lives only while its goal stays in `quietGoals`; once it leaves, the next stall starts fresh.
+After every able unit has been tried the holder keeps the goal.
 
 **Proof (ADR 0430).** Unit tests that fail on main: the sticky case (a freed opener beside a
 chest a keyless pair holds through a drop gets it) and a stalled pair re-paired (an opener as the
 sent unit, so only the quiet drop explains it). Each other rule has a test that fails when the rule
 is mutated away: the fresh order (a far opener against a keyless unit beside the chest), a barred
-opener, a spent opener, the acted exemption, the village, the dropped unit's exclusion and its
-fallback. The control, two chests with one opener and one keyless unit taken in parallel, passes on
+opener, a spent opener, the acted exemption, the village, the tried record (no swap back, its fallback, its carrying, its
+clearing) and botrun's pass-through of it. The control, two chests with one opener and one keyless unit taken in parallel, passes on
 main and on the branch, as a control should. One replay, `fix719` (`resume --game vanilla
 --campaigns b640e-cs-s4009 --chapter 16 --last 16 --attempts 1 --scout --route 1 --seal-at 10`),
 before these review changes: won on turn 19 with 1 death (Dozla, turn 5, as in `fix711c`), where

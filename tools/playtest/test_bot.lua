@@ -6400,7 +6400,7 @@ do
     local E = blue(0x02, 1, 1, 0, { minRange = false })
     local F = blue(0x03, 2, 2, 0, { minRange = false })
     local D = red(0x81, 0, 9, { minRange = false })
-    -- o.far: the opener is far from the chests and the keyless units are beside them, so the
+    -- extra.far: the opener is far from the chests and the keyless units are beside them, so the
     -- keyless pairs come first by distance and by worth
     local function goals(chests, sent, extra)
         extra = extra or {}
@@ -6493,6 +6493,45 @@ do
                                       quietGoals = quiet and { [kind .. ":4,0"] = true } or nil })
         return ctx.exploreGoal[0x01] and 0x01 or ctx.exploreGoal[0x02] and 0x02 or 0
     end
+    -- the goal does not swap between A and C for ever (#719): decision 1 drops A for C and records
+    -- both as tried; decision 2, C sent, keeps it. Without the record A, nearer, takes it back.
+    -- The record is carried only while the goal stays quiet.
+    local function round(sentId, tried, quiet)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local C = blue(0x02, 1, 2, 0, { minRange = false })
+        local s = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 2, 0 }, { 3, 0 }) },
+            field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["2,0"] = 2, ["3,0"] = 1, ["4,0"] = 0 } },
+            doors = {}, obstacles = {},
+            explorable = { { x = 4, y = 0, kind = "chest" } },
+            canExplore = { [0x01] = { ["4,0"] = "chest" }, [0x02] = { ["4,0"] = "chest" } },
+        }
+        local _, ctx = B.candidates(boardOf(A, C, E), sightOf(s), style("careful"),
+                                    { sent = { { id = sentId, x = 4, y = 0 } }, tried = tried,
+                                      quietGoals = quiet and { ["chest:4,0"] = true } or nil })
+        return ctx.exploreGoal[0x01] and 0x01 or ctx.exploreGoal[0x02] and 0x02 or 0, ctx.tried
+    end
+    local first, tried = round(0x01, nil, true)
+    check(first, 0x02, "swap: decision 1 hands the stalled goal to the nearer unit")
+    check(tried["chest:4,0"] and tried["chest:4,0"][0x01] and tried["chest:4,0"][0x02], true,
+          "swap: both units are recorded as tried")
+    check((round(0x02, tried, true)), 0x02, "swap: decision 2 keeps the unit the goal was handed to")
+    check((round(0x02, nil, true)), 0x01, "swap: without the record the goal goes back to the first unit")
+    local _, cleared = round(0x02, tried, false)
+    check(next(cleared), nil, "swap: the record is dropped once the goal is no longer quiet")
+    -- a quiet goal nobody can take this decision keeps its record for the next one
+    do
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local s = {
+            reach = { [0x01] = tiles({ 0, 0 }) }, field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["4,0"] = 0 } },
+            doors = {}, obstacles = {}, explorable = { { x = 4, y = 0, kind = "chest" } }, canExplore = {},
+        }
+        local _, ctx = B.candidates(boardOf(A, E), sightOf(s), style("careful"),
+                                    { tried = tried, quietGoals = { ["chest:4,0"] = true } })
+        check(ctx.tried["chest:4,0"] and ctx.tried["chest:4,0"][0x02], true,
+              "swap: a quiet goal with no taker keeps its record")
+    end
+
     for _, kind in ipairs({ "chest", "visit" }) do
         check(who(kind, false), 0x01, "stalled pair: a live " .. kind .. " keeps its sent unit")
         check(who(kind, true), 0x02, "stalled pair: a stalled " .. kind .. " is paired fresh")

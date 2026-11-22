@@ -2728,6 +2728,7 @@ do
             return s
         end
         g.quietAt = {}
+        g.triedAt = {}   -- the opts.tried the first plan call of phase t was given (o.triedOut[t]: what plan t reports)
         g.api.Planner = {
             surprise = function() return "the plan is played out" end,
             plan = function(_, board, _, _, opts)
@@ -2742,6 +2743,7 @@ do
                     table.sort(ids)
                     g.quietAt[board.turn] = table.concat(ids, " ")
                 end
+                if g.triedAt[board.turn] == nil then g.triedAt[board.turn] = opts.tried or false end
                 local st = steps[board.turn] or {}
                 local a = { unit = 0x01, unitId = 0x01, act = st.act or "wait",
                             move = st.move or { x = 0, y = 0 }, target = st.target,
@@ -2749,7 +2751,8 @@ do
                 return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true },
                             nearest = st.nearest or { { id = "objective", turns = 4 } },
                             ledger = o.ledger and o.ledger[board.turn],
-                            explore = o.explore }
+                            explore = o.explore,
+                            tried = o.triedOut and o.triedOut[board.turn] }
             end,
         }
         local act = g.api.act
@@ -2845,6 +2848,18 @@ do
     for t = 1, 9 do got[t] = ga.quietAt[t] == "" and "-" or ga.quietAt[t] end
     check(table.concat(got, " "), "- - - - visit:3,3 visit:3,3 - - -",
           "quiet goals: three readings without a new low; a new low, a gap and a return clear it")
+
+    -- the units a stalled goal was given to ride from a plan to the next one's opts.tried, as
+    -- `sent` does (#719): plan 1 reports them, plan 2 is given them, plan 3 (after a plan that
+    -- reported none) is not
+    do
+        local tr = { ["chest:4,0"] = { [1] = true, [2] = true } }
+        local _, _, _, gt = shadow(5, {}, nil, { triedOut = { [1] = tr } })
+        check(gt.triedAt[1], false, "tried: none before a plan reported any")
+        check(gt.triedAt[2] and gt.triedAt[2]["chest:4,0"] and gt.triedAt[2]["chest:4,0"][2], true,
+              "tried: the plan's record is the next plan's opts.tried")
+        check(gt.triedAt[3], false, "tried: a plan that reports none clears it")
+    end
 
     -- a goal's run is against its last GOAL_QUIET readings, not its all-time low: a taker that
     -- walked away and is walking back is quiet while it rises, and is out again once a reading

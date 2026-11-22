@@ -117,7 +117,7 @@
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
 -- to the average, opts = { stalled = bool, idle (botrun's quiet reached M.GOAL_QUIET), sent,
--- explored (both Bot.candidates'), quietGoals = the ledger ids
+-- tried, explored (all Bot.candidates'), quietGoals = the ledger ids
 -- no unit has neared for M.GOAL_QUIET readings (botrun's rule 1, ADR 0403) } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the recruit, village
@@ -2931,6 +2931,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- one did within the cap: a skip is a fault only when a legal Seize under the cap was there
     -- to take (FR-015, botrun's seize skips)
     best.seizes, best.seizeJudged, best.seizeAdmitted = seizesIn(best), false, false
+    best.tried = ctx.tried   -- the units each stalled goal was given to (Bot.candidates' opts.tried)
     best.stuck = ctx.stuck   -- the goals units are blocked from (Bot.candidates' opts.stuck)
     for _, c in ipairs(considered) do
         if c.seizes then

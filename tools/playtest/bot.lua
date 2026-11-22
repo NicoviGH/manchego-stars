@@ -2511,8 +2511,9 @@ local function sendOpeners(ctx, barred)
     end
 end
 
-local function exploring(ctx, sent, barred)
+local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
+    ctx.tried = {}
     barred = barred or {}
     local taken = {}
     -- Whether `u` uses `t` on its own: the game's menu check, never asked of a unit that has acted
@@ -2594,14 +2595,28 @@ local function exploring(ctx, sent, barred)
     -- standing still fine). An acted unit keeps its tile, as it always did. Both are paired fresh
     -- below, and the unit a stalled pair dropped comes last for that goal (`dropped`): a stalled
     -- goal handed back to the same unit would stall on.
-    local dropped = {}
+    -- `tried[goal id]` = the units a stalled goal was already given to (triedIn, last decision's,
+    -- carried like `sent`; kept only while the goal stays quiet): a unit is dropped from a
+    -- stalled goal once per quiet spell, so the goal does not swap between two units for ever
+    -- (goalQuiet counts the goal, not the pair, and its nearest reading is a min over all takers)
+    local quiet, tried = ctx.quietGoals or {}, ctx.tried
+    local function triedOn(id)
+        if not tried[id] then
+            tried[id] = {}
+            for k in pairs(triedIn and triedIn[id] or {}) do tried[id][k] = true end
+        end
+        return tried[id]
+    end
+    for id in pairs(triedIn or {}) do
+        if quiet[id] then triedOn(id) end
+    end
     for _, keyless in ipairs({ false, true }) do
         for _, g in ipairs(sent or {}) do
             local t, u = open[tileKey(g.x, g.y)], blues[g.id]
             if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
                 and ownOpener(u, t) ~= keyless and not isBarred(barred, u.id, t) then
-                if not u.acted and (ctx.quietGoals or {})[t.id] then
-                    dropped[tileKey(t.x, t.y)] = u.id
+                if not u.acted and quiet[t.id] and not triedOn(t.id)[u.id] then
+                    triedOn(t.id)[u.id] = true
                 elseif reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0
                     and not (keyless and openerFree(t, u)) then
                     taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
@@ -2622,7 +2637,7 @@ local function exploring(ctx, sent, barred)
             if d then
                 local v, c = sendWorth(ctx, u, t)
                 if c > 0 then
-                    local list = dropped[tileKey(t.x, t.y)] == u.id and byOpen[3]
+                    local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
                         or byOpen[ownOpener(u, t) and 1 or 2]
                     list[#list + 1] = { t = t, u = u, d = d, v = v }
                 end
@@ -2630,6 +2645,11 @@ local function exploring(ctx, sent, barred)
         end
     end
     for _, list in ipairs(byOpen) do assign(list, function(t) return tileKey(t.x, t.y) end) end
+    -- a unit now holding a stalled goal has had its turn with it: the next decision keeps it
+    for uid, g in pairs(ctx.exploreGoal) do
+        local t = open[tileKey(g.x, g.y)]
+        if t and not g.door and quiet[t.id] then triedOn(t.id)[uid] = true end
+    end
     sendOpeners(ctx, barred)
 end
 
@@ -3200,7 +3220,7 @@ function M.candidates(board, sight, style, opts)
             if e.since < turn then barred[k] = true end
         end
         local before = ctx.exploreGoal
-        exploring(ctx, opts and opts.sent, barred)
+        exploring(ctx, opts and opts.sent, barred, opts and opts.tried)
         out = propose(ctx, out, before)
         local more = false
         for _, c in ipairs(out) do
