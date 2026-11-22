@@ -75,6 +75,7 @@ Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 Board.US_BIT9 = 1 << 9
 Board.US_BIT8 = 1 << 8   -- "seen": RefreshUnitsOnBmMap clears US_BIT9 for it (bmmap.c)
 Board.FOG_BITS = Board.US_BIT9 | Board.US_BIT8
+Board.US_BIT16 = 1 << 16   -- include/bmunit.h; with US_DEAD and US_NOT_DEPLOYED, US_UNAVAILABLE
 Board.US_HAS_MOVED_AI = 1 << 10   -- the AI has moved it this phase (cp_order.c skips it)
 Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that downs it (bmmind.c)
 -- "On the field" has no one test in FE8, so this is the union of the two the game uses.
@@ -83,6 +84,11 @@ Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that d
 -- the prep screen un-deploys a unit with US_NOT_DEPLOYED alone (prep_unitselect.c), and an
 -- event kills one with US_DEAD alone (eventscr.c).
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
+-- Whether the terrain heal skips `u` (MakeTerrainHealTargetList, bmtarget.c:587-608): a unit
+-- dead, not deployed, rescued or with US_BIT16 is never healed.
+function Board.terrainHealSkips(u)
+    return (u.state & (Board.US_DEAD | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_BIT16)) ~= 0
+end
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
 Board.ITEMDATA_NUMBER = 0x06    -- bmitem.h ItemData +06 number: the row's own id (data_items.c)

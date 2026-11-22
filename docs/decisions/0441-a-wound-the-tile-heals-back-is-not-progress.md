@@ -25,15 +25,37 @@ as far as it outlasts that heal: `e.hp - healed > DUST`. The enemy stands on its
 phase and the heal comes before it acts, so its tile now is the one that heals it. A kill chance, a
 bait kill, a goal or a win chance advance as before: the heal does not touch them.
 
-**What does not change.** Without `opts.idle` nothing reads it: `advances()` only decides the idle
-rule. The plan's score and the judged enemy phase are untouched: the wound's `W.dealt` credit and the
-army's reply still read the HP the plan leaves, unhealed. Modelling the heal there changes how every
-plan is scored, which is a weight call, not a game rule, and is left to a measurement. The
-second phase's HP in the lookahead is the same.
+**What does not change, and the open follow-up.** Without `opts.idle` nothing reads the heal:
+`advances()` only decides the idle rule. Outside it the bot still credits a fort chip through
+`W.dealt` in `score()` (`planner.lua`, the attack branch), and the judged enemy phase and the army's
+reply read the boss's unhealed HP. The same bias therefore persists in normal scoring. Modelling
+the heal there moves every plan's score, which is a weight call and goes to Nicolas, not this rule.
+The lookahead's second phase has the same gap: it reads `st.enemyHp` as the plan left it, with no
+heal between the phases (`planner.lua`, the `reds` table built from `st.enemyHp` in the judged
+phase).
 
-**Replay (ADR 0430's one game).** Vanilla Ch15, b640e-cs-s4005, attempt 1 (stuck in the #699
-measurement, 30 turns): still stuck on turn 30 with the same two deaths. Its loop is not the fatal
-chip. Innes shoots Valter from range for 6, Valter cannot strike back, and the fort heals 9 each
-phase. The chip is now read as no progress, but no plan advances in that board, so the idle rule
-stays off and the hold-or-chip order is as before. What the board needs is a plan that kills Valter
-(45 HP, +9 per phase): that is a separate fault, not this rule.
+**Details.** `terrainHeal` truncates toward zero as C's `/ 100` does and gives 0 for the units the
+game skips (`Board.terrainHealSkips`: dead, not deployed, rescued, `US_BIT16`). It is required:
+`Planner.healed` errors on a sight without it. `sight.maxHps` now reads every unit on the field,
+so an enemy's `maxhp` is `GetUnitMaxHp` (weapon HP bonus included), the max the heal and its cap
+use. `Planner.addHp` is the one owner of AddUnitHp's clamp: a staff heal, the plan's heal of a unit
+that lives and the terrain heal all go through it.
+
+**Evidence.** The 35 of 55 deaths and the Caellach count are from #699's measurement (comment
+7071434440), not re-measured here. Replays (ADR 0430's light proof), all on `b640e-cs-s4003`/
+`s4005` Ch15 starts:
+
+- `s4005` attempt 1 (stuck in the measurement): still stuck, 30 turns, the same 2 deaths. Its loop
+  is a different one: Innes shoots Valter from range for 6, Valter cannot strike back, and the
+  fort heals 9 a phase. That is not the fatal-chip case and is no proof of this fix.
+- `s4003` attempts 1-2 (`fix709c`). Attempt 1: won in 21 turns, 4 deaths (Valter killed 2 on
+  turns 13 and 15, Caellach 2 on turn 21), not clean; originally won in 25 turns, 6 deaths.
+  Attempt 2: lost in 27 turns, 4 deaths, all to Caellach (turns 18, 19, 24, 27); originally lost
+  in 28 turns, 8 deaths, all to Caellach (turns 21 to 28). Not clean. The runs diverge at turn 18
+  (the fix's Joshua kills Valter in one blow, where the original's Seth chipped Caellach for 7), so
+  the original's chip turns do not recur. Unit-proven; the replay did not reach the case: the fix's
+  Caellach deaths are not single-unit chips the fort heals back. They are plans of five to seven
+  units attacking at once (turn 18 `spare`, turn 23 `assault`, turn 27 `assault`), played as
+  `FALLBACK_SACRIFICE` with `max_die` 1.0, 0.9986 and 0.9998 while the holds were rejected as
+  idle (`max_die` 0 on turns 18, 19 and 27). They advance under the rule. Why they read as
+  advancing (a kill chance on Caellach, or a total wound past his 9-HP heal) is untested.

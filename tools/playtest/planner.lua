@@ -386,15 +386,23 @@ local function taught(x, ways, hp, unitHp, struck)
     return sum
 end
 
+-- `hp` after a heal of `gain`, held to `maxhp` as AddUnitHp holds it (bmunit.c): the one owner
+-- of that clamp. A planned staff heal, the plan's heal of a unit that lives and the terrain heal
+-- all go through it; each passes its own max (nil: the unit has no max HP to fill to, so no gain
+-- for a staff, none held for a unit read as having none).
+function M.addHp(hp, gain, maxhp)
+    return math.min(maxhp or math.huge, hp + gain)
+end
+
 -- The HP `e` stands on once its own phase begins, after the plan leaves it on `hp`: the game
 -- heals a unit on a heal tile at the start of its faction's phase, before any enemy acts
 -- (MakeTerrainHealTargetList, bmtarget.c:587-608: GetTerrainHealAmount x max HP / 100, a fort
 -- 20, a gate or throne 10; AddUnitHp holds it to max HP). The enemy stands on its tile through
 -- our phase, so its tile now is the one that heals it (#709). Sight answers the heal (ADR
--- 0369); a sight without it (no terrain read) heals nothing.
+-- 0369). The read is required: a sight without it would hide the bug this fixes. `e.maxhp` is
+-- GetUnitMaxHp (bot.lua's context reads it for every unit), the max the heal itself uses.
 function M.healed(sight, e, hp)
-    local heal = sight.terrainHeal and sight.terrainHeal(e) or 0
-    return math.min(math.max(e.maxhp or hp, e.hp), hp + heal)
+    return M.addHp(hp, sight.terrainHeal(e), e.maxhp)
 end
 
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
@@ -486,7 +494,7 @@ local function score(act, st, W, style, odds)
         -- is the plan's, which no game state holds
         local t = act.targetUnit
         local hp = st.hp[t.id] or t.hp
-        local gain = math.min(act.amount, (t.maxhp or hp) - hp)
+        local gain = M.addHp(hp, act.amount, t.maxhp or hp) - hp
         -- and the experience the staff teaches the healer (the game's count, sight.staffExp)
         v = v + W.heal * gain + (gain > 0 and W.exp * (act.exp or 0) or 0)
         fx.heals = { id = t.id, hp = hp + gain }
@@ -1934,8 +1942,7 @@ function M.plan(Bot, board, sight, style, opts)
                                     n.dead[o.uid] = true
                                 else
                                     n.hp = copy(w.hp)
-                                    n.hp[o.uid] = math.min(u.maxhp or math.huge,
-                                                           u.hp - o.back + (st.healed[o.uid] or 0))
+                                    n.hp[o.uid] = M.addHp(u.hp - o.back, st.healed[o.uid] or 0, u.maxhp)
                                 end
                             end
                             nxt[#nxt + 1] = n

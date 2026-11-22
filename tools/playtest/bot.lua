@@ -577,8 +577,9 @@ local function context(board, sight)
         end
     end
     table.sort(ctx.actors, function(a, b) return a.slot < b.slot end)
-    -- the max HP a heal fills to, as the game reads it (the board's maxhp is the raw stat)
-    if sight.maxHps then sight.maxHps(ctx.blues) end
+    -- the max HP a heal fills to, as the game reads it (the board's maxhp is the raw stat): for
+    -- every unit on the field, the enemy a terrain heal fills too (planner's M.healed)
+    if sight.maxHps then sight.maxHps(ctx.onField) end
     return ctx
 end
 

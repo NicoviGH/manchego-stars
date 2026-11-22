@@ -2917,6 +2917,30 @@ do
     check(searches, 2, "demands: the talk event search runs once")
 end
 
+-- #709: the terrain heal is the table's % of GetUnitMaxHp truncated toward zero as C does (a fort,
+-- 20 of 47, is 9; for a negative percent Lua's floor would round away from zero), and a unit the
+-- game skips (a rescued one) is healed 0 with no game call.
+do
+    check(Sight.terrainHealPoints(20, 47), 9, "terrainHealPoints: a fort on 47 max HP")
+    check(Sight.terrainHealPoints(10, 45), 4, "terrainHealPoints: a gate truncates")
+    check(Sight.terrainHealPoints(0, 45), 0, "terrainHealPoints: no heal off a heal tile")
+    check(Sight.terrainHealPoints(0xEC, 47), -9, "terrainHealPoints: a negative s8 truncates toward zero (-20 of 47)")
+    local nop = function() end
+    local S2 = setmetatable({}, { __index = function() return 0x08001000 end })
+    local reads = 0
+    local mem = { u8 = function() reads = reads + 1; return 0 end, u16 = function() return 0 end,
+                  u32 = function() return 0 end, s8 = function() return 0 end }
+    local sight = Sight.new({ cpu = fakeCpu(1), mem = mem, write8 = nop, write16 = nop, write32 = nop,
+        SYM = S2, Board = Board, map = function() return 1, 1 end, chapter = function() return 1 end,
+        turn = function() return 1 end, board = function() return { units = {} } end })
+    reads = 0
+    check(sight.terrainHeal({ id = 1, x = 0, y = 0, addr = 0x100, state = Board.US_RESCUED }), 0,
+          "terrainHeal: a rescued unit is not healed")
+    check(reads, 0, "terrainHeal: and its tile is not even read")
+    sight.terrainHeal({ id = 2, x = 0, y = 0, addr = 0x100, state = 0 })
+    check(reads > 0, true, "terrainHeal: a unit that is healed has its tile read")
+end
+
 -- #671, through Sight.new: itemReach is the widest weapon in the bag (a staff counts for nothing),
 -- and readsReds says when a unit's decision reads reds beyond its reach: a ballista class or rider, a
 -- staff in the bag, or a script that can (scriptReadsReds).

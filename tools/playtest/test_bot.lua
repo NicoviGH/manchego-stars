@@ -6524,7 +6524,18 @@ do
     local sight = { terrainHeal = function() return 6 end }
     check(Planner.healed(sight, E, 26) .. " " .. Planner.healed(sight, E, 20) .. " " .. Planner.healed(sight, E, 30),
           "30 26 30", "terrain heal: a wound is healed up to the HP it started on, never past max")
-    check(Planner.healed({}, E, 20), 20, "terrain heal: a sight without the read heals nothing")
+    check(tostring(pcall(Planner.healed, {}, E, 20)), "false", "terrain heal: a sight without the read is an error, not a silent no-heal")
+    check(Planner.addHp(10, 5, 12) .. " " .. Planner.addHp(10, 5, nil) .. " " .. Planner.addHp(10, 0, 30),
+          "12 15 10", "addHp: the one clamp to max HP")
+    -- the heal's cap is the max HP the game reads for an enemy too (sight.maxHps over the reds)
+    do
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = 1, hp = 38, maxhp = 40, isBoss = true })
+        local o = { objective = { kind = "boss" }, maxHp = { [0x81] = 47 },
+                    reach = { [0x01] = tiles({ 0, 0 }) }, enemyPhase = function() return {} end }
+        Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"), { idle = true })
+        check(E.maxhp, 47, "terrain heal: an enemy's max HP is the game's GetUnitMaxHp, as a blue's is")
+    end
 end
 
 -- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%

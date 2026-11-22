@@ -526,5 +526,13 @@ do
     check(#bound.convoyItems(), 4, "bind: convoyItems")
 end
 
+-- terrainHealSkips (bmtarget.c:587-608): dead, undeployed, rescued and US_BIT16 units are not healed
+check(Board.terrainHealSkips({ state = 0 }), false, "terrainHealSkips: a plain unit is healed")
+check(Board.terrainHealSkips({ state = Board.US_RESCUED }), true, "terrainHealSkips: a rescued unit")
+check(Board.terrainHealSkips({ state = Board.US_DEAD }), true, "terrainHealSkips: a dead unit")
+check(Board.terrainHealSkips({ state = Board.US_NOT_DEPLOYED }), true, "terrainHealSkips: an undeployed unit")
+check(Board.terrainHealSkips({ state = Board.US_BIT16 }), true, "terrainHealSkips: US_BIT16")
+check(Board.terrainHealSkips({ state = Board.US_HAS_MOVED }), false, "terrainHealSkips: a unit that moved is healed")
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

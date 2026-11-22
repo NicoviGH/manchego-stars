@@ -221,8 +221,8 @@
 --   terrainHeal(u)          the HP the tile `u` stands on heals it at the start of its own
 --                            faction's phase, as MakeTerrainHealTargetList reads it
 --                            (bmtarget.c): GetTerrainHealAmount(terrain) * GetUnitMaxHp(u) / 100,
---                            C integer division (a fort 20%, a gate or throne 10%); 0 off a heal
---                            tile. The raw amount: AddUnitHp's clamp to max HP is the caller's.
+--                            truncated toward zero as C does (a fort 20%, a gate or throne 10%);
+--                            0 off a heal tile, and for a unit the game skips (Board.terrainHealSkips). The raw amount: AddUnitHp's clamp to max HP is the caller's.
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff (IA_STAFF),
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
@@ -2417,6 +2417,14 @@ function M.watched(cpu)
     end }, { __index = cpu }), function(fn) watch = fn end
 end
 
+-- The HP a heal tile gives: `pct` (TerrainTable_HealAmount's s8, read as a register: 0x80 and
+-- up is negative) of `maxHp`, truncated toward zero as C's `/ 100` does (Lua's `//` floors).
+function M.terrainHealPoints(pct, maxHp)
+    if pct >= 0x80 then pct = pct - 0x100 end
+    local n = pct * maxHp
+    return n >= 0 and n // 100 or -((-n) // 100)
+end
+
 function M.new(outer)
     local watchedCpu, setWatch = M.watched(outer.cpu)
     outer = setmetatable({ cpu = watchedCpu }, { __index = outer })
@@ -3977,14 +3985,14 @@ function M.new(outer)
     end
 
     function s.terrainHeal(u)
+        if Board.terrainHealSkips(u) then return 0 end
         local terrain = s.terrain(u.x, u.y)
         local k = ownKey("terrainheal", u, "-") .. ":" .. terrain
         if own[k] == nil then
             assert(S.GetTerrainHealAmount, "sight.terrainHeal: symbols.lua lacks GetTerrainHealAmount (run gen_symbols.py)")
             own[k] = sandbox(function(call)
-                local pct = call(S.GetTerrainHealAmount, { terrain })
-                if pct >= 0x80 then pct = pct - 0x100 end   -- an s8 table
-                return pct * call(S.GetUnitMaxHp, { u.addr }) // 100
+                return M.terrainHealPoints(call(S.GetTerrainHealAmount, { terrain }),
+                                           call(S.GetUnitMaxHp, { u.addr }))
             end)
         end
         return own[k]
