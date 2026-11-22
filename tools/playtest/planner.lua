@@ -691,6 +691,17 @@ end
 -- lookahead's), a protected unit's deaths over the plan's (overAll).
 function M.either(a, b) return 1 - (1 - a) * (1 - b) end
 
+-- The kind of win the planner prices for `objective` (sight.objective): "boss" when the boss's
+-- death ends the chapter -- a Defeat Boss goal, or any other goal window beside a Misc
+-- DefeatBoss event (vanilla Ch13: a Survive window, `DefeatBoss(EndingScene)`; sight.objective.boss
+-- names that boss) -- else the goal's own kind. A Rout stays a Rout: its last red unit ends it
+-- too, and one kind is priced. The one owner of "this boss's death is the win" (#721).
+function M.winKind(objective)
+    if objective == nil then return nil end
+    if objective.kind ~= "rout" and (objective.kind == "boss" or objective.boss) then return "boss" end
+    return objective.kind
+end
+
 -- Whether the death of enemy `id` ends the chapter, on a board with `left` red units (a Rout's
 -- count, the plan's: sight.redCount less the plan's kills), `byId` the board's units:
 -- -> ends(id, gone), `gone` (optional) the ids dead since that count. The boss on a Defeat Boss
@@ -844,7 +855,7 @@ function M.plan(Bot, board, sight, style, opts)
     if now then now.stage = "search" end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
-    local objective = sight.objective and sight.objective.kind
+    local objective = M.winKind(sight.objective)
     local gameOver = Bot.gameOver(sight)
     -- the HP a heal tile gives each enemy at its own phase's start (sight.terrainHeal), read once
     -- an enemy for the whole search: its tile and max HP do not move through our phase. Required:

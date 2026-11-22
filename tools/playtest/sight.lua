@@ -141,8 +141,9 @@
 --                            plays one. -> as enemyPhase, plus .hp (each blue and green unit's
 --                            HP when it begins, 0 if dead) and .moved. See s.nextPhase.
 --   objective                { kind, tile, turnsLeft, boss, gameOver } -- see objective();
---                            boss = on a Defeat Boss map, the charId whose death quote raises
---                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
+--                            boss = where a boss's death ends the chapter (a Defeat Boss goal, or
+--                            a Misc DefeatBoss event beside another goal), the charId whose death
+--                            quote raises EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
 --                            gameOver = the charIds, on any side, whose death sets
 --                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
@@ -375,7 +376,7 @@ local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
 -- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
 local EVENT_FLAG, EVENT_X, EVENT_Y = 0x08, 0x18, 0x19
-local CHAPTER_TURNS, CHAPTER_LOCATIONS = 0x00, 0x08
+local CHAPTER_TURNS, CHAPTER_LOCATIONS, CHAPTER_MISC = 0x00, 0x08, 0x0C
 local TALK_SCRIPT, TALK_PID_A, TALK_PID_B, NO_PID = 0x04, 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
 local CHAPTER_TALKS = 0x04
@@ -2607,20 +2608,29 @@ function M.new(outer)
         local ent = call(S.GetDefeatTalkEntry, { charId })
         return ent ~= 0 and mem.u16(ent + M.DEFEAT_TALK_FLAG) or nil
     end
-    -- On a Defeat Boss map, the boss is the unit whose death raises the goal's flag -- how the
-    -- game itself ends the chapter (EVFLAG_DEFEAT_BOSS), not CA_BOSS, which a boss on a cloned
-    -- generic row (Manchego Stars ch03's grell) does not carry.
-    if goal.kind == "boss" then
-        s.objective.boss = sandbox(function(call)
-            for _, u in ipairs(api.board().units) do
-                if u.faction == "red" and u.onField
-                        and defeatFlag(call, u.charId) == M.EVFLAG_DEFEAT_BOSS then
-                    return u.charId
-                end
+    -- The boss is the unit whose death raises EVFLAG_DEFEAT_BOSS (its GetDefeatTalkEntry row's
+    -- flag) -- how the game itself ends the chapter, not CA_BOSS, which a boss on a cloned
+    -- generic row (Manchego Stars ch03's grell) does not carry. On a Defeat Boss goal that flag
+    -- is the win. On any other goal window it is the win only when the chapter's Misc list
+    -- carries `DefeatBoss(scr)` = AFEV(EVFLAG_WIN, scr, EVFLAG_DEFEAT_BOSS)
+    -- (Main_Code_Helpers.h): vanilla Ch13's Survive window has one, so Aias's death ends it on
+    -- turn 4; a Seize or Rout map's boss has the same row (Ch3's Bazba) and ends nothing. The
+    -- game's own path asks it: the unit's death flag set (SetPidDefeatedFlag, as gameOver
+    -- below), the Misc list searched (RunWaitEvents), the flag cleared for the next row (#721).
+    s.objective.boss = sandbox(function(call, info)
+        for _, u in ipairs(api.board().units) do
+            if u.faction == "red" and u.onField
+                    and defeatFlag(call, u.charId) == M.EVFLAG_DEFEAT_BOSS then
+                if goal.kind == "boss" then return u.charId end
+                call(S.SetPidDefeatedFlag, { u.charId, M.EVFLAG_DEFEAT_BOSS })
+                eventSearch(api, call, info, CHAPTER_MISC)
+                local ends = call(S.SearchAvailableEvent, { info }) ~= 0
+                call(S.ClearFlag, { M.EVFLAG_DEFEAT_BOSS })
+                if ends then return u.charId end
             end
-            return nil
-        end)
-    end
+        end
+        return nil
+    end)
     -- The units whose death ends the game, on any side (an escort's too): the game's own death
     -- step, run in one sandbox. SetPidDefeatedFlag sets the unit's flag -- but never
     -- EVFLAG_GAMEOVER for the chapter's protected unit on a non-story map -- and that flag is
