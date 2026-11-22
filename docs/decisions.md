@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-445 decisions. Read this index, then open the two or three you need — the whole
+446 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -288,6 +288,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0444` | [A march also offers the nearest tile where a death is impossible](decisions/0444-a-march-also-offers-the-nearest-tile-where-a-death-is-impossible.md) | 2026-11-22 | #714 #699 #510 |
 | `0445` | [A DefeatBoss boss is the win on any map](decisions/0445-a-defeatboss-boss-is-the-win-on-any-map.md) | 2026-11-22 | #721 #699 #510 |
 | `0446` | [A recruit's arrival and scripted removal are read from the turn events](decisions/0446-a-recruits-arrival-and-scripted-removal-are-read-from-the-turn-events.md) | 2026-11-22 | #724 #699 #510 |
+| `0447` | [A recruit on the field is met where his AI takes him](decisions/0447-a-recruit-on-the-field-is-met-where-his-ai-takes-him.md) | 2026-11-22 | #724 #699 #510 |
 
 ---
 
