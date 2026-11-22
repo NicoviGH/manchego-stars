@@ -3507,9 +3507,14 @@ do
     local function rd(a) return ram[a] or 0 end
     local mem = { u8 = rd, u16 = rd, u32 = rd, s8 = rd }
     local calls, placed, raise = 0, 0, false
+    local sight, ghost   -- set below; playsAtCall: whether the ghost played at the last game call
+    local playsAtCall
     local cpu = fakeCpu(1)
     local counted = setmetatable({ write = function(r, v)
-        if r == "pc" and v == GAME then calls = calls + 1 end
+        if r == "pc" and v == GAME then
+            calls = calls + 1
+            if sight and ghost then playsAtCall = sight.plays(ghost) end
+        end
         cpu.write(r, v)
     end, breakpoint = function() return 1 end, unbreak = function() end }, { __index = cpu })
     local GHOST, BLUE, HIDDEN, SEEN = 0x200, 0x100, 0x300, 0x400
@@ -3522,13 +3527,13 @@ do
     end
     local nop = function() end
     local function at(u, x, y) u.x, u.y = x, y; ram[u.addr + Sight.UNIT_X], ram[u.addr + Sight.UNIT_Y] = x, y end
-    local ghost = { id = 7, charId = 3, classId = 9, faction = "red", onField = true, fogged = true, addr = GHOST }
+    ghost = { id = 7, charId = 3, classId = 9, faction = "red", onField = true, fogged = true, addr = GHOST }
     local blue = { id = 1, charId = 1, classId = 1, faction = "blue", onField = true, addr = BLUE }
     local hidden = { id = 8, charId = 4, classId = 9, faction = "red", onField = true, fogged = true, addr = HIDDEN }
     local seenRed = { id = 9, charId = 5, classId = 9, faction = "red", onField = true, addr = SEEN }
     at(ghost, 0, 0); at(blue, 1, 1); at(hidden, 2, 1); at(seenRed, 0, 2)
     local board = { units = { ghost, blue, hidden, seenRed } }
-    local sight = Sight.new({ cpu = counted, mem = mem, write8 = write8, write16 = nop, write32 = nop,
+    sight = Sight.new({ cpu = counted, mem = mem, write8 = write8, write16 = nop, write32 = nop,
                               SYM = setmetatable({}, { __index = function() return GAME end }),
                               Board = Board, map = function() return 3, 3 end,
                               chapter = function() return 1 end, turn = function() return 1 end,
@@ -3541,6 +3546,7 @@ do
     local function loaded() at(ghost, 0, 0) end
     sight.danger(0, 0)
     check(placed, 1, "ghost: a danger read stands it on its tile")
+    check(playsAtCall, true, "ghost: it plays at the danger read's game call, inside the scope")
     check(sight.plays(ghost), false, "ghost: the scope closes with the sandbox")
     loaded()
     sight.threat(seenRed)
@@ -3569,12 +3575,26 @@ do
     -- a unit in sight on the tile takes it; the latest sighting wins a shared one
     at(blue, 2, 1)
     sight.refresh()
-    check(sight.ghostOf(ghost), nil, "ghost: none on a tile one of ours holds")
+    check(sight.ghostOf(ghost), nil, "ghost: none on a tile a player unit holds")
     at(blue, 1, 1)
     sight.sighted({ { id = 8, charId = 4, classId = 9, x = 2, y = 1 } })
     sight.refresh()
     check(sight.ghostOf(ghost), nil, "ghost: a later sighting on its tile wins it")
     check(sight.ghostOf(hidden) and "won" or "none", "won", "ghost: the later one plays there")
+    -- with a ghost recorded and no retry memory, a changed arrival drops the cached answers
+    local refreshes, plain = 0, sight.refresh
+    sight.refresh = function() refreshes = refreshes + 1; return plain() end
+    sight.arrived({ { id = 7, charId = 3, classId = 9, turn = 4 } })
+    check(refreshes, 1, "ghost: a changed arrival refreshes (a ghost matches on it)")
+    sight.refresh = plain
+end
+
+-- M.ghostPlacing (#713): placing only in a ghostly scope's own body, once
+do
+    check(Sight.ghostPlacing(false, 1, 1), "place", "ghostPlacing: in the scope, not yet placed")
+    check(Sight.ghostPlacing({}, 1, 1), "placed", "ghostPlacing: placed already")
+    check(pcall(Sight.ghostPlacing, nil, nil, 1), false, "ghostPlacing: outside a scope raises")
+    check(pcall(Sight.ghostPlacing, false, 1, 2), false, "ghostPlacing: a nested sandbox raises")
 end
 
 -- M.ghostsOn (#713): the rule alone. A fogged red a retry remembers blocks (the bot plays it

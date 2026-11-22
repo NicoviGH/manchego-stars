@@ -34,12 +34,12 @@ played from the tile it was last seen on, which is what a player knows, never fr
 - **Its tile taken.** A ghost does not play when a unit the player can see stands on its tile:
   a unit of another faction, a red in sight, or a fogged red a retry remembers. Then the player
   sees that the ghost is not there. A hidden red there blocks nothing, since the player cannot
-  know it is there. In a judged phase our units are placed first, so a plan that stands one of
-  ours on that tile has it. When two ghosts were last seen on one tile, the later sighting plays
+  know it is there. In a judged phase the player's units are placed first, so a plan that
+  stands a player unit on that tile has it. When two ghosts were last seen on one tile, the later sighting plays
   there. `Sight.ghostsOn` is the one owner of this rule, for the board and for the sandbox.
 - **Where it is placed.** Placing happens once per scope, in the ghost-placing sandbox's own
   body. A sandbox nested in that one would put the moves back while the scope still named
-  them, so `placeGhosts` asserts the depth.
+  them, so `placeGhosts` refuses it (`Sight.ghostPlacing`, tested).
 - **Precedence.** A unit a retry remembers plays where it stands (ADR 0399), so it has no ghost.
 
 **Left out, by the approved scope.** `closings`' looters and `keySources` still ask ADR 0399's
@@ -55,13 +55,14 @@ it (comment 7078483524).
 **Proof.**
 - Unit tests. Each new one fails without its fix (run against the reverted code).
   - `test_sight.lua`, through `Sight.new` on a board the test sets:
-    - the ghost is played from its seen tile, and a hidden red there does not block it, but one
-      of ours does;
+    - the ghost is played from its seen tile, and a hidden red there does not block it, but a
+      player unit does;
     - the later sighting wins a shared tile;
     - a danger read and a threat read each place it in their own scope, and that scope is
       closed when the sandbox returns;
     - a read that raises closes its scope, so the next read places the ghost again;
-    - a kill on the ghost's tile rebuilds the danger grid, and a kill elsewhere keeps it.
+    - a kill on the ghost's tile rebuilds the danger grid, and a kill elsewhere keeps it;
+    - a changed arrival refreshes the cached answers, with no retry memory.
   - `test_sight.lua`, the pure rules: `Sight.ghostOf`'s matching and `Sight.ghostsOn`'s blockers.
   - `test_sight.lua`, source-place guards: every caller of `placeGhosts` is in a `ghostly`
     sandbox. The runtime assert backs this up.

@@ -2933,19 +2933,38 @@ function M.ghostOf(seen, u, known, arrival)
     return nil
 end
 
+-- Every unit of `list` that has a ghost record (M.ghostOf), whether or not its tile is free:
+-- -> { { unit, g } }. M.ghostsOn's candidates, and s.changed's tiles a kill may free.
+function M.ghostCandidates(list, seen, known, arrivalOf)
+    local out = {}
+    for _, o in ipairs(list) do
+        local g = M.ghostOf(seen, o, known(o), arrivalOf(o))
+        if g then out[#out + 1] = { unit = o, g = g } end
+    end
+    return out
+end
+
+-- Whether placeGhosts may place now: `state` = the scope's ghosts (nil outside a ghostly()
+-- scope, false before placing, a table after), `scopeLevel` its sandbox depth, `level` the
+-- depth now. -> "place", "placed" (done for this scope), or raises: outside a scope, or in a
+-- sandbox nested in it (its journal would move the ghosts back while the scope still names them).
+function M.ghostPlacing(state, scopeLevel, level)
+    assert(state ~= nil, "placeGhosts outside a ghostly sandbox")
+    assert(level == scopeLevel, "placeGhosts in a sandbox nested in its ghostly scope")
+    return state and "placed" or "place"
+end
+
 -- The ghosts that play among `list` (#713, ADR 0455): -> { [id] = { x, y } }, each unit's
 -- M.ghostOf tile, when no unit the player can see stands there -- a unit of another faction,
 -- a red in sight, or a fogged one a retry remembers (known(o)) -- and no ghost seen there more
 -- recently (`seq`, s.sighted's order) claims it. A hidden red there blocks nothing: the player
--- cannot know it is there. at(o) -> x, y where o stands now, nil when it is off the map: the
--- board's tile, or its struct's inside a sandbox, where a staged plan has stood our units.
+-- cannot know it is there. at(o) -> x, y where o stands now, or nil for a unit that holds no
+-- tile there. The board's `at` is its read tile: a unit off the field or dead is skipped by
+-- the onField and dead tests here. A sandbox's is its struct's, where a staged plan has stood
+-- the player's units, and nil for one the sandbox took off (US_HIDDEN: a judged kill).
 -- The one owner of the rule, for s.ghostOf (the board's) and placeGhosts (a sandbox's).
 function M.ghostsOn(list, seen, known, arrivalOf, at)
-    local cand = {}
-    for _, o in ipairs(list) do
-        local g = M.ghostOf(seen, o, known(o), arrivalOf(o))
-        if g then cand[#cand + 1] = { unit = o, g = g } end
-    end
+    local cand = M.ghostCandidates(list, seen, known, arrivalOf)
     local out = {}
     for _, c in ipairs(cand) do
         local g, held = c.g, false
@@ -3319,9 +3338,8 @@ function M.new(outer)
         -- nor when one stood on the last-seen tile of a fogged unit (M.ghostOf): its death
         -- frees the tile for that ghost to play from (M.ghostsOn, #713)
         local ghostAt = {}
-        for _, o in ipairs(units()) do
-            local g = M.ghostOf(lastSeen, o, s.knows(o), s.arrivalOf(o))
-            if g then ghostAt[g.x .. "," .. g.y] = true end
+        for _, c in ipairs(M.ghostCandidates(units(), lastSeen, s.knows, s.arrivalOf)) do
+            ghostAt[c.g.x .. "," .. c.g.y] = true
         end
         for id in pairs(change.gone or {}) do
             local k = byId[id]
@@ -3400,9 +3418,7 @@ function M.new(outer)
     -- there (M.ghostsOn, each unit where its struct stands: a staged plan's units are already on
     -- their tiles) stood on its last-seen tile (M.standOn: its struct and gBmMapUnit, journaled).
     local function placeGhosts(list)
-        assert(ghosts ~= nil, "placeGhosts outside a ghostly sandbox")
-        assert(level() == ghostLevel, "placeGhosts in a sandbox nested in its ghostly scope")
-        if ghosts then return end
+        if M.ghostPlacing(ghosts, ghostLevel, level()) == "placed" then return end
         ghosts = {}
         local tiles = M.ghostsOn(list, lastSeen, s.knows, s.arrivalOf, function(o)
             if (mem.u32(o.addr + UNIT_STATE) & US_HIDDEN) ~= 0 then return nil end
