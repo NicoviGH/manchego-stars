@@ -11,7 +11,9 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, late; main is 062e8801 + HANDOFF): the work is the measurement on #699 (comment 7069149395).** #699's plan comment (7066011205) opens with a status table; keep it current. The GitHub tidy-up #706 is closed. Its guard `make tidy` (#707, PR #708) is in the session-start checklist: run it and fix every finding. `../manchego-stars-wt2` is deleted; `../manchego-stars-wt4` still holds Trade (#688), uncommitted. Bot issues should carry a bot title prefix (`Bot`, `#510`, `Harness`, ...) so the orphan check sees them (`tools/gh_tidy.py` docstring).
+**Next session starts here (2026-11-21, night; main is 062e8801 + HANDOFFs): #699's measurement is done (comment 7071434440): the five merged fixes gave no measurable gain (1 of 34 clean against the lap's 2). Every blocker is root-caused and filed as a sub-issue of #699: #709-#714. The status table (7066011205) gives the order: #710 (a certain bug), #709 (this week's #702 regression on Ch15), #711, #714, then 2a/2b, then #712/#713. One call is Nicolas's: the 0.01 risk cap (see the comment). Run tags `m699c<N>` and `probe699*` are in the vanilla store.**
+
+*Before that (2026-11-21, late; main is 062e8801 + HANDOFF): the work is the measurement on #699 (comment 7069149395).** #699's plan comment (7066011205) opens with a status table; keep it current. The GitHub tidy-up #706 is closed. Its guard `make tidy` (#707, PR #708) is in the session-start checklist: run it and fix every finding. `../manchego-stars-wt2` is deleted; `../manchego-stars-wt4` still holds Trade (#688), uncommitted. Bot issues should carry a bot title prefix (`Bot`, `#510`, `Harness`, ...) so the orphan check sees them (`tools/gh_tidy.py` docstring).
 
 *Before that (2026-11-21, afternoon):* The work is #699: its plan comment (7066011205), Nicolas's calls after it, and the progress comment (7067278347). #700-#703 are merged. #704 was measured and closed; #705 (chest keys and door openers) is merged. The state is on #699's latest comments.
 
