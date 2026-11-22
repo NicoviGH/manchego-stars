@@ -21,20 +21,31 @@ nothing (the PR #725 replay, turn 5: won with him unrecruited).
   (2,13) on turn 5 and (2,6) on turn 6, then (5,2), (10,1). Confirmed.
 
 **What changed.** `sight.closings` takes a second look at a watched unit whose replayed path never
-left its start tile (`M.stayedPut`): our units' states are put back as they stood, the unit is stood
-on its start tile, and the same enemy-phase replay (one local `replay`, shared with the looters')
-plays it again, the game's AI deciding where it goes. `M.takeSecondLook` keeps that path only where
-the unit left its tile, so a unit the AI does not move stays the stationary path and its chance stays
-0: an unreachable recruit that never moves holds no win. Every other path (a unit that moved the
-first time, an escape) is as it was. `Goals.chance` already prices a recruit's `goal.path` (ADR
-0436's `meet`), so nothing else changed: no `meetingTile` for an on-field recruit.
+left its start tile (`M.secondLook`: `M.stayedPut`, then the replay, then `M.takeSecondLook`, the one
+wiring, tested with a fake replay). The first look (our units hidden, the looters, the waves' reach)
+now runs in a sandbox of its own, rolled back when it returns, and the second look in another: it
+starts from the board as it stood (AI words, tiles, terrain a looter sacked, fog bits) with our units
+visible, and plays only the stayed-put units, tile only (`aiDecide`'s `tileOnly` skips the battle
+simulation a decision to attack would run, since only the tile is read). The looters' loop and the
+second look share one local `replay`; the hide has one owner, `M.hideUnit`. `M.takeSecondLook` keeps
+the second path only where the unit left its tile, so a unit the AI does not move stays the stationary
+path and its chance stays 0: an unreachable recruit that never moves holds no win; one that escapes in
+the second look has its path cut to the phases before the escape (empty when it goes in the first).
+`closingsKey` now keys each of our units by id, tile, HP and what it carries, since the second look
+reads them as targets. `Goals.chance` already prices a recruit's `goal.path` (ADR 0436's `meet`), so
+nothing else changed: no `meetingTile` for an on-field recruit.
 
-**Result (Ch13 s4009 a1, same replay).** The replay path now reads (2,6) in phase 1, as the game
-played it. Cormag's goal is feasible on turns 5-10 and holds the win: the chapter is won on turn 11
-(PR #725: turn 5), 1 death (Cormag killed a unit on an enemy phase), and he is still **not recruited**:
-he flew on and Eirika, his only talker, was 1.2-2.6 turns away on every plan, never beside him.
+**Estimates, labelled.** Our units are taken to stand still for all 8 phases (they will move). Only a
+recruit that stayed put in the hidden look is read again: one that moved there keeps the path the
+hidden look gave it.
+
+**Result (Ch13 s4009 a1, same replay).** Cormag's goal is feasible on turns 5-10 and holds the win:
+the chapter is won on turn 11 (PR #725: turn 5), 1 death (Marisa, 0x16, killed by Cormag on an enemy
+phase), and he is still **not recruited**: he flew from (2,13) to (2,6) on turn 6, then (5,2) and
+(10,1), and Eirika, his only talker, was 1.2-2.6 turns away on every plan, never beside him.
 Pricing him is what this changes; meeting a moving flier is the march's problem, untouched here.
 
-**Cost.** `closings` over that replay: 640 ms CPU in 1157 reads (mean 0.55 ms, max 47 ms) against
-55 ms in 597 reads (mean 0.09 ms, max 6.6 ms) on the PR #725 base: not the same game (11 turns
-against 5), and the second look runs only for a watched unit that stood still, once per board.
+**Cost.** On identical boards (the branch and PR #725 agree on turns 1-4 within 1.5%, so turn 5's first
+board is the same) the second look takes 22.7-27 ms of CPU per uncached board on turn 5 and 25-38 ms on
+turns 6-10 (14 boards, about 450 ms over the game). Turn 5's first plan took 5.0 s on the branch and
+6.6 s on PR #725: the second look is about 0.5% of it.

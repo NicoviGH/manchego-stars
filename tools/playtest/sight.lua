@@ -1544,8 +1544,10 @@ function M.opensChests(items, attributes, capacity)
 end
 
 -- closings()' cache key: what its read depends on -- the turn, the horizon, each looter as it
--- stands (id, tile, HP), the tiles our units block, the open tiles, each wave's units and the
--- map. A looter killed or moved, a player unit moved, a tile taken, a door opened is a new key.
+-- stands (id, tile, HP), each of our units (id, tile, HP, who it carries: the second look of a
+-- watched unit reads them as the AI's targets, and a carrier's stats halve), the open tiles, each
+-- wave's units and the map. A looter killed or moved, a player unit moved or hurt, a tile taken, a
+-- door opened is a new key.
 function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
     -- the map (sight.mapKey): a looter walks through a door the planner's re-listing opened
     -- (sight.changed, #661), and that read must not answer for the shut map
@@ -1553,8 +1555,12 @@ function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
     for _, o in ipairs(looters) do parts[#parts + 1] = o.id .. "@" .. o.x .. "," .. o.y .. "/" .. o.hp end
     -- the units watched (their paths are in the answer): a watched looter reads as an unwatched one
     for id in pairs(watch or {}) do parts[#parts + 1] = "v" .. id end
-    -- our units are hidden from the AI but still block its walk
-    for _, o in ipairs(blockers or {}) do parts[#parts + 1] = "b" .. o.x .. "," .. o.y end
+    -- our units: the AI's first look hides them (they still block its walk), its second look
+    -- (M.secondLook) reads them as targets, so who stands where and how hurt is in the key
+    for _, o in ipairs(blockers or {}) do
+        parts[#parts + 1] = "b" .. (o.id or "") .. "@" .. o.x .. "," .. o.y .. "/" .. (o.hp or 0)
+            .. "c" .. (o.carrying or 0)
+    end
     for key in pairs(open) do parts[#parts + 1] = key end
     for _, w in ipairs(waves or {}) do
         for _, u in ipairs(w.units) do
@@ -1598,15 +1604,28 @@ function M.stayedPut(paths, starts, gone)
     return out
 end
 
--- The second look's paths, `seen` = { [id] = path }, taken where a unit left its start tile: one
--- that stayed put again keeps the first (the same stationary path, so a unit the game's AI does
--- not move reads as it did). `paths` is edited. Pure.
-function M.takeSecondLook(paths, seen, starts)
+-- The second look's paths, `seen` = { [id] = path }, taken where a unit left its start tile or
+-- escaped (`escaped` = { [id] = true }: the path is then the phases before it, as closes' deadline
+-- less one, empty when it went in the first); one that stayed put again keeps the first (the same
+-- stationary path, so a unit the game's AI does not move reads as it did). `paths` is edited. Pure.
+function M.takeSecondLook(paths, seen, starts, escaped)
     for id, path in pairs(seen) do
         for _, t in pairs(path) do
             if t.x ~= starts[id].x or t.y ~= starts[id].y then paths[id] = path; break end
         end
     end
+    for id in pairs(escaped or {}) do paths[id] = seen[id] or {} end
+end
+
+-- The second look of closings() (#724), the one place its steps are wired: the watched units that
+-- stayed put in the first (M.stayedPut) are `replayAgain`ed -- a function of the set, run on the
+-- board as it stood, which answers (their second paths, the ids that escaped) -- and their answer
+-- taken (M.takeSecondLook). Asked of nothing when no unit stayed put. `paths` is edited.
+function M.secondLook(paths, starts, gone, replayAgain)
+    local again = M.stayedPut(paths, starts, gone)
+    if next(again) == nil then return end
+    local second, escaped = replayAgain(again)
+    M.takeSecondLook(paths, second, starts, escaped)
 end
 
 -- The terrain closings() leaves on a tile a looter took, `t` its explorable() entry: an emptied
@@ -2661,12 +2680,21 @@ function M.openAll(api, call, S, set)
     end
 end
 
+-- Inside a sandbox: unit `e` hidden from the AI (US_HIDDEN: its target loops skip it; it keeps its
+-- gBmMapUnit entry, so it still blocks), the write journaled. The one owner of the hide: takeOff,
+-- onlyTarget. -> a function that writes the state word back as it was.
+function M.hideUnit(api, e)
+    local was = api.mem.u32(e.addr + UNIT_STATE)
+    api.write32(e.addr + UNIT_STATE, was | api.Board.US_HIDDEN)
+    return function() api.write32(e.addr + UNIT_STATE, was) end
+end
+
 -- Inside a sandbox: unit `e`, standing on (x, y), off the map as a death takes it -- off
 -- gBmMapUnit, and US_HIDDEN, which RefreshUnitsOnBmMap skips (bmmap.c) -- every write
 -- journaled. The judged phase's (a kill, a counter's) and Sight.changed's.
 function M.takeOff(api, e, x, y)
     M.liftOff(api, x, y, e.id)
-    api.write32(e.addr + UNIT_STATE, api.mem.u32(e.addr + UNIT_STATE) | api.Board.US_HIDDEN)
+    M.hideUnit(api, e)
 end
 
 -- The answers a changed board starts from (s.changed): none of `kept`'s, but the march cost
@@ -3308,9 +3336,7 @@ function M.new(outer)
     -- `all` is units(), read before the sandbox stood `u` elsewhere.
     local function onlyTarget(u, all)
         for _, o in ipairs(all) do
-            if o.faction ~= "red" and o.id ~= u.id and o.onField then
-                api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
-            end
+            if o.faction ~= "red" and o.id ~= u.id and o.onField then M.hideUnit(api, o) end
         end
     end
 
@@ -3340,7 +3366,7 @@ function M.new(outer)
         api.write8(addr + UNIT_HP, hp)
         if decides then healStale = true end
     end
-    local function aiDecide(call, proc, e, all, before, starts)
+    local function aiDecide(call, proc, e, all, before, starts, tileOnly)
         M.keepAi(api, all)
         M.keepMaps(api, all)   -- `setup` refreshes the maps
         M.keepRide(api, S, e, all)
@@ -3377,6 +3403,7 @@ function M.new(outer)
         healStale = false   -- a phase start reads them too
         if before then before() end
         if decide then call(decide) end
+        if tileOnly then return nil, nil end   -- the caller reads the tile (gAiDecision), not the blow
         local D = S.gAiDecision
         local DEC = Board.AI_DEC
         if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then
@@ -3894,13 +3921,14 @@ function M.new(outer)
     -- When each village or chest still open (explorable()) closes: the first enemy phase,
     -- numbered from this turn's as 1, after which an enemy has looted it, nil = not within `k`
     -- (default M.CLOSE_HORIZON).
-    -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2)
-    -- play k enemy phases forward with the game's own AI (aiDecide, as enemyPhase plays one),
-    -- in the game's turn order, every other unit held where it stands and the player's hidden from
-    -- the AI (when it falls undefended): a looter's decision is
-    -- AI_ACTION_PILLAGE on the tile, and it is stood where it decided to go. Only the looters
-    -- decide: replaying every enemy for 8 phases on every decision tripled a Ch5 attempt's AI
-    -- calls (3,787 -> 11,086). Read again only when a looter or an open tile changed. A wave not
+    -- The field's looters (a red unit whose own AI scripts loot, M.loots on its ai1 and ai2) and
+    -- the units the caller watches (below) play k enemy phases forward with the game's own AI
+    -- (aiDecide, as enemyPhase plays one), in the game's turn order, every other unit held where
+    -- it stands and the player's hidden from the AI (the question is when a tile falls
+    -- undefended): a looter's decision is AI_ACTION_PILLAGE on the tile, and it is stood where
+    -- it decided to go. Only those decide: replaying every enemy for 8 phases on every decision
+    -- tripled a Ch5 attempt's AI calls (3,787 -> 11,086). Read again only when a looter, a watched
+    -- unit, a player unit or an open tile changed. A wave not
     -- loaded yet (waves = { { turn, units = { { class, x, y, ai1, ai2, items = {ids} } } } },
     -- the guide's reinforcements resolved) loots when an AI script of its does (M.loots), chests too
     -- when it can open one (M.opensChests): from its spawn tile, on its class's costs, as soon
@@ -3912,13 +3940,17 @@ function M.new(outer)
     -- phase: the phase the game removes it, so a Talk to it after that is no Talk (#699). The
     -- second answer is { [unit id] = { [enemy phase] = {x, y} } }, where each watched unit stands
     -- after each phase before it is gone (M.carryPaths: the escape phase is left out, so a path
-    -- is as long as its deadline less one). A scripted removal (a turn event's DISA or KILL) is not
-    -- played here: s.scriptedUnits reads it off the script's bytes and Goals.closings folds it in
-    -- (#724). Both are estimates, as the chest closings are: the replay
-    -- hides our units, so a recruit's moves and its escape phase are the ones he makes when
-    -- no player unit is near; the planner uses them as the deadline it is.
-    -- closings() by what it reads: the turn, k, the waves, and each looter or watched unit as it
-    -- stands (one our act kills or moves is a new read). newPhase() runs before every decision.
+    -- is as long as its deadline less one). A watched unit that never left its tile with our
+    -- units hidden is played again with them visible (M.secondLook, #724): the game's AI then
+    -- moves it toward the units it can see. Our units are taken to stand still for all k
+    -- phases, and only a unit that stayed put is read again. A scripted removal (a turn event's
+    -- DISA or KILL) is not played here: s.scriptedUnits reads it off the script's bytes and
+    -- Goals.closings folds it in (#724). All are estimates, as the chest closings are: a
+    -- recruit's moves and its escape phase are the ones he makes with our units hidden (or, for
+    -- the second look, where they stand now); the planner uses them as the deadline it is.
+    -- closings() by what it reads: the turn, k, the waves, each looter or watched unit, and
+    -- each player unit, as they stand (one an act kills, moves or hurts is a new read). newPhase()
+    -- runs before every decision.
     local closingsAt = {}
     function s.closings(k, waves, watch)
         k = k or M.CLOSE_HORIZON
@@ -3946,38 +3978,19 @@ function M.new(outer)
         sandbox(function(call, proc)
             local byId = {}
             for _, o in ipairs(all) do byId[o.id] = o end
-            -- the question is when a tile falls if no player unit defends it: our units are
-            -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
-            -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
-            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell).
-            -- The phase start skips a hidden unit too (SetupUnitInventoryAIFlags), so the
-            -- replay's gAiState.bestBlueMov is 0: no tile is kept from a looter for a faster
-            -- player unit (cp_utility.c AiTryMoveTowards), the same question asked. Read off
-            -- the decomp; its effect on a closing turn is not measured.
-            local shown = {}   -- our units' states before they are hidden, for the second look
-            for _, o in ipairs(all) do
-                if o.faction ~= "red" and o.onField then
-                    shown[#shown + 1] = { o.addr, mem.u32(o.addr + UNIT_STATE) }
-                    api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
-                end
-            end
             local D, DEC = S.gAiDecision, Board.AI_DEC
-            -- each watched unit's tile now (path[0] is the goal's own), and those that escaped
-            local at, gone = {}, {}
-            for id in pairs(watch or {}) do
-                local e = looter[id] and byId[id]
-                if e then at[id] = { x = e.x, y = e.y } end
-            end
-            -- The enemy phases played: the units of `who` decide in the game's own order, `at` =
-            -- each watched one's latest tile (a path of it is written to `into`), an escape is
-            -- gone, and `onPillage(x, y, phase)` is asked of a looter's pillage.
-            local function replay(who, at, into, onPillage)
+            -- The enemy phases played, from the board as the sandbox it runs in found it: the units
+            -- of `who` decide in the game's own order, `at` = each watched one's latest tile (a
+            -- path of it is written to `into`), an escape is gone (`gone`, and out["unit:<id>"]),
+            -- `onPillage(x, y, phase)` is asked of a looter's pillage, and `tileOnly` skips the
+            -- battle simulation a decision to attack would run (only the tile it moves to is read).
+            local function replay(who, at, into, gone, onPillage, tileOnly)
                 for phase = 1, next(who) and k or 0 do
                     api.write16(S.gPlaySt + PLAY_TURN, turn0 + phase - 1)
                     for _, id in ipairs(aiOrder(call, all)) do
                         local e = who[id] and byId[id]
                         if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
-                            aiDecide(call, proc, e, all)
+                            aiDecide(call, proc, e, all, nil, nil, tileOnly)
                             local x, y = followMove(e)
                             if x then
                                 if at[id] then at[id] = { x = x, y = y } end
@@ -3994,58 +4007,80 @@ function M.new(outer)
                     M.carryPaths(into, at, phase, gone)
                 end
             end
-            replay(looter, at, paths, function(x, y, phase)
-                close(x, y, phase)
-                -- the tile is taken: AiPillageAction opens a chest (it empties) or runs the
-                -- village's tile change, which the replay does not play; a terrain off the AI's
-                -- loot lists (cp_utility.c gTerrainList_Lootable*) keeps it from being chosen
-                -- again, so the looter goes on to its next target
-                api.write8(cell(mem, S.gBmMapTerrain, x, y), M.sackedTerrain(open[x .. "," .. y]))
-            end)
-            -- The second look (#724): a watched unit that never left its tile with our units
-            -- hidden is played again with them as they stand, the game's AI then deciding where it
-            -- goes (toward the units it can see). Only these: every other path is as it was.
-            local starts = {}
+            -- each watched unit's tile now (path[0] is the goal's own), and those that escaped
+            local at, gone = {}, {}
             for id in pairs(watch or {}) do
-                local e = byId[id]
-                if e and (at[id] or gone[id]) then starts[id] = { x = e.x, y = e.y } end
+                local e = looter[id] and byId[id]
+                if e then at[id] = { x = e.x, y = e.y } end
             end
-            local again = M.stayedPut(paths, starts, gone)
-            if next(again) then
-                for _, h in ipairs(shown) do api.write32(h[1] + UNIT_STATE, h[2]) end
-                local there, second = {}, {}
-                for id in pairs(again) do
-                    standOn(byId[id], starts[id].x, starts[id].y)
-                    there[id] = { x = starts[id].x, y = starts[id].y }
+            -- The first look, in a sandbox of its own (rolled back when it returns: the second
+            -- look starts from the board as it stood, its AI words, tiles, terrain and fog bits).
+            -- The question is when a tile falls if no player unit defends it: our units are
+            -- hidden from the AI (they still block, as onlyTarget leaves them), or a looter
+            -- beside one attacks it every phase of the replay and never loots (vanilla Ch2:
+            -- (1,12) read "closes on turn 5" until our units came near, then nothing, and fell).
+            -- The phase start skips a hidden unit too (SetupUnitInventoryAIFlags), so the
+            -- replay's gAiState.bestBlueMov is 0: no tile is kept from a looter for a faster
+            -- player unit (cp_utility.c AiTryMoveTowards), the same question asked. Read off
+            -- the decomp; its effect on a closing turn is not measured. A wave's reach follows
+            -- in it: its class's costs, on a stand-in unit struct (any on the board).
+            sandbox(function()
+                for _, o in ipairs(all) do
+                    if o.faction ~= "red" and o.onField then M.hideUnit(api, o) end
                 end
-                replay(again, there, second)
-                M.takeSecondLook(paths, second, starts)
-            end
-            -- a wave: its class's costs, on a stand-in unit struct (any on the board)
-            local stand = all[1]
-            for _, wv in ipairs(waves or {}) do
-                if wv.turn > turn0 and stand then
-                    for _, wu in ipairs(wv.units) do
-                        local cls = call(S.GetClassData, { wu.class })
-                        local items = {}
-                        for _, id in ipairs(wu.items or {}) do items[#items + 1] = { id = id } end
-                        local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
-                            or M.loots(mem, S.gpAi2Table, wu.ai2)
-                        local chests = villages
-                            and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES), Board.ITEM_COUNT)
-                        for _, t in pairs(open) do
-                            -- a House is never looted (AiLocationIsPillageTarget: no House)
-                            if (t.kind == "visit" and villages and not t.house)
-                                    or (t.kind == "chest" and chests) then
-                                local cost = costGrid(stand, t, cls)[wu.y][wu.x]
-                                local turns = cost and math.ceil(cost / mem.s8(cls + CLASS_MOV))
-                                local at = M.waveCloses(wv.turn, turn0, turns)
-                                if at then close(t.x, t.y, at) end
+                replay(looter, at, paths, gone, function(x, y, phase)
+                    close(x, y, phase)
+                    -- the tile is taken: AiPillageAction opens a chest (it empties) or runs the
+                    -- village's tile change, which the replay does not play; a terrain off the AI's
+                    -- loot lists (cp_utility.c gTerrainList_Lootable*) keeps it from being chosen
+                    -- again, so the looter goes on to its next target
+                    api.write8(cell(mem, S.gBmMapTerrain, x, y), M.sackedTerrain(open[x .. "," .. y]))
+                end)
+                local stand = all[1]
+                for _, wv in ipairs(waves or {}) do
+                    if wv.turn > turn0 and stand then
+                        for _, wu in ipairs(wv.units) do
+                            local cls = call(S.GetClassData, { wu.class })
+                            local items = {}
+                            for _, id in ipairs(wu.items or {}) do items[#items + 1] = { id = id } end
+                            local villages = M.loots(mem, S.gpAi1Table, wu.ai1)
+                                or M.loots(mem, S.gpAi2Table, wu.ai2)
+                            local chests = villages
+                                and M.opensChests(items, mem.u32(cls + CLASS_ATTRIBUTES), Board.ITEM_COUNT)
+                            for _, t in pairs(open) do
+                                -- a House is never looted (AiLocationIsPillageTarget: no House)
+                                if (t.kind == "visit" and villages and not t.house)
+                                        or (t.kind == "chest" and chests) then
+                                    local cost = costGrid(stand, t, cls)[wu.y][wu.x]
+                                    local turns = cost and math.ceil(cost / mem.s8(cls + CLASS_MOV))
+                                    local at = M.waveCloses(wv.turn, turn0, turns)
+                                    if at then close(t.x, t.y, at) end
+                                end
                             end
                         end
                     end
                 end
+            end)
+            -- The second look (#724): a watched unit that never left its tile with our units
+            -- hidden is played again, in a sandbox of its own from the board as it stood, our
+            -- units visible and standing where they do for all k phases (an estimate: they will
+            -- move), so the game's AI decides where it goes, toward the units it can see. Only a
+            -- unit that stayed put is read again: every other path is as it was.
+            local starts = {}
+            for id in pairs(watch or {}) do
+                local e = byId[id]
+                if e and at[id] then starts[id] = { x = e.x, y = e.y } end
             end
+            M.secondLook(paths, starts, gone, function(again)
+                return sandbox(function()
+                    local there, second, escaped = {}, {}, {}
+                    for id in pairs(again) do there[id] = { x = starts[id].x, y = starts[id].y } end
+                    local goneAgain = {}
+                    replay(again, there, second, goneAgain, nil, true)
+                    for id in pairs(goneAgain) do escaped[id] = true end
+                    return second, escaped
+                end)
+            end)
         end)
         closingsAt[ck] = { out = out, paths = paths }
         return out, paths

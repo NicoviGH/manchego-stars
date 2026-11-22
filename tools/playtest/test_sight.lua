@@ -905,7 +905,7 @@ do
     check(bodyOf("local function aiOrder(call, all)")
               :find("local n = M%.aiPhaseStart%(api, call, S, all,%s*{ { S%.BuildAiUnitList, {} } }%)") ~= nil,
           true, "aiPhaseStart: aiOrder builds the order in the phase start's own list")
-    local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts)")
+    local decide = bodyOf("local function aiDecide(call, proc, e, all, before, starts, tileOnly)")
     local started = decide:find("M%.aiPhaseStart%(api, call, S, all, setup, known%)")
     -- red, or the player's for a berserked player unit in the berserk phase (#660)
     local guard = decide:find('local phase = e%.faction == "blue" and M%.PHASES%[1%] or '
@@ -964,7 +964,7 @@ do
         check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
               "refresh: " .. name .. " holds one of the three calls")
     end
-    local at = src:find("local function aiDecide(call, proc, e, all, before, starts)", 1, true)
+    local at = src:find("local function aiDecide(call, proc, e, all, before, starts, tileOnly)", 1, true)
     local body = at and src:sub(at, src:find("\n    end\n", at, true))
     local keep = body and body:find("M.keepAi(api, all)", 1, true)
     local write = body and body:find("api.write", 1, true)
@@ -1723,6 +1723,103 @@ do
     local kept = { [1] = { [1] = here0, [2] = here0 } }
     Sight.takeSecondLook(kept, still, starts)
     check(#kept[1], 2, "takeSecondLook: a unit that stayed put again keeps the first path")
+end
+
+-- secondLook (#724), the wiring closings() runs: a unit that stayed put is replayed and its second
+-- path replaces the first where it left its tile; a stayer keeps its path; a mover or an escaped
+-- unit is not asked; nothing asks the replay when no unit stayed put; an escape in the second look
+-- cuts the path to the phases before it.
+do
+    local peak = { x = 2, y = 13 }
+    local function run(paths, starts, gone, second, escaped)
+        local asked = {}
+        Sight.secondLook(paths, starts, gone, function(again)
+            for id in pairs(again) do asked[#asked + 1] = id end
+            table.sort(asked)
+            return second, escaped
+        end)
+        return table.concat(asked, ",")
+    end
+    local paths = { [1] = { [1] = peak, [2] = peak }, [2] = { [1] = { x = 5, y = 5 } },
+                    [3] = { [1] = peak }, [4] = { [1] = peak, [2] = peak } }
+    local starts = { [1] = peak, [2] = { x = 4, y = 5 }, [3] = peak, [4] = peak }
+    local asked = run(paths, starts, { [3] = true },
+                      { [1] = { [1] = { x = 2, y = 9 }, [2] = { x = 2, y = 6 } }, [4] = { [1] = peak } }, {})
+    check(asked, "1,4", "secondLook: only the units that stayed put are asked")
+    check(paths[1][2].y, 6, "secondLook: a mover's second path replaces the first")
+    check(#paths[4], 2, "secondLook: a stayer keeps its path")
+    check(paths[2][1].x, 5, "secondLook: a unit that moved the first time is as it was")
+    -- nothing stayed put: the replay is never asked
+    local calls = 0
+    Sight.secondLook({ [1] = { [1] = { x = 3, y = 3 } } }, { [1] = peak }, {}, function() calls = calls + 1 return {} end)
+    check(calls, 0, "secondLook: no unit stayed put, no second replay")
+    -- an escape in the second look: the path is the phases before it (one phase here), then none
+    local esc = { [1] = { [1] = peak, [2] = peak, [3] = peak } }
+    run(esc, { [1] = peak }, {}, { [1] = { [1] = peak } }, { [1] = true })
+    check(#esc[1], 1, "secondLook: an escape cuts the stationary path to the phases before it")
+    local early = { [1] = { [1] = peak, [2] = peak } }
+    run(early, { [1] = peak }, {}, {}, { [1] = true })
+    check(next(early[1]), nil, "secondLook: an escape in the first phase leaves no path")
+end
+
+-- closings() runs the second look through M.secondLook, its replay in a sandbox of its own and
+-- tile-only, and hides our units through M.hideUnit alone (the sandboxed game calls cannot run
+-- here; the Ch13 replay is their proof)
+do
+    local at = sightSrc:find("function s.closings", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("closingsAt[ck] = {", at, true))
+    check(body ~= nil and body:find("M.secondLook(paths, starts, gone, function(again)", 1, true) ~= nil, true,
+          "closings: the second look is wired through M.secondLook")
+    check(body ~= nil and body:find("return sandbox(function()", 1, true) ~= nil
+          and body:find("replay(again, there, second, goneAgain, nil, true)", 1, true) ~= nil, true,
+          "closings: the second look plays in a sandbox of its own, tile only")
+    check(body ~= nil and body:find("M.hideUnit(api, o)", 1, true) ~= nil
+          and body:find("| US_HIDDEN", 1, true) == nil, true, "closings: our units are hidden by M.hideUnit alone")
+end
+
+-- hideUnit: one owner of the hide, journaled, and its restore puts the word back.
+do
+    local m = fakeMem()
+    m.w32(0x210, 0x20)
+    local api = { mem = m, Board = { US_HIDDEN = 1 }, write32 = function(a, v) m.w32(a, v) end }
+    local restore = Sight.hideUnit(api, { addr = 0x200 })
+    check(m.u32(0x200 + 0x0C), 1, "hideUnit: the unit is hidden")
+    restore()
+    check(m.u32(0x200 + 0x0C), 0, "hideUnit: its restore writes the state back")
+end
+
+-- the closings key reads our units as the AI's targets (the second look): same tiles, other HP
+-- or another carrier is another read.
+do
+    local a = { id = 0x81, x = 8, y = 8, hp = 10 }
+    local mine = { id = 1, x = 3, y = 3, hp = 20 }
+    local key = Sight.closingsKey(3, 8, nil, { a }, {}, { mine })
+    check(Sight.closingsKey(3, 8, nil, { a }, {}, { { id = 1, x = 3, y = 3, hp = 19 } }) ~= key, true,
+          "closingsKey: our unit hurt is a new read")
+    check(Sight.closingsKey(3, 8, nil, { a }, {}, { { id = 1, x = 3, y = 3, hp = 20, carrying = 4 } }) ~= key, true,
+          "closingsKey: our unit carrying another is a new read")
+    check(Sight.closingsKey(3, 8, nil, { a }, {}, { { id = 2, x = 3, y = 3, hp = 20 } }) ~= key, true,
+          "closingsKey: another unit on the tile is a new read")
+end
+
+-- the second look starts from the board as it stood: the first look runs in a sandbox of its own
+-- (rolled back), so the second reads the words as they were (the shape closings() uses).
+do
+    local cpu = fakeCpu(1)
+    local bytes = { [0x100] = 7 }
+    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                       u16 = function(a) return bytes[a] or 0 end,
+                                       u32 = function(a) return bytes[a] or 0 end },
+                    write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end }
+    local sandbox, api = Sight.batching(outer)
+    local seenSecond
+    sandbox(function()
+        sandbox(function() api.write8(0x100, 99) end)                  -- the first look
+        sandbox(function() seenSecond = outer.mem.u8(0x100) end)       -- the second
+    end)
+    check(seenSecond, 7, "second look: starts from the original board, not the first look's end")
 end
 
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
