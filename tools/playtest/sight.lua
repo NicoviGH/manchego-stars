@@ -3993,7 +3993,7 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer =
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer, area =
                 stagePhase(call, proc, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
@@ -4077,6 +4077,7 @@ function M.new(outer)
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
                                   remove, nil, cast, pilfer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
+            out.areaPositional, out.areaTruncated = area.positional, area.truncated
             return out
         end) end)
     end

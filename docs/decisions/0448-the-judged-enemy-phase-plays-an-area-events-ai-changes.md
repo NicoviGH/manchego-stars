@@ -47,7 +47,8 @@ turn 4, and the Sage kills of s4007 and s4009).
   waits of a way include the dead actors, which are in no board list, so their struct is stood on the
   end tile for the ask alone and put back. The first version woke nothing in such a way (it
   under-woke).
-- The unread parts are counted, never silent: the judged phase's result carries `.areaPositional` and
+- The unread parts are counted, never silent: the judged phase's result and the lookahead's first
+  phase's (`nextPhase`, the same staging, summed at both call sites) carry `.areaPositional` and
   `.areaTruncated`, the planner's cost line `area_positional` / `area_truncated` next to `averaged` and
   `unsplit`, and the bot's record `plans.area_positional` / `plans.area_truncated`.
 - Keys: `M.phaseKey` (the kept phase start) now includes each unit's `ai1` and `ai2`: a start kept

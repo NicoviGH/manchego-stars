@@ -2541,6 +2541,8 @@ function M.plan(Bot, board, sight, style, opts)
         local clock = os.clock()
         local r = sight.nextPhase(M.staged(st), replyOn)
         wearCalls = wearCalls + 1
+        cost.area_positional = cost.area_positional + (r.areaPositional or 0)
+        cost.area_truncated = cost.area_truncated + (r.areaTruncated or 0)
         -- the lookahead's second phase for this plan is this same call: kept for it
         st.wearNext = r
         local worn = {}
@@ -2827,6 +2829,8 @@ function M.plan(Bot, board, sight, style, opts)
                     elseif not seizesIn(st) then
                         r = sight.nextPhase(M.staged(st), replyOn)
                         look.calls = look.calls + 1
+                        cost.area_positional = cost.area_positional + (r.areaPositional or 0)
+                        cost.area_truncated = cost.area_truncated + (r.areaTruncated or 0)
                     end
                     -- the units the wear read (ADR 0421): their later phases are its reading,
                     -- the same second phase on each way's HP and the third, already in their

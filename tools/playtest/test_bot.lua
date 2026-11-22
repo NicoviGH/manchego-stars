@@ -9058,6 +9058,26 @@ local function looksAhead(boss, replyPhase)
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
 
+-- #712: the lookahead's first phase stages through the same waits, so what its Misc scripts left
+-- unread (CHAI_AT, a walk the budget cut short) is counted in the plan's cost as the judged
+-- phase's is. The control: a lookahead that reports none adds none.
+do
+    local board, sight, st = looksAhead(true)
+    local _, _, cost0 = Planner.plan(B, board, sight, st)
+    check(cost0.area_positional .. "/" .. cost0.area_truncated, "0/0", "#712 lookahead control: nothing unread, nothing counted")
+    board, sight, st = looksAhead(true)
+    local next0, calls = sight.nextPhase, 0
+    sight.nextPhase = function(...)
+        local r = next0(...)
+        calls = calls + 1
+        r.areaPositional, r.areaTruncated = 2, 1
+        return r
+    end
+    local _, _, cost = Planner.plan(B, board, sight, st)
+    check(calls > 0 and cost.area_positional == 2 * calls and cost.area_truncated == calls, true,
+          "#712 lookahead: each nextPhase's unread script parts are summed into the cost")
+end
+
 -- test_lookahead_triggers_on_a_remembered_boss (ADR 0399): a boss in fog that a retry remembers
 -- (sight.knows) is a boss whose reach a step enters, so the lookahead is triggered as for one in
 -- sight; one the fog hides and no attempt showed triggers nothing.
