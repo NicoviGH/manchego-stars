@@ -8,8 +8,7 @@ issues: [719, 510]
 
 # A chest goes to a unit that opens it itself, and a stalled sent pair is paired fresh
 
-**Decided (#719), #510 step 9.** Extends ADR 0369 (the game's own check says who uses a tile)
-and the exploring pass's sticky keep (`exploring`, `bot.lua`). No new number, and no plan is
+**Decided (#719), #510 step 9.** Extends the exploring pass's sticky keep (`exploring`, `bot.lua`). No new number, and no plan is
 scored differently: only `ctx.exploreGoal` changes.
 
 **The bug.** Vanilla Ch16 (`b640e-cs-s4009`, attempt 1): a keyless unit may be sent to a chest
