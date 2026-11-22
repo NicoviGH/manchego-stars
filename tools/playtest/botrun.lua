@@ -892,6 +892,13 @@ function M.run(api)
         end
         return out
     end
+    -- the owed recruits as a set of charIds, nil when the api cannot say (no recruits())
+    local function owedCharIds()
+        if not owed then return nil end
+        local out = {}
+        for _, c in ipairs(owed) do out[c] = true end
+        return out
+    end
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
@@ -1563,6 +1570,7 @@ function M.run(api)
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(sight),
+                                     owedRecruits = owedCharIds(),
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,

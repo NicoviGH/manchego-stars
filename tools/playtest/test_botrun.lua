@@ -1855,7 +1855,7 @@ end
 -- #724: attempt 1 (no memory) is told the arrival a turn event's script makes (sight.scriptedUnits);
 -- one a retry saw (memory) wins over the scripted one; an unowed one is not told.
 do
-    local asked = false
+    local asked, owedSeen = false, nil
     local function told(memory, owes)
         local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) },
                              recruits = owes or { 0x30 } }
@@ -1875,6 +1875,7 @@ do
             surprise = function() return "the plan is played out" end,
             plan = function(_, board, _, _, opts)
                 got = got or opts.pending
+                owedSeen = owedSeen or opts.owedRecruits
                 for _, u in ipairs(board.units) do
                     if u.faction == "blue" and u.acted then return nil end
                 end
@@ -1888,6 +1889,7 @@ do
     local got = told(nil)
     check(got and #got, 1, "scripted: attempt 1 is told the owed arrival, not the unowed")
     check(got and got[1] and got[1].x .. "," .. got[1].y, "7,7", "scripted: at the script's tile")
+    check(owedSeen and owedSeen[0x30], true, "scripted: the planner is told the owed set (opts.owedRecruits)")
     asked = false
     told(nil, {})
     check(asked, false, "scripted: nothing owed, no scan of the scripts")

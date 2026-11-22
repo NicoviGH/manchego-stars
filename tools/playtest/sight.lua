@@ -1255,6 +1255,7 @@ end
 -- (a visitor with no state between CALLs, callsScript: a diamond of CALLs is then linear, not
 -- exponential), { budget = n } stops the walk after n commands in all (a visitor with state, as
 -- scriptEffects' slot 2, walks a script CALLed twice twice, so its total is bounded instead).
+-- walkScript returns (stopped, truncated): `truncated` is true when the budget ended a walk.
 -- Without memo the scripts being walked are a stack that guards a loop. Branches are not
 -- evaluated: every command the bytes reach linearly is visited. Pure over mem.
 -- Every ENQUEUE_CALL is followed, whatever its subcommand: an enqueued paid script reads as paid,
@@ -1267,7 +1268,7 @@ M.EV_WALK_BUDGET = 8 * M.EV_SCRIPT_LIMIT
 local ROM_REGION, ROM_SHIFT = 4, 25
 function M.walkScript(mem, script, visit, opts)
     opts = opts or {}
-    local stack, left = {}, opts.budget or math.huge
+    local stack, left, truncated = {}, opts.budget or math.huge, false
     local done = opts.memo and {} or nil
     local function walk(from)
         if from >> ROM_SHIFT ~= ROM_REGION or stack[from] or (done and done[from]) then return false end
@@ -1277,7 +1278,8 @@ function M.walkScript(mem, script, visit, opts)
         for _ = 1, M.EV_SCRIPT_LIMIT do
             local head = mem.u16(at)
             local cmd, len = head >> 8, (head >> 4) & 0xF
-            if len == 0 or left <= 0 then break end
+            if len == 0 then break end
+            if left <= 0 then truncated = true; break end
             left = left - 1
             if visit(at, cmd, head & 0xF) then stopped = true; break end
             if cmd == EV_CMD_LABEL then
@@ -1298,7 +1300,8 @@ function M.walkScript(mem, script, visit, opts)
         stack[from] = nil
         return stopped
     end
-    return walk(script)
+    local stopped = walk(script)
+    return stopped, truncated
 end
 
 -- Whether the event script at `script` CALLs `target` (EV_CMD_CALL or EV_CMD_ENQUEUE_CALL),
@@ -1311,7 +1314,7 @@ function M.callsScript(mem, script, target)
 end
 
 -- What an event script does to the field's units, read from its bytes (#724): the units it loads
--- and the ones it removes. -> { loads = { { charId, x, y } }, removals = { charId } }.
+-- and the ones it removes. -> { loads = { { charId, x, y } }, removals = { charId }, truncated }.
 -- Encodings (include/eventscript.h, src/eventscr.c): a command's head halfword is cmd << 8 | len
 -- << 4 | sub (_EvtCmd, eventscript.h:570); SVAL (EvtSetSlot, :591) is slot at +2 and a u32 at +4;
 -- LOAD1-3 (EvtLoadUnit1.., :687, sub 0-2) is a UnitDefinition array at +4, and a pointer < 0
@@ -1328,7 +1331,8 @@ end
 -- CHECK_ALLEGIANCE, a flag) are not evaluated, so a removal that only holds for a unit in some
 -- state reads as always; a REDA walks a loaded unit off the tile read; LOAD_PRECONF's
 -- SETCOUNT and SETCHANCE (eventscript.h:451-453) are not read, so an array is loaded whole. The
--- walk is bounded to M.EV_WALK_BUDGET commands in all. Pure over mem.
+-- walk is bounded to M.EV_WALK_BUDGET commands in all: a read the budget cut short has
+-- `truncated = true` and is an estimate of less than the script does. Pure over mem.
 local EV_CMD_SVAL, EV_CMD_LOADUNIT, EV_CMD_LOADSINGLEUNIT, EV_CMD_CHANGESTATE =
     0x05, 0x2C, 0x32, 0x34
 local EVSUB_KILL, EVSUB_DISA, EVENT_SLOT_2 = 0xD, 0xF, 2
@@ -1336,7 +1340,7 @@ local UDEF_SIZE, UDEF_LIMIT = 0x14, 64
 local MAP_COORD_LIMIT = 64   -- x and y are 6-bit fields in a UnitDefinition; a byte's 7th bit is a sign
 function M.scriptEffects(mem, script)
     local loads, removed, slot2 = {}, {}, 0
-    M.walkScript(mem, script, function(at, cmd, sub)
+    local _, truncated = M.walkScript(mem, script, function(at, cmd, sub)
         if cmd == EV_CMD_SVAL then
             if mem.u16(at + 2) == EVENT_SLOT_2 then slot2 = mem.u32(at + 4) end
         elseif cmd == EV_CMD_LOADUNIT and sub <= 2 then
@@ -1369,17 +1373,18 @@ function M.scriptEffects(mem, script)
     for _, c in ipairs(removed) do
         if not cast[c] then removals[#removals + 1] = c end
     end
-    return { loads = loads, removals = removals }
+    return { loads = loads, removals = removals, truncated = truncated }
 end
 
 -- The turn events' effects (M.scriptEffects of each, in the order the game offers them: `events`
--- = { { turn, boardTurn, loads, removals } }) as s.scriptedUnits' answer: { arrivals = { { charId,
--- x, y, turn, boardTurn } }, removals = { [charId] = boardTurn } }. A unit's earliest removal is
+-- = { { turn, boardTurn, loads, removals, truncated } }) as s.scriptedUnits' answer: { arrivals = {
+-- { charId, x, y, turn, boardTurn } }, removals = { [charId] = boardTurn }, truncated }. A unit's earliest removal is
 -- kept, and a removal at or before the unit's earliest arrival is dropped: a cast loaded in one
 -- event and removed in an earlier or the same one was never a unit of the field. Pure.
 function M.foldScripted(events)
     local out, first = { arrivals = {}, removals = {} }, {}
     for _, e in ipairs(events) do
+        out.truncated = out.truncated or e.truncated
         for _, l in ipairs(e.loads) do
             out.arrivals[#out.arrivals + 1] = { charId = l.charId, x = l.x, y = l.y, turn = e.turn,
                                                 boardTurn = e.boardTurn }
@@ -4483,10 +4488,10 @@ function M.new(outer)
     -- boardTurn } }. Each turn event the game offers on turns 1..M.SCRIPT_HORIZON (turnScripts,
     -- the game's own turn/phase/flag check, each script at the first phase it is offered) has its
     -- bytes walked (M.scriptEffects: no event is run, nothing is written but the sandbox's turn
-    -- and phase, which it puts back). `turn` is the turn of the event; `boardTurn` the first
-    -- player turn its effect is on the board: the turn itself for a blue-phase event, the next
-    -- for a green or red one. (botrun's arrivals_seen `turn` is the enemy phase's own turn for an
-    -- arrival it saw there too, and the same boardTurn; the scan has no phase that it saw.) A
+    -- and phase, which it puts back). `boardTurn` is the first player turn its effect is on the
+    -- board: the turn itself for a blue-phase event, the next for a green or red one; `turn` is
+    -- the same, as botrun's arrivals_seen reads an arrival no enemy was seen acting on (the
+    -- board of the next player phase). `truncated` is set when a script's walk hit the budget. A
     -- unit's earliest arrival and earliest removal are kept, and a removal at or before the
     -- unit's earliest arrival is dropped (a cast loaded in one event and removed in a later one
     -- is no removal of a unit that was on the field). About 3 x the horizon game calls once a
@@ -4510,8 +4515,9 @@ function M.new(outer)
                     for _, script in ipairs(fresh) do
                         done[script] = true
                         local fx = M.scriptEffects(mem, script)
-                        events[#events + 1] = { turn = t, boardTurn = phase == M.PHASES[1] and t or t + 1,
-                                                loads = fx.loads, removals = fx.removals }
+                        local boardTurn = phase == M.PHASES[1] and t or t + 1
+                        events[#events + 1] = { turn = boardTurn, boardTurn = boardTurn,
+                                                loads = fx.loads, removals = fx.removals, truncated = fx.truncated }
                     end
                 end
             end

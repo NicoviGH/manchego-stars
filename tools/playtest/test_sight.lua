@@ -1661,6 +1661,22 @@ do
     local t0 = os.clock()
     Sight.scriptEffects(m, D)
     check(os.clock() - t0 < 1, true, "scriptEffects: a diamond is bounded by its budget")
+    -- a chain of long scripts: the budget ends the walk, a DISA behind it is not read, and the
+    -- read says it was cut short
+    local L = 0x08010000
+    local per = Sight.EV_SCRIPT_LIMIT - 1   -- a script's commands: these and its CALL
+    local links = Sight.EV_WALK_BUDGET // per + 2
+    for i = 0, links - 1 do
+        local at = L + i * 0x1000
+        for k = 0, per - 1 do m.w16(at + k * 4, 0x0020) end   -- NOPs, 4 bytes each
+        call(at + per * 4, L + (i + 1) * 0x1000)
+    end
+    local last = L + links * 0x1000
+    m.w16(last, 0x342F); m.w16(last + 2, 0x12); m.w16(last + 4, 0x0120)
+    local cut = Sight.scriptEffects(m, L)
+    check(cut.truncated, true, "scriptEffects: a walk past the budget is cut short and says so")
+    check(#cut.removals, 0, "scriptEffects: a removal behind the budget is not read")
+    check(Sight.scriptEffects(m, EV).truncated, false, "scriptEffects: a short walk is not truncated")
 end
 
 -- foldScripted (#724): Amelia is loaded on turn 5 and removed on turn 12 (the removal stays); a cast

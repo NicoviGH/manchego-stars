@@ -11,7 +11,8 @@
 --   opts (optional): { unpaid = { ["<talker charId>><target charId>"] = true } }, the Talks
 --          this attempt that recruited no one (botrun's, #679), offered no more; and, for
 --          Bot.candidates, pending = { { charId, x, y, turn } }: owed recruits an earlier attempt
---          saw arrive (botrun's pendingRecruits, ADR 0436).
+--          saw arrive (botrun's pendingRecruits, ADR 0436); owedRecruits = { [charId] = true }, the
+--          recruits the game still owes (api.recruits less the party), for the scripted removals.
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
 --            claims = {claim ids}, route = 1|2 }, plus the fields the claim behaviours add
 --          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
@@ -3194,6 +3195,7 @@ function M.candidates(board, sight, style, opts)
     ctx.beside = function(tile) return besideGoal(ctx, tile) end
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
     ctx.pending = opts and opts.pending
+    ctx.owedRecruits = opts and opts.owedRecruits   -- a set of charIds (botrun's owed), Goals.scriptedCloses'
     ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end

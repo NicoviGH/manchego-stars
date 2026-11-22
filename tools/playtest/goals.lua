@@ -139,18 +139,23 @@ end
 -- recruit's path (as long as its deadline less one, the closings contract) is cut to match. An
 -- ESTIMATE: the script's guards (CHECK_ALIVE, CHECK_ALLEGIANCE) are not evaluated; for a recruit
 -- not yet joined the removal holds, and a removal whose turn is past is none. `board` names each
--- recruit's charId (a pending one is ctx.pendingRecruits'). Returns new tables: sight keeps its
+-- recruit's charId (a pending one is ctx.pendingRecruits'); ctx.owedRecruits (a set of charIds)
+-- names the ones owed, and empty or nil asks for no scan. Returns new tables: sight keeps its
 -- answers for the board.
 function M.scriptedCloses(sight, ctx, board, out, paths)
-    local watch = ctx.recruitTalkers or {}
-    if not sight.scriptedUnits or next(watch) == nil then return out, paths end
+    assert(board.turn, "Goals.scriptedCloses: the board has no turn")
+    -- only an owed recruit (ctx.owedRecruits, a set of charIds: botrun's) can be removed from a
+    -- goal: recruitTalkers also holds any talk offered, and a scan for those would be asked again
+    -- by every plan's sandbox
+    local watch, owed = ctx.recruitTalkers or {}, ctx.owedRecruits or {}
+    if not sight.scriptedUnits or next(watch) == nil or next(owed) == nil then return out, paths end
     local gone = sight.scriptedUnits().removals
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local outCopy, pathCopy = nil, nil
     for id in pairs(watch) do
         local u = byId[id] or (ctx.pendingRecruits or {})[id]
-        local at = u and gone[u.charId] and gone[u.charId] - board.turn
+        local at = u and owed[u.charId] and gone[u.charId] and gone[u.charId] - board.turn
         if at and at >= 1 and at < (out["unit:" .. id] or math.huge) then
             if not outCopy then
                 outCopy, pathCopy = {}, {}

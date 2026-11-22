@@ -21,7 +21,8 @@ still read 0.8-0.97 on turn 11 although `ch9a`'s turn-12 event removes her with 
   CALLs, and a diamond of CALLs stays linear; a probe of 21 scripts each CALLing the next twice was
   6,291,453 visits without it). `M.scriptEffects` walks a script CALLed twice twice, because slot 2
   can differ between the calls, so its total is bounded by a `budget` (`M.EV_WALK_BUDGET` = 8 x
-  `EV_SCRIPT_LIMIT` commands).
+  `EV_SCRIPT_LIMIT` commands). A read the budget cut short says `truncated = true` (`foldScripted`
+  carries it): it is an estimate of less than the script does.
 - `M.scriptEffects(mem, script)`: the units a script loads (`LOAD1-3` arrays, slot 2 set by `SVAL`
   and read through the CALL as `LOAD1(1, -1)`; `LOADSINGLEUNIT`) and removes (`CHANGESTATE` DISA or
   KILL; `DISA_IF` waits for a death fade and is not one). A unit the same script loads and removes
@@ -42,7 +43,8 @@ still read 0.8-0.97 on turn 11 although `ch9a`'s turn-12 event removes her with 
 - `goals.lua` `M.scriptedCloses`, folded in by `Goals.list` (not `M.closings`, which `openTiles`
   calls with no board): a scripted removal closes the recruit after enemy phase `boardTurn -
   turn`, the smaller of that and the AI's escape; its path is cut to the deadline less one (the
-  closings contract); a removal already past is none. No recruit watched: no scan.
+  closings contract); a removal already past is none. Only a recruit the game owes counts (`ctx.owedRecruits`, botrun's
+  owed set, through `opts`): no owed recruit watched, no scan, so a plan's sandbox never starts one.
 
 **Horizon.** An event names its turn in a byte (`M.LAST_EVENT_TURN` = 0xFF). The scan stops at turn
 30, because each turn costs three game calls and the latest start turn any vanilla turn event names
