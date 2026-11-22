@@ -70,7 +70,8 @@
 -- Goals.forfeited(ledger, goals, closes) -> the sorted ids of the feasible rows a plan loses
 -- for good (FR-011's forfeits), `closes` what the plan does in the judged phase, each a chance
 -- over its judged branches: { win (the chapter ends), took = { [goal id] = true }, lost =
--- { [recruit unit id] = chance it dies }, reach = { [goal id] = { before, after } }, gone }.
+-- { [recruit unit id] = chance it dies }, loose = { [unit id] = true } (owed recruits no one may
+-- Talk yet, no row: their death alone forfeits "owed:<id>"), reach = { [goal id] = { before, after } }, gone }.
 -- Counted conservatively (FR-014): a goal is lost when it is lost in any branch with p > 0, so
 -- any chance at all is the whole goal. A win
 -- closes every goal the plan does not take; a recruit's death closes its Talk; a looter's
@@ -327,6 +328,13 @@ function M.forfeited(ledger, goals, closes)
         local gone = shut[r.id]
         for _, id in ipairs(r.needs or {}) do gone = gone or shut[id] end
         if r.status == "feasible" and gone then out[#out + 1] = r.id end
+    end
+    -- an owed recruit no player unit may Talk yet (closes.loose, a set of unit ids: Bot's
+    -- looseRecruits) has no row, so its death is a forfeit of its own, "owed:<unit id>": the same
+    -- consequence as a recruit with a talker (#730 fix 2, ADR 0452). Its death only: a win does
+    -- not close it, or a row nobody can take would hold the Seize for good
+    for id in pairs(closes.loose or {}) do
+        if (lost[id] or 0) > M.DUST then out[#out + 1] = "owed:" .. id end
     end
     table.sort(out)
     return out

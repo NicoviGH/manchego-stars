@@ -10174,6 +10174,66 @@ do
     check(Planner.winKind(nil), nil, "winKind: no objective")
 end
 
+-- test_an_owed_recruit_no_one_may_talk_yet_is_a_recruit_to_spare (#730 fix 2, ADR 0452; vanilla
+-- Ch10's Marisa, charId 0x16, owed before Gerik joins): R is red, the game owes it
+-- (opts.owedRecruits), and no blue unit may Talk it. On main recruitsOf counts a recruit only when a
+-- blue unit may Talk it, so its death forfeited nothing: A's counter that kills R, and A's own blow
+-- that kills R, cost the plan no more than any other. Now each forfeits "owed:129" (no ledger row,
+-- so a win does not close it), the same rank as the death of a recruit with a talker.
+do
+    local owed = { owedRecruits = { [0x81] = true } }
+    -- the counter: counterKillsRecruit's board, with no Talk offered. A has only (0,0), R strikes
+    local board, o = counterKillsRecruit(true)
+    o.talk = nil
+    local a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000), owed)
+    check(plan and table.concat(plan.forfeited or {}, ","), "owed:129",
+          "owed: a counter that fells the owed recruit forfeits it")
+    -- with (1,0) offered, the plan played is the one whose counter spares it (on main they tie)
+    board, o = counterKillsRecruit()
+    o.talk = nil
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("careful", 10000), owed)
+    check(at(a) .. " " .. #(plan and plan.forfeited or { 1 }), "1,0 0",
+          "owed: the plan whose counter spares the owed recruit ranks above the one that fells it")
+    -- no owed set: the same board forfeits nothing, as on main
+    board, o = counterKillsRecruit(true)
+    o.talk = nil
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000))
+    check(plan and #(plan.forfeited or {}), 0, "owed: a red unit the game does not owe is no recruit")
+    -- the owed unit has a Talk: it keeps its ledger row, no second forfeit
+    board, o = counterKillsRecruit(true)
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000), owed)
+    check(plan and table.concat(plan.forfeited or {}, ","), "recruit:129",
+          "owed: with a talker the recruit's row is the forfeit, not a second one")
+end
+
+-- the same price on our own blow (the player phase): A, next to R and Y (the Rout's other enemy),
+-- may kill R. Played on main (a kill is a gain); now that plan forfeits "owed:129" and the plan
+-- played does not strike R.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local Y = red(0x82, 9, 9, { hp = 20, minRange = false })
+    local function scene()
+        return boardOf(A, R, Y), {
+            reach = { [0x01] = tiles({ 0, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1,
+                                                        killsTarget = true } } } },
+        }
+    end
+    local board, o = scene()
+    local a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000),
+                                 { owedRecruits = { [0x81] = true } })
+    local struck, spared = nil, nil
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local hits = false
+        for _, x in ipairs(c.acts) do hits = hits or x:find("attack", 1, true) ~= nil end
+        if hits then struck = c.rank.forfeits else spared = c.rank.forfeits end
+    end
+    check(tostring(struck) .. " " .. tostring(spared), "1 0",
+          "owed: our own blow that fells the owed recruit forfeits it, a plan without it does not")
+    check(a and a.act, "wait", "owed: the plan played does not strike the owed recruit")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

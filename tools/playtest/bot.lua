@@ -2079,8 +2079,12 @@ end
 -- talker reaches anywhere.
 -- -> out[id] = true, talkers[id] = the player units' ids that may Talk it over (goals.lua's
 -- takers), and pending[id] = { id, charId, x, y } for the arrivals.
+-- Then `loose` (#730 fix 2, ADR 0452): the red units on the field the game still owes
+-- (ctx.owedRecruits) that no blue unit may Talk yet (vanilla Ch10's Marisa before Gerik joins).
+-- They are in `out` too, so a blow from our side that fells one is priced as a recruit's death, but they
+-- have no talkers and no goal: a row nobody can take would hold the win for good.
 local function recruitsOf(ctx)
-    local out, talkers = {}, {}
+    local out, talkers, loose = {}, {}, {}
     -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to
     local units = {}
     for _, t in ipairs(ctx.onField) do units[#units + 1] = t end
@@ -2095,6 +2099,12 @@ local function recruitsOf(ctx)
                 talkers[t.id] = talkers[t.id] or {}
                 table.insert(talkers[t.id], u.id)
             end
+        end
+    end
+    local owed = ctx.owedRecruits or {}
+    for _, t in ipairs(ctx.onField) do
+        if t.faction == "red" and not t.fogged and owed[t.charId] and not out[t.id] then
+            out[t.id], loose[t.id] = true, true
         end
     end
     local pending, here = {}, {}
@@ -2116,7 +2126,7 @@ local function recruitsOf(ctx)
             end
         end
     end
-    return out, talkers, pending
+    return out, talkers, pending, loose
 end
 
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
@@ -3282,7 +3292,7 @@ function M.candidates(board, sight, style, opts)
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
     ctx.pending = opts and opts.pending
     ctx.owedRecruits = opts and opts.owedRecruits   -- a set of charIds (botrun's owed), Goals.scriptedCloses'
-    ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)
+    ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits, ctx.looseRecruits = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     -- A unit sent where it has had no step nearer since an earlier turn is sent again,

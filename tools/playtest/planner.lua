@@ -2282,6 +2282,15 @@ function M.plan(Bot, board, sight, style, opts)
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)
         judged = judged + st.goalNow + W.exp * learnt
+        -- an owed recruit no one may Talk yet has no goal for goalTerm to read: its death costs
+        -- the goal's own W.death here, so the plans that forfeit it alike still order by its
+        -- chance (#730 fix 2, ADR 0452; the forfeit itself is Goals.forfeited's `loose`)
+        local looseIds = {}
+        for id in pairs(ctx.looseRecruits or {}) do looseIds[#looseIds + 1] = id end
+        table.sort(looseIds)
+        for _, id in ipairs(looseIds) do
+            judged = judged - W.death * math.min(1, (st.recruitHit[id] or 0) + (felled[id] or 0))
+        end
         st.winFell, st.winStruck = fell, winStruck
         st.advances, st.woundOnly = advances(st, fell, countered)
         -- each way the phase went and its units' HP there, for the wear's later phases
@@ -2320,7 +2329,8 @@ function M.plan(Bot, board, sight, style, opts)
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost, reach = reached(st),
+                                                       lost = lost, loose = ctx.looseRecruits,
+                                                       reach = reached(st),
                                                        gone = M.GONE })
         local gain = progress(st)
         local greenDie = 0
