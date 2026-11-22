@@ -68,8 +68,9 @@ each beside the twin; `--decision` reads only that decision's components (FR-032
 
 `calibration` reads kept traces, each play once, and prints three tables (#510 PR A): each blue
 unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; each
-chapter's blue enemy-phase deaths by what the plan the phase met read of it against its style's
-cap, as botrun grades them (ADR 0454), split by what the plan that moved the unit read; and the lookahead's second phase (read after our army's reply, ADR 0389) against
+chapter's blue enemy-phase deaths by what the plan the phase met read of it against its
+style's cap, as botrun grades them (ADR 0454), split by what the plan that moved the unit
+read; and the lookahead's second phase (read after our army's reply, ADR 0389) against
 the phase the game played after, split by whether the unit held its tile. Every change to the
 bot's first attempts is read by it the same way.
 
@@ -3542,8 +3543,8 @@ def death_read(plan, uid, field='die'):
     """The death chance trace plan event `plan` read for unit slot `uid` once its own acts were
     played: its `protected` entry's `field` (`die`, every phase it read, as botrun grades a death;
     `first`, the next enemy phase alone) given the unit lived through the plan's own counters
-    (`counter`), else its predict's `die` for a unit it does not protect; None when it read
-    neither. The twin of botrun.lua's M.deathRead and M.givenCounter: botrun grades the run in
+    (`counter`), else its predict's `die` for a unit it does not protect, or whose entry lacks
+    `field` (a trace from before ADR 0389 kept no `first`); None when it read neither. The twin of botrun.lua's M.deathRead and M.givenCounter: botrun grades the run in
     Lua, this reads the kept traces, and the two must agree (ADR 0454)."""
     for pr in (plan or {}).get('protected') or []:
         if pr.get('id') == uid and pr.get(field) is not None:

@@ -50,10 +50,13 @@ phase met; what the mover believed is the second field, for asking why the repla
 **Proof.** `test_botrun.lua`: a death with `predict.die` 0 and `protected.die` 0.041 grades
 0.041, a tail, over a 1% cap (fails on main: 0); the mover test now grades the replan's 90% and
 keeps the mover's 30% beside it (fails on main); the counter cases fail without `M.givenCounter`,
-and `test_bot.lua`'s `counter` check fails without the planner's field. Replay `fix717` (vanilla
-Ch15 `b640e-cs-s4005` attempt 1, `resume --scout --attempts 1`, before the review wave) played
-another game (stuck, 35 turns); its one enemy-phase death, 0x13 on turn 2, was graded by the
-committed plan (ref 6) at 0.897 over the 0.05 cap, the mover's (ref 3) kept beside it. Re-graded from the kept `p709b` traces, the
+and `test_bot.lua`'s `counter` check fails without the planner's field. Replay `fix717` (vanilla Ch15
+`b640e-cs-s4005` attempt 1, `resume --scout --attempts 1`, before the review wave) played
+another game (stuck, 35 turns). Its one enemy-phase death, 0x13 on turn 2, was graded by the
+committed plan (ref 6) at 0.897 over the 0.05 cap, the mover's (ref 3) kept beside it. Re-read
+with `death_read` after the review wave it is still 0.897: that trace keeps no `counter` (the
+unit's read had none to take away). `test_montecarlo.py` pins that `death_read` and
+`M.deathRead` agree. Re-graded from the kept `p709b` traces, the
 three deaths read 0.744 (cap 0.01: over_cap, Saleh 0x17), 0.0455 (cap 0.05: rng_tail, Cormag) and
 0.324 (cap 0.05: over_cap, Joshua 0x20), as #717 classed them by hand.
 

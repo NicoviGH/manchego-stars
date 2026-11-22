@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -3528,6 +3529,23 @@ class Calibration(unittest.TestCase):
         self.assertEqual(mc.death_read(plan, 1), 0.0, 'all its risk was the resolved counter')
         plan = {'protected': [{'id': 1, 'die': 0.6, 'counter': 0.2}]}
         self.assertAlmostEqual(mc.death_read(plan, 1), 0.5, msg='(0.6 - 0.2) / (1 - 0.2)')
+
+    @unittest.skipUnless(shutil.which('lua'), 'no lua on PATH')
+    def test_death_read_agrees_with_botrun(self):
+        """death_read is M.deathRead's twin (botrun.lua): the two give one number on a grid of
+        reads and counters, so the record and the calibration table cannot drift apart."""
+        grid = [(d, c) for d in (0, 0.041, 0.3, 0.6, 1) for c in (0, 0.2, 0.3, 0.99, 1) if c <= d]
+        here = os.path.dirname(os.path.abspath(__file__))
+        lua = ('local B = dofile(%r); for _, p in ipairs({%s}) do '
+               'print(string.format("%%.12f", B.deathRead({ protected = { { id = 1, '
+               'die = p[1], counter = p[2] } } }, 1))) end'
+               % (os.path.join(here, 'botrun.lua'),
+                  ', '.join('{%r, %r}' % (d, c) for d, c in grid)))
+        got = subprocess.run(['lua', '-e', lua], capture_output=True, text=True, check=True,
+                             cwd=here).stdout.split()
+        want = ['%.12f' % mc.death_read({'protected': [{'id': 1, 'die': d, 'counter': c}]}, 1)
+                for d, c in grid]
+        self.assertEqual(got, want)
 
     @staticmethod
     def lookahead(second=0.8, extended=True, held=True, dies=False, gone=False):

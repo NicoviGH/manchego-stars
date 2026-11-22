@@ -951,7 +951,10 @@ do
     local a, rec = Planner.plan(B, boardOf(A, E), sight, style("bold"))
     check(a and a.act, "attack", "counter part: bold strikes into a 10% counter")
     local pr = rec and rec.protected and rec.protected[1]
-    check(pr and pr.counter and pr.counter > 0, true, "counter part: recorded")
+    -- the 20-damage counter kills the 20 HP unit on its 10% hit (two RNs), whether our blow hit or not
+    local want = Sight.rollChance(2, 10)
+    check(pr and pr.counter and math.abs(pr.counter - want) < 1e-12, true,
+          "counter part: the counter's own kill chance")
     check(pr and pr.counter <= pr.die + 1e-12, true, "counter part: within the unit's die")
 end
 
