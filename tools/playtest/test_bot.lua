@@ -6528,6 +6528,122 @@ do
     check(n, 0, "gentle: a unit that has acted is offered none")
 end
 
+-- test_an_attack_holding_a_sparing_weapon_saves_a_recruit (#730 fix 4, ADR 0453; vanilla Ch10's
+-- Amelia): A (20 HP) strikes T (5 HP, a sure kill with either weapon) from (0,2), and the recruit R
+-- (20 HP, strikes for 5) is in reach of that tile. A's first weapon (slot 0) is the stronger and
+-- the pick every kept strike holds; R's strike is countered by it for 30 and R falls. Slot 2's
+-- counter is 2: R lives. A struck this turn, so it holds the weapon it struck with into the enemy
+-- phase, and no wait helps. On main no strike carried slot 2 (proposeOne keeps best/safe/guard per
+-- target, deduped by tile without a slot), so every plan forfeited R or never struck; the menu now
+-- offers the attack holding slot 2 ("gentle", slotKey), past the per-unit cut. Opts: `tiles` = the
+-- strike tiles (a column (0,y) and T at (1,2): (0,2) alone by default), `counter`/`dmg` = R's
+-- strike's counter and its damage on A by slot, `three` = A holds slot 3 too.
+local function sparingStrikeScene(opt)
+    opt = opt or {}
+    local weapons = { { slot = 0, min = 1, max = 1 }, { slot = 2, min = 1, max = 1 } }
+    if opt.three then weapons[3] = { slot = 3, min = 1, max = 1 } end
+    local A = blue(0x01, 0, 0, 5, { weapons = weapons })
+    local R = red(0x81, 3, 0, { hp = 20, minRange = 1, maxRange = 1 })
+    local T = red(0x82, 1, 2, { hp = 5, minRange = false })
+    local counter = opt.counter or { [0] = 30, [2] = 2 }
+    local dmg = opt.dmg or { [0] = 5, [2] = 5 }
+    local function strike(slot)
+        return fc { takenHit = 100, takenDmg = dmg[slot or 0] or 5, takenHits = 1,
+                    counterHit = 100, counterDmg = counter[slot or 0] or 30, counterHits = 1,
+                    strikerHp = 20 }
+    end
+    local strikeTiles = opt.tiles or { { 0, 2 } }
+    local reach, fcR, fcT, spare, danger = { { 0, 5 } }, {}, {}, {}, { ["0,5"] = 1 }
+    for _, t in ipairs(strikeTiles) do
+        local k = t[1] .. "," .. t[2]
+        reach[#reach + 1], spare[k], danger[k] = t, true, 1
+        fcR[k] = strike(nil)
+        fcT[k .. "/0"] = fc { hit = 100, dmg = 12, hits = 1, killsTarget = true }
+        for slot in pairs(counter) do
+            if slot > 0 then
+                fcR[k .. "/" .. slot] = strike(slot)
+                fcT[k .. "/" .. slot] = fc { hit = 100, dmg = 6, hits = 1, killsTarget = true }
+            end
+        end
+    end
+    local sweep = {}
+    for x = 0, 2 do
+        for y = 0, 5 do sweep[#sweep + 1] = { x, y } end
+    end
+    local o = {
+        reach = { [0x01] = tiles(table.unpack(reach)), [0x81] = tiles(table.unpack(sweep)) },
+        danger = danger,
+        talk = { [0x01] = { [0x81] = true } },
+        fc = { [0x01] = { [0x81] = fcR, [0x82] = fcT } },
+        enemyPhase = function(plan)
+            local held, at
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 then held, at = b.slot, b.x .. "," .. b.y end
+            end
+            local slot = spare[at] and held or nil
+            return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = dmg[slot or 0] or 5,
+                       takenHits = 1, targetHp = 20, counterHit = 100,
+                       counterDmg = counter[slot or 0] or 30, counterHits = 1, strikerHp = 20 } }
+        end,
+    }
+    return boardOf(A, R, T), o
+end
+-- the gentle attacks the menu offers A, as "act#slot@x,y"
+local function gentleActs(board, o)
+    local out = {}
+    for _, c in ipairs(B.candidates(board, sightOf(o), style("careful"))) do
+        for _, a in ipairs(c.acts) do
+            if a.why == "gentle" and a.act == "attack" then
+                out[#out + 1] = a.act .. "#" .. tostring(a.slot) .. "@" .. at(a)
+                    .. (a.slotKey and "" or "!nokey")
+            end
+        end
+    end
+    return table.concat(out, " ")
+end
+do
+    check(gentleActs(sparingStrikeScene()), "attack#2@0,2",
+          "gentle strike: the menu offers A's attack holding the weapon whose counter spares R")
+    -- the plan played: the cut leaves A's strikes to the "gentle" line alone at PER_UNIT 0 (the
+    -- kept strike and the holds are gone), and the beam is cut to one plan
+    for _, cut in ipairs({ 1, 0 }) do
+        local perUnit, beam = Planner.PER_UNIT, Planner.BEAM
+        Planner.PER_UNIT, Planner.BEAM = cut, 1
+        local board, o = sparingStrikeScene()
+        local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+        Planner.PER_UNIT, Planner.BEAM = perUnit, beam
+        check(a and a.act .. "#" .. tostring(a.slot) .. "@" .. at(a), "attack#2@0,2",
+              "gentle strike: the plan played has A strike holding slot 2 (PER_UNIT " .. cut .. ")")
+        check(plan and #(plan.forfeited or {}), 0, "gentle strike: the plan played forfeits no recruit")
+    end
+    -- A's own death counts: slot 2 spares R but R's strike kills A (25 on 20); slot 3 spares both
+    local opt = { three = true, counter = { [0] = 30, [2] = 2, [3] = 2 },
+                  dmg = { [0] = 5, [2] = 25, [3] = 5 } }
+    check(gentleActs(sparingStrikeScene(opt)), "attack#3@0,2",
+          "gentle strike: only the weapon that spares R and keeps A alive is offered")
+    opt.dmg[3] = 25
+    check(gentleActs(sparingStrikeScene(opt)), "",
+          "gentle strike: a weapon whose strike kills A is not offered")
+    -- nothing to spare: R's counter fell is not on any weapon, or no recruit
+    check(gentleActs(sparingStrikeScene({ counter = { [0] = 2, [2] = 2 } })), "",
+          "gentle strike: where the held weapon spares R already, nothing is offered")
+    -- the cap: the sparing weapon answers on three strike tiles, M.GENTLE of them are kept
+    local three = { { 0, 2 }, { 1, 1 }, { 1, 3 } }
+    local cap = B.GENTLE
+    local n = 0
+    for _ in gentleActs(sparingStrikeScene({ tiles = three })):gmatch("attack") do n = n + 1 end
+    check(n, cap, "gentle strike: the three sparing attacks are cut to M.GENTLE")
+    B.GENTLE = 3
+    n = 0
+    for _ in gentleActs(sparingStrikeScene({ tiles = three })):gmatch("attack") do n = n + 1 end
+    B.GENTLE = cap
+    check(n, 3, "gentle strike: the cap is what cuts them")
+    -- a unit with one weapon has no other to hold
+    local board, o = sparingStrikeScene()
+    board.units[1].weapons = { { slot = 0, min = 1, max = 1 } }
+    check(gentleActs(board, o), "", "gentle strike: one weapon, nothing to swap to")
+end
+
 -- test_planner_never_credits_killing_a_recruit: A can kill R from (1,0); C, far off, is the one
 -- the game lets Talk to R, so R is a recruit. Its kill is paid as a death, not credited, so
 -- careful does not attack it.

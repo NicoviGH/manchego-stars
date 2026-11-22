@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-451 decisions. Read this index, then open the two or three you need — the whole
+452 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -294,6 +294,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0450` | [A goal driven to none before its deadline is forfeit](decisions/0450-a-goal-driven-to-none-before-its-deadline-is-forfeit.md) | 2026-11-22 | #714 #699 #510 |
 | `0451` | [A wait holding the weapon whose counter spares a recruit](decisions/0451-a-wait-holding-the-weapon-that-spares-a-recruit.md) | 2026-11-22 | #730 #699 #510 |
 | `0452` | [An owed recruit no one may Talk yet is a recruit to spare](decisions/0452-an-owed-recruit-no-one-may-talk-yet-is-a-recruit-to-spare.md) | 2026-11-22 | #730 #699 #510 |
+| `0453` | [An attack holding the weapon whose counter spares a recruit](decisions/0453-an-attack-holding-the-weapon-that-spares-a-recruit.md) | 2026-11-22 | #730 #699 #510 |
 
 ---
 
