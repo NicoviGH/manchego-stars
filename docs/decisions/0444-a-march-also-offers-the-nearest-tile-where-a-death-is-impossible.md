@@ -25,19 +25,17 @@ nearest tile the `careful` gate allows (worst-case sum under HP), over every til
 tiles only, as the open march is. No new helper: `march`, `gated` and `GATES` already did it. It is
 added after the retreat so a tile both pick keeps the retreat's label (the planner keeps hold and
 retreat through the beam's cut, `planner.lua`, and a march is not cut-proof: its own score carries
-the progress and the risk, so a tile worth playing ranks in the per-unit best by itself). It has no
-`why` of its own, because the planner does not need to tell it from the open march. Where no tile
+the progress and the risk, so a tile worth playing ranks in the per-unit best by itself). It carries its own `why`, `careful`, which the planner keeps through the per-unit cut as it keeps hold and
+retreat: a debug replay showed the menu's PER_UNIT cut (`planner.lua`) dropped it (Tana's (16,4) ranked 6th of 8 on turn 1, own score -33.7 against -13.6 for the holds), so it never reached the beam. Where no tile
 passes the gate or the unit has no goal, `march` falls back to the safest tile, the hold's
 duplicate, which `add` drops. The `even` gate (no single enemy's max reaches HP) is not offered: no
 data asks for it.
 
 **Proof (ADR 0430).** `test_a_march_offers_the_nearest_tile_where_a_death_is_impossible` fails on
-main (the tile between the march and the retreat is not offered). One replay, `fix714`
-(`resume --game vanilla --campaigns b640e-cs-s4005 --chapter 10 --last 10 --attempts 1 --scout
---route 1 --seal-at 10`): won on turn 15 with 1 death (Rennac, 0x12, turn 10), the village
-(11,15) razed on turn 5 as before. A debug print confirmed the candidate: turn 1 Tana is offered
-(16,4) (open march (14,3), goal (11,15)), turn 2 (14,4). The plan played is unchanged through turn
-4 (Tana retreat (17,5) then hold (15,0); Vanessa march (15,2) then mend (14,0)): the tile is
-offered and not chosen. Why the beam or the judge prefers the others is untested here, and is the
-second half of #714 (what a goal driven to 0 costs a plan). Planning frames, turns 1-4, same
-boards: 27,041 against 26,999 on `m699c10`'s record, +0.2%.
+main. One replay, `fix714e` (`resume --game vanilla --campaigns b640e-cs-s4005 --chapter 10 --last 10
+--attempts 1 --scout --route 1 --seal-at 10`): won on turn 14 with 0 deaths; Tana played the
+careful march (14,4) on turn 2. The village (11,15) was still razed on turn 5: Tana mended at (14,6)
+on turns 3-4 instead of going on. Without the cut-proof label (`fix714`) the plan was unchanged and
+the village razed too. From (16,4) Tana is 2.29 turns from the village, the same as from the retreat
+(17,5); only (14,4) is nearer (2.00). Why she mends rather than visits is the scoring half of #714
+(a march earns no goal progress of its own at the menu stage), not built here.

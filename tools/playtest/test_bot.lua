@@ -3210,7 +3210,7 @@ do
     local text = " " .. table.concat(tilesOf, " ") .. " "
     check(text:find(" march@3,0 ", 1, true) ~= nil, true, "careful march: the nearest tile is still offered")
     check(text:find(" retreat@1,0 ", 1, true) ~= nil, true, "careful march: so is the retreat")
-    check(text:find(" march@2,0 ", 1, true) ~= nil, true,
+    check(text:find(" careful@2,0 ", 1, true) ~= nil, true,
           "careful march: and the nearest tile a death is impossible on")
 end
 

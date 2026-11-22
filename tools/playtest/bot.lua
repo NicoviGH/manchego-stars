@@ -2947,9 +2947,9 @@ local function proposeOne(ctx, u)
     -- for five turns, the throne open, every forward tile an ally's who stayed put)
     -- (no tile at all only for a re-listing's unit, M.candidates' opts.tiles: its new tiles
     -- may all be allies')
-    local function marched(gate)
+    local function marched(gate, why)
         local t = march(ctx, u, gate, objective)
-        add(t and action(u, t, "wait"), "march")
+        add(t and action(u, t, "wait"), why or "march")
     end
     marched(open)
     ctx.freeOnly = true
@@ -2985,9 +2985,9 @@ local function proposeOne(ctx, u)
     -- survival of the beam's cut); the march is not cut-proof, its own score carries the
     -- progress and the risk. Where no tile passes the gate `march` falls back to the safest
     -- tile, the hold's duplicate, which `add` drops.
-    marched(GATES.careful)
+    marched(GATES.careful, "careful")
     ctx.freeOnly = true
-    marched(GATES.careful)
+    marched(GATES.careful, "careful")
     ctx.freeOnly = nil
     -- the next safest holds too: another unit the plan moves first may take the safest,
     -- and with one hold the unit had only exposed tiles left (Manchego Stars ch03: Braulo, at 16
