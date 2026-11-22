@@ -103,6 +103,9 @@
 #   stealprobe           -- PT_VANILLA=1 PT_LEAKGUARD=1: the judged enemy phase plays an enemy
 #                           thief's steal (#711): the holder's Chest Key is taken in the
 #                           simulation, the plan moves her out of reach, no sandbox leak
+#   ghostprobe           -- PT_VANILLA=1 PT_LEAKGUARD=1: a fogged enemy is played from the tile
+#                           this attempt last saw it on (#713): its threat, a judged strike and
+#                           a lookahead move from there, none in the control, the ghost put back
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
 #                           handshakes with an EXTERNAL sidecar over PT_LLM_DIR (default
 #                           /tmp/playtest-llm-handshake). Start the sidecar first:

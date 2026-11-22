@@ -1078,9 +1078,17 @@ do
     -- sandboxed game calls cannot run here; the campaign rerun is their proof, ADR 0399)
     local src = sightSrc
     local _, asks = src:gsub("M%.playsAsSeen%(Board, [^\n]-, s%.knows%(e%)%)", "")
-    check(asks, 3, "playsAsSeen: decides, closings' looters and keySources ask it")
-    local _, lifts = src:gsub("liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
-    check(lifts, 1, "knows: the one danger reader (dangerGrid) lifts the remembered out of the fog")
+    check(asks, 2, "playsAsSeen: closings' looters and keySources ask knows (no ghost: #713)")
+    local _, plays = src:gsub("M%.playsAsSeen%(Board, [^\n]-, s%.plays%(%a%)%)", "")
+    check(plays, 3, "playsAsSeen: decides, the army's reply and the danger lift ask plays")
+    local _, lifts = src:gsub("placeGhosts%(units%(%)%)\n%s+liftRemembered%(%)\n%s+call%(S%.GenerateDangerZoneRange", "")
+    check(lifts, 1, "knows: the one danger reader (dangerGrid) places the ghosts, then lifts the fog")
+    -- #713: every sandbox that places ghosts is ghostly (placeGhosts asserts it at run time):
+    -- the danger and threat reads and both judged phases
+    local _, ghostlies = src:gsub("sandbox%(ghostly%(function", "")
+    check(ghostlies, 4, "ghostly: danger, threat, enemyPhase and nextPhase")
+    local _, places = src:gsub("placeGhosts%(units%(%)%)", "")
+    check(places, 2, "placeGhosts: dangerGrid and stagePhase (after our units stand)")
     local _, readers = src:gsub("call%(S%.GenerateDangerZoneRange", "")
     local _, users = src:gsub("dangerGrid%(call", "")
     users = users - select(2, src:gsub("function dangerGrid%(", ""))
@@ -1088,6 +1096,25 @@ do
           "knows: danger, threat and the army's reply read it there")
     local _, fogTests = src:gsub("& Board%.US_BIT9%)", "")
     check(fogTests, 1, "the fog bit is read in playsAsSeen alone")
+
+    -- M.ghostOf (#713 fix 1, ADR 0455): a red in fog now that this attempt saw is played from
+    -- where it was seen, when it is the same unit and no retry remembers it
+    local rec = { [0x90] = { charId = 0x80, classId = 0x0A, arrival = 3, x = 5, y = 6 } }
+    local function unit(over)
+        local u = { id = 0x90, charId = 0x80, classId = 0x0A, faction = "red", onField = true,
+                    fogged = true, x = 9, y = 9 }
+        for k, v in pairs(over or {}) do u[k] = v end
+        return u
+    end
+    local g = Sight.ghostOf(rec, unit(), false, 3)
+    check(g and (g.x .. "," .. g.y), "5,6", "ghostOf: fogged, seen before: its last-seen tile")
+    check(Sight.ghostOf(rec, unit({ fogged = false }), false, 3), nil, "ghostOf: in sight is no ghost")
+    check(Sight.ghostOf(rec, unit(), true, 3), nil, "ghostOf: a remembered one plays where it is")
+    check(Sight.ghostOf(rec, unit({ classId = 0x0B }), false, 3), nil, "ghostOf: another class in the slot")
+    check(Sight.ghostOf(rec, unit(), false, 7), nil, "ghostOf: another arrival in the slot")
+    check(Sight.ghostOf(rec, unit({ id = 0x91 }), false, 3), nil, "ghostOf: never seen")
+    check(Sight.ghostOf(rec, unit({ dead = true }), false, 3), nil, "ghostOf: dead")
+    check(Sight.ghostOf(nil, unit(), false, 3), nil, "ghostOf: nothing seen yet")
 end
 
 -- The call-list stub's last word is a hand-encoded Thumb `b loop`: decoded, it must land on the
@@ -3371,7 +3398,7 @@ do
                               chapter = function() return 1 end, turn = function() return 1 end,
                               board = function()
                                   boardReads = boardReads + 1
-                                  return { units = { { id = 1, addr = 0x100, x = 0, y = 0 } } }
+                                  return { units = { { id = 1, addr = 0x100, x = 0, y = 0, onField = true } } }
                               end })
     local function dangerReads(change)
         sight.danger(0, 0)   -- the live board's read, kept
@@ -3405,6 +3432,17 @@ do
         sight.arrived({ { id = 5, charId = 3, classId = 4, turn = 7 } })
         check(refreshes, 1, "arrived: an unchanged stamp refreshes nothing")
         sight.refresh = plain
+    end
+    -- #713 (ADR 0455): sighted() keeps the tile a red was last seen on, under its arrival; a
+    -- ghost there is none while another unit (the board's unit 1, at 0,0) stands on that tile
+    do
+        -- (a unit no retry remembers: the remembered class-4 arrivals play where they stand)
+        local fogged = { id = 7, charId = 3, classId = 9, faction = "red", onField = true, fogged = true }
+        sight.sighted({ { id = 7, charId = 3, classId = 9, x = 2, y = 3 } })
+        local g = sight.ghostOf(fogged)
+        check(g and (g.x .. "," .. g.y), "2,3", "sighted: a fogged red's ghost is where it was seen")
+        sight.sighted({ { id = 7, charId = 3, classId = 9, x = 0, y = 0 } })
+        check(sight.ghostOf(fogged), nil, "sighted: no ghost on a tile another unit holds")
     end
 
     sight.refresh()

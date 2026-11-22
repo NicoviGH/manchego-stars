@@ -5261,6 +5261,92 @@ scenarios.waitprobe = function()
     return result("PASS", "a wait holding slot 1 equips it: the weapon moved to the bag's front")
 end
 
+-- ghostprobe (#713 fix 1, ADR 0455): an enemy the fog hides is played from the tile this
+-- attempt last saw it on, never from where it truly stands. On the retail Prologue the enemy
+-- farthest from Eirika (charId 1) is put in fog (gPlaySt.chapterVisionRange 1, gBmMapFog 0 on
+-- its tile, its US_BIT9) and told to the sight as last seen on a free tile beside her
+-- (sight.sighted). With the ghost: its threat covers her tile, sight.enemyPhase has it strike
+-- her, sight.nextPhase's first phase moves it, and Bot.enemiesOf lists it as a threat on the
+-- seen tile. The control, a fresh sight told nothing, reads none of it from the same board.
+-- After every read its struct and gBmMapUnit are as they were (the sandboxes put the ghost
+-- back). Run it with PT_LEAKGUARD=1: no sandbox leak may be logged. PT_VANILLA=1 only.
+scenarios.ghostprobe = function()
+    if PLAYTEST_VANILLA ~= "1" then
+        return result("FAIL", "ghostprobe reads the retail Prologue")
+    end
+    local sapi, sight = INSPECT.probeMap()
+    if not sapi then return end
+    local board = BOARD.read()
+    local eirika
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.charId == 1 then eirika = u end
+    end
+    if not eirika then return result("FAIL", "no Eirika on the Prologue") end
+    local ghost, far
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        local d = BOARD.distance(e.x, e.y, eirika.x, eirika.y)
+        if e.onField and not e.isBoss and (not far or d > far) then ghost, far = e, d end
+    end
+    if not ghost then return result("FAIL", "no enemy on the Prologue") end
+    local gx, gy = INSPECT.freeBeside(eirika)
+    if not gx then return result("FAIL", "no free tile beside Eirika") end
+    -- the fog: on, and over the enemy's true tile, its state bit as RefreshUnitsOnBmMap sets it
+    local STATE = 0x0C
+    sapi.write8(SYM.gPlaySt + 0x0D, 1)
+    sapi.write8(sapi.mem.u32(sapi.mem.u32(SYM.gBmMapFog) + ghost.y * 4) + ghost.x, 0)
+    sapi.write32(ghost.addr + STATE, sapi.mem.u32(ghost.addr + STATE) | BOARD.US_BIT9)
+    sight.refresh()
+    local plan = { blues = { { unit = eirika, x = eirika.x, y = eirika.y, hp = eirika.hp } },
+                   waits = {}, reds = {}, gone = {} }
+    -- -> what one sight reads of the enemy: its threat on her tile, a strike on her in the
+    -- judged phase, a move in the lookahead's first phase, and its tile among enemiesOf's threats
+    local function reads(s)
+        local threat = s.threat(ghost)(eirika.x, eirika.y)
+        local struck, seenStrikes = false, {}
+        for _, o in ipairs(s.enemyPhase(plan).outcomes) do
+            for _, t in ipairs(o.strikes) do
+                struck = struck or (t.enemy == ghost.id and t.target == eirika.id)
+                seenStrikes[#seenStrikes + 1] = string.format("%x>%x", t.enemy, t.target)
+            end
+        end
+        local moved = false
+        for _, m in ipairs(s.nextPhase(plan, false).moved) do
+            if m.id == ghost.id then
+                moved = true
+                seenStrikes[#seenStrikes + 1] = string.format("moved(%d,%d)", m.x, m.y)
+            end
+        end
+        log(string.format("ghostprobe reads: %s", table.concat(seenStrikes, " ")))
+        local listed = "-"
+        local _, threats = BOT.enemiesOf(BOARD.read(), s)
+        for _, t in ipairs(threats) do
+            if t.id == ghost.id then listed = t.x .. "," .. t.y end
+        end
+        return threat, struck, moved, listed
+    end
+    sight.sighted({ { id = ghost.id, charId = ghost.charId, classId = ghost.classId, x = gx, y = gy } })
+    local threat, struck, moved, listed = reads(sight)
+    local control = INSPECT.Sight.new(sapi)
+    local threatC, struckC, movedC, listedC = reads(control)
+    -- struct Unit +10 xPos, +11 yPos
+    local back = sapi.mem.u8(ghost.addr + 0x10) == ghost.x and sapi.mem.u8(ghost.addr + 0x11) == ghost.y
+    local cellFree = sapi.mem.u8(sapi.mem.u32(sapi.mem.u32(SYM.gBmMapUnit) + gy * 4) + gx) == 0
+    log(string.format("ghostprobe: enemy 0x%02X (class 0x%02X) at (%d,%d), %d tiles from Eirika, "
+        .. "last seen at (%d,%d). Ghost: threat %d, strikes her %s, moves %s, listed at %s. "
+        .. "Control: threat %d, strikes %s, moves %s, listed at %s. Put back: struct %s, cell free %s",
+        ghost.charId, ghost.classId, ghost.x, ghost.y, far, gx, gy, threat, tostring(struck),
+        tostring(moved), listed, threatC, tostring(struckC), tostring(movedC), listedC,
+        tostring(back), tostring(cellFree)))
+    if threat > 0 and struck and moved and listed == gx .. "," .. gy and threatC == 0
+            and not struckC and not movedC and listedC == "-" and back and cellFree then
+        return result("PASS", "a fogged enemy is played from its last-seen tile, in the danger "
+            .. "map and both judged phases, and put back")
+    end
+    return result("FAIL", string.format("ghost %d/%s/%s/%s control %d/%s/%s/%s back %s cell %s",
+        threat, tostring(struck), tostring(moved), listed, threatC, tostring(struckC),
+        tostring(movedC), listedC, tostring(back), tostring(cellFree)))
+end
+
 -- stealprobe (#711): the judged enemy phase plays an enemy thief's steal, and the bag change it
 -- makes leaves nothing behind. On the retail Prologue the enemy nearest Eirika (charId 1) is made
 -- a thief (class Thief 0x0D, so CA_STEAL, Spd 40, an empty bag so it is unarmed, its Mov cut to 3) and

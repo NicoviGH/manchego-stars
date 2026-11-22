@@ -895,6 +895,38 @@ do
     end
 end
 
+-- #713 fix 1 (ADR 0455): every board tells the sight the reds it shows out of the fog, where
+-- each stands (its last-seen tile, a ghost's once the fog takes it); a fogged one never.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                local hid = unit(0x83, 2, "red", 9, 8, 10)
+                hid.fogged = true
+                g.units[#g.units + 1] = hid
+            end
+            return {}
+        end,
+    }
+    local shown = {}
+    local make = g.api.sight
+    g.api.sight = function()
+        local s = make()
+        s.sighted = function(list)
+            for _, u in ipairs(list) do shown[u.id] = u.x .. "," .. u.y end
+        end
+        return s
+    end
+    Botrun.run(g.api)
+    check(shown[0x83], nil, "sighted: a fogged red is never shown")
+    for _, u in ipairs(rout()) do
+        if u.faction == "red" then
+            check(shown[u.id] ~= nil, true, "sighted: a red in sight is shown with its tile")
+        end
+    end
+end
+
 -- ADR 0449, review of #729. The arrival turn has ONE owner, arrivals_seen's detector (stamp):
 -- a slot refilled by the same character and class gets its own turn; a killer that landed in
 -- the phase is stored once, arrival-keyed; a board read mid enemy phase gives the same turn as

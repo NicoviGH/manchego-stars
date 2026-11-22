@@ -57,6 +57,14 @@
 --                            it can take a slot another unit died out of).
 --   arrived(list)            botrun's stamps: { { id, charId, classId, turn } }, the turn each
 --                            red unit arrived on (0: there at the start), what knows() reads
+--   sighted(units)           botrun's every board: the red units it shows out of the fog, each
+--                            one's tile kept as where this attempt last saw it (#713, ADR 0455)
+--   ghostOf(u) -> {x, y}|nil a ghost (M.ghostOf): red unit `u` in fog now, seen earlier this
+--                            attempt and not remembered by a retry, played from its last-seen
+--                            tile in the danger maps and both judged phases -- what a player
+--                            knows of it. nil when another unit holds that tile.
+--   plays(u)                 whether a fogged red plays as seen: knows(u), or a ghost placed
+--                            in the sandbox open now (placeGhosts)
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
 --                            the game shows them, a remembered unit's tile lifted out of the
 --                            fog for the call: 0 when no enemy reaches (x, y), else its
@@ -126,7 +134,7 @@
 --                            { ["x,y"] = true } the doors it opens and walls it breaks, each
 --                            map change applied (M.openMap), the game builds its
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
---                            in it the player can see or knows() makes its own decision (the setup
+--                            in it the player can see or plays() makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and takes its expected damage off the target before the
 --                            next decides. plan.reds = { [enemy id] = hp } (optional): the HP
@@ -2906,6 +2914,21 @@ function M.playsAsSeen(Board, state, knows)
     return Board.playsAsSeen((state & Board.US_BIT9) ~= 0, knows)
 end
 
+-- #713 fix 1 (ADR 0455): red unit `u`'s ghost, the record `seen[u.id]` of where this attempt
+-- last saw it ({ charId, classId, arrival, x, y }, s.sighted), when `u` is in fog now and is
+-- the same unit: its character, class and arrival turn (`arrival`, s.arrivalOf: a slot an
+-- arrival refilled is another unit). `known`: a retry remembers it (ADR 0399), which plays it
+-- where it stands, so it has no ghost. A player knows where he last saw an enemy, not where it
+-- went in the fog: the bot plays it from there, never from its true tile.
+function M.ghostOf(seen, u, known, arrival)
+    local g = seen and seen[u.id]
+    if g and u.faction == "red" and u.onField and not u.dead and u.fogged and not known
+        and g.charId == u.charId and g.classId == u.classId and g.arrival == arrival then
+        return g
+    end
+    return nil
+end
+
 -- canExplore's memo key: the act, the tile and the tile's terrain (an opened chest's changes)
 function M.exploreKey(kind, x, y, terrain) return kind .. "@" .. x .. "," .. y .. "#" .. terrain end
 
@@ -2956,6 +2979,10 @@ function M.new(outer)
     s.watch = setWatch
     local seen   -- this board's answers, dropped by refresh()
     local remembered   -- remember()'s keys: { [Board.memoryKey] = true }, nil on attempt 1
+    -- #713 (ADR 0455): where this attempt last saw each red unit, by slot (s.sighted, M.ghostOf),
+    -- and the ghosts placed in the sandbox open now: nil outside a ghostly() one, false in one
+    -- before placeGhosts ran, { [id] = true } after (the ghosts standing on their tile)
+    local lastSeen, ghosts = {}, nil
 
     -- The board's units, read once per board like every other answer: kept only from a read
     -- made with no sandbox open, the live board (refresh() takes it, so a decision's batch finds
@@ -3252,8 +3279,14 @@ function M.new(outer)
         -- a kill-only change keeps the danger and threat grids too (M.freshSeen), unless a
         -- killed enemy is one the retry remembers: liftRemembered lifts only a unit not hidden
         local keepDanger = keepGrids
+        -- nor when one stood on a ghost's last-seen tile: its death frees the cell the ghost
+        -- is placed on (placeGhosts, #713)
         for id in pairs(change.gone or {}) do
-            if byId[id] and s.knows(byId[id]) then keepDanger = false end
+            local k = byId[id]
+            if k and s.knows(k) then keepDanger = false end
+            for slot, g in pairs(k and lastSeen or {}) do
+                if slot ~= id and g.x == k.x and g.y == k.y then keepDanger = false end
+            end
         end
         return M.changed(sandbox, api, S, function() return fresh(true, keepGrids, keepDanger) end,
                          change, byId, fn, function(list) seen.units = list end)
@@ -3290,19 +3323,71 @@ function M.new(outer)
         return a and a.charId == u.charId and a.classId == u.classId and a.turn or nil
     end
     function s.knows(u) return M.knows(Board, remembered, u, s.arrivalOf(u)) end
+    function s.sighted(list)
+        for _, u in ipairs(list) do
+            lastSeen[u.id] = { charId = u.charId, classId = u.classId, arrival = s.arrivalOf(u),
+                               x = u.x, y = u.y }
+        end
+    end
+    -- u's ghost on the board as read (units()): none when another unit stands on its tile -- the
+    -- player sees that it is not there
+    function s.ghostOf(u)
+        local g = M.ghostOf(lastSeen, u, s.knows(u), s.arrivalOf(u))
+        if not g then return nil end
+        for _, o in ipairs(units()) do
+            if o.id ~= u.id and o.onField and not o.dead and o.x == g.x and o.y == g.y then
+                return nil
+            end
+        end
+        return g
+    end
+    function s.plays(u) return s.knows(u) or (ghosts and ghosts[u.id]) == true end
+    -- fn(call, proc) as a sandbox's body that may place the ghosts (placeGhosts): they stand on
+    -- their tile until the sandbox returns, whose journal moves them back. A sandbox opened
+    -- inside one that placed them reads them where that one's play left them.
+    local function ghostly(fn)
+        return function(call, proc)
+            if ghosts ~= nil then return fn(call, proc) end
+            ghosts = false
+            local ok, a, b = pcall(fn, call, proc)
+            ghosts = nil
+            if not ok then error(a, 0) end
+            return a, b
+        end
+    end
+    -- Inside a ghostly() sandbox, once: every ghost (M.ghostOf) among `list` stood on its
+    -- last-seen tile (M.standOn: its struct and gBmMapUnit), when that cell is free as the
+    -- sandbox stands (a staged plan may have put a player unit there: then it does not play). The
+    -- moves are journaled writes, so the sandbox puts them back.
+    local function placeGhosts(list)
+        assert(ghosts ~= nil, "placeGhosts outside a ghostly sandbox")
+        if ghosts then return end
+        ghosts = {}
+        for _, o in ipairs(list) do
+            local g = M.ghostOf(lastSeen, o, s.knows(o), s.arrivalOf(o))
+            if g then
+                local cx, cy = mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y)
+                local there = cx == g.x and cy == g.y
+                if there or grid(mem, S.gBmMapUnit, g.x, g.y) == 0 then
+                    if not there then M.standOn(api, o, g.x, g.y) end
+                    ghosts[o.id] = true
+                end
+            end
+        end
+    end
     -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
     -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen.
     -- Where each stands and its fog bit are read off its unit struct, not the board's snapshot:
     -- inside nextPhase the first phase has moved them (armyReply's danger read)
     local function liftRemembered()
-        if not remembered then return end
+        if not remembered and not ghosts then return end
         for _, o in ipairs(units()) do
             local st = mem.u32(o.addr + UNIT_STATE)
             -- counts as seen (M.playsAsSeen): in sight, its tile is already out of the fog
             -- (inside nextPhase once M.refresh has run, as armyReply runs it first); in fog,
-            -- remembered
+            -- remembered or a ghost on its last-seen tile (s.plays)
             if o.faction == "red" and o.onField and (st & US_HIDDEN) == 0
-                and M.playsAsSeen(Board, st, s.knows(o)) then
+                and M.playsAsSeen(Board, st, s.plays(o)) then
                 api.write8(cell(mem, S.gBmMapFog, mem.u8(o.addr + UNIT_X),
                                 mem.u8(o.addr + UNIT_Y)), 1)
             end
@@ -3323,6 +3408,7 @@ function M.new(outer)
                 roof[#roof + 1] = o
             end
         end
+        placeGhosts(units())
         liftRemembered()
         call(S.GenerateDangerZoneRange, { 0 })
         local g = readGrid(mem, S.gBmMapRange, w, h)
@@ -3334,16 +3420,16 @@ function M.new(outer)
 
     function s.danger(x, y)
         if not seen.danger then
-            seen.danger = sandbox(function(call) return dangerGrid(call) end)
+            seen.danger = sandbox(ghostly(function(call) return dangerGrid(call) end))
         end
         return seen.danger[y] and seen.danger[y][x] or 0
     end
 
     function s.threat(e)
         if not seen.threats[e.id] then
-            seen.threats[e.id] = sandbox(function(call)
+            seen.threats[e.id] = sandbox(ghostly(function(call)
                 return dangerGrid(call, function(o) return o.id ~= e.id end)
-            end)
+            end))
         end
         local g = seen.threats[e.id]
         return function(x, y) return g[y] and g[y][x] or 0 end
@@ -3730,6 +3816,8 @@ function M.new(outer)
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
         end
+        -- the ghosts (#713) after our units: a cell the plan stands a player unit on holds none
+        placeGhosts(units())
         -- the waits the plan makes run the chapter's Misc events before the enemy phase: an AREA
         -- event that wakes an enemy (vanilla Ch16's Sage, #712) has done so by then
         seen.area = seen.area or { tiles = {}, scripts = {} }
@@ -3772,13 +3860,13 @@ function M.new(outer)
             return aiOrder(call, byId)
         end
         -- an enemy in the order that decides: not gone, and seen (US_BIT9: hidden by fog) or
-        -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399)
-        -- (or our berserked unit, M.berserkers, never fogged), and alive: a berserk strike's
+        -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399) or a ghost
+        -- on its last-seen tile (plays(), #713, ADR 0455) (or our berserked unit, M.berserkers, never fogged), and alive: a berserk strike's
         -- expected damage can leave its target at 0 HP on the map
         local function decides(id)
             local e = byId[id]
             if not e or gone[id] or mem.u8(e.addr + UNIT_HP) == 0 then return false end
-            return M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) and e
+            return M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.plays(e)) and e
         end
         -- e strikes as it decided: stood on its tile, its expected damage off the target, and
         -- the uses the exchange is expected to spend off both weapons (M.wear): a counter that
@@ -3881,7 +3969,7 @@ function M.new(outer)
     end
 
     function s.enemyPhase(plan)
-        return learningAs(true, function() return sandbox(function(call, proc)
+        return learningAs(true, function() return sandbox(ghostly(function(call, proc)
             local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer, area =
                 stagePhase(call, proc, plan)
             local out = playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
@@ -3889,7 +3977,7 @@ function M.new(outer)
             -- what the plan's waits' events left unread (M.areaWake's stats), for the cost line
             out.areaPositional, out.areaTruncated = area.positional, area.truncated
             return out
-        end) end)
+        end)) end)
     end
 
     -- The army's reply between the lookahead's two enemy phases (#510 comment 6906859807): the
@@ -3919,7 +4007,7 @@ function M.new(outer)
                     -- enemy's staff) is the player's to move no more: it stands (bot.lua's
                     -- `held`, Board.statusHeld)
                     if not M.heldAtReply(mem, Board, o) then ours[#ours + 1] = o end
-                elseif o.faction == "red" and M.playsAsSeen(Board, st, s.knows(o)) then
+                elseif o.faction == "red" and M.playsAsSeen(Board, st, s.plays(o)) then
                     reds[#reds + 1] = o
                 end
             end
@@ -4011,7 +4099,8 @@ function M.new(outer)
     -- counter kills at even odds or better is gone. The turn then advances and the second phase
     -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
     -- sees decides, in both: an enemy hidden by fog does not act unless a retry remembers it
-    -- (knows(), ADR 0399), and no arrival is placed (one not yet loaded is no unit to play).
+    -- (knows(), ADR 0399) or this attempt saw it (a ghost, played from its last-seen tile:
+    -- plays(), ADR 0455), and no arrival is placed (one not yet loaded is no unit to play).
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
     -- and .moved = the units the first phase moved (enemies, and the player's berserked units,
@@ -4021,7 +4110,7 @@ function M.new(outer)
     -- armyReply's turn between the two phases in place of the hold; .reply = what they played.
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
-        return learningAs(false, function() return sandbox(function(call, proc)
+        return learningAs(false, function() return sandbox(ghostly(function(call, proc)
             local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer, area =
                 stagePhase(call, proc, plan)
             local moved, fell = {}, {}
@@ -4108,7 +4197,7 @@ function M.new(outer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
             out.areaPositional, out.areaTruncated = area.positional, area.truncated
             return out
-        end) end)
+        end)) end)
     end
 
     -- When each village or chest still open (explorable()) closes: the first enemy phase,

@@ -442,14 +442,22 @@ end
 -- -> those in sight, and the threats: those plus every fogged one a retry remembers
 -- (sight.knows, ADR 0399), which can strike a tile but not be targeted (bmtarget.c refuses a
 -- unit on a fogged tile): the danger reads take them (exposure), and on a Defeat Boss map the
--- march's goal when one is the boss (objectiveTile, ADR 0401).
+-- march's goal when one is the boss (objectiveTile, ADR 0401). A fogged one this attempt saw
+-- and no retry remembers is a threat as a ghost (sight.ghostOf, #713, ADR 0455): a copy of it
+-- standing on its last-seen tile, `ghost` true, as sight's danger reads place it.
 function M.enemiesOf(board, sight)
     local o, out, threats = sight.objective, {}, {}
     for _, u in ipairs(board.units) do
         if o and o.boss and u.faction == "red" and u.charId == o.boss then u.isBoss = true end
         if u.onField and u.faction == "red" then
             if not u.fogged then out[#out + 1] = u end
-            if Board.playsAsSeen(u.fogged, u.fogged and sight.knows and sight.knows(u)) then
+            local g = u.fogged and sight.ghostOf and sight.ghostOf(u)
+            if g then
+                local copy = {}
+                for k, v in pairs(u) do copy[k] = v end
+                copy.x, copy.y, copy.ghost = g.x, g.y, true
+                threats[#threats + 1] = copy
+            elseif Board.playsAsSeen(u.fogged, u.fogged and sight.knows and sight.knows(u)) then
                 threats[#threats + 1] = u
             end
         end
