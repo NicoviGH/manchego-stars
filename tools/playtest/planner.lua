@@ -386,6 +386,17 @@ local function taught(x, ways, hp, unitHp, struck)
     return sum
 end
 
+-- The HP `e` stands on once its own phase begins, after the plan leaves it on `hp`: the game
+-- heals a unit on a heal tile at the start of its faction's phase, before any enemy acts
+-- (MakeTerrainHealTargetList, bmtarget.c:587-608: GetTerrainHealAmount x max HP / 100, a fort
+-- 20, a gate or throne 10; AddUnitHp holds it to max HP). The enemy stands on its tile through
+-- our phase, so its tile now is the one that heals it (#709). Sight answers the heal (ADR
+-- 0369); a sight without it (no terrain read) heals nothing.
+function M.healed(sight, e, hp)
+    local heal = sight.terrainHeal and sight.terrainHeal(e) or 0
+    return math.min(math.max(e.maxhp or hp, e.hp), hp + heal)
+end
+
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
@@ -1000,7 +1011,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- rescue), ends the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
     -- chapter, any red of a Rout). A march nearer a goal does not: nearing is what the stall
     -- reading found idle, and a blow that deals nothing wounds nothing. `counters`: each red
-    -- enemy's chance our counters kill it in the judged phase.
+    -- enemy's chance our counters kill it in the judged phase. A wound counts only as far as it
+    -- outlasts the tile's heal (M.healed, #709): a boss on a fort regains it before it acts.
     local function advances(st, fell, counters)
         if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true end
         for _, p in pairs(counters) do
@@ -1013,7 +1025,7 @@ function M.plan(Bot, board, sight, style, opts)
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and e.isBoss))
-            if needed and e.hp - hp > M.DUST then return true end
+            if needed and e.hp - M.healed(sight, e, hp) > M.DUST then return true end
         end
         return false
     end

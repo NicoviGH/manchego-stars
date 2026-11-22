@@ -434,6 +434,8 @@ local function sightOf(o)
         readsReds = function(e) return (o.reads or {})[e.id] or false end,
         cache = o.cache,
         terrain = o.terrain,
+        -- the game's terrain heal (sight.terrainHeal): the HP a unit regains on its tile, by id
+        terrainHeal = function(u) return (o.heal or {})[u.id] or 0 end,
         weapons = weapons,
         -- The game's price per use (sight.usePrice; nil: no price), when the test prices uses
         usePrice = o.usePrice,
@@ -6492,6 +6494,37 @@ do
     check(tostring(Planner.tookGoal({ ["convoy:101x1"] = true })) .. " "
           .. tostring(Planner.tookGoal({ ["convoy:101x1"] = true, ["chest:1,2"] = true })) .. " "
           .. tostring(Planner.tookGoal({})), "false true false", "advances: a convoy take is no goal")
+end
+
+-- test_planner_terrain_heal (#709): the boss stands on a fort, which heals it 6 HP before it
+-- acts. A's blow wounds it for 4 and its counter kills A, so the chip is healed back and costs
+-- A its life. Under opts.idle the wound is no progress and the hold is played; on a tile that
+-- heals nothing the same wound advances, and the attack is played as the fallback.
+do
+    local function play(heal)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = 1, hp = 30, isBoss = true })
+        local o = {
+            objective = { kind = "boss" },
+            heal = { [0x81] = heal },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 4, hits = 1,
+                counters = true, counterHit = 100, counterDmg = 99, counterHits = 1 } } } },
+            enemyPhase = function() return {} end,
+        }
+        local _, plan = Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"), { idle = true })
+        local attacks = false
+        for _, x in ipairs(plan and plan.acts or {}) do attacks = attacks or x.act == "attack" end
+        return attacks
+    end
+    check(tostring(play(6)), "false", "terrain heal: a chip the fort heals back is no progress, the hold is played")
+    check(tostring(play(0)), "true", "terrain heal: with no heal the same chip advances")
+    -- the heal model: 6 HP back on 30 max; a wound of 4 is healed whole, one of 10 leaves 4
+    local E = { hp = 30, maxhp = 30 }
+    local sight = { terrainHeal = function() return 6 end }
+    check(Planner.healed(sight, E, 26) .. " " .. Planner.healed(sight, E, 20) .. " " .. Planner.healed(sight, E, 30),
+          "30 26 30", "terrain heal: a wound is healed up to the HP it started on, never past max")
+    check(Planner.healed({}, E, 20), 20, "terrain heal: a sight without the read heals nothing")
 end
 
 -- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%

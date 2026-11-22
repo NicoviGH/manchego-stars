@@ -218,6 +218,11 @@
 --                            one HP short, for a heal the planner means to follow a blow.
 --   maxHps(units)            sets each unit's `maxhp` to GetUnitMaxHp (maxHP + the equipped
 --                            weapon's HP bonus), the cap AddUnitHp holds a heal to.
+--   terrainHeal(u)          the HP the tile `u` stands on heals it at the start of its own
+--                            faction's phase, as MakeTerrainHealTargetList reads it
+--                            (bmtarget.c): GetTerrainHealAmount(terrain) * GetUnitMaxHp(u) / 100,
+--                            C integer division (a fort 20%, a gate or throne 10%); 0 off a heal
+--                            tile. The raw amount: AddUnitHp's clamp to max HP is the caller's.
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff (IA_STAFF),
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
@@ -3969,6 +3974,20 @@ function M.new(outer)
             end)
         end
         for _, u in ipairs(units) do u.maxhp = own[ownKey("maxhp", u, "-")] end
+    end
+
+    function s.terrainHeal(u)
+        local terrain = s.terrain(u.x, u.y)
+        local k = ownKey("terrainheal", u, "-") .. ":" .. terrain
+        if own[k] == nil then
+            assert(S.GetTerrainHealAmount, "sight.terrainHeal: symbols.lua lacks GetTerrainHealAmount (run gen_symbols.py)")
+            own[k] = sandbox(function(call)
+                local pct = call(S.GetTerrainHealAmount, { terrain })
+                if pct >= 0x80 then pct = pct - 0x100 end   -- an s8 table
+                return pct * call(S.GetUnitMaxHp, { u.addr }) // 100
+            end)
+        end
+        return own[k]
     end
 
     function s.mend(u)
