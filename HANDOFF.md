@@ -11,15 +11,19 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23; main is d6339c1e + this HANDOFF). All six overnight PRs are merged:** #722 (ADR 0444), the stack #723 → #725 → #726 → #728 (ADRs 0445-0448, `--merge`), and #729 (ADR 0449). Each was brought up to main, its decisions index regenerated, and merged on green CI for its new head. #721, #724 and #712 are closed; #714 and #713 stay open for the calls below. #699's status table (comment 7066011205) is current.
+**Next session starts here (2026-11-23; main is f8f5792c + this HANDOFF).** Nicolas approved the four overnight recommendations ("Oh yeah I approve your recommendations"), recorded on #714, #713 and #717. Then, each PR reviewed (`review-to-clean`), re-reviewed once and merged on green CI:
+- **PR #731** (#714 closed, ADR 0450): a DATED goal whose reach chance a plan drives from at least 0.5 to 0 before its deadline is forfeit. Reach only, without survival weights (no double count with the cap). It changed no decision in the Ch10 replay.
+- **PR #732** (#730 fix 1, ADR 0451): a wait holding the weapon whose counter spares a recruit (`sparingWaits`, capped `M.GENTLE = 2`, kept past `PER_UNIT`). Emulator probe `PT_VANILLA=1 tools/playtest/run.sh waitprobe`. It reaches about 17% of recruit counter deaths (the waits).
+- **PR #733** (#730 fix 2, ADR 0452): Nicolas's call: an owed recruit no one can Talk yet (Marisa before Gerik) dies to us at the same price as a talker recruit, through `sparedOf`. The price is paid only in the judge and lookahead. In the beam it pruned the only admitted plan: `fix730d` lost with 5 deaths, `fix730g`/`fix730h` won in 17 turns with 0 deaths. A unit whose death IS the win forfeits nothing.
 
-- **The repo deletes a head branch on merge** and GitHub retargets its children itself. A stacked PR's clean merge can still leave `docs/decisions.md` stale (the record count), so regenerate the index on every branch after its parent lands.
-- **Next, once the calls are made:** one `attempts` set over the batch on #699's starts (`m699c<N>`). Open without a call: 2c (our counter kills a recruit-to-be), #727 (positional AI changes, Ch10 and 14), #711's leftovers.
-- **Nicolas's calls, waiting:**
-  - #714's forfeit half: a goal driven to 0 before its deadline counts in `forfeits` (comment 7075363029).
-  - #713 fix 1: a ghost at the last-seen tile vs ADR 0399's live tile (7078483524).
-  - #713 fix 3: sum the unseen strikes (7078468840). **New evidence for it (7079106170):** a bisect shows #711 (PR #718) made vanilla Ch19 `b640e-cs-s4003` a1 lose on turn 7 (Eirika dead); its parent won on turn 13. The prep key makes the fog chests goals, and the advance plan read fog risk 0.001. Main loses Ch19 a1 until fix 3 or a call. #718 is not reverted.
-  - #717 classed: the three Ch15 "0-risk" deaths are a grading artifact (the mover plan's likeliest-way read). Your call: grade by the committed plan's weighted read (#717's last comment).
+**In order next:**
+1. **#730 fix 4:** an attack holding the weapon that spares a recruit. About 60 of the recruit counter deaths were by a unit that attacked that turn. `proposeOne` keeps only `best`/`safe`/`guard` per enemy, deduped without a slot. The plan is on #730 (`sparingStrikes` beside `sparingWaits`; adds acts only).
+2. **#717:** grade a death by the committed plan's weighted `protected[].die`, approved. The bait question in #717 stays open.
+3. **#713 fix 1:** a ghost at the last-seen tile, approved (option A). It needs `keep16` and a leak-guard run.
+4. **#713 fix 3:** sum the strikes of the game's arrivals, approved. The waves come from the ROM's turn events (`scriptedUnits().arrivals`, widened to class, level and items) plus a stand-in unit for the strike. The reinforcement claims cover only Prologue to Ch8 and Ch13. Evidence: every killer in Ch19 s4003 a1 was an arrival; Eirika's turn-7 death is a target misprediction (lead on #713).
+5. **#734:** a talker recruit's goal term may prune in the beam. **#730 fix 3:** a kill-then-Talk plan; first log the offered Talk acts.
+6. Then one `attempts` set over the batch on #699's starts (`m699c<N>`).
+- #699's status table (7066011205): 2c row → #730. Also open: #727 and #711's leftovers.
 - **Lessons from the night (how to work):**
   - Every issue claim was checked before building, and three were wrong:
     - #714's "a turn to spare": the village has none.
