@@ -1,7 +1,7 @@
 ---
 id: 440
 title: "A recruit on a locked tile is talked to beside it"
-date: "2026-11-22"
+date: "2026-11-21"
 section: "Combat System"
 issues: [710, 699, 510]
 ---
@@ -18,11 +18,16 @@ his chance read exactly 0 (0.74 before the plan). The memo key read `from`'s coo
 same arguments read 3.2 or nil depending on call order.
 
 **Decided.**
-1. A Talk is made from a tile beside the recruit, never on his tile, so a recruit goal's
-   `turnsTo` is asked with `beside`: the lock on his own tile is left out (`turnsFor`'s `keyed`
-   read). A chest goal keeps its lock.
+1. A Talk is made from a tile beside the recruit, never on his tile, so every read of a recruit
+   goal's tile asks `turnsTo` with `beside` (`Goals.beside`, the one owner): the lock on his own
+   tile is left out (`turnsFor`'s `unlocked`). The reads are the goal's chance, the planner's
+   nearest row and advance, the talker's assignment (`exploreGoal[...].beside`) and
+   `stepsToward`. A chest goal keeps its lock.
 2. The convoy-key way is taken when `from` is at `u`'s coordinates, not when it is the table
-   `u`. The take is this turn's act, so a unit that moved on has none, and the test now agrees
-   with the memo key.
+   `u`, so the test agrees with the memo key's coordinates. `acted` is deliberately not read
+   there, as `from == u` did not: the memo key's late suffix only separates the reads whose
+   start turn it changes (`viaObstacle`), and the convoy way's walk is the same either way.
+3. That late suffix tests whose `acted` it is by id, not table identity (`startsLate`): `u`, a
+   copy of it, or a planner position, never another unit's table.
 
 **Measure.** The effect is one replay of the game that showed the problem (ADR 0430).
