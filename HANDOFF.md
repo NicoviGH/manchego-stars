@@ -26,6 +26,13 @@ and start a fresh instance; don't rely on auto-compaction.
   - #713 fix 1: a ghost at the last-seen tile vs ADR 0399's live tile (7078483524).
   - #713 fix 3: sum the unseen strikes (7078468840). **New evidence for it (7079106170):** a bisect shows #711 (PR #718) made vanilla Ch19 `b640e-cs-s4003` a1 lose on turn 7 (Eirika dead); its parent won on turn 13. The prep key makes the fog chests goals, and the advance plan read fog risk 0.001. Main loses Ch19 a1 until fix 3 or a call. #718 is not reverted.
   - #717 classed: the three Ch15 "0-risk" deaths are a grading artifact (the mover plan's likeliest-way read). Your call: grade by the committed plan's weighted read (#717's last comment).
+- **Lessons from the night (how to work):**
+  - Every issue claim was checked before building, and three were wrong:
+    - #714's "a turn to spare": the village has none.
+    - #713's "last-seen tile": no such tile exists; the board reads every enemy's true tile.
+    - #717's "read at 0": the grader read the wrong plan.
+  - A new candidate act can be offered and still never judged: the planner's per-unit cut (`PER_UNIT`) dropped #722's careful march. Check that an act reaches the beam, not only the candidate list.
+  - A replay that shows no change is not proof that a fix does nothing. Read the trace for why. Ch13 needed three PRs (#723, #725, #726) before Cormag's goal held the win.
 - **Run tags:** `fix714*`, `fix721`, `fix724*`, `fix712*`, `fix713*`, `iso711`, `isomain`, `bis0-2`.
 
 *Before that (2026-11-22; main was d7892189 + HANDOFF).* Four #699 blockers merged today, one PR each, built by Sonnet subagents and reviewed by them (`review-to-clean`). Next was #714 (a march offers only the nearest and the safest tile). The status table on #699 (comment 7066011205) is current. After #714 the order is 2a/2b, then #712, #713 and #717. Then one `attempts` set over the batch, on the #699 measurement's starts (`m699c<N>`).
