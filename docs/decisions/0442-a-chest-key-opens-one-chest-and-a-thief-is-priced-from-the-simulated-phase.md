@@ -107,3 +107,18 @@ main replay controlled for it.
 use of Colm's Lockpick covering the third. That is what the rule intends. Whether Ch16's doors are
 needed is not settled here: the trace plays no door act, so the two keys went unused, and why is not read
 here. The count itself did not over-take.
+
+**The probe in the emulator (`PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh stealprobe`).** On
+the retail Prologue the enemy nearest Eirika is made a Thief (class 0x0D: `CA_STEAL`; Spd 40, Mov 3,
+an empty bag so it strikes no one) and stood beside her; she holds a Chest Key and a chest goal is
+faked a turn or two off, on the thief's side. All inside one `sight.batch`, as botrun decides.
+- `sight.enemyPhase` records the theft: thief 130, target Eirika, item 0x69, `lock` true.
+- `Planner.plan` ends her on 3,2, a tile the thief's threat does not cover.
+- Her bag reads `036C,2809,0169,0000,0000` before, after the judged phase inside the batch, and
+  after. No sandbox leak was reported. `RESULT: PASS`.
+- **With the two `keep16` lines of `M.moveItem` removed it FAILS:** `RESULT: FAIL -- 4 sandbox
+  leak(s)`, each a unit-struct bag word (`+0x1C`, `+0x20`) changed after its sandbox returned, 2 to
+  13 times each, "a game call wrote it and no keep16 held it". The bag-unchanged read did not catch
+  it: the outermost sandbox restores the whole state, and only the leak guard sees a nested leak.
+- Not shown: that the theft is what sent her to 3,2. The control (her key taken away) also ends
+  on 3,2, the objective's pull; the attribution is the unit test's.
