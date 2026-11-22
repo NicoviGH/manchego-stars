@@ -18,7 +18,10 @@ mid-map fetch happened in 1 of 12 attempts (#699). `sight.demandsOf` now counts 
 demand covers (`locks`); `need` stays the openers the team seats, so `Bot.team` is unchanged.
 `locks` counts only a lock a key may still be needed for (`Sight.lockNeeded`): still shut, and
 reached by a fielded unit's march (`sight.turnsTo`, the game's costs); with no unit on the map
-every shut lock counts. A door behind another lock reads unreached and is the mid-map fetch's, and
+every shut lock counts. The units read are the prep screen's default deployment, not `Bot.team`'s pick (the team is chosen
+from these demands, and a benched unit has no tile): a lock only a benched flier reaches is the
+mid-map fetch's, a walk, where an over-count costs a bag slot for good. A door behind another lock
+reads unreached and is the mid-map fetch's too, and
 a door nobody reaches no longer pulls a spare Door Key into a bag (Ch21's replay took one).
 `takeKeys` wants `locks` uses, less what the fielded bags already open. An item that opens counts
 its `uses` (a Chest Key 1, a Lockpick as many as it has left), and one item's uses are spent once
@@ -35,7 +38,7 @@ best-ranked slot (`cp_battle.c:416`), and keeps the lowest rank over all targets
 (`cp_battle.c:424`). It runs only with a free bag slot (`cp_battle.c:46`). The rank is
 the item's place in `gAiStealPriorityItemList` (`cp_data.c:921`); an item not on it ranks 0xFF and is
 never taken, so a weapon is never stolen and an equipped one is no safer than a carried one: only
-the list decides. The Lockpick ranks 4 of the list, above every key and booster. (The player's own
+the list decides. The Lockpick is the 5th entry (index 4) of the list, above every key and booster. (The player's own
 steal, `AddAsTarget_IfCanStealFrom`, `bmtarget.c:760-787`, and `IsItemStealable`, `bmitem.c:824`,
 are the player's menu, not the AI's.) `ActionSteal` (`bmmind.c:365-390`) removes the slot's item and
 appends it to the thief's bag. A stolen item comes back only if the thief carries `US_DROP_ITEM`
@@ -48,8 +51,10 @@ stayed where it stood and the planner never saw the theft. Now:
 
 - `sight.stealAct` reads the decision (target, item slot, tile). `sight.pilfer` stands the thief on
   its tile, moves the item with the game's own `UnitRemoveItem` and `UnitAddItem` through `call`
-  (ADR 0369; `sight.moveItem`, which also clears the target's `US_DROP_ITEM` when the slot was its
-  last item, as `ActionSteal` does), so a second thief finds the item gone, and reads whether the
+  (ADR 0369), after `api.keep16` on both bags, since a nested sandbox undoes only `api.write*` and
+  a game call that writes a unit struct would otherwise leak one plan's theft into the next
+  (`sight.moveItem`, which also clears the target's `US_DROP_ITEM` when the slot was its last item,
+  as `ActionSteal` does), so a second thief finds the item gone, and reads whether the
   target opened a chest before and no longer does (`lock`, `GetUnitKeyItemSlotForTerrain` through
   `sight.opensAt`, the one owner of that read). A Chest Key, a Door Key or a Lockpick can all be
   stolen (all are on the list, `cp_data.c:921`) and all are priced the same way: whichever item
@@ -84,7 +89,9 @@ tiles, one where a one-use Lockpick is held, and shares a Lockpick's uses across
 a Lockpick or Chest Key holder out of the thief's reach, counts a robbed-and-killed way once, and
 leaves a holder whose stolen item opens nothing where it was; `Goals.chance` reads `p.opens`;
 `Sight.pilfer`, `moveItem`, `chain` and `phaseList` run on fake memory and a fake `call`.
-`nextPhase`'s own theft branch (it applies `pilfer` and records the move) has no test of its own.
+`Sight.stepOf` is the one dispatch of an enemy's act (steal, then staff, then strike) for
+`enemyPhase` and `nextPhase`, tested with stub handlers; `s.demands`'s reach is tested on a real
+`Sight.new` (a reached, a cut-off, an opened and a no-unit lock).
 
 **Replays** (ADR 0430's one game each; both on vanilla, before the review's fixes above):
 - `fix711`, Ch16 `b640e-cs-s4009` attempt 1: won in 22 turns, 0 deaths, not clean (the original:
@@ -94,3 +101,9 @@ leaves a holder whose stolen item opens nothing where it was; `Goals.chance` rea
   original, but the game ended stuck after 44 turns.
 Neither is a before-and-after of the theft price: the bot changed since #699's measurement, and no
 main replay controlled for it.
+
+**Ch16's doors, checked against `fix711c`'s prep.** The team demands read `doors locks 3` and
+`chests locks 4`; Eirika took two Door Keys (item 106), one fewer than the doors, which fits one
+use of Colm's Lockpick covering the third. That is what the rule intends. Whether Ch16's doors are
+needed is not settled here: the trace plays no door act, so the two keys went unused, and why is not read
+here. The count itself did not over-take.

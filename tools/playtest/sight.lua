@@ -274,6 +274,9 @@ M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrain
 M.TERRAIN_VILLAGE_CLOSED, M.TERRAIN_CHEST_EMPTY = 0x04, 0x20
 -- The terrain a demand kind (api.needs' `doors`, `chests`) opens: the one owner of kind -> lock.
 M.LOCK_TERRAIN = { doors = M.TERRAIN_DOOR, chests = M.TERRAIN_CHEST_FULL }
+-- the tile command that offers each lock demand kind: with LOCK_TERRAIN, the one owner of
+-- command -> kind -> terrain (demandsOf, lockNeeded, isChestLock, locked)
+M.LOCK_KIND = { [M.TILE_COMMAND_CHEST] = "chests", [M.TILE_COMMAND_DOOR] = "doors" }
 M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the first booster
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
@@ -1160,13 +1163,13 @@ function M.answerOf(a, hp)
 end
 
 -- Whether a lock tile (command `c`, the terrain `terrain` on it now) is one a key may still be
--- needed for: still shut (a full chest, a closed door), and some fielded unit in `blues` reaches
--- it by `turnsTo` (sight's: the game's march costs). With no unit on the map nothing is known
--- to be out of reach, so every shut lock counts. A lock behind another lock reads unreached and
--- is not counted: its key is the mid-map fetch's (bot.lua supplyKey).
+-- needed for: still shut (a full chest, a closed door), and some fielded unit in `blues` has a
+-- march path to it (`turnsTo` is not nil: sight's, the game's costs; the cost itself, so how many
+-- turns, is not read). With no unit on the map nothing is known to be out of reach, so every shut
+-- lock counts. A lock behind another lock has no path and is not counted: its key is the
+-- mid-map fetch's (bot.lua supplyKey).
 function M.lockNeeded(c, terrain, blues, turnsTo)
-    local shut = c.cmd == M.TILE_COMMAND_CHEST and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR
-    if terrain ~= shut then return false end
+    if terrain ~= M.LOCK_TERRAIN[M.LOCK_KIND[c.cmd]] then return false end
     if #blues == 0 then return true end
     for _, u in ipairs(blues) do
         if turnsTo(u, { x = c.x, y = c.y }) then return true end
@@ -1197,7 +1200,7 @@ function M.demandsOf(units, commands, fog, freeTalks, needed)
             d.need = d.need + 1
         end
     end
-    local kinds = { [M.TILE_COMMAND_CHEST] = "chests", [M.TILE_COMMAND_DOOR] = "doors" }
+    local kinds = M.LOCK_KIND
     for _, c in ipairs(commands) do
         if c.cmd == M.TILE_COMMAND_VISIT then
             out[#out + 1] = { id = string.format("village:%d,%d", c.x, c.y), kind = "village",
@@ -2083,8 +2086,10 @@ function M.stealAct(mem, Board, D)
     return { steal = true, target = mem.u8(D + DEC.TARGET), slot = mem.u8(D + DEC.SLOT),
              tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
 end
--- ActionSteal's bag change (bmmind.c:365), through the game's own calls inside a sandbox
--- (ADR 0369): the target's drop flag goes when the slot is its last item, the item leaves its bag
+-- ActionSteal's bag change (bmmind.c:365), inside a sandbox: both bags are kept first (api.keep16),
+-- since the game's own UnitRemoveItem and UnitAddItem write a unit struct that a nested sandbox
+-- does not undo, and one plan's theft would leak into the next plan's board. The target's drop
+-- flag goes when the slot is its last item (an api write, journaled), the item leaves its bag
 -- (UnitRemoveItem packs it) and UnitAddItem puts it in the thief's first free slot (the AI steals
 -- only with one, cp_battle.c:46). A gold item (which ActionSteal pays into the party's gold
 -- instead) is never on the AI's steal list, so it is not handled. -> the item's id
@@ -2099,6 +2104,8 @@ function M.moveItem(api, call, S, Board, from, slot, to)
     if state & Board.US_DROP_ITEM ~= 0 and slot == count - 1 then
         api.write32(from + UNIT_STATE, state & ~Board.US_DROP_ITEM)
     end
+    api.keep16(from + Board.UNIT_ITEMS, Board.ITEM_COUNT)
+    api.keep16(to + Board.UNIT_ITEMS, Board.ITEM_COUNT)
     call(S.UnitRemoveItem, { from, slot })
     call(S.UnitAddItem, { to, raw })
     return raw & 0xFF
@@ -2115,6 +2122,16 @@ function M.pilfer(api, call, S, Board, standOn, e, act)
     local item = M.moveItem(api, call, S, Board, addr, act.slot, e.addr)
     return { thief = e.id, target = act.target, item = item,
              lock = was and not M.opensAt(call, S, addr, chests) }
+end
+-- What an enemy's decision is, and which handler plays it: a steal (M.stealAct) before a staff
+-- (M.staffAct), each an act of its own; else a strike when the AI named a target; else none. The
+-- one dispatch of enemyPhase's ways and nextPhase's first phase, so a new act is added once.
+-- `on` = { steal, staff, strike, none } functions; -> what the chosen one returns.
+function M.stepOf(act, target, on)
+    if act and act.steal then return on.steal(act) end
+    if act then return on.staff(act) end
+    if target then return on.strike(target) end
+    return on.none()
 end
 -- The strikes of a phase's way after one more act: `done`'s, then the strike `t` (nil for a
 -- theft), and the thefts so far, then `theft` (a list read by the planner as `.thefts`; the
@@ -2637,8 +2654,13 @@ function M.new(outer)
         talks = talks or M.recruitTalks(M.talks(api, sandbox))
         local free = M.freeTalks(mem, talks, S.EventScr_9EEB00, joined)
         -- a lock a key may still be needed for: still shut, and some fielded unit's march reaches
-        -- it (s.turnsTo: the game's costs, a closed door's own tile the field's start). With no
-        -- unit on the map yet nothing is known to be out of reach, so every shut lock counts.
+        -- it (s.turnsTo: the game's costs, a closed door's own tile the field's start). `blues`
+        -- are the units on the field at the prep screen (the game's default deployment), not
+        -- Bot.team's pick: the team is chosen from these demands, so its deployment is not known
+        -- yet, and a benched unit has no tile to march from. A lock only a benched flier would
+        -- reach is not counted; its key then comes mid-map (supplyKey), a miss that costs a
+        -- walk, where an over-count costs a bag slot for good. With no unit on the map yet
+        -- nothing is known to be out of reach, so every shut lock counts.
         local blues = {}
         for _, u in ipairs(us) do
             if u.faction == "blue" and u.onField then blues[#blues + 1] = u end
@@ -3404,18 +3426,23 @@ function M.new(outer)
                 local e = decides(id)
                 if not e then return nil end
                 local target, side, act = aiDecide(call, proc, e, byId)
-                if act and act.steal then
+                return M.stepOf(act, target, {
                     -- a theft (#711): no strike and no chance, the board changes as it did; the
                     -- way's strikes list carries it (.thefts) for the planner's price
-                    return { lands = 0 }, M.chain(done, nil, pilfer(call, e, act))
-                elseif act then
+                    steal = function()
+                        return { lands = 0 }, M.chain(done, nil, pilfer(call, e, act))
+                    end,
                     -- a status staff (#674): no strike, its hit a way of its own
-                    local q, land = cast(e, act)
-                    return { lands = q }, done, land
-                end
-                if not target then return nil end
-                local t, now = strike(e, id, target, side, done)
-                return t, now, function() remove(e, side.tile.x, side.tile.y) end
+                    staff = function()
+                        local q, land = cast(e, act)
+                        return { lands = q }, done, land
+                    end,
+                    strike = function()
+                        local t, now = strike(e, id, target, side, done)
+                        return t, now, function() remove(e, side.tile.x, side.tile.y) end
+                    end,
+                    none = function() return nil end,
+                })
             end, sandbox, nil, mass, tail, done0)
         end
         local outcomes, unsplit
@@ -3589,43 +3616,48 @@ function M.new(outer)
                     local e = decides(id)
                     if e then
                         local target, side, act = aiDecide(call, proc, e, byId)
-                        if act and act.steal then
+                        M.stepOf(act, target, {
                             -- a theft (#711): the board changes as it did (the first phase's
                             -- thefts are priced in enemyPhase; the lookahead reads its board)
-                            pilfer(call, e, act)
-                            moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
-                        elseif act then
+                            steal = function()
+                                pilfer(call, e, act)
+                                moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
+                            end,
                             -- a status staff (#674): it lands on the expected way when its hit
                             -- is even odds or better, as a counter kill is taken
-                            local q, land = cast(e, act)
-                            if q >= 0.5 then land() end
-                            moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
-                        elseif target then
-                            local t, now, addr = strike(e, id, target, side, first)
-                            first = now
-                            moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
-                            -- (a berserk strike's kill: strike() took it off already)
-                            if mem.u8(addr + UNIT_HP) == 0 and not t.berserk then
-                                local u = byId[target]
-                                if u then
-                                    remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y))
+                            staff = function()
+                                local q, land = cast(e, act)
+                                if q >= 0.5 then land() end
+                                moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
+                            end,
+                            strike = function()
+                                local t, now, addr = strike(e, id, target, side, first)
+                                first = now
+                                moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
+                                -- (a berserk strike's kill: strike() took it off already)
+                                if mem.u8(addr + UNIT_HP) == 0 and not t.berserk then
+                                    local u = byId[target]
+                                    if u then
+                                        remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y))
+                                    end
                                 end
-                            end
-                            if t.felled >= 0.5 then
-                                remove(e, side.tile.x, side.tile.y)
-                                -- a Rout's count: the player's berserked unit is none of it
-                                if not t.berserk then fell[#fell + 1] = id end
-                            else
-                                -- it lives: our counter's expected damage stays on it, as a
-                                -- strike's stays on its target
-                                local _, back = M.odds({ t.counterDist }, t.strikerHp)
-                                wound(e.addr, math.max(1, t.strikerHp - math.floor(back + 0.5)),
-                                      true)
-                            end
-                        else
-                            local x, y = followMove(e)
-                            if x then moved[#moved + 1] = { id = id, x = x, y = y } end
-                        end
+                                if t.felled >= 0.5 then
+                                    remove(e, side.tile.x, side.tile.y)
+                                    -- a Rout's count: the player's berserked unit is none of it
+                                    if not t.berserk then fell[#fell + 1] = id end
+                                else
+                                    -- it lives: our counter's expected damage stays on it, as a
+                                    -- strike's stays on its target
+                                    local _, back = M.odds({ t.counterDist }, t.strikerHp)
+                                    wound(e.addr, math.max(1, t.strikerHp - math.floor(back + 0.5)),
+                                          true)
+                                end
+                            end,
+                            none = function()
+                                local x, y = followMove(e)
+                                if x then moved[#moved + 1] = { id = id, x = x, y = y } end
+                            end,
+                        })
                     end
                 end
             end
@@ -3854,11 +3886,13 @@ function M.new(outer)
 
     -- (like opensDoor: the bot asks the one lock, not the terrain)
     function s.opensChest(u) return s.opens(u, M.LOCK_TERRAIN.chests) end
-    function s.isChestLock(terrain) return terrain == M.TERRAIN_CHEST_FULL end
+    function s.isChestLock(terrain) return terrain == M.LOCK_TERRAIN.chests end
 
     function s.locked(u, x, y)
         local t = s.terrain(x, y)
-        if (t == M.TERRAIN_DOOR or t == M.TERRAIN_CHEST_FULL) and not s.opens(u, t) then return t end
+        if (t == M.LOCK_TERRAIN.doors or t == M.LOCK_TERRAIN.chests) and not s.opens(u, t) then
+            return t
+        end
         return nil
     end
 

@@ -161,7 +161,8 @@
 --   A demand is what the map asks (an enemy class, chests, fog...), `kind` sight.demandsOf's
 --   name for what it is ("enemy" for an enemy class; a demand without one raises), `need` how
 --   many answerers cover it (`locks`, a chests or doors demand's: the tiles a key may still be
---   needed for, Bot.supply's); `answers` and `strength` are measured by the caller in the game.
+--   needed for, is read by Bot.supply's takeKeys alone, never by Bot.team); `answers` and
+--   `strength` are measured by the caller in the game.
 --   In order: forced units (slot order, past every ceiling); then style.deploy, a followed
 --   claim's units; then, while a demand still needs answerers, the scarcest one first (ADR
 --   0402): the open demand the fewest units still fitting can answer (ties: a demand of
