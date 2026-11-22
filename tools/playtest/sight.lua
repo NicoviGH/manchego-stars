@@ -327,7 +327,11 @@ function M.carryOf(a, uid)
     return nil
 end
 M.CLOSE_HORIZON = 8   -- enemy phases closings() plays forward
-M.SCRIPT_HORIZON = 30 -- turns s.scriptedUnits() reads the turn events of
+-- turns s.scriptedUnits() reads the turn events of: a turn an event can name runs to
+-- M.LAST_EVENT_TURN (a byte); the scan stops at 30: the latest start turn any vanilla turn event names is
+-- 19 (grep of src/events/*eventinfo.h TurnEvent*, 255 = open-ended end excluded), and each turn
+-- costs three game calls. A turn event starting later than the horizon is not read
+M.SCRIPT_HORIZON = 30
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
 -- (player_interface.c), so the turns left on turn T are End - T.
@@ -1247,52 +1251,63 @@ end
 -- The bytecode is linear and a GOTO or branch can jump over an END to a CALL behind a later
 -- LABEL, so an END stops the walk only when every label a GOTO/branch named is already behind it.
 -- Bounded: EV_SCRIPT_LIMIT commands a script, and a pointer is followed only inside the ROM
--- (a script in RAM, or garbage, is not read). `stack` (the scripts being walked) guards a
--- loop; a script CALLed twice is walked twice, as a visitor's slot 2 may differ between them.
--- Branches are not evaluated: every command the bytes reach linearly is visited. Pure over mem.
+-- (a script in RAM, or garbage, is not read). `opts`: { memo = true } walks each script once
+-- (a visitor with no state between CALLs, callsScript: a diamond of CALLs is then linear, not
+-- exponential), { budget = n } stops the walk after n commands in all (a visitor with state, as
+-- scriptEffects' slot 2, walks a script CALLed twice twice, so its total is bounded instead).
+-- Without memo the scripts being walked are a stack that guards a loop. Branches are not
+-- evaluated: every command the bytes reach linearly is visited. Pure over mem.
 -- Every ENQUEUE_CALL is followed, whatever its subcommand: an enqueued paid script reads as paid,
 -- which only withholds a free-talker demand, never adds a wrong one.
 local EV_CMD_LABEL, EV_CMD_GOTO, EV_CMD_CALL, EV_CMD_ENQUEUE_CALL, EV_CMD_BRANCH, EV_CMD_END =
     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x01
 M.EV_SCRIPT_LIMIT = 512
+M.EV_WALK_BUDGET = 8 * M.EV_SCRIPT_LIMIT
 -- the cartridge ROM is the 32MB the GBA maps at 0x08 and 0x09 (top byte), so `ptr >> 25 == 4`
 local ROM_REGION, ROM_SHIFT = 4, 25
-function M.walkScript(mem, script, visit, stack)
-    stack = stack or {}
-    if script >> ROM_SHIFT ~= ROM_REGION or stack[script] then return false end
-    stack[script] = true
-    local at, reached, wanted, stopped = script, {}, {}, false
-    for _ = 1, M.EV_SCRIPT_LIMIT do
-        local head = mem.u16(at)
-        local cmd, len = head >> 8, (head >> 4) & 0xF
-        if len == 0 then break end
-        if visit(at, cmd, head & 0xF) then stopped = true; break end
-        if cmd == EV_CMD_LABEL then
-            reached[mem.u16(at + 2)] = true
-        elseif cmd == EV_CMD_GOTO or cmd == EV_CMD_BRANCH then
-            wanted[mem.u16(at + 2)] = true
-        elseif cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL then
-            if M.walkScript(mem, mem.u32(at + 4), visit, stack) then stopped = true; break end
-        elseif cmd == EV_CMD_END then
-            local ahead = false
-            for label in pairs(wanted) do
-                if not reached[label] then ahead = true end
+function M.walkScript(mem, script, visit, opts)
+    opts = opts or {}
+    local stack, left = {}, opts.budget or math.huge
+    local done = opts.memo and {} or nil
+    local function walk(from)
+        if from >> ROM_SHIFT ~= ROM_REGION or stack[from] or (done and done[from]) then return false end
+        stack[from] = true
+        if done then done[from] = true end
+        local at, reached, wanted, stopped = from, {}, {}, false
+        for _ = 1, M.EV_SCRIPT_LIMIT do
+            local head = mem.u16(at)
+            local cmd, len = head >> 8, (head >> 4) & 0xF
+            if len == 0 or left <= 0 then break end
+            left = left - 1
+            if visit(at, cmd, head & 0xF) then stopped = true; break end
+            if cmd == EV_CMD_LABEL then
+                reached[mem.u16(at + 2)] = true
+            elseif cmd == EV_CMD_GOTO or cmd == EV_CMD_BRANCH then
+                wanted[mem.u16(at + 2)] = true
+            elseif cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL then
+                if walk(mem.u32(at + 4)) then stopped = true; break end
+            elseif cmd == EV_CMD_END then
+                local ahead = false
+                for label in pairs(wanted) do
+                    if not reached[label] then ahead = true end
+                end
+                if not ahead then break end
             end
-            if not ahead then break end
+            at = at + len * 2
         end
-        at = at + len * 2
+        stack[from] = nil
+        return stopped
     end
-    stack[script] = nil
-    return stopped
+    return walk(script)
 end
 
 -- Whether the event script at `script` CALLs `target` (EV_CMD_CALL or EV_CMD_ENQUEUE_CALL),
--- through the CALLs of its own (M.walkScript's walk).
+-- through the CALLs of its own (M.walkScript's walk, each script once).
 function M.callsScript(mem, script, target)
     if script == target then return true end
     return M.walkScript(mem, script, function(at, cmd)
         return (cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL) and mem.u32(at + 4) == target
-    end)
+    end, { memo = true })
 end
 
 -- What an event script does to the field's units, read from its bytes (#724): the units it loads
@@ -1303,18 +1318,24 @@ end
 -- means slot 2 (Event2C_LoadUnits, eventscr.c:2797); LOADSINGLEUNIT (:722, Event32_SpawnSingleUnit,
 -- eventscr.c:3128) is the allegiance in sub, the char at +2 (-3: slot 2), x and y bytes at +4, +5;
 -- CHANGESTATE (EvtKillUnit/EvtRemoveUnit, :720-723, Event34_MessWithUnitState) sub 0xD KILL or
--- 0xF DISA is the char at +2. A UnitDefinition (bmunit.h:195) is 0x14 bytes, an array ends at
--- charIndex 0 (GetLoadUnitsAmount), x is the 6 bits and y the next 6 of the halfword at +4.
+-- 0xF DISA is the char at +2. DISA_IF (0xE, EvtWaitUnitDeathFade) is not counted: it waits for a
+-- death fade a script began, not a removal of its own. A UnitDefinition (bmunit.h:195) is 0x14
+-- bytes, an array ends at charIndex 0 (GetLoadUnitsAmount), x is the 6 bits and y the next 6 of
+-- the halfword at +4.
 -- Slot 2 is tracked by the walk through its CALLs (SVAL slot 2 then CALL(EventScr_LoadReinforce),
--- LOAD1(1, -1)). An ESTIMATE: the script's guards (CHECK_ALIVE, CHECK_ALLEGIANCE, a flag) are
--- not evaluated, so a removal that only holds for a unit in some state reads as always, and a
--- REDA walks a loaded unit off the tile read here. Pure over mem.
+-- LOAD1(1, -1)). A unit the script loads AND removes (a cutscene cast) is no removal of the
+-- field's: the removal is dropped. An ESTIMATE: the script's guards (CHECK_ALIVE,
+-- CHECK_ALLEGIANCE, a flag) are not evaluated, so a removal that only holds for a unit in some
+-- state reads as always; a REDA walks a loaded unit off the tile read; LOAD_PRECONF's
+-- SETCOUNT and SETCHANCE (eventscript.h:451-453) are not read, so an array is loaded whole. The
+-- walk is bounded to M.EV_WALK_BUDGET commands in all. Pure over mem.
 local EV_CMD_SVAL, EV_CMD_LOADUNIT, EV_CMD_LOADSINGLEUNIT, EV_CMD_CHANGESTATE =
     0x05, 0x2C, 0x32, 0x34
 local EVSUB_KILL, EVSUB_DISA, EVENT_SLOT_2 = 0xD, 0xF, 2
 local UDEF_SIZE, UDEF_LIMIT = 0x14, 64
+local MAP_COORD_LIMIT = 64   -- x and y are 6-bit fields in a UnitDefinition; a byte's 7th bit is a sign
 function M.scriptEffects(mem, script)
-    local loads, removals, slot2 = {}, {}, 0
+    local loads, removed, slot2 = {}, {}, 0
     M.walkScript(mem, script, function(at, cmd, sub)
         if cmd == EV_CMD_SVAL then
             if mem.u16(at + 2) == EVENT_SLOT_2 then slot2 = mem.u32(at + 4) end
@@ -1333,16 +1354,46 @@ function M.scriptEffects(mem, script)
             local pid = mem.u16(at + 2)
             if pid == 0xFFFD then pid = slot2 end
             local x, y = mem.u8(at + 4), mem.u8(at + 5)
-            if pid > 0 and pid < 0x100 and x < 0x80 and y < 0x80 then
+            if pid > 0 and pid < 0x100 and x < MAP_COORD_LIMIT and y < MAP_COORD_LIMIT then
                 loads[#loads + 1] = { charId = pid, x = x, y = y }
             end
         elseif cmd == EV_CMD_CHANGESTATE and (sub == EVSUB_KILL or sub == EVSUB_DISA) then
             local pid = mem.u16(at + 2)
-            if pid > 0 and pid < 0x100 then removals[#removals + 1] = pid end
+            if pid > 0 and pid < 0x100 then removed[#removed + 1] = pid end
         end
         return false
-    end)
+    end, { budget = M.EV_WALK_BUDGET })
+    local cast = {}
+    for _, l in ipairs(loads) do cast[l.charId] = true end
+    local removals = {}
+    for _, c in ipairs(removed) do
+        if not cast[c] then removals[#removals + 1] = c end
+    end
     return { loads = loads, removals = removals }
+end
+
+-- The turn events' effects (M.scriptEffects of each, in the order the game offers them: `events`
+-- = { { turn, boardTurn, loads, removals } }) as s.scriptedUnits' answer: { arrivals = { { charId,
+-- x, y, turn, boardTurn } }, removals = { [charId] = boardTurn } }. A unit's earliest removal is
+-- kept, and a removal at or before the unit's earliest arrival is dropped: a cast loaded in one
+-- event and removed in an earlier or the same one was never a unit of the field. Pure.
+function M.foldScripted(events)
+    local out, first = { arrivals = {}, removals = {} }, {}
+    for _, e in ipairs(events) do
+        for _, l in ipairs(e.loads) do
+            out.arrivals[#out.arrivals + 1] = { charId = l.charId, x = l.x, y = l.y, turn = e.turn,
+                                                boardTurn = e.boardTurn }
+            first[l.charId] = math.min(first[l.charId] or e.boardTurn, e.boardTurn)
+        end
+    end
+    for _, e in ipairs(events) do
+        for _, c in ipairs(e.removals) do
+            if e.boardTurn > (first[c] or 0) then
+                out.removals[c] = math.min(out.removals[c] or e.boardTurn, e.boardTurn)
+            end
+        end
+    end
+    return out
 end
 
 -- The recruits a unit brings over for FREE: of `talks` (M.recruitTalks), the talks to a unit not
@@ -4434,16 +4485,21 @@ function M.new(outer)
     -- bytes walked (M.scriptEffects: no event is run, nothing is written but the sandbox's turn
     -- and phase, which it puts back). `turn` is the turn of the event; `boardTurn` the first
     -- player turn its effect is on the board: the turn itself for a blue-phase event, the next
-    -- for a green or red one (as botrun's arrivals_seen). A unit's earliest arrival and earliest
-    -- removal are kept. About 3 x the horizon game calls once a chapter (cached), none a turn.
+    -- for a green or red one. (botrun's arrivals_seen `turn` is the enemy phase's own turn for an
+    -- arrival it saw there too, and the same boardTurn; the scan has no phase that it saw.) A
+    -- unit's earliest arrival and earliest removal are kept, and a removal at or before the
+    -- unit's earliest arrival is dropped (a cast loaded in one event and removed in a later one
+    -- is no removal of a unit that was on the field). About 3 x the horizon game calls once a
+    -- chapter (cached), none a turn.
     -- An estimate where scriptEffects' is: guards are not evaluated, a load tile is not where a
     -- REDA leaves the unit. The flags the scan reads are those of its first call (the chapter's
-    -- first plan), so an event a later flag opens is not in it.
+    -- first plan), so an event a later flag opens is not in it. A read made inside a sandbox (a
+    -- decision's batch) may see flags that sandbox set, so it is returned but not kept.
     local scripted
     function s.scriptedUnits()
         if scripted then return scripted end
-        scripted = sandbox(function(call, info)
-            local out, done = { arrivals = {}, removals = {} }, {}
+        local read = sandbox(function(call, info)
+            local events, done = {}, {}
             for t = 1, M.SCRIPT_HORIZON do
                 for _, phase in ipairs(M.PHASES) do
                     local fresh = {}
@@ -4451,23 +4507,18 @@ function M.new(outer)
                         if not done[script] then fresh[#fresh + 1] = script end
                     end
                     table.sort(fresh)   -- pairs() order is no order: a run must replay
-                    local boardTurn = phase == M.PHASES[1] and t or t + 1
                     for _, script in ipairs(fresh) do
                         done[script] = true
                         local fx = M.scriptEffects(mem, script)
-                        for _, l in ipairs(fx.loads) do
-                            out.arrivals[#out.arrivals + 1] = { charId = l.charId, x = l.x, y = l.y,
-                                                                turn = t, boardTurn = boardTurn }
-                        end
-                        for _, c in ipairs(fx.removals) do
-                            out.removals[c] = math.min(out.removals[c] or boardTurn, boardTurn)
-                        end
+                        events[#events + 1] = { turn = t, boardTurn = phase == M.PHASES[1] and t or t + 1,
+                                                loads = fx.loads, removals = fx.removals }
                     end
                 end
             end
-            return out
+            return M.foldScripted(events)
         end)
-        return scripted
+        if not open() then scripted = read end
+        return read
     end
 
     return s

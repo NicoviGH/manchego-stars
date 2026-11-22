@@ -1590,30 +1590,98 @@ do
 end
 
 -- scriptEffects (#724): a turn event's bytes say who it loads and removes. E_13's turn 5 sets slot 2
--- to a unit array (SVAL), CALLs the shared reinforcement script (LOAD1(1, -1): the array in slot 2)
--- and a DISA removes a char; a LOADSINGLEUNIT is a load of its own.
+-- to a unit array (SVAL), CALLs the shared reinforcement script (LOAD1(1, -1): the array in slot 2,
+-- EventScr_LoadReinforce) and a DISA removes a char; a LOADSINGLEUNIT is a load of its own.
 do
     local m = fakeMem()
-    local EV, LOADER, ARR = 0x08003000, 0x08003100, 0x08003200
+    local EV, LOADER, ARR, ARR2 = 0x08003000, 0x08003100, 0x08003200, 0x08003300
     local function udef(at, char, x, y) m.w8(at, char); m.w16(at + 4, x | (y << 6)) end
+    local function sval2(at, v) m.w16(at, 0x0540); m.w16(at + 2, 2); m.w32(at + 4, v) end
+    local function call(at, to) m.w16(at, 0x0A40); m.w32(at + 4, to) end
+    local function loaded(fx)
+        local got = {}
+        for _, l in ipairs(fx.loads) do got[#got + 1] = string.format("%X@%d,%d", l.charId, l.x, l.y) end
+        return table.concat(got, " ")
+    end
     udef(ARR, 0x0E, 9, 3); udef(ARR + 0x14, 0x40, 1, 2)   -- two units, then charIndex 0
-    -- the shared loader: LOAD1 (0x2C, sub 1) with the pointer -1 = slot 2, then END
-    m.w16(LOADER, 0x2C41); m.w16(LOADER + 2, 1); m.w32(LOADER + 4, 0xFFFFFFFF); m.w16(LOADER + 8, 0x0120)
+    udef(ARR2, 0x55, 5, 6)
+    -- the shared loader: LOAD1 (0x2C, len 4, sub 0) with the pointer -1 = slot 2, then END
+    m.w16(LOADER, 0x2C40); m.w16(LOADER + 2, 1); m.w32(LOADER + 4, 0xFFFFFFFF); m.w16(LOADER + 8, 0x0120)
     -- the event: SVAL slot 2 = ARR; CALL LOADER; SPAWN_ENEMY char 0x33 at (4,5); DISA 0x12; END
-    m.w16(EV, 0x0540); m.w16(EV + 2, 2); m.w32(EV + 4, ARR)
-    m.w16(EV + 8, 0x0A40); m.w32(EV + 12, LOADER)
-    m.w16(EV + 16, 0x3242 | 0); m.w16(EV + 18, 0x33); m.w8(EV + 20, 4); m.w8(EV + 21, 5)
-    m.w16(EV + 24, 0x342F - 0x3400 + 0x3400); m.w16(EV + 26, 0x12)
+    sval2(EV, ARR)
+    call(EV + 8, LOADER)
+    m.w16(EV + 16, 0x3242); m.w16(EV + 18, 0x33); m.w8(EV + 20, 4); m.w8(EV + 21, 5)
+    m.w16(EV + 24, 0x342F); m.w16(EV + 26, 0x12)
     m.w16(EV + 28, 0x0120)
     local fx = Sight.scriptEffects(m, EV)
-    local got = {}
-    for _, l in ipairs(fx.loads) do got[#got + 1] = string.format("%X@%d,%d", l.charId, l.x, l.y) end
-    check(table.concat(got, " "), "E@9,3 40@1,2 33@4,5", "scriptEffects: slot 2 through a CALL, then a single spawn")
+    check(loaded(fx), "E@9,3 40@1,2 33@4,5", "scriptEffects: slot 2 through a CALL, then a single spawn")
     check(table.concat(fx.removals, ","), "18", "scriptEffects: a DISA is a removal")
     m.w16(EV + 24, 0x342D)   -- KILL
     check(Sight.scriptEffects(m, EV).removals[1], 0x12, "scriptEffects: a KILL is one too")
+    m.w16(EV + 24, 0x342E)   -- DISA_IF waits for a death fade: none
+    check(#Sight.scriptEffects(m, EV).removals, 0, "scriptEffects: DISA_IF is no removal")
     m.w16(EV + 24, 0x3420)   -- CHANGESTATE sub 0 (a state change): none
     check(#Sight.scriptEffects(m, EV).removals, 0, "scriptEffects: another state change is none")
+    m.w16(EV + 24, 0x342F)
+    -- the same loader CALLed twice with a different slot 2 each time: both arrays load
+    local TWICE = 0x08003400
+    sval2(TWICE, ARR2); call(TWICE + 8, LOADER); sval2(TWICE + 16, ARR + 0x14); call(TWICE + 24, LOADER)
+    m.w16(TWICE + 32, 0x0120)
+    check(loaded(Sight.scriptEffects(m, TWICE)), "55@5,6 40@1,2", "scriptEffects: a script CALLed twice is walked twice")
+    -- a load tile outside the map's 6-bit range, or negative (a slot position) is no load
+    local RANGE = 0x08003500
+    m.w16(RANGE, 0x3242); m.w16(RANGE + 2, 0x33); m.w8(RANGE + 4, 70); m.w8(RANGE + 5, 5)
+    m.w16(RANGE + 8, 0x3242); m.w16(RANGE + 10, 0x34); m.w8(RANGE + 12, 0xFF); m.w8(RANGE + 13, 0xFF)
+    m.w16(RANGE + 16, 0x3242); m.w16(RANGE + 18, 0x35); m.w8(RANGE + 20, 63); m.w8(RANGE + 21, 0)
+    m.w16(RANGE + 24, 0x0120)
+    check(loaded(Sight.scriptEffects(m, RANGE)), "35@63,0", "scriptEffects: a tile outside the map's range is no load")
+    -- a cast: a unit the script loads and removes is no removal of the field's
+    local CAST = 0x08003600
+    m.w16(CAST, 0x3242); m.w16(CAST + 2, 0x12); m.w8(CAST + 4, 3); m.w8(CAST + 5, 4)
+    m.w16(CAST + 8, 0x342F); m.w16(CAST + 10, 0x12)
+    m.w16(CAST + 12, 0x342F); m.w16(CAST + 14, 0x13)
+    m.w16(CAST + 16, 0x0120)
+    fx = Sight.scriptEffects(m, CAST)
+    check(table.concat(fx.removals, ","), "19", "scriptEffects: a unit loaded and removed in one script is a cast")
+    -- a diamond of CALLs, each script CALLing the next twice: the walk is linear, not 2^N
+    local D = 0x08004000
+    local N = 21
+    for i = 0, N - 1 do
+        local at = D + i * 0x40
+        call(at, D + (i + 1) * 0x40); call(at + 8, D + (i + 1) * 0x40); m.w16(at + 16, 0x0120)
+    end
+    m.w16(D + N * 0x40, 0x0120)
+    local visits = 0
+    Sight.walkScript(m, D, function() visits = visits + 1 return false end, { memo = true })
+    check(visits <= 3 * (N + 1), true, "walkScript memo: a diamond of CALLs is walked once a script")
+    check(Sight.callsScript(m, D, 0x08009999), false, "callsScript: a diamond is no blow-up")
+    visits = 0
+    Sight.walkScript(m, D, function() visits = visits + 1 return false end, { budget = 1000 })
+    check(visits, 1000, "walkScript budget: stops after n commands in all")
+    local t0 = os.clock()
+    Sight.scriptEffects(m, D)
+    check(os.clock() - t0 < 1, true, "scriptEffects: a diamond is bounded by its budget")
+end
+
+-- foldScripted (#724): Amelia is loaded on turn 5 and removed on turn 12 (the removal stays); a cast
+-- unit loaded in turn 2's event and removed by the same or an earlier one is no removal; a unit
+-- never loaded (on the map from the start) keeps its removal; the earliest removal wins.
+do
+    local f = Sight.foldScripted({
+        { turn = 5, boardTurn = 5, loads = { { charId = 0x12, x = 2, y = 23 } }, removals = {} },
+        { turn = 12, boardTurn = 12, loads = {}, removals = { 0x12, 0x1C } },
+        { turn = 1, boardTurn = 2, loads = { { charId = 0x40, x = 1, y = 1 } }, removals = { 0x40 } },
+        { turn = 3, boardTurn = 3, loads = {}, removals = { 0x1C } },
+    })
+    check(f.removals[0x12], 12, "foldScripted: loaded turn 5, removed turn 12 stays")
+    check(f.removals[0x40], nil, "foldScripted: a cast loaded and removed in one event is none")
+    check(f.removals[0x1C], 3, "foldScripted: an unloaded unit's earliest removal")
+    check(#f.arrivals, 2, "foldScripted: every load is an arrival")
+    local g = Sight.foldScripted({
+        { turn = 2, boardTurn = 2, loads = {}, removals = { 0x40 } },
+        { turn = 6, boardTurn = 6, loads = { { charId = 0x40, x = 1, y = 1 } }, removals = {} },
+    })
+    check(g.removals[0x40], nil, "foldScripted: a removal ordered before the arrival is none")
 end
 
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO

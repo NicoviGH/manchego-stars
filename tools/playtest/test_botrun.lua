@@ -1855,14 +1855,16 @@ end
 -- #724: attempt 1 (no memory) is told the arrival a turn event's script makes (sight.scriptedUnits);
 -- one a retry saw (memory) wins over the scripted one; an unowed one is not told.
 do
-    local function told(memory)
+    local asked = false
+    local function told(memory, owes)
         local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) },
-                             recruits = { 0x30 } }
+                             recruits = owes or { 0x30 } }
         g.api.style.memory = memory
         local mk = g.api.sight
         g.api.sight = function()
             local s = mk()
             s.scriptedUnits = function()
+                asked = true
                 return { removals = {}, arrivals = { { charId = 0x30, x = 7, y = 7, turn = 5, boardTurn = 5 },
                                                      { charId = 0x82, x = 8, y = 8, turn = 3, boardTurn = 3 } } }
             end
@@ -1886,6 +1888,9 @@ do
     local got = told(nil)
     check(got and #got, 1, "scripted: attempt 1 is told the owed arrival, not the unowed")
     check(got and got[1] and got[1].x .. "," .. got[1].y, "7,7", "scripted: at the script's tile")
+    asked = false
+    told(nil, {})
+    check(asked, false, "scripted: nothing owed, no scan of the scripts")
     got = told({ enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 6 } } })
     check(got and #got == 1 and got[1].x, 9, "scripted: a remembered arrival wins")
 end

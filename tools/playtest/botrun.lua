@@ -884,8 +884,11 @@ function M.run(api)
         for _, a in ipairs(arrivals) do
             if owedSet[a.charId] then out[#out + 1], have[a.charId] = a, true end
         end
-        for _, a in ipairs(sight and sight.scriptedUnits and sight.scriptedUnits().arrivals or {}) do
-            if owedSet[a.charId] and not have[a.charId] then out[#out + 1], have[a.charId] = a, true end
+        -- nothing owed (or not known): no scan of the chapter's scripts is asked
+        if next(owedSet) and sight and sight.scriptedUnits then
+            for _, a in ipairs(sight.scriptedUnits().arrivals) do
+                if owedSet[a.charId] and not have[a.charId] then out[#out + 1], have[a.charId] = a, true end
+            end
         end
         return out
     end
@@ -1494,6 +1497,9 @@ function M.run(api)
             end
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
+            -- the chapter's scripted units, read once here with no plan's sandbox open (a read made
+            -- inside one is not kept, so every plan would scan again) and only when a recruit is owed
+            if owed and #owed > 0 and sight.scriptedUnits then sight.scriptedUnits() end
             commit, movers = nil, {}
             for _, u in ipairs(board.units) do
                 if u.onField and u.faction == "green" then
