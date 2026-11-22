@@ -67,8 +67,9 @@
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, slot = n|nil }.
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
---   `slot` is the item an attack strikes with (one of sight.weapons), a heal's staff or a used
---   item; nil = the first the Weapon Select menu lists.
+--   `slot` is the item an attack strikes with (one of sight.weapons), the weapon a wait holds
+--   (a bait's or a gentle wait's: equipped first), a heal's staff or a used item; nil =
+--   the first the Weapon Select menu lists.
 --   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue",
 --   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) and "supply" (the
 --   convoy's door key taken, `item`/`uses`, then Wait: supplyKey) only the planner's
@@ -404,6 +405,7 @@ end
 -- (the runner's list). The team is not an axis: Bot.team picks it from the map and the claims.
 -- The route is not one either: a campaign SETTING (#510 plan comment, "Lords").
 M.HOLDS = 3        -- hold tiles offered per unit (candidates), safest first
+M.GENTLE = 2       -- waits holding a recruit-sparing weapon offered per unit (#730), the best first
 
 M.STYLES = {
     aggression = { "careful", "even", "bold" },
@@ -995,6 +997,86 @@ local function betterAttack(c, b)
     if c.expected ~= b.expected then return c.expected > b.expected end
     if c.target.isBoss ~= b.target.isBoss then return c.target.isBoss end
     return c.target.hp < b.target.hp
+end
+
+-- What our counter does to the enemies `want` names that strike `u` ending on (x, y) holding the
+-- weapon in `slot` (nil: the one it holds): the chance it kills, and the chance it hurts
+-- (sight.odds of the strike's counterDist), summed over them. The one read of a held weapon's
+-- counter, as the bait's boss and the sparing wait's recruits ask it (#641, #730).
+local function counterOn(ctx, u, x, y, slot, want)
+    local kill, dealt = 0, 0
+    for _, s in ipairs(exposure(ctx, u, x, y, slot)) do
+        if want(s.by) and s.f and s.f.counterDist then
+            local k, d = oddsOf(ctx.sight)({ s.f.counterDist }, s.by.hp)
+            kill, dealt = kill + k, dealt + d
+        end
+    end
+    return kill, dealt
+end
+
+-- `u`'s chance to die ending on (x, y) holding `slot`, summed over what strikes it there (the
+-- strikes' own takenDist; an overcount where two strikes share one death, which only orders).
+local function dieAt(ctx, u, x, y, slot)
+    local die = 0
+    for _, s in ipairs(exposure(ctx, u, x, y, slot)) do
+        if s.f and s.f.takenDist then die = die + (oddsOf(ctx.sight)({ s.f.takenDist }, u.hp)) end
+    end
+    return die
+end
+
+-- `u`'s wait on `tile` holding the weapon in bag slot `slot`: the act's `slot` and its key's
+-- too; the harness equips it before the Wait and the judged phase arms the unit with it. Slot 0
+-- (or nil) is the weapon the unit fights with already (the game equips the first usable one,
+-- GetUnitEquippedWeapon): a plain Wait. The one owner of that act, for the bait and the gentle wait.
+local function waitHolding(u, tile, slot)
+    local a = action(u, tile, "wait")
+    if slot and slot > 0 then a.slot, a.slotKey = slot, true end
+    return a
+end
+
+-- The waits of `u` that spare a recruit (#730, ADR 0451): where our counter would fell a
+-- recruit (ctx.recruits) striking `u` on a tile a wait of `u` already ends on, the same wait
+-- holding another bag slot, when the recruits' fall plus `u`'s own death there is less than with
+-- the weapon `u` holds now (the first usable one: slot nil). Per tile the least wins; the
+-- M.GENTLE best over all tiles are offered, since each is a judged phase in the mend. A range-2
+-- bow against a recruit's melee strike answers nothing: the no-counter choice a player has.
+-- -> the acts, each labelled "gentle"
+local function sparingWaits(ctx, u, acts)
+    local weapons = ctx.sight.weapons(u)
+    if #weapons < 2 or next(ctx.recruits) == nil then return {} end
+    local function recruit(e) return ctx.recruits[e.id] end
+    local function cost(x, y, slot)
+        return (counterOn(ctx, u, x, y, slot, recruit)) + dieAt(ctx, u, x, y, slot)
+    end
+    local picks, done = {}, {}
+    for _, a in ipairs(acts) do
+        local k = tileKey(a.move.x, a.move.y)
+        if a.act == "wait" and not a.slot and not a.canto and not done[k] then
+            done[k] = true
+            local x, y = a.move.x, a.move.y
+            if counterOn(ctx, u, x, y, nil, recruit) > Goals.DUST then
+                local base, pick, least = cost(x, y), nil, nil
+                for i = 2, #weapons do
+                    local c = cost(x, y, weapons[i].slot)
+                    if c < base - Goals.DUST and (not least or c < least) then
+                        pick, least = weapons[i].slot, c
+                    end
+                end
+                if pick then
+                    local b = waitHolding(u, a.move, pick)
+                    b.why = "gentle"
+                    picks[#picks + 1] = { a = b, c = least, i = #picks }
+                end
+            end
+        end
+    end
+    table.sort(picks, function(p, q)
+        if p.c ~= q.c then return p.c < q.c end
+        return p.i < q.i
+    end)
+    local out = {}
+    for i = 1, math.min(M.GENTLE, #picks) do out[i] = picks[i].a end
+    return out
 end
 
 -- A priority claim's enemy, or under a keys claim one the game says holds a key or lockpick
@@ -2274,7 +2356,7 @@ local function exposed(ctx, u, acts)
         local friend = vacated(ctx, u, a.move.x, a.move.y)
         a.vacate = friend and friend.id
         a.exposure = {}
-        -- a strike's weapon, or the one a bait's wait holds (M.baitAt)
+        -- a strike's weapon, or the one a wait holds (M.baitAt's, sparingWaits')
         local held = (a.act == "attack" or a.act == "wait") and a.slot or nil
         local at = Board.endTile(a)
         for _, s in ipairs(exposure(ctx, u, at.x, at.y, held)) do
@@ -2334,18 +2416,9 @@ function M.baitAt(ctx, u, boss, tile, slot)
         if t.x == tile.x and t.y == tile.y then may = true end
     end
     if not may then return nil end
-    for _, s in ipairs(exposure(ctx, u, tile.x, tile.y, slot)) do
-        if s.by.id == boss.id and s.f and s.f.counterDist then
-            local _, back = oddsOf(ctx.sight)({ s.f.counterDist }, boss.hp)
-            if back > Goals.DUST then
-                -- slot 0 holds the weapon the unit fights with already (the game equips the
-                -- first usable one, GetUnitEquippedWeapon; the strike proves it usable): a plain
-                -- Wait. Another is equipped first, and is the act's identity (its key)
-                local a = action(u, tile, "wait")
-                if slot and slot > 0 then a.slot, a.slotKey = slot, true end
-                return offeredAt(ctx, u, a)
-            end
-        end
+    local _, back = counterOn(ctx, u, tile.x, tile.y, slot, function(e) return e.id == boss.id end)
+    if back > Goals.DUST then
+        return offeredAt(ctx, u, waitHolding(u, tile, slot))
     end
     return nil
 end
@@ -2995,6 +3068,7 @@ local function proposeOne(ctx, u)
     -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)
     for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
     for _, a in ipairs(cantoMoves(ctx, u, acts, gain)) do add(a, a.why) end
+    for _, a in ipairs(sparingWaits(ctx, u, acts)) do acts[#acts + 1] = a end
     return { unit = u, acts = exposed(ctx, u, acts) }
 end
 

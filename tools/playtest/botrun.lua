@@ -329,8 +329,8 @@ end
 local function actOf(a)
     return { unit = a.unit, act = a.act, x = a.move.x, y = a.move.y, target = a.target,
              why = a.why, canto = a.canto,
-             -- an attack's weapon and what it was priced to spend (#642)
-             slot = a.act == "attack" and a.slot or nil, useCost = a.useCost }
+             -- an attack's weapon and what it was priced to spend (#642), a wait's held one (#730)
+             slot = (a.act == "attack" or a.act == "wait") and a.slot or nil, useCost = a.useCost }
 end
 
 -- Units on the field before and gone after, with the fighter that downed them. A player-phase

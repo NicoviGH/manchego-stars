@@ -1256,6 +1256,9 @@ function M.plan(Bot, board, sight, style, opts)
                 local e = endTile(x.a)
                 if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
                         or x.a.why == "hold" or x.a.why == "retreat" or x.a.why == "careful"
+                        -- the wait that spares a recruit (Bot.candidates' "gentle", #730): its
+                        -- own score never sees the forfeit it avoids, only the judged phase
+                        or x.a.why == "gentle"
                         -- what a Rescue or Drop saves or opens is the judged phase's to read, and
                         -- its own score never sees the phase; a step aside's is the teammate's
                         -- act it frees the tile for (Bot.candidates' aside), which its own score
@@ -1884,8 +1887,8 @@ function M.plan(Bot, board, sight, style, opts)
                                       -- act: the game runs the chapter's Misc events after it
                                       -- (#712, waitsIn)
                                       acted = a ~= nil, order = nth[u.id],
-                                      -- a strike's weapon, or a bait's (Bot.baitAt): the
-                                      -- one its counter answers the boss with
+                                      -- a strike's weapon, or a wait's held one (a bait's,
+                                      -- a gentle wait's): the one its counter answers with
                                       slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
                                       wearSlot = w and w.slot, wear = w and w.uses }
         end
@@ -2676,7 +2679,8 @@ function M.plan(Bot, board, sight, style, opts)
         local function tries(p)
             if p.recruit then
                 -- a recruit has no player menu: the units it strikes try theirs (out of its
-                -- reach, or holding no weapon that answers it)
+                -- reach, or waiting holding a weapon whose counter spares it: the "gentle"
+                -- waits, #730)
                 local out = {}
                 for _, id in ipairs(p.struck) do
                     for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
