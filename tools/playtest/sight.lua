@@ -410,6 +410,10 @@ local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
 M.PLAY_VISION = PLAY_VISION
 -- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
 local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
+-- UNIT_MOV of the unit struct at `addr`: the class's MOV plus the unit's bonus. Pure over mem.
+function M.movOf(mem, addr)
+    return mem.s8(addr + UNIT_MOV_BONUS) + mem.s8(mem.u32(addr + UNIT_CLASS) + CLASS_MOV)
+end
 -- struct ClassData +28 attributes (CA_*), as CharacterData's; struct Unit +42 ai1, +44 ai2 (the
 -- AI script indices)
 local CLASS_ATTRIBUTES, UNIT_AI1, UNIT_AI2 = 0x28, 0x42, 0x44
@@ -1341,7 +1345,8 @@ end
 -- 0xF DISA is the char at +2. DISA_IF (0xE, EvtWaitUnitDeathFade) is not counted: it waits for a
 -- death fade a script began, not a removal of its own. A UnitDefinition (bmunit.h:195) is 0x14
 -- bytes, an array ends at charIndex 0 (GetLoadUnitsAmount), x is the 6 bits and y the next 6 of
--- the halfword at +4.
+-- the halfword at +4. A LOAD1-3 load also carries its definition (`def`, its address) and
+-- whether it loads an enemy (`red`: allegiance 2, the bits 1-2 of +3), for s.arrivalUnits.
 -- Slot 2 is tracked by the walk through its CALLs (SVAL slot 2 then CALL(EventScr_LoadReinforce),
 -- LOAD1(1, -1)). A unit the script loads AND removes (a cutscene cast) is no removal of the
 -- field's: the removal is dropped. An ESTIMATE: the script's guards (CHECK_ALIVE,
@@ -1355,6 +1360,10 @@ local EV_CMD_SVAL, EV_CMD_LOADUNIT, EV_CMD_LOADSINGLEUNIT, EV_CMD_CHANGESTATE =
 local EVSUB_KILL, EVSUB_DISA, EVENT_SLOT_2 = 0xD, 0xF, 2
 local UDEF_SIZE, UDEF_LIMIT = 0x14, 64
 local MAP_COORD_LIMIT = 64   -- x and y are 6-bit fields in a UnitDefinition; a byte's 7th bit is a sign
+-- A UnitDefinition's allegiance (bmunit.h:202: the 2 bits above autolevel in +3): 0 blue, 1
+-- green, 2 red (LoadUnit's switch, bmunit.c:586)
+local UDEF_RED = 2
+function M.udefAllegiance(byte3) return (byte3 >> 1) & 3 end
 function M.scriptEffects(mem, script)
     local loads, removed, slot2 = {}, {}, 0
     local _, truncated = M.walkScript(mem, script, function(at, cmd, sub)
@@ -1368,7 +1377,8 @@ function M.scriptEffects(mem, script)
                     local d = ud + i * UDEF_SIZE
                     if mem.u8(d) == 0 then break end
                     local xy = mem.u16(d + 4)
-                    loads[#loads + 1] = { charId = mem.u8(d), x = xy & 0x3F, y = (xy >> 6) & 0x3F }
+                    loads[#loads + 1] = { charId = mem.u8(d), x = xy & 0x3F, y = (xy >> 6) & 0x3F,
+                                          def = d, red = M.udefAllegiance(mem.u8(d + 3)) == UDEF_RED }
                 end
             end
         elseif cmd == EV_CMD_LOADSINGLEUNIT then
@@ -1429,8 +1439,11 @@ function M.scriptAiChanges(mem, script)
 end
 
 -- The turn events' effects (M.scriptEffects of each, in the order the game offers them: `events`
--- = { { turn, boardTurn, loads, removals, truncated } }) as s.scriptedUnits' answer: { arrivals = {
--- { charId, x, y, turn, boardTurn } }, removals = { [charId] = boardTurn }, truncated }. A unit's earliest removal is
+-- = { { turn, boardTurn, eventTurn, loads, removals, truncated } }) as s.scriptedUnits' answer:
+-- { arrivals = { { charId, x, y, turn, boardTurn, eventTurn, def, red } }, removals = { [charId] =
+-- boardTurn }, truncated }. `eventTurn` is the turn the event itself runs on (its phase may be
+-- the enemy's, so the unit acts on that turn; nil in `events`: the boardTurn); `def` and `red`
+-- are the load's own (M.scriptEffects). A unit's earliest removal is
 -- kept, and a removal at or before the unit's earliest arrival is dropped: a cast loaded in one
 -- event and removed in an earlier or the same one was never a unit of the field. Pure.
 function M.foldScripted(events)
@@ -1439,7 +1452,9 @@ function M.foldScripted(events)
         out.truncated = out.truncated or e.truncated
         for _, l in ipairs(e.loads) do
             out.arrivals[#out.arrivals + 1] = { charId = l.charId, x = l.x, y = l.y, turn = e.turn,
-                                                boardTurn = e.boardTurn }
+                                                boardTurn = e.boardTurn,
+                                                eventTurn = e.eventTurn or e.boardTurn,
+                                                def = l.def, red = l.red }
             first[l.charId] = math.min(first[l.charId] or e.boardTurn, e.boardTurn)
         end
     end
@@ -1723,6 +1738,8 @@ end
 -- the ally's later liftOff then finds it is not the ally's. `keepOccupant` (asActive) leaves a
 -- cell another unit holds as it is: the actor is only a struct there, off the map.
 local UNIT_INDEX = 0x0B
+-- gUnitArrayRed's 50 slots by unit id (bmunit.h:376; Board.FACTIONS' red)
+local RED_FIRST, RED_LAST = 0x81, 0xB2
 function M.standOn(api, u, x, y, keepOccupant)
     -- where it stands now, not u.x/u.y: a sandbox may have moved it already
     local cx, cy = api.mem.u8(u.addr + UNIT_X), api.mem.u8(u.addr + UNIT_Y)
@@ -1733,6 +1750,30 @@ function M.standOn(api, u, x, y, keepOccupant)
     api.write8(u.addr + UNIT_X, x)
     api.write8(u.addr + UNIT_Y, y)
 end
+-- The red unit in slot `id` as an arrival's stand-in (#713 fix 3, ADR 0456): the board's own
+-- read of it (Board.unitAt: classId, level, items { id, uses }), with `mov` (M.movOf), `reach`
+-- (the longest maxRange of its weapons, Board.itemRange; 0 with none) and `words` (the
+-- struct's halfwords, for M.standIn). `Board` is the bound reader (api.Board). Pure over mem.
+function M.arrivalOf(mem, S, Board, id)
+    local u = Board.unitAt(S.gUnitArrayRed, id - RED_FIRST)
+    u.mov, u.reach, u.words = M.movOf(mem, u.addr), 0, {}
+    for _, it in ipairs(u.items or {}) do
+        local _, max = Board.itemRange(it.id)
+        if max and max > u.reach then u.reach = max end
+    end
+    for k = 0, Board.UNIT_SIZE // 2 - 1 do u.words[k + 1] = mem.u16(u.addr + k * 2) end
+    return u
+end
+
+-- Inside a sandbox: the stand-in `e` ({ id, addr, words }, s.strike's) loaded into its free red
+-- slot as M.arrivalOf read it, its index the slot's (ClearUnit keeps a slot's index,
+-- bmunit.c:229). api writes only: the journal empties the slot again when the sandbox returns,
+-- and the words any game call wrote there since with it.
+function M.standIn(api, e)
+    for k, v in ipairs(e.words) do api.write16(e.addr + (k - 1) * 2, v) end
+    api.write8(e.addr + UNIT_INDEX, e.id)
+end
+
 -- Inside a sandbox: `u` on (x, y) as the active unit, not yet acted, as the unit menu finds
 -- it after a move: its struct there and gActiveUnit it, and OFF the unit map, the part of
 -- UnitBeginAction (bmunit.c) a menu read sees. Its tile stays clear until
@@ -3172,10 +3213,7 @@ function M.new(outer)
         end
         return costGrids[k]
     end
-    -- UNIT_MOV: the class's MOV plus the unit's bonus
-    local function movOf(unit)
-        return mem.s8(unit.addr + UNIT_MOV_BONUS) + mem.s8(mem.u32(unit.addr + UNIT_CLASS) + CLASS_MOV)
-    end
+    local function movOf(unit) return M.movOf(mem, unit.addr) end
     -- Turns `unit` needs from `at` to `tile` on its own movement costs, nil = never.
     local function turnsTo(unit, tile, at)
         local cost = costGrid(unit, tile)[at.y][at.x]
@@ -3661,6 +3699,16 @@ function M.new(outer)
 
     local function standOn(u, x, y) M.standOn(api, u, x, y) end
 
+    -- The red slots no unit is loaded in (pCharacterData 0), by id, as memory stands.
+    local function freeRed()
+        local out = {}
+        for id = RED_FIRST, RED_LAST do
+            local addr = mem.u32(S.gUnitLookup + id * 4)
+            if addr ~= 0 and mem.u32(addr) == 0 then out[#out + 1] = { id = id, addr = addr } end
+        end
+        return out
+    end
+
     -- Hides every other unit the AI could choose, so its own routine can only pick `u`. Hidden
     -- units keep their gBmMapUnit entries: they still block as they do.
     -- `all` is units(), read before the sandbox stood `u` elsewhere.
@@ -3754,9 +3802,19 @@ function M.new(outer)
         return target, side
     end
 
+    -- `e` may be a stand-in (#713 fix 3, ADR 0456): an arrival of s.arrivalUnits, whose `words`
+    -- are loaded into a free red slot for the strike (M.standIn), `from` its tile. With no free
+    -- slot it makes no strike.
     function s.strike(u, e, x, y, slot, from)
         local all = units()
+        if e.words then
+            local free = freeRed()
+            if #free == 0 then return M.strikeOf(nil) end
+            local f = free[#free]
+            e = { id = f.id, addr = f.addr, words = e.words, faction = "red" }
+        end
         local t = learningAs(false, function() return sandbox(function(call, proc)
+            if e.words then M.standIn(api, e) end
             standOn(u, x, y)
             if from then standOn(e, from.x, from.y) end
             M.equip(api, call, S, u, slot)
@@ -4951,7 +5009,7 @@ function M.new(outer)
                         done[script] = true
                         local fx = M.scriptEffects(mem, script)
                         local boardTurn = phase == M.PHASES[1] and t or t + 1
-                        events[#events + 1] = { turn = boardTurn, boardTurn = boardTurn,
+                        events[#events + 1] = { turn = boardTurn, boardTurn = boardTurn, eventTurn = t,
                                                 loads = fx.loads, removals = fx.removals, truncated = fx.truncated }
                     end
                 end
@@ -4960,6 +5018,52 @@ function M.new(outer)
         end)
         if not open() then scripted = read end
         return read
+    end
+
+    -- The enemies the chapter's turn events bring on (#713 fix 3, ADR 0456), each as the game
+    -- itself loads it: of s.scriptedUnits' arrivals, every red LOAD1-3 load, through the game's
+    -- own event loader on its quiet path (eventscr.c LoadUnit_800F704(def, 1, TRUE, 0), as
+    -- EventScr's quiet load calls it, :2264: LoadUnit, the difficulty's bonus levels, the last
+    -- REDA tile at once by MoveUnitExt). One arrival at a time on the board as it stands: each
+    -- is read (M.arrivalOf) and its slot emptied before the next. All in ONE sandbox at the top
+    -- level, which loads the whole state back after (RAM, RNG, the sprites it refreshed).
+    -- -> { { charId, x, y, eventTurn, boardTurn, classId, level, items, mov, reach, words } },
+    -- x and y where the loader leaves it. An ESTIMATE: its stats are one draw of the game's
+    -- RNG (GetAutoleveledStatIncrease, bmbattle.c:1241), not the draw it will make; a single
+    -- spawn (LOADSINGLEUNIT) has no definition and is not built, nor a load that finds no free
+    -- red slot (the loader would read a NULL unit). Read once a sight, never inside a sandbox
+    -- (asserted: a nested one does not undo the loader's writes): botrun reads it at each
+    -- fog chapter's player phase, with no plan's sandbox open.
+    local arrivalUnits
+    function s.arrivalUnits()
+        if arrivalUnits then return arrivalUnits end
+        assert(not open(), "sight.arrivalUnits inside a sandbox: botrun reads it at the phase start")
+        assert(S.LoadUnit_800F704, "sight.arrivalUnits: symbols.lua lacks LoadUnit_800F704 (run gen_symbols.py)")
+        local wanted = {}
+        for _, a in ipairs(s.scriptedUnits().arrivals) do
+            if a.def and a.red then wanted[#wanted + 1] = a end
+        end
+        arrivalUnits = sandbox(function(call)
+            local out = {}
+            for _, a in ipairs(wanted) do
+                local free = freeRed()
+                if #free > 0 then
+                    call(S.LoadUnit_800F704, { a.def, 1, 1, 0 })
+                    for _, f in ipairs(free) do
+                        if mem.u32(f.addr) ~= 0 then
+                            local o = M.arrivalOf(mem, S, Board, f.id)
+                            o.eventTurn, o.boardTurn = a.eventTurn, a.boardTurn
+                            out[#out + 1] = o
+                            api.write32(f.addr, 0)   -- the slot free again for the next
+                            call(S.RefreshEntityBmMaps, {})
+                            break
+                        end
+                    end
+                end
+            end
+            return out
+        end)
+        return arrivalUnits
     end
 
     return s

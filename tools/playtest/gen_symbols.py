@@ -288,6 +288,7 @@ WANTED = [
     # An enemy's decision: the enemy phase's per-unit setup and its decision itself (cp_decide.c
     # CpDecide_Main's loop body, AiDecideMain).
     'RefreshEntityBmMaps',      # the unit, fog and hidden maps, rebuilt from the unit structs
+    'LoadUnit_800F704',         # the event engine's unit load: LoadUnit, difficulty levels, REDA tile (eventscr.c)
     'AiDecideMain',             # the AI's whole decision for the active unit: scripts A and B
     'AiUpdateNoMoveFlag',       # sets AI_FLAG_STAY from the unit's ai_config
     'AiInitDangerMap',          # the AI's danger map, which its tile choice reads

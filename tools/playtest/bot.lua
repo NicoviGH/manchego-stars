@@ -489,18 +489,92 @@ function M.useCharge(price, least, most, rare)
     return price - least
 end
 
--- The fog read (#510 PR A, plan comment 6779357154 step 4): ground the fog hides may hide what
--- strikes a unit beside it, and the judged phase plays only the enemies in sight. A unit on
--- (x, y) within FOG_REACH of an unseen tile meets one strike from the strongest enemy seen so
--- far, stood on the nearest unseen tile no other unit stands on (sight.strike's `from`: the
--- game's AI choosing from there, the unit its one target; a tile another hidden unit holds would
--- put two units on one cell of the map, while the enemy's own tile is where it stands). Seen so far is `seen` (unit slot -> charId, botrun's: every red a
--- board showed out of fog this attempt), else the enemies in sight; of each class and kit the
--- highest level is asked. -> { die(u, x, y, hp): the chance that strike kills `u` at `hp`, 0
--- with no free unseen tile in reach or no enemy seen; unseen: every tile the fog hides }. Its
--- strikes are memoised for the decision.
+-- The fog read (#510 PR A, plan comment 6779357154 step 4; #713 fix 3, ADR 0456): ground the
+-- fog hides may hide what strikes a unit beside it, and the judged phase plays only the enemies
+-- in sight (and the ghosts and remembered ones). A unit on (x, y) meets, summed (sight.odds of
+-- every strike's damage together):
+--   * one strike from the strongest enemy seen so far, stood on the nearest unseen tile within
+--     FOG_REACH no other unit stands on (sight.strike's `from`: the game's AI choosing from
+--     there, the unit its one target; a tile another hidden unit holds would put two units on
+--     one cell of the map, while the enemy's own tile is where it stands). Seen so far is
+--     `seen` (unit slot -> charId, botrun's: every red a board showed out of fog this attempt),
+--     else the enemies in sight; of each class and kit the highest level is asked;
+--   * one strike from each arrival the game's turn events bring on that no one has seen
+--     (M.unseenArrivals over sight.arrivalUnits: each as the game loads it), stood where its
+--     moves since it arrived could have taken it unseen (M.arrivalFrom). This is what a player
+--     knows of a wave: the chapter brings it, not where it went.
+-- -> { die(u, x, y, hp): the chance those strikes kill `u` at `hp`, 0 with none in reach;
+-- unseen: every tile the fog hides }. Its strikes are memoised for the decision.
 -- A sight's odds (sight.odds), or none where a sight carries no odds (a test's bare board).
 local function oddsOf(sight) return sight.odds or function() return 0 end end
+
+-- The arrivals of `arrivals` (sight.arrivalUnits') a player has not seen by `turn` (#713 fix 3,
+-- ADR 0456): each matched, by character and arrival turn (`arrivalOf`, sight.arrivalOf: the
+-- turn botrun stamped it on the board), to a red unit of `board` not matched before. A matched
+-- one is kept while it lives on the field unseen: not in `seen` (botrun's sightings; nil: the
+-- units in sight) and not known (`knows`, sight.knows: a retry remembers it). An unmatched one
+-- is kept when its event runs by this turn's enemy phase and it is not yet on the board
+-- (eventTurn <= turn < boardTurn); one that should be on the board and is not never came (the
+-- event's guard held it) or is gone. -> { { a = arrival, unit = the matched unit or nil } }
+function M.unseenArrivals(arrivals, board, turn, seen, knows, arrivalOf)
+    local onBoard = {}
+    for _, u in ipairs(board.units) do
+        local t = u.faction == "red" and arrivalOf and arrivalOf(u)
+        if t and t > 0 then
+            local k = u.charId .. "@" .. t
+            onBoard[k] = onBoard[k] or {}
+            table.insert(onBoard[k], u)
+        end
+    end
+    local out = {}
+    for _, a in ipairs(arrivals or {}) do
+        if a.eventTurn <= turn then
+            local list = onBoard[a.charId .. "@" .. a.boardTurn]
+            local u = list and table.remove(list, 1)
+            if u then
+                local unseen = u.onField and not u.dead
+                    and not (seen and seen[u.id] == u.charId or not seen and not u.fogged)
+                    and not (knows and knows(u))
+                if unseen then out[#out + 1] = { a = a, unit = u } end
+            elseif a.boardTurn > turn then
+                out[#out + 1] = { a = a }
+            end
+        end
+    end
+    return out
+end
+
+-- Where arrival `a` (M.unseenArrivals' entry's) may stand at the enemy phase of `turn`, unseen,
+-- to strike (x, y) from (#713 fix 3, ADR 0456): on its load tile when it arrives this phase (it
+-- acts the phase it comes: eventTurn = turn; none when another unit, `x, y` or an earlier stand-in
+-- holds it: the loader would move it, unread); else the unseen tile `unseen` nearest (x, y) that
+-- its moves since could reach, (turn - eventTurn) x its MOV from the load tile (Manhattan: no
+-- terrain, an over-read), and no unit but its own holds (`held`, tile key -> unit id; `used`, the
+-- tiles this read stood another arrival on). nil when it cannot strike (x, y) from there (more
+-- than MOV + reach away) or no such tile is left.
+function M.arrivalFrom(a, unit, turn, x, y, unseen, held, used)
+    local from
+    local moves = turn - a.eventTurn
+    local own = unit and unit.id
+    if moves <= 0 then
+        local k = tileKey(a.x, a.y)
+        if used[k] or (held[k] and held[k] ~= own) or (a.x == x and a.y == y) then return nil end
+        from = { x = a.x, y = a.y }
+    else
+        local near
+        for _, t in ipairs(unseen) do
+            local k = tileKey(t.x, t.y)
+            local by = held[k]
+            if not used[k] and (not by or by == own)
+                    and manhattan(t.x, t.y, a.x, a.y) <= moves * a.mov then
+                local d = manhattan(t.x, t.y, x, y)
+                if not near or d < near then from, near = t, d end
+            end
+        end
+    end
+    if not from or manhattan(from.x, from.y, x, y) > a.mov + a.reach then return nil end
+    return from
+end
 
 function M.fogRead(board, sight, seen)
     local unseen = sight.unseen and sight.unseen() or {}
@@ -526,15 +600,30 @@ function M.fogRead(board, sight, seen)
             end
         end
     end
+    local arrivals = {}
+    if #unseen > 0 and sight.strike and sight.arrivalUnits then
+        arrivals = M.unseenArrivals(sight.arrivalUnits(), board, board.turn, seen, sight.knows,
+                                    sight.arrivalOf)
+    end
     -- the unit on each tile, hidden ones too (board.lua reads every unit's tile)
     local held = {}
     for _, u in ipairs(board.units) do
         if u.onField and not u.dead then held[tileKey(u.x, u.y)] = u.id end
     end
     local odds = oddsOf(sight)
+    local function struck(u, x, y, e, key, from)
+        local k = u.id .. "@" .. x .. "," .. y .. "/" .. key .. "<" .. from.x .. "," .. from.y
+        local f = memo[k]
+        if not f then
+            f = sight.strike(u, e, x, y, nil, from)
+            memo[k] = f
+        end
+        return f.takenDist
+    end
     local function die(u, x, y, hp)
-        if #reps == 0 or hp <= 0 then return 0 end
-        local worst = 0
+        if hp <= 0 then return 0 end
+        -- the strongest seen kit's strike, the one most likely to kill alone
+        local worst, worstDist, worstEdge = 0, nil, nil
         for _, e in ipairs(reps) do
             -- the nearest unseen tile in reach that no unit but `e` itself holds
             local edge, near
@@ -546,16 +635,24 @@ function M.fogRead(board, sight, seen)
                 end
             end
             if edge then
-                local k = u.id .. "@" .. x .. "," .. y .. "/" .. e.id
-                local f = memo[k]
-                if not f then
-                    f = sight.strike(u, e, x, y, nil, edge)
-                    memo[k] = f
-                end
-                worst = math.max(worst, (odds({ f.takenDist }, hp)))
+                local dist = struck(u, x, y, e, e.id, edge)
+                local p = odds({ dist }, hp)
+                if not worstDist or p > worst then worst, worstDist, worstEdge = p, dist, edge end
             end
         end
-        return worst
+        local dists = { worstDist }
+        -- a tile one enemy is stood on for this read holds no other
+        local used = {}
+        if worstEdge then used[tileKey(worstEdge.x, worstEdge.y)] = true end
+        for i, p in ipairs(arrivals) do
+            local from = M.arrivalFrom(p.a, p.unit, board.turn, x, y, unseen, held, used)
+            if from then
+                used[tileKey(from.x, from.y)] = true
+                dists[#dists + 1] = struck(u, x, y, p.a, "arrival" .. i, from)
+            end
+        end
+        if #dists == 0 then return 0 end
+        return (odds(dists, hp))
     end
     return { die = die, unseen = unseen }
 end

@@ -950,19 +950,26 @@ end
 -- Every enemy decision keeps the AI bytes first (the tests above prove only the helpers): read
 -- off the source, aiDecide calls Sight.keepAi before its first write, nothing else does, and
 -- every call of aiDecide hands it the board's units. And every map refresh in a sandbox keeps
--- the fog bits: RefreshEntityBmMaps is called from Sight.refresh, from fullInfo (the outermost
--- sandbox, whose load undoes it) and in aiDecide's call list, after its keepMaps.
+-- the fog bits: RefreshEntityBmMaps is called from Sight.refresh, from fullInfo and
+-- s.arrivalUnits (each the outermost sandbox, whose load undoes it) and in aiDecide's call list,
+-- after its keepMaps.
 do
     local src = sightSrc
     local _, refreshes = src:gsub("\n[^\n-]*S%.RefreshEntityBmMaps", "")
-    check(refreshes, 3, "refresh: RefreshEntityBmMaps is called from refresh, fullInfo and "
-          .. "a decision's calls (decisionCalls, aiDecide's) alone")
+    check(refreshes, 4, "refresh: RefreshEntityBmMaps is called from refresh, fullInfo, "
+          .. "arrivalUnits and a decision's calls (decisionCalls, aiDecide's) alone")
+    -- arrivalUnits' sandbox is the outermost: it refuses to run inside one
+    local at = src:find("function s.arrivalUnits(", 1, true)
+    local body = at and src:sub(at, src:find("\n    end\n", at, true) or #src)
+    check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil
+          and body:find("assert(not open()", 1, true) ~= nil, true,
+          "refresh: s.arrivalUnits holds one, outside every sandbox")
     for _, name in ipairs({ "function M.refresh(", "function M.fullInfo(",
                             "function M.decisionCalls(" }) do
         local at = src:find(name, 1, true)
         local body = at and src:sub(at, src:find("\nend\n", at, true) or #src)
         check(body ~= nil and body:find("S.RefreshEntityBmMaps", 1, true) ~= nil, true,
-              "refresh: " .. name .. " holds one of the three calls")
+              "refresh: " .. name .. " holds one of the calls")
     end
     local at = src:find("local function aiDecide(call, proc, e, all, before, starts, tileOnly)", 1, true)
     local body = at and src:sub(at, src:find("\n    end\n", at, true))
@@ -1659,6 +1666,14 @@ do
     m.w16(EV + 28, 0x0120)
     local fx = Sight.scriptEffects(m, EV)
     check(loaded(fx), "E@9,3 40@1,2 33@4,5", "scriptEffects: slot 2 through a CALL, then a single spawn")
+    -- a LOAD1-3 load names its definition and whether it is red (+3 bits 1-2 = 2, #713 fix 3);
+    -- a single spawn has no definition
+    m.w8(ARR + 0x14 + 3, (2 << 1) | 1)   -- the second unit red, autolevel set
+    fx = Sight.scriptEffects(m, EV)
+    check(string.format("%X %s %X %s %s", fx.loads[1].def, tostring(fx.loads[1].red),
+                        fx.loads[2].def, tostring(fx.loads[2].red), tostring(fx.loads[3].def)),
+          string.format("%X false %X true nil", ARR, ARR + 0x14),
+          "scriptEffects: a load's definition and side")
     check(table.concat(fx.removals, ","), "18", "scriptEffects: a DISA is a removal")
     m.w16(EV + 24, 0x342D)   -- KILL
     check(Sight.scriptEffects(m, EV).removals[1], 0x12, "scriptEffects: a KILL is one too")
@@ -1743,6 +1758,53 @@ do
         { turn = 6, boardTurn = 6, loads = { { charId = 0x40, x = 1, y = 1 } }, removals = {} },
     })
     check(g.removals[0x40], nil, "foldScripted: a removal ordered before the arrival is none")
+    -- an arrival keeps its load's definition and side, and the turn its event runs on (#713
+    -- fix 3): a red-phase event of turn 4 is on the board on turn 5, and acts on turn 4
+    local h = Sight.foldScripted({
+        { turn = 5, boardTurn = 5, eventTurn = 4,
+          loads = { { charId = 0xA0, x = 3, y = 4, def = 0x08123400, red = true } }, removals = {} },
+    })
+    local a = h.arrivals[1]
+    check(string.format("%d %d %X %s", a.boardTurn, a.eventTurn, a.def, tostring(a.red)),
+          "5 4 8123400 true", "foldScripted: an arrival's event turn, definition and side")
+end
+
+-- arrivalOf / standIn (#713 fix 3, ADR 0456): the unit the game's loader left in a red slot is
+-- read as the board reads a unit, with its MOV and longest weapon reach, and its words; loaded
+-- back into another free slot it is the same unit under that slot's index, and the sandbox's
+-- journal (api writes only) empties the slot again.
+do
+    local m = fakeMem()
+    local SYM = { gUnitArrayBlue = 0x0202BE4C, gUnitArrayRed = 0x0202CFBC,
+                  gUnitArrayGreen = 0x0202DDCC, gItemData = 0x08840000 }
+    local B = Board.bind(m, SYM)
+    local addr = SYM.gUnitArrayRed + 3 * Board.UNIT_SIZE   -- slot 3: id 0x84
+    local CHAR, CLASS = 0x08801000, 0x08807000
+    m.w32(addr, CHAR); m.w8(CHAR + 4, 0xA0)
+    m.w32(addr + 4, CLASS); m.w8(CLASS + 4, 0x2A); m.w8(CLASS + 0x12, 6)
+    m.w8(addr + 8, 12); m.w8(addr + 0x0B, 0x84); m.w8(addr + 0x1D, 0xFF)   -- level 12, movBonus -1
+    m.w8(addr + 0x10, 7); m.w8(addr + 0x11, 9); m.w8(addr + 0x13, 30)
+    local function weapon(id, min, max)
+        local d = SYM.gItemData + id * Board.ITEMDATA_STRIDE
+        m.w32(d + 0x08, 1); m.w8(d + 0x19, (min << 4) | max)
+    end
+    weapon(0x2D, 2, 2); weapon(0x01, 1, 1)
+    m.w16(addr + Board.UNIT_ITEMS, 0x2D | (20 << 8)); m.w16(addr + Board.UNIT_ITEMS + 2, 0x01 | (30 << 8))
+    local a = Sight.arrivalOf(m, SYM, B, 0x84)
+    check(string.format("%X %X %d %d %d %d,%d %d", a.charId, a.classId, a.level, a.mov, a.reach,
+                        a.x, a.y, #a.words),
+          "A0 2A 12 5 2 7,9 36", "arrivalOf: the board's read, MOV with its bonus, the longest reach")
+    -- loaded into slot 0x90 through api writes, undone in reverse
+    local journal = {}
+    local api = { write8 = function(at, v) journal[#journal + 1] = { at, m.u8(at), m.w8 }; m.w8(at, v) end,
+                  write16 = function(at, v) journal[#journal + 1] = { at, m.u16(at), m.w16 }; m.w16(at, v) end }
+    local to = SYM.gUnitArrayRed + 0x0F * Board.UNIT_SIZE
+    Sight.standIn(api, { id = 0x90, addr = to, words = a.words })
+    local b = Sight.arrivalOf(m, SYM, B, 0x90)
+    check(string.format("%X %X %X %d %d,%d", b.id, b.charId, b.classId, b.level, b.x, b.y), "90 A0 2A 12 7,9",
+          "standIn: the arrival in the free slot, under its index")
+    for k = #journal, 1, -1 do journal[k][3](journal[k][1], journal[k][2]) end
+    check(m.u32(to), 0, "standIn: the journal empties the slot again")
 end
 
 -- stayedPut / takeSecondLook (#724): Ch13's Cormag stands in the peaks at (2,13) and, with our units

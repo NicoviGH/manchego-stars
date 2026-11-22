@@ -490,6 +490,10 @@ local function sightOf(o)
             return own and own(u, e, x, y, slot)
         end
     end
+    -- the arrivals the turn events bring (sight.arrivalUnits) and the turn botrun stamped each
+    -- red unit on (sight.arrivalOf): o.arrivals, o.arrivedOn[id]
+    if o.arrivals then s.arrivalUnits = function() return o.arrivals end end
+    if o.arrivedOn then s.arrivalOf = function(u) return o.arrivedOn[u.id] end end
     if o.maxHp then
         s.maxHps = function(units)
             for _, u in ipairs(units) do u.maxhp = o.maxHp[u.id] or u.maxhp end
@@ -7766,6 +7770,67 @@ do
     B.fogRead(boardOf(A, X, Z), s, { [0x81] = 0x81, [0x84] = 0x84 }).die(A, 0, 0, 20)
     table.sort(asked)
     check(table.concat(asked, " "), "81<3,0 84<2,0", "fog read: an enemy's own tile is free to it")
+end
+
+-- test_the_fog_read_sums_the_unseen_arrivals (#713 fix 3, ADR 0456): two arrivals no one has
+-- seen, each of whose strikes A outlives, kill it together. A seen arrival is the judged
+-- phase's, not the fog read's; one too far to have come is none; one arriving this enemy phase
+-- strikes from its load tile.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 20 })
+    local function arrival(charId, x, y, eventTurn, boardTurn)
+        return { charId = charId, x = x, y = y, eventTurn = eventTurn, boardTurn = boardTurn,
+                 mov = 5, reach = 1, words = { 0 } }
+    end
+    local asked = {}
+    local function sight(arrivals, arrivedOn)
+        return sightOf({
+            unseen = { { x = 3, y = 0 }, { x = 4, y = 0 }, { x = 9, y = 9 } },
+            arrivals = arrivals, arrivedOn = arrivedOn,
+            fogStrike = function(u, e, x, y, fx, fy)
+                asked[#asked + 1] = string.format("%X<%d,%d", e.charId or e.id, fx, fy)
+                return { takenDist = { [12] = 1 } }   -- 12 of A's 20: one outlived, two not
+            end,
+        })
+    end
+    -- turn 3; both came on turn 2 (a blue-phase event): on the board, fogged, unseen
+    local P = red(0x81, 6, 0, { minRange = false, fogged = true, charId = 0xA0 })
+    local Q = red(0x82, 7, 0, { minRange = false, fogged = true, charId = 0xA1 })
+    local board = boardOf(A, P, Q)
+    board.turn = 3
+    local both = { arrival(0xA0, 8, 0, 2, 2), arrival(0xA1, 8, 0, 2, 2) }
+    local stamps = { [0x81] = 2, [0x82] = 2 }
+    local die = B.fogRead(board, sight(both, stamps), {}).die(A, 0, 0, 20)
+    check(die, 1, "fog read: two unseen arrivals' strikes together kill A")
+    check(table.concat(asked, " "), "A0<3,0 A1<4,0", "fog read: each on its own unseen tile, the nearest first")
+    asked = {}
+    check(B.fogRead(board, sight({ both[1] }, stamps), {}).die(A, 0, 0, 20), 0,
+          "fog read: one arrival's strike alone leaves A alive")
+    -- P seen this attempt: it is the seen kit's strike (ADR 0400), never an arrival's too
+    asked = {}
+    B.fogRead(board, sight(both, stamps), { [0x81] = 0xA0 }).die(A, 0, 0, 20)
+    check(table.concat(asked, " "), "A0<3,0 A1<4,0", "fog read: a seen arrival is no unseen one")
+    -- an arrival that cannot have come within reach: loaded at (14,9) on turn 2, MOV 5
+    asked = {}
+    local far = { arrival(0xA0, 14, 9, 2, 2) }
+    local P2 = red(0x81, 14, 9, { minRange = false, fogged = true, charId = 0xA0 })
+    local b2 = boardOf(A, P2)
+    b2.turn = 3
+    check(B.fogRead(b2, sight(far, { [0x81] = 2 }), {}).die(A, 0, 0, 20), 0,
+          "fog read: an arrival too far to reach A is none")
+    check(#asked, 0, "fog read: and it is not asked")
+    -- an arrival whose red-phase event runs this turn (not yet on the board) strikes from its tile
+    asked = {}
+    local now = { arrival(0xA2, 1, 1, 3, 4) }
+    local b3 = boardOf(A)
+    b3.turn = 3
+    B.fogRead(b3, sight(now, {}), {}).die(A, 0, 0, 20)
+    check(table.concat(asked, " "), "A2<1,1", "fog read: this phase's arrival strikes from its load tile")
+    -- and an event of a later turn brings nothing yet
+    asked = {}
+    b3.turn = 2
+    B.fogRead(b3, sight(now, {}), {}).die(A, 0, 0, 20)
+    check(#asked, 0, "fog read: a later turn's arrival is none yet")
 end
 
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the

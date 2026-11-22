@@ -57,7 +57,8 @@ in `value`, where admission never read it.
 **The read.** `Bot.fogRead`: a unit ending within `FOG_REACH` (6) of an unseen tile meets one
 strike from the strongest enemy seen so far this attempt (`opts.seen`, botrun's: every red a
 board showed out of fog), stood on the nearest unseen tile; `sight.fogStrike` asks the game's AI
-from there, the unit its one target. `W.fog` is gone. Under fog the units the read threatens
+from there, the unit its one target. `W.fog` is gone. (Amended by ADR 0456, 2026-11-23: the strikes of the
+chapter's arrivals no one has seen are summed with it.) Under fog the units the read threatens
 move last, so what a sturdier unit reveals is planned around on the replan.
 
 **The call (Nicolas, after four witnesses).** The read is a rank key, `fog` (`M.outranks`): the
