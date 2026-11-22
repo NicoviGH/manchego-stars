@@ -10234,6 +10234,76 @@ do
     check(a and a.act, "wait", "owed: the plan played does not strike the owed recruit")
 end
 
+-- The review's gaps on the owed recruit (#730 fix 2, ADR 0452).
+do
+    local owed = { owedRecruits = { [0x81] = true } }
+    local function loose(R, talk)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local o = { reach = { [0x01] = tiles({ 0, 0 }) } }
+        if talk then o.talk = { [0x01] = { [0x81] = true } } end
+        local _, ctx = B.candidates(boardOf(A, R), sightOf(o), style("bold"), owed)
+        local ids, rec = {}, {}
+        for id in pairs(ctx.looseRecruits) do ids[#ids + 1] = id end
+        for id in pairs(ctx.recruits) do rec[#rec + 1] = id end
+        return table.concat(ids, ",") .. "|" .. table.concat(rec, ",")
+    end
+    -- who is loose: a red, seen, owed unit no one may Talk; never a green, a fogged one, or one
+    -- the game does not owe; and never a talker recruit, which stays the march's (#730 review 7)
+    check(loose(red(0x81, 5, 5, { minRange = false })), "129|", "loose: an owed red no one may Talk")
+    check(loose(unit({ id = 0x81, slot = 0, x = 5, y = 5, faction = "green", minRange = false })), "|",
+          "loose: a green owed unit is no one to spare")
+    check(loose(red(0x81, 5, 5, { minRange = false, fogged = true })), "|",
+          "loose: a fogged owed red is not on the player's board")
+    check(loose(red(0x82, 5, 5, { minRange = false })), "|", "loose: a red the game does not owe")
+    check(loose(red(0x81, 5, 5, { minRange = false }), true), "|129",
+          "loose: with a talker it is a talker recruit, not loose (the march stands beside only that)")
+
+    -- the win: the Rout's last red is the owed recruit; the plan that kills it ends the chapter
+    -- and is played, not a hold the forfeit would make (a row with no taker never releases)
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }) },
+                fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1,
+                                                            killsTarget = true } } } } }
+    local a, plan = Planner.plan(B, boardOf(A, R), sightOf(o), gifted("bold", 10000), owed)
+    check((a and a.act) .. " " .. #(plan and plan.forfeited or { 1 }), "attack 0",
+          "owed: a kill that ends the chapter forfeits nothing, and is played")
+
+    -- progress credit: a loose red is worn down like any red (only a talker recruit's damage
+    -- earns nothing): A may chip R, 30 HP, and does
+    R = red(0x81, 1, 0, { hp = 30, minRange = false })
+    local Y = red(0x82, 9, 9, { hp = 20, minRange = false })
+    o = { reach = { [0x01] = tiles({ 0, 0 }) },
+          fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 5, hits = 1 } } } } }
+    a = Planner.plan(B, boardOf(A, R, Y), sightOf(o), gifted("bold", 10000), owed)
+    local _, chip = Planner.plan(B, boardOf(A, R, Y), sightOf(o), gifted("bold", 10000), owed)
+    local _, plain = Planner.plan(B, boardOf(A, R, Y), sightOf(o), gifted("bold", 10000))
+    check(a and a.act, "attack", "owed: a loose red is struck")
+    check(math.abs(chip.judged - plain.judged) < 1e-9 and chip.judged > plain.judged - 1e-9, true,
+          "owed: a loose red keeps the credit of damage, as any red (a talker recruit's earns none)")
+
+    -- the value: two plans that both forfeit are ordered by the chance the recruit falls, a
+    -- death's worth of it, by the combination a talker recruit's goal uses
+    local function judgedWith(felled)
+        local board, so = counterKillsRecruit(true)
+        so.talk = nil
+        so.enemyPhase = function()
+            return { { enemy = 0x81, target = 0x01, takenHit = 0, takenDmg = 0, takenHits = 1,
+                       takenCrit = 0, targetHp = 20, felled = felled } }
+        end
+        local _, p = Planner.plan(B, board, sightOf(so), gifted("bold", 10000), owed)
+        return p
+    end
+    local whole, half, none = judgedWith(1), judgedWith(0.5), judgedWith(0)
+    check(table.concat(whole.forfeited, ",") .. " " .. table.concat(half.forfeited, ","),
+          "owed:129 owed:129", "owed: any chance past DUST forfeits")
+    check(#none.forfeited, 0, "owed: a counter that fells nothing forfeits nothing (the enemy's own blows cost it nothing)")
+    check(math.abs((half.judged - whole.judged) - 0.5 * Planner.WEIGHTS.bold.death) < 1e-6, true,
+          "owed: equal forfeits order by the chance, a death's worth of it")
+    check(math.abs((none.judged - whole.judged) - Planner.WEIGHTS.bold.death) < 1e-6, true,
+          "owed: the chance spared is a whole death's worth")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

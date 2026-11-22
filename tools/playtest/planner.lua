@@ -93,13 +93,14 @@
 -- chances) },
 -- rank = what plans are compared by (M.outranks): { admitted, idle (opts.idle only: 1 for a plan
 -- that does not advance the level, 0 for one that does; ADR 0439),
--- forfeits (how many ledger goals it closes for good), complete (its chance to end the
+-- forfeits (how many ledger goals it closes for good, and owed recruits no one may Talk yet it
+-- risks: Goals.forfeited), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
 -- chance), value (the judged score), game_over (the chance a unit whose death ends the game
 -- dies), max_exceed, sum_exceed, max_die, sum_die, hp_left, fog (the fog read's summed
 -- chance to kill, where the chapter goes on), key }, forfeited = the ids it
--- closes, ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
+-- closes (a row's, or "owed:<unit id>"), ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
 -- seizeJudged / seizeAdmitted = whether any plan judged took the Seize, and one within the
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
@@ -353,6 +354,19 @@ local function exposed(act, hp, gone, odds)
     return odds(strikes, hp)
 end
 
+-- The keys of a set in one order every run (a key may be a number or a string: numbers by value,
+-- else by their text). The one owner of the sorted-set walks the judge's records and the change
+-- key use, so a record logged as JSON and a memo key come out the same each time.
+local function sortedKeys(set)
+    local ks = {}
+    for k in pairs(set) do ks[#ks + 1] = k end
+    table.sort(ks, function(a, b)
+        if type(a) == type(b) then return a < b end
+        return tostring(a) < tostring(b)
+    end)
+    return ks
+end
+
 -- What losing unit `charId` costs: the chapter, for one whose death ends the game (its death
 -- sets EVFLAG_GAMEOVER, a lord's: sight.objective.gameOver), else one unit's death.
 local function loss(W, st, charId)
@@ -431,6 +445,8 @@ local function score(act, st, W, style, odds)
         -- design decision 5)
         local hp = st.enemyHp[e.id] or e.hp
         local kill, dealt = odds({ f.dealt }, hp)
+        -- an owed unit no one may Talk yet keeps every credit of a red; only its death is priced
+        if st.loose[e.id] then fx.recruitHit = { id = e.id, p = kill } end
         if st.recruits[e.id] then
             -- a recruit is talked over, not worn down: its damage earns nothing, and its death
             -- is its goal lost (the goals' term reads fx.recruitHit)
@@ -900,7 +916,7 @@ function M.plan(Bot, board, sight, style, opts)
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
                     fought = {}, healed = {}, healOf = healOf,
                     walls = {}, opened = {}, objective = objective, winBoss = winBoss,
-                    recruits = ctx.recruits or {},
+                    recruits = ctx.recruits or {}, loose = ctx.looseRecruits or {},
                     gameOver = gameOver, kill = {}, carry = {}, wear = {}, redWear = {} }
     -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
     -- { x, y } once dropped (score's fx.carry, fx.drop); the board's carries to start
@@ -1140,6 +1156,12 @@ function M.plan(Bot, board, sight, style, opts)
         end
         return false, false
     end
+    -- A goal's chance after the plan's blows on its recruit: our attack's (recruitHit) and our counter's
+    -- (felled), each a chance the recruit is gone. The one combination a talker recruit's goal
+    -- and a loose recruit's death both use (#730 fix 2, ADR 0452).
+    local function sparedOf(st, felled, id, c)
+        return c * (1 - (st.recruitHit[id] or 0)) * (1 - (felled and felled[id] or 0))
+    end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
         local read = turnsOn(st, pos)
@@ -1153,8 +1175,7 @@ function M.plan(Bot, board, sight, style, opts)
             else
                 c = chanceOf(st, g, pos, read) * (1 - pWin)
                 if g.kind == "recruit" then
-                    c = c * (1 - (st.recruitHit[g.unitId] or 0))
-                        * (1 - (felled and felled[g.unitId] or 0))
+                    c = sparedOf(st, felled, g.unitId, c)
                 end
             end
             v = v + Goals.worth(g, W) * (c - before[g.id])
@@ -1163,6 +1184,13 @@ function M.plan(Bot, board, sight, style, opts)
                                     worth = Goals.worth(g, W), before = before[g.id], after = c,
                                     closes = g.closes }
             end
+        end
+        -- an owed recruit no one may Talk yet has no goal, but its death costs what a talker
+        -- recruit's does: a death's worth of the chance it is gone, by the same combination. Its
+        -- reach is whole (1: nothing to reach, no one can Talk it yet), so the chance it stays is
+        -- the win's discount and the blows' (#730 fix 2, ADR 0452)
+        for _, id in ipairs(sortedKeys(st.loose)) do
+            v = v + W.death * (sparedOf(st, felled, id, 1 - pWin) - 1)
         end
         -- the win now rather than a turn later: one death's worth x (1 - GAMMA). With nothing
         -- left to get, a unit beside the boss whose way there is already sure would otherwise
@@ -1241,7 +1269,7 @@ function M.plan(Bot, board, sight, style, opts)
                 -- walk to Ross never reached the beam, and Ross died on turn 4)
                 local alone = { acts = { a }, took = fx.took and { [fx.took] = true } or {},
                                 recruitHit = fx.recruitHit and { [fx.recruitHit.id] = fx.recruitHit.p } or {},
-                                win = fx.win or 0, gone = gone }
+                                win = fx.win or 0, gone = gone, loose = start.loose }
                 scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, gone) + goalTerm(alone) }
                 a.own = scored[#scored].v   -- the advance's tie-break
             end
@@ -1294,12 +1322,6 @@ function M.plan(Bot, board, sight, style, opts)
     -- changed one (botrun's DIAG `relisted` says so), and a sight without the read (test fakes)
     -- has none: both keep the board's menus.
     local relisted = {}
-    local function sorted(set)
-        local ks = {}
-        for k in pairs(set) do ks[#ks + 1] = tostring(k) end
-        table.sort(ks)
-        return ks
-    end
     -- The enemies a plan's changes count dead: the reds of its `gone` (a Talk's recruit is one
     -- too, red until it joins); the board's units are looked up here for both menusFor and
     -- extend's key.
@@ -1315,7 +1337,7 @@ function M.plan(Bot, board, sight, style, opts)
     local function changeKeyOf(opened, gone)
         local dead = deadReds(gone)
         if next(opened) == nil and next(dead) == nil then return nil end
-        return table.concat(sorted(opened), ";") .. "|" .. table.concat(sorted(dead), ";")
+        return table.concat(sortedKeys(opened), ";") .. "|" .. table.concat(sortedKeys(dead), ";")
     end
     local function menusFor(st)
         if offer or not sight.changed or not st.changeKey then return menus end
@@ -1459,7 +1481,7 @@ function M.plan(Bot, board, sight, style, opts)
                     recruitHit = copy(st.recruitHit), win = st.win, bossWant = st.bossWant,
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
                     opened = copy(st.opened), objective = objective, winBoss = winBoss,
-                    recruits = st.recruits,
+                    recruits = st.recruits, loose = st.loose,
                     gameOver = st.gameOver,
                     kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
                     redWear = copy(st.redWear), changeKey = st.changeKey, healOf = st.healOf }
@@ -2221,7 +2243,7 @@ function M.plan(Bot, board, sight, style, opts)
                 if s.berserk and strikers[s.enemy] then
                     strikers[s.enemy][s.target] = true
                 end
-                if st.recruits[s.enemy] then
+                if st.recruits[s.enemy] or st.loose[s.enemy] then
                     felled[s.enemy] = (felled[s.enemy] or 0) + o.p * (s.felled or 0)
                     struckBy[s.enemy] = struckBy[s.enemy] or {}
                     struckBy[s.enemy][s.target] = true
@@ -2240,32 +2262,25 @@ function M.plan(Bot, board, sight, style, opts)
         st.predict = {}
         for _, g in ipairs(greens) do
             judged = judged - loss(W, st, g.charId) * die[g.id]
-            local by = {}   -- a list: the record is logged as JSON, whose keys are strings
-            for id in pairs(strikers[g.id]) do by[#by + 1] = id end
-            table.sort(by)
+            local by = sortedKeys(strikers[g.id])   -- a list: the record is logged as JSON
             st.predict[#st.predict + 1] = { id = g.id, charId = g.charId, x = g.x, y = g.y,
                                             hp = g.hp, die = die[g.id], taken = taken[g.id],
                                             strikes = struck[g.id], strikers = by,
                                             green = true }
         end
-        local fallen = {}   -- in id order: the judged sum and the trace are the same every run
-        for id, d in pairs(felled) do
-            if d > 0 then fallen[#fallen + 1] = id end
-        end
-        table.sort(fallen)
-        for _, id in ipairs(fallen) do
-            local d, r, hit = felled[id], byId[id], {}
-            for t in pairs(struckBy[id]) do hit[#hit + 1] = t end
-            table.sort(hit)
-            st.predict[#st.predict + 1] = { id = id, charId = r.charId, x = r.x, y = r.y,
-                                            hp = st.enemyHp[id] or r.hp, die = d, taken = 0,
-                                            strikes = 0, struck = hit, recruit = true }
+        -- in id order: the judged sum and the trace are the same every run
+        for _, id in ipairs(sortedKeys(felled)) do
+            if felled[id] > 0 then
+                local r = byId[id]
+                st.predict[#st.predict + 1] = { id = id, charId = r.charId, x = r.x, y = r.y,
+                                                hp = st.enemyHp[id] or r.hp, die = felled[id],
+                                                taken = 0, strikes = 0,
+                                                struck = sortedKeys(struckBy[id]), recruit = true }
+            end
         end
         for _, p in ipairs(planned) do
             local id = p.unit.id
-            local by = {}
-            for e in pairs(strikers[id]) do by[#by + 1] = e end
-            table.sort(by)
+            local by = sortedKeys(strikers[id])
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
                                             y = p.y, hp = p.hp, die = die[id], taken = taken[id],
                                             strikes = struck[id], strikers = by }
@@ -2282,15 +2297,6 @@ function M.plan(Bot, board, sight, style, opts)
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)
         judged = judged + st.goalNow + W.exp * learnt
-        -- an owed recruit no one may Talk yet has no goal for goalTerm to read: its death costs
-        -- the goal's own W.death here, so the plans that forfeit it alike still order by its
-        -- chance (#730 fix 2, ADR 0452; the forfeit itself is Goals.forfeited's `loose`)
-        local looseIds = {}
-        for id in pairs(ctx.looseRecruits or {}) do looseIds[#looseIds + 1] = id end
-        table.sort(looseIds)
-        for _, id in ipairs(looseIds) do
-            judged = judged - W.death * math.min(1, (st.recruitHit[id] or 0) + (felled[id] or 0))
-        end
         st.winFell, st.winStruck = fell, winStruck
         st.advances, st.woundOnly = advances(st, fell, countered)
         -- each way the phase went and its units' HP there, for the wear's later phases
@@ -2329,7 +2335,7 @@ function M.plan(Bot, board, sight, style, opts)
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost, loose = ctx.looseRecruits,
+                                                       lost = lost, loose = st.loose,
                                                        reach = reached(st),
                                                        gone = M.GONE })
         local gain = progress(st)
@@ -2716,10 +2722,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- a player unit whose counter may end the chapter (the boss striking it and dying)
         -- tries its other acts too: the beam cannot see that counter, so every plan it kept
         -- had Seth strike the boss and stand beside it (vanilla Ch5 attempt 8, turn 5)
-        local struckIds = {}
-        for id in pairs(base.winStruck or {}) do struckIds[#struckIds + 1] = id end
-        table.sort(struckIds)
-        for _, id in ipairs(struckIds) do
+        for _, id in ipairs(sortedKeys(base.winStruck or {})) do
             if menuOf[id] then risky[#risky + 1] = { id = id, die = base.winFell } end
         end
         table.sort(risky, function(x, y)
