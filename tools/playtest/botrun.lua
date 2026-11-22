@@ -1006,12 +1006,93 @@ function M.run(api)
     -- turn }; 0 for one on the field at the first board. An enemy is remembered by it
     -- (Board.memoryKey): the slot an arrival lands in is not the same between attempts
     local arrivedOn, playSight = {}, nil
-    local function sawEnemy(id, charId, classId)
+    -- the board stamp() last compared, and the red slots the game killed since: M.events sees a
+    -- slot go off the field and on again, but not one killed and refilled between two boards
+    local stampedFrom, killedSince = nil, {}
+    -- an enemy a board or a fight showed, remembered by its whole key. Its arrival is the stamp
+    -- of the unit now in its slot, which stamp() has already put there for every board read; one
+    -- that is missing (a killer that landed and fell with no board between) is stamped here as
+    -- an arrival, by the one rule (arrivalStamp), and noted as an anomaly
+    local stamping
+    local function sawEnemy(id, charId, classId, board)
         local a = arrivedOn[id]
-        local arrival = a and a.charId == charId and a.classId == classId and a.turn > 0
-            and a.turn or nil
+        if not (a and a.charId == charId and a.classId == classId) then
+            a = stamping(id, charId, classId, board or lastBoard or { turn = turn })
+            anomaly({ kind = "arrival_unstamped", turn = turn, charId = charId })
+        end
+        local arrival = a.turn > 0 and a.turn or nil
         enemiesSeen[Bot.memoryKey(id, charId, classId, arrival)] = { id = id, charId = charId,
                                                             classId = classId, arrival = arrival }
+    end
+    -- the first player turn an arrival stands on the board (arrivals_seen's boardTurn, ADR 0436's
+    -- goal holds before it): the one rule for every board it is read on. Landed in an enemy
+    -- phase where it acted: the next turn; read in an enemy phase it did not act in (a board
+    -- between the phase's acts): the next turn too; read on a player phase: this one
+    local function boardTurnOf(after, id)
+        local inPhase = actedIn and actedIn.ids[id] and actedIn.turn
+        if inPhase then return inPhase + 1, inPhase end
+        local t = after.turn or turn
+        if after.phase ~= nil and after.phase ~= "blue" then return t + 1, t end
+        return t, t
+    end
+    function stamping(id, charId, classId, after)
+        local boardTurn = boardTurnOf(after, id)
+        arrivedOn[id] = { charId = charId, classId = classId, turn = boardTurn }
+        return arrivedOn[id], boardTurn
+    end
+    -- Every red a board shows, stamped with the turn it arrived on, and each arrival noted in
+    -- the record (arrivals_seen, only as the screen showed it: ADR 0386 -- one that arrived under
+    -- fog was never seen arrive). The ONE detector of an arrival: M.events' unit that was not
+    -- on the field (an arrival or a recruit), or a slot the game killed that stands again
+    -- (a refill of the same character and class). The first board's reds were there from the
+    -- start: turn 0, whose key is the slot's.
+    local function stamp(after)
+        local from = stampedFrom
+        stampedFrom = after
+        local now, fresh, told = byId(after), {}, {}
+        if from then
+            for _, e in ipairs(M.events(from, after)) do
+                e.t = "event"
+                trace(e)
+                if e.kind == "arrive" and e.faction == "red" then fresh[e.id] = e end
+            end
+            for id in pairs(killedSince) do
+                local u = now[id]
+                if u and u.faction == "red" and u.onField and not u.dead and not fresh[id] then
+                    fresh[id] = { id = id, charId = u.charId, x = u.x, y = u.y }
+                end
+            end
+        end
+        killedSince = {}
+        for _, u in ipairs(after.units or {}) do
+            local a = arrivedOn[u.id]
+            if u.faction == "red" and u.onField and not u.dead then
+                local e = fresh[u.id]
+                if e or not a or a.charId ~= u.charId or a.classId ~= u.classId then
+                    if not e and from then
+                        anomaly({ kind = "arrival_unstamped", turn = turn, charId = u.charId })
+                    end
+                    local at, boardTurn
+                    if from then
+                        a, boardTurn = stamping(u.id, u.charId, u.classId, after)
+                    else
+                        a, boardTurn = { charId = u.charId, classId = u.classId, turn = 0 }, 0
+                        arrivedOn[u.id] = a
+                    end
+                    told[#told + 1] = { id = u.id, charId = u.charId, classId = u.classId,
+                                        turn = boardTurn }
+                    if e and not u.fogged then
+                        -- `turn`: the player phase it arrives on, or the enemy phase's own
+                        -- turn when it acted there
+                        local inPhase = actedIn and actedIn.ids[u.id] and actedIn.turn
+                        rec.arrivals_seen[#rec.arrivals_seen + 1] = {
+                            turn = inPhase or after.turn or turn, boardTurn = boardTurn,
+                            x = e.x, y = e.y, charId = e.charId }
+                    end
+                end
+            end
+        end
+        if #told > 0 and playSight and playSight.arrived then playSight.arrived(told) end
     end
     local function changes(after)
         if api.recruits and not owed then
@@ -1022,50 +1103,11 @@ function M.run(api)
                 if not party[c] then owed[#owed + 1] = c end
             end
         end
-        if lastBoard then
-            local now = byId(after)
-            for _, e in ipairs(M.events(lastBoard, after)) do
-                e.t = "event"
-                trace(e)
-                -- what a retry may remember (ADR 0386): a reinforcement's turn and tile, only
-                -- as the screen showed it -- one that arrived under fog was never seen arrive.
-                -- Its turn as a guide claim cites one: the player phase it arrives on, or the
-                -- enemy phase's own turn when it acted there (one that landed then and did not
-                -- act reads as the next turn's)
-                if e.kind == "arrive" and e.faction == "red" and not now[e.id].fogged then
-                    local inPhase = actedIn and actedIn.ids[e.id] and actedIn.turn
-                    -- boardTurn: the first player turn it stands on the board (ADR 0436's goal
-                    -- holds before it): the next one after an enemy-phase arrival, this one else
-                    rec.arrivals_seen[#rec.arrivals_seen + 1] = { turn = inPhase or after.turn or turn,
-                                                                  boardTurn = inPhase and inPhase + 1
-                                                                      or after.turn or turn,
-                                                                  x = e.x, y = e.y,
-                                                                  charId = e.charId }
-                end
-            end
-        end
-        -- every red's arrival turn, fogged or not (the board reads the unit's struct; the turn
-        -- only names it for the retry's memory, ADR 0449). As arrivals_seen's boardTurn: the
-        -- first player turn it stands on
-        local was = lastBoard and byId(lastBoard) or {}
-        for _, u in ipairs(after.units or {}) do
-            local a = arrivedOn[u.id]
-            if u.faction == "red" and u.onField and not u.dead
-                and (not (was[u.id] and was[u.id].onField)
-                     or (a and (a.charId ~= u.charId or a.classId ~= u.classId))
-                     or not a) then
-                local inPhase = lastBoard and actedIn and actedIn.ids[u.id] and actedIn.turn
-                local turn0 = lastBoard and (inPhase and inPhase + 1 or after.turn or turn) or 0
-                arrivedOn[u.id] = { charId = u.charId, classId = u.classId, turn = turn0 }
-                if playSight and playSight.arrived then
-                    playSight.arrived(u.id, u.charId, u.classId, turn0)
-                end
-            end
-        end
+        stamp(after)
         for _, u in ipairs(after.units or {}) do
             if u.faction == "red" and u.onField and not u.dead and not u.fogged then
                 seenReds[u.id] = u.charId
-                sawEnemy(u.id, u.charId, u.classId)
+                sawEnemy(u.id, u.charId, u.classId, after)
             end
         end
         lastBoard, actedIn = after, nil
@@ -1090,7 +1132,15 @@ function M.run(api)
         -- could not read, which neither fell nor left as far as anyone can say
         local seen, killed, unread = {}, {}, {}
         for _, d in ipairs(list) do seen[d.id] = d end
-        for _, k in ipairs(api.killed()) do
+        local kills = api.killed()
+        -- a red slot the game killed may stand again by the next board (a reinforcement loaded
+        -- into it): stamp() takes that for an arrival. The board after the deaths is stamped
+        -- first, so a killer that landed in the phase has its arrival before it is remembered
+        for _, k in ipairs(kills) do
+            if k.faction == "red" and not k.fault then killedSince[k.id] = true end
+        end
+        if now then stamp(now) end
+        for _, k in ipairs(kills) do
             if k.fault then
                 unread[k.id] = true
                 deathFaults[#deathFaults + 1] = { kind = "death_unread", why = k.fault,
@@ -1115,7 +1165,7 @@ function M.run(api)
                     end
                 end
                 -- a fight is on screen, fog or not: the killer is an enemy seen
-                if g.killerClass then sawEnemy(g.killerId, g.killer, g.killerClass) end
+                if g.killerClass then sawEnemy(g.killerId, g.killer, g.killerClass, now or lastBoard) end
                 rec.deaths[#rec.deaths + 1] = g
                 if g.faction == "green" and greenSeen[g.id] == g.turn then
                     -- a green lost on the turn it was first seen: the plan had one player

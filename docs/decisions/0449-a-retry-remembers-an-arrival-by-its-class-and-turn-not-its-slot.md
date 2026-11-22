@@ -18,23 +18,30 @@ On Ch19 `b640e-cs-s4003` the Sniper of slot 147 in attempt 2 was not remembered:
 Great Knight and a Warrior in attempt 1. A player does not recall "slot 147"; he recalls the
 Sniper that came on turn 7.
 
-**The rule.** An arrival (a red unit that stood off the field and then on it) is keyed by
-character, class and the turn it first stood on the board: `a:<char>:<class>:<turn>`. Two Snipers
-of one wave are one memory, as to a player. The turn is the board turn `arrivals_seen` already
-names (`boardTurn`: the next player turn after an enemy-phase landing). It is read for a fogged
-arrival too, since the key only names the unit for matching; what the bot may know of a fogged
+**The rule.** An arrival (a red unit that stood off the field and then on it, or whose slot the
+game killed and loaded again) is named by character, class and the turn it first stands on the
+board: `a:<char>:<class>:<turn>`. Two Snipers of one wave are one memory, as to a player. The
+turn is `arrivals_seen`'s `boardTurn` (ADR 0436), and it has ONE owner: `botrun`'s `stamp`, the
+detector that also writes `arrivals_seen`. It reads the turn the same way from every board: the
+turn after an enemy-phase landing, and for a board read inside an enemy phase. It stamps fogged
+arrivals too, since the key only names the unit for matching; what the bot may know of a fogged
 unit is #713 fix 1's question.
 
-**A unit on the field at the start keeps its slot key.** Every attempt loads the same start, so
-its slot is stable, and a player recalls it by where it stood, which its start slot stands for;
-keying on the start tile instead would add a tile read for nothing and break when a unit is moved
-by a start event. So its key is unchanged: `<slot>:<char>:<class>`.
+**A unit on the field at the start keeps its slot key**, `<slot>:<char>:<class>`, stamped turn 0.
+Every attempt loads the same start, so its slot is stable, and a player recalls it by where it
+stood; keying on the start tile would add a tile read for nothing.
 
-**Stored memory keeps working.** `sight.knows` tries the arrival key and then the slot key, and an
-entry written before this ADR has no `arrival`, so it is keyed by slot and still matches as it did.
-An entry with an arrival has no slot key, so it never matches by slot. Memory lives for one
-campaign's attempts (`campaign.lua`), so no stored file needs migrating.
+**The two never match each other.** `Sight.knows` asks for the key of the unit's own kind: an
+arrival's key when it has an arrival turn, the slot key when it was there at the start. So a
+memory of the start's unit in slot S does not name a later arrival in S, and a memory of an
+arrival does not name the start's unit there. A memory written before this ADR names every
+unit by slot, so a retry reading one would not know an arrival; memory lives only for one
+campaign's attempts (`campaign.lua`), so none is stored across versions and none needs reading.
 
-**Wiring.** `botrun.changes` stamps each red unit's arrival turn (0 at the first board) and tells
-the sight (`sight.arrived`); `enemies_seen` entries carry `arrival`; `campaign.lua` keeps and copies
-it into `style.memory.enemies`; `sight.knows` reads it.
+**A killer is stamped before it is remembered.** `record` stamps the board after the deaths
+before it reads a killer, so an arrival that kills on its landing turn is stored once, with its
+turn. One no board showed is stamped as an arrival and noted as an `arrival_unstamped` anomaly.
+
+**Wiring.** `stamp` tells the sight (`sight.arrived`, once per board, refreshing its reads only
+when a turn above 0 changes); `enemies_seen` entries carry `arrival`; `campaign.lua` keeps and
+copies it into `style.memory.enemies`; `sight.knows` reads it.

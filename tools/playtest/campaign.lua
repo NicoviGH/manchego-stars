@@ -29,7 +29,8 @@
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
 -- { enemies, arrivals }: every red unit a board showed out of fog and every killer a fight showed
--- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is
+-- (botrun's `enemies_seen`), each by Board.memoryKey: a unit that was there at the start by slot,
+-- character and class, an arrival by character, class and arrival turn (ADR 0449). A death is
 -- remembered through its killer: where our units stood is the play's, not the game's. An
 -- arrival is kept once per character, the latest failed attempt's sighting (ADR 0436). Never a
 -- dice result.

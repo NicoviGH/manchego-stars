@@ -131,6 +131,10 @@ DEAD_CONCEPTS = [
     # (styles drawn again), never once every style has been tried
     r'\bremembers only the (?:reinforcement )?arrival', r'\bremembers one thing\b',
     r'\bno tile, unit or outcome\b', r'\bno clean clear in all \d+ styles\b',
+    # retired by ADR 0449 (#713): an arrival is kept by character, class and arrival turn, so
+    # "by slot, character and class" alone is stale for a remembered enemy; the start unit's own
+    # wording says "a unit on the field at the start by slot"
+    r'\bby slot, character and class \(Board\.memoryKey\)', r'\bso a unit keeps its slot;',
     # retired by ADR 0388's 2026-11-11 amendment (#510, run fwd1): a missed reward no plan was
     # offered is `never_offered`; the record never knew whether a unit could reach it
     r'\bskipped from unreachable\b', r'`unreachable` \(never offered\)',

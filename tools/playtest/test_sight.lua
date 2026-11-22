@@ -1035,8 +1035,9 @@ do
     end
 end
 
--- Sight.knows (ADR 0399): a red unit is remembered by slot and character (Board.memoryKey); a
--- slot another character holds now is not; no memory, none. And every read the fog alone would
+-- Sight.knows (ADR 0399, 0449): a red unit that was there at the start is remembered by slot,
+-- character and class (Board.memoryKey); an arrival by character, class and turn; a slot
+-- another character holds now is not; no memory, none. And every read the fog alone would
 -- hide a unit from asks it: both judged phases' decides, the danger maps (the remembered tile
 -- lifted out of the fog), and keySources.
 do
@@ -1063,9 +1064,11 @@ do
           "knows: the same class on another turn is another wave")
     check(Sight.knows(Board, arrivalKeys, { id = 147, charId = 0x80, classId = SNIPER }), false,
           "knows: an arrival's entry does not match a unit that stood there at the start")
-    -- an entry kept before arrivals were keyed (no arrival) still matches by slot
-    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x80, classId = 0x0A }, 7), true,
-          "knows: an old slot-keyed entry still matches, whatever turn the unit arrived on")
+    -- and the reverse: a start unit's slot entry is not an arrival that took the slot (#713)
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x80, classId = 0x0A }, 7), false,
+          "knows: a start unit's slot entry does not name an arrival landing in that slot")
+    check(Sight.knows(Board, keys, { id = 0x81, charId = 0x80, classId = 0x0A }, 0), true,
+          "knows: turn 0 is the start: the slot key")
     -- playsAsSeen: in sight always; in fog only when remembered
     local FOG = Board.US_BIT9
     check(Sight.playsAsSeen(bound, 0, false), true, "playsAsSeen: in sight")
@@ -3132,6 +3135,28 @@ do
     sight.remember({ { id = 1 } })
     check(dangerReads({ gone = { [1] = true } }) > 0, true,
           "changed: a remembered enemy's death rebuilds the danger grid")
+    -- ADR 0449: knows() reads the arrival botrun stamped; a refresh only when one changes
+    do
+        local refreshes, plain = 0, sight.refresh
+        sight.refresh = function() refreshes = refreshes + 1; return plain() end
+        sight.remember({ { id = 9, charId = 3, classId = 4, arrival = 7 },
+                         { id = 8, charId = 3, classId = 4 } })
+        refreshes = 0
+        sight.arrived({ { id = 8, charId = 3, classId = 4, turn = 0 } })
+        check(refreshes, 0, "arrived: the start's units (turn 0) change no key: no refresh")
+        check(sight.knows({ id = 8, charId = 3, classId = 4 }), true, "arrived: a start unit by its slot")
+        sight.arrived({ { id = 5, charId = 3, classId = 4, turn = 7 },
+                        { id = 6, charId = 3, classId = 4, turn = 7 } })
+        check(refreshes, 1, "arrived: arrivals landing together refresh once")
+        check(sight.knows({ id = 5, charId = 3, classId = 4 }), true,
+              "arrived: an arrival of that class and turn is known in any slot")
+        check(sight.knows({ id = 5, charId = 3, classId = 9 }), false, "arrived: not another class")
+        check(sight.knows({ id = 9, charId = 3, classId = 4 }), false,
+              "arrived: a slot with no stamp is not an arrival (and no slot entry names it)")
+        sight.arrived({ { id = 5, charId = 3, classId = 4, turn = 7 } })
+        check(refreshes, 1, "arrived: an unchanged stamp refreshes nothing")
+        sight.refresh = plain
+    end
 
     sight.refresh()
     local before = boardReads
