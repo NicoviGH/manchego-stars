@@ -11,7 +11,38 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-21, night; main is 062e8801 + HANDOFFs): #699's measurement is done (comment 7071434440): the five merged fixes gave no measurable gain (1 of 34 clean against the lap's 2). Every blocker is root-caused and filed as a sub-issue of #699: #709-#714. The status table (7066011205) gives the order: #710 (a certain bug), #709 (this week's #702 regression on Ch15), #711, #714, then 2a/2b, then #712/#713. Nicolas: the cap stays as it is, and the next session works #709-#714 one PR at a time on Sonnet subagents (the plan is on #699, the comment after 7071434440). Run tags `m699c<N>` and `probe699*` are in the vanilla store.**
+**Next session starts here (2026-11-22; main is d7892189 + this HANDOFF). Four #699 blockers merged today, one PR each, built by Sonnet subagents and reviewed by them (`review-to-clean`). Next is #714 (a march offers only the nearest and the safest tile).** The status table on #699 (comment 7066011205) is current. After #714 the order is 2a/2b, then #712, #713 and #717. Then one `attempts` set over the batch, on the #699 measurement's starts (`m699c<N>`).
+
+- **Merged:**
+  - **PR #715 (#710, ADR 0440).** A recruit standing on a locked tile is talked to from beside it. The chance, the planner and the march all read it that way.
+    - Rennac (0x1C) is still missed in Ch14: every approach is over the cap. That is #714's pattern; the witness is #714 comment 7071832697.
+  - **PR #716 (#709, ADR 0441).** Terrain healing is modelled everywhere a human sees it: the judged enemy phase, the lookahead, our own and green units' phases, and `W.dealt`.
+    - Nicolas's progress rule: under the risk cap, any wound that outlasts the heal is progress. Over the cap, a wound counts only with a kill chance.
+    - Ch15 proof (`p709b`, 5 campaigns x 3 attempts): 3 of 5 campaigns clean against 0; deaths 55 to 28; stuck 5 to 2.
+    - Cost: +1.7% planning frames on identical boards.
+  - **PR #718 (#711 parts 1 and 3, ADR 0442).** Prep takes one Chest Key per reachable chest; a Lockpick's uses are shared across chests and doors.
+    - The judged phase plays the game AI's steal, and the planner prices the chance of losing the last opener.
+    - The emulator probe `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh stealprobe` passes. With the bag keeps removed it reports 4 leaks.
+  - **PR #720 (#719, ADR 0443).** A chest goes first to a unit that opens it itself. A stalled sent pair is re-paired, each unit tried once per quiet spell.
+    - Ch16 `b640e-cs-s4009` attempt 1: stuck on turn 34 (`fix711c`) before, won on turn 19 after (`fix719c`).
+- **Open, filed:**
+  - **#717:** 3 Ch15 deaths to Caellach at 0 predicted risk.
+  - **#711, still open:**
+    - ADR 0442's price is yes or no on the last opener, so a stolen Lockpick beside a single-use key prices at zero (comment 7074603493). Fix: price the chests left unopenable, by uses.
+    - A thief carrying a stolen item is not a goal yet.
+    - Doors and the lookahead's thefts are not priced.
+    - Part 2 (buying keys) is with #693.
+  - **#719's sweep:** the pairing pattern showed in 72 attempts, most in ch23 (41, 13 of them stuck). Whether ch23's stalls are fixed by #720 is untested.
+- **How to work (Nicolas, this session):**
+  - Don't trust your own assumptions. Settle a "why" with a cheap read-only subagent on the trace and the code before building. Twice the subagent overturned the plan: #719's first fix, and the Ch15 assault cause.
+  - A fix that adds a game call writing unit memory needs `api.keep16` and an emulator smoke run. Unit tests missed both #716's turn-1 crash (a `Board.bind` export) and #718's sandbox leak.
+  - Usage ran out once mid-session (5-hour limit). A stopped subagent resumes with SendMessage.
+- **Run tags in the vanilla store:**
+  - Ch15: `fix709c/d/e`, `diag709b`, `p709b`, `t709base`/`t709br`.
+  - Ch16: `fix711`, `fix711c/d`, `fix719`, `fix719b/c`.
+  - Ch21: `fix711b`.
+
+*Before that (2026-11-21, night; main was 062e8801 + HANDOFFs): #699's measurement is done (comment 7071434440): the five merged fixes gave no measurable gain (1 of 34 clean against the lap's 2). Every blocker is root-caused and filed as a sub-issue of #699: #709-#714. The status table (7066011205) gives the order: #710 (a certain bug), #709 (this week's #702 regression on Ch15), #711, #714, then 2a/2b, then #712/#713. Nicolas: the cap stays as it is, and the next session works #709-#714 one PR at a time on Sonnet subagents (the plan is on #699, the comment after 7071434440). Run tags `m699c<N>` and `probe699*` are in the vanilla store.**
 
 *Before that (2026-11-21, late; main is 062e8801 + HANDOFF): the work is the measurement on #699 (comment 7069149395).** #699's plan comment (7066011205) opens with a status table; keep it current. The GitHub tidy-up #706 is closed. Its guard `make tidy` (#707, PR #708) is in the session-start checklist: run it and fix every finding. `../manchego-stars-wt2` is deleted; `../manchego-stars-wt4` still holds Trade (#688), uncommitted. Bot issues should carry a bot title prefix (`Bot`, `#510`, `Harness`, ...) so the orphan check sees them (`tools/gh_tidy.py` docstring).
 
