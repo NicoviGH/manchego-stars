@@ -75,6 +75,27 @@ do
         G ^ 1, "chance: standing on it, acted: next turn too (taking it now is worth a turn)")
 end
 
+-- #711: a chest's taker is worth p.opens, the chance it lives and keeps an opener (planner.lua
+-- reads it per way of the phase), not p.alive: a village's taker is unaffected by it. The taker
+-- 2 turns away, unacted: 0.85^1 times that chance.
+do
+    local sight = fakeSight({ open = { { x = 8, y = 0, kind = "chest" },
+                                       { x = 7, y = 1, kind = "visit" } },
+                              prices = { [0x0E] = 500 } })
+    local board = { units = { blue(1, 0, 0) }, turn = 1 }
+    local goals = Goals.list(board, sight, { villageGifts = { items = { 0x0E }, gold = {} } }, {})
+    local chest, village = find(goals, "chest:8,0"), find(goals, "visit:7,1")
+    local pos = { [1] = { x = 0, y = 0, acted = false, alive = 0.9, opens = 0.4 } }
+    check(chest ~= nil and village ~= nil, true, "opens: a chest and a village are goals")
+    check(math.abs(Goals.chance(chest, pos, G, sight.turnsTo) - 0.4 * G) < 1e-9, true,
+          "opens: a chest's taker counts at the chance it lives and keeps a key")
+    check(math.abs(Goals.chance(village, pos, G, sight.turnsTo) - 0.9 * G) < 1e-9, true,
+          "opens: a village's taker counts at the chance it lives")
+    pos[1].opens = nil
+    check(math.abs(Goals.chance(chest, pos, G, sight.turnsTo) - 0.9 * G) < 1e-9, true,
+          "opens: with no theft read, a chest's taker counts at the chance it lives")
+end
+
 -- TestChanceZeroWhenClosedFirst: the taker arrives on player phase 3; a looter closes it after
 -- enemy phase 2 -> 0. Closing after phase 3 leaves it.
 do

@@ -35,13 +35,15 @@ end
 -- (gBmMapUnit, gBmMapHidden, gBmMapFog), W x H tiles (3 x 2 unless given): gBmMapSize, then per
 -- pool the h + 4 row pointers and the (w + 2)-wide rows, the handle on the third pointer. -> the
 -- SYM fields, and cell(x, y, name), the address of that map's (x, y) (the unit map's by default).
-local function bmUnitMap(m, W, H)
+local function bmUnitMap(m, W, H, extra)
     W, H = W or 3, H or 2
     local SYM = { gBmMapSize = 0x2000, gBmMapUnit = 0x2008, gBmMapHidden = 0x200C,
-                  gBmMapFog = 0x2010 }
+                  gBmMapFog = 0x2010, gBmMapTerrain = 0x2014, gBmMapMovement = 0x2018 }
     m.w16(SYM.gBmMapSize, W); m.w16(SYM.gBmMapSize + 2, H)
     local data = {}
-    for i, name in ipairs({ "gBmMapUnit", "gBmMapHidden", "gBmMapFog" }) do
+    local names = { "gBmMapUnit", "gBmMapHidden", "gBmMapFog" }
+    for _, name in ipairs(extra or {}) do names[#names + 1] = name end
+    for i, name in ipairs(names) do
         local rows = 0x2100 + (i - 1) * 0x400
         data[name] = rows + 0x100
         for r = 0, H + 3 do m.w32(rows + r * 4, data[name] + r * (W + 2)) end
@@ -1505,6 +1507,33 @@ do
     check(table.concat(ids, " "), "enemy:9/2 enemy:7/1 chests/1 village:5,6/1 sustain/1",
         "demandsOf: classes, chests once, the village, sustain; no fog, no Seize demand")
     check(d[1].rep.id, 0x81, "demandsOf: the class's first unit stands for it")
+    check(d[3].locks, 2, "demandsOf: the chests demand counts its tiles (#711: a key each)")
+    -- #711: only the locks `needed` accepts are counted; the demand itself (the openers the team
+    -- seats) stays while any lock tile exists
+    local locks = { { x = 1, y = 1, cmd = Sight.TILE_COMMAND_DOOR },
+                    { x = 2, y = 2, cmd = Sight.TILE_COMMAND_DOOR },
+                    { x = 3, y = 3, cmd = Sight.TILE_COMMAND_DOOR } }
+    d = Sight.demandsOf({}, locks, 0, nil, function(c) return c.x < 3 end)
+    check(d[1].id .. "/" .. d[1].need .. "/" .. d[1].locks, "doors/1/2",
+          "demandsOf: a lock `needed` refuses is no key's")
+    d = Sight.demandsOf({}, locks, 0, nil, function() return false end)
+    check(d[1].id .. "/" .. d[1].locks, "doors/0",
+          "demandsOf: the demand stays with no lock needed")
+    -- lockNeeded: shut, and reached by a fielded unit (or none on the map)
+    local door = { x = 5, y = 5, cmd = Sight.TILE_COMMAND_DOOR }
+    local chest = { x = 6, y = 6, cmd = Sight.TILE_COMMAND_CHEST }
+    local function reach(u) if u.far then return nil end return 1 end
+    check(Sight.lockNeeded(door, Sight.TERRAIN_DOOR, { {} }, reach), true,
+          "lockNeeded: a shut, reached door")
+    check(Sight.lockNeeded(door, 0, { {} }, reach), false, "lockNeeded: an opened door is none")
+    check(Sight.lockNeeded(door, Sight.TERRAIN_DOOR, { { far = true } }, reach), false,
+          "lockNeeded: a door no fielded unit reaches is none")
+    check(Sight.lockNeeded(door, Sight.TERRAIN_DOOR, { { far = true }, {} }, reach), true,
+          "lockNeeded: one unit reaching it is enough")
+    check(Sight.lockNeeded(chest, Sight.TERRAIN_CHEST_FULL, {}, reach), true,
+          "lockNeeded: no unit on the map yet: every shut lock counts")
+    check(Sight.lockNeeded(chest, Sight.TERRAIN_DOOR, {}, reach), false,
+          "lockNeeded: an emptied chest is none")
     d = Sight.demandsOf({}, { { x = 0, y = 0, cmd = Sight.TILE_COMMAND_DOOR } }, 3)
     ids = {}
     for _, x in ipairs(d) do ids[#ids + 1] = x.id end
@@ -2792,6 +2821,135 @@ do
     Sight.setStatus(api, Board, actor, Board.STATUS_SLEEP)
     check(m.u8(actor + Board.UNIT_STATUS), 0, "setStatus: a unit a strike killed takes none")
 
+    -- #711: a thief's decision is AI_ACTION_STEAL (AiSetDecision: tile, target, item slot);
+    -- ActionSteal moves the item from the target's bag to the thief's first free slot
+    m.w8(D + DEC.ACTION, Board.AI_ACTION_STEAL); m.w8(D + DEC.TARGET, 5); m.w8(D + DEC.SLOT, 1)
+    m.w8(D + DEC.X, 2); m.w8(D + DEC.Y, 3)
+    local steal = Sight.stealAct(m, Board, D)
+    check(steal and table.concat({ tostring(steal.steal), steal.target, steal.slot, steal.tile.x,
+                                   steal.tile.y }, ","), "true,5,1,2,3",
+          "stealAct: the thief's target, the item's slot and the tile it steals from")
+    check(Sight.stealAct(m, Board, D + 0x40), nil, "stealAct: no steal in a decision that is none")
+    -- the game's calls on the fake memory: UnitRemoveItem packs the bag down over the slot,
+    -- UnitAddItem fills the first free slot, GetUnitKeyItemSlotForTerrain finds a Chest Key (0x69)
+    -- or a Lockpick (0x6B) and returns its slot, else -1 (as the game's unsigned word)
+    local thief, mark = 0x02030200, 0x02030300
+    local SY = { UnitRemoveItem = 1, UnitAddItem = 2, GetUnitKeyItemSlotForTerrain = 3,
+                 gUnitLookup = 0x02024000 }
+    local IT = Board.UNIT_ITEMS
+    local function bagOf(a)
+        local out = {}
+        for i = 0, 4 do out[#out + 1] = string.format("%X", m.u16(a + IT + i * 2)) end
+        return table.concat(out, ",")
+    end
+    local function setBag(a, ...)
+        for i = 0, 4 do m.w16(a + IT + i * 2, select(i + 1, ...) or 0) end
+    end
+    local order = {}   -- what the fake saw, in order: a bag kept (keep16) or a game call
+    local function gameCall(fn, args)
+        local a = args[1]
+        order[#order + 1] = "call"
+        if fn == SY.UnitRemoveItem then
+            for i = args[2], 3 do m.w16(a + IT + i * 2, m.u16(a + IT + (i + 1) * 2)) end
+            m.w16(a + IT + 8, 0)
+        elseif fn == SY.UnitAddItem then
+            for i = 0, 4 do
+                if m.u16(a + IT + i * 2) == 0 then m.w16(a + IT + i * 2, args[2]) break end
+            end
+        else
+            for i = 0, 4 do
+                local id = m.u16(a + IT + i * 2) & 0xFF
+                if id == 0x69 or id == 0x6B then return i end
+            end
+            return 0xFFFFFFFF
+        end
+        return 0
+    end
+    local moveApi = { mem = m, write32 = m.w32, write16 = m.w16,
+                      keep16 = function(a, n)
+                          order[#order + 1] = string.format("keep %X %d", a, n)
+                      end }
+    setBag(mark, 0x0114, 0x016B, 0x2D6C); setBag(thief, 0x2814)
+    local item = Sight.moveItem(moveApi, gameCall, SY, Board, mark, 1, thief)
+    check(item, 0x6B, "moveItem: the Lockpick's id")
+    -- a nested sandbox undoes only api writes: both bags are kept before the game's own calls
+    check(table.concat(order, ","),
+          string.format("keep %X 5,keep %X 5,call,call", mark + IT, thief + IT),
+          "moveItem: both bags are kept before UnitRemoveItem and UnitAddItem")
+    check(bagOf(mark), "114,2D6C,0,0,0", "moveItem: the target's bag packs down over the slot")
+    check(bagOf(thief), "2814,16B,0,0,0", "moveItem: the thief's first free slot takes it")
+    -- ActionSteal clears the target's drop flag when the stolen slot was its last item
+    local DROP = Board.US_DROP_ITEM
+    setBag(mark, 0x0114, 0x016B); m.w32(mark + 0x0C, DROP | 1)
+    Sight.moveItem(moveApi, gameCall, SY, Board, mark, 0, thief)
+    check(m.u32(mark + 0x0C), DROP | 1,
+          "moveItem: a slot that is not the last leaves the drop flag")
+    setBag(mark, 0x0114, 0x016B); m.w32(mark + 0x0C, DROP | 1)
+    Sight.moveItem(moveApi, gameCall, SY, Board, mark, 1, thief)
+    check(m.u32(mark + 0x0C), 1, "moveItem: the last item's slot clears the target's drop flag")
+
+    -- pilfer: the thief stands on the act's tile, the item moves, and `lock` says whether the
+    -- target opened a chest before and no longer does (a second opener keeps it)
+    m.w32(SY.gUnitLookup + 5 * 4, mark)
+    local stoodOn
+    local function standOn(e, x, y) stoodOn = { e.id, x, y } end
+    local act = { steal = true, target = 5, slot = 1, tile = { x = 2, y = 3 } }
+    setBag(mark, 0x0114, 0x016B); setBag(thief, 0)
+    local th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    check(table.concat({ th.thief, th.target, th.item, tostring(th.lock),
+                         table.concat(stoodOn, "/") }, ","), "129,5,107,true,129/2/3",
+          "pilfer: the Lockpick's theft costs its holder the chests")
+    setBag(mark, 0x0114, 0x016B, 0x0169); setBag(thief, 0)
+    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    check(th.lock, false, "pilfer: a holder with a Chest Key left still opens chests")
+    setBag(mark, 0x0114, 0x0169); setBag(thief, 0)
+    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief },
+                      { steal = true, target = 5, slot = 1, tile = { x = 2, y = 3 } })
+    check(th.item == 0x69 and th.lock, true,
+          "pilfer: a stolen Chest Key costs its holder the chests")
+    setBag(mark, 0x0114, 0x2D6C); setBag(thief, 0)
+    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    check(th.lock, false, "pilfer: an item that opens nothing costs no chest")
+
+    -- stepOf: a steal is chosen before a staff (each an act of its own), a staff before a strike,
+    -- a strike when the AI named a target, else none
+    local function pick(act, target)
+        local function on(name) return function(x) return name .. ":" .. tostring(x) end end
+        return Sight.stepOf(act, target, { steal = on("steal"), staff = on("staff"),
+                                           strike = on("strike"), none = on("none") })
+    end
+    check(pick({ steal = true, status = 4 }, 7):sub(1, 5), "steal",
+          "stepOf: a steal is played as one")
+    check(pick({ status = 4 }, 7):sub(1, 5), "staff",
+          "stepOf: a staff act before the strike's target")
+    check(pick(nil, 7), "strike:7", "stepOf: a target is a strike")
+    check(pick(nil, nil), "none:nil", "stepOf: no act and no target moves on")
+
+    -- a phase's way carries the thefts: a thief that steals after another enemy struck, and one
+    -- that strikes after a theft, keep the record (Sight.chain), and the phase's result list has
+    -- it (Sight.phaseList)
+    local function wayOf(theftFirst)
+        local struck, robbed = { target = 7, felled = 0 }, { thief = 0x82, target = 5, lock = true }
+        local function theft(done) return { lands = 0 }, Sight.chain(done, nil, robbed) end
+        local function strike(done) return struck, Sight.chain(done, struck) end
+        local outs = Sight.phaseWays(2, function(k, done)
+            if (k == 1) == theftFirst then return theft(done) end
+            return strike(done)
+        end, function(fn) return fn() end)
+        return Sight.phaseList(outs[1], outs, 0)
+    end
+    for _, first in ipairs({ false, true }) do
+        local list = wayOf(first)
+        check(#list == 1 and list[1].target == 7 and list.thefts and #list.thefts == 1
+              and list.thefts[1].lock, true,
+              "phase: the thefts and the strike both reach the result, theft "
+              .. (first and "first" or "last"))
+    end
+    local one = Sight.chain({}, nil, { target = 5 })
+    local two = Sight.chain(one, nil, { target = 6 })
+    check(#one.thefts .. #two.thefts, "12",
+          "chain: a way's thefts are a new list, not another way's")
+
     -- phaseWays: the staff's hit is a way of its own, its strikes the phase's as they were
     local function sandbox(fn) return fn() end
     local landed
@@ -2869,6 +3027,62 @@ do
     local mixed = Sight.freshSeen(kept, true, false)
     check(mixed.grids == "g" and mixed.danger == nil and mixed.threats ~= kept.threats, true,
           "freshSeen: a remembered enemy's death keeps only the cost grids")
+end
+
+-- #711, through Sight.new: s.demands counts the locks a fielded unit's march reaches
+-- (Sight.lockNeeded over s.turnsTo). A 21 x 1 map; the fake game function returns r0 + r1, so
+-- GetAvailableTileEventCommand(x, y) is x + y: a door command at x = 18 (0x12), a chest at x = 20
+-- (0x14). The door's terrain is shut (0x1E), the chest's full (0x21). The movement map the fake
+-- march leaves is the test's: a wall's cell is UNREACHED where the unit's tile is cut off.
+do
+    local m = fakeMem()
+    local nop = function() end
+    local GAME = 0x08001000
+    local SYM, cell = bmUnitMap(m, 21, 1, { "gBmMapTerrain", "gBmMapMovement" })
+    local S = setmetatable(SYM, { __index = function() return GAME end })
+    local UNIT, CLS = 0x02030000, 0x08700000
+    m.w32(UNIT + 0x04, CLS)
+    m.w8(CLS + 0x12, 5)
+    local function terrain(x, v) m.w8(cell(x, 0, "gBmMapTerrain"), v) end
+    local function movement(reach)
+        for x = 0, 20 do m.w8(cell(x, 0, "gBmMapMovement"), reach and 1 or Sight.UNREACHED) end
+    end
+    local function locksOf(units)
+        local cpu = setmetatable({ breakpoint = function() return 1 end, unbreak = nop },
+                                 { __index = fakeCpu(1) })
+        local sight = Sight.new({ cpu = cpu, mem = m, write8 = m.w8, write16 = m.w16,
+                                  write32 = m.w32, SYM = S, Board = Board,
+                                  map = function() return 21, 1 end,
+                                  chapter = function() return 1 end, turn = function() return 1 end,
+                                  board = function() return { units = units } end })
+        local out = {}
+        for _, d in ipairs(sight.demands()) do
+            if d.kind == "doors" or d.kind == "chests" then out[d.kind] = d.locks end
+        end
+        return out
+    end
+    local blue = { faction = "blue", onField = true, id = 1, charId = 1, addr = UNIT, x = 0, y = 0 }
+    terrain(18, 0x1E); terrain(20, 0x21)
+    movement(true)
+    local reached = locksOf({ blue })
+    check(reached.doors .. "/" .. reached.chests, "1/1",
+          "demands: a reached door and chest are counted")
+    movement(false)
+    local cut = locksOf({ blue })
+    check(cut.doors .. "/" .. cut.chests, "0/0",
+          "demands: locks no fielded unit's march reaches are not")
+    local none = locksOf({})
+    check(none.doors .. "/" .. none.chests, "1/1",
+          "demands: with no unit on the map every shut lock counts")
+    local benched = { faction = "blue", onField = false, id = 2, charId = 2, addr = UNIT,
+                      x = 0, y = 0 }
+    local partly = locksOf({ benched })
+    check(partly.doors .. "/" .. partly.chests, "1/1",
+          "demands: a roster with nobody fielded yet counts every shut lock")
+    terrain(18, 0x00)
+    movement(true)
+    local opened = locksOf({ blue })
+    check(opened.doors .. "/" .. opened.chests, "0/1", "demands: an opened door counts none")
 end
 
 -- #671, through Sight.new: s.changed reads the board once for every units() read inside it (the

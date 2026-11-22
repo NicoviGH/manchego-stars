@@ -397,6 +397,7 @@ WANTED = [
     'AddItemToConvoy',          # an item into the convoy's first empty slot (bmcontainer.c)
     'ClearSupplyItems',         # the convoy emptied, before the Supply screen rebuilds it (bmcontainer.c)
     'UnitAddItem',              # an item into a unit's first empty bag slot (bmunit.c)
+    'UnitRemoveItem',           # a bag slot cleared, the bag packed: ActionSteal's take (bmunit.c)
     'UnitRemoveInvalidItems',   # a unit's bag packed after a slot is cleared (bmunit.c)
     'CanUnitUseItemPrepScreen', # what the prep screen's Use offers: a booster that gains (bmitemuse.c)
 ]

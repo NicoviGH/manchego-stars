@@ -899,7 +899,8 @@ function M.plan(Bot, board, sight, style, opts)
     local function positions(st, alive)
         local pos = {}
         for _, u in ipairs(ctx.blues) do
-            pos[u.id] = { x = u.x, y = u.y, acted = u.acted, alive = alive and alive[u.id] or 1 }
+            pos[u.id] = { x = u.x, y = u.y, acted = u.acted, alive = alive and alive[u.id] or 1,
+                        opens = st.opens and st.opens[u.id] }
         end
         for _, a in ipairs(st.acts) do
             local p = pos[a.unitId]
@@ -2088,10 +2089,21 @@ function M.plan(Bot, board, sight, style, opts)
             return n
         end
         local ends = endsIn(st)
+        -- The key a thief takes in the phase (#711): per unit a thief robs of its last chest
+        -- opener in some outcome, the chance it lives AND keeps one, summed per outcome (the
+        -- game's own AI decided the theft, sight's pilfer; a plan that moves the holder out of
+        -- reach, or kills the thief, reads none). A chest it would have opened is worth that
+        -- much of what it was, and a way where the thief also kills the holder counts once.
+        local robbed, keeps = {}, {}
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
+            local robbedHere = {}
+            for _, th in ipairs(o.strikes.thefts or {}) do
+                if th.lock then robbedHere[th.target], robbed[th.target] = true, true end
+            end
             for _, u in ipairs(hitOf[o.way]) do
                 local id, r = u.id, res[u.id]
+                if not robbedHere[id] then keeps[id] = (keeps[id] or 0) + o.p * (1 - r.d) end
                 die[id] = (die[id] or 0) + o.p * r.d
                 byWay[id] = byWay[id] or {}
                 byWay[id][o.way] = (byWay[id][o.way] or 0) + o.p * r.d
@@ -2176,6 +2188,8 @@ function M.plan(Bot, board, sight, style, opts)
         -- counter may have felled (its goal lost)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
+        st.opens = {}
+        for id in pairs(robbed) do st.opens[id] = keeps[id] or 0 end
         st.goalWorth = {}
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)

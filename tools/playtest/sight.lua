@@ -274,6 +274,9 @@ M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrain
 M.TERRAIN_VILLAGE_CLOSED, M.TERRAIN_CHEST_EMPTY = 0x04, 0x20
 -- The terrain a demand kind (api.needs' `doors`, `chests`) opens: the one owner of kind -> lock.
 M.LOCK_TERRAIN = { doors = M.TERRAIN_DOOR, chests = M.TERRAIN_CHEST_FULL }
+-- the tile command that offers each lock demand kind: with LOCK_TERRAIN, the one owner of
+-- command -> kind -> terrain (demandsOf, lockNeeded, isChestLock, locked)
+M.LOCK_KIND = { [M.TILE_COMMAND_CHEST] = "chests", [M.TILE_COMMAND_DOOR] = "doors" }
 M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the first booster
 M.MENU_ENABLED = 1           -- include/uimenu.h
 M.MENU_NOTSHOWN = 3
@@ -1159,14 +1162,32 @@ function M.answerOf(a, hp)
     return a.killsTarget and a.counterWorst < hp, a.expected
 end
 
+-- Whether a lock tile (command `c`, the terrain `terrain` on it now) is one a key may still be
+-- needed for: still shut (a full chest, a closed door), and some fielded unit in `blues` has a
+-- march path to it (`turnsTo` is not nil: sight's, the game's costs; the cost itself, so how many
+-- turns, is not read). With no unit on the map nothing is known to be out of reach, so every shut
+-- lock counts. A lock behind another lock has no path and is not counted: its key is the
+-- mid-map fetch's (bot.lua supplyKey).
+function M.lockNeeded(c, terrain, blues, turnsTo)
+    if terrain ~= M.LOCK_TERRAIN[M.LOCK_KIND[c.cmd]] then return false end
+    if #blues == 0 then return true end
+    for _, u in ipairs(blues) do
+        if turnsTo(u, { x = c.x, y = c.y }) then return true end
+    end
+    return false
+end
+
 -- What the map asks of a team, for Bot.team (#510 plan comment, "Party selection"). Pure, so
 -- test_sight.lua builds every case. units = Board.read's; commands = {{ x, y, cmd }...} the
 -- chapter's tile commands; fog = gPlaySt.chapterVisionRange. One demand per red class on the
 -- field (need = how many stand there, rep = the first), one per village tile, one for chests
--- and one for doors when there are any, fog when the chapter has it, and sustain always.
+-- and one for doors when there are any, fog when the chapter has it, and sustain always. A lock
+-- demand's `need` is the openers the team seats; its `locks` the tiles a key may still be needed
+-- for (#711), those `needed(command)` accepts (default: all), so a door nobody can reach does
+-- not pull a spare key into a bag.
 -- `freeTalks` (M.freeTalks) adds one `talk` demand per recruit a unit may bring over for free:
 -- answered only by those talkers, so Bot.team seats one of them (#699).
-function M.demandsOf(units, commands, fog, freeTalks)
+function M.demandsOf(units, commands, fog, freeTalks, needed)
     local out, byClass, once = {}, {}, {}
     for _, u in ipairs(units) do
         if u.faction == "red" and u.onField and u.classId then
@@ -1179,14 +1200,19 @@ function M.demandsOf(units, commands, fog, freeTalks)
             d.need = d.need + 1
         end
     end
-    local kinds = { [M.TILE_COMMAND_CHEST] = "chests", [M.TILE_COMMAND_DOOR] = "doors" }
+    local kinds = M.LOCK_KIND
     for _, c in ipairs(commands) do
         if c.cmd == M.TILE_COMMAND_VISIT then
             out[#out + 1] = { id = string.format("village:%d,%d", c.x, c.y), kind = "village",
                               need = 1, tile = { x = c.x, y = c.y } }
-        elseif kinds[c.cmd] and not once[c.cmd] then
-            once[c.cmd] = true
-            out[#out + 1] = { id = kinds[c.cmd], kind = kinds[c.cmd], need = 1 }
+        elseif kinds[c.cmd] then
+            -- `need` is the openers the team seats (one opener opens every lock); `locks` is the
+            -- tiles to open, one key each (Bot.supply's takeKeys, #711)
+            if not once[c.cmd] then
+                once[c.cmd] = { id = kinds[c.cmd], kind = kinds[c.cmd], need = 1, locks = 0 }
+                out[#out + 1] = once[c.cmd]
+            end
+            if not needed or needed(c) then once[c.cmd].locks = once[c.cmd].locks + 1 end
         end
     end
     if fog > 0 then out[#out + 1] = { id = "fog", kind = "fog", need = 1 } end
@@ -1610,6 +1636,13 @@ function M.batching(outer, guarded, log)
     return sandbox, api, open
 end
 
+-- Whether the unit at `unitAddr` opens `terrain` as its bag stands: the game's own check, a key
+-- slot of 0 or more (GetUnitKeyItemSlotForTerrain returns -1 for none). The one owner of that
+-- read: s.opens, keyItemOpens and a theft's before-and-after (M.pilfer).
+function M.opensAt(call, S, unitAddr, terrain)
+    return s32(call(S.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain })) >= 0
+end
+
 -- Inside a sandbox: `u` holds the weapon in item `slot` as it does after striking with it
 -- (WeaponSelectMenu_Selected: EquipUnitItemSlot), the one it counters with next phase.
 -- EquipUnitItemSlot reorders the bag in place, a game write no journal sees, so the bag is
@@ -1633,7 +1666,8 @@ function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
         bag[k] = io.read16(at)
         io.write16(at, k == 0 and value or 0)
     end
-    local key = call(S.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
+    -- the item alone in slot 0: the slot the game's check finds, so >= 0 is its yes
+    local key = M.opensAt(call, S, unitAddr, terrain)
     for k = 0, B.ITEM_COUNT - 1 do io.write16(unitAddr + B.UNIT_ITEMS + k * 2, bag[k]) end
     return key
 end
@@ -2040,6 +2074,89 @@ function M.staffAct(mem, Board, D, actor)
     if not status then return nil end
     return { target = mem.u8(D + DEC.TARGET), status = status,
              tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- An enemy thief's steal as its decision names it: AI_ACTION_STEAL (cp_battle.c
+-- AiAttemptStealActionWithinMovement: AiSetDecision's tile, target and the item's slot in the
+-- target's bag, taken from the highest-ranked item among every unit the thief can stand beside,
+-- the game's own choice, ADR 0379). `D` = gAiDecision. -> { steal = true, target = the id, slot,
+-- tile = { x, y } the thief stands on }, or nil for any other act
+function M.stealAct(mem, Board, D)
+    local DEC = Board.AI_DEC
+    if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_STEAL then return nil end
+    return { steal = true, target = mem.u8(D + DEC.TARGET), slot = mem.u8(D + DEC.SLOT),
+             tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- ActionSteal's bag change (bmmind.c:365), inside a sandbox: both bags are kept first (api.keep16),
+-- since the game's own UnitRemoveItem and UnitAddItem write a unit struct that a nested sandbox
+-- does not undo, and one plan's theft would leak into the next plan's board. The target's drop
+-- flag goes when the slot is its last item (an api write, journaled), the item leaves its bag
+-- (UnitRemoveItem packs it) and UnitAddItem puts it in the thief's first free slot (the AI steals
+-- only with one, cp_battle.c:46). A gold item (which ActionSteal pays into the party's gold
+-- instead) is never on the AI's steal list, so it is not handled. -> the item's id
+function M.moveItem(api, call, S, Board, from, slot, to)
+    local mem = api.mem
+    local raw = mem.u16(from + Board.UNIT_ITEMS + slot * 2)
+    local count = 0
+    for i = 0, Board.ITEM_COUNT - 1 do
+        if mem.u16(from + Board.UNIT_ITEMS + i * 2) ~= 0 then count = count + 1 end
+    end
+    local state = mem.u32(from + UNIT_STATE)
+    if state & Board.US_DROP_ITEM ~= 0 and slot == count - 1 then
+        api.write32(from + UNIT_STATE, state & ~Board.US_DROP_ITEM)
+    end
+    api.keep16(from + Board.UNIT_ITEMS, Board.ITEM_COUNT)
+    api.keep16(to + Board.UNIT_ITEMS, Board.ITEM_COUNT)
+    call(S.UnitRemoveItem, { from, slot })
+    call(S.UnitAddItem, { to, raw })
+    return raw & 0xFF
+end
+-- A theft played on the board, inside an open sandbox: the thief `e` stood on the act's tile
+-- (`standOn`), the item moved from the target's bag to its own (a theft never misses), so a later
+-- enemy decides on the board it leaves and a second thief finds the item gone. -> { thief,
+-- target, item, lock = true when the target opened a chest before and no longer does }
+function M.pilfer(api, call, S, Board, standOn, e, act)
+    local addr = api.mem.u32(S.gUnitLookup + act.target * 4)
+    local chests = M.LOCK_TERRAIN.chests
+    local was = M.opensAt(call, S, addr, chests)
+    standOn(e, act.tile.x, act.tile.y)
+    local item = M.moveItem(api, call, S, Board, addr, act.slot, e.addr)
+    return { thief = e.id, target = act.target, item = item,
+             lock = was and not M.opensAt(call, S, addr, chests) }
+end
+-- What an enemy's decision is, and which handler plays it: a steal (M.stealAct) before a staff
+-- (M.staffAct), each an act of its own; else a strike when the AI named a target; else none. The
+-- one dispatch of enemyPhase's ways and nextPhase's first phase, so a new act is added once.
+-- `on` = { steal, staff, strike, none } functions; -> what the chosen one returns.
+function M.stepOf(act, target, on)
+    if act and act.steal then return on.steal(act) end
+    if act then return on.staff(act) end
+    if target then return on.strike(target) end
+    return on.none()
+end
+-- The strikes of a phase's way after one more act: `done`'s, then the strike `t` (nil for a
+-- theft), and the thefts so far, then `theft` (a list read by the planner as `.thefts`; the
+-- copy is new, so a way never changes the list another way holds). The one owner of how a
+-- way's list carries them: a thief that steals after another enemy struck keeps its record.
+function M.chain(done, t, theft)
+    local now = {}
+    for x = 1, #done do now[x] = done[x] end
+    if t then now[#now + 1] = t end
+    now.thefts = done.thefts
+    if theft then
+        now.thefts = {}
+        for x, th in ipairs(done.thefts or {}) do now.thefts[x] = th end
+        now.thefts[#now.thefts + 1] = theft
+    end
+    return now
+end
+-- The phase's result list: the likeliest outcome `top`'s strikes and thefts, every outcome and
+-- the unsplit count riding on it (what enemyPhase returns).
+function M.phaseList(top, outcomes, unsplit)
+    local out = {}
+    for x, t in ipairs(top.strikes) do out[x] = t end
+    out.thefts = top.strikes.thefts
+    out.outcomes, out.unsplit = outcomes, unsplit
+    return out
 end
 -- Whether the player's unit `o` (Board.read's) is asleep or berserked once the next player
 -- phase's start ticks it (Board.statusAfter, one start): the army's reply between the
@@ -2536,7 +2653,22 @@ function M.new(outer)
         end
         talks = talks or M.recruitTalks(M.talks(api, sandbox))
         local free = M.freeTalks(mem, talks, S.EventScr_9EEB00, joined)
-        return M.demandsOf(us, commands, mem.u8(S.gPlaySt + PLAY_VISION), free)
+        -- a lock a key may still be needed for: still shut, and some fielded unit's march reaches
+        -- it (s.turnsTo: the game's costs, a closed door's own tile the field's start). `blues`
+        -- are the units on the field at the prep screen (the game's default deployment), not
+        -- Bot.team's pick: the team is chosen from these demands, so its deployment is not known
+        -- yet, and a benched unit has no tile to march from. A lock only a benched flier would
+        -- reach is not counted; its key then comes mid-map (supplyKey), a miss that costs a
+        -- walk, where an over-count costs a bag slot for good. With no unit on the map yet
+        -- nothing is known to be out of reach, so every shut lock counts.
+        local blues = {}
+        for _, u in ipairs(us) do
+            if u.faction == "blue" and u.onField then blues[#blues + 1] = u end
+        end
+        local function needed(c)
+            return M.lockNeeded(c, s.terrain(c.x, c.y), blues, s.turnsTo)
+        end
+        return M.demandsOf(us, commands, mem.u8(S.gPlaySt + PLAY_VISION), free, needed)
     end
 
     -- FE8's own march distance to `tile`: GenerateExtendedMovementMap from it, out to
@@ -3001,7 +3133,8 @@ function M.new(outer)
     -- a staged phase wrote an enemy's HP since (`healStale`: wound() sets it).
     -- -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack;
-    -- then, when it casts a status staff instead, the act (M.staffAct) as a third value.
+    -- then, when it casts a status staff (M.staffAct) or steals (M.stealAct) instead, the act as a
+    -- third value.
     local healStale = false
     -- A simulated phase's own HP write, on the unit at `addr`: `decides` = it is of the side
     -- deciding, whose heal flags the next decision must read again.
@@ -3049,7 +3182,7 @@ function M.new(outer)
         local D = S.gAiDecision
         local DEC = Board.AI_DEC
         if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then
-            return nil, nil, M.staffAct(mem, Board, D, e.addr)
+            return nil, nil, M.staffAct(mem, Board, D, e.addr) or M.stealAct(mem, Board, D)
         end
         local target = mem.u8(D + DEC.TARGET)
         local addr = mem.u32(S.gUnitLookup + target * 4)
@@ -3243,9 +3376,7 @@ function M.new(outer)
             local addr = mem.u32(S.gUnitLookup + target * 4)
             local t = M.strikeAt(side, id, target, mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP),
                                  byId[target] and byId[target].level)
-            local now = {}
-            for x = 1, #done do now[x] = done[x] end
-            now[#now + 1] = t
+            local now = M.chain(done, t)
             standOn(e, side.tile.x, side.tile.y)
             local _, mean = M.odds({ t.takenDist }, t.targetHp)
             -- the target's heal flag is stale when it is of the deciding side (the faction whose
@@ -3275,7 +3406,11 @@ function M.new(outer)
             local q = call(S.GetOffensiveStaffAccuracy, { e.addr, addr }) / 100
             return q, function() M.setStatus(api, Board, addr, act.status) end
         end
-        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast
+        -- e steals as it decided (#711, M.stealAct, M.pilfer)
+        local function pilfer(call, e, act)
+            return M.pilfer(api, call, S, Board, standOn, e, act)
+        end
+        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
@@ -3284,21 +3419,30 @@ function M.new(outer)
     -- the units it moves; each of its ways ends in the enemy phase `order()` lists on that way's
     -- board. `order` = stagePhase's, and `cast` (a status staff's, #674).
     local function playPhase(call, proc, byId, berserkFirst, after, order, decides, strike, remove,
-                             mass0, cast)
+                             mass0, cast, pilfer)
         local function ways(list, mass, tail, done0)
             return M.phaseWays(#list, function(k, done)
                 local id = list[k]
                 local e = decides(id)
                 if not e then return nil end
                 local target, side, act = aiDecide(call, proc, e, byId)
-                if act then
+                return M.stepOf(act, target, {
+                    -- a theft (#711): no strike and no chance, the board changes as it did; the
+                    -- way's strikes list carries it (.thefts) for the planner's price
+                    steal = function()
+                        return { lands = 0 }, M.chain(done, nil, pilfer(call, e, act))
+                    end,
                     -- a status staff (#674): no strike, its hit a way of its own
-                    local q, land = cast(e, act)
-                    return { lands = q }, done, land
-                end
-                if not target then return nil end
-                local t, now = strike(e, id, target, side, done)
-                return t, now, function() remove(e, side.tile.x, side.tile.y) end
+                    staff = function()
+                        local q, land = cast(e, act)
+                        return { lands = q }, done, land
+                    end,
+                    strike = function()
+                        local t, now = strike(e, id, target, side, done)
+                        return t, now, function() remove(e, side.tile.x, side.tile.y) end
+                    end,
+                    none = function() return nil end,
+                })
             end, sandbox, nil, mass, tail, done0)
         end
         local outcomes, unsplit
@@ -3319,18 +3463,15 @@ function M.new(outer)
         for _, o in ipairs(outcomes) do
             if o.p > top.p then top = o end
         end
-        local out = {}
-        for x, t in ipairs(top.strikes) do out[x] = t end
-        out.outcomes, out.unsplit = outcomes, unsplit
-        return out
+        return M.phaseList(top, outcomes, unsplit)
     end
 
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, _, berserkFirst, cast =
+            local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer =
                 stagePhase(call, plan)
             return playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
-                             plan.mass, cast)
+                             plan.mass, cast, pilfer)
         end) end)
     end
 
@@ -3464,7 +3605,7 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast =
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer =
                 stagePhase(call, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
@@ -3475,38 +3616,48 @@ function M.new(outer)
                     local e = decides(id)
                     if e then
                         local target, side, act = aiDecide(call, proc, e, byId)
-                        if act then
+                        M.stepOf(act, target, {
+                            -- a theft (#711): the board changes as it did (the first phase's
+                            -- thefts are priced in enemyPhase; the lookahead reads its board)
+                            steal = function()
+                                pilfer(call, e, act)
+                                moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
+                            end,
                             -- a status staff (#674): it lands on the expected way when its hit
                             -- is even odds or better, as a counter kill is taken
-                            local q, land = cast(e, act)
-                            if q >= 0.5 then land() end
-                            moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
-                        elseif target then
-                            local t, now, addr = strike(e, id, target, side, first)
-                            first = now
-                            moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
-                            -- (a berserk strike's kill: strike() took it off already)
-                            if mem.u8(addr + UNIT_HP) == 0 and not t.berserk then
-                                local u = byId[target]
-                                if u then
-                                    remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y))
+                            staff = function()
+                                local q, land = cast(e, act)
+                                if q >= 0.5 then land() end
+                                moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
+                            end,
+                            strike = function()
+                                local t, now, addr = strike(e, id, target, side, first)
+                                first = now
+                                moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
+                                -- (a berserk strike's kill: strike() took it off already)
+                                if mem.u8(addr + UNIT_HP) == 0 and not t.berserk then
+                                    local u = byId[target]
+                                    if u then
+                                        remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y))
+                                    end
                                 end
-                            end
-                            if t.felled >= 0.5 then
-                                remove(e, side.tile.x, side.tile.y)
-                                -- a Rout's count: the player's berserked unit is none of it
-                                if not t.berserk then fell[#fell + 1] = id end
-                            else
-                                -- it lives: our counter's expected damage stays on it, as a
-                                -- strike's stays on its target
-                                local _, back = M.odds({ t.counterDist }, t.strikerHp)
-                                wound(e.addr, math.max(1, t.strikerHp - math.floor(back + 0.5)),
-                                      true)
-                            end
-                        else
-                            local x, y = followMove(e)
-                            if x then moved[#moved + 1] = { id = id, x = x, y = y } end
-                        end
+                                if t.felled >= 0.5 then
+                                    remove(e, side.tile.x, side.tile.y)
+                                    -- a Rout's count: the player's berserked unit is none of it
+                                    if not t.berserk then fell[#fell + 1] = id end
+                                else
+                                    -- it lives: our counter's expected damage stays on it, as a
+                                    -- strike's stays on its target
+                                    local _, back = M.odds({ t.counterDist }, t.strikerHp)
+                                    wound(e.addr, math.max(1, t.strikerHp - math.floor(back + 0.5)),
+                                          true)
+                                end
+                            end,
+                            none = function()
+                                local x, y = followMove(e)
+                                if x then moved[#moved + 1] = { id = id, x = x, y = y } end
+                            end,
+                        })
                     end
                 end
             end
@@ -3536,7 +3687,7 @@ function M.new(outer)
             healFaction(call, byId, "red")
             -- our berserked units again, those the next player phase's start leaves berserked
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
-                                  remove, nil, cast)
+                                  remove, nil, cast, pilfer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
             return out
         end) end)
@@ -3695,7 +3846,7 @@ function M.new(outer)
 
     function s.opens(u, terrain)
         return mine("opens" .. terrain, u, function() return sandbox(function(call)
-            return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
+            return M.opensAt(call, S, u.addr, terrain)
         end) end) or false
     end
 
@@ -3735,11 +3886,13 @@ function M.new(outer)
 
     -- (like opensDoor: the bot asks the one lock, not the terrain)
     function s.opensChest(u) return s.opens(u, M.LOCK_TERRAIN.chests) end
-    function s.isChestLock(terrain) return terrain == M.TERRAIN_CHEST_FULL end
+    function s.isChestLock(terrain) return terrain == M.LOCK_TERRAIN.chests end
 
     function s.locked(u, x, y)
         local t = s.terrain(x, y)
-        if (t == M.TERRAIN_DOOR or t == M.TERRAIN_CHEST_FULL) and not s.opens(u, t) then return t end
+        if (t == M.LOCK_TERRAIN.doors or t == M.LOCK_TERRAIN.chests) and not s.opens(u, t) then
+            return t
+        end
         return nil
     end
 

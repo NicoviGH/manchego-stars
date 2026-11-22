@@ -5229,6 +5229,143 @@ scenarios.staffprobe = function()
         berserksCtl, tostring(replied)))
 end
 
+-- stealprobe (#711): the judged enemy phase plays an enemy thief's steal, and the bag change it
+-- makes leaves nothing behind. On the retail Prologue the enemy nearest Eirika (charId 1) is made
+-- a thief (class Thief 0x0D, so CA_STEAL, Spd 40, an empty bag so it is unarmed, its Mov cut to 3) and
+-- stood beside her; she holds a Chest Key (0x69, on the AI's steal list), and a chest goal is
+-- faked at the tile nearest the thief that she needs 1.2 to 3 turns to reach. Then:
+--   (1) sight.enemyPhase on a plan that leaves her beside the thief records the theft:
+--       { thief, target = Eirika, item = 0x69, lock = true };
+--   (2) Planner.plan's chosen acts end her on a tile the thief's threat does not cover;
+--   (3) with PT_LEAKGUARD=1 no sandbox leak is reported (result() fails the run on one);
+--   (4) her bag reads the same before and after the planning (the sandboxes put it back).
+-- PT_VANILLA=1 only. Run it with PT_LEAKGUARD=1: the keep16 of M.moveItem is what (3) proves.
+scenarios.stealprobe = function()
+    if PLAYTEST_VANILLA ~= "1" then
+        return result("FAIL", "stealprobe reads the retail Prologue")
+    end
+    local sapi, sight = INSPECT.probeMap()
+    if not sapi then return end
+    local board = BOARD.read()
+    local eirika
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.charId == 1 then eirika = u end
+    end
+    if not eirika then return result("FAIL", "no Eirika on the Prologue") end
+    local thief, best
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        local d = BOARD.distance(e.x, e.y, eirika.x, eirika.y)
+        if e.onField and not e.isBoss and (not best or d < best) then thief, best = e, d end
+    end
+    if not thief then return result("FAIL", "no enemy on the Prologue") end
+    local ITEMS = BOARD.UNIT_ITEMS
+    -- struct Unit +04 class pointer, +16 spd, +1D mov bonus (signed); constants/classes.h
+    local CLASS, SPD, MOV_BONUS = 0x04, 0x16, 0x1D
+    local class = INSPECT.gameCalls(function(call) return call(SYM.GetClassData, { 0x0D }) end)
+    sapi.write32(thief.addr + CLASS, class)
+    sapi.write8(thief.addr + SPD, 40)
+    sapi.write8(thief.addr + MOV_BONUS, 0xFD)
+    -- unarmed, so it strikes no one: the only thing it does to her is steal
+    for slot = 0, 4 do sapi.write16(thief.addr + ITEMS + slot * 2, 0) end
+    -- stood beside her, off its own tile
+    local tx, ty = INSPECT.freeBeside(eirika)
+    if not tx then return result("FAIL", "no free tile beside Eirika") end
+    INSPECT.Sight.liftOff(sapi, thief.x, thief.y, thief.id)
+    INSPECT.Sight.putOn(sapi, tx, ty, thief.id)
+    sapi.write8(thief.addr + 0x10, tx)
+    sapi.write8(thief.addr + 0x11, ty)
+    -- her Chest Key in her first free slot
+    local slot = 0
+    while slot < 4 and sapi.mem.u16(eirika.addr + ITEMS + slot * 2) ~= 0 do slot = slot + 1 end
+    sapi.write16(eirika.addr + ITEMS + slot * 2, 0x69 | (1 << 8))
+    sight.refresh()
+    board = BOARD.read()
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.charId == 1 then eirika = u end
+    end
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        if e.charId == thief.charId then thief = e end
+    end
+    local function bag()
+        local out = {}
+        for i = 0, 4 do out[#out + 1] = string.format("%04X", sapi.mem.u16(eirika.addr + ITEMS + i * 2)) end
+        return table.concat(out, ",")
+    end
+    local before = bag()
+    local mid, after
+    local recorded, ended, covered
+    -- one batch, as botrun decides in one (every call below nests in its sandbox): the leak a
+    -- nested sandbox would leave is the stolen item gone from her bag for the calls after it
+    sight.batch(function()
+        -- (1) the judged enemy phase, Eirika left beside the thief
+        local out = sight.enemyPhase({ blues = { { unit = eirika, x = eirika.x, y = eirika.y,
+                                                   hp = eirika.hp } }, reds = {}, gone = {} })
+        mid = bag()
+        local th = out.thefts and out.thefts[1]
+        log(string.format("enemyPhase: %d theft(s)%s", out.thefts and #out.thefts or 0,
+            th and string.format(": thief %d target %d item %02X lock %s", th.thief, th.target,
+                                 th.item, tostring(th.lock)) or ""))
+        recorded = th ~= nil and th.thief == thief.id and th.target == eirika.id
+            and th.item == 0x69 and th.lock == true
+        -- (2) the planner's decision, a chest goal faked a turn or two off
+        -- a tile she needs 1.2 to 3 turns to reach, so no tile of this turn takes it, and the goal's
+        -- chance is the same wherever she stands in reach: only the theft tells the tiles apart
+        -- on the thief's side (the nearest such tile to it), so that without a steal to avoid she
+        -- walks toward it and into the thief's reach: the control below
+        local chest, nearest
+        local w, h = mapSize()
+        for y = 0, h - 1 do
+            for x = 0, w - 1 do
+                local t = sight.turnsTo(eirika, { x = x, y = y })
+                local d = BOARD.distance(x, y, thief.x, thief.y)
+                if t and t > 1.2 and t <= 3 and (not nearest or d < nearest) then
+                    chest, nearest = { x = x, y = y }, d
+                end
+            end
+        end
+        if not chest then return result("FAIL", "no tile 1.2 to 3 turns from Eirika") end
+        local seen = setmetatable({
+            explorable = function() return { { x = chest.x, y = chest.y, kind = "chest" } } end,
+            canExplore = function(u) return u.charId == 1 end,
+            closings = function() return {} end,
+        }, { __index = sight })
+        local style = { aggression = "careful", deploy = {}, claims = {},
+                        villageGifts = { items = {}, gold = { 500 } } }
+        local act, plan = INSPECT.Planner.plan(BOT, board, seen, style)
+        local covers = sight.threat(thief)
+        for _, a in ipairs(plan and plan.acts or {}) do
+            if a.unitId == eirika.id then
+                local at = a.move or { x = eirika.x, y = eirika.y }
+                ended = at
+                covered = covers(at.x, at.y) > 0
+            end
+        end
+        log(string.format("plan: Eirika ends %s, covered by the thief: %s", ended
+            and (ended.x .. "," .. ended.y) or "(no act)", tostring(covered)))
+        after = bag()
+        log(string.format("bag before %s after %s", before, after))
+        -- the control, logged: her key taken away, the same decision: where she stands without a
+        -- steal to avoid
+        sapi.write16(eirika.addr + ITEMS + slot * 2, 0)
+        sight.refresh()
+        local _, plan0 = INSPECT.Planner.plan(BOT, BOARD.read(), seen, style)
+        for _, a in ipairs(plan0 and plan0.acts or {}) do
+            if a.unitId == eirika.id then
+                local at = a.move or { x = eirika.x, y = eirika.y }
+                log(string.format("control (no key): Eirika ends %d,%d, covered by the thief: %s",
+                    at.x, at.y, tostring(covers(at.x, at.y) > 0)))
+            end
+        end
+    end)
+    log(string.format("bag in the batch after the judged phase %s", mid))
+    if recorded and ended and covered == false and before == after and mid == before then
+        return result("PASS", "the thief's steal is judged, the holder leaves its reach, the bag is unchanged")
+    end
+    return result("FAIL", string.format("recorded=%s ended=%s covered=%s bag=%s/%s", tostring(recorded),
+        tostring(ended and "yes"), tostring(covered), tostring(mid == before),
+        tostring(before == after)))
+end
+
 -- ---- stability fuzzer (#49): SEEDED random inputs over the same I/O layer, hunting the
 -- crashes/soft-locks the DIRECTED smoke/clear bots can't -- they only ever drive clean,
 -- scripted input orderings. A "smart monkey": broad in-chapter key surface (incl START/
