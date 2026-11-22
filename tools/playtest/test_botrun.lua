@@ -970,6 +970,44 @@ do
     for _, a in ipairs(r.anomalies) do if a.kind == "arrival_unstamped" then anomalies = anomalies + 1 end end
     check(anomalies, 0, "killer arrival: nothing had to be stamped late")
 
+    -- a kill reported late for a slot the previous board already showed dead is no refill
+    local deadRed
+    g, stamps = arrivalGame(function(g)
+        if g.turn == 1 then
+            for _, u in ipairs(g.units) do
+                if u.faction == "red" and not deadRed then
+                    deadRed = u
+                    u.hp, u.dead, u.onField = 0, true, false
+                end
+            end
+        elseif g.turn == 2 then
+            g.late = { id = deadRed.id, charId = deadRed.charId, faction = "red" }
+        end
+    end)
+    g.api.killed = function()
+        if g.late and not g.told then g.told = true; return { g.late } end
+        return {}
+    end
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(#r.arrivals_seen, 0, "a late kill report: no arrival")
+    check(#(stamps[deadRed.id] or {}), 1, "a late kill report: the slot is stamped once, at the start")
+    -- a class read another way keeps its arrival turn, and is no anomaly
+    local classy
+    g, stamps = arrivalGame(function(g)
+        if g.turn == 1 then
+            for _, u in ipairs(g.units) do
+                if u.faction == "red" and not classy then classy = u; u.classId = (u.classId or 0) + 1 end
+            end
+        end
+    end)
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(stamps[classy.id][2], 0, "a class change keeps the turn it arrived on")
+    local unstamped = 0
+    for _, a in ipairs(r.anomalies) do if a.kind == "arrival_unstamped" then unstamped = unstamped + 1 end end
+    check(unstamped, 0, "a class change is no unstamped arrival")
+
     -- a board read in the enemy phase (old turn, phase red): the turn is the next player phase's
     local mid
     g, stamps = arrivalGame(function(g)

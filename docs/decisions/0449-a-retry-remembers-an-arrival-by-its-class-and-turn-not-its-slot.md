@@ -38,6 +38,19 @@ arrival does not name the start's unit there. A memory written before this ADR n
 unit by slot, so a retry reading one would not know an arrival; memory lives only for one
 campaign's attempts (`campaign.lua`), so none is stored across versions and none needs reading.
 
+**A refill is an arrival record too.** A killed slot loaded again is written to `arrivals_seen`
+like any other, so `campaign.lua` feeds its turn into `style.arrivals` (ADR 0386) and its unit and
+tile into `style.memory.arrivals` (ADR 0436): a retry's reinforcement claims and owed-recruit
+goals see it. A slot counts as refilled only when the previous board showed its unit alive and the
+game has since killed it (`killedSince`, cleared at every stamp); a kill reported late for a slot
+already dead is none.
+
+**`arrival_unstamped`** (an anomaly in the record, beside ADR 0388's) fires for two cases only: a
+red on the field that no event named and no stamp holds (a unit that changed sides to red, a first
+sighting mid-chapter), and a killer no board showed. Each is stamped as an arrival. A class read
+another way for the same character (a promotion, a class not read) keeps its arrival turn and is no
+anomaly; another character in a slot no kill was reported for is an arrival, also no anomaly.
+
 **A killer is stamped before it is remembered.** `record` stamps the board after the deaths
 before it reads a killer, so an arrival that kills on its landing turn is stored once, with its
 turn. One no board showed is stamped as an arrival and noted as an `arrival_unstamped` anomaly.

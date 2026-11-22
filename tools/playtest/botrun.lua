@@ -1009,21 +1009,6 @@ function M.run(api)
     -- the board stamp() last compared, and the red slots the game killed since: M.events sees a
     -- slot go off the field and on again, but not one killed and refilled between two boards
     local stampedFrom, killedSince = nil, {}
-    -- an enemy a board or a fight showed, remembered by its whole key. Its arrival is the stamp
-    -- of the unit now in its slot, which stamp() has already put there for every board read; one
-    -- that is missing (a killer that landed and fell with no board between) is stamped here as
-    -- an arrival, by the one rule (arrivalStamp), and noted as an anomaly
-    local stamping
-    local function sawEnemy(id, charId, classId, board)
-        local a = arrivedOn[id]
-        if not (a and a.charId == charId and a.classId == classId) then
-            a = stamping(id, charId, classId, board or lastBoard or { turn = turn })
-            anomaly({ kind = "arrival_unstamped", turn = turn, charId = charId })
-        end
-        local arrival = a.turn > 0 and a.turn or nil
-        enemiesSeen[Bot.memoryKey(id, charId, classId, arrival)] = { id = id, charId = charId,
-                                                            classId = classId, arrival = arrival }
-    end
     -- the first player turn an arrival stands on the board (arrivals_seen's boardTurn, ADR 0436's
     -- goal holds before it): the one rule for every board it is read on. Landed in an enemy
     -- phase where it acted: the next turn; read in an enemy phase it did not act in (a board
@@ -1035,10 +1020,24 @@ function M.run(api)
         if after.phase ~= nil and after.phase ~= "blue" then return t + 1, t end
         return t, t
     end
-    function stamping(id, charId, classId, after)
+    local function stamping(id, charId, classId, after)
         local boardTurn = boardTurnOf(after, id)
         arrivedOn[id] = { charId = charId, classId = classId, turn = boardTurn }
         return arrivedOn[id], boardTurn
+    end
+    -- an enemy a board or a fight showed, remembered by its whole key. Its arrival is the stamp
+    -- of the unit now in its slot, which stamp() has already put there for every board read; one
+    -- that is missing (a killer that landed and fell with no board between) is stamped here as
+    -- an arrival, by the one rule (boardTurnOf), and noted as an anomaly
+    local function sawEnemy(id, charId, classId, board)
+        local a = arrivedOn[id]
+        if not (a and a.charId == charId and a.classId == classId) then
+            a = stamping(id, charId, classId, board or lastBoard or { turn = turn })
+            anomaly({ kind = "arrival_unstamped", turn = turn, charId = charId })
+        end
+        local arrival = a.turn > 0 and a.turn or nil
+        enemiesSeen[Bot.memoryKey(id, charId, classId, arrival)] = { id = id, charId = charId,
+                                                            classId = classId, arrival = arrival }
     end
     -- Every red a board shows, stamped with the turn it arrived on, and each arrival noted in
     -- the record (arrivals_seen, only as the screen showed it: ADR 0386 -- one that arrived under
@@ -1056,9 +1055,13 @@ function M.run(api)
                 trace(e)
                 if e.kind == "arrive" and e.faction == "red" then fresh[e.id] = e end
             end
+            local was = byId(from)
             for id in pairs(killedSince) do
-                local u = now[id]
-                if u and u.faction == "red" and u.onField and not u.dead and not fresh[id] then
+                local u, w = now[id], was[id]
+                -- only a slot the previous board showed alive: one already dead there (a kill
+                -- reported late) is no refill, M.events sees any later unit load into it
+                if u and u.faction == "red" and u.onField and not u.dead and not fresh[id]
+                    and w and w.onField and not w.dead then
                     fresh[id] = { id = id, charId = u.charId, x = u.x, y = u.y }
                 end
             end
@@ -1068,11 +1071,20 @@ function M.run(api)
             local a = arrivedOn[u.id]
             if u.faction == "red" and u.onField and not u.dead then
                 local e = fresh[u.id]
-                if e or not a or a.charId ~= u.charId or a.classId ~= u.classId then
-                    if not e and from then
+                if a and not e and a.charId == u.charId and a.classId ~= u.classId then
+                    -- the same unit read as another class (a promotion, a class not read): it
+                    -- keeps the turn it arrived on, under its new class
+                    a.classId = u.classId
+                    told[#told + 1] = { id = u.id, charId = u.charId, classId = u.classId,
+                                        turn = a.turn }
+                elseif e or not a or a.charId ~= u.charId then
+                    -- an arrival; or a red no event named and no stamp holds (a recruit that
+                    -- turned red, a first sighting): an anomaly, stamped as an arrival; or
+                    -- another character in a slot no kill was reported for: an arrival
+                    if not e and not a and from then
                         anomaly({ kind = "arrival_unstamped", turn = turn, charId = u.charId })
                     end
-                    local at, boardTurn
+                    local boardTurn
                     if from then
                         a, boardTurn = stamping(u.id, u.charId, u.classId, after)
                     else
