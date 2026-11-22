@@ -335,6 +335,7 @@ WANTED = [
     'CanUnitUseItem',           # usable now; for a staff it builds the targets (bmitemuse.c)
     'GetUnitItemHealAmount',    # the HP an item restores for this unit (bmitem.c)
     'GetUnitMaxHp',             # maxHP + the equipped weapon's HP bonus, AddUnitHp's cap (bmunit.c)
+    'GetTerrainHealAmount',     # the % of max HP a tile heals its unit each own phase (bmmap.c; #709)
     'GetSelectTargetCount',     # the target list the last builder made (uiselecttarget.c)
     'GetTarget',                # one entry of it: struct SelectTarget { x, y, uid, extra }
     'CheckForCharacterEvents',  # whether a Talk event joins two characters (eventinfo.c)

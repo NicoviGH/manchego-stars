@@ -386,6 +386,34 @@ local function taught(x, ways, hp, unitHp, struck)
     return sum
 end
 
+-- The HP `e` stands on once its own phase begins, after the plan leaves it on `hp` and the tile
+-- gives it `heal` HP (sight.terrainHeal, via the plan's memo `st.healOf`): the game heals a unit
+-- on a heal tile at the start of its faction's phase, before any enemy acts
+-- (MakeTerrainHealTargetList, bmtarget.c:587-608; AddUnitHp holds it to max HP). The enemy
+-- stands on its tile through our phase, so its tile now is the one that heals it (#709). No heal
+-- leaves `hp` as it is; the cap is the unit's max HP (GetUnitMaxHp, bot.lua's context) and never
+-- below the HP it stands on now, so a unit over its max is not credited a wound by the clamp. A
+-- unit left at 0 HP gains nothing. `hp` here is ONE HP (a survivor's): `outlasting` is the one
+-- owner of the survivors' share of an expectation that mixes a kill.
+function M.healed(heal, e, hp)
+    if heal == 0 or hp <= 0 then return hp end
+    return Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp))
+end
+
+-- What a blow of `dealt` on `hp` earns once the heal is counted (`kill`: its chance to kill). The
+-- kill branch earns what it always did (the dead heal nothing: `dealt` there is the HP it had),
+-- the surviving branch only the wound that outlasts the heal, healed(hp) - healed(hp - its mean
+-- damage); the whole `dealt` where nothing heals.
+function M.outlasting(heal, e, hp, dealt, kill)
+    kill = kill or 0
+    if heal == 0 or kill >= 1 or hp - dealt <= 0 then return dealt end
+    if kill == 0 then return M.healed(heal, e, hp) - M.healed(heal, e, hp - dealt) end
+    -- the surviving branch's mean damage, held to hp: a survivor was left above 0, so more than
+    -- hp is a rounding of `dealt`, never a bigger wound
+    local survived = math.min(hp, math.max(0, (dealt - kill * hp) / (1 - kill)))
+    return kill * hp + (1 - kill) * (M.healed(heal, e, hp) - M.healed(heal, e, hp - survived))
+end
+
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
 local function score(act, st, W, style, odds)
@@ -416,7 +444,10 @@ local function score(act, st, W, style, odds)
             local want = st.bossWant or 1
             local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
-            v = v + W.dealt * dealt * target + W.kill * kill * worth
+            -- only the wound that outlasts the tile's heal: a fort heals it back at the start
+            -- of the enemy's phase (#709, M.outlasting); the plan's own HP is the unhealed one
+            local earned = M.outlasting(st.healOf(e), e, hp, dealt, kill)
+            v = v + W.dealt * earned * target + W.kill * kill * worth
                 -- at the HP the plan leaves the target: a kill an earlier blow of the plan
                 -- set up is this unit's, so the plan's chip and finish train the finisher
                 + W.exp * taught(f.exp, f.joint, hp, act.unitHp)
@@ -475,7 +506,8 @@ local function score(act, st, W, style, odds)
         -- is the plan's, which no game state holds
         local t = act.targetUnit
         local hp = st.hp[t.id] or t.hp
-        local gain = math.min(act.amount, (t.maxhp or hp) - hp)
+        -- the staff's amount the clamp leaves: what the target is short by, up to the amount
+        local gain = Board.addHp(hp, act.amount, t.maxhp or hp) - hp
         -- and the experience the staff teaches the healer (the game's count, sight.staffExp)
         v = v + W.heal * gain + (gain > 0 and W.exp * (act.exp or 0) or 0)
         fx.heals = { id = t.id, hp = hp + gain }
@@ -814,9 +846,18 @@ function M.plan(Bot, board, sight, style, opts)
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
     local gameOver = Bot.gameOver(sight)
+    -- the HP a heal tile gives each enemy at its own phase's start (sight.terrainHeal), read once
+    -- an enemy for the whole search: its tile and max HP do not move through our phase. Required:
+    -- a sight without it would hide the bug (#709).
+    local healMemo = {}
+    local function healOf(e)
+        local h = healMemo[e.id]
+        if h == nil then h = sight.terrainHeal(e); healMemo[e.id] = h end
+        return h
+    end
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
-                    fought = {}, healed = {},
+                    fought = {}, healed = {}, healOf = healOf,
                     walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {}, carry = {}, wear = {}, redWear = {} }
     -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
@@ -1000,22 +1041,30 @@ function M.plan(Bot, board, sight, style, opts)
     -- rescue), ends the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
     -- chapter, any red of a Rout). A march nearer a goal does not: nearing is what the stall
     -- reading found idle, and a blow that deals nothing wounds nothing. `counters`: each red
-    -- enemy's chance our counters kill it in the judged phase.
+    -- enemy's chance our counters kill it in the judged phase. A wound counts only as far as it
+    -- outlasts the tile's heal (M.healed, #709): a boss on a fort regains it before it acts.
+    -- -> advances, woundOnly: `woundOnly` when a wound that outlasts the heal is all it has. A
+    -- kill chance on any red is a return of its own, ahead of the wound read, so a plan whose
+    -- wound is all it has has no kill chance this phase (#709: admit() asks it only under the cap).
+    -- The lookahead's second-phase kills are not read here: they come from sight.nextPhase, a
+    -- search made for finalists after this judge, and advances() runs for every plan.
     local function advances(st, fell, counters)
-        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true end
+        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true, false end
         for _, p in pairs(counters) do
-            if p > M.DUST then return true end
+            if p > M.DUST then return true, false end
         end
         for id, blows in pairs(st.kill) do
-            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.DUST then return true end
+            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.DUST then return true, false end
         end
         for id, hp in pairs(st.enemyHp) do
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and e.isBoss))
-            if needed and e.hp - hp > M.DUST then return true end
+            -- no kill share is needed here: a kill chance above DUST returned as progress in the
+            -- kill loop above, so `hp` (the plan's expected HP) is a survivor's, to within DUST
+            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
         end
-        return false
+        return false, false
     end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
@@ -1334,7 +1383,7 @@ function M.plan(Bot, board, sight, style, opts)
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
                     opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
-                    redWear = copy(st.redWear), changeKey = st.changeKey }
+                    redWear = copy(st.redWear), changeKey = st.changeKey, healOf = st.healOf }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
@@ -1682,6 +1731,13 @@ function M.plan(Bot, board, sight, style, opts)
     -- every plan ties on `idle`, so it stays off. Set by pick(), which re-admits every plan judged
     -- when it moves.
     local idleOn = false
+    -- Whether a plan advances the level for the idle rule: under the death-risk cap any
+    -- advance counts; over it, a wound that only outlasts the heal does not (#709, ADR 0441: a
+    -- seven-unit assault netting 1 HP on a fort boss, max_die 0.999, outranked every hold). Read
+    -- off the rank's `max_exceed`, which admit() sets before this is asked.
+    local function advancing(st)
+        return st.advances and (not st.woundOnly or st.rank.max_exceed == 0)
+    end
     local function admit(st)
         local rank = st.rank
         local firstCall = rank.first_game_over == nil
@@ -1698,7 +1754,7 @@ function M.plan(Bot, board, sight, style, opts)
             rank.sum_die = rank.sum_die + pr.die
         end
         -- a plan that does not advance is no plan once the stall reading fired (ADR 0439)
-        rank.idle = (idleOn and not st.advances) and 1 or 0
+        rank.idle = (idleOn and not advancing(st)) and 1 or 0
         rank.admitted = rank.admitted and rank.idle ~= 1
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
@@ -1922,8 +1978,7 @@ function M.plan(Bot, board, sight, style, opts)
                                     n.dead[o.uid] = true
                                 else
                                     n.hp = copy(w.hp)
-                                    n.hp[o.uid] = math.min(u.maxhp or math.huge,
-                                                           u.hp - o.back + (st.healed[o.uid] or 0))
+                                    n.hp[o.uid] = Board.addHp(u.hp - o.back, st.healed[o.uid] or 0, u.maxhp)
                                 end
                             end
                             nxt[#nxt + 1] = n
@@ -2126,7 +2181,7 @@ function M.plan(Bot, board, sight, style, opts)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)
         judged = judged + st.goalNow + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
-        st.advances = advances(st, fell, countered)
+        st.advances, st.woundOnly = advances(st, fell, countered)
         -- each way the phase went and its units' HP there, for the wear's later phases
         st.outcomes, st.hitOf = outcomes, hitOf
         -- the units the phase strikes that no heal of the army's reaches after it, in id order
@@ -2363,7 +2418,7 @@ function M.plan(Bot, board, sight, style, opts)
         local was = idleOn
         idleOn = false
         for _, j in ipairs(judgedPlans) do
-            if opts and opts.idle and j.ok and j.st.advances then idleOn = true end
+            if opts and opts.idle and j.ok and advancing(j.st) then idleOn = true end
         end
         if idleOn ~= was then
             for _, j in ipairs(judgedPlans) do admit(j.st) end

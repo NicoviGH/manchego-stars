@@ -921,7 +921,8 @@ do
     -- stale for the deciding side: the staging's two writes come before the phase's order,
     -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
     -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf).
-    -- wound()'s callers: a strike's target, the lookahead's striker, the army reply's killer
+    -- wound()'s callers: a strike's target, the lookahead's striker, the army reply's killer,
+    -- and healFaction (a red's phase start heals it: #709)
     local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
     local at = src:find("function M.expOf(", 1, true)
     local count = at and src:sub(at, src:find("\nend\n", at, true)) or ""
@@ -929,7 +930,7 @@ do
     local writes = all - onBattle
     check(onBattle, 2, "aiPhaseStart: the experience count writes the battle units' HP twice")
     local _, wounds = src:gsub("\n%s+wound%(", "")
-    check(writes == 4 and wounds == 3
+    check(writes == 4 and wounds == 4
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
           true, "aiPhaseStart: a phase's own HP writes are wound()'s, the heal flags stale after")
     check(bodyOf("function s.strike("):find("function%(%) onlyTarget%(u, all%) end,%s*true%)") ~= nil,
@@ -2915,6 +2916,56 @@ do
     check(boardReads - before, 1, "changed: several units() reads inside cost one board read")
     -- #699: the chapter's talk search runs once per Sight, not once per demands() (two so far)
     check(searches, 2, "demands: the talk event search runs once")
+end
+
+-- #709: the terrain heal is the table's % of GetUnitMaxHp truncated toward zero as C does (a fort,
+-- 20 of 47, is 9; for a negative percent Lua's floor would round away from zero), and a unit the
+-- game skips (a rescued one) is healed 0 with no game call.
+do
+    check(Sight.terrainHealPoints(20, 47), 9, "terrainHealPoints: a fort on 47 max HP")
+    check(Sight.terrainHealPoints(10, 45), 4, "terrainHealPoints: a gate truncates")
+    check(Sight.terrainHealPoints(0, 45), 0, "terrainHealPoints: no heal off a heal tile")
+    check(Sight.terrainHealPoints(0xEC, 47), -9, "terrainHealPoints: a negative s8 truncates toward zero (-20 of 47)")
+    -- through the call path: the fake game function returns r0 + r1 and r1 holds 1 here, so
+    -- GetTerrainHealAmount(t) is t + 1 (a "fort" of terrain id 19 heals 20%) and GetUnitMaxHp(addr)
+    -- is addr + 1 (a unit at 99 has 100 max HP). The terrain map puts that fort at (1, 0).
+    local m = fakeMem()
+    local GAME = 0x08001000
+    local S2 = setmetatable({ gBmMapTerrain = 0x2020 }, { __index = function() return GAME end })
+    m.w32(0x2020, 0x2100); m.w32(0x2100, 0x2200); m.w8(0x2200 + 1, 19)
+    local function red(addr, hp, state)
+        m.w8(addr + 0x10, 1); m.w8(addr + 0x11, 0); m.w8(addr + 0x13, hp); m.w32(addr + 0x0C, state or 0)
+        return { id = addr, faction = "red", x = 1, y = 0, addr = addr, state = state or 0 }
+    end
+    local sight = Sight.new({ cpu = fakeCpu(1), mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32,
+        SYM = S2, Board = Board.bind(m, S2), map = function() return 3, 2 end, chapter = function() return 1 end,
+        turn = function() return 1 end, board = function() return { units = {} } end })
+    check(sight.terrainHeal(red(99, 30)), 20, "terrainHeal: the fort's 20% of the unit's max HP of 100")
+    check(sight.terrainHeal(red(99, 30, Board.US_RESCUED)), 0, "terrainHeal: a rescued unit is not healed")
+    -- the reds' phase start heals each unit the game would, held to its max HP (addr + 1 here):
+    -- 30 of 100 gains 20, 190 of 200 is held at 200, a rescued one is skipped
+    local a, b, c = red(99, 30), red(199, 190), red(239, 30, Board.US_RESCUED)
+    sight.healFaction({ [99] = a, [199] = b, [239] = c }, "red")
+    check(m.u8(99 + 0x13) .. " " .. m.u8(199 + 0x13) .. " " .. m.u8(239 + 0x13), "50 200 30", "healFaction: a heal tile heals each red to its max HP, a rescued one not")
+    -- a faction's phase heals that faction alone: a blue on the fort (max HP 300 here) is healed by "blue", not "red"
+    local bl = red(299, 30)
+    bl.faction = "blue"
+    sight.healFaction({ [299] = bl }, "red")
+    check(m.u8(299 + 0x13), 30, "healFaction: another faction's unit is not healed")
+    sight.healFaction({ [299] = bl }, "blue")
+    check(m.u8(299 + 0x13), 90, "healFaction: our units heal at our phase, as the reds do at theirs")
+end
+
+-- #709: both reds' phases begin with the heal: stagePhase (enemyPhase's, and nextPhase's first) after
+-- the plan's reds HP is written, and nextPhase's second after the army's reply, before it plays.
+do
+    local stage = sightSrc:match("local function stagePhase%(call, plan%).-\n    end\n")
+    check(stage ~= nil and stage:find("plan%.reds or {}%) do.-end\n%s+healFaction%(call, byId, \"red\"%)") ~= nil, true,
+          "healFaction: the staged phase heals the reds after the plan's HP is written")
+    local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
+    check(nextPhase ~= nil and nextPhase:find("healFaction%(call, byId, \"green\"%)%s+healFaction%(call, byId, \"blue\"%)%s+local played = reply and armyReply") ~= nil
+          and nextPhase:find("armyReply%(call.-healFaction%(call, byId, \"red\"%).-playPhase%(call, proc, byId, berserkFirst, 1,") ~= nil,
+          true, "healFaction: our units heal before the army's reply, the reds after it and before the second phase plays")
 end
 
 -- #671, through Sight.new: itemReach is the widest weapon in the bag (a staff counts for nothing),

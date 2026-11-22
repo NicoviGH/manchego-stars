@@ -434,6 +434,8 @@ local function sightOf(o)
         readsReds = function(e) return (o.reads or {})[e.id] or false end,
         cache = o.cache,
         terrain = o.terrain,
+        -- the game's terrain heal (sight.terrainHeal): the HP a unit regains on its tile, by id
+        terrainHeal = function(u) return (o.heal or {})[u.id] or 0 end,
         weapons = weapons,
         -- The game's price per use (sight.usePrice; nil: no price), when the test prices uses
         usePrice = o.usePrice,
@@ -6492,6 +6494,123 @@ do
     check(tostring(Planner.tookGoal({ ["convoy:101x1"] = true })) .. " "
           .. tostring(Planner.tookGoal({ ["convoy:101x1"] = true, ["chest:1,2"] = true })) .. " "
           .. tostring(Planner.tookGoal({})), "false true false", "advances: a convoy take is no goal")
+end
+
+-- test_planner_terrain_heal (#709): the boss stands on a fort, which heals it 6 HP before it
+-- acts. A's blow wounds it for 4 and its counter kills A, so the chip is healed back and costs
+-- A its life. Under opts.idle the wound is no progress and the hold is played; on a tile that
+-- heals nothing the same wound advances, and the attack is played as the fallback.
+do
+    local function play(heal)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = 1, hp = 30, isBoss = true })
+        local o = {
+            objective = { kind = "boss" },
+            heal = { [0x81] = heal },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 4, hits = 1,
+                counters = true, counterHit = 100, counterDmg = 99, counterHits = 1 } } } },
+            enemyPhase = function() return {} end,
+        }
+        local _, plan = Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"), { idle = true })
+        local attacks = false
+        for _, x in ipairs(plan and plan.acts or {}) do attacks = attacks or x.act == "attack" end
+        return attacks
+    end
+    check(tostring(play(6)), "false", "terrain heal: a chip the fort heals back is no progress, the hold is played")
+    -- over the cap a wound with no kill chance is no progress, healed back or not (ADR 0441 G)
+    check(tostring(play(0)), "false", "terrain heal: over the cap, a chip with no kill chance is no progress either")
+    -- ADR 0441 G: an over-cap assault that nets ~1 HP after the heal and has no kill chance does
+    -- not outrank a safe hold (Caellach, 47 HP on a fort: the seven-unit assault's 36.97 -> 45.97).
+    -- A and B each wound E (30 of 40, fort heal 9) for 5, the counters kill each: over the cap.
+    do
+        local function assault(hp, heal, counter)
+            local A = blue(0x01, 0, 0, 0)
+            local Bu = blue(0x02, 1, 0, 1)
+            local E = red(0x81, 2, 0, { minRange = 1, hp = hp, maxhp = 40, isBoss = true })
+            local lethal = counter and { counters = true, counterHit = 100, counterDmg = 99, counterHits = 1 } or {}
+            local function blow(o) o.hit, o.dmg, o.hits = 100, 5, 1; return fc(o) end
+            local o = {
+                objective = { kind = "boss" }, heal = { [0x81] = heal },
+                reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 2, 1 }) },
+                fc = { [0x01] = { [0x81] = { ["1,0"] = blow(lethal) } },
+                       [0x02] = { [0x81] = { ["2,1"] = blow(lethal) } } },
+                enemyPhase = function() return {} end,
+            }
+            local _, plan = Planner.plan(B, boardOf(A, Bu, E), sightOf(o), style("careful"), { idle = true })
+            local n = 0
+            for _, x in ipairs(plan and plan.acts or {}) do if x.act == "attack" then n = n + 1 end end
+            return n
+        end
+        check(assault(30, 9, true), 0, "advances G: an over-cap assault that nets 1 HP, no kill chance, is not played over a hold")
+        check(assault(10, 9, true) > 0, true, "advances G: the same assault with a kill chance still advances")
+        check(assault(30, 9, false) > 0, true, "advances G: an under-cap chip that outlasts the heal still advances")
+    end
+    -- the heal model (Planner.healed): 6 HP back on 30 max; a wound of 4 is healed whole, one of
+    -- 10 leaves 4; no heal leaves the HP as it is, even above max; a unit above its max HP is
+    -- not credited by the clamp; no max HP is no gain past the HP it stands on
+    check(Planner.healed(6, { hp = 30, maxhp = 30 }, 26) .. " " .. Planner.healed(6, { hp = 30, maxhp = 30 }, 20)
+          .. " " .. Planner.healed(6, { hp = 30, maxhp = 30 }, 30), "30 26 30",
+          "terrain heal: a wound is healed up to the HP it started on, never past max")
+    check(Planner.healed(0, { hp = 40, maxhp = 30 }, 40), 40, "terrain heal: no heal leaves the HP as it is, above max too")
+    check(Planner.healed(0, { hp = 30, maxhp = 30 }, 40), 40, "terrain heal: no heal returns the HP as given, whatever the cap")
+    check(Planner.healed(6, { hp = 35, maxhp = 30 }, 35), 35, "terrain heal: a unit above its max is not credited a wound by the clamp")
+    check(Planner.healed(6, { hp = 20 }, 20), 20, "terrain heal: no max HP is no gain")
+    check(Board.addHp(10, 5, 12) .. " " .. Board.addHp(10, 5, nil) .. " " .. Board.addHp(10, 0, 30),
+          "12 15 10", "addHp: the one clamp to max HP")
+    -- what a blow earns once the heal is counted (Planner.outlasting): 4 of 30 on a fort that heals 6
+    -- earns 0 (the unit is full), 12 earns 6; one below max (39 of 47, heal 9) earns what the cap lets
+    -- the heal take back, and with no heal the whole blow
+    local full, below = { hp = 30, maxhp = 30 }, { hp = 39, maxhp = 47 }
+    check(Planner.outlasting(6, full, 30, 4) .. " " .. Planner.outlasting(6, full, 30, 12) .. " "
+          .. Planner.outlasting(9, below, 39, 4) .. " " .. Planner.outlasting(0, full, 30, 4),
+          "0 6 3 4", "terrain heal: a blow earns the wound that outlasts the heal")
+    -- a kill heals nothing: 18 HP on a +4 fort (max 20) killed by 18 earns all 18, not 16; a half
+    -- kill (9 of the 18, the other half 6 damage) earns 9 + half of (20 - 16); a dead unit gains no heal
+    local e18 = { hp = 18, maxhp = 20 }
+    check(Planner.outlasting(4, e18, 18, 18, 1) .. " " .. Planner.outlasting(4, e18, 18, 18) .. " "
+          .. Planner.outlasting(4, e18, 18, 12, 0.5) .. " " .. Planner.healed(4, e18, 0),
+          "18 18 11.0 0", "terrain heal: the heal is the survivors' alone, a kill earns what it did")
+    -- a sight without the heal read is an error where a blow is scored, not a silent no-heal
+    do
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = 1, hp = 30, isBoss = true })
+        local o = { objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+                    fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 4, hits = 1 } } } },
+                    enemyPhase = function() return {} end }
+        local sight = sightOf(o)
+        sight.terrainHeal = nil
+        check(tostring((pcall(Planner.plan, B, boardOf(A, E), sight, style("careful")))), "false",
+              "terrain heal: a sight without the read is an error")
+    end
+    -- score(): a chip the fort heals back earns nothing (W.dealt on the wound that outlasts), so
+    -- the attack plan's value falls by what the credit was; without opts.idle, the plain score
+    do
+        local function chip(heal)
+            local A = blue(0x01, 0, 0, 0)
+            local E = red(0x81, 2, 0, { minRange = 1, hp = 30, isBoss = true })
+            local o = { objective = { kind = "boss" }, heal = { [0x81] = heal },
+                        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+                        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 4, hits = 1 } } } },
+                        enemyPhase = function() return {} end }
+            local _, plan = Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"))
+            local best
+            for _, c in ipairs(plan.considered) do
+                if c.acts[1]:find("attack@1,0") then best = math.max(best or -math.huge, c.rank.value) end
+            end
+            return best
+        end
+        check(tostring(chip(6) < chip(0)), "true", "terrain heal: score() credits the chip only for the wound that outlasts the heal")
+    end
+    -- the heal's cap is the max HP the game reads for an enemy too (sight.maxHps over the reds)
+    do
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = 1, hp = 38, maxhp = 40, isBoss = true })
+        local o = { objective = { kind = "boss" }, maxHp = { [0x81] = 47 },
+                    reach = { [0x01] = tiles({ 0, 0 }) }, enemyPhase = function() return {} end }
+        Planner.plan(B, boardOf(A, E), sightOf(o), style("careful"), { idle = true })
+        check(E.maxhp, 47, "terrain heal: an enemy's max HP is the game's GetUnitMaxHp, as a blue's is")
+    end
 end
 
 -- test_planner_plays_an_uncertain_kill_both_ways: L can attack E from (1,0), killing it 40%

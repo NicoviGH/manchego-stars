@@ -218,6 +218,14 @@
 --                            one HP short, for a heal the planner means to follow a blow.
 --   maxHps(units)            sets each unit's `maxhp` to GetUnitMaxHp (maxHP + the equipped
 --                            weapon's HP bonus), the cap AddUnitHp holds a heal to.
+--   terrainHeal(u)           the HP the tile `u` stands on heals it at the start of its own
+--                            faction's phase, as MakeTerrainHealTargetList reads it
+--                            (bmtarget.c): GetTerrainHealAmount(terrain) * GetUnitMaxHp(u) / 100,
+--                            truncated toward zero as C does (a fort 20%, a gate or throne 10%);
+--                            0 off a heal tile, and for a unit the game skips
+--                            (Board.terrainHealSkips). The raw amount: AddUnitHp's clamp to max
+--                            HP (Board.addHp) is the caller's. The phases enemyPhase and
+--                            nextPhase play heal every red this way as each begins (healFaction).
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff (IA_STAFF),
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
@@ -2412,6 +2420,14 @@ function M.watched(cpu)
     end }, { __index = cpu }), function(fn) watch = fn end
 end
 
+-- The HP a heal tile gives: `pct` (TerrainTable_HealAmount's s8, read as a register: 0x80 and
+-- up is negative) of `maxHp`, truncated toward zero as C's `/ 100` does (Lua's `//` floors).
+function M.terrainHealPoints(pct, maxHp)
+    if pct >= 0x80 then pct = pct - 0x100 end
+    local n = pct * maxHp
+    return n >= 0 and n // 100 or -((-n) // 100)
+end
+
 function M.new(outer)
     local watchedCpu, setWatch = M.watched(outer.cpu)
     outer = setmetatable({ cpu = watchedCpu }, { __index = outer })
@@ -3121,6 +3137,45 @@ function M.new(outer)
         end
     end
 
+    -- The HP the tile `terrain` heals the unit at `addr`, the game's own: its table's percent of
+    -- GetUnitMaxHp. One owner for the board's read (s.terrainHeal) and the sandbox's (healFaction).
+    local healPct = {}
+    local function healAmount(call, terrain, addr)
+        assert(S.GetTerrainHealAmount, "sight.terrainHeal: symbols.lua lacks GetTerrainHealAmount (run gen_symbols.py)")
+        local pct = healPct[terrain]
+        if pct == nil then
+            pct = call(S.GetTerrainHealAmount, { terrain })   -- a ROM table: read once a terrain
+            healPct[terrain] = pct
+        end
+        if pct == 0 then return 0 end
+        return M.terrainHealPoints(pct, call(S.GetUnitMaxHp, { addr }))
+    end
+
+    -- The start of `faction`'s phase inside a sandbox: each of its units the game would heal (not
+    -- Board.terrainHealSkips) gains its tile's heal, held to its max HP (Board.addHp), where it
+    -- stands NOW (the second phase's units have moved). The game does this at the start of each
+    -- faction's own phase (MakeTerrainHealTargetList(gPlaySt.faction)) before anyone acts, and our
+    -- plan's HP on the reds (plan.reds) is the unhealed one, so every phase the planner judges
+    -- starts from the same HP the game's own would (#709). Each unit's own writes are independent,
+    -- so the order of `byId` does not matter.
+    local function healFaction(call, byId, faction)
+        for _, o in pairs(byId) do
+            if o.faction == faction and not Board.terrainHealSkips({ state = mem.u32(o.addr + UNIT_STATE) }) then
+                local hp = mem.u8(o.addr + UNIT_HP)
+                if hp > 0 then
+                    local terrain = grid(mem, S.gBmMapTerrain, mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y))
+                    local heal = healAmount(call, terrain, o.addr)
+                    if heal > 0 then
+                        -- `decides`: only the reds, whose phase it is, read the heal flags again; a blue's or
+                        -- green's heal changes no red's decision
+                        wound(o.addr, Board.addHp(hp, heal, call(S.GetUnitMaxHp, { o.addr })),
+                              faction == "red")
+                    end
+                end
+            end
+        end
+    end
+
     -- the enemy phase against a staged plan, inside an open sandbox (enemyPhase, nextPhase):
     -- our units stood and their HP set, armed as the plan leaves them, the reds' HP and the
     -- uses their counters to our planned attacks spent, the gone off the map. `wearing.base` is
@@ -3135,6 +3190,7 @@ function M.new(outer)
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
         end
+        healFaction(call, byId, "red")   -- the reds' phase begins: a heal tile heals before any acts
         local wearing = { base = M.stageWear(api, call, S, plan, byId) }
         stageCarry(byId, plan.carry)
         local function remove(e, x, y) M.takeOff(api, e, x, y) end
@@ -3458,6 +3514,11 @@ function M.new(outer)
             decideAll(order())
             -- the second phase wears on what the first and the reply left
             wearing.base = wearing.after(first)
+            -- the greens' phase and then the player's begin between the two reds' phases: a heal
+            -- tile heals each of those units as it does the reds, before the army's reply moves
+            -- (and `hp` below)
+            healFaction(call, byId, "green")
+            healFaction(call, byId, "blue")
             local played = reply and armyReply(call, proc, byId, remove, wearing) or nil
             -- player units and the greens: a green whose death ends the game is protected too
             local hp = {}
@@ -3471,6 +3532,8 @@ function M.new(outer)
             -- the fog as the first phase leaves it (RefreshUnitsOnBmMap sets US_BIT9 there): an
             -- enemy that walked out of it is seen, one that walked into it is not
             M.refresh(api, call, S, byId)
+            -- the second reds' phase begins (after the army's reply, as the game's)
+            healFaction(call, byId, "red")
             -- our berserked units again, those the next player phase's start leaves berserked
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
                                   remove, nil, cast)
@@ -3969,6 +4032,19 @@ function M.new(outer)
             end)
         end
         for _, u in ipairs(units) do u.maxhp = own[ownKey("maxhp", u, "-")] end
+    end
+
+    -- healFaction on its own, the units as { faction, addr } by id (the phase's `byId`)
+    function s.healFaction(byId, faction) sandbox(function(call) healFaction(call, byId, faction) end) end
+
+    function s.terrainHeal(u)
+        if Board.terrainHealSkips(u) then return 0 end
+        local terrain = s.terrain(u.x, u.y)
+        local k = ownKey("terrainheal", u, "-") .. ":" .. terrain
+        if own[k] == nil then
+            own[k] = sandbox(function(call) return healAmount(call, terrain, u.addr) end)
+        end
+        return own[k]
     end
 
     function s.mend(u)
