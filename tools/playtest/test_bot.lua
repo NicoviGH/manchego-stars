@@ -4085,6 +4085,33 @@ do
     t, goal = chestTurns({ convoyChestKey = key })
     check(t == nil and goal == nil, true,
           "chest key: with no Supply tile in reach the chest is no way")
+    -- #710: the way is read alike whether `from` is the unit or a planner's position table at its
+    -- tile (the memo key reads coordinates), in either order; a unit that moved on has none. The
+    -- chest read `beside` (a recruit standing on it) leaves the lock out, with no key anywhere.
+    do
+        local o = { convoyChestKey = key, supplyAt = { ["1,0"] = true } }
+        o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
+        o.field = fieldsOf { ["4,0"] = { ["0,0"] = 4, ["1,0"] = 3, ["4,0"] = 0 } }
+        o.doors, o.obstacles = {}, {}
+        o.explorable = { { x = 4, y = 0, kind = "chest" } }
+        o.canExplore, o.locked = {}, { [0x01] = { ["4,0"] = "chest" } }
+        local _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+        local chest = { x = 4, y = 0 }
+        local pos = { x = 0, y = 0, acted = false }
+        ctx.keyTurns = {}   -- candidates already read the unit's own
+        local viaPos = ctx.turnsTo(A, chest, pos)
+        check(viaPos ~= nil and viaPos == ctx.turnsTo(A, chest), true,
+              "chest key: a planner's position at the unit's tile reads as the unit's own")
+        ctx.keyTurns = {}
+        check(ctx.turnsTo(A, chest) == viaPos, true, "chest key: the same read in the other order")
+        check(ctx.turnsTo(A, chest, { x = 1, y = 0, acted = false }), nil,
+              "chest key: a unit that moved on takes no convoy key")
+        o.convoyChestKey = {}
+        _, ctx = B.candidates(boardOf(A, E), sightOf(o), style("careful"))
+        check(ctx.turnsTo(A, chest, { x = 1, y = 0 }), nil, "beside: with no key the chest is shut")
+        check(ctx.turnsTo(A, chest, { x = 1, y = 0 }, true) ~= nil, true,
+              "beside: the lock on the tile is left out")
+    end
     -- the Take's key names its lock, so a replay takes the chest key the plan took
     local k = Planner.key({ unitId = 1, act = "supply", move = { x = 1, y = 0 }, terrain = 33 })
     local back = Planner.unkey(k)

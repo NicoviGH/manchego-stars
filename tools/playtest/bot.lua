@@ -1595,7 +1595,10 @@ turnsFor = function(ctx, u, tile, from, seeking, keyed)
         n = select(2, keyWay(ctx, u, tile, from, lock, seeking))
         -- a chest key in the convoy is a way too (#699): taken with Supply (supplyKey), after
         -- which the chest is the walk alone, so the walk with the key is its turns
-        if from == u and convoyChestKey(ctx, u, tile) then
+        -- only from where `u` stands: the take is this turn's act. By coordinates, not table
+        -- identity: a planner position is never `u`, and the memo key above reads coordinates, so
+        -- identical arguments must read alike (#710)
+        if from.x == u.x and from.y == u.y and convoyChestKey(ctx, u, tile) then
             local c = turnsFor(ctx, u, tile, from, seeking, true)
             if c and (not n or c < n) then n = c end
         end
@@ -2963,11 +2966,11 @@ turnsOn = function(ctx, walls, pos)
     if #keys == 0 then return ctx.turnsTo end
     table.sort(keys)
     local sig = table.concat(keys, ";")
-    return function(u, tile, from)
+    return function(u, tile, from, beside)
         ctx.wallHp, ctx.wallPos, ctx.wallSig = walls, pos, sig
         -- cleared whatever happens: an error left inside it would key every later read as this
         -- plan's board
-        local ok, n = pcall(turnsFor, ctx, u, tile, from)
+        local ok, n = pcall(turnsFor, ctx, u, tile, from, nil, beside)
         ctx.wallHp, ctx.wallPos, ctx.wallSig = nil, nil, nil
         if not ok then error(n, 0) end
         return n
@@ -3083,7 +3086,10 @@ function M.candidates(board, sight, style, opts)
     -- asks it per goal, taker and partial plan, and a unit cut off goes through breachFor and
     -- the field again each time
     ctx.keyTurns, ctx.ways = {}, {}
-    ctx.turnsTo = function(u, tile, from) return turnsFor(ctx, u, tile, from) end
+    -- `beside`: the tile's lock is left out (a Talk is beside a recruit, not on his tile)
+    ctx.turnsTo = function(u, tile, from, beside)
+        return turnsFor(ctx, u, tile, from, nil, beside)
+    end
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
     ctx.pending = opts and opts.pending
     ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)
