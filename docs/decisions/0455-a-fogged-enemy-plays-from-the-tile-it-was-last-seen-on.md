@@ -57,4 +57,10 @@ it (comment 7078483524).
   phase, and `enemiesOf` lists it at the seen tile. The control, a sight told nothing, reads none
   of it. Its struct and the seen cell are as they were after every read, and no sandbox leak is
   logged: PASS.
-- One replay, tag `fix713g` (vanilla Ch19 `b640e-cs-s4003` attempt 1): see #713.
+- One replay, tag `fix713g` (vanilla Ch19 `b640e-cs-s4003` attempt 1, `resume --scout
+  --attempts 1`), against main's `isomain`. Turns 1-2 play the same: the escort's green armor
+  knights (0xCD) die as on main. From there on, main lost on turn 7 with four player deaths, three
+  of them to unseen enemies read at 0 or near it (Saleh 0x17 on turn 5 to arrival 155, the
+  ghost case). The branch lost on turn 12 with three, none to the fog: Knoll (0x1F) on turn 9 read
+  at 0.038 (`rng_tail`), Saleh on turn 11 over the cap (0.449), Franz (0x04) on turn 12 read at 0
+  (`other`, not fog; untested). One game: a lead, not a measurement.
