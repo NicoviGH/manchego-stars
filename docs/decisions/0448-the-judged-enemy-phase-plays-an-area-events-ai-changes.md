@@ -31,13 +31,25 @@ turn 4, and the Sage kills of s4007 and s4009).
 
 **What changed.**
 - `Sight.scriptAiChanges(mem, script)`: the CHAIs of a script, over the one script walker
-  (`walkScript`, ADR 0446), slot 1 and slot 2 tracked through CALLs.
+  (`walkScript`, ADR 0446), slot 1 and slot 2 tracked through CALLs; it also counts the `CHAI_AT`s
+  it does not read (`positional`) and says when the budget cut the walk (`truncated`).
 - `Sight.areaWake(...)`, called by `stagePhase` (the one owner of the judged phase's staging, so
-  `enemyPhase` and the lookahead's first phase share it): for each blue unit the plan **acts**
-  (`acted`, new on the planner's blues), the game is asked what the Misc list offers with that unit
-  as `gActiveUnit` (`availableList`, now the ordered owner of `availableScripts`), a flag taken by an
-  earlier entry is not offered again, and each script's CHAIs are written through `M.changeUnitAi`
-  (journaled; the AI words `keep16`'d first, `M.keepAi`).
+  `enemyPhase` and the lookahead's first phase share it) with the plan's **waits**
+  (`plan.waits`, `Planner.waitsIn`: each unit the plan acts, with its act's index): in act order
+  (the game runs the Misc events after each wait in turn, so of two entries sharing a flag the first
+  unit to wait fires its script), the unit is stood on its end tile for the ask, the game is asked
+  what the Misc list offers (`availableList`, now the ordered owner of `availableScripts`), a flag
+  taken by an earlier wait is not offered again, and each script's CHAIs are written through
+  `M.changeUnitAi` (api writes: the journal restores them, and the decisions' own `keepAi` unwinds
+  first, so no `keep16` of ours).
+- A unit whose counter kills it still waits (`RunPotentialWaitEvents` after `ApplyUnitAction`,
+  `playerphase.c:98-99`, `cp_perform.c:85-86`; `UnitKill` keeps its tile, `bmunit.c:958`): the
+  waits of a way include the dead actors, which are in no board list, so their struct is stood on the
+  end tile for the ask alone and put back. The first version woke nothing in such a way (it
+  under-woke).
+- The unread parts are counted, never silent: the judged phase's result carries `.areaPositional` and
+  `.areaTruncated`, the planner's cost line `area_positional` / `area_truncated` next to `averaged` and
+  `unsplit`, and the bot's record `plans.area_positional` / `plans.area_truncated`.
 - Keys: `M.phaseKey` (the kept phase start) now includes each unit's `ai1` and `ai2`: a start kept
   on a board where the Sage slept would write its `aiFlags` over a woken one (`AI_UNIT_FLAG_3`).
   `closingsKey` and the danger grids are not read inside the judged phase (the danger map is the
@@ -45,14 +57,19 @@ turn 4, and the Sage kills of s4007 and s4009).
   (`seen.area`) is dropped with the board by `refresh()`.
 
 **Not read, labelled.** `CHAI_AT` (queue-driven, `EventScr_ChangeAIinQueue`,
-`events_script_utils.c:523`) is counted in `positional` and not played: vanilla E_10's and E_14's AREA
-scripts use it (`ch10a-eventscript.h:368`, `ch14a-eventscript.h:411`), a follow-up issue. Guards in a
-script are not evaluated (a walk, as `scriptEffects`); the player's units pass the faction guard.
-The lookahead's reply turn ends units elsewhere and wakes nothing. Units in the plan with no act do
-not trigger: the game runs the event at their wait only.
+`events_script_utils.c:523`) is counted, not played: vanilla E_10's and E_14's AREA scripts use it
+(`ch10a-eventscript.h:368`, `ch14a-eventscript.h:411`), follow-up #727. Guards in a script are not
+evaluated (a walk, as `scriptEffects`); the player's units pass the faction guard. `RunWaitEvents`'
+other work is not modelled: it sets or clears `EVFLAG_DEFEAT_ALL` and runs nothing when flag 0x65 is
+set or no blue unit is left. The lookahead's reply turn ends units elsewhere and wakes nothing.
+Units in the plan with no act do not trigger: the game runs the event at their wait only.
 
 **Tested how.** `test_sight.lua` "areaWake": a fake game answers `SearchAvailableEvent` as
 `EvCheck0B_AREA` does; a unit ending in the area switches the Sage 6/7 -> 3/3 and the 0x8f unit to
-0/0; the control (outside, or not acting) leaves them; a shared flag fires once; a taken flag, a dead
-unit, the tile memo and `phaseKey` have their cases. `test_bot.lua`: the planner tells the judged
-phase which units acted. Each fails on the code without the change (reverted and run).
+0/0; the control (outside, or no wait) leaves them; a shared flag fires once; two entries of one flag
+and different scripts fire for the first unit in act order, not roster order; a dead actor's end
+tile wakes and its struct is put back; the positional count; a taken flag, a dead unit, the tile memo
+and `phaseKey`. `test_bot.lua`: the judged phase is told the plan's waits with their act index, and
+`Planner.waitsIn` includes a counter-killed actor and no unit without an act. Each fails
+individually with its piece removed (areaWake a no-op, the call out of `stagePhase`, the act-order
+sort, the end-tile stand).

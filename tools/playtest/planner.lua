@@ -134,7 +134,9 @@
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
 -- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
--- left unsplit below sight's SPLIT_FLOOR, summed over them), floored (the ways of the plan's
+-- left unsplit below sight's SPLIT_FLOOR, summed over them), area_positional and area_truncated
+-- (the CHAI_AT commands, #727, and the walks the budget cut short in the Misc scripts the plans'
+-- waits ran, which the judged phase did not play: M.areaWake), floored (the ways of the plan's
 -- uncertain kills left unsplit below that floor of the plan, ADR 0415), look = { decisions, triggered,
 -- extended, skipped_budget, calls, cpu_s, wear, wear_cpu_s, wear_skipped } (the lookahead's and
 -- the wear's; absent when no unit can act) }.
@@ -680,10 +682,27 @@ function M.wearAt(at, hp)
     return n
 end
 
+-- The waits a way of a judged plan makes (sight's M.areaWake): `blues` = the way's blues, of
+-- which each that acts waits; and each acting unit in `dead` (its counter killed it): the game
+-- runs the Misc events after the action whether or not the actor lived (playerphase.c:98-99,
+-- cp_perform.c:85-86), and a dead actor is in no board list. `planned` = the plan's entries
+-- ({ unit, x, y, acted, order }); a unit whose act was not played is `unacted` (acted false) and
+-- waits nowhere. Pure.
+function M.waitsIn(planned, dead, blues)
+    local out = {}
+    for _, p in ipairs(planned) do
+        if p.acted and dead[p.unit.id] then out[#out + 1] = p end
+    end
+    for _, p in ipairs(blues) do
+        if p.acted then out[#out + 1] = p end
+    end
+    return out
+end
+
 -- A finalist's staged board for sight.nextPhase: its first phase as the judge played it.
 function M.staged(st)
     local ph = st.phase
-    return { blues = ph.blues, gone = ph.gone, reds = ph.reds, redWear = ph.redWear,
+    return { blues = ph.blues, waits = ph.waits, gone = ph.gone, reds = ph.reds, redWear = ph.redWear,
              opened = ph.opened, carry = ph.carry }
 end
 
@@ -860,7 +879,8 @@ function M.plan(Bot, board, sight, style, opts)
     else
         cands, ctx = Bot.candidates(board, sight, style, opts)
     end
-    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0, floored = 0 } end
+    if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0, floored = 0,
+                                      area_positional = 0, area_truncated = 0 } end
     if now then now.stage = "search" end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
@@ -1702,6 +1722,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the average past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
+                   area_positional = 0, area_truncated = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
     -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
@@ -1816,8 +1837,8 @@ function M.plan(Bot, board, sight, style, opts)
         return res, none
     end
     local function judge(st)
-        local planned, at = {}, {}
-        for _, a in ipairs(st.acts) do at[a.unitId] = a end
+        local planned, at, nth = {}, {}, {}
+        for i, a in ipairs(st.acts) do at[a.unitId], nth[a.unitId] = a, i end
         for _, u in ipairs(ctx.blues) do
             local a = at[u.id]
             local at = a and endTile(a)
@@ -1828,9 +1849,10 @@ function M.plan(Bot, board, sight, style, opts)
             local w = st.wear[u.id]
             planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
-                                      -- a unit the plan acts ends its action there: the game
-                                      -- runs the chapter's Misc events after it (#712)
-                                      acted = a ~= nil,
+                                      -- a unit the plan acts ends its action there, the nth
+                                      -- act: the game runs the chapter's Misc events after it
+                                      -- (#712, waitsIn)
+                                      acted = a ~= nil, order = nth[u.id],
                                       -- a strike's weapon, or a bait's (Bot.baitAt): the
                                       -- one its counter answers the boss with
                                       slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
@@ -1962,7 +1984,8 @@ function M.plan(Bot, board, sight, style, opts)
             end
             return inWay(list, w, function(p) return not p.unacted and p.unit.id or nil end)
         end
-        st.phase = { blues = bluesIn({ gone = gone, dead = {}, hp = {} }), gone = gone, reds = reds,
+        local blues0 = bluesIn({ gone = gone, dead = {}, hp = {} })
+        st.phase = { blues = blues0, waits = M.waitsIn(planned, {}, blues0), gone = gone, reds = reds,
                      redWear = st.redWear,
                      opened = st.opened, carry = st.carry }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
@@ -2032,10 +2055,14 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             if phase then cost.phases = cost.phases + 1 end
             if now then now.phases = cost.phases end
-            local s = phase and phase({ blues = bluesIn(w), gone = w.gone, reds = w.reds,
+            local blues = bluesIn(w)
+            local s = phase and phase({ blues = blues, waits = M.waitsIn(planned, w.dead, blues), gone = w.gone,
+                                        reds = w.reds,
                                         redWear = st.redWear, mass = w.p,
                                         opened = st.opened, carry = st.carry }) or {}
             unsplit = unsplit + (s.unsplit or 0)
+            cost.area_positional = cost.area_positional + (s.areaPositional or 0)
+            cost.area_truncated = cost.area_truncated + (s.areaTruncated or 0)
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
                 outcomes[#outcomes + 1] = { p = w.p * o.p, strikes = o.strikes, way = i }
                 total = total + w.p * o.p

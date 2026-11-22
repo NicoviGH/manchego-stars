@@ -1034,10 +1034,9 @@ do
     check(Planner.wearAt({ [0] = 1, [4] = 1 }, 4), 1, "wearAt: the second blow cut off at 4 HP")
 end
 
--- #712: the judged phase is told which of our units act (`acted`): the game runs the chapter's Misc
--- events (an AREA event that wakes an enemy) after a unit's wait, and only a unit the plan acts
--- waits. A judged plan's acted units are exactly the units of its acts, the rest stand where they
--- are and trigger nothing.
+-- #712: the judged phase is told the waits the plan makes (`waits`): the game runs the chapter's
+-- Misc events (an AREA event that wakes an enemy) after a unit's wait, in the order the units act.
+-- A judged plan's waits are exactly the units of its acts, each with its act's index.
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
     local Idle = blue(0x02, 5, 5, 1, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
@@ -1047,22 +1046,33 @@ do
         reach = { [0x01] = tiles({ 0, 1 }) },
         fc = { [0x01] = { [0x81] = { ["0,1"] = fc { hit = 100, dmg = 6, hits = 1, wearSlot = 0 } } } },
         enemyPhase = function(plan)
-            local acted = {}
-            for _, b in ipairs(plan.blues) do acted[#acted + 1] = b.unit.id .. "=" .. tostring(b.acted) end
-            seen[#seen + 1] = table.concat(acted, ",")
+            local waits = {}
+            for _, w in ipairs(plan.waits or {}) do
+                waits[#waits + 1] = w.unit.id .. "@" .. w.x .. "," .. w.y .. "#" .. tostring(w.order)
+            end
+            seen[#seen + 1] = table.concat(waits, " ")
             return {}
         end,
     }
     Planner.plan(B, boardOf(A, Idle, E), sightOf(o), style("careful"))
-    local anyActed, anyIdle, nonBool = false, false, false
+    local anyA, anyOrdered = false, true
     for _, line in ipairs(seen) do
-        anyActed = anyActed or line:find("1=true", 1, true) ~= nil
-        anyIdle = anyIdle or line:find("2=false", 1, true) ~= nil
-        nonBool = nonBool or line:find("=nil", 1, true) ~= nil
+        anyA = anyA or line:find("1@", 1, true) ~= nil
+        for w in line:gmatch("%S+") do anyOrdered = anyOrdered and w:find("#%d+$") ~= nil end
     end
-    check(#seen > 0 and not nonBool, true, "#712 acted: every blue of a judged plan says whether it acted")
-    check(anyActed, true, "#712 acted: a plan that acts A tells the judged phase so")
-    check(anyIdle, true, "#712 acted: a plan that leaves the other unit alone tells it did not act")
+    check(#seen > 0 and anyA, true, "#712 waits: a plan that acts A tells the judged phase A waits")
+    check(anyOrdered, true, "#712 waits: each wait carries its act's index")
+
+    -- waitsIn: the way's acting blues, then the actors its counters killed (in no blues list)
+    local function p(id, acted, order) return { unit = { id = id }, x = id, y = 0, acted = acted, order = order } end
+    local planned = { p(1, true, 2), p(2, true, 1), p(3, false), p(4, true, 3) }
+    local blues = { planned[1], planned[3], planned[4] }       -- unit 2's counter killed it
+    local ids = {}
+    for _, w in ipairs(Planner.waitsIn(planned, { [2] = true }, blues)) do ids[#ids + 1] = w.unit.id end
+    check(table.concat(ids, ","), "2,1,4", "#712 waitsIn: a dead actor still waits, a unit with no act does not")
+    ids = {}
+    for _, w in ipairs(Planner.waitsIn(planned, {}, { planned[1], planned[3], planned[4] })) do ids[#ids + 1] = w.unit.id end
+    check(table.concat(ids, ","), "1,4", "#712 waitsIn control: with no death, the acting blues alone")
 end
 
 -- #644 review (PR #645, finding 7): an enemy's weapon worn by countering our planned attack.
@@ -9311,7 +9321,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds,waits", "lookahead: the staged board, nothing more")
 end
 
 -- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers
