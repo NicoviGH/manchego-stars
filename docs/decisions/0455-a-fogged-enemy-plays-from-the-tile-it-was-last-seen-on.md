@@ -58,7 +58,7 @@ it (comment 7078483524).
   of it. Its struct and the seen cell are as they were after every read, and no sandbox leak is
   logged: PASS.
 - One replay, tag `fix713g` (vanilla Ch19 `b640e-cs-s4003` attempt 1, `resume --scout
-  --attempts 1`), against main's `isomain`. Turns 1-2 play the same: the escort's green armor
+  --attempts 1`), against main's `isomain`. Turns 1-2 play the same: the green armor
   knights (0xCD) die as on main. From there on, main lost on turn 7 with four player deaths, three
   of them to unseen enemies read at 0 or near it (Saleh 0x17 on turn 5 to arrival 155, the
   ghost case). The branch lost on turn 12 with three, none to the fog: Knoll (0x1F) on turn 9 read
