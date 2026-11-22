@@ -29,7 +29,10 @@ win's own counts, and ADR 0384 forbids counting a unit's death again as a forfei
 is never counted this way (the issue's "before its deadline"). `reach` and `gone` come together
 (`forfeited` asserts it). No new weight. `Goals.chance` reads 0 for a goal whose closing phase is
 before the phase its taker arrives on, so "no unit can arrive in time" is the 0. A taken goal is
-not read.
+not read. `reached` ignores a chest opener's death or theft (`p.opens = nil`), so a plan that
+lets a thief steal the key is not forfeit through this path: that is ADR 0384's cap and the theft
+price (ADR 0442). It reads only the dated goals whose ledger row is feasible, and nothing when
+there are none.
 
 **The risk, and what limits it.** A false 0 from the chance model, on either side. The floor
 (`before >= GONE`) only guards the BEFORE side: a goal that was never likelier than not is no loss.
@@ -50,6 +53,11 @@ holding the Seize. That is right: a goal lost by its deadline is lost, and the S
 nothing. The closure path is the one `g.closes <= 1` already takes. It cannot flag a skip the rank
 chose, because forfeits rank first: a plan that forfeits every remaining goal ties the Seize on
 forfeits (the win closes all) and loses to it on `complete`.
+
+**Seize test.** `test_bot.lua`: a lord who can Seize, and a village out of reach by its deadline
+once he has acted: the waiting plan forfeits it (1), the Seize ties on forfeits and wins on
+`complete`, so it is played. With the rule off the waiting plan forfeited nothing and the village
+held the Seize back (tried: the rule's clause disabled, the test fails).
 
 **Proof (ADR 0430).** `test_goals.lua`: a dated goal driven from 0.6 to 0 is counted; 0.3 to 0, 0.9 to 0.2
 and an undated goal at 0.6 to 0 are not; `reach` without `gone` raises. `test_bot.lua`, on a village
