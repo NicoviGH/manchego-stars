@@ -94,7 +94,9 @@ than the objective. A skip with one is justified and is not a stall. The anomali
 - `bait_loop`: an enemy that stood on two tiles in turn for four phase starts;
 - `same_turn_green`: a green lost on the turn it was first seen at a phase start, so the planner
   had one player phase to save it;
-- `unseen_green`: a green lost before any player phase saw it.
+- `unseen_green`: a green lost before any player phase saw it;
+- `arrival_unstamped`: a red on the field with no arrival stamp and no event naming it, or a
+  killer no board showed (ADR 0449).
 
 `narrate` is `montecarlo.py story <trace> --turn N`, which tells that turn and the one before.
 `montecarlo.keep_trace` sets it, the one place that knows where the trace is kept; botrun records

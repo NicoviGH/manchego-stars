@@ -46,14 +46,17 @@
 --                            raises ends the read (M.watched; botrun's decision budget).
 --   newPhase()               refresh(), and a fresh `cache` for the phase: an AI a turn event
 --                            rewrote between phases is in no cache key.
---   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId, classId } }, every
+--   remember(enemies)        a retry's memory (ADR 0399): enemies = { { id, charId, classId, arrival } }, every
 --                            red unit earlier attempts at this start showed on screen (nil or
 --                            {} on attempt 1). From then on a remembered unit counts as seen
 --                            wherever the fog alone would hide it: danger, threat, keySources,
 --                            closings' looters and both judged phases (M.playsAsSeen).
---   knows(u)                 whether red unit `u` is one remember() named (Board.memoryKey: its
---                            slot, character and class; an arrival can take a slot another unit
---                            died out of).
+--   knows(u)                 whether red unit `u` is one remember() named (Board.memoryKey: a unit
+--                            on the field at the start by its slot, character and class; an
+--                            arrival by its character, class and arrival turn, ADR 0449, for
+--                            it can take a slot another unit died out of).
+--   arrived(list)            botrun's stamps: { { id, charId, classId, turn } }, the turn each
+--                            red unit arrived on (0: there at the start), what knows() reads
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
 --                            the game shows them, a remembered unit's tile lifted out of the
 --                            fog for the call: 0 when no enemy reaches (x, y), else its
@@ -2888,8 +2891,13 @@ function M.changed(sandbox, api, S, isolate, change, byId, fn, prime)
 end
 
 -- Whether red unit `u` is one a retry remembers: `keys` = { [Board.memoryKey] = true } (s.knows).
-function M.knows(Board, keys, u)
-    return keys ~= nil and u ~= nil and keys[Board.memoryKey(u.id, u.charId, u.classId)] == true
+-- `arrival`: the turn `u` arrived on (nil or 0 for one on the field at the start). A unit that
+-- arrived is asked by its class and turn alone, never by the slot it landed in; one on the field
+-- at the start by its slot (Board.memoryKey, ADR 0449). So a memory of the start's unit in a slot
+-- does not name an arrival that took the slot later, nor the reverse.
+function M.knows(Board, keys, u, arrival)
+    return keys ~= nil and u ~= nil
+        and keys[Board.memoryKey(u.id, u.charId, u.classId, arrival)] == true
 end
 
 -- Whether an enemy with unit state `state` counts as seen (Board.playsAsSeen, the game's US_BIT9
@@ -3255,12 +3263,33 @@ function M.new(outer)
         remembered = nil
         for _, e in ipairs(enemies or {}) do
             remembered = remembered or {}
-            remembered[Board.memoryKey(e.id, e.charId, e.classId)] = true
+            remembered[Board.memoryKey(e.id, e.charId, e.classId, e.arrival)] = true
         end
         -- every answer read before is without the memory; attempt 1 (none) keeps them
         if remembered then s.refresh() end
     end
-    function s.knows(u) return M.knows(Board, remembered, u) end
+    -- The turn each slot's present unit arrived on (botrun's stamp, ADR 0449): slot -> { charId,
+    -- classId, turn }; `list` = { { id, charId, classId, turn } }. A slot another unit holds now
+    -- has no arrival under this unit's name. The answers read before are without a changed
+    -- arrival, so they are dropped (once per list), but only when one changes: the start's units
+    -- (turn 0) are keyed by slot and change nothing.
+    local arrivals = {}
+    function s.arrived(list)
+        local changed = false
+        for _, e in ipairs(list) do
+            local was = arrivals[e.id]
+            local before = was and was.charId == e.charId and was.classId == e.classId
+                and was.turn > 0 and was.turn or nil
+            if (e.turn > 0 and e.turn or nil) ~= before then changed = true end
+            arrivals[e.id] = { charId = e.charId, classId = e.classId, turn = e.turn }
+        end
+        if changed and remembered then s.refresh() end
+    end
+    function s.arrivalOf(u)
+        local a = arrivals[u.id]
+        return a and a.charId == u.charId and a.classId == u.classId and a.turn or nil
+    end
+    function s.knows(u) return M.knows(Board, remembered, u, s.arrivalOf(u)) end
     -- Inside a sandbox: every remembered red's tile out of the fog (gBmMapFog 1), the one test
     -- GenerateDangerZoneRange skips a fogged unit by (bmidoten.c), so its reach counts as if seen.
     -- Where each stands and its fog bit are read off its unit struct, not the board's snapshot:

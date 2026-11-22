@@ -28,10 +28,10 @@ screen, fog or not; its class is read from the board after the deaths, where an 
 struck in the phase stands, else the one before, `killerClass`). A unit killed and a later
 arrival in its slot are both kept: botrun keeps what it saw by the whole key. A unit whose class
 was not read is not kept: its key would match nothing. Each is
-kept once by slot, character and class (`Board.memoryKey`). Every attempt loads the same start,
-so a unit keeps its slot; an arrival can take a slot another unit died out of, so the character
-and class must match too. The character alone is not enough: most enemies share one generic
-character id. The reinforcement arrival turns (ADR 0386) are still
+kept once by `Board.memoryKey`: a unit on the field at the start by slot, character and class
+(every attempt loads the same start, so it keeps its slot; the character alone is not enough:
+most enemies share one generic character id). **Amended by ADR 0449 (2026-11-22):** an arrival
+is kept by character, class and arrival turn, since it can take a slot another unit died out of. The reinforcement arrival turns (ADR 0386) are still
 kept and used as before. A dice result is never remembered.
 
 ## 2. How the bot uses it
@@ -71,7 +71,7 @@ rule's. So a death reaches the next attempt only through its killer.
 
 | What the screen shows | Remembered? |
 |---|---|
-| Each enemy: where, class, weapons and items | Yes, by slot, character and class. The start is the same, so its class, items and stats are the live unit's. |
+| Each enemy: where, class, weapons and items | Yes, a start unit by slot, character and class, an arrival by character, class and turn (ADR 0449). The start is the same, so its class, items and stats are the live unit's. |
 | The map the fog opened | Nothing to remember. FE8's fog hides units only (`RefreshUnitsOnBmMap` sets `US_BIT9` on a unit on a fogged tile); the terrain is always drawn. |
 | Reinforcements | Their arrival turns (ADR 0386). Once loaded, an arrival is a remembered unit like any other. |
 | Who died, where, and to what | The killer, as a remembered enemy. Where our unit stood is the play's, not the game's. |

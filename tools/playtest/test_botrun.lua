@@ -857,6 +857,181 @@ do
     check(seen[Bot.memoryKey(0x83, 2)], nil, "one only ever fogged is not")
 end
 
+-- ADR 0449: an arrival is remembered by the turn it came on (the board turn arrivals_seen's
+-- boardTurn names), not left as its slot; a red on the field at the start has none; and the
+-- sight is told each arrival's turn as the board shows it, fogged or not.
+do
+    local g = fakeGame {
+        units = rout(),
+        enemy = function(g)
+            if g.turn == 1 then
+                g.units[#g.units + 1] = unit(0x82, 1, "red", 9, 9, 10)
+                local hid = unit(0x83, 2, "red", 9, 8, 10)
+                hid.fogged = true
+                g.units[#g.units + 1] = hid
+            end
+            return {}
+        end,
+    }
+    local told = {}
+    local make = g.api.sight
+    g.api.sight = function()
+        local s = make()
+        s.arrived = function(list) for _, e in ipairs(list) do told[e.id] = e.turn end end
+        return s
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local byChar = {}
+    for _, e in ipairs(r.enemies_seen) do byChar[e.charId] = e end
+    check(byChar[0x82].arrival, r.arrivals_seen[1].boardTurn, "an arrival in sight is kept with its turn")
+    check(told[0x82], r.arrivals_seen[1].boardTurn, "the sight is told the arrival's turn")
+    check(told[0x83], told[0x82], "a fogged arrival is told its turn too")
+    for _, u in ipairs(rout()) do
+        if u.faction == "red" then
+            check(byChar[u.charId].arrival, nil, "a red on the field at the start has no arrival")
+            check(told[u.id], 0, "and the sight is told turn 0")
+        end
+    end
+end
+
+-- ADR 0449, review of #729. The arrival turn has ONE owner, arrivals_seen's detector (stamp):
+-- a slot refilled by the same character and class gets its own turn; a killer that landed in
+-- the phase is stored once, arrival-keyed; a board read mid enemy phase gives the same turn as
+-- the player phase after it.
+do
+    local function arrivalGame(extra)
+        local g = fakeGame { units = rout(), enemy = function(g, find) return extra(g, find) or {} end }
+        local stamps = {}
+        local make = g.api.sight
+        g.api.sight = function()
+            local s = make()
+            s.arrived = function(list)
+                for _, e in ipairs(list) do stamps[e.id] = stamps[e.id] or {}; table.insert(stamps[e.id], e.turn) end
+            end
+            return s
+        end
+        return g, stamps
+    end
+    -- a dead red's slot refilled by the same character and class between two boards
+    local firstRed
+    local g, stamps = arrivalGame(function(g)
+        if g.turn == 1 then
+            for _, u in ipairs(g.units) do
+                if u.faction == "red" and not firstRed then firstRed = u end
+            end
+            local fresh = {}
+            for k, v in pairs(firstRed) do fresh[k] = v end
+            for i, u in ipairs(g.units) do if u == firstRed then g.units[i] = fresh end end
+            g.refilled = { id = firstRed.id, charId = firstRed.charId, faction = "red" }
+        end
+    end)
+    g.api.killed = function()
+        if g.refilled and not g.told then g.told = true; return { g.refilled } end
+        return {}
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(stamps[firstRed.id][1], 0, "refill: the unit there at the start is turn 0")
+    check(stamps[firstRed.id][2], 2, "refill: the same character and class in a killed slot has its own turn")
+    local arrivedChars = {}
+    for _, a in ipairs(r.arrivals_seen) do arrivedChars[#arrivedChars + 1] = a.charId end
+    check(arrivedChars[1], firstRed.charId, "refill: the one detector notes it in arrivals_seen")
+
+    -- an arrival that kills on its landing turn is stored once, arrival-keyed (not slot-keyed first)
+    g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
+                             unit(0x81, 0, "red", 9, 9, 10) },
+                   enemy = function(g, find)
+                       if g.turn == 1 and not g.came then
+                           g.came = true
+                           local W = unit(0x85, 4, "red", 1, 0, 10)
+                           W.classId = 0x22
+                           g.units[#g.units + 1] = W
+                           local u = find(0x01)
+                           u.hp, u.dead, u.onField = 0, true, false
+                       end
+                       return {}
+                   end }
+    g.api.killed = function()
+        if g.turn ~= 2 or g.told then return {} end
+        g.told = true
+        return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x85, killerId = 0x85,
+                   phase = "enemy" } }
+    end
+    Botrun.run(g.api)
+    r = recordOf(g)
+    local n, arrival = 0, nil
+    for _, e in ipairs(r.enemies_seen) do
+        if e.id == 0x85 then n = n + 1; arrival = e.arrival end
+    end
+    check(n, 1, "killer arrival: stored once")
+    check(arrival, 2, "killer arrival: arrival-keyed")
+    local anomalies = 0
+    for _, a in ipairs(r.anomalies) do if a.kind == "arrival_unstamped" then anomalies = anomalies + 1 end end
+    check(anomalies, 0, "killer arrival: nothing had to be stamped late")
+
+    -- a kill reported late for a slot the previous board already showed dead is no refill
+    local deadRed
+    g, stamps = arrivalGame(function(g)
+        if g.turn == 1 then
+            for _, u in ipairs(g.units) do
+                if u.faction == "red" and not deadRed then
+                    deadRed = u
+                    u.hp, u.dead, u.onField = 0, true, false
+                end
+            end
+        elseif g.turn == 2 then
+            g.late = { id = deadRed.id, charId = deadRed.charId, faction = "red" }
+        end
+    end)
+    g.api.killed = function()
+        if g.late and not g.told then g.told = true; return { g.late } end
+        return {}
+    end
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(#r.arrivals_seen, 0, "a late kill report: no arrival")
+    check(#(stamps[deadRed.id] or {}), 1, "a late kill report: the slot is stamped once, at the start")
+    -- a class read another way keeps its arrival turn, and is no anomaly
+    local classy
+    g, stamps = arrivalGame(function(g)
+        if g.turn == 1 then
+            for _, u in ipairs(g.units) do
+                if u.faction == "red" and not classy then classy = u; u.classId = (u.classId or 0) + 1 end
+            end
+        end
+    end)
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(stamps[classy.id][2], 0, "a class change keeps the turn it arrived on")
+    local unstamped = 0
+    for _, a in ipairs(r.anomalies) do if a.kind == "arrival_unstamped" then unstamped = unstamped + 1 end end
+    check(unstamped, 0, "a class change is no unstamped arrival")
+
+    -- a board read in the enemy phase (old turn, phase red): the turn is the next player phase's
+    local mid
+    g, stamps = arrivalGame(function(g)
+        if g.turn == 1 and not g.came then
+            g.came = true
+            g.units[#g.units + 1] = unit(0x86, 5, "red", 8, 8, 10)
+            g.mid = 2
+        end
+    end)
+    local board = g.api.board
+    g.api.board = function()
+        local b = board()
+        if g.mid and g.mid > 0 then
+            g.mid = g.mid - 1
+            b.turn, b.phase = b.turn - 1, "red"
+        end
+        return b
+    end
+    Botrun.run(g.api)
+    r = recordOf(g)
+    check(stamps[0x86][1], 2, "mid-phase board: the next player turn, as a player-phase board gives")
+    check(r.arrivals_seen[1].boardTurn, 2, "mid-phase board: arrivals_seen's boardTurn the same")
+end
+
 -- test_a_retry_starts_from_its_memory (ADR 0399): style.memory reaches the attempt's sight
 -- (remember: what plays as seen); it is not handed back as seen this attempt (campaign.lua keeps
 -- the union) nor given to the fog read's enemies seen; attempt 1 (no memory) tells nothing.
@@ -921,8 +1096,8 @@ do
 end
 
 -- test_enemies_seen_keep_a_reused_slot (ADR 0399): a red seen, then killed, and a reinforcement
--- later loaded into its slot: both are among the enemies seen (kept by slot, character and
--- class), so a retry remembers the first, alive again at the start.
+-- later loaded into its slot: both are among the enemies seen (the first by slot, character and
+-- class; the arrival by character, class and turn, ADR 0449), so a retry remembers the first, alive again at the start.
 do
     local g = fakeGame {
         units = rout(),

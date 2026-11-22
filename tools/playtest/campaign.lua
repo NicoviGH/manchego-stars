@@ -29,7 +29,8 @@
 -- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
 -- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
 -- { enemies, arrivals }: every red unit a board showed out of fog and every killer a fight showed
--- (botrun's `enemies_seen`), by slot, character and class (Board.memoryKey). A death is
+-- (botrun's `enemies_seen`), each by Board.memoryKey: a unit that was there at the start by slot,
+-- character and class, an arrival by character, class and arrival turn (ADR 0449). A death is
 -- remembered through its killer: where our units stood is the play's, not the game's. An
 -- arrival is kept once per character, the latest failed attempt's sighting (ADR 0436). Never a
 -- dice result.
@@ -466,12 +467,12 @@ function M.run(api)
             local arrived = {}   -- charId -> its place in memory.arrivals: the latest sighting wins
             -- a unit whose class was not read cannot be told from another in its slot (its key
             -- would match nothing, and grow the memory with nothing learned): not kept
-            local function rememberEnemy(id, charId, classId)
-                local k = Bot.memoryKey(id, charId, classId)
+            local function rememberEnemy(id, charId, classId, arrival)
+                local k = Bot.memoryKey(id, charId, classId, arrival)
                 if classId ~= nil and not memoryKeys[k] then
                     memoryKeys[k] = true
                     memory.enemies[#memory.enemies + 1] = { id = id, charId = charId,
-                                                            classId = classId }
+                                                            classId = classId, arrival = arrival }
                 end
             end
             -- #639: the promotion level is stamped on every style drawn, here and nowhere else.
@@ -537,7 +538,7 @@ function M.run(api)
                 if #memory.enemies > 0 or #memory.arrivals > 0 then
                     local copy, arrivals = {}, {}   -- each attempt its own copy
                     for i, e in ipairs(memory.enemies) do
-                        copy[i] = { id = e.id, charId = e.charId, classId = e.classId }
+                        copy[i] = { id = e.id, charId = e.charId, classId = e.classId, arrival = e.arrival }
                     end
                     for i, a in ipairs(memory.arrivals) do
                         arrivals[i] = { turn = a.turn, x = a.x, y = a.y, charId = a.charId }
@@ -610,7 +611,7 @@ function M.run(api)
                 end
                 table.sort(remembered)
                 for _, e in ipairs(rec.enemies_seen or {}) do
-                    rememberEnemy(e.id, e.charId, e.classId)
+                    rememberEnemy(e.id, e.charId, e.classId, e.arrival)
                 end
                 if entry.attempts >= attemptCap then
                     if not kept then return noClean(entry) end

@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-447 decisions. Read this index, then open the two or three you need — the whole
+448 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -290,6 +290,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0446` | [A recruit's arrival and scripted removal are read from the turn events](decisions/0446-a-recruits-arrival-and-scripted-removal-are-read-from-the-turn-events.md) | 2026-11-22 | #724 #699 #510 |
 | `0447` | [A recruit on the field is met where his AI takes him](decisions/0447-a-recruit-on-the-field-is-met-where-his-ai-takes-him.md) | 2026-11-22 | #724 #699 #510 |
 | `0448` | [The judged enemy phase plays an AREA event's AI changes](decisions/0448-the-judged-enemy-phase-plays-an-area-events-ai-changes.md) | 2026-11-22 | #712 #699 #510 |
+| `0449` | [A retry remembers an arrival by its class and turn, not its slot](decisions/0449-a-retry-remembers-an-arrival-by-its-class-and-turn-not-its-slot.md) | 2026-11-22 | #713 #510 |
 
 ---
 
