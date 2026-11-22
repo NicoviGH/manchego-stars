@@ -19,7 +19,7 @@ and start a fresh instance; don't rely on auto-compaction.
   3. **PR #725** (#724, ADR 0446, base #723): the turn-event scripts are read from the ROM (arrivals: Cormag turn 5; removals: Amelia turn 12) and feed pending recruits and `closes`.
   4. **PR #726** (ADR 0447, base #725): a recruit on the field is met where his AI takes him. It is a second look with our units visible, only for a recruit who stayed put. On Ch13 the boss kill is now held to turn 11 (main: turn 4). Cormag is still missed: Eirika never reaches the flier, and Marisa (0x16) is killed by him.
   5. **PR #728** (#712, ADR 0448, base #726): the judged phase plays an AREA event's AI changes. Ch16 s4002 a1 won clean in 21 turns, 0 deaths (one game). Turn-5 planning +16%, because the woken units decide. Positional AI changes (Ch10, 14) are #727.
-  6. **PR #729** (#713 fix 2, ADR 0449, base main): a retry remembers an arrival by class and turn, not slot. In re-review at the time of writing; check its last PR comment.
+  6. **PR #729** (#713 fix 2, ADR 0449, base main): a retry remembers an arrival by class and turn, not slot. Ready: review, re-review and CI green (824c4df5). Independent of the stack.
   - The stack #723 → #725 → #726 → #728 lands with `--merge`. Retarget each child to main before its parent's branch is deleted. Every PR adds an ADR row, so regenerate the decisions index (`python3 tools/gen_decisions_index.py`) after each merge.
 - **Nicolas's calls, waiting:**
   - #714's forfeit half: a goal driven to 0 before its deadline counts in `forfeits` (comment 7075363029).
