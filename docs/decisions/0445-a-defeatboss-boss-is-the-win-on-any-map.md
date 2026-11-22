@@ -34,11 +34,13 @@ Misc list after each action. The flag alone ends nothing: 31 rows carry `EVFLAG_
   when the goal is a boss goal or `objective.boss` is set, else the goal's own kind. `plan` calls
   it once, so every site that keyed on `objective == "boss"` follows: `fx.win` (the kill is the
   win, so the forfeit ledger prices it), `BOSS_WORTH` (a wound on the boss is a step to the win),
-  `endsIn` (a counter that kills him ends the chapter), `advances` (a wound on him is progress). The named boss only: `M.isWinBoss(e, bossId)` compares `charId` to
+  `endsIn` (a counter that kills him ends the chapter), `advances` (a wound on him is progress).
+  The named boss only: `M.isWinBoss(e, bossId)` compares `charId` to
   `objective.boss` (a second CA_BOSS on the map is no win; with no name, any CA_BOSS, as a boss goal
   with no row). One owner beside `winKind`, with `st.winBoss` carried in the plan state.
 - Not changed, on purpose: a Rout stays a Rout (its last red unit also ends it; one kind is
-  priced; known gap: a Rout map whose boss's death ends it early is priced as a plain kill); the throne assault (`M.throne` reads `kind == "seize"`); `objectiveTile` in `bot.lua`
+  priced; known gap: a Rout map whose boss's death ends it early is priced as a plain kill); the
+  throne assault (`M.throne` reads `kind == "seize"`); `objectiveTile` in `bot.lua`
   (where units march: on a Survive map they do not march at the boss, which is not this issue);
   the survive win itself (turn 12) is untouched.
 

@@ -1562,7 +1562,9 @@ end
 
 -- Whether a Misc list's scripts `after` a death flag was set hold one `before` did not that
 -- completes EVFLAG_WIN: the chapter's win event (an unconditional entry is in both; a TMP or
--- DefeatAll flag's is no DefeatBoss win). Pure.
+-- DefeatAll flag's is no DefeatBoss win). Scripts are keyed by address, so two entries sharing
+-- one merge; every such pair in vanilla's Misc lists is AREA entries of one TMP flag (checked by
+-- grepping each *-eventinfo.h Misc list for a repeated script), so none hides a WIN. Pure.
 function M.winEvent(before, after)
     for script, flag in pairs(after) do
         if not before[script] and flag == M.EVFLAG_WIN then return true end

@@ -692,12 +692,6 @@ end
 -- lookahead's), a protected unit's deaths over the plan's (overAll).
 function M.either(a, b) return 1 - (1 - a) * (1 - b) end
 
--- The kind of win the planner prices for `objective` (sight.objective): "boss" when the boss's
--- death ends the chapter -- a Defeat Boss goal, or any other goal window beside a Misc
--- DefeatBoss event (vanilla Ch13: a Survive window, `DefeatBoss(EndingScene)`; sight.objective.boss
--- names that boss) -- else the goal's own kind. The one owner of "this boss's death is the win"
--- (#721), with M.isWinBoss. Known gap: a Rout stays a Rout (one kind is priced), so a Rout map
--- whose boss's death ends it early is priced as a plain kill.
 -- Whether enemy `e` is the unit whose death is the "boss" win: the one `bossId`
 -- (sight.objective.boss) names, else any CA_BOSS unit (a Defeat Boss goal whose boss has no row).
 -- A second CA_BOSS on a map is no win: its death ends nothing. Pure.
@@ -705,6 +699,12 @@ function M.isWinBoss(e, bossId)
     return e.isBoss == true and (bossId == nil or e.charId == bossId)
 end
 
+-- The kind of win the planner prices for `objective` (sight.objective): "boss" when the boss's
+-- death ends the chapter -- a Defeat Boss goal, or any other goal window beside a Misc
+-- DefeatBoss event (vanilla Ch13: a Survive window, `DefeatBoss(EndingScene)`; sight.objective.boss
+-- names that boss) -- else the goal's own kind. The one owner of "this boss's death is the win"
+-- (#721), with M.isWinBoss. Known gap: a Rout stays a Rout (one kind is priced), so a Rout map
+-- whose boss's death ends it early is priced as a plain kill.
 function M.winKind(objective)
     if objective == nil then return nil end
     if objective.kind ~= "rout" and (objective.kind == "boss" or objective.boss) then return "boss" end
