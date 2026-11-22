@@ -86,6 +86,13 @@ Board.US_DROP_ITEM = 1 << 12   -- it gives its last item to the blue unit that d
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
 -- Whether the terrain heal skips `u` (MakeTerrainHealTargetList, bmtarget.c:587-608): a unit
 -- dead, not deployed, rescued or with US_BIT16 is never healed.
+-- `hp` after a heal of `gain`, held to `maxhp` as AddUnitHp holds it (bmunit.c): the one owner of
+-- that clamp. A planned staff heal, the plan's heal of a unit that lives and the terrain heal
+-- all go through it, each with its own max (nil: no max to fill to, so no cap).
+function Board.addHp(hp, gain, maxhp)
+    return math.min(maxhp or math.huge, hp + gain)
+end
+
 function Board.terrainHealSkips(u)
     return (u.state & (Board.US_DEAD | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_BIT16)) ~= 0
 end
@@ -687,6 +694,7 @@ function Board.bind(mem, SYM)
         itemUser = function() return Board.itemUser(mem, SYM) end,
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
+        terrainHealSkips = Board.terrainHealSkips, addHp = Board.addHp,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,
         statusOf = Board.statusOf, STATUS_BERSERK = Board.STATUS_BERSERK,
         statusAfter = Board.statusAfter, STATUS_STAVES = Board.STATUS_STAVES,

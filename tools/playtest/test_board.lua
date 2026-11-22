@@ -534,5 +534,28 @@ check(Board.terrainHealSkips({ state = Board.US_NOT_DEPLOYED }), true, "terrainH
 check(Board.terrainHealSkips({ state = Board.US_BIT16 }), true, "terrainHealSkips: US_BIT16")
 check(Board.terrainHealSkips({ state = Board.US_HAS_MOVED }), false, "terrainHealSkips: a unit that moved is healed")
 
+-- Every `Board.<name>` sight.lua reads (api.Board: the table Board.bind returns, which the
+-- emulator hands it) must exist on that table. A name board.lua defines but bind() leaves out
+-- crashes only in the emulator (#709: terrainHealSkips), never in a test that passes the
+-- unbound Board.
+do
+    local f = assert(io.open(here .. "sight.lua"))
+    local missing, seen = {}, {}
+    local bound = Board.bind({ u8 = function() return 0 end, s8 = function() return 0 end,
+                               u16 = function() return 0 end, u32 = function() return 0 end }, SYM)
+    for raw in f:lines() do
+        local line = raw:gsub("%-%-.*$", "")   -- code only: a comment may name a pattern ("US_*")
+        for name in line:gmatch("Board%.([%w_]+)") do
+            if not seen[name] and name ~= "bind" then
+                seen[name] = true
+                if bound[name] == nil then missing[#missing + 1] = name end
+            end
+        end
+    end
+    f:close()
+    table.sort(missing)
+    check(table.concat(missing, ","), "", "sight.lua reads only what Board.bind exports")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

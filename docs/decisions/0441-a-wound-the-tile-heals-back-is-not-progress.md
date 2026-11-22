@@ -25,21 +25,38 @@ as far as it outlasts that heal: `e.hp - healed > DUST`. The enemy stands on its
 phase and the heal comes before it acts, so its tile now is the one that heals it. A kill chance, a
 bait kill, a goal or a win chance advance as before: the heal does not touch them.
 
-**What does not change, and the open follow-up.** Without `opts.idle` nothing reads the heal:
-`advances()` only decides the idle rule. Outside it the bot still credits a fort chip through
-`W.dealt` in `score()` (`planner.lua`, the attack branch), and the judged enemy phase and the army's
-reply read the boss's unhealed HP. The same bias therefore persists in normal scoring. Modelling
-the heal there moves every plan's score, which is a weight call and goes to Nicolas, not this rule.
-The lookahead's second phase has the same gap: it reads `st.enemyHp` as the plan left it, with no
-heal between the phases (`planner.lua`, the `reds` table built from `st.enemyHp` in the judged
-phase).
+**The heal everywhere the bot reads an enemy's HP across a phase boundary (Nicolas: "a human sees
+the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `healAmount`
+(sight.lua, the game's own read), applied at every boundary through one clamp, `Board.addHp`:
+
+- The simulated enemy phase: `healReds` runs in `stagePhase` after the plan's red HP is written,
+  so `enemyPhase` and `nextPhase`'s first phase begin as the game's do, before any enemy acts. The
+  planner's `plan.reds` carries the unhealed HP the plan leaves.
+- The lookahead's second phase: `nextPhase` runs `healReds` again after the army's reply and before
+  the second phase plays. The army's reply itself needs none: the game heals at the start of the
+  enemy's phase, so the reply, a player phase, sees the HP the first phase left.
+- `W.dealt` in `score()`: a blow is credited only for the wound that outlasts the heal
+  (`Planner.outlasting`, `healed(hp) - healed(hp - dealt)`, the whole blow where nothing heals).
+  `st.healOf` is the plan's one read of each enemy's heal.
+- `advances()` (the idle rule) as before: `e.hp - Planner.healed(...)`. Its rule and the idle
+  ranking are unchanged; what counts as progress against a healing boss is a separate call.
+
+`plan.reds` and `st.enemyHp` stay the unhealed HP the plan leaves, so no read counts a heal twice.
 
 **Details.** `terrainHeal` truncates toward zero as C's `/ 100` does and gives 0 for the units the
 game skips (`Board.terrainHealSkips`: dead, not deployed, rescued, `US_BIT16`). It is required:
-`Planner.healed` errors on a sight without it. `sight.maxHps` now reads every unit on the field,
-so an enemy's `maxhp` is `GetUnitMaxHp` (weapon HP bonus included), the max the heal and its cap
-use. `Planner.addHp` is the one owner of AddUnitHp's clamp: a staff heal, the plan's heal of a unit
-that lives and the terrain heal all go through it.
+a sight without it is an error where a blow is scored. `sight.maxHps` reads every unit on the
+field, so an enemy's `maxhp` is `GetUnitMaxHp` (weapon HP bonus included), the max the heal and
+its cap use. `Planner.healed` keeps the floor at the HP the unit stands on now and returns the HP
+as given when nothing heals. `Board.addHp` is the one owner of AddUnitHp's clamp (a staff heal,
+the plan's heal of a unit that lives, the terrain heal). `Board.bind` must export every
+`Board.<name>` sight.lua reads: the emulator's Board is that table, and test_board.lua scans
+sight.lua for the names (the first push of this change crashed every emulator run on turn 1 for
+want of one).
+
+**Cost.** The planner side adds one memoised `sight.terrainHeal` read per enemy per search and
+arithmetic in `score()`. The sandbox side adds `healReds` to each judged phase: four memory reads
+a red and, only on a heal tile, one `GetUnitMaxHp` call; the percent is read once a terrain.
 
 **Evidence.** The 35 of 55 deaths and the Caellach count are from #699's measurement (comment
 7071434440), not re-measured here. Replays (ADR 0430's light proof), all on `b640e-cs-s4003`/

@@ -386,23 +386,23 @@ local function taught(x, ways, hp, unitHp, struck)
     return sum
 end
 
--- `hp` after a heal of `gain`, held to `maxhp` as AddUnitHp holds it (bmunit.c): the one owner
--- of that clamp. A planned staff heal, the plan's heal of a unit that lives and the terrain heal
--- all go through it; each passes its own max (nil: the unit has no max HP to fill to, so no gain
--- for a staff, none held for a unit read as having none).
-function M.addHp(hp, gain, maxhp)
-    return math.min(maxhp or math.huge, hp + gain)
+-- The HP `e` stands on once its own phase begins, after the plan leaves it on `hp` and the tile
+-- gives it `heal` HP (sight.terrainHeal, via the plan's memo `st.healOf`): the game heals a unit
+-- on a heal tile at the start of its faction's phase, before any enemy acts
+-- (MakeTerrainHealTargetList, bmtarget.c:587-608; AddUnitHp holds it to max HP). The enemy
+-- stands on its tile through our phase, so its tile now is the one that heals it (#709). No heal
+-- leaves `hp` as it is; the cap is the unit's max HP (GetUnitMaxHp, bot.lua's context) and never
+-- below the HP it stands on now, so a unit over its max is not credited a wound by the clamp.
+function M.healed(heal, e, hp)
+    if heal == 0 then return hp end
+    return Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp))
 end
 
--- The HP `e` stands on once its own phase begins, after the plan leaves it on `hp`: the game
--- heals a unit on a heal tile at the start of its faction's phase, before any enemy acts
--- (MakeTerrainHealTargetList, bmtarget.c:587-608: GetTerrainHealAmount x max HP / 100, a fort
--- 20, a gate or throne 10; AddUnitHp holds it to max HP). The enemy stands on its tile through
--- our phase, so its tile now is the one that heals it (#709). Sight answers the heal (ADR
--- 0369). The read is required: a sight without it would hide the bug this fixes. `e.maxhp` is
--- GetUnitMaxHp (bot.lua's context reads it for every unit), the max the heal itself uses.
-function M.healed(sight, e, hp)
-    return M.addHp(hp, sight.terrainHeal(e), e.maxhp)
+-- What a blow of `dealt` on `hp` earns once the heal is counted: the wound that outlasts it
+-- (healed(hp) - healed(hp - dealt)), the whole `dealt` where nothing heals.
+function M.outlasting(heal, e, hp, dealt)
+    if heal == 0 then return dealt end
+    return M.healed(heal, e, hp) - M.healed(heal, e, hp - dealt)
 end
 
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
@@ -435,7 +435,10 @@ local function score(act, st, W, style, odds)
             local want = st.bossWant or 1
             local target = (e.isBoss and st.objective == "boss") and 1 + (M.BOSS_WORTH - 1) * want or 1
             local worth = (e.isBoss and 1 + 4 * want or 1) + (act.first and 1 or 0)
-            v = v + W.dealt * dealt * target + W.kill * kill * worth
+            -- only the wound that outlasts the tile's heal: a fort heals it back at the start
+            -- of the enemy's phase (#709, M.outlasting); the plan's own HP is the unhealed one
+            local earned = M.outlasting(st.healOf(e), e, hp, dealt)
+            v = v + W.dealt * earned * target + W.kill * kill * worth
                 -- at the HP the plan leaves the target: a kill an earlier blow of the plan
                 -- set up is this unit's, so the plan's chip and finish train the finisher
                 + W.exp * taught(f.exp, f.joint, hp, act.unitHp)
@@ -494,7 +497,8 @@ local function score(act, st, W, style, odds)
         -- is the plan's, which no game state holds
         local t = act.targetUnit
         local hp = st.hp[t.id] or t.hp
-        local gain = M.addHp(hp, act.amount, t.maxhp or hp) - hp
+        -- the staff's amount the clamp leaves: what the target is short by, up to the amount
+        local gain = Board.addHp(hp, act.amount, t.maxhp or hp) - hp
         -- and the experience the staff teaches the healer (the game's count, sight.staffExp)
         v = v + W.heal * gain + (gain > 0 and W.exp * (act.exp or 0) or 0)
         fx.heals = { id = t.id, hp = hp + gain }
@@ -833,9 +837,18 @@ function M.plan(Bot, board, sight, style, opts)
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
     local gameOver = Bot.gameOver(sight)
+    -- the HP a heal tile gives each enemy at its own phase's start (sight.terrainHeal), read once
+    -- an enemy for the whole search: its tile and max HP do not move through our phase. Required:
+    -- a sight without it would hide the bug (#709).
+    local healMemo = {}
+    local function healOf(e)
+        local h = healMemo[e.id]
+        if h == nil then h = sight.terrainHeal(e); healMemo[e.id] = h end
+        return h
+    end
     local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
                     gone = {}, enemyHp = {}, hp = {}, took = {}, recruitHit = {}, win = 0,
-                    fought = {}, healed = {},
+                    fought = {}, healed = {}, healOf = healOf,
                     walls = {}, opened = {}, objective = objective, recruits = ctx.recruits or {},
                     gameOver = gameOver, kill = {}, carry = {}, wear = {}, redWear = {} }
     -- who carries whom as the plan leaves it: [carried id] = { by = carrier id } while carried,
@@ -1033,7 +1046,7 @@ function M.plan(Bot, board, sight, style, opts)
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and e.isBoss))
-            if needed and e.hp - M.healed(sight, e, hp) > M.DUST then return true end
+            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true end
         end
         return false
     end
@@ -1354,7 +1367,7 @@ function M.plan(Bot, board, sight, style, opts)
                     fought = copy(st.fought), healed = copy(st.healed), walls = copy(st.walls),
                     opened = copy(st.opened), objective = objective, recruits = st.recruits, gameOver = st.gameOver,
                     kill = copy(st.kill), carry = copy(st.carry), wear = copy(st.wear),
-                    redWear = copy(st.redWear), changeKey = st.changeKey }
+                    redWear = copy(st.redWear), changeKey = st.changeKey, healOf = st.healOf }
         n.acts[#n.acts + 1] = a
         -- what the board should show after it (M.surprise): a Talk or a kill takes its target
         -- off the enemy side (score's fx.gone)
@@ -1942,7 +1955,7 @@ function M.plan(Bot, board, sight, style, opts)
                                     n.dead[o.uid] = true
                                 else
                                     n.hp = copy(w.hp)
-                                    n.hp[o.uid] = M.addHp(u.hp - o.back, st.healed[o.uid] or 0, u.maxhp)
+                                    n.hp[o.uid] = Board.addHp(u.hp - o.back, st.healed[o.uid] or 0, u.maxhp)
                                 end
                             end
                             nxt[#nxt + 1] = n
