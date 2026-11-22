@@ -104,7 +104,8 @@
 -- seizeJudged / seizeAdmitted = whether any plan judged took the Seize, and one within the
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
--- { id, charId, die, branches = { { p, die } } per way the judged phase went, cap, second (the
+-- { id, charId, die, counter (the part of `die` that is the counters to the plan's own acts),
+-- branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both, but for a unit the
 -- wear read, whose `die` is the wear's reading of the later phases alone), wear (what the
 -- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
@@ -2411,8 +2412,10 @@ function M.plan(Bot, board, sight, style, opts)
                 end
             end
             if gameOver[u.charId] and o > 0 then overAll = M.either(overAll, o) end
+            -- `counter`: the part of `die` that is the plan's own acts' counters, resolved by the
+            -- enemy phase; botrun grades a later death given the unit lived through it (#737)
             st.protected[#st.protected + 1] = { id = u.id, charId = u.charId, die = d,
-                                                branches = branches, cap = cap }
+                                                counter = o, branches = branches, cap = cap }
             rank.hp_left = rank.hp_left + (hp - (taken[u.id] or 0))
         end
         for _, p in ipairs(planned) do protect(p.unit, p.hp) end

@@ -936,6 +936,28 @@ do
     check(fresh.calls(), 0, "greedy reads no forecast")
 end
 
+-- test_protected_keeps_its_counter_part (#717, PR #737's review): a protected unit's `die`
+-- counts the counter to its own act, which is resolved before the enemy phase; `counter` keeps
+-- that part apart, so botrun grades an enemy-phase death given the unit lived through it.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20, maxhp = 20 })
+    local E = red(0x81, 1, 0, { hp = 30 })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = {
+            ["0,0"] = fc { hit = 90, dmg = 10, hits = 1, counters = true, counterHit = 10,
+                           counterDmg = 20, counterHits = 1 } } } },
+    }
+    local a, rec = Planner.plan(B, boardOf(A, E), sight, style("bold"))
+    check(a and a.act, "attack", "counter part: bold strikes into a 10% counter")
+    local pr = rec and rec.protected and rec.protected[1]
+    -- the 20-damage counter kills the 20 HP unit on its 10% hit (two RNs), whether our blow hit or not
+    local want = Sight.rollChance(2, 10)
+    check(pr and pr.counter and math.abs(pr.counter - want) < 1e-12, true,
+          "counter part: the counter's own kill chance")
+    check(pr and pr.counter <= pr.die + 1e-12, true, "counter part: within the unit's die")
+end
+
 -- Every weapon the Weapon Select menu lists is asked (sight.weapons), not the equipped one
 -- alone (audit 9): a sword (1) and a javelin (1-2) in the bag, the javelin strikes an enemy two
 -- tiles off; where both reach, the act's slot is the weapon whose forecast wins.

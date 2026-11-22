@@ -635,10 +635,45 @@ function M.cause(d, why)
     return "other", detail
 end
 
+-- Plan `plan`'s predict entry for unit slot `id`, or nil.
+function M.predictOf(plan, id)
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == id then return p end
+    end
+end
+
+-- The chance `c` of dying in a plan's later phases given the unit lived through its own acts'
+-- counters, from `die`, the chance of dying in either (`counter` the counters' part of it).
+-- The counters are resolved by the enemy phase: a unit that died in it lived through them, so
+-- a plan whose risk was all in a counter read its later death as unseen (#737's review).
+function M.givenCounter(die, counter)
+    counter = counter or 0
+    if counter <= 0 or counter >= 1 then return die end
+    return math.max(0, math.min(1, (die - counter) / (1 - counter)))
+end
+
+-- The death chance plan `plan` read for unit slot `id` once its own acts were played: its
+-- `protected` entry's weighted `die` (what Planner.admit tests against the cap: every way of the
+-- judged phase, the lookahead's second phase and the wear), given the unit lived through the
+-- plan's own counters (M.givenCounter), else its predict's for a unit it does not protect; nil
+-- when the plan read neither. montecarlo.py's death_read is its Python twin, for the traces.
+function M.deathRead(plan, id)
+    for _, pr in ipairs(plan and plan.protected or {}) do
+        if pr.id == id then return M.givenCounter(pr.die, pr.counter) end
+    end
+    local p = M.predictOf(plan, id)
+    return p and p.die
+end
+
 -- Grade blue or green death `d` (its id, charId, faction, killer, killerId, phase) against
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
--- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the plan
--- that last moved the unit, else the phase's last (its `predict`; the caller picks, record).
+-- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
+-- phase's last plan, the one the enemy phase was played against, by the weighted chance its
+-- admission read once its acts were played (M.deathRead), else its `predict` for a unit it
+-- does not protect (an allied green). Not the
+-- likeliest way's `predict.die` (#717: Cormag's 0.041 read as 0), and not the plan that moved
+-- the unit, whose bait act a replan may drop. `mover` (optional): the plan that last moved the
+-- unit; what it read is kept apart (`mover_predicted`, `mover_ref`), never graded.
 -- `plan.snapshot` is the board when that plan was made,
 -- `cap` the style's risk cap (nil for greedy, which plays no plan; kept only on a protected
 -- unit's death), `lords` the set (charId -> true) of the units whose death ends the game,
@@ -648,7 +683,7 @@ end
 -- from the snapshot, its slot free for an arrival of the same generic charId. Unknown is nil,
 -- never zero: a death with no plan behind it has no prediction, and so no over-cap,
 -- reinforcement or fog flag.
-function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
+function M.grade(d, plan, action, cap, lords, board, diedAt, admits, mover)
     local playerPhase = d.phase == "player"
     local snap, known = {}, plan and plan.snapshot ~= nil
     for _, u in ipairs(plan and plan.snapshot or {}) do
@@ -687,9 +722,9 @@ function M.grade(d, plan, action, cap, lords, board, diedAt, admits)
     if playerPhase and not berserk then
         if action and action.unitId == d.id then d.predicted = action.die end
     else
-        for _, p in ipairs(plan and plan.predict or {}) do
-            if p.id == d.id then judged = p; d.predicted = p.die end
-        end
+        judged = M.predictOf(plan, d.id)
+        d.predicted = M.deathRead(plan, d.id)
+        if mover then d.mover_predicted, d.mover_ref = M.deathRead(mover, d.id), mover.ref end
     end
     local fought = (d.killer or d.killerId) and true or false
     -- player_phase: a counter to our own act; the berserk phase is none (M.cause)
@@ -1153,9 +1188,8 @@ function M.run(api)
     -- could not read is a watch fault, never a guess.
     -- Each blue or green death is graded against the plan that committed to its board (plan,
     -- and for a player-phase death the action that struck: M.grade). An enemy-phase death is
-    -- graded by the plan that last moved its unit this turn (`movers`, unit slot -> plan): what
-    -- that plan knew when it put the unit there, not what a later replan found (#510 PR A); a
-    -- unit no plan moved (a green, one carried) falls back to `plan`, the phase's last.
+    -- graded by `plan`, the phase's last, which the enemy phase was played against (#717); the
+    -- plan that last moved its unit this turn (`movers`, unit slot -> plan) is kept beside it.
     local deathFaults = {}
     -- `now` (optional): the board read after the deaths, where a killer that arrived during the
     -- phase stands (lastBoard, from before it, does not hold one)
@@ -1184,8 +1218,8 @@ function M.run(api)
                                     turn = k.turn or turn, killer = k.killer or d.killer,
                                     killerId = k.killerId or d.killerId,
                                     phase = k.phase or phase },
-                                  movers and movers[k.id] or plan, action, cap, lords,
-                                  lastBoard, diedAt, admits)
+                                  plan, action, cap, lords, lastBoard, diedAt, admits,
+                                  movers and movers[k.id])
                 -- the killer's class: with its slot and character, what a retry remembers it by
                 -- (Board.memoryKey, ADR 0399). The board after the deaths first (an arrival that
                 -- struck in this phase), then the one before (a killer that fell on the counter)
@@ -1447,8 +1481,8 @@ function M.run(api)
         local seen, waitUntil = {}, nil
         -- the plan that committed to the enemy phase: this phase's last (FR-003)
         local commit
-        -- the plan that last moved each blue unit this turn (unit slot -> plan): an enemy-phase
-        -- death's grader (record)
+        -- the plan that last moved each blue unit this turn (unit slot -> plan): kept beside an
+        -- enemy-phase death's grade (record's `mover_predicted`)
         local movers = {}
         -- each red unit's tile at every phase start, for a bait loop; the turn of the last
         -- seize skip recorded (one a turn)

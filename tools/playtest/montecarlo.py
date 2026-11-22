@@ -68,8 +68,9 @@ each beside the twin; `--decision` reads only that decision's components (FR-032
 
 `calibration` reads kept traces, each play once, and prints three tables (#510 PR A): each blue
 unit at each enemy phase by the chance the phase's last plan gave it, beside how many died; each
-chapter's blue enemy-phase deaths by what the plan that moved the unit said of it against its
-style's cap; and the lookahead's second phase (read after our army's reply, ADR 0389) against
+chapter's blue enemy-phase deaths by what the plan the phase met read of it against its
+style's cap, as botrun grades them (ADR 0454), split by what the plan that moved the unit
+read; and the lookahead's second phase (read after our army's reply, ADR 0389) against
 the phase the game played after, split by whether the unit held its tile. Every change to the
 bot's first attempts is read by it the same way.
 
@@ -3536,7 +3537,23 @@ def style_caps():
 # a predicted chance's bins (upper bounds, inclusive), the calibration table's rows
 CALIBRATION_BINS = ((0.0, '0'), (0.01, 'up to 1%'), (0.05, '1 to 5%'), (0.15, '5 to 15%'),
                     (0.5, '15 to 50%'), (1.0, 'over 50%'))
-# what the plan that moved a dead unit said of it (#510 PR A): the death-table's columns
+
+
+def death_read(plan, uid, field='die'):
+    """The death chance trace plan event `plan` read for unit slot `uid` once its own acts were
+    played: its `protected` entry's `field` (`die`, every phase it read, as botrun grades a death;
+    `first`, the next enemy phase alone) given the unit lived through the plan's own counters
+    (`counter`), else its predict's `die` for a unit it does not protect, or whose entry lacks
+    `field` (a trace from before ADR 0389 kept no `first`); None when it read neither. The twin of botrun.lua's M.deathRead and M.givenCounter: botrun grades the run in
+    Lua, this reads the kept traces, and the two must agree (ADR 0454)."""
+    for pr in (plan or {}).get('protected') or []:
+        if pr.get('id') == uid and pr.get(field) is not None:
+            die, counter = pr[field], pr.get('counter') or 0
+            if counter <= 0 or counter >= 1:
+                return die
+            return max(0.0, min(1.0, (die - counter) / (1 - counter)))
+    return next((p.get('die') for p in (plan or {}).get('predict') or [] if p.get('id') == uid),
+                None)
 
 
 def calibration_bin(p):
@@ -3545,9 +3562,11 @@ def calibration_bin(p):
     return next((lb for hi, lb in CALIBRATION_BINS if p <= hi), CALIBRATION_BINS[-1][1])
 
 
-MOVER_KINDS = ('moved over the cap', 'moved under, over by the phase end',
-               'under: dice', 'under: fog', 'under: arrival', 'under: blind spot',
-               'no cap', 'no prediction')
+# a dead unit's death-table column: what the plan the enemy phase met read of it, and whether the
+# plan that moved it read it under the cap (ADR 0454)
+MOVER_KINDS = ('over the cap', 'over the cap, moved under',
+               'under: dice', 'under: fog', 'under: arrival', 'under: berserk',
+               'under: blind spot', 'no cap', 'no prediction')
 
 
 def trace_key(events):
@@ -3562,12 +3581,13 @@ def calibration(traces):
     """The judged enemy phase against the played one, from kept traces (#510 PR A step 2).
     `traces`: event lists (read_trace). Repeats of one play (trace_key) count once.
 
-    Each blue unit at each enemy phase is binned by the chance the phase's last plan gave it
-    (`bins`: label -> [unit-phases, died, summed prediction]). Each blue enemy-phase death is
-    put in one MOVER_KINDS column by the plan that last moved its unit that turn (the phase's
-    last plan if none did) against its style's cap (`deaths`: chapter -> Counter). Under the
-    cap with a prediction of 0, the record's own flags say fog or arrival; a record graded
-    before #510 PR A took those flags from the phase's last plan. Returns
+    Each blue unit at each enemy phase is binned by the chance the phase's last plan gave it of
+    that phase alone (`bins`: label -> [unit-phases, died, summed prediction]; death_read's
+    `first`). Each blue enemy-phase death is put in one MOVER_KINDS column by the phase's last
+    plan's read of it, as botrun grades it (death_read's `die`, ADR 0454), against its style's
+    cap, and over the cap by whether the plan that last moved it read it under (`deaths`:
+    chapter -> Counter). Under the cap with a read of 0, the record's own flags say fog or
+    arrival. Returns
     {'traces', 'distinct', 'bins', 'deaths', 'second'}.
 
     `second`: label -> [unit-phases, died, summed second, held, held died, summed re-read,
@@ -3624,7 +3644,7 @@ def calibration(traces):
             # only a unit on the field in the phase: a carried or already dead one is no
             # unit-phase, whatever the plan said of it
             for p in [p for p in (last or {}).get('predict') or [] if p.get('id') in field]:
-                die = p.get('die') or 0
+                die = death_read(last, p.get('id'), 'first') or 0
                 row = bins[calibration_bin(die)]
                 row[0] += 1
                 row[1] += (turn, p.get('id')) in died
@@ -3632,7 +3652,8 @@ def calibration(traces):
             nxt = phases.get(turn + 1)
             if not nxt or not ((last or {}).get('lookahead') or {}).get('extended'):
                 continue
-            reread = {p.get('id'): p.get('die') or 0 for p in (nxt[0] or {}).get('predict') or []}
+            reread = {p.get('id'): death_read(nxt[0], p.get('id'), 'first') or 0
+                      for p in (nxt[0] or {}).get('predict') or []}
             for pr in (last or {}).get('protected') or []:
                 uid, sec = pr.get('id'), pr.get('second')
                 # gone before the second phase (died, carried): no unit-phase of it
@@ -3653,22 +3674,17 @@ def calibration(traces):
         for (turn, uid), d in died.items():
             last, moved = phases.get(turn, (None, {}))[:2]
             mover = moved.get(uid) or last
-
-            def die_of(pl):
-                return next((p.get('die') for p in (pl or {}).get('predict') or []
-                             if p.get('id') == uid), None)
-            said, lastSaid = die_of(mover), die_of(last)
+            said, moverSaid = death_read(last, uid), death_read(mover, uid)
             flags = d.get('flags') or {}
             if said is None:
                 kind = 'no prediction'
             elif cap is None:
                 kind = 'no cap'
-            # Planner.admits's test (planner.lua), restated: kept traces graded before #510
-            # PR A name the phase's last plan, not the mover, so their records cannot say it
+            # Planner.admits's test (planner.lua), restated: a kept trace's record may be graded
+            # under an older rule, so the table reads the plans again
             elif said > cap + dust:
-                kind = 'moved over the cap'
-            elif lastSaid is not None and lastSaid > cap + dust:
-                kind = 'moved under, over by the phase end'
+                kind = ('over the cap, moved under'
+                        if moverSaid is not None and moverSaid <= cap + dust else 'over the cap')
             elif said > 0:
                 kind = 'under: dice'
             elif flags.get('fog'):

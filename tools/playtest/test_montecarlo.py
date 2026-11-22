@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -3462,8 +3463,9 @@ class Report(unittest.TestCase):
 
 
 class Calibration(unittest.TestCase):
-    """`calibration` (#510 PR A): unit-phases binned by the phase's last plan; a death read by
-    the plan that moved its unit; a play kept twice counts once."""
+    """`calibration` (#510 PR A, ADR 0454): unit-phases binned by the phase's last plan; a death
+    read by it too, split by what the plan that moved its unit read; a play kept twice counts
+    once."""
 
     @staticmethod
     def trace(style='careful', moved_die=0.3, last_die=0.9, chapter=6, dies=True, carried=False,
@@ -3492,20 +3494,58 @@ class Calibration(unittest.TestCase):
         self.assertEqual((c['traces'], c['distinct']), (3, 2))
         self.assertEqual(c['bins']['over 50%'][:2], [1, 1], "binned by the phase's last plan")
         self.assertEqual(c['bins']['0'][:2], [3, 0])
-        self.assertEqual(dict(c['deaths']['Ch5']), {'moved over the cap': 1},
-                         'careful caps at 1%: its mover said 30%')
+        self.assertEqual(dict(c['deaths']['Ch5']), {'over the cap': 1},
+                         'careful caps at 1%: the last plan read 90%, its mover 30%')
         kinds = [next(iter(mc.calibration([x])['deaths']['Ch5'])) for x in (
             t(style='bold', moved_die=0.1),                      # mover under 15%, last 90%
             t(style='bold', moved_die=0.1, last_die=0.1),
             t(style='bold', moved_die=0.0, last_die=0.0),
             t(style='greedy'),
             t(style='bold', moved_die=0.0, last_die=0.0, flags={'berserk': True}))]
-        self.assertEqual(kinds, ['moved under, over by the phase end', 'under: dice',
+        self.assertEqual(kinds, ['over the cap, moved under', 'under: dice',
                                  'under: blind spot', 'no cap', 'under: berserk'])
+        # the phase's last plan graded, not the mover: a mover over the cap and a last plan
+        # under it is under (ADR 0454)
+        c = mc.calibration([t(style='bold', moved_die=0.9, last_die=0.1)])
+        self.assertEqual(dict(c['deaths']['Ch5']), {'under: dice': 1})
+        # the berserk column is listed, so its table prints it
+        self.assertIn('under: berserk', mc.MOVER_KINDS)
         c = mc.calibration([t(carried=True, dies=False)])
         self.assertEqual(sum(n for n, _, _ in c['bins'].values()), 1,
                          'a unit off the field in the phase is no unit-phase')
         self.assertIn('| Ch5 | 1 | 1 |', '\n'.join(mc.calibration_lines(mc.calibration([t()]))))
+
+    def test_death_read(self):
+        """death_read (botrun.lua M.deathRead's twin): the weighted `protected` read given the
+        unit lived through its own counters, else predict; #717's Cormag read 0 by predict."""
+        plan = {'predict': [{'id': 1, 'die': 0}, {'id': 2, 'die': 0.3}],
+                'protected': [{'id': 1, 'die': 0.041, 'first': 0.03}]}
+        self.assertEqual(mc.death_read(plan, 1), 0.041, 'the weighted read, not predict 0')
+        self.assertEqual(mc.death_read(plan, 1, 'first'), 0.03, 'the next phase alone')
+        self.assertEqual(mc.death_read(plan, 2), 0.3, 'an unprotected unit: its predict')
+        self.assertIsNone(mc.death_read(plan, 3))
+        self.assertIsNone(mc.death_read(None, 1))
+        plan = {'protected': [{'id': 1, 'die': 0.3, 'counter': 0.3}]}
+        self.assertEqual(mc.death_read(plan, 1), 0.0, 'all its risk was the resolved counter')
+        plan = {'protected': [{'id': 1, 'die': 0.6, 'counter': 0.2}]}
+        self.assertAlmostEqual(mc.death_read(plan, 1), 0.5, msg='(0.6 - 0.2) / (1 - 0.2)')
+
+    @unittest.skipUnless(shutil.which('lua'), 'no lua on PATH')
+    def test_death_read_agrees_with_botrun(self):
+        """death_read is M.deathRead's twin (botrun.lua): the two give one number on a grid of
+        reads and counters, so the record and the calibration table cannot drift apart."""
+        grid = [(d, c) for d in (0, 0.041, 0.3, 0.6, 1) for c in (0, 0.2, 0.3, 0.99, 1) if c <= d]
+        here = os.path.dirname(os.path.abspath(__file__))
+        lua = ('local B = dofile(%r); for _, p in ipairs({%s}) do '
+               'print(string.format("%%.12f", B.deathRead({ protected = { { id = 1, '
+               'die = p[1], counter = p[2] } } }, 1))) end'
+               % (os.path.join(here, 'botrun.lua'),
+                  ', '.join('{%r, %r}' % (d, c) for d, c in grid)))
+        got = subprocess.run(['lua', '-e', lua], capture_output=True, text=True, check=True,
+                             cwd=here).stdout.split()
+        want = ['%.12f' % mc.death_read({'protected': [{'id': 1, 'die': d, 'counter': c}]}, 1)
+                for d, c in grid]
+        self.assertEqual(got, want)
 
     @staticmethod
     def lookahead(second=0.8, extended=True, held=True, dies=False, gone=False):
