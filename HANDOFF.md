@@ -11,7 +11,15 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23; main is 6f3302a0 + this HANDOFF).** Nicolas approved the four overnight recommendations ("Oh yeah I approve your recommendations"), recorded on #714, #713 and #717. Then, each PR reviewed (`review-to-clean`), re-reviewed once and merged on green CI:
+**Next session starts here (2026-11-23; main is d8d915ab + this HANDOFF).**
+- **First: merge PR #738** (#713 fix 1, ADR 0455) once both CI workflows are green on its head `fa301c61` (`gh run list --branch feat/713-fog-ghost --json headSha,status,conclusion`). It is reviewed (`review-to-clean`: 10 findings plus 5 re-review nits, all fixed). Step-9 PRs merge after review and CI. Squash, then delete the branch.
+  - What it does: a fogged enemy this attempt saw, and no retry remembers, is a ghost. The danger maps and both judged phases play it from its last-seen tile (`Sight.ghostsOn`, `placeGhosts`, `ghostly` scopes).
+  - Proof: unit tests that fail without the fix; `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh ghostprobe` PASS; replay `fix713g` (Ch19 `b640e-cs-s4003` a1). Main lost on turn 7, three deaths to the fog. The branch lost on turn 12, none to the fog. Table on #713.
+  - Left out by scope (ADR 0455): `closings`' looters, `keySources`, an enemy shown only in a fight.
+- **Filed: #739** (sub-issue of #699). Franz (0x04) died at a 0 read in `fix713g` t12, not to the fog: after a replan (ref 33), the judged phase sent enemies 169 and 145, both in sight, at no one. Three hypotheses are on the issue; next comes one instrumented replay logging each enemy's decision.
+- Reviewer worktrees are left in `.claude/worktrees/` (untracked); they can be deleted.
+
+*Before that (2026-11-23, earlier; main was 6f3302a0 + HANDOFF).* Nicolas approved the four overnight recommendations ("Oh yeah I approve your recommendations"), recorded on #714, #713 and #717. Then, each PR reviewed (`review-to-clean`), re-reviewed once and merged on green CI:
 - **PR #731** (#714 closed, ADR 0450): a DATED goal whose reach chance a plan drives from at least 0.5 to 0 before its deadline is forfeit. Reach only, without survival weights (no double count with the cap). It changed no decision in the Ch10 replay.
 - **PR #732** (#730 fix 1, ADR 0451): a wait holding the weapon whose counter spares a recruit (`sparingWaits`, capped `M.GENTLE = 2`, kept past `PER_UNIT`). Emulator probe `PT_VANILLA=1 tools/playtest/run.sh waitprobe`. It reaches about 17% of recruit counter deaths (the waits).
 - **PR #733** (#730 fix 2, ADR 0452): Nicolas's call: an owed recruit no one can Talk yet (Marisa before Gerik) dies to us at the same price as a talker recruit, through `sparedOf`. The price is paid only in the judge and lookahead. In the beam it pruned the only admitted plan: `fix730d` lost with 5 deaths, `fix730g`/`fix730h` won in 17 turns with 0 deaths. A unit whose death IS the win forfeits nothing.
@@ -21,11 +29,10 @@ and start a fresh instance; don't rely on auto-compaction.
 - **PR #737** (#717 closed, ADR 0454, reverses ADR 0400 §1): an enemy-phase death is graded by the phase's last plan (the one the enemy phase met) by `protected[].die`, given the unit lived through its own act's counter (`counter`, `M.givenCounter`); the mover's read is kept as `mover_predicted`. `montecarlo.py calibration` reads the same (`death_read`, pinned to `M.deathRead`); its death columns are now `over the cap` / `over the cap, moved under`. Replay `fix717` (Ch15 s4005 a1) played another game (stuck, 35 turns). The bait question moved to **#736** (sub-issue of #699, no call yet).
 
 **In order next:**
-1. #730 is open for fix 3 (kill-then-Talk; first log the offered Talk acts).
-3. **#713 fix 1:** a ghost at the last-seen tile, approved (option A). It needs `keep16` and a leak-guard run.
-4. **#713 fix 3:** sum the strikes of the game's arrivals, approved. The waves come from the ROM's turn events (`scriptedUnits().arrivals`, widened to class, level and items) plus a stand-in unit for the strike. The reinforcement claims cover only Prologue to Ch8 and Ch13. Evidence: every killer in Ch19 s4003 a1 was an arrival; Eirika's turn-7 death is a target misprediction (lead on #713).
-5. **#734:** a talker recruit's goal term may prune in the beam. **#730 fix 3:** a kill-then-Talk plan; first log the offered Talk acts.
-6. Then one `attempts` set over the batch on #699's starts (`m699c<N>`).
+1. Merge #738 (above).
+2. **#713 fix 3:** sum the strikes of the game's arrivals, approved. The waves come from the ROM's turn events (`scriptedUnits().arrivals`, widened to class, level and items) plus a stand-in unit for the strike. The reinforcement claims cover only Prologue to Ch8 and Ch13. Evidence: every killer in Ch19 s4003 a1 was an arrival; Eirika's turn-7 death is a target misprediction (lead on #713).
+3. **#734:** a talker recruit's goal term may prune in the beam. **#730 fix 3:** a kill-then-Talk plan; first log the offered Talk acts.
+4. #739, then one `attempts` set over the batch on #699's starts (`m699c<N>`).
 - #699's status table (7066011205): 2c row → #730. Also open: #727 and #711's leftovers.
 - **Lessons from the night (how to work):**
   - Every issue claim was checked before building, and three were wrong:
