@@ -11,16 +11,10 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23; main is b5bf2fe9 + this HANDOFF). Overnight, unattended: six PRs are reviewed (`review-to-clean`) and green on CI, and none is merged.** This session's permission check blocked `gh pr merge`. Nicolas merges them or allows it. #699's status table (comment 7066011205) is current.
+**Next session starts here (2026-11-23; main is d6339c1e + this HANDOFF). All six overnight PRs are merged:** #722 (ADR 0444), the stack #723 → #725 → #726 → #728 (ADRs 0445-0448, `--merge`), and #729 (ADR 0449). Each was brought up to main, its decisions index regenerated, and merged on green CI for its new head. #721, #724 and #712 are closed; #714 and #713 stay open for the calls below. #699's status table (comment 7066011205) is current.
 
-- **Ready to merge, in this order:**
-  1. **PR #722** (#714, ADR 0444, base main): a march also offers the nearest tile where a death is impossible, kept through the per-unit cut. Ch10's village (11,15) is still razed: it can be saved only by turn 4 with no turn to spare.
-  2. **PR #723** (#721, ADR 0445, base main): a DefeatBoss boss is the win on any map. E_13 is a survive map whose boss kill ends it. Only a NEW Misc script with completion flag WIN counts (Ch1's Breguet does not).
-  3. **PR #725** (#724, ADR 0446, base #723): the turn-event scripts are read from the ROM (arrivals: Cormag turn 5; removals: Amelia turn 12) and feed pending recruits and `closes`.
-  4. **PR #726** (ADR 0447, base #725): a recruit on the field is met where his AI takes him. It is a second look with our units visible, only for a recruit who stayed put. On Ch13 the boss kill is now held to turn 11 (main: turn 4). Cormag is still missed: Eirika never reaches the flier, and Marisa (0x16) is killed by him.
-  5. **PR #728** (#712, ADR 0448, base #726): the judged phase plays an AREA event's AI changes. Ch16 s4002 a1 won clean in 21 turns, 0 deaths (one game). Turn-5 planning +16%, because the woken units decide. Positional AI changes (Ch10, 14) are #727.
-  6. **PR #729** (#713 fix 2, ADR 0449, base main): a retry remembers an arrival by class and turn, not slot. Ready: review, re-review and CI green (824c4df5). Independent of the stack.
-  - The stack #723 → #725 → #726 → #728 lands with `--merge`. Retarget each child to main before its parent's branch is deleted. Every PR adds an ADR row, so regenerate the decisions index (`python3 tools/gen_decisions_index.py`) after each merge.
+- **The repo deletes a head branch on merge** and GitHub retargets its children itself. A stacked PR's clean merge can still leave `docs/decisions.md` stale (the record count), so regenerate the index on every branch after its parent lands.
+- **Next, once the calls are made:** one `attempts` set over the batch on #699's starts (`m699c<N>`). Open without a call: 2c (our counter kills a recruit-to-be), #727 (positional AI changes, Ch10 and 14), #711's leftovers.
 - **Nicolas's calls, waiting:**
   - #714's forfeit half: a goal driven to 0 before its deadline counts in `forfeits` (comment 7075363029).
   - #713 fix 1: a ghost at the last-seen tile vs ADR 0399's live tile (7078483524).
