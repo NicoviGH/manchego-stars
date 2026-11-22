@@ -10174,6 +10174,216 @@ do
     check(Planner.winKind(nil), nil, "winKind: no objective")
 end
 
+-- test_an_owed_recruit_no_one_may_talk_yet_is_a_recruit_to_spare (#730 fix 2, ADR 0452; vanilla
+-- Ch10's Marisa, charId 0x16, owed before Gerik joins): R is red, the game owes it
+-- (opts.owedRecruits), and no blue unit may Talk it. On main recruitsOf counts a recruit only when a
+-- blue unit may Talk it, so its death forfeited nothing: A's counter that kills R, and A's own blow
+-- that kills R, cost the plan no more than any other. Now each forfeits "owed:129" (no ledger row,
+-- so a win does not close it), the same rank as the death of a recruit with a talker.
+do
+    local owed = { owedRecruits = { [0x81] = true } }
+    -- the counter: counterKillsRecruit's board, with no Talk offered. A has only (0,0), R strikes
+    local board, o = counterKillsRecruit(true)
+    o.talk = nil
+    local a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000), owed)
+    check(plan and table.concat(plan.forfeited or {}, ","), "owed:129",
+          "owed: a counter that fells the owed recruit forfeits it")
+    -- with (1,0) offered, the plan played is the one whose counter spares it (on main they tie)
+    board, o = counterKillsRecruit()
+    o.talk = nil
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("careful", 10000), owed)
+    check(at(a) .. " " .. #(plan and plan.forfeited or { 1 }), "1,0 0",
+          "owed: the plan whose counter spares the owed recruit ranks above the one that fells it")
+    -- no owed set: the same board forfeits nothing, as on main
+    board, o = counterKillsRecruit(true)
+    o.talk = nil
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000))
+    check(plan and #(plan.forfeited or {}), 0, "owed: a red unit the game does not owe is no recruit")
+    -- the owed unit has a Talk: it keeps its ledger row, no second forfeit
+    board, o = counterKillsRecruit(true)
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000), owed)
+    check(plan and table.concat(plan.forfeited or {}, ","), "recruit:129",
+          "owed: with a talker the recruit's row is the forfeit, not a second one")
+end
+
+-- the same price on our own blow (the player phase): A, next to R and Y (the Rout's other enemy),
+-- may kill R. Played on main (a kill is a gain); now that plan forfeits "owed:129" and the plan
+-- played does not strike R.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local Y = red(0x82, 9, 9, { hp = 20, minRange = false })
+    local function scene()
+        return boardOf(A, R, Y), {
+            reach = { [0x01] = tiles({ 0, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1,
+                                                        killsTarget = true } } } },
+        }
+    end
+    local board, o = scene()
+    local a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000),
+                                 { owedRecruits = { [0x81] = true } })
+    local struck, spared = nil, nil
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local hits = false
+        for _, x in ipairs(c.acts) do hits = hits or x:find("attack", 1, true) ~= nil end
+        if hits then struck = c.rank.forfeits else spared = c.rank.forfeits end
+    end
+    check(tostring(struck) .. " " .. tostring(spared), "1 0",
+          "owed: our own blow that fells the owed recruit forfeits it, a plan without it does not")
+    check(a and a.act, "wait", "owed: the plan played does not strike the owed recruit")
+end
+
+-- The review's gaps on the owed recruit (#730 fix 2, ADR 0452).
+do
+    local owed = { owedRecruits = { [0x81] = true } }
+    local function loose(R, talk)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local o = { reach = { [0x01] = tiles({ 0, 0 }) } }
+        if talk then o.talk = { [0x01] = { [0x81] = true } } end
+        local _, ctx = B.candidates(boardOf(A, R), sightOf(o), style("bold"), owed)
+        local ids, rec = {}, {}
+        for id in pairs(ctx.looseRecruits) do ids[#ids + 1] = id end
+        for id in pairs(ctx.recruits) do rec[#rec + 1] = id end
+        return table.concat(ids, ",") .. "|" .. table.concat(rec, ",")
+    end
+    -- who is loose: a red, seen, owed unit no one may Talk; never a green, a fogged one, or one
+    -- the game does not owe; and never a talker recruit, which stays the march's (#730 review 7)
+    check(loose(red(0x81, 5, 5, { minRange = false })), "129|", "loose: an owed red no one may Talk")
+    check(loose(unit({ id = 0x81, slot = 0, x = 5, y = 5, faction = "green", minRange = false })), "|",
+          "loose: a green owed unit is no one to spare")
+    check(loose(red(0x81, 5, 5, { minRange = false, fogged = true })), "|",
+          "loose: a fogged owed red is not on the player's board")
+    check(loose(red(0x82, 5, 5, { minRange = false })), "|", "loose: a red the game does not owe")
+    check(loose(red(0x81, 5, 5, { minRange = false }), true), "|129",
+          "loose: with a talker it is a talker recruit, not loose (the march stands beside only that)")
+
+    -- the win: the Rout's last red is the owed recruit; the plan that kills it ends the chapter
+    -- and is played, not a hold the forfeit would make (a row with no taker never releases)
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }) },
+                fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1,
+                                                            killsTarget = true } } } } }
+    local a, plan = Planner.plan(B, boardOf(A, R), sightOf(o), gifted("bold", 10000), owed)
+    check((a and a.act) .. " " .. #(plan and plan.forfeited or { 1 }), "attack 0",
+          "owed: a kill that ends the chapter forfeits nothing, and is played")
+
+    -- progress credit: a loose red is worn down like any red (only a talker recruit's damage
+    -- earns nothing): A may chip R, 30 HP, and does
+    R = red(0x81, 1, 0, { hp = 30, minRange = false })
+    local Y = red(0x82, 9, 9, { hp = 20, minRange = false })
+    o = { reach = { [0x01] = tiles({ 0, 0 }) },
+          fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 5, hits = 1 } } } } }
+    a = Planner.plan(B, boardOf(A, R, Y), sightOf(o), gifted("bold", 10000), owed)
+    local _, chip = Planner.plan(B, boardOf(A, R, Y), sightOf(o), gifted("bold", 10000), owed)
+    local _, plain = Planner.plan(B, boardOf(A, R, Y), sightOf(o), gifted("bold", 10000))
+    check(a and a.act, "attack", "owed: a loose red is struck")
+    check(math.abs(chip.judged - plain.judged) < 1e-9 and chip.judged > plain.judged - 1e-9, true,
+          "owed: a loose red keeps the credit of damage, as any red (a talker recruit's earns none)")
+
+    -- the value: two plans that both forfeit are ordered by the chance the recruit falls, a
+    -- death's worth of it, by the combination a talker recruit's goal uses
+    local function judgedWith(felled)
+        local board, so = counterKillsRecruit(true)
+        so.talk = nil
+        so.enemyPhase = function()
+            return { { enemy = 0x81, target = 0x01, takenHit = 0, takenDmg = 0, takenHits = 1,
+                       takenCrit = 0, targetHp = 20, felled = felled } }
+        end
+        local _, p = Planner.plan(B, board, sightOf(so), gifted("bold", 10000), owed)
+        return p
+    end
+    local whole, half, none = judgedWith(1), judgedWith(0.5), judgedWith(0)
+    check(table.concat(whole.forfeited, ",") .. " " .. table.concat(half.forfeited, ","),
+          "owed:129 owed:129", "owed: any chance past DUST forfeits")
+    check(#none.forfeited, 0, "owed: a counter that fells nothing forfeits nothing (the enemy's own blows cost it nothing)")
+    check(math.abs((half.judged - whole.judged) - 0.5 * Planner.WEIGHTS.bold.death) < 1e-6, true,
+          "owed: equal forfeits order by the chance, a death's worth of it")
+    check(math.abs((none.judged - whole.judged) - Planner.WEIGHTS.bold.death) < 1e-6, true,
+          "owed: the chance spared is a whole death's worth")
+end
+
+-- The loose price is paid in the judged phase, not the beam (#730 fix 2, ADR 0452; replay
+-- `fix730d` lost where `fix730g` won): A, struck dead by R in any plan that leaves R alive, has one
+-- admitted plan, the kill of R, the owed recruit. A price in the beam's partial score cuts that
+-- plan before the judge ranks it (BEAM 1 and PER_UNIT 1 keep only the best-scored act): the wait
+-- is played and A dies. Paid at the judge, the kill is admitted, forfeits owed:129, and is played.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local Y = red(0x82, 9, 9, { hp = 20, minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1,
+                                                    killsTarget = true } } } },
+        enemyPhase = function(plan)
+            if (plan.gone or {})[0x81] then return {} end
+            return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       targetHp = 20 } }
+        end,
+    }
+    local beam, per = Planner.BEAM, Planner.PER_UNIT
+    Planner.BEAM, Planner.PER_UNIT = 1, 1
+    local a, plan = Planner.plan(B, boardOf(A, R, Y), sightOf(o), style("careful"),
+                                 { owedRecruits = { [0x81] = true } })
+    Planner.BEAM, Planner.PER_UNIT = beam, per
+    check((a and a.act) .. " " .. table.concat(plan and plan.forfeited or {}, ",") .. " "
+          .. tostring(plan and plan.rank and plan.rank.admitted), "attack owed:129 true",
+          "owed: the kill that is the one admitted plan reaches the judge and is played")
+end
+
+-- A loose unit whose death IS the win forfeits nothing, whatever the kill's chance; an unrelated
+-- win does not release it (#730 fix 2 re-review, ADR 0452). The release reads which unit's death
+-- is the win (Planner winByDeath), not the chance arithmetic: a 90% kill of the loose boss left
+-- `kill * (1 - kill)` over DUST once.
+do
+    local owed = { owedRecruits = { [0x81] = true } }
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local B1 = red(0x81, 1, 0, { hp = 10, minRange = false, isBoss = true })
+    local o = { objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }) },
+                fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 90, dmg = 30, hits = 1,
+                                                            killsTarget = true } } } } }
+    local a, plan = Planner.plan(B, boardOf(A, B1), sightOf(o), gifted("bold", 10000), owed)
+    check((a and a.act) .. " " .. #(plan and plan.forfeited or { 1 }), "attack 0",
+          "owed boss: a likely kill of the loose boss is played and forfeits nothing")
+    -- an unrelated win: another boss (0x82) dies to B, while A's blow also fells the loose R
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local Bs = red(0x82, 6, 5, { hp = 10, minRange = false, isBoss = true })
+    local A2 = blue(0x02, 1, 5, 5, { minRange = 1, maxRange = 1 })
+    o = { objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 5, 5 }) },
+          fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } } },
+                 [0x02] = { [0x82] = { ["5,5"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } } } } }
+    local _, p = Planner.plan(B, boardOf(A, A2, R, Bs), sightOf(o), gifted("bold", 10000), owed)
+    local both
+    for _, c in ipairs(p and p.considered or {}) do
+        local n = 0
+        for _, x in ipairs(c.acts) do
+            if x:find(">attack@", 1, true) then n = n + 1 end
+        end
+        if n == 2 then both = c.rank.forfeits end
+    end
+    check(both, 1, "owed boss: the plan that fells the loose unit while another boss's death wins still forfeits it")
+
+    -- the value follows the talker's discount: the plan that wins (the boss killed) pays the loose
+    -- unit's death's worth of the chance it stays, (1 - pWin) of it
+    local plain
+    _, plain = Planner.plan(B, boardOf(A2, red(0x81, 9, 9, { hp = 10, minRange = false }), Bs),
+                            sightOf({ objective = { kind = "boss" }, reach = { [0x02] = tiles({ 5, 5 }) },
+                                      fc = o.fc }), gifted("bold", 10000))
+    local withOwed
+    _, withOwed = Planner.plan(B, boardOf(A2, red(0x81, 9, 9, { hp = 10, minRange = false }), Bs),
+                               sightOf({ objective = { kind = "boss" }, reach = { [0x02] = tiles({ 5, 5 }) },
+                                         fc = o.fc }), gifted("bold", 10000), owed)
+    check(math.abs((plain.judged - withOwed.judged) - Planner.WEIGHTS.bold.death) < 1e-6, true,
+          "owed: a winning plan pays the loose unit a death's worth times (1 - pWin), the talker's discount")
+    -- sortedKeys: one total order for mixed keys (numbers by value, then strings)
+    local ks = Planner.sortedKeys({ [10] = true, [9] = true, ["1x"] = true, ["a"] = true,
+                                    [11] = true, ["2y"] = true, ["10x"] = true, [100] = true })
+    check(table.concat(ks, ","), "9,10,11,100,10x,1x,2y,a",
+          "sortedKeys: mixed keys come out in one total order")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

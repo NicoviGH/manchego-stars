@@ -1035,16 +1035,19 @@ local function waitHolding(u, tile, slot)
 end
 
 -- The waits of `u` that spare a recruit (#730, ADR 0451): where our counter would fell a
--- recruit (ctx.recruits) striking `u` on a tile a wait of `u` already ends on, the same wait
--- holding another bag slot, when the recruits' fall plus `u`'s own death there is less than with
+-- recruit (ctx.recruits, or ctx.looseRecruits) striking `u` on a tile a wait of `u` already ends
+-- on, the same wait holding another bag slot, when the recruits' fall plus `u`'s own death there is less than with
 -- the weapon `u` holds now (the first usable one: slot nil). Per tile the least wins; the
 -- M.GENTLE best over all tiles are offered, since each is a judged phase in the mend. A range-2
 -- bow against a recruit's melee strike answers nothing: the no-counter choice a player has.
 -- -> the acts, each labelled "gentle"
 local function sparingWaits(ctx, u, acts)
     local weapons = ctx.sight.weapons(u)
-    if #weapons < 2 or next(ctx.recruits) == nil then return {} end
-    local function recruit(e) return ctx.recruits[e.id] end
+    if #weapons < 2 or (next(ctx.recruits) == nil and next(ctx.looseRecruits) == nil) then
+        return {}
+    end
+    -- the loose too (owed, no talker yet): their fall is a forfeit, so a sparing weapon is worth it
+    local function recruit(e) return ctx.recruits[e.id] or ctx.looseRecruits[e.id] end
     local function cost(x, y, slot)
         return (counterOn(ctx, u, x, y, slot, recruit)) + dieAt(ctx, u, x, y, slot)
     end
@@ -2079,8 +2082,13 @@ end
 -- talker reaches anywhere.
 -- -> out[id] = true, talkers[id] = the player units' ids that may Talk it over (goals.lua's
 -- takers), and pending[id] = { id, charId, x, y } for the arrivals.
+-- Then `loose` (#730 fix 2, ADR 0452): the red units on the field the game still owes
+-- (ctx.owedRecruits) that no blue unit may Talk yet (vanilla Ch10's Marisa before Gerik joins).
+-- They are NOT in `out`: no one can Talk them, so the march has nothing to stand beside and a
+-- red keeps its damage and advance credit; only their death is priced (Planner's looseHit,
+-- Goals.forfeited's `loose`), with no goal and no row: a row nobody can take would hold the win.
 local function recruitsOf(ctx)
-    local out, talkers = {}, {}
+    local out, talkers, loose = {}, {}, {}
     -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to
     local units = {}
     for _, t in ipairs(ctx.onField) do units[#units + 1] = t end
@@ -2095,6 +2103,12 @@ local function recruitsOf(ctx)
                 talkers[t.id] = talkers[t.id] or {}
                 table.insert(talkers[t.id], u.id)
             end
+        end
+    end
+    local owed = ctx.owedRecruits or {}
+    for _, t in ipairs(ctx.onField) do
+        if t.faction == "red" and not t.fogged and owed[t.charId] and not out[t.id] then
+            loose[t.id] = true
         end
     end
     local pending, here = {}, {}
@@ -2116,7 +2130,7 @@ local function recruitsOf(ctx)
             end
         end
     end
-    return out, talkers, pending
+    return out, talkers, pending, loose
 end
 
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
@@ -3204,8 +3218,9 @@ end
 -- were dropped.
 local function stepsToward(ctx, u, g)
     local there = ctx.standing[tileKey(g.x, g.y)]
-    -- a recruit (recruitsOf: one a player unit may Talk over), not any unit: an enemy holding
-    -- a village is no goal reached by standing beside it
+    -- a talker recruit (recruitsOf's `out`: one a player unit may Talk over; never a loose one,
+    -- whom no one can Talk), not any unit: an enemy holding a village is no goal reached by
+    -- standing beside it
     local recruit = there and ctx.recruits[there.id]
     local beside = besideGoal(ctx, g)
     local now = ctx.turnsTo(u, g, nil, beside)
@@ -3242,7 +3257,8 @@ end
 -- re-listing (#661, #670): only those units' acts are listed, each over those tiles of its
 -- reach alone, every other unit standing as it is.
 -- -> { { unit, acts } }, ctx (the planner scores with the same view; ctx.recruits, recruitsOf's
--- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over).
+-- ids, are the units a player blow must not kill; ctx.recruitTalkers who may Talk each over;
+-- ctx.looseRecruits the owed ones no one may Talk yet, whose death is a forfeit all the same).
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
@@ -3282,7 +3298,7 @@ function M.candidates(board, sight, style, opts)
     ctx.turnsOn = function(walls, pos) return turnsOn(ctx, walls, pos) end
     ctx.pending = opts and opts.pending
     ctx.owedRecruits = opts and opts.owedRecruits   -- a set of charIds (botrun's owed), Goals.scriptedCloses'
-    ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits = recruitsOf(ctx)
+    ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits, ctx.looseRecruits = recruitsOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     -- A unit sent where it has had no step nearer since an earlier turn is sent again,
