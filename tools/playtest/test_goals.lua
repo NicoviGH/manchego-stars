@@ -448,5 +448,44 @@ do
     check(rows[1] and rows[1].status, "stalled", "a recruit that is not pending stalls on quiet readings")
 end
 
+-- A scripted removal (#724): a turn event's DISA of a recruit on turn 12, read on turn 8, closes
+-- the goal after enemy phase 4; the AI's earlier escape stays, a removal in the past is none.
+do
+    local board = { units = { blue(1, 0, 0), { id = 0x85, charId = 0x12, x = 5, y = 5, faction = "green",
+                                              onField = true, items = {} } }, turn = 8 }
+    local function closes(removals, closings)
+        local sight = fakeSight({ closings = closings })
+        sight.scriptedUnits = function() return { arrivals = {}, removals = removals } end
+        local g = find(Goals.list(board, sight, {}, { recruitTalkers = { [0x85] = { 1 } }, owedRecruits = { [0x12] = true } }), "recruit:133")
+        return g and g.closes
+    end
+    check(closes({ [0x12] = 12 }, nil), 4, "scripted removal: turn 12 read on turn 8 closes after phase 4")
+    check(closes({ [0x12] = 12 }, { ["unit:133"] = 2 }), 2, "scripted removal: the AI's earlier escape wins")
+    check(closes({ [0x12] = 7 }, nil), nil, "scripted removal: one in the past is none")
+    check(closes({}, nil), nil, "scripted removal: none read")
+    -- the path is cut to the deadline less one, and sight's own answer is left as it was
+    local own = { [0x85] = { [1] = { x = 1, y = 1 }, [2] = { x = 2, y = 2 }, [3] = { x = 3, y = 3 },
+                             [4] = { x = 4, y = 4 }, [5] = { x = 5, y = 5 } } }
+    local sight = fakeSight({})
+    sight.scriptedUnits = function() return { arrivals = {}, removals = { [0x12] = 11 } } end
+    function sight.closings() return {}, own end
+    local g = find(Goals.list(board, sight, {}, { recruitTalkers = { [0x85] = { 1 } }, owedRecruits = { [0x12] = true } }), "recruit:133")
+    check(g.closes, 3, "scripted removal: turn 11 read on turn 8")
+    check(g.path[2] ~= nil and g.path[3], nil, "scripted removal: the path stops at deadline less one")
+    check(own[0x85][5].x, 5, "scripted removal: sight's own path is not edited")
+    -- nobody to watch: the scripts are not asked
+    local asked = false
+    sight.scriptedUnits = function() asked = true return { arrivals = {}, removals = {} } end
+    Goals.list(board, sight, {}, { recruitTalkers = {}, owedRecruits = { [0x12] = true } })
+    check(asked, false, "scripted removal: no recruit, no scan")
+    -- a talk offered to a unit nobody owes (a two-way talk) asks for no scan either
+    Goals.list(board, sight, {}, { recruitTalkers = { [0x85] = { 1 } }, owedRecruits = {} })
+    Goals.list(board, sight, {}, { recruitTalkers = { [0x85] = { 1 } } })
+    check(asked, false, "scripted removal: a watched unit nobody owes is no scan")
+    local owedOnly = find(Goals.list(board, sight, {}, { recruitTalkers = { [0x85] = { 1 } },
+                                                          owedRecruits = { [0x99] = true } }), "recruit:133")
+    check(owedOnly and owedOnly.closes, nil, "scripted removal: another recruit's owed does not close this one")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
