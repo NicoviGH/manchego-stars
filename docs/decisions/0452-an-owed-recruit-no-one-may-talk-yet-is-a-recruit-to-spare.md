@@ -36,6 +36,14 @@ being 1 (nothing to reach: no one can Talk it yet), so `c = (1 - pWin)` times th
 factors. Its gold is 0 here (a talker's worth is its items' gold plus `W.death`); the items of a
 unit nobody can Talk are not read.
 
+**The price is paid by the judge only.** The value term runs in the judged phase and the
+lookahead (`goalTerm` with `rows`), never in a menu's or the beam's partial score. The rank orders
+by what the game forbids (admitted, then forfeits), and its forfeit already counts the death; a
+partial score that pre-pays it prunes the plan the rank would pick, as in #722. Replay: the term in
+the beam cut the one admitted plan on turn 8 (it fells Marisa, 0.05 max death chance) and left plans
+that let her kill a healer (0.82). The talker recruit's goal term still runs in the beam; that is
+older than this change and is filed apart, not changed here.
+
 **A win by the kill does not forfeit it.** Decided by the coordinator, 2026-11-22. A loose unit
 whose death is the win (a Defeat-boss boss, a Rout's last red) would otherwise make every
 winning plan forfeit `owed:<id>` while a hold forfeits 0, and with no ledger row GOAL_QUIET's
@@ -71,10 +79,16 @@ who is loose (a green, a fogged red and an unowed red are not; a talker recruit 
 the march's alone); a counter that fells nothing forfeits nothing.
 
 **Replay (`b640e-cs-s4008`, Ch10, one attempt each; the start was played by an older bot, so the
-base is the recording).** Recorded: won in 15 turns, 1 blue death, Marisa killed on turn 8 by our
-blow. First build of this change (loose units counted as recruits): won in 17 turns, 0 deaths,
-Marisa killed on turn 8 by our attack. This build (loose units kept apart, a red's credit): lost
-in 14 turns, 5 deaths, all by Marisa, whom no plan attacks on turn 8 (she lives at 9 HP and kills
-five units over turns 8 to 14); no plan that spares her was admitted. The same build with the loose
-unit also marked as a recruit: won in 18 turns, 2 deaths. So the lost game comes from the loose
-unit being an ordinary red to the march and the credit, not from the price; open in the PR.
+base is the recording).**
+
+| Build | Result | Marisa |
+|---|---|---|
+| Recorded | won, 15 turns, 1 death | killed turn 8 by our blow |
+| `fix730c` (loose also a recruit, price at the judge only) | won, 17 turns, 0 deaths | killed turn 8 |
+| `fix730d` (loose a red, price in the beam) | lost, 14 turns, 5 deaths | none attacks her; she kills five |
+| `fix730f` (`fix730d` with her marked a recruit) | won, 18 turns, 2 deaths | spared by a retreat, not admitted |
+| `fix730g` (loose a red, price at the judge only) | won, 17 turns, 0 deaths | killed turn 8, the played plan admitted (0.045) |
+
+Item 5 and 7 (the loose unit is a red to the march and the credit) are not the cause of `fix730d`'s
+loss: `fix730g` keeps them. The beam's pre-paid price is, and the test pins it with BEAM and
+PER_UNIT at 1.

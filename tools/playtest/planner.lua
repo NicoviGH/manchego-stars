@@ -1188,8 +1188,11 @@ function M.plan(Bot, board, sight, style, opts)
         -- an owed recruit no one may Talk yet has no goal, but its death costs what a talker
         -- recruit's does: a death's worth of the chance it is gone, by the same combination. Its
         -- reach is whole (1: nothing to reach, no one can Talk it yet), so the chance it stays is
-        -- the win's discount and the blows' (#730 fix 2, ADR 0452)
-        for _, id in ipairs(sortedKeys(st.loose)) do
+        -- the win's discount and the blows' (#730 fix 2, ADR 0452). Paid by the judged phase and
+        -- the lookahead only (`rows`): a menu's or the beam's partial score that pre-pays it
+        -- prunes the plan the rank would pick (a kill that is the one admitted plan; #722's
+        -- lesson). The rank orders by what the game forbids, and its forfeit already counts it
+        for _, id in ipairs(rows and sortedKeys(st.loose) or {}) do
             v = v + W.death * (sparedOf(st, felled, id, 1 - pWin) - 1)
         end
         -- the win now rather than a turn later: one death's worth x (1 - GAMMA). With nothing

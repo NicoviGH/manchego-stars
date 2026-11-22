@@ -10304,6 +10304,35 @@ do
           "owed: the chance spared is a whole death's worth")
 end
 
+-- The loose price is paid in the judged phase, not the beam (#730 fix 2, ADR 0452; replay
+-- `fix730d` lost where `fix730g` won): A, struck dead by R in any plan that leaves R alive, has one
+-- admitted plan, the kill of R, the owed recruit. A price in the beam's partial score cuts that
+-- plan before the judge ranks it (BEAM 1 and PER_UNIT 1 keep only the best-scored act): the wait
+-- is played and A dies. Paid at the judge, the kill is admitted, forfeits owed:129, and is played.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local Y = red(0x82, 9, 9, { hp = 20, minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1,
+                                                    killsTarget = true } } } },
+        enemyPhase = function(plan)
+            if (plan.gone or {})[0x81] then return {} end
+            return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99, takenHits = 1,
+                       targetHp = 20 } }
+        end,
+    }
+    local beam, per = Planner.BEAM, Planner.PER_UNIT
+    Planner.BEAM, Planner.PER_UNIT = 1, 1
+    local a, plan = Planner.plan(B, boardOf(A, R, Y), sightOf(o), style("careful"),
+                                 { owedRecruits = { [0x81] = true } })
+    Planner.BEAM, Planner.PER_UNIT = beam, per
+    check((a and a.act) .. " " .. table.concat(plan and plan.forfeited or {}, ",") .. " "
+          .. tostring(plan and plan.rank and plan.rank.admitted), "attack owed:129 true",
+          "owed: the kill that is the one admitted plan reaches the judge and is played")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
