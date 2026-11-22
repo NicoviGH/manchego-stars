@@ -899,7 +899,8 @@ function M.plan(Bot, board, sight, style, opts)
     local function positions(st, alive)
         local pos = {}
         for _, u in ipairs(ctx.blues) do
-            pos[u.id] = { x = u.x, y = u.y, acted = u.acted, alive = alive and alive[u.id] or 1 }
+            pos[u.id] = { x = u.x, y = u.y, acted = u.acted, alive = alive and alive[u.id] or 1,
+                        lock = 1 - (st.robbed and st.robbed[u.id] or 0) }
         end
         for _, a in ipairs(st.acts) do
             local p = pos[a.unitId]
@@ -2176,6 +2177,20 @@ function M.plan(Bot, board, sight, style, opts)
         -- counter may have felled (its goal lost)
         local alive = {}
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
+        -- the key a thief takes in the phase (#711): per unit, the chance over the phase's ways
+        -- that it loses its last way to open a chest. The game's own AI decided the theft
+        -- (sight's pilfer), so a plan that moves the holder out of reach, or kills the thief,
+        -- reads none. The chests it would still have opened are worth that much less.
+        st.robbed = {}
+        for _, o in ipairs(outcomes) do
+            local once = {}
+            for _, th in ipairs(o.strikes.thefts or {}) do
+                if th.lock and not once[th.target] then
+                    once[th.target] = true
+                    st.robbed[th.target] = (st.robbed[th.target] or 0) + o.p
+                end
+            end
+        end
         st.goalWorth = {}
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)

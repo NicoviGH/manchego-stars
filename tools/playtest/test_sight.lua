@@ -1505,6 +1505,7 @@ do
     check(table.concat(ids, " "), "enemy:9/2 enemy:7/1 chests/1 village:5,6/1 sustain/1",
         "demandsOf: classes, chests once, the village, sustain; no fog, no Seize demand")
     check(d[1].rep.id, 0x81, "demandsOf: the class's first unit stands for it")
+    check(d[3].locks, 2, "demandsOf: the chests demand counts its tiles (#711: a key each)")
     d = Sight.demandsOf({}, { { x = 0, y = 0, cmd = Sight.TILE_COMMAND_DOOR } }, 3)
     ids = {}
     for _, x in ipairs(d) do ids[#ids + 1] = x.id end
@@ -2791,6 +2792,26 @@ do
     m.w8(actor + Board.UNIT_STATUS, 0); m.w8(actor + 0x13, 0)
     Sight.setStatus(api, Board, actor, Board.STATUS_SLEEP)
     check(m.u8(actor + Board.UNIT_STATUS), 0, "setStatus: a unit a strike killed takes none")
+
+    -- #711: a thief's decision is AI_ACTION_STEAL (AiSetDecision: tile, target, item slot);
+    -- ActionSteal moves the item from the target's bag to the thief's first free slot
+    m.w8(D + DEC.ACTION, Board.AI_ACTION_STEAL); m.w8(D + DEC.TARGET, 5); m.w8(D + DEC.SLOT, 1)
+    m.w8(D + DEC.X, 2); m.w8(D + DEC.Y, 3)
+    local steal = Sight.stealAct(m, Board, D)
+    check(steal and table.concat({ tostring(steal.steal), steal.target, steal.slot, steal.tile.x,
+                                   steal.tile.y }, ","), "true,5,1,2,3",
+          "stealAct: the thief's target, the item's slot and the tile it steals from")
+    check(Sight.stealAct(m, Board, D + 0x40), nil, "stealAct: no steal in a decision that is none")
+    local thief, mark = 0x02030200, 0x02030300
+    for i = 0, 4 do m.w16(mark + Board.UNIT_ITEMS + i * 2, 0); m.w16(thief + Board.UNIT_ITEMS + i * 2, 0) end
+    m.w16(mark + Board.UNIT_ITEMS, 0x0114); m.w16(mark + Board.UNIT_ITEMS + 2, 0x016B)
+    m.w16(mark + Board.UNIT_ITEMS + 4, 0x2D6C); m.w16(thief + Board.UNIT_ITEMS, 0x2814)
+    local item = Sight.moveItem({ mem = m, write16 = m.w16 }, Board, mark, 1, thief)
+    check(item, 0x6B, "moveItem: the Lockpick's id")
+    check(table.concat({ m.u16(mark + Board.UNIT_ITEMS), m.u16(mark + Board.UNIT_ITEMS + 2),
+                         m.u16(mark + Board.UNIT_ITEMS + 4) }, ","), "276,11628,0",
+          "moveItem: the target's bag packs down over the slot")
+    check(m.u16(thief + Board.UNIT_ITEMS + 2), 0x016B, "moveItem: the thief's first free slot takes it")
 
     -- phaseWays: the staff's hit is a way of its own, its strikes the phase's as they were
     local function sandbox(fn) return fn() end

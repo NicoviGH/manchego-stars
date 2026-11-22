@@ -1163,7 +1163,7 @@ end
 -- test_sight.lua builds every case. units = Board.read's; commands = {{ x, y, cmd }...} the
 -- chapter's tile commands; fog = gPlaySt.chapterVisionRange. One demand per red class on the
 -- field (need = how many stand there, rep = the first), one per village tile, one for chests
--- and one for doors when there are any, fog when the chapter has it, and sustain always.
+-- and one for doors when there are any (`locks`: how many tiles), fog when the chapter has it, and sustain always.
 -- `freeTalks` (M.freeTalks) adds one `talk` demand per recruit a unit may bring over for free:
 -- answered only by those talkers, so Bot.team seats one of them (#699).
 function M.demandsOf(units, commands, fog, freeTalks)
@@ -1184,9 +1184,14 @@ function M.demandsOf(units, commands, fog, freeTalks)
         if c.cmd == M.TILE_COMMAND_VISIT then
             out[#out + 1] = { id = string.format("village:%d,%d", c.x, c.y), kind = "village",
                               need = 1, tile = { x = c.x, y = c.y } }
-        elseif kinds[c.cmd] and not once[c.cmd] then
-            once[c.cmd] = true
-            out[#out + 1] = { id = kinds[c.cmd], kind = kinds[c.cmd], need = 1 }
+        elseif kinds[c.cmd] then
+            -- `need` is the openers the team seats (one opener opens every lock); `locks` is the
+            -- tiles to open, one key each (Bot.supply's takeKeys, #711)
+            if not once[c.cmd] then
+                once[c.cmd] = { id = kinds[c.cmd], kind = kinds[c.cmd], need = 1, locks = 0 }
+                out[#out + 1] = once[c.cmd]
+            end
+            once[c.cmd].locks = once[c.cmd].locks + 1
         end
     end
     if fog > 0 then out[#out + 1] = { id = "fog", kind = "fog", need = 1 } end
@@ -2040,6 +2045,34 @@ function M.staffAct(mem, Board, D, actor)
     if not status then return nil end
     return { target = mem.u8(D + DEC.TARGET), status = status,
              tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- An enemy thief's steal as its decision names it: AI_ACTION_STEAL (cp_battle.c
+-- AiAttemptStealActionWithinMovement: AiSetDecision's tile, target and the item's slot in the
+-- target's bag, taken from the highest-ranked item among every unit the thief can stand beside,
+-- the game's own choice, ADR 0379). `D` = gAiDecision. -> { steal = true, target = the id,
+-- slot, item = the item's id, tile = { x, y } the thief stands on }, or nil for any other act
+function M.stealAct(mem, Board, D)
+    local DEC = Board.AI_DEC
+    if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_STEAL then return nil end
+    return { steal = true, target = mem.u8(D + DEC.TARGET), slot = mem.u8(D + DEC.SLOT),
+             tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- ActionSteal's bag change (bmmind.c): the item in slot `slot` of the unit at `from` leaves its
+-- bag (UnitRemoveItem packs it) and goes to the first free slot of the unit at `to`
+-- (UnitAddItem); the AI steals only with a free slot (cp_battle.c:44). -> the item's id
+function M.moveItem(api, Board, from, slot, to)
+    local mem = api.mem
+    local at = function(a, i) return a + Board.UNIT_ITEMS + i * 2 end
+    local raw = mem.u16(at(from, slot))
+    for i = slot, Board.ITEM_COUNT - 2 do api.write16(at(from, i), mem.u16(at(from, i + 1))) end
+    api.write16(at(from, Board.ITEM_COUNT - 1), 0)
+    for i = 0, Board.ITEM_COUNT - 1 do
+        if mem.u16(at(to, i)) == 0 then
+            api.write16(at(to, i), raw)
+            break
+        end
+    end
+    return raw & 0xFF
 end
 -- Whether the player's unit `o` (Board.read's) is asleep or berserked once the next player
 -- phase's start ticks it (Board.statusAfter, one start): the army's reply between the
@@ -3001,7 +3034,8 @@ function M.new(outer)
     -- a staged phase wrote an enemy's HP since (`healStale`: wound() sets it).
     -- -> the struck unit's id and the strike as
     -- the forecast reads it (M.side, with slot and tile), or nil when the AI does not attack;
-    -- then, when it casts a status staff instead, the act (M.staffAct) as a third value.
+    -- then, when it casts a status staff (M.staffAct) or steals (M.stealAct) instead, the act as a
+    -- third value.
     local healStale = false
     -- A simulated phase's own HP write, on the unit at `addr`: `decides` = it is of the side
     -- deciding, whose heal flags the next decision must read again.
@@ -3049,7 +3083,7 @@ function M.new(outer)
         local D = S.gAiDecision
         local DEC = Board.AI_DEC
         if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_COMBAT then
-            return nil, nil, M.staffAct(mem, Board, D, e.addr)
+            return nil, nil, M.staffAct(mem, Board, D, e.addr) or M.stealAct(mem, Board, D)
         end
         local target = mem.u8(D + DEC.TARGET)
         local addr = mem.u32(S.gUnitLookup + target * 4)
@@ -3245,6 +3279,7 @@ function M.new(outer)
                                  byId[target] and byId[target].level)
             local now = {}
             for x = 1, #done do now[x] = done[x] end
+            now.thefts = done.thefts
             now[#now + 1] = t
             standOn(e, side.tile.x, side.tile.y)
             local _, mean = M.odds({ t.takenDist }, t.targetHp)
@@ -3275,7 +3310,23 @@ function M.new(outer)
             local q = call(S.GetOffensiveStaffAccuracy, { e.addr, addr }) / 100
             return q, function() M.setStatus(api, Board, addr, act.status) end
         end
-        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast
+        -- e steals as it decided (#711, M.stealAct): stood on its tile, the item moved from the
+        -- target's bag to its own, as ActionSteal does (a theft never misses). Later enemies
+        -- decide on the board it leaves: a second thief finds the item gone. -> the theft:
+        -- { thief, target, item, lock = true when the target opened a chest before and no
+        -- longer does (GetUnitKeyItemSlotForTerrain, the game's own read) }
+        local function pilfer(call, e, act)
+            local addr = mem.u32(S.gUnitLookup + act.target * 4)
+            local chests = M.LOCK_TERRAIN.chests
+            local function opens()
+                return s32(call(S.GetUnitKeyItemSlotForTerrain, { addr, chests })) >= 0
+            end
+            local was = opens()
+            standOn(e, act.tile.x, act.tile.y)
+            local item = M.moveItem(api, Board, addr, act.slot, e.addr)
+            return { thief = e.id, target = act.target, item = item, lock = was and not opens() }
+        end
+        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
@@ -3284,14 +3335,23 @@ function M.new(outer)
     -- the units it moves; each of its ways ends in the enemy phase `order()` lists on that way's
     -- board. `order` = stagePhase's, and `cast` (a status staff's, #674).
     local function playPhase(call, proc, byId, berserkFirst, after, order, decides, strike, remove,
-                             mass0, cast)
+                             mass0, cast, pilfer)
         local function ways(list, mass, tail, done0)
             return M.phaseWays(#list, function(k, done)
                 local id = list[k]
                 local e = decides(id)
                 if not e then return nil end
                 local target, side, act = aiDecide(call, proc, e, byId)
-                if act then
+                if act and act.steal then
+                    -- a theft (#711): no strike and no chance, the board changes as it did; the
+                    -- way's strikes list carries it (.thefts) for the planner's price
+                    local now = {}
+                    for x = 1, #done do now[x] = done[x] end
+                    now.thefts = {}
+                    for x, th in ipairs(done.thefts or {}) do now.thefts[x] = th end
+                    now.thefts[#now.thefts + 1] = pilfer(call, e, act)
+                    return { lands = 0 }, now
+                elseif act then
                     -- a status staff (#674): no strike, its hit a way of its own
                     local q, land = cast(e, act)
                     return { lands = q }, done, land
@@ -3321,16 +3381,17 @@ function M.new(outer)
         end
         local out = {}
         for x, t in ipairs(top.strikes) do out[x] = t end
+        out.thefts = top.strikes.thefts
         out.outcomes, out.unsplit = outcomes, unsplit
         return out
     end
 
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, _, berserkFirst, cast =
+            local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer =
                 stagePhase(call, plan)
             return playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
-                             plan.mass, cast)
+                             plan.mass, cast, pilfer)
         end) end)
     end
 
@@ -3464,7 +3525,7 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast =
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer =
                 stagePhase(call, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
@@ -3475,7 +3536,12 @@ function M.new(outer)
                     local e = decides(id)
                     if e then
                         local target, side, act = aiDecide(call, proc, e, byId)
-                        if act then
+                        if act and act.steal then
+                            -- a theft (#711): the board changes as it did (the first phase's
+                            -- thefts are priced in enemyPhase; the lookahead reads its board)
+                            pilfer(call, e, act)
+                            moved[#moved + 1] = { id = id, x = act.tile.x, y = act.tile.y }
+                        elseif act then
                             -- a status staff (#674): it lands on the expected way when its hit
                             -- is even odds or better, as a counter kill is taken
                             local q, land = cast(e, act)
@@ -3536,7 +3602,7 @@ function M.new(outer)
             healFaction(call, byId, "red")
             -- our berserked units again, those the next player phase's start leaves berserked
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
-                                  remove, nil, cast)
+                                  remove, nil, cast, pilfer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
             return out
         end) end)

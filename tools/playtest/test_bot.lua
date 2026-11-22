@@ -2372,6 +2372,23 @@ do
     local pickThief = armedUnit(1, 5, { items = { lance(), heldPick } })
     check(acts(B.supply({ pickThief, roomy2 }, { chestKey }, nil, chests)), "",
         "supply: a fielded thief with a Lockpick opens chests, so no Chest Key is taken")
+    -- #711: a Chest Key opens one chest, so one is taken per chest tile (vanilla Ch21 has two)
+    local twoChests = { { id = "chests", kind = "chests", need = 1, locks = 2 } }
+    check(acts(B.supply({ roomy, solo }, { chestKey, chestKey }, nil, twoChests)),
+        "take 1:69, take 1:69", "supply: two chest tiles and two keys in the convoy: two taken")
+    check(acts(B.supply({ roomy, solo }, { chestKey }, nil, twoChests)), "take 1:69",
+        "supply: two chest tiles and one key in the convoy: the one is taken")
+    -- a deployed Lockpick holder opens as many chests as the pick has uses left
+    local twoUses = item(0x6C, { [1] = { opens = { doors = true, chests = true } } },
+                         { kind = "key", uses = 2 })
+    local oneUse = item(0x6C, { [1] = { opens = { doors = true, chests = true } } },
+                        { kind = "key", uses = 1 })
+    local pick2 = armedUnit(1, 5, { items = { lance(), twoUses } })
+    local pick1 = armedUnit(1, 5, { items = { lance(), oneUse } })
+    check(acts(B.supply({ pick2, roomy2 }, { chestKey, chestKey }, nil, twoChests)), "",
+        "supply: a Lockpick with two uses left opens both chests: no Chest Key is taken")
+    check(acts(B.supply({ pick1, roomy2 }, { chestKey, chestKey }, nil, twoChests)), "take 2:69",
+        "supply: a Lockpick with one use left opens one chest: one Chest Key is taken")
     -- a key taken for an earlier chapter's chests goes back when this chapter has none (it
     -- costs a slot for good): not while a demand names its lock, not with no demands known
     local keeper = armedUnit(2, 5, { items = { lance(), held } })
@@ -5282,6 +5299,39 @@ do
         check(e and e.die > 0, true, "explore: the offer carries its chance to die, " .. aggression)
         check(e and e.played, nil, "explore: unplayed, " .. aggression)
     end
+end
+
+-- test_planner_moves_a_key_holder_out_of_a_thieves_reach (#711, vanilla Ch16: an enemy Thief
+-- stole Colm's Lockpick in 5 of 15 attempts, and the chests it would have opened went unopened).
+-- A holds the Lockpick and the chest at (4,0) is in its reach from every tile. With no thief A
+-- stands on (0,1) (the fixture's baseline). The game's AI (sight.enemyPhase's theft,
+-- M.stealAct) steals the Lockpick from that tile; the chest is worth 500 and the steal loses
+-- it, so A stands elsewhere. A theft of an item that opens no lock (lock = false) costs the
+-- chest nothing: A stays on (0,1).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 3, { minRange = false })
+    local function stands(lock)
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+            explorable = { { x = 4, y = 0, kind = "chest" } },
+            canExplore = { [0x01] = { ["4,0"] = "chest" } },
+            enemyPhase = function(plan)
+                for _, b in ipairs(plan.blues) do
+                    if b.x == 0 and b.y == 1 then
+                        return { thefts = { { thief = 0x81, target = b.unit.id, item = 0x6B,
+                                              lock = lock } } }
+                    end
+                end
+                return {}
+            end,
+        }
+        return at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500)))
+    end
+    local calm = stands(nil)
+    check(calm, "0,1", "theft: with no steal, A stands where it does (the fixture's baseline)")
+    check(stands(false), calm, "theft: a stolen item that opens nothing leaves A's way alone")
+    check(stands(true) ~= calm, true, "theft: the holder leaves the tile the thief steals from")
 end
 
 -- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with

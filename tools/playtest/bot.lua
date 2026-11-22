@@ -3675,32 +3675,49 @@ end
 -- GetUnitKeyItemSlotForTerrain, so a Lockpick counts only for a thief; no id lives here). The
 -- taker is the unit with the most free slots, ties to party order: the take costs it nothing,
 -- and a full bag gives first what Bot.fullBag would send, so the next in order is tried when
--- that gives nothing up. A key is one use, so one is taken per kind; the next arrives mid-map
--- (bot.lua supplyKey).
+-- that gives nothing up. A key is one use and a chest or door takes one, so one is taken per lock
+-- the demand counts (`locks`) that no bag already opens (#711); the rest arrive mid-map (supplyKey).
 local function takeKeys(L, party, demands)
     for _, d in ipairs(demands or {}) do
         if d.kind == "chests" or d.kind == "doors" then
             local function opens(u, it) return (forUnit(it, u.charId).opens or {})[d.kind] end
-            local held = false
+            -- the locks still unopened, less what the fielded bags already open: a key is one
+            -- use and a Lockpick has as many as its uses left (#711: a Chest Key opens one
+            -- chest, and vanilla Ch21 has two)
+            local want = d.locks or d.need or 1
             for _, u in ipairs(party) do
-                for _, it in ipairs(L.bags[u.charId]) do held = held or opens(u, it) or false end
+                for _, it in ipairs(L.bags[u.charId]) do
+                    if opens(u, it) then want = want - (it.uses or 1) end
+                end
             end
             local order = {}
             for i, u in ipairs(party) do
-                order[#order + 1] = { u = u, i = i, free = Board.ITEM_COUNT - #L.bags[u.charId] }
+                order[#order + 1] = { u = u, i = i }
             end
-            table.sort(order, function(a, b)
-                if a.free ~= b.free then return a.free > b.free end
-                return a.i < b.i
-            end)
-            local done = held
-            for _, o in ipairs(order) do
-                for i, it in ipairs(L.pool) do
-                    if not done and opens(o.u, it) then
-                        done = L.take(o.u.charId, i, "the " .. d.kind .. " key", "key")
-                        if done then break end
+            -- a pass takes one item for the unit with the most free slots (ties to party
+            -- order), as the first take of a kind always did; the next pass counts the slot the
+            -- take used, so a second key goes to the next unit with room
+            while want > 0 do
+                table.sort(order, function(a, b)
+                    local fa, fb = Board.ITEM_COUNT - #L.bags[a.u.charId],
+                                   Board.ITEM_COUNT - #L.bags[b.u.charId]
+                    if fa ~= fb then return fa > fb end
+                    return a.i < b.i
+                end)
+                local took = false
+                for _, o in ipairs(order) do
+                    for i, it in ipairs(L.pool) do
+                        if opens(o.u, it) then
+                            local uses = it.uses or 1
+                            if L.take(o.u.charId, i, "the " .. d.kind .. " key", "key") then
+                                want, took = want - uses, true
+                                break
+                            end
+                        end
                     end
+                    if took then break end
                 end
+                if not took then break end
             end
         end
     end

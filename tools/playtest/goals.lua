@@ -314,7 +314,10 @@ function M.chance(goal, pos, gamma, turnsTo)
     local options = {}
     for _, u in ipairs(goal.takerUnits) do
         local p = pos[u.id]
-        if p and (p.alive or 1) > 0 then
+        -- a chest's taker lives to open it and keeps the key that opens it (p.lock, #711: the
+        -- chance a thief's steal of it does not leave the unit without one)
+        local alive = p and (p.alive or 1) * (goal.kind == "chest" and p.lock or 1)
+        if p and alive > 0 then
             local late = p.acted and 1 or 0
             local beside = M.beside(goal.kind)
             local t
@@ -329,7 +332,7 @@ function M.chance(goal, pos, gamma, turnsTo)
             end
             if t then
                 options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
-                                          alive = p.alive or 1 }
+                                          alive = alive }
             end
         end
     end
