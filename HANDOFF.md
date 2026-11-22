@@ -11,16 +11,17 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23; main is 053f4076 + this HANDOFF).** Nicolas approved the four overnight recommendations ("Oh yeah I approve your recommendations"), recorded on #714, #713 and #717. Then, each PR reviewed (`review-to-clean`), re-reviewed once and merged on green CI:
+**Next session starts here (2026-11-23; main is 6f3302a0 + this HANDOFF).** Nicolas approved the four overnight recommendations ("Oh yeah I approve your recommendations"), recorded on #714, #713 and #717. Then, each PR reviewed (`review-to-clean`), re-reviewed once and merged on green CI:
 - **PR #731** (#714 closed, ADR 0450): a DATED goal whose reach chance a plan drives from at least 0.5 to 0 before its deadline is forfeit. Reach only, without survival weights (no double count with the cap). It changed no decision in the Ch10 replay.
 - **PR #732** (#730 fix 1, ADR 0451): a wait holding the weapon whose counter spares a recruit (`sparingWaits`, capped `M.GENTLE = 2`, kept past `PER_UNIT`). Emulator probe `PT_VANILLA=1 tools/playtest/run.sh waitprobe`. It reaches about 17% of recruit counter deaths (the waits).
 - **PR #733** (#730 fix 2, ADR 0452): Nicolas's call: an owed recruit no one can Talk yet (Marisa before Gerik) dies to us at the same price as a talker recruit, through `sparedOf`. The price is paid only in the judge and lookahead. In the beam it pruned the only admitted plan: `fix730d` lost with 5 deaths, `fix730g`/`fix730h` won in 17 turns with 0 deaths. A unit whose death IS the win forfeits nothing.
 
 - **PR #735** (#730 fix 4, ADR 0453): an attack holding the weapon whose counter spares a recruit (`sparingStrikes`, shared `sparingPicks`/`spotKey`/`strikeActOf`). It reads HP after the target's counter, excludes a weapon that breaks on the attack, and skips a spot no recruit reaches (no measured cost: Ch10 78.2 s vs 78.3 s). The plan trace now records the gentle acts offered (`best.gentle`). The replay (`fix730i`) did not reach an attack-counter death. Few recorded killers carry a sparing weapon, so the lift may be small.
 
+- **PR #737** (#717 closed, ADR 0454, reverses ADR 0400 §1): an enemy-phase death is graded by the phase's last plan (the one the enemy phase met) by `protected[].die`, given the unit lived through its own act's counter (`counter`, `M.givenCounter`); the mover's read is kept as `mover_predicted`. `montecarlo.py calibration` reads the same (`death_read`, pinned to `M.deathRead`); its death columns are now `over the cap` / `over the cap, moved under`. Replay `fix717` (Ch15 s4005 a1) played another game (stuck, 35 turns). The bait question moved to **#736** (sub-issue of #699, no call yet).
+
 **In order next:**
 1. #730 is open for fix 3 (kill-then-Talk; first log the offered Talk acts).
-2. **#717:** grade a death by the committed plan's weighted `protected[].die`, approved. The bait question in #717 stays open.
 3. **#713 fix 1:** a ghost at the last-seen tile, approved (option A). It needs `keep16` and a leak-guard run.
 4. **#713 fix 3:** sum the strikes of the game's arrivals, approved. The waves come from the ROM's turn events (`scriptedUnits().arrivals`, widened to class, level and items) plus a stand-in unit for the strike. The reinforcement claims cover only Prologue to Ch8 and Ch13. Evidence: every killer in Ch19 s4003 a1 was an arrival; Eirika's turn-7 death is a target misprediction (lead on #713).
 5. **#734:** a talker recruit's goal term may prune in the beam. **#730 fix 3:** a kill-then-Talk plan; first log the offered Talk acts.
@@ -33,7 +34,7 @@ and start a fresh instance; don't rely on auto-compaction.
     - #717's "read at 0": the grader read the wrong plan.
   - A new candidate act can be offered and still never judged: the planner's per-unit cut (`PER_UNIT`) dropped #722's careful march. Check that an act reaches the beam, not only the candidate list.
   - A replay that shows no change is not proof that a fix does nothing. Read the trace for why. Ch13 needed three PRs (#723, #725, #726) before Cormag's goal held the win.
-- **Run tags:** `fix714*`, `fix721`, `fix724*`, `fix712*`, `fix713*`, `iso711`, `isomain`, `bis0-2`.
+- **Run tags:** `fix717`, `fix714*`, `fix721`, `fix724*`, `fix712*`, `fix713*`, `iso711`, `isomain`, `bis0-2`.
 
 *Before that (2026-11-22; main was d7892189 + HANDOFF).* Four #699 blockers merged today, one PR each, built by Sonnet subagents and reviewed by them (`review-to-clean`). Next was #714 (a march offers only the nearest and the safest tile). The status table on #699 (comment 7066011205) is current. After #714 the order is 2a/2b, then #712, #713 and #717. Then one `attempts` set over the batch, on the #699 measurement's starts (`m699c<N>`).
 
