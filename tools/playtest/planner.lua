@@ -392,14 +392,12 @@ end
 -- (MakeTerrainHealTargetList, bmtarget.c:587-608; AddUnitHp holds it to max HP). The enemy
 -- stands on its tile through our phase, so its tile now is the one that heals it (#709). No heal
 -- leaves `hp` as it is; the cap is the unit's max HP (GetUnitMaxHp, bot.lua's context) and never
--- below the HP it stands on now, so a unit over its max is not credited a wound by the clamp.
--- `hp` is an expectation over the kill and the survival: a unit that dies heals nothing, so the
--- heal applies to the share that lives, `1 - kill` (kill: the chance the plan kills it, nil = 0),
--- and not at all to a unit left at 0 HP.
-function M.healed(heal, e, hp, kill)
+-- below the HP it stands on now, so a unit over its max is not credited a wound by the clamp. A
+-- unit left at 0 HP gains nothing. `hp` here is ONE HP (a survivor's): `outlasting` is the one
+-- owner of the survivors' share of an expectation that mixes a kill.
+function M.healed(heal, e, hp)
     if heal == 0 or hp <= 0 then return hp end
-    local lives = 1 - (kill or 0)
-    return hp + (Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp)) - hp) * lives
+    return Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp))
 end
 
 -- What a blow of `dealt` on `hp` earns once the heal is counted (`kill`: its chance to kill). The
@@ -410,7 +408,9 @@ function M.outlasting(heal, e, hp, dealt, kill)
     kill = kill or 0
     if heal == 0 or kill >= 1 or hp - dealt <= 0 then return dealt end
     if kill == 0 then return M.healed(heal, e, hp) - M.healed(heal, e, hp - dealt) end
-    local survived = math.max(0, (dealt - kill * hp) / (1 - kill))
+    -- the surviving branch's mean damage, held to hp: a survivor was left above 0, so more than
+    -- hp is a rounding of `dealt`, never a bigger wound
+    local survived = math.min(hp, math.max(0, (dealt - kill * hp) / (1 - kill)))
     return kill * hp + (1 - kill) * (M.healed(heal, e, hp) - M.healed(heal, e, hp - survived))
 end
 
@@ -1060,11 +1060,9 @@ function M.plan(Bot, board, sight, style, opts)
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and e.isBoss))
-            -- `hp` is the plan's expected HP over the kill and the survival; the kill chance has
-            -- returned above (> DUST), so what is left of it is at most DUST, and only the share
-            -- that lives heals (M.healed's `kill`)
-            local kill = st.kill[id] and odds(st.kill[id], e.hp) or 0
-            if needed and e.hp - M.healed(healOf(e), e, hp, kill) > M.DUST then return true, true end
+            -- no kill share is needed here: a kill chance above DUST returned as progress in the
+            -- kill loop above, so `hp` (the plan's expected HP) is a survivor's, to within DUST
+            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
         end
         return false, false
     end

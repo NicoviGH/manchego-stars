@@ -3166,7 +3166,10 @@ function M.new(outer)
                     local terrain = grid(mem, S.gBmMapTerrain, mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y))
                     local heal = healAmount(call, terrain, o.addr)
                     if heal > 0 then
-                        wound(o.addr, Board.addHp(hp, heal, call(S.GetUnitMaxHp, { o.addr })), true)
+                        -- `decides`: only the reds, whose phase it is, read the heal flags again; a blue's or
+                        -- green's heal changes no red's decision
+                        wound(o.addr, Board.addHp(hp, heal, call(S.GetUnitMaxHp, { o.addr })),
+                              faction == "red")
                     end
                 end
             end

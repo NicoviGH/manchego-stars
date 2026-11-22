@@ -19,9 +19,10 @@ Under ADR 0439's idle rule the bot could not hold, so it chipped a fort boss for
 counter: the chip was healed back before the boss acted (35 of 55 deaths in #699's Ch15 measure).
 
 **Decided.** `sight.terrainHeal(u)` asks the game (`GetTerrainHealAmount`, `GetUnitMaxHp`, ADR 0369)
-for the HP the tile `u` stands on heals it. `Planner.healed(heal, e, hp, kill)` is the one owner of
-"HP after the heal": `hp` plus `min(max HP, hp + heal) - hp`, for the share that lives (`1 - kill`);
-a unit at 0 HP gains nothing. `advances()` credits a wound on a needed unit only as far as it
+for the HP the tile `u` stands on heals it. `Planner.healed(heal, e, hp)` is the one owner of
+"HP after the heal" for one HP: `min(max HP, hp + heal)`, floored at the HP the unit stands on now;
+a unit at 0 HP gains nothing. The survivors' share of an expectation that mixes a kill lives in
+`Planner.outlasting` only. `advances()` credits a wound on a needed unit only as far as it
 outlasts that heal: `e.hp - healed > DUST`. The enemy stands on its tile through our
 phase and the heal comes before it acts, so its tile now is the one that heals it. A kill chance, a
 bait kill, a goal or a win chance advance as before: the heal does not touch them.
@@ -45,9 +46,9 @@ the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `h
   `healed(hp) - healed(hp - its mean damage)`. `st.healOf` is the plan's one read of each enemy's
   heal. `st.enemyHp` is an expectation over the kill and the survival, so the heal is applied to the
   surviving share only.
-- `advances()` (the idle rule): `e.hp - Planner.healed(heal, e, hp, kill)` with `kill` the plan's
-  chance to kill that enemy; a kill chance above `DUST` has already returned as progress, so `kill`
-  here is at most `DUST`. The wound loop returns on the first needed enemy that passes, but every
+- `advances()` (the idle rule): `e.hp - Planner.healed(heal, e, hp)`. It needs no kill share: a kill
+  chance above `DUST` has already returned as progress in the kill loop, so `hp` there is a
+  survivor's, to within `DUST`. The wound loop returns on the first needed enemy that passes, but every
   such return is the same `(true, true)`, so its result does not depend on `pairs` order.
 
 `plan.reds` and `st.enemyHp` stay the unhealed HP the plan leaves, so no read counts a heal twice.
@@ -65,7 +66,10 @@ max_die 0 were rejected as idle (diag709b). *Kill chance:* only this phase's is 
 on any red is a return of its own in `advances()`, ahead of the wound read, so a plan that reaches
 the wound read has none. (`admit()` runs for every plan at the end of `judge()`, before `pick()`
 reads `rank.max_exceed`, and again after the lookahead; `advancing()` reads the rank `admit()` has
-just set.) The lookahead's second-phase kill comes from `sight.nextPhase`, a search
+just set. After that second `admit()` a finalist's `max_exceed` includes the second phase's deaths,
+so a finalist is tested over the cap on the lookahead-extended rank and every other plan on the
+first phase's. That is intended: the cap is the plan's death risk, and a finalist known to die in
+the next phase is over it, as `rank.admitted` already treats it.) The lookahead's second-phase kill comes from `sight.nextPhase`, a search
 made for the finalists after the judge, and `advances()` runs for every plan, so reading it would
 be a new search per plan; ADR 0439 already leaves it out.
 
@@ -81,9 +85,10 @@ sight.lua for the names (the first push of this change crashed every emulator ru
 want of one).
 
 **Cost.** The planner side adds one memoised `sight.terrainHeal` read per enemy per search and
-arithmetic in `score()`. The sandbox side adds `healFaction` to each judged phase (three factions in the
-lookahead's): four memory reads a unit and, only on a heal tile, one `GetUnitMaxHp` call; the
-percent is read once a terrain.
+arithmetic in `score()`. The sandbox side adds `healFaction` to each judged phase: it walks `byId` once per
+call, one call in `enemyPhase` and four in the lookahead's `nextPhase` (red, green, blue, red), with
+four memory reads a unit and, only on a heal tile, one `GetUnitMaxHp` call; the percent is read once
+a terrain.
 
 **Evidence.** The 35 of 55 deaths and the Caellach count are from #699's measurement (comment
 7071434440), not re-measured here. Replays (ADR 0430's light proof), all on `b640e-cs-s4003`/
