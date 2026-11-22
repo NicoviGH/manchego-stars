@@ -1589,6 +1589,33 @@ do
     check(pcall(Json.encode, Sight.demandsOf({}, {}, 0, free)), true, "demandsOf: a talk demand encodes")
 end
 
+-- scriptEffects (#724): a turn event's bytes say who it loads and removes. E_13's turn 5 sets slot 2
+-- to a unit array (SVAL), CALLs the shared reinforcement script (LOAD1(1, -1): the array in slot 2)
+-- and a DISA removes a char; a LOADSINGLEUNIT is a load of its own.
+do
+    local m = fakeMem()
+    local EV, LOADER, ARR = 0x08003000, 0x08003100, 0x08003200
+    local function udef(at, char, x, y) m.w8(at, char); m.w16(at + 4, x | (y << 6)) end
+    udef(ARR, 0x0E, 9, 3); udef(ARR + 0x14, 0x40, 1, 2)   -- two units, then charIndex 0
+    -- the shared loader: LOAD1 (0x2C, sub 1) with the pointer -1 = slot 2, then END
+    m.w16(LOADER, 0x2C41); m.w16(LOADER + 2, 1); m.w32(LOADER + 4, 0xFFFFFFFF); m.w16(LOADER + 8, 0x0120)
+    -- the event: SVAL slot 2 = ARR; CALL LOADER; SPAWN_ENEMY char 0x33 at (4,5); DISA 0x12; END
+    m.w16(EV, 0x0540); m.w16(EV + 2, 2); m.w32(EV + 4, ARR)
+    m.w16(EV + 8, 0x0A40); m.w32(EV + 12, LOADER)
+    m.w16(EV + 16, 0x3242 | 0); m.w16(EV + 18, 0x33); m.w8(EV + 20, 4); m.w8(EV + 21, 5)
+    m.w16(EV + 24, 0x342F - 0x3400 + 0x3400); m.w16(EV + 26, 0x12)
+    m.w16(EV + 28, 0x0120)
+    local fx = Sight.scriptEffects(m, EV)
+    local got = {}
+    for _, l in ipairs(fx.loads) do got[#got + 1] = string.format("%X@%d,%d", l.charId, l.x, l.y) end
+    check(table.concat(got, " "), "E@9,3 40@1,2 33@4,5", "scriptEffects: slot 2 through a CALL, then a single spawn")
+    check(table.concat(fx.removals, ","), "18", "scriptEffects: a DISA is a removal")
+    m.w16(EV + 24, 0x342D)   -- KILL
+    check(Sight.scriptEffects(m, EV).removals[1], 0x12, "scriptEffects: a KILL is one too")
+    m.w16(EV + 24, 0x3420)   -- CHANGESTATE sub 0 (a state change): none
+    check(#Sight.scriptEffects(m, EV).removals, 0, "scriptEffects: another state change is none")
+end
+
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
 -- (cp_script.h; the scripts loop back with a GOTO, so a scan past it reads the next script).
 do

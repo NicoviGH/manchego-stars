@@ -448,5 +448,22 @@ do
     check(rows[1] and rows[1].status, "stalled", "a recruit that is not pending stalls on quiet readings")
 end
 
+-- A scripted removal (#724): a turn event's DISA of a recruit on turn 12, read on turn 8, closes
+-- the goal after enemy phase 4; the AI's earlier escape stays, a removal in the past is none.
+do
+    local board = { units = { blue(1, 0, 0), { id = 0x85, charId = 0x12, x = 5, y = 5, faction = "green",
+                                              onField = true, items = {} } }, turn = 8 }
+    local function closes(removals, closings)
+        local sight = fakeSight({ closings = closings })
+        sight.scriptedUnits = function() return { arrivals = {}, removals = removals } end
+        local g = find(Goals.list(board, sight, {}, { recruitTalkers = { [0x85] = { 1 } } }), "recruit:133")
+        return g and g.closes
+    end
+    check(closes({ [0x12] = 12 }, nil), 4, "scripted removal: turn 12 read on turn 8 closes after phase 4")
+    check(closes({ [0x12] = 12 }, { ["unit:133"] = 2 }), 2, "scripted removal: the AI's earlier escape wins")
+    check(closes({ [0x12] = 7 }, nil), nil, "scripted removal: one in the past is none")
+    check(closes({}, nil), nil, "scripted removal: none read")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

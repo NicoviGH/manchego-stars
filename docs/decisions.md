@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-443 decisions. Read this index, then open the two or three you need — the whole
+444 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -286,6 +286,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0442` | [A Chest Key opens one chest, and a thief's steal is priced from the simulated enemy phase](decisions/0442-a-chest-key-opens-one-chest-and-a-thief-is-priced-from-the-simulated-phase.md) | 2026-11-21 | #711 #699 #510 |
 | `0443` | [A chest goes to a unit that opens it itself, and a stalled sent pair is paired fresh](decisions/0443-a-chest-goes-to-a-unit-that-opens-it-and-a-stalled-pair-is-paired-fresh.md) | 2026-11-21 | #719 #510 |
 | `0445` | [A DefeatBoss boss is the win on any map](decisions/0445-a-defeatboss-boss-is-the-win-on-any-map.md) | 2026-11-22 | #721 #699 #510 |
+| `0446` | [A recruit's arrival and scripted removal are read from the turn events](decisions/0446-a-recruits-arrival-and-scripted-removal-are-read-from-the-turn-events.md) | 2026-11-22 | #724 #699 #510 |
 
 ---
 

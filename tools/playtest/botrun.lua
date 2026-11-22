@@ -869,8 +869,11 @@ function M.run(api)
     local owed = nil
     -- the owed recruits an earlier attempt of this chapter saw arrive (style.memory.arrivals,
     -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
-    local function pendingRecruits()
-        local out, owedSet = {}, {}
+    -- Then the arrivals the chapter's own turn events script (sight.scriptedUnits, #724: a unit a
+    -- script loads, read off the ROM's bytes), for an owed unit no remembered arrival covers: an
+    -- arrival actually seen wins, and attempt 1 has the scripted ones before any game saw them.
+    local function pendingRecruits(sight)
+        local out, owedSet, have = {}, {}, {}
         local arrivals = style.memory and style.memory.arrivals or {}
         -- owed is read in changes() before the first decision, from api.recruits: a harness with
         -- no api.recruits cannot tell which arrivals are owed, so a memory it was given is a fault
@@ -879,7 +882,10 @@ function M.run(api)
         end
         for _, c in ipairs(owed or {}) do owedSet[c] = true end
         for _, a in ipairs(arrivals) do
-            if owedSet[a.charId] then out[#out + 1] = a end
+            if owedSet[a.charId] then out[#out + 1], have[a.charId] = a, true end
+        end
+        for _, a in ipairs(sight and sight.scriptedUnits and sight.scriptedUnits().arrivals or {}) do
+            if owedSet[a.charId] and not have[a.charId] then out[#out + 1], have[a.charId] = a, true end
         end
         return out
     end
@@ -1550,7 +1556,7 @@ function M.run(api)
                                      idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
-                                     pending = pendingRecruits(),
+                                     pending = pendingRecruits(sight),
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
