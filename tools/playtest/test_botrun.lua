@@ -2084,9 +2084,9 @@ do
     check(recordOf(g).outcome, "crashed", "arrivals without recruits(): recorded as crashed")
 end
 
--- test_enemy_phase_death_graded_by_its_mover (#510 PR A): a unit's enemy-phase death is
--- graded by the plan that moved it, not by a later replan that found it over the cap; a unit
--- no plan moved this turn falls back to the phase's last plan.
+-- test_enemy_phase_death_graded_by_the_committed_plan (#717, reverses #510 PR A): a unit's
+-- enemy-phase death is graded by the phase's last plan, the one the enemy phase was played
+-- against; the plan that moved it is kept beside it (mover_predicted, mover_ref), never graded.
 do
     local function run(moveFirst)
         local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 2, 20),
@@ -2125,10 +2125,33 @@ do
         return recordOf(g).deaths[1]
     end
     local d = run(true)
-    check(d and d.predicted, 0.3, "moved by the first plan: its 30%, not the replan's 90%")
-    check(d and d.plan_ref, 1, "and its plan_ref is the mover's (the first plan made)")
+    check(d and d.predicted, 0.9, "moved by the first plan: graded by the replan's 90%")
+    check(d and d.plan_ref ~= 1, true, "and its plan_ref is the committed plan, not the mover")
+    check(d and d.mover_predicted, 0.3, "the mover's 30% kept beside it")
+    check(d and d.mover_ref, 1, "and the mover's ref (the first plan made)")
     d = run(false)
     check(d and d.predicted, 0.9, "moved by no plan: the phase's last plan")
+    check(d and d.mover_predicted, nil, "and no mover read")
+end
+
+-- test_enemy_phase_death_graded_by_the_weighted_read (#717): a death is graded by the chance
+-- the plan's admission read (`protected[].die`, every way), not by the likeliest way's
+-- `predict.die`. vanilla Ch15 b640e-cs-s4005 a1 t25: Cormag (0x0E) read 0 on the likeliest
+-- way and 0.041 weighted, and was graded a 0% blindspot. A unit the plan does not protect (an
+-- allied green) is still read from its predict.
+do
+    local plan = committed { predict = { { id = 0x01, die = 0, strikers = { 0x81 } } } }
+    plan.protected = { { id = 0x01, charId = 0x01, die = 0.041 } }
+    local d = Botrun.grade(death(), plan, nil, nil, {})
+    check(d.predicted, 0.041, "the weighted read, not the likeliest way's 0")
+    check(d.cause, "rng_tail", "a weighted chance above 0 is a tail, not a blindspot")
+    local admits = dofile(here .. "planner.lua").admits
+    d = Botrun.grade(death(), plan, nil, 0.01, {}, nil, nil, admits)
+    check(d.over_cap, true, "and graded against the cap by it")
+    local green = death { faction = "green", charId = 0x41, id = 0x41 }
+    d = Botrun.grade(green, committed { predict = { { id = 0x41, die = 0.3,
+                                                      strikers = { 0x81 } } } }, nil, nil, {})
+    check(d.predicted, 0.3, "an unprotected green: its predict")
 end
 
 -- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose

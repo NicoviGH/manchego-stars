@@ -14,6 +14,10 @@ is on its own comment. These are the calls that change what the first-attempt nu
 
 ## 1. An enemy-phase death is graded by the plan that moved its unit
 
+**Reversed by [ADR 0454](0454-an-enemy-phase-death-is-graded-by-the-committed-plans-weighted-read.md)
+(#717, 2026-11-22):** the death is graded by the phase's last plan's weighted read; the mover's
+is kept beside it.
+
 **The error.** A death was graded by the phase's last plan (FR-003 as coded). A unit moved under
 the cap and found over it by a later replan read `over_cap`, and `over_cap` was tested before
 `fog`, so the cause table undercounted fog.
