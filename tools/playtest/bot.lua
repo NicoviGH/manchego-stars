@@ -2947,13 +2947,13 @@ local function proposeOne(ctx, u)
     -- for five turns, the throne open, every forward tile an ally's who stayed put)
     -- (no tile at all only for a re-listing's unit, M.candidates' opts.tiles: its new tiles
     -- may all be allies')
-    local function marched()
-        local t = march(ctx, u, open, objective)
+    local function marched(gate)
+        local t = march(ctx, u, gate, objective)
         add(t and action(u, t, "wait"), "march")
     end
-    marched()
+    marched(open)
     ctx.freeOnly = true
-    marched()
+    marched(open)
     ctx.freeOnly = nil
     local holds = bySafety(ctx, u, waitTiles(ctx, u))
     add(holds[1] and action(u, holds[1], "wait"), "hold")
@@ -2977,6 +2977,18 @@ local function proposeOne(ctx, u)
     retreat = retreatOver(waitTiles(ctx, u))
     ctx.freeOnly = nil
     if retreat then add(action(u, retreat, "wait"), "retreat") end
+    -- the nearest tile where a death is impossible (`careful`'s gate, worst-case sum under HP),
+    -- over every tile and free ones. The nearest tile is often over that cap (vanilla Ch10:
+    -- Tana's, sum 39 against 20 HP) and the retreat gains little, so a deadline goal behind a
+    -- threat had nothing between the two (#714); the risk cap stays, this finds the goalward tile
+    -- under it. Placed after the retreat so a tile both are keeps the retreat's label (its
+    -- survival of the beam's cut); the march is not cut-proof, its own score carries the
+    -- progress and the risk. Where no tile passes the gate `march` falls back to the safest
+    -- tile, the hold's duplicate, which `add` drops.
+    marched(GATES.careful)
+    ctx.freeOnly = true
+    marched(GATES.careful)
+    ctx.freeOnly = nil
     -- the next safest holds too: another unit the plan moves first may take the safest,
     -- and with one hold the unit had only exposed tiles left (Manchego Stars ch03: Braulo, at 16
     -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)

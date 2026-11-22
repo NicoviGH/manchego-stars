@@ -3187,6 +3187,33 @@ do
           "wall cost: a striker that could come but stands off is not counted")
 end
 
+-- test_a_march_offers_the_nearest_tile_where_a_death_is_impossible (#714, vanilla Ch10): X
+-- reaches (3,0), the tile nearest the goal, for 30 of A's 20 HP, and (2,0) for 5; (1,0) and
+-- (0,0) are out of its reach. The march (nearest) is (3,0) and the retreat (safest that gains
+-- ground) is (1,0); the tile between, (2,0), is under the cap and nearer, and was offered by
+-- neither. Fails without the careful-gated march.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }),
+                  [0x81] = tiles({ 3, 1 }, { 2, 1 }) },
+        danger = { ["3,0"] = 1, ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = {
+            ["3,0"] = fc { takenHit = 100, takenDmg = 30, takenHits = 1 },
+            ["2,0"] = fc { takenHit = 100, takenDmg = 5, takenHits = 1 },
+        } } },
+    }
+    local cands = B.candidates(boardOf(A, X), sightOf(o), style("careful"))
+    local tilesOf = {}
+    for _, a in ipairs(cands[1].acts) do tilesOf[#tilesOf + 1] = a.why .. "@" .. at(a) end
+    local text = " " .. table.concat(tilesOf, " ") .. " "
+    check(text:find(" march@3,0 ", 1, true) ~= nil, true, "careful march: the nearest tile is still offered")
+    check(text:find(" retreat@1,0 ", 1, true) ~= nil, true, "careful march: so is the retreat")
+    check(text:find(" march@2,0 ", 1, true) ~= nil, true,
+          "careful march: and the nearest tile a death is impossible on")
+end
+
 -- test_the_march_takes_the_wall_the_army_breaks_soon: the boss also has a long walk round (20
 -- steps, 4 turns). A's own 2-damage blow on the 20-HP wall needs 10 turns, so A walks round
 -- (its march to (0,1)); with C beside the wall striking 20 it falls this turn, the way through
