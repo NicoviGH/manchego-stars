@@ -87,6 +87,7 @@ local function fakeGame(o)
                 objective = { kind = o.kind or "rout" },
                 danger = function() return 0 end,
                 threat = function() return function() return 0 end end,
+                terrainHeal = function() return 0 end,   -- no heal tile (sight.terrainHeal, #709)
                 weapons = function(u) return { { slot = 0, min = u.minRange, max = u.maxRange } } end,
                 canSeize = function() return true end,
                 reach = function(u)

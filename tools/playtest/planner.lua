@@ -1034,21 +1034,26 @@ function M.plan(Bot, board, sight, style, opts)
     -- reading found idle, and a blow that deals nothing wounds nothing. `counters`: each red
     -- enemy's chance our counters kill it in the judged phase. A wound counts only as far as it
     -- outlasts the tile's heal (M.healed, #709): a boss on a fort regains it before it acts.
+    -- -> advances, woundOnly: `woundOnly` when a wound that outlasts the heal is all it has. A
+    -- kill chance on any red is a return of its own, ahead of the wound read, so a plan whose
+    -- wound is all it has has no kill chance this phase (#709: admit() asks it only under the cap).
+    -- The lookahead's second-phase kills are not read here: they come from sight.nextPhase, a
+    -- search made for finalists after this judge, and advances() runs for every plan.
     local function advances(st, fell, counters)
-        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true end
+        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true, false end
         for _, p in pairs(counters) do
-            if p > M.DUST then return true end
+            if p > M.DUST then return true, false end
         end
         for id, blows in pairs(st.kill) do
-            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.DUST then return true end
+            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.DUST then return true, false end
         end
         for id, hp in pairs(st.enemyHp) do
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and e.isBoss))
-            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true end
+            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
         end
-        return false
+        return false, false
     end
     local function goalTerm(st, alive, felled, rows, fell)
         local pos, v = positions(st, alive), 0
@@ -1715,6 +1720,13 @@ function M.plan(Bot, board, sight, style, opts)
     -- every plan ties on `idle`, so it stays off. Set by pick(), which re-admits every plan judged
     -- when it moves.
     local idleOn = false
+    -- Whether a plan advances the level for the idle rule: under the death-risk cap any
+    -- advance counts; over it, a wound that only outlasts the heal does not (#709, ADR 0441: a
+    -- seven-unit assault netting 1 HP on a fort boss, max_die 0.999, outranked every hold). Read
+    -- off the rank's `max_exceed`, which admit() sets before this is asked.
+    local function advancing(st)
+        return st.advances and (not st.woundOnly or st.rank.max_exceed == 0)
+    end
     local function admit(st)
         local rank = st.rank
         local firstCall = rank.first_game_over == nil
@@ -1731,7 +1743,7 @@ function M.plan(Bot, board, sight, style, opts)
             rank.sum_die = rank.sum_die + pr.die
         end
         -- a plan that does not advance is no plan once the stall reading fired (ADR 0439)
-        rank.idle = (idleOn and not st.advances) and 1 or 0
+        rank.idle = (idleOn and not advancing(st)) and 1 or 0
         rank.admitted = rank.admitted and rank.idle ~= 1
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
@@ -2158,7 +2170,7 @@ function M.plan(Bot, board, sight, style, opts)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)
         judged = judged + st.goalNow + W.exp * learnt
         st.winFell, st.winStruck = fell, winStruck
-        st.advances = advances(st, fell, countered)
+        st.advances, st.woundOnly = advances(st, fell, countered)
         -- each way the phase went and its units' HP there, for the wear's later phases
         st.outcomes, st.hitOf = outcomes, hitOf
         -- the units the phase strikes that no heal of the army's reaches after it, in id order
@@ -2395,7 +2407,7 @@ function M.plan(Bot, board, sight, style, opts)
         local was = idleOn
         idleOn = false
         for _, j in ipairs(judgedPlans) do
-            if opts and opts.idle and j.ok and j.st.advances then idleOn = true end
+            if opts and opts.idle and j.ok and advancing(j.st) then idleOn = true end
         end
         if idleOn ~= was then
             for _, j in ipairs(judgedPlans) do admit(j.st) end

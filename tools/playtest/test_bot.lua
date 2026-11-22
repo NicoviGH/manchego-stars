@@ -6518,7 +6518,34 @@ do
         return attacks
     end
     check(tostring(play(6)), "false", "terrain heal: a chip the fort heals back is no progress, the hold is played")
-    check(tostring(play(0)), "true", "terrain heal: with no heal the same chip advances")
+    -- over the cap a wound with no kill chance is no progress, healed back or not (ADR 0441 G)
+    check(tostring(play(0)), "false", "terrain heal: over the cap, a chip with no kill chance is no progress either")
+    -- ADR 0441 G: an over-cap assault that nets ~1 HP after the heal and has no kill chance does
+    -- not outrank a safe hold (Caellach, 47 HP on a fort: the seven-unit assault's 36.97 -> 45.97).
+    -- A and B each wound E (30 of 40, fort heal 9) for 5, the counters kill each: over the cap.
+    do
+        local function assault(hp, heal, counter)
+            local A = blue(0x01, 0, 0, 0)
+            local Bu = blue(0x02, 1, 0, 1)
+            local E = red(0x81, 2, 0, { minRange = 1, hp = hp, maxhp = 40, isBoss = true })
+            local lethal = counter and { counters = true, counterHit = 100, counterDmg = 99, counterHits = 1 } or {}
+            local function blow(o) o.hit, o.dmg, o.hits = 100, 5, 1; return fc(o) end
+            local o = {
+                objective = { kind = "boss" }, heal = { [0x81] = heal },
+                reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 2, 1 }) },
+                fc = { [0x01] = { [0x81] = { ["1,0"] = blow(lethal) } },
+                       [0x02] = { [0x81] = { ["2,1"] = blow(lethal) } } },
+                enemyPhase = function() return {} end,
+            }
+            local _, plan = Planner.plan(B, boardOf(A, Bu, E), sightOf(o), style("careful"), { idle = true })
+            local n = 0
+            for _, x in ipairs(plan and plan.acts or {}) do if x.act == "attack" then n = n + 1 end end
+            return n
+        end
+        check(assault(30, 9, true), 0, "advances G: an over-cap assault that nets 1 HP, no kill chance, is not played over a hold")
+        check(assault(10, 9, true) > 0, true, "advances G: the same assault with a kill chance still advances")
+        check(assault(30, 9, false) > 0, true, "advances G: an under-cap chip that outlasts the heal still advances")
+    end
     -- the heal model (Planner.healed): 6 HP back on 30 max; a wound of 4 is healed whole, one of
     -- 10 leaves 4; no heal leaves the HP as it is, even above max; a unit above its max HP is
     -- not credited by the clamp; no max HP is no gain past the HP it stands on

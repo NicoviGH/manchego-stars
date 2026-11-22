@@ -43,6 +43,20 @@ the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `h
 
 `plan.reds` and `st.enemyHp` stay the unhealed HP the plan leaves, so no read counts a heal twice.
 
+**Over the cap, a wound is not progress (G; Nicolas, 2026-11-21: "Yeah, try that").** Amends ADR
+0439's "the least-risk advancing plan is then played" line. A plan under the death-risk cap
+(`rank.max_exceed == 0`) keeps the rule above: a wound that outlasts the heal advances. A plan over
+the cap counts a wound as progress no more; it advances only by a kill chance above `DUST`, a goal,
+a carry or the win, as before. `advances()` returns `woundOnly` for a plan whose only progress is
+the wound, and `advancing()` in `admit()` and `pick()` reads it against the rank. No new number.
+*Diagnosis:* Caellach 47 HP on a fort (+9 a phase); the seven-unit assault of trace fix709c turn 27
+took his expected HP 36.97 to 45.97 after the heal (nets 1.03), max_die 0.999, while the holds at
+max_die 0 were rejected as idle (diag709b). *Kill chance:* only this phase's is read. A kill chance
+on any red is a return of its own in `advances()`, ahead of the wound read, so a plan that reaches
+the wound read has none. The lookahead's second-phase kill comes from `sight.nextPhase`, a search
+made for the finalists after the judge, and `advances()` runs for every plan, so reading it would
+be a new search per plan; ADR 0439 already leaves it out.
+
 **Details.** `terrainHeal` truncates toward zero as C's `/ 100` does and gives 0 for the units the
 game skips (`Board.terrainHealSkips`: dead, not deployed, rescued, `US_BIT16`). It is required:
 a sight without it is an error where a blow is scored. `sight.maxHps` reads every unit on the
