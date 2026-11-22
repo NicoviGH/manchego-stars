@@ -42,8 +42,9 @@ mend's `tries(p)` for a recruit then finds it on the menu of the unit the recrui
 stale comment there now says so.
 
 **What it does not do.** It prices nothing new; the chosen plan is whichever the judged phase ranks
-first. The forfeit is yes or no, so a weapon that only lowers the recruit's chance to fall changes
-no plan until it spares it. It does not cover a unit that has acted (it holds the weapon it
+first. The forfeit is yes or no, so a weapon that only lowers the recruit's chance to fall clears
+nothing; it still enters the plan's value through the goals' term (a late tie-break), and a
+chance under `Goals.DUST` clears the forfeit. It does not cover a unit that has acted (it holds the weapon it
 equipped; 46 of the 106 recorded recruit counter deaths were such units, the unit having acted
 earlier in the turn), one that attacks and is then struck (its counter weapon is the attack's;
 34), or one that uses an item (8), nor a recruit no talker can reach by its deadline (it has no
@@ -52,12 +53,21 @@ that, Nicolas's call). The weaker weapon stays at the bag's front after the wait
 Equip moves it there); later turns read the real bag, so they price it as it is, but the unit
 fights with it until something equips another.
 
-**Proof.** `test_bot.lua`: a unit with four waits (three holds and a march) on a column in the
+**Proof.** `test_bot.lua`: a unit with waits on three tiles of a column in the
 recruit's reach, first weapon fells it, the second spares it on one tile. On main the plan
 forfeits the recruit; now the menu offers the wait with the sparing slot, it is the plan played with
 no forfeit and a recruit death of about nothing, at `PER_UNIT` 3 (where only the cut's `gentle` line
 keeps it) and at 0. A second scene: slot 2 spares the recruit but kills our unit, slot 3 spares it
-and lives; only slot 3 is offered and played. The cap, and a unit that has acted, are tested too.
-No emulator probe was added: the path from the act to the game (`equipSlot`, the Wait) is the
-bait's (#641), unchanged here, and not separately run for a gentle wait; a probe is a scenario of
-its own.
+and lives; only slot 3 is offered and played. The cap is tested with three sparing wait tiles, of which two are kept (the test fails with the
+cap removed), and a unit that has acted gets none.
+`waitprobe` (`matrix.yaml`, `PT_VANILLA=1 tools/playtest/run.sh waitprobe`, by hand) proves the harness
+path in the emulator: Eirika is given an Iron Sword behind her Rapier on the Prologue, `api.act`
+waits her holding slot 1, and the Iron Sword is at the bag's front, the weapon the game fights
+with. It passes; with the harness's Equip for waits skipped it fails (the front stays the Rapier).
+
+**Cost.** The planner timing on a fake sight (0.58 to 0.69 ms a plan on base and branch alike) does
+not time the ROM's exposure reads: `sparingWaits` reads the exposure per felling tile and other
+weapon, memoised, and only on a board with a recruit. A real read: vanilla Ch10
+(`m699c10-b640e-cs-s4002`, `resume --attempts 2`), the same two attempts on main and on the branch
+back to back, load about 3: 160.1 s and 163.1 s wall, the same outcomes (won turn 16 with 1 death,
+won turn 15 with 0). That is two whole games, so it bounds the cost per turn at about 2 percent.

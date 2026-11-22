@@ -67,8 +67,9 @@
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, slot = n|nil }.
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
---   `slot` is the item an attack strikes with (one of sight.weapons), the weapon a wait holds (a
---   bait's or a gentle wait's: equipped first), a heal's staff or a used item; nil = the first the Weapon Select menu lists.
+--   `slot` is the item an attack strikes with (one of sight.weapons), the weapon a wait holds
+--   (a bait's or a gentle wait's: equipped first), a heal's staff or a used item; nil =
+--   the first the Weapon Select menu lists.
 --   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue",
 --   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) and "supply" (the
 --   convoy's door key taken, `item`/`uses`, then Wait: supplyKey) only the planner's

@@ -140,6 +140,8 @@ scenarios:
   staffprobe: {rom: any, manual: true, deadline: 900}
   # #711: the judged phase plays a thief's steal; PT_VANILLA=1 PT_LEAKGUARD=1, by hand only
   stealprobe: {rom: any, manual: true, deadline: 900}
+  # #730: a wait holding a weapon is played with it equipped (PT_VANILLA=1), by hand only
+  waitprobe: {rom: any, manual: true, deadline: 900}
   campaign: {rom: any, manual: true, deadline: 86400}
   goodberry: {}
   ch01: {}

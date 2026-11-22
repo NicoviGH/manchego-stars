@@ -1504,9 +1504,10 @@ INSPECT.itemSubmenu = function(slot)
 end
 
 -- Item -> inventory `slot` -> Equip (a wait's held weapon: #641's bait holds the one its counter
--- answers the boss with, #730's gentle wait the one whose counter spares a recruit). ItemSubMenu_EquipItem (bmmenu.c) calls EquipUnitItemSlot, which moves the
--- item to the bag's front, and goes back to the inventory list; B there starts the unit menu
--- again (ItemMenu_ButtonBPressed), where the Wait follows. -> true, or nil, why.
+-- answers the boss with, #730's gentle wait the one whose counter spares a recruit).
+-- ItemSubMenu_EquipItem (bmmenu.c) calls EquipUnitItemSlot, which moves the item to the bag's
+-- front, and goes back to the inventory list; B there starts the unit menu again
+-- (ItemMenu_ButtonBPressed), where the Wait follows. -> true, or nil, why.
 INSPECT.equipSlot = function(slot)
     local opened, why = INSPECT.itemSubmenu(slot)
     if not opened then return nil, why end
@@ -3913,8 +3914,8 @@ INSPECT.botApi = function(game)
             end, 900) then return false end
             return waitFor(won, 9000, true)
         end
-        -- a wait holds its weapon (a bait's or a gentle wait's `slot`): equipped first, as the judged
-        -- phase armed it
+        -- a wait holds its weapon (a bait's or a gentle wait's `slot`): equipped first, as the
+        -- judged phase armed it
         if a.act == "wait" and a.slot and a.slot > 0 then
             local equipped, why = INSPECT.equipSlot(a.slot)
             if not equipped then return false, why end
@@ -5227,6 +5228,37 @@ scenarios.staffprobe = function()
     return result("FAIL", string.format("hitWay=%s/%s struck=%s/%s berserks=%d/%d replied=%s",
         tostring(split), tostring(splitCtl), tostring(struck), tostring(struckCtl), berserks,
         berserksCtl, tostring(replied)))
+end
+
+-- waitprobe (#730): a wait holding a weapon is played with that weapon equipped. On the retail
+-- Prologue Eirika (charId 1) is handed an Iron Sword (0x01) in her second bag slot, behind the
+-- Rapier, and the bot's api.act waits her where she stands with `slot = 1` (a gentle wait's or a
+-- bait's act). The game's Item -> Equip must put the Iron Sword at the bag's front, which is the
+-- weapon the game fights with (GetUnitEquippedWeapon: the first usable). The probe fails when the
+-- harness skips the Equip: the bag is then as it was. PT_VANILLA=1 only.
+scenarios.waitprobe = function()
+    if PLAYTEST_VANILLA ~= "1" then
+        return result("FAIL", "waitprobe reads the retail Prologue")
+    end
+    local sapi = INSPECT.probeMap()
+    if not sapi then return end
+    local api = INSPECT.botApi("vanilla")
+    local eirika = BOARD.find("blue", 1)
+    if not eirika then return result("FAIL", "no Eirika on the Prologue") end
+    local ITEMS, IRON_SWORD = BOARD.UNIT_ITEMS, 0x01   -- constants/items.h ITEM_SWORD_IRON
+    local function bag(k) return sapi.mem.u16(eirika.addr + ITEMS + k * 2) & 0xFF end
+    local was = bag(0)
+    sapi.write16(eirika.addr + ITEMS + 2, IRON_SWORD | (46 << 8))
+    local ok, why = api.act({ unit = 1, unitId = eirika.id, move = { x = eirika.x, y = eirika.y },
+                              act = "wait", slot = 1 })
+    log(string.format("waitprobe: the bag's front was 0x%02X, is 0x%02X after the wait holding "
+        .. "slot 1 (the Iron Sword, 0x%02X)", was, bag(0), IRON_SWORD))
+    if not ok then return result("FAIL", "the wait failed: " .. tostring(why)) end
+    if bag(0) ~= IRON_SWORD or bag(1) ~= was then
+        return result("FAIL", string.format("the wait did not equip slot 1: front 0x%02X, then 0x%02X",
+            bag(0), bag(1)))
+    end
+    return result("PASS", "a wait holding slot 1 equips it: the weapon moved to the bag's front")
 end
 
 -- stealprobe (#711): the judged enemy phase plays an enemy thief's steal, and the bag change it

@@ -6484,8 +6484,9 @@ end
 
 -- test_a_gentle_wait_counts_the_units_own_death (#730): slot 2 spares R but its strike kills A (25
 -- HP of damage on 20); slot 3 spares R and A lives. The wait offered and played holds slot 3, not
--- the weapon that merely spares R (the forfeit is yes or no, so a counter that fells R less but
--- not never would change no plan).
+-- the weapon that merely spares R. (A counter that fells R less but not never is no better by the
+-- forfeit, which is yes or no, but felled enters the plan's value through the goals' term, so it
+-- breaks a late tie, and under Goals.DUST it clears the forfeit.)
 do
     local opt = { three = true, counter = { [0] = 30, [2] = 2, [3] = 2 },
                   dmg = { [0] = 5, [2] = 25, [3] = 5 } }
@@ -6504,15 +6505,16 @@ do
     local a = Planner.plan(B, board, sightOf(o), style("careful"))
     Planner.BEAM = beam
     check(a and a.act .. "#" .. tostring(a.slot), "wait#3", "gentle: A waits holding slot 3")
-    -- the cap: four tiles each sparing R, the best M.GENTLE offered, the lowest tile on a tie
-    board, o = sparingScene({ also = { 1, 2, 3 } })
-    local n = 0
+    -- the cap: A's waits are on (0,0) (the march), (0,5) and (0,1) (holds), and the sparing weapon
+    -- answers on all three: three picks of one cost, the first M.GENTLE kept (the acts' order)
+    board, o = sparingScene({ also = { 0, 1 } })
+    local kept = {}
     for _, c in ipairs(B.candidates(board, sightOf(o), style("careful"))) do
         for _, x in ipairs(c.acts) do
-            if x.why == "gentle" then n = n + 1 end
+            if x.why == "gentle" then kept[#kept + 1] = at(x) end
         end
     end
-    check(n, B.GENTLE, "gentle: no more than M.GENTLE acts a unit are offered")
+    check(table.concat(kept, " "), "0,0 0,5", "gentle: the three sparing waits are cut to M.GENTLE")
     check(B.GENTLE, 2, "gentle: the cap is two")
     -- a unit that acted already holds the weapon it equipped: no menu, so no gentle wait (46 of
     -- the 106 recorded recruit counter deaths were such units, #730)
