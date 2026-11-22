@@ -2515,8 +2515,15 @@ local function exploring(ctx, sent, barred)
     ctx.exploreGoal = {}
     barred = barred or {}
     local taken = {}
+    -- Whether `u` uses `t` on its own: the game's menu check, never asked of a unit that has acted
+    -- (an acted unit keeps its tile on the path alone). Not Goals.list's takerUnits (any unit
+    -- that opens it, or that an enemy's key would let), nor botrun's reading of a goal's takers:
+    -- those ask who could ever take the goal, this who needs no one's key now.
+    local function ownOpener(u, t)
+        return u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)
+    end
     local function reaches(u, t)
-        if u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind) then return marchLength(ctx, u, t) end
+        if ownOpener(u, t) then return marchLength(ctx, u, t) end
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
         return lockAt(ctx, u, t.x, t.y) and movesFor(ctx, u, t) or nil
     end
@@ -2562,37 +2569,43 @@ local function exploring(ctx, sent, barred)
     local open, blues = {}, {}
     for _, t in ipairs(openTiles(ctx)) do open[tileKey(t.x, t.y)] = t end
     for _, u in ipairs(ctx.blues) do blues[u.id] = u end
-    -- A unit that uses the tile on its own (the game's menu check, asked only of a unit that can
-    -- act) as against one that reaches a chest only by way of the key an enemy drops (#719:
+    -- A keyless unit is one that reaches a chest only by way of the key an enemy drops (#719:
     -- vanilla Ch16, Colm freed by a thief's opening of his chest waited twenty turns at (14,4)
     -- while Eirika and Seth held the two chests he opens, through a Druid's key).
-    local function opens(u, t)
-        return not u.acted and ctx.sight.canExplore(u, t.x, t.y, t.kind)
-    end
-    -- whether a free unit (no goal yet) opens `t` itself and gets there
+    -- Whether a free unit (no goal, not spent on a tile already) opens `t` itself and gets
+    -- there; the one found is spent, so two keyless pairs and one opener drop one pair, not both
+    -- (both dropped could swap chests and walk back: the handoff the sticky keep prevents).
+    local spent = {}
     local function openerFree(t, but)
         for _, w in ipairs(ctx.actors) do
-            if w ~= but and not ctx.exploreGoal[w.id] and opens(w, t) and reaches(w, t)
+            if w ~= but and not spent[w.id] and not ctx.exploreGoal[w.id]
+                and not isBarred(barred, w.id, t) and ownOpener(w, t) and reaches(w, t)
                 and select(2, sendWorth(ctx, w, t)) > 0 then
+                spent[w.id] = true
                 return true
             end
         end
         return false
     end
     -- The sent pairs, openers' first: a keyless pair is dropped while a free opener stands to
-    -- take the chest, and so is any pair whose goal the ledger marks stalled (quietGoals: no unit
-    -- has neared it over GOAL_QUIET waiting player phases, and the sticky keep is what held it
-    -- there); both are then paired fresh below.
+    -- take the chest, and so is a pair of a unit that can act whose goal the ledger marks
+    -- stalled (quietGoals: no unit has neared it over GOAL_QUIET waiting player phases, and the
+    -- sticky keep is what held it there; a village stalls like a chest, nothing about it makes
+    -- standing still fine). An acted unit keeps its tile, as it always did. Both are paired fresh
+    -- below, and the unit a stalled pair dropped comes last for that goal (`dropped`): a stalled
+    -- goal handed back to the same unit would stall on.
+    local dropped = {}
     for _, keyless in ipairs({ false, true }) do
         for _, g in ipairs(sent or {}) do
             local t, u = open[tileKey(g.x, g.y)], blues[g.id]
             if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-                and (opens(u, t) or u.acted) ~= keyless
-                and not (ctx.quietGoals or {})[t.id]
-                and not isBarred(barred, u.id, t)
-                and reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0
-                and not (keyless and not u.acted and openerFree(t, u)) then
-                taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
+                and ownOpener(u, t) ~= keyless and not isBarred(barred, u.id, t) then
+                if not u.acted and (ctx.quietGoals or {})[t.id] then
+                    dropped[tileKey(t.x, t.y)] = u.id
+                elseif reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0
+                    and not (keyless and openerFree(t, u)) then
+                    taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
+                end
             end
         end
     end
@@ -2600,15 +2613,17 @@ local function exploring(ctx, sent, barred)
     -- slow one would lose), the nearer on a tie; the units that open the tile themselves
     -- first, then the keyless ones take what is left (a chest only an enemy's key opens for
     -- them goes to an opener, but two chests still go to two units while one opener is
-    -- free for one: ch23's win took its chests in parallel that way)
-    local byOpen = { {}, {} }
+    -- free for one: ch23's win took its chests in parallel that way), and last the unit a
+    -- stalled pair just dropped, when no other is left to take its goal
+    local byOpen = { {}, {}, {} }
     for _, t in ipairs(openTiles(ctx)) do
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
             if d then
                 local v, c = sendWorth(ctx, u, t)
                 if c > 0 then
-                    local list = byOpen[(opens(u, t) or u.acted) and 1 or 2]
+                    local list = dropped[tileKey(t.x, t.y)] == u.id and byOpen[3]
+                        or byOpen[ownOpener(u, t) and 1 or 2]
                     list[#list + 1] = { t = t, u = u, d = d, v = v }
                 end
             end
