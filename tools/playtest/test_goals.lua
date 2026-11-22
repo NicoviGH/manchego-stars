@@ -371,6 +371,20 @@ do
                                                lost = { [0x90] = 0.01 } })),
           "recruit:144", "forfeits: a recruit killed in any branch with p > 0 is lost")
 
+    -- #714, ADR 0450: a plan that drives a goal's chance from at least `gone` to none counts it,
+    -- before the phase a looter takes it (visit:14,9 has no closing: unit 1 reaches it in turns)
+    local took = { ["visit:4,0"] = true }
+    local function rowsOf(b, a) return { { id = "visit:14,9", before = b, after = a } } end
+    check(ids(Goals.forfeited(ledger, goals, { win = 0, took = took, gone = 0.5,
+                                               rows = rowsOf(0.6, 0) })), "visit:14,9",
+          "forfeits: a goal driven from likelier-than-not to none is lost before its deadline")
+    check(ids(Goals.forfeited(ledger, goals, { win = 0, took = took, gone = 0.5,
+                                               rows = rowsOf(0.3, 0) })), "",
+          "forfeits: a goal that was never likelier than not loses nothing (a false 0)")
+    check(ids(Goals.forfeited(ledger, goals, { win = 0, took = took, gone = 0.5,
+                                               rows = rowsOf(0.9, 0.2) })), "",
+          "forfeits: a chance left above none is not lost")
+
     -- a sight with no read of who may use a tile, or when it closes
     local blind = fakeSight({ open = open })
     blind.closings = nil

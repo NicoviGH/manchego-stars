@@ -74,7 +74,12 @@
 -- when it is lost in any branch with p > 0, so any chance at all is the whole goal. A win
 -- closes every goal the plan does not take; a recruit's death closes its Talk; a looter's
 -- closing after this phase (`closes` 1) closes a tile the plan does not take; a reward closes
--- with any goal it needs. A unit whose death ends the game closes nothing here: its risk is
+-- with any goal it needs. So does a plan that drives a goal's chance from at least `closes.gone`
+-- before it to none after it (`closes.rows`: { id, before, after }, closes.gone the planner's
+-- M.GONE), whatever the goal's deadline: a village no unit can reach any more is lost the turn
+-- the plan leaves it, not the phase the looter takes it (#714, ADR 0450). A chance that was never
+-- likelier than not is no loss: a false 0 from the chance model cannot mark a plan down for a
+-- goal it never held. A unit whose death ends the game closes nothing here: its risk is
 -- admission's, within the style's cap, and counted again as a forfeit the plan whose lord is
 -- at 0% would beat every plan that puts it in danger (Nicolas, 2026-11-02: ADR 0384).
 
@@ -302,11 +307,17 @@ end
 function M.forfeited(ledger, goals, closes)
     local took, lost, shut = closes.took or {}, closes.lost or {}, {}
     local wins = (closes.win or 0) > M.DUST
+    -- the chance each goal had before the plan and has after it (the planner's goalTerm rows)
+    local drove = {}
+    for _, row in ipairs(closes.rows or {}) do
+        drove[row.id] = closes.gone ~= nil and row.before >= closes.gone and row.after <= M.DUST
+    end
     for _, g in ipairs(goals) do
         if g.kind ~= "objective" and not took[g.id] then
             shut[g.id] = wins
                 or (g.kind == "recruit" and (lost[g.unitId] or 0) > M.DUST)
                 or (g.closes ~= nil and g.closes <= 1)
+                or drove[g.id] == true
         end
     end
     local out = {}

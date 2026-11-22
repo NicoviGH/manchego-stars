@@ -2286,7 +2286,8 @@ function M.plan(Bot, board, sight, style, opts)
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost })
+                                                       lost = lost, rows = st.goalWorth,
+                                                       gone = M.GONE })
         local gain = progress(st)
         local greenDie = 0
         for _, g in ipairs(greens) do

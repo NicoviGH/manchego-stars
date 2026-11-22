@@ -8103,6 +8103,39 @@ do
 end
 
 
+-- test_a_plan_that_leaves_a_village_out_of_reach_forfeits_it (#714, ADR 0450): the looter takes
+-- (10,0) after enemy phase 3. A (MOV 5) at (0,4) is 2.8 turns from it: unacted it arrives on
+-- phase 3 in time (chance 0.75, over GONE); once it has acted it is a phase late, so waiting
+-- there drives the chance to 0 with the deadline still two enemy phases away, which the
+-- one-phase test never counted. (4,4) is 2 turns from it and keeps the chance.
+do
+    local X = red(0x81, 14, 9, { minRange = false })
+    local function forfeits(...)
+        local A = blue(0x01, 0, 0, 4, { minRange = false })
+        local o = {
+            reach = { [0x01] = tiles(...) },
+            field = function(goal)
+                local f = {}
+                for y = 0, 9 do
+                    f[y] = {}
+                    for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+                end
+                return f
+            end,
+            explorable = { { x = 10, y = 0, kind = "visit" } },
+            canExplore = { [0x01] = { ["10,0"] = "visit" } },
+            closings = { ["10,0"] = 3 },
+            enemyPhase = function() return {} end,
+        }
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
+        return at(a) .. " " .. table.concat(plan and plan.forfeited or {}, ",")
+    end
+    check(forfeits({ 0, 4 }), "0,4 visit:10,0",
+          "forfeits: waiting where the village's chance falls from over GONE to 0 loses it")
+    check(forfeits({ 0, 4 }, { 4, 4 }), "4,4 ",
+          "forfeits: and the plan that keeps it in reach is the one played")
+end
+
 -- test_a_counter_that_kills_the_boss_is_the_win: at (1,0) the boss strikes A and A's counter
 -- kills it in the enemy phase -- the chapter ends there, closing the village. Careful keeps A
 -- at (1,1), out of the boss's reach, while the village is open (vanilla Ch5 attempt 8: the
