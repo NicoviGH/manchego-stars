@@ -2126,7 +2126,7 @@ do
     end
     local d = run(true)
     check(d and d.predicted, 0.9, "moved by the first plan: graded by the replan's 90%")
-    check(d and d.plan_ref ~= 1, true, "and its plan_ref is the committed plan, not the mover")
+    check(d and d.plan_ref, 3, "and its plan_ref is the committed plan (the third), not the mover")
     check(d and d.mover_predicted, 0.3, "the mover's 30% kept beside it")
     check(d and d.mover_ref, 1, "and the mover's ref (the first plan made)")
     d = run(false)
@@ -2152,6 +2152,40 @@ do
     d = Botrun.grade(green, committed { predict = { { id = 0x41, die = 0.3,
                                                       strikers = { 0x81 } } } }, nil, nil, {})
     check(d.predicted, 0.3, "an unprotected green: its predict")
+    -- a green whose death ends the game is protected: its weighted read
+    local vip = committed { predict = { { id = 0x41, die = 0, strikers = { 0x81 } } } }
+    vip.protected = { { id = 0x41, charId = 0x41, die = 0.2 } }
+    d = Botrun.grade(death { faction = "green", charId = 0x41, id = 0x41 }, vip, nil, 0.01,
+                     { [0x41] = true }, nil, nil, admits)
+    check(d.predicted, 0.2, "a game-over green: its protected read")
+    check(d.over_cap, true, "and its cap")
+    -- the lookahead's second phase is in the read (Nicolas's call on #717: first plus second)
+    plan.protected = { { id = 0x01, charId = 0x01, die = 0.5, first = 0, second = 0.5 } }
+    d = Botrun.grade(death(), plan, nil, nil, {})
+    check(d.predicted, 0.5, "the two-phase read, not the next phase's alone")
+    -- the plan's own counters were resolved before the enemy phase: a unit that died in it
+    -- lived through them, so its read is given that (#737's review). All of a 30% read in its
+    -- counter is a 0 read of the enemy phase; 0.6 with 0.2 of it a counter is 0.5
+    plan.protected = { { id = 0x01, charId = 0x01, die = 0.3, counter = 0.3 } }
+    d = Botrun.grade(death(), plan, nil, 0.01, {}, nil, nil, admits)
+    check(d.predicted, 0, "a counter-only risk, resolved: 0")
+    check(d.over_cap, false, "and under the cap, not over it")
+    plan.protected = { { id = 0x01, charId = 0x01, die = 0.6, counter = 0.2 } }
+    d = Botrun.grade(death(), plan, nil, nil, {})
+    check(math.abs(d.predicted - 0.5) < 1e-12, true, "(0.6 - 0.2) / (1 - 0.2)")
+    -- a berserk-phase death (the player phase's, judged with the enemy phase) reads it too
+    plan.protected = { { id = 0x01, charId = 0x01, die = 0.041 } }
+    plan.snapshot = { { id = 0x01, charId = 0x01, faction = "blue" },
+                      { id = 0x05, charId = 0x0A, faction = "blue" } }
+    d = Botrun.grade(death { killer = 0x0A, killerId = 0x05, phase = "player" }, plan,
+                     { unitId = 0x04, die = 0 }, nil, {})
+    check(d.predicted, 0.041, "berserk phase: the weighted read")
+    -- the mover is read the same way, and kept apart; the same plan twice is the same read
+    d = Botrun.grade(death(), plan, nil, nil, {}, nil, nil, nil, plan)
+    check(d.mover_predicted, d.predicted, "mover = the committed plan: the same read")
+    check(d.mover_ref, d.plan_ref, "and the same ref")
+    -- no plan: no read, never zero
+    check(Botrun.deathRead(nil, 0x01), nil, "no plan: nil")
 end
 
 -- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose

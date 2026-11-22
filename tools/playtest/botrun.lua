@@ -642,12 +642,24 @@ function M.predictOf(plan, id)
     end
 end
 
--- The death chance plan `plan` admitted unit slot `id` at: its `protected` entry's weighted
--- `die` (what Planner.admit tests against the cap), else its predict's for a unit it does not
--- protect; nil when the plan read neither.
+-- The chance `c` of dying in a plan's later phases given the unit lived through its own acts'
+-- counters, from `die`, the chance of dying in either (`counter` the counters' part of it).
+-- The counters are resolved by the enemy phase: a unit that died in it lived through them, so
+-- a plan whose risk was all in a counter read its later death as unseen (#737's review).
+function M.givenCounter(die, counter)
+    counter = counter or 0
+    if counter <= 0 or counter >= 1 then return die end
+    return math.max(0, math.min(1, (die - counter) / (1 - counter)))
+end
+
+-- The death chance plan `plan` read for unit slot `id` once its own acts were played: its
+-- `protected` entry's weighted `die` (what Planner.admit tests against the cap: every way of the
+-- judged phase, the lookahead's second phase and the wear), given the unit lived through the
+-- plan's own counters (M.givenCounter), else its predict's for a unit it does not protect; nil
+-- when the plan read neither. montecarlo.py's death_read is its Python twin, for the traces.
 function M.deathRead(plan, id)
     for _, pr in ipairs(plan and plan.protected or {}) do
-        if pr.id == id then return pr.die end
+        if pr.id == id then return M.givenCounter(pr.die, pr.counter) end
     end
     local p = M.predictOf(plan, id)
     return p and p.die
@@ -657,8 +669,8 @@ end
 -- the plan that committed to the board it happened on (FR-003, FR-004): for a player-phase
 -- death, the plan whose `action` struck (its counter's `die`); for an enemy-phase one, the
 -- phase's last plan, the one the enemy phase was played against, by the weighted chance its
--- admission read (`protected[].die`: every way of the judged phase, and the lookahead's second
--- phase), else its `predict` for a unit it does not protect (an allied green). Not the
+-- admission read once its acts were played (M.deathRead), else its `predict` for a unit it
+-- does not protect (an allied green). Not the
 -- likeliest way's `predict.die` (#717: Cormag's 0.041 read as 0), and not the plan that moved
 -- the unit, whose bait act a replan may drop. `mover` (optional): the plan that last moved the
 -- unit; what it read is kept apart (`mover_predicted`, `mover_ref`), never graded.

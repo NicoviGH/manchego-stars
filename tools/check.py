@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0454 (#717): an enemy-phase death is graded by the plan the phase met, not
+    # by the plan that moved its unit; the calibration table's mover-first columns are gone
+    r'\bgraded by the plan that (last )?moved\b', r'\bmoved under, over by the phase end\b',
+    r"\bdeath's grader \(record\)",
     # retired by #664 (ADR 0409's amendment): the scout lap no longer carries on at the first
     # win; a chapter gets every attempt for a clean clear, then the best win is carried on from
     r'\bSCOUT_PATIENCE\b',
