@@ -3214,6 +3214,63 @@ do
           "careful march: and the nearest tile a death is impossible on")
 end
 
+-- test_the_careful_march_survives_the_per_unit_cut (#714): the same board, with the menu cut to
+-- the unit's one best act (PER_UNIT = 1) and the beam and the judge wide. The careful march
+-- (2,0) ranks below the holds on its own score (the risk it carries, the progress not counted),
+-- so only the planner's exemption for the `careful` label (planner.lua's menu keep) lets it reach
+-- the beam. Fails with that exemption removed.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local X = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }),
+                  [0x81] = tiles({ 3, 1 }, { 2, 1 }) },
+        danger = { ["3,0"] = 1, ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = {
+            ["3,0"] = fc { takenHit = 100, takenDmg = 30, takenHits = 1 },
+            ["2,0"] = fc { takenHit = 100, takenDmg = 5, takenHits = 1 },
+        } } },
+    }
+    local per, beam, final = Planner.PER_UNIT, Planner.BEAM, Planner.FINAL
+    Planner.PER_UNIT, Planner.BEAM, Planner.FINAL = 1, 20, 20
+    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.PER_UNIT, Planner.BEAM, Planner.FINAL = per, beam, final
+    local reached = false
+    -- the beam's own plans only: the advance plan is built from the candidates, past the cut
+    for _, c in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(c.kind == "beam" and c.acts or {}) do reached = reached or k == "1>wait@2,0>nil" end
+    end
+    check(reached, true, "careful march: kept through the per-unit cut, a beam plan with it is judged")
+end
+
+-- test_the_careful_march_is_offered_over_free_tiles (#714): X reaches (4,0), the tile nearest
+-- it, for 30 of A's 20 HP, (3,0) for 5 and (2,0) for 8. An ally C stands on (3,0), so over
+-- every tile the careful march is C's (3,0) (it may vacate); over free tiles only it is (2,0),
+-- the nearest careful tile no ally holds. The open march is (4,0) either way, so (2,0) is
+-- offered only by the free-only call of the careful march: fails without it.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local C = blue(0x02, 1, 3, 0, { hp = 20 })
+    local X = red(0x81, 6, 0, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }, { 4, 0 }),
+                  [0x02] = tiles({ 3, 0 }, { 3, 1 }),
+                  [0x81] = tiles({ 5, 0 }, { 4, 1 }, { 3, 1 }, { 2, 1 }) },
+        danger = { ["4,0"] = 1, ["3,0"] = 1, ["2,0"] = 1 },
+        fc = { [0x01] = { [0x81] = {
+            ["4,0"] = fc { takenHit = 100, takenDmg = 30, takenHits = 1 },
+            ["3,0"] = fc { takenHit = 100, takenDmg = 5, takenHits = 1 },
+            ["2,0"] = fc { takenHit = 100, takenDmg = 8, takenHits = 1 },
+        } } },
+    }
+    local cands = B.candidates(boardOf(A, C, X), sightOf(o), style("careful"))
+    local text = {}
+    for _, a in ipairs(cands[1].acts) do text[#text + 1] = a.why .. "@" .. at(a) end
+    text = " " .. table.concat(text, " ") .. " "
+    check(text:find(" careful@3,0 ", 1, true) ~= nil, true, "free careful march: over every tile it is the ally's tile")
+    check(text:find(" careful@2,0 ", 1, true) ~= nil, true, "free careful march: over free tiles the tile beside it")
+end
+
 -- test_the_march_takes_the_wall_the_army_breaks_soon: the boss also has a long walk round (20
 -- steps, 4 turns). A's own 2-damage blow on the 20-HP wall needs 10 turns, so A walks round
 -- (its march to (0,1)); with C beside the wall striking 20 it falls this turn, the way through

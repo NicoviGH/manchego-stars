@@ -2951,10 +2951,14 @@ local function proposeOne(ctx, u)
         local t = march(ctx, u, gate, objective)
         add(t and action(u, t, "wait"), why or "march")
     end
-    marched(open)
-    ctx.freeOnly = true
-    marched(open)
-    ctx.freeOnly = nil
+    -- `fn` over every tile, then over free tiles only (ctx.freeOnly)
+    local function bothViews(fn)
+        fn()
+        ctx.freeOnly = true
+        fn()
+        ctx.freeOnly = nil
+    end
+    bothViews(function() marched(open) end)
     local holds = bySafety(ctx, u, waitTiles(ctx, u))
     add(holds[1] and action(u, holds[1], "wait"), "hold")
     local gain = groundFor(ctx, u, objective)
@@ -2971,24 +2975,20 @@ local function proposeOne(ctx, u)
         end
         return retreat
     end
-    local retreat = retreatOver(waitTiles(ctx, u))
-    if retreat then add(action(u, retreat, "wait"), "retreat") end
-    ctx.freeOnly = true
-    retreat = retreatOver(waitTiles(ctx, u))
-    ctx.freeOnly = nil
-    if retreat then add(action(u, retreat, "wait"), "retreat") end
+    bothViews(function()
+        local retreat = retreatOver(waitTiles(ctx, u))
+        if retreat then add(action(u, retreat, "wait"), "retreat") end
+    end)
     -- the nearest tile where a death is impossible (`careful`'s gate, worst-case sum under HP),
     -- over every tile and free ones. The nearest tile is often over that cap (vanilla Ch10:
     -- Tana's, sum 39 against 20 HP) and the retreat gains little, so a deadline goal behind a
     -- threat had nothing between the two (#714); the risk cap stays, this finds the goalward tile
-    -- under it. Placed after the retreat so a tile both are keeps the retreat's label (its
-    -- survival of the beam's cut); the march is not cut-proof, its own score carries the
-    -- progress and the risk. Where no tile passes the gate `march` falls back to the safest
-    -- tile, the hold's duplicate, which `add` drops.
-    marched(GATES.careful, "careful")
-    ctx.freeOnly = true
-    marched(GATES.careful, "careful")
-    ctx.freeOnly = nil
+    -- under it. The tile carries its own `careful` label, which the planner keeps through the
+    -- per-unit cut (its own score ranked it below PER_UNIT, Ch10 turn 1). It sits after the
+    -- retreat because `add` keeps the first label of a duplicate tile, so a tile both pick stays
+    -- the retreat. Where no tile passes the gate `march` falls back to the safest tile, the
+    -- hold's duplicate, which `add` drops.
+    bothViews(function() marched(GATES.careful, "careful") end)
     -- the next safest holds too: another unit the plan moves first may take the safest,
     -- and with one hold the unit had only exposed tiles left (Manchego Stars ch03: Braulo, at 16
     -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)
