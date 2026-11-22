@@ -1034,6 +1034,47 @@ do
     check(Planner.wearAt({ [0] = 1, [4] = 1 }, 4), 1, "wearAt: the second blow cut off at 4 HP")
 end
 
+-- #712: the judged phase is told the waits the plan makes (`waits`): the game runs the chapter's
+-- Misc events (an AREA event that wakes an enemy) after a unit's wait, in the order the units act.
+-- A judged plan's waits are exactly the units of its acts, each with its act's index.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local Idle = blue(0x02, 5, 5, 1, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local E = red(0x81, 1, 1, { hp = 10, minRange = false })
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["0,1"] = fc { hit = 100, dmg = 6, hits = 1, wearSlot = 0 } } } },
+        enemyPhase = function(plan)
+            local waits = {}
+            for _, w in ipairs(plan.waits or {}) do
+                waits[#waits + 1] = w.unit.id .. "@" .. w.x .. "," .. w.y .. "#" .. tostring(w.order)
+            end
+            seen[#seen + 1] = table.concat(waits, " ")
+            return {}
+        end,
+    }
+    Planner.plan(B, boardOf(A, Idle, E), sightOf(o), style("careful"))
+    local anyA, anyOrdered = false, true
+    for _, line in ipairs(seen) do
+        anyA = anyA or line:find("1@", 1, true) ~= nil
+        for w in line:gmatch("%S+") do anyOrdered = anyOrdered and w:find("#%d+$") ~= nil end
+    end
+    check(#seen > 0 and anyA, true, "#712 waits: a plan that acts A tells the judged phase A waits")
+    check(anyOrdered, true, "#712 waits: each wait carries its act's index")
+
+    -- waitsIn: the way's acting blues, then the actors its counters killed (in no blues list)
+    local function p(id, acted, order) return { unit = { id = id }, x = id, y = 0, acted = acted, order = order } end
+    local planned = { p(1, true, 2), p(2, true, 1), p(3, false), p(4, true, 3) }
+    local blues = { planned[1], planned[3], planned[4] }       -- unit 2's counter killed it
+    local ids = {}
+    for _, w in ipairs(Planner.waitsIn(planned, { [2] = true }, blues)) do ids[#ids + 1] = w.unit.id end
+    check(table.concat(ids, ","), "2,1,4", "#712 waitsIn: a dead actor still waits, a unit with no act does not")
+    ids = {}
+    for _, w in ipairs(Planner.waitsIn(planned, {}, { planned[1], planned[3], planned[4] })) do ids[#ids + 1] = w.unit.id end
+    check(table.concat(ids, ","), "1,4", "#712 waitsIn control: with no death, the acting blues alone")
+end
+
 -- #644 review (PR #645, finding 7): an enemy's weapon worn by countering our planned attack.
 -- A's chip leaves E standing and E's counter throws a javelin from its bag slot 1, a use a
 -- landed blow: the judged phase is told (plan.redWear) so E strikes with what it has left.
@@ -9101,6 +9142,26 @@ local function looksAhead(boss, replyPhase)
     return boardOf(A, X, K), sightOf(o), gifted("careful", 1000)
 end
 
+-- #712: the lookahead's first phase stages through the same waits, so what its Misc scripts left
+-- unread (CHAI_AT, a walk the budget cut short) is counted in the plan's cost as the judged
+-- phase's is. The control: a lookahead that reports none adds none.
+do
+    local board, sight, st = looksAhead(true)
+    local _, _, cost0 = Planner.plan(B, board, sight, st)
+    check(cost0.area_positional .. "/" .. cost0.area_truncated, "0/0", "#712 lookahead control: nothing unread, nothing counted")
+    board, sight, st = looksAhead(true)
+    local next0, calls = sight.nextPhase, 0
+    sight.nextPhase = function(...)
+        local r = next0(...)
+        calls = calls + 1
+        r.areaPositional, r.areaTruncated = 2, 1
+        return r
+    end
+    local _, _, cost = Planner.plan(B, board, sight, st)
+    check(calls > 0 and cost.area_positional == 2 * calls and cost.area_truncated == calls, true,
+          "#712 lookahead: each nextPhase's unread script parts are summed into the cost")
+end
+
 -- test_lookahead_triggers_on_a_remembered_boss (ADR 0399): a boss in fog that a retry remembers
 -- (sight.knows) is a boss whose reach a step enters, so the lookahead is triggered as for one in
 -- sight; one the fog hides and no attempt showed triggers nothing.
@@ -9364,7 +9425,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds,waits", "lookahead: the staged board, nothing more")
 end
 
 -- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers

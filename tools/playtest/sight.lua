@@ -113,9 +113,13 @@
 --                            inside are dropped after it (M.changed). The planner's re-listing
 --                            (#661, #670).
 --   enemyPhase(plan)        the enemy phase the AI would play against a planned board, in
---                            one batch. plan = { blues = { { unit, x, y, hp } }, gone =
+--                            one batch. plan = { blues = { { unit, x, y, hp } }, waits = { { unit, x, y, order } }, gone =
 --                            { [enemy id] = true } }: our units stand where the plan leaves
---                            them with its HP, the gone are off the map, plan.opened =
+--                            them with its HP (plan.waits, optional: the units the plan acts, each at
+--                            its end tile in act order `order`, a unit its counter killed
+--                            among them; the AI changes the Misc events make at those waits are
+--                            played first, M.areaWake; the result's .areaPositional and
+--                            .areaTruncated count what its scripts left unread), the gone are off the map, plan.opened =
 --                            { ["x,y"] = true } the doors it opens and walls it breaks, each
 --                            map change applied (M.openMap), the game builds its
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
@@ -1376,6 +1380,41 @@ function M.scriptEffects(mem, script)
     return { loads = loads, removals = removals, truncated = truncated }
 end
 
+-- The AI changes an event script makes, read from its bytes (#712): the units it switches to
+-- another AI. -> { changes = { { charId, ai1, ai2 } }, positional, truncated }, in script order.
+-- Encodings: CHAI (EvtChangeAI, include/eventscript.h:729, EV_CMD_CHANGEAI 0x39) is the char at +2
+-- (a negative one: slot 2) and the AI in slot 1, ai1 its low byte and ai2 the next
+-- (Event39_ChangeAiScript, eventscr.c:3604-3623 -> ChangeAiForCharacter, eventscr3.c:61: every
+-- unit of that character in the green and red factions). SVAL (slot at +2, a u32 at +4) is tracked
+-- through the walk's CALLs as scriptEffects tracks slot 2. CHAI_AT (sub 1, EvtChangeAIat :730)
+-- takes its units from a queue and a position slot the script fills (vanilla E_10's and E_14's
+-- AREA scripts, through EventScr_ChangeAIinQueue, events_script_utils.c:523): `positional` counts
+-- them, none is read. An ESTIMATE as scriptEffects is: guards are not evaluated (the
+-- UnTriggerIfNotFaction call at the head of an AREA script ends it for a unit not of the
+-- faction it names, and the player's units are the ones asked). Pure over mem.
+local EV_CMD_CHANGEAI, EVSUB_CHAI_AT, EVENT_SLOT_1 = 0x39, 1, 1
+function M.scriptAiChanges(mem, script)
+    local changes, positional, slot1, slot2 = {}, 0, 0, 0
+    local _, truncated = M.walkScript(mem, script, function(at, cmd, sub)
+        if cmd == EV_CMD_SVAL then
+            local slot = mem.u16(at + 2)
+            if slot == EVENT_SLOT_1 then slot1 = mem.u32(at + 4)
+            elseif slot == EVENT_SLOT_2 then slot2 = mem.u32(at + 4) end
+        elseif cmd == EV_CMD_CHANGEAI then
+            if sub == EVSUB_CHAI_AT then
+                positional = positional + 1
+            else
+                local pid = mem.u16(at + 2)
+                if pid >= 0x8000 then pid = slot2 end
+                changes[#changes + 1] = { charId = pid & 0xFF, ai1 = slot1 & 0xFF,
+                                          ai2 = (slot1 >> 8) & 0xFF }
+            end
+        end
+        return false
+    end, { budget = M.EV_WALK_BUDGET })
+    return { changes = changes, positional = positional, truncated = truncated }
+end
+
 -- The turn events' effects (M.scriptEffects of each, in the order the game offers them: `events`
 -- = { { turn, boardTurn, loads, removals, truncated } }) as s.scriptedUnits' answer: { arrivals = {
 -- { charId, x, y, turn, boardTurn } }, removals = { [charId] = boardTurn }, truncated }. A unit's earliest removal is
@@ -1725,16 +1764,23 @@ local function eventSearch(api, call, info, offset)
     api.write32(info, api.mem.u32(events + offset))
 end
 
--- Inside a sandbox: the scripts the chapter's event list at `offset` offers now, { [script] =
--- its completion flag (EventInfo +08) }: the game's SearchAvailableEvent walk.
-local function availableScripts(api, call, info, offset)
+-- Inside a sandbox: the scripts the chapter's event list at `offset` offers now, in the game's
+-- order, { { script, flag (EventInfo +08) } } (availableList), or { [script] = flag }
+-- (availableScripts): the game's SearchAvailableEvent walk.
+local function availableList(api, call, info, offset)
     eventSearch(api, call, info, offset)
     local out = {}
     local found = call(api.SYM.SearchAvailableEvent, { info })
     while found ~= 0 do
-        out[api.mem.u32(info + EVENT_SCRIPT)] = api.mem.u32(info + EVENT_FLAG)
+        out[#out + 1] = { script = api.mem.u32(info + EVENT_SCRIPT),
+                          flag = api.mem.u32(info + EVENT_FLAG) }
         found = call(api.SYM.SearchNextAvailableEvent, { info })
     end
+    return out
+end
+local function availableScripts(api, call, info, offset)
+    local out = {}
+    for _, e in ipairs(availableList(api, call, info, offset)) do out[e.script] = e.flag end
     return out
 end
 
@@ -1746,6 +1792,109 @@ function M.turnScripts(api, call, info, turn, phase)
     api.write16(api.SYM.gPlaySt + PLAY_TURN, turn)
     api.write8(api.SYM.gPlaySt + PLAY_FACTION, phase)
     return availableScripts(api, call, info, CHAPTER_TURNS)
+end
+
+-- ChangeUnitAi (eventscr3.c:33-58), inside a sandbox: `e`'s AI scripts switched, as an event's
+-- CHAI does. A hidden or dead unit is left; an ai1 of AI_A_INVALID (0x15, the enumerator after
+-- AI_A_14, cp_common.h:110) or an ai2 of AI_B_INVALID (0x13, after AI_B_12, :135) leaves that
+-- script alone; each script's counter restarts at 0 and an ai2 of AI_B_0C flags the unit
+-- AI_UNIT_FLAG_3 (cp_common.h:58). These are api writes, so the journal puts the board's words
+-- back when the sandbox returns, and the decisions' own keep (M.keepAi: it holds the value it
+-- finds first, here the woken one) unwinds before them, to the board's: no keep16 is
+-- needed (it is for a game call's writes, which no journal sees).
+local AI_A_INVALID, AI_B_INVALID, AI_B_0C, AI_UNIT_FLAG_3 = 0x15, 0x13, 0x0C, 0x08
+local UNIT_AI_A_PC, UNIT_AI_B_PC = 0x43, 0x45
+function M.changeUnitAi(api, e, ai1, ai2)
+    if api.mem.u32(e.addr + UNIT_STATE) & (api.Board.US_HIDDEN | api.Board.US_DEAD) ~= 0 then
+        return false
+    end
+    if ai1 ~= AI_A_INVALID then
+        api.write8(e.addr + UNIT_AI1, ai1)
+        api.write8(e.addr + UNIT_AI_A_PC, 0)
+    end
+    if ai2 ~= AI_B_INVALID then
+        api.write8(e.addr + UNIT_AI2, ai2)
+        api.write8(e.addr + UNIT_AI_B_PC, 0)
+        if ai2 == AI_B_0C then
+            api.write8(e.addr + M.UNIT_AI_FLAGS, api.mem.u8(e.addr + M.UNIT_AI_FLAGS) | AI_UNIT_FLAG_3)
+        end
+    end
+    return true
+end
+
+-- The AI changes the plan's own waits cause, played inside a sandbox before the enemy phase
+-- (#712). The game runs the chapter's Misc events after every unit's wait (RunWaitEvents,
+-- eventinfo.c:1628-1659: SearchAvailableEvent over miscBasedEvents with gActiveUnit the unit that
+-- waited, each script started after SetFlag(flag), StartEventFromInfo, eventinfo.c:71-77), and an
+-- AREA entry (EvCheck0B_AREA, eventinfo.c:1020) offers its script when gActiveUnit stands in its
+-- rectangle and its flag is clear. `waits` = the plan's waits, { { unit, x, y, order } }: for each,
+-- in the order the plan acts them (`order`, the act's index; the game runs the events at each wait
+-- in turn, so two entries sharing a flag fire for the first unit to wait), the unit is stood on
+-- its end tile for the ask (its x and y bytes, journaled and put back: a unit the counter killed is in no board list, and
+-- the game keeps a dead unit's tile, UnitKill, bmunit.c:958, and runs the wait events after the
+-- action whether or not it died, playerphase.c:98-99, cp_perform.c:85-86) and the game is asked
+-- what it offers there; a flag an earlier wait took is not offered again (the game's SetFlag before
+-- the script), and each script's CHAI changes (M.scriptAiChanges) are written into the units of that
+-- character in `byId` (ChangeAiForCharacter: every non-blue unit; M.changeUnitAi).
+-- -> woken { { id, ai1, ai2 } }, and stats { positional, truncated }: the scripts that ran
+-- whose CHAI_AT the walk did not read (#727) and whose walk the budget cut short, for the
+-- planner's cost line (a plan's silent estimate is never silent).
+-- `memo` = { tiles = {}, scripts = {} }, the board's: what the game offers on a tile (the Misc
+-- kinds in vanilla -- AREA, the Defeat flags, AFEV, CauseGameOverIfLordDies -- ask the unit's
+-- tile and the flags, never who it is) and what each script changes (ROM bytes). An ESTIMATE as
+-- M.scriptAiChanges is: not modelled are RunWaitEvents' other work (it sets or clears
+-- EVFLAG_DEFEAT_ALL, and runs nothing when flag 0x65 is set or no blue unit is left) and a
+-- lookahead reply turn (armyReply: its units end elsewhere and wake nothing). `info` is a sandbox's
+-- scratch.
+function M.areaWake(api, call, info, byId, waits, memo)
+    local S, mem = api.SYM, api.mem
+    local fired, woken, stats = {}, {}, { positional = 0, truncated = 0 }
+    local order = {}
+    for i, w in ipairs(waits) do order[i] = w end
+    local rank = {}
+    for i, w in ipairs(waits) do rank[w] = i end
+    table.sort(order, function(x, y)
+        local ox, oy = x.order or math.huge, y.order or math.huge
+        if ox ~= oy then return ox < oy end
+        return rank[x] < rank[y]
+    end)
+    for _, b in ipairs(order) do
+        local key = b.x * 64 + b.y
+        local entries = memo.tiles[key]
+        if not entries then
+            -- stood on its end tile for the ask alone, then back: a dead actor is in no list of
+            -- the phase, and a map refresh would put its struct on the tile it died on
+            local ax, ay = mem.u8(b.unit.addr + UNIT_X), mem.u8(b.unit.addr + UNIT_Y)
+            api.write8(b.unit.addr + UNIT_X, b.x)
+            api.write8(b.unit.addr + UNIT_Y, b.y)
+            api.write32(S.gActiveUnit, b.unit.addr)
+            entries = availableList(api, call, info, CHAPTER_MISC)
+            memo.tiles[key] = entries
+            api.write8(b.unit.addr + UNIT_X, ax)
+            api.write8(b.unit.addr + UNIT_Y, ay)
+        end
+        for _, entry in ipairs(entries) do
+            if entry.flag == 0 or not fired[entry.flag] then
+                fired[entry.flag] = true
+                local fx = memo.scripts[entry.script]
+                if not fx then
+                    fx = M.scriptAiChanges(mem, entry.script)
+                    memo.scripts[entry.script] = fx
+                end
+                stats.positional = stats.positional + fx.positional
+                stats.truncated = stats.truncated + (fx.truncated and 1 or 0)
+                for _, c in ipairs(fx.changes) do
+                    for id, e in pairs(byId) do
+                        if e.faction ~= "blue" and e.charId == c.charId
+                                and M.changeUnitAi(api, e, c.ai1, c.ai2) then
+                            woken[#woken + 1] = { id = id, ai1 = c.ai1, ai2 = c.ai2 }
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return woken, stats
 end
 
 -- Whether a Misc list's scripts `after` a death flag was set hold one `before` did not that
@@ -2401,16 +2550,20 @@ function M.phaseStarted(mem, S, units)
     return known
 end
 
--- What a kept phase start (M.phaseStarted) is kept by: each unit's HP and state word as they
--- read now, by its address. They are what the two calls read that a sandbox can have staged
+-- What a kept phase start (M.phaseStarted) is kept by: each unit's HP, state word and AI scripts
+-- (ai1, ai2: a plan's wait that wakes an enemy, M.areaWake, writes them, and ChangeUnitAi flags
+-- an ai2 of AI_B_0C, which the start's kept aiFlags would write over) as they read now, by
+-- its address. They are what the two calls read that a sandbox can have staged
 -- (a plan's HP, a unit hidden, carried or off the map), so a strike asked inside a staged
 -- board finds no start kept for it and makes its own; a unit's Mov and bag change only with
 -- the board (`seen`).
 function M.phaseKey(mem, units)
     local parts = {}
     for _, o in pairs(units) do
-        parts[#parts + 1] = ("%x:%d:%x"):format(o.addr, mem.u8(o.addr + UNIT_HP),
-                                                mem.u32(o.addr + UNIT_STATE))
+        parts[#parts + 1] = ("%x:%d:%x:%d:%d"):format(o.addr, mem.u8(o.addr + UNIT_HP),
+                                                      mem.u32(o.addr + UNIT_STATE),
+                                                      mem.u8(o.addr + UNIT_AI1),
+                                                      mem.u8(o.addr + UNIT_AI2))
     end
     table.sort(parts)
     return table.concat(parts, ",")
@@ -3541,13 +3694,17 @@ function M.new(outer)
     -- our units stood and their HP set, armed as the plan leaves them, the reds' HP and the
     -- uses their counters to our planned attacks spent, the gone off the map. `wearing.base` is
     -- the wear ledger (M.tally) the phase starts from: the plan's own wear on it.
-    local function stagePhase(call, plan)
+    local function stagePhase(call, scratch, plan)
         local byId = {}
         for _, o in ipairs(units()) do byId[o.id] = o end
         for _, b in ipairs(plan.blues) do
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
         end
+        -- the waits the plan makes run the chapter's Misc events before the enemy phase: an AREA
+        -- event that wakes an enemy (vanilla Ch16's Sage, #712) has done so by then
+        seen.area = seen.area or { tiles = {}, scripts = {} }
+        local _, area = M.areaWake(api, call, scratch, byId, plan.waits or {}, seen.area)
         for id, hp in pairs(plan.reds or {}) do
             if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
         end
@@ -3638,7 +3795,7 @@ function M.new(outer)
         local function pilfer(call, e, act)
             return M.pilfer(api, call, S, Board, standOn, e, act)
         end
-        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer
+        return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer, area
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
@@ -3696,10 +3853,13 @@ function M.new(outer)
 
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer =
-                stagePhase(call, plan)
-            return playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
-                             plan.mass, cast, pilfer)
+            local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer, area =
+                stagePhase(call, proc, plan)
+            local out = playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
+                                  plan.mass, cast, pilfer)
+            -- what the plan's waits' events left unread (M.areaWake's stats), for the cost line
+            out.areaPositional, out.areaTruncated = area.positional, area.truncated
+            return out
         end) end)
     end
 
@@ -3833,8 +3993,8 @@ function M.new(outer)
     -- The planner asks it on every second phase but PT_REPLY=hold's.
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(function(call, proc)
-            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer =
-                stagePhase(call, plan)
+            local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer, area =
+                stagePhase(call, proc, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
             -- wears on what the last left (M.tally)
@@ -3917,6 +4077,7 @@ function M.new(outer)
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
                                   remove, nil, cast, pilfer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
+            out.areaPositional, out.areaTruncated = area.positional, area.truncated
             return out
         end) end)
     end

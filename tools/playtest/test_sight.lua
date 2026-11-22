@@ -1019,7 +1019,7 @@ do
     for _, name in ipairs({ "s.enemyPhase", "s.nextPhase" }) do
         local at = src:find("function " .. name .. "(", 1, true)
         local body = at and src:sub(at, (src:find("\n    function ", at + 1) or #src))
-        check(body ~= nil and body:find("stagePhase(call, plan)", 1, true) ~= nil, true,
+        check(body ~= nil and body:find("stagePhase(call, proc, plan)", 1, true) ~= nil, true,
               "equip: " .. name .. " stages through stagePhase")
     end
     -- the phase's staging arms each unit through M.stageWear and M.armAsPlanned, which equips
@@ -1677,6 +1677,7 @@ do
     check(cut.truncated, true, "scriptEffects: a walk past the budget is cut short and says so")
     check(#cut.removals, 0, "scriptEffects: a removal behind the budget is not read")
     check(Sight.scriptEffects(m, EV).truncated, false, "scriptEffects: a short walk is not truncated")
+    check(Sight.scriptAiChanges(m, L).truncated, true, "scriptAiChanges: a walk past the budget says so (#712)")
 end
 
 -- foldScripted (#724): Amelia is loaded on turn 5 and removed on turn 12 (the removal stays); a cast
@@ -3421,7 +3422,7 @@ end
 -- #709: both reds' phases begin with the heal: stagePhase (enemyPhase's, and nextPhase's first) after
 -- the plan's reds HP is written, and nextPhase's second after the army's reply, before it plays.
 do
-    local stage = sightSrc:match("local function stagePhase%(call, plan%).-\n    end\n")
+    local stage = sightSrc:match("local function stagePhase%(call, scratch, plan%).-\n    end\n")
     check(stage ~= nil and stage:find("plan%.reds or {}%) do.-end\n%s+healFaction%(call, byId, \"red\"%)") ~= nil, true,
           "healFaction: the staged phase heals the reds after the plan's HP is written")
     local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
@@ -3484,6 +3485,211 @@ do
     check(Sight.winEvent({ [0xA] = WIN }, { [0xA] = WIN }), false, "winEvent: a WIN script offered all along is no change")
     check(Sight.winEvent({}, { [0xB] = 0 }), false, "winEvent: a new flag-0 script is no win")
     check(Sight.winEvent({}, {}), false, "winEvent: nothing offered")
+end
+
+-- areaWake (#712): vanilla Ch16 (E_16) has two AREA entries in its Misc list (x 2-21 / y 0-11 and
+-- x 1-13 / y 18-22, ch16a-eventinfo.h:27-28) sharing flag TMP(11) and one script
+-- (EventScr_089F7570, ch16a-eventscript.h:563): UnTriggerIfNotFaction, slot 1 = 0x10000, CHAI 0x8f,
+-- slot 1 = 0x10303, CHAI 0x90. A player unit that ends its action in an area wakes both units (the
+-- Sage 0x90 went from DoNothing, ai1 6, to ai1 3 / ai2 3 and killed Eirika, 10 tiles away). The
+-- judged phase reads AI bytes as they stand, so the wake is written before it; a plan whose units
+-- end elsewhere leaves them as they are. The fake game below answers SearchAvailableEvent as
+-- EvCheck0B_AREA does: gActiveUnit's tile against the rectangle, the entry's flag clear.
+do
+    local m = fakeMem()
+    local EV, UNTRIG = 0x08003000, 0x08003100
+    local INFO, LIST, GROUP, ACTIVE = 0x03000000, 0x08100000, 0x08200000, 0x03004000
+    m.w16(UNTRIG, 0x0120)                                           -- ENDA
+    local function sval(at, slot, v) m.w16(at, 0x0540); m.w16(at + 2, slot); m.w32(at + 4, v) end
+    sval(EV, 2, 0)
+    m.w16(EV + 8, 0x0A40); m.w32(EV + 12, UNTRIG)                   -- CALL UnTriggerIfNotFaction
+    sval(EV + 16, 1, 0x10000)
+    m.w16(EV + 24, 0x3920); m.w16(EV + 26, 0x8F)                    -- CHAI 0x8f
+    sval(EV + 28, 1, 0x10303)
+    m.w16(EV + 36, 0x3920); m.w16(EV + 38, 0x90)                    -- CHAI 0x90
+    m.w16(EV + 40, 0x0120)
+    -- the Misc list: two AREA entries (cmd 0x0B, flag << 16 | cmd, script, x1 y1 x2 y2 bytes)
+    local FLAG = 11
+    local function area(at, x1, y1, x2, y2)
+        m.w32(at, 0x0B | (FLAG << 16)); m.w32(at + 4, EV)
+        m.w8(at + 8, x1); m.w8(at + 9, y1); m.w8(at + 10, x2); m.w8(at + 11, y2)
+    end
+    area(LIST, 2, 0, 21, 11); area(LIST + 12, 1, 18, 13, 22)
+    m.w32(GROUP + 0x0C, LIST)
+    local unit = { [0x01] = 0x03000100, [0x90] = 0x03000200, [0x8F] = 0x03000300, [0x50] = 0x03000400,
+                   [0x02] = 0x03000500 }
+    local function unitAt(id, faction, charId, ai1, ai2)
+        return { id = id, addr = unit[charId], faction = faction, charId = charId }
+    end
+    local function board()
+        local eirika = unitAt(1, "blue", 0x01)
+        local sage = unitAt(0x90, "red", 0x90); local lord8f = unitAt(0x8F, "red", 0x8F)
+        local other = unitAt(0x50, "red", 0x50)
+        local joshua = unitAt(2, "blue", 0x02)
+        for _, e in ipairs({ sage, lord8f, other }) do
+            m.w8(e.addr + 0x42, 6); m.w8(e.addr + 0x43, 5); m.w8(e.addr + 0x44, 7); m.w8(e.addr + 0x45, 4)
+            m.w32(e.addr + 0x0C, 0)
+        end
+        return { eirika = eirika, joshua = joshua, sage = sage, lord8f = lord8f, other = other,
+                 byId = { [1] = eirika, [2] = joshua, [0x90] = sage, [0x8F] = lord8f, [0x50] = other } }
+    end
+    local taken, searches = {}, 0
+    local S = { GetChapterEventDataPointer = 1, SearchAvailableEvent = 2, SearchNextAvailableEvent = 3,
+                gActiveUnit = ACTIVE }
+    local api = { SYM = S, mem = m, write8 = m.w8, write16 = m.w16, write32 = m.w32, Board = Board,
+                  chapter = function() return 16 end,
+                  keep16 = function() end }
+    local function search(info)
+        searches = searches + 1
+        local x, y = m.u8(m.u32(ACTIVE) + 0x10), m.u8(m.u32(ACTIVE) + 0x11)
+        while m.u32(m.u32(info)) & 0xFFFF == 0x0B do
+            local at = m.u32(info)
+            local flag = m.u32(at) >> 16
+            if not taken[flag] and x >= m.u8(at + 8) and x <= m.u8(at + 10)
+                    and y >= m.u8(at + 9) and y <= m.u8(at + 11) then
+                m.w32(info + 4, m.u32(at + 4)); m.w32(info + 8, flag)
+                return 1
+            end
+            m.w32(info, at + 12)
+        end
+        return 0
+    end
+    local function call(addr)
+        if addr == S.GetChapterEventDataPointer then return GROUP end
+        if addr == S.SearchAvailableEvent then return search(INFO) end
+        if addr == S.SearchNextAvailableEvent then
+            m.w32(INFO, m.u32(INFO) + 12)
+            return search(INFO)
+        end
+    end
+    local function at(b, x, y, order) return { unit = b, x = x, y = y, order = order or 1 } end
+    local function ai(e) return m.u8(e.addr + 0x42) .. "/" .. m.u8(e.addr + 0x44) end
+    local function fresh() return { tiles = {}, scripts = {} } end
+
+    local B = board()
+    local fx = Sight.scriptAiChanges(m, EV)
+    check(#fx.changes, 2, "scriptAiChanges: E_16's script has two CHAIs")
+    check(fx.changes[1].charId .. ":" .. fx.changes[1].ai1 .. ":" .. fx.changes[1].ai2, "143:0:0",
+          "scriptAiChanges: CHAI 0x8f is slot 1's 0x10000: ai1 0, ai2 0")
+    check(fx.changes[2].charId .. ":" .. fx.changes[2].ai1 .. ":" .. fx.changes[2].ai2, "144:3:3",
+          "scriptAiChanges: CHAI 0x90 is slot 1's 0x10303: ai1 3, ai2 3")
+    check(fx.positional, 0, "scriptAiChanges: no CHAI_AT here")
+
+    -- the plan ends Eirika inside the first area (the played plan's unit 5 at (7,10)): the Sage and
+    -- the other CHAI's unit are switched, the unit no event names is not
+    m.w8(B.eirika.addr + 0x10, 7); m.w8(B.eirika.addr + 0x11, 10)
+    local woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, fresh())
+    check(#woke, 2, "areaWake: a unit ending inside the area wakes the two units")
+    check(ai(B.sage), "3/3", "areaWake: the Sage plays ai1 3, ai2 3 (was DoNothing's 6/7)")
+    check(ai(B.lord8f), "0/0", "areaWake: the other CHAI's unit plays ai1 0, ai2 0")
+    check(m.u8(B.sage.addr + 0x43) .. "/" .. m.u8(B.sage.addr + 0x45), "0/0",
+          "areaWake: ChangeUnitAi restarts both script counters")
+    check(ai(B.other), "6/7", "areaWake: a unit the script names not is left as it is")
+
+    -- the control: the plan's units end outside both areas, or do not act: nothing changes
+    B = board()
+    m.w8(B.eirika.addr + 0x10, 15); m.w8(B.eirika.addr + 0x11, 14)
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 15, 14) }, fresh())
+    check(#woke, 0, "areaWake control: a unit ending outside every area wakes none")
+    check(ai(B.sage), "6/7", "areaWake control: the Sage keeps DoNothing")
+    B = board()
+    m.w8(B.eirika.addr + 0x10, 7); m.w8(B.eirika.addr + 0x11, 10)
+    woke = Sight.areaWake(api, call, INFO, B.byId, {}, fresh())
+    check(#woke, 0, "areaWake control: a unit that does not wait triggers nothing, whatever it stands on")
+
+    -- the game takes the flag before the script: a second unit in the area wakes nothing more, and
+    -- a flag already set (the event fired on an earlier turn) offers none
+    B = board()
+    m.w8(B.joshua.addr + 0x10, 3); m.w8(B.joshua.addr + 0x11, 4)
+    m.w8(B.eirika.addr + 0x10, 7); m.w8(B.eirika.addr + 0x11, 20)
+    woke = Sight.areaWake(api, call, INFO, B.byId,
+                          { at(B.eirika, 7, 20, 1), at(B.joshua, 3, 4, 2) }, fresh())
+    check(#woke, 2, "areaWake: the two areas share one flag, the script runs once")
+    B = board()
+    taken[FLAG] = true
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, fresh())
+    taken[FLAG] = nil
+    check(#woke, 0, "areaWake: a flag already set offers no event")
+
+    -- a hidden or dead unit is left (ChangeUnitAi); a blue unit of the same character is not one
+    B = board()
+    m.w32(B.sage.addr + 0x0C, Board.US_DEAD)
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, fresh())
+    check(ai(B.sage) .. " " .. ai(B.lord8f), "6/7 0/0", "areaWake: a dead unit is left, the other woken")
+
+    -- the board's memo: a second plan ending on the same tile asks the game nothing
+    B = board()
+    local memo = fresh()
+    Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, memo)
+    local before = searches
+    B = board()
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 7, 10) }, memo)
+    check(searches, before, "areaWake: a tile the board already asked is not asked again")
+    check(#woke, 2, "areaWake: and the memo's answer wakes the same units")
+
+    -- phaseKey: a woken unit is another board for a kept phase start (its aiFlags may differ)
+    local k0 = Sight.phaseKey(m, { B.sage })
+    m.w8(B.sage.addr + 0x42, 9)
+    check(Sight.phaseKey(m, { B.sage }) ~= k0, true, "phaseKey: another ai1 is another board")
+
+    -- CHAI with a negative character is slot 2's; CHAI_AT is counted, not read
+    local SC = 0x08003400
+    sval(SC, 2, 0x44); sval(SC + 8, 1, 0x0705)
+    m.w16(SC + 16, 0x3920); m.w16(SC + 18, 0xFFFF)
+    m.w16(SC + 20, 0x3921); m.w16(SC + 22, 0x0403)
+    m.w16(SC + 24, 0x0120)
+    local fx2 = Sight.scriptAiChanges(m, SC)
+    check(#fx2.changes == 1 and fx2.changes[1].charId, 0x44, "scriptAiChanges: a negative CHAI is slot 2's character")
+    check(fx2.changes[1].ai1 .. ":" .. fx2.changes[1].ai2, "5:7", "scriptAiChanges: ai1 the low byte, ai2 the next")
+    check(fx2.positional, 1, "scriptAiChanges: CHAI_AT is counted as positional, not read")
+
+    -- the game runs the events at each wait in turn: two entries of one flag and different scripts
+    -- (Ch16 has one script for both, but a Misc list may not): the first unit to wait fires its
+    -- script, whatever the roster order. A third list: area 1 (x 0-5) -> EV1 (CHAI 0x8f), area 2
+    -- (x 10-15) -> EV2 (CHAI 0x90), one flag.
+    local EV1, EV2, LIST2 = 0x08003500, 0x08003600, 0x08101000
+    sval(EV1, 1, 0x0000); m.w16(EV1 + 8, 0x3920); m.w16(EV1 + 10, 0x8F); m.w16(EV1 + 12, 0x0120)
+    sval(EV2, 1, 0x0000); m.w16(EV2 + 8, 0x3920); m.w16(EV2 + 10, 0x90); m.w16(EV2 + 12, 0x0120)
+    local function area2(at, script, x1, y1, x2, y2, flag)
+        m.w32(at, 0x0B | ((flag or 12) << 16)); m.w32(at + 4, script)
+        m.w8(at + 8, x1); m.w8(at + 9, y1); m.w8(at + 10, x2); m.w8(at + 11, y2)
+    end
+    area2(LIST2, EV1, 0, 0, 5, 5); area2(LIST2 + 12, EV2, 10, 10, 15, 15)
+    m.w32(GROUP + 0x0C, LIST2)
+    FLAG = 12
+    B = board()
+    -- roster order: Eirika (area 1) before Joshua (area 2); act order: Joshua first
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 2, 2, 2), at(B.joshua, 12, 12, 1) }, fresh())
+    check(#woke == 1 and woke[1].id, 0x90, "areaWake order: the unit that waits first fires its script (0x90's), not the roster's")
+    B = board()
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 2, 2, 1), at(B.joshua, 12, 12, 2) }, fresh())
+    check(#woke == 1 and woke[1].id, 0x8F, "areaWake order: and the other way round, the roster's first is the act's first")
+
+    -- a unit its counter killed still waited (the wait events run after the action whether the actor
+    -- lived, playerphase.c:98-99): its struct is on the tile it stood on before the plan, outside
+    -- every area, yet the end tile wakes; and its struct is put back where it was after the ask
+    B = board()
+    m.w8(B.eirika.addr + 0x10, 20); m.w8(B.eirika.addr + 0x11, 20)
+    woke = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 2, 2) }, fresh())
+    check(#woke, 1, "areaWake dead actor: the end tile of a unit in no board list wakes the unit")
+    check(m.u8(B.eirika.addr + 0x10) .. "," .. m.u8(B.eirika.addr + 0x11), "20,20",
+          "areaWake dead actor: the struct is put back, a map refresh must not find it on that tile")
+
+    -- the scripts' unread parts are counted, not dropped: a CHAI_AT is positional, a walk the budget
+    -- cut short is truncated
+    local PS = 0x08003700
+    m.w16(PS, 0x3921); m.w16(PS + 2, 0x0403); m.w16(PS + 4, 0x0120)
+    area2(LIST2 + 24, PS, 3, 3, 4, 4, 13)
+    B = board()
+    local _, stats = Sight.areaWake(api, call, INFO, B.byId, { at(B.eirika, 3, 3) }, fresh())
+    check(stats.positional, 1, "areaWake stats: a CHAI_AT in a script that ran is counted")
+    check(stats.truncated, 0, "areaWake stats: a short walk is not truncated")
+    FLAG = 11
+    m.w32(GROUP + 0x0C, LIST)
+
+    -- the judged phase is staged through it
+    check(sightSrc:find("M%.areaWake%(api, call, scratch, byId, plan%.waits or {}, seen%.area%)") ~= nil, true,
+          "stagePhase: the plan's waits run the Misc events' AI changes before the phase")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

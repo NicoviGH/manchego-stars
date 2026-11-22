@@ -5081,7 +5081,7 @@ scenarios.berserkprobe = function()
     local sx, sy = INSPECT.freeBeside(seth)
     local side = sx and { x = sx, y = sy }
     if not side then return result("FAIL", "no free tile beside Seth") end
-    local plan = { blues = { { unit = eirika, x = side.x, y = side.y, hp = 5 } }, reds = {},
+    local plan = { blues = { { unit = eirika, x = side.x, y = side.y, hp = 5 } }, waits = {}, reds = {},
                    gone = {} }
     local function sethStrikes(status)
         sapi.write8(seth.addr + BOARD.UNIT_STATUS, status)
@@ -5164,7 +5164,7 @@ scenarios.staffprobe = function()
     local POW, SKL, RES, STAFF_RANK = 0x14, 0x15, 0x18, 0x28 + 4
     local BERSERK = 0x53   -- ITEM_STAFF_BERSERK
     sapi.write8(caster.addr + STAFF_RANK, 251)
-    local plan = { blues = { { unit = eirika, x = sx, y = sy, hp = eirika.hp } }, reds = {},
+    local plan = { blues = { { unit = eirika, x = sx, y = sy, hp = eirika.hp } }, waits = {}, reds = {},
                    gone = {} }
     -- `staff` = the item id, or nil for the control
     local function arm(staff, pow)
@@ -5299,7 +5299,7 @@ scenarios.stealprobe = function()
     sight.batch(function()
         -- (1) the judged enemy phase, Eirika left beside the thief
         local out = sight.enemyPhase({ blues = { { unit = eirika, x = eirika.x, y = eirika.y,
-                                                   hp = eirika.hp } }, reds = {}, gone = {} })
+                                                   hp = eirika.hp } }, waits = {}, reds = {}, gone = {} })
         mid = bag()
         local th = out.thefts and out.thefts[1]
         log(string.format("enemyPhase: %d theft(s)%s", out.thefts and #out.thefts or 0,

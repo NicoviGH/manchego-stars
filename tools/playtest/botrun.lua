@@ -749,9 +749,12 @@ function M.run(api)
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   -- unsplit: the counter kills the judged phases left unsplit (sight's
                   -- M.phaseWays); floored: the ways of a plan's uncertain kills left unsplit
-                  -- (the planner's, ADR 0415); slowest: the decision that ran the most frames, and its
+                  -- (the planner's, ADR 0415); area_positional, area_truncated: the Misc
+                  -- scripts' CHAI_AT (#727) and budget-cut walks the judged phases left unread
+                  -- (M.areaWake); slowest: the decision that ran the most frames, and its
                   -- turn (what M.DECISION_FRAMES is sized from)
                   plans = { made = 0, kept = 0, phases = 0, averaged = 0, unsplit = 0, floored = 0,
+                            area_positional = 0, area_truncated = 0,
                             slowest = { frames = 0 } }, bag = {},
                   -- every Talk made: the harness's entry (turn, unit, target, asked, spent: a
                   -- paid recruit's question and its gold, #679) and whether the target joined
@@ -1657,6 +1660,8 @@ function M.run(api)
                         rec.plans.averaged = rec.plans.averaged + (cost.averaged or 0)
                         rec.plans.unsplit = rec.plans.unsplit + (cost.unsplit or 0)
                         rec.plans.floored = rec.plans.floored + (cost.floored or 0)
+                        rec.plans.area_positional = rec.plans.area_positional + (cost.area_positional or 0)
+                        rec.plans.area_truncated = rec.plans.area_truncated + (cost.area_truncated or 0)
                         for k, v in pairs(cost.look or {}) do
                             rec.lookahead[k] = rec.lookahead[k] + v
                         end
