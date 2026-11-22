@@ -21,12 +21,13 @@ same arguments read 3.2 or nil depending on call order.
 1. A Talk is made from a tile beside the recruit, never on his tile, so every read of a recruit
    goal's tile asks `turnsTo` with `beside` (`Goals.beside`, the one owner): the lock on his own
    tile is left out (`turnsFor`'s `unlocked`). The reads are the goal's chance, the planner's
-   nearest row and advance, the talker's assignment (`exploreGoal[...].beside`) and
-   `stepsToward`. A chest goal keeps its lock.
+   nearest row and advance, the talker's assignment (`exploreGoal[...].kind`), `stepsToward`, and
+   the march's (`stepFor`, `movesFor`, `marchLength`) and `supplyKey`'s, which would otherwise
+   send a talker to a key-dropping enemy or burn a convoy key. A chest goal keeps its lock.
 2. The convoy-key way is taken when `from` is at `u`'s coordinates, not when it is the table
    `u`, so the test agrees with the memo key's coordinates. `acted` is deliberately not read
-   there, as `from == u` did not: the memo key's late suffix only separates the reads whose
-   start turn it changes (`viaObstacle`), and the convoy way's walk is the same either way.
+   there, as `from == u` did not: the way is offered whether or not `u` has acted, and the walk
+   inside it reads its own late start (`viaObstacle`, its own memo key).
 3. That late suffix tests whose `acted` it is by id, not table identity (`startsLate`): `u`, a
    copy of it, or a planner position, never another unit's table.
 

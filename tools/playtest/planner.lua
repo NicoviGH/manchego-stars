@@ -932,9 +932,9 @@ function M.plan(Bot, board, sight, style, opts)
     local assigned, goalOf = {}, {}
     for _, u in ipairs(ctx.blues) do
         local tile = (ctx.exploreGoal or {})[u.id] or (ctx.objectiveTile and ctx.objectiveTile(u))
-        -- the tile's `beside` (a Talk assignment, Bot.candidates' exploring) rides along on
-        -- every read of it below
-        local beside = tile and tile.beside
+        -- the tile's kind (a Talk assignment, Bot.candidates' exploring) says whether every read
+        -- of it below is beside it
+        local beside = tile and ctx.beside and ctx.beside(tile) or false
         local t = tile and turnsTo(u, tile, nil, beside)
         if t then
             assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside }

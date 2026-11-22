@@ -39,7 +39,8 @@
 --
 -- Goals.chance(goal, pos, gamma, turnsTo) -> 0..1: pos[unit id] = { x, y, acted, alive (0..1) },
 -- the board a plan leaves. t = turnsTo(u, tile, pos, beside), its turns there (sight's: cost /
--- MOV, not rounded; `beside` = M.beside(goal.kind), the tile's lock left out); one that has acted takes it a turn later. The chance is gamma ^ (max(t, 1) - 1 +
+-- MOV, not rounded; `beside` = M.beside(goal.kind), the tile's lock left out); one that has
+-- acted takes it a turn later. The chance is gamma ^ (max(t, 1) - 1 +
 -- late): each turn further is another enemy phase where something can go wrong, and every
 -- step beyond reach counts. Within reach it is 1 for a unit that has not acted and gamma for
 -- one that has, standing on the goal too: taking it now is worth a turn over waiting there.
