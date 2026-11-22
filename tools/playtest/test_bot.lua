@@ -8110,8 +8110,8 @@ end
 -- one-phase test never counted. (4,4) is 2 turns from it and keeps the chance.
 do
     local X = red(0x81, 14, 9, { minRange = false })
-    local function forfeits(...)
-        local A = blue(0x01, 0, 0, 4, { minRange = false })
+    local function played(start, dies, ...)
+        local A = blue(0x01, 0, start[1], start[2], { minRange = false })
         local o = {
             reach = { [0x01] = tiles(...) },
             field = function(goal)
@@ -8125,15 +8125,29 @@ do
             explorable = { { x = 10, y = 0, kind = "visit" } },
             canExplore = { [0x01] = { ["10,0"] = "visit" } },
             closings = { ["10,0"] = 3 },
-            enemyPhase = function() return {} end,
+            enemyPhase = function()
+                if not dies then return {} end
+                return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99, takenHits = 1,
+                           takenCrit = 0, targetHp = A.hp } }
+            end,
         }
         local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
-        return at(a) .. " " .. table.concat(plan and plan.forfeited or {}, ",")
+        local g
+        for _, r in ipairs(plan and plan.goalWorth or {}) do
+            if r.id == "visit:10,0" then g = r end
+        end
+        return at(a) .. " " .. table.concat(plan and plan.forfeited or {}, ",") .. " "
+            .. string.format("%.2f>%.2f", g and g.before or -1, g and g.after or -1)
     end
-    check(forfeits({ 0, 4 }), "0,4 visit:10,0",
+    check(played({ 0, 4 }, false, { 0, 4 }), "0,4 visit:10,0 0.75>0.00",
           "forfeits: waiting where the village's chance falls from over GONE to 0 loses it")
-    check(forfeits({ 0, 4 }, { 4, 4 }), "4,4 ",
+    check(played({ 0, 4 }, false, { 0, 4 }, { 4, 4 }), "4,4  0.75>0.72",
           "forfeits: and the plan that keeps it in reach is the one played")
+    -- the taker's own death is the cap's count, not a forfeit (ADR 0384): the village is in reach
+    -- from (4,4), and the chance read with survival is 0
+    local dies = played({ 4, 4 }, true, { 4, 4 })
+    check(dies, "4,4  0.85>0.00",
+          "forfeits: a village in reach is not forfeit because its only taker may die")
 end
 
 -- test_a_counter_that_kills_the_boss_is_the_win: at (1,0) the boss strikes A and A's counter

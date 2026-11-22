@@ -968,7 +968,22 @@ function M.plan(Bot, board, sight, style, opts)
         moved.tile = { x = at.x, y = at.y }
         return Goals.chance(moved, pos, Goals.GAMMA, read) * late
     end
+    -- the chance of each dated goal on the board a plan leaves, by reaching it alone: no unit's
+    -- survival, no win, no opener's chance (the cap's and the win's own counts, not a loss of
+    -- the goal), so a 0 here is the goal out of reach by its deadline (ADR 0450) -> { [goal id]
+    -- = { before, after } }, `before` the decision's
     local before = {}
+    local function reached(st)
+        local pos = positions(st)
+        for _, p in pairs(pos) do p.opens = nil end
+        local read, out = turnsOn(st, pos), {}
+        for _, g in ipairs(goals) do
+            if g.closes ~= nil and g.kind ~= "objective" and not st.took[g.id] then
+                out[g.id] = { before = before[g.id], after = chanceOf(st, g, pos, read) }
+            end
+        end
+        return out
+    end
     do
         local pos = positions(start)
         for _, g in ipairs(goals) do before[g.id] = chanceOf(start, g, pos) end
@@ -2286,7 +2301,7 @@ function M.plan(Bot, board, sight, style, opts)
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost, rows = st.goalWorth,
+                                                       lost = lost, reach = reached(st),
                                                        gone = M.GONE })
         local gain = progress(st)
         local greenDie = 0

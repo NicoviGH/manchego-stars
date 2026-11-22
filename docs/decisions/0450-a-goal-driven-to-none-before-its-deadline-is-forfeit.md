@@ -18,24 +18,46 @@ a village no unit can reach any more, with the looter still phases away, ranked 
 that keeps it. Vanilla Ch10 (`b640e-cs-s4005`): the Pirate razes the village (11,15) in enemy
 phase 4; a turn-2 plan that left Tana too far to arrive in time forfeited nothing.
 
-**What changed.** `Goals.forfeited` also counts a goal the plan drives from a chance of at least
-`closes.gone` before it to none after it (`after <= Goals.DUST`), whatever the goal's deadline.
-The planner passes the rows its own `goalTerm` already computes (`st.goalWorth`: each goal's
-`before` and `after` chance) and `Planner.GONE` (0.5, the line the planner already calls
-"gone"/"won"). `Goals.chance` reads 0 for a goal whose closing phase is before the phase its
-taker arrives on, so "no unit can arrive in time" is the 0. A goal the plan takes reads 1, so a
-taken goal is never counted. Rows that are not `feasible` (stalled, unknown) are still not
-counted: `forfeited` only lists ledger rows.
+**What changed.** `Goals.forfeited` also counts a DATED goal (`g.closes` set: a looter or a
+scripted removal ends it) the plan leaves out of reach by its deadline: its reach chance was at
+least `closes.gone` before the plan (the planner's `M.GONE`, 0.5) and is none after it
+(`closes.reach[id] = { before, after }`). The planner builds `reach` per plan (`reached`) with the
+one chance reader, `Goals.chance` (through `chanceOf`), on the board the plan leaves with every
+unit alive, no win and no opener's chance: reaching the goal alone, not the goalTerm's `after`,
+which is weighted by survival, the win and a recruit's death. Those weights are the cap's and the
+win's own counts, and ADR 0384 forbids counting a unit's death again as a forfeit. An undated goal
+is never counted this way (the issue's "before its deadline"). `reach` and `gone` come together
+(`forfeited` asserts it). No new weight. `Goals.chance` reads 0 for a goal whose closing phase is
+before the phase its taker arrives on, so "no unit can arrive in time" is the 0. A taken goal is
+not read.
 
-**The risk, and what limits it.** A false 0 from the chance model (Rennac's 0 before #710) would
-mark a plan down for a goal it never lost. The floor limits it: a goal that was never likelier
-than not before the plan (`before < GONE`) is no loss. A goal that reads 0 only after a plan, from
-a model that is right about the plan, is the loss itself.
+**The risk, and what limits it.** A false 0 from the chance model, on either side. The floor
+(`before >= GONE`) only guards the BEFORE side: a goal that was never likelier than not is no loss.
+It does not guard an `after` 0 that is false (Rennac's 0 before #710 was an `after`-side 0: the
+model read a lock on his tile as no way there). What still can give one: `sight.turnsTo` reading no
+way, or too long a way, to a goal from the tile a plan leaves a unit on, or a `closes` that is
+earlier than the game's real one. What limits it now: the read is the game's movement and the
+looter's own closing phase, with no weight of ours; the rule needs a likelier-than-not chance to
+start from; and the same read already decides the goal's chance in every plan's goal term, so a
+wrong 0 here is a wrong 0 there. A false 0 would mark down a plan that moves a unit away from a
+goal the read wrongly cuts off, and the plans that keep the goal in reach rank above it; it cannot
+reject a plan or end a game, since forfeits order plans and the cap admits them.
 
-**Proof (ADR 0430).** `test_goals.lua`: `Goals.forfeited` counts a goal driven from 0.6 to 0,
-not one from 0.3 to 0, nor one left at 0.2 (the first fails on main). `test_bot.lua`: a unit
-that must wait where the village's chance falls from 0.75 to 0 (deadline phase 3) has the village
-in `plan.forfeited` (fails on main); where a tile keeps it in reach, that tile is the one played.
+**The Seize.** `best.forfeited` is written into the plan's ledger as closed, and botrun's
+`unjustified_seize_skip` reads that ledger: a Seize skip is justified only while a row is feasible.
+A goal the plan puts out of reach by its deadline is closed in that ledger, so it no longer justifies
+holding the Seize. That is right: a goal lost by its deadline is lost, and the Seize costs it
+nothing. The closure path is the one `g.closes <= 1` already takes. It cannot flag a skip the rank
+chose, because forfeits rank first: a plan that forfeits every remaining goal ties the Seize on
+forfeits (the win closes all) and loses to it on `complete`.
+
+**Proof (ADR 0430).** `test_goals.lua`: a dated goal driven from 0.6 to 0 is counted; 0.3 to 0, 0.9 to 0.2
+and an undated goal at 0.6 to 0 are not; `reach` without `gone` raises. `test_bot.lua`, on a village
+a looter takes after phase 3: a unit waiting where its reach chance falls from 0.75 to 0 has it in
+`plan.forfeited`, and the tile that keeps it (0.75 to 0.72) is the one played; a unit whose only
+village is in reach but whose own death chance is 1 (the goal term's `after` reads 0.00) forfeits
+nothing. Each fails against main; the death case and the undated and `gone` checks also fail
+against the first version of this PR, which counted the goal term's `after`.
 Replay (`resume --game vanilla --tag fix714f2 --campaigns b640e-cs-s4005 --chapter 10 --last 10
 --attempts 1 --scout --route 1 --seal-at 10`; `fix714f` was already taken by an earlier #714 run):
 won on turn 14, 0 deaths, the village (11,15) razed in enemy phase 3 (the Fighter). Same result as
