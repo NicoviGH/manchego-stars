@@ -31,9 +31,18 @@ second look share one local `replay`; the hide has one owner, `M.hideUnit`. `M.t
 the second path only where the unit left its tile, so a unit the AI does not move stays the stationary
 path and its chance stays 0: an unreachable recruit that never moves holds no win; one that escapes in
 the second look has its path cut to the phases before the escape (empty when it goes in the first).
-`closingsKey` now keys each of our units by id, tile, HP and what it carries, since the second look
-reads them as targets. `Goals.chance` already prices a recruit's `goal.path` (ADR 0436's `meet`), so
+`closingsKey` now keys each of our units by id, tile, HP and what it carries when a unit is watched
+(only then can the second look run, and it reads them as targets); with none, the tiles alone, as
+before. `Goals.chance` already prices a recruit's `goal.path` (ADR 0436's `meet`), so
 nothing else changed: no `meetingTile` for an on-field recruit.
+
+**Tested how.** `M.secondLook`, `takeSecondLook`, `stayedPut` and `hideUnit` are tested with a fake
+replay (each case fails with its wiring removed: mutated and run). The `closings` call site itself is
+source-pinned (it calls `M.secondLook`, hides only through `M.hideUnit`), not fake-replay tested: the
+sandboxed game calls cannot run in the unit tests, so the Ch13 replay is its proof. The rollback is a
+behaviour test of the sandbox primitive (a `keep16`'d word a game call wrote in the first look is
+back for the second) with its control. A `PT_LEAKGUARD=1` replay of the same game logged no leak
+(no `leaks` key in the record; the guard's env reaching the emulator is assumed, not shown).
 
 **Estimates, labelled.** Our units are taken to stand still for all 8 phases (they will move). Only a
 recruit that stayed put in the hidden look is read again: one that moved there keeps the path the

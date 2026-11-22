@@ -1544,8 +1544,8 @@ function M.opensChests(items, attributes, capacity)
 end
 
 -- closings()' cache key: what its read depends on -- the turn, the horizon, each looter as it
--- stands (id, tile, HP), each of our units (id, tile, HP, who it carries: the second look of a
--- watched unit reads them as the AI's targets, and a carrier's stats halve), the open tiles, each
+-- stands (id, tile, HP), each of our units (its tile; with a watched unit also id, HP and who it
+-- carries: the second look reads them as the AI's targets, and a carrier's stats halve), the open tiles, each
 -- wave's units and the map. A looter killed or moved, a player unit moved or hurt, a tile taken, a
 -- door opened is a new key.
 function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
@@ -1557,9 +1557,12 @@ function M.closingsKey(turn, k, waves, looters, open, blockers, map, watch)
     for id in pairs(watch or {}) do parts[#parts + 1] = "v" .. id end
     -- our units: the AI's first look hides them (they still block its walk), its second look
     -- (M.secondLook) reads them as targets, so who stands where and how hurt is in the key
+    -- (HP and what a unit carries only when a unit is watched: with none, no second look runs
+    -- and the tiles are all the first look reads of them)
+    local looked = next(watch or {}) ~= nil
     for _, o in ipairs(blockers or {}) do
-        parts[#parts + 1] = "b" .. (o.id or "") .. "@" .. o.x .. "," .. o.y .. "/" .. (o.hp or 0)
-            .. "c" .. (o.carrying or 0)
+        parts[#parts + 1] = "b" .. (looked and (o.id or "") or "") .. "@" .. o.x .. "," .. o.y
+            .. (looked and ("/" .. (o.hp or 0) .. "c" .. (o.carrying or 0)) or "")
     end
     for key in pairs(open) do parts[#parts + 1] = key end
     for _, w in ipairs(waves or {}) do

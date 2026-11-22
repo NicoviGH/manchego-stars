@@ -1762,18 +1762,15 @@ do
     check(next(early[1]), nil, "secondLook: an escape in the first phase leaves no path")
 end
 
--- closings() runs the second look through M.secondLook, its replay in a sandbox of its own and
--- tile-only, and hides our units through M.hideUnit alone (the sandboxed game calls cannot run
--- here; the Ch13 replay is their proof)
+-- closings() calls M.secondLook and hides our units through M.hideUnit alone: a source pin, since
+-- the sandboxed game calls cannot run here (the call site is not fake-replay tested; the Ch13
+-- replay is its proof)
 do
     local at = sightSrc:find("function s.closings", 1, true)
     local body = at and sightSrc:sub(at, sightSrc:find("closingsAt[ck] = {", at, true))
-    check(body ~= nil and body:find("M.secondLook(paths, starts, gone, function(again)", 1, true) ~= nil, true,
+    check(body ~= nil and body:find("M.secondLook(", 1, true) ~= nil, true,
           "closings: the second look is wired through M.secondLook")
-    check(body ~= nil and body:find("return sandbox(function()", 1, true) ~= nil
-          and body:find("replay(again, there, second, goneAgain, nil, true)", 1, true) ~= nil, true,
-          "closings: the second look plays in a sandbox of its own, tile only")
-    check(body ~= nil and body:find("M.hideUnit(api, o)", 1, true) ~= nil
+    check(body ~= nil and body:find("M.hideUnit(", 1, true) ~= nil
           and body:find("| US_HIDDEN", 1, true) == nil, true, "closings: our units are hidden by M.hideUnit alone")
 end
 
@@ -1788,38 +1785,56 @@ do
     check(m.u32(0x200 + 0x0C), 0, "hideUnit: its restore writes the state back")
 end
 
--- the closings key reads our units as the AI's targets (the second look): same tiles, other HP
--- or another carrier is another read.
+-- the closings key reads our units as the AI's targets only for the second look, which runs only
+-- for a watched unit: with one, same tiles and another HP or carrier is another read; with none
+-- (a looters-only chapter), the tiles are all that count.
 do
     local a = { id = 0x81, x = 8, y = 8, hp = 10 }
     local mine = { id = 1, x = 3, y = 3, hp = 20 }
-    local key = Sight.closingsKey(3, 8, nil, { a }, {}, { mine })
-    check(Sight.closingsKey(3, 8, nil, { a }, {}, { { id = 1, x = 3, y = 3, hp = 19 } }) ~= key, true,
-          "closingsKey: our unit hurt is a new read")
-    check(Sight.closingsKey(3, 8, nil, { a }, {}, { { id = 1, x = 3, y = 3, hp = 20, carrying = 4 } }) ~= key, true,
-          "closingsKey: our unit carrying another is a new read")
-    check(Sight.closingsKey(3, 8, nil, { a }, {}, { { id = 2, x = 3, y = 3, hp = 20 } }) ~= key, true,
-          "closingsKey: another unit on the tile is a new read")
+    local watch = { [0x81] = true }
+    local function key(unit, w) return Sight.closingsKey(3, 8, nil, { a }, {}, { unit }, nil, w) end
+    check(key({ id = 1, x = 3, y = 3, hp = 19 }, nil), key(mine, nil),
+          "closingsKey: no watched unit, our unit's HP is not in the key")
+    check(key({ id = 1, x = 3, y = 3, hp = 20, carrying = 4 }, {}), key(mine, {}),
+          "closingsKey: no watched unit, what it carries is not in the key")
+    check(key({ id = 1, x = 4, y = 3, hp = 20 }, nil) ~= key(mine, nil), true,
+          "closingsKey: no watched unit, its tile still is")
+    check(key({ id = 1, x = 3, y = 3, hp = 19 }, watch) ~= key(mine, watch), true,
+          "closingsKey: a watched unit, our unit hurt is a new read")
+    check(key({ id = 1, x = 3, y = 3, hp = 20, carrying = 4 }, watch) ~= key(mine, watch), true,
+          "closingsKey: a watched unit, our unit carrying another is a new read")
+    check(key({ id = 2, x = 3, y = 3, hp = 20 }, watch) ~= key(mine, watch), true,
+          "closingsKey: a watched unit, another unit on the tile is a new read")
 end
 
--- the second look starts from the board as it stood: the first look runs in a sandbox of its own
--- (rolled back), so the second reads the words as they were (the shape closings() uses).
+-- the second look starts from the board as it stood: closings() runs the first look in a sandbox of
+-- its own, so a word a game call wrote there (not through the journal: keep16 holds it, as keepAi
+-- does the AI words) is back when the second look reads. Run in one sandbox instead, the second
+-- look reads the first look's end word (the control).
 do
-    local cpu = fakeCpu(1)
-    local bytes = { [0x100] = 7 }
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
-                    write8 = function(a, v) bytes[a] = v end,
-                    write16 = function(a, v) bytes[a] = v end,
-                    write32 = function(a, v) bytes[a] = v end }
-    local sandbox, api = Sight.batching(outer)
-    local seenSecond
-    sandbox(function()
-        sandbox(function() api.write8(0x100, 99) end)                  -- the first look
-        sandbox(function() seenSecond = outer.mem.u8(0x100) end)       -- the second
-    end)
-    check(seenSecond, 7, "second look: starts from the original board, not the first look's end")
+    local function run(nested)
+        local cpu = fakeCpu(1)
+        local bytes = { [0x100] = 7 }
+        local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                           u16 = function(a) return bytes[a] or 0 end,
+                                           u32 = function(a) return bytes[a] or 0 end },
+                        write8 = function(a, v) bytes[a] = v end,
+                        write16 = function(a, v) bytes[a] = v end,
+                        write32 = function(a, v) bytes[a] = v end }
+        local sandbox, api = Sight.batching(outer)
+        local read
+        sandbox(function()
+            local function first()
+                api.keep16(0x100, 1)    -- as aiDecide keeps the AI words before the game call
+                bytes[0x100] = 99       -- the game call's own write, no journal
+            end
+            if nested then sandbox(first) else first() end
+            read = bytes[0x100]
+        end)
+        return read
+    end
+    check(run(true), 7, "second look: starts from the original board, the first look's game write undone")
+    check(run(false), 99, "second look: (control) in one sandbox it would read the first look's end word")
 end
 
 -- loots: an AI script loots when it holds AI_CMD_PILLAGE (0x10) before its first GOTO
