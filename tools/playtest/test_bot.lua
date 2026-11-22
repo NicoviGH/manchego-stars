@@ -6391,6 +6391,68 @@ do
           "planner: the mend keeps A out of the recruit's reach")
 end
 
+-- test_a_wait_holding_a_sparing_weapon_saves_a_recruit (#730, ADR 0451; vanilla Ch10's Amelia,
+-- charId 18): A (20 HP) can only wait on (0,0), where the recruit R (20 HP) strikes it. A's first
+-- weapon (slot 0) counters for 30 and fells R; the one in slot 2 counters for 2. No tile is out of
+-- R's reach, so on main every plan forfeits R (a counter uses the first usable weapon, and no wait
+-- carried a slot). The menu now offers the wait holding slot 2 ("gentle"), the judged phase arms A
+-- with it, and that plan forfeits nothing: it is the plan played, past the per-unit cut and with the
+-- beam cut to one plan (the mend tries the struck unit's menu).
+do
+    local function scene()
+        local A = blue(0x01, 0, 0, 0, { weapons = { { slot = 0, min = 1, max = 1 },
+                                                    { slot = 2, min = 1, max = 1 } } })
+        local R = red(0x81, 3, 0, { hp = 20, minRange = 1, maxRange = 1 })
+        local function strike(counter)
+            return fc { takenHit = 100, takenDmg = 5, takenHits = 1, counterHit = 100,
+                        counterDmg = counter, counterHits = 1, strikerHp = 20 }
+        end
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 1, 0 }) },
+            danger = { ["0,0"] = 1 },
+            talk = { [0x01] = { [0x81] = true } },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = strike(30), ["0,0/2"] = strike(2) } } },
+            enemyPhase = function(plan)
+                local held
+                for _, b in ipairs(plan.blues) do
+                    if b.unit.id == 0x01 then held = b.slot end
+                end
+                return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 5, takenHits = 1,
+                           targetHp = 20, counterHit = 100, counterDmg = held == 2 and 2 or 30,
+                           counterHits = 1, strikerHp = 20 } }
+            end,
+        }
+        return boardOf(A, R), o
+    end
+    local board, o = scene()
+    local cands = B.candidates(board, sightOf(o), style("careful"))
+    local gentle
+    for _, c in ipairs(cands) do
+        for _, a in ipairs(c.acts) do
+            if a.why == "gentle" then gentle = a end
+        end
+    end
+    check(gentle and gentle.act .. "#" .. tostring(gentle.slot) .. "@" .. at(gentle), "wait#2@0,0",
+          "gentle: the menu offers A's wait holding the weapon whose counter spares R")
+    for _, cut in ipairs({ 4, 0 }) do
+        local perUnit = Planner.PER_UNIT
+        Planner.PER_UNIT = cut
+        board, o = scene()
+        local beam = Planner.BEAM
+        Planner.BEAM = 1
+        local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+        Planner.PER_UNIT, Planner.BEAM = perUnit, beam
+        local r
+        for _, p in ipairs(plan and plan.predict or {}) do
+            if p.recruit then r = p end
+        end
+        check(a and a.act .. "#" .. tostring(a.slot), "wait#2",
+              "gentle: the plan played has A wait holding slot 2 (PER_UNIT " .. cut .. ")")
+        check(plan and #(plan.forfeited or {}), 0, "gentle: the plan played forfeits no recruit")
+        check(r == nil or r.die < Planner.DUST, true, "gentle: R's chance to fall is about nothing")
+    end
+end
+
 -- test_planner_never_credits_killing_a_recruit: A can kill R from (1,0); C, far off, is the one
 -- the game lets Talk to R, so R is a recruit. Its kill is paid as a death, not credited, so
 -- careful does not attack it.

@@ -997,6 +997,50 @@ local function betterAttack(c, b)
     return c.target.hp < b.target.hp
 end
 
+-- The waits of `u` that spare a recruit (#730, ADR 0451): for each tile a wait already ends on
+-- where a recruit (ctx.recruits) strikes `u`, the same wait holding the weapon in another bag
+-- slot whose counter fells the recruits that reach the tile least (summed, by the strike's
+-- counterDist), when that is less than the weapon `u` holds now (the first usable one, the
+-- game's pick: slot nil). The act is the bait's own (M.baitAt): the harness equips `slot`
+-- before the Wait, and the judged phase arms the unit with it. A range-2 bow against a
+-- recruit's melee strike answers nothing: the no-counter choice a player has.
+-- -> the acts, each labelled "gentle"
+local function sparingWaits(ctx, u, acts)
+    local weapons = ctx.sight.weapons(u)
+    if #weapons < 2 or next(ctx.recruits) == nil then return {} end
+    local function felled(x, y, slot)
+        local sum = 0
+        for _, s in ipairs(exposure(ctx, u, x, y, slot)) do
+            if ctx.recruits[s.by.id] and s.f and s.f.counterDist then
+                sum = sum + (oddsOf(ctx.sight)({ s.f.counterDist }, s.by.hp))
+            end
+        end
+        return sum
+    end
+    local out, done = {}, {}
+    for _, a in ipairs(acts) do
+        local k = tileKey(a.move.x, a.move.y)
+        if a.act == "wait" and not a.slot and not a.canto and not done[k] then
+            done[k] = true
+            local base, pick, least = felled(a.move.x, a.move.y), nil, nil
+            if base > Goals.DUST then
+                for i = 2, #weapons do
+                    local f = felled(a.move.x, a.move.y, weapons[i].slot)
+                    if f < base - Goals.DUST and (not least or f < least) then
+                        pick, least = weapons[i].slot, f
+                    end
+                end
+            end
+            if pick then
+                local b = action(u, a.move, "wait")
+                b.slot, b.slotKey, b.why = pick, true, "gentle"
+                out[#out + 1] = b
+            end
+        end
+    end
+    return out
+end
+
 -- A priority claim's enemy, or under a keys claim one the game says holds a key or lockpick
 -- (sight.holdsKey): struck before the rest.
 local function isPriority(ctx, e)
@@ -2995,6 +3039,7 @@ local function proposeOne(ctx, u)
     -- HP, parked beside the Mogall at an 81% chance to die while a safe tile stood free)
     for i = 2, math.min(M.HOLDS, #holds) do add(action(u, holds[i], "wait"), "hold") end
     for _, a in ipairs(cantoMoves(ctx, u, acts, gain)) do add(a, a.why) end
+    for _, a in ipairs(sparingWaits(ctx, u, acts)) do acts[#acts + 1] = a end
     return { unit = u, acts = exposed(ctx, u, acts) }
 end
 

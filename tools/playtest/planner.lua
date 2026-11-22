@@ -1256,6 +1256,9 @@ function M.plan(Bot, board, sight, style, opts)
                 local e = endTile(x.a)
                 if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
                         or x.a.why == "hold" or x.a.why == "retreat" or x.a.why == "careful"
+                        -- the wait that spares a recruit (Bot.candidates' "gentle", #730): its
+                        -- own score never sees the forfeit it avoids, only the judged phase
+                        or x.a.why == "gentle"
                         -- what a Rescue or Drop saves or opens is the judged phase's to read, and
                         -- its own score never sees the phase; a step aside's is the teammate's
                         -- act it frees the tile for (Bot.candidates' aside), which its own score
@@ -2676,7 +2679,8 @@ function M.plan(Bot, board, sight, style, opts)
         local function tries(p)
             if p.recruit then
                 -- a recruit has no player menu: the units it strikes try theirs (out of its
-                -- reach, or holding no weapon that answers it)
+                -- reach, or waiting holding a weapon whose counter spares it: the "gentle"
+                -- waits, #730)
                 local out = {}
                 for _, id in ipairs(p.struck) do
                     for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
