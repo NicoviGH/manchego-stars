@@ -145,7 +145,8 @@
 --           faction, tile, HP and item ids
 --   plan    a decision: the act chosen, and from the planner its judged score, the other plans
 --           judged (`considered`), what it expects of the enemy phase (`predict`), every Visit
---           and Chest offered (`explore`), the tile each unit was sent to (`goals`), what the
+--           and Chest offered (`explore`), the tile each unit was sent to (`goals`), the
+--           recruit-sparing acts the menus offered before the PER_UNIT cut (`gentle`, #730), what the
 --           plan does to each open goal (`worth`: id, kind, gold, worth, before, after), and whether a kept plan's act was played or a
 --           surprise (`replan`, why) forced a new one
 --   act     one act, either side: unit, from, to, the act and its target, the game's own

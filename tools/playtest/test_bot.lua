@@ -6727,6 +6727,11 @@ do
     check(gentleActs(sparingStrikeScene({ recruit = 0x82, tthreat = true,
                                           tcounter = { [0] = 30, [2] = 2 } })), "",
           "gentle strike: a recruit killed for sure by the attack is not a counter to spare")
+    -- the trigger asks the same: the only recruit in reach is the target the attack kills for sure
+    check(gentleActs(sparingStrikeScene({ recruit = 0x82, tthreat = true,
+                                          tcounter = { [0] = 30, [2] = 2 },
+                                          dmg = { [0] = 25, [2] = 5 } })), "",
+          "gentle strike: a sure-killed recruit target is no reason to offer a gentle act")
     -- the weapon that breaks on the attack: slot 2 has one use, the blow spends it
     check(gentleActs(sparingStrikeScene({ uses2 = 1 })), "",
           "gentle strike: a weapon the attack breaks is not offered as the sparing one")
@@ -6747,7 +6752,8 @@ do
     check(gentleActs(cb, co, nil, function(sight)
               sight.cantoTiles = function() return { { x = 0, y = 3 } } end
           end), "attack#2@0,2", "gentle strike: a Canto unit is offered the same strike")
-    -- a priced spare (#642) carrying slot 2 beside the gentle pick: no act key twice
+    -- a priced spare (#642) carrying slot 2 beside the gentle pick: the menu offers both, and no two
+    -- top-level acts share a key (the planner's own dedupe of plans is another thing, Planner.key's)
     local board, so = sparingStrikeScene({ thp = 30, items = {
         { id = 0x1A, uses = 30 }, { id = 0x1A, uses = 30 }, { id = 0x14, uses = 30 } } })
     so.usePrice = function(id) return ({ [0x1A] = 600, [0x14] = 8 })[id] end

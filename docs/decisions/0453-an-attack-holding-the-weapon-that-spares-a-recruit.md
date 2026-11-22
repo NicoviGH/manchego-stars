@@ -42,7 +42,7 @@ HP its target's counter leaves it (the option's `spent`), the target a sure kill
 `worstCase` does); a weapon the attack can use up (its uses at most the blows thrown) is never the
 sparing one, since the game then equips the next usable and the read would be of another weapon. A
 wall's strike (no target) is skipped. A spot no recruit can reach is skipped before any strike is
-read (`reaches`), the cost bound. The plan's trace record carries `gentle`, the acts the menus kept,
+read (`reaches`), the cost bound. The plan's trace record carries `gentle`, the acts the menus offered (read before the per-unit cut),
 so a replay shows whether one was offered and which was played.
 
 **What it does not do.** It decides nothing: a weaker weapon may fail the kill, and the judge reads

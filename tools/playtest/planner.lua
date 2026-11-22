@@ -132,7 +132,8 @@
 -- second phase's win (#641, M.secondRead's `won`) when it read one: { won, gain (what it adds to
 -- the rank's value, never to `judged`), worth (goalWorth's rows with it) }, talks = the charIds any
 -- unit was offered a Talk to, sorted, seizable = whether any unit was offered the Seize,
--- gentle = the recruit-sparing acts the board's menus kept ({ unit, act, slot, x, y, target }; #730),
+-- gentle = the recruit-sparing acts the board's menus offered, read before the PER_UNIT cut ({ unit,
+-- act, slot, x, y, target }; #730),
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
 -- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
@@ -1263,7 +1264,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- worth is the unit it shields, which only the judged phase reads (#661). The board's own menus (no `opens`) also record
     -- every Visit, Chest, Talk and Seize offered.
     local offered, talks, seizable = {}, {}, false   -- every Talk and Seize the candidates offered
-    local gentle = {}   -- every recruit-sparing act the board's menus kept (best.gentle)
+    local gentle = {}   -- every recruit-sparing act the board's menus offered, before the cut (best.gentle)
     local function menusOf(list, opens)
         local out = {}
         for _, c in ipairs(list) do

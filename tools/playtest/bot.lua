@@ -405,7 +405,8 @@ end
 -- (the runner's list). The team is not an axis: Bot.team picks it from the map and the claims.
 -- The route is not one either: a campaign SETTING (#510 plan comment, "Lords").
 M.HOLDS = 3        -- hold tiles offered per unit (candidates), safest first
-M.GENTLE = 2       -- waits, and attacks, holding a recruit-sparing weapon offered per unit, each menu apart (#730), the best first
+M.GENTLE = 2       -- waits, and attacks, holding a recruit-sparing weapon offered per unit,
+                   -- each menu apart (#730), the best first
 
 M.STYLES = {
     aggression = { "careful", "even", "bold" },
@@ -1091,7 +1092,8 @@ local function sparingPicks(ctx, u, recruit, spots)
     end
     local picks = {}
     for _, p in ipairs(spots) do
-        if reached(p.x, p.y) and counterOn(ctx, u, p.x, p.y, p.slot, recruit) > Goals.DUST then
+        local spared = p.after and select(2, p.after(p.slot)) or nil
+        if reached(p.x, p.y) and counterOn(ctx, u, p.x, p.y, p.slot, recruit, spared) > Goals.DUST then
             local base, pick, least = cost(p, p.slot), nil, nil
             for _, slot in ipairs(p.slots) do
                 local c = cost(p, slot)
