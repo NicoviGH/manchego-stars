@@ -1034,6 +1034,37 @@ do
     check(Planner.wearAt({ [0] = 1, [4] = 1 }, 4), 1, "wearAt: the second blow cut off at 4 HP")
 end
 
+-- #712: the judged phase is told which of our units act (`acted`): the game runs the chapter's Misc
+-- events (an AREA event that wakes an enemy) after a unit's wait, and only a unit the plan acts
+-- waits. A judged plan's acted units are exactly the units of its acts, the rest stand where they
+-- are and trigger nothing.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local Idle = blue(0x02, 5, 5, 1, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local E = red(0x81, 1, 1, { hp = 10, minRange = false })
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 1 }) },
+        fc = { [0x01] = { [0x81] = { ["0,1"] = fc { hit = 100, dmg = 6, hits = 1, wearSlot = 0 } } } },
+        enemyPhase = function(plan)
+            local acted = {}
+            for _, b in ipairs(plan.blues) do acted[#acted + 1] = b.unit.id .. "=" .. tostring(b.acted) end
+            seen[#seen + 1] = table.concat(acted, ",")
+            return {}
+        end,
+    }
+    Planner.plan(B, boardOf(A, Idle, E), sightOf(o), style("careful"))
+    local anyActed, anyIdle, nonBool = false, false, false
+    for _, line in ipairs(seen) do
+        anyActed = anyActed or line:find("1=true", 1, true) ~= nil
+        anyIdle = anyIdle or line:find("2=false", 1, true) ~= nil
+        nonBool = nonBool or line:find("=nil", 1, true) ~= nil
+    end
+    check(#seen > 0 and not nonBool, true, "#712 acted: every blue of a judged plan says whether it acted")
+    check(anyActed, true, "#712 acted: a plan that acts A tells the judged phase so")
+    check(anyIdle, true, "#712 acted: a plan that leaves the other unit alone tells it did not act")
+end
+
 -- #644 review (PR #645, finding 7): an enemy's weapon worn by countering our planned attack.
 -- A's chip leaves E standing and E's counter throws a javelin from its bag slot 1, a use a
 -- landed blow: the judged phase is told (plan.redWear) so E strikes with what it has left.

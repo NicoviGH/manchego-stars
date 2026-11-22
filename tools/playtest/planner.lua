@@ -1828,6 +1828,9 @@ function M.plan(Bot, board, sight, style, opts)
             local w = st.wear[u.id]
             planned[#planned + 1] = { unit = u, x = at and at.x or u.x, y = at and at.y or u.y,
                                       hp = st.hp[u.id] or u.hp,
+                                      -- a unit the plan acts ends its action there: the game
+                                      -- runs the chapter's Misc events after it (#712)
+                                      acted = a ~= nil,
                                       -- a strike's weapon, or a bait's (Bot.baitAt): the
                                       -- one its counter answers the boss with
                                       slot = (attacks or (a and a.act == "wait")) and a.slot or nil,
@@ -1954,7 +1957,7 @@ function M.plan(Bot, board, sight, style, opts)
                 if back[p.unit.id] then
                     if list == planned then list = copy(planned) end
                     list[i] = { unit = p.unit, x = p.unit.x, y = p.unit.y, hp = p.unit.hp,
-                                unacted = true }
+                                unacted = true, acted = false }
                 end
             end
             return inWay(list, w, function(p) return not p.unacted and p.unit.id or nil end)
