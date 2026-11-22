@@ -154,12 +154,14 @@
 --   halves it). The caller says which stock item is the Vulnerary, so no item id lives here.
 -- Bot.team(t) -> { deploy = {charIds}, reasons = {[charId] = reason}, give = {} }: whom the
 --   prep screen fields (#510 plan comment, "Party selection"). t = { roster, cap,
---   maxima = {[group] = n}, demands = {{ id, kind, need }...}, answers = {[charId] = {[demandId] =
---   true}}, strength = {[charId] = {[demandId] = n}}, carried = {[charId] = true}, style }. Each roster entry carries `group`, the
+--   maxima = {[group] = n}, demands = {{ id, kind, need, locks }...}, answers = {[charId] =
+--   {[demandId] = true}}, strength = {[charId] = {[demandId] = n}}, carried = {[charId] = true},
+--   style }. Each roster entry carries `group`, the
 --   caller's read of team_groups.py (the bot weighs no class); a unit without one raises.
 --   A demand is what the map asks (an enemy class, chests, fog...), `kind` sight.demandsOf's
 --   name for what it is ("enemy" for an enemy class; a demand without one raises), `need` how
---   many answerers cover it; `answers` and `strength` are measured by the caller in the game.
+--   many answerers cover it (`locks`, a chests or doors demand's: the tiles a key may still be
+--   needed for, Bot.supply's); `answers` and `strength` are measured by the caller in the game.
 --   In order: forced units (slot order, past every ceiling); then style.deploy, a followed
 --   claim's units; then, while a demand still needs answerers, the scarcest one first (ADR
 --   0402): the open demand the fewest units still fitting can answer (ties: a demand of
@@ -3669,34 +3671,53 @@ local function takeWeapons(L, party)
 end
 
 -- The keys a chapter's chests and doors need (#699: vanilla Ch21's two chests, a Chest Key in
--- the convoy and nobody holding one -- 134 of 135 recorded attempts missed a chest). For each
--- `demands` entry of kind chests or doors that no fielded unit's bag opens, one fielded unit
--- takes from the convoy an item the game says opens it for that unit (`for[charId].opens`:
--- GetUnitKeyItemSlotForTerrain, so a Lockpick counts only for a thief; no id lives here). The
--- taker is the unit with the most free slots, ties to party order: the take costs it nothing,
--- and a full bag gives first what Bot.fullBag would send, so the next in order is tried when
--- that gives nothing up. A key is one use and a chest or door takes one, so one is taken per lock
--- the demand counts (`locks`) that no bag already opens (#711); the rest arrive mid-map (supplyKey).
+-- the convoy and nobody holding one -- 134 of 135 recorded attempts missed a chest). A `demands`
+-- entry of kind chests or doors wants one use per lock tile it counts (`locks`: the tiles a key
+-- may still be needed for, #711; a Chest Key opens one chest, vanilla Ch21 has two), less the
+-- uses the fielded bags already open. An item the game says opens the kind for its holder
+-- (`for[charId].opens`: GetUnitKeyItemSlotForTerrain, so a Lockpick counts only for a thief; no
+-- id lives here) has `uses` of them, and one Lockpick's uses are spent once across the kinds: the
+-- narrowest opener is counted first, so a Chest Key answers chests before a Lockpick is. What is
+-- still wanted is taken from the convoy, one item per pass, by the unit with the most free slots
+-- then (ties to party order): the take costs it nothing, and a full bag gives first what
+-- Bot.fullBag would send, so the next in order is tried when that gives nothing up.
 local function takeKeys(L, party, demands)
+    local spare = {}   -- a held item -> its uses not yet counted against a lock
+    local function left(it)
+        if spare[it] == nil then spare[it] = it.uses or 1 end
+        return spare[it]
+    end
+    local function spend(it, want)
+        local n = math.min(left(it), want)
+        spare[it] = spare[it] - n
+        return want - n
+    end
     for _, d in ipairs(demands or {}) do
         if d.kind == "chests" or d.kind == "doors" then
             local function opens(u, it) return (forUnit(it, u.charId).opens or {})[d.kind] end
-            -- the locks still unopened, less what the fielded bags already open: a key is one
-            -- use and a Lockpick has as many as its uses left (#711: a Chest Key opens one
-            -- chest, and vanilla Ch21 has two)
-            local want = d.locks or d.need or 1
+            local want, held = d.locks or d.need or 1, {}
             for _, u in ipairs(party) do
                 for _, it in ipairs(L.bags[u.charId]) do
-                    if opens(u, it) then want = want - (it.uses or 1) end
+                    if opens(u, it) then
+                        local kinds = 0
+                        for _, yes in pairs(forUnit(it, u.charId).opens) do
+                            if yes then kinds = kinds + 1 end
+                        end
+                        held[#held + 1] = { it = it, kinds = kinds, i = #held }
+                    end
                 end
             end
+            table.sort(held, function(a, b)
+                if a.kinds ~= b.kinds then return a.kinds < b.kinds end
+                return a.i < b.i
+            end)
+            for _, h in ipairs(held) do want = spend(h.it, want) end
             local order = {}
             for i, u in ipairs(party) do
                 order[#order + 1] = { u = u, i = i }
             end
-            -- a pass takes one item for the unit with the most free slots (ties to party
-            -- order), as the first take of a kind always did; the next pass counts the slot the
-            -- take used, so a second key goes to the next unit with room
+            -- a pass takes one item for the unit with the most free slots; the next pass counts
+            -- the slot the take used, so a second key goes to the next unit with room
             while want > 0 do
                 table.sort(order, function(a, b)
                     local fa, fb = Board.ITEM_COUNT - #L.bags[a.u.charId],
@@ -3707,12 +3728,11 @@ local function takeKeys(L, party, demands)
                 local took = false
                 for _, o in ipairs(order) do
                     for i, it in ipairs(L.pool) do
-                        if opens(o.u, it) then
-                            local uses = it.uses or 1
-                            if L.take(o.u.charId, i, "the " .. d.kind .. " key", "key") then
-                                want, took = want - uses, true
-                                break
-                            end
+                        local why = "the " .. d.kind .. " key"
+                        if opens(o.u, it) and L.take(o.u.charId, i, why, "key") then
+                            local bag = L.bags[o.u.charId]
+                            want, took = spend(bag[#bag], want), true
+                            break
                         end
                     end
                     if took then break end

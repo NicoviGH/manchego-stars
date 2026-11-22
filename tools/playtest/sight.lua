@@ -1159,14 +1159,32 @@ function M.answerOf(a, hp)
     return a.killsTarget and a.counterWorst < hp, a.expected
 end
 
+-- Whether a lock tile (command `c`, the terrain `terrain` on it now) is one a key may still be
+-- needed for: still shut (a full chest, a closed door), and some fielded unit in `blues` reaches
+-- it by `turnsTo` (sight's: the game's march costs). With no unit on the map nothing is known
+-- to be out of reach, so every shut lock counts. A lock behind another lock reads unreached and
+-- is not counted: its key is the mid-map fetch's (bot.lua supplyKey).
+function M.lockNeeded(c, terrain, blues, turnsTo)
+    local shut = c.cmd == M.TILE_COMMAND_CHEST and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR
+    if terrain ~= shut then return false end
+    if #blues == 0 then return true end
+    for _, u in ipairs(blues) do
+        if turnsTo(u, { x = c.x, y = c.y }) then return true end
+    end
+    return false
+end
+
 -- What the map asks of a team, for Bot.team (#510 plan comment, "Party selection"). Pure, so
 -- test_sight.lua builds every case. units = Board.read's; commands = {{ x, y, cmd }...} the
 -- chapter's tile commands; fog = gPlaySt.chapterVisionRange. One demand per red class on the
 -- field (need = how many stand there, rep = the first), one per village tile, one for chests
--- and one for doors when there are any (`locks`: how many tiles), fog when the chapter has it, and sustain always.
+-- and one for doors when there are any, fog when the chapter has it, and sustain always. A lock
+-- demand's `need` is the openers the team seats; its `locks` the tiles a key may still be needed
+-- for (#711), those `needed(command)` accepts (default: all), so a door nobody can reach does
+-- not pull a spare key into a bag.
 -- `freeTalks` (M.freeTalks) adds one `talk` demand per recruit a unit may bring over for free:
 -- answered only by those talkers, so Bot.team seats one of them (#699).
-function M.demandsOf(units, commands, fog, freeTalks)
+function M.demandsOf(units, commands, fog, freeTalks, needed)
     local out, byClass, once = {}, {}, {}
     for _, u in ipairs(units) do
         if u.faction == "red" and u.onField and u.classId then
@@ -1191,7 +1209,7 @@ function M.demandsOf(units, commands, fog, freeTalks)
                 once[c.cmd] = { id = kinds[c.cmd], kind = kinds[c.cmd], need = 1, locks = 0 }
                 out[#out + 1] = once[c.cmd]
             end
-            once[c.cmd].locks = once[c.cmd].locks + 1
+            if not needed or needed(c) then once[c.cmd].locks = once[c.cmd].locks + 1 end
         end
     end
     if fog > 0 then out[#out + 1] = { id = "fog", kind = "fog", need = 1 } end
@@ -1615,6 +1633,13 @@ function M.batching(outer, guarded, log)
     return sandbox, api, open
 end
 
+-- Whether the unit at `unitAddr` opens `terrain` as its bag stands: the game's own check, a key
+-- slot of 0 or more (GetUnitKeyItemSlotForTerrain returns -1 for none). The one owner of that
+-- read: s.opens, keyItemOpens and a theft's before-and-after (M.pilfer).
+function M.opensAt(call, S, unitAddr, terrain)
+    return s32(call(S.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain })) >= 0
+end
+
 -- Inside a sandbox: `u` holds the weapon in item `slot` as it does after striking with it
 -- (WeaponSelectMenu_Selected: EquipUnitItemSlot), the one it counters with next phase.
 -- EquipUnitItemSlot reorders the bag in place, a game write no journal sees, so the bag is
@@ -1638,7 +1663,8 @@ function M.keyItemOpens(io, call, S, B, unitAddr, value, terrain)
         bag[k] = io.read16(at)
         io.write16(at, k == 0 and value or 0)
     end
-    local key = call(S.GetUnitKeyItemSlotForTerrain, { unitAddr, terrain }) == 0
+    -- the item alone in slot 0: the slot the game's check finds, so >= 0 is its yes
+    local key = M.opensAt(call, S, unitAddr, terrain)
     for k = 0, B.ITEM_COUNT - 1 do io.write16(unitAddr + B.UNIT_ITEMS + k * 2, bag[k]) end
     return key
 end
@@ -2049,30 +2075,71 @@ end
 -- An enemy thief's steal as its decision names it: AI_ACTION_STEAL (cp_battle.c
 -- AiAttemptStealActionWithinMovement: AiSetDecision's tile, target and the item's slot in the
 -- target's bag, taken from the highest-ranked item among every unit the thief can stand beside,
--- the game's own choice, ADR 0379). `D` = gAiDecision. -> { steal = true, target = the id,
--- slot, item = the item's id, tile = { x, y } the thief stands on }, or nil for any other act
+-- the game's own choice, ADR 0379). `D` = gAiDecision. -> { steal = true, target = the id, slot,
+-- tile = { x, y } the thief stands on }, or nil for any other act
 function M.stealAct(mem, Board, D)
     local DEC = Board.AI_DEC
     if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_STEAL then return nil end
     return { steal = true, target = mem.u8(D + DEC.TARGET), slot = mem.u8(D + DEC.SLOT),
              tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
 end
--- ActionSteal's bag change (bmmind.c): the item in slot `slot` of the unit at `from` leaves its
--- bag (UnitRemoveItem packs it) and goes to the first free slot of the unit at `to`
--- (UnitAddItem); the AI steals only with a free slot (cp_battle.c:44). -> the item's id
-function M.moveItem(api, Board, from, slot, to)
+-- ActionSteal's bag change (bmmind.c:365), through the game's own calls inside a sandbox
+-- (ADR 0369): the target's drop flag goes when the slot is its last item, the item leaves its bag
+-- (UnitRemoveItem packs it) and UnitAddItem puts it in the thief's first free slot (the AI steals
+-- only with one, cp_battle.c:46). A gold item (which ActionSteal pays into the party's gold
+-- instead) is never on the AI's steal list, so it is not handled. -> the item's id
+function M.moveItem(api, call, S, Board, from, slot, to)
     local mem = api.mem
-    local at = function(a, i) return a + Board.UNIT_ITEMS + i * 2 end
-    local raw = mem.u16(at(from, slot))
-    for i = slot, Board.ITEM_COUNT - 2 do api.write16(at(from, i), mem.u16(at(from, i + 1))) end
-    api.write16(at(from, Board.ITEM_COUNT - 1), 0)
+    local raw = mem.u16(from + Board.UNIT_ITEMS + slot * 2)
+    local count = 0
     for i = 0, Board.ITEM_COUNT - 1 do
-        if mem.u16(at(to, i)) == 0 then
-            api.write16(at(to, i), raw)
-            break
-        end
+        if mem.u16(from + Board.UNIT_ITEMS + i * 2) ~= 0 then count = count + 1 end
     end
+    local state = mem.u32(from + UNIT_STATE)
+    if state & Board.US_DROP_ITEM ~= 0 and slot == count - 1 then
+        api.write32(from + UNIT_STATE, state & ~Board.US_DROP_ITEM)
+    end
+    call(S.UnitRemoveItem, { from, slot })
+    call(S.UnitAddItem, { to, raw })
     return raw & 0xFF
+end
+-- A theft played on the board, inside an open sandbox: the thief `e` stood on the act's tile
+-- (`standOn`), the item moved from the target's bag to its own (a theft never misses), so a later
+-- enemy decides on the board it leaves and a second thief finds the item gone. -> { thief,
+-- target, item, lock = true when the target opened a chest before and no longer does }
+function M.pilfer(api, call, S, Board, standOn, e, act)
+    local addr = api.mem.u32(S.gUnitLookup + act.target * 4)
+    local chests = M.LOCK_TERRAIN.chests
+    local was = M.opensAt(call, S, addr, chests)
+    standOn(e, act.tile.x, act.tile.y)
+    local item = M.moveItem(api, call, S, Board, addr, act.slot, e.addr)
+    return { thief = e.id, target = act.target, item = item,
+             lock = was and not M.opensAt(call, S, addr, chests) }
+end
+-- The strikes of a phase's way after one more act: `done`'s, then the strike `t` (nil for a
+-- theft), and the thefts so far, then `theft` (a list read by the planner as `.thefts`; the
+-- copy is new, so a way never changes the list another way holds). The one owner of how a
+-- way's list carries them: a thief that steals after another enemy struck keeps its record.
+function M.chain(done, t, theft)
+    local now = {}
+    for x = 1, #done do now[x] = done[x] end
+    if t then now[#now + 1] = t end
+    now.thefts = done.thefts
+    if theft then
+        now.thefts = {}
+        for x, th in ipairs(done.thefts or {}) do now.thefts[x] = th end
+        now.thefts[#now.thefts + 1] = theft
+    end
+    return now
+end
+-- The phase's result list: the likeliest outcome `top`'s strikes and thefts, every outcome and
+-- the unsplit count riding on it (what enemyPhase returns).
+function M.phaseList(top, outcomes, unsplit)
+    local out = {}
+    for x, t in ipairs(top.strikes) do out[x] = t end
+    out.thefts = top.strikes.thefts
+    out.outcomes, out.unsplit = outcomes, unsplit
+    return out
 end
 -- Whether the player's unit `o` (Board.read's) is asleep or berserked once the next player
 -- phase's start ticks it (Board.statusAfter, one start): the army's reply between the
@@ -2569,7 +2636,17 @@ function M.new(outer)
         end
         talks = talks or M.recruitTalks(M.talks(api, sandbox))
         local free = M.freeTalks(mem, talks, S.EventScr_9EEB00, joined)
-        return M.demandsOf(us, commands, mem.u8(S.gPlaySt + PLAY_VISION), free)
+        -- a lock a key may still be needed for: still shut, and some fielded unit's march reaches
+        -- it (s.turnsTo: the game's costs, a closed door's own tile the field's start). With no
+        -- unit on the map yet nothing is known to be out of reach, so every shut lock counts.
+        local blues = {}
+        for _, u in ipairs(us) do
+            if u.faction == "blue" and u.onField then blues[#blues + 1] = u end
+        end
+        local function needed(c)
+            return M.lockNeeded(c, s.terrain(c.x, c.y), blues, s.turnsTo)
+        end
+        return M.demandsOf(us, commands, mem.u8(S.gPlaySt + PLAY_VISION), free, needed)
     end
 
     -- FE8's own march distance to `tile`: GenerateExtendedMovementMap from it, out to
@@ -3277,10 +3354,7 @@ function M.new(outer)
             local addr = mem.u32(S.gUnitLookup + target * 4)
             local t = M.strikeAt(side, id, target, mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP),
                                  byId[target] and byId[target].level)
-            local now = {}
-            for x = 1, #done do now[x] = done[x] end
-            now.thefts = done.thefts
-            now[#now + 1] = t
+            local now = M.chain(done, t)
             standOn(e, side.tile.x, side.tile.y)
             local _, mean = M.odds({ t.takenDist }, t.targetHp)
             -- the target's heal flag is stale when it is of the deciding side (the faction whose
@@ -3310,21 +3384,9 @@ function M.new(outer)
             local q = call(S.GetOffensiveStaffAccuracy, { e.addr, addr }) / 100
             return q, function() M.setStatus(api, Board, addr, act.status) end
         end
-        -- e steals as it decided (#711, M.stealAct): stood on its tile, the item moved from the
-        -- target's bag to its own, as ActionSteal does (a theft never misses). Later enemies
-        -- decide on the board it leaves: a second thief finds the item gone. -> the theft:
-        -- { thief, target, item, lock = true when the target opened a chest before and no
-        -- longer does (GetUnitKeyItemSlotForTerrain, the game's own read) }
+        -- e steals as it decided (#711, M.stealAct, M.pilfer)
         local function pilfer(call, e, act)
-            local addr = mem.u32(S.gUnitLookup + act.target * 4)
-            local chests = M.LOCK_TERRAIN.chests
-            local function opens()
-                return s32(call(S.GetUnitKeyItemSlotForTerrain, { addr, chests })) >= 0
-            end
-            local was = opens()
-            standOn(e, act.tile.x, act.tile.y)
-            local item = M.moveItem(api, Board, addr, act.slot, e.addr)
-            return { thief = e.id, target = act.target, item = item, lock = was and not opens() }
+            return M.pilfer(api, call, S, Board, standOn, e, act)
         end
         return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer
     end
@@ -3345,12 +3407,7 @@ function M.new(outer)
                 if act and act.steal then
                     -- a theft (#711): no strike and no chance, the board changes as it did; the
                     -- way's strikes list carries it (.thefts) for the planner's price
-                    local now = {}
-                    for x = 1, #done do now[x] = done[x] end
-                    now.thefts = {}
-                    for x, th in ipairs(done.thefts or {}) do now.thefts[x] = th end
-                    now.thefts[#now.thefts + 1] = pilfer(call, e, act)
-                    return { lands = 0 }, now
+                    return { lands = 0 }, M.chain(done, nil, pilfer(call, e, act))
                 elseif act then
                     -- a status staff (#674): no strike, its hit a way of its own
                     local q, land = cast(e, act)
@@ -3379,11 +3436,7 @@ function M.new(outer)
         for _, o in ipairs(outcomes) do
             if o.p > top.p then top = o end
         end
-        local out = {}
-        for x, t in ipairs(top.strikes) do out[x] = t end
-        out.thefts = top.strikes.thefts
-        out.outcomes, out.unsplit = outcomes, unsplit
-        return out
+        return M.phaseList(top, outcomes, unsplit)
     end
 
     function s.enemyPhase(plan)
@@ -3761,7 +3814,7 @@ function M.new(outer)
 
     function s.opens(u, terrain)
         return mine("opens" .. terrain, u, function() return sandbox(function(call)
-            return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
+            return M.opensAt(call, S, u.addr, terrain)
         end) end) or false
     end
 

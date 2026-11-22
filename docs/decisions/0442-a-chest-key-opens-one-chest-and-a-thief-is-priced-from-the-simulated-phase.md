@@ -16,9 +16,16 @@ a Lockpick wears out) stays with #693's shopping. Extends ADR 0379 (what a thief
 arrives mid-map"). A Chest Key is one use and opens one chest; vanilla Ch21 has two, and the
 mid-map fetch happened in 1 of 12 attempts (#699). `sight.demandsOf` now counts the tiles a lock
 demand covers (`locks`); `need` stays the openers the team seats, so `Bot.team` is unchanged.
-`takeKeys` wants `locks` keys, less what the fielded bags already open (an item that opens counts
-its `uses`: a Chest Key 1, a Lockpick as many as it has left), and takes from the convoy, one per
-pass, to the unit with the most free slots then, until the want is met or the convoy has no more.
+`locks` counts only a lock a key may still be needed for (`Sight.lockNeeded`): still shut, and
+reached by a fielded unit's march (`sight.turnsTo`, the game's costs); with no unit on the map
+every shut lock counts. A door behind another lock reads unreached and is the mid-map fetch's, and
+a door nobody reaches no longer pulls a spare Door Key into a bag (Ch21's replay took one).
+`takeKeys` wants `locks` uses, less what the fielded bags already open. An item that opens counts
+its `uses` (a Chest Key 1, a Lockpick as many as it has left), and one item's uses are spent once
+across the kinds, the narrowest opener first (a Chest Key answers chests before a Lockpick does), so
+a 3-use Lockpick against 2 chests and 3 doors covers 3 of the 5. The rest is taken from the convoy,
+one item per pass, by the unit with the most free slots then, until the want is met or the convoy
+has no more.
 
 **Part 3: what a thief can take, from the decomp.** The AI thief (class `CA_STEAL`) weighs a steal
 before any attack (`cp_battle.c:44-52`). `AiAttemptStealActionWithinMovement` (`cp_battle.c:377`)
@@ -39,17 +46,28 @@ falls with the item last in its bag; ADR 0379 saw a Ch3 thief give no drop.
 returned a strike or a staff act; a thief's `AI_ACTION_STEAL` came back as nothing, so the thief
 stayed where it stood and the planner never saw the theft. Now:
 
-- `sight.stealAct` reads the decision (target, item slot, tile); `sight.moveItem` does
-  `ActionSteal`'s bag change; `stagePhase`'s `pilfer` stands the thief on its tile, moves the item
-  (so a second thief finds it gone) and reads, with `GetUnitKeyItemSlotForTerrain`, whether the
-  target opened a chest before and no longer does (`lock`). A theft never misses, so it is no
-  branch: it rides on the way's strikes list (`.thefts`) and `enemyPhase` returns it per outcome.
-  The lookahead's first phase applies it too.
-- The planner sets `st.robbed[unit]`: the chance, over the phase's outcomes, that the unit lost its
-  last chest opener. `Goals.chance` multiplies a chest goal's taker by `1 - robbed`. The price is
-  therefore the chest goals' existing worth times the theft's chance; there is no new number. A plan
-  that moves the holder out of the thief's reach, or kills the thief (it is `gone`, so it does not
-  decide), reads no theft. The chest the plan opens this turn (`st.took`) is not priced.
+- `sight.stealAct` reads the decision (target, item slot, tile). `sight.pilfer` stands the thief on
+  its tile, moves the item with the game's own `UnitRemoveItem` and `UnitAddItem` through `call`
+  (ADR 0369; `sight.moveItem`, which also clears the target's `US_DROP_ITEM` when the slot was its
+  last item, as `ActionSteal` does), so a second thief finds the item gone, and reads whether the
+  target opened a chest before and no longer does (`lock`, `GetUnitKeyItemSlotForTerrain` through
+  `sight.opensAt`, the one owner of that read). A Chest Key, a Door Key or a Lockpick can all be
+  stolen (all are on the list, `cp_data.c:921`) and all are priced the same way: whichever item
+  was the holder's last chest opener sets `lock`. A theft never misses, so it is no branch: it
+  rides on the way's strikes list (`.thefts`, carried by `sight.chain`) and `enemyPhase` returns it
+  per outcome (`sight.phaseList`). The lookahead's first phase applies it too.
+- The planner keeps, per unit a theft robs of its last chest opener in some outcome, the chance
+  `st.opens` that it lives AND keeps an opener, summed per outcome: a way where the thief also kills
+  the holder is not counted twice. `Goals.chance` takes a chest goal's taker at `p.opens`. The price
+  is therefore the chest goals' existing worth times the theft's chance; there is no new number. A
+  plan that moves the holder out of the thief's reach, or kills the thief (it is `gone`, so it does
+  not decide), reads no theft. The chest the plan opens this turn (`st.took`) is not priced.
+- After a theft the thief holds the key in game memory. The reads that could see it stale do not:
+  the simulated phase's later enemies decide through the game's own AI on that memory
+  (`aiDecide`); `units()` inside a sandbox is read fresh and dropped (`sight.lua:2561`); the
+  closings replay is keyed by the turn and decides by `aiDecide` (`sight.lua:3743`), and a real
+  theft happens in the enemy phase, so the next player turn's key is new; and `M.opensChests` is
+  asked only of a wave's units not yet loaded (`sight.lua:3777`), never of a thief.
 - A plan with no thief able to steal scores as before: `thefts` is empty and `lock` never set.
 
 **Not built (reported on #711).** (1) A thief carrying a stolen item as a goal. Killing the thief
@@ -60,8 +78,19 @@ as its own change. (2) Doors: a stolen Lockpick also
 costs the doors the holder opens, but a door is a way (`turnsTo`), not a goal, so only the chests are
 priced. (3) A theft in the lookahead's second phase is played on the board but not priced.
 
-**Evidence.** Unit tests (each fails on the code before this change): `Bot.supply` takes two Chest
-Keys for two chest tiles, and one key where a one-use Lockpick is held; `Sight.demandsOf` counts a
-demand's `locks`; a planner fixture moves a Lockpick holder off the tile the fixture's thief steals
-from, and leaves a holder whose stolen item opens nothing where it was. `Sight.stealAct` and
-`Sight.moveItem` read and move on a fake memory. The replay is on #711's PR.
+**Evidence.** Unit tests, each mutated to fail: `Bot.supply` takes two Chest Keys for two chest
+tiles, one where a one-use Lockpick is held, and shares a Lockpick's uses across chests and doors;
+`Sight.demandsOf` counts `locks` and `Sight.lockNeeded` drops the shut-out; a planner fixture moves
+a Lockpick or Chest Key holder out of the thief's reach, counts a robbed-and-killed way once, and
+leaves a holder whose stolen item opens nothing where it was; `Goals.chance` reads `p.opens`;
+`Sight.pilfer`, `moveItem`, `chain` and `phaseList` run on fake memory and a fake `call`.
+`nextPhase`'s own theft branch (it applies `pilfer` and records the move) has no test of its own.
+
+**Replays** (ADR 0430's one game each; both on vanilla, before the review's fixes above):
+- `fix711`, Ch16 `b640e-cs-s4009` attempt 1: won in 22 turns, 0 deaths, not clean (the original:
+  14 turns). It diverged at turn 1 from the extra prep key. The misses are #714's pattern (Colm
+  pinned at (2,17) and (2,18)); the lock factor was 1 throughout, so no Lockpick theft was priced.
+- `fix711b`, Ch21 `s4003` attempt 1: prep took two Chest Keys and opened one chest more than the
+  original, but the game ended stuck after 44 turns.
+Neither is a before-and-after of the theft price: the bot changed since #699's measurement, and no
+main replay controlled for it.
