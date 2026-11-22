@@ -72,7 +72,7 @@
 -- whose death it risks. `closes` is what the plan does in the judged phase, each a chance
 -- over its judged branches: { win (the chapter ends), took = { [goal id] = true }, lost =
 -- { [recruit unit id] = chance it dies }, loose = { [unit id] = true } (owed recruits no one may
--- Talk yet, no row: their death alone forfeits "owed:<id>", the part a win outlasts), reach =
+-- Talk yet and whose death is not the win, no row: their death alone forfeits "owed:<id>"), reach =
 -- { [goal id] = { before, after } }, gone }.
 -- Counted conservatively (FR-014): a goal is lost when it is lost in any branch with p > 0, so
 -- any chance at all is the whole goal. A win
@@ -332,13 +332,13 @@ function M.forfeited(ledger, goals, closes)
         if r.status == "feasible" and gone then out[#out + 1] = r.id end
     end
     -- an owed recruit no player unit may Talk yet (closes.loose, a set of unit ids: the planner's
-    -- looseRecruits) has no row, so its death is a forfeit of its own, "owed:<unit id>": the same
-    -- consequence as a recruit with a talker (#730 fix 2, ADR 0452). Its death only, and not the
-    -- part of it a win outlasts: the plan whose kill ends the chapter (a Rout's last red, the boss)
-    -- forfeits nothing, the win being what a talker row's stall release gives; and a win does not
-    -- close it, or a row nobody can take would hold the Seize for good
+    -- looseRecruits, less the ones whose death is the win itself: the Defeat-boss boss, a Rout's
+    -- last red, which the planner leaves out) has no row, so its death is a forfeit of its own,
+    -- "owed:<unit id>": the same consequence as a recruit with a talker (#730 fix 2, ADR 0452).
+    -- Its death only: a win does not close it (an unrelated one, a Seize, does not release it
+    -- either), or a row nobody can take would hold the Seize for good
     for id in pairs(closes.loose or {}) do
-        if (lost[id] or 0) * (1 - (closes.win or 0)) > M.DUST then out[#out + 1] = "owed:" .. id end
+        if (lost[id] or 0) > M.DUST then out[#out + 1] = "owed:" .. id end
     end
     table.sort(out)
     return out

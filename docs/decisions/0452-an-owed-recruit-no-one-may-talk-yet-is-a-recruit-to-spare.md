@@ -45,15 +45,18 @@ that let her kill a healer (0.82). The talker recruit's goal term still runs in 
 older than this change and is filed apart, not changed here.
 
 **A win by the kill does not forfeit it.** Decided by the coordinator, 2026-11-22. A loose unit
-whose death is the win (a Defeat-boss boss, a Rout's last red) would otherwise make every
-winning plan forfeit `owed:<id>` while a hold forfeits 0, and with no ledger row GOAL_QUIET's
-stall could never release it: the bot would hold for good. A talker recruit's row is released by
-that stall; for a unit with no row the equivalent is that the plan whose kill ends the chapter
-forfeits nothing, the win ending the chapter. A score's `fx.win = kill` (the boss) is set for a
-loose boss because it keeps the red path.
+whose death is the win (a Defeat-boss boss, a Rout's last red) would otherwise make every winning
+plan forfeit `owed:<id>` while a hold forfeits 0, and with no ledger row GOAL_QUIET's stall could
+never release it: the bot would hold for good. A talker recruit's row is released by that stall; for
+a unit with no row the equivalent is that the unit whose death is the win forfeits nothing. The
+planner reads which unit that is (`winByDeath`: the win boss, or the last red after the plan's
+kills), not the chance arithmetic: `win * (1 - kill)` left a residue over `Goals.DUST` for a 90%
+kill. Any other win (a Seize, another boss) does not release a loose unit the plan also fells.
+`fx.win = kill` is set for a loose boss because it keeps the red path.
 
 **Why no ledger row.** A row nobody can take would stay feasible and hold the Seize for good, so
-only the death counts; a win does not close `owed:<id>`.
+only the death counts; a win does not close `owed:<id>` (this is about the forfeit; the value
+follows the talker's `(1 - pWin)` discount, pinned by a test).
 
 **What it does not do.** No new weight and no change to any board without such a unit. A talker
 whose row is not feasible (stalled, unknown, absent) gets no price, as before: such a row means

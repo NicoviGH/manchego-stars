@@ -361,11 +361,13 @@ local function sortedKeys(set)
     local ks = {}
     for k in pairs(set) do ks[#ks + 1] = k end
     table.sort(ks, function(a, b)
-        if type(a) == type(b) then return a < b end
-        return tostring(a) < tostring(b)
+        local ta, tb = type(a), type(b)
+        if ta ~= tb then return ta < tb end   -- a total order: by type first, then within it
+        return a < b
     end)
     return ks
 end
+M.sortedKeys = sortedKeys
 
 -- What losing unit `charId` costs: the chapter, for one whose death ends the game (its death
 -- sets EVFLAG_GAMEOVER, a lord's: sight.objective.gameOver), else one unit's death.
@@ -1116,6 +1118,17 @@ function M.plan(Bot, board, sight, style, opts)
         if objective ~= "rout" then return st.win end
         return redsLeft(st) == 0 and 1 or 0
     end
+    -- Whether `id`'s death is the plan's win (#730 fix 2, ADR 0452): the Defeat-boss boss, or a
+    -- Rout's last red (no other red left after the plan's kills). The one reading of "this unit's
+    -- death ends the chapter" a loose recruit's forfeit is released by; an unrelated win (a
+    -- Seize, another boss) does not release it.
+    local function winByDeath(st, id)
+        local e = byId[id]
+        if not e or e.faction ~= "red" then return false end
+        if objective == "boss" then return M.isWinBoss(e, winBoss) end
+        if objective == "rout" then return redsLeft(st) - (st.gone[id] and 0 or 1) <= 0 end
+        return false
+    end
     -- `alive` (the judge's): each unit's chance to live the phase; `felled`: each recruit's
     -- chance our counter killed it; `fell`: the chance a player counter ended the chapter in
     -- the phase (the boss, or a Rout's last enemy, striking and dying: vanilla Ch5 attempt 8's
@@ -1272,7 +1285,7 @@ function M.plan(Bot, board, sight, style, opts)
                 -- walk to Ross never reached the beam, and Ross died on turn 4)
                 local alone = { acts = { a }, took = fx.took and { [fx.took] = true } or {},
                                 recruitHit = fx.recruitHit and { [fx.recruitHit.id] = fx.recruitHit.p } or {},
-                                win = fx.win or 0, gone = gone, loose = start.loose }
+                                win = fx.win or 0, gone = gone }
                 scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, gone) + goalTerm(alone) }
                 a.own = scored[#scored].v   -- the advance's tie-break
             end
@@ -2337,8 +2350,12 @@ function M.plan(Bot, board, sight, style, opts)
         for _, g in ipairs(greens) do
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
+        local looseHeld = {}   -- the loose recruits whose death is not the win
+        for id in pairs(st.loose) do
+            if not winByDeath(st, id) then looseHeld[id] = true end
+        end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost, loose = st.loose,
+                                                       lost = lost, loose = looseHeld,
                                                        reach = reached(st),
                                                        gone = M.GONE })
         local gain = progress(st)

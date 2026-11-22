@@ -10333,6 +10333,57 @@ do
           "owed: the kill that is the one admitted plan reaches the judge and is played")
 end
 
+-- A loose unit whose death IS the win forfeits nothing, whatever the kill's chance; an unrelated
+-- win does not release it (#730 fix 2 re-review, ADR 0452). The release reads which unit's death
+-- is the win (Planner winByDeath), not the chance arithmetic: a 90% kill of the loose boss left
+-- `kill * (1 - kill)` over DUST once.
+do
+    local owed = { owedRecruits = { [0x81] = true } }
+    local A = blue(0x01, 0, 0, 0, { minRange = 1, maxRange = 1 })
+    local B1 = red(0x81, 1, 0, { hp = 10, minRange = false, isBoss = true })
+    local o = { objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }) },
+                fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 90, dmg = 30, hits = 1,
+                                                            killsTarget = true } } } } }
+    local a, plan = Planner.plan(B, boardOf(A, B1), sightOf(o), gifted("bold", 10000), owed)
+    check((a and a.act) .. " " .. #(plan and plan.forfeited or { 1 }), "attack 0",
+          "owed boss: a likely kill of the loose boss is played and forfeits nothing")
+    -- an unrelated win: another boss (0x82) dies to B, while A's blow also fells the loose R
+    local R = red(0x81, 1, 0, { hp = 10, minRange = false })
+    local Bs = red(0x82, 6, 5, { hp = 10, minRange = false, isBoss = true })
+    local A2 = blue(0x02, 1, 5, 5, { minRange = 1, maxRange = 1 })
+    o = { objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 5, 5 }) },
+          fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } } },
+                 [0x02] = { [0x82] = { ["5,5"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } } } } }
+    local _, p = Planner.plan(B, boardOf(A, A2, R, Bs), sightOf(o), gifted("bold", 10000), owed)
+    local both
+    for _, c in ipairs(p and p.considered or {}) do
+        local n = 0
+        for _, x in ipairs(c.acts) do
+            if x:find(">attack@", 1, true) then n = n + 1 end
+        end
+        if n == 2 then both = c.rank.forfeits end
+    end
+    check(both, 1, "owed boss: the plan that fells the loose unit while another boss's death wins still forfeits it")
+
+    -- the value follows the talker's discount: the plan that wins (the boss killed) pays the loose
+    -- unit's death's worth of the chance it stays, (1 - pWin) of it
+    local plain
+    _, plain = Planner.plan(B, boardOf(A2, red(0x81, 9, 9, { hp = 10, minRange = false }), Bs),
+                            sightOf({ objective = { kind = "boss" }, reach = { [0x02] = tiles({ 5, 5 }) },
+                                      fc = o.fc }), gifted("bold", 10000))
+    local withOwed
+    _, withOwed = Planner.plan(B, boardOf(A2, red(0x81, 9, 9, { hp = 10, minRange = false }), Bs),
+                               sightOf({ objective = { kind = "boss" }, reach = { [0x02] = tiles({ 5, 5 }) },
+                                         fc = o.fc }), gifted("bold", 10000), owed)
+    check(math.abs((plain.judged - withOwed.judged) - Planner.WEIGHTS.bold.death) < 1e-6, true,
+          "owed: a winning plan pays the loose unit a death's worth times (1 - pWin), the talker's discount")
+    -- sortedKeys: one total order for mixed keys (numbers by value, then strings)
+    local ks = Planner.sortedKeys({ [10] = true, [9] = true, ["1x"] = true, ["a"] = true,
+                                    [11] = true, ["2y"] = true, ["10x"] = true, [100] = true })
+    check(table.concat(ks, ","), "9,10,11,100,10x,1x,2y,a",
+          "sortedKeys: mixed keys come out in one total order")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
