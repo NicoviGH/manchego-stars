@@ -8103,6 +8103,122 @@ do
 end
 
 
+-- test_a_plan_that_leaves_a_village_out_of_reach_forfeits_it (#714, ADR 0450): the looter takes
+-- (10,0) after enemy phase 3. A (MOV 5) at (0,4) is 2.8 turns from it: unacted it arrives on
+-- phase 3 in time (chance 0.75, over GONE); once it has acted it is a phase late, so waiting
+-- there drives the chance to 0 with the deadline still two enemy phases away, which the
+-- one-phase test never counted. (4,4) is 2 turns from it and keeps the chance.
+do
+    local X = red(0x81, 14, 9, { minRange = false })
+    local function played(start, dies, ...)
+        local A = blue(0x01, 0, start[1], start[2], { minRange = false })
+        local o = {
+            reach = { [0x01] = tiles(...) },
+            field = function(goal)
+                local f = {}
+                for y = 0, 9 do
+                    f[y] = {}
+                    for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+                end
+                return f
+            end,
+            explorable = { { x = 10, y = 0, kind = "visit" } },
+            canExplore = { [0x01] = { ["10,0"] = "visit" } },
+            closings = { ["10,0"] = 3 },
+            enemyPhase = function()
+                if not dies then return {} end
+                return { { enemy = 0x81, target = 0x01, takenHit = 100, takenDmg = 99, takenHits = 1,
+                           takenCrit = 0, targetHp = A.hp } }
+            end,
+        }
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
+        local g
+        for _, r in ipairs(plan and plan.goalWorth or {}) do
+            if r.id == "visit:10,0" then g = r end
+        end
+        return at(a) .. " " .. table.concat(plan and plan.forfeited or {}, ",") .. " "
+            .. string.format("%.2f>%.2f", g and g.before or -1, g and g.after or -1)
+    end
+    check(played({ 0, 4 }, false, { 0, 4 }), "0,4 visit:10,0 0.75>0.00",
+          "forfeits: waiting where the village's chance falls from over GONE to 0 loses it")
+    check(played({ 0, 4 }, false, { 0, 4 }, { 4, 4 }), "4,4  0.75>0.72",
+          "forfeits: and the plan that keeps it in reach is the one played")
+    -- the taker's own death is the cap's count, not a forfeit (ADR 0384): the village is in reach
+    -- from (4,4), and the chance read with survival is 0
+    local dies = played({ 4, 4 }, true, { 4, 4 })
+    check(dies, "4,4  0.85>0.00",
+          "forfeits: a village in reach is not forfeit because its only taker may die")
+end
+
+-- test_an_undated_goal_out_of_reach_is_not_forfeit (#714, ADR 0450): the village's field has no
+-- way from (0,4), so a unit waiting there reads its chance at 0 (from 0.77 at (4,4)). With a
+-- looter's closing phase that is a forfeit; with none (no deadline) it is not.
+do
+    local X = red(0x81, 14, 9, { minRange = false })
+    local function ranked(closings)
+        local A = blue(0x01, 0, 4, 4, { minRange = false })
+        local o = {
+            reach = { [0x01] = tiles({ 0, 4 }) },
+            field = function(goal)
+                local f = {}
+                for y = 0, 9 do
+                    f[y] = {}
+                    for x = 0, 14 do
+                        if not (x == 0 and y == 4) then
+                            f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y)
+                        end
+                    end
+                end
+                return f
+            end,
+            explorable = { { x = 10, y = 0, kind = "visit" } },
+            canExplore = { [0x01] = { ["10,0"] = "visit" } },
+            closings = closings,
+            enemyPhase = function() return {} end,
+        }
+        local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 1000))
+        for _, c in ipairs(plan and plan.considered or {}) do
+            if c.rank.key:find("@0,4", 1, true) then return c.rank.forfeits end
+        end
+    end
+    check(ranked({ ["10,0"] = 3 }), 1, "forfeits: a dated village cut off by the plan is lost")
+    check(ranked({}), 0, "forfeits: the same cut-off village with no deadline is not")
+end
+
+-- test_a_goal_lost_by_its_deadline_no_longer_holds_the_seize (#714, ADR 0450): the lord can Seize
+-- now. A village a looter takes after phase 3 is out of reach by then from where he stands once he
+-- has acted (13 tiles, 2.6 turns: a phase late), so every plan forfeits it, the Seize included
+-- (the win closes it). They tie on forfeits and the Seize wins on `complete`: it is played, and
+-- botrun's seize-skip reading has no skip to call. Without the rule the waiting plan forfeited
+-- nothing and the village justified holding the Seize.
+do
+    local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+    local Z = red(0x83, 14, 14, { minRange = false })
+    local o = {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x01] = tiles({ 4, 3 }, { 4, 4 }) },
+        field = function(goal)
+            local f = {}
+            for y = 0, 9 do
+                f[y] = {}
+                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+            end
+            return f
+        end,
+        explorable = { { x = 14, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["14,0"] = "visit" } },
+        closings = { ["14,0"] = 3 },
+        enemyPhase = function() return {} end,
+    }
+    local a, plan = Planner.plan(B, boardOf(L, Z), sightOf(o), gifted("bold", 100))
+    local wait
+    for _, c in ipairs(plan and plan.considered or {}) do
+        if not c.seizes then wait = wait or c.rank end
+    end
+    check(wait and wait.forfeits, 1, "seize: the waiting plan forfeits the village out of reach")
+    check(a and a.act, "seize", "seize: so the village no longer holds the Seize back")
+end
+
 -- test_a_counter_that_kills_the_boss_is_the_win: at (1,0) the boss strikes A and A's counter
 -- kills it in the enemy phase -- the chapter ends there, closing the village. Careful keeps A
 -- at (1,1), out of the boss's reach, while the village is open (vanilla Ch5 attempt 8: the

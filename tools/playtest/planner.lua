@@ -976,6 +976,37 @@ function M.plan(Bot, board, sight, style, opts)
     -- the completion ledger (FR-014): what is still to get at this decision, for the rank's
     -- forfeits and botrun's seize skips
     local ledger = Goals.ledger(goals, sight, style, ctx, before)
+    -- the chance of each dated, feasible ledger goal (the only rows `forfeited` reads this for) on
+    -- the board a plan leaves, by reaching it alone: no unit's survival, no win, no opener's
+    -- chance (a chest opener's death or theft is the cap's and the theft price's, ADR 0384, 0442;
+    -- p.opens = nil), so a 0 here is the goal out of reach by its deadline (ADR 0450)
+    -- -> { [goal id] = { before, after } }, `before` the decision's. Empty (no read at all) when the
+    -- ledger has no such row.
+    local dated = {}
+    do
+        local feasible = {}
+        for _, r in ipairs(ledger) do
+            if r.status == "feasible" then feasible[r.id] = true end
+        end
+        for _, g in ipairs(goals) do
+            if g.closes ~= nil and g.kind ~= "objective" and feasible[g.id] then
+                dated[#dated + 1] = g
+            end
+        end
+    end
+    local function reached(st)
+        local out = {}
+        if #dated == 0 then return out end
+        local pos = positions(st)
+        for _, p in pairs(pos) do p.opens = nil end
+        local read = turnsOn(st, pos)
+        for _, g in ipairs(dated) do
+            if not st.took[g.id] then
+                out[g.id] = { before = before[g.id], after = chanceOf(st, g, pos, read) }
+            end
+        end
+        return out
+    end
     -- the progress signal's near half (#510 fwd1 item C; botrun's rules read it): how near the objective's
     -- nearest unit is, and each still-feasible or stalled ledger goal's best taker, in turns (a
     -- stalled row stays read: a new low there makes it feasible again, ADR 0403). Goals.chance
@@ -2286,7 +2317,8 @@ function M.plan(Bot, board, sight, style, opts)
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost })
+                                                       lost = lost, reach = reached(st),
+                                                       gone = M.GONE })
         local gain = progress(st)
         local greenDie = 0
         for _, g in ipairs(greens) do

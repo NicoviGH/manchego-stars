@@ -10,7 +10,7 @@ issues: [714, 699, 510]
 
 **Decided (#714), #510 step 9. Half of #714: the candidate list.** The other half (a goal driven to
 0 before its deadline counting in `forfeits`, `planner.lua`, `goals.lua`) changes how every plan is
-scored and stays open on the issue. The risk cap stays (Nicolas, #699 comment 7071632376): this
+scored and is ADR 0450. The risk cap stays (Nicolas, #699 comment 7071632376): this
 finds the goalward tile under it, it does not raise it. Extends ADR 0396's candidate list; its five
 tests are met: the act is a `wait`, the game forbids nothing new, and no rule orders the outcomes.
 

@@ -371,6 +371,28 @@ do
                                                lost = { [0x90] = 0.01 } })),
           "recruit:144", "forfeits: a recruit killed in any branch with p > 0 is lost")
 
+    -- #714, ADR 0450: a plan that leaves a DATED goal out of reach by its deadline, from a chance
+    -- of at least `gone` before it, counts it (visit:14,9 as a dated goal, a looter after phase 3)
+    local took = { ["visit:4,0"] = true }
+    local dated, undated = {}, {}
+    for k, g in ipairs(goals) do
+        dated[k], undated[k] = g, g
+        if g.id == "visit:14,9" then
+            dated[k] = setmetatable({ closes = 3 }, { __index = g })
+        end
+    end
+    local function reachOf(b, a) return { ["visit:14,9"] = { before = b, after = a } } end
+    local function lostBy(gs, b, a)
+        return ids(Goals.forfeited(ledger, gs, { win = 0, took = took, gone = 0.5,
+                                                 reach = reachOf(b, a) }))
+    end
+    check(lostBy(dated, 0.6, 0), "visit:14,9", "forfeits: a dated goal out of reach by its deadline")
+    check(lostBy(dated, 0.3, 0), "", "forfeits: one that was never likelier than not loses nothing")
+    check(lostBy(dated, 0.9, 0.2), "", "forfeits: a chance left above none is not lost")
+    check(lostBy(undated, 0.6, 0), "", "forfeits: a goal with no deadline is never lost this way")
+    check(not pcall(Goals.forfeited, ledger, dated, { win = 0, reach = reachOf(0.6, 0) }), true,
+          "forfeits: reach without gone is an error, not a silent no-op")
+
     -- a sight with no read of who may use a tile, or when it closes
     local blind = fakeSight({ open = open })
     blind.closings = nil

@@ -70,11 +70,20 @@
 -- Goals.forfeited(ledger, goals, closes) -> the sorted ids of the feasible rows a plan loses
 -- for good (FR-011's forfeits), `closes` what the plan does in the judged phase, each a chance
 -- over its judged branches: { win (the chapter ends), took = { [goal id] = true }, lost =
--- { [recruit unit id] = chance it dies } }. Counted conservatively (FR-014): a goal is lost
--- when it is lost in any branch with p > 0, so any chance at all is the whole goal. A win
+-- { [recruit unit id] = chance it dies }, reach = { [goal id] = { before, after } }, gone }.
+-- Counted conservatively (FR-014): a goal is lost when it is lost in any branch with p > 0, so
+-- any chance at all is the whole goal. A win
 -- closes every goal the plan does not take; a recruit's death closes its Talk; a looter's
 -- closing after this phase (`closes` 1) closes a tile the plan does not take; a reward closes
--- with any goal it needs. A unit whose death ends the game closes nothing here: its risk is
+-- with any goal it needs. So does a plan that leaves a DATED goal (g.closes set) out of reach by
+-- its deadline: `reach[id]` is the goal's chance read from reaching it alone (Goals.chance on
+-- the board before the plan, `before`, and the board it leaves, `after`: no survival or win
+-- weight, which are the cap's and the win's own counts), and the goal counts when `before` was
+-- at least `gone` (the planner's M.GONE) and `after` is none. That 0.5 floor is a deliberate
+-- exception to "any chance at all is the whole goal": this reading comes from the chance model,
+-- not the game's rules, so a goal that was never likelier than not is not marked lost by it
+-- (#714, ADR 0450). `reach` and `gone` come together. A unit whose death ends the game closes
+-- nothing here: its risk is
 -- admission's, within the style's cap, and counted again as a forfeit the plan whose lord is
 -- at 0% would beat every plan that puts it in danger (Nicolas, 2026-11-02: ADR 0384).
 
@@ -302,11 +311,15 @@ end
 function M.forfeited(ledger, goals, closes)
     local took, lost, shut = closes.took or {}, closes.lost or {}, {}
     local wins = (closes.win or 0) > M.DUST
+    assert((closes.reach == nil) == (closes.gone == nil), "forfeited: reach and gone come together")
+    local reach = closes.reach or {}
     for _, g in ipairs(goals) do
         if g.kind ~= "objective" and not took[g.id] then
             shut[g.id] = wins
                 or (g.kind == "recruit" and (lost[g.unitId] or 0) > M.DUST)
                 or (g.closes ~= nil and g.closes <= 1)
+                or (g.closes ~= nil and reach[g.id] ~= nil and reach[g.id].before >= closes.gone
+                    and reach[g.id].after <= M.DUST)
         end
     end
     local out = {}
