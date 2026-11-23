@@ -23,7 +23,11 @@ and start a fresh instance; don't rely on auto-compaction.
   - Fog deaths are 26 of the 183 player deaths, all in Ch19. Over-the-cap deaths are 106 (58%).
   - Fix 4's case, several hidden strikers that kill only together, is 10 deaths. Fog only breaks ties, so it would likely change no play.
   - Not built; recommended to Nicolas to stop the fog line here.
-- **Then, in order:** #734, #730 fix 3, #739, and the `attempts` set on #699's starts (`m699c<N>`).
+- **Measured the batch (#699 comment 7093112364, tags `m740c<N>`, main a4a55371):** 7 of 34 campaigns clean within 3 attempts, against `m699c`'s 1 of 34.
+  - Over-cap deaths are now 68% of player deaths (108 of 158).
+  - **Next:** root-cause Ch14's Rennac (0x1C) miss from the `m740c14` traces before building anything. It blocks all 5 Ch14 pairs. Every fix is sized against all the deaths before it is recommended (Nicolas, 2026-11-22).
+  - Then size Ch10 (the village plus Amelia: 5 pairs) and Ch16's chests (3). #734, #730 fix 3 and #739 wait until they are sized.
+  - Cause 4's ally ruling is not in the recorder yet (no ADR 0376 amendment). It is a certain record fix, but it frees no pair now.
 - Reviewer worktrees in `.claude/worktrees/` (untracked) can be deleted.
 
 *Before that (2026-11-23, evening; fix 3 built, not merged):* see #713 comments 7087475499, 7089185979.
