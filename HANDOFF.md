@@ -12,15 +12,15 @@ and start a fresh instance; don't rely on auto-compaction.
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
 **Next session starts here (2026-11-23; main is 04bf54f0 + HANDOFF).**
-- **The work order lives on the roadmap board,** https://github.com/users/NicoviGH/projects/2 (ADR 0457). Use its "Roadmap" view (one column per Status) or "Ranked list". It is not restated here. `make tidy` fails on any open #640 issue that is not on the board.
+- **The work order is #699's fix list** (status comment 7066011205): nine fixes, worked top-down. The roadmap Project was retired (Nicolas, 2026-11-23: it moved the backlog instead of shrinking it); PR #749 reverted #748 and the Project is closed.
 - **Results in (checked, on the issues):**
   - **#743 (comment 7109461427):** the trap is real for the unit in 4 of 4 deaths, but an alternative improved the army in only 2. The second-phase read is blind (0 for a unit that dies next turn), so scoring by it is off the table. Next: why the read is blind. Hook: `review/743-force-plan-hook.patch`.
-  - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Nicolas approved the 0.05 floor plus the under-cap exemption: build it next. #658's one-replay door test is approved too. Keep lord-first. Variants: `review/744-rule-variants.patch`.
+  - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Nicolas approved the 0.05 floor plus the under-cap exemption: built as PR #750 (ADR 0458), in review; replays on #744 comment 7111745048 (all three Ch21 bait deaths gone). #658's one-replay door test is approved too. Keep lord-first. Variants: `review/744-rule-variants.patch`.
 - **Nicolas's calls this session:**
   - Size a fix against all the deaths before recommending it.
   - Retries learn what happened (#741). The guide claims are removed once that lands, and attempt 1 plays with no guide.
   - The verdict counts attempts to the first clean clear (#742).
-  - The order lives on the GitHub roadmap.
+  - The order lives on #699's fix list (the roadmap Project is retired).
 - **Measurement:** `m740c` (#699 comment 7093112364): 7 of 34 campaigns clean. Root causes: comment 7106711753.
 
 *Before that (2026-11-23, evening; fix 3 built, not merged):* see #713 comments 7087475499, 7089185979.

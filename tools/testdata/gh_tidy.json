@@ -9,24 +9,6 @@
    "parent": null,
    "comments": {
     "nodes": []
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
-     }
-    ]
    }
   },
   {
@@ -40,24 +22,6 @@
    },
    "comments": {
     "nodes": []
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
-     }
-    ]
    }
   },
   {
@@ -68,12 +32,6 @@
    },
    "parent": null,
    "comments": {
-    "nodes": []
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
     "nodes": []
    }
   },
@@ -88,24 +46,6 @@
    },
    "comments": {
     "nodes": []
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
-     }
-    ]
    }
   },
   {
@@ -117,12 +57,6 @@
    "parent": null,
    "comments": {
     "nodes": []
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": []
    }
   },
   {
@@ -133,12 +67,6 @@
    },
    "parent": null,
    "comments": {
-    "nodes": []
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
     "nodes": []
    }
   },
@@ -164,24 +92,6 @@
       "updatedAt": "2026-11-18T00:00:00Z"
      }
     ]
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
-     }
-    ]
    }
   },
   {
@@ -204,24 +114,6 @@
       "body": "**ON HOLD (Nicolas, 2026-11-03).** why",
       "createdAt": "2026-11-03T00:00:00Z",
       "updatedAt": "2026-11-03T00:00:00Z"
-     }
-    ]
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Parked"
-      }
      }
     ]
    }
@@ -256,24 +148,6 @@
       "updatedAt": "2026-11-21T14:00:00Z"
      }
     ]
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
-     }
-    ]
    }
   },
   {
@@ -298,24 +172,6 @@
       "body": "### Status (edited in place, 2026-11-21)",
       "createdAt": "2026-11-21T09:00:00Z",
       "updatedAt": "2026-11-21T12:00:00Z"
-     }
-    ]
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
      }
     ]
    }
@@ -344,262 +200,6 @@
       "updatedAt": "2026-11-21T13:00:00Z"
      }
     ]
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Next"
-      }
-     }
-    ]
-   }
-  },
-  {
-   "number": 930,
-   "title": "Bot: not on the roadmap",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 640
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 7,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Now"
-      }
-     }
-    ]
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 931,
-   "title": "Bot: on the roadmap, no phase",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 640
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": null
-     }
-    ]
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 932,
-   "title": "Bot: a grandchild not on the roadmap",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 699,
-    "parent": {
-     "number": 640,
-     "parent": {
-      "number": 510
-     }
-    }
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": []
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 933,
-   "title": "Bot: parked without the label",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 640
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Parked"
-      }
-     }
-    ]
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 934,
-   "title": "Bot: nested too deep to read",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 960,
-    "parent": {
-     "number": 961,
-     "parent": {
-      "number": 962,
-      "parent": {
-       "number": 963,
-       "parent": {
-        "number": 964
-       }
-      }
-     }
-    }
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": []
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 935,
-   "title": "Bot: on another owner's project 2",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 640
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 2,
-       "owner": {
-        "login": "someone-else"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Now"
-      }
-     }
-    ]
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 936,
-   "title": "Bot: on too many projects to read",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 640
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": true
-    },
-    "nodes": [
-     {
-      "project": {
-       "number": 9,
-       "owner": {
-        "login": "NicoviGH"
-       }
-      },
-      "fieldValueByName": {
-       "name": "Now"
-      }
-     }
-    ]
-   },
-   "comments": {
-    "nodes": []
-   }
-  },
-  {
-   "number": 937,
-   "title": "Bot: four levels under another epic",
-   "labels": {
-    "nodes": []
-   },
-   "parent": {
-    "number": 970,
-    "parent": {
-     "number": 971,
-     "parent": {
-      "number": 972,
-      "parent": {
-       "number": 973,
-       "parent": null
-      }
-     }
-    }
-   },
-   "projectItems": {
-    "pageInfo": {
-     "hasNextPage": false
-    },
-    "nodes": []
-   },
-   "comments": {
-    "nodes": []
    }
   }
  ],
