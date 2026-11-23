@@ -11,12 +11,12 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23, late; main is 0bfe6b1b + HANDOFF).**
+**Next session starts here (2026-11-23, night; main is 53fc723b + HANDOFF).**
 - **The work order is #640's sub-issues: #752 (nobody dies, the enemy forecast), then #753 (every reward), then #754 (the chapter ends)**; within each, its own sub-issue list. Step 10 is #751, a child of #510. The roadmap Project was retired (Nicolas, 2026-11-23: it moved the backlog instead of shrinking it); PR #749 reverted #748 and the Project is closed.
-- **In flight: #743, the plan is comment 7116037866 (Nicolas approved). Do its steps in order:**
-  1. **Cut PR #755** (branch `feat/743-wounded-read`, head 99d91bf7; CI green, reviewed with `review-to-clean`: every finding fixed and re-reviewed) down to the two bug fixes. Keep the sandbox strike's weapon equip (`sight.lua` `M.strikeLedger`, `M.strikeWear` through `M.armAsPlanned`) and the berserked striker left unequipped. Revert the `carries()` widening in `planner.lua` and its `test_bot.lua` tests. Rewrite ADR 0459 to match, keep the 0389 note, and drop the 0421 note. Then tests, CI, and ask Nicolas to "merge".
-  2. **Calibration of the read past the first phase,** from the m740c traces, no runs: bucket `protected[].second`, or the wear's `phases` > 1, against whether the unit died in that window.
-  3. **Post the table on #743** with one recommendation (fog, the first phase's hit spread, or heals in the reply), then stop for his call. No ranking change and no new games before that.
+- **In flight: #743, the plan is comment 7116037866 (Nicolas approved). Steps 1 to 3 are done; waiting on Nicolas:**
+  1. **PR #755 is cut** to the two bug fixes (head a54c8b6d, rebased on main, CI green for the head, `make test` green; the two equip tests fail on main's `sight.lua`). ADR 0459 is rewritten as "A sandbox strike equips its weapon"; the 0421 note is dropped, the 0389 note kept. The cut reverted reviewed code to main and rewrote the ADR; no fresh `/code-review` was run on the cut. **Needs Nicolas's "merge".**
+  2. **Calibration posted on #743 (comment 7116614727; scripts `review/743-size/wear_calib.py`, `why.py`):** of 172 reads over 15% past the first phase, 9 died. 43 of 141 over-read survivors were healed in our reply. The 20 deaths at a second-phase read of 0 were seen over the cap by the next turn's own plan (15) or were dice (5); none was fog.
+  3. **Recommendation posted: heals in the reply first.** No ranking change and no new games until Nicolas decides.
   - **Why the change:** the one-phase read is calibrated; the read past it is not, in either direction. #755's widening saved no unit and moved a Ch21 choice on a 57.5% no-heal read of Ephraim, for +12.6% CPU. Evidence: #743 comments 7113390219 (three gaps), 7113644701 (sizing, corrected), 7116037866 (the plan), and PR #755's body.
   - **Lessons:**
     - The lookahead's trace has two readers: `lookahead.calls` is the trigger's, and `lookahead.wear` plus `protected[].phases` are the wear's. Counting one alone gave a wrong "89 of 101 never read".
