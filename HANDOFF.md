@@ -13,10 +13,9 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **Next session starts here (2026-11-23; main is 04bf54f0 + HANDOFF).**
 - **The work order lives on the roadmap board,** https://github.com/users/NicoviGH/projects/2 (ADR 0457). Use its "Roadmap" view (one column per Status) or "Ranked list". It is not restated here. `make tidy` fails on any open #640 issue that is not on the board.
-- **In flight when this was written:** two Sonnet subagents, results due as comments on their issues.
-  - **#743 (the over-cap trap):** a forced-plan hook plus replays.
-  - **#744 (the idle and lord-first rules):** a variant replayed on the witness games.
-  - Each saves its report to `review/743-trap-report.md` or `review/744-rules-report.md` and posts it on its issue, marked unchecked. Check its central claims against the traces before acting on it.
+- **Results in (checked, on the issues):**
+  - **#743 (comment 7109461427):** the trap is real for the unit in 4 of 4 deaths, but an alternative improved the army in only 2. The second-phase read is blind (0 for a unit that dies next turn), so scoring by it is off the table. Next: why the read is blind. Hook: `review/743-force-plan-hook.patch`.
+  - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Recommended a 0.05 floor plus an under-cap exemption, **waiting on Nicolas** (a weight). Keep lord-first. Variants: `review/744-rule-variants.patch`.
 - **Nicolas's calls this session:**
   - Size a fix against all the deaths before recommending it.
   - Retries learn what happened (#741). The guide claims are removed once that lands, and attempt 1 plays with no guide.
