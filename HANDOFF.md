@@ -19,7 +19,10 @@ and start a fresh instance; don't rely on auto-compaction.
 - **The "replan reads no fog" lead is refuted** (#713 comment 7089816121, from the kept trace; nothing replayed).
   - Eirika's turn-8 death in `fo713on` s4010 came from two hidden starting Soldiers (138 and 151). They never moved and were never seen, and together they did exactly her 17 HP. The fog read prices one hidden strike, so it read 0.
   - Vanilla's Chapter Status screen shows the enemy count, fogged units included (`uichapterstatus.c:611`).
-- **Waiting on Nicolas: #713 fix 4** (recommended in comment 7089816121). The fog read would add one strike per hidden enemy that count implies, each priced like an unseen arrival (ADR 0456).
+- **#713 fix 4 is not worth building now** (#713 comment 7090479113, counted from the `m699c` traces).
+  - Fog deaths are 26 of the 183 player deaths, all in Ch19. Over-the-cap deaths are 106 (58%).
+  - Fix 4's case, several hidden strikers that kill only together, is 10 deaths. Fog only breaks ties, so it would likely change no play.
+  - Not built; recommended to Nicolas to stop the fog line here.
 - **Then, in order:** #734, #730 fix 3, #739, and the `attempts` set on #699's starts (`m699c<N>`).
 - Reviewer worktrees in `.claude/worktrees/` (untracked) can be deleted.
 
