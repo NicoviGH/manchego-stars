@@ -25,8 +25,15 @@ and start a fresh instance; don't rely on auto-compaction.
   - Not built; recommended to Nicolas to stop the fog line here.
 - **Measured the batch (#699 comment 7093112364, tags `m740c<N>`, main a4a55371):** 7 of 34 campaigns clean within 3 attempts, against `m699c`'s 1 of 34.
   - Over-cap deaths are now 68% of player deaths (108 of 158).
-  - **Next:** root-cause Ch14's Rennac (0x1C) miss from the `m740c14` traces before building anything. It blocks all 5 Ch14 pairs. Every fix is sized against all the deaths before it is recommended (Nicolas, 2026-11-22).
-  - Then size Ch10 (the village plus Amelia: 5 pairs) and Ch16's chests (3). #734, #730 fix 3 and #739 wait until they are sized.
+  - **Three causes, root-caused from the `m740c` traces (#699 comment 7106711753).**
+    - **Over-cap deaths:** the trap is set the turn before, because the read covers one phase and the second phase only breaks ties. 16 deaths are sacrifices made by rule (the idle rule, the lord first).
+    - **Ch14:** our own door act at (22,18) releases Rennac before his talker is near.
+    - **Ch19:** the chests have no deadline (`closes_on` None).
+    - **The measurement:** deterministic, but it sees only large moves.
+  - **Next, in order:**
+    1. A forced-plan replay at t−1 on 3 or 4 trapped deaths. `replay` refuses non-suite runs, so it needs a hook. If the trap holds, the scoring change is Nicolas's call.
+    2. Ch14's door timing.
+    3. Ch19's deadlines from `scriptedUnits`.
   - Cause 4's ally ruling is not in the recorder yet (no ADR 0376 amendment). It is a certain record fix, but it frees no pair now.
 - Reviewer worktrees in `.claude/worktrees/` (untracked) can be deleted.
 
