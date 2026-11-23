@@ -11,9 +11,17 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23; main is 04bf54f0 + HANDOFF).**
+**Next session starts here (2026-11-23, late; main is 0bfe6b1b + HANDOFF).**
 - **The work order is #640's sub-issues: #752 (nobody dies, the enemy forecast), then #753 (every reward), then #754 (the chapter ends)**; within each, its own sub-issue list. Step 10 is #751, a child of #510. The roadmap Project was retired (Nicolas, 2026-11-23: it moved the backlog instead of shrinking it); PR #749 reverted #748 and the Project is closed.
-- **In flight: #743** (first of #752). Its second-phase read misses for three separate reasons, one death each: fog, the first phase played at its average HP, and the enemy's weapon order (comment 7113390219). Sizing the three over m740c's 108 over-cap deaths from the traces (no runs) is under way; the counts go on #743.
+- **In flight: #743, the plan is comment 7116037866 (Nicolas approved). Do its steps in order:**
+  1. **Cut PR #755** (branch `feat/743-wounded-read`, head 99d91bf7; CI green, reviewed with `review-to-clean`: every finding fixed and re-reviewed) down to the two bug fixes. Keep the sandbox strike's weapon equip (`sight.lua` `M.strikeLedger`, `M.strikeWear` through `M.armAsPlanned`) and the berserked striker left unequipped. Revert the `carries()` widening in `planner.lua` and its `test_bot.lua` tests. Rewrite ADR 0459 to match, keep the 0389 note, and drop the 0421 note. Then tests, CI, and ask Nicolas to "merge".
+  2. **Calibration of the read past the first phase,** from the m740c traces, no runs: bucket `protected[].second`, or the wear's `phases` > 1, against whether the unit died in that window.
+  3. **Post the table on #743** with one recommendation (fog, the first phase's hit spread, or heals in the reply), then stop for his call. No ranking change and no new games before that.
+  - **Why the change:** the one-phase read is calibrated; the read past it is not, in either direction. #755's widening saved no unit and moved a Ch21 choice on a 57.5% no-heal read of Ephraim, for +12.6% CPU. Evidence: #743 comments 7113390219 (three gaps), 7113644701 (sizing, corrected), 7116037866 (the plan), and PR #755's body.
+  - **Lessons:**
+    - The lookahead's trace has two readers: `lookahead.calls` is the trigger's, and `lookahead.wear` plus `protected[].phases` are the wear's. Counting one alone gave a wrong "89 of 101 never read".
+    - Pick a replay witness inside the rule's population. The Ch14 lord was at full HP and unstruck, so the rule could not reach him.
+  - Per-death rows: `review/743-rows6.pkl` (gitignored; session scratchpad `size743/` has the scripts, the 108 deaths with their gap flags). Run tags: `w13 w15 w19 v13 x13 x15 x19` (worktree `agent-a1c958076a8bf3a70`'s store), `fix743a`, `base743e`, `fix743e` (main store).
 - **Results in (checked, on the issues):**
   - **#743 (comment 7109461427):** the trap is real for the unit in 4 of 4 deaths, but an alternative improved the army in only 2. The second-phase read is blind (0 for a unit that dies next turn), so scoring by it is off the table. Next: why the read is blind. Hook: `review/743-force-plan-hook.patch`.
   - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Nicolas approved the 0.05 floor plus the under-cap exemption: merged as PR #750 (ADR 0458), #744 closed; replays on #744 comment 7111745048 (all three Ch21 bait deaths gone). #658's one-replay door test is approved too. Keep lord-first. Variants: `review/744-rule-variants.patch`.
