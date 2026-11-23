@@ -548,11 +548,12 @@ end
 
 -- Where arrival `a` (M.unseenArrivals' entry's) may stand at the enemy phase of `turn`, unseen,
 -- to strike (x, y) from, and the chance it is there (#713 fix 3, ADR 0456). A player knows the
--- wave came, not where it went. On its load tile when it arrives this phase (it acts the phase it
--- comes: eventTurn = turn), for certain; none when another unit, `x, y` or an earlier stand-in
--- holds it, since the loader would move it, unread. Else it may be on any tile of its `region`
--- (M.arrivalRegion), each alike. It strikes from the one nearest (x, y) that no other stand-in
--- takes (`used`), and the chance is the share of the region within its MOV + reach of (x, y).
+-- wave came, not where it went. On its load tile when it arrives this phase (it acts the phase
+-- it comes: eventTurn = turn), for certain; none when another unit, `x, y` or an earlier
+-- stand-in holds it, since the loader would move it, unread. Else it may be on any tile of its
+-- `region` (M.arrivalRegion), each alike. It strikes from the one nearest (x, y) that no other
+-- stand-in takes (`used`), and the chance is the share of the region, (x, y) aside, within its
+-- MOV + reach of (x, y).
 -- `held`: tile key -> the unit on it. -> from ({ x, y }), chance; nil when no tile of the
 -- region reaches (x, y).
 function M.arrivalFrom(a, unit, turn, x, y, region, held, used)
