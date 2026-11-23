@@ -11,19 +11,19 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23, evening; main is f7367888 + HANDOFFs).**
-- **#713 fix 3 is built on `feat/713-arrival-fog-read` (pushed, no PR yet; commits 999310a9, 6a958fd4; ADR 0456).** Findings are on #713 (comments 7087475499, 7089185979).
-  - **What it does:** the fog read adds one strike from each red arrival of the turn events that no one has seen. The game's own loader (`LoadUnit_800F704`) builds each arrival once a chapter in a top-level sandbox (`s.arrivalUnits`). Each strike counts by the share of the arrival's reachable unseen tiles within MOV + reach (`Bot.arrivalRegion`, `arrivalFrom`, `present`).
-  - **Two fixes ship with it, both bugs on main too:** the seen kit's strike was stood on the unit's own planned tile, and greens never met the fog read.
-  - **Proof:** unit tests that fail without each fix; replays of Ch19 `b640e-cs-s4003` a1 (`fix713i`/`j`/`k`) with no leaks.
-    - The read now tells tiles apart: Artur's turn-4 tiles read 0.13 to 0.76, where before every tile read 0.66 to 0.88.
-    - The game is unchanged: lost on turn 7. The plan that kills Artur wins on progress, and fog ranks after progress (ADR 0400).
-  - **Tried and dropped (not in the branch): `fog_over`,** the fog read above the cap ranked right after the win. Vanilla Ch6, 10 starts a1, on vs off (`fo713on`/`fo713off`): 1 loss against 0, and fallback turns 7 against 3. Ch19 (`fix713l`) was worse too. Table on #713.
-- **Next, in order:**
-  1. Open the PR for the branch, `/code-review <PR> medium`, `review-to-clean`; merge on green CI (step-9 PRs may merge after review).
-  2. **New lead (untested):** a replan later in a turn does not read the fog for units that acted earlier that turn. Witness: `fo713on` s4010 t8, where Eirika died in fog unread and every judged plan carried the same `fog_over` 0.92. Settle it with one instrumented replay.
-  3. Then the rest below (#734, #730 fix 3, #739, the `attempts` set on #699's starts).
-- Nicolas this session: "if you found the root cause you don't need my input"; and send cheap subagents to confirm details rather than guess.
+**Next session starts here (2026-11-22, late; main is 4f5bfdbc + HANDOFF).**
+- **Merged: PR #740** (#713 fix 3, ADR 0456) as 4f5bfdbc, on green CI for its head. The fog read now sums the strikes of the unseen arrivals.
+  - Reviewed with `review-to-clean`: 6 findings, 5 fixed and 1 stale; then a scoped re-review, whose 1 nit was fixed.
+  - Two of the fixes change behaviour: botrun builds the arrivals at the phase start of any fog chapter (`sight.fogChapter`), and `arrivalFrom` leaves the unit's own tile out of the share.
+  - Recorded on #713 (comment 7089767212).
+- **The "replan reads no fog" lead is refuted** (#713 comment 7089816121, from the kept trace; nothing replayed).
+  - Eirika's turn-8 death in `fo713on` s4010 came from two hidden starting Soldiers (138 and 151). They never moved and were never seen, and together they did exactly her 17 HP. The fog read prices one hidden strike, so it read 0.
+  - Vanilla's Chapter Status screen shows the enemy count, fogged units included (`uichapterstatus.c:611`).
+- **Waiting on Nicolas: #713 fix 4** (recommended in comment 7089816121). The fog read would add one strike per hidden enemy that count implies, each priced like an unseen arrival (ADR 0456).
+- **Then, in order:** #734, #730 fix 3, #739, and the `attempts` set on #699's starts (`m699c<N>`).
+- Reviewer worktrees in `.claude/worktrees/` (untracked) can be deleted.
+
+*Before that (2026-11-23, evening; fix 3 built, not merged):* see #713 comments 7087475499, 7089185979.
 
 *Earlier the same day (main was f7367888 + HANDOFF):*
 
