@@ -2993,6 +2993,35 @@ do
     end)
     check(seen, "2|1401,0,0,0,0", "strikeLedger: a ballista shot spends its rider's trap, not its bag")
 
+    -- #743: an enemy striking with its slot-1 javelin (2 uses, the strike spends 1) equips it, as
+    -- the game does: the javelin leads the bag in the next phase and the sword it counted 0.45
+    -- on follows to slot 1 with its row. A strike with no slot (the game armed it, slot nil) or
+    -- from the front keeps the bag as it was
+    local JAVX = 0x1C | (2 << 8)
+    fill(red.addr, { SWORD, JAVX })
+    local pre = Sight.tally({}, red.addr, 0, 0.45)
+    local javStrike = { wear = 1, wearSlot = 1, counterWear = 0 }
+    local lastRows
+    sandbox(function()
+        sandbox(function()
+            local l = Sight.strikeLedger(api, call, S, {}, pre, {}, javStrike, { slot = 1 }, red.addr, myrrh.addr)
+            seen, lastRows = bag(red.addr), l
+        end)
+    end)
+    check(seen, "11C,1401,0,0,0", "strikeLedger: the striker's weapon is equipped, its use spent where it went")
+    check(lastRows[red.addr][1] and lastRows[red.addr][1].total, 0.45,
+          "strikeLedger: the sword's counted use follows it to slot 1")
+    for _, side in ipairs({ { slot = 0 }, {} }) do
+        fill(red.addr, { SWORD, JAVX })
+        sandbox(function()
+            sandbox(function()
+                Sight.strikeLedger(api, call, S, {}, {}, {}, { wear = 0, counterWear = 0 }, side, red.addr, myrrh.addr)
+                seen = bag(red.addr)
+            end)
+        end)
+        check(seen, "1401,21C,0,0,0", "strikeLedger: slot " .. tostring(side.slot) .. " leaves the bag as it was")
+    end
+
     -- (7) strikeWall's read (M.strikeWallIn): the game's forecast of two blows on a 10-HP wall
     -- (6, then 4) with an axe in slot 1, 3 uses before and 1 after
     local A_, T_ = S.gBattleActor, S.gBattleTarget

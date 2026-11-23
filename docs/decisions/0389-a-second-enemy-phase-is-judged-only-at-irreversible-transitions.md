@@ -193,3 +193,5 @@ turn the 2026-11-08 amendment set aside (the planner's own plan, 4.6x).
   which plan wins. The hold's games above are counted from the log (a hand count had read 18
   won, 12 stuck); fallbacks and Ch8's turns are recounted on `replyfix1*`.
 - **Control:** `PT_REPLY=hold` reads every second phase with our units holding, as before.
+
+**Amended 2026-11-23 (ADR 0459, #743): the sandbox strike equips its weapon,** so the second phase reads the bag in the game's order.
