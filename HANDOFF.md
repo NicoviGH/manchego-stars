@@ -16,7 +16,7 @@ and start a fresh instance; don't rely on auto-compaction.
 - **In flight when this was written:** two Sonnet subagents, results due as comments on their issues.
   - **#743 (the over-cap trap):** a forced-plan hook plus replays.
   - **#744 (the idle and lord-first rules):** a variant replayed on the witness games.
-  - If a session ends before they report, their worktrees are in `.claude/worktrees/`.
+  - Each saves its report to `review/743-trap-report.md` or `review/744-rules-report.md` and posts it on its issue, marked unchecked. Check its central claims against the traces before acting on it.
 - **Nicolas's calls this session:**
   - Size a fix against all the deaths before recommending it.
   - Retries learn what happened (#741). The guide claims are removed once that lands, and attempt 1 plays with no guide.
