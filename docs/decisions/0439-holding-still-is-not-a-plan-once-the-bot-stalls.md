@@ -24,7 +24,9 @@ should not be a viable choice", unless the player is baiting enemies into counte
 the abort reads, and the threshold the ledger's stall rule already uses (ADR 0403). No new weight.
 Under `opts.idle`, a plan ADVANCES when it does any of these:
 
-- kills a red unit with a chance above `DUST`: by our blows, or by our counters in the judged
+- kills a red unit with a chance above `DUST` (amended by ADR 0458, #744: above
+  `M.ADVANCE_MIN`, 0.05, for a kill, counter-kill or win chance; and an under-cap march is not
+  idle): by our blows, or by our counters in the judged
   enemy phase (a bait counts, which is the baiting exception);
 - takes a goal: a visit, chest, talk or rescue (a convoy use is no goal);
 - raises the chance of the win, or wounds a unit the win needs: the boss of a Defeat-boss

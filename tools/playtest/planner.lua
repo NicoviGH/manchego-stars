@@ -235,6 +235,12 @@ M.DUST = Goals.DUST
 -- this much, the judge a composed kill, the assault a lone strike's, and the rank a plan's win
 -- (M.outranks). One line, so what the planner calls "gone" and what it ranks as "won" agree
 M.GONE = 0.5
+-- the chance at which a win, a kill or a counter's kill counts as advancing the level under the
+-- idle rule (ADR 0439, #744): a bait with a 0.0003 win chance is no bait. Ch21's all-wait plan
+-- with one unit in reach read as "baiting" and outranked every under-cap march, and cost charId 2
+-- a 0.93 death three times. Nicolas's call (2026-11-23): 0.05, the value replayed; the caps run
+-- 0.01 to 0.15. A weight, his to move.
+M.ADVANCE_MIN = 0.05
 -- the lookahead's budget (FR-018): extra judged calls (sight.nextPhase, one a finalist) per
 -- decision and per attempt. 128 an attempt, not 32: 32 ran out before the boss fight on
 -- Manchego Stars ch03 and two vanilla starts, so the decisive turns were judged one phase deep
@@ -1154,21 +1160,30 @@ function M.plan(Bot, board, sight, style, opts)
     -- wound is all it has has no kill chance this phase (#709: admit() asks it only under the cap).
     -- The lookahead's second-phase kills are not read here: they come from sight.nextPhase, a
     -- search made for finalists after this judge, and advances() runs for every plan.
+    -- A win, kill or counter-kill chance advances only above M.ADVANCE_MIN (#744).
     local function advances(st, fell, counters)
-        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.DUST then return true, false end
+        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.ADVANCE_MIN then
+            return true, false
+        end
         for _, p in pairs(counters) do
-            if p > M.DUST then return true, false end
+            if p > M.ADVANCE_MIN then return true, false end
         end
         for id, blows in pairs(st.kill) do
-            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.DUST then return true, false end
+            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.ADVANCE_MIN then return true, false end
         end
         for id, hp in pairs(st.enemyHp) do
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and M.isWinBoss(e, winBoss)))
-            -- no kill share is needed here: a kill chance above DUST returned as progress in the
-            -- kill loop above, so `hp` (the plan's expected HP) is a survivor's, to within DUST
-            if needed and e.hp - M.healed(healOf(e), e, hp) > M.DUST then return true, true end
+            if needed then
+                -- the survivor's mean HP: the plan's `hp` is a mean over the kill branch too (its
+                -- blows deal the HP it had, leaving 0), and a kill chance up to ADVANCE_MIN did not
+                -- return above; its share is no wound either (#744: a 4% crit, else a miss, would
+                -- read as a wound on the boss)
+                local k = st.kill[id] and (odds(st.kill[id], e.hp)) or 0
+                local left = k < 1 and math.min(e.hp, hp / (1 - k)) or hp
+                if e.hp - M.healed(healOf(e), e, left) > M.DUST then return true, true end
+            end
         end
         return false, false
     end
@@ -1880,8 +1895,12 @@ function M.plan(Bot, board, sight, style, opts)
             rank.max_die = math.max(rank.max_die, pr.die)
             rank.sum_die = rank.sum_die + pr.die
         end
-        -- a plan that does not advance is no plan once the stall reading fired (ADR 0439)
-        rank.idle = (idleOn and not advancing(st)) and 1 or 0
+        -- a plan that does not advance is no plan once the stall reading fired (ADR 0439); one
+        -- under the cap that brings a unit nearer its goal is not idle (#744): the cap already
+        -- keeps it safe, and idling it handed the turn to a 0.93-death bait. `idleOn` still turns
+        -- on only for a real advance (pick()), so a march never switches the rule on.
+        local marches = rank.max_exceed == 0 and rank.progress > M.DUST
+        rank.idle = (idleOn and not advancing(st) and not marches) and 1 or 0
         rank.admitted = rank.admitted and rank.idle ~= 1
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end

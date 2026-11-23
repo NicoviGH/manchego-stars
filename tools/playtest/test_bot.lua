@@ -7201,6 +7201,37 @@ do
           "false nil played", "idle: a plan that risks the game over still ranks below the hold, and the hold is no sacrifice")
 end
 
+-- test_planner_idle_spares_an_undercap_march (#744): the idle fixture above, plus (0,1), where A
+-- stands nearer its goal (field 10 against 20) at no risk. The march under the cap is no idle
+-- plan: it is admitted and played, and the kill over the cap is not the fallback. With no march
+-- (both tiles at 20) the hold is idle as before and the kill is played.
+do
+    local function play(near)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = false, hp = 10 })
+        local J = red(0x82, 9, 9, { minRange = false })
+        local o = {
+            objective = { kind = "rout" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+            field = function() return { [0] = { [0] = 20, [1] = 20 }, [1] = { [0] = near } } end,
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 10, hits = 1 } } } },
+            enemyPhase = function(plan)
+                for _, b in ipairs(plan.blues) do
+                    if b.unit.id == 0x01 and b.x == 1 then
+                        return { { enemy = 0x82, target = 0x01, takenHit = 40, takenDmg = 99,
+                                   takenHits = 1, takenCrit = 0, targetHp = 20 } }
+                    end
+                end
+                return {}
+            end,
+        }
+        local a, plan = Planner.plan(B, boardOf(A, E, J), sightOf(o), style("careful"), { idle = true })
+        return at(a) .. " " .. tostring(plan and plan.fallback)
+    end
+    check(play(10), "0,1 nil", "idle: an under-cap march nearer the goal is played, not the over-cap kill (#744)")
+    check(play(20), "1,0 FALLBACK_SACRIFICE", "idle: with no march, the kill is played as before")
+end
+
 -- test_planner_advances (ADR 0439): which plans advance the level under opts.idle. Each fixture
 -- puts A on (0,0) holding or on (1,0) doing the thing; the plan's `rank.idle` says whether the
 -- planner read it as advancing (0) or not (1). With no plan that advances, idleOn stays off and
@@ -7255,6 +7286,26 @@ do
     end
     check(boss(10), "hold 1 there 0", "advances: a wound on the boss advances")
     check(boss(0), "hold 0 there 0", "advances: a blow that deals 0 advances nothing")
+    -- #744: a chance at or under M.ADVANCE_MIN is no advance. A bait whose counter kills 3% of
+    -- the time baits nothing (Ch21's 0.0003 bait outranked every under-cap march)
+    check(bait(0.03), "hold 0 there 0", "advances: a 3% counter-kill is no bait (#744)")
+    -- a 4% crit that kills the boss, else a miss: its kill share is no wound either, so the
+    -- survivor's HP is read, not the plan's mean
+    local function crit(hit)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = false, hp = 30, isBoss = true })
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = hit, dmg = 99, hits = 1 } } } },
+            enemyPhase = function() return {} end,
+        }
+        local t = idles({ A, E }, o)
+        t.there = t["attack@1,0"]
+        return show(t)
+    end
+    check(crit(4), "hold 0 there 0", "advances: a 4% kill, else a miss, is no wound on the boss (#744)")
+    check(crit(40), "hold 1 there 0", "advances: a 40% kill on the boss advances")
     -- a goal taken: a village A visits from (1,0)
     do
         local A = blue(0x01, 0, 0, 0, { minRange = false })
@@ -7335,12 +7386,19 @@ do
                 enemyPhase = function() return {} end,
             }
             local _, plan = Planner.plan(B, boardOf(A, Bu, E), sightOf(o), style("careful"), { idle = true })
-            local n = 0
+            local n, assaultIdle = 0, nil
             for _, x in ipairs(plan and plan.acts or {}) do if x.act == "attack" then n = n + 1 end end
-            return n
+            for _, c in ipairs(plan and plan.considered or {}) do
+                if c.acts[1]:find("attack") and c.acts[2] and c.acts[2]:find("attack") then
+                    assaultIdle = c.rank.idle
+                end
+            end
+            return n, assaultIdle
         end
         check(assault(30, 9, true), 0, "advances G: an over-cap assault that nets 1 HP, no kill chance, is not played over a hold")
-        check(assault(10, 9, true) > 0, true, "advances G: the same assault with a kill chance still advances")
+        -- the same assault with a kill chance advances (idle 0); it is not played here, since the
+        -- under-cap march toward the boss (progress 0.6) is no idle plan either (#744)
+        check(select(2, assault(10, 9, true)), 0, "advances G: the same assault with a kill chance still advances")
         check(assault(30, 9, false) > 0, true, "advances G: an under-cap chip that outlasts the heal still advances")
     end
     -- the heal model (Planner.healed): 6 HP back on 30 max; a wound of 4 is healed whole, one of
