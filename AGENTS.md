@@ -163,9 +163,9 @@ re-ask.
 - **No table record past Revel's End (ch08).** The book and vanilla FE8 are both inspiration and
   the best story wins: "the book doesn't have it" rules nothing out; say which parts are
   invented.
-- **The #510 work order is #699's fix list; a side finding is not a new issue.** Work the list
-  top-down. A finding made along the way goes as one line on the closest open issue, and becomes
-  its own issue only if it explains more deaths than the fix being worked (Nicolas, 2026-11-23).
+- **A side finding is not a new issue.** A finding made along the way goes as one line on the
+  closest open issue; it becomes its own issue only if it outranks the work being done (Nicolas,
+  2026-11-23).
 
 ## Models and subagents
 
