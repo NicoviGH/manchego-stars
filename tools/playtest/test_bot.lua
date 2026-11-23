@@ -7289,6 +7289,8 @@ do
     -- #744: a chance at or under M.ADVANCE_MIN is no advance. A bait whose counter kills 3% of
     -- the time baits nothing (Ch21's 0.0003 bait outranked every under-cap march)
     check(bait(0.03), "hold 0 there 0", "advances: a 3% counter-kill is no bait (#744)")
+    check(bait(0.05), "hold 0 there 0", "advances: a counter-kill at ADVANCE_MIN itself is no bait (#744)")
+    check(bait(0.06), "hold 1 there 0", "advances: a 6% counter-kill, just above, is a bait (#744)")
     -- a 4% crit that kills the boss, else a miss: its kill share is no wound either, so the
     -- survivor's HP is read, not the plan's mean
     local function crit(hit)
@@ -7372,6 +7374,7 @@ do
     -- not outrank a safe hold (Caellach, 47 HP on a fort: the seven-unit assault's 36.97 -> 45.97).
     -- A and B each wound E (30 of 40, fort heal 9) for 5, the counters kill each: over the cap.
     do
+        local played
         local function assault(hp, heal, counter)
             local A = blue(0x01, 0, 0, 0)
             local Bu = blue(0x02, 1, 0, 1)
@@ -7389,6 +7392,9 @@ do
             local n, assaultIdle = 0, nil
             for _, x in ipairs(plan and plan.acts or {}) do if x.act == "attack" then n = n + 1 end end
             for _, c in ipairs(plan and plan.considered or {}) do
+                if not c.rejected then played = table.concat(c.acts, " ") end
+            end
+            for _, c in ipairs(plan and plan.considered or {}) do
                 if c.acts[1]:find("attack") and c.acts[2] and c.acts[2]:find("attack") then
                     assaultIdle = c.rank.idle
                 end
@@ -7399,6 +7405,7 @@ do
         -- the same assault with a kill chance advances (idle 0); it is not played here, since the
         -- under-cap march toward the boss (progress 0.6) is no idle plan either (#744)
         check(select(2, assault(10, 9, true)), 0, "advances G: the same assault with a kill chance still advances")
+        check(played, "1>wait@1,0>nil 2>wait@2,1>nil", "advances G: and the under-cap march toward the boss is played over it (#744)")
         check(assault(30, 9, false) > 0, true, "advances G: an under-cap chip that outlasts the heal still advances")
     end
     -- the heal model (Planner.healed): 6 HP back on 30 max; a wound of 4 is healed whole, one of

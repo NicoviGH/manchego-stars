@@ -21,9 +21,9 @@ s4005 a1). Report and replays: #744.
 1. **An advance is material.** A win, kill or counter-kill chance advances only above
    `M.ADVANCE_MIN = 0.05` (`planner.lua`). A weight, Nicolas's: 0.05 is the value replayed; the
    death caps run 0.01 to 0.15. The wound read follows: a needed red's wound is read on its
-   survivor's mean HP (the plan's mean HP over the kill branches too, divided by the chance it
-   lives), so a small kill chance's share is no wound either (a 4% crit, else a miss, on the
-   boss).
+   survivor's HP (`M.survivorDealt`, the one read `M.outlasting` shares), so a small kill
+   chance's share is no wound either (a 4% crit, else a miss, on the boss). Exact for one blow;
+   for a chain of blows on one red it is near, since the plan's HP composes blow by blow.
 2. **An under-cap march is not idle.** A plan with `max_exceed` 0 and `progress` above `DUST`
    (it brings a unit nearer its goal) ranks `idle = 0`. `idleOn` is still turned on only by a
    real advance (`pick()`), so a march never switches the rule on.
@@ -37,4 +37,6 @@ under-cap plan advances or marches.
 one floor replay on a lord case got worse (#744).
 
 **Proof (ADR 0430).** Unit tests that fail without each part (`test_bot.lua`: a 3% bait, a 4%
-crit on the boss, an under-cap march over an over-cap kill), and one replay of each Ch21 witness.
+crit on the boss, an under-cap march over an over-cap kill), and one replay of each Ch21 witness
+(tags `fix744a`/`fix744b`, #744 comment 7111745048): all three bait deaths of charId 2 are gone,
+and each game is otherwise as in `m740c` or better. Ch21 still sticks at the Lyon gate (#698).

@@ -34,7 +34,8 @@ Under `opts.idle`, a plan ADVANCES when it does any of these:
 
 A plan that only moves units nearer a goal does not advance (nearing is what `GOAL_QUIET` found
 idle), and neither does a blow that deals nothing (Ch15: 29 runs chipped Caellach for 0 damage).
-A plan that does not advance is not admitted, whatever its risk. Its rank carries `idle = 1`
+A plan that does not advance is not admitted, whatever its risk. (Amended by ADR 0458, #744: a
+march under the cap is not idle, and is admitted.) Its rank carries `idle = 1`
 (0 when it advances), placed in the non-admitted lead order of `M.outranks` right after
 `first_game_over`: a plan that risks ending the game still ranks last, below a hold, and an idle
 hold ranks below every other plan. The least-risk advancing plan is then played through the

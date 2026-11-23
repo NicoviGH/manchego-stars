@@ -268,8 +268,9 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
 -- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
 -- among others, it ends the chapter (Nicolas, 2026-11-01); then, once the bot's own stall
--- reading has fired (opts.idle, ADR 0439), a plan that advances the level before one that
--- only holds or marches (`idle`); then the smallest largest excess,
+-- reading has fired (opts.idle, ADR 0439), a plan that advances the level before an idle one
+-- (`idle`: a hold, or a march over the cap; an under-cap march is not idle, ADR 0458); then
+-- the smallest largest excess,
 -- then summed excess, then largest death chance. Each of those is read on the next enemy
 -- phase first (`first_*`) and on both phases only to break its ties: the lookahead's second
 -- phase has our units stand still another round, and over Manchego Stars ch03's pilots its readings
@@ -431,13 +432,19 @@ end
 -- kill branch earns what it always did (the dead heal nothing: `dealt` there is the HP it had),
 -- the surviving branch only the wound that outlasts the heal, healed(hp) - healed(hp - its mean
 -- damage); the whole `dealt` where nothing heals.
+-- The surviving branch's mean damage of `dealt` on `hp`, a mean over the kill branch too (a kill
+-- deals the HP it had), given its chance `kill` < 1; held to [0, hp]: a survivor was left above 0,
+-- so more than hp is a rounding of `dealt`, never a bigger wound. The one read of it, for the
+-- heal (M.outlasting) and the idle rule's wound (advances(), #744).
+function M.survivorDealt(hp, dealt, kill)
+    return math.min(hp, math.max(0, (dealt - kill * hp) / (1 - kill)))
+end
+
 function M.outlasting(heal, e, hp, dealt, kill)
     kill = kill or 0
     if heal == 0 or kill >= 1 or hp - dealt <= 0 then return dealt end
     if kill == 0 then return M.healed(heal, e, hp) - M.healed(heal, e, hp - dealt) end
-    -- the surviving branch's mean damage, held to hp: a survivor was left above 0, so more than
-    -- hp is a rounding of `dealt`, never a bigger wound
-    local survived = math.min(hp, math.max(0, (dealt - kill * hp) / (1 - kill)))
+    local survived = M.survivorDealt(hp, dealt, kill)
     return kill * hp + (1 - kill) * (M.healed(heal, e, hp) - M.healed(heal, e, hp - survived))
 end
 
@@ -1148,11 +1155,13 @@ function M.plan(Bot, board, sight, style, opts)
     local function endsIn(st)
         return M.endsIn(objective, objective == "rout" and redsLeft(st) or 0, byId, winBoss)
     end
-    -- Whether a plan advances the level (ADR 0439): it kills a red unit (our blows, or our
+    -- Whether a plan advances the level (ADR 0439): it may kill a red unit (our blows, or our
     -- counters in the judged phase: a bait counts), takes a goal (a visit, chest, talk or
-    -- rescue), ends the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
-    -- chapter, any red of a Rout). A march nearer a goal does not: nearing is what the stall
-    -- reading found idle, and a blow that deals nothing wounds nothing. `counters`: each red
+    -- rescue), may end the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
+    -- chapter, any red of a Rout). A kill, counter-kill or win chance counts only above
+    -- M.ADVANCE_MIN (ADR 0458, #744). A march nearer a goal does not advance: nearing is what
+    -- the stall reading found idle (an under-cap march is still no idle plan: admit(), ADR
+    -- 0458), and a blow that deals nothing wounds nothing. `counters`: each red
     -- enemy's chance our counters kill it in the judged phase. A wound counts only as far as it
     -- outlasts the tile's heal (M.healed, #709): a boss on a fort regains it before it acts.
     -- -> advances, woundOnly: `woundOnly` when a wound that outlasts the heal is all it has. A
@@ -1160,28 +1169,32 @@ function M.plan(Bot, board, sight, style, opts)
     -- wound is all it has has no kill chance this phase (#709: admit() asks it only under the cap).
     -- The lookahead's second-phase kills are not read here: they come from sight.nextPhase, a
     -- search made for finalists after this judge, and advances() runs for every plan.
-    -- A win, kill or counter-kill chance advances only above M.ADVANCE_MIN (#744).
+    -- a chance above M.ADVANCE_MIN, past the ulps a composed chance lands over it (M.admits)
+    local function material(p) return not M.admits(p, M.ADVANCE_MIN) end
     local function advances(st, fell, counters)
-        if M.tookGoal(st.took) or next(st.carry) or winOf(st, fell) > M.ADVANCE_MIN then
+        if M.tookGoal(st.took) or next(st.carry) or material(winOf(st, fell)) then
             return true, false
         end
         for _, p in pairs(counters) do
-            if p > M.ADVANCE_MIN then return true, false end
+            if material(p) then return true, false end
         end
+        local kills = {}
         for id, blows in pairs(st.kill) do
-            if not st.recruits[id] and (odds(blows, byId[id].hp)) > M.ADVANCE_MIN then return true, false end
+            kills[id] = (odds(blows, byId[id].hp))
+            if not st.recruits[id] and material(kills[id]) then return true, false end
         end
         for id, hp in pairs(st.enemyHp) do
             local e = byId[id]
             local needed = e and not st.recruits[id]
                 and (objective == "rout" or (objective == "boss" and M.isWinBoss(e, winBoss)))
             if needed then
-                -- the survivor's mean HP: the plan's `hp` is a mean over the kill branch too (its
-                -- blows deal the HP it had, leaving 0), and a kill chance up to ADVANCE_MIN did not
-                -- return above; its share is no wound either (#744: a 4% crit, else a miss, would
-                -- read as a wound on the boss)
-                local k = st.kill[id] and (odds(st.kill[id], e.hp)) or 0
-                local left = k < 1 and math.min(e.hp, hp / (1 - k)) or hp
+                -- the survivor's HP: the plan's `hp` is a mean over the kill branch too, and a
+                -- kill chance up to ADVANCE_MIN did not return above, so its share is no wound
+                -- either (#744: a 4% crit, else a miss, would read as a wound on the boss). Exact
+                -- for one blow; a chain of blows composes its mean blow by blow and its kill
+                -- whole, so there it is near, not exact. `k` < 1: a sure kill returned above
+                local k = kills[id] or 0
+                local left = e.hp - M.survivorDealt(e.hp, e.hp - hp, k)
                 if e.hp - M.healed(healOf(e), e, left) > M.DUST then return true, true end
             end
         end

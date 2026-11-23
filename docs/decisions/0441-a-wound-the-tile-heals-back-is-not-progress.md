@@ -46,9 +46,9 @@ the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `h
   `healed(hp) - healed(hp - its mean damage)`. `st.healOf` is the plan's one read of each enemy's
   heal. `st.enemyHp` is an expectation over the kill and the survival, so the heal is applied to the
   surviving share only.
-- `advances()` (the idle rule): `e.hp - Planner.healed(heal, e, hp)`. It needs no kill share: a kill
-  chance above `DUST` has already returned as progress in the kill loop, so `hp` there is a
-  survivor's, to within `DUST`. The wound loop returns on the first needed enemy that passes, but every
+- `advances()` (the idle rule): `e.hp - Planner.healed(heal, e, hp)`, on the survivor's HP
+  (`Planner.survivorDealt`): a kill chance above `M.ADVANCE_MIN` has already returned as progress
+  in the kill loop, and the share of one under it is no wound (amended by ADR 0458, #744). The wound loop returns on the first needed enemy that passes, but every
   such return is the same `(true, true)`, so its result does not depend on `pairs` order.
 
 `plan.reds` and `st.enemyHp` stay the unhealed HP the plan leaves, so no read counts a heal twice.
@@ -56,7 +56,7 @@ the fort healing so the bot should too").** One amount, `sight.terrainHeal` / `h
 **Over the cap, a wound is not progress (G; Nicolas, 2026-11-21: "Yeah, try that").** Amends ADR
 0439's "the least-risk advancing plan is then played" line. A plan under the death-risk cap
 (`rank.max_exceed == 0`) keeps the rule above: a wound that outlasts the heal advances. A plan over
-the cap counts a wound as progress no more; it advances only by a kill chance above `DUST`, a goal,
+the cap counts a wound as progress no more; it advances only by a kill chance above `DUST` (`M.ADVANCE_MIN` since ADR 0458), a goal,
 a carry or the win, as before. Over the cap a wound counts whether or not its target heals (the call as Nicolas made it).
 `advances()` returns `woundOnly` for a plan whose only progress is
 a wound, and `advancing()` in `admit()` and `pick()` reads it against the rank. No new number.
