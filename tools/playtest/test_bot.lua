@@ -10398,7 +10398,7 @@ local function strikes12(plan)
     return {}
 end
 local function wears(hp, o, ...)
-    local A = blue(0x01, 0, 0, 0, { hp = hp or 27, maxhp = (o or {}).maxhp, minRange = false })
+    local A = blue(0x01, 0, 0, 0, { hp = hp or 27, minRange = false })
     local X = red(0x81, 0, 9, { minRange = false })
     local strikes = strikes12
     local so = {
@@ -10441,48 +10441,8 @@ do
     -- a heal of its own: its HP does not carry, the next phase alone is read
     board, sight, st = wears(27, { salve = { [0x01] = true } })
     a, plan, cost = Planner.plan(B, board, sight, st)
-    check(at(a), "1,0", "wear: a unit holding its own heal outlasts the two phases it is read on")
-    check(cost.look.wear > 0, true, "wear: a heal's reach does not exempt it (ADR 0459)")
-
-    -- a unit a heal can reach is read on two phases, not three (ADR 0459): 24 HP is dead to the
-    -- second blow of 12, 36 HP to the third only. A unit holding a heal, or a staff a turn away,
-    -- stays out at 24 and goes at 36; with no heal at all 36 is the third's death
-    local function stays(label, hp, o, ...)
-        local b, sg, sty = wears(hp, o, ...)
-        return at(Planner.plan(B, b, sg, sty)), label
-    end
-    check((stays("salve24", 24, { salve = { [0x01] = true } })), "0,0", "wear: a heal of its own, two blows kill 24 HP")
-    check((stays("salve36", 36, { salve = { [0x01] = true } })), "1,0", "wear: a heal of its own, 36 HP outlasts two blows")
-    check((stays("none36", 36)), "0,0", "wear: no heal, the third blow kills 36 HP")
-    local nurse = blue(0x02, 1, 0, 1, { minRange = false })
-    local nurseSight = { staves = { [0x02] = { { slot = 0, amount = 10 } } },
-                         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }) } }
-    check((stays("staff24", 24, nurseSight, nurse)), "0,0", "wear: a staff a turn away, two blows kill 24 HP")
-    check((stays("staff36", 36, nurseSight, nurse)), "1,0", "wear: a staff a turn away, 36 HP outlasts two blows")
-
-    -- a unit the phase does not strike is read when the plan leaves it at or under half its HP
-    -- (ADR 0459): staying put on (0,0) the first phase finds no one, the second strikes it for 12
-    -- wherever it stands. 12 of 30 HP is wounded and read dead; 12 of 20 is not and is not read
-    local function anywhere(plan)
-        for _, b in ipairs(plan.blues) do
-            if b.unit.id == 0x01 then
-                return { { target = b.unit.id, takenHit = 100, takenDmg = 12, takenHits = 1,
-                           takenCrit = 0 } }
-            end
-        end
-        return {}
-    end
-    -- a board without maxhp (a test's; Board.read always gives it) has no half to measure: not wounded
-    for _, case in ipairs({ { 30, 1, "12 of 30 HP" }, { 20, 0, "12 of 20 HP" }, { false, 0, "12 HP, no maxhp" } }) do
-        board, sight, st = wears(12, { maxhp = case[1] or nil, enemyPhase = function() return {} end,
-                                       nextPhase = anywhere })
-        a, plan, cost = Planner.plan(B, board, sight, st)
-        local stay
-        for _, c in ipairs(plan.considered) do
-            if c.acts[1] == "1>wait@0,0>nil" then stay = c end
-        end
-        check(stay and stay.rank.max_die, case[2], "wear: " .. case[3] .. ", unstruck, staying in the next phase's reach")
-    end
+    check(at(a), "1,0", "wear: a unit holding its own heal is read on the next phase")
+    check(cost.look.wear, 0, "wear: no second phase asked for it")
 
     -- a staff of the army's one turn away: the same
     local H = blue(0x02, 1, 0, 1, { minRange = false })

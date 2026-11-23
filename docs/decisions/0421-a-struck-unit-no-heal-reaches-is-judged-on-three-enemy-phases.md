@@ -118,5 +118,3 @@ witness, not a verdict).**
   door at 0.82, `lap3e/9` turn 3 at 0.73.
 - In `scout-ch14`, Colm (charId 9) dies on turn 7 at 24.5% under a labelled fallback, with and
   without the rule.
-
-**Amended 2026-11-23 (ADR 0459, #743): the wear reads a wounded unit** (struck, or left at or under half its HP), on three phases when no heal can reach it and two when one can. The title above names the first case only and stays as written (an amended ADR keeps its title, as 0389 does); ADR 0459 is the current rule for who is read and on how many phases.

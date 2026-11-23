@@ -63,10 +63,9 @@
 --      opts.budget.attempt left of M.LOOK_ATTEMPT, else skipped and tagged. Each protected
 --      unit's death chance becomes that of dying in either phase, and those plans are ranked
 --      again among themselves.
---      Apart from that, a wounded unit of a plan (struck in its judged phase, or left at or
---      under half its HP) is read on enemy phases with its HP carried (the wear, ADR 0421,
---      0459): M.WEAR when no heal of the army's can reach it, two when one can, within its own
---      budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
+--      Apart from that, a unit a plan's judged phase strikes, that no heal of the army's can
+--      reach before the phase after, is read on M.WEAR enemy phases with its HP carried (the
+--      wear, ADR 0421), within its own budget of M.WEAR_DECISION and M.WEAR_ATTEMPT calls.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
@@ -109,8 +108,8 @@
 -- branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both, but for a unit the
 -- wear read, whose `die` is the wear's reading of the later phases alone), wear (what the
--- phases after the next add for a wounded unit, and `phases` how many were read, M.WEAR
--- when no heal of the army's reaches it, else two: ADR 0421, 0459; `die` counts it) }, lookahead =
+-- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
+-- read: ADR 0421, M.WEAR; `die` counts it) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep, wear (the wear's
 -- calls, ADR 0421), wear_skipped (its plans past the budget) }, audit = the
 -- failure audit's (FR-020): { offered_n = how many acts Bot.candidates offered, mend_rounds =
@@ -248,10 +247,9 @@ M.ADVANCE_MIN = 0.05
 -- (#570)
 M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
--- the wear (ADR 0421, 0459): the most enemy phases a unit's HP is carried over while no heal of
--- the army's can reach it (a unit a heal can reach is read on 2: the next and the one after).
--- 3, the least that read Colm's Ch9 death (27 HP outlives two hits of 12: runs wg2x23 and
--- wg3x23, #510). Its own budget of sight.nextPhase calls, beside the
+-- the wear (ADR 0421): the most enemy phases a unit's HP is carried over while no heal of the
+-- army's can reach it. 3, the least that read Colm's Ch9 death (27 HP outlives two hits of 12:
+-- runs wg2x23 and wg3x23, #510). Its own budget of sight.nextPhase calls, beside the
 -- lookahead's: a decision and an attempt. The most seen were 57 and 122 (vanilla Ch11,
 -- lap3e/11, run wn11), so neither cut any of the 31 games behind the ADR
 M.WEAR = 3
@@ -2234,29 +2232,23 @@ function M.plan(Bot, board, sight, style, opts)
         for i, w in ipairs(ways) do
             hitOf[i] = inWay(hit, w, function(u) return u.id end, "back")
         end
-        -- The wear (ADR 0421, 0459): how many enemy phases a wounded unit of the plan is read on.
-        -- A heal of the army's can reach it when it holds one of its own (sight.salve) or a staff
-        -- of the army's gets within its reach next turn (healsNext). With none its HP carries
-        -- through M.WEAR phases; with one, through the two the reading can play, the next and the
-        -- one after, with no heal between them (pessimistic for that unit: a heal reaching it
-        -- next turn is no heal played).
+        -- The wear (ADR 0421): whether a heal of the army's can reach a unit of the plan
+        -- before the enemy phase after the next. None can when it holds none of its own
+        -- (sight.salve) and no staff of the army's gets within its reach next turn (healsNext).
+        -- Its HP then carries from phase to phase.
         local plannedBy, unhealed = {}, {}
         for _, p in ipairs(planned) do plannedBy[p.unit.id] = p end
-        -- -> the enemy phases the unit is read on: 1 when the sight cannot tell (no salve or turnsTo),
-        -- else 2 when a heal can reach it and M.WEAR when none can
+        -- -> the enemy phases the unit meets before a heal of the army's can reach it: 1 when one
+        -- reaches it next turn, M.WEAR at most
         local function carries(id)
             if unhealed[id] ~= nil then return unhealed[id] end
             local p, n = plannedBy[id], 1
-            if p ~= nil and sight.salve ~= nil and sight.turnsTo ~= nil then
+            if p ~= nil and sight.salve ~= nil and sight.turnsTo ~= nil and not sight.salve(p.unit) then
                 n = M.WEAR
-                if sight.salve(p.unit) then
-                    n = 2
-                else
-                    for _, q in ipairs(planned) do
-                        if q ~= p and healsNext(q, p) then
-                            n = 2
-                            break
-                        end
+                for _, q in ipairs(planned) do
+                    if q ~= p and healsNext(q, p) then
+                        n = 1
+                        break
                     end
                 end
             end
@@ -2378,14 +2370,10 @@ function M.plan(Bot, board, sight, style, opts)
         st.advances, st.woundOnly = advances(st, fell, countered)
         -- each way the phase went and its units' HP there, for the wear's later phases
         st.outcomes, st.hitOf = outcomes, hitOf
-        -- the wounded units of the plan, in id order: struck by the phase, or left at or under half
-        -- their HP by the plan (ADR 0459: 39 of the 79 deaths with no read past the first phase
-        -- were of a unit the phase did not strike; #743 comment 7113644701)
+        -- the units the phase strikes that no heal of the army's reaches after it, in id order
         st.worn, st.wearFor = {}, {}
         for _, p in ipairs(planned) do
-            local hurt = (struck[p.unit.id] or 0) > 0
-                         or (p.hp > 0 and p.hp * 2 <= (p.unit.maxhp or p.hp))
-            if hurt and carries(p.unit.id) > 1 then
+            if (struck[p.unit.id] or 0) > 0 and carries(p.unit.id) > 1 then
                 st.worn[#st.worn + 1] = p.unit.id
                 st.wearFor[p.unit.id] = carries(p.unit.id)
             end
@@ -2649,19 +2637,18 @@ function M.plan(Bot, board, sight, style, opts)
         local function r4(x) return math.floor(x * 1e4 + 0.5) / 1e4 end
         return { base = r4(st.base), max_die = r4(most), sum_die = r4(sum) }
     end
-    -- The wear (ADR 0421, 0459): a wounded unit of the plan (judge's st.worn: struck, or left at
-    -- or under half its HP) is read on st.wearFor enemy phases (M.WEAR when no heal of the
-    -- army's can reach it, two when one can), its HP carried from each into the next. The
-    -- second is played by the game's AI after our army's reply (sight.nextPhase); each one past
-    -- it is taken as the second again. Its chance to die is that of dying in any of them: each
-    -- way the next phase went (judge's st.outcomes, on that way's HP: st.hitOf), the same ways
-    -- its own death is read over, then the later phases' strikes on what is left. A unit whose death ends the game adds its
+    -- The wear (ADR 0421): a unit the judged phase strikes that no heal of the army's reaches
+    -- before the phase after it (judge's st.worn) is read on M.WEAR enemy phases, its HP
+    -- carried from each into the next. The second is played by the game's AI after our army's
+    -- reply (sight.nextPhase); each one past it is taken as the second again. Its
+    -- chance to die is that of dying in any of them: each way the next phase went (judge's
+    -- st.outcomes, on that way's HP: st.hitOf), the same ways its own death is read over, then
+    -- the later phases' strikes on what is left. A unit whose death ends the game adds its
     -- later death to the game over, as the lookahead's second phase does.
-    -- Only such a unit takes the later phases here: a unit not wounded has no later death worth
-    -- the call, and the hold is no reading (ADR 0389's amendment of 2026-11-08; ADR 0459 widened
-    -- the unit from "struck and no heal reaches" to "wounded"). One sight.nextPhase call a plan,
-    -- within its own budget beside the lookahead's: M.WEAR_DECISION a decision and
-    -- opts.budget.wear left of M.WEAR_ATTEMPT. A plan past it keeps the one-phase
+    -- Only such a unit takes the later phases here: for any other the turn between can
+    -- restore it, and the hold is no reading (ADR 0389's amendment of 2026-11-08). One
+    -- sight.nextPhase call a plan, within its own budget beside the lookahead's: M.WEAR_DECISION
+    -- a decision and opts.budget.wear left of M.WEAR_ATTEMPT. A plan past it keeps the one-phase
     -- reading and is counted (`wear_skipped`): botrun records a wear_budget anomaly.
     -- The mend does not try such a unit's other acts for the wear alone: tried, it lost
     -- vanilla Ch5x's two chests and its clean clear (runs wr5 and wn5, #510).

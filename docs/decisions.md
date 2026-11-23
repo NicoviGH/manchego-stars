@@ -299,7 +299,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0455` | [A fogged enemy plays from the tile it was last seen on](decisions/0455-a-fogged-enemy-plays-from-the-tile-it-was-last-seen-on.md) | 2026-11-22 | #713 #699 #510 |
 | `0456` | [The fog read sums the strikes of the arrivals no one has seen](decisions/0456-the-fog-read-sums-the-strikes-of-the-unseen-arrivals.md) | 2026-11-22 | #713 #699 #510 |
 | `0458` | [An advance is material, and an under-cap march is not idle](decisions/0458-an-advance-is-material-and-an-under-cap-march-is-not-idle.md) | 2026-11-23 | #744 #699 #510 |
-| `0459` | [A wounded unit is read on the phases after the next, and a sandbox strike equips its weapon](decisions/0459-a-wounded-unit-is-read-on-the-phases-after-the-next-and-a-strike-equips-its-weapon.md) | 2026-11-23 | #743 #510 |
+| `0459` | [A sandbox strike equips its weapon](decisions/0459-a-sandbox-strike-equips-its-weapon.md) | 2026-11-23 | #743 #510 |
 
 ---
 
