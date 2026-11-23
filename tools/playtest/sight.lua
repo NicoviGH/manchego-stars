@@ -170,6 +170,7 @@
 --   unseen()                 every tile the fog hides now: gBmMapFog 0 there, which
 --                            RefreshEntityBmMaps never leaves without fog (bmmap.c). An enemy
 --                            in fog is the game's US_BIT9 (board.lua), no target.
+--   fogChapter()             whether the chapter has fog (gPlaySt.chapterVisionRange > 0).
 --   staves(u)                the staves `u` can heal with, { slot (0-based), amount, exp,
 --                            range (its reach: Board.staffRange, Physic's Mag/2) }:
 --                            one of M.HEAL_STAVES that CanUnitUseStaff allows.
@@ -4495,6 +4496,9 @@ function M.new(outer)
         end
         return seen.redCount
     end
+    -- Whether the chapter has fog (gPlaySt.chapterVisionRange > 0): botrun's gate for reading
+    -- the arrivals (s.arrivalUnits) before any plan's sandbox opens.
+    function s.fogChapter() return mem.u8(S.gPlaySt + PLAY_VISION) > 0 end
     function s.unseen()
         local out = {}
         for y = 0, h - 1 do
@@ -5033,7 +5037,10 @@ function M.new(outer)
     -- spawn (LOADSINGLEUNIT) has no definition and is not built, nor a load that finds no free
     -- red slot (the loader would read a NULL unit). Read once a sight, never inside a sandbox
     -- (asserted: a nested one does not undo the loader's writes): botrun reads it at each
-    -- fog chapter's player phase, with no plan's sandbox open.
+    -- fog chapter's player phase (s.fogChapter), with no plan's sandbox open, whatever the fog
+    -- shows then: a plan's sandbox may hide tiles the phase start saw. Kept for the sight's
+    -- life, one attempt (botrun's play makes a sight each attempt): the levels and items are
+    -- that one draw for the whole attempt, an estimate either way.
     local arrivalUnits
     function s.arrivalUnits()
         if arrivalUnits then return arrivalUnits end

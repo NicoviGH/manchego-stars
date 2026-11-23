@@ -2065,6 +2065,34 @@ do
           "48@9,9 t5", "pending: its tile and turn")
 end
 
+-- #713 fix 3 (review of PR #740): the arrivals are built at the phase start of a fog chapter
+-- even when the fog hides nothing then; a plan that moves a unit away hides tiles, and its fog
+-- read would build them inside the plan's sandbox (sight.arrivalUnits refuses that).
+do
+    local built = 0
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) } }
+    local mk = g.api.sight
+    g.api.sight = function()
+        local s = mk()
+        s.fogChapter = function() return true end
+        s.unseen = function() return {} end
+        s.arrivalUnits = function() built = built + 1; return {} end
+        return s
+    end
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board)
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true } }
+        end,
+    }
+    Botrun.run(g.api)
+    check(built > 0, true, "arrivals: built at a fog chapter's phase start, nothing hidden yet")
+end
+
 -- #724: attempt 1 (no memory) is told the arrival a turn event's script makes (sight.scriptedUnits);
 -- one a retry saw (memory) wins over the scripted one; an unowed one is not told.
 do

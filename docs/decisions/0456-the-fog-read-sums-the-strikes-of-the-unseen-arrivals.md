@@ -1,7 +1,7 @@
 ---
 id: 456
 title: "The fog read sums the strikes of the arrivals no one has seen"
-date: "2026-11-23"
+date: "2026-11-22"
 section: "Combat System"
 issues: [713, 699, 510]
 ---
@@ -29,18 +29,21 @@ cover Prologue to Ch8 and Ch13 only, so they could not be the input.
     sighted this attempt, and not remembered by a retry (those are the judged phase's, ADR 0399
     and 0455). An unmatched one counts only when it arrives in the coming enemy phase; one that
     should be on the board and is not was held by its event's guard, or is gone.
-  - **As the game makes it.** Each is built once a chapter by the game's own event loader
+  - **As the game makes it.** Each is built once an attempt by the game's own event loader
     (`LoadUnit_800F704` on its quiet path: LoadUnit, the difficulty's bonus levels, the last REDA
     tile), one at a time on the board as it stands. This runs in one sandbox at the top level,
     whose load puts RAM and RNG back (`s.arrivalUnits`). For a strike, its struct is written into a
     free red slot by journaled writes (`Sight.standIn`), so the sandbox empties the slot again. The
-    game's AI then decides from there, as the fog read's other strike does.
+    game's AI then decides from there, as the fog read's other strike does. Botrun builds them at
+    the first player phase of a fog chapter (`s.fogChapter`), before any plan's sandbox opens,
+    whatever the fog hides then: a plan that moves a unit away hides tiles the phase start saw.
   - **Where it stands, and how likely.** A player knows the wave came, not where it went. On
     its load tile when it arrives this enemy phase, since it acts the phase it comes, for certain.
     Otherwise it may be on any unseen tile its moves since could reach, each alike: (turn − its
     event's turn) × its MOV from the load tile (`Bot.arrivalRegion`). It strikes from the one nearest
     the unit that no other stand-in takes, and its strike counts by the share of those tiles within
-    its MOV + reach of the unit (`Bot.arrivalFrom`, `Bot.present`).
+    its MOV + reach of the unit (`Bot.arrivalFrom`, `Bot.present`). The unit's own tile is not one
+    of those tiles: no arrival stands there.
   - **Why the chance.** Counted in full, each arrival stood on the reachable tile nearest every
     unit. After two turns that is everywhere, so the read was high on every tile and steered
     nothing: in Ch19 Artur (0x13) read 0.66 to 0.88 on every tile a plan offered him (#713

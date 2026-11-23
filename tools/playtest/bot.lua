@@ -563,16 +563,21 @@ function M.arrivalFrom(a, unit, turn, x, y, region, held, used)
         if manhattan(a.x, a.y, x, y) > a.mov + a.reach then return nil end
         return { x = a.x, y = a.y }, 1
     end
-    local from, near, within = nil, nil, 0
+    -- the unit's own tile (x, y) is not one the arrival can stand on: it is out of the count
+    -- too, else the chance is too low (3 of 10 where it is 3 of 9)
+    local from, near, within, tiles = nil, nil, 0, 0
     for _, t in ipairs(region) do
         local d = manhattan(t.x, t.y, x, y)
-        if d <= a.mov + a.reach and d > 0 then
-            within = within + 1
-            if not used[tileKey(t.x, t.y)] and (not near or d < near) then from, near = t, d end
+        if d > 0 then
+            tiles = tiles + 1
+            if d <= a.mov + a.reach then
+                within = within + 1
+                if not used[tileKey(t.x, t.y)] and (not near or d < near) then from, near = t, d end
+            end
         end
     end
     if not from then return nil end
-    return from, within / #region
+    return from, within / tiles
 end
 
 -- The tiles arrival `a` may stand on unseen at the enemy phase of `turn` (#713 fix 3): every

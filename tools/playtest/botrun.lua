@@ -1639,8 +1639,10 @@ function M.run(api)
             -- inside one is not kept, so every plan would scan again) and only when a recruit is owed
             if owed and #owed > 0 and sight.scriptedUnits then sight.scriptedUnits() end
             -- the arrivals as the game loads them (sight.arrivalUnits, #713 fix 3, ADR 0456), built
-            -- here for the same reason: every plan's fog read asks them, from inside its sandbox
-            if sight.arrivalUnits and sight.unseen and #sight.unseen() > 0 then sight.arrivalUnits() end
+            -- here for the same reason: every plan's fog read asks them, from inside its sandbox.
+            -- Gated on the chapter's fog, not on what the fog hides now: a plan that moves a unit
+            -- away hides tiles this board shows, and its read would then build them in a sandbox
+            if sight.arrivalUnits and sight.fogChapter and sight.fogChapter() then sight.arrivalUnits() end
             commit, movers = nil, {}
             for _, u in ipairs(board.units) do
                 if u.onField and u.faction == "green" then

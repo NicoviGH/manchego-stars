@@ -7847,6 +7847,10 @@ do
     local from, chance = B.arrivalFrom(a, nil, 3, 0, 0, region, {}, {})
     check(from and (from.x .. "," .. from.y), "6,0", "arrivalFrom: the region's tile in reach")
     check(chance, 0.25, "arrivalFrom: the share of the region within MOV + reach")
+    -- the unit's own tile is no tile the arrival stands on, so not one of the share's either
+    -- (review of PR #740): on (9, 0), the other 3 tiles are all in reach, 3 of 3, not 3 of 4
+    local _, mine = B.arrivalFrom(a, nil, 3, 9, 0, region, {}, {})
+    check(mine, 1, "arrivalFrom: the unit's own tile is out of the share")
     local mixed = B.present({ [12] = 1 }, 0.25)
     check(string.format("%.2f %.2f", mixed[0], mixed[12]), "0.75 0.25", "present: the strike or nothing")
     -- the fog read takes it so: a strike that kills, from an arrival a quarter likely in reach,

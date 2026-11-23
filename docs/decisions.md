@@ -297,7 +297,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0453` | [An attack holding the weapon whose counter spares a recruit](decisions/0453-an-attack-holding-the-weapon-that-spares-a-recruit.md) | 2026-11-22 | #730 #699 #510 |
 | `0454` | [An enemy-phase death is graded by the committed plan's weighted read](decisions/0454-an-enemy-phase-death-is-graded-by-the-committed-plans-weighted-read.md) | 2026-11-22 | #717 #510 |
 | `0455` | [A fogged enemy plays from the tile it was last seen on](decisions/0455-a-fogged-enemy-plays-from-the-tile-it-was-last-seen-on.md) | 2026-11-22 | #713 #699 #510 |
-| `0456` | [The fog read sums the strikes of the arrivals no one has seen](decisions/0456-the-fog-read-sums-the-strikes-of-the-unseen-arrivals.md) | 2026-11-23 | #713 #699 #510 |
+| `0456` | [The fog read sums the strikes of the arrivals no one has seen](decisions/0456-the-fog-read-sums-the-strikes-of-the-unseen-arrivals.md) | 2026-11-22 | #713 #699 #510 |
 
 ---
 
