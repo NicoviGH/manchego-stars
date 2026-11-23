@@ -20,15 +20,20 @@ never been sized against the latest measurement (`m740c`, #699 comment 709311236
 **The call.**
 - **The roadmap:** the user Project https://github.com/users/NicoviGH/projects/2, linked to
   the repository. Its fields:
-  - **Phase:** Now, Next, Later, Parked or Epic. The epics are #640, #699 and #689.
-  - **Rank:** the order within a phase.
+  - **Status:** Now, Next, Later, Parked, Epic or Done. The epics are #640, #699 and #689.
+    It is the built-in Status field: a Board view's columns group by it, and grouping cannot
+    be set through the API.
+  - **Rank:** the order within a Status.
   - **Reach:** what the issue touches in the latest measurement.
 - **The one place the order lives.** HANDOFF and #699's status table point at the Project;
   they do not restate the order.
 - **The guard:** `make tidy` (`tools/gh_tidy.py`, `check_roadmap`) reports every open issue in
-  #640's tree, the root included, that is not on the Project or has no Phase. Reading Project
+  #640's tree, the root included, that is not on the Project or has no Status. Reading Project
   items needs the token's `read:project` scope. Without it, the run exits 2 (UNCHECKED), never
   clean.
+- **Views:** "Roadmap" (a Board, one column per Status) and "Ranked list" (a Table); both
+  hide Done.
 - **Placing new work:** a new issue under #640 is placed with its reach, sized against the
   latest measurement, before work starts on it (Nicolas, 2026-11-22: size a fix before
-  recommending it). Parked issues also carry the `on-hold` label and their one why-comment.
+  recommending it). Parked issues also carry the `on-hold` label and its one why-comment; `make tidy` checks the
+  label.
