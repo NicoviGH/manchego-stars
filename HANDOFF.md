@@ -11,31 +11,18 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-22, late; main is 4f5bfdbc + HANDOFF).**
-- **Merged: PR #740** (#713 fix 3, ADR 0456) as 4f5bfdbc, on green CI for its head. The fog read now sums the strikes of the unseen arrivals.
-  - Reviewed with `review-to-clean`: 6 findings, 5 fixed and 1 stale; then a scoped re-review, whose 1 nit was fixed.
-  - Two of the fixes change behaviour: botrun builds the arrivals at the phase start of any fog chapter (`sight.fogChapter`), and `arrivalFrom` leaves the unit's own tile out of the share.
-  - Recorded on #713 (comment 7089767212).
-- **The "replan reads no fog" lead is refuted** (#713 comment 7089816121, from the kept trace; nothing replayed).
-  - Eirika's turn-8 death in `fo713on` s4010 came from two hidden starting Soldiers (138 and 151). They never moved and were never seen, and together they did exactly her 17 HP. The fog read prices one hidden strike, so it read 0.
-  - Vanilla's Chapter Status screen shows the enemy count, fogged units included (`uichapterstatus.c:611`).
-- **#713 fix 4 is not worth building now** (#713 comment 7090479113, counted from the `m699c` traces).
-  - Fog deaths are 26 of the 183 player deaths, all in Ch19. Over-the-cap deaths are 106 (58%).
-  - Fix 4's case, several hidden strikers that kill only together, is 10 deaths. Fog only breaks ties, so it would likely change no play.
-  - Not built; recommended to Nicolas to stop the fog line here.
-- **Measured the batch (#699 comment 7093112364, tags `m740c<N>`, main a4a55371):** 7 of 34 campaigns clean within 3 attempts, against `m699c`'s 1 of 34.
-  - Over-cap deaths are now 68% of player deaths (108 of 158).
-  - **Three causes, root-caused from the `m740c` traces (#699 comment 7106711753).**
-    - **Over-cap deaths:** the trap is set the turn before, because the read covers one phase and the second phase only breaks ties. 16 deaths are sacrifices made by rule (the idle rule, the lord first).
-    - **Ch14:** our own door act at (22,18) releases Rennac before his talker is near.
-    - **Ch19:** the chests have no deadline (`closes_on` None).
-    - **The measurement:** deterministic, but it sees only large moves.
-  - **Next, in order:**
-    1. A forced-plan replay at t−1 on 3 or 4 trapped deaths. `replay` refuses non-suite runs, so it needs a hook. If the trap holds, the scoring change is Nicolas's call.
-    2. Ch14's door timing.
-    3. Ch19's deadlines from `scriptedUnits`.
-  - Cause 4's ally ruling is not in the recorder yet (no ADR 0376 amendment). It is a certain record fix, but it frees no pair now.
-- Reviewer worktrees in `.claude/worktrees/` (untracked) can be deleted.
+**Next session starts here (2026-11-23; main is 04bf54f0 + HANDOFF).**
+- **The work order lives on the roadmap board,** https://github.com/users/NicoviGH/projects/2 (ADR 0457). Use its "Roadmap" view (one column per Status) or "Ranked list". It is not restated here. `make tidy` fails on any open #640 issue that is not on the board.
+- **In flight when this was written:** two Sonnet subagents, results due as comments on their issues.
+  - **#743 (the over-cap trap):** a forced-plan hook plus replays.
+  - **#744 (the idle and lord-first rules):** a variant replayed on the witness games.
+  - If a session ends before they report, their worktrees are in `.claude/worktrees/`.
+- **Nicolas's calls this session:**
+  - Size a fix against all the deaths before recommending it.
+  - Retries learn what happened (#741). The guide claims are removed once that lands, and attempt 1 plays with no guide.
+  - The verdict counts attempts to the first clean clear (#742).
+  - The order lives on the GitHub roadmap.
+- **Measurement:** `m740c` (#699 comment 7093112364): 7 of 34 campaigns clean. Root causes: comment 7106711753.
 
 *Before that (2026-11-23, evening; fix 3 built, not merged):* see #713 comments 7087475499, 7089185979.
 
