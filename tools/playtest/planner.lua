@@ -2280,9 +2280,21 @@ function M.plan(Bot, board, sight, style, opts)
         -- first reaches it: M.outranks runs inside table.sort, and a sandbox call there yields
         -- across a C call (every scout-ch6 run crashed so, review of #598)
         st.fogBy, st.fogSum = {}, 0
-        for _, p in ipairs(planned) do
-            local f = fogDie(p.unit, p.x, p.y, p.hp - (taken[p.unit.id] or 0))
-            if f > 0 then st.fogBy[p.unit.id], st.fogSum = f, st.fogSum + f end
+        -- the fog read of unit `u` on (x, y) at `hp`, paid into the plan's sum
+        local function addFog(u, x, y, hp)
+            local f = fogDie(u, x, y, hp)
+            if f > 0 then st.fogBy[u.id], st.fogSum = f, st.fogSum + f end
+        end
+        for _, p in ipairs(planned) do addFog(p.unit, p.x, p.y, p.hp - (taken[p.unit.id] or 0)) end
+        -- a green meets the fog where the plan leaves it (#713): every green's loss is paid as a
+        -- player unit's (below), so its fog read is summed with theirs. A carried one meets none
+        for _, g in ipairs(greens) do
+            local c = (st.carry or {})[g.id]
+            local gx, gy = g.x, g.y
+            if c and c.x then gx, gy = c.x, c.y end
+            if not (c and c.by) and (g.onField or (c and c.x)) then
+                addFog(g, gx, gy, g.hp - (taken[g.id] or 0))
+            end
         end
         st.predict = {}
         for _, g in ipairs(greens) do
