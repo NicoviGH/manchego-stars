@@ -29,8 +29,8 @@ reordered would give that slot another item.
 
 **Not done: the wider wounded read.** PR #755 first also read a wounded unit (struck, or left at
 or under half its HP, a heal in reach or not) on the phases after the next. It was cut before
-merge: the read past the first phase is not calibrated in either direction (#743 comments
-7106711753, 7113644701), the widening saved no unit the replays could point to, it moved a Ch21
+merge: the read past the first phase is not calibrated in either direction (#699 comment
+7106711753, #743 comment 7113644701), the widening saved no unit the replays could point to, it moved a Ch21
 choice (vanilla `b640e-cs-s4007` attempt 1, turn 2) on a 57.5% read of Ephraim (charId 0x0F) that
 plays no heal between the phases, and it cost +12.6% CPU. The calibration comes first (#743 plan,
 step 2).
