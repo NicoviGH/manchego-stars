@@ -11,7 +11,22 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23; main is f7367888 + this HANDOFF).**
+**Next session starts here (2026-11-23, evening; main is f7367888 + HANDOFFs).**
+- **#713 fix 3 is built on `feat/713-arrival-fog-read` (pushed, no PR yet; commits 999310a9, 6a958fd4; ADR 0456).** Findings are on #713 (comments 7087475499, 7089185979).
+  - **What it does:** the fog read adds one strike from each red arrival of the turn events that no one has seen. The game's own loader (`LoadUnit_800F704`) builds each arrival once a chapter in a top-level sandbox (`s.arrivalUnits`). Each strike counts by the share of the arrival's reachable unseen tiles within MOV + reach (`Bot.arrivalRegion`, `arrivalFrom`, `present`).
+  - **Two fixes ship with it, both bugs on main too:** the seen kit's strike was stood on the unit's own planned tile, and greens never met the fog read.
+  - **Proof:** unit tests that fail without each fix; replays of Ch19 `b640e-cs-s4003` a1 (`fix713i`/`j`/`k`) with no leaks.
+    - The read now tells tiles apart: Artur's turn-4 tiles read 0.13 to 0.76, where before every tile read 0.66 to 0.88.
+    - The game is unchanged: lost on turn 7. The plan that kills Artur wins on progress, and fog ranks after progress (ADR 0400).
+  - **Tried and dropped (not in the branch): `fog_over`,** the fog read above the cap ranked right after the win. Vanilla Ch6, 10 starts a1, on vs off (`fo713on`/`fo713off`): 1 loss against 0, and fallback turns 7 against 3. Ch19 (`fix713l`) was worse too. Table on #713.
+- **Next, in order:**
+  1. Open the PR for the branch, `/code-review <PR> medium`, `review-to-clean`; merge on green CI (step-9 PRs may merge after review).
+  2. **New lead (untested):** a replan later in a turn does not read the fog for units that acted earlier that turn. Witness: `fo713on` s4010 t8, where Eirika died in fog unread and every judged plan carried the same `fog_over` 0.92. Settle it with one instrumented replay.
+  3. Then the rest below (#734, #730 fix 3, #739, the `attempts` set on #699's starts).
+- Nicolas this session: "if you found the root cause you don't need my input"; and send cheap subagents to confirm details rather than guess.
+
+*Earlier the same day (main was f7367888 + HANDOFF):*
+
 - **Merged: PR #738** (#713 fix 1, ADR 0455) as f7367888, on green CI for its head. Reviewed (`review-to-clean`: 10 findings plus 5 re-review nits, all fixed).
   - What it does: a fogged enemy this attempt saw, and no retry remembers, is a ghost. The danger maps and both judged phases play it from its last-seen tile (`Sight.ghostsOn`, `placeGhosts`, `ghostly` scopes).
   - Proof: unit tests that fail without the fix; `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh ghostprobe` PASS; replay `fix713g` (Ch19 `b640e-cs-s4003` a1). Main lost on turn 7, three deaths to the fog. The branch lost on turn 12, none to the fog. Table on #713.
