@@ -69,8 +69,10 @@ REPO = '%s/%s' % (REPO_OWNER, REPO_NAME)
 ROADMAP_URL = 'https://github.com/users/%s/projects/%d' % (REPO_OWNER, ROADMAP_PROJECT)
 COMMENT_PAGE = 100
 _COMMENT_FIELDS = 'pageInfo { hasNextPage endCursor } nodes { databaseId body createdAt updatedAt }'
+# One level past PARENT_DEPTH, so the deepest ancestor read shows whether it has a parent of its
+# own: a chain of exactly PARENT_DEPTH ancestors ending at its top is then told from a longer one.
 _PARENTS = 'number'
-for _ in range(PARENT_DEPTH - 1):
+for _ in range(PARENT_DEPTH):
     _PARENTS = 'number parent { %s }' % _PARENTS
 _PROJECT_ITEMS = ('projectItems(first: %d) { pageInfo { hasNextPage } nodes { project { number '
                   'owner { ... on User { login } ... on Organization { login } } } '
@@ -238,7 +240,7 @@ def _in_roadmap_tree(issue):
         depth += 1
         if p['number'] == ROADMAP_ROOT:
             return True
-        if depth >= PARENT_DEPTH and 'parent' not in p:
+        if depth >= PARENT_DEPTH and p.get('parent'):
             return None
         p = p.get('parent')
     return False

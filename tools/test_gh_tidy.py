@@ -99,7 +99,8 @@ class RoadmapTest(unittest.TestCase):
         self.assertIn('more than %d Projects' % gh_tidy.PROJECT_PAGE, self._of(936)[0])
 
     def test_issues_outside_the_tree_and_a_labelled_parked_one_pass(self):
-        for n in (900, 902, 903, 911):
+        # #937: exactly PARENT_DEPTH ancestors, its top another epic's: outside, not too deep
+        for n in (900, 902, 903, 911, 937):
             self.assertEqual(self._of(n), [], n)
 
     def test_the_root_itself_must_be_on_the_board(self):
@@ -108,7 +109,7 @@ class RoadmapTest(unittest.TestCase):
         self.assertTrue(any(m.startswith('#640 ') for m in gh_tidy.check_roadmap(data['issues'])))
 
     def test_the_queries_read_the_parent_chain_and_the_status_apart(self):
-        self.assertEqual(gh_tidy.ISSUES_QUERY.count('parent {'), gh_tidy.PARENT_DEPTH)
+        self.assertEqual(gh_tidy.ISSUES_QUERY.count('parent {'), gh_tidy.PARENT_DEPTH + 1)
         self.assertNotIn('projectItems', gh_tidy.ISSUES_QUERY)
         self.assertIn('fieldValueByName(name: "Status")', gh_tidy.ROADMAP_QUERY)
         self.assertIn('owner {', gh_tidy.ROADMAP_QUERY)

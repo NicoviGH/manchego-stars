@@ -493,7 +493,10 @@
      "parent": {
       "number": 962,
       "parent": {
-       "number": 963
+       "number": 963,
+       "parent": {
+        "number": 964
+       }
       }
      }
     }
@@ -565,6 +568,35 @@
       }
      }
     ]
+   },
+   "comments": {
+    "nodes": []
+   }
+  },
+  {
+   "number": 937,
+   "title": "Bot: four levels under another epic",
+   "labels": {
+    "nodes": []
+   },
+   "parent": {
+    "number": 970,
+    "parent": {
+     "number": 971,
+     "parent": {
+      "number": 972,
+      "parent": {
+       "number": 973,
+       "parent": null
+      }
+     }
+    }
+   },
+   "projectItems": {
+    "pageInfo": {
+     "hasNextPage": false
+    },
+    "nodes": []
    },
    "comments": {
     "nodes": []

@@ -35,5 +35,5 @@ never been sized against the latest measurement (`m740c`, #699 comment 709311236
   hide Done.
 - **Placing new work:** a new issue under #640 is placed with its reach, sized against the
   latest measurement, before work starts on it (Nicolas, 2026-11-22: size a fix before
-  recommending it). Parked issues also carry the `on-hold` label and its one why-comment; `make tidy` checks the
-  label.
+  recommending it). Parked issues also carry the `on-hold` label and its one why-comment;
+  `make tidy` checks the label.
