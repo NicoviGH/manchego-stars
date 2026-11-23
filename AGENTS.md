@@ -26,6 +26,7 @@ The data is the doc — facts live in one place, indexes are generated (`decisio
 | The back half (ch09–ch20) | `status: planned` chapter YAMLs via the wiki (`tools/gen_wiki.py`); `docs/roadmap.md` |
 | Vision / roadmap | `docs/PRD.md` |
 | Backlog | GitHub issues (milestones M0–M4); current state → `HANDOFF.md` |
+| The bot's work order (#640) | The roadmap Project, https://github.com/users/NicoviGH/projects/2 (Phase, Rank, Reach; ADR 0457). `make tidy` fails on an open #640 issue missing from it. |
 
 ## The decomp answers "what does vanilla do," never "what do WE do"
 

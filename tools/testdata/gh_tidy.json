@@ -9,6 +9,18 @@
    "parent": null,
    "comments": {
     "nodes": []
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
+     }
+    ]
    }
   },
   {
@@ -22,6 +34,18 @@
    },
    "comments": {
     "nodes": []
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
+     }
+    ]
    }
   },
   {
@@ -32,6 +56,9 @@
    },
    "parent": null,
    "comments": {
+    "nodes": []
+   },
+   "projectItems": {
     "nodes": []
    }
   },
@@ -46,6 +73,18 @@
    },
    "comments": {
     "nodes": []
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
+     }
+    ]
    }
   },
   {
@@ -57,6 +96,9 @@
    "parent": null,
    "comments": {
     "nodes": []
+   },
+   "projectItems": {
+    "nodes": []
    }
   },
   {
@@ -67,6 +109,9 @@
    },
    "parent": null,
    "comments": {
+    "nodes": []
+   },
+   "projectItems": {
     "nodes": []
    }
   },
@@ -92,6 +137,18 @@
       "updatedAt": "2026-11-18T00:00:00Z"
      }
     ]
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
+     }
+    ]
    }
   },
   {
@@ -114,6 +171,18 @@
       "body": "**ON HOLD (Nicolas, 2026-11-03).** why",
       "createdAt": "2026-11-03T00:00:00Z",
       "updatedAt": "2026-11-03T00:00:00Z"
+     }
+    ]
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
      }
     ]
    }
@@ -148,6 +217,18 @@
       "updatedAt": "2026-11-21T14:00:00Z"
      }
     ]
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
+     }
+    ]
    }
   },
   {
@@ -172,6 +253,18 @@
       "body": "### Status (edited in place, 2026-11-21)",
       "createdAt": "2026-11-21T09:00:00Z",
       "updatedAt": "2026-11-21T12:00:00Z"
+     }
+    ]
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
      }
     ]
    }
@@ -200,6 +293,88 @@
       "updatedAt": "2026-11-21T13:00:00Z"
      }
     ]
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": {
+       "name": "Next"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "number": 930,
+   "title": "Bot: not on the roadmap",
+   "labels": {
+    "nodes": []
+   },
+   "parent": {
+    "number": 640
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 7
+      },
+      "fieldValueByName": {
+       "name": "Now"
+      }
+     }
+    ]
+   },
+   "comments": {
+    "nodes": []
+   }
+  },
+  {
+   "number": 931,
+   "title": "Bot: on the roadmap, no phase",
+   "labels": {
+    "nodes": []
+   },
+   "parent": {
+    "number": 640
+   },
+   "projectItems": {
+    "nodes": [
+     {
+      "project": {
+       "number": 2
+      },
+      "fieldValueByName": null
+     }
+    ]
+   },
+   "comments": {
+    "nodes": []
+   }
+  },
+  {
+   "number": 932,
+   "title": "Bot: a grandchild not on the roadmap",
+   "labels": {
+    "nodes": []
+   },
+   "parent": {
+    "number": 699,
+    "parent": {
+     "number": 640,
+     "parent": {
+      "number": 510
+     }
+    }
+   },
+   "projectItems": {
+    "nodes": []
+   },
+   "comments": {
+    "nodes": []
    }
   }
  ],

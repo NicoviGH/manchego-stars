@@ -78,6 +78,30 @@ class StatusTest(unittest.TestCase):
         self.assertFalse(any(m.startswith('#921') for m in msgs))
 
 
+class RoadmapTest(unittest.TestCase):
+    def test_off_board_and_phaseless_issues_in_the_tree_are_reported(self):
+        # #930 sits on another Project only; #931 is on the roadmap with no Phase; #932 is a
+        # grandchild of #640 (through #699) with no board item at all
+        msgs = gh_tidy.check_roadmap(DATA['issues'])
+        self.assertEqual(sorted(m.split(' ')[0] for m in msgs), ['#930', '#931', '#932'], msgs)
+        self.assertIn('no Phase', next(m for m in msgs if m.startswith('#931')))
+
+    def test_issues_outside_the_tree_are_not_checked(self):
+        # #900 (no parent), #902 and #903 (other work) have no board item and are not reported
+        msgs = gh_tidy.check_roadmap(DATA['issues'])
+        self.assertFalse(any(m.startswith(p) for m in msgs for p in ('#900 ', '#902 ', '#903 ')))
+
+    def test_the_root_itself_must_be_on_the_board(self):
+        data = copy.deepcopy(DATA)
+        next(i for i in data['issues'] if i['number'] == 640)['projectItems'] = {'nodes': []}
+        self.assertTrue(any(m.startswith('#640 ') for m in gh_tidy.check_roadmap(data['issues'])))
+
+    def test_the_query_reads_the_parent_chain_and_the_phase(self):
+        q = gh_tidy.ISSUES_QUERY
+        self.assertEqual(q.count('parent {'), gh_tidy.PARENT_DEPTH)
+        self.assertIn('fieldValueByName(name: "Phase")', q)
+
+
 class MainTest(unittest.TestCase):
     def _run(self, fetch):
         with mock.patch.object(gh_tidy, 'fetch', fetch), \

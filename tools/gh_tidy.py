@@ -13,6 +13,11 @@ is wrong, and the one-line fix:
            reported twice).
   status   an issue with a status comment edited in place (STATUS_MARKER) that is older than
            the newest other comment on the issue.
+  roadmap  an OPEN issue in the roadmap root's tree (ROADMAP_ROOT, #640, and every issue whose
+           parent chain reaches it) that is not an item of the roadmap Project
+           (ROADMAP_PROJECT) or has no Phase there (#747, Nicolas 2026-11-23: "build a roadmap
+           and stick to it"). New work cannot pile up unranked. Reading Project items needs
+           the token's read:project scope; without it the fetch fails and the run exits 2.
 
 Run: python3 tools/gh_tidy.py     (or `make tidy`)
 Exit: 0 clean, 1 any finding, 2 `gh` failed (a failed fetch is never reported as clean).
@@ -42,19 +47,37 @@ ROOTS = frozenset({510})
 HOLD_LABEL = 'on-hold'
 HOLD_COMMENT = re.compile(r'^\s*\*\*on hold', re.IGNORECASE)
 STATUS_MARKER = re.compile(r'^### Status \(edited in place', re.MULTILINE)
+# The roadmap (#747): the user Project every open issue under ROADMAP_ROOT sits on, ranked by
+# its single-select ROADMAP_FIELD (Now, Next, Later, Parked, Epic).
+ROADMAP_ROOT = 640
+ROADMAP_PROJECT = 2
+ROADMAP_FIELD = 'Phase'
+ROADMAP_URL = 'https://github.com/users/NicoviGH/projects/%d' % ROADMAP_PROJECT
+# How far up the parent chain the query reads: #510 > #640 > #699 > a fix is three levels; one
+# more for headroom. An issue nested deeper is reported as outside the tree, so keep the tree
+# within it.
+PARENT_DEPTH = 4
 
 REPO_OWNER, REPO_NAME = 'NicoviGH', 'manchego-stars'
 REPO = '%s/%s' % (REPO_OWNER, REPO_NAME)
 COMMENT_PAGE = 100
 _COMMENT_FIELDS = 'pageInfo { hasNextPage endCursor } nodes { databaseId body createdAt updatedAt }'
+_PARENTS = 'number'
+for _ in range(PARENT_DEPTH - 1):
+    _PARENTS = 'number parent { %s }' % _PARENTS
+_PROJECT_ITEMS = ('projectItems(first: 20) { nodes { project { number } '
+                  'fieldValueByName(name: "%s") { '
+                  '... on ProjectV2ItemFieldSingleSelectValue { name } } } }' % ROADMAP_FIELD)
 ISSUES_QUERY = '''query($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
   issues(states: OPEN, first: 50, after: $after) {
     pageInfo { hasNextPage endCursor }
     nodes { number title
       labels(first: 30) { nodes { name } }
-      parent { number }
-      comments(first: %d) { %s } } } } }''' % (COMMENT_PAGE, _COMMENT_FIELDS)
+      parent { %s }
+      %s
+      comments(first: %d) { %s } } } } }''' % (_PARENTS, _PROJECT_ITEMS, COMMENT_PAGE,
+                                              _COMMENT_FIELDS)
 COMMENTS_QUERY = '''query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) { issue(number: $number) {
     comments(first: %d, after: $after) { %s } } } }''' % (COMMENT_PAGE, _COMMENT_FIELDS)
@@ -181,13 +204,44 @@ def check_stale_status(issues):
     return out
 
 
+def _in_roadmap_tree(issue):
+    """The issue is ROADMAP_ROOT or has it somewhere up its parent chain."""
+    if issue['number'] == ROADMAP_ROOT:
+        return True
+    p = issue['parent']
+    while p:
+        if p['number'] == ROADMAP_ROOT:
+            return True
+        p = p.get('parent')
+    return False
+
+
+def check_roadmap(issues):
+    out = []
+    for i in issues:
+        if not _in_roadmap_tree(i):
+            continue
+        items = [n for n in i['projectItems']['nodes']
+                 if n['project']['number'] == ROADMAP_PROJECT]
+        if not items:
+            out.append('#%d (%s): not on the roadmap (%s). Fix: gh project item-add %d '
+                       '--owner %s --url https://github.com/%s/issues/%d, then set its %s'
+                       % (i['number'], i['title'], ROADMAP_URL, ROADMAP_PROJECT, REPO_OWNER,
+                          REPO, i['number'], ROADMAP_FIELD))
+        elif not any(n['fieldValueByName'] for n in items):
+            out.append('#%d (%s): on the roadmap with no %s. Fix: set it on %s'
+                       % (i['number'], i['title'], ROADMAP_FIELD, ROADMAP_URL))
+    return out
+
+
 def findings(data):
     """Every finding as (kind, message), in a stable order."""
     return ([('orphan', m) for m in check_orphans(data['issues'])]
             + [('hold', m) for m in check_holds(data['issues'])]
             + [('pr-link', m) for m in check_pr_links(
                 data['pullRequests'], {i['number'] for i in data['issues']})]
-            + [('status', m) for m in check_stale_status(data['issues'])])
+            + [('status', m) for m in check_stale_status(data['issues'])]
+            + [('roadmap', m) for m in check_roadmap(data['issues'])])
 
 
 def main(argv):
