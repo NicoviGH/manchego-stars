@@ -13,6 +13,13 @@ is wrong, and the one-line fix:
            reported twice).
   status   an issue with a status comment edited in place (STATUS_MARKER) that is older than
            the newest other comment on the issue.
+  roadmap  an OPEN issue in the roadmap root's tree (ROADMAP_ROOT, #640, and every issue whose
+           parent chain reaches it) that is not an item of the roadmap Project
+           (ROADMAP_PROJECT) or has no Status there (#747, Nicolas 2026-11-23: "build a roadmap
+           and stick to it"). New work cannot pile up unranked. A Parked issue also needs the
+           on-hold label. Reading Project items needs the token's read:project scope; the
+           roadmap is read apart, so without it the other checks still run and print, and the
+           run exits 2 (the roadmap UNCHECKED).
 
 Run: python3 tools/gh_tidy.py     (or `make tidy`)
 Exit: 0 clean, 1 any finding, 2 `gh` failed (a failed fetch is never reported as clean).
@@ -24,7 +31,8 @@ backlog (#526, #543, #547 mention #510 and are roster/lord design, not bot work)
 resolves...", #707 "Tidy check: ...", both children of the #510 tree) are NOT checked for a
 parent; name a bot issue with a BOT_TITLE prefix to have it guarded.
 
-The fetch is two paginated GraphQL queries (open issues, open PRs), plus one follow-up query
+The fetch is three paginated GraphQL queries (open issues, open PRs, the open issues' roadmap
+items), plus one follow-up query
 for each issue with more than a page of comments, never a call per issue otherwise; the checks
 are pure functions of the parsed data, unit-tested on tools/testdata/gh_tidy.json.
 """
@@ -42,19 +50,50 @@ ROOTS = frozenset({510})
 HOLD_LABEL = 'on-hold'
 HOLD_COMMENT = re.compile(r'^\s*\*\*on hold', re.IGNORECASE)
 STATUS_MARKER = re.compile(r'^### Status \(edited in place', re.MULTILINE)
+# The roadmap (#747): the user Project every open issue under ROADMAP_ROOT sits on, ranked by
+# its single-select ROADMAP_FIELD: Now, Next, Later, Parked, Epic, Done. It is the built-in
+# Status field because a Board view's columns group by Status, and grouping cannot be set
+# through the API (ProjectV2ViewConfigurationInput holds only the visible fields).
+ROADMAP_ROOT = 640
+ROADMAP_PROJECT = 2
+ROADMAP_FIELD = 'Status'
+# How far up the parent chain the query reads: #510 > #640 > #699 > a fix is three levels; one
+# more for headroom. A chain cut off at this depth before it reaches the root or its top is a
+# finding (`check_roadmap`): its place in the tree cannot be told, so it is never passed.
+PARENT_DEPTH = 4
+# Project items read per issue: more than this on one issue is a finding, never a pass.
+PROJECT_PAGE = 20
 
 REPO_OWNER, REPO_NAME = 'NicoviGH', 'manchego-stars'
 REPO = '%s/%s' % (REPO_OWNER, REPO_NAME)
+ROADMAP_URL = 'https://github.com/users/%s/projects/%d' % (REPO_OWNER, ROADMAP_PROJECT)
 COMMENT_PAGE = 100
 _COMMENT_FIELDS = 'pageInfo { hasNextPage endCursor } nodes { databaseId body createdAt updatedAt }'
+# One level past PARENT_DEPTH, so the deepest ancestor read shows whether it has a parent of its
+# own: a chain of exactly PARENT_DEPTH ancestors ending at its top is then told from a longer one.
+_PARENTS = 'number'
+for _ in range(PARENT_DEPTH):
+    _PARENTS = 'number parent { %s }' % _PARENTS
+_PROJECT_ITEMS = ('projectItems(first: %d) { pageInfo { hasNextPage } nodes { project { number '
+                  'owner { ... on User { login } ... on Organization { login } } } '
+                  'fieldValueByName(name: "%s") { '
+                  '... on ProjectV2ItemFieldSingleSelectValue { name } } } }'
+                  % (PROJECT_PAGE, ROADMAP_FIELD))
 ISSUES_QUERY = '''query($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
   issues(states: OPEN, first: 50, after: $after) {
     pageInfo { hasNextPage endCursor }
     nodes { number title
       labels(first: 30) { nodes { name } }
-      parent { number }
-      comments(first: %d) { %s } } } } }''' % (COMMENT_PAGE, _COMMENT_FIELDS)
+      parent { %s }
+      comments(first: %d) { %s } } } } }''' % (_PARENTS, COMMENT_PAGE, _COMMENT_FIELDS)
+# The roadmap's own read, apart from ISSUES_QUERY: it needs the token's read:project scope, and a
+# token without it must leave the other checks running (only the roadmap is UNCHECKED).
+ROADMAP_QUERY = '''query($owner: String!, $name: String!, $after: String) {
+  repository(owner: $owner, name: $name) {
+  issues(states: OPEN, first: 50, after: $after) {
+    pageInfo { hasNextPage endCursor }
+    nodes { number %s } } } }''' % _PROJECT_ITEMS
 COMMENTS_QUERY = '''query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) { issue(number: $number) {
     comments(first: %d, after: $after) { %s } } } }''' % (COMMENT_PAGE, _COMMENT_FIELDS)
@@ -119,8 +158,18 @@ def fetch():
             i['comments'] = _all_comments(i)
         else:
             i['comments'] = {'nodes': i['comments']['nodes']}
-    return {'issues': issues,
-            'pullRequests': _pages(PRS_QUERY, lambda r: r['pullRequests'])}
+    data = {'issues': issues, 'pullRequests': _pages(PRS_QUERY, lambda r: r['pullRequests'])}
+    try:
+        items = {n['number']: n['projectItems']
+                 for n in _pages(ROADMAP_QUERY, lambda r: r['issues'])}
+    except GhError as e:
+        data['roadmapError'] = str(e)
+        return data
+    for i in issues:
+        # an issue opened between the two reads has no row: it reads as off the board, a finding
+        i['projectItems'] = items.get(i['number'], {'pageInfo': {'hasNextPage': False},
+                                                     'nodes': []})
+    return data
 
 
 def is_bot(title):
@@ -181,13 +230,68 @@ def check_stale_status(issues):
     return out
 
 
+def _in_roadmap_tree(issue):
+    """True when the issue is ROADMAP_ROOT or has it up its parent chain, False when the chain
+    ends below the root's tree, None when the query's PARENT_DEPTH cut the chain off first."""
+    if issue['number'] == ROADMAP_ROOT:
+        return True
+    p, depth = issue['parent'], 0
+    while p:
+        depth += 1
+        if p['number'] == ROADMAP_ROOT:
+            return True
+        if depth >= PARENT_DEPTH and p.get('parent'):
+            return None
+        p = p.get('parent')
+    return False
+
+
+def check_roadmap(issues):
+    out = []
+    for i in issues:
+        tree = _in_roadmap_tree(i)
+        if tree is None:
+            out.append('#%d (%s): nested more than %d levels deep, so whether it is under #%d '
+                       'cannot be read. Fix: raise PARENT_DEPTH in tools/gh_tidy.py'
+                       % (i['number'], i['title'], PARENT_DEPTH, ROADMAP_ROOT))
+            continue
+        if not tree:
+            continue
+        conn = i['projectItems']
+        items = [n for n in conn['nodes']
+                 if n['project']['number'] == ROADMAP_PROJECT
+                 and (n['project'].get('owner') or {}).get('login') == REPO_OWNER]
+        if not items and conn['pageInfo']['hasNextPage']:
+            out.append('#%d (%s): on more than %d Projects, so whether the roadmap is one of '
+                       'them cannot be read. Fix: raise PROJECT_PAGE in tools/gh_tidy.py'
+                       % (i['number'], i['title'], PROJECT_PAGE))
+        elif not items:
+            out.append('#%d (%s): not on the roadmap (%s). Fix: gh project item-add %d '
+                       '--owner %s --url https://github.com/%s/issues/%d, then set its %s'
+                       % (i['number'], i['title'], ROADMAP_URL, ROADMAP_PROJECT, REPO_OWNER,
+                          REPO, i['number'], ROADMAP_FIELD))
+        elif not any(n['fieldValueByName'] for n in items):
+            out.append('#%d (%s): on the roadmap with no %s. Fix: set it on %s'
+                       % (i['number'], i['title'], ROADMAP_FIELD, ROADMAP_URL))
+        elif (any((n['fieldValueByName'] or {}).get('name') == 'Parked' for n in items)
+              and HOLD_LABEL not in [l['name'] for l in i['labels']['nodes']]):
+            # Parked is the board's word for on hold: the label (and through check_holds its
+            # one why-comment) keeps the two records saying the same thing (ADR 0457)
+            out.append('#%d (%s): Parked on the roadmap without the %s label. Fix: gh issue '
+                       'edit %d --add-label %s, plus one "**On hold" comment saying why'
+                       % (i['number'], i['title'], HOLD_LABEL, i['number'], HOLD_LABEL))
+    return out
+
+
 def findings(data):
     """Every finding as (kind, message), in a stable order."""
     return ([('orphan', m) for m in check_orphans(data['issues'])]
             + [('hold', m) for m in check_holds(data['issues'])]
             + [('pr-link', m) for m in check_pr_links(
                 data['pullRequests'], {i['number'] for i in data['issues']})]
-            + [('status', m) for m in check_stale_status(data['issues'])])
+            + [('status', m) for m in check_stale_status(data['issues'])]
+            + ([] if 'roadmapError' in data
+               else [('roadmap', m) for m in check_roadmap(data['issues'])]))
 
 
 def main(argv):
@@ -200,6 +304,12 @@ def main(argv):
     found = findings(data)
     for kind, msg in found:
         print('[%s] %s' % (kind, msg))
+    if 'roadmapError' in data:
+        # the other checks ran and are printed; the roadmap alone is unread, never clean
+        print('gh_tidy: could not read the roadmap Project, so it is UNCHECKED (needs the '
+              'read:project scope: gh auth refresh -s project): %s' % data['roadmapError'],
+              file=sys.stderr)
+        return 2
     if found:
         print('gh_tidy: %d finding(s)' % len(found))
         return 1
