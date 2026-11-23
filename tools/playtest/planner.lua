@@ -421,17 +421,13 @@ end
 -- stands on its tile through our phase, so its tile now is the one that heals it (#709). No heal
 -- leaves `hp` as it is; the cap is the unit's max HP (GetUnitMaxHp, bot.lua's context) and never
 -- below the HP it stands on now, so a unit over its max is not credited a wound by the clamp. A
--- unit left at 0 HP gains nothing. `hp` here is ONE HP (a survivor's): `outlasting` is the one
--- owner of the survivors' share of an expectation that mixes a kill.
+-- unit left at 0 HP gains nothing. `hp` here is ONE HP (a survivor's): `survivorDealt` is the
+-- one owner of the survivors' share of an expectation that mixes a kill.
 function M.healed(heal, e, hp)
     if heal == 0 or hp <= 0 then return hp end
     return Board.addHp(hp, heal, math.max(e.maxhp or hp, e.hp))
 end
 
--- What a blow of `dealt` on `hp` earns once the heal is counted (`kill`: its chance to kill). The
--- kill branch earns what it always did (the dead heal nothing: `dealt` there is the HP it had),
--- the surviving branch only the wound that outlasts the heal, healed(hp) - healed(hp - its mean
--- damage); the whole `dealt` where nothing heals.
 -- The surviving branch's mean damage of `dealt` on `hp`, a mean over the kill branch too (a kill
 -- deals the HP it had), given its chance `kill` < 1; held to [0, hp]: a survivor was left above 0,
 -- so more than hp is a rounding of `dealt`, never a bigger wound. The one read of it, for the
@@ -440,6 +436,10 @@ function M.survivorDealt(hp, dealt, kill)
     return math.min(hp, math.max(0, (dealt - kill * hp) / (1 - kill)))
 end
 
+-- What a blow of `dealt` on `hp` earns once the heal is counted (`kill`: its chance to kill). The
+-- kill branch earns what it always did (the dead heal nothing: `dealt` there is the HP it had),
+-- the surviving branch only the wound that outlasts the heal, healed(hp) - healed(hp - its mean
+-- damage); the whole `dealt` where nothing heals.
 function M.outlasting(heal, e, hp, dealt, kill)
     kill = kill or 0
     if heal == 0 or kill >= 1 or hp - dealt <= 0 then return dealt end
