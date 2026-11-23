@@ -14,8 +14,8 @@ and counted.
 
 **The problem.** Of 101 deaths over the cap in run m740c, 79 had no read past the first phase: 40
 were struck in it and not read (the wear exempted a unit a heal could reach), 39 were not struck
-in it (the counts are #743 comment 7113644701's). The wear already plays the later phases (`sight.nextPhase`) and its reading already
-replaces the unit's death in `protected`, so in admission. A second mechanism would copy it.
+in it (the counts are #743 comment 7113644701's). The wear already plays the later phases
+(`sight.nextPhase`) and its reading already replaces the unit's death in `protected`, so in admission. A second mechanism would copy it.
 
 **1. Who is read (`planner.lua` `carries()` and `judge()`'s `st.worn`).** A unit is read when it
 is wounded: struck in the judged phase, or left at or under half its max HP by the plan. Then:

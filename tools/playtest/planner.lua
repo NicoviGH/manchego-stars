@@ -250,8 +250,8 @@ M.LOOK_DECISION = 8
 M.LOOK_ATTEMPT = 128
 -- the wear (ADR 0421, 0459): the most enemy phases a unit's HP is carried over while no heal of
 -- the army's can reach it (a unit a heal can reach is read on 2: the next and the one after).
--- 3, the least that read Colm's Ch9 death (27 HP outlives two hits of 12:
--- runs wg2x23 and wg3x23, #510). Its own budget of sight.nextPhase calls, beside the
+-- 3, the least that read Colm's Ch9 death (27 HP outlives two hits of 12: runs wg2x23 and
+-- wg3x23, #510). Its own budget of sight.nextPhase calls, beside the
 -- lookahead's: a decision and an attempt. The most seen were 57 and 122 (vanilla Ch11,
 -- lap3e/11, run wn11), so neither cut any of the 31 games behind the ADR
 M.WEAR = 3
@@ -2653,10 +2653,9 @@ function M.plan(Bot, board, sight, style, opts)
     -- or under half its HP) is read on st.wearFor enemy phases (M.WEAR when no heal of the
     -- army's can reach it, two when one can), its HP carried from each into the next. The
     -- second is played by the game's AI after our army's reply (sight.nextPhase); each one past
-    -- it is taken as the second again. Its
-    -- chance to die is that of dying in any of them: each way the next phase went (judge's
-    -- st.outcomes, on that way's HP: st.hitOf), the same ways its own death is read over, then
-    -- the later phases' strikes on what is left. A unit whose death ends the game adds its
+    -- it is taken as the second again. Its chance to die is that of dying in any of them: each
+    -- way the next phase went (judge's st.outcomes, on that way's HP: st.hitOf), the same ways
+    -- its own death is read over, then the later phases' strikes on what is left. A unit whose death ends the game adds its
     -- later death to the game over, as the lookahead's second phase does.
     -- Only such a unit takes the later phases here: a unit not wounded has no later death worth
     -- the call, and the hold is no reading (ADR 0389's amendment of 2026-11-08; ADR 0459 widened
