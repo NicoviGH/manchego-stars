@@ -12,7 +12,8 @@ and start a fresh instance; don't rely on auto-compaction.
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
 **Next session starts here (2026-11-23; main is 04bf54f0 + HANDOFF).**
-- **The work order is #640's sub-issues, top to bottom** (GitHub's own parent/child list; #699 is closed into #640). Step 10 is #751, a child of #510. The roadmap Project was retired (Nicolas, 2026-11-23: it moved the backlog instead of shrinking it); PR #749 reverted #748 and the Project is closed.
+- **The work order is #640's sub-issues: #752 (nobody dies, the enemy forecast), then #753 (every reward), then #754 (the chapter ends)**; within each, its own sub-issue list. Step 10 is #751, a child of #510. The roadmap Project was retired (Nicolas, 2026-11-23: it moved the backlog instead of shrinking it); PR #749 reverted #748 and the Project is closed.
+- **In flight: #743** (first of #752). Its second-phase read misses for three separate reasons, one death each: fog, the first phase played at its average HP, and the enemy's weapon order (comment 7113390219). Sizing the three over m740c's 108 over-cap deaths from the traces (no runs) is under way; the counts go on #743.
 - **Results in (checked, on the issues):**
   - **#743 (comment 7109461427):** the trap is real for the unit in 4 of 4 deaths, but an alternative improved the army in only 2. The second-phase read is blind (0 for a unit that dies next turn), so scoring by it is off the table. Next: why the read is blind. Hook: `review/743-force-plan-hook.patch`.
   - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Nicolas approved the 0.05 floor plus the under-cap exemption: merged as PR #750 (ADR 0458), #744 closed; replays on #744 comment 7111745048 (all three Ch21 bait deaths gone). #658's one-replay door test is approved too. Keep lord-first. Variants: `review/744-rule-variants.patch`.
@@ -43,11 +44,6 @@ and start a fresh instance; don't rely on auto-compaction.
 
 - **PR #737** (#717 closed, ADR 0454, reverses ADR 0400 §1): an enemy-phase death is graded by the phase's last plan (the one the enemy phase met) by `protected[].die`, given the unit lived through its own act's counter (`counter`, `M.givenCounter`); the mover's read is kept as `mover_predicted`. `montecarlo.py calibration` reads the same (`death_read`, pinned to `M.deathRead`); its death columns are now `over the cap` / `over the cap, moved under`. Replay `fix717` (Ch15 s4005 a1) played another game (stuck, 35 turns). The bait question moved to **#736** (sub-issue of #699, no call yet).
 
-**In order next:**
-1. **#713 fix 3:** sum the strikes of the game's arrivals, approved. The waves come from the ROM's turn events (`scriptedUnits().arrivals`, widened to class, level and items) plus a stand-in unit for the strike. The reinforcement claims cover only Prologue to Ch8 and Ch13. Evidence: every killer in Ch19 s4003 a1 was an arrival; Eirika's turn-7 death is a target misprediction (lead on #713).
-2. **#734:** a talker recruit's goal term may prune in the beam. **#730 fix 3:** a kill-then-Talk plan; first log the offered Talk acts.
-3. #739, then one `attempts` set over the batch on #699's starts (`m699c<N>`).
-- #699's status table (7066011205): 2c row → #730. Also open: #727 and #711's leftovers.
 - **Lessons from the night (how to work):**
   - Every issue claim was checked before building, and three were wrong:
     - #714's "a turn to spare": the village has none.
