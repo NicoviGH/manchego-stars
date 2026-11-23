@@ -3011,6 +3011,17 @@ do
     check(seen, "11C,1401,0,0,0", "strikeLedger: the striker's weapon is equipped, its use spent where it went")
     check(lastRows[red.addr][1] and lastRows[red.addr][1].total, 0.45,
           "strikeLedger: the sword's counted use follows it to slot 1")
+    check(bag(red.addr), "1401,21C,0,0,0", "strikeLedger: the sandbox's return restores the bag's order")
+    -- our own berserked unit (t.berserk) keeps its bag: the army's reply reads its weapon slots off
+    -- the board's list, and a reordered bag would give a slot another item
+    sandbox(function()
+        sandbox(function()
+            Sight.strikeLedger(api, call, S, {}, pre, {}, { wear = 1, wearSlot = 1, counterWear = 0, berserk = true },
+                               { slot = 1 }, red.addr, myrrh.addr)
+            seen = bag(red.addr)
+        end)
+    end)
+    check(seen, "1401,11C,0,0,0", "strikeLedger: a berserked striker's bag keeps its order, its use spent where it was")
     for _, side in ipairs({ { slot = 0 }, {} }) do
         fill(red.addr, { SWORD, JAVX })
         sandbox(function()

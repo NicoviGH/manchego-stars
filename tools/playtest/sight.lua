@@ -2770,10 +2770,11 @@ end
 -- Inside a sandbox: a phase strike `t` (M.strikeOf's) leaves both weapons at the uses it is
 -- expected to spend: the striker's at `strikerAddr`, the target's counter's at `targetAddr`.
 -- -> the ledger after it (M.wear).
--- `armed` = the bag slot the equip brought to the front first (M.strikeLedger), which moved the
--- slot the strike's uses are read at (M.afterEquip); none for a strike on a bag left as it was.
+-- `armed` = the bag slot the striker equips first (M.armAsPlanned: the game equips the weapon it
+-- strikes with, which moves the slot the strike's uses are read at); none for a strike on a bag
+-- left as it was.
 function M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr, armed)
-    ledger = M.wear(api, call, S, ledger, strikerAddr, M.afterEquip(armed, t.wearSlot), t.wear)
+    ledger = M.armAsPlanned(api, call, S, ledger, { addr = strikerAddr }, armed, t.wearSlot, t.wear)
     return M.wear(api, call, S, ledger, targetAddr, t.counterSlot, t.counterWear)
 end
 
@@ -2842,15 +2843,16 @@ function M.strikeLedger(api, call, S, after, base, done, t, side, strikerAddr, t
     if side.slot == BALLISTA_SLOT then
         ledger = M.wearBallista(api, ledger,
             S.sTrapPool + api.mem.u8(strikerAddr + M.UNIT_BALLISTA) * M.TRAP_SIZE, t.wear)
-    elseif side.slot and side.slot > 0 and side.slot < api.Board.ITEM_COUNT then
+    elseif side.slot and side.slot > 0 and side.slot < api.Board.ITEM_COUNT and not t.berserk then
         -- The game equips the weapon it strikes with (EquipUnitItemSlot reorders the bag), so a
         -- striker with two weapons reaches the next phase with the other one in front: Ch13's
         -- enemy 138 alternates its Steel and Killer Lance, and the second phase read the Steel
         -- one (no crit) in the turn the Killer one killed (#743). The strike's uses are read
         -- off the weapon where the equip put it, and the ledger's rows follow their items.
+        -- Not for our own berserked unit (t.berserk): the army's reply picks its weapon by the
+        -- slot the board lists (s.weapons) when the berserk ends before it, and a bag the strike
+        -- reordered would give that slot another item.
         armed = side.slot
-        M.equip(api, call, S, { addr = strikerAddr }, armed)
-        ledger = M.equipRows(ledger, strikerAddr, armed)
     end
     after[t] = M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr, armed)
     return after[t]

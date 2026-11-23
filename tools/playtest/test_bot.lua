@@ -10445,7 +10445,7 @@ do
     check(cost.look.wear > 0, true, "wear: a heal's reach does not exempt it (ADR 0459)")
 
     -- a unit a heal can reach is read on two phases, not three (ADR 0459): 24 HP is dead to the
-    -- second blow of 12, 36 HP to the third only. A holding a heal, or a staff a turn away,
+    -- second blow of 12, 36 HP to the third only. A unit holding a heal, or a staff a turn away,
     -- stays out at 24 and goes at 36; with no heal at all 36 is the third's death
     local function stays(label, hp, o, ...)
         local b, sg, sty = wears(hp, o, ...)
@@ -10472,8 +10472,9 @@ do
         end
         return {}
     end
-    for _, case in ipairs({ { 30, 1, "12 of 30 HP" }, { 20, 0, "12 of 20 HP" } }) do
-        board, sight, st = wears(12, { maxhp = case[1], enemyPhase = function() return {} end,
+    -- a board without maxhp (a test's; Board.read always gives it) has no half to measure: not wounded
+    for _, case in ipairs({ { 30, 1, "12 of 30 HP" }, { 20, 0, "12 of 20 HP" }, { false, 0, "12 HP, no maxhp" } }) do
+        board, sight, st = wears(12, { maxhp = case[1] or nil, enemyPhase = function() return {} end,
                                        nextPhase = anywhere })
         a, plan, cost = Planner.plan(B, board, sight, st)
         local stay
