@@ -15,7 +15,7 @@ and start a fresh instance; don't rely on auto-compaction.
 - **The work order lives on the roadmap board,** https://github.com/users/NicoviGH/projects/2 (ADR 0457). Use its "Roadmap" view (one column per Status) or "Ranked list". It is not restated here. `make tidy` fails on any open #640 issue that is not on the board.
 - **Results in (checked, on the issues):**
   - **#743 (comment 7109461427):** the trap is real for the unit in 4 of 4 deaths, but an alternative improved the army in only 2. The second-phase read is blind (0 for a unit that dies next turn), so scoring by it is off the table. Next: why the read is blind. Hook: `review/743-force-plan-hook.patch`.
-  - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Recommended a 0.05 floor plus an under-cap exemption, **waiting on Nicolas** (a weight). Keep lord-first. Variants: `review/744-rule-variants.patch`.
+  - **#744:** the idle rule's "advance" counts a 0.0003 win chance (`planner.lua:1157`). Nicolas approved the 0.05 floor plus the under-cap exemption: build it next. #658's one-replay door test is approved too. Keep lord-first. Variants: `review/744-rule-variants.patch`.
 - **Nicolas's calls this session:**
   - Size a fix against all the deaths before recommending it.
   - Retries learn what happened (#741). The guide claims are removed once that lands, and attempt 1 plays with no guide.
