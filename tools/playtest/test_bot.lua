@@ -8229,6 +8229,33 @@ do
     check(pendingOn(7, { act = "door", x = 22, y = 18 }), true, "loaded by our act: still a goal")
 end
 
+-- #741 (vanilla Ch14's Rennac): a pending recruit our act loads (`by`) gets a marcher. The talker
+-- stands far off; with no one on the field to Talk, exploring sends it to the recruit's meeting
+-- tile, unclaimed and claimed alike (exploring's talkPairs).
+do
+    local function pend(st)
+        local L = blue(0x01, 0, 0, 3, { charId = 0x0F, minRange = false })
+        local o = { talk = { [0x01] = { ["arrival:14"] = true } },
+                    reach = { [0x01] = tiles({ 0, 3 }, { 3, 3 }) },
+                    field = function()
+                        local f = {}
+                        for y = 0, 9 do
+                            f[y] = {}
+                            for x = 0, 14 do f[y][x] = math.abs(x - 9) + math.abs(y - 9) end
+                        end
+                        return f
+                    end }
+        local _, ctx = B.candidates(boardOf(L), sightOf(o), st,
+            { pending = { { charId = 14, x = 9, y = 9, turn = 5, by = { act = "door", x = 22, y = 18 } } } })
+        local g = ctx.exploreGoal[0x01]
+        return g and g.x .. "," .. g.y .. "/" .. tostring(g.kind)
+    end
+    local goal = pend(style("careful"))
+    check(goal, "9,9/recruit", "pending recruit: the talker is sent to its meeting tile")
+    local claimedGoal = pend(claimed("careful", { id = "r1", kind = "recruit", unit = { 14 } }))
+    check(claimedGoal, "9,9/recruit", "pending recruit, claimed: the claim's talker is sent too")
+end
+
 -- test_a_stalled_goal_does_not_hold_the_win (#510 fwd1 item C, call 3, ADR 0403): the same board
 -- as the visit above, but botrun reports the village's id in opts.quietGoals (no unit neared it
 -- for a while). Its row is stalled, the Seize forfeits nothing, and it is played; the plan's

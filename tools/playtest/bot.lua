@@ -2383,7 +2383,22 @@ local function recruitsOf(ctx)
     return out, talkers, pending, loose
 end
 
--- A recruit claim, before anything else: a talker it names (any the game lets, when it names
+-- The recruits a talker marches on: those on the field, then each pending one (ctx.pendingRecruits,
+-- at its meeting tile) in id order. A pending recruit our own act loads (`by`, #741) is no less a
+-- recruit to march on: the talker that waits for it to appear is a turn or two behind a unit that
+-- leaves the map faster than it chases (vanilla Ch14's Rennac).
+local function recruitTargets(ctx)
+    local out = {}
+    for _, t in ipairs(ctx.onField) do out[#out + 1] = t end
+    local ids = {}
+    for id in pairs(ctx.pendingRecruits or {}) do ids[#ids + 1] = id end
+    table.sort(ids)
+    for _, id in ipairs(ids) do out[#out + 1] = ctx.pendingRecruits[id] end
+    return out
+end
+
+-- A recruit claim, before anything else (Bot.decide's greedy path only, which reads no pending
+-- arrival: ctx.pending is the planner's, so a pending recruit is no site here): a talker it names (any the game lets, when it names
 -- none) talks the recruit over when it can reach it, else the nearest such talker (by the
 -- field from the recruit) marches on it.
 local function recruitFirst(ctx, gate)
@@ -2892,7 +2907,7 @@ local function exploring(ctx, sent, barred, triedIn)
     -- Ross, killed on turn 2 while Eirika marched on the brigands). A recruit the style claims
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
-    for _, t in ipairs(ctx.onField) do
+    for _, t in ipairs(recruitTargets(ctx)) do
         -- unclaimed: any talker; claimed: the first claim with a talker that can go, as
         -- recruitFirst falls through its claims in order
         local claims, talkers = claimsOn(ctx, "recruits", t), nil
