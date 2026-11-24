@@ -2403,6 +2403,22 @@ do
     check(table.concat(ps, " "), "0.2 0.3 0.5", "ways: dead, alive and the counter kill, alive and not")
 end
 
+-- Sight.likeliestLeft (#743, ADR 0463): the HP a unit keeps at the likeliest outcome it lives
+-- through, never the mean (an HP the game cannot produce)
+do
+    check(Sight.likeliestLeft({ { [0] = 0.3, [10] = 0.7 } }, 30), 20,
+          "likeliestLeft: a 70% hit for 10 on 30 leaves 20, not the mean's 23")
+    check(Sight.likeliestLeft({ { [0] = 0.6, [10] = 0.3, [30] = 0.1 } }, 25), 25,
+          "likeliestLeft: a likely miss leaves it whole")
+    check(Sight.likeliestLeft({ { [0] = 0.2, [10] = 0.3, [30] = 0.5 } }, 25), 15,
+          "likeliestLeft: the likeliest outcome it lives through, a likelier death aside")
+    check(Sight.likeliestLeft({ { [0] = 0.5, [10] = 0.5 } }, 30), 20,
+          "likeliestLeft: equal chances go to the larger loss")
+    check(Sight.likeliestLeft({ { [0] = 0.5, [6] = 0.5 }, { [0] = 0.5, [6] = 0.5 } }, 30), 24,
+          "likeliestLeft: two exchanges together (0, 6, 12 at 1/4, 1/2, 1/4)")
+    check(Sight.likeliestLeft({ { [10] = 1 } }, 10), nil, "likeliestLeft: nil when it never lives")
+end
+
 -- Sight.deathSplit (#743): a blow's joint outcomes split by whether the target dies. The dead
 -- record's blow takes at least its HP for sure; the alive one's never does; each counter is
 -- the one its side of the blow met. A blow that cannot kill gives nil
@@ -2418,7 +2434,7 @@ do
     check(Sight.odds({ s.alive.takenDist }, 10), 0, "deathSplit: the alive record's never does")
     check(s.dead.felled .. "/" .. six(s.alive.felled), "0/0.285714",
           "deathSplit: a dead target's counter never lands; alive, ours fells it 2 in 7")
-    check(s.aliveHp, 6, "deathSplit: alive, the unit keeps 10 minus its expected 3.6 (of 0, 5)")
+    check(s.aliveHp, 5, "deathSplit: alive, the unit keeps 10 minus its likeliest 5 (of 0, 5), never the mean's 6")
     check(t.felled, 0.2, "deathSplit: the blow's own record is left as it was")
     check(Sight.deathSplit(Sight.strikeAt({ dealt = { [3] = 1 }, back = { [0] = 1 },
                                             joint = { { p = 1, dealt = 3, back = 0 } } }, 0x81, 1, 8, 10, 5)),

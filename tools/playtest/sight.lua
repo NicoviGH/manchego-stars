@@ -1094,6 +1094,23 @@ function M.odds(dists, hp)
     return dead, mean
 end
 
+-- The HP a unit of `hp` keeps after `dists` together (M.damage's), at the likeliest of the
+-- outcomes it lives through (#743, ADR 0463): a player reads a blow by its likeliest case ("he
+-- probably gets hit, so he'll be at 20"), never by the mean, an HP the game cannot produce (23
+-- after a 70% hit for 10 on 30). Equal chances go to the larger loss. nil when no outcome
+-- leaves it alive. Pure.
+M.TIE = 1e-12
+function M.likeliestLeft(dists, hp)
+    local lost, best
+    for d, p in pairs(M.damage(dists, hp)) do
+        if d < hp and p > 0 and (not best or p > best + M.TIE
+                                 or (p >= best - M.TIE and d > lost)) then
+            lost, best = d, p
+        end
+    end
+    return lost and hp - lost
+end
+
 -- The most and the least a distribution can take: its largest and smallest damage with any
 -- chance.
 function M.worst(dist)
@@ -1242,7 +1259,8 @@ M.SPLIT_DUST = 1e-9
 -- M.SPLIT_DUST); dead / alive = t's record given that side, its blow what that side's outcomes
 -- took and, with a joint, its counter too (felled read again: a dead target's counter fells no
 -- one; with none, t's own counter stays, whole, on both); aliveHp = the HP the target keeps
--- given it lives, its expected loss there rounded, at least 1. nil when the blow cannot kill.
+-- given it lives, at that side's likeliest outcome (M.likeliestLeft). nil when the blow cannot
+-- kill.
 -- `t` is left as it was. Pure.
 function M.deathSplit(t)
     local hp = t.targetHp
@@ -1251,12 +1269,11 @@ function M.deathSplit(t)
         joint = {}
         for d, p in pairs(t.takenDist or {}) do joint[#joint + 1] = { p = p, dealt = d, back = 0 } end
     end
-    local sides = { dead = { p = 0, items = {}, lost = 0 }, alive = { p = 0, items = {}, lost = 0 } }
+    local sides = { dead = { p = 0, items = {} }, alive = { p = 0, items = {} } }
     for _, w in ipairs(M.jointAt(joint, hp)) do
         local s = sides[w.dead and "dead" or "alive"]
         s.p = s.p + w.p
         for _, x in ipairs(w.items) do s.items[#s.items + 1] = x end
-        if not w.dead then s.lost = s.lost + w.p * hp - w.sum end
     end
     if sides.dead.p < M.SPLIT_DUST then return nil end
     local out = { dies = sides.alive.p < M.SPLIT_DUST and 1 or sides.dead.p }
@@ -1274,7 +1291,7 @@ function M.deathSplit(t)
             M.blowOf(r, dealt, t.joint and back or t.counterDist, t.strikerHp)
             r.joint = t.joint and j or nil
             out[name] = r
-            if name == "alive" then out.aliveHp = math.max(1, hp - math.floor(s.lost / s.p + 0.5)) end
+            if name == "alive" then out.aliveHp = M.likeliestLeft({ dealt }, hp) end
         end
     end
     return out
@@ -2586,8 +2603,8 @@ function M.putFog(api, Board, kept)
     end
 end
 
--- Whether a berserk strike (t.berserk) kills its target on the phase's expected way: its HP
--- `left` after the strike's expected damage. Such a target is taken off the map for the units
+-- Whether a berserk strike (t.berserk) kills its target on the phase's likeliest way: its HP
+-- `left` after the strike (0 when it dies at even odds or better, M.likeliestLeft else). Such a target is taken off the map for the units
 -- after it, as nextPhase takes one; an enemy's own strike keeps its target (the judged phase
 -- reads it on the target's whole odds).
 function M.berserkKills(t, left) return t.berserk == true and left <= 0 end
@@ -4196,14 +4213,14 @@ function M.new(outer)
         -- an enemy in the order that decides: not gone; seen (US_BIT9: hidden by fog), or
         -- remembered (knows(): an earlier attempt at this start showed it, ADR 0399), or a
         -- ghost on its last-seen tile (plays(), #713, ADR 0455); or our berserked unit
-        -- (M.berserkers, never fogged); and alive: a berserk strike's expected damage can
-        -- leave its target at 0 HP on the map
+        -- (M.berserkers, never fogged); and alive: a berserk strike's likely kill can leave its
+        -- target at 0 HP on the map
         local function decides(id)
             local e = byId[id]
             if not e or gone[id] or mem.u8(e.addr + UNIT_HP) == 0 then return false end
             return M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.plays(e)) and e
         end
-        -- e strikes as it decided: stood on its tile, its expected damage off the target, and
+        -- e strikes as it decided: stood on its tile, the target left at its likeliest HP, and
         -- the uses the exchange is expected to spend off both weapons (M.wear): a counter that
         -- spends the target's last use leaves it unarmed for the next enemy (#644). The ledger
         -- it adds to is the one the way's last strike (`done`'s) left, or the phase's base; the
@@ -4215,17 +4232,20 @@ function M.new(outer)
                                  byId[target] and byId[target].level)
             local now = M.chain(done, t)
             standOn(e, side.tile.x, side.tile.y)
-            local _, mean = M.odds({ t.takenDist }, t.targetHp)
             -- a strike by the player's berserked unit (#660), marked for the planner: its
             -- striker is one of the player's, whose death to the counter is a loss
             t.berserk = e.faction == "blue" or nil
-            -- An enemy's blow that may kill (#743, M.deathSplit): the unit is left at the HP it
-            -- keeps given it lives, and phaseWays plays its death (t.kill) as a way of its own,
-            -- or takes it off on the likelier side. The mean alone left a likely death on the map
-            -- at 0 HP, and the enemies after it struck the corpse (fc743d19, 26 of 748 decisions).
-            -- A berserk strike on a red keeps its mean and M.berserkKills.
+            -- The target is left at the likeliest HP it lives at (M.likeliestLeft, #743, ADR
+            -- 0463), never the mean: the enemies after it score every candidate's HP, and the
+            -- mean put Knoll at 19 where the game had 29 (fc743d21 Ch21 T13). An enemy's blow
+            -- that may kill (M.deathSplit) also plays its death (t.kill) as a way of its own, or
+            -- takes it off on the likelier side: the mean alone left a likely death on the map at
+            -- 0 HP, and the enemies after it struck the corpse (fc743d19, 26 of 748 decisions).
+            -- A berserk strike on a red is not split: it kills at even odds or better
+            -- (M.berserkKills).
             local split = not t.berserk and M.deathSplit(t) or nil
-            local left = t.targetHp - math.floor(mean + 0.5)
+            local left = M.likeliestLeft({ t.takenDist }, t.targetHp) or 0
+            if t.berserk and M.odds({ t.takenDist }, t.targetHp) >= 0.5 then left = 0 end
             if split then
                 t.dies, t.deadT, t.aliveT = split.dies, split.dead, split.alive
                 left = split.alive and split.aliveHp or 0
@@ -4344,8 +4364,9 @@ function M.new(outer)
     -- whether a kill the reply made left a death unread is checked on the runs, not assumed).
     -- The kill's chance is read once a weapon distance (the target's tile sets the blow), and
     -- every free tile at that distance offers it; the counter the killer takes is read again on
-    -- the tile it is given, its weapon equipped as the attack would, and its expected damage
-    -- stays on it (at 1 HP or more, as nextPhase keeps a striker's) and is reported as `lost`.
+    -- the tile it is given, its weapon equipped as the attack would, and it is left at the
+    -- likeliest HP it lives at (M.likeliestLeft; 1 when none, as nextPhase keeps a striker), the
+    -- loss reported as `lost`.
     -- Then each unit that killed nothing steps to the free tile in its reach that the fewest
     -- enemies left reach (M.safest), the most threatened first. Greens are the AI's and hold.
     -- Inside nextPhase's sandbox, after its first phase; `remove` is stagePhase's. The faction
@@ -4406,11 +4427,10 @@ function M.new(outer)
             local u, e = byId[k.unit], byId[k.enemy]
             local hp = mem.u8(u.addr + UNIT_HP)
             local kill = strike(u, e, k.tile, k.slot)
-            local _, back = M.odds({ kill.back }, hp)
             remove(e, at(e))
             standOn(u, k.tile.x, k.tile.y)
             wearing.base = M.replyArm(api, call, S, wearing.base, u, k, kill)
-            local left = math.max(1, hp - math.floor(back + 0.5))
+            local left = M.likeliestLeft({ kill.back }, hp) or 1
             wound(u.addr, left, false)
             acted[u.id] = true
             out.kills[#out.kills + 1] = { unit = k.unit, enemy = k.enemy, x = k.tile.x,
@@ -4451,8 +4471,8 @@ function M.new(outer)
     -- there (below). plan as enemyPhase's. The
     -- next phase is played along its expected way, unbranched: each enemy goes where its own
     -- decision takes it (a strike's tile, or the move it decides without striking), a strike
-    -- takes its expected damage, a player unit left at 0 HP is off the map, and a striker our
-    -- counter kills at even odds or better is gone. The turn then advances and the second phase
+    -- leaves its target at its likeliest HP, a player unit it likely kills is off the map, and a
+    -- striker our counter kills at even odds or better is gone. The turn then advances and the second phase
     -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
     -- sees decides, in both: an enemy hidden by fog does not act unless a retry remembers it
     -- (knows(), ADR 0399) or this attempt saw it (a ghost, played from its last-seen tile:
@@ -4506,10 +4526,9 @@ function M.new(outer)
                                     -- a Rout's count: the player's berserked unit is none of it
                                     if not t.berserk then fell[#fell + 1] = id end
                                 else
-                                    -- it lives: our counter's expected damage stays on it, as a
-                                    -- strike's stays on its target
-                                    local _, back = M.odds({ t.counterDist }, t.strikerHp)
-                                    wound(e.addr, math.max(1, t.strikerHp - math.floor(back + 0.5)),
+                                    -- it lives: at the likeliest HP our counter leaves it, as a
+                                    -- strike leaves its target
+                                    wound(e.addr, M.likeliestLeft({ t.counterDist }, t.strikerHp) or 1,
                                           true)
                                 end
                             end,
