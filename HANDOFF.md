@@ -11,12 +11,12 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23, late night; main is 81fc9e39 + HANDOFF).**
+**Next session starts here (2026-11-23, late night; main is c568d87f + HANDOFF).**
 - **The work order is #640's sub-issues: #752 (nobody dies, the enemy forecast), then #753 (every reward), then #754 (the chapter ends)**; within each, its own sub-issue list. Step 10 is #751, a child of #510.
-- **Two PRs wait on Nicolas's "merge", each reviewed with `review-to-clean` (Sonnet review + duplicate check, every finding resolved, one scoped re-review, its findings fixed):**
-  - **PR #755** (`feat/743-wounded-read`, head df757bcf, ADR 0459): a sandbox strike equips its weapon; `M.equip` owns the slot range. Replay `rp755c13`: enemy 138's Steel/Killer Lance read right every turn.
-  - **PR #756** (`feat/743-death-split`, head 01f7f663, ADR 0460): a blow that may kill our unit splits the judged phase; no unit stays on the map at 0 HP. New owners `M.blowOf`, `M.jointAt` (shared with the planner's kill ways). Replay `fx743n19`: attacks on a 0-HP unit 9 to 0. Cost +5.0% CPU, accepted by Nicolas as #671's exception (#671 comment 7118862017).
-  - Both touch `sight.lua` near `strikeLedger`/`strike`; merge one, then rebase the other on main and rerun its tests and CI before merging it.
+- **Merged on Nicolas's "merge both", each on green CI for its head after `review-to-clean`:**
+  - **PR #755** (ADR 0459) as e3d668ff: a sandbox strike equips its weapon; `M.equip` owns the slot range.
+  - **PR #756** (ADR 0460) as c568d87f, rebased on #755 (`make test` green, CI green): a blow that may kill our unit splits the judged phase; no unit stays at 0 HP. New owners `M.blowOf`, `M.jointAt`. Cost +5.0% CPU, accepted as #671's exception.
+- **Next on #743:** the 8 next-phase departures with no cause found (Ch15 enemy 144 waits in the copy, attacks in the game, both attempts: not dice). No call from Nicolas yet on what follows #756.
 - **#743's measurements (all on the issue):** calibration of the read past the first phase (comment 7116614727, heal lead refuted); the 19 stand-ins for game code (comment 7117002542); why the forecast misses, 7 instrumented games (comment 7117572249). The phase after next is wrong mostly because our own turn is guessed: no game code can fix that.
 - **Open, no call yet:** the 8 next-phase departures with no cause found (Ch15 enemy 144 in both attempts: not dice); fog (by design). Instrument: local branch `diag/743-forecast` (`PT_FORECAST=1`, `PT_PROFILE=1`; not for merge); scripts `review/743-size/forecast.py`, `timing.py`.
 - **#671 (cost):** a profiled game's time split is on #671 (comment 7117973105): planning 89% (emulation in the copy 64%, the bot's Lua 24%), live play 11%, save-states 0.02%.
