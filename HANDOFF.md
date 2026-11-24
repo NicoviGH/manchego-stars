@@ -11,13 +11,17 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-24, small hours; main is 87504515 + HANDOFF).**
+**Next session starts here (2026-11-23, late; main is 22ee6981 + HANDOFF).**
+- **Merged: PR #759** (ADR 0463): a struck unit that lives keeps its likeliest HP in the copy's enemy phase (`M.likeliestLeft`, `M.strikeLeft`), never the mean. Result and the planner-means side finding: #743 comment 7121706105. Replay `lh743a` (Ch21 s4009 a1).
+- **Next, in #752's order:** #569 (reinforcement waves in the second phase), then #727 (AREA events changing AI by position).
+
+*Before that (2026-11-24, small hours; main was 87504515 + HANDOFF).*
 - **Nicolas (2026-11-23): build a found root cause and its fix without asking** ("my approval is just going to be a bottle neck"). Step-9 PRs merge after `review-to-clean` and green CI. His calls stay his: what a measurement means, weights, stopping a line of work.
 - **Merged this session:**
   - **PR #757** (ADR 0461): an enemy that moves without striking moves in both judged phases and the route watcher (`M.idleMove`); an escape leaves the map.
   - **PR #758** (ADR 0462): a dying carrier sets down whom it carries (`M.deathDropAt` calls the game's `UnitGetDeathDropLocation`; `M.drop`, `M.dieOff`, `M.takeGone`). New manual probe: `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh dropprobe`.
 - **#743:** the 8 unexplained departures are root-caused (comment 7119556199). The copy's board differed, never its AI: (a) unmoved idle enemies, fixed by #757; (b) mean-HP wounds; (c) corpses, fixed by #756. The old "Ch15 enemy 144, not dice" was an artifact of `review/743-size/forecast.py` (first way only); use `review/743-size/departures.py`.
-- **Do first: #743's average-HP fix, the likeliest result** (Nicolas agreed 2026-11-24). What, where and the proof: #743 comment 7121316555.
+- #743's average-HP fix: done in #759.
 - **#739:** the green 65 / 74 half is fixed by #758. Enemy 169 striking Franz at a read of 0 stays open: its board cannot be rebuilt (`fix713g` is a resume made on an older instrument). Comment 7121049084 says what would close it.
 - **Then, in #752's order:** #569 (reinforcement waves in the second phase), then #727 (AREA events changing AI by position).
 - Run tags: `fx743i` (Ch21 s4009), `i739`, `fx739a` (Ch19 s4003). Instrument: `diag/743-forecast` (apply 8e76a677 uncommitted).
