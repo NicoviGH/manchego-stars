@@ -410,14 +410,13 @@ local function sightOf(o)
     end
     local s = {
         objective = o.objective or { kind = "rout" },
-        field = o.field,
         -- the march field from a tile (sight.march): the test's field, none when it has none
-        march = function(u, tile) return o.field and o.field(tile) or {} end,
+        march = function(u, tile) return o.field and o.field(tile, u) or nil end,
         -- The game's march cost to a goal over MOV (sight.turnsTo, not rounded): the test's
         -- field when it gives one, else Manhattan; MOV 5 unless the unit says.
         turnsTo = function(u, tile, from)
             from = from or u
-            local f = o.field and o.field(tile)
+            local f = o.field and o.field(tile, u)
             local d = f and f[from.y] and f[from.y][from.x]
             if f and not d then return nil end
             return (d or Board.distance(from.x, from.y, tile.x, tile.y)) / (u.mov or 5)
@@ -1403,7 +1402,7 @@ do
         "the unit facing one lethal enemy acts before the one facing two chips")
 end
 
--- sight.field routes the march around a wall; without it the march is Manhattan.
+-- sight.march routes the march around a wall; without it the march is Manhattan.
 do
     local P = dofile(here .. "pathing.lua")
     -- a wall at x = 2 for y = 0..1; the way past it is y = 2
@@ -3800,6 +3799,30 @@ do
     end
     check(visits(nil), 1, "visited: an unvisited house is offered")
     check(visits({ explored = { ["1,0"] = true } }), 0, "visited: not offered again")
+end
+
+-- test_a_fliers_march_reads_its_own_costs (#730): the village at (4,0) is walked by the army's
+-- reference unit (R, on the ground at (3,0)), whose field leaves the cliff tile (0,0) nil;
+-- the flier A stands on that tile, and its own costs reach the village. Pairing read the
+-- reference unit's field as A's distance, found A "unreachable", and dropped the pair: no one
+-- went, and Ch10's village at (11,15) was razed with two pegasus knights beside it.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local R = blue(0x02, 1, 3, 0)
+    local E = red(0x81, 0, 9, { minRange = false })
+    local WALKER = { ["3,0"] = 1, ["4,0"] = 0 }              -- nil at (0,0): a cliff
+    local FLIER = { ["0,0"] = 4, ["3,0"] = 1, ["4,0"] = 0 }
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 3, 0 }) },
+        field = function(g, u)
+            local f = (u and u.id == 0x01) and FLIER or WALKER
+            return fieldsOf { ["4,0"] = f }(g)
+        end,
+        explorable = { { x = 4, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["4,0"] = "visit" } },
+    }
+    local _, ctx = B.candidates(boardOf(A, R, E), sightOf(o), gifted("careful", 500), {})
+    check(ctx.exploreGoal[0x01] ~= nil, true, "flier: sent to the village its own costs reach")
 end
 
 -- test_exploring_opens_the_door_to_a_chest: the chest at (4,0) sits behind the door at (2,0),

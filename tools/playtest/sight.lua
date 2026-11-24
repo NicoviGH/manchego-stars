@@ -162,9 +162,9 @@
 --                            quote raises EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
 --                            gameOver = the charIds, on any side, whose death sets
 --                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
---   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
---                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
---                            unreached.
+--   march(unit, goal)       dist[y][x] = the movement cost from `goal` to (x, y), FE8's
+--                            GenerateExtendedMovementMap with `unit`'s own costs (its march
+--                            distance); nil = unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
 --   redCount()               CountRedUnits: every red not dead (a Rout's count).
@@ -5174,7 +5174,7 @@ function M.new(outer)
     end
 
     -- What opening the door or breaking the wall at (x, y) opens: the tiles of its map change
-    -- the march walks, on fieldUnit()'s costs as field() reads (M.mapChangeTiles), each with
+    -- the march walks, on fieldUnit()'s costs (M.mapChangeTiles), each with
     -- its cost; nil when it has no change. A change is the chapter's data, so the read is kept
     -- for the run, per class.
     local changes = {}
@@ -5226,13 +5226,6 @@ function M.new(outer)
             end
         end
         return first
-    end
-
-    -- The march heading to a goal: costGrid on fieldUnit()'s costs. Each unit's real reach is
-    -- reach()'s.
-    function s.field(goalTile)
-        local unit = s.fieldUnit()
-        return unit and costGrid(unit, goalTile) or nil
     end
 
     -- The game's turn-event check (eventinfo.c: the phase-change hook searches turnBasedEvents
