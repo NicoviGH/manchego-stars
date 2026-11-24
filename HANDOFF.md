@@ -15,7 +15,8 @@ and start a fresh instance; don't rely on auto-compaction.
 - **Merged: PR #759** (ADR 0463): a struck unit that lives keeps its likeliest HP in the copy's enemy phase (`M.likeliestLeft`, `M.strikeLeft`), never the mean. Replay `lh743a` (Ch21 s4009 a1).
 - **Merged: PR #760** (ADR 0463 amended): the planner hands the phase its likeliest HPs too (`fx.hp`, `reds`, the kill ways' `left` via `jointAt`). `st.enemyHp` stays the plan's expected-damage score. Replay `lh743b`.
 - **Nicolas (2026-11-23):** a site with the fix's own cause is fixed in that work, never left as a side finding.
-- **Next, in #752's order:** #569 (reinforcement waves in the second phase), then #727 (AREA events changing AI by position).
+- **#752's rest is on hold or blocked:** #569 stays on hold, re-scoped to waves remembered by a retry, so it waits on #741 (comment 7122693695: 5 of 108 over-cap deaths, untested). #727 on hold; #739 waits on a witness.
+- **Next: #741** (a retry remembers closings, triggers, recruit fates; the design comment is approved, and the guide's claims go in the same PR).
 
 *Before that (2026-11-24, small hours; main was 87504515 + HANDOFF).*
 - **Nicolas (2026-11-23): build a found root cause and its fix without asking** ("my approval is just going to be a bottle neck"). Step-9 PRs merge after `review-to-clean` and green CI. His calls stay his: what a measurement means, weights, stopping a line of work.
