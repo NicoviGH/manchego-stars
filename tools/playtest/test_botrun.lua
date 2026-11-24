@@ -7,6 +7,7 @@ local Json = dofile(here .. "json.lua")
 local Bot = dofile(here .. "bot.lua")
 local Board = dofile(here .. "board.lua")
 local Sight = dofile(here .. "sight.lua")
+local Fakeline = dofile(here .. "fakeline.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -658,12 +659,25 @@ do
     check(g.eventAsks, 2, "the game's turn-event check is asked at the repeat and after the event")
 end
 
--- A claimed reinforcement arrival is part of what decide reads: the turns to it change the hash.
+-- A remembered reinforcement arrival is part of what decide reads: the turns to it change the
+-- hash. Only a turn's arrival holds the march, never one the play brought (#741, #765).
 do
-    check(Bot.nextArrival({ { 3, 6 }, { 5 } }, 2), 1, "turn 3 is the next arrival after turn 2")
-    check(Bot.nextArrival({ { 3 } }, 3), nil, "none left after the last")
-    local turn2 = Botrun.boardHash(Bot, { turn = 2, units = {} }, nil, { { 5 } })
-    local turn3 = Botrun.boardHash(Bot, { turn = 3, units = {} }, nil, { { 5 } })
+    local function seen(turns, extra)
+        local arrivals = {}
+        for _, t in ipairs(turns) do arrivals[#arrivals + 1] = { charId = 0x80 + t, classId = 1, turn = t } end
+        for _, a in ipairs(extra or {}) do arrivals[#arrivals + 1] = a end
+        return { arrivals = arrivals }
+    end
+    check(Bot.nextArrival(Fakeline.memory(seen({ 3, 6 }), seen({ 5 })), 2), 1,
+          "turn 3 is the next arrival after turn 2")
+    check(Bot.nextArrival(Fakeline.memory(seen({ 3 })), 3), nil, "none left after the last")
+    check(Bot.nextArrival(Fakeline.memory(seen({}, {
+        { charId = 0x30, classId = 1, turn = 3, by = { act = "door", x = 1, y = 1 } },
+        { charId = 0x31, classId = 1, turn = 4, timed = false } })), 2), nil,
+          "an arrival the play brought holds nothing")
+    local mem = Fakeline.memory(seen({ 5 }))
+    local turn2 = Botrun.boardHash(Bot, { turn = 2, units = {} }, nil, mem)
+    local turn3 = Botrun.boardHash(Bot, { turn = 3, units = {} }, nil, mem)
     check(turn2 ~= turn3, true, "the same board, a turn nearer an arrival, hashes differently")
 end
 
@@ -1158,12 +1172,13 @@ do
         for _, e in ipairs(r.enemies_seen) do keys[Bot.memoryKey(e.id, e.charId, e.classId)] = true end
         return told, keys
     end
-    local mem = { enemies = { { id = 0x9A, charId = 0x77 } } }
+    local mem = Fakeline.memory({ enemies = { { id = 0x9A, charId = 0x77, classId = 3 } } })
     local told, keys = played(mem)
-    check(told, mem.enemies, "memory: the sight is told what plays as seen")
-    check(keys[Bot.memoryKey(0x9A, 0x77)], nil, "memory: a remembered red never shown is not seen")
+    check(told ~= "never" and #told == 1 and Bot.memoryKey(told[1].id, told[1].charId, told[1].classId),
+          Bot.memoryKey(0x9A, 0x77, 3), "memory: the sight is told what plays as seen")
+    check(keys[Bot.memoryKey(0x9A, 0x77, 3)], nil, "memory: a remembered red never shown is not seen")
     told, keys = played(nil)
-    check(told, nil, "attempt 1: the sight is told nothing")
+    check(told ~= "never" and #told, 0, "attempt 1: the sight is told nothing")
     check(keys[Bot.memoryKey(0x9A, 0x77)], nil, "attempt 1: nothing remembered")
 end
 
@@ -2101,7 +2116,7 @@ do
     -- so a remembered unit is not also its stand-in for what the fog may hide
     local g2 = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x82, 1, "red", 9, 9, 10) } }
     g2.units[2].fogged = true
-    g2.api.style.memory = { enemies = { { id = 0x82, charId = 0x82, classId = 1 } } }
+    g2.api.style.memory = Fakeline.memory({ enemies = { { id = 0x82, charId = 0x82, classId = 1 } } })
     got = nil
     g2.api.Planner = g.api.Planner
     Botrun.run(g2.api)
@@ -2109,12 +2124,12 @@ do
 end
 
 -- test_the_planner_is_told_the_owed_recruits_a_retry_saw_arrive (#683, ADR 0436): opts.pending
--- holds the remembered arrivals (style.memory.arrivals) of units the game owes us, and no other.
+-- holds the remembered arrivals (Timeline.arrivals) of units the game owes us, and no other.
 do
     local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) },
                          recruits = { 0x30 } }
-    g.api.style.memory = { enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 5 },
-                                                      { charId = 0x82, x = 8, y = 8, turn = 3 } } }
+    g.api.style.memory = Fakeline.memory({ arrivals = { { charId = 0x30, x = 9, y = 9, turn = 5 },
+                                                       { charId = 0x82, x = 8, y = 8, turn = 3 } } })
     local got
     g.api.Planner = {
         surprise = function() return "the plan is played out" end,
@@ -2143,8 +2158,8 @@ do
                              if g.turn == 2 then table.remove(g.units, #g.units) end
                              return {}
                          end }
-    g.api.style.memory = { enemies = {}, arrivals = {
-        { charId = 0x30, x = 9, y = 9, turn = 4, by = { act = "door", x = 7, y = 7 } } } }
+    g.api.style.memory = Fakeline.memory({ arrivals = {
+        { charId = 0x30, x = 9, y = 9, turn = 4, by = { act = "door", x = 7, y = 7 } } } })
     local pending = {}
     g.api.Planner = {
         surprise = function() return "the plan is played out" end,
@@ -2236,7 +2251,7 @@ do
     -- M.timedArrival); with nothing owed it gives the planner no pending recruit
     check(asked, true, "scripted: nothing owed, the scripts are still read once")
     check(none == nil or #none == 0, true, "scripted: nothing owed, nothing pending")
-    got = told({ enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 6 } } })
+    got = told(Fakeline.memory({ arrivals = { { charId = 0x30, x = 9, y = 9, turn = 6 } } }))
     check(got and #got == 1 and got[1].x, 9, "scripted: a remembered arrival wins")
 end
 
@@ -2244,7 +2259,7 @@ end
 -- not "no pending recruits" (ADR 0436).
 do
     local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) } }
-    g.api.style.memory = { enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 5 } } }
+    g.api.style.memory = Fakeline.memory({ arrivals = { { charId = 0x30, x = 9, y = 9, turn = 5 } } })
     g.api.Planner = { surprise = function() return "the plan is played out" end,
                       plan = function() return nil end }
     local ok = Botrun.run(g.api)

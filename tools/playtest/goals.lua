@@ -31,7 +31,7 @@
 --   a reward (style.rewards, a guide's claim): its item's itemCost shared evenly over the open
 --     goals its `needs` names, none of it once one of them is lost (ctx.lost).
 -- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it (or a
--- retry remembers one did, style.memory.closings), or
+-- retry remembers one did, Timeline.deadlines), or
 -- the game's AI escapes with the recruit (Goals.closings), or a turn event removes it (Goals.scriptedCloses,
 -- #724).
 --
@@ -94,6 +94,10 @@
 
 local M = {}
 
+-- timeline.lua, beside this file: what a retry remembers losing, and when (#765)
+local Timeline = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/timeline.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "timeline.lua"))
+
 -- What each turn further from a goal leaves of its chance: another enemy phase where something
 -- can go wrong (Claude's starting value, #510 comment 6534885686; tuned on the runs).
 M.GAMMA = 0.85
@@ -139,8 +143,9 @@ end
 -- sight.closings for this board: when a looter has each open tile and, for each recruit on the
 -- field (ctx.recruitTalkers), "unit:<id>" -> the enemy phase the game's own AI escapes with it
 -- (#699); and the paths of those recruits, { [unit id] = { [enemy phase] = tile } }.
--- Then what a retry remembers (style.memory.closings, #741: the earliest enemy phase an earlier
--- attempt lost each tile in) for a tile still open: the earlier of the two, as M.scriptedCloses
+-- Then what a retry remembers (Timeline.deadlines' tiles, #765: the earliest enemy phase an
+-- earlier attempt lost each tile in, a looter the play brought dated from its appearance in this
+-- attempt, ctx.appeared) for a tile still open: the earlier of the two, as M.scriptedCloses
 -- takes the earlier removal. ctx.turn is the board's turn; a remembered phase already past
 -- closes nothing (this attempt's play kept the tile so far).
 function M.closings(sight, style, ctx)
@@ -153,14 +158,14 @@ function M.closings(sight, style, ctx)
         out, paths = sight.closings(nil, style.waves, watch)
     end
     -- a sight with no simulated closings still has the remembered ones
-    local lost = style.memory and style.memory.closings
-    if lost and next(lost) then
+    local lost = Timeline.deadlines(style.memory, ctx.appeared).tiles
+    if next(lost) then
         assert(ctx.turn, "Goals.closings: a remembered closing needs ctx.turn")
         local copy = {}   -- sight keeps its answer for the board
         for k, v in pairs(out) do copy[k] = v end
-        for k, c in pairs(lost) do
+        for k, phase in pairs(lost) do
             -- enemy phase 1 is this turn's
-            local at = c.phase - ctx.turn + 1
+            local at = phase - ctx.turn + 1
             if at >= 1 and at < (copy[k] or math.huge) then copy[k] = at end
         end
         out = copy
@@ -176,8 +181,9 @@ end
 -- not yet joined the removal holds, and a removal whose turn is past is none. `board` names each
 -- recruit's charId (a pending one is ctx.pendingRecruits'); ctx.owedRecruits (a set of charIds)
 -- names the ones owed, and empty or nil asks for no scan. Returns new tables: sight keeps its
--- answers for the board. A departure a retry remembers (`memory.fates`, #741: { charId,
--- boardTurn }) is a removal too, the earlier of the two.
+-- answers for the board. A departure a retry remembers (Timeline.deadlines' `gone`, #765: the
+-- first player turn the unit was off the map, one the play brought dated from its appearance in
+-- this attempt, ctx.appeared) is a removal too, the earlier of the two.
 function M.scriptedCloses(sight, ctx, board, out, paths, memory)
     assert(board.turn, "Goals.scriptedCloses: the board has no turn")
     -- only an owed recruit (ctx.owedRecruits, a set of charIds: botrun's) can be removed from a
@@ -186,13 +192,11 @@ function M.scriptedCloses(sight, ctx, board, out, paths, memory)
     local watch, owed = ctx.recruitTalkers or {}, ctx.owedRecruits or {}
     if not sight.scriptedUnits or next(watch) == nil or next(owed) == nil then return out, paths end
     local gone = sight.scriptedUnits().removals
-    local fates = memory and memory.fates
-    if fates and #fates > 0 then
+    local left = Timeline.deadlines(memory, ctx.appeared).gone
+    if next(left) then
         local merged = {}
         for c, t in pairs(gone) do merged[c] = t end
-        for _, f in ipairs(fates) do
-            merged[f.charId] = math.min(merged[f.charId] or f.boardTurn, f.boardTurn)
-        end
+        for c, t in pairs(left) do merged[c] = math.min(merged[c] or t, t) end
         gone = merged
     end
     local byId = {}
