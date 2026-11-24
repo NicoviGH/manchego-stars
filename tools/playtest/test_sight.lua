@@ -2467,7 +2467,7 @@ do
     check(s.dead.felled .. "/" .. six(s.alive.felled), "0/0.285714",
           "deathSplit: a dead target's counter never lands; alive, ours fells it 2 in 7")
     check(s.aliveHp, 5,
-          "deathSplit: alive, the unit keeps 10 minus its likeliest 5 (of 0, 5), never the mean's 6")
+          "deathSplit: alive, the unit keeps 10 less its likeliest 5 (of 0, 5), not the mean's 6")
     check(t.felled, 0.2, "deathSplit: the blow's own record is left as it was")
     check(Sight.deathSplit(Sight.strikeAt({ dealt = { [3] = 1 }, back = { [0] = 1 },
                                             joint = { { p = 1, dealt = 3, back = 0 } } }, 0x81, 1, 8, 10, 5)),

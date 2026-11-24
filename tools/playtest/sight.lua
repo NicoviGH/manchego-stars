@@ -138,9 +138,10 @@
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and leaves the target at its likeliest HP
 --                            (M.strikeLeft) before the next decides. plan.reds =
---                            { [enemy id] = hp } (optional): the HP the plan leaves an enemy. Where the target's counter may kill
---                            the striker (its played chance, `felled`), the rest of the phase
---                            is played both ways, the striker's tile freed in the second
+--                            { [enemy id] = hp } (optional): the HP the plan leaves an enemy.
+--                            Where the target's counter may kill the striker (its played chance,
+--                            `felled`), the rest of the phase is played both ways, the
+--                            striker's tile freed in the second
 --                            (ch02: a Brigand Marty killed let the next one in), while the
 --                            rarer way is at least M.SPLIT_FLOOR of the phase (M.phaseWays).
 --                            -> { { enemy, target, taken* as strike(), counterDist, felled,
