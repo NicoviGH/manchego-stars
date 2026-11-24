@@ -527,7 +527,9 @@ local function writeRegisters(cpu, regs)
     end
 end
 -- An enemy phase's outcomes, { { p, strikes } } (p sums to 1), and how many uncertain counter
--- kills and status staves it left unsplit. strikeAt(k, done) plays the k-th enemy of `n` after
+-- kills, deaths of our units and status staves it left unsplit. A blow that may kill its target
+-- (t.dies, t.kill, t.deadT, t.aliveT: M.deathSplit's, #743, ADR 0460) splits the phase first,
+-- each way with that side's record, the alive one then split on its counter. strikeAt(k, done) plays the k-th enemy of `n` after
 -- `done`'s strikes: nil when it neither strikes nor casts a status staff; for a strike, `t`
 -- (t.felled: the played chance the target's counter kills it), `done` with t added, and free(),
 -- which takes the striker off its tile. A status staff (#674) is no strike: `t` = { lands = its
@@ -554,30 +556,52 @@ M.SPLIT_FLOOR = 1 / 64
 function M.phaseWays(n, strikeAt, sandbox, floor, mass0, tail, done0)
     floor = floor or M.SPLIT_FLOOR
     local unsplit = 0
-    local function play(i, done, mass)
+    local play
+    -- both sides of a split, each played in its own sandbox: `keep` as likely as 1 - q, `change`
+    -- (which first changes the board) as likely as q
+    local function both(q, keep, change)
+        local out = {}
+        for _, side in ipairs({ { 1 - q, sandbox(keep) }, { q, sandbox(change) } }) do
+            for _, o in ipairs(side[2]) do
+                out[#out + 1] = { p = o.p * side[1], strikes = o.strikes }
+            end
+        end
+        return out
+    end
+    -- the phase from enemy k + 1 on, after strike `t` (its list `now`): split where our counter
+    -- may kill its striker, or its status staff may land
+    local function after(k, t, now, free, mass)
+        local q = t.lands or t.felled
+        if q > 0 and q < 1 and mass * math.min(q, 1 - q) >= floor then
+            return both(q, function() return play(k + 1, now, mass * (1 - q)) end,
+                        function() free(); return play(k + 1, now, mass * q) end)
+        elseif q > 0 then
+            if q < 1 then unsplit = unsplit + 1 end
+            if q >= 0.5 then free() end
+        end
+        return play(k + 1, now, mass)
+    end
+    function play(i, done, mass)
         for k = i, n do
             local t, now, free = strikeAt(k, done)
             if t then
-                done = now
-                local q = t.lands or t.felled
-                if q > 0 and q < 1 and mass * math.min(q, 1 - q) >= floor then
-                    local out = {}
-                    local stood = sandbox(function() return play(k + 1, done, mass * (1 - q)) end)
-                    local fell = sandbox(function()
-                        free()
-                        return play(k + 1, done, mass * q)
-                    end)
-                    for _, o in ipairs(stood) do
-                        out[#out + 1] = { p = o.p * (1 - q), strikes = o.strikes }
-                    end
-                    for _, o in ipairs(fell) do
-                        out[#out + 1] = { p = o.p * q, strikes = o.strikes }
-                    end
-                    return out
-                elseif q > 0 then
-                    if q < 1 then unsplit = unsplit + 1 end
-                    if q >= 0.5 then free() end
+                -- a blow that may kill its target (#743, M.deathSplit: t.dies, t.deadT, t.aliveT,
+                -- t.kill takes the unit off the map): each way carries its side's record, so the
+                -- planner reads the death once. Unsplit, the blow's whole record stays and the
+                -- board is the likelier side's: a unit never stays on the map at 0 HP
+                local d = t.kill and t.dies or 0
+                if d > 0 and d < 1 and mass * math.min(d, 1 - d) >= floor then
+                    return both(d,
+                        function() return after(k, t.aliveT, M.chain(done, t.aliveT), free, mass * (1 - d)) end,
+                        function()
+                            t.kill()
+                            return after(k, t.deadT, M.chain(done, t.deadT), free, mass * d)
+                        end)
+                elseif d > 0 then
+                    if d < 1 then unsplit = unsplit + 1 end
+                    if d >= 0.5 then t.kill() end
                 end
+                return after(k, t, now, free, mass)
             end
         end
         if tail then return tail(done, mass) end
@@ -1166,6 +1190,51 @@ function M.strikeAt(side, id, target, strikerHp, targetHp, level)
     t.strikerHp, t.targetHp, t.targetLevel = strikerHp, targetHp, level
     t.felled = (M.odds({ t.counterDist }, t.strikerHp))
     return t
+end
+
+-- A phase strike `t` (M.strikeAt's) split by whether its target dies (#743): the game plays one
+-- or the other, and the enemies after it decide on that board (a dead unit is off the map). From
+-- the exchange's joint outcomes (t.joint, else its blow's alone): dies = the chance the blow
+-- takes at least the target's HP; dead / alive = t's record given that side, its blow and
+-- counter what that side's outcomes took (felled read again: a dead target's counter fells no
+-- one); aliveHp = the HP the target keeps given it lives, its expected loss there rounded, at
+-- least 1. nil when the blow cannot kill. `t` is left as it was. Pure.
+function M.deathSplit(t)
+    local hp = t.targetHp
+    local joint = t.joint
+    if not joint then
+        joint = {}
+        for d, p in pairs(t.takenDist or {}) do joint[#joint + 1] = { p = p, dealt = d, back = 0 } end
+    end
+    local sides = { dead = { p = 0, dealt = {}, back = {}, joint = {}, lost = 0 },
+                    alive = { p = 0, dealt = {}, back = {}, joint = {}, lost = 0 } }
+    for _, x in ipairs(joint) do
+        local s = sides[x.dealt >= hp and "dead" or "alive"]
+        s.p = s.p + x.p
+        s.joint[#s.joint + 1] = x
+        s.lost = s.lost + x.p * x.dealt
+    end
+    if sides.dead.p <= 0 then return nil end
+    local out = { dies = sides.dead.p }
+    for name, s in pairs(sides) do
+        if s.p > 0 then
+            local r = {}
+            for k, v in pairs(t) do r[k] = v end
+            local dealt, back, j = {}, {}, {}
+            for _, x in ipairs(s.joint) do
+                local q = x.p / s.p
+                dealt[x.dealt] = (dealt[x.dealt] or 0) + q
+                back[x.back] = (back[x.back] or 0) + q
+                j[#j + 1] = { p = q, dealt = x.dealt, back = x.back }
+            end
+            r.takenDist, r.takenWorst, r.counterDist = dealt, M.worst(dealt), back
+            r.joint = t.joint and j or nil
+            r.felled = (M.odds({ back }, t.strikerHp))
+            out[name] = r
+            if name == "alive" then out.aliveHp = math.max(1, hp - math.floor(s.lost / s.p + 0.5)) end
+        end
+    end
+    return out
 end
 
 -- The enemy's strike read off its simulation, or none (nil) when its AI does not strike:
@@ -4020,18 +4089,39 @@ function M.new(outer)
             local now = M.chain(done, t)
             standOn(e, side.tile.x, side.tile.y)
             local _, mean = M.odds({ t.takenDist }, t.targetHp)
-            -- the target's heal flag is stale when it is of the deciding side (the faction whose
-            -- heal statuses the phase reads): a red struck by the player's berserked unit is not
-            local left = t.targetHp - math.floor(mean + 0.5)
-            wound(addr, left, byId[target] ~= nil and byId[target].faction == e.faction)
             -- a strike by the player's berserked unit (#660), marked for the planner: its
             -- striker is one of the player's, whose death to the counter is a loss
             t.berserk = e.faction == "blue" or nil
+            -- An enemy's blow that may kill (#743, M.deathSplit): the unit is left at the HP it
+            -- keeps given it lives, and phaseWays plays its death (t.kill) as a way of its own,
+            -- or takes it off on the likelier side. The mean alone left a likely death on the map
+            -- at 0 HP, and the enemies after it struck the corpse (fc743d19, 26 of 748 decisions).
+            -- A berserk strike on a red keeps its mean and M.berserkKills.
+            local split = not t.berserk and M.deathSplit(t) or nil
+            local left = t.targetHp - math.floor(mean + 0.5)
+            if split then
+                t.dies, t.deadT, t.aliveT = split.dies, split.dead, split.alive
+                if split.alive then left = split.aliveHp end
+                local o = byId[target]
+                t.kill = function()
+                    wound(addr, 0, o ~= nil and o.faction == e.faction)
+                    if o then remove(o, mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y)) end
+                end
+            end
+            -- the target's heal flag is stale when it is of the deciding side (the faction whose
+            -- heal statuses the phase reads): a red struck by the player's berserked unit is not
+            wound(addr, left, byId[target] ~= nil and byId[target].faction == e.faction)
             if M.berserkKills(t, left) and byId[target] then
                 local o = byId[target]
                 remove(o, mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y))
             end
             M.strikeLedger(api, call, S, after, wearing.base, done, t, side, e.addr, addr)
+            -- each side's record ends its way's list in place of t: the same ledger after it
+            if split then
+                for _, r in ipairs({ split.dead, split.alive }) do
+                    if r then after[r] = after[t] end
+                end
+            end
             return t, now, addr
         end
         -- the ledger the strikes `done` leave (the base when none)
@@ -4279,13 +4369,11 @@ function M.new(outer)
                                 local t, now, addr = strike(e, id, target, side, first)
                                 first = now
                                 moved[#moved + 1] = { id = id, x = side.tile.x, y = side.tile.y }
-                                -- (a berserk strike's kill: strike() took it off already)
-                                if mem.u8(addr + UNIT_HP) == 0 and not t.berserk then
-                                    local u = byId[target]
-                                    if u then
-                                        remove(u, mem.u8(u.addr + UNIT_X), mem.u8(u.addr + UNIT_Y))
-                                    end
-                                end
+                                -- the expected way: a blow that kills at even odds or better takes
+                                -- its target off, as a counter kill takes the striker (#743: the
+                                -- unit is left at the HP it keeps alive, never 0; a berserk
+                                -- strike's kill: strike() took it off already)
+                                if t.kill and t.dies >= 0.5 then t.kill() end
                                 if t.felled >= 0.5 then
                                     remove(e, side.tile.x, side.tile.y)
                                     -- a Rout's count: the player's berserked unit is none of it
