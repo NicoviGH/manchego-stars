@@ -2340,10 +2340,9 @@ local function recruitsOf(ctx)
     -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to
     local units = {}
     for _, t in ipairs(ctx.onField) do units[#units + 1] = t end
-    local carried = {}
-    for id in pairs(ctx.carried or {}) do carried[#carried + 1] = id end
-    table.sort(carried)
-    for _, id in ipairs(carried) do units[#units + 1] = ctx.carried[id] end
+    for _, id in ipairs(Board.sortedKeys(ctx.carried or {})) do
+        units[#units + 1] = ctx.carried[id]
+    end
     for _, t in ipairs(units) do
         for _, u in ipairs(ctx.blues) do
             if mayTalkOver(ctx, u, t) then
@@ -2390,17 +2389,16 @@ end
 local function recruitTargets(ctx)
     local out = {}
     for _, t in ipairs(ctx.onField) do out[#out + 1] = t end
-    local ids = {}
-    for id in pairs(ctx.pendingRecruits or {}) do ids[#ids + 1] = id end
-    table.sort(ids)
-    for _, id in ipairs(ids) do out[#out + 1] = ctx.pendingRecruits[id] end
+    for _, id in ipairs(Board.sortedKeys(ctx.pendingRecruits or {})) do
+        out[#out + 1] = ctx.pendingRecruits[id]
+    end
     return out
 end
 
--- A recruit claim, before anything else (Bot.decide's greedy path only, which reads no pending
--- arrival: ctx.pending is the planner's, so a pending recruit is no site here): a talker it names (any the game lets, when it names
+-- A recruit claim, before anything else: a talker it names (any the game lets, when it names
 -- none) talks the recruit over when it can reach it, else the nearest such talker (by the
--- field from the recruit) marches on it.
+-- field from the recruit) marches on it. Bot.decide's greedy path only: ctx.pending is the
+-- planner's, so no pending recruit reaches it.
 local function recruitFirst(ctx, gate)
     for _, c in ipairs(ctx.style.recruits or {}) do
         for _, t in ipairs(ctx.onField) do

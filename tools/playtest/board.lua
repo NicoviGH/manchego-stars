@@ -729,4 +729,19 @@ function Board.bind(mem, SYM)
     }
 end
 
+-- The keys of a set in one order every run (a key may be a number or a string: numbers by value,
+-- else by their text). The one owner of the sorted-set walks: the judge's records, the change
+-- key and the bot's recruit lists use it, so a record logged as JSON and a memo key come out
+-- the same each time.
+function Board.sortedKeys(set)
+    local ks = {}
+    for k in pairs(set) do ks[#ks + 1] = k end
+    table.sort(ks, function(a, b)
+        local ta, tb = type(a), type(b)
+        if ta ~= tb then return ta < tb end   -- a total order: by type first, then within it
+        return a < b
+    end)
+    return ks
+end
+
 return Board
