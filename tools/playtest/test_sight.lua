@@ -1895,6 +1895,33 @@ do
     check(m.u32(0x200 + 0x0C), 0, "hideUnit: its restore writes the state back")
 end
 
+-- idleMove (#743, ADR 0461): a judged phase's decider that neither strikes, casts nor steals
+-- stands where it decided before the next one decides, and an escape leaves the map. Both
+-- judged phases dispatch `none` to it: the first phase once left the decider where it stood.
+do
+    local m = fakeMem()
+    local S = { gAiDecision = 0x300 }
+    local Board = { AI_DEC = { ACTION = 0 }, AI_ACTION_ESCAPE = 4 }
+    local stood, off = nil, nil
+    local follow = function(e) stood = e.id; return 5, 6 end
+    local takeOff = Sight.takeOff
+    Sight.takeOff = function(_, e, x, y) off = e.id .. "@" .. x .. "," .. y end
+    local x, y = Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
+    check(stood .. "|" .. x .. "," .. y .. "|" .. tostring(off), "134|5,6|nil",
+          "idleMove: a mover stands on its decided tile and stays on the map")
+    m.w8(0x300, 4)
+    Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
+    check(off, "134@5,6", "idleMove: an escape leaves the map from its tile")
+    off = nil
+    check(Sight.idleMove({}, m, S, Board, function() return nil end, { id = 0x86 }), nil,
+          "idleMove: a decider that performs nothing stays")
+    check(off, nil, "idleMove: nothing performed, nothing taken off")
+    Sight.takeOff = takeOff
+    local _, nones = sightSrc:gsub("none = function%(%)%s+idleMove%(e%)", "")
+    local _, nexts = sightSrc:gsub("none = function%(%)%s+local x, y = idleMove%(e%)", "")
+    check(nones .. "," .. nexts, "1,1", "idleMove: both judged phases move a non-striker")
+end
+
 -- the closings key reads our units as the AI's targets only for the second look, which runs only
 -- for a watched unit: with one, same tiles and another HP or carrier is another read; with none
 -- (a looters-only chapter), the tiles are all that count.

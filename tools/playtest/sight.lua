@@ -3039,6 +3039,20 @@ function M.takeOff(api, e, x, y)
     M.liftOff(api, x, y, e.id)
     M.hideUnit(api, e)
 end
+-- A decider of a judged phase that neither strikes, casts nor steals still does what it
+-- decided before the next enemy decides, as the game's AI phase moves each unit in turn:
+-- `follow(e)` (the sandbox's followMove) stands it on its tile, and an escape
+-- (AI_ACTION_ESCAPE) then leaves the map, holding no tile. Left where it stood, the first phase
+-- showed later enemies a tile free that the game had filled, and a friend's zone the game had
+-- moved (#743, ADR 0461: fc743d21 Ch21 T12, enemy 134 on (2,2); 5 of 8 departures).
+-- -> its tile, or nil when it performs nothing
+function M.idleMove(api, mem, S, Board, follow, e)
+    local x, y = follow(e)
+    if x and mem.u8(S.gAiDecision + Board.AI_DEC.ACTION) == Board.AI_ACTION_ESCAPE then
+        M.takeOff(api, e, x, y)
+    end
+    return x, y
+end
 
 -- The answers a changed board starts from (s.changed): none of `kept`'s, but the march cost
 -- grids when `keepGrids` (terrain's alone: no unit blocks them) and the danger and threat grids
@@ -3980,6 +3994,7 @@ function M.new(outer)
         standOn(e, x, y)
         return x, y
     end
+    local function idleMove(e) return M.idleMove(api, mem, S, Board, followMove, e) end
 
     -- The plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
     -- UnitDrop), inside an open sandbox: a carried unit off gBmMapUnit and hidden, so the AI
@@ -4213,7 +4228,7 @@ function M.new(outer)
                         local t, now = strike(e, id, target, side, done)
                         return t, now, function() remove(e, side.tile.x, side.tile.y) end
                     end,
-                    none = function() return nil end,
+                    none = function() idleMove(e) end,
                 })
             end, sandbox, nil, mass, tail, done0)
         end
@@ -4428,7 +4443,7 @@ function M.new(outer)
                                 end
                             end,
                             none = function()
-                                local x, y = followMove(e)
+                                local x, y = idleMove(e)
                                 if x then moved[#moved + 1] = { id = id, x = x, y = y } end
                             end,
                         })
