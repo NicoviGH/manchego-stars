@@ -231,6 +231,9 @@ local Goals = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. 
 local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
 
+-- for a module handed only Bot (campaign.lua's api.Bot): Board.copy is the one shallow copy
+M.Board = Board
+
 local manhattan = Board.distance   -- FE8's RECT_DISTANCE
 
 -- json.lua, beside this file: the strike memo's guard compares and prints two reads with it
@@ -2359,7 +2362,7 @@ local function recruitsOf(ctx)
         -- once it has come this attempt
         if not here[p.charId] and (p.by or (ctx.turn or 0) < (p.boardTurn or p.turn + 1)) then
             local t = { id = "arrival:" .. p.charId, charId = p.charId, faction = "red", x = p.x,
-                        y = p.y }
+                        y = p.y, by = p.by }
             local by = {}
             for _, u in ipairs(ctx.blues) do
                 if mayTalkOver(ctx, u, t) then by[#by + 1] = u end

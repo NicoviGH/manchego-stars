@@ -539,6 +539,31 @@ do
     check(g and g.closes, 4, "remembered departure: turn 12 read on turn 8, as a script's removal")
 end
 
+-- #741 review: a pending recruit an act loads (`by`) has no turn to pass, so a quiet count of it
+-- stalls its row as any goal's (else an act this attempt never makes holds the win for good); a
+-- timed pending one still waits for its turn.
+do
+    local function status(p)
+        local g = { id = "recruit:arrival:28", kind = "recruit", unitId = "arrival:28" }
+        local rows = Goals.ledger({ g }, fakeSight({}), {},
+            { pendingRecruits = { ["arrival:28"] = p }, quietGoals = { [g.id] = true } },
+            { [g.id] = 0.5 })
+        return rows[1] and rows[1].status
+    end
+    check(status({ charId = 28 }), "feasible", "pending, timed: a quiet count is no stall")
+    check(status({ charId = 28, by = { act = "door", x = 22, y = 17 } }), "stalled",
+          "pending, loaded by an act: a quiet count stalls it")
+end
+
+-- #741 review: a sight with no simulated closings still has the remembered ones.
+do
+    local sight = fakeSight({ open = { { x = 4, y = 4, kind = "visit" } } })
+    sight.closings = nil
+    local out = Goals.closings(sight, { memory = { closings = { ["4,4"] = { phase = 10 } } } },
+                               { turn = 8 })
+    check(out["4,4"], 3, "remembered closing kept without sight.closings")
+end
+
 -- An on-field recruit the game's AI takes out of unreachable ground (#724: Ch13's Cormag at (2,13) in
 -- the peaks, no tile beside him reachable): his replayed path to a tile a talker reaches is a chance,
 -- the control whose path never leaves the peaks stays 0 and so holds no win.

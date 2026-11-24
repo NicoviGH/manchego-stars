@@ -143,12 +143,15 @@ end
 -- takes the earlier removal. ctx.turn is the board's turn; a remembered phase already past
 -- closes nothing (this attempt's play kept the tile so far).
 function M.closings(sight, style, ctx)
-    if not sight.closings then return {}, {} end
-    local watch = {}
-    for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
-    -- style.waves: no caller sets it since the guide's claims stopped playing (ADR 0464); it is
-    -- the slot #569's remembered waves would fill
-    local out, paths = sight.closings(nil, style.waves, watch)
+    local out, paths = {}, {}
+    if sight.closings then
+        local watch = {}
+        for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
+        -- style.waves: no caller sets it since the guide's claims stopped playing (ADR 0464); it
+        -- is the slot #569's remembered waves would fill
+        out, paths = sight.closings(nil, style.waves, watch)
+    end
+    -- a sight with no simulated closings still has the remembered ones
     local lost = style.memory and style.memory.closings
     if lost and next(lost) then
         assert(ctx.turn, "Goals.closings: a remembered closing needs ctx.turn")
@@ -311,9 +314,12 @@ function M.ledger(goals, sight, style, ctx, chances)
             local known = g.kind == "recruit" or reads
             local status = known and "feasible" or "unknown"
             -- a pending recruit (ctx.pendingRecruits, ADR 0436) cannot close before its turn, so
-            -- no quiet count of it is a stall: it holds the win until it is there or its turn is past
+            -- no quiet count of it is a stall: it holds the win until it is there or its turn is
+            -- past. One an act loads (`by`, ADR 0464) has no turn to pass: if no unit nears it, it
+            -- stalls as any goal does, or an act this attempt never makes would hold the win
             local pending = g.kind == "recruit" and (ctx.pendingRecruits or {})[g.unitId]
-            if known and not pending and (ctx.quietGoals or {})[g.id] then status = "stalled" end
+            local waits = pending and not pending.by
+            if known and not waits and (ctx.quietGoals or {})[g.id] then status = "stalled" end
             local row = { id = g.id, kind = g.kind, status = status, closes_on = g.closes }
             rows[#rows + 1], byId[g.id] = row, row
         end

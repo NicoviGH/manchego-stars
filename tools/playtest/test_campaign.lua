@@ -898,7 +898,10 @@ local function test_a_retry_remembers_what_was_lost()
                               closed_phase = 9, closer_class = 0x0D },
                             { x = 3, y = 3, kind = "chest", status = "visited", by = 1 },
                             { x = 22, y = 5, kind = "chest", status = "closed", closed_by = 0x1C,
-                              closed_phase = 3, closer_class = 0x37 } },
+                              closed_phase = 3, closer_class = 0x37 },
+                            -- its class not read: matched by character alone
+                            { x = 22, y = 3, kind = "chest", status = "closed", closed_by = 0x1C,
+                              closed_phase = 4 } },
                     [2] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
                               closed_phase = 4, closer_class = 0x0D } } },
         missed = { [1] = { { charId = 0x12, reason = "left_map", boardTurn = 8, x = 0, y = 5 },
@@ -920,6 +923,10 @@ local function test_a_retry_remembers_what_was_lost()
     check(m2.closings["11,15"].closerClass, 0x0D, "with its closer's class")
     check(m2.closings["3,3"], nil, "a tile we took is no closing")
     check(m2.closings["22,5"], nil, "a tile taken by a unit our door brought: its date is ours, not kept")
+    check(m2.closings["22,3"], nil, "and one whose closer's class was not read")
+    local room
+    for _, a in ipairs(m2.arrivals) do if a.x == 22 and a.y == 7 then room = a end end
+    check(room and room.timed, false, "the copy keeps `timed`")
     check(m3.closings["11,15"].phase, 4, "attempt 3: the earliest closing over both")
     check(#m2.fates, 1, "a recruit killed, or one our door brought: not kept")
     check(m2.fates[1].charId .. " t" .. m2.fates[1].boardTurn, "18 t8", "attempt 2: the departure")
