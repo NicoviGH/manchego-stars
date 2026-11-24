@@ -580,6 +580,7 @@ local function sightOf(o)
         end
     end
     s.odds = Sight.odds
+    s.jointAt = Sight.jointAt
     s.splitFloor = Sight.SPLIT_FLOOR
     -- each strike played on its target at the HP the plan gives it; the lookahead's second
     -- phase (o.nextPhase, sight.nextPhase) also says each unit's HP when it begins, the plan's
@@ -7532,6 +7533,32 @@ do
     Planner.plan(B, boardOf(A, C, E), sightOf(o), style("bold"))
     check(tostring(seen.dead) .. " " .. tostring(seen["13"]), "true true",
           "planner: two blows on one target are played dead and alive at 13 HP")
+end
+
+-- test_planner_plays_a_lone_blows_joint_ways (pins Sight.jointAt's planner read, #743 fold):
+-- A alone strikes E (10 HP) with two blows of 6 at 50%: E dies a quarter of the time (both
+-- land), and alive it keeps (10 x 1/4 + 4 x 1/2) / (3/4) = 6 HP, read off the exchange's own
+-- pairs. A counters, so the target's exchange is the planner's own (the joint's ways). The judged
+-- phase is played dead and alive at 6.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 1, 0, { minRange = false, hp = 10 })
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 50, dmg = 6, hits = 2, counters = true,
+                                                   counterHit = 100, counterDmg = 3,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            if plan.blues[1] and plan.blues[1].slot then
+                seen[(plan.gone or {})[0x81] and "dead" or tostring((plan.reds or {})[0x81])] = true
+            end
+            return {}
+        end,
+    }
+    Planner.plan(B, boardOf(A, E), sightOf(o), style("bold"))
+    check(tostring(seen.dead) .. " " .. tostring(seen["6"]), "true true",
+          "planner: a lone blow's joint is played dead and alive at 6 HP")
 end
 
 -- test_planner_prices_a_game_over_greens_death_as_the_chapter: as the green test above, in

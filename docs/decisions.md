@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-457 decisions. Read this index, then open the two or three you need — the whole
+458 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -300,6 +300,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0456` | [The fog read sums the strikes of the arrivals no one has seen](decisions/0456-the-fog-read-sums-the-strikes-of-the-unseen-arrivals.md) | 2026-11-22 | #713 #699 #510 |
 | `0458` | [An advance is material, and an under-cap march is not idle](decisions/0458-an-advance-is-material-and-an-under-cap-march-is-not-idle.md) | 2026-11-23 | #744 #699 #510 |
 | `0459` | [A sandbox strike equips its weapon](decisions/0459-a-sandbox-strike-equips-its-weapon.md) | 2026-11-23 | #743 #510 |
+| `0460` | [A blow that may kill our unit splits the judged phase, and no unit stays on the map at 0 HP](decisions/0460-a-blow-that-may-kill-splits-the-judged-phase.md) | 2026-11-23 | #743 #510 |
 
 ---
 

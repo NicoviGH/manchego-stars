@@ -24,6 +24,9 @@ local function check(got, want, msg)
     end
 end
 
+-- A probability to six places, so a float sum compares against the figure written in the test.
+local function six(p) return math.floor(p * 1e6 + 0.5) / 1e6 end
+
 -- Memory that reads 0 at every address and width, for a batching sandbox whose game code never
 -- reads RAM the test cares about.
 local function zeroMem()
@@ -923,8 +926,8 @@ do
     -- stale for the deciding side: the staging's two writes come before the phase's order,
     -- and the fourth is a planned heal's (an ally read as wounded, no phase simulated). The
     -- experience count's two writes are to the simulation's battle units, no unit's (M.expOf).
-    -- wound()'s callers: a strike's target, the lookahead's striker, the army reply's killer,
-    -- and healFaction (a red's phase start heals it: #709)
+    -- wound()'s callers: a strike's target, its death (#743, t.kill), the lookahead's striker,
+    -- the army reply's killer, and healFaction (a red's phase start heals it: #709)
     local _, all = src:gsub("api%.write8%([^\n,]- %+ UNIT_HP,", "")
     local at = src:find("function M.expOf(", 1, true)
     local count = at and src:sub(at, src:find("\nend\n", at, true)) or ""
@@ -932,7 +935,7 @@ do
     local writes = all - onBattle
     check(onBattle, 2, "aiPhaseStart: the experience count writes the battle units' HP twice")
     local _, wounds = src:gsub("\n%s+wound%(", "")
-    check(writes == 4 and wounds == 4
+    check(writes == 4 and wounds == 5
           and src:find("api%.write8%(addr %+ UNIT_HP, hp%)%s+if decides then healStale = true end") ~= nil,
           true, "aiPhaseStart: a phase's own HP writes are wound()'s, the heal flags stale after")
     check(bodyOf("function s.strike("):find("function%(%) onlyTarget%(u, all%) end,%s*true%)") ~= nil,
@@ -2235,6 +2238,106 @@ do
     -- an enemy that does not strike splits nothing
     out = Sight.phaseWays(3, function() return nil end, sandbox)
     check(#out == 1 and #out[1].strikes == 0, true, "ways: no strike, one way")
+
+    -- #743: a blow that may kill our unit splits the phase too (Sight.deathSplit's records):
+    -- the enemies after it decide once with the unit dead and off the map, once with it alive.
+    -- The strike in each way is that way's record, so the planner's per-way read counts the
+    -- death once. Without the split, a unit the mean left at 0 HP stayed on the map and the
+    -- next enemy struck its corpse (fc743d19, turn 2: enemies 137 and 139 on unit 68)
+    local function deadly(n, dies, floor, mass0)
+        local killed, asked = 0, 0
+        local outcomes, unsplit = Sight.phaseWays(n, function(k, done)
+            asked = asked + 1
+            local t = { enemy = k, target = 1, felled = 0, dies = dies,
+                        deadT = { enemy = k, way = "dead", felled = 0 },
+                        aliveT = { enemy = k, way = "alive", felled = 0 } }
+            t.kill = function() killed = killed + 1 end
+            return t, Sight.chain(done, t), function() end
+        end, sandbox, floor, mass0)
+        return outcomes, unsplit, killed, asked
+    end
+    local o, un, killed, asked = deadly(1, 0.3)
+    check(#o .. "/" .. un .. "/" .. killed, "2/0/1", "ways: a 30% death splits the phase, the unit killed in one")
+    local byWay = {}
+    for _, w in ipairs(o) do byWay[w.strikes[1].way] = six(w.p) end
+    check(byWay.dead .. "/" .. byWay.alive, "0.3/0.7", "ways: each way carries its own record, at its chance")
+    o, un, killed, asked = deadly(2, 0.3)
+    check(asked, 3, "ways: the next enemy decides once a way of the death")
+    check(total(o), 1, "ways: the death's ways sum to 1")
+    -- below the floor: one way, the board the likelier side's, the blow's whole record kept
+    o, un, killed = deadly(1, 0.004)
+    check(#o .. "/" .. un .. "/" .. killed .. "/" .. tostring(o[1].strikes[1].way),
+          "1/1/0/nil", "ways: a rare death keeps the unit, the marginal record read")
+    o, un, killed = deadly(1, 0.996)
+    check(#o .. "/" .. un .. "/" .. killed .. "/" .. tostring(o[1].strikes[1].way),
+          "1/1/1/nil", "ways: a near-sure death takes the unit off, the marginal record read")
+    o, un, killed = deadly(1, 1)
+    check(#o .. "/" .. un .. "/" .. killed, "1/0/1", "ways: a sure death takes the unit off, no split")
+    -- the alive way still splits on our counter's kill, at the alive record's own chance
+    local split = Sight.phaseWays(1, function(_, done)
+        local t = { enemy = 1, felled = 0.2, dies = 0.5, deadT = { way = "dead", felled = 0 },
+                    aliveT = { way = "alive", felled = 0.4 } }
+        t.kill = function() end
+        return t, Sight.chain(done, t), function() end
+    end, sandbox)
+    local ps = {}
+    for _, w in ipairs(split) do ps[#ps + 1] = six(w.p) end
+    table.sort(ps)
+    check(table.concat(ps, " "), "0.2 0.3 0.5", "ways: dead, alive and the counter kill, alive and not")
+end
+
+-- Sight.deathSplit (#743): a blow's joint outcomes split by whether the target dies. The dead
+-- record's blow takes at least its HP for sure; the alive one's never does; each counter is
+-- the one its side of the blow met. A blow that cannot kill gives nil
+do
+    local t = Sight.strikeAt({ dealt = { [0] = 0.2, [5] = 0.5, [10] = 0.3 },
+                               back = { [0] = 0.8, [8] = 0.2 },
+                               joint = { { p = 0.2, dealt = 0, back = 8 }, { p = 0.5, dealt = 5, back = 0 },
+                                         { p = 0.3, dealt = 10, back = 0 } } },
+                             0x81, 0x01, 8, 10, 5)
+    local s = Sight.deathSplit(t)
+    check(s and six(s.dies), 0.3, "deathSplit: the blow kills 30% of the time")
+    check(Sight.odds({ s.dead.takenDist }, 10), 1, "deathSplit: the dead record's blow kills for sure")
+    check(Sight.odds({ s.alive.takenDist }, 10), 0, "deathSplit: the alive record's never does")
+    check(s.dead.felled .. "/" .. six(s.alive.felled), "0/0.285714",
+          "deathSplit: a dead target's counter never lands; alive, ours fells it 2 in 7")
+    check(s.aliveHp, 6, "deathSplit: alive, the unit keeps 10 minus its expected 3.6 (of 0, 5)")
+    check(t.felled, 0.2, "deathSplit: the blow's own record is left as it was")
+    check(Sight.deathSplit(Sight.strikeAt({ dealt = { [3] = 1 }, back = { [0] = 1 },
+                                            joint = { { p = 1, dealt = 3, back = 0 } } }, 0x81, 1, 8, 10, 5)),
+          nil, "deathSplit: a blow that cannot kill splits nothing")
+    -- no joint (a strike read without its exchange's pairs): the blow splits on its own
+    -- distribution and the marginal counter stays whole on both sides, so the counter's kill
+    -- chance is read still (it was 0: the rebuilt joint had no counter)
+    local m = Sight.strikeAt({ dealt = { [0] = 0.5, [10] = 0.5 }, back = { [0] = 0.6, [8] = 0.4 } },
+                             0x81, 0x01, 8, 10, 5)
+    local ms = Sight.deathSplit(m)
+    check(six(ms.dies) .. "/" .. six(m.felled), "0.5/0.4", "deathSplit, no joint: the blow's own odds, the counter fells 2 in 5")
+    check(six(ms.dead.felled) .. "/" .. six(ms.alive.felled), "0.4/0.4",
+          "deathSplit, no joint: both sides keep the marginal counter's kill chance")
+    check(ms.alive.counterDist[8] .. "/" .. ms.dead.takenWorst, "0.4/10",
+          "deathSplit, no joint: the counter's spread and the dead blow's worst are kept")
+    -- a sure death is 1, not the float dust its outcomes sum to; dust of the other side is no way
+    local sure = Sight.deathSplit(Sight.strikeAt({ dealt = { [10] = 0.9999999999, [0] = 0.0000000001 },
+                                                   back = { [0] = 1 } }, 0x81, 1, 8, 10, 5))
+    check(sure.dies .. "/" .. tostring(sure.alive) .. "/" .. tostring(sure.aliveHp), "1/nil/nil",
+          "deathSplit: a death summing to 0.9999999999 is sure, with no alive side")
+    check(Sight.deathSplit(Sight.strikeAt({ dealt = { [10] = 0.0000000001, [0] = 0.9999999999 },
+                                            back = { [0] = 1 } }, 0x81, 1, 8, 10, 5)),
+          nil, "deathSplit: a death of float dust splits nothing")
+end
+
+-- Sight.jointAt (#743 fold, the planner's plan-wide kill ways read it too): a joint grouped by the
+-- target's death and the counter, first met first, `left` the HP an alive group keeps unrounded
+do
+    local ways = Sight.jointAt({ { p = 0.25, dealt = 0, back = 4 }, { p = 0.25, dealt = 6, back = 4 },
+                                 { p = 0.25, dealt = 10, back = 0 }, { p = 0.25, dealt = 4, back = 1 } }, 10)
+    local out = {}
+    for _, w in ipairs(ways) do
+        out[#out + 1] = (w.dead and "d" or "l") .. w.back .. ":" .. w.p .. ":" .. tostring(w.left) .. ":" .. #w.items
+    end
+    check(table.concat(out, " "), "l4:0.5:7.0:2 d0:0.25:nil:1 l1:0.25:6.0:1",
+          "jointAt: groups by death and counter, left = the mean HP kept")
 end
 
 -- Sight.watched: the watch is asked before every game call's frames, and what it raises ends
