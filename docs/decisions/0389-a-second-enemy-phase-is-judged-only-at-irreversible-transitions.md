@@ -193,3 +193,5 @@ turn the 2026-11-08 amendment set aside (the planner's own plan, 4.6x).
   which plan wins. The hold's games above are counted from the log (a hand count had read 18
   won, 12 stuck); fallbacks and Ch8's turns are recounted on `replyfix1*`.
 - **Control:** `PT_REPLY=hold` reads every second phase with our units holding, as before.
+
+**Amended 2026-11-23 (ADR 0459, #743): the sandbox strike equips its weapon.** The game equips the weapon an enemy strikes with, which moves it to slot 0 of the bag; the sandbox's strike did not, so the second phase started from the bag in its old order and read the wrong weapon for a striker with two (a Steel Lance where the Killer Lance had struck). The equip now carries the bag order into the second phase, and into each phase the wear reads after it, with the ledger's rows following their items. Our own berserked unit's strike does not equip (its reply slots are read off the board's list).

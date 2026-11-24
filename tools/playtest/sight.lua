@@ -2644,10 +2644,14 @@ function M.decisionCalls(S, unit, stale, split)
     return setup, nil
 end
 
+-- Inside a sandbox: `u`'s weapon of bag `slot` equipped as the game does (EquipUnitItemSlot). The
+-- one owner of which slots that is: 1..Board.ITEM_COUNT-1 (slot 0 is already in hand; no slot,
+-- a ballista's 0xFF or a borrowed item is no slot of the bag). -> whether it moved the bag.
 function M.equip(api, call, S, u, slot)
-    if not slot or slot <= 0 then return end
+    if not slot or slot <= 0 or slot >= api.Board.ITEM_COUNT then return false end
     api.keep16(u.addr + api.Board.UNIT_ITEMS, slot + 1)
     call(S.EquipUnitItemSlot, { u.addr, slot })
+    return true
 end
 
 -- Inside a sandbox: `u`'s strike from (x, y) on the wall `o` ({ x, y, hp }), as the Attack
@@ -2770,8 +2774,11 @@ end
 -- Inside a sandbox: a phase strike `t` (M.strikeOf's) leaves both weapons at the uses it is
 -- expected to spend: the striker's at `strikerAddr`, the target's counter's at `targetAddr`.
 -- -> the ledger after it (M.wear).
-function M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr)
-    ledger = M.wear(api, call, S, ledger, strikerAddr, t.wearSlot, t.wear)
+-- `armed` = the bag slot the striker equips first (M.armAsPlanned: the game equips the weapon it
+-- strikes with, which moves the slot the strike's uses are read at); none for a strike on a bag
+-- left as it was.
+function M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr, armed)
+    ledger = M.armAsPlanned(api, call, S, ledger, { addr = strikerAddr }, armed, t.wearSlot, t.wear)
     return M.wear(api, call, S, ledger, targetAddr, t.counterSlot, t.counterWear)
 end
 
@@ -2794,7 +2801,8 @@ function M.equipRows(ledger, addr, slot)
 end
 
 function M.armAsPlanned(api, call, S, ledger, u, slot, wearSlot, wear)
-    M.equip(api, call, S, u, slot)
+    -- a slot M.equip refuses leaves the bag as it was, so the rows and the wear slot stay put too
+    if not M.equip(api, call, S, u, slot) then slot = nil end
     ledger = M.equipRows(ledger, u.addr, slot)
     return M.wear(api, call, S, ledger, u.addr, M.afterEquip(slot, wearSlot), wear)
 end
@@ -2836,11 +2844,23 @@ end
 -- BALLISTA_SLOT) wears the trap its rider sits on (sTrapPool[ballistaIndex], M.wearBallista).
 function M.strikeLedger(api, call, S, after, base, done, t, side, strikerAddr, targetAddr)
     local ledger = M.ledgerAfter(after, base, done)
+    local armed
     if side.slot == BALLISTA_SLOT then
         ledger = M.wearBallista(api, ledger,
             S.sTrapPool + api.mem.u8(strikerAddr + M.UNIT_BALLISTA) * M.TRAP_SIZE, t.wear)
+    elseif not t.berserk then
+        -- The game equips the weapon it strikes with (EquipUnitItemSlot reorders the bag), so a
+        -- striker with two weapons reaches the next phase with the other one in front: Ch13's
+        -- enemy 138 alternates its Steel and Killer Lance, and the second phase read the Steel
+        -- one (no crit) in the turn the Killer one killed (#743). The strike's uses are read
+        -- off the weapon where the equip put it, and the ledger's rows follow their items.
+        -- Not for our own berserked unit (t.berserk): the army's reply picks its weapon by the
+        -- slot the board lists (s.weapons) when the berserk ends before it, and a bag the strike
+        -- reordered would give that slot another item. A slot outside the bag is refused by
+        -- M.equip, the one owner of the slot range (M.armAsPlanned then moves nothing).
+        armed = side.slot
     end
-    after[t] = M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr)
+    after[t] = M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr, armed)
     return after[t]
 end
 
