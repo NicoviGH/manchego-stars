@@ -2997,8 +2997,7 @@ do
     -- the game does: the javelin leads the bag in the next phase and the sword it counted 0.45
     -- on follows to slot 1 with its row. A strike with no slot (the game armed it, slot nil) or
     -- from the front keeps the bag as it was
-    local JAVX = 0x1C | (2 << 8)
-    fill(red.addr, { SWORD, JAVX })
+    fill(red.addr, { SWORD, JAV2 })
     local pre = Sight.tally({}, red.addr, 0, 0.45)
     local javStrike = { wear = 1, wearSlot = 1, counterWear = 0 }
     local lastRows
@@ -3023,7 +3022,7 @@ do
     end)
     check(seen, "1401,11C,0,0,0", "strikeLedger: a berserked striker's bag keeps its order, its use spent where it was")
     for _, side in ipairs({ { slot = 0 }, {} }) do
-        fill(red.addr, { SWORD, JAVX })
+        fill(red.addr, { SWORD, JAV2 })
         sandbox(function()
             sandbox(function()
                 Sight.strikeLedger(api, call, S, {}, {}, {}, { wear = 0, counterWear = 0 }, side, red.addr, myrrh.addr)
@@ -3032,6 +3031,53 @@ do
         end)
         check(seen, "1401,21C,0,0,0", "strikeLedger: slot " .. tostring(side.slot) .. " leaves the bag as it was")
     end
+    -- a slot past the bag (5) or a borrowed item's 0xFF is no slot to equip (M.equip, the one owner:
+    -- strikeLedger, replyArm and stageWear's blues all reach it through M.armAsPlanned): no equip
+    -- call, the bag and the ledger's rows stay put, the use is spent where the strike's wearSlot is
+    for _, slot in ipairs({ 5, 0xFF }) do
+        for name, arm in pairs({
+            strikeLedger = function()
+                return Sight.strikeLedger(api, call, S, {}, pre, {}, javStrike, { slot = slot }, red.addr, myrrh.addr)
+            end,
+            replyArm = function()
+                return Sight.replyArm(api, call, S, pre, red, { slot = slot }, { wearSlot = 1, wear = 1 })
+            end }) do
+            fill(red.addr, { SWORD, JAV2 })
+            local before, l = #calls
+            sandbox(function()
+                sandbox(function()
+                    l = arm()
+                    seen = bag(red.addr)
+                end)
+            end)
+            -- a ballista's 0xFF is strikeLedger's own branch (its trap, not the bag); the rest is the same
+            if not (name == "strikeLedger" and slot == 0xFF) then
+                check(seen, "1401,11C,0,0,0", name .. ": slot " .. slot .. " leaves the bag in its order")
+                check(l[red.addr][0] and l[red.addr][0].total, 0.45,
+                      name .. ": slot " .. slot .. " leaves the ledger's rows in place")
+            end
+            check(#calls, before, name .. ": slot " .. slot .. " makes no equip call")
+        end
+    end
+
+    -- an enemy decides once per phase (s.playPhase's order list), so it strikes with its two weapons in
+    -- two phases: the second reads its slot off the bag the first reordered. Javelin first (slot 1,
+    -- 2 uses -> 1), then the sword it left at slot 1 (20 uses -> 19) with the ledger the first left
+    -- as the second's base: each use is spent on its own item and each row stays on its own item
+    fill(red.addr, { SWORD, JAV2 })
+    local second
+    sandbox(function()
+        sandbox(function()
+            local l1 = Sight.strikeLedger(api, call, S, {}, pre, {}, javStrike, { slot = 1 }, red.addr, myrrh.addr)
+            local mid = bag(red.addr)
+            second = Sight.strikeLedger(api, call, S, {}, l1, {}, { wear = 1, wearSlot = 1, counterWear = 0 },
+                                        { slot = 1 }, red.addr, myrrh.addr)
+            seen = mid .. "|" .. bag(red.addr)
+        end)
+    end)
+    check(seen, "11C,1401,0,0,0|1301,11C,0,0,0", "strikeLedger: two phases' strikes each wear their own weapon")
+    check(second[red.addr][0] and second[red.addr][0].total, 1.45, "strikeLedger: the sword's row (0.45, then 1) is in front")
+    check(second[red.addr][1] and second[red.addr][1].total, 1, "strikeLedger: the javelin's row follows it to slot 1")
 
     -- (7) strikeWall's read (M.strikeWallIn): the game's forecast of two blows on a 10-HP wall
     -- (6, then 4) with an axe in slot 1, 3 uses before and 1 after

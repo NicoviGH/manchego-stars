@@ -2644,10 +2644,14 @@ function M.decisionCalls(S, unit, stale, split)
     return setup, nil
 end
 
+-- Inside a sandbox: `u`'s weapon of bag `slot` equipped as the game does (EquipUnitItemSlot). The
+-- one owner of which slots that is: 1..Board.ITEM_COUNT-1 (slot 0 is already in hand; no slot,
+-- a ballista's 0xFF or a borrowed item is no slot of the bag). -> whether it moved the bag.
 function M.equip(api, call, S, u, slot)
-    if not slot or slot <= 0 then return end
+    if not slot or slot <= 0 or slot >= api.Board.ITEM_COUNT then return false end
     api.keep16(u.addr + api.Board.UNIT_ITEMS, slot + 1)
     call(S.EquipUnitItemSlot, { u.addr, slot })
+    return true
 end
 
 -- Inside a sandbox: `u`'s strike from (x, y) on the wall `o` ({ x, y, hp }), as the Attack
@@ -2797,7 +2801,8 @@ function M.equipRows(ledger, addr, slot)
 end
 
 function M.armAsPlanned(api, call, S, ledger, u, slot, wearSlot, wear)
-    M.equip(api, call, S, u, slot)
+    -- a slot M.equip refuses leaves the bag as it was, so the rows and the wear slot stay put too
+    if not M.equip(api, call, S, u, slot) then slot = nil end
     ledger = M.equipRows(ledger, u.addr, slot)
     return M.wear(api, call, S, ledger, u.addr, M.afterEquip(slot, wearSlot), wear)
 end
@@ -2843,7 +2848,7 @@ function M.strikeLedger(api, call, S, after, base, done, t, side, strikerAddr, t
     if side.slot == BALLISTA_SLOT then
         ledger = M.wearBallista(api, ledger,
             S.sTrapPool + api.mem.u8(strikerAddr + M.UNIT_BALLISTA) * M.TRAP_SIZE, t.wear)
-    elseif side.slot and side.slot > 0 and side.slot < api.Board.ITEM_COUNT and not t.berserk then
+    elseif not t.berserk then
         -- The game equips the weapon it strikes with (EquipUnitItemSlot reorders the bag), so a
         -- striker with two weapons reaches the next phase with the other one in front: Ch13's
         -- enemy 138 alternates its Steel and Killer Lance, and the second phase read the Steel
