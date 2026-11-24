@@ -529,12 +529,13 @@ end
 -- An enemy phase's outcomes, { { p, strikes } } (p sums to 1), and how many uncertain counter
 -- kills, deaths of our units and status staves it left unsplit. A blow that may kill its target
 -- (t.dies, t.kill, t.deadT, t.aliveT: M.deathSplit's, #743, ADR 0460) splits the phase first,
--- each way with that side's record, the alive one then split on its counter. strikeAt(k, done) plays the k-th enemy of `n` after
--- `done`'s strikes: nil when it neither strikes nor casts a status staff; for a strike, `t`
--- (t.felled: the played chance the target's counter kills it), `done` with t added, and free(),
--- which takes the striker off its tile. A status staff (#674) is no strike: `t` = { lands = its
--- hit's chance }, `done` as it was, and free() its hit. Either splits the phase alike, and one
--- left unsplit takes its likelier side (a hit at even odds or better lands).
+-- each way with that side's record, the alive one then split on its counter. strikeAt(k, done)
+-- plays the k-th enemy of `n` after `done`'s strikes: nil when it neither strikes nor casts a
+-- status staff; for a strike, `t` (t.felled: the played chance the target's counter kills it),
+-- `done` with t added, and free(), which takes the striker off its tile. A status staff (#674)
+-- is no strike: `t` = { lands = its hit's chance }, `done` as it was, and free() its hit.
+-- Either splits the phase alike, and one left unsplit takes its likelier side (a hit at even
+-- odds or better lands).
 -- A striker the counter may kill splits the phase: the enemies after it decide once with it
 -- standing and once with its tile free (each in a nested `sandbox`, so neither sees the
 -- other's board), the second as likely as the counter kills it (ch02: a Brigand Marty killed
@@ -557,6 +558,8 @@ function M.phaseWays(n, strikeAt, sandbox, floor, mass0, tail, done0)
     floor = floor or M.SPLIT_FLOOR
     local unsplit = 0
     local play
+    -- whether a split on chance q is played: the rarer side is at least `floor` of the plan
+    local function splits(q, mass) return q > 0 and q < 1 and mass * math.min(q, 1 - q) >= floor end
     -- both sides of a split, each played in its own sandbox: `keep` as likely as 1 - q, `change`
     -- (which first changes the board) as likely as q
     local function both(q, keep, change)
@@ -572,7 +575,7 @@ function M.phaseWays(n, strikeAt, sandbox, floor, mass0, tail, done0)
     -- may kill its striker, or its status staff may land
     local function after(k, t, now, free, mass)
         local q = t.lands or t.felled
-        if q > 0 and q < 1 and mass * math.min(q, 1 - q) >= floor then
+        if splits(q, mass) then
             return both(q, function() return play(k + 1, now, mass * (1 - q)) end,
                         function() free(); return play(k + 1, now, mass * q) end)
         elseif q > 0 then
@@ -590,7 +593,7 @@ function M.phaseWays(n, strikeAt, sandbox, floor, mass0, tail, done0)
                 -- planner reads the death once. Unsplit, the blow's whole record stays and the
                 -- board is the likelier side's: a unit never stays on the map at 0 HP
                 local d = t.kill and t.dies or 0
-                if d > 0 and d < 1 and mass * math.min(d, 1 - d) >= floor then
+                if splits(d, mass) then
                     return both(d,
                         function() return after(k, t.aliveT, M.chain(done, t.aliveT), free, mass * (1 - d)) end,
                         function()
@@ -1179,6 +1182,16 @@ function M.safest(tiles, danger, at)
     return best
 end
 
+-- A strike record's blow and counter: `dealt` / `back` the distributions of what its blow takes
+-- off its target / our counter takes off its striker, takenWorst the most of the first, and, with
+-- `strikerHp`, felled the chance the counter kills the striker. The one owner of these four
+-- fields (strikeOf, strikeAt, deathSplit's side records). -> `r`.
+function M.blowOf(r, dealt, back, strikerHp)
+    r.takenDist, r.takenWorst, r.counterDist = dealt, M.worst(dealt), back
+    if strikerHp then r.felled = (M.odds({ back }, strikerHp)) end
+    return r
+end
+
 -- A judged phase's strike by enemy `id` on unit `target` (strikeOf's, `side` its simulation),
 -- played at the HPs the phase had left when it came: strikerHp / targetHp, which its exchange's
 -- ways were simulated at, felled the chance our counter kills the striker, and targetLevel the
@@ -1188,17 +1201,49 @@ function M.strikeAt(side, id, target, strikerHp, targetHp, level)
     local t = M.strikeOf(side)
     t.enemy, t.target = id, target
     t.strikerHp, t.targetHp, t.targetLevel = strikerHp, targetHp, level
-    t.felled = (M.odds({ t.counterDist }, t.strikerHp))
-    return t
+    return M.blowOf(t, t.takenDist, t.counterDist, strikerHp)
 end
+
+-- An exchange's joint outcomes `joint` ({ p, dealt, back }, exchangeOf's) at a target of `hp`,
+-- grouped by whether our blow takes its HP (dealt >= hp) and by the counter that follows
+-- (back), in the order first met -> { { p, dead, back, items, left } }: `items` the joint
+-- entries the group holds; `left`, for a group that lives, the HP the target keeps, unrounded
+-- (`sum` the chance-weighted HP before the division). The one split of a joint by the target's
+-- death, read by M.deathSplit and the planner's plan-wide kill ways. Pure.
+function M.jointAt(joint, hp)
+    local ways, by = {}, {}
+    for _, x in ipairs(joint) do
+        local dead = x.dealt >= hp
+        local k = (dead and "d" or "l") .. ":" .. x.back
+        local w = by[k]
+        if not w then
+            w = { p = 0, dead = dead, back = x.back, sum = 0, items = {} }
+            by[k] = w
+            ways[#ways + 1] = w
+        end
+        w.p = w.p + x.p
+        w.items[#w.items + 1] = x
+        if not dead then w.sum = w.sum + x.p * (hp - x.dealt) end
+    end
+    for _, w in ipairs(ways) do
+        if not w.dead then w.left = w.sum / w.p end
+    end
+    return ways
+end
+
+-- A side of a split is real only above this chance: a sure death sums its outcomes to 0.9999999999
+-- and a float's dust is no way of the game.
+M.SPLIT_DUST = 1e-9
 
 -- A phase strike `t` (M.strikeAt's) split by whether its target dies (#743): the game plays one
 -- or the other, and the enemies after it decide on that board (a dead unit is off the map). From
--- the exchange's joint outcomes (t.joint, else its blow's alone): dies = the chance the blow
--- takes at least the target's HP; dead / alive = t's record given that side, its blow and
--- counter what that side's outcomes took (felled read again: a dead target's counter fells no
--- one); aliveHp = the HP the target keeps given it lives, its expected loss there rounded, at
--- least 1. nil when the blow cannot kill. `t` is left as it was. Pure.
+-- the exchange's joint outcomes (t.joint, else its blow's alone; M.jointAt): dies = the chance
+-- the blow takes at least the target's HP (exactly 1 when no alive side is left above
+-- M.SPLIT_DUST); dead / alive = t's record given that side, its blow what that side's outcomes
+-- took and, with a joint, its counter too (felled read again: a dead target's counter fells no
+-- one; with none, t's own counter stays, whole, on both); aliveHp = the HP the target keeps
+-- given it lives, its expected loss there rounded, at least 1. nil when the blow cannot kill.
+-- `t` is left as it was. Pure.
 function M.deathSplit(t)
     local hp = t.targetHp
     local joint = t.joint
@@ -1206,30 +1251,28 @@ function M.deathSplit(t)
         joint = {}
         for d, p in pairs(t.takenDist or {}) do joint[#joint + 1] = { p = p, dealt = d, back = 0 } end
     end
-    local sides = { dead = { p = 0, dealt = {}, back = {}, joint = {}, lost = 0 },
-                    alive = { p = 0, dealt = {}, back = {}, joint = {}, lost = 0 } }
-    for _, x in ipairs(joint) do
-        local s = sides[x.dealt >= hp and "dead" or "alive"]
-        s.p = s.p + x.p
-        s.joint[#s.joint + 1] = x
-        s.lost = s.lost + x.p * x.dealt
+    local sides = { dead = { p = 0, items = {}, lost = 0 }, alive = { p = 0, items = {}, lost = 0 } }
+    for _, w in ipairs(M.jointAt(joint, hp)) do
+        local s = sides[w.dead and "dead" or "alive"]
+        s.p = s.p + w.p
+        for _, x in ipairs(w.items) do s.items[#s.items + 1] = x end
+        if not w.dead then s.lost = s.lost + w.p * hp - w.sum end
     end
-    if sides.dead.p <= 0 then return nil end
-    local out = { dies = sides.dead.p }
+    if sides.dead.p < M.SPLIT_DUST then return nil end
+    local out = { dies = sides.alive.p < M.SPLIT_DUST and 1 or sides.dead.p }
     for name, s in pairs(sides) do
-        if s.p > 0 then
-            local r = {}
-            for k, v in pairs(t) do r[k] = v end
+        if s.p >= M.SPLIT_DUST then
             local dealt, back, j = {}, {}, {}
-            for _, x in ipairs(s.joint) do
+            for _, x in ipairs(s.items) do
                 local q = x.p / s.p
                 dealt[x.dealt] = (dealt[x.dealt] or 0) + q
                 back[x.back] = (back[x.back] or 0) + q
                 j[#j + 1] = { p = q, dealt = x.dealt, back = x.back }
             end
-            r.takenDist, r.takenWorst, r.counterDist = dealt, M.worst(dealt), back
+            local r = {}
+            for k, v in pairs(t) do r[k] = v end
+            M.blowOf(r, dealt, t.joint and back or t.counterDist, t.strikerHp)
             r.joint = t.joint and j or nil
-            r.felled = (M.odds({ back }, t.strikerHp))
             out[name] = r
             if name == "alive" then out.aliveHp = math.max(1, hp - math.floor(s.lost / s.p + 0.5)) end
         end
@@ -1243,16 +1286,14 @@ end
 -- what it takes off our unit, back = what our counter takes off it); taught our unit's count
 -- (expOf's, its side "target"), nil when the target is no player unit.
 function M.strikeOf(t)
-    local dealt = t and t.dealt or { [0] = 1 }
-    return { takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
-             takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
-             takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil,
-             takenDist = dealt, takenWorst = M.worst(dealt),
-             counterDist = t and t.back or { [0] = 1 },
-             joint = t and t.joint or nil, taught = t and t.exp or nil,
-             wear = t and t.wear or 0, wearSlot = t and t.wearSlot or nil,
-             counterWear = t and t.counter and t.counter.wear or 0,
-             counterSlot = t and t.counter and t.counter.wearSlot or nil }
+    return M.blowOf({ takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
+                      takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
+                      takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil,
+                      joint = t and t.joint or nil, taught = t and t.exp or nil,
+                      wear = t and t.wear or 0, wearSlot = t and t.wearSlot or nil,
+                      counterWear = t and t.counter and t.counter.wear or 0,
+                      counterSlot = t and t.counter and t.counter.wearSlot or nil },
+                    t and t.dealt or { [0] = 1 }, t and t.back or { [0] = 1 })
 end
 
 -- Whether our attack ANSWERS its target, and how hard: the game's own simulation kills it
@@ -3157,7 +3198,7 @@ function M.new(outer)
     local w, h = api.map()
     -- outer.strikeCheck (PT_STRIKECHECK=1): the run's log for the bot's strike-memo guard
     -- (bot.lua strike), which reads it as s.strikeCheck
-    local s = { cache = {}, odds = M.odds, splitFloor = M.SPLIT_FLOOR, strikeCheck = outer.strikeCheck }
+    local s = { cache = {}, odds = M.odds, jointAt = M.jointAt, splitFloor = M.SPLIT_FLOOR, strikeCheck = outer.strikeCheck }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     -- watch() is asked before every game call from now on (nil: no longer): M.watched.
@@ -4101,7 +4142,7 @@ function M.new(outer)
             local left = t.targetHp - math.floor(mean + 0.5)
             if split then
                 t.dies, t.deadT, t.aliveT = split.dies, split.dead, split.alive
-                if split.alive then left = split.aliveHp end
+                left = split.alive and split.aliveHp or 0
                 local o = byId[target]
                 t.kill = function()
                     wound(addr, 0, o ~= nil and o.faction == e.faction)

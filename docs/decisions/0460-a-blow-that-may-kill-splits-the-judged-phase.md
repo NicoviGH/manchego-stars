@@ -36,9 +36,28 @@ blow keeps its whole record then, so its death chance is still read; the count g
 The lookahead's first phase, played along its expected way, takes the unit off on the same rule
 (it took it off only at 0 HP).
 
-**Not changed.** A berserk strike on a red keeps its mean and `M.berserkKills`. The phase after
-next stays a read of our guessed turn (ADR 0389), the larger part of its misses (#743).
+**Wear.** Both side records share the marginal strike's wear ledger (`after[r] = after[t]`): the
+ledger holds weapon uses, not HP, and the uses spent are the exchange's expected ones, not each
+side's. Per-side uses would need each leaf's wear carried through the exchange's joint, which
+keeps none (`M.exchangeOf` sums it over every way). The counter-kill split already shared one
+ledger across its two ways (both took `done`'s last strike's), so expected-value wear stays the
+stand-in, as ADR 0423's note has it.
+
+**Not changed.** A berserk strike on a red keeps its mean and `M.berserkKills` (the two never
+both remove a target: no split is made for a berserk strike). The phase after next stays a read
+of our guessed turn (ADR 0389), the larger part of its misses (#743).
 
 **Proof (ADR 0430).** Unit tests that fail without the change (`test_sight.lua`: the death's
 ways, each with its own record and chance, the floor's three cases, the alive way's counter
-split; `M.deathSplit`'s conditioned records). The replay and the timing are in PR's body.
+split; `M.deathSplit`'s conditioned records, with and without a joint, and a death of float
+dust; `test_bot.lua`: the planner's plan-wide kill ways, which now read `Sight.jointAt`, as
+before).
+
+One replay: vanilla Ch19 `b640e-cs-s4007` attempt 1, `PT_FORECAST` on. Enemy attacks on a unit
+at 0 HP: 9 on main (run `fc743d19`), 0 on the branch (run `fx743n19`). Ways per next phase: 2.5
+mean on main, 4.6 on the branch. Both games were lost (main: turn 6, 11 deaths; branch: turn 13,
+14 deaths): a different game, so no verdict.
+
+Timing: vanilla Ch15 `b640e-cs-s4002` attempt 1, the identical game on both (acts `1d960643`, 26
+plans), base and branch back to back, load average 4-5. CPU 356.6 s -> 374.3 s (+5.0%); emulation
+`run_s` 229.2 s -> 244.1 s (+6.5%).

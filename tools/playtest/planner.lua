@@ -2003,20 +2003,8 @@ function M.plan(Bot, board, sight, style, opts)
             gone[id] = p >= M.GONE or nil
             local uid = only[id]
             if p > 0 and p < 1 and uid then
-                local pairsOf, list = {}, {}
-                for _, l in ipairs(st.fought[uid].exchange.joint) do
-                    local dead = l.dealt >= hp
-                    local k = (dead and "d" or "l") .. ":" .. l.back
-                    if not pairsOf[k] then
-                        pairsOf[k] = { p = 0, dead = dead, back = l.back, uid = uid, sum = 0 }
-                        list[#list + 1] = pairsOf[k]
-                    end
-                    pairsOf[k].p = pairsOf[k].p + l.p
-                    if not dead then pairsOf[k].sum = pairsOf[k].sum + l.p * (hp - l.dealt) end
-                end
-                for _, w in ipairs(list) do
-                    if not w.dead then w.left = w.sum / w.p end
-                end
+                local list = sight.jointAt(st.fought[uid].exchange.joint, hp)
+                for _, w in ipairs(list) do w.uid = uid end
                 dims[#dims + 1] = { id = id, key = "k" .. id, ways = list }
                 joined[uid] = true
             elseif p > 0 and p < 1 then
