@@ -19,14 +19,14 @@ log that used to sit here is in this file's git history and on the issues.
 plan, first. In short: one-case fixes kept trading one loss for another. The bot will:
 - **R1 #765: done.** PR #769 (ADR 0467): a retry's memory is each failed attempt's visible
   timeline, read off its trace by `tools/playtest/timeline.lua`.
-- **R2 #766: next.** Assign each unit a job over several turns, by deadlines and threats. It
-  reads `Timeline.deadlines`, `routes` and `threats`; the last two have no reader yet.
+- **R2 #766: in progress** on branch `feat/766-job-layer` (pushed, no PR). Nicolas settled the
+  horizon and loss-weight calls (#764's body). Built: `jobs.lua`, the assignment `exploring`
+  now uses. Left, and the Ch14 lead to test first: #766's progress comment
+  (issuecomment-7145144548).
 - **R3 #767:** have the per-turn planner play those jobs;
 - **R4 #768:** then measure the walls.
 
-The plan lists three calls for Nicolas: the job horizon, how a job's loss is weighed against a
-death, and whether R3 touches the rank's order. R2 needs the first two: bring them as
-recommendations before building.
+The one call still open for Nicolas is whether R3 touches the rank's order (before R3).
 
 **Merged today:** PR #762 (ADR 0465, fliers' march reads their own costs; #730 stays open, it
 was only referenced), PR #763 (ADR 0466, a talker marches on a recruit our act will load), PR
