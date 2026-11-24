@@ -1920,6 +1920,7 @@ do
           "idleMove: a decider that performs nothing stays")
     check(off, nil, "idleMove: nothing performed, nothing taken off")
     Sight.takeOff = takeOff
+    -- a body ends at its first "end,": an inner one before idleMove would fail this, never pass it
     local nones, moving = 0, 0
     for body in sightSrc:gmatch("none = function%(%)(.-)\n?%s*end,") do
         nones = nones + 1
@@ -1927,7 +1928,7 @@ do
     end
     check(moving .. "/" .. nones, "2/2", "idleMove: both judged phases move a non-striker")
     local at = sightSrc:find("local function replay(who, at, into, gone, onPillage, tileOnly)", 1, true)
-    local body = at and sightSrc:sub(at, sightSrc:find("\n            end\n", at, true)) or ""
+    local body = at and sightSrc:sub(at, sightSrc:find("M.carryPaths(", at, true)) or ""
     check(body:find("idleMove(e)", 1, true) ~= nil and body:find("followMove(", 1, true) == nil,
           true, "idleMove: the route watcher's replay moves through it")
 end
