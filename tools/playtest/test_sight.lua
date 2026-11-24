@@ -2422,7 +2422,8 @@ do
     -- game rolled the miss: 29, the likeliest HP he lives at
     local knoll = Sight.deathSplit(Sight.strikeAt({ dealt = { [0] = 0.5, [20] = 0.47, [29] = 0.03 },
                                                     back = { [0] = 1 } }, 136, 10, 9, 29, 10))
-    check(knoll.aliveHp, 29, "likeliestLeft: the witness's Knoll keeps 29 (the game's), not the mean's 19")
+    check(knoll.aliveHp, 29,
+          "likeliestLeft: the witness's Knoll keeps 29 (the game's), not the mean's 19")
 end
 
 -- Sight.strikeLeft (#743, ADR 0463): a phase strike's target HP. A split's alive side, 0 for a
@@ -2434,16 +2435,19 @@ do
         return t
     end
     local under, over = berserk({ [0] = 0.51, [10] = 0.49 }), berserk({ [0] = 0.49, [10] = 0.51 })
-    check(Sight.strikeLeft(under, nil), 10, "strikeLeft: a berserk blow 49% to kill leaves the red whole")
-    check(Sight.berserkKills(under, Sight.strikeLeft(under, nil)), false, "strikeLeft: ... and keeps it on the map")
-    check(Sight.strikeLeft(over, nil), 0, "strikeLeft: a berserk blow 51% to kill kills")
-    check(Sight.berserkKills(over, Sight.strikeLeft(over, nil)), true, "strikeLeft: ... and takes it off")
+    local lu, lo = Sight.strikeLeft(under, nil), Sight.strikeLeft(over, nil)
+    check(lu, 10, "strikeLeft: a berserk blow 49% to kill leaves the red whole")
+    check(Sight.berserkKills(under, lu), false, "strikeLeft: ... and keeps it on the map")
+    check(lo, 0, "strikeLeft: a berserk blow 51% to kill kills")
+    check(Sight.berserkKills(over, lo), true, "strikeLeft: ... and takes it off")
     local t = Sight.strikeAt({ dealt = { [0] = 0.2, [4] = 0.5, [10] = 0.3 }, back = { [0] = 1 } },
                              0x81, 0x01, 8, 10, 5)
-    check(Sight.strikeLeft(t, Sight.deathSplit(t)), 6, "strikeLeft: a split's alive side, at its likeliest")
+    check(Sight.strikeLeft(t, Sight.deathSplit(t)), 6,
+          "strikeLeft: a split's alive side, at its likeliest")
     local sure = Sight.strikeAt({ dealt = { [10] = 1 }, back = { [0] = 1 } }, 0x81, 0x01, 8, 10, 5)
     check(Sight.strikeLeft(sure, Sight.deathSplit(sure)), 0, "strikeLeft: a sure death leaves 0")
-    local soft = Sight.strikeAt({ dealt = { [0] = 0.3, [3] = 0.7 }, back = { [0] = 1 } }, 0x81, 0x01, 8, 10, 5)
+    local soft = Sight.strikeAt({ dealt = { [0] = 0.3, [3] = 0.7 }, back = { [0] = 1 } },
+                                0x81, 0x01, 8, 10, 5)
     check(Sight.strikeLeft(soft, nil), 7, "strikeLeft: a blow that cannot kill, at its likeliest")
 end
 
@@ -2462,7 +2466,8 @@ do
     check(Sight.odds({ s.alive.takenDist }, 10), 0, "deathSplit: the alive record's never does")
     check(s.dead.felled .. "/" .. six(s.alive.felled), "0/0.285714",
           "deathSplit: a dead target's counter never lands; alive, ours fells it 2 in 7")
-    check(s.aliveHp, 5, "deathSplit: alive, the unit keeps 10 minus its likeliest 5 (of 0, 5), never the mean's 6")
+    check(s.aliveHp, 5,
+          "deathSplit: alive, the unit keeps 10 minus its likeliest 5 (of 0, 5), never the mean's 6")
     check(t.felled, 0.2, "deathSplit: the blow's own record is left as it was")
     check(Sight.deathSplit(Sight.strikeAt({ dealt = { [3] = 1 }, back = { [0] = 1 },
                                             joint = { { p = 1, dealt = 3, back = 0 } } }, 0x81, 1, 8, 10, 5)),

@@ -137,8 +137,8 @@
 --                            in it the player can see or plays() makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and leaves the target at its likeliest HP
---                            (M.strikeLeft) before the next decides. plan.reds = { [enemy id] = hp } (optional): the HP
---                            the plan leaves an enemy. Where the target's counter may kill
+--                            (M.strikeLeft) before the next decides. plan.reds =
+--                            { [enemy id] = hp } (optional): the HP the plan leaves an enemy. Where the target's counter may kill
 --                            the striker (its played chance, `felled`), the rest of the phase
 --                            is played both ways, the striker's tile freed in the second
 --                            (ch02: a Brigand Marty killed let the next one in), while the
@@ -4540,8 +4540,8 @@ function M.new(outer)
                                 else
                                     -- it lives: at the likeliest HP our counter leaves it, as a
                                     -- strike leaves its target
-                                    wound(e.addr,
-                                          M.likeliestLeft({ t.counterDist }, t.strikerHp) or 1, true)
+                                    local hp = M.likeliestLeft({ t.counterDist }, t.strikerHp)
+                                    wound(e.addr, hp or 1, true)
                                 end
                             end,
                             none = function()
