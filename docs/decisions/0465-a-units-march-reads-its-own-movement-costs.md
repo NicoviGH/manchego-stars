@@ -19,16 +19,20 @@ plan counted on a trip no one was sent on, and the village was razed.
 
 ## What changed
 
-`sight.field(goal, unit)` is that unit's grid (`sight.march`, memoised per class and tile); with
-no unit it is the seizer's, as before. `bot.lua` `fieldFor` / `walkFrom` take the unit where the
-distance is one unit's:
+`sight.field` is gone: `sight.march(unit, goal)` is the one owner of a unit's march grid (its
+own movement costs). `bot.lua` `fieldFor` / `walkFrom` take the unit wherever the distance is one
+unit's, and there is no unit-less read left in `bot.lua`. The grid is memoised per class and tile
+by `costGrid`'s existing behaviour, not new here; the one new memo key is `stepsOnto`'s, which now
+carries the unit because its field is the unit's.
 
 - `marchLength` (pairing, `talkersOf`), `cutOff`, `lockedOnWay`: a flier on a cliff no longer
   reads "cut off" and is not routed to a door.
 - `groundFor` (the march's progress), the `pickMove` field in the march, the wait and the Talk
-  march, and the debug dump's `fd`.
+  march, `meetingTile`, and the debug dump's `fd`.
+- The obstacle chain (`obstacleTurns`, `viaObstacle`, `wallsOnWays`' `shorter`): the steps from
+  an obstacle onto the goal's ground are divided by that unit's MOV, so they are read on that
+  unit's costs, as `turnsFor` reads its walk.
 
-**Left on the army's way, on purpose:** the obstacle chain (`obstacleTurns`, `viaObstacle`,
-`shorter`) reads the ground a wall or door opens onto, from the obstacle's tile, not from a
-unit; `sight.mapChange` is the chapter's map change, not a unit's walk; the village demand in
-`sight.lua` asks whether the lead unit gets there (`turnsTo(u, tile, fieldUnit())`).
+**Left on the shared (lead unit's) costs, on purpose:** `sight.mapChange` is the chapter's map
+change, cached per class, not a unit's walk; the village demand in `sight.lua` asks whether the
+lead unit gets there (`turnsTo(u, tile, fieldUnit())`).

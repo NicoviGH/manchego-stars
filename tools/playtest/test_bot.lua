@@ -410,9 +410,8 @@ local function sightOf(o)
     end
     local s = {
         objective = o.objective or { kind = "rout" },
-        field = o.field,
         -- the march field from a tile (sight.march): the test's field, none when it has none
-        march = function(u, tile) return o.field and o.field(tile, u) or {} end,
+        march = function(u, tile) return o.field and o.field(tile, u) or nil end,
         -- The game's march cost to a goal over MOV (sight.turnsTo, not rounded): the test's
         -- field when it gives one, else Manhattan; MOV 5 unless the unit says.
         turnsTo = function(u, tile, from)
