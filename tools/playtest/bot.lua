@@ -244,6 +244,18 @@ M.Timeline = Timeline
 local Jobs = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/jobs.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "jobs.lua"))
 
+-- planner.lua's style weights (Planner.WEIGHTS) for `aggression`: a Talk's job is the recruit's
+-- worth less its hire in the same points (#766). planner.lua loads no Bot, so there is no cycle;
+-- it is loaded on the first ask, not with this file (most decisions price no Talk)
+local PLANNER_PATH = PLAYTEST_DIR and (PLAYTEST_DIR .. "/planner.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "planner.lua")
+local plannerWeights
+local function weightsFor(aggression)
+    plannerWeights = plannerWeights or dofile(PLANNER_PATH).WEIGHTS
+    return plannerWeights[aggression]
+        or error("bot.lua: no weights for style " .. tostring(aggression))
+end
+
 local manhattan = Board.distance   -- FE8's RECT_DISTANCE
 
 -- json.lua, beside this file: the strike memo's guard compares and prints two reads with it
@@ -2190,12 +2202,32 @@ local function supplyKey(ctx, u, gate, objective)
     return M.takeItem(s, u, a)
 end
 
+-- The gold `u`'s Talk hires `t` for (sight.talkPrice; 0: free, or a sight that cannot price
+-- one), and the party's gold (sight.gold), each read once per decide.
+local function hirePrice(ctx, u, t)
+    if not ctx.sight.talkPrice then return 0 end
+    ctx.hirePrices = ctx.hirePrices or {}
+    local k = u.charId .. ">" .. t.charId
+    if ctx.hirePrices[k] == nil then ctx.hirePrices[k] = ctx.sight.talkPrice(u, t) end
+    return ctx.hirePrices[k]
+end
+local function partyGold(ctx)
+    if ctx.partyGold == nil then
+        ctx.partyGold = ctx.sight.gold and ctx.sight.gold() or math.huge
+    end
+    return ctx.partyGold
+end
+
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
 local function talks(ctx, u, t)
     -- a Talk that recruited no one this attempt is not offered again: the game re-arms a paid
     -- recruit the party cannot pay (common-events.h EventScr_9EEB00, ENUF), and its check knows
     -- no gold, so the same Talk would spend the talker's act every turn (#679; botrun's unpaid)
     if ctx.unpaid and ctx.unpaid[u.charId .. ">" .. t.charId] then return false end
+    -- nor one whose price is over the party's gold: the paid script then refuses the hire
+    -- (EventScr_9EEB00's CHECK_MONEY), so the talker can recruit no one (#766: Ch14's Eirika,
+    -- 9,980 gold against 9,420, was sent on Rennac while the free talker marched on the boss)
+    if hirePrice(ctx, u, t) > partyGold(ctx) then return false end
     local k = u.id .. ">" .. t.id
     if ctx.talks[k] == nil then
         ctx.talks[k] = ctx.sight.canTalk ~= nil and ctx.sight.canTalk(u, t) or false
@@ -2268,7 +2300,13 @@ local function talkFrom(ctx, u, t, gate)
     local k = u.id .. ">" .. t.id
     ctx.talkTiles[k] = ctx.talkTiles[k] or ctx.sight.offers(u, waitTiles(ctx, u), "talk", t)
     for _, tile in ipairs(ctx.talkTiles[k]) do
-        if gate(ctx, u, tile.x, tile.y, nil) then return action(u, tile, "talk", t) end
+        if gate(ctx, u, tile.x, tile.y, nil) then
+            local a = action(u, tile, "talk", t)
+            -- the gold the hire spends, for the planner to charge (st.priced)
+            local price = hirePrice(ctx, u, t)
+            if price > 0 then a.hirePrice = price end
+            return a
+        end
     end
     return nil
 end
@@ -2900,8 +2938,9 @@ local function exploring(ctx, sent, barred, triedIn)
     -- unit could not reach in time, #764). `key` names a goal; the goal's `kind` rides on the
     -- unit's goal tile (Goals.beside: every read of a recruit's tile leaves its lock out).
     -- `chained`: a unit may be given a second goal, counted on from the first's tile (villages
-    -- and chests; a Talk is one a unit). A pair's `v` is its worth (none: 1, every Talk alike),
-    -- `turns` its arrival turn, `d` its march: a tie in worth goes to the shorter marches
+    -- and chests; a Talk is one a unit). A pair's `v` is its worth (a Talk's: the recruit's
+    -- less its hire; none: 1), `turns` its arrival turn, `d` its march: a tie in worth goes to
+    -- the shorter marches
     local function assign(pairs_, key, kind, chained)
         local units, jobs, pair, isUnit, byKey = {}, {}, {}, {}, {}
         for _, p in ipairs(pairs_) do
@@ -2961,7 +3000,12 @@ local function exploring(ctx, sent, barred, triedIn)
             if #talkers > 0 then break end
         end
         for _, p in ipairs(talkers) do
-            talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d }
+            -- the job's worth: the recruit's (Goals.worth) less what the hire spends, so a free
+            -- talker outranks a paid one, and a hire dearer than a unit is worth to the style
+            -- is no job at all (#766)
+            local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, p.u, t) },
+                                  weightsFor(ctx.style.aggression))
+            if v > 0 then talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = v } end
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)

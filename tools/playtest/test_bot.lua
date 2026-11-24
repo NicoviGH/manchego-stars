@@ -500,6 +500,10 @@ local function sightOf(o)
         end
     end
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
+    -- a paid Talk's price (sight.talkPrice: o.price[u.id][t.id], 0 when unset) and the party's
+    -- gold (sight.gold)
+    if o.price then s.talkPrice = function(u, t) return (o.price[u.id] or {})[t.id] or 0 end end
+    if o.gold then s.gold = function() return o.gold end end
     -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
     s.mapKey = function() return o.mapKey or "-" end
     -- fn() on the board a plan leaves (sight.changed, #661, #670): o.change(change) gives the
@@ -8752,6 +8756,45 @@ do
                  [0x02] = { [0x30] = true, [0x31] = true } } })
     check(g[0x01], "3,0", "talker: the nearest pair is sent first")
     check(g[0x02], "4,4", "talker: the second recruit gets the free talker")
+end
+
+-- test_a_paid_talker_is_priced_and_never_sent_past_the_purse (#766, vanilla Ch14's Rennac): A
+-- and C may both Talk T over, A the nearer. A's Talk is the paid hire (9,980 gold, Eirika's), C's
+-- free (L'Arachel's). With 9,420 gold the paid script refuses A's hire, so C is sent; A beside T
+-- is offered no Talk. With the gold to pay, the free talker still outranks the paid one, and with
+-- C out of it A is sent only where the style rates a unit above the price (careful: 1,000 points
+-- against 9,980 x 0.04; even: 300 against 9,980 x 0.08). An affordable Talk carries its price for
+-- the planner to charge.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local C = blue(0x19, 1, 9, 0, { minRange = false })
+    local T = blue(0x1C, 5, 0, 0, { faction = "green" })
+    local function o(gold, cTalks)
+        return { reach = { [0x01] = tiles({ 4, 0 }), [0x19] = tiles({ 9, 0 }) },
+                 talk = { [0x01] = { [0x1C] = true }, [0x19] = { [0x1C] = cTalks ~= false } },
+                 price = { [0x01] = { [0x1C] = 9980 } }, gold = gold }
+    end
+    check(talkGoals(boardOf(A, C, T), o(9420))[0x19], "0,0", "paid: the free talker is sent when the purse is short")
+    check(talkGoals(boardOf(A, C, T), o(9420))[0x01] ~= "0,0", true, "paid: the unpayable talker is not")
+    check(talkGoals(boardOf(A, C, T), o(20000))[0x19], "0,0", "paid: the free talker outranks the paid one")
+    check(talkGoals(boardOf(A, C, T), o(20000, false))[0x01], "0,0",
+          "paid: careful sends the paid talker when it is the only one")
+    check(talkGoals(boardOf(A, C, T), o(20000, false), style("even"))[0x01] ~= "0,0", true,
+          "paid: even rates the hire below its price")
+    local near = blue(0x01, 0, 1, 0, { minRange = false })
+    local reach = { [0x01] = tiles({ 1, 0 }) }
+    local short = o(9420, false); short.reach = reach
+    check(B.decide(boardOf(near, T), sightOf(short), style("careful")).act ~= "talk", true,
+          "paid: no Talk offered past the purse")
+    local rich = o(20000, false); rich.reach = reach
+    local a = B.decide(boardOf(near, T), sightOf(rich), style("careful"))
+    check(a.act == "talk" and a.hirePrice, 9980, "paid: an affordable Talk carries its price")
+    -- and the planner charges it, as it charges a weapon's uses (st.priced, W.gold points)
+    local _, plan = Planner.plan(B, boardOf(near, T), sightOf(rich), style("careful"))
+    local talked = false
+    for _, x in ipairs(plan and plan.acts or {}) do talked = talked or x.act == "talk" end
+    check(talked and plan.priced, 9980 * Planner.WEIGHTS.careful.gold,
+          "paid: the planner charges the hire")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is

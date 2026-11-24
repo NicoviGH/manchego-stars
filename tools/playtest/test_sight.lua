@@ -1594,34 +1594,50 @@ do
     check(table.concat(ids, " "), "doors fog sustain", "demandsOf: doors, fog when the range is set")
 end
 
--- freeTalks (#699): E_14's Rennac is hired by Eirika for a price (her script CALLs a second
--- one that CALLs the paid-recruit script) and by L'Arachel for free (a script with no CALL).
--- Only the free talker answers the demand; a paid-only recruit, a joined one and "anyone" ask
--- nothing.
+-- freeTalks (#699) and talkPrice (#766): E_14's Rennac is hired by Eirika for a price (her script
+-- sets slot 4 and CALLs a second one that CALLs the paid-recruit script) and by L'Arachel for
+-- free (a script with no CALL). Only the free talker answers the demand; a paid-only recruit, a
+-- joined one and "anyone" ask nothing.
 do
     local m = fakeMem()
     local PAID, MID, EIRIKA, LARACHEL = 0x08002000, 0x08002100, 0x08002200, 0x08002300
     local function call(at, to) m.w16(at, 0x0A40); m.w32(at + 4, to) end
     local function enda(at) m.w16(at, 0x0120) end
+    -- SVAL (EvtSetSlot: cmd 05, 4 halfwords): slot at +2, the value at +4
+    local function sval(at, slot, v) m.w16(at, 0x0540); m.w16(at + 2, slot); m.w32(at + 4, v) end
     m.w16(PAID, 0x0020); enda(PAID + 4)
     m.w16(MID, 0x0020); call(MID + 4, PAID); enda(MID + 12)
-    m.w16(EIRIKA, 0x0020); call(EIRIKA + 4, MID); enda(EIRIKA + 12)
+    sval(EIRIKA, 4, 0x26FC); call(EIRIKA + 8, MID); enda(EIRIKA + 16)
     m.w16(LARACHEL, 0x0020); enda(LARACHEL + 4)
-    check(Sight.callsScript(m, EIRIKA, PAID), true, "callsScript: reached through a second CALL")
-    check(Sight.callsScript(m, LARACHEL, PAID), false, "callsScript: a script with no CALL")
+    check(Sight.talkPrice(m, EIRIKA, PAID), 9980, "talkPrice: slot 4, held through a second CALL")
+    check(Sight.talkPrice(m, LARACHEL, PAID), nil, "talkPrice: a script with no CALL is free")
     -- a paid CALL behind a GOTO that jumps over the END, behind a later LABEL (BEQ the same)
     local HIDDEN, QUEUED, GARBAGE, TWO = 0x08002400, 0x08002500, 0x08002600, 0x08002700
-    m.w16(HIDDEN, 0x0920); m.w16(HIDDEN + 2, 7); enda(HIDDEN + 4)
-    m.w16(HIDDEN + 8, 0x0820); m.w16(HIDDEN + 10, 7); call(HIDDEN + 12, PAID); enda(HIDDEN + 20)
-    check(Sight.callsScript(m, HIDDEN, PAID), true, "callsScript: a paid CALL behind GOTO and LABEL")
-    m.w16(QUEUED, 0x0B40); m.w32(QUEUED + 4, PAID); enda(QUEUED + 8)
-    check(Sight.callsScript(m, QUEUED, PAID), true, "callsScript: an ENQUEUE_CALL")
+    sval(HIDDEN, 4, 500)
+    m.w16(HIDDEN + 8, 0x0920); m.w16(HIDDEN + 10, 7); enda(HIDDEN + 12)
+    m.w16(HIDDEN + 16, 0x0820); m.w16(HIDDEN + 18, 7); call(HIDDEN + 20, PAID); enda(HIDDEN + 28)
+    check(Sight.talkPrice(m, HIDDEN, PAID), 500, "talkPrice: a paid CALL behind GOTO and LABEL")
+    sval(QUEUED, 4, 700); m.w16(QUEUED + 8, 0x0B40); m.w32(QUEUED + 12, PAID); enda(QUEUED + 16)
+    check(Sight.talkPrice(m, QUEUED, PAID), 700, "talkPrice: an ENQUEUE_CALL")
     m.w16(GARBAGE, 0x0A40); m.w32(GARBAGE + 4, 0xDEADBEEF); enda(GARBAGE + 8)
-    check(Sight.callsScript(m, GARBAGE, PAID), false, "callsScript: a pointer outside the ROM is not followed")
+    check(Sight.talkPrice(m, GARBAGE, PAID), nil, "talkPrice: a pointer outside the ROM is not followed")
     -- a GOTO to a label that is never there walks to the bound and stops
     m.w16(TWO, 0x0920); m.w16(TWO + 2, 9)
     for i = 1, 600 do m.w16(TWO + 4 * i, 0x0020) end
-    check(Sight.callsScript(m, TWO, PAID), false, "callsScript: bounded when a label is never reached")
+    check(Sight.talkPrice(m, TWO, PAID), nil, "talkPrice: bounded when a label is never reached")
+    -- the paid CALL with slot 4 never set, or set to a ROM address (E_19's UnitDefinition), is
+    -- a script the read does not know: it raises
+    local UNSET, POINTER = 0x08002800, 0x08002900
+    call(UNSET, MID); enda(UNSET + 8)
+    local ok, err = pcall(Sight.talkPrice, m, UNSET, PAID)
+    check(not ok and tostring(err):find("never set") ~= nil, true, "talkPrice: slot 4 never set raises")
+    sval(POINTER, 4, 0x088C03F8); call(POINTER + 8, MID); enda(POINTER + 16)
+    ok, err = pcall(Sight.talkPrice, m, POINTER, PAID)
+    check(not ok and tostring(err):find("0x088C03F8") ~= nil, true, "talkPrice: a ROM address raises")
+    -- slot 4 set for another use and no paid CALL (E_9's text ids): free
+    local TEXT = 0x08002A00
+    sval(TEXT, 4, 0xA18); enda(TEXT + 8)
+    check(Sight.talkPrice(m, TEXT, PAID), nil, "talkPrice: slot 4 with no paid CALL is free")
     local talks = { { a = 0x01, b = 0x1C, script = EIRIKA }, { a = 0x19, b = 0x1C, script = LARACHEL },
                     { a = 0x01, b = 0x30, script = EIRIKA }, { a = 0, b = 0x31, script = LARACHEL } }
     local free = Sight.freeTalks(m, talks, PAID, {})
@@ -1713,11 +1729,10 @@ do
         call(at, D + (i + 1) * 0x40); call(at + 8, D + (i + 1) * 0x40); m.w16(at + 16, 0x0120)
     end
     m.w16(D + N * 0x40, 0x0120)
+    local ok, err = pcall(Sight.talkPrice, m, D, 0x08009999)
+    check(not ok and tostring(err):find("cut short") ~= nil, true,
+          "talkPrice: a walk the budget cuts short raises, never reads as free")
     local visits = 0
-    Sight.walkScript(m, D, function() visits = visits + 1 return false end, { memo = true })
-    check(visits <= 3 * (N + 1), true, "walkScript memo: a diamond of CALLs is walked once a script")
-    check(Sight.callsScript(m, D, 0x08009999), false, "callsScript: a diamond is no blow-up")
-    visits = 0
     Sight.walkScript(m, D, function() visits = visits + 1 return false end, { budget = 1000 })
     check(visits, 1000, "walkScript budget: stops after n commands in all")
     local t0 = os.clock()

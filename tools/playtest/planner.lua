@@ -2363,8 +2363,8 @@ function M.plan(Bot, board, sight, style, opts)
                 st.wearFor[p.unit.id] = carries(p.unit.id)
             end
         end
-        -- what the plan's strikes spend of their weapons, at the gold's points (#642, Bot's
-        -- useCharge): the uses each spends at the HP the plan leaves its target (st.wear, the
+        -- what the plan's strikes spend of their weapons, and its hires, at the gold's points
+        -- (#642, Bot's useCharge): the uses each spends at the HP the plan leaves its target (st.wear, the
         -- game's played ways), charged here, on the judged plan, and never on an act's own
         -- score, so the beam builds the plan a dear weapon's kill makes safe and the cap reads
         -- it first
@@ -2372,6 +2372,8 @@ function M.plan(Bot, board, sight, style, opts)
         for _, a in ipairs(st.acts) do
             local w = st.wear[a.unitId]
             st.priced = st.priced + W.gold * (a.useCharge or 0) * (w and w.uses or 0)
+            -- a paid Talk's hire (#766, Bot's hirePrice): the gold the paid-recruit script takes
+            st.priced = st.priced + W.gold * (a.hirePrice or 0)
         end
         judged = judged - st.priced
         st.judged = judged
