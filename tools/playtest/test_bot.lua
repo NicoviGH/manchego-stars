@@ -1797,6 +1797,27 @@ do
         "the error says what is missing")
 end
 
+-- #765 review: botrun's opts.appeared reaches the goals through candidates' ctx, so a retry dates
+-- a loss by a unit the play brought from its appearance this attempt (Timeline.deadlines). A
+-- looter our door loaded razed (4,4) 3 phases after it came; this attempt it came on turn 6.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 9, 0)
+    local board = boardOf(A, E)
+    board.turn = 8
+    local sight = sightOf { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) } }
+    local st = style("careful")
+    st.memory = Fakeline.memory({
+        arrivals = { { charId = 0x80, classId = 63, x = 1, y = 1, turn = 2,
+                       by = { act = "door", x = 2, y = 2 } } },
+        closings = { { x = 4, y = 4, phase = 5, closerKey = "a:128:63:2" } } })
+    local function on(c, k) return c == 0x80 and k == 63 and 6 or nil end
+    local _, ctx = B.candidates(board, sight, st, { appeared = on })
+    check(Goals.closings(sight, st, ctx)["4,4"], 2, "candidates: opts.appeared dates the brought loss")
+    local _, bare = B.candidates(board, sight, st, {})
+    check(Goals.closings(sight, st, bare)["4,4"], nil, "and without it the loss is not dated")
+end
+
 -- test_unmodelled_is_reported_not_dropped: every claim with no behaviour comes back by id.
 do
     local claims = {

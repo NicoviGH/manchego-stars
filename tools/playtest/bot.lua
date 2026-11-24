@@ -2749,6 +2749,9 @@ function M.decide(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     ctx.unpaid = opts and opts.unpaid
+    -- this attempt's first board turn per arrival (botrun's stamps): a retry dates a loss by a
+    -- unit the play brought from it (Timeline.deadlines, #765)
+    ctx.appeared = opts and opts.appeared
     if #ctx.actors == 0 then return nil end
     for _, u in ipairs(ctx.actors) do
         local held = benchedWait(ctx, u)
@@ -3532,6 +3535,9 @@ function M.candidates(board, sight, style, opts)
     -- whatever the memo holds
     if opts and opts.talks then ctx.talks = opts.talks end
     ctx.unpaid = opts and opts.unpaid
+    -- this attempt's first board turn per arrival (botrun's stamps): a retry dates a loss by a
+    -- unit the play brought from it (Timeline.deadlines, #765)
+    ctx.appeared = opts and opts.appeared
     if opts and opts.only then
         local kept = {}
         for _, u in ipairs(ctx.actors) do

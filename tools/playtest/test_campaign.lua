@@ -863,6 +863,23 @@ local function test_a_retry_is_given_the_earlier_timelines()
 end
 test_a_retry_is_given_the_earlier_timelines()
 
+-- #765 review: a failed attempt whose record has no timeline is a crash, never a retry with a
+-- smaller memory and nothing said.
+local function test_a_record_without_a_timeline_crashes()
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "won" } } } }
+    local play = g.api.play
+    g.api.play = function(...)
+        local rec = play(...)
+        rec.timeline = nil
+        return rec
+    end
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "the campaign stops")
+    check(tostring(why):find("no timeline", 1, true) ~= nil, true, "and says why")
+    check(#g.plays, 1, "no retry is played")
+end
+test_a_record_without_a_timeline_crashes()
+
 -- The retry cap (ADR 0399): every style tried, the styles are drawn again, up to MAX_ATTEMPTS
 -- attempts a chapter start, while what is remembered keeps growing; then the chapter stops.
 local function test_styles_are_drawn_again_up_to_the_cap()

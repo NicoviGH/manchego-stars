@@ -577,6 +577,12 @@ function M.run(api)
                     return "timeout", string.format("chapter %d attempt %d: %s", ch,
                         entry.attempts, tostring(rec.why))
                 end
+                -- every attempt botrun finished hands its timeline back; one missing would
+                -- shrink the next retry's memory with nothing said
+                if not rec.timeline then
+                    return "crashed", string.format("chapter %d attempt %d: no timeline in its record",
+                        ch, entry.attempts)
+                end
                 memory.attempts[#memory.attempts + 1] = rec.timeline
                 if entry.attempts >= attemptCap then
                     if not kept then return noClean(entry) end

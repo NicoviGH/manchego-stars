@@ -1335,7 +1335,7 @@ function M.run(api)
                     if phase == "player" then markEvent("kill") end
                 elseif not unread[d.id] then
                     -- the first player turn it is gone on (the removal's boardTurn, #741)
-                    leftMap[d.charId] = { boardTurn = phase == "player" and turn or turn + 1,
+                    leftMap[d.charId] = { boardTurn = Bot.Timeline.boardTurnOf(turn, phase),
                                           x = d.x, y = d.y }
                 end
             end

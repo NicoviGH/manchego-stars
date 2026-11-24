@@ -37,12 +37,14 @@ local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
 
 local M = {}
 
--- The first player turn a unit stands (or is gone) on, read off the snapshot that first shows it:
--- a player phase's snapshot is that turn; an enemy phase's, the next (botrun's boardTurnOf and
--- leftMap use the same rule).
-local function boardTurnOf(turn, phase)
+-- The first player turn a unit stands (or is gone) on, from the phase that first shows it: a
+-- player phase is that turn; an enemy phase, the next. The one owner of the rule for a phase
+-- named by its turn: botrun's leftMap reads it too (its boardTurnOf reads a board, whose arrival
+-- may have acted in the phase: the same rule, with that case first).
+function M.boardTurnOf(turn, phase)
     return phase == "player" and turn or turn + 1
 end
+local boardTurnOf = M.boardTurnOf
 
 local function tileKey(x, y) return x .. "," .. y end
 
@@ -268,8 +270,11 @@ local function attempts(memory)
 end
 
 -- A reader's answer, kept per memory table: a retry's memory never changes during its attempt,
--- and the hold is read at every decision (weak keys: a finished attempt's memory is dropped)
+-- and the hold is read at every decision (weak keys: a finished attempt's memory is dropped).
+-- Every caller gets the same tables: a reader's answer is READ-ONLY (no caller edits one; a
+-- caller that must, copies it first).
 local cache = setmetatable({}, { __mode = "k" })
+local compute = {}   -- each cached reader's own work, by name
 local function memo(name, memory, fn)
     if not memory then return fn(memory) end
     local c = cache[memory]
@@ -288,8 +293,8 @@ end
 
 -- Every red unit the earlier attempts showed, once each by its key: sight.remember's list
 -- { id, charId, classId, arrival } (ADR 0399, 0449).
-function M.enemies(memory) return memo("enemies", memory, M._enemies) end
-function M._enemies(memory)
+function M.enemies(memory) return memo("enemies", memory, compute.enemies) end
+function compute.enemies(memory)
     local out, had = {}, {}
     for _, tl in ipairs(attempts(memory)) do
         for _, u in ipairs(tl.units or {}) do
@@ -305,8 +310,8 @@ end
 
 -- Each character the screen showed arrive, its latest attempt's sighting (ADR 0436): botrun's
 -- pending recruits. { turn, boardTurn, x, y, charId, classId, by, timed }.
-function M.arrivals(memory) return memo("arrivals", memory, M._arrivals) end
-function M._arrivals(memory)
+function M.arrivals(memory) return memo("arrivals", memory, compute.arrivals) end
+function compute.arrivals(memory)
     local out, at = {}, {}
     for _, tl in ipairs(attempts(memory)) do
         for _, u in ipairs(tl.units or {}) do
@@ -324,8 +329,8 @@ end
 
 -- The turns the earlier attempts saw a turn's reinforcement arrive (the march's hold, ADR 0386),
 -- sorted, once each; never one the play brought (#741).
-function M.holdTurns(memory) return memo("holdTurns", memory, M._holdTurns) end
-function M._holdTurns(memory)
+function M.holdTurns(memory) return memo("holdTurns", memory, compute.holdTurns) end
+function compute.holdTurns(memory)
     local out, had = {}, {}
     for _, tl in ipairs(attempts(memory)) do
         for _, u in ipairs(tl.units or {}) do
@@ -347,35 +352,49 @@ end
 -- (Ch14's Rennac, whom our door loads, loots and leaves) is dated by the turns after it appeared,
 -- and counts once it has appeared in this attempt: `appeared(charId, classId)` -> this attempt's
 -- first board turn for that unit, or nil (botrun's stamps). A death is the play's, never kept.
-function M.deadlines(memory, appeared)
-    local tiles, gone = {}, {}
-    local function when(u, t)
-        if not brought(u) then return t end
-        local now = appeared and appeared(u.charId, u.classId)
-        if not now then return nil end
-        return now + (t - u.appeared.boardTurn)
-    end
+-- Every loss the attempts remember, once per memory: { kind = "tile"|"gone", k ("x,y" or a
+-- charId), t (its turn), from (the unit's own appearance when the play brought it: { charId,
+-- classId, boardTurn }) }.
+local function losses(memory)
+    local out = {}
     for _, tl in ipairs(attempts(memory)) do
         local byKey = {}
         for _, u in ipairs(tl.units or {}) do byKey[u.key] = u end
+        local function from(u)
+            if not brought(u) then return nil end
+            return { charId = u.charId, classId = u.classId, boardTurn = u.appeared.boardTurn }
+        end
         for _, c in ipairs(tl.closings or {}) do
-            local t = when(byKey[c.closerKey], c.phase)
-            local k = tileKey(c.x, c.y)
-            if t and (not tiles[k] or t < tiles[k]) then tiles[k] = t end
+            out[#out + 1] = { kind = "tile", k = tileKey(c.x, c.y), t = c.phase,
+                              from = from(byKey[c.closerKey]) }
         end
         for _, u in ipairs(tl.units or {}) do
             if u.gone and u.gone.how == "left" then
-                local t = when(u, u.gone.boardTurn)
-                if t and (not gone[u.charId] or t < gone[u.charId]) then gone[u.charId] = t end
+                out[#out + 1] = { kind = "gone", k = u.charId, t = u.gone.boardTurn, from = from(u) }
             end
         end
     end
-    return { tiles = tiles, gone = gone }
+    return out
+end
+
+function M.deadlines(memory, appeared)
+    local out = { tile = {}, gone = {} }
+    for _, l in ipairs(memo("losses", memory, losses)) do
+        local t = l.t
+        if l.from then
+            local now = appeared and appeared(l.from.charId, l.from.classId)
+            t = now and now + (t - l.from.boardTurn) or nil
+        end
+        local into = out[l.kind]
+        if t and (not into[l.k] or t < into[l.k]) then into[l.k] = t end
+    end
+    return { tiles = out.tile, gone = out.gone }
 end
 
 -- Where each unit walked, counted from its appearance (0 = its first board turn), from the latest
 -- attempt that showed it: { [key] = { charId, classId, steps = { { after, phase, x, y } } } }.
-function M.routes(memory)
+function M.routes(memory) return memo("routes", memory, compute.routes) end
+function compute.routes(memory)
     local out = {}
     for _, tl in ipairs(attempts(memory)) do
         for _, u in ipairs(tl.units or {}) do
@@ -393,7 +412,8 @@ end
 
 -- Who killed whom, from where, on which turn, over every earlier attempt, oldest first: each
 -- death as M.recorder's `deaths` has it, with its `attempt`.
-function M.threats(memory)
+function M.threats(memory) return memo("threats", memory, compute.threats) end
+function compute.threats(memory)
     local out = {}
     for i, tl in ipairs(attempts(memory)) do
         for _, d in ipairs(tl.deaths or {}) do
