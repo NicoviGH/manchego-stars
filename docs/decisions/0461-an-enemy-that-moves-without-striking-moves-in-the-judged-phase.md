@@ -23,23 +23,31 @@ moved onto (2,2) in the game; the copy left it at (7,1), and enemy 138 struck fr
 it could not take. The lookahead's first phase (`nextPhase`) already moved such an enemy
 (`followMove`).
 
-**The change (`sight.lua` `M.idleMove`).** Both judged phases send `none` to one owner. The
-decider stands on the tile it decided (`followMove`, as the game's AI phase moves each unit
-before the next decides); an escape (`AI_ACTION_ESCAPE`) then leaves the map (`M.takeOff`),
-holding no tile. A decider that performs nothing stays. Each way of the phase plays in its own
-sandbox (`M.phaseWays`), so the move is undone between ways as a strike's stand is.
+**The change (`sight.lua` `M.idleMove`).** One owner moves such a decider, for both judged
+phases' `none` and the route watcher's `replay`. The decider stands on the tile it decided
+(`followMove`, as the game's AI phase moves each unit before the next decides); an escape
+(`AI_ACTION_ESCAPE`) then leaves the map (`M.takeOff`), holding no tile, and `idleMove` says so.
+A decider that performs nothing stays. Each way of the phase plays in its own sandbox
+(`M.phaseWays`), so the move is undone between ways as a strike's stand is. The lookahead's
+`.moved` marks an escaper `gone`. The route watcher's escaper, which before stayed on its tile
+while it stopped playing, now leaves the map too, as its comment always said ("holds no tile").
 
 **Not changed.** A struck unit that lives still carries the mean HP its blow leaves (#743's
 cause (b), in 7 of the 8 departures): splitting on every blow's HP outcome multiplies the ways
-and is sized on its own. The lookahead's `replay` (the route watcher) keeps its own escape
-handling.
+and is sized on its own.
 
 **Proof (ADR 0430).** A unit test that fails without the change (`test_sight.lua`: `idleMove`
-stands a mover, takes an escaper off from its tile, leaves a decider that performs nothing, and
-both judged phases dispatch `none` to it; with the first phase's old `return nil` the last check
-fails). One replay: vanilla Ch21 `b640e-cs-s4009` attempt 1, `PT_FORECAST` on (run `fx743i`,
-against main's `fc743d21`). Copy strikes from a tile an enemy had already moved onto without
-striking in the game: 2 in this game on main (turn 12, enemy 138 on (2,2)), 0 on the branch; 5
-(3 decisions) over all 7 of main's instrumented games. Phases where no way of the copy matches the game: 3 of 40 on main,
-2 of 32 on the branch, neither with such a mover near the decider. The branch played another
-game (stuck on turn 33, 2 deaths), so the outcome is no verdict.
+stands a mover, takes an escaper off from its tile and reports it, leaves a decider that performs
+nothing; both judged phases' `none` and `replay` go through it. With the first phase's old
+`return nil`, or `replay`'s old `followMove`, a check fails).
+
+One replay: vanilla Ch21 `b640e-cs-s4009` attempt 1, `PT_FORECAST` on (branch run `fx743i`; main's
+run of the same start is `fc743d21`).
+- In this game, copy strikes from a tile an enemy had already moved onto without striking: 2 on
+  main (turn 12, enemy 138 on (2,2)), 0 on the branch.
+- Over all 7 of main's instrumented games (`fc743d*`) there were 5 such strikes, in 3 decisions.
+- Phases where no way of the copy matches the game: 3 of 40 on main, 2 of 32 on the branch,
+  neither of the 2 with such a mover near the decider.
+
+The branch played a different game from main's (stuck on turn 33, 2 deaths), so these counts are
+not a like-for-like comparison and the outcome is no verdict.

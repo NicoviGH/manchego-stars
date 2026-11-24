@@ -1896,8 +1896,10 @@ do
 end
 
 -- idleMove (#743, ADR 0461): a judged phase's decider that neither strikes, casts nor steals
--- stands where it decided before the next one decides, and an escape leaves the map. Both
--- judged phases dispatch `none` to it: the first phase once left the decider where it stood.
+-- stands where it decided before the next one decides, and an escape leaves the map (and says
+-- so). Both judged phases dispatch `none` to it, and the route watcher's replay moves through it:
+-- the first phase once left the decider where it stood. The dispatch is a source pin (the
+-- phases run only in the emulator); it reads each `none` body whatever its layout.
 do
     local m = fakeMem()
     local S = { gAiDecision = 0x300 }
@@ -1906,20 +1908,28 @@ do
     local follow = function(e) stood = e.id; return 5, 6 end
     local takeOff = Sight.takeOff
     Sight.takeOff = function(_, e, x, y) off = e.id .. "@" .. x .. "," .. y end
-    local x, y = Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
-    check(stood .. "|" .. x .. "," .. y .. "|" .. tostring(off), "134|5,6|nil",
-          "idleMove: a mover stands on its decided tile and stays on the map")
+    local x, y, escaped = Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
+    check(stood .. "|" .. x .. "," .. y .. "|" .. tostring(off) .. "|" .. tostring(escaped),
+          "134|5,6|nil|false", "idleMove: a mover stands on its decided tile and stays on the map")
     m.w8(0x300, 4)
-    Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
-    check(off, "134@5,6", "idleMove: an escape leaves the map from its tile")
+    _, _, escaped = Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
+    check(off .. "|" .. tostring(escaped), "134@5,6|true",
+          "idleMove: an escape leaves the map from its tile, and says so")
     off = nil
     check(Sight.idleMove({}, m, S, Board, function() return nil end, { id = 0x86 }), nil,
           "idleMove: a decider that performs nothing stays")
     check(off, nil, "idleMove: nothing performed, nothing taken off")
     Sight.takeOff = takeOff
-    local _, nones = sightSrc:gsub("none = function%(%)%s+idleMove%(e%)", "")
-    local _, nexts = sightSrc:gsub("none = function%(%)%s+local x, y = idleMove%(e%)", "")
-    check(nones .. "," .. nexts, "1,1", "idleMove: both judged phases move a non-striker")
+    local nones, moving = 0, 0
+    for body in sightSrc:gmatch("none = function%(%)(.-)\n?%s*end,") do
+        nones = nones + 1
+        if body:find("idleMove(e)", 1, true) then moving = moving + 1 end
+    end
+    check(moving .. "/" .. nones, "2/2", "idleMove: both judged phases move a non-striker")
+    local at = sightSrc:find("local function replay(who, at, into, gone, onPillage, tileOnly)", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("\n            end\n", at, true)) or ""
+    check(body:find("idleMove(e)", 1, true) ~= nil and body:find("followMove(", 1, true) == nil,
+          true, "idleMove: the route watcher's replay moves through it")
 end
 
 -- the closings key reads our units as the AI's targets only for the second look, which runs only
