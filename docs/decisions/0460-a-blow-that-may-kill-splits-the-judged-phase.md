@@ -47,6 +47,10 @@ stand-in, as ADR 0423's note has it.
 both remove a target: no split is made for a berserk strike). The phase after next stays a read
 of our guessed turn (ADR 0389), the larger part of its misses (#743).
 
+**Cost, accepted (Nicolas, 2026-11-23).** The split plays more ways in every judged phase: +5.0%
+CPU on an identical Ch15 game (below). Nicolas accepted it as #671's exception (the bot plays well
+first; the cost is fixed there, not here): #671 comment 7118862017.
+
 **Proof (ADR 0430).** Unit tests that fail without the change (`test_sight.lua`: the death's
 ways, each with its own record and chance, the floor's three cases, the alive way's counter
 split; `M.deathSplit`'s conditioned records, with and without a joint, and a death of float

@@ -105,6 +105,8 @@ local function fakeGame(o)
                 strike = function() return Sight.strikeOf(nil) end,
                 odds = Sight.odds,
                 splitFloor = Sight.SPLIT_FLOOR,
+                -- the planner's kill ways read a lone blow's joint through it (#743, ADR 0460)
+                jointAt = Sight.jointAt,
                 nextTurnEvent = function(turn)
                     g.eventAsks = (g.eventAsks or 0) + 1
                     return o.eventTurn and o.eventTurn > turn and o.eventTurn or nil
