@@ -1995,6 +1995,14 @@ do
           "3,6|0|0|0|0|65", "dieOff: the carried unit stands on the drop tile, shown and free")
     check(m.u8(at(4, 5)) .. "|" .. (m.u32(carrier + 0x0C) & HIDDEN), "0|1",
           "dieOff: the carrier leaves the map")
+    -- the plan's own gone units are taken off with no drop: a talked recruit is not dead
+    stage()
+    calls = {}
+    local set = Sight.takeGone(api, { [0x01] = { id = 0x01, addr = carrier, x = 4, y = 5 },
+        [0x41] = { id = 0x41, addr = carried } }, { [0x01] = true })
+    check(tostring(set[0x01]) .. "|" .. #calls .. "|" .. m.u32(carried + 0x0C) .. "|" .. m.u8(at(4, 5)),
+          "true|0|" .. (RESCUED | HIDDEN) .. "|0", "takeGone: off the map, whom it carries stays carried")
+    m.w32(carrier + 0x0C, 0)
     calls = {}
     check(Sight.deathDropAt(api, call, S, scratch, { addr = carrier }), nil,
           "deathDropAt: a unit that carries no one sets no one down")

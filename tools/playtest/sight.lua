@@ -3096,19 +3096,31 @@ function M.deathDropAt(api, call, S, scratch, o)
     for k, c in ipairs(cells) do api.write8(c, held[k]) end
     return mem.u8(o.addr + Board.UNIT_RESCUE), x, y
 end
+-- The state bits of a carried unit (bmunit.c UnitRescue): off the map's refresh and hidden.
+function M.carried(Board) return Board.US_RESCUED | Board.US_HIDDEN end
 -- The carried unit `t` set down on (x, y) by its carrier `r` (nil when gone), as bmunit.c
 -- UnitDrop writes it: both rescue words cleared, the carried one shown and on the map there.
 -- One owner for the plan's Drop (stageCarry) and a carrier's death (M.dieOff).
 function M.drop(api, t, r, x, y)
     local mem, Board = api.mem, api.Board
-    local carry = Board.US_RESCUED | Board.US_HIDDEN
-    api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) & ~carry)
+    api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) & ~M.carried(Board))
     api.write8(t.addr + Board.UNIT_RESCUE, 0)
     if r then
         api.write32(r.addr + UNIT_STATE, mem.u32(r.addr + UNIT_STATE) & ~Board.US_RESCUING)
         api.write8(r.addr + Board.UNIT_RESCUE, 0)
     end
     M.standOn(api, t, x, y)
+end
+-- The plan's own gone units (`gone`, { [id] = true }) off the map before its enemy phase, by
+-- M.takeOff alone: the list holds a recruit talked to (not dead) as well as our kills, and no
+-- plan carry rides on an enemy (planner.lua fx.gone), so no drop. -> the ids, as a set
+function M.takeGone(api, byId, gone)
+    local out = {}
+    for id in pairs(gone or {}) do
+        out[id] = true
+        if byId[id] then M.takeOff(api, byId[id], byId[id].x, byId[id].y) end
+    end
+    return out
 end
 -- Unit `e` dies on (x, y) in a judged phase: whom it carries is set down first, where the game
 -- sets it (M.deathDropAt, M.drop), then `e` leaves the map (M.takeOff). `byId` is the phase's.
@@ -4060,7 +4072,7 @@ function M.new(outer)
     end
     local function idleMove(e) return M.idleMove(api, mem, S, Board, followMove, e) end
 
-    local CARRY = Board.US_RESCUED | US_HIDDEN
+    local CARRY = M.carried(Board)
     local function drop(t, r, x, y) M.drop(api, t, r, x, y) end
 
     -- The plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
@@ -4155,11 +4167,7 @@ function M.new(outer)
         local function remove(e, x, y) M.dieOff(api, call, S, scratch, byId, e, x, y) end
         -- the plan's own gone units are only taken off: the list holds a recruit talked to (not
         -- dead) as well as our kills, and no plan carry rides on an enemy (planner.lua fx.gone)
-        local gone = {}
-        for id in pairs(plan.gone or {}) do
-            gone[id] = true
-            if byId[id] then M.takeOff(api, byId[id], byId[id].x, byId[id].y) end
-        end
+        local gone = M.takeGone(api, byId, plan.gone)
         -- the doors the plan opens and the walls it breaks (M.openMap): the enemies behind
         -- them reach through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed
         -- him at 0%)
