@@ -3039,6 +3039,20 @@ function M.takeOff(api, e, x, y)
     M.liftOff(api, x, y, e.id)
     M.hideUnit(api, e)
 end
+-- A decider that neither strikes, casts nor steals still does what it decided before the next
+-- enemy decides, as the game's AI phase moves each unit in turn (both judged phases, and the
+-- route watcher's `replay`):
+-- `follow(e)` (the sandbox's followMove) stands it on its tile, and an escape
+-- (AI_ACTION_ESCAPE) then leaves the map, holding no tile. Left where it stood, the first phase
+-- showed later enemies a tile free that the game had filled, and a friend's zone the game had
+-- moved (#743, ADR 0461: fc743d21 Ch21 T12, enemy 134 on (2,2); 5 of 8 departures).
+-- -> its tile and whether it escaped from there, or nil when it performs nothing
+function M.idleMove(api, mem, S, Board, follow, e)
+    local x, y = follow(e)
+    local escaped = x ~= nil and mem.u8(S.gAiDecision + Board.AI_DEC.ACTION) == Board.AI_ACTION_ESCAPE
+    if escaped then M.takeOff(api, e, x, y) end
+    return x, y, escaped
+end
 
 -- The answers a changed board starts from (s.changed): none of `kept`'s, but the march cost
 -- grids when `keepGrids` (terrain's alone: no unit blocks them) and the danger and threat grids
@@ -3980,6 +3994,7 @@ function M.new(outer)
         standOn(e, x, y)
         return x, y
     end
+    local function idleMove(e) return M.idleMove(api, mem, S, Board, followMove, e) end
 
     -- The plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
     -- UnitDrop), inside an open sandbox: a carried unit off gBmMapUnit and hidden, so the AI
@@ -4213,7 +4228,7 @@ function M.new(outer)
                         local t, now = strike(e, id, target, side, done)
                         return t, now, function() remove(e, side.tile.x, side.tile.y) end
                     end,
-                    none = function() return nil end,
+                    none = function() idleMove(e) end,
                 })
             end, sandbox, nil, mass, tail, done0)
         end
@@ -4374,7 +4389,7 @@ function M.new(outer)
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
     -- begins, 0 when the first left it dead }
     -- and .moved = the units the first phase moved (enemies, and the player's berserked units,
-    -- #660), { { id, x, y } }, .fell = the ids of the
+    -- #660), { { id, x, y, gone } } (gone: it escaped from that tile, M.idleMove), .fell = the ids of the
     -- strikers our counters removed in it (a Rout's count, Planner.secondRead).
     -- `reply` (#510 comment 6906859807, ADR 0389's amendment of 2026-11-17): our units play
     -- armyReply's turn between the two phases in place of the hold; .reply = what they played.
@@ -4428,8 +4443,10 @@ function M.new(outer)
                                 end
                             end,
                             none = function()
-                                local x, y = followMove(e)
-                                if x then moved[#moved + 1] = { id = id, x = x, y = y } end
+                                local x, y, escaped = idleMove(e)
+                                if x then
+                                    moved[#moved + 1] = { id = id, x = x, y = y, gone = escaped or nil }
+                                end
                             end,
                         })
                     end
@@ -4541,11 +4558,11 @@ function M.new(outer)
                         local e = who[id] and byId[id]
                         if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
                             aiDecide(call, proc, e, all, nil, nil, tileOnly)
-                            local x, y = followMove(e)
+                            local x, y, escaped = idleMove(e)
                             if x then
                                 if at[id] then at[id] = { x = x, y = y } end
-                                if mem.u8(D + DEC.ACTION) == Board.AI_ACTION_ESCAPE then
-                                    -- gone this phase: it plays no more and holds no tile
+                                if escaped then
+                                    -- gone this phase (idleMove took it off): it plays no more
                                     out["unit:" .. id] = out["unit:" .. id] or phase
                                     who[id], gone[id] = nil, true
                                 elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE and onPillage then

@@ -1895,6 +1895,44 @@ do
     check(m.u32(0x200 + 0x0C), 0, "hideUnit: its restore writes the state back")
 end
 
+-- idleMove (#743, ADR 0461): a judged phase's decider that neither strikes, casts nor steals
+-- stands where it decided before the next one decides, and an escape leaves the map (and says
+-- so). Both judged phases dispatch `none` to it, and the route watcher's replay moves through it:
+-- the first phase once left the decider where it stood. The dispatch is a source pin (the
+-- phases run only in the emulator); it reads each `none` body whatever its layout.
+do
+    local m = fakeMem()
+    local S = { gAiDecision = 0x300 }
+    local Board = { AI_DEC = { ACTION = 0 }, AI_ACTION_ESCAPE = 4 }
+    local stood, off = nil, nil
+    local follow = function(e) stood = e.id; return 5, 6 end
+    local takeOff = Sight.takeOff
+    Sight.takeOff = function(_, e, x, y) off = e.id .. "@" .. x .. "," .. y end
+    local x, y, escaped = Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
+    check(stood .. "|" .. x .. "," .. y .. "|" .. tostring(off) .. "|" .. tostring(escaped),
+          "134|5,6|nil|false", "idleMove: a mover stands on its decided tile and stays on the map")
+    m.w8(0x300, 4)
+    _, _, escaped = Sight.idleMove({}, m, S, Board, follow, { id = 0x86 })
+    check(off .. "|" .. tostring(escaped), "134@5,6|true",
+          "idleMove: an escape leaves the map from its tile, and says so")
+    off = nil
+    check(Sight.idleMove({}, m, S, Board, function() return nil end, { id = 0x86 }), nil,
+          "idleMove: a decider that performs nothing stays")
+    check(off, nil, "idleMove: nothing performed, nothing taken off")
+    Sight.takeOff = takeOff
+    -- a body ends at its first "end,": an inner one before idleMove would fail this, never pass it
+    local nones, moving = 0, 0
+    for body in sightSrc:gmatch("none = function%(%)(.-)\n?%s*end,") do
+        nones = nones + 1
+        if body:find("idleMove(e)", 1, true) then moving = moving + 1 end
+    end
+    check(moving .. "/" .. nones, "2/2", "idleMove: both judged phases move a non-striker")
+    local at = sightSrc:find("local function replay(who, at, into, gone, onPillage, tileOnly)", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("M.carryPaths(", at, true)) or ""
+    check(body:find("idleMove(e)", 1, true) ~= nil and body:find("followMove(", 1, true) == nil,
+          true, "idleMove: the route watcher's replay moves through it")
+end
+
 -- the closings key reads our units as the AI's targets only for the second look, which runs only
 -- for a watched unit: with one, same tiles and another HP or carrier is another read; with none
 -- (a looters-only chapter), the tiles are all that count.
