@@ -1402,7 +1402,7 @@ do
         "the unit facing one lethal enemy acts before the one facing two chips")
 end
 
--- sight.field routes the march around a wall; without it the march is Manhattan.
+-- sight.march routes the march around a wall; without it the march is Manhattan.
 do
     local P = dofile(here .. "pathing.lua")
     -- a wall at x = 2 for y = 0..1; the way past it is y = 2

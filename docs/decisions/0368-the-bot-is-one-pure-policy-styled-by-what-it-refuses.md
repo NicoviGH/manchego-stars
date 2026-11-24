@@ -67,7 +67,8 @@ standing ON the seize tile (the boss on the throne), which it strikes from the a
   first named here).
 - `sight.field(goal)`, optional: a distance field toward `goal` (ADR 0369: FE8's own extended
   movement map). A function of the goal because the bot picks the goal. Without it the march is
-  Manhattan, which strands a unit against a wall (#60).
+  Manhattan, which strands a unit against a wall (#60). ADR 0465 replaced it with
+  `sight.march(unit, goal)`, on the marching unit's own movement costs.
 - `sight.cache`, optional: one table per player phase, forecasts kept across decide calls. The
   key is the exchange and the WHOLE board (ADR 0369: the enemy's strike is its AI's own pick of
   weapon and tile, which any unit can change; this record first keyed it on the units within

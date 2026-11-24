@@ -1459,8 +1459,8 @@ objectiveTile = function(ctx, u, objective)
 end
 
 -- The obstacle that opens `u`'s way to `goal` when no walk reaches it: u's own field to the
--- goal is known and leaves u's tile unreached (cutOff). Of the obstacles the Attack command can strike
--- (sight.obstacles), one whose opening opens onto ground the goal's field reaches
+-- goal is known and leaves u's tile unreached (cutOff). Of the obstacles the Attack command
+-- can strike (sight.obstacles), one whose opening opens onto ground the goal's field reaches
 -- (stepsThrough): first one whose own field reaches u, the nearest u by that field; else one u
 -- has turns to through others (turnsFor, which asks this again for that obstacle), the fewest
 -- -- a way through two doors in a row is still a way, as a player opens them one after
@@ -2689,8 +2689,9 @@ function M.baitAt(ctx, u, boss, tile, slot)
 end
 
 -- The old clear-bot through decide: the first unit in slot order, pickTarget's pick, else
--- pickMove toward the goal over u's own march distance (sight.march) when there is one. With no field pickMove's cork
--- rule sends it at the nearest enemy, which is the charge the greedy bot has always made.
+-- pickMove toward the goal over u's own march distance (sight.march) when there is one. With
+-- no field pickMove's cork rule sends it at the nearest enemy, which is the charge the greedy
+-- bot has always made.
 local function greedy(ctx, objective)
     local u = ctx.actors[1]
     local targets = {}
