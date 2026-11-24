@@ -15,8 +15,8 @@ log that used to sit here is in this file's git history and on the issues.
 
 ## Next session starts here (2026-11-24; main is 690ab0bb + this HANDOFF)
 
-**The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its plan comment
-(7141604567) first. In short: one-case fixes kept trading one loss for another. The bot will:
+**The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the
+plan, first. In short: one-case fixes kept trading one loss for another. The bot will:
 - **R1 #765:** remember the whole visible timeline of a failed attempt;
 - **R2 #766:** assign each unit a job over several turns, by deadlines and threats;
 - **R3 #767:** have the per-turn planner play those jobs;

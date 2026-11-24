@@ -140,8 +140,9 @@ re-ask.
   `ours` is only the code's game id, in backticks (`check.py check_prose_names_manchego_stars`).
 - **Findings and an issue's status live on the GitHub issue**; HANDOFF only points at them. On
   hold is the `on-hold` label plus ONE comment saying why and what reopens it.
-- **No design docs.** A design or plan is ONE comment on its issue, edited in place; the body
-  links to it, nothing copies it, and the PR records the settled call as an ADR. This overrides
+- **No design docs.** A design or plan lives in ONE place on its issue, edited in place: an
+  epic's plan is its body (Nicolas, 2026-11-24, #764), a single issue's is one comment the body
+  links to. Nothing copies it, and the PR records the settled call as an ADR. This overrides
   the brainstorming skill's spec file.
 - **Never make tests, the parity read or CI slower** without fixing the cost in the same PR;
   report before/after timings, base and branch timed back to back with `uptime` and CPU time.
