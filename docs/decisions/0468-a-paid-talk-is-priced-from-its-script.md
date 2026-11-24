@@ -62,5 +62,6 @@ botrun's `unpaid` learns a Talk is unpaid only after one fails (#766's root-caus
 
 - The talker's job is now right, but the per-turn planner does not play it: she spends turns on
   her staff while Rennac walks away. That is R3 (#767).
-- Attempt 2's stall at the seize is not yet explained (#766).
+- Attempt 2's stall at the seize: a door the planner never played from an ally's tile, fixed
+  by ADR 0469 (replay `r766g`: attempt 2 won clean).
 - botrun's `unpaid` (#679) stays as a fallback for a sight that cannot price a Talk.

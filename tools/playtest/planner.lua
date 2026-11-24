@@ -1502,7 +1502,47 @@ function M.plan(Bot, board, sight, style, opts)
         return true
     end
 
-    local function extend(st, a, uid)
+    -- An act on an ally's tile (its `vacate`) brings that ally's move off it, as a player moves
+    -- the ally first: its best act by its own score (a.own) that ends on neither tile the act
+    -- needs. Without it the act waited for some other part of the plan to move the ally first,
+    -- and nothing did: vanilla Ch14 s4003 (#766, `r766f`), Colm and Innes were offered the
+    -- (17,2) door from (18,1) and (17,1) for nine turns, the allies who stood there held, no
+    -- plan judged held the door, and the board repeated until the run was cut. One step deep:
+    -- the ally's own move is not given an ally's in turn.
+    local candOf
+    local function stepAside(st, a, extendFn)
+        if not candOf then
+            candOf = {}
+            for _, c in ipairs(cands) do candOf[c.unit.id] = c end
+        end
+        local c = candOf[a.vacate]
+        if not c then return nil end
+        local need, at = a.move.x .. "," .. a.move.y, endTile(a)
+        local order = {}
+        for _, b in ipairs(c.acts) do
+            local e = endTile(b)
+            local tile = e.x .. "," .. e.y
+            if tile ~= need and tile ~= at.x .. "," .. at.y
+                    and b.move.x .. "," .. b.move.y ~= need then
+                order[#order + 1] = b
+            end
+        end
+        table.sort(order, function(x, y)
+            if (x.own or 0) ~= (y.own or 0) then return (x.own or 0) > (y.own or 0) end
+            return key(x) < key(y)
+        end)
+        for _, b in ipairs(order) do
+            local n = extendFn(st, b, a.vacate, true)
+            if n then return n end
+        end
+        return nil
+    end
+
+    local extend
+    extend = function(st, a, uid, aside)
+        if a.vacate and not st.used[a.vacate] and not aside and not st.used[uid] then
+            st = stepAside(st, a, extend) or st
+        end
         -- the tile it ends on (a Canto move's), which the plan then holds; the act's own tile
         -- must be free too, when it moves on from it
         local at = endTile(a)

@@ -3712,6 +3712,39 @@ do
     check(where[0x01], "1,0", "vacate: with the ally ahead staying, A takes the free tile")
 end
 
+-- test_an_act_on_an_allys_tile_brings_the_allys_move_off_it (#766, vanilla Ch14 s4003 `r766f`):
+-- the board of the aside test below, with the beam cut to one partial plan of one act a unit.
+-- K's Door from (1,0) asks J, who stands there, to move first; the beam that ranked J's holds
+-- above its aside never put J's move before K's act, so no plan judged held the door. The act
+-- now brings J's best move off the tile with it (Colm and Innes offered the (17,2) door for
+-- nine turns while Tana and Artur held (17,1) and (18,1), and the board repeated until cut).
+do
+    local K = blue(0x01, 0, 0, 1)
+    local J = blue(0x02, 1, 1, 0)
+    local C = blue(0x03, 2, 0, 0)
+    local D = blue(0x04, 3, 1, 1)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 1 }, { 1, 0 }),
+                  [0x02] = tiles({ 1, 0 }, { 0, 0 }, { 1, 1 }, { 0, 2 }),
+                  [0x03] = tiles({ 0, 0 }, { 1, 0 }), [0x04] = tiles({ 1, 1 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["4,0"] = 2, ["0,1"] = 3, ["1,1"] = 2, ["0,2"] = 4 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+    }
+    local beam, per = Planner.BEAM, Planner.PER_UNIT
+    Planner.BEAM, Planner.PER_UNIT = 1, 1
+    local ok, _, plan = pcall(Planner.plan, B, boardOf(K, J, C, D, E), sightOf(o), style("careful"))
+    Planner.BEAM, Planner.PER_UNIT = beam, per
+    local opened = false
+    for _, a in ipairs(ok and plan and plan.acts or {}) do
+        opened = opened or (a.unitId == 0x01 and a.act == "door")
+    end
+    check(opened, true, "step aside: K's Door is played, J moved off its tile first")
+end
+
 -- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
 -- (0,1) and (0,2) are safe, (0,1) the safest by board order. C marches onto (0,1). A must
 -- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (Manchego Stars ch03:
