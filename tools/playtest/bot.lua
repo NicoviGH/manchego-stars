@@ -2340,10 +2340,9 @@ local function recruitsOf(ctx)
     -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to
     local units = {}
     for _, t in ipairs(ctx.onField) do units[#units + 1] = t end
-    local carried = {}
-    for id in pairs(ctx.carried or {}) do carried[#carried + 1] = id end
-    table.sort(carried)
-    for _, id in ipairs(carried) do units[#units + 1] = ctx.carried[id] end
+    for _, id in ipairs(Board.sortedKeys(ctx.carried or {})) do
+        units[#units + 1] = ctx.carried[id]
+    end
     for _, t in ipairs(units) do
         for _, u in ipairs(ctx.blues) do
             if mayTalkOver(ctx, u, t) then
@@ -2383,9 +2382,23 @@ local function recruitsOf(ctx)
     return out, talkers, pending, loose
 end
 
+-- The recruits a talker marches on: those on the field, then each pending one (ctx.pendingRecruits,
+-- at its meeting tile) in id order. A pending recruit our own act loads (`by`, #741) is no less a
+-- recruit to march on: the talker that waits for it to appear is a turn or two behind a unit that
+-- leaves the map faster than it chases (vanilla Ch14's Rennac).
+local function recruitTargets(ctx)
+    local out = {}
+    for _, t in ipairs(ctx.onField) do out[#out + 1] = t end
+    for _, id in ipairs(Board.sortedKeys(ctx.pendingRecruits or {})) do
+        out[#out + 1] = ctx.pendingRecruits[id]
+    end
+    return out
+end
+
 -- A recruit claim, before anything else: a talker it names (any the game lets, when it names
 -- none) talks the recruit over when it can reach it, else the nearest such talker (by the
--- field from the recruit) marches on it.
+-- field from the recruit) marches on it. Bot.decide's greedy path only: ctx.pending is the
+-- planner's, so no pending recruit reaches it.
 local function recruitFirst(ctx, gate)
     for _, c in ipairs(ctx.style.recruits or {}) do
         for _, t in ipairs(ctx.onField) do
@@ -2892,7 +2905,7 @@ local function exploring(ctx, sent, barred, triedIn)
     -- Ross, killed on turn 2 while Eirika marched on the brigands). A recruit the style claims
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
-    for _, t in ipairs(ctx.onField) do
+    for _, t in ipairs(recruitTargets(ctx)) do
         -- unclaimed: any talker; claimed: the first claim with a talker that can go, as
         -- recruitFirst falls through its claims in order
         local claims, talkers = claimsOn(ctx, "recruits", t), nil

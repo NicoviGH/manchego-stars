@@ -364,19 +364,8 @@ local function exposed(act, hp, gone, odds)
     return odds(strikes, hp)
 end
 
--- The keys of a set in one order every run (a key may be a number or a string: numbers by value,
--- else by their text). The one owner of the sorted-set walks the judge's records and the change
--- key use, so a record logged as JSON and a memo key come out the same each time.
-local function sortedKeys(set)
-    local ks = {}
-    for k in pairs(set) do ks[#ks + 1] = k end
-    table.sort(ks, function(a, b)
-        local ta, tb = type(a), type(b)
-        if ta ~= tb then return ta < tb end   -- a total order: by type first, then within it
-        return a < b
-    end)
-    return ks
-end
+-- the one owner is Board.sortedKeys (board.lua): bot.lua walks sets in the same order
+local sortedKeys = Board.sortedKeys
 M.sortedKeys = sortedKeys
 
 -- What losing unit `charId` costs: the chapter, for one whose death ends the game (its death
