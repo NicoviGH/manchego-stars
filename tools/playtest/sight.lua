@@ -1237,11 +1237,11 @@ function M.strikeAt(side, id, target, strikerHp, targetHp, level)
 end
 
 -- An exchange's joint outcomes `joint` ({ p, dealt, back }, exchangeOf's) at a target of `hp`,
--- grouped by whether our blow takes its HP (dealt >= hp) and by the counter that follows
--- (back), in the order first met -> { { p, dead, back, items, left } }: `items` the joint
--- entries the group holds; `left`, for a group that lives, the HP the target keeps, unrounded
--- (`sum` the chance-weighted HP before the division). The one split of a joint by the target's
--- death, read by M.deathSplit and the planner's plan-wide kill ways. Pure.
+-- grouped by whether our blow takes its HP (dealt >= hp) and by the counter that follows (back), in
+-- the order first met -> { { p, dead, back, items, left } }: `items` the joint entries the group
+-- holds; `left`, for a group that lives, the HP the target keeps at the group's likeliest blow
+-- (M.likeliestLeft, ADR 0463), never its mean. The one split of a joint by the target's death, read
+-- by M.deathSplit and the planner's plan-wide kill ways. Pure.
 function M.jointAt(joint, hp)
     local ways, by = {}, {}
     for _, x in ipairs(joint) do
@@ -1249,16 +1249,19 @@ function M.jointAt(joint, hp)
         local k = (dead and "d" or "l") .. ":" .. x.back
         local w = by[k]
         if not w then
-            w = { p = 0, dead = dead, back = x.back, sum = 0, items = {} }
+            w = { p = 0, dead = dead, back = x.back, items = {} }
             by[k] = w
             ways[#ways + 1] = w
         end
         w.p = w.p + x.p
         w.items[#w.items + 1] = x
-        if not dead then w.sum = w.sum + x.p * (hp - x.dealt) end
     end
     for _, w in ipairs(ways) do
-        if not w.dead then w.left = w.sum / w.p end
+        if not w.dead then
+            local dealt = {}
+            for _, x in ipairs(w.items) do dealt[x.dealt] = (dealt[x.dealt] or 0) + x.p end
+            w.left = M.likeliestLeft({ dealt }, hp)
+        end
     end
     return ways
 end
@@ -3323,7 +3326,8 @@ function M.new(outer)
     local w, h = api.map()
     -- outer.strikeCheck (PT_STRIKECHECK=1): the run's log for the bot's strike-memo guard
     -- (bot.lua strike), which reads it as s.strikeCheck
-    local s = { cache = {}, odds = M.odds, jointAt = M.jointAt, splitFloor = M.SPLIT_FLOOR, strikeCheck = outer.strikeCheck }
+    local s = { cache = {}, odds = M.odds, jointAt = M.jointAt, likeliestLeft = M.likeliestLeft,
+                splitFloor = M.SPLIT_FLOOR, strikeCheck = outer.strikeCheck }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     -- watch() is asked before every game call from now on (nil: no longer): M.watched.

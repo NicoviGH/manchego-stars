@@ -2494,7 +2494,7 @@ do
 end
 
 -- Sight.jointAt (#743 fold, the planner's plan-wide kill ways read it too): a joint grouped by the
--- target's death and the counter, first met first, `left` the HP an alive group keeps unrounded
+-- target's death and the counter, first met first, `left` the likeliest HP an alive group keeps
 do
     local ways = Sight.jointAt({ { p = 0.25, dealt = 0, back = 4 }, { p = 0.25, dealt = 6, back = 4 },
                                  { p = 0.25, dealt = 10, back = 0 }, { p = 0.25, dealt = 4, back = 1 } }, 10)
@@ -2502,8 +2502,8 @@ do
     for _, w in ipairs(ways) do
         out[#out + 1] = (w.dead and "d" or "l") .. w.back .. ":" .. w.p .. ":" .. tostring(w.left) .. ":" .. #w.items
     end
-    check(table.concat(out, " "), "l4:0.5:7.0:2 d0:0.25:nil:1 l1:0.25:6.0:1",
-          "jointAt: groups by death and counter, left = the mean HP kept")
+    check(table.concat(out, " "), "l4:0.5:4:2 d0:0.25:nil:1 l1:0.25:6:1",
+          "jointAt: groups by death and counter, left = the likeliest HP (a tie: the larger loss)")
 end
 
 -- Sight.watched: the watch is asked before every game call's frames, and what it raises ends

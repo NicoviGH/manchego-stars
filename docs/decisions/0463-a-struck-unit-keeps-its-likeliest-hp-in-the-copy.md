@@ -44,10 +44,33 @@ for that and stays off.
     counter it takes: the likeliest HP, 1 when none.
 - The death split itself (ADR 0460) is unchanged.
 
-**Left out by scope.** The planner's own HP sums for its attacks on reds (`planner.lua`
-`fx.hp`, `st.enemyHp`, the plan-wide kill ways' `left`) still read means: those are the plan's
-own turn, not the copy's enemy phase. The weapon-use ledger (`M.wear`) still spends expected
-uses.
+**Amended (2026-11-23, Nicolas: "You should have just fixed it right away instead of producing a
+side issue").** The first cut left the planner's hand-off to the phase at means; the board the
+phase meets comes from the plan, so the same rule holds there (`planner.lua`, through the
+sight's `likeliestLeft`):
+- `score`'s `fx.hp`: our attacker after its counter, at the likeliest HP it lives at (1 when
+  none). It is the HP the plan's risk and the phase read, so it is the board's.
+- The phase's `reds`: each red the plan struck, at the likeliest HP all its blows together
+  (`st.kill`) leave it alive at.
+- The plan-wide kill ways: an alive way's `left`, from `M.jointAt` (each group's likeliest blow)
+  or, with no joint, the blows together; the unsplit way is now "the likeliest way" in the
+  planner's comments, where they said "the average".
+
+A heal's worth and the plan's own deficit follow the board: a heal after a counter that most
+likely misses gains nothing, as the counter most likely leaves the unit whole; the way the counter
+lands is the split's (or, past BRANCH and the floor, unplayed). What still reads a mean, on
+purpose: `st.enemyHp`, the plan's own running score of the HP its
+blows take (a chip's worth is its expected damage, design decision 5), and the idle rule's
+advance test (#744) that reads it; the weapon-use ledger (`M.wear`) spends expected uses. None is
+a board the game's AI reads. Proof: `test_bot.lua` (the phase meets a countered attacker at 30, its
+likeliest, where main gave 29 (an 8.2% counter for 10); two blows on one red played alive at 10, not
+13; a lone blow's joint at 4, not 6) and `test_sight.lua` (`jointAt`'s likeliest `left`), each
+failing on main. Replay `lh743b` (Ch21 `b640e-cs-s4009` a1, against `lh743a`, the replay above; both
+run tags in `references/sim/vanilla/c25b145e3745/resume-runs.jsonl`): it splits at turn 3 by
+choosing another first plan; after its replan the read of Saleh's death in the phase after next is
+0.94, from the Draco Zombie's likely 27 leaving him at 4, and the game's hit did leave him at 4 (31
+to 4). The forecast instrument reads the board after our turn, so it cannot see the planner's
+hand-off (every enemy's HP matched the game in both runs).
 
 **Proof.** `test_sight.lua`, each failing on main's `sight.lua`: `likeliestLeft` (the 70%-for-10
 case, a likely miss, a likelier death aside, a tie, two exchanges, no living outcome);
