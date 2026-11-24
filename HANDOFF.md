@@ -11,8 +11,10 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23, late; main is 22ee6981 + HANDOFF).**
-- **Merged: PR #759** (ADR 0463): a struck unit that lives keeps its likeliest HP in the copy's enemy phase (`M.likeliestLeft`, `M.strikeLeft`), never the mean. Result and the planner-means side finding: #743 comment 7121706105. Replay `lh743a` (Ch21 s4009 a1).
+**Next session starts here (2026-11-23, late; main is the #760 merge + HANDOFF).**
+- **Merged: PR #759** (ADR 0463): a struck unit that lives keeps its likeliest HP in the copy's enemy phase (`M.likeliestLeft`, `M.strikeLeft`), never the mean. Replay `lh743a` (Ch21 s4009 a1).
+- **Merged: PR #760** (ADR 0463 amended): the planner hands the phase its likeliest HPs too (`fx.hp`, `reds`, the kill ways' `left` via `jointAt`). `st.enemyHp` stays the plan's expected-damage score. Replay `lh743b`.
+- **Nicolas (2026-11-23):** a site with the fix's own cause is fixed in that work, never left as a side finding.
 - **Next, in #752's order:** #569 (reinforcement waves in the second phase), then #727 (AREA events changing AI by position).
 
 *Before that (2026-11-24, small hours; main was 87504515 + HANDOFF).*
