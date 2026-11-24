@@ -21,8 +21,10 @@ plan, first. In short: one-case fixes kept trading one loss for another. The bot
   timeline, read off its trace by `tools/playtest/timeline.lua`.
 - **R2 #766: in progress** on branch `feat/766-job-layer` (pushed, no PR). Nicolas settled the
   horizon and loss-weight calls (#764's body). Built: `jobs.lua`, the assignment `exploring`
-  now uses. Left, and the Ch14 lead to test first: #766's progress comment
-  (issuecomment-7145144548).
+  now uses. Left: #766's progress comment (issuecomment-7145144548). Next: the Ch14 lead in
+  #766's latest comment. On turn 8 no march toward Rennac was listed for L'Arachel, though the
+  way was free; check whether her goal was still the pending recruit's meeting tile (one
+  instrumented replay).
 - **R3 #767:** have the per-turn planner play those jobs;
 - **R4 #768:** then measure the walls.
 
