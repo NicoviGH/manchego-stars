@@ -913,10 +913,13 @@ local function test_a_retry_remembers_what_was_lost()
     check(m2.closings["11,15"].closerClass, 0x0D, "with its closer's class")
     check(m2.closings["3,3"], nil, "a tile we took is no closing")
     check(m3.closings["11,15"].phase, 4, "attempt 3: the earliest closing over both")
-    check(m2.fates[0x12] and m2.fates[0x12].boardTurn, 8, "attempt 2: the departure")
-    check(m2.fates[0x1C], nil, "a recruit killed is the play's, not kept")
-    check(m3.fates[0x12].boardTurn .. " " .. m3.fates[0x12].x .. "," .. m3.fates[0x12].y, "6 0,4",
+    check(#m2.fates, 1, "a recruit killed is the play's, not kept")
+    check(m2.fates[1].charId .. " t" .. m2.fates[1].boardTurn, "18 t8", "attempt 2: the departure")
+    check(#m3.fates, 1, "the same recruit twice is one memory")
+    check(m3.fates[1].boardTurn .. " " .. m3.fates[1].x .. "," .. m3.fates[1].y, "6 0,4",
           "attempt 3: the earliest departure")
+    -- the record is JSON: a style with memory encodes (a number key would not)
+    check(pcall(Json.encode, g.plays[3].style), true, "the memory encodes as JSON")
 end
 test_a_retry_remembers_what_was_lost()
 

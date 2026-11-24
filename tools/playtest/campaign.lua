@@ -141,8 +141,8 @@ local M = {}
 -- looter or an event closed (rec.explore's `closed_phase`, the enemy phase it went in) as
 -- memory.closings["x,y"], the EARLIEST phase over the attempts, since it is a deadline (Ch10's
 -- raze came anywhere from turn 4 to 10 with our play); and each owed recruit that left the map
--- (rec.missed_recruits' `left_map`) as memory.fates[charId] = { boardTurn, x, y }, the first
--- player turn it was gone on, the earliest too. A recruit we or the enemy killed is the play's,
+-- (rec.missed_recruits' `left_map`) as one memory.fates entry { charId, boardTurn, x, y }, the
+-- first player turn it was gone on, the earliest too. A recruit we or the enemy killed is the play's,
 -- never the game's: not kept.
 function M.rememberLosses(memory, rec)
     for _, t in ipairs(rec.explore or {}) do
@@ -157,9 +157,14 @@ function M.rememberLosses(memory, rec)
     end
     for _, r in ipairs(rec.missed_recruits or {}) do
         if r.reason == "left_map" and r.boardTurn then
-            local had = memory.fates[r.charId]
+            local at
+            for i, f in ipairs(memory.fates) do
+                if f.charId == r.charId then at = i end
+            end
+            local had = at and memory.fates[at]
             if not had or r.boardTurn < had.boardTurn then
-                memory.fates[r.charId] = { boardTurn = r.boardTurn, x = r.x, y = r.y }
+                memory.fates[at or #memory.fates + 1] = { charId = r.charId, boardTurn = r.boardTurn,
+                                                          x = r.x, y = r.y }
             end
         end
     end
@@ -493,8 +498,9 @@ function M.run(api)
             local attemptCap = api.attempts or M.MAX_ATTEMPTS
             -- a retry's memory of the enemy (ADR 0399): style.memory
             -- closings: "x,y" -> { phase, closerChar, closerClass }, the earliest enemy phase a
-            -- failed attempt lost the tile in (a deadline); fates: an owed recruit's departure,
-            -- charId -> { boardTurn, x, y }, the earliest (#741)
+            -- failed attempt lost the tile in (a deadline); fates: each owed recruit's departure,
+            -- { charId, boardTurn, x, y }, the earliest (#741). A list, as arrivals: the record is
+            -- JSON, whose keys are strings
             local memory, memoryKeys = { enemies = {}, arrivals = {}, closings = {}, fates = {} }, {}
             local arrived = {}   -- charId -> its place in memory.arrivals: the latest sighting wins
             -- a unit whose class was not read cannot be told from another in its slot (its key
@@ -568,7 +574,7 @@ function M.run(api)
                 if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
                 -- and every enemy they showed (ADR 0399), from attempt 2
                 if #memory.enemies > 0 or #memory.arrivals > 0 or next(memory.closings)
-                    or next(memory.fates) then
+                    or #memory.fates > 0 then
                     local copy, arrivals, closings, fates = {}, {}, {}, {}   -- each attempt its own copy
                     for i, e in ipairs(memory.enemies) do
                         copy[i] = { id = e.id, charId = e.charId, classId = e.classId, arrival = e.arrival }
@@ -582,8 +588,8 @@ function M.run(api)
                         closings[k] = { phase = c.phase, closerChar = c.closerChar,
                                         closerClass = c.closerClass }
                     end
-                    for c, f in pairs(memory.fates) do
-                        fates[c] = { boardTurn = f.boardTurn, x = f.x, y = f.y }
+                    for i, f in ipairs(memory.fates) do
+                        fates[i] = { charId = f.charId, boardTurn = f.boardTurn, x = f.x, y = f.y }
                     end
                     style.memory = { enemies = copy, arrivals = arrivals, closings = closings,
                                      fates = fates }

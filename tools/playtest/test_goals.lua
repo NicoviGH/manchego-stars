@@ -533,7 +533,7 @@ do
                                            onField = true, items = {} } }, turn = 8 }
     local sight = fakeSight({})
     sight.scriptedUnits = function() return { arrivals = {}, removals = {} } end
-    local g = find(Goals.list(rb, sight, { memory = { fates = { [0x12] = { boardTurn = 12 } } } },
+    local g = find(Goals.list(rb, sight, { memory = { fates = { { charId = 0x12, boardTurn = 12 } } } },
                               { turn = 8, recruitTalkers = { [0x85] = { 1 } },
                                 owedRecruits = { [0x12] = true } }), "recruit:133")
     check(g and g.closes, 4, "remembered departure: turn 12 read on turn 8, as a script's removal")

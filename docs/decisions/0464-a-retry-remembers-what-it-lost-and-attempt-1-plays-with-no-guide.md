@@ -35,7 +35,7 @@ One owner, `style.memory` (`campaign.lua`), built from the failed attempt's reco
   phase before the first player phase that no longer listed it). The EARLIEST phase over the
   attempts is kept: it is a deadline, and Ch10's raze came anywhere from turn 4 to 10 with our
   play.
-- **`fates[charId] = { boardTurn, x, y }`**: an owed recruit that left the map (`missed_recruits`
+- **`fates`, a list of `{ charId, boardTurn, x, y }`** (a list: the record is JSON, whose keys are strings): an owed recruit that left the map (`missed_recruits`
   with `left_map`), the first player turn it was gone on, the earliest. A recruit we or the enemy
   killed is the play's, never the game's, and is not kept. This is its own table, not a field on
   `arrivals` as the design comment had it: a recruit on the map from the start (Ch10's Amelia)

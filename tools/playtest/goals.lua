@@ -172,8 +172,8 @@ end
 -- not yet joined the removal holds, and a removal whose turn is past is none. `board` names each
 -- recruit's charId (a pending one is ctx.pendingRecruits'); ctx.owedRecruits (a set of charIds)
 -- names the ones owed, and empty or nil asks for no scan. Returns new tables: sight keeps its
--- answers for the board. A departure a retry remembers (`memory.fates`, #741: charId ->
--- { boardTurn }) is a removal too, the earlier of the two.
+-- answers for the board. A departure a retry remembers (`memory.fates`, #741: { charId,
+-- boardTurn }) is a removal too, the earlier of the two.
 function M.scriptedCloses(sight, ctx, board, out, paths, memory)
     assert(board.turn, "Goals.scriptedCloses: the board has no turn")
     -- only an owed recruit (ctx.owedRecruits, a set of charIds: botrun's) can be removed from a
@@ -183,10 +183,12 @@ function M.scriptedCloses(sight, ctx, board, out, paths, memory)
     if not sight.scriptedUnits or next(watch) == nil or next(owed) == nil then return out, paths end
     local gone = sight.scriptedUnits().removals
     local fates = memory and memory.fates
-    if fates and next(fates) then
+    if fates and #fates > 0 then
         local merged = {}
         for c, t in pairs(gone) do merged[c] = t end
-        for c, f in pairs(fates) do merged[c] = math.min(merged[c] or f.boardTurn, f.boardTurn) end
+        for _, f in ipairs(fates) do
+            merged[f.charId] = math.min(merged[f.charId] or f.boardTurn, f.boardTurn)
+        end
         gone = merged
     end
     local byId = {}
