@@ -5265,7 +5265,7 @@ function M.new(outer)
     -- unit's earliest arrival and earliest removal are kept, and a removal at or before the
     -- unit's earliest arrival is dropped (a cast loaded in one event and removed in a later one
     -- is no removal of a unit that was on the field). About 3 x the horizon game calls once a
-    -- chapter (cached), none a turn.
+    -- run, i.e. each attempt (cached in this sight), none a turn.
     -- An estimate where scriptEffects' is: guards are not evaluated, a load tile is not where a
     -- REDA leaves the unit. The flags the scan reads are those of its first call (the chapter's
     -- first plan), so an event a later flag opens is not in it. A read made inside a sandbox (a

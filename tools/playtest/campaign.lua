@@ -26,14 +26,17 @@
 -- Attempt 1 advances none, so every measured cell (ADR 0385) plays as it always did, and a run
 -- stays reproducible: the same start and the same attempt number are the same dice.
 -- A retry remembers what earlier failed attempts at this start showed on screen, from attempt 2
--- on: the turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) as one more list
--- in style.arrivals, where a reinforcements claim's turns go; and (ADR 0399) style.memory =
--- { enemies, arrivals }: every red unit a board showed out of fog and every killer a fight showed
--- (botrun's `enemies_seen`), each by Board.memoryKey: a unit that was there at the start by slot,
+-- on. The turns a reinforcement arrived (botrun's `arrivals_seen`, ADR 0386) go as one list in
+-- style.arrivals, the march's hold: only a turn's arrivals (botrun's `timed`), never one the play
+-- brought (ADR 0464). The rest is style.memory = { enemies, arrivals, closings, fates } (ADR
+-- 0399). `enemies`: every red unit a board showed out of fog and every killer a fight showed
+-- (botrun's `enemies_seen`), each by Board.memoryKey: a unit there at the start by slot,
 -- character and class, an arrival by character, class and arrival turn (ADR 0449). A death is
--- remembered through its killer: where our units stood is the play's, not the game's. An
--- arrival is kept once per character, the latest failed attempt's sighting (ADR 0436). Never a
--- dice result.
+-- remembered through its killer: where our units stood is the play's, not the game's.
+-- `arrivals`: once per character, the latest failed attempt's sighting (ADR 0436), with the act
+-- we made that loaded it (`by`, ADR 0464). `closings` and `fates` (M.rememberLosses): each
+-- reward tile's earliest closing and each owed recruit's earliest departure. Never a dice
+-- result.
 -- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
 -- this chapter start would draw is played, and nothing else. Every attempt loads the same
 -- start state; the style draws restart at each chapter start (api.seed) and never read a
@@ -135,6 +138,58 @@
 -- `CAMPAIGN <json>`, and the campaign a last one with `chapter = nil`.
 
 local M = {}
+
+-- `entry` kept in `list` once per character (its charId): it replaces the one already there
+-- when `better(entry, had)` says so, or always with no `better` (the latest sighting wins,
+-- memory.arrivals); appended when the character has none. The memory's lists are lists, not
+-- maps by charId: the record is JSON, whose keys are strings.
+function M.keepOne(list, entry, better)
+    for i, had in ipairs(list) do
+        if had.charId == entry.charId then
+            if not better or better(entry, had) then list[i] = entry end
+            return
+        end
+    end
+    list[#list + 1] = entry
+end
+
+-- What a failed attempt `rec` lost, folded into a retry's `memory` (#741): each reward tile a
+-- looter or an event closed (rec.explore's `closed_phase`, the enemy phase it went in) as
+-- memory.closings["x,y"], the EARLIEST phase over the attempts, since it is a deadline (Ch10's
+-- raze came anywhere from turn 4 to 10 with our play); and each owed recruit that left the map
+-- (rec.missed_recruits' `left_map`) as one memory.fates entry { charId, boardTurn, x, y }, the
+-- first player turn it was gone on, the earliest too. A recruit we or the enemy killed is the
+-- play's, never the game's: not kept. Nor is a loss by a unit whose arrival the play brought
+-- (`by`, or not `timed`: vanilla Ch14's Rennac, whom our door loads, takes the chests and
+-- leaves): its date follows what we did, not the turn.
+function M.rememberLosses(memory, rec)
+    local brought = {}   -- "charId" and "charId:classId" of each arrival the play brought
+    for _, a in ipairs(rec.arrivals_seen or {}) do
+        if a.by or a.timed == false then
+            brought[tostring(a.charId)] = true
+            brought[a.charId .. ":" .. tostring(a.classId)] = true
+        end
+    end
+    for _, t in ipairs(rec.explore or {}) do
+        -- a closer whose class was not read is matched by its character alone
+        local key = t.closer_class and (tostring(t.closed_by) .. ":" .. t.closer_class)
+            or tostring(t.closed_by)
+        if t.status == "closed" and t.closed_phase and not brought[key] then
+            local k = t.x .. "," .. t.y
+            local had = memory.closings[k]
+            if not had or t.closed_phase < had.phase then
+                memory.closings[k] = { phase = t.closed_phase, closerChar = t.closed_by,
+                                       closerClass = t.closer_class }
+            end
+        end
+    end
+    for _, r in ipairs(rec.missed_recruits or {}) do
+        if r.reason == "left_map" and r.boardTurn and not brought[tostring(r.charId)] then
+            M.keepOne(memory.fates, { charId = r.charId, boardTurn = r.boardTurn, x = r.x, y = r.y },
+                      function(new, had) return new.boardTurn < had.boardTurn end)
+        end
+    end
+end
 
 M.PREFIX = "CAMPAIGN "
 -- the retry cap a chapter start (Nicolas, 2026-11-10; ADR 0399): late chapters need many
@@ -463,8 +518,11 @@ function M.run(api)
             local kept
             local attemptCap = api.attempts or M.MAX_ATTEMPTS
             -- a retry's memory of the enemy (ADR 0399): style.memory
-            local memory, memoryKeys = { enemies = {}, arrivals = {} }, {}
-            local arrived = {}   -- charId -> its place in memory.arrivals: the latest sighting wins
+            -- closings: "x,y" -> { phase, closerChar, closerClass }, the earliest enemy phase a
+            -- failed attempt lost the tile in (a deadline); fates: each owed recruit's departure,
+            -- { charId, boardTurn, x, y }, the earliest (#741). A list, as arrivals: the record is
+            -- JSON, whose keys are strings
+            local memory, memoryKeys = { enemies = {}, arrivals = {}, closings = {}, fates = {} }, {}
             -- a unit whose class was not read cannot be told from another in its slot (its key
             -- would match nothing, and grow the memory with nothing learned): not kept
             local function rememberEnemy(id, charId, classId, arrival)
@@ -531,19 +589,21 @@ function M.run(api)
                         entry.attempts, bwhy)
                 end
                 -- a retry's memory (ADR 0386): the turns earlier failures here saw a
-                -- reinforcement arrive on screen, read where a reinforcements claim's are
-                -- (style.arrivals); attempt 1, and any attempt alone, has none
+                -- reinforcement arrive on screen (style.arrivals, the march's hold); attempt 1,
+                -- and any attempt alone, has none
                 if #remembered > 0 then style.arrivals = { table.move(remembered, 1, #remembered, 1, {}) } end
                 -- and every enemy they showed (ADR 0399), from attempt 2
-                if #memory.enemies > 0 or #memory.arrivals > 0 then
-                    local copy, arrivals = {}, {}   -- each attempt its own copy
-                    for i, e in ipairs(memory.enemies) do
-                        copy[i] = { id = e.id, charId = e.charId, classId = e.classId, arrival = e.arrival }
+                if #memory.enemies > 0 or #memory.arrivals > 0 or next(memory.closings)
+                    or #memory.fates > 0 then
+                    -- each attempt its own copy of every entry (no reader edits a nested field)
+                    local function copies(t)
+                        local out = {}
+                        for k, v in pairs(t) do out[k] = Bot.Board.copy(v) end
+                        return out
                     end
-                    for i, a in ipairs(memory.arrivals) do
-                        arrivals[i] = { turn = a.turn, x = a.x, y = a.y, charId = a.charId }
-                    end
-                    style.memory = { enemies = copy, arrivals = arrivals }
+                    style.memory = { enemies = copies(memory.enemies),
+                                     arrivals = copies(memory.arrivals),
+                                     closings = copies(memory.closings), fates = copies(memory.fates) }
                 end
                 -- after the prep screen and before the first move, so the draws land on the
                 -- play's dice whatever the screens above drew (they run the same every attempt)
@@ -596,23 +656,22 @@ function M.run(api)
                         entry.attempts, tostring(rec.why))
                 end
                 for _, a in ipairs(rec.arrivals_seen or {}) do
-                    if not known[a.turn] then
+                    -- the hold is for a turn's arrivals (botrun's `timed`): one the play brought
+                    -- (our door, an area walked into) comes when it does, not on a turn (#741)
+                    if not a.by and a.timed ~= false and not known[a.turn] then
                         known[a.turn] = true
                         remembered[#remembered + 1] = a.turn
                     end
                     -- the unit and its tile too (ADR 0436), once each: an owed recruit's goal.
                     -- The most recent failed attempt's sighting replaces an older one: the
                     -- freshest evidence (a scripted arrival agrees anyway)
-                    if a.charId then
-                        local at = arrived[a.charId] or #memory.arrivals + 1
-                        arrived[a.charId] = at
-                        memory.arrivals[at] = a
-                    end
+                    if a.charId then M.keepOne(memory.arrivals, a) end
                 end
                 table.sort(remembered)
                 for _, e in ipairs(rec.enemies_seen or {}) do
                     rememberEnemy(e.id, e.charId, e.classId, e.arrival)
                 end
+                M.rememberLosses(memory, rec)
                 if entry.attempts >= attemptCap then
                     if not kept then return noClean(entry) end
                     -- a state that does not read back as kept is the harness failing (the

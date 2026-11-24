@@ -16,7 +16,8 @@
 --   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the player units that
 --                  may Talk it over); its takers are those talkers. A recruit a retry saw
 --                  arrive and that is not on the board yet (ctx.pendingRecruits, ADR 0436) is
---                  one too, at the tile it arrived on.
+--                  one too, at the tile it arrived on; one an act loaded (`by`, ADR 0464)
+--                  stalls on a quiet count, as any goal (M.ledger).
 --   objective      each unit's own way to the objective (ctx.objectiveTile: the Seize tile,
 --                  the boss, or on Rout the nearest enemy -- where its march heads), the unit
 --                  its one taker. None on Survive, whose way there is holding.
@@ -29,7 +30,8 @@
 --   a recruit: its items' sight.itemCost;
 --   a reward (style.rewards, a guide's claim): its item's itemCost shared evenly over the open
 --     goals its `needs` names, none of it once one of them is lost (ctx.lost).
--- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it, or
+-- `closes`: sight.closings(k, style.waves) -- the enemy phase after which a looter has it (or a
+-- retry remembers one did, style.memory.closings), or
 -- the game's AI escapes with the recruit (Goals.closings), or a turn event removes it (Goals.scriptedCloses,
 -- #724).
 --
@@ -137,11 +139,32 @@ end
 -- sight.closings for this board: when a looter has each open tile and, for each recruit on the
 -- field (ctx.recruitTalkers), "unit:<id>" -> the enemy phase the game's own AI escapes with it
 -- (#699); and the paths of those recruits, { [unit id] = { [enemy phase] = tile } }.
+-- Then what a retry remembers (style.memory.closings, #741: the earliest enemy phase an earlier
+-- attempt lost each tile in) for a tile still open: the earlier of the two, as M.scriptedCloses
+-- takes the earlier removal. ctx.turn is the board's turn; a remembered phase already past
+-- closes nothing (this attempt's play kept the tile so far).
 function M.closings(sight, style, ctx)
-    if not sight.closings then return {}, {} end
-    local watch = {}
-    for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
-    local out, paths = sight.closings(nil, style.waves, watch)
+    local out, paths = {}, {}
+    if sight.closings then
+        local watch = {}
+        for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
+        -- style.waves: no caller sets it since the guide's claims stopped playing (ADR 0464); it
+        -- is the slot #569's remembered waves would fill
+        out, paths = sight.closings(nil, style.waves, watch)
+    end
+    -- a sight with no simulated closings still has the remembered ones
+    local lost = style.memory and style.memory.closings
+    if lost and next(lost) then
+        assert(ctx.turn, "Goals.closings: a remembered closing needs ctx.turn")
+        local copy = {}   -- sight keeps its answer for the board
+        for k, v in pairs(out) do copy[k] = v end
+        for k, c in pairs(lost) do
+            -- enemy phase 1 is this turn's
+            local at = c.phase - ctx.turn + 1
+            if at >= 1 and at < (copy[k] or math.huge) then copy[k] = at end
+        end
+        out = copy
+    end
     return out, paths or {}
 end
 
@@ -153,8 +176,9 @@ end
 -- not yet joined the removal holds, and a removal whose turn is past is none. `board` names each
 -- recruit's charId (a pending one is ctx.pendingRecruits'); ctx.owedRecruits (a set of charIds)
 -- names the ones owed, and empty or nil asks for no scan. Returns new tables: sight keeps its
--- answers for the board.
-function M.scriptedCloses(sight, ctx, board, out, paths)
+-- answers for the board. A departure a retry remembers (`memory.fates`, #741: { charId,
+-- boardTurn }) is a removal too, the earlier of the two.
+function M.scriptedCloses(sight, ctx, board, out, paths, memory)
     assert(board.turn, "Goals.scriptedCloses: the board has no turn")
     -- only an owed recruit (ctx.owedRecruits, a set of charIds: botrun's) can be removed from a
     -- goal: recruitTalkers also holds any talk offered, and a scan for those would be asked again
@@ -162,6 +186,15 @@ function M.scriptedCloses(sight, ctx, board, out, paths)
     local watch, owed = ctx.recruitTalkers or {}, ctx.owedRecruits or {}
     if not sight.scriptedUnits or next(watch) == nil or next(owed) == nil then return out, paths end
     local gone = sight.scriptedUnits().removals
+    local fates = memory and memory.fates
+    if fates and #fates > 0 then
+        local merged = {}
+        for c, t in pairs(gone) do merged[c] = t end
+        for _, f in ipairs(fates) do
+            merged[f.charId] = math.min(merged[f.charId] or f.boardTurn, f.boardTurn)
+        end
+        gone = merged
+    end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local outCopy, pathCopy = nil, nil
@@ -231,7 +264,8 @@ function M.list(board, sight, style, ctx)
         end
         return out
     end
-    local closings, paths = M.scriptedCloses(sight, ctx, board, M.closings(sight, style, ctx))
+    local open, walks = M.closings(sight, style, ctx)
+    local closings, paths = M.scriptedCloses(sight, ctx, board, open, walks, style.memory)
     for _, g in ipairs(M.openTiles(sight, style, ctx, closings)) do
         g.takerUnits = takers(function(u)
             if sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind) then
@@ -281,9 +315,12 @@ function M.ledger(goals, sight, style, ctx, chances)
             local known = g.kind == "recruit" or reads
             local status = known and "feasible" or "unknown"
             -- a pending recruit (ctx.pendingRecruits, ADR 0436) cannot close before its turn, so
-            -- no quiet count of it is a stall: it holds the win until it is there or its turn is past
+            -- no quiet count of it is a stall: it holds the win until it is there or its turn is
+            -- past. One an act loads (`by`, ADR 0464) has no turn to pass: if no unit nears it, it
+            -- stalls as any goal does, or an act this attempt never makes would hold the win
             local pending = g.kind == "recruit" and (ctx.pendingRecruits or {})[g.unitId]
-            if known and not pending and (ctx.quietGoals or {})[g.id] then status = "stalled" end
+            local waits = pending and not pending.by
+            if known and not waits and (ctx.quietGoals or {})[g.id] then status = "stalled" end
             local row = { id = g.id, kind = g.kind, status = status, closes_on = g.closes }
             rows[#rows + 1], byId[g.id] = row, row
         end

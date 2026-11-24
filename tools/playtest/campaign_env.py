@@ -25,8 +25,9 @@ Each env also carries `claims`: {chapter index: [claim]}, every Strategy claim o
 keys) RESOLVED to game ids for the bot, which maps no name (bot.lua, Claims): a unit to its
 character id, a class to its id and every reskin built on it (a reskin plays as its base, ADR
 0362), one of our enemy ids to its class's, a terrain name to its TERRAIN_ id. A name that
-resolves to nothing raises. A claim whose fields need a model the runner has not got
-(`reinforcements`' arrival turns) goes as kind `unresolved`, so the run reports it unplayed.
+resolves to nothing raises. A `reinforcements` claim goes as kind `unresolved`, so the run
+reports it unplayed: attempt 1 plays as a first-time player with no guide, in both games alike,
+and a retry knows the waves it saw (campaign.lua's memory; Nicolas on #741, ADR 0464).
 
 --from N resumes at chapter index N's start as an earlier run of the same --id saved it
 (references/sim/<game>/<rom-hash>/states/<id>/N.ss), so a fault in a late chapter is studied
@@ -144,19 +145,13 @@ def _vs(v, game, chap, campaign):
 
 def resolve(claim, key, game, chap=None, campaign=campaign_chapters.CAMPAIGN, ref=None):
     """One claim as bot.lua takes it (its Claims section): id `key`, game ids for every name.
-    `chap` is our chapter (Manchego Stars), `ref` the twin's parity reference (vanilla): a
-    reinforcements claim resolves to the waves that chapter loads (difficulty.arrival_waves), and
-    goes `unresolved` where they are not read (no chapter, or an uncurated twin)."""
+    `chap` is our chapter (Manchego Stars), `ref` the twin's parity reference (vanilla). A
+    reinforcements claim is the guide's warning, which no first attempt plays (ADR 0464): it goes
+    `unresolved`, in both games."""
     kind = claim['kind']
     out = {'id': key, 'kind': kind}
     if kind == 'reinforcements':
-        where = chap if game == 'ours' else ref
-        if where is None:
-            return {'id': key, 'kind': 'unresolved', 'was': kind}
-        waves = difficulty.arrival_waves(where, game)
-        if waves is None:
-            return {'id': key, 'kind': 'unresolved', 'was': kind}
-        return dict(out, turns=[w['turn'] for w in waves], waves=waves)
+        return {'id': key, 'kind': 'unresolved', 'was': kind}
     if kind == 'reward':
         enum = inject.decomp.ITEM_ENUM.get(claim['item'])
         ids = {e: i for i, e in difficulty._item_id_to_enum().items()}

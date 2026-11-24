@@ -128,6 +128,8 @@ local function fakeGame(o)
                      deaths = deaths, trace = "t" .. g.attempt,
                      arrivals_seen = (ch.seen or {})[g.attempt] or {},
                      enemies_seen = (ch.enemies or {})[g.attempt] or {},
+                     explore = (ch.explore or {})[g.attempt],
+                     missed_recruits = (ch.missed or {})[g.attempt],
                      clear = { won = won, lost = deaths,
                                recruits_missing = out == "spoiled" and { 0x30 } or {},
                                rewards_missing = {} } }
@@ -874,6 +876,67 @@ local function test_a_retry_remembers_the_arrivals_it_saw()
     check(third.plays[1].style.arrivals, nil, "a pool attempt k has no earlier result to remember")
 end
 test_a_retry_remembers_the_arrivals_it_saw()
+
+-- #741: a retry remembers what earlier attempts lost, not only what arrived.
+--  * an arrival our own act loaded (`by`), or one no turn event loads (`timed` false), is no
+--    turn's: it stays out of the hold's turns; one loaded by our act keeps its act in
+--    memory.arrivals;
+--  * a loss by a unit the play brought is dated by the play: not kept;
+--  * a reward tile a failed attempt lost is memory.closings["x,y"], the EARLIEST phase;
+--  * an owed recruit that left the map is memory.fates[charId], the earliest turn; one killed is
+--    the play's and is not kept.
+local function test_a_retry_remembers_what_was_lost()
+    local door = { act = "door", x = 22, y = 18 }
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
+        seen = { [1] = { { turn = 2, boardTurn = 2, x = 22, y = 12, charId = 0x1C, classId = 0x37,
+                           by = door },
+                         { turn = 4, boardTurn = 5, x = 7, y = 18, charId = 0x80 },
+                         -- a thief's door opened this room: no turn event loads it (botrun's timed)
+                         { turn = 3, boardTurn = 3, x = 22, y = 7, charId = 0x80, timed = false } },
+                 [2] = { { turn = 6, boardTurn = 6, x = 22, y = 12, charId = 0x1C, by = door } } },
+        explore = { [1] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
+                              closed_phase = 9, closer_class = 0x0D },
+                            { x = 3, y = 3, kind = "chest", status = "visited", by = 1 },
+                            { x = 22, y = 5, kind = "chest", status = "closed", closed_by = 0x1C,
+                              closed_phase = 3, closer_class = 0x37 },
+                            -- its class not read: matched by character alone
+                            { x = 22, y = 3, kind = "chest", status = "closed", closed_by = 0x1C,
+                              closed_phase = 4 } },
+                    [2] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
+                              closed_phase = 4, closer_class = 0x0D } } },
+        missed = { [1] = { { charId = 0x12, reason = "left_map", boardTurn = 8, x = 0, y = 5 },
+                           { charId = 0x1C, reason = "left_map", boardTurn = 11 },
+                           { charId = 0x13, reason = "killed_before_talk" } },
+                   [2] = { { charId = 0x12, reason = "left_map", boardTurn = 6, x = 0, y = 4 } } } } } }
+    Campaign.run(g.api)
+    check(table.concat(g.plays[2].style.arrivals[1], ","), "4",
+          "the hold: the turn's arrival only, not the door's")
+    check(table.concat(g.plays[3].style.arrivals[1], ","), "4", "nor the door's on a later turn")
+    local m2, m3 = g.plays[2].style.memory, g.plays[3].style.memory
+    local rennac
+    for _, a in ipairs(m2.arrivals) do if a.charId == 0x1C then rennac = a end end
+    check(rennac and rennac.by and (rennac.by.act .. "@" .. rennac.by.x .. "," .. rennac.by.y),
+          "door@22,18", "the door's arrival keeps its act")
+    check(rennac and rennac.boardTurn, 2, "and its board turn")
+    check(rennac and rennac.classId, 0x37, "and its class")
+    check(m2.closings["11,15"] and m2.closings["11,15"].phase, 9, "attempt 2: attempt 1's closing")
+    check(m2.closings["11,15"].closerClass, 0x0D, "with its closer's class")
+    check(m2.closings["3,3"], nil, "a tile we took is no closing")
+    check(m2.closings["22,5"], nil, "a tile taken by a unit our door brought: its date is ours, not kept")
+    check(m2.closings["22,3"], nil, "and one whose closer's class was not read")
+    local room
+    for _, a in ipairs(m2.arrivals) do if a.x == 22 and a.y == 7 then room = a end end
+    check(room and room.timed, false, "the copy keeps `timed`")
+    check(m3.closings["11,15"].phase, 4, "attempt 3: the earliest closing over both")
+    check(#m2.fates, 1, "a recruit killed, or one our door brought: not kept")
+    check(m2.fates[1].charId .. " t" .. m2.fates[1].boardTurn, "18 t8", "attempt 2: the departure")
+    check(#m3.fates, 1, "the same recruit twice is one memory")
+    check(m3.fates[1].boardTurn .. " " .. m3.fates[1].x .. "," .. m3.fates[1].y, "6 0,4",
+          "attempt 3: the earliest departure")
+    -- the record is JSON: a style with memory encodes (a number key would not)
+    check(pcall(Json.encode, g.plays[3].style), true, "the memory encodes as JSON")
+end
+test_a_retry_remembers_what_was_lost()
 
 -- A retry remembers what earlier attempts showed on screen (ADR 0399): every enemy a board
 -- showed out of fog (enemies_seen) and every killer a death showed, each once by slot and

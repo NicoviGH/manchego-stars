@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0464 (#741): the guide's reinforcements claims are not played; the hold
+    # reads only a retry's remembered arrival turns
+    r'\breinforcements claim cites\b', r"\bwhere a reinforcements claim's turns go\b",
+    r'\bclaim now resolves to the waves\b',
     # retired by ADR 0463 (#743): a struck unit in the judged enemy phase keeps its likeliest HP,
     # never its expected damage off (the mean)
     r'\btakes its expected damage off the target\b', r'\bas a strike takes its expected damage\b',

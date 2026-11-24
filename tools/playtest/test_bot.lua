@@ -1772,8 +1772,9 @@ do
         "terrain vs a class not on the map: a no-op")
 end
 
--- test_reinforcements_hold_the_turn_before: arrival on turn 3 holds the march on turn 2. The
--- turn is the board's (Board.read's), the one source for it.
+-- test_arrivals_hold_the_turn_before: a remembered arrival on turn 3 (style.arrivals, a retry's,
+-- campaign.lua) holds the march on turn 2. The turn is the board's (Board.read's), the one
+-- source for it.
 do
     local A = blue(0x01, 0, 0, 0)
     local E = red(0x81, 9, 0)
@@ -1783,14 +1784,15 @@ do
         b.turn = turn
         return b
     end
-    local st = claimed("careful", { id = "r1", kind = "reinforcements", turns = { 3, 7 } })
-    check(at(B.decide(boardAt(2), sight, style("careful"))), "2,0", "no claim: marches")
-    check(at(B.decide(boardAt(2), sight, st)), "0,0", "reinforcements: holds the turn before")
-    check(at(B.decide(boardAt(6), sight, st)), "0,0", "reinforcements: before each arrival")
-    check(at(B.decide(boardAt(3), sight, st)), "2,0", "reinforcements: marches on arrival")
+    local st = style("careful")
+    st.arrivals = { { 3, 7 } }
+    check(at(B.decide(boardAt(2), sight, style("careful"))), "2,0", "no memory: marches")
+    check(at(B.decide(boardAt(2), sight, st)), "0,0", "arrivals: holds the turn before")
+    check(at(B.decide(boardAt(6), sight, st)), "0,0", "arrivals: before each arrival")
+    check(at(B.decide(boardAt(3), sight, st)), "2,0", "arrivals: marches on arrival")
     local ok, err = pcall(B.decide, boardAt(nil), sight, st)
-    check(ok, false, "reinforcements without board.turn raise")
-    check(tostring(err):find("a reinforcements claim needs board.turn", 1, true) ~= nil, true,
+    check(ok, false, "arrivals without board.turn raise")
+    check(tostring(err):find("needs board.turn", 1, true) ~= nil, true,
         "the error says what is missing")
 end
 
@@ -1807,19 +1809,17 @@ do
     check(B.CLAIM_BEHAVIOURS.threat, nil, "threat has no behaviour")
 end
 
--- A reward claim lands in style.rewards and is played; a reinforcements claim's waves land
--- in style.waves beside its turns in style.arrivals.
+-- A reward claim lands in style.rewards and is played. A reinforcements claim has no behaviour
+-- (the guide's warning, ADR 0464): it is reported unplayed.
 do
-    local wave = { turn = 8, units = { { class = 9, x = 13, y = 0, ai1 = 0, ai2 = 4, items = {} } } }
-    local st = claimed("careful", { id = "r1", kind = "reward", item = 0x68, needs = "villages" },
-        { id = "w1", kind = "reinforcements", turns = { 2, 8 }, waves = { wave } })
+    local st = claimed("careful", { id = "r1", kind = "reward", item = 0x68, needs = "villages" })
     check(#st.rewards, 1, "reward: style.rewards holds it")
     check(st.rewards[1].item, 0x68, "reward: its item")
     check(st.rewards[1].needs, "villages", "reward: its needs")
     check(#B.unplayed({ { id = "r1", kind = "reward", item = 0x68, needs = "villages" } }), 0,
         "reward: played")
-    check(st.waves[1].turn, 8, "reinforcements: style.waves holds its waves")
-    check(st.arrivals[1][2], 8, "reinforcements: style.arrivals keeps its turns")
+    check(B.CLAIM_BEHAVIOURS.reinforcements, nil, "reinforcements: no behaviour")
+    check(B.unplayed({ { id = "w1", kind = "reinforcements" } })[1], "w1", "reinforcements: unplayed")
     local ok = pcall(B.CLAIM_BEHAVIOURS.reward, { id = "r2", kind = "reward", needs = "villages" },
         style("careful"))
     check(ok, false, "reward without an item raises")
@@ -1832,11 +1832,9 @@ do
         { id = "m2", kind = "answer", unit = { 0x01 } },
         { id = "m3", kind = "wall", unit = {}, vs = "boss" },
         { id = "m4", kind = "terrain", vs = "all" },
-        { id = "m5", kind = "reinforcements" },
         { id = "m6", kind = "answer", unit = { 0x01 }, vs = "fighter" },
         { id = "m7", kind = "carry", unit = { "some-name" }, vs = { CLS_A } },
         { id = "m8", kind = "wall", unit = { 0x01 }, vs = { "fighter" } },
-        { id = "m9", kind = "reinforcements", turns = { "3" } },
         { id = "m10", kind = "terrain", tile = "fort", vs = "all" },
     }
     for _, c in ipairs(bad) do
@@ -8181,6 +8179,31 @@ do
     end
     check(meet(6), "6,9", "pending recruit: the reachable tile nearest where it arrived")
     check(meet(-1), nil, "pending recruit: no talker can walk anywhere, no goal")
+end
+
+-- #741: a pending recruit our act loads (`by`: Ch14's door) comes when we act, on no turn: it is a
+-- goal past the turn a timed one's goal ends on (botrun drops it once it has come).
+do
+    local function pendingOn(turn, by)
+        local L = blue(0x01, 0, 4, 3, { charId = 0x0F, minRange = false })
+        local o = { talk = { [0x01] = { ["arrival:14"] = true } },
+                    field = function()
+                        local f = {}
+                        for y = 0, 9 do
+                            f[y] = {}
+                            for x = 0, 9 do f[y][x] = 1 end
+                        end
+                        return f
+                    end }
+        local b = boardOf(L)
+        b.turn = turn
+        local _, ctx = B.candidates(b, sightOf(o), style("bold"),
+            { pending = { { charId = 14, x = 9, y = 9, turn = 5, boardTurn = 6, by = by } } })
+        return ctx.pendingRecruits["arrival:14"] ~= nil
+    end
+    check(pendingOn(5, nil), true, "timed: a goal before its turn")
+    check(pendingOn(7, nil), false, "timed: none after")
+    check(pendingOn(7, { act = "door", x = 22, y = 18 }), true, "loaded by our act: still a goal")
 end
 
 -- test_a_stalled_goal_does_not_hold_the_win (#510 fwd1 item C, call 3, ADR 0403): the same board

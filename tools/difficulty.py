@@ -4047,45 +4047,6 @@ def _vanilla_reinforcement_turns(stem):
     return out
 
 
-def arrival_waves(where, game):
-    """The enemy waves a chapter loads after turn 1, as the bot's planner reads them (#510
-    step 9): [{turn, units: [{class, x, y, ai1, ai2, items}]}] by turn, with the game's ids.
-    `where` is the twin's parity reference (vanilla: `_vanilla_reinforcement_turns` joined with
-    `_vanilla_red_defs`, the spawn tile its UnitDefinition loads on) or our chapter (each body
-    the injector emits, `inject.units.enemy_bodies`, with the donor AI, `enemy_ai_bytes`), each
-    with the class id the ROM loads it as. None for a twin whose
-    force is not curated (Ch5x, Ch9 on)."""
-    classes = inject.class_ids.vanilla_class_values()
-    items = {e: i for i, e in _item_id_to_enum().items()}
-    waves = {}
-    if game == 'vanilla':
-        reds = _vanilla_red_defs(where)
-        if where not in PARITY_REFERENCE_STEM or reds is None:
-            return None                    # an uncurated twin: its force is not read yet
-        turns = _vanilla_reinforcement_turns(PARITY_REFERENCE_STEM[where])
-        for array, _i, d in reds:
-            if array in turns:
-                waves.setdefault(turns[array], []).append({
-                    'class': classes[d['classIndex']], 'x': d['xPosition'], 'y': d['yPosition'],
-                    'ai1': d['ai'][0], 'ai2': d['ai'][1],
-                    'items': [items[n] for n in d['items'] if n in items]})
-    else:
-        class_ids = inject.class_ids.ChapterClassIds(where['id'].split('-')[0])
-        reskin_ids = {rk['slot']: inject.reskins.reskin_class_id(rk)
-                      for rk in inject.reskins.enemy_class_reskins(class_ids.campaign)}
-        turns = {inject.raw_pids.entry_arrival_turn(e) for e in where.get('enemy_units') or []}
-        for turn in sorted(t for t in turns if t > 1):
-            for b in inject.units.enemy_bodies(where, class_ids, arrives_turn=turn):
-                # the class the ROM loads it as (a reskin's own id, its base's clone, ADR 0362),
-                # so GetClassData reads that class's costs and MOV
-                cls = classes[b['cls']] if b['cls'] in classes else reskin_ids[b['cls']]
-                ai = enemy_ai_bytes(where, b['enemy'], b['index'])
-                waves.setdefault(turn, []).append({
-                    'class': cls, 'x': b['x'], 'y': b['y'], 'ai1': ai[0], 'ai2': ai[1],
-                    'items': [items[e] for e in b['carried']]})
-    return [{'turn': t, 'units': us} for t, us in sorted(waves.items())]
-
-
 def chapter_enemy_groups(chap):
     """Our force split by battlefield role (#171): line (turn-1 must-kill), reinforcements
     (arriving after turn 1, `inject.raw_pids.entry_arrival_turn`), convertibles
