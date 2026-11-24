@@ -11,12 +11,20 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23, late; main is the #760 merge + HANDOFF).**
+**Next session starts here (2026-11-24; main is the #761 merge b1c34e99 + HANDOFF).**
+- **Merged: PR #761** (ADR 0464, part of #741): a retry remembers lost reward tiles (`memory.closings`, earliest enemy phase) and owed recruits' departures (`memory.fates`), and which arrivals the play brought (`by`, our door/chest/visit; `timed`, a turn event loads it, `M.timedArrival` via `sight.scriptedUnits`). The hold reads only timed arrivals. The guide's `reinforcements` claims are no longer played, in both games (Nicolas's call): attempt 1 now plays with no guide.
+- **Replays:** Ch14 s4003 a1–a3 `x741c`: hold [2,5,6] (main [2..8]), deaths 1/0/0, all won. Ch10 s4002 a1–a3 `x741d`: unchanged (PR comment 7123547102).
+- **Open, causes untested (one instrumented replay each, then fix):**
+  1. **#741, Rennac (Ch14):** a ledger goal from turn 1 (`recruit:arrival:28`, feasible), yet no Talk reaches him before he loots (22,3)/(22,5) and leaves (comment 7123622382). Hypotheses to test in one run of `x741c` a2: the talker cannot reach him in time after the door; the Talk is a paid recruit the party cannot pay (#679, `unpaid`); the door is opened before a talker stands near.
+  2. **#730, Ch10 village (11,15):** razed in all three attempts although the nearest unit was 1.4 turns away on turn 2 with the closing read for enemy phase 4 (comment 7123622742). Why the plan sends no one is untested.
+- **Then:** #741 item 4 (`memory.kills`, a planner weight: measured before kept), then the rest of #753.
+
+*Before that (2026-11-23, late; main was the #760 merge + HANDOFF).*
 - **Merged: PR #759** (ADR 0463): a struck unit that lives keeps its likeliest HP in the copy's enemy phase (`M.likeliestLeft`, `M.strikeLeft`), never the mean. Replay `lh743a` (Ch21 s4009 a1).
 - **Merged: PR #760** (ADR 0463 amended): the planner hands the phase its likeliest HPs too (`fx.hp`, `reds`, the kill ways' `left` via `jointAt`). `st.enemyHp` stays the plan's expected-damage score. Replay `lh743b`.
 - **Nicolas (2026-11-23):** a site with the fix's own cause is fixed in that work, never left as a side finding.
 - **#752's rest is on hold or blocked:** #569 stays on hold, re-scoped to waves remembered by a retry, so it waits on #741 (comment 7122693695: 5 of 108 over-cap deaths, untested). #727 on hold; #739 waits on a witness.
-- **Next: #741** (a retry remembers closings, triggers, recruit fates; the design comment is approved, and the guide's claims go in the same PR).
+- **Next was #741:** built as PR #761 (above).
 
 *Before that (2026-11-24, small hours; main was 87504515 + HANDOFF).*
 - **Nicolas (2026-11-23): build a found root cause and its fix without asking** ("my approval is just going to be a bottle neck"). Step-9 PRs merge after `review-to-clean` and green CI. His calls stay his: what a measurement means, weights, stopping a line of work.
