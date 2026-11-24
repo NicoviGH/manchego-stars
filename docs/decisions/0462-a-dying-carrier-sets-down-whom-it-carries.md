@@ -26,12 +26,17 @@ someone else. The same pattern stands behind #739's green 65, read at 0 in `fix7
 - `M.deathDropAt` asks the game where the carried unit lands: it calls
   `UnitGetDeathDropLocation` in the sandbox. The search clears gBmMapUnit's cells of the carrier
   and of gActiveUnit (bmunit.c); a game call's writes are not journaled, so both cells are kept
-  (`keep16`) and put back. Its two int outputs borrow the scratch bytes, which in the judged phase
-  are the AI's proc, and are put back too. The outputs start at the carrier's tile, since the game
-  leaves them unset when no tile is free.
-- The phase's `remove` (every death: a blow's kill, our counter's, a berserk strike's, the plan's
-  own kills) sets the carried unit down there before the carrier leaves the map.
-- The drop itself is one owner, `drop` (`UnitDrop`'s writes through the journal), shared with
+  (`keep16`) and put back, and a unit off the map (a stale gActiveUnit) has no cell. The search
+  also fills gBmMapMovement; that is left, as every AI read makes the movement map fresh first
+  (the sandbox's journal note; every generator the AI calls sets the working map and costs,
+  bmidoten.c). Its two int outputs borrow the scratch bytes, which in the judged phase are the
+  AI's proc, and are put back too. The outputs start at the carrier's tile, since the game leaves
+  them unset when no tile is free.
+- `M.dieOff`, the phase's `remove` (a blow's kill, our counter's, a berserk strike's), sets the
+  carried unit down there before the carrier leaves the map. The plan's own `gone` units are only
+  taken off: that list holds a recruit talked to (not dead) as well as our kills, and no plan carry
+  rides on an enemy.
+- The drop itself is one owner, `M.drop` (`UnitDrop`'s writes through the journal), shared with
   `stageCarry`'s plan Drop. `UnitDrop` is not called: its writes to the unit structs would need
   keeping, and the Lua drop already wrote them for the plan's Drop.
 
@@ -41,13 +46,18 @@ instrument), and a fresh game did not reach it.
 
 **Proof (ADR 0430).** A unit test that fails without the change (`test_sight.lua`:
 `deathDropAt` returns the carried unit and the game's tile, starts the outputs at the carrier's
-tile, keeps both map cells and puts them back, puts the proc's bytes back, and asks nothing of a
-unit that carries no one; `remove` drops through it and the plan's Drop shares `drop`).
+tile, keeps both map cells and puts them back, skips a cell off the map, puts the proc's bytes
+back, and asks nothing of a unit that carries no one or a carrier off the map; `M.dieOff` leaves
+the carried unit on the drop tile, shown, both rescue words cleared, and the carrier off the map).
 
 Emulator probe `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh dropprobe` (retail Prologue:
 Seth, charId 2, carries Eirika, charId 1, at 1 HP beside two enemies given Power and Skill 30):
-PASS on the branch, with a way where the second enemy strikes the dropped Eirika (the control,
-Seth at full HP, has none), and no leak. FAIL on main: no enemy ever strikes her.
+PASS on the branch: in the way where enemy 0x82 kills Seth (p 0.60), enemy 0x83 strikes the
+dropped Eirika; the control (Seth at full HP, killed at most by the last enemy) has no such
+strike; no leak. FAIL on main: no enemy ever strikes her.
+
+Not yet seen in a played game: the green 65 / 74 deaths themselves. #739 names the replay that
+would show it.
 
 One replay, `PT_LEAKGUARD=1 PT_FORECAST=1` (run `fx739a`, vanilla Ch19 `b640e-cs-s4003` attempt
 1): won on turn 13, no leak. It did not reach a carrier death the copy splits on. Turn 3 played as

@@ -5233,10 +5233,11 @@ end
 -- dropprobe (#739): a carrier that dies in the judged enemy phase sets down whom it carries,
 -- where the game's own search puts it (bmunit.c UnitGetDeathDropLocation, as bmmind.c
 -- DropRescueOnDeath does), so the enemies after the death may strike that unit. On the retail
--- Prologue Seth (charId 2) carries Eirika (charId 1) at 1 HP, stood beside two enemies: in a
--- way where the first enemy's blow kills him (both enemies' Power and Skill set to 30), the
--- second must be free to strike Eirika. The
--- control: Seth at his full HP, so no blow kills him and no enemy reaches the carried Eirika.
+-- Prologue Seth (charId 2) carries Eirika (charId 1) at 1 HP, stood beside two enemies whose
+-- Power and Skill are set to 30. Counted: a strike on Eirika in a way where an earlier blow of
+-- that way killed Seth (its record's every damage at least his HP, M.deathSplit's dead side).
+-- The control: Seth at his full HP, killed at most by the last enemy's blow, so no enemy is
+-- left to strike Eirika after his death.
 -- PT_VANILLA=1 only; run it with PT_LEAKGUARD=1 (the search writes the unit map).
 scenarios.dropprobe = function()
     if PLAYTEST_VANILLA ~= "1" then
@@ -5271,21 +5272,30 @@ scenarios.dropprobe = function()
         sapi.write8(e.addr + 0x15, 30)
     end
     sight.refresh()
-    -- -> the strikes on Eirika over every way, and the ways where an earlier blow killed Seth
+    -- a strike record whose every damage kills its target (the dead side of a death split)
+    local function kills(t)
+        local any = false
+        for d, q in pairs(t.takenDist or {}) do
+            if q > 0 then
+                if d < t.targetHp then return false end
+                any = true
+            end
+        end
+        return any
+    end
+    -- -> the strikes on Eirika that follow Seth's death in their way
     local function eirikaStruck(hp)
         local plan = { blues = { { unit = seth, x = sx, y = sy, hp = hp } }, waits = {}, reds = {},
                        gone = {}, carry = { [eirika.id] = { by = seth.id } } }
         local out = sight.enemyPhase(plan)
         local struck, ps = 0, {}
         for _, o in ipairs(out.outcomes) do
-            local line = {}
+            local line, sethDead = {}, false
             for _, t in ipairs(o.strikes) do
-                local dist = {}
-                for d, q in pairs(t.takenDist or {}) do dist[#dist + 1] = string.format("%d:%.2f", d, q) end
-                line[#line + 1] = string.format("%x>%x hp%s dies%s dist{%s} joint%s", t.enemy, t.target,
-                    tostring(t.targetHp), tostring(t.dies), table.concat(dist, ","),
-                    tostring(t.joint and #t.joint))
-                if t.target == eirika.id then struck = struck + 1 end
+                local dead = t.target == seth.id and kills(t)
+                line[#line + 1] = string.format("%x>%x%s", t.enemy, t.target, dead and "(dead)" or "")
+                if t.target == eirika.id and sethDead then struck = struck + 1 end
+                sethDead = sethDead or dead
             end
             ps[#ps + 1] = string.format("%.3f[%s]", o.p, table.concat(line, " "))
         end
