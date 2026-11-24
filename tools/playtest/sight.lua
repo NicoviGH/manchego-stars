@@ -136,8 +136,8 @@
 --                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
 --                            in it the player can see or plays() makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
---                            its tile and takes its expected damage off the target before the
---                            next decides. plan.reds = { [enemy id] = hp } (optional): the HP
+--                            its tile and leaves the target at its likeliest HP
+--                            (M.strikeLeft) before the next decides. plan.reds = { [enemy id] = hp } (optional): the HP
 --                            the plan leaves an enemy. Where the target's counter may kill
 --                            the striker (its played chance, `felled`), the rest of the phase
 --                            is played both ways, the striker's tile freed in the second
@@ -1099,16 +1099,30 @@ end
 -- probably gets hit, so he'll be at 20"), never by the mean, an HP the game cannot produce (23
 -- after a 70% hit for 10 on 30). Equal chances go to the larger loss. nil when no outcome
 -- leaves it alive. Pure.
-M.TIE = 1e-12
 function M.likeliestLeft(dists, hp)
+    local dist, keys = M.damage(dists, hp), {}
+    for d, p in pairs(dist) do
+        if d < hp and p > 0 then keys[#keys + 1] = d end
+    end
+    -- the larger loss first, so a chance within M.TIE of the best never displaces it: the winner
+    -- does not hang on pairs' order (a replay must decide alike)
+    table.sort(keys, function(a, b) return a > b end)
     local lost, best
-    for d, p in pairs(M.damage(dists, hp)) do
-        if d < hp and p > 0 and (not best or p > best + M.TIE
-                                 or (p >= best - M.TIE and d > lost)) then
-            lost, best = d, p
-        end
+    for _, d in ipairs(keys) do
+        if not best or dist[d] > best + M.TIE then lost, best = d, dist[d] end
     end
     return lost and hp - lost
+end
+
+-- The HP a judged phase's strike `t` (M.strikeAt's, t.berserk set) leaves its target at, given
+-- `split` (M.deathSplit's of t, or nil): the HP it lives at (aliveHp), or 0 when it surely
+-- dies; with no split, the likeliest HP (M.likeliestLeft). A berserk strike is never split: it
+-- kills at even odds or better, as the next phase's likeliest way takes a kill (M.berserkKills
+-- then takes the red off). Pure.
+function M.strikeLeft(t, split)
+    if split then return split.alive and split.aliveHp or 0 end
+    if t.berserk and M.odds({ t.takenDist }, t.targetHp) >= 0.5 then return 0 end
+    return M.likeliestLeft({ t.takenDist }, t.targetHp) or 0
 end
 
 -- The most and the least a distribution can take: its largest and smallest damage with any
@@ -1251,6 +1265,9 @@ end
 -- A side of a split is real only above this chance: a sure death sums its outcomes to 0.9999999999
 -- and a float's dust is no way of the game.
 M.SPLIT_DUST = 1e-9
+-- Two chances closer than this are equal (M.likeliestLeft's tie): products of the same chances
+-- taken in another order differ by a float's dust.
+M.TIE = 1e-12
 
 -- A phase strike `t` (M.strikeAt's) split by whether its target dies (#743): the game plays one
 -- or the other, and the enemies after it decide on that board (a dead unit is off the map). From
@@ -2604,7 +2621,7 @@ function M.putFog(api, Board, kept)
 end
 
 -- Whether a berserk strike (t.berserk) kills its target on the phase's likeliest way: its HP
--- `left` after the strike (0 when it dies at even odds or better, M.likeliestLeft else). Such a target is taken off the map for the units
+-- `left` after the strike is 0 (M.strikeLeft). Such a target is taken off the map for the units
 -- after it, as nextPhase takes one; an enemy's own strike keeps its target (the judged phase
 -- reads it on the target's whole odds).
 function M.berserkKills(t, left) return t.berserk == true and left <= 0 end
@@ -2855,7 +2872,7 @@ end
 -- (BattleApplyUnitUpdates) and the bag packed (UpdateUnitFromBattle's UnitRemoveInvalidItems),
 -- so a weapon spent to 0 is gone and the unit fights the rest of the phase unarmed (vanilla
 -- Ch19: Myrrh, charId 0x1E, read at 0% death with the Divinestone she had spent). The phase is
--- played along its expected way, as a strike takes its expected damage rounded. No slot (a
+-- worn by its expected uses rounded (a strike's HP is its likeliest, M.strikeLeft). No slot (a
 -- ballista's strike, or a counter that wrote nothing back: M.wearSlotOf) or one past the bag (a
 -- borrowed item's 0xFF) is no item of the unit's. The packing is a game write no journal sees,
 -- so the bag is kept first (M.equip's reason). -> the ledger after it.
@@ -4235,20 +4252,15 @@ function M.new(outer)
             -- a strike by the player's berserked unit (#660), marked for the planner: its
             -- striker is one of the player's, whose death to the counter is a loss
             t.berserk = e.faction == "blue" or nil
-            -- The target is left at the likeliest HP it lives at (M.likeliestLeft, #743, ADR
-            -- 0463), never the mean: the enemies after it score every candidate's HP, and the
-            -- mean put Knoll at 19 where the game had 29 (fc743d21 Ch21 T13). An enemy's blow
-            -- that may kill (M.deathSplit) also plays its death (t.kill) as a way of its own, or
-            -- takes it off on the likelier side: the mean alone left a likely death on the map at
-            -- 0 HP, and the enemies after it struck the corpse (fc743d19, 26 of 748 decisions).
-            -- A berserk strike on a red is not split: it kills at even odds or better
-            -- (M.berserkKills).
+            -- The target is left at the likeliest HP it lives at (M.strikeLeft, #743, ADR 0463).
+            -- An enemy's blow that may kill (M.deathSplit) also plays its death (t.kill) as a
+            -- way of its own, or takes it off on the likelier side: the mean alone left a likely
+            -- death on the map at 0 HP, and the enemies after it struck the corpse (fc743d19, 26
+            -- of 748 decisions).
             local split = not t.berserk and M.deathSplit(t) or nil
-            local left = M.likeliestLeft({ t.takenDist }, t.targetHp) or 0
-            if t.berserk and M.odds({ t.takenDist }, t.targetHp) >= 0.5 then left = 0 end
+            local left = M.strikeLeft(t, split)
             if split then
                 t.dies, t.deadT, t.aliveT = split.dies, split.dead, split.alive
-                left = split.alive and split.aliveHp or 0
                 local o = byId[target]
                 t.kill = function()
                     wound(addr, 0, o ~= nil and o.faction == e.faction)
@@ -4472,9 +4484,9 @@ function M.new(outer)
     -- next phase is played along its expected way, unbranched: each enemy goes where its own
     -- decision takes it (a strike's tile, or the move it decides without striking), a strike
     -- leaves its target at its likeliest HP, a player unit it likely kills is off the map, and a
-    -- striker our counter kills at even odds or better is gone. The turn then advances and the second phase
-    -- is played as enemyPhase plays one, every way a counter may kill. Only what the player
-    -- sees decides, in both: an enemy hidden by fog does not act unless a retry remembers it
+    -- striker our counter kills at even odds or better is gone. The turn then advances and the
+    -- second phase is played as enemyPhase plays one, every way a counter may kill. Only what the
+    -- player sees decides, in both: an enemy hidden by fog does not act unless a retry remembers it
     -- (knows(), ADR 0399) or this attempt saw it (a ghost, played from its last-seen tile:
     -- plays(), ADR 0455), and no arrival is placed (one not yet loaded is no unit to play).
     -- -> as enemyPhase, plus .hp = { [blue or green unit id] = its HP when the second phase
@@ -4528,8 +4540,8 @@ function M.new(outer)
                                 else
                                     -- it lives: at the likeliest HP our counter leaves it, as a
                                     -- strike leaves its target
-                                    wound(e.addr, M.likeliestLeft({ t.counterDist }, t.strikerHp) or 1,
-                                          true)
+                                    wound(e.addr,
+                                          M.likeliestLeft({ t.counterDist }, t.strikerHp) or 1, true)
                                 end
                             end,
                             none = function()

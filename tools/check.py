@@ -92,6 +92,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0463 (#743): a struck unit in the judged enemy phase keeps its likeliest HP,
+    # never its expected damage off (the mean)
+    r'\btakes its expected damage off the target\b', r'\bas a strike takes its expected damage\b',
     # retired by ADR 0454 (#717): an enemy-phase death is graded by the plan the phase met, not
     # by the plan that moved its unit; the calibration table's mover-first columns are gone
     r'\bgraded by the plan that (last )?moved\b', r'\bmoved under, over by the phase end\b',

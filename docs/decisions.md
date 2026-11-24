@@ -303,7 +303,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0460` | [A blow that may kill our unit splits the judged phase, and no unit stays on the map at 0 HP](decisions/0460-a-blow-that-may-kill-splits-the-judged-phase.md) | 2026-11-23 | #743 #510 |
 | `0461` | [An enemy that moves without striking moves in the judged phase](decisions/0461-an-enemy-that-moves-without-striking-moves-in-the-judged-phase.md) | 2026-11-23 | #743 #510 |
 | `0462` | [A dying carrier sets down whom it carries, in the copy's enemy phase](decisions/0462-a-dying-carrier-sets-down-whom-it-carries.md) | 2026-11-23 | #739 #743 #510 |
-| `0463` | [A struck unit keeps its likeliest HP in the copy's enemy phase, never the mean](decisions/0463-a-struck-unit-keeps-its-likeliest-hp-in-the-copy.md) | 2026-11-24 | #743 #510 |
+| `0463` | [A struck unit keeps its likeliest HP in the copy's enemy phase, never the mean](decisions/0463-a-struck-unit-keeps-its-likeliest-hp-in-the-copy.md) | 2026-11-23 | #743 #510 |
 
 ---
 
