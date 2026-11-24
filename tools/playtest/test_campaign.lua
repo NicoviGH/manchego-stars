@@ -878,8 +878,10 @@ end
 test_a_retry_remembers_the_arrivals_it_saw()
 
 -- #741: a retry remembers what earlier attempts lost, not only what arrived.
---  * an arrival our own act loaded (`by`) is no turn's: it stays out of the hold's turns and is
---    kept, with its act, in memory.arrivals;
+--  * an arrival our own act loaded (`by`), or one no turn event loads (`timed` false), is no
+--    turn's: it stays out of the hold's turns; one loaded by our act keeps its act in
+--    memory.arrivals;
+--  * a loss by a unit the play brought is dated by the play: not kept;
 --  * a reward tile a failed attempt lost is memory.closings["x,y"], the EARLIEST phase;
 --  * an owed recruit that left the map is memory.fates[charId], the earliest turn; one killed is
 --    the play's and is not kept.
@@ -888,15 +890,20 @@ local function test_a_retry_remembers_what_was_lost()
     local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
         seen = { [1] = { { turn = 2, boardTurn = 2, x = 22, y = 12, charId = 0x1C, classId = 0x37,
                            by = door },
-                         { turn = 4, boardTurn = 5, x = 7, y = 18, charId = 0x80 } },
+                         { turn = 4, boardTurn = 5, x = 7, y = 18, charId = 0x80 },
+                         -- a thief's door opened this room: no turn event loads it (botrun's timed)
+                         { turn = 3, boardTurn = 3, x = 22, y = 7, charId = 0x80, timed = false } },
                  [2] = { { turn = 6, boardTurn = 6, x = 22, y = 12, charId = 0x1C, by = door } } },
         explore = { [1] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
                               closed_phase = 9, closer_class = 0x0D },
-                            { x = 3, y = 3, kind = "chest", status = "visited", by = 1 } },
+                            { x = 3, y = 3, kind = "chest", status = "visited", by = 1 },
+                            { x = 22, y = 5, kind = "chest", status = "closed", closed_by = 0x1C,
+                              closed_phase = 3, closer_class = 0x37 } },
                     [2] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
                               closed_phase = 4, closer_class = 0x0D } } },
         missed = { [1] = { { charId = 0x12, reason = "left_map", boardTurn = 8, x = 0, y = 5 },
-                           { charId = 0x1C, reason = "killed_before_talk" } },
+                           { charId = 0x1C, reason = "left_map", boardTurn = 11 },
+                           { charId = 0x13, reason = "killed_before_talk" } },
                    [2] = { { charId = 0x12, reason = "left_map", boardTurn = 6, x = 0, y = 4 } } } } } }
     Campaign.run(g.api)
     check(table.concat(g.plays[2].style.arrivals[1], ","), "4",
@@ -912,8 +919,9 @@ local function test_a_retry_remembers_what_was_lost()
     check(m2.closings["11,15"] and m2.closings["11,15"].phase, 9, "attempt 2: attempt 1's closing")
     check(m2.closings["11,15"].closerClass, 0x0D, "with its closer's class")
     check(m2.closings["3,3"], nil, "a tile we took is no closing")
+    check(m2.closings["22,5"], nil, "a tile taken by a unit our door brought: its date is ours, not kept")
     check(m3.closings["11,15"].phase, 4, "attempt 3: the earliest closing over both")
-    check(#m2.fates, 1, "a recruit killed is the play's, not kept")
+    check(#m2.fates, 1, "a recruit killed, or one our door brought: not kept")
     check(m2.fates[1].charId .. " t" .. m2.fates[1].boardTurn, "18 t8", "attempt 2: the departure")
     check(#m3.fates, 1, "the same recruit twice is one memory")
     check(m3.fates[1].boardTurn .. " " .. m3.fates[1].x .. "," .. m3.fates[1].y, "6 0,4",

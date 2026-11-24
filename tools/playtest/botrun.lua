@@ -412,6 +412,21 @@ function M.triggerOf(a)
     return { act = a.act, x = at.x, y = at.y }
 end
 
+-- Whether an arrival is a turn's (#741, ADR 0464): no act we made loaded it (`by` nil) and the
+-- chapter's turn events load its character on that board turn (`sight.scriptedUnits`, read off
+-- the ROM's scripts with the game's own turn, phase and flag check). Anything else came with
+-- something the play did: a door it opened, a thief's door, an area a unit walked into (vanilla
+-- Ch14's rooms and its AREA-flagged waves), and comes on another turn when the play differs. A
+-- sight that cannot read the scripts (a test's fake) leaves every arrival no act loaded timed.
+function M.timedArrival(sight, by, charId, boardTurn)
+    if by then return false end
+    if not (sight and sight.scriptedUnits) then return true end
+    for _, a in ipairs(sight.scriptedUnits().arrivals) do
+        if a.charId == charId and a.boardTurn == boardTurn then return true end
+    end
+    return false
+end
+
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
     local drops, felled = {}, {}
@@ -1186,12 +1201,14 @@ function M.run(api)
                                         turn = boardTurn }
                     if e and not u.fogged then
                         -- `turn`: the player phase it arrives on, or the enemy phase's own
-                        -- turn when it acted there. `by`: our act that loaded it
+                        -- turn when it acted there. `by`: our act that loaded it. `timed`: a
+                        -- turn's arrival, the one a retry's hold waits for (M.timedArrival)
                         local inPhase = actedIn and actedIn.ids[u.id] and actedIn.turn
+                        local by = M.triggerOf(actNow)
                         rec.arrivals_seen[#rec.arrivals_seen + 1] = {
                             turn = inPhase or after.turn or turn, boardTurn = boardTurn,
                             x = e.x, y = e.y, charId = e.charId, classId = u.classId,
-                            by = M.triggerOf(actNow) }
+                            by = by, timed = M.timedArrival(playSight, by, e.charId, boardTurn) }
                     end
                 end
             end
@@ -1678,8 +1695,10 @@ function M.run(api)
             seen[h] = stalled and "stalled" or seen[h] or true
             changes(board)
             -- the chapter's scripted units, read once here with no plan's sandbox open (a read made
-            -- inside one is not kept, so every plan would scan again) and only when a recruit is owed
-            if owed and #owed > 0 and sight.scriptedUnits then sight.scriptedUnits() end
+            -- inside one is not kept, so every plan would scan again), at the first phase: the
+            -- scan reads the flags of its first call, and an event that has run has set its own,
+            -- so a later first call would miss it (M.timedArrival reads it for every arrival)
+            if sight.scriptedUnits then sight.scriptedUnits() end
             -- the arrivals as the game loads them (sight.arrivalUnits, #713 fix 3, ADR 0456), built
             -- here for the same reason: every plan's fog read asks them, from inside its sandbox.
             -- Gated on the chapter's fog, not on what the fog hides now: a plan that moves a unit

@@ -883,6 +883,19 @@ do
     check((byChar[0x86] or {}).by, nil, "a turn event's arrival names no act")
 end
 
+-- M.timedArrival (#741, ADR 0464): an arrival is a turn's only when no act we made loaded it and
+-- the chapter's turn events load that character on that board turn; a sight that cannot read
+-- the scripts leaves it timed.
+do
+    local sight = { scriptedUnits = function()
+        return { arrivals = { { charId = 0x80, boardTurn = 5 } }, removals = {} } end }
+    check(Botrun.timedArrival(sight, nil, 0x80, 5), true, "timed: a turn event loads it then")
+    check(Botrun.timedArrival(sight, nil, 0x80, 3), false, "untimed: no turn event then (a thief's door)")
+    check(Botrun.timedArrival(sight, nil, 0x1C, 5), false, "untimed: no turn event loads him")
+    check(Botrun.timedArrival(sight, { act = "door" }, 0x80, 5), false, "untimed: our act loaded it")
+    check(Botrun.timedArrival({}, nil, 0x80, 3), true, "no script read: timed")
+end
+
 -- test_enemies_seen_lists_every_red_out_of_fog (ADR 0399): what a retry may remember of the
 -- enemy -- every red unit a board showed out of fog, once, by slot and character; a fogged one
 -- is not listed until a board shows it.
@@ -2218,8 +2231,11 @@ do
     check(got and got[1] and got[1].x .. "," .. got[1].y, "7,7", "scripted: at the script's tile")
     check(owedSeen and owedSeen[0x30], true, "scripted: the planner is told the owed set (opts.owedRecruits)")
     asked = false
-    told(nil, {})
-    check(asked, false, "scripted: nothing owed, no scan of the scripts")
+    local none = told(nil, {})
+    -- the scan runs once at the first phase all the same: it dates every arrival (#741,
+    -- M.timedArrival); with nothing owed it gives the planner no pending recruit
+    check(asked, true, "scripted: nothing owed, the scripts are still read once")
+    check(none == nil or #none == 0, true, "scripted: nothing owed, nothing pending")
     got = told({ enemies = {}, arrivals = { { charId = 0x30, x = 9, y = 9, turn = 6 } } })
     check(got and #got == 1 and got[1].x, 9, "scripted: a remembered arrival wins")
 end

@@ -142,11 +142,21 @@ local M = {}
 -- memory.closings["x,y"], the EARLIEST phase over the attempts, since it is a deadline (Ch10's
 -- raze came anywhere from turn 4 to 10 with our play); and each owed recruit that left the map
 -- (rec.missed_recruits' `left_map`) as one memory.fates entry { charId, boardTurn, x, y }, the
--- first player turn it was gone on, the earliest too. A recruit we or the enemy killed is the play's,
--- never the game's: not kept.
+-- first player turn it was gone on, the earliest too. A recruit we or the enemy killed is the
+-- play's, never the game's: not kept. Nor is a loss by a unit whose arrival the play brought
+-- (`by`, or not `timed`: vanilla Ch14's Rennac, whom our door loads, takes the chests and
+-- leaves): its date follows what we did, not the turn.
 function M.rememberLosses(memory, rec)
+    local brought = {}   -- "charId" and "charId:classId" of each arrival the play brought
+    for _, a in ipairs(rec.arrivals_seen or {}) do
+        if a.by or a.timed == false then
+            brought[tostring(a.charId)] = true
+            brought[a.charId .. ":" .. tostring(a.classId)] = true
+        end
+    end
     for _, t in ipairs(rec.explore or {}) do
-        if t.status == "closed" and t.closed_phase then
+        if t.status == "closed" and t.closed_phase
+            and not brought[tostring(t.closed_by) .. ":" .. tostring(t.closer_class)] then
             local k = t.x .. "," .. t.y
             local had = memory.closings[k]
             if not had or t.closed_phase < had.phase then
@@ -156,7 +166,7 @@ function M.rememberLosses(memory, rec)
         end
     end
     for _, r in ipairs(rec.missed_recruits or {}) do
-        if r.reason == "left_map" and r.boardTurn then
+        if r.reason == "left_map" and r.boardTurn and not brought[tostring(r.charId)] then
             local at
             for i, f in ipairs(memory.fates) do
                 if f.charId == r.charId then at = i end
@@ -645,9 +655,9 @@ function M.run(api)
                         entry.attempts, tostring(rec.why))
                 end
                 for _, a in ipairs(rec.arrivals_seen or {}) do
-                    -- the hold is for a turn's arrivals: one our own act loaded comes when we
-                    -- act, not on a turn (#741)
-                    if not a.by and not known[a.turn] then
+                    -- the hold is for a turn's arrivals (botrun's `timed`): one the play brought
+                    -- (our door, an area walked into) comes when it does, not on a turn (#741)
+                    if not a.by and a.timed ~= false and not known[a.turn] then
                         known[a.turn] = true
                         remembered[#remembered + 1] = a.turn
                     end

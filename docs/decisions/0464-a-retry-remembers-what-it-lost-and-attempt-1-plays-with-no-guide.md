@@ -30,22 +30,33 @@ One owner, `style.memory` (`campaign.lua`), built from the failed attempt's reco
   phase's first board, before any act we make, so the two are told apart on every board. Each
   arrival also keeps `boardTurn` and `classId` now (the copy into a retry dropped `boardTurn`,
   so a start-of-turn arrival's goal ended a turn late).
+- **`arrivals_seen[i].timed`** (`botrun.lua` `M.timedArrival`): an arrival is a turn's only when
+  no act of the play loaded it and the chapter's turn events load its character on that board
+  turn (`sight.scriptedUnits`, read off the ROM with the game's turn, phase and flag check, now
+  once at every run's first phase: the scan reads the flags of its first call, and an event that
+  has run has set its own). Found in the first replay (`x741b`): Ch14's door also releases a
+  second room, which Rennac opens as a thief in that turn's enemy phase. It arrived on the door's
+  turn in all three `m740c` attempts (2, 4, 6) and is loaded by no turn event, so it is not
+  timed; nor are the waves Ch14's AREA flags open (#727's events).
 - **`closings["x,y"] = { phase, closerChar, closerClass }`**: each reward tile a looter or an
   event closed (the record's `explore` rows: `closed_phase`, the closer's enemy phase, else the
   phase before the first player phase that no longer listed it). The EARLIEST phase over the
   attempts is kept: it is a deadline, and Ch10's raze came anywhere from turn 4 to 10 with our
   play.
-- **`fates`, a list of `{ charId, boardTurn, x, y }`** (a list: the record is JSON, whose keys are strings): an owed recruit that left the map (`missed_recruits`
-  with `left_map`), the first player turn it was gone on, the earliest. A recruit we or the enemy
+- **`fates`, a list of `{ charId, boardTurn, x, y }`** (a list: the record is JSON, whose keys
+  are strings): an owed recruit that left the map (`missed_recruits` with `left_map`), the first player turn it was gone on, the earliest. A recruit we or the enemy
   killed is the play's, never the game's, and is not kept. This is its own table, not a field on
   `arrivals` as the design comment had it: a recruit on the map from the start (Ch10's Amelia)
   has no arrival to hang it on.
 
-Fogged arrivals stay out, as ADR 0386 has it: only what the screen showed.
+A loss by a unit the play brought (`by`, or not `timed`) is not kept: Rennac takes Ch14's chests
+and leaves a set number of turns after our door, so a date in turns is wrong once the door opens
+on another turn. Fogged arrivals stay out, as ADR 0386 has it: only what the screen showed.
 
 ## 2. How it is read
 
-- **The hold** (`style.arrivals`) takes only a turn's arrivals: one with `by` comes when we act.
+- **The hold** (`style.arrivals`) takes only the `timed` arrivals: any other comes when the play
+  brings it.
 - **A pending recruit with `by`** (`bot.lua` `recruitsOf`) is a goal on no turn bound, and
   `botrun.lua` drops any remembered arrival whose character has come this attempt (`cameChars`),
   so Rennac pulls a talker toward his tile until the door loads him, and never after.
