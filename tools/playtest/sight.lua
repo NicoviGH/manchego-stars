@@ -2856,7 +2856,8 @@ function M.strikeLedger(api, call, S, after, base, done, t, side, strikerAddr, t
         -- off the weapon where the equip put it, and the ledger's rows follow their items.
         -- Not for our own berserked unit (t.berserk): the army's reply picks its weapon by the
         -- slot the board lists (s.weapons) when the berserk ends before it, and a bag the strike
-        -- reordered would give that slot another item.
+        -- reordered would give that slot another item. A slot outside the bag is refused by
+        -- M.equip, the one owner of the slot range (M.armAsPlanned then moves nothing).
         armed = side.slot
     end
     after[t] = M.strikeWear(api, call, S, ledger, t, strikerAddr, targetAddr, armed)

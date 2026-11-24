@@ -3055,6 +3055,11 @@ do
                 check(seen, "1401,11C,0,0,0", name .. ": slot " .. slot .. " leaves the bag in its order")
                 check(l[red.addr][0] and l[red.addr][0].total, 0.45,
                       name .. ": slot " .. slot .. " leaves the ledger's rows in place")
+            else
+                -- the shot is the trap's (M.wearBallista): the rider's bag keeps its order, the sword
+                -- in front (this synthetic strike's wearSlot still wears the javelin where it is; a
+                -- real ballista strike has none, M.wearSlotOf)
+                check(seen, "1401,11C,0,0,0", "strikeLedger: a ballista shot keeps its rider's bag in its order")
             end
             check(#calls, before, name .. ": slot " .. slot .. " makes no equip call")
         end
