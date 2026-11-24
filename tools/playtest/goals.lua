@@ -16,7 +16,8 @@
 --   recruit        each unit ctx.recruitTalkers names (Bot.candidates: the player units that
 --                  may Talk it over); its takers are those talkers. A recruit a retry saw
 --                  arrive and that is not on the board yet (ctx.pendingRecruits, ADR 0436) is
---                  one too, at the tile it arrived on.
+--                  one too, at the tile it arrived on; one an act loaded (`by`, ADR 0464)
+--                  stalls on a quiet count, as any goal (M.ledger).
 --   objective      each unit's own way to the objective (ctx.objectiveTile: the Seize tile,
 --                  the boss, or on Rout the nearest enemy -- where its march heads), the unit
 --                  its one taker. None on Survive, whose way there is holding.

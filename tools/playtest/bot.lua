@@ -2319,8 +2319,9 @@ end
 -- stood on the board (boardTurn: T+1 after an enemy-phase arrival of turn T, T itself for a
 -- start-of-turn one; a record without it reads turn + 1): a unit not there by then is not coming
 -- this attempt, and its goal is none after. One our own act loaded (`by`: a door, chest or
--- village, #741) has no such turn: it is a goal until it comes. Its talkers are the units the game's own check (mayTalkOver) lets
--- Talk its charId -- that check reads the two charIds and the event flags, never the unit. The
+-- village, #741) has no such turn: it is a goal until it comes. Its talkers are the units the
+-- game's own check (mayTalkOver) lets Talk its charId -- that check reads the two charIds and
+-- the event flags, never the unit. The
 -- goal is the tile a talker can reach nearest to where it arrived (meetingTile), none when no
 -- talker reaches anywhere.
 -- -> out[id] = true, talkers[id] = the player units' ids that may Talk it over (goals.lua's
