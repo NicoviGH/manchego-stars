@@ -3012,6 +3012,7 @@ local function exploring(ctx, sent, barred, triedIn)
 end
 
 function M.explain(board, sight, style)
+    -- no opts: it reads no goal's deadline (no Goals call), so it needs no ctx.appeared
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
     local gate = GATES[style.aggression] or GATES.bold

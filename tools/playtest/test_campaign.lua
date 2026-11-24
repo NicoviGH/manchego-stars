@@ -877,6 +877,9 @@ local function test_a_record_without_a_timeline_crashes()
     check(ok, false, "the campaign stops")
     check(tostring(why):find("no timeline", 1, true) ~= nil, true, "and says why")
     check(#g.plays, 1, "no retry is played")
+    local l = lines(g)[1]
+    check(l and l.outcome, "crashed", "the chapter's line is written, as every crash's")
+    check(l and #l.failures, 1, "with the failed attempt in it")
 end
 test_a_record_without_a_timeline_crashes()
 
