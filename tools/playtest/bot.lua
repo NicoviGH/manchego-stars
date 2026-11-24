@@ -1020,10 +1020,13 @@ local function strikeTiles(ctx, u, e)
     return waitTiles(ctx, u)
 end
 
--- sight.field for `goal` (sight keeps it for the board); nil when the caller has none.
-local function fieldFor(ctx, goal)
+-- sight.field for `goal` (sight keeps it for the board); nil when the caller has none. With
+-- `u`, the march on u's OWN movement costs (a flier's field crosses the cliffs a walker's
+-- leaves nil, #730); without, the army's reference unit's -- for a read that is no one unit's
+-- distance (the ground an obstacle opens onto).
+local function fieldFor(ctx, goal, u)
     if not (goal and ctx.sight.field) then return nil end
-    return ctx.sight.field(goal)
+    return ctx.sight.field(goal, u)
 end
 
 -- The style's claim entries in `field` that name `u` (a carry, answer or wall's units).
@@ -1516,16 +1519,17 @@ local function stepsThrough(ctx, field, o)
     return best
 end
 
--- The goal's field distance at (x, y): the walk from there, nil when cut off or no field.
-local function walkFrom(ctx, goal, x, y)
-    local field = fieldFor(ctx, goal)
+-- The goal's field distance at (x, y): the walk from there, nil when cut off or no field; on
+-- `u`'s costs when given (fieldFor).
+local function walkFrom(ctx, goal, x, y, u)
+    local field = fieldFor(ctx, goal, u)
     return field and field[y] and field[y][x]
 end
 
 -- `u` is cut off from `goal`: its field is known and leaves u's tile unreached (breachFor's
 -- case). With no field known, nothing says a way is cut.
 local function cutOff(ctx, goal, u)
-    return fieldFor(ctx, goal) ~= nil and walkFrom(ctx, goal, u.x, u.y) == nil
+    return fieldFor(ctx, goal, u) ~= nil and walkFrom(ctx, goal, u.x, u.y, u) == nil
 end
 
 -- `u` holds a key or lockpick for doors (sight.opens, the Door command's own check).
@@ -2128,9 +2132,9 @@ end
 -- breachFor reads an obstacle). nil when there is none.
 local function lockedOnWay(ctx, u, goal)
     if not (goal and ctx.sight.doors and cutOff(ctx, goal, u)) then return nil end
-    local field = fieldFor(ctx, goal)
+    local field = fieldFor(ctx, goal, u)
     for _, d in ipairs(ctx.sight.doors()) do
-        if lockAt(ctx, u, d.x, d.y) and walkFrom(ctx, d, u.x, u.y)
+        if lockAt(ctx, u, d.x, d.y) and walkFrom(ctx, d, u.x, u.y, u)
                 and stepsThrough(ctx, field, d) then
             return d
         end
@@ -2261,12 +2265,12 @@ end
 
 -- The march from `u` to `t` by the game's field from `t`, or the way through an obstacle where
 -- that is shorter (breachFor), counted as turnsFor counts it (movesFor); nil = no way at all.
--- Both are movement cost: the field's is the march's cost grid, movesFor's is u's own grid
+-- Both are movement cost: the field's is u's own cost grid to `t`, movesFor's is u's own grid
 -- (sight.turnsTo is cost / MOV), so units are ranked on one count. A wall's wait is in the
 -- second because that march is that long: running ahead of the wall's fall gains nothing.
 local function marchLength(ctx, u, t)
     if breachFor(ctx, u, t) then return movesFor(ctx, u, t) end
-    return walkFrom(ctx, t, u.x, u.y)
+    return walkFrom(ctx, t, u.x, u.y, u)
 end
 
 -- Whether `u` may Talk `t` over: the game's own check (talks), for a unit not on our side
@@ -2399,7 +2403,7 @@ local function recruitFirst(ctx, gate)
                     if not nearD or p.d < nearD then near, nearD = p.u, p.d end
                 end
                 if near then
-                    local field = fieldFor(ctx, t)
+                    local field = fieldFor(ctx, t, near)
                     local allowed = {}
                     for _, tile in ipairs(waitTiles(ctx, near)) do
                         if gate(ctx, near, tile.x, tile.y, nil) then allowed[#allowed + 1] = tile end
@@ -2501,7 +2505,7 @@ local function march(ctx, u, gate, objective)
     end
     -- no enemies passed: pickMove's cork fallback pushes at a foe when the march is jammed,
     -- and over tiles the style allowed that push is the greedy bot's charge, not this one's
-    return M.pickMove(allowed, { cur = u, goal = goal, field = fieldFor(ctx, goal) })
+    return M.pickMove(allowed, { cur = u, goal = goal, field = fieldFor(ctx, goal, u) })
 end
 
 -- A wall's approach: of the wait tiles the gate allows, one a walled enemy reaches, the
@@ -2701,7 +2705,7 @@ local function greedy(ctx, objective)
     if b then return b end
     local goal = marchGoal(ctx, u, objective)
     local tile = M.pickMove(waitTiles(ctx, u), { cur = u, goal = goal,
-                                                 field = fieldFor(ctx, goal), enemies = targets })
+                                                 field = fieldFor(ctx, goal, u), enemies = targets })
     return action(u, tile, "wait")
 end
 
@@ -3004,7 +3008,7 @@ function M.explain(board, sight, style)
         local tiles = waitTiles(ctx, u)
         local allowed = gated(ctx, u, tiles, gate)
         local goal = goalFor(ctx, u, o)
-        local function fd(t) return walkFrom(ctx, goal, t.x, t.y) end
+        local function fd(t) return walkFrom(ctx, goal, t.x, t.y, u) end
         local function nearest(list)
             local best
             for _, t in ipairs(list) do
@@ -3107,12 +3111,12 @@ local function cantoMoves(ctx, u, acts, gain)
     return out
 end
 
--- progress: how much nearer its march goal (the game's field to it) `u` ends on (x, y), as
+-- progress: how much nearer its march goal (the field to it on u's own costs) `u` ends on (x, y), as
 -- gain(x, y); 0 where either end has no way to the goal.
 local function groundFor(ctx, u, objective)
     local goal = marchGoal(ctx, u, objective)
     local function fd(x, y)
-        if fieldFor(ctx, goal) then return walkFrom(ctx, goal, x, y) end
+        if fieldFor(ctx, goal, u) then return walkFrom(ctx, goal, x, y, u) end
         return goal and manhattan(x, y, goal.x, goal.y)
     end
     local here = fd(u.x, u.y)

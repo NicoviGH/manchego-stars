@@ -162,8 +162,9 @@
 --                            quote raises EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start;
 --                            gameOver = the charIds, on any side, whose death sets
 --                            EVFLAG_GAMEOVER (SetPidDefeatedFlag: a lord's), read at the start.
---   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
---                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
+--   field(goal, unit)        dist[y][x] = the movement cost from `goal` to (x, y), FE8's
+--                            GenerateExtendedMovementMap with `unit`'s costs (a unit's own
+--                            march distance), else fieldUnit()'s (the army's way); nil =
 --                            unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
@@ -5228,11 +5229,12 @@ function M.new(outer)
         return first
     end
 
-    -- The march heading to a goal: costGrid on fieldUnit()'s costs. Each unit's real reach is
-    -- reach()'s.
-    function s.field(goalTile)
-        local unit = s.fieldUnit()
-        return unit and costGrid(unit, goalTile) or nil
+    -- The march heading to a goal: costGrid on `unit`'s own costs (a unit's march distance is
+    -- its own: a flier stands where a walker's grid is nil, #730), else on fieldUnit()'s -- the
+    -- army's way, for a read that is no one unit's. Each unit's real reach is reach()'s.
+    function s.field(goalTile, unit)
+        unit = unit or s.fieldUnit()
+        return unit and s.march(unit, goalTile) or nil
     end
 
     -- The game's turn-event check (eventinfo.c: the phase-change hook searches turnBasedEvents
