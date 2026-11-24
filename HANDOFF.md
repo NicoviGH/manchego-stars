@@ -11,7 +11,18 @@ and start a fresh instance; don't rely on auto-compaction.
 
 **#510's work, issues and PRs, is tracked on GitHub only:** #510 and its sub-issue #640 (step 9).
 
-**Next session starts here (2026-11-23, late night; main is c568d87f + HANDOFF).**
+**Next session starts here (2026-11-24, small hours; main is 87504515 + HANDOFF).**
+- **Nicolas (2026-11-23): build a found root cause and its fix without asking** ("my approval is just going to be a bottle neck"). Step-9 PRs merge after `review-to-clean` and green CI. His calls stay his: what a measurement means, weights, stopping a line of work.
+- **Merged this session:**
+  - **PR #757** (ADR 0461): an enemy that moves without striking moves in both judged phases and the route watcher (`M.idleMove`); an escape leaves the map.
+  - **PR #758** (ADR 0462): a dying carrier sets down whom it carries (`M.deathDropAt` calls the game's `UnitGetDeathDropLocation`; `M.drop`, `M.dieOff`, `M.takeGone`). New manual probe: `PT_VANILLA=1 PT_LEAKGUARD=1 tools/playtest/run.sh dropprobe`.
+- **#743:** the 8 unexplained departures are root-caused (comment 7119556199). The copy's board differed, never its AI: (a) unmoved idle enemies, fixed by #757; (b) mean-HP wounds; (c) corpses, fixed by #756. The old "Ch15 enemy 144, not dice" was an artifact of `review/743-size/forecast.py` (first way only); use `review/743-size/departures.py`.
+- **Waiting on Nicolas: cause (b)** (comment 7120211903). It explains at most 2 of 18 enemy-phase deaths, at a cost several times #756's, so the recommendation is not to build it. Note: in `fx739a` turn 3, (b) also hid carrier 5's death from the copy.
+- **#739:** the green 65 / 74 half is fixed by #758. Enemy 169 striking Franz at a read of 0 stays open: its board cannot be rebuilt (`fix713g` is a resume made on an older instrument). Comment 7121049084 says what would close it.
+- **Next in #752's order:** #569 (reinforcement waves in the second phase), then #727 (AREA events changing AI by position).
+- Run tags: `fx743i` (Ch21 s4009), `i739`, `fx739a` (Ch19 s4003). Instrument: `diag/743-forecast` (apply 8e76a677 uncommitted).
+
+*Before that (2026-11-23, late night; main was c568d87f + HANDOFF).*
 - **The work order is #640's sub-issues: #752 (nobody dies, the enemy forecast), then #753 (every reward), then #754 (the chapter ends)**; within each, its own sub-issue list. Step 10 is #751, a child of #510.
 - **Merged on Nicolas's "merge both", each on green CI for its head after `review-to-clean`:**
   - **PR #755** (ADR 0459) as e3d668ff: a sandbox strike equips its weapon; `M.equip` owns the slot range.
