@@ -240,6 +240,10 @@ local Timeline = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/timeline.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "timeline.lua"))
 M.Timeline = Timeline
 
+-- jobs.lua: who does which job over several turns (#766): exploring's assignment
+local Jobs = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/jobs.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "jobs.lua"))
+
 local manhattan = Board.distance   -- FE8's RECT_DISTANCE
 
 -- json.lua, beside this file: the strike memo's guard compares and prints two reads with it
@@ -2826,13 +2830,15 @@ end
 local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) end
 
 -- What sending `u` to open tile `t` is worth: its gold x the chance `u` gets there (Goals.chance:
--- its own turns, none once a looter closes it first), and that chance. A unit cut off from it
--- goes through the breach (turnsFor).
-local function sendWorth(ctx, u, t)
+-- its own turns, none once a looter closes it first), that chance, and the turn it gets there on.
+-- A unit cut off from it goes through the breach (turnsFor). `from` (jobs.lua's chain: { x, y,
+-- late }) starts the trip where an earlier job ends, `late` turns from now; nil: where u stands.
+local function sendWorth(ctx, u, t, from)
     local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
-    local pos = { [u.id] = { x = u.x, y = u.y, acted = u.acted, alive = 1 } }
-    local c = Goals.chance(goal, pos, Goals.GAMMA, ctx.turnsTo)
-    return t.gold * c, c
+    local p = from and { x = from.x, y = from.y, late = from.late, alive = 1 }
+        or { x = u.x, y = u.y, acted = u.acted, alive = 1 }
+    local c, turns = Goals.chance(goal, { [u.id] = p }, Goals.GAMMA, ctx.turnsTo)
+    return t.gold * c, c, turns
 end
 
 -- Whether the goal tile `t` is barred for unit `id` (the goals units are blocked from).
@@ -2871,6 +2877,8 @@ end
 
 local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
+    -- each unit's chain of goals (jobs.lua), the first its exploreGoal: R3's planner reads it
+    ctx.jobs = {}
     ctx.tried = {}
     barred = barred or {}
     local taken = {}
@@ -2886,22 +2894,55 @@ local function exploring(ctx, sent, barred, triedIn)
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
         return lockAt(ctx, u, t.x, t.y) and movesFor(ctx, u, t) or nil
     end
-    -- each goal one unit, each unit one goal, the nearest pair first; `key` names a goal
-    -- the goal's `kind` rides on the unit's goal tile (Goals.beside: every read of a recruit's
-    -- tile leaves its lock out)
-    local function assign(pairs_, key, kind)
-        table.sort(pairs_, function(a, b)
-            if (a.v or 0) ~= (b.v or 0) then return (a.v or 0) > (b.v or 0) end
-            if a.d ~= b.d then return a.d < b.d end
-            if a.u.slot ~= b.u.slot then return a.u.slot < b.u.slot end
-            if a.t.y ~= b.t.y then return a.t.y < b.t.y end
-            return a.t.x < b.t.x
-        end)
+    -- each goal one unit, each unit its chain of goals (jobs.lua, #766): the assignment that gets
+    -- the most worth before the goals close, not the best pair first (the greedy pairing gave
+    -- the one unit able to make two villages the richer, and lost the other, which a slower
+    -- unit could not reach in time, #764). `key` names a goal; the goal's `kind` rides on the
+    -- unit's goal tile (Goals.beside: every read of a recruit's tile leaves its lock out).
+    -- `chained`: a unit may be given a second goal, counted on from the first's tile (villages
+    -- and chests; a Talk is one a unit). A pair's `v` is its worth (none: 1, every Talk alike),
+    -- `turns` its arrival turn, `d` its march: a tie in worth goes to the shorter marches
+    local function assign(pairs_, key, kind, chained)
+        local units, jobs, pair, isUnit, byKey = {}, {}, {}, {}, {}
         for _, p in ipairs(pairs_) do
             local k = key(p.t)
             if not taken[k] and not ctx.exploreGoal[p.u.id]
                 and not isBarred(barred, p.u.id, p.t) then
-                taken[k], ctx.exploreGoal[p.u.id] = true, { x = p.t.x, y = p.t.y, kind = kind }
+                if not isUnit[p.u.id] then isUnit[p.u.id], units[#units + 1] = true, p.u end
+                local j = byKey[k]
+                if not j then
+                    j = { id = k, t = p.t, tile = { x = p.t.x, y = p.t.y }, closes = p.t.closes,
+                          worth = 0, takers = {} }
+                    byKey[k], jobs[#jobs + 1] = j, j
+                end
+                -- the most the goal is worth to anyone, at chance 1: the search's bound
+                j.worth = math.max(j.worth, p.v or 1, chained and p.t.gold or 0)
+                if not pair[p.u.id .. ">" .. k] then j.takers[#j.takers + 1] = p.u end
+                pair[p.u.id .. ">" .. k] = p
+            end
+        end
+        local bySlot = function(a, b) return a.slot < b.slot end
+        table.sort(units, bySlot)
+        for _, j in ipairs(jobs) do table.sort(j.takers, bySlot) end
+        local function value(u, j, from)
+            local p = pair[u.id .. ">" .. j.id]
+            if not p then return nil end
+            if not from then return p.v or 1, p.turns or 1, p.d end
+            local v, c, turns = sendWorth(ctx, u, j.t, from)
+            if c <= 0 then return nil end
+            -- the tie's cost in the first job's measure: the march from the chain's last tile
+            -- (a way through an obstacle has no field walk: its turns at the unit's MOV)
+            return v, turns, walkFrom(ctx, j.t, from.x, from.y, u)
+                or turns * ctx.sight.mov(u)
+        end
+        local out = Jobs.assign(units, jobs, value, {
+            chain = chained and Jobs.CHAIN or 1, takers = function(j) return j.takers end })
+        for _, u in ipairs(units) do
+            local c = out[u.id]
+            if c then
+                ctx.exploreGoal[u.id] = { x = c[1].t.x, y = c[1].t.y, kind = kind }
+                ctx.jobs[u.id] = c
+                for _, j in ipairs(c) do taken[j.id] = true end
             end
         end
     end
@@ -2993,16 +3034,18 @@ local function exploring(ctx, sent, barred, triedIn)
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
             if d then
-                local v, c = sendWorth(ctx, u, t)
+                local v, c, turns = sendWorth(ctx, u, t)
                 if c > 0 then
                     local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
                         or byOpen[ownOpener(u, t) and 1 or 2]
-                    list[#list + 1] = { t = t, u = u, d = d, v = v }
+                    list[#list + 1] = { t = t, u = u, d = d, v = v, turns = turns }
                 end
             end
         end
     end
-    for _, list in ipairs(byOpen) do assign(list, function(t) return tileKey(t.x, t.y) end) end
+    for _, list in ipairs(byOpen) do
+        assign(list, function(t) return tileKey(t.x, t.y) end, nil, true)
+    end
     -- a unit now holding a stalled goal has had its turn with it: the next decision keeps it
     for uid, g in pairs(ctx.exploreGoal) do
         local t = open[tileKey(g.x, g.y)]

@@ -5685,6 +5685,29 @@ do
         check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
     end
 
+    -- test_exploring_times_both_villages (#766, #764's Ch10 witness): a flier A (MOV 8) makes
+    -- either village in time, a knight B (MOV 4) only the near one, (6,0), shut after enemy
+    -- phase 3; the far one, (14,0), shuts after phase 2. The greedy pairing gave A the near
+    -- village (its best pair) and the far one was lost. The assignment sends A far, B near.
+    do
+        local A3 = blue(0x01, 0, 0, 0, { minRange = false, mov = 8 })
+        local B3 = blue(0x02, 1, 0, 1, { minRange = false, mov = 4 })
+        local two = {}
+        for k, v in pairs(o) do two[k] = v end
+        two.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) }
+        two.explorable = { { x = 6, y = 0, kind = "visit" }, { x = 14, y = 0, kind = "visit" } }
+        two.canExplore = { [0x01] = { ["6,0"] = "visit", ["14,0"] = "visit" },
+                           [0x02] = { ["6,0"] = "visit", ["14,0"] = "visit" } }
+        two.closings = { ["6,0"] = 3, ["14,0"] = 2 }
+        local _, ctx = B.candidates(boardOf(A3, B3, X), sightOf(two), gifted("careful", 500))
+        local function goalOf(id)
+            local g = ctx.exploreGoal[id]
+            return g and (g.x .. "," .. g.y) or "-"
+        end
+        check(goalOf(0x01), "14,0", "exploring: the flier takes the village only it makes in time")
+        check(goalOf(0x02), "6,0", "exploring: the knight takes the near one")
+    end
+
     -- test_threats_are_the_seen_and_the_remembered (ADR 0399): enemiesOf's first list is the
     -- reds in sight (what can be targeted); its second adds every fogged red sight.knows, which
     -- can strike; a fogged one not remembered is in neither. Attempt 1 (no knows) adds none.
