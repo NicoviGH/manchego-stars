@@ -31,7 +31,10 @@ was not read is not kept: its key would match nothing. Each is
 kept once by `Board.memoryKey`: a unit on the field at the start by slot, character and class
 (every attempt loads the same start, so it keeps its slot; the character alone is not enough:
 most enemies share one generic character id). **Amended by ADR 0449 (2026-11-22):** an arrival
-is kept by character, class and arrival turn, since it can take a slot another unit died out of. The reinforcement arrival turns (ADR 0386) are still
+is kept by character, class and arrival turn, since it can take a slot another unit died out of.
+**Amended by ADR 0464 (2026-11-23, #741):** it also keeps each reward tile's earliest closing,
+each owed recruit's earliest departure, and the act we made that loaded an arrival (which then
+stays out of the hold's turns). The reinforcement arrival turns (ADR 0386) are still
 kept and used as before. A dice result is never remembered.
 
 ## 2. How the bot uses it

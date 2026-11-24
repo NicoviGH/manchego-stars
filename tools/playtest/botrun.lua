@@ -18,7 +18,7 @@
 --            change it -- for the planner, a board that comes round again AFTER the planner was
 --            made to change it once (its first repeat: opts.stalled, counted in the record's
 --            `board_repeats`): the hash holds every on-field unit's id, tile and HP, the
---            objective's turns left, and the turns until the next arrival a reinforcements claim cites --
+--            objective's turns left, and the turns until the next remembered arrival (style.arrivals) --
 --            everything Bot.decide reads -- and the game's own turn-event check
 --            (sight.nextTurnEvent) finds no event still to fire. A repeat with an event ahead
 --            waits for that turn. Also `stuck`: M.QUIET_BOUND player phases in a row with no progress
@@ -395,6 +395,23 @@ end
 --                      why = its status, closed_by }. Taken = visited, or a chest whose
 --                      thief the game then made drop that chest's item to a player unit
 --                      (popup.c sets US_DROP_ITEM on the thief), or whose thief joined us
+-- The player acts a chapter's script can answer by loading units (#741): `act` -> the tile the
+-- script is keyed on. A door's is the door itself (bot.lua's openAct sets `door`), a chest's or
+-- a village's the tile the unit stands on.
+M.TRIGGER_ACTS = {
+    door = function(a) return a.door end,
+    chest = function(a) return a.move end,
+    visit = function(a) return a.move end,
+}
+
+-- `a`: our act just made (nil: none) -> { act, x, y }, the trigger an arrival on the board
+-- read right after it is remembered by; nil for an act no script answers.
+function M.triggerOf(a)
+    local at = a and M.TRIGGER_ACTS[a.act] and M.TRIGGER_ACTS[a.act](a)
+    if not at then return nil end
+    return { act = a.act, x = at.x, y = at.y }
+end
+
 function M.exploreLog()
     local log, tiles, order = {}, {}, {}
     local drops, felled = {}, {}
@@ -459,9 +476,12 @@ function M.exploreLog()
         end
         return out
     end
-    function log.closedBy(x, y, charId, loot)
+    -- `phase`: the enemy phase (its turn) the closer took it in; `classId`: the closer's class
+    function log.closedBy(x, y, charId, loot, phase, classId)
         local e = tiles[key(x, y)]
-        if e and not e.by then e.closedBy, e.loot = charId, loot end
+        if e and not e.by then
+            e.closedBy, e.loot, e.closedPhase, e.closerClass = charId, loot, phase, classId
+        end
     end
     function log.dropped(d) drops[#drops + 1] = d end
     function log.fell(charId) felled[charId] = true end
@@ -508,6 +528,11 @@ function M.exploreLog()
             out[#out + 1] = { x = e.x, y = e.y, kind = e.kind, status = status, by = e.by,
                               turn = e.turn or e.closed, offers = e.offers, die = e.die,
                               tried = e.failed, closed_by = e.closedBy,
+                              -- the enemy phase it closed in: the closer's own, else the one
+                              -- before the first player phase that no longer listed it
+                              closed_phase = not e.by and (e.closedPhase
+                                  or (e.closed and e.closed - 1)) or nil,
+                              closer_class = e.closerClass,
                               won_back = wonBack(e) or nil }
         end
         return out
@@ -840,7 +865,7 @@ function M.run(api)
     -- (sight.objective.gameOver), every charId of another side that fell, every charId a
     -- Talk was offered to, and the turn each green unit was first seen at a phase's start
     local lords, felled, talked, greenSeen = {}, {}, {}, {}
-    -- leftMap: the red units gone from the field that the game did not kill (charId -> true);
+    -- leftMap: the red units gone from the field that the game did not kill (charId -> { boardTurn, x, y });
     -- lordFell: the game killed a unit whose death ends it (Bot.gameOver). The game-over event
     -- runs only once the death quote and the act are over, so its screen is not up yet
     local leftMap, lordFell = {}, false
@@ -911,6 +936,8 @@ function M.run(api)
     -- Then the arrivals the chapter's own turn events script (sight.scriptedUnits, #724: a unit a
     -- script loads, read off the ROM's bytes), for an owed unit no remembered arrival covers: an
     -- arrival actually seen wins, and attempt 1 has the scripted ones before any game saw them.
+    -- the characters that arrived on the board this attempt (stamp's arrivals), never cleared
+    local cameChars = {}
     local function pendingRecruits(sight)
         local out, owedSet, have = {}, {}, {}
         local arrivals = style.memory and style.memory.arrivals or {}
@@ -920,8 +947,12 @@ function M.run(api)
             error("style.memory.arrivals was given to a run whose api has no recruits()")
         end
         for _, c in ipairs(owed or {}) do owedSet[c] = true end
+        -- one that has come this attempt is a goal on the board, or gone: never pending again
+        -- (an arrival our act loaded has no turn to end it, #741)
         for _, a in ipairs(arrivals) do
-            if owedSet[a.charId] then out[#out + 1], have[a.charId] = a, true end
+            if owedSet[a.charId] and not cameChars[a.charId] then
+                out[#out + 1], have[a.charId] = a, true
+            end
         end
         -- nothing owed (or not known): no scan of the chapter's scripts is asked
         if next(owedSet) and sight and sight.scriptedUnits then
@@ -1051,6 +1082,10 @@ function M.run(api)
         end
     end
     local lastBoard, actedIn
+    -- our act whose board stamp() is reading now (nil on any other board): an arrival that first
+    -- stands on the board right after our door, chest or visit is that act's effect (#741), where
+    -- a turn event's lands on the phase's first board, before any act we make
+    local actNow
     -- every red unit a board showed out of fog this attempt, slot -> charId: the planner's
     -- strongest enemy seen so far, for its fog rule (Planner.plan's opts.seen, #510 PR A): the
     -- slot's current unit. What a retry may remember (rec.enemies_seen, ADR 0399) is every unit a
@@ -1078,6 +1113,7 @@ function M.run(api)
     local function stamping(id, charId, classId, after)
         local boardTurn = boardTurnOf(after, id)
         arrivedOn[id] = { charId = charId, classId = classId, turn = boardTurn }
+        cameChars[charId] = true
         return arrivedOn[id], boardTurn
     end
     -- an enemy a board or a fight showed, remembered by its whole key. Its arrival is the stamp
@@ -1150,11 +1186,12 @@ function M.run(api)
                                         turn = boardTurn }
                     if e and not u.fogged then
                         -- `turn`: the player phase it arrives on, or the enemy phase's own
-                        -- turn when it acted there
+                        -- turn when it acted there. `by`: our act that loaded it
                         local inPhase = actedIn and actedIn.ids[u.id] and actedIn.turn
                         rec.arrivals_seen[#rec.arrivals_seen + 1] = {
                             turn = inPhase or after.turn or turn, boardTurn = boardTurn,
-                            x = e.x, y = e.y, charId = e.charId }
+                            x = e.x, y = e.y, charId = e.charId, classId = u.classId,
+                            by = M.triggerOf(actNow) }
                     end
                 end
             end
@@ -1265,7 +1302,9 @@ function M.run(api)
                     progressed = progressed or phase == "player"
                     if phase == "player" then markEvent("kill") end
                 elseif not unread[d.id] then
-                    leftMap[d.charId] = true
+                    -- the first player turn it is gone on (the removal's boardTurn, #741)
+                    leftMap[d.charId] = { boardTurn = phase == "player" and turn or turn + 1,
+                                          x = d.x, y = d.y }
                 end
             end
         end
@@ -1349,13 +1388,16 @@ function M.run(api)
         if owed then
             rec.missed_recruits = {}
             for _, c in ipairs(missing) do
-                rec.missed_recruits[#rec.missed_recruits + 1] = { charId = c,
-                    reason = (fellOurs[c] and "died_after_joining")
-                        or (felled[c] and "killed_before_talk")
-                        or (leftMap[c] and "left_map")
-                        or (outcome == "won" and planned and stalledRows["recruit:" .. c] and "stalled")
-                        or (talked[c] and "talk_skipped")
-                        or (planned and "not_reached") or "unknown" }
+                local reason = (fellOurs[c] and "died_after_joining")
+                    or (felled[c] and "killed_before_talk")
+                    or (leftMap[c] and "left_map")
+                    or (outcome == "won" and planned and stalledRows["recruit:" .. c] and "stalled")
+                    or (talked[c] and "talk_skipped")
+                    or (planned and "not_reached") or "unknown"
+                -- a departure's turn and tile: what a retry remembers of it (#741)
+                local left = reason == "left_map" and leftMap[c] or {}
+                rec.missed_recruits[#rec.missed_recruits + 1] = { charId = c, reason = reason,
+                    boardTurn = left.boardTurn, x = left.x, y = left.y }
             end
         end
         rec.missed_rewards = {}
@@ -2041,6 +2083,7 @@ function M.run(api)
                 if lords[action.unit] and from and (from.x ~= to.x or from.y ~= to.y) then
                     progressed = true
                 end
+                actNow = action   -- what stamp() reads on this board, in record() or changes()
                 record(fell, "player", playing, action, nil, after)
                 trace({ t = "act", phase = "player", unit = action.unit, id = action.unitId,
                         from = from and { x = from.x, y = from.y },
@@ -2051,6 +2094,7 @@ function M.run(api)
                         taught = taught or nil,
                         fell = fell, trapped = trapped or nil })
                 changes(after)
+                actNow = nil
                 playerActs = M.actsHash(playerActs, action)
                 -- before any complaint about the act: an act that felled our lord is a loss,
                 -- however it left the board
@@ -2099,7 +2143,8 @@ function M.run(api)
                             if c > (had[id] or 0) then loot = id end
                         end
                     end
-                    explore.closedBy(a.tile.x, a.tile.y, a.charId, loot)
+                    explore.closedBy(a.tile.x, a.tile.y, a.charId, loot, turn,
+                                     b and b.classId)
                 end
                 -- our unit's counter: what it learnt against the plan's read of that strike
                 -- (the committed plan's phase, its strike by this enemy on that unit), read at

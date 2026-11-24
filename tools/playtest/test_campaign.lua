@@ -128,6 +128,8 @@ local function fakeGame(o)
                      deaths = deaths, trace = "t" .. g.attempt,
                      arrivals_seen = (ch.seen or {})[g.attempt] or {},
                      enemies_seen = (ch.enemies or {})[g.attempt] or {},
+                     explore = (ch.explore or {})[g.attempt],
+                     missed_recruits = (ch.missed or {})[g.attempt],
                      clear = { won = won, lost = deaths,
                                recruits_missing = out == "spoiled" and { 0x30 } or {},
                                rewards_missing = {} } }
@@ -874,6 +876,49 @@ local function test_a_retry_remembers_the_arrivals_it_saw()
     check(third.plays[1].style.arrivals, nil, "a pool attempt k has no earlier result to remember")
 end
 test_a_retry_remembers_the_arrivals_it_saw()
+
+-- #741: a retry remembers what earlier attempts lost, not only what arrived.
+--  * an arrival our own act loaded (`by`) is no turn's: it stays out of the hold's turns and is
+--    kept, with its act, in memory.arrivals;
+--  * a reward tile a failed attempt lost is memory.closings["x,y"], the EARLIEST phase;
+--  * an owed recruit that left the map is memory.fates[charId], the earliest turn; one killed is
+--    the play's and is not kept.
+local function test_a_retry_remembers_what_was_lost()
+    local door = { act = "door", x = 22, y = 18 }
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
+        seen = { [1] = { { turn = 2, boardTurn = 2, x = 22, y = 12, charId = 0x1C, classId = 0x37,
+                           by = door },
+                         { turn = 4, boardTurn = 5, x = 7, y = 18, charId = 0x80 } },
+                 [2] = { { turn = 6, boardTurn = 6, x = 22, y = 12, charId = 0x1C, by = door } } },
+        explore = { [1] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
+                              closed_phase = 9, closer_class = 0x0D },
+                            { x = 3, y = 3, kind = "chest", status = "visited", by = 1 } },
+                    [2] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
+                              closed_phase = 4, closer_class = 0x0D } } },
+        missed = { [1] = { { charId = 0x12, reason = "left_map", boardTurn = 8, x = 0, y = 5 },
+                           { charId = 0x1C, reason = "killed_before_talk" } },
+                   [2] = { { charId = 0x12, reason = "left_map", boardTurn = 6, x = 0, y = 4 } } } } } }
+    Campaign.run(g.api)
+    check(table.concat(g.plays[2].style.arrivals[1], ","), "4",
+          "the hold: the turn's arrival only, not the door's")
+    check(table.concat(g.plays[3].style.arrivals[1], ","), "4", "nor the door's on a later turn")
+    local m2, m3 = g.plays[2].style.memory, g.plays[3].style.memory
+    local rennac
+    for _, a in ipairs(m2.arrivals) do if a.charId == 0x1C then rennac = a end end
+    check(rennac and rennac.by and (rennac.by.act .. "@" .. rennac.by.x .. "," .. rennac.by.y),
+          "door@22,18", "the door's arrival keeps its act")
+    check(rennac and rennac.boardTurn, 2, "and its board turn")
+    check(rennac and rennac.classId, 0x37, "and its class")
+    check(m2.closings["11,15"] and m2.closings["11,15"].phase, 9, "attempt 2: attempt 1's closing")
+    check(m2.closings["11,15"].closerClass, 0x0D, "with its closer's class")
+    check(m2.closings["3,3"], nil, "a tile we took is no closing")
+    check(m3.closings["11,15"].phase, 4, "attempt 3: the earliest closing over both")
+    check(m2.fates[0x12] and m2.fates[0x12].boardTurn, 8, "attempt 2: the departure")
+    check(m2.fates[0x1C], nil, "a recruit killed is the play's, not kept")
+    check(m3.fates[0x12].boardTurn .. " " .. m3.fates[0x12].x .. "," .. m3.fates[0x12].y, "6 0,4",
+          "attempt 3: the earliest departure")
+end
+test_a_retry_remembers_what_was_lost()
 
 -- A retry remembers what earlier attempts showed on screen (ADR 0399): every enemy a board
 -- showed out of fog (enemies_seen) and every killer a death showed, each once by slot and

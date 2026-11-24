@@ -44,6 +44,9 @@ the decided bound, not a loose thread.
   close before its turn, so a quiet count of it (nobody can near a tile before the unit comes)
   never marks its row stalled (`goals.lua`'s ledger); the turn bound above is its end.
 
+**Amended by ADR 0464 (2026-11-23, #741):** an arrival our own act loaded (`by`: a door, chest
+or village) has no turn bound; it is a goal until it has come this attempt, and never after.
+
 Attempt 1, and any attempt played alone, has no memory and is unchanged (ADR 0385: verdicts
 measure attempt 1 only).
 

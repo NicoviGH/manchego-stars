@@ -229,6 +229,25 @@ do
     check(by[4].tried, 0x1C, "explore log: by whom")
 end
 
+-- test_explore_log_dates_a_closing (#741): a tile lost is dated by the enemy phase it went in,
+-- what a retry remembers as its deadline: the closer's own phase and class when an enemy act
+-- took it, else the phase before the first player phase that no longer listed it.
+do
+    local log = Botrun.exploreLog()
+    log.open({ { x = 1, y = 1, kind = "visit" }, { x = 2, y = 2, kind = "chest" },
+               { x = 3, y = 3, kind = "visit" } }, 1)
+    log.closedBy(2, 2, 0x82, 0x6B, 4, 0x0D)
+    log.open({ { x = 3, y = 3, kind = "visit" } }, 6)
+    log.visited({ unit = 0x01, move = { x = 3, y = 3 } }, 6)
+    local by = {}
+    for _, e in ipairs(log.summary()) do by[e.x] = e end
+    check(by[2].closed_phase, 4, "closing: the closer's enemy phase")
+    check(by[2].closer_class, 0x0D, "closing: the closer's class")
+    check(by[1].closed_phase, 5, "closing seen gone on turn 6: enemy phase 5")
+    check(by[1].closer_class, nil, "closing: no closer seen, no class")
+    check(by[3].closed_phase, nil, "ours: no closing")
+end
+
 -- test_explore_left_open: a tile still open at the last player phase that a unit could use
 -- (the game's own check, read then) and that was never explored is a bot fault; one nobody
 -- could use any more (a chest with no opener left, a village destroyed) is not.
@@ -829,6 +848,39 @@ do
     check(a.turn, 2, "the player phase whose board first showed it")
     check(a.x .. "," .. a.y, "9,9", "and its tile")
     check(b.turn, 1, "one that acted in the enemy phase it landed in: that phase's turn")
+end
+
+-- test_an_arrival_our_act_loaded_names_the_act (#741): a unit that first stands on the board
+-- right after our Visit is that act's effect (`by`: the act and its tile); one a turn event
+-- loads at the phase's start is a turn's, with no `by`. A retry holds the march only for those.
+-- The bot's first act is made a Visit where it ends (the fake prices no village): the record
+-- reads the act the run made, whatever chose it.
+do
+    local g = fakeGame {
+        units = standoff(),
+        enemy = function(g)
+            if g.turn == 1 then g.units[#g.units + 1] = unit(0x86, 4, "red", 9, 7, 10) end
+            return {}
+        end,
+    }
+    local act, first = g.api.act, true
+    g.api.act = function(a)
+        local visit = first
+        first = false
+        if visit then a.act = "visit" end
+        local done = act(a)
+        if visit then g.units[#g.units + 1] = unit(0x85, 3, "red", 8, 9, 10) end
+        return done
+    end
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    local byChar = {}
+    for _, a in ipairs(r.arrivals_seen) do byChar[a.charId] = a end
+    local v = byChar[0x85] or {}
+    check(v.by and v.by.act, "visit", "loaded by our visit: the act")
+    check(v.by and (v.by.x .. "," .. v.by.y), "3,0", "and its tile")
+    check(byChar[0x86] ~= nil, true, "the turn's arrival is seen")
+    check((byChar[0x86] or {}).by, nil, "a turn event's arrival names no act")
 end
 
 -- test_enemies_seen_lists_every_red_out_of_fog (ADR 0399): what a retry may remember of the
@@ -2068,6 +2120,37 @@ do
           "48@9,9 t5", "pending: its tile and turn")
 end
 
+-- #741: an owed recruit a retry saw our act load (`by`) has no turn to end its goal, so once it
+-- has come this attempt it is never pending again, gone or not.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 5, 5, 10) },
+                         recruits = { 0x30 },
+                         enemy = function(g)
+                             if g.turn == 1 then g.units[#g.units + 1] = unit(0x30, 2, "red", 9, 9, 10) end
+                             if g.turn == 2 then table.remove(g.units, #g.units) end
+                             return {}
+                         end }
+    g.api.style.memory = { enemies = {}, arrivals = {
+        { charId = 0x30, x = 9, y = 9, turn = 4, by = { act = "door", x = 7, y = 7 } } } }
+    local pending = {}
+    g.api.Planner = {
+        surprise = function() return "the plan is played out" end,
+        plan = function(_, board, _, _, opts)
+            if pending[board.turn] == nil then pending[board.turn] = #(opts.pending or {}) end
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            local a = { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 0, y = 0 } }
+            return a, { acts = { a }, expect = { { hp = 20 } }, enemies = { [0x81] = true } }
+        end,
+    }
+    g.turnsLeft = 4
+    Botrun.run(g.api)
+    check(pending[1], 1, "before it comes: pending")
+    check(pending[2], 0, "on the board: no longer pending")
+    check(pending[3], 0, "gone again: never pending again")
+end
+
 -- #713 fix 3 (review of PR #740): the arrivals are built at the phase start of a fog chapter
 -- even when the fog hides nothing then; a plan that moves a unit away hides tiles, and its fog
 -- read would build them inside the plan's sandbox (sight.arrivalUnits refuses that).
@@ -2927,6 +3010,11 @@ do
     for _, m in ipairs(r.missed_recruits) do why[m.charId] = m.reason end
     check(why[0x30], "left_map", "a recruit a script removed: left the map")
     check(why[0x33], "killed_before_talk", "a recruit the game killed: killed before the Talk")
+    -- what a retry remembers of the departure (#741): gone in enemy phase 1, so from turn 2
+    local left = {}
+    for _, m in ipairs(r.missed_recruits) do left[m.charId] = m end
+    check(left[0x30].boardTurn, 2, "left the map: the first player turn it is gone on")
+    check(left[0x33].boardTurn, nil, "killed: no departure turn")
     check(r.clean, false, "a recruit that left: the clear is not clean")
     -- a slot the watch could not read neither fell nor left
     units = rout()

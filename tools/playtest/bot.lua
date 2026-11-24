@@ -100,13 +100,13 @@
 -- kill, then the likeliest kill (the hit rate once per blow it needs), then the most expected
 -- damage, then the boss, then the lowest HP -- else march toward the objective (its tile, the
 -- boss, or the nearest enemy) over allowed tiles. With none allowed, or nothing to march to
--- (survive, or a reinforcements hold), it ends where the worst case is smallest, its own tile
+-- (survive, or an arrival hold), it ends where the worst case is smallest, its own tile
 -- first on a tie.
 --
 -- ── Claims: Bot.CLAIM_BEHAVIOURS[kind](claim, style) -> a NEW style (the given one is kept) ──
 -- A claim reaches the bot RESOLVED by the runner, which reads the Strategy YAML (the kinds are
 -- tools/strategy.py's): { id, kind, unit = {charIds}, vs = {classIds}|"boss"|"all",
--- tile = terrain id, turns = {arrival turns} }, each kind with the fields it uses. The bot
+-- tile = terrain id }, each kind with the fields it uses. The bot
 -- maps no name: every unit, class and turn must be an integer, and a claim missing a field
 -- its kind needs, or holding a name, raises naming its id (one with no string id or kind
 -- raises before dispatch).
@@ -122,11 +122,6 @@
 --   terrain {tile, vs}: the march keeps to allowed tiles of that terrain that an enemy `vs`
 --                       names reaches, when any is in reach -- it holds the tile AGAINST them;
 --                       a unit out of their reach marches on. Needs sight.terrain.
---   reinforcements {turns}: on the turn before any of `turns` the march holds (the no-goal
---                       rule above); attacks are still made. Reads board.turn (Board.read's),
---                       and decide raises when it is missing.
---                       Its `waves` (who arrives where: campaign_env) go to style.waves, which
---                       the goals read for when a looter reaches a village (sight.closings).
 --   reward {item, needs}: an end-of-chapter reward the game gives when every goal `needs`
 --                       names is taken (villages, chests or tiles): style.rewards, which the
 --                       goals share out over those goals.
@@ -2320,7 +2315,8 @@ end
 -- under the id "arrival:<charId>", from the turn it is read on until the first player turn it
 -- stood on the board (boardTurn: T+1 after an enemy-phase arrival of turn T, T itself for a
 -- start-of-turn one; a record without it reads turn + 1): a unit not there by then is not coming
--- this attempt, and its goal is none after. Its talkers are the units the game's own check (mayTalkOver) lets
+-- this attempt, and its goal is none after. One our own act loaded (`by`: a door, chest or
+-- village, #741) has no such turn: it is a goal until it comes. Its talkers are the units the game's own check (mayTalkOver) lets
 -- Talk its charId -- that check reads the two charIds and the event flags, never the unit. The
 -- goal is the tile a talker can reach nearest to where it arrived (meetingTile), none when no
 -- talker reaches anywhere.
@@ -2359,7 +2355,9 @@ local function recruitsOf(ctx)
     for _, t in ipairs(ctx.onField) do here[t.charId] = true end
     for id, t in pairs(ctx.carried or {}) do here[t.charId] = true end
     for _, p in ipairs(ctx.pending or {}) do
-        if not here[p.charId] and (ctx.turn or 0) < (p.boardTurn or p.turn + 1) then
+        -- one our own act loaded (`by`, #741) comes when we act, on no turn: botrun drops it
+        -- once it has come this attempt
+        if not here[p.charId] and (p.by or (ctx.turn or 0) < (p.boardTurn or p.turn + 1)) then
             local t = { id = "arrival:" .. p.charId, charId = p.charId, faction = "red", x = p.x,
                         y = p.y }
             local by = {}
@@ -2470,8 +2468,9 @@ local function onTerrain(ctx, tiles)
     return tiles
 end
 
--- The turns from `turn` to the next arrival `arrivals` (a style's reinforcements claims) cites,
--- or nil when none is left. botrun hashes it too: it is part of what decide reads.
+-- The turns from `turn` to the next arrival `arrivals` (style.arrivals: the turns a retry saw
+-- waves arrive on, campaign.lua) cites, or nil when none is left. botrun hashes it too: it is
+-- part of what decide reads.
 function M.nextArrival(arrivals, turn)
     local best
     for _, turns in ipairs(arrivals or {}) do
@@ -2482,8 +2481,8 @@ function M.nextArrival(arrivals, turn)
     return best and best - turn or nil
 end
 
--- A reinforcements claim: the turn before any cited arrival, the march holds. The turn is
--- board.turn (decide has checked it is there).
+-- A remembered arrival: the turn before it, the march holds (the no-goal rule above); attacks
+-- are still made. The turn is board.turn (decide has checked it is there).
 local function holding(ctx) return M.nextArrival(ctx.style.arrivals, ctx.turn) == 1 end
 
 local function march(ctx, u, gate, objective)
@@ -2721,7 +2720,7 @@ function M.decide(board, sight, style, opts)
     end
     local arrivals = style.arrivals
     if arrivals and #arrivals > 0 and board.turn == nil then
-        error("bot.lua: a reinforcements claim needs board.turn")
+        error("bot.lua: a remembered arrival (style.arrivals) needs board.turn")
     end
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
@@ -3655,13 +3654,6 @@ M.CLAIM_BEHAVIOURS = {
     terrain = function(claim, style)
         if not isInteger(claim.tile) then malformed(claim, "needs tile = a terrain id") end
         return withEntry(style, "terrains", { tile = claim.tile, vs = needVs(claim) })
-    end,
-    reinforcements = function(claim, style)
-        local out = withEntry(style, "arrivals", needIds(claim, "turns", "{arrival turns}"))
-        -- the waves themselves (campaign_env: who arrives where), for the goals' closings
-        out.waves = copyList(style.waves)
-        for _, w in ipairs(claim.waves or {}) do out.waves[#out.waves + 1] = w end
-        return out
     end,
     -- an end-of-chapter reward (the game gives `item` when every goal `needs` names is taken)
     reward = function(claim, style)

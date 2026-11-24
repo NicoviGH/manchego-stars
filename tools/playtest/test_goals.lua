@@ -509,6 +509,36 @@ do
     check(owedOnly and owedOnly.closes, nil, "scripted removal: another recruit's owed does not close this one")
 end
 
+-- #741: what a retry remembers it lost is a deadline like the game's own. A tile an earlier
+-- attempt lost in enemy phase 10 (style.memory.closings), read on turn 8, closes after phase 3
+-- (this turn's is 1); a later simulated date gives way, an earlier one stays, one past is none.
+-- A recruit that left the map from turn 12 (memory.fates) is a removal as a script's is.
+do
+    local board = { units = { blue(1, 0, 0) }, turn = 8 }
+    local open = { { x = 4, y = 4, kind = "visit" } }
+    local function closes(remembered, simulated)
+        local sight = fakeSight({ open = open, closings = simulated })
+        local style = { memory = { closings = { ["4,4"] = remembered } } }
+        local g = find(Goals.list(board, sight, style, { turn = 8 }), "visit:4,4")
+        return g and g.closes
+    end
+    check(closes({ phase = 10 }, nil), 3, "remembered: enemy phase 10 read on turn 8")
+    check(closes({ phase = 10 }, { ["4,4"] = 5 }), 3, "remembered: the earlier wins over the simulated")
+    check(closes({ phase = 10 }, { ["4,4"] = 2 }), 2, "remembered: an earlier simulated stays")
+    check(closes({ phase = 7 }, nil), nil, "remembered: a phase past closes nothing")
+    local ok = pcall(Goals.list, board, fakeSight({ open = open }),
+                     { memory = { closings = { ["4,4"] = { phase = 10 } } } }, {})
+    check(ok, false, "remembered: no ctx.turn raises")
+    local rb = { units = { blue(1, 0, 0), { id = 0x85, charId = 0x12, x = 5, y = 5, faction = "green",
+                                           onField = true, items = {} } }, turn = 8 }
+    local sight = fakeSight({})
+    sight.scriptedUnits = function() return { arrivals = {}, removals = {} } end
+    local g = find(Goals.list(rb, sight, { memory = { fates = { [0x12] = { boardTurn = 12 } } } },
+                              { turn = 8, recruitTalkers = { [0x85] = { 1 } },
+                                owedRecruits = { [0x12] = true } }), "recruit:133")
+    check(g and g.closes, 4, "remembered departure: turn 12 read on turn 8, as a script's removal")
+end
+
 -- An on-field recruit the game's AI takes out of unreachable ground (#724: Ch13's Cormag at (2,13) in
 -- the peaks, no tile beside him reachable): his replayed path to a tile a talker reaches is a chance,
 -- the control whose path never leaves the peaks stays 0 and so holds no win.
