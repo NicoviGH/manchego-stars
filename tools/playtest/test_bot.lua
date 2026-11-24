@@ -581,6 +581,7 @@ local function sightOf(o)
     end
     s.odds = Sight.odds
     s.jointAt = Sight.jointAt
+    s.likeliestLeft = Sight.likeliestLeft
     s.splitFloor = Sight.SPLIT_FLOOR
     -- each strike played on its target at the HP the plan gives it; the lookahead's second
     -- phase (o.nextPhase, sight.nextPhase) also says each unit's HP when it begins, the plan's
@@ -4862,12 +4863,13 @@ do
           "counter ways: the attack reads the miss's chance, the way the counter kills by F")
 end
 
--- test_a_counter_that_kills_is_not_undone_by_a_later_heal (PR #585 review): A (12 HP)
--- strikes E (9 HP); a miss lets E's 12-damage counter kill A, then H's staff gives A 10. The
--- heal comes after the death: the way the counter kills plays the phase without A, never with
--- A standing on what the heal gives back.
+-- test_a_counter_that_kills_is_not_undone_by_a_later_heal (PR #585 review): A (12 of 20 HP: the
+-- counter leaves A whole or dead, so a heal is worth giving, ADR 0463) strikes E (9 HP); a miss
+-- lets E's 12-damage counter kill A, then H's staff gives A 10. The heal comes after the death: the
+-- way the counter kills plays the phase without A, never with A standing on what the heal gives
+-- back.
 do
-    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 20 })
     local H = blue(0x02, 1, 0, 1, { minRange = false })
     local E = red(0x81, 1, 0, { hp = 9 })
     local seen = {}
@@ -4903,7 +4905,7 @@ end
 -- none. A's death in the attack-then-heal plan is the miss's chance once, never the phase's
 -- again on an HP the heal gave a dead unit.
 do
-    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 12 })
+    local A = blue(0x01, 0, 0, 0, { hp = 12, maxhp = 20 })
     local H = blue(0x02, 1, 0, 1, { minRange = false })
     local E = red(0x81, 1, 0, { hp = 9 })
     local o = {
@@ -4936,6 +4938,34 @@ do
     local miss = 1 - Sight.rollChance(2, 60)
     check(die and math.abs(die - miss) < 1e-9, true,
           "averaged counter: A dies on the miss alone (" .. tostring(die) .. " vs " .. miss .. ")")
+end
+
+-- test_a_counter_leaves_its_attacker_at_the_likeliest_hp (ADR 0463): A (30 of 40 HP) strikes E,
+-- whose counter rarely hits (20 shown, two rolls) for 10. With the counter not split (BRANCH =
+-- 0), the phase meets A at 30, the likeliest (the miss), never the mean's lower HP.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 30, maxhp = 40 })
+    local E = red(0x81, 1, 0, { hp = 40 })
+    local seen = {}
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 5, hits = 1, counters = true,
+                                                   counterHit = 20, counterDmg = 10,
+                                                   counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.slot then seen[#seen + 1] = b.hp end
+            end
+            return {}
+        end,
+    }
+    local saved = Planner.BRANCH
+    Planner.BRANCH = 0
+    pcall(Planner.plan, B, boardOf(A, E), sightOf(o), style("bold"))
+    Planner.BRANCH = saved
+    local all30, got = #seen > 0, table.concat(seen, ",")
+    for _, hp in ipairs(seen) do all30 = all30 and hp == 30 end
+    check(all30, true, "likeliest counter: the phase meets the attacker at 30 (" .. got .. ")")
 end
 
 -- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field toward a
@@ -7506,10 +7536,10 @@ do
     check(attacks, false, "planner: a kill that may free a striker on the lord is played both ways")
 end
 
--- test_planner_composes_a_targets_blows_before_branching: A and C each hit E (20 HP) for 10 at
--- 50%. Together they kill it a quarter of the time (both land), and when it lives it keeps
--- 13 HP on average ((0 x 1/4 + 10 x 1/2) / (3/4) taken). Read one blow at a time, at the HP
--- the first leaves on average (15), neither kills and the judge never plays E dead.
+-- test_planner_composes_a_targets_blows_before_branching: A and C each hit E (20 HP) for 10 at 50%.
+-- Together they kill it a quarter of the time (both land), and when it lives it keeps 10 HP, its
+-- likeliest (one lands, 1/2; ADR 0463), never the mean's 13. Read one blow at a time, at the HP the
+-- first leaves on average (15), neither kills and the judge never plays E dead.
 do
     local A = blue(0x01, 0, 0, 0)
     local C = blue(0x02, 1, 2, 1)
@@ -7531,15 +7561,15 @@ do
         end,
     }
     Planner.plan(B, boardOf(A, C, E), sightOf(o), style("bold"))
-    check(tostring(seen.dead) .. " " .. tostring(seen["13"]), "true true",
-          "planner: two blows on one target are played dead and alive at 13 HP")
+    check(tostring(seen.dead) .. " " .. tostring(seen["10"]), "true true",
+          "planner: two blows on one target are played dead and alive at 10 HP")
 end
 
--- test_planner_plays_a_lone_blows_joint_ways (pins Sight.jointAt's planner read, #743 fold):
--- A alone strikes E (10 HP) with two blows of 6 at 50%: E dies a quarter of the time (both
--- land), and alive it keeps (10 x 1/4 + 4 x 1/2) / (3/4) = 6 HP, read off the exchange's own
--- pairs. A counters, so the target's exchange is the planner's own (the joint's ways). The judged
--- phase is played dead and alive at 6.
+-- test_planner_plays_a_lone_blows_joint_ways (pins Sight.jointAt's planner read, #743 fold): A
+-- alone strikes E (10 HP) with two blows of 6 at 50%: E dies a quarter of the time (both land), and
+-- alive it keeps 4 HP, its likeliest (one lands, 1/2; ADR 0463; the mean's 6), read off the
+-- exchange's own pairs. A counters, so the target's exchange is the planner's own (the joint's
+-- ways). The judged phase is played dead and alive at 4.
 do
     local A = blue(0x01, 0, 0, 0)
     local E = red(0x81, 1, 0, { minRange = false, hp = 10 })
@@ -7557,8 +7587,8 @@ do
         end,
     }
     Planner.plan(B, boardOf(A, E), sightOf(o), style("bold"))
-    check(tostring(seen.dead) .. " " .. tostring(seen["6"]), "true true",
-          "planner: a lone blow's joint is played dead and alive at 6 HP")
+    check(tostring(seen.dead) .. " " .. tostring(seen["4"]), "true true",
+          "planner: a lone blow's joint is played dead and alive at 4 HP")
 end
 
 -- test_planner_prices_a_game_over_greens_death_as_the_chapter: as the green test above, in

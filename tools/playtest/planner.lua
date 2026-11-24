@@ -50,7 +50,7 @@
 --      The enemy phase is played both ways where a counter may kill a striker (its tile
 --      freed for the next), while the rarer way is at least sight's SPLIT_FLOOR of the phase
 --      (ADR 0411), and once per way each uncertain kill can go, up to
---      BRANCH of them (an enemy the average keeps may die, one it removes may live), a way
+--      BRANCH of them (an enemy the likeliest way keeps may die, one it removes may live), a way
 --      splitting only while that kill's rarer side is at least the same floor of the whole
 --      plan, and each phase told its way's share so its splits are bounded alike (ADR 0415).
 --      Last, the
@@ -118,7 +118,7 @@
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
--- to the average, opts = { stalled = bool, idle (botrun's quiet reached M.GOAL_QUIET), sent,
+-- to the likeliest way, opts = { stalled = bool, idle (botrun's quiet reached M.GOAL_QUIET), sent,
 -- tried, explored (all Bot.candidates'), quietGoals = the ledger ids
 -- no unit has neared for M.GOAL_QUIET readings (botrun's rule 1, ADR 0403) } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
@@ -137,7 +137,7 @@
 -- act, slot, x, y, target }; #730),
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
--- uncertain kills left to the average past BRANCH), unsplit (the counter kills those phases
+-- uncertain kills left to the likeliest way past BRANCH), unsplit (the counter kills those phases
 -- left unsplit below sight's SPLIT_FLOOR, summed over them), area_positional and area_truncated
 -- (the CHAI_AT commands, #727, and the walks the budget cut short in the Misc scripts the plans'
 -- waits ran, which the judged phase did not play: M.areaWake), floored (the ways of the plan's
@@ -181,7 +181,7 @@ M.MEND_ROUNDS = 3  -- the mend's rounds; past the first, only while no plan is u
 -- likely kill gone (FR-009). Even an enemy that reaches no one is played both ways: its death
 -- can free a tile for one that does (test_planner_plays_an_uncertain_kill_both_ways). This
 -- many at most, so a board of uncertain kills cannot cost thousands of phases a plan: past
--- it, the most uncertain are branched and the plan records how many it left to the average
+-- it, the most uncertain are branched and the plan records how many it left to the likeliest way
 -- (`averaged`). ADR 0384 has the cost.
 M.BRANCH = 8
 M.AUDIT_WAYS = 4  -- the judged phase's ways whose chances a plan's audit record keeps
@@ -450,7 +450,7 @@ end
 
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
 -- already counted gone). Returns the score and the act's effects on the plan.
-local function score(act, st, W, style, odds)
+local function score(act, st, W, style, odds, likeliest)
     -- the HP the plan has left its unit so far: a heal earlier in the plan stays (from the start
     -- board's, a staff heal before its target's wait was undone; ADR 0408). An attack's own HP
     -- is set below, on the HP it fought at (the counter's ways add the plan's heals back)
@@ -493,10 +493,12 @@ local function score(act, st, W, style, odds)
             -- the counter's risk is its chance to kill (a target dead before it answers takes
             -- nothing: the game's play of the exchange); the HP it takes is paid once, at the
             -- end, after any heal the plan gives back (the judge's deficit)
-            local die, taken = odds({ f.counterDist }, act.unitHp)
+            local die = odds({ f.counterDist }, act.unitHp)
             fx.die = die
             v = v - loss(W, st, act.unit) * die
-            fx.hp = math.max(1, act.unitHp - math.floor(taken + 0.5))
+            -- the HP the board is left at: the likeliest the counter leaves it alive at (ADR
+            -- 0463), never the mean, an HP the game cannot produce
+            fx.hp = likeliest({ f.counterDist }, act.unitHp) or 1
             -- the judge chains it with the enemy phase's strikes, so a counter that lands is
             -- not averaged away
             fx.counter = { f.counterDist }
@@ -894,6 +896,7 @@ function M.plan(Bot, board, sight, style, opts)
     local cap = M.CAPS[style.aggression]
     if not cap then error("planner.lua: no risk cap for style " .. tostring(style.aggression)) end
     local odds = sight.odds
+    local likeliest = sight.likeliestLeft
     -- sight's split floor, one bound for the whole judged plan (ADR 0415)
     local floor = assert(sight.splitFloor, "planner.lua: the sight gives no splitFloor")
     -- opts.offer: the acts read on another board (a full-information replay's: the fogged
@@ -1279,7 +1282,7 @@ function M.plan(Bot, board, sight, style, opts)
     local function readied(b)
         if not b.unitHp then
             annotate(b, byId[b.unitId])
-            b.die = select(2, score(b, start, W, style, odds)).die or 0
+            b.die = select(2, score(b, start, W, style, odds, likeliest)).die or 0
         end
         return b
     end
@@ -1305,7 +1308,7 @@ function M.plan(Bot, board, sight, style, opts)
                                               y = a.move.y, kind = a.act,
                                               die = (exposed(a, a.unitHp, {}, odds)) }
                 end
-                local v, fx = score(a, start, W, style, odds)
+                local v, fx = score(a, start, W, style, odds, likeliest)
                 -- the counter's chance to kill the attacker, for the record (botrun's `predicted`
                 -- on a player-phase death): every attack act passes through here, mends included
                 if a.act == "attack" then a.die = fx.die or 0 end
@@ -1526,7 +1529,7 @@ function M.plan(Bot, board, sight, style, opts)
                     or st.tiles[a.dropAt.x .. "," .. a.dropAt.y])) then
             return nil
         end
-        local v, fx = score(a, st, W, style, odds)
+        local v, fx = score(a, st, W, style, odds, likeliest)
         if fx.blocked then return nil end
         local n = { base = st.base + v, acts = copy(st.acts), expect = copy(st.expect),
                     used = copy(st.used), tiles = copy(st.tiles), gone = copy(st.gone),
@@ -1829,7 +1832,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- `fog`) and orders the best plan's acts (below).
     local fogDie = (offer and Bot.fogRead(board, sight, opts and opts.seen) or ctx.fogRead()).die
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
-    -- uncertain kills left to the average past BRANCH (never silent)
+    -- uncertain kills left to the likeliest way past BRANCH (never silent)
     local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
                    area_positional = 0, area_truncated = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
@@ -1920,7 +1923,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, fought?,
     -- heal? }): per id { d (its chance to die), t (HP taken), sh (HP short at the end, when
     -- maxhp is given), n (strikes) }, and the chance no unit whose death ends the game dies. A
-    -- unit with `back` (our counter's blows on it, from the plan's attack, left to the average)
+    -- unit with `back` (our counter's blows on it, from the plan's attack, left to the likeliest
+    -- way)
     -- plays each way the counter goes: on `fought`, the HP it struck at, a counter that kills
     -- it is score()'s death and never the phase's; one that leaves it standing leaves it on
     -- that HP plus `heal`, what the plan heals it by after, and the phase strikes it there
@@ -1972,19 +1976,23 @@ function M.plan(Bot, board, sight, style, opts)
                                       wearSlot = w and w.slot, wear = w and w.uses }
         end
         local reds = {}
-        for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
-        -- each uncertain kill, and each counter that can leave its attacker on more than one
-        -- HP, played every way it goes: the average (an enemy gone at a kill >= M.GONE, else
-        -- standing at its mean HP; our attacker on its mean HP after the counter) hides the
-        -- way the rolls go otherwise. Vanilla Ch5 turn 5: Eirika's attack killed an enemy the
-        -- plan kept standing, and Joshua's AI turned on her. Manchego Stars ch03 (T100b): Wolfram's
-        -- attack missed, the counter left him on 3 HP, and the AI that had passed him by at
-        -- his mean HP killed him. A unit whose blow is the only one on its target plays the
-        -- exchange's own pairs (sight's `joint`), so a counter is played only where our blow
-        -- did not kill first; any other counter is played on its own spread. The most uncertain
-        -- are played first, BRANCH of them at most; one that would take the ways past
-        -- 2^BRANCH keeps the average and a narrower one after it is still played. Each left to
-        -- the average is counted (`averaged`) so it is never silent.
+        -- the board the phase meets: each red the plan struck at the likeliest HP all its
+        -- blows together leave it alive at (ADR 0463), never the mean st.enemyHp scores by
+        for id in pairs(st.enemyHp) do
+            reds[id] = likeliest(st.kill[id] or {}, byId[id].hp) or 1
+        end
+        -- each uncertain kill, and each counter that can leave its attacker on more than one HP,
+        -- played every way it goes: one way alone (an enemy gone at a kill >= M.GONE, else standing
+        -- at its likeliest HP; our attacker at its likeliest HP after the counter) hides the way
+        -- the rolls go otherwise. Vanilla Ch5 turn 5: Eirika's attack killed an enemy the plan kept
+        -- standing, and Joshua's AI turned on her. Manchego Stars ch03 (T100b): Wolfram's attack
+        -- missed, the counter left him on 3 HP, and the AI that had passed him by at his mean HP
+        -- killed him. A unit whose blow is the only one on its target plays the exchange's own
+        -- pairs (sight's `joint`), so a counter is played only where our blow did not kill first;
+        -- any other counter is played on its own spread. The most uncertain are played first,
+        -- BRANCH of them at most; one that would take the ways past 2^BRANCH keeps its likeliest
+        -- HP and a narrower one after it is still played. Each left unsplit is counted (`averaged`)
+        -- so it is never silent.
         local dims, gone = {}, copy(st.gone)
         local only = {}   -- target id -> the unit whose blow is the plan's only one on it
         for uid, x in pairs(st.fought) do
@@ -1996,10 +2004,10 @@ function M.plan(Bot, board, sight, style, opts)
         for id, blows in pairs(st.kill) do
             -- the plan's blows on it together, at its own HP: each blow alone was scored at the
             -- HP the earlier ones leave on average, which can call a sure kill short. Gone or
-            -- standing by that composed chance; `left`, the HP it keeps when it lives (the
-            -- damage is capped at its HP, so the dead share is hp * p)
+            -- standing by that composed chance; `left`, the HP it keeps when it lives, at the
+            -- likeliest outcome (ADR 0463)
             local hp = byId[id].hp
-            local p, mean = odds(blows, hp)
+            local p = odds(blows, hp)
             gone[id] = p >= M.GONE or nil
             local uid = only[id]
             if p > 0 and p < 1 and uid then
@@ -2010,7 +2018,7 @@ function M.plan(Bot, board, sight, style, opts)
             elseif p > 0 and p < 1 then
                 dims[#dims + 1] = { id = id, key = "k" .. id, ways = {
                     { p = p, dead = true },
-                    { p = 1 - p, dead = false, left = hp - (mean - hp * p) / (1 - p) } } }
+                    { p = 1 - p, dead = false, left = likeliest(blows, hp) } } }
             end
         end
         for uid, x in pairs(st.fought) do
@@ -2032,7 +2040,7 @@ function M.plan(Bot, board, sight, style, opts)
             if x.unsure ~= y.unsure then return x.unsure > y.unsure end
             return x.key < y.key
         end)
-        -- the phase as the average leaves it: what the lookahead plays on (nextPhase)
+        -- the phase as the likeliest way leaves it: what the lookahead plays on (nextPhase)
         -- `list`'s units as way `w` leaves them: one its counter killed gone (that death is
         -- score()'s, never the phase's), one it played the counter on at the HP it left, with
         -- field `clear` dropped (what that HP already holds); `idOf` reads a unit's id
@@ -2093,14 +2101,14 @@ function M.plan(Bot, board, sight, style, opts)
         st.branched, st.floored = 0, 0
         for _, d in ipairs(dims) do
             if st.branched >= M.BRANCH then break end
-            -- a dim too wide for the ways left keeps the average; a narrower one after it is
+            -- a dim too wide for the ways left keeps the likeliest way; a narrower one after it is
             -- still played
             if #ways * #d.ways <= 2 ^ M.BRANCH then
                 local nxt, split = {}, false
                 for _, w in ipairs(ways) do
-                    -- a way splits on this kill only while the chance off its likeliest side is
-                    -- at least sight's floor of the whole plan (ADR 0415); below it the way keeps
-                    -- the average, as a dim past BRANCH does. A counter's dim of three or more
+                    -- a way splits on this kill only while the chance off its likeliest side is at
+                    -- least sight's floor of the whole plan (ADR 0415); below it the way keeps its
+                    -- likeliest side, as a dim past BRANCH does. A counter's dim of three or more
                     -- ways may still leave one of its ways rarer than the floor: the bound is on
                     -- the chance off the likeliest, and BRANCH bounds the ways
                     if w.p * d.unsure < floor then
@@ -2116,7 +2124,7 @@ function M.plan(Bot, board, sight, style, opts)
                                 n.gone[d.id] = o.dead or nil
                                 if not o.dead then
                                     n.reds = copy(w.reds)
-                                    n.reds[d.id] = math.max(1, math.floor(o.left + 0.5))
+                                    n.reds[d.id] = o.left
                                 end
                             end
                             if o.uid then
@@ -2138,7 +2146,7 @@ function M.plan(Bot, board, sight, style, opts)
                     end
                 end
                 ways = nxt
-                -- a kill every way floored was split nowhere: it is left to the average
+                -- a kill every way floored was split nowhere: it is left to the likeliest way
                 if split then st.branched = st.branched + 1 end
             end
         end
@@ -2856,7 +2864,7 @@ function M.plan(Bot, board, sight, style, opts)
             h.map, h.needs = x.map, x.needs
             annotate(h, u)
             local gain = math.min(h.amount, h.unitMaxHp - (now.hp[h.unitId] or h.unitHp))
-            return score(h, now, W, style, odds) + W.taken * gain > 0 and h or nil
+            return score(h, now, W, style, odds, likeliest) + W.taken * gain > 0 and h or nil
         end)
         st = complete(st)
         -- no heal fitted (none scored, or each lost its tile): no new plan to judge
