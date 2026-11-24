@@ -1933,6 +1933,55 @@ do
           true, "idleMove: the route watcher's replay moves through it")
 end
 
+-- deathDropAt (#739, ADR 0462): a dying carrier sets down whom it carries where the game's own
+-- search puts it; the search's writes to gBmMapUnit (the carrier's and gActiveUnit's cells) are
+-- kept and put back, and so are the 8 proc bytes it borrows. A unit that carries no one asks
+-- nothing. The phase's remove() drops through it, and stageCarry's Drop shares the one drop.
+do
+    local m = fakeMem()
+    local S = { gBmMapUnit = 0x100, gActiveUnit = 0x110, UnitGetDeathDropLocation = 0x0800AAAA }
+    m.w32(0x100, 0x200)
+    for y = 0, 15 do m.w32(0x200 + y * 4, 0x1000 + y * 0x20) end
+    local carrier, striker = 0x3000, 0x3100
+    m.w8(carrier + 0x10, 4); m.w8(carrier + 0x11, 5); m.w8(carrier + 0x1B, 0x41)
+    m.w32(carrier + 0x0C, 1 << 4)
+    m.w8(striker + 0x10, 5); m.w8(striker + 0x11, 5)
+    m.w32(S.gActiveUnit, striker)
+    m.w8(0x1000 + 5 * 0x20 + 4, 0x0B)         -- the carrier on (4,5)
+    m.w8(0x1000 + 5 * 0x20 + 5, 0x86)         -- the striker on (5,5)
+    local scratch = 0x4000
+    m.w32(scratch, 0xAABBCCDD); m.w32(scratch + 4, 0x11223344)
+    local kept, calls = {}, {}
+    local api = { mem = m, Board = { US_RESCUING = 1 << 4, UNIT_RESCUE = 0x1B },
+                  write8 = m.w8, write32 = m.w32,
+                  keep16 = function(a, n) kept[#kept + 1] = string.format("%X:%d", a, n) end }
+    local call = function(fn, args)
+        calls[#calls + 1] = string.format("%X(%X,%d,%d)", fn, args[1], m.u32(args[2]), m.u32(args[3]))
+        -- as bmunit.c: both cells cleared, the drop tile written
+        m.w8(0x1000 + 5 * 0x20 + 4, 0); m.w8(0x1000 + 5 * 0x20 + 5, 0)
+        m.w32(args[2], 3); m.w32(args[3], 6)
+    end
+    local r, x, y = Sight.deathDropAt(api, call, S, scratch, { addr = carrier })
+    check(string.format("%X|%d,%d", r, x, y), "41|3,6", "deathDropAt: the carried unit and the game's tile")
+    check(calls[1], "800AAAA(3000,4,5)", "deathDropAt: the search starts its outputs at the carrier's tile")
+    check(table.concat(kept, ","), "10A4:1,10A4:1", "deathDropAt: both cells kept before the call")
+    check(m.u8(0x1000 + 5 * 0x20 + 4) .. "," .. m.u8(0x1000 + 5 * 0x20 + 5), "11,134",
+          "deathDropAt: the board is as the phase had it")
+    check(string.format("%X,%X", m.u32(scratch), m.u32(scratch + 4)), "AABBCCDD,11223344",
+          "deathDropAt: the proc's bytes are put back")
+    m.w32(carrier + 0x0C, 0)
+    calls = {}
+    check(Sight.deathDropAt(api, call, S, scratch, { addr = carrier }), nil,
+          "deathDropAt: a unit that carries no one sets no one down")
+    check(#calls, 0, "deathDropAt: and asks the game nothing")
+    local at = sightSrc:find("local function remove(e, x, y)", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("\n        end\n", at, true)) or ""
+    check(body:find("M.deathDropAt(", 1, true) ~= nil and body:find("drop(byId[r]", 1, true) ~= nil,
+          true, "deathDropAt: a death in the phase drops the carried unit")
+    local _, drops = sightSrc:gsub("drop%(t, r, c%.x, c%.y%)", "")
+    check(drops, 1, "deathDropAt: the plan's Drop shares the one drop")
+end
+
 -- the closings key reads our units as the AI's targets only for the second look, which runs only
 -- for a watched unit: with one, same tiles and another HP or carrier is another read; with none
 -- (a looters-only chapter), the tiles are all that count.

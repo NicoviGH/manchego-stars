@@ -5230,6 +5230,79 @@ scenarios.staffprobe = function()
         berserksCtl, tostring(replied)))
 end
 
+-- dropprobe (#739): a carrier that dies in the judged enemy phase sets down whom it carries,
+-- where the game's own search puts it (bmunit.c UnitGetDeathDropLocation, as bmmind.c
+-- DropRescueOnDeath does), so the enemies after the death may strike that unit. On the retail
+-- Prologue Seth (charId 2) carries Eirika (charId 1) at 1 HP, stood beside two enemies: in a
+-- way where the first enemy's blow kills him (both enemies' Power and Skill set to 30), the
+-- second must be free to strike Eirika. The
+-- control: Seth at his full HP, so no blow kills him and no enemy reaches the carried Eirika.
+-- PT_VANILLA=1 only; run it with PT_LEAKGUARD=1 (the search writes the unit map).
+scenarios.dropprobe = function()
+    if PLAYTEST_VANILLA ~= "1" then
+        return result("FAIL", "dropprobe reads the retail Prologue")
+    end
+    local sapi, sight = INSPECT.probeMap()
+    if not sapi then return end
+    local board = BOARD.read()
+    local eirika, seth
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.charId == 1 then eirika = u elseif u.charId == 2 then seth = u end
+    end
+    if not (eirika and seth) then return result("FAIL", "no Eirika and Seth on the Prologue") end
+    local reds = {}
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        if e.onField and not e.isBoss then reds[#reds + 1] = e end
+    end
+    table.sort(reds, function(a, b)
+        return BOARD.distance(a.x, a.y, seth.x, seth.y) < BOARD.distance(b.x, b.y, seth.x, seth.y)
+    end)
+    local a, b = reds[1], reds[2]
+    if not (a and b) then return result("FAIL", "fewer than two enemies on the Prologue") end
+    local sx, sy = INSPECT.freeBeside(a)
+    if not sx then return result("FAIL", "no free tile beside the first enemy") end
+    local bx, by = INSPECT.freeBeside({ x = sx, y = sy })
+    if not bx then return result("FAIL", "no free tile beside Seth's for the second enemy") end
+    INSPECT.Sight.standOn(sapi, b, bx, by)
+    -- struct Unit +14 pow, +15 skl: both enemies hit hard and sure, so a blow on Seth at 1 HP
+    -- kills him at a chance the phase splits on
+    for _, e in ipairs({ a, b }) do
+        sapi.write8(e.addr + 0x14, 30)
+        sapi.write8(e.addr + 0x15, 30)
+    end
+    sight.refresh()
+    -- -> the strikes on Eirika over every way, and the ways where an earlier blow killed Seth
+    local function eirikaStruck(hp)
+        local plan = { blues = { { unit = seth, x = sx, y = sy, hp = hp } }, waits = {}, reds = {},
+                       gone = {}, carry = { [eirika.id] = { by = seth.id } } }
+        local out = sight.enemyPhase(plan)
+        local struck, ps = 0, {}
+        for _, o in ipairs(out.outcomes) do
+            local line = {}
+            for _, t in ipairs(o.strikes) do
+                local dist = {}
+                for d, q in pairs(t.takenDist or {}) do dist[#dist + 1] = string.format("%d:%.2f", d, q) end
+                line[#line + 1] = string.format("%x>%x hp%s dies%s dist{%s} joint%s", t.enemy, t.target,
+                    tostring(t.targetHp), tostring(t.dies), table.concat(dist, ","),
+                    tostring(t.joint and #t.joint))
+                if t.target == eirika.id then struck = struck + 1 end
+            end
+            ps[#ps + 1] = string.format("%.3f[%s]", o.p, table.concat(line, " "))
+        end
+        log(string.format("enemyPhase Seth hp %d carrying Eirika: %d ways %s", hp, #out.outcomes,
+            table.concat(ps, " ")))
+        return struck
+    end
+    local struck = eirikaStruck(1)
+    local struckCtl = eirikaStruck(seth.maxhp)
+    log(string.format("dropprobe: enemies %x and %x beside Seth (%x) on (%d,%d); strikes on "
+        .. "Eirika (%x) %d (control %d)", a.id, b.id, seth.id, sx, sy, eirika.id, struck, struckCtl))
+    if struck > 0 and struckCtl == 0 then
+        return result("PASS", "a dying carrier sets down whom it carries in the judged phase")
+    end
+    return result("FAIL", string.format("strikes on Eirika %d, control %d", struck, struckCtl))
+end
+
 -- waitprobe (#730): a wait holding a weapon is played with that weapon equipped. On the retail
 -- Prologue Eirika (charId 1) is handed an Iron Sword (0x01) in her second bag slot, behind the
 -- Rapier, and the bot's api.act waits her where she stands with `slot = 1` (a gentle wait's or a
