@@ -18,8 +18,8 @@
 --            change it -- for the planner, a board that comes round again AFTER the planner was
 --            made to change it once (its first repeat: opts.stalled, counted in the record's
 --            `board_repeats`): the hash holds every on-field unit's id, tile and HP, the
---            objective's turns left, and the turns until the next remembered arrival (style.arrivals) --
---            everything Bot.decide reads -- and the game's own turn-event check
+--            objective's turns left, and the turns until the next remembered arrival
+--            (Bot.nextArrival) -- everything Bot.decide reads -- and the game's own turn-event check
 --            (sight.nextTurnEvent) finds no event still to fire. A repeat with an event ahead
 --            waits for that turn. Also `stuck`: M.QUIET_BOUND player phases in a row with no progress
 --            (an event, or a new low in turns-to-goal: see the progress state in M.run), once the
@@ -218,15 +218,16 @@ function M.matcher(original, ref, Json)
 end
 
 -- What Bot.decide reads at a player phase's start, as one string: who stands where with what
--- HP, the objective's turns left, and the turns until the next claimed arrival.
-function M.boardHash(Bot, board, objective, arrivals)
+-- HP, the objective's turns left, and the turns until the next arrival a retry's `memory`
+-- remembers (Bot.nextArrival).
+function M.boardHash(Bot, board, objective, memory)
     local parts = {}
     for _, u in ipairs(board.units) do
         if u.onField then parts[#parts + 1] = string.format("%d@%d,%d:%d", u.id, u.x, u.y, u.hp) end
     end
     table.sort(parts)
     parts[#parts + 1] = "left=" .. tostring(objective and objective.turnsLeft or "-")
-    parts[#parts + 1] = "arrive=" .. tostring(Bot.nextArrival(arrivals, board.turn) or "-")
+    parts[#parts + 1] = "arrive=" .. tostring(Bot.nextArrival(memory, board.turn) or "-")
     return table.concat(parts, ";")
 end
 
@@ -245,7 +246,7 @@ function M.snapshot(board)
             for _, it in ipairs(u.items or {}) do items[#items + 1] = it.id end
             out[#out + 1] = { id = u.id, charId = u.charId, classId = u.classId,
                               faction = u.faction, x = u.x, y = u.y, hp = u.hp, items = items,
-                              isBoss = u.isBoss or nil }
+                              isBoss = u.isBoss or nil, fogged = u.fogged or nil }
         end
     end
     return out
@@ -946,20 +947,30 @@ function M.run(api)
     -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
     -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
     local owed = nil
-    -- the owed recruits an earlier attempt of this chapter saw arrive (style.memory.arrivals,
+    -- the owed recruits an earlier attempt of this chapter saw arrive (Timeline.arrivals,
     -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
     -- Then the arrivals the chapter's own turn events script (sight.scriptedUnits, #724: a unit a
     -- script loads, read off the ROM's bytes), for an owed unit no remembered arrival covers: an
     -- arrival actually seen wins, and attempt 1 has the scripted ones before any game saw them.
     -- the characters that arrived on the board this attempt (stamp's arrivals), never cleared
     local cameChars = {}
+    -- the first board turn each character and class arrived on this attempt ("charId:classId"
+    -- and "charId" -> turn, stamp's): a loss a retry remembers by a unit the play brought is
+    -- dated from it (Timeline.deadlines' `appeared`, #765)
+    local firstArrival = {}
+    local function appearedOn(charId, classId)
+        return firstArrival[tostring(charId) .. ":" .. tostring(classId)]
+            or (classId == nil and firstArrival[tostring(charId)]) or nil
+    end
+    -- what this attempt shows on screen, read off its own trace (Timeline, #765)
+    local seenLine = Bot.Timeline.recorder()
     local function pendingRecruits(sight)
         local out, owedSet, have = {}, {}, {}
-        local arrivals = style.memory and style.memory.arrivals or {}
+        local arrivals = Bot.Timeline.arrivals(style.memory)
         -- owed is read in changes() before the first decision, from api.recruits: a harness with
         -- no api.recruits cannot tell which arrivals are owed, so a memory it was given is a fault
         if #arrivals > 0 and owed == nil then
-            error("style.memory.arrivals was given to a run whose api has no recruits()")
+            error("a remembered arrival (Timeline.arrivals) was given to a run whose api has no recruits()")
         end
         for _, c in ipairs(owed or {}) do owedSet[c] = true end
         -- one that has come this attempt is a goal on the board, or gone: never pending again
@@ -1006,6 +1017,7 @@ function M.run(api)
     local playerPhases, playerActs = 0, nil   -- rec.player_phases, rec.acts_hash
     local function trace(ev)
         ev.turn = ev.turn or turn
+        seenLine.feed(ev)
         if watch then
             watch.see(ev)
             -- a replay that left its original stops at once: nothing past it is the same attempt
@@ -1129,6 +1141,9 @@ function M.run(api)
         local boardTurn = boardTurnOf(after, id)
         arrivedOn[id] = { charId = charId, classId = classId, turn = boardTurn }
         cameChars[charId] = true
+        for _, k in ipairs({ tostring(charId) .. ":" .. tostring(classId), tostring(charId) }) do
+            firstArrival[k] = math.min(firstArrival[k] or boardTurn, boardTurn)
+        end
         return arrivedOn[id], boardTurn
     end
     -- an enemy a board or a fight showed, remembered by its whole key. Its arrival is the stamp
@@ -1475,6 +1490,13 @@ function M.run(api)
             or "clean"
         rec.instrument = api.info.instrument   -- the bot and suite version (montecarlo.py)
         rec.trace = api.info.trace   -- the trace's file, when the api keeps one
+        -- every red a board or a fight showed, by the key a retry knows it by (Board.memoryKey):
+        -- in the trace's record, which the timeline reads (#765)
+        for _, e in pairs(enemiesSeen) do rec.enemies_seen[#rec.enemies_seen + 1] = e end
+        table.sort(rec.enemies_seen, function(a, b)
+            return Bot.memoryKey(a.id, a.charId, a.classId, a.arrival)
+                < Bot.memoryKey(b.id, b.charId, b.classId, b.arrival)
+        end)
         trace({ t = "end", record = rec })
         if diag then
             -- the replay's one line: never the record, which production reads
@@ -1516,13 +1538,10 @@ function M.run(api)
                 diag.ref, outcome, why))
             return false, why, nil
         end
-        -- every red a board or a fight showed: campaign.lua's memory for the next retry
-        for _, e in pairs(enemiesSeen) do rec.enemies_seen[#rec.enemies_seen + 1] = e end
-        table.sort(rec.enemies_seen, function(a, b)
-            return Bot.memoryKey(a.id, a.charId, a.classId, a.arrival)
-                < Bot.memoryKey(b.id, b.charId, b.classId, b.arrival)
-        end)
         api.emit(M.PREFIX .. Json.encode(rec))
+        -- what this attempt showed, for campaign.lua's retry (Timeline, #765): handed back with
+        -- the record, never printed in its line (the trace holds every event it is read from)
+        rec.timeline = seenLine.result()
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
         return (outcome == "won" or outcome == "lost" or outcome == "stuck") and not rec.strikeChecks,
             why, rec
@@ -1534,7 +1553,7 @@ function M.run(api)
         local sight = api.sight()
         playSight = sight
         -- a retry's memory (ADR 0399): what earlier attempts at this start showed plays as seen
-        if sight.remember then sight.remember(style.memory and style.memory.enemies) end
+        if sight.remember then sight.remember(Bot.Timeline.enemies(style.memory)) end
         -- the units whose death ends the game, as the game says (sight.objective.gameOver)
         trace({ t = "start", info = api.info, style = api.style, bench = api.bench,
                 claims_played = played,
@@ -1654,7 +1673,7 @@ function M.run(api)
                     end
                 end
             end
-            local h = M.boardHash(Bot, board, sight.objective, style.arrivals)
+            local h = M.boardHash(Bot, board, sight.objective, style.memory)
             local stalled = false
             if seen[h] and not (waitUntil and turn < waitUntil) then
                 waitUntil = sight.nextTurnEvent(turn)
@@ -1768,6 +1787,7 @@ function M.run(api)
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(sight),
                                      owedRecruits = owedCharIds(),
+                                     appeared = appearedOn,
                                      budget = { attempt = callsLeft("LOOK_ATTEMPT", "calls"),
                                                 wear = callsLeft("WEAR_ATTEMPT", "wear") },
                                      seen = seenReds,
@@ -1968,7 +1988,8 @@ function M.run(api)
                         end
                         return a
                     end
-                    local a = Bot.decide(board, sight, style, { unpaid = unpaidNow() })
+                    local a = Bot.decide(board, sight, style, { unpaid = unpaidNow(),
+                                                                appeared = appearedOn })
                     trace({ t = "plan", choice = a and actOf(a), policy = style.aggression })
                     return a
                 end

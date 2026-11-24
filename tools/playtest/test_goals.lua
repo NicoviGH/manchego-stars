@@ -3,6 +3,7 @@
 -- Run: lua tools/playtest/test_goals.lua
 local here = (arg[0]:match("(.*/)")) or "./"
 local Goals = dofile(here .. "goals.lua")
+local Fakeline = dofile(here .. "fakeline.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -509,34 +510,60 @@ do
     check(owedOnly and owedOnly.closes, nil, "scripted removal: another recruit's owed does not close this one")
 end
 
--- #741: what a retry remembers it lost is a deadline like the game's own. A tile an earlier
--- attempt lost in enemy phase 10 (style.memory.closings), read on turn 8, closes after phase 3
+-- #741, #765: what a retry remembers it lost is a deadline like the game's own. A tile an earlier
+-- attempt lost in enemy phase 10 (Timeline.deadlines), read on turn 8, closes after phase 3
 -- (this turn's is 1); a later simulated date gives way, an earlier one stays, one past is none.
--- A recruit that left the map from turn 12 (memory.fates) is a removal as a script's is.
+-- A recruit that left the map from turn 12 is a removal as a script's is.
 do
     local board = { units = { blue(1, 0, 0) }, turn = 8 }
     local open = { { x = 4, y = 4, kind = "visit" } }
-    local function closes(remembered, simulated)
+    local function lost(phase) return Fakeline.memory({ closings = { { x = 4, y = 4, phase = phase } } }) end
+    local function closes(memory, simulated, appeared)
         local sight = fakeSight({ open = open, closings = simulated })
-        local style = { memory = { closings = { ["4,4"] = remembered } } }
-        local g = find(Goals.list(board, sight, style, { turn = 8 }), "visit:4,4")
+        local g = find(Goals.list(board, sight, { memory = memory }, { turn = 8, appeared = appeared }),
+                       "visit:4,4")
         return g and g.closes
     end
-    check(closes({ phase = 10 }, nil), 3, "remembered: enemy phase 10 read on turn 8")
-    check(closes({ phase = 10 }, { ["4,4"] = 5 }), 3, "remembered: the earlier wins over the simulated")
-    check(closes({ phase = 10 }, { ["4,4"] = 2 }), 2, "remembered: an earlier simulated stays")
-    check(closes({ phase = 7 }, nil), nil, "remembered: a phase past closes nothing")
-    local ok = pcall(Goals.list, board, fakeSight({ open = open }),
-                     { memory = { closings = { ["4,4"] = { phase = 10 } } } }, {})
+    check(closes(lost(10), nil), 3, "remembered: enemy phase 10 read on turn 8")
+    check(closes(lost(10), { ["4,4"] = 5 }), 3, "remembered: the earlier wins over the simulated")
+    check(closes(lost(10), { ["4,4"] = 2 }), 2, "remembered: an earlier simulated stays")
+    check(closes(lost(7), nil), nil, "remembered: a phase past closes nothing")
+    check(closes(Fakeline.memory({ closings = { { x = 4, y = 4, phase = 12 } } },
+                                 { closings = { { x = 4, y = 4, phase = 10 } } }), nil), 3,
+          "remembered: the earliest over the attempts")
+    local ok = pcall(Goals.list, board, fakeSight({ open = open }), { memory = lost(10) }, {})
     check(ok, false, "remembered: no ctx.turn raises")
+    -- #765: a looter our door loaded (Ch14's) razed the tile 3 phases after it appeared. This
+    -- attempt it appeared on turn 6: the tile goes in enemy phase 9, after phase 2 read on turn
+    -- 8. Before it has appeared, the memory dates nothing (ADR 0464 dropped the loss for good)
+    local door = Fakeline.memory({
+        arrivals = { { charId = 0x80, classId = 63, x = 1, y = 1, turn = 2,
+                       by = { act = "door", x = 2, y = 2 } } },
+        closings = { { x = 4, y = 4, phase = 5, closer = 0x80, closerClass = 63,
+                       closerKey = "a:128:63:2" } } })
+    check(closes(door, nil, function(c, k) return c == 0x80 and k == 63 and 6 or nil end), 2,
+          "brought: dated from its appearance this attempt")
+    check(closes(door, nil, function() return nil end), nil, "brought: not appeared yet, no date")
     local rb = { units = { blue(1, 0, 0), { id = 0x85, charId = 0x12, x = 5, y = 5, faction = "green",
                                            onField = true, items = {} } }, turn = 8 }
     local sight = fakeSight({})
     sight.scriptedUnits = function() return { arrivals = {}, removals = {} } end
-    local g = find(Goals.list(rb, sight, { memory = { fates = { { charId = 0x12, boardTurn = 12 } } } },
-                              { turn = 8, recruitTalkers = { [0x85] = { 1 } },
-                                owedRecruits = { [0x12] = true } }), "recruit:133")
-    check(g and g.closes, 4, "remembered departure: turn 12 read on turn 8, as a script's removal")
+    local function departs(memory, appeared)
+        local g = find(Goals.list(rb, sight, { memory = memory },
+                                  { turn = 8, recruitTalkers = { [0x85] = { 1 } }, appeared = appeared,
+                                    owedRecruits = { [0x12] = true } }), "recruit:133")
+        return g and g.closes
+    end
+    check(departs(Fakeline.memory({ arrivals = { { charId = 0x12, classId = 5, x = 5, y = 5, turn = 3,
+                                                  gone = { how = "left", boardTurn = 12 } } } })), 4,
+          "remembered departure: turn 12 read on turn 8, as a script's removal")
+    -- #765: Ch14's Rennac, loaded by our door on turn 2, gone from turn 11 (9 turns on). This
+    -- attempt he appeared on turn 4: gone from turn 13, 5 turns after turn 8
+    local rennac = Fakeline.memory({ arrivals = { { charId = 0x12, classId = 5, x = 5, y = 5, turn = 2,
+        by = { act = "door", x = 2, y = 2 }, gone = { how = "left", boardTurn = 11 } } } })
+    check(departs(rennac, function(c) return c == 0x12 and 4 or nil end), 5,
+          "brought departure: dated from his appearance this attempt")
+    check(departs(rennac, function() return nil end), nil, "brought departure: not appeared, no date")
 end
 
 -- #741 review: a pending recruit an act loads (`by`) has no turn to pass, so a quiet count of it
@@ -559,7 +586,7 @@ end
 do
     local sight = fakeSight({ open = { { x = 4, y = 4, kind = "visit" } } })
     sight.closings = nil
-    local out = Goals.closings(sight, { memory = { closings = { ["4,4"] = { phase = 10 } } } },
+    local out = Goals.closings(sight, { memory = Fakeline.memory({ closings = { { x = 4, y = 4, phase = 10 } } }) },
                                { turn = 8 })
     check(out["4,4"], 3, "remembered closing kept without sight.closings")
 end

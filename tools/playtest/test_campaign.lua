@@ -36,8 +36,8 @@ end
 -- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"|"timeout"... },
 -- options = n (a route split before it), needs = Bot.team's demands/answers/strength } };
 -- "dead" is a win with a death, "spoiled" a win with a recruit missed. o.route = the
--- campaign's route setting, o.game the game (default "fake"). ch.seen = { [attempt] =
--- arrivals_seen } (the record's reinforcements seen on screen, ADR 0386).
+-- campaign's route setting, o.game the game (default "fake"). Each attempt's record carries a
+-- timeline tagged with its attempt number (`tag`).
 -- o.sealAt = the campaign's promotion level (#639; unset plays 10, so a unit holding a seal
 -- is level 10 or more, as the game's own check needs).
 local function fakeGame(o)
@@ -126,10 +126,9 @@ local function fakeGame(o)
             local won = out == "won" or out == "dead" or out == "spoiled"
             return { outcome = won and "won" or out, clean = out == "won", turns = 4,
                      deaths = deaths, trace = "t" .. g.attempt,
-                     arrivals_seen = (ch.seen or {})[g.attempt] or {},
-                     enemies_seen = (ch.enemies or {})[g.attempt] or {},
-                     explore = (ch.explore or {})[g.attempt],
-                     missed_recruits = (ch.missed or {})[g.attempt],
+                     -- botrun's timeline of the attempt, tagged by its number
+                     timeline = { tag = g.attempt, units = {}, deaths = {}, closings = {},
+                                  items = {} },
                      clear = { won = won, lost = deaths,
                                recruits_missing = out == "spoiled" and { 0x30 } or {},
                                rewards_missing = {} } }
@@ -191,7 +190,7 @@ local function test_one_attempt_alone_is_the_loops_kth()
     -- the loop's attempt 3 also carries its memory (ADR 0399); the style drawn is the same
     local drawn = {}
     for k, v in pairs(seq.plays[3].style) do
-        if k ~= "memory" and k ~= "arrivals" then drawn[k] = v end
+        if k ~= "memory" then drawn[k] = v end
     end
     check(Json.encode(alone.plays[1].style), Json.encode(drawn),
           "attempt 3 alone plays the loop's third style")
@@ -829,176 +828,48 @@ local function test_resume_without_a_carried_team_says_so()
 end
 test_resume_without_a_carried_team_says_so()
 
--- A retry remembers the arrivals it saw (ADR 0386, T061): attempt k >= 2 is given, in
--- style.arrivals, the turns of every earlier failed attempt's arrivals_seen at this start;
--- attempt 1 none; one attempt alone (api.only) none either: the pool's workers share no results.
-local function test_a_retry_remembers_the_arrivals_it_saw()
-    local seen = { [1] = { { turn = 4, x = 9, y = 9, charId = 0x82 } },
-                   [2] = { { turn = 4, x = 8, y = 9, charId = 0x83 },
-                           { turn = 6, x = 9, y = 0, charId = 0x84 } } }
-    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" }, seen = seen } } }
+-- A retry remembers what earlier failed attempts showed (#765, ADR 0467): attempt k >= 2 is
+-- given style.memory = { attempts }, the timelines of attempts 1..k-1 (botrun's rec.timeline),
+-- oldest first, and nothing else; attempt 1 none; one attempt alone (api.only) none either: the
+-- pool's workers share no results. What a reader makes of them is timeline.lua's (its tests).
+local function test_a_retry_is_given_the_earlier_timelines()
+    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" } } } }
     Campaign.run(g.api)
     check(#g.plays, 3, "three attempts")
-    check(g.plays[1].style.arrivals, nil, "attempt 1 remembers nothing")
-    check(table.concat(g.plays[2].style.arrivals[1], ","), "4", "attempt 2: attempt 1's arrival turn")
-    check(#g.plays[2].style.arrivals, 1, "as one list, beside any claim's")
-    check(table.concat(g.plays[3].style.arrivals[1], ","), "4,6",
-          "attempt 3: the union over both failures, each turn once, in order")
+    check(g.plays[1].style.memory, nil, "attempt 1 has no memory")
+    local function tags(m)
+        local out = {}
+        for _, tl in ipairs(m and m.attempts or {}) do out[#out + 1] = tl.tag end
+        return table.concat(out, ",")
+    end
+    check(tags(g.plays[2].style.memory), "1", "attempt 2: attempt 1's timeline")
+    check(tags(g.plays[3].style.memory), "1,2", "attempt 3: both failures', oldest first")
     local keys = {}
     for k in pairs(g.plays[3].style) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "aggression,arrivals,claims,memory,sealAt",
-          "the arrival turns, and the arrivals as memory (ADR 0436)")
-    local m = g.plays[3].style.memory
-    check(#m.enemies, 0, "no enemy was shown, so none remembered (ADR 0399)")
-    local got = {}
-    for _, a in ipairs(m.arrivals) do got[#got + 1] = string.format("%X@%d,%d t%d", a.charId, a.x, a.y, a.turn) end
-    check(table.concat(got, " "), "82@9,9 t4 83@8,9 t4 84@9,0 t6",
-          "attempt 3: each unit seen arrive, its tile and turn (ADR 0436)")
-    check(g.plays[2].style.memory.arrivals[1].charId, 0x82, "attempt 2: attempt 1's arrival")
-    check(g.plays[1].style.memory, nil, "attempt 1 has no memory")
-    -- the same unit seen again by a later failure: the latest sighting replaces the older (ADR 0436)
-    local again = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
-        seen = { [1] = { { turn = 4, x = 9, y = 9, charId = 0x82 } },
-                 [2] = { { turn = 5, x = 7, y = 2, charId = 0x82 } } } } } }
-    Campaign.run(again.api)
-    local latest = again.plays[3].style.memory.arrivals
-    check(#latest, 1, "the same unit seen twice is one memory")
-    check(latest[1].x .. "," .. latest[1].y .. " t" .. latest[1].turn, "7,2 t5",
-          "the latest failed attempt's sighting wins")
-    local alone = fakeGame { chapters = { { id = 1, seen = seen } } }
-    alone.api.only = 1
-    Campaign.run(alone.api)
-    check(alone.plays[1].style.arrivals, nil, "a measured cell (api.only = 1) is untouched")
-    local third = fakeGame { chapters = { { id = 1, seen = seen } } }
-    third.api.only = 3
-    Campaign.run(third.api)
-    check(third.plays[1].style.arrivals, nil, "a pool attempt k has no earlier result to remember")
-end
-test_a_retry_remembers_the_arrivals_it_saw()
-
--- #741: a retry remembers what earlier attempts lost, not only what arrived.
---  * an arrival our own act loaded (`by`), or one no turn event loads (`timed` false), is no
---    turn's: it stays out of the hold's turns; one loaded by our act keeps its act in
---    memory.arrivals;
---  * a loss by a unit the play brought is dated by the play: not kept;
---  * a reward tile a failed attempt lost is memory.closings["x,y"], the EARLIEST phase;
---  * an owed recruit that left the map is memory.fates[charId], the earliest turn; one killed is
---    the play's and is not kept.
-local function test_a_retry_remembers_what_was_lost()
-    local door = { act = "door", x = 22, y = 18 }
-    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
-        seen = { [1] = { { turn = 2, boardTurn = 2, x = 22, y = 12, charId = 0x1C, classId = 0x37,
-                           by = door },
-                         { turn = 4, boardTurn = 5, x = 7, y = 18, charId = 0x80 },
-                         -- a thief's door opened this room: no turn event loads it (botrun's timed)
-                         { turn = 3, boardTurn = 3, x = 22, y = 7, charId = 0x80, timed = false } },
-                 [2] = { { turn = 6, boardTurn = 6, x = 22, y = 12, charId = 0x1C, by = door } } },
-        explore = { [1] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
-                              closed_phase = 9, closer_class = 0x0D },
-                            { x = 3, y = 3, kind = "chest", status = "visited", by = 1 },
-                            { x = 22, y = 5, kind = "chest", status = "closed", closed_by = 0x1C,
-                              closed_phase = 3, closer_class = 0x37 },
-                            -- its class not read: matched by character alone
-                            { x = 22, y = 3, kind = "chest", status = "closed", closed_by = 0x1C,
-                              closed_phase = 4 } },
-                    [2] = { { x = 11, y = 15, kind = "visit", status = "closed", closed_by = 0x81,
-                              closed_phase = 4, closer_class = 0x0D } } },
-        missed = { [1] = { { charId = 0x12, reason = "left_map", boardTurn = 8, x = 0, y = 5 },
-                           { charId = 0x1C, reason = "left_map", boardTurn = 11 },
-                           { charId = 0x13, reason = "killed_before_talk" } },
-                   [2] = { { charId = 0x12, reason = "left_map", boardTurn = 6, x = 0, y = 4 } } } } } }
-    Campaign.run(g.api)
-    check(table.concat(g.plays[2].style.arrivals[1], ","), "4",
-          "the hold: the turn's arrival only, not the door's")
-    check(table.concat(g.plays[3].style.arrivals[1], ","), "4", "nor the door's on a later turn")
-    local m2, m3 = g.plays[2].style.memory, g.plays[3].style.memory
-    local rennac
-    for _, a in ipairs(m2.arrivals) do if a.charId == 0x1C then rennac = a end end
-    check(rennac and rennac.by and (rennac.by.act .. "@" .. rennac.by.x .. "," .. rennac.by.y),
-          "door@22,18", "the door's arrival keeps its act")
-    check(rennac and rennac.boardTurn, 2, "and its board turn")
-    check(rennac and rennac.classId, 0x37, "and its class")
-    check(m2.closings["11,15"] and m2.closings["11,15"].phase, 9, "attempt 2: attempt 1's closing")
-    check(m2.closings["11,15"].closerClass, 0x0D, "with its closer's class")
-    check(m2.closings["3,3"], nil, "a tile we took is no closing")
-    check(m2.closings["22,5"], nil, "a tile taken by a unit our door brought: its date is ours, not kept")
-    check(m2.closings["22,3"], nil, "and one whose closer's class was not read")
-    local room
-    for _, a in ipairs(m2.arrivals) do if a.x == 22 and a.y == 7 then room = a end end
-    check(room and room.timed, false, "the copy keeps `timed`")
-    check(m3.closings["11,15"].phase, 4, "attempt 3: the earliest closing over both")
-    check(#m2.fates, 1, "a recruit killed, or one our door brought: not kept")
-    check(m2.fates[1].charId .. " t" .. m2.fates[1].boardTurn, "18 t8", "attempt 2: the departure")
-    check(#m3.fates, 1, "the same recruit twice is one memory")
-    check(m3.fates[1].boardTurn .. " " .. m3.fates[1].x .. "," .. m3.fates[1].y, "6 0,4",
-          "attempt 3: the earliest departure")
-    -- the record is JSON: a style with memory encodes (a number key would not)
+    check(table.concat(keys, ","), "aggression,claims,memory,sealAt",
+          "the memory is the one field a retry adds (the hold reads it too)")
     check(pcall(Json.encode, g.plays[3].style), true, "the memory encodes as JSON")
-end
-test_a_retry_remembers_what_was_lost()
-
--- A retry remembers what earlier attempts showed on screen (ADR 0399): every enemy a board
--- showed out of fog (enemies_seen) and every killer a death showed, each once by slot and
--- character; attempt 1 and an attempt alone (api.only) remember nothing.
-local function test_a_retry_remembers_the_enemies_it_saw()
-    local enemies = { [1] = { { id = 0x81, charId = 0x50, classId = 1 }, { id = 0x82, charId = 0x51, classId = 1 } },
-                      [2] = { { id = 0x81, charId = 0x50, classId = 1 }, { id = 0x81, charId = 0x52, classId = 1 } } }
-    local g = fakeGame { chapters = { { id = 1, outcomes = { "lost", "dead", "won" },
-                                        enemies = enemies } } }
-    Campaign.run(g.api)
-    check(g.plays[1].style.memory, nil, "attempt 1 remembers nothing")
-    local m2 = g.plays[2].style.memory
-    local ids = {}
-    for _, e in ipairs(m2.enemies) do ids[#ids + 1] = string.format("%x:%x:%x", e.id, e.charId, e.classId) end
-    check(table.concat(ids, ","), "81:50:1,82:51:1",
-          "attempt 2: attempt 1's enemies seen (a killer is among them: botrun's enemies_seen)")
-    check(m2.deaths, nil, "a death is remembered through its killer alone")
-    local m3 = g.plays[3].style.memory
-    ids = {}
-    for _, e in ipairs(m3.enemies) do ids[#ids + 1] = string.format("%x:%x", e.id, e.charId) end
-    check(table.concat(ids, ","), "81:50,82:51,81:52",
-          "attempt 3: the union, each enemy once; a slot another unit took is another enemy")
-    -- ADR 0449: an arrival's turn is kept, and keys it apart from the same slot's other units
-    local g2 = fakeGame { chapters = { { id = 1, outcomes = { "lost", "won" },
-        enemies = { [1] = { { id = 0x93, charId = 0x50, classId = 1, arrival = 7 },
-                            { id = 0x93, charId = 0x50, classId = 1 } } } } } }
-    Campaign.run(g2.api)
-    local kept = g2.plays[2].style.memory.enemies
-    check(#kept, 2, "an arrival and a start unit of one slot, class and character are two memories")
-    check(kept[1].arrival, 7, "attempt 2: the arrival's turn is kept")
-    check(kept[2].arrival, nil, "and a start unit has none")
-    -- ADR 0449: a refill (a killed slot loaded again) is an arrivals_seen record like any, so a
-    -- retry's style.arrivals and memory.arrivals carry its turn
-    local refill = fakeGame { chapters = { { id = 1, outcomes = { "lost", "won" },
-        seen = { [1] = { { turn = 5, boardTurn = 6, x = 3, y = 4, charId = 0x81 } } } } } }
-    Campaign.run(refill.api)
-    check(refill.plays[2].style.arrivals[1][1], 5, "a refill's turn reaches style.arrivals")
-    check(refill.plays[2].style.memory.arrivals[1].charId, 0x81, "and memory.arrivals")
-    m2.enemies[1] = nil
-    check(#g.plays[3].style.memory.enemies, 3, "each attempt gets its own copy")
-    -- a unit whose class was not read is not kept: its key would match nothing
-    local noClass = fakeGame { chapters = { { id = 1, outcomes = { "lost", "won" },
-                                              enemies = { [1] = { { id = 0x81, charId = 0x50 } } } } } }
-    Campaign.run(noClass.api)
-    check(noClass.plays[2].style.memory, nil, "a unit with no class read is not remembered")
-    local alone = fakeGame { chapters = { { id = 1, enemies = enemies } } }
-    alone.api.only = 2
+    -- each failure's record keeps its style without the memory (the line's earlier failures are
+    -- it), and says how many attempts it remembered
+    local f = lines(g)[1].failures
+    check(f[2].style.memory, nil, "a failure's style carries no copy of the memory")
+    check(f[2].style.remembered, 1, "but says it remembered one attempt")
+    check(f[1].style.remembered, nil, "and attempt 1 none")
+    local alone = fakeGame { chapters = { { id = 1 } } }
+    alone.api.only = 3
     Campaign.run(alone.api)
-    check(alone.plays[1].style.memory, nil, "a pool attempt has no earlier result to remember")
+    check(alone.plays[1].style.memory, nil, "a pool attempt k has no earlier result to remember")
 end
-test_a_retry_remembers_the_enemies_it_saw()
+test_a_retry_is_given_the_earlier_timelines()
 
 -- The retry cap (ADR 0399): every style tried, the styles are drawn again, up to MAX_ATTEMPTS
 -- attempts a chapter start, while what is remembered keeps growing; then the chapter stops.
 local function test_styles_are_drawn_again_up_to_the_cap()
     check(Campaign.MAX_ATTEMPTS, 12, "the cap is 12 a chapter start (Nicolas, 2026-11-10)")
-    local outcomes, enemies = {}, {}
-    for i = 1, 12 do
-        outcomes[i] = "lost"
-        enemies[i] = { { id = 0x80 + i, charId = 0x50, classId = 1 } }   -- something new each try
-    end
-    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes, enemies = enemies } } })
+    local outcomes = {}
+    for i = 1, 12 do outcomes[i] = "lost" end
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
     local ok, why = Campaign.run(g.api)
     check(ok, false, "no clean clear in the cap stops the campaign")
     check(#g.plays, 12, "all 12 attempts are played, past the 3 styles (no claims)")
@@ -1068,8 +939,7 @@ test_one_attempt_alone_advances_as_attempt_k()
 local function test_a_chapter_runs_to_the_cap_past_every_style()
     local outcomes = {}
     for i = 1, 12 do outcomes[i] = "lost" end
-    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes,
-        enemies = { [1] = { { id = 0x90, charId = 0x40, classId = 0x0C } } } } } })
+    local g = fakeGame({ game = "vanilla", chapters = { { id = 5, outcomes = outcomes } } })
     local ok, why = Campaign.run(g.api)
     check(ok, false, "the chapter stops")
     check(#g.plays, 12, "all 12 attempts are played, memory or no new memory")

@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0467 (#765): a retry's memory is the failed attempts' timelines
+    # (timeline.lua), not four hand-picked lists; the hold reads Timeline.holdTurns
+    r'\bstyle\.arrivals\b', r'\bmemory\.(?:enemies|arrivals|closings|fates)\b',
+    r'\brememberLosses\b', r'\bkeepOne\b',
     # retired by ADR 0464 (#741): the guide's reinforcements claims are not played; the hold
     # reads only a retry's remembered arrival turns
     r'\breinforcements claim cites\b', r"\bwhere a reinforcements claim's turns go\b",

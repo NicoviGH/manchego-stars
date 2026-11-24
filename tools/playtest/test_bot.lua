@@ -13,6 +13,7 @@ local B = dofile(here .. "bot.lua")
 local Planner = dofile(here .. "planner.lua")
 local Goals = dofile(here .. "goals.lua")
 local Sight = dofile(here .. "sight.lua")
+local Fakeline = dofile(here .. "fakeline.lua")
 local Board = dofile(here .. "board.lua")
 local Json = dofile(here .. "json.lua")
 
@@ -1771,8 +1772,8 @@ do
         "terrain vs a class not on the map: a no-op")
 end
 
--- test_arrivals_hold_the_turn_before: a remembered arrival on turn 3 (style.arrivals, a retry's,
--- campaign.lua) holds the march on turn 2. The turn is the board's (Board.read's), the one
+-- test_arrivals_hold_the_turn_before: a remembered arrival on turn 3 (a retry's memory,
+-- Timeline.holdTurns) holds the march on turn 2. The turn is the board's (Board.read's), the one
 -- source for it.
 do
     local A = blue(0x01, 0, 0, 0)
@@ -1784,7 +1785,8 @@ do
         return b
     end
     local st = style("careful")
-    st.arrivals = { { 3, 7 } }
+    st.memory = Fakeline.memory({ arrivals = { { charId = 0x83, classId = 1, turn = 3 },
+                                               { charId = 0x87, classId = 1, turn = 7 } } })
     check(at(B.decide(boardAt(2), sight, style("careful"))), "2,0", "no memory: marches")
     check(at(B.decide(boardAt(2), sight, st)), "0,0", "arrivals: holds the turn before")
     check(at(B.decide(boardAt(6), sight, st)), "0,0", "arrivals: before each arrival")

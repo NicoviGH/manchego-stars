@@ -234,6 +234,12 @@ local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
 -- for a module handed only Bot (campaign.lua's api.Bot): Board.copy is the one shallow copy
 M.Board = Board
 
+-- timeline.lua: a retry's memory, what earlier attempts showed (#765). The hold reads it here;
+-- botrun and campaign.lua reach it as Bot.Timeline
+local Timeline = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/timeline.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "timeline.lua"))
+M.Timeline = Timeline
+
 local manhattan = Board.distance   -- FE8's RECT_DISTANCE
 
 -- json.lua, beside this file: the strike memo's guard compares and prints two reads with it
@@ -2489,22 +2495,19 @@ local function onTerrain(ctx, tiles)
     return tiles
 end
 
--- The turns from `turn` to the next arrival `arrivals` (style.arrivals: the turns a retry saw
--- waves arrive on, campaign.lua) cites, or nil when none is left. botrun hashes it too: it is
--- part of what decide reads.
-function M.nextArrival(arrivals, turn)
-    local best
-    for _, turns in ipairs(arrivals or {}) do
-        for _, t in ipairs(turns) do
-            if t > turn and (not best or t < best) then best = t end
-        end
+-- The turns from `turn` to the next arrival a retry's `memory` (style.memory) saw a turn bring
+-- (Timeline.holdTurns), or nil when none is left. botrun hashes it too: it is part of what
+-- decide reads.
+function M.nextArrival(memory, turn)
+    for _, t in ipairs(Timeline.holdTurns(memory)) do
+        if t > turn then return t - turn end
     end
-    return best and best - turn or nil
+    return nil
 end
 
 -- A remembered arrival: the turn before it, the march holds (the no-goal rule above); attacks
 -- are still made. The turn is board.turn (decide has checked it is there).
-local function holding(ctx) return M.nextArrival(ctx.style.arrivals, ctx.turn) == 1 end
+local function holding(ctx) return M.nextArrival(ctx.style.memory, ctx.turn) == 1 end
 
 local function march(ctx, u, gate, objective)
     local tiles = behindWalls(ctx, u, waitTiles(ctx, u))
@@ -2740,9 +2743,8 @@ function M.decide(board, sight, style, opts)
     if not gate and aggression ~= "greedy" then
         error("bot.lua: unknown aggression " .. tostring(aggression))
     end
-    local arrivals = style.arrivals
-    if arrivals and #arrivals > 0 and board.turn == nil then
-        error("bot.lua: a remembered arrival (style.arrivals) needs board.turn")
+    if #Timeline.holdTurns(style.memory) > 0 and board.turn == nil then
+        error("bot.lua: a remembered arrival (Timeline.holdTurns) needs board.turn")
     end
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
