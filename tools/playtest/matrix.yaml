@@ -142,6 +142,8 @@ scenarios:
   stealprobe: {rom: any, manual: true, deadline: 900}
   # #730: a wait holding a weapon is played with it equipped (PT_VANILLA=1), by hand only
   waitprobe: {rom: any, manual: true, deadline: 900}
+  # #739: a dying carrier drops whom it carries; PT_VANILLA=1 PT_LEAKGUARD=1, by hand only
+  dropprobe: {rom: any, manual: true, deadline: 900}
   # #713: a fogged enemy plays from its last-seen tile; PT_VANILLA=1 PT_LEAKGUARD=1, by hand only
   ghostprobe: {rom: any, manual: true, deadline: 900}
   campaign: {rom: any, manual: true, deadline: 86400}

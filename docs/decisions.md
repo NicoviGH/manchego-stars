@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-459 decisions. Read this index, then open the two or three you need — the whole
+460 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -302,6 +302,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0459` | [A sandbox strike equips its weapon](decisions/0459-a-sandbox-strike-equips-its-weapon.md) | 2026-11-23 | #743 #510 |
 | `0460` | [A blow that may kill our unit splits the judged phase, and no unit stays on the map at 0 HP](decisions/0460-a-blow-that-may-kill-splits-the-judged-phase.md) | 2026-11-23 | #743 #510 |
 | `0461` | [An enemy that moves without striking moves in the judged phase](decisions/0461-an-enemy-that-moves-without-striking-moves-in-the-judged-phase.md) | 2026-11-23 | #743 #510 |
+| `0462` | [A dying carrier sets down whom it carries, in the copy's enemy phase](decisions/0462-a-dying-carrier-sets-down-whom-it-carries.md) | 2026-11-23 | #739 #743 #510 |
 
 ---
 

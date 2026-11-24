@@ -3054,6 +3054,82 @@ function M.idleMove(api, mem, S, Board, follow, e)
     return x, y, escaped
 end
 
+-- Where a dying carrier `o` sets down whom it carries, inside a sandbox: the game's own
+-- search, bmunit.c UnitGetDeathDropLocation, as bmmind.c DropRescueOnDeath calls it when a unit
+-- at 0 HP is US_RESCUING (#739). Left carried, the unit stayed hidden and the enemies after the
+-- death could not strike it (vanilla Ch19: green 65 killed in the game, read at 0). The search
+-- writes gBmMapUnit's cells of gActiveUnit and of `o` (bmunit.c clears both): they are kept
+-- first (a game write is not journaled, ADR 0380's sandbox) and put back after, so the unit
+-- map stays as the phase had it; a unit off the map (a stale gActiveUnit) has no cell. It also
+-- fills gBmMapMovement with a flier's map from `o`'s tile: left, as every AI read makes that
+-- map fresh first (the sandbox's journal note; its working map and costs are set by every
+-- generator the AI calls, bmidoten.c). Its two int outputs
+-- borrow `scratch`'s first 8 bytes, which in the judged phase are the AI's proc
+-- (stagePhase's): they are put back too. The outputs start at `o`'s tile (the game leaves them
+-- unset when no tile is free).
+-- -> the carried unit's id and its drop tile, or nil when `o` carries no one
+function M.deathDropAt(api, call, S, scratch, o)
+    local mem, Board = api.mem, api.Board
+    if mem.u32(o.addr + UNIT_STATE) & Board.US_RESCUING == 0 then return nil end
+    local w, h = Board.mapSize()
+    local function onMap(x, y) return x < w and y < h end
+    local ox, oy = mem.u8(o.addr + UNIT_X), mem.u8(o.addr + UNIT_Y)
+    if not onMap(ox, oy) then return nil end
+    local cells = { cell(mem, S.gBmMapUnit, ox, oy) }
+    local active = mem.u32(S.gActiveUnit)
+    if active ~= 0 then
+        local ax, ay = mem.u8(active + UNIT_X), mem.u8(active + UNIT_Y)
+        if onMap(ax, ay) then cells[2] = cell(mem, S.gBmMapUnit, ax, ay) end
+    end
+    local held = {}
+    for k, c in ipairs(cells) do
+        api.keep16(c & ~1, 1)
+        held[k] = mem.u8(c)
+    end
+    local was = { mem.u32(scratch), mem.u32(scratch + 4) }
+    api.write32(scratch, ox)
+    api.write32(scratch + 4, oy)
+    call(S.UnitGetDeathDropLocation, { o.addr, scratch, scratch + 4 })
+    local x, y = mem.u32(scratch), mem.u32(scratch + 4)
+    api.write32(scratch, was[1])
+    api.write32(scratch + 4, was[2])
+    for k, c in ipairs(cells) do api.write8(c, held[k]) end
+    return mem.u8(o.addr + Board.UNIT_RESCUE), x, y
+end
+-- The state bits of a carried unit (bmunit.c UnitRescue): off the map's refresh and hidden.
+function M.carried(Board) return Board.US_RESCUED | Board.US_HIDDEN end
+-- The carried unit `t` set down on (x, y) by its carrier `r` (nil when gone), as bmunit.c
+-- UnitDrop writes it: both rescue words cleared, the carried one shown and on the map there.
+-- One owner for the plan's Drop (stageCarry) and a carrier's death (M.dieOff).
+function M.drop(api, t, r, x, y)
+    local mem, Board = api.mem, api.Board
+    api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) & ~M.carried(Board))
+    api.write8(t.addr + Board.UNIT_RESCUE, 0)
+    if r then
+        api.write32(r.addr + UNIT_STATE, mem.u32(r.addr + UNIT_STATE) & ~Board.US_RESCUING)
+        api.write8(r.addr + Board.UNIT_RESCUE, 0)
+    end
+    M.standOn(api, t, x, y)
+end
+-- The plan's own gone units (`gone`, { [id] = true }) off the map before its enemy phase, by
+-- M.takeOff alone: the list holds a recruit talked to (not dead) as well as our kills, and no
+-- plan carry rides on an enemy (planner.lua fx.gone), so no drop. -> the ids, as a set
+function M.takeGone(api, byId, gone)
+    local out = {}
+    for id in pairs(gone or {}) do
+        out[id] = true
+        if byId[id] then M.takeOff(api, byId[id], byId[id].x, byId[id].y) end
+    end
+    return out
+end
+-- Unit `e` dies on (x, y) in a judged phase: whom it carries is set down first, where the game
+-- sets it (M.deathDropAt, M.drop), then `e` leaves the map (M.takeOff). `byId` is the phase's.
+function M.dieOff(api, call, S, scratch, byId, e, x, y)
+    local r, dx, dy = M.deathDropAt(api, call, S, scratch, e)
+    if r and byId[r] then M.drop(api, byId[r], e, dx, dy) end
+    M.takeOff(api, e, x, y)
+end
+
 -- The answers a changed board starts from (s.changed): none of `kept`'s, but the march cost
 -- grids when `keepGrids` (terrain's alone: no unit blocks them) and the danger and threat grids
 -- when `keepDanger` (no door opened and nothing remembered died). A kill changes neither
@@ -3996,6 +4072,9 @@ function M.new(outer)
     end
     local function idleMove(e) return M.idleMove(api, mem, S, Board, followMove, e) end
 
+    local CARRY = M.carried(Board)
+    local function drop(t, r, x, y) M.drop(api, t, r, x, y) end
+
     -- The plan's Rescues and Drops, as the game writes them (bmunit.c UnitRescue,
     -- UnitDrop), inside an open sandbox: a carried unit off gBmMapUnit and hidden, so the AI
     -- never targets it (cp_battle.c skips US_RESCUED); its carrier US_RESCUING, so
@@ -4003,7 +4082,6 @@ function M.new(outer)
     -- tile. `carry` is the planner's: [id] = { by = carrier } or { x, y } once dropped.
     -- `byId` is units() by id.
     local function stageCarry(byId, carry)
-        local CARRY = Board.US_RESCUED | US_HIDDEN
         for id, c in pairs(carry or {}) do
             local t = byId[id]
             local r = t and byId[c.by or mem.u8(t.addr + Board.UNIT_RESCUE)]
@@ -4017,14 +4095,7 @@ function M.new(outer)
                 api.write8(t.addr + UNIT_X, mem.u8(r.addr + UNIT_X))
                 api.write8(t.addr + UNIT_Y, mem.u8(r.addr + UNIT_Y))
             elseif t and c.x then
-                api.write32(t.addr + UNIT_STATE, mem.u32(t.addr + UNIT_STATE) & ~CARRY)
-                api.write8(t.addr + Board.UNIT_RESCUE, 0)
-                if r then
-                    api.write32(r.addr + UNIT_STATE,
-                                mem.u32(r.addr + UNIT_STATE) & ~Board.US_RESCUING)
-                    api.write8(r.addr + Board.UNIT_RESCUE, 0)
-                end
-                standOn(t, c.x, c.y)
+                drop(t, r, c.x, c.y)
             end
         end
     end
@@ -4091,12 +4162,12 @@ function M.new(outer)
         healFaction(call, byId, "red")   -- the reds' phase begins: a heal tile heals before any acts
         local wearing = { base = M.stageWear(api, call, S, plan, byId) }
         stageCarry(byId, plan.carry)
-        local function remove(e, x, y) M.takeOff(api, e, x, y) end
-        local gone = {}
-        for id in pairs(plan.gone or {}) do
-            gone[id] = true
-            if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
-        end
+        -- a unit dies in the phase (a blow's kill, our counter's, a berserk strike's): a
+        -- carrier first sets down whom it carries (M.dieOff)
+        local function remove(e, x, y) M.dieOff(api, call, S, scratch, byId, e, x, y) end
+        -- the plan's own gone units are only taken off: the list holds a recruit talked to (not
+        -- dead) as well as our kills, and no plan carry rides on an enemy (planner.lua fx.gone)
+        local gone = M.takeGone(api, byId, plan.gone)
         -- the doors the plan opens and the walls it breaks (M.openMap): the enemies behind
         -- them reach through (vanilla Ch3: Colm opened (6,9) and the Brigand behind it killed
         -- him at 0%)
