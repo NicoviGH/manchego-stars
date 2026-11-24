@@ -491,14 +491,15 @@ local function score(act, st, W, style, odds, likeliest)
         end
         if f.counters then
             -- the counter's risk is its chance to kill (a target dead before it answers takes
-            -- nothing: the game's play of the exchange); the HP it takes is paid once, at the
-            -- end, after any heal the plan gives back (the judge's deficit)
+            -- nothing: the game's play of the exchange); the HP it takes, its likeliest loss, is
+            -- paid once, at the end, after any heal the plan gives back (the judge's deficit)
             local die = odds({ f.counterDist }, act.unitHp)
             fx.die = die
             v = v - loss(W, st, act.unit) * die
             -- the HP the board is left at: the likeliest the counter leaves it alive at (ADR
-            -- 0463), never the mean, an HP the game cannot produce
-            fx.hp = likeliest({ f.counterDist }, act.unitHp) or 1
+            -- 0463), never the mean, an HP the game cannot produce. A heal after it is worth only
+            -- what that HP lacks: none for a counter that most likely misses
+            fx.hp = likeliest({ f.counterDist }, act.unitHp)
             -- the judge chains it with the enemy phase's strikes, so a counter that lands is
             -- not averaged away
             fx.counter = { f.counterDist }
@@ -896,7 +897,9 @@ function M.plan(Bot, board, sight, style, opts)
     local cap = M.CAPS[style.aggression]
     if not cap then error("planner.lua: no risk cap for style " .. tostring(style.aggression)) end
     local odds = sight.odds
-    local likeliest = sight.likeliestLeft
+    -- the HP a unit keeps at its likeliest surviving outcome (ADR 0463); 1 when none is left
+    -- alive (a sure death: the plan's `gone` or the counter's `die` carries it)
+    local function likeliest(dists, hp) return sight.likeliestLeft(dists, hp) or 1 end
     -- sight's split floor, one bound for the whole judged plan (ADR 0415)
     local floor = assert(sight.splitFloor, "planner.lua: the sight gives no splitFloor")
     -- opts.offer: the acts read on another board (a full-information replay's: the fogged
@@ -1976,23 +1979,18 @@ function M.plan(Bot, board, sight, style, opts)
                                       wearSlot = w and w.slot, wear = w and w.uses }
         end
         local reds = {}
-        -- the board the phase meets: each red the plan struck at the likeliest HP all its
-        -- blows together leave it alive at (ADR 0463), never the mean st.enemyHp scores by
-        for id in pairs(st.enemyHp) do
-            reds[id] = likeliest(st.kill[id] or {}, byId[id].hp) or 1
-        end
         -- each uncertain kill, and each counter that can leave its attacker on more than one HP,
         -- played every way it goes: one way alone (an enemy gone at a kill >= M.GONE, else standing
         -- at its likeliest HP; our attacker at its likeliest HP after the counter) hides the way
         -- the rolls go otherwise. Vanilla Ch5 turn 5: Eirika's attack killed an enemy the plan kept
         -- standing, and Joshua's AI turned on her. Manchego Stars ch03 (T100b): Wolfram's attack
         -- missed, the counter left him on 3 HP, and the AI that had passed him by at his mean HP
-        -- killed him. A unit whose blow is the only one on its target plays the exchange's own
-        -- pairs (sight's `joint`), so a counter is played only where our blow did not kill first;
-        -- any other counter is played on its own spread. The most uncertain are played first,
-        -- BRANCH of them at most; one that would take the ways past 2^BRANCH keeps its likeliest
-        -- HP and a narrower one after it is still played. Each left unsplit is counted (`averaged`)
-        -- so it is never silent.
+        -- (before ADR 0463) killed him. A unit whose blow is the only one on its target plays the
+        -- exchange's own pairs (sight's `joint`), so a counter is played only where our blow did
+        -- not kill first; any other counter is played on its own spread. The most uncertain are
+        -- played first, BRANCH of them at most; one that would take the ways past 2^BRANCH keeps
+        -- its likeliest HP and a narrower one after it is still played. Each left unsplit is
+        -- counted (`averaged`) so it is never silent.
         local dims, gone = {}, copy(st.gone)
         local only = {}   -- target id -> the unit whose blow is the plan's only one on it
         for uid, x in pairs(st.fought) do
@@ -2004,10 +2002,12 @@ function M.plan(Bot, board, sight, style, opts)
         for id, blows in pairs(st.kill) do
             -- the plan's blows on it together, at its own HP: each blow alone was scored at the
             -- HP the earlier ones leave on average, which can call a sure kill short. Gone or
-            -- standing by that composed chance; `left`, the HP it keeps when it lives, at the
-            -- likeliest outcome (ADR 0463)
+            -- standing by that composed chance. The board the phase meets holds it at the
+            -- likeliest HP all the blows leave it alive at (`reds`, ADR 0463), never the mean
+            -- st.enemyHp scores by; a way that lives keeps the same (`left`)
             local hp = byId[id].hp
             local p = odds(blows, hp)
+            reds[id] = likeliest(blows, hp)
             gone[id] = p >= M.GONE or nil
             local uid = only[id]
             if p > 0 and p < 1 and uid then
@@ -2018,7 +2018,7 @@ function M.plan(Bot, board, sight, style, opts)
             elseif p > 0 and p < 1 then
                 dims[#dims + 1] = { id = id, key = "k" .. id, ways = {
                     { p = p, dead = true },
-                    { p = 1 - p, dead = false, left = likeliest(blows, hp) } } }
+                    { p = 1 - p, dead = false, left = reds[id] } } }
             end
         end
         for uid, x in pairs(st.fought) do

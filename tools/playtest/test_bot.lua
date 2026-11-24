@@ -4941,8 +4941,9 @@ do
 end
 
 -- test_a_counter_leaves_its_attacker_at_the_likeliest_hp (ADR 0463): A (30 of 40 HP) strikes E,
--- whose counter rarely hits (20 shown, two rolls) for 10. With the counter not split (BRANCH =
--- 0), the phase meets A at 30, the likeliest (the miss), never the mean's lower HP.
+-- whose counter rarely hits for 10 (20 shown; the game's two-roll hit makes it 8.2% true,
+-- Sight.rollChance). With the counter not split (BRANCH = 0), the phase meets A at 30, the
+-- likeliest (the miss), never the mean's 29 (30 less 0.82, rounded).
 do
     local A = blue(0x01, 0, 0, 0, { hp = 30, maxhp = 40 })
     local E = red(0x81, 1, 0, { hp = 40 })

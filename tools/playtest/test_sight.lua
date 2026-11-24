@@ -2494,8 +2494,7 @@ do
 end
 
 -- Sight.jointAt (#743 fold, the planner's plan-wide kill ways read it too): a joint grouped by the
--- target's death and the counter, first met first, `left` the HP an alive group keeps, its
--- likeliest
+-- target's death and the counter, first met first, `left` the likeliest HP an alive group keeps
 do
     local ways = Sight.jointAt({ { p = 0.25, dealt = 0, back = 4 }, { p = 0.25, dealt = 6, back = 4 },
                                  { p = 0.25, dealt = 10, back = 0 }, { p = 0.25, dealt = 4, back = 1 } }, 10)
