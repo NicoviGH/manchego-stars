@@ -29,9 +29,16 @@ botrun's `unpaid` learns a Talk is unpaid only after one fails (#766's root-caus
   a walk the budget cut short. Of vanilla's six slot-4 SVALs only E_14a's and E_14b's reach the
   paid script (through `EventScr_9EEAAC`); E_9a/b set a text id before `EventScr_089F3C34` and
   E_19a/b a UnitDefinition before `EventScr_089F82FC`, neither of which CALLs it.
-- **A live Sight answers `s.talkPrice(u, t)`** (every entry of the chapter's talk table, available
-  now or not, read once per Sight; the dearest when a pair has two) **and `s.gold()`** (the game's
-  `GetPartyGoldAmount`, what `CHECK_MONEY` reads: 0 in Ch5x).
+- **A live Sight answers `s.talkPrice(u, t)`** (`M.pairPrice` over every entry of the
+  chapter's talk table, available now or not, read once per Sight; the dearest when a pair has
+  two) **and `s.gold()`**: the api's own, harness.lua `INSPECT.spendableGold`, the one owner of
+  the game's `GetPartyGoldAmount` (what `CHECK_MONEY` and the shop read: 0 in Ch5x).
+- **A talk whose script is the paid one itself raises**: it sets no price before it.
+- **A forced Talk** rebuilt from its key in a diagnostic replay gets its hire from
+  `Bot.hirePrice`, so the planner charges it the same way.
+- **The march's job search** (jobs.lua) asks each (unit, job, from) once and tries each job's
+  takers best first, so a search the budget cuts short keeps the greedy dive. `opts.fixed` had
+  no caller and is gone (#770's review).
 - **Bot:** a Talk whose price is over the party's gold is not a Talk (`talks`), so no talker
   pairing, march, menu or candidate offers it. An affordable one carries `hirePrice`.
 - **The march's Talk job** (`exploring`, jobs.lua) is worth `Goals.worth` of a recruit with the

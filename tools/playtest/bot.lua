@@ -2203,12 +2203,15 @@ local function supplyKey(ctx, u, gate, objective)
 end
 
 -- The gold `u`'s Talk hires `t` for (sight.talkPrice; 0: free, or a sight that cannot price
--- one), and the party's gold (sight.gold), each read once per decide.
+-- one): the one reader, the bot's and a forced replay's (botrun's forcedAct).
+function M.hirePrice(sight, u, t)
+    return sight.talkPrice and sight.talkPrice(u, t) or 0
+end
+-- M.hirePrice and the party's gold (sight.gold), each read once per decide.
 local function hirePrice(ctx, u, t)
-    if not ctx.sight.talkPrice then return 0 end
     ctx.hirePrices = ctx.hirePrices or {}
     local k = u.charId .. ">" .. t.charId
-    if ctx.hirePrices[k] == nil then ctx.hirePrices[k] = ctx.sight.talkPrice(u, t) end
+    if ctx.hirePrices[k] == nil then ctx.hirePrices[k] = M.hirePrice(ctx.sight, u, t) end
     return ctx.hirePrices[k]
 end
 local function partyGold(ctx)
@@ -2227,7 +2230,8 @@ local function talks(ctx, u, t)
     -- nor one whose price is over the party's gold: the paid script then refuses the hire
     -- (EventScr_9EEB00's CHECK_MONEY), so the talker can recruit no one (#766: Ch14's Eirika,
     -- 9,980 gold against 9,420, was sent on Rennac while the free talker marched on the boss)
-    if hirePrice(ctx, u, t) > partyGold(ctx) then return false end
+    local price = hirePrice(ctx, u, t)
+    if price > 0 and price > partyGold(ctx) then return false end
     local k = u.id .. ">" .. t.id
     if ctx.talks[k] == nil then
         ctx.talks[k] = ctx.sight.canTalk ~= nil and ctx.sight.canTalk(u, t) or false
@@ -2915,7 +2919,8 @@ end
 
 local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
-    -- each unit's chain of goals (jobs.lua), the first its exploreGoal: R3's planner reads it
+    -- each unit's chain of goals (jobs.lua), the first its exploreGoal: written for R3 (#767),
+    -- whose per-turn planner plays these jobs; nothing reads it before then
     ctx.jobs = {}
     ctx.tried = {}
     barred = barred or {}
@@ -3001,8 +3006,9 @@ local function exploring(ctx, sent, barred, triedIn)
         end
         for _, p in ipairs(talkers) do
             -- the job's worth: the recruit's (Goals.worth) less what the hire spends, so a free
-            -- talker outranks a paid one, and a hire dearer than a unit is worth to the style
-            -- is no job at all (#766)
+            -- talker outranks a paid one, and a hire dearer than a unit is worth to the style is
+            -- not marched on (#766). A ranking, not a ban (ADR 0396): the Talk stays offered, and
+            -- the planner may still play it, the hire charged (st.priced)
             local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, p.u, t) },
                                   weightsFor(ctx.style.aggression))
             if v > 0 then talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = v } end

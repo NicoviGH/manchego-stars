@@ -2739,6 +2739,30 @@ do
     check(played and played.slot, 1, "#642: with the weapon its key names")
 end
 
+-- #770 review (finding 9): a forced Talk no candidate offered is built from its key, which carries
+-- no price; a paid hire's (Bot.hirePrice) is set on it, so the planner charges it as it charges
+-- the offered Talk
+do
+    local played
+    replay({ ref = 1, mode = "force", force = { "1>talk@0,1>129" },
+             failure = failure, run = run, original = original() }, nil,
+           function(g)
+               local sight = g.api.sight
+               g.api.sight = function()
+                   local s = sight()
+                   s.talkPrice = function(_, t) return t.id == 0x81 and 5000 or 0 end
+                   return s
+               end
+               local act = g.api.act
+               g.api.act = function(a, ...)
+                   played = played or a
+                   return act(a, ...)
+               end
+           end)
+    check(played and played.act, "talk", "forced talk: played")
+    check(played and played.hirePrice, 5000, "forced talk: carries its hire")
+end
+
 -- test_a_forced_act_with_no_unit_witnesses_nothing: the replay stops at the pin, nothing was
 -- played, so nothing was avoided
 do

@@ -3714,10 +3714,12 @@ end
 
 -- test_an_act_on_an_allys_tile_brings_the_allys_move_off_it (#766, vanilla Ch14 s4003 `r766f`):
 -- the board of the aside test below, with the beam cut to one partial plan of one act a unit.
--- K's Door from (1,0) asks J, who stands there, to move first; the beam that ranked J's holds
--- above its aside never put J's move before K's act, so no plan judged held the door. The act
--- now brings J's best move off the tile with it (Colm and Innes offered the (17,2) door for
--- nine turns while Tana and Artur held (17,1) and (18,1), and the board repeated until cut).
+-- K's Door from (1,0) asks J, who stands there, to move first. The narrowed beam pins the
+-- mechanism: at the default beam this small board's beam happens to place J's aside first
+-- itself (#770's review), as Ch14's twelve units' did not (Colm and Innes offered the (17,2)
+-- door for nine turns while Tana and Artur held (17,1) and (18,1), no plan judged held it, and
+-- the board repeated until cut; with the step aside, `r766g`'s attempt 2 opened it on turn 8).
+-- The act now brings J's best move off the tile with it.
 do
     local K = blue(0x01, 0, 0, 1)
     local J = blue(0x02, 1, 1, 0)

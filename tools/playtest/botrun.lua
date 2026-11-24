@@ -1601,6 +1601,13 @@ function M.run(api)
                 error("botrun.lua: forced Take " .. k .. " finds no key in the convoy for the unit",
                       0)
             end
+            -- a paid Talk's hire (Bot.hirePrice), which a key does not carry: the planner charges
+            -- it (st.priced) as it charges the offered Talk
+            local t = a.act == "talk" and byIdNow[a.targetId]
+            if t then
+                local price = Bot.hirePrice(sight, u, t)
+                if price > 0 then a.hirePrice = price end
+            end
             pin.unoffered[#pin.unoffered + 1] = k
             a.unit = u.charId
             if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end

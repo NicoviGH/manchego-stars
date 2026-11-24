@@ -1638,6 +1638,17 @@ do
     local TEXT = 0x08002A00
     sval(TEXT, 4, 0xA18); enda(TEXT + 8)
     check(Sight.talkPrice(m, TEXT, PAID), nil, "talkPrice: slot 4 with no paid CALL is free")
+    -- a talk whose script is the paid one itself sets no price: raises
+    ok, err = pcall(Sight.talkPrice, m, PAID, PAID)
+    check(not ok and tostring(err):find("paid%-recruit script itself") ~= nil, true,
+          "talkPrice: the paid script as a talk's own raises")
+    -- pairPrice: a pair's price over every entry naming it (anyone's too), the dearest; 0 free
+    local entries = { { a = 0x01, b = 0x1C, script = EIRIKA }, { a = 0x19, b = 0x1C, script = LARACHEL },
+                      { a = 0, b = 0x30, script = HIDDEN }, { a = 0x01, b = 0x30, script = LARACHEL } }
+    check(Sight.pairPrice(m, entries, PAID, 0x01, 0x1C), 9980, "pairPrice: Eirika's hire")
+    check(Sight.pairPrice(m, entries, PAID, 0x19, 0x1C), 0, "pairPrice: L'Arachel's is free")
+    check(Sight.pairPrice(m, entries, PAID, 0x02, 0x1C), 0, "pairPrice: no entry, no price")
+    check(Sight.pairPrice(m, entries, PAID, 0x01, 0x30), 500, "pairPrice: anyone's paid entry, the dearest")
     local talks = { { a = 0x01, b = 0x1C, script = EIRIKA }, { a = 0x19, b = 0x1C, script = LARACHEL },
                     { a = 0x01, b = 0x30, script = EIRIKA }, { a = 0, b = 0x31, script = LARACHEL } }
     local free = Sight.freeTalks(m, talks, PAID, {})

@@ -91,17 +91,6 @@ do
     check(jobOf(out, 2), "-", "takers: the nearer non-talker is not")
 end
 
--- test_a_fixed_job_is_kept: B was sent to `w` last decision. A is nearer now, but B keeps it,
--- and A is left the rest.
-do
-    local A = { id = 1, slot = 1, x = 2, mov = 4 }
-    local B = { id = 2, slot = 2, x = 8, mov = 4 }
-    local w = { id = "w", tile = { x = 1 }, worth = 100 }
-    local out = Jobs.assign({ A, B }, { w }, road({ A, B }), { fixed = { [2] = "w" } })
-    check(jobOf(out, 2), "w", "fixed: the sent unit keeps its job")
-    check(jobOf(out, 1), "-", "fixed: the nearer unit is not given it")
-end
-
 -- test_budget: with a budget of 1 node the search stops at once and still returns an
 -- assignment (all jobs left), never an error.
 do
@@ -110,6 +99,36 @@ do
     local out, total = Jobs.assign({ A }, { w }, road({ A }), { budget = 1 })
     check(type(out), "table", "budget: an assignment comes back")
     check(total >= 0, true, "budget: its worth is a number")
+end
+
+-- test_budget_keeps_the_best_first_dive: A (slot 1) and B (slot 2) may both take w; B, nearer,
+-- gets it sooner. With a budget of one node the search sees one dive only: the takers are tried
+-- best first, so that dive gives w to B. By slot order it gave it to A, worse than greedy.
+do
+    local A = { id = 1, slot = 1, x = 40, mov = 4 }
+    local B = { id = 2, slot = 2, x = 2, mov = 4 }
+    local w = { id = "w", tile = { x = 1 }, worth = 100 }
+    local out = Jobs.assign({ A, B }, { w }, road({ A, B }), { budget = 1 })
+    check(jobOf(out, 2), "w", "budget: the cut search keeps the best taker's dive")
+end
+
+-- test_value_is_asked_once: the search reaches a chain's end by several orders; the caller's
+-- value is asked once per (unit, job, from)
+do
+    local A = { id = 1, slot = 1, x = 0, mov = 4 }
+    local B = { id = 2, slot = 2, x = 0, mov = 4 }
+    local C = { id = 3, slot = 3, x = 0, mov = 4 }
+    local jobs = { { id = "a", tile = { x = 4 }, worth = 10 }, { id = "b", tile = { x = 4 }, worth = 10 },
+                   { id = "c", tile = { x = 4 }, worth = 10 }, { id = "d", tile = { x = 4 }, worth = 10 } }
+    local seen, again = {}, 0
+    local v = road({ A, B, C })
+    Jobs.assign({ A, B, C }, jobs, function(u, j, from)
+        local k = u.id .. j.id .. (from and (from.x .. "," .. from.late) or "-")
+        if seen[k] then again = again + 1 end
+        seen[k] = true
+        return v(u, j, from)
+    end)
+    check(again, 0, "memo: no (unit, job, from) asked twice")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

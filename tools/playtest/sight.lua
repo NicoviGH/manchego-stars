@@ -1471,7 +1471,6 @@ function M.walkScript(mem, script, visit, opts)
     return stopped, truncated
 end
 
-
 -- What an event script does to the field's units, read from its bytes (#724): the units it loads
 -- and the ones it removes. -> { loads = { { charId, x, y } }, removals = { charId }, truncated }.
 -- Encodings (include/eventscript.h, src/eventscr.c): a command's head halfword is cmd << 8 | len
@@ -1635,12 +1634,30 @@ function M.talkPrice(mem, script, paid)
         end
         return false
     end
-    if script == paid then visit(script, EV_CMD_CALL) end
+    -- a talk whose script IS the paid one sets no price of its own before it
+    if script == paid then
+        error(string.format("sight.talkPrice: script 0x%08X is the paid-recruit script itself, "
+            .. "with slot 4 never set", script), 0)
+    end
     local _, truncated = M.walkScript(mem, script, visit, { budget = M.EV_WALK_BUDGET })
     if truncated and price == nil then
         error(string.format("sight.talkPrice: the walk of script 0x%08X was cut short", script), 0)
     end
     return price
+end
+
+-- The gold talker `a`'s Talk to `b` hires `b` for: of `talks` (M.talks' entries, available or
+-- not), those naming the pair (a = 0 is anyone), priced by M.talkPrice; the dearest when more
+-- than one names it, 0 for free or none. An entry's flag only says whether it runs now; its
+-- script is what it charges, so a script this read does not know raises whatever its flag. Pure.
+function M.pairPrice(mem, talks, paid, a, b)
+    local p = 0
+    for _, e in ipairs(talks) do
+        if (e.a == a or e.a == 0) and e.b == b then
+            p = math.max(p, M.talkPrice(mem, e.script, paid) or 0)
+        end
+    end
+    return p
 end
 
 -- The recruits a unit brings over for FREE: of `talks` (M.recruitTalks), the talks to a unit not
@@ -4877,21 +4894,13 @@ function M.new(outer)
         local k = u.charId .. ">" .. t.charId
         if prices[k] == nil then
             allTalks = allTalks or M.talks(api, sandbox, true)
-            local p = 0
-            for _, e in ipairs(allTalks) do
-                if (e.a == u.charId or e.a == 0) and e.b == t.charId then
-                    p = math.max(p, M.talkPrice(mem, e.script, S.EventScr_9EEB00) or 0)
-                end
-            end
-            prices[k] = p
+            prices[k] = M.pairPrice(mem, allTalks, S.EventScr_9EEB00, u.charId, t.charId)
         end
         return prices[k]
     end
-    -- the party's gold as the paid-recruit script's CHECK_MONEY reads it (eventscr.c:
-    -- GetPartyGoldAmount, 0 in Ch5x, not the PlaySt field)
-    function s.gold()
-        return sandbox(function(call) return call(S.GetPartyGoldAmount, {}) end)
-    end
+    -- the party's gold as the paid-recruit script's CHECK_MONEY reads it: the api's own
+    -- (harness.lua INSPECT.spendableGold, the campaign's api.gold too); nil without one
+    s.gold = api.gold
 
     local function asActive(u, x, y) M.asActive(api, u, x, y) end
 

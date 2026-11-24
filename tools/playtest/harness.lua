@@ -3205,10 +3205,18 @@ INSPECT.loadSight = function()
     return INSPECT.Sight
 end
 
+-- What the party may spend, the game's answer (the shop's, and the paid-recruit script's
+-- CHECK_MONEY), not the PlaySt field: GetPartyGoldAmount is 0 in Ch5x (bmgold.c), where the shop
+-- refuses every purchase. The campaign's api.gold and the Sight's api.gold (sight.gold) both.
+INSPECT.spendableGold = function()
+    return INSPECT.gameCalls(function(call) return call(SYM.GetPartyGoldAmount, {}) end)
+end
+
 INSPECT.sightApi = function()
     local raw = PROCS.raw
     INSPECT.loadSight()
     return {
+        gold = INSPECT.spendableGold,
         mem = { u8 = ru8, s8 = rs8, u16 = ru16, s16 = rs16, u32 = ru32 },
         write8 = function(a, v) emu:write8(a, v) end,
         write16 = function(a, v) emu:write16(a, v) end,
@@ -4284,11 +4292,7 @@ INSPECT.campaignApi = function(game)
         -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
         -- attempt draws what the whole campaign would have drawn there
         seed = function(ch) math.randomseed(seed, ch) end,
-        -- What the party may spend is the game's answer, not the PlaySt field: GetPartyGoldAmount
-        -- is 0 in Ch5x (bmgold.c), where the shop refuses every purchase.
-        gold = function()
-            return INSPECT.gameCalls(function(call) return call(SYM.GetPartyGoldAmount, {}) end)
-        end,
+        gold = INSPECT.spendableGold,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }

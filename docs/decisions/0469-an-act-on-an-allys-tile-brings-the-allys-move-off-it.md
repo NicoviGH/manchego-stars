@@ -33,6 +33,15 @@ replay (`r766f`) settled it:
   the act. If no such move fits, the act is refused as before.
 - It goes one step deep: the ally's own move is not given another ally's move in turn.
 - It applies to every act with a `vacate` (a door, a strike, a heal, a march), not to doors only.
+- **Only fresh plan builders step aside:** the beam, the advance, the assault, the bait, the
+  Seize and goal offers, and `unstall`. A replay of acts a plan already holds passes `exact`:
+  `complete`, `rebuild`, the mends, the kept `rest` and the fog reorder. An aside there would
+  silently swap an ally's own act for another (#770's review).
+- **The beam carries a plan whose every unit is already placed** to the next depth as it is. A
+  step aside places two units in one depth, and such a plan would otherwise extend to nothing at
+  the last depth and lose its place (#770's review). No board tried shows the loss: on two test
+  boards the beam built the same plan at the last depth in another order. So this is held by
+  reading, not by a test.
 
 ## Proof
 

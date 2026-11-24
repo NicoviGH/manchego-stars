@@ -54,20 +54,43 @@ end
 --          it gets there on (counted from now, `from.late` included: the next job's `late`), and
 --          what a tie between equal worths is settled by, the fewer the better (default: turns;
 --          a march's length is finer); nil: u cannot do it in time. A worth of 0 is still a job
---          (a village whose gift the style has no prior for: a new player visits it anyway). `from` is nil for
---          u's first job, { x, y, late } for the next one
+--          (a village whose gift the style has no prior for: a new player visits it anyway).
+--          `from` is nil for u's first job, { x, y, late } for the next one. Asked once per
+--          (unit, job, from): the search reaches one chain's end by many orders
 --   opts   { takers = function(job) -> the units that may take it (default: all), chain (default
---          M.CHAIN), budget (default M.BUDGET), fixed = { [unit id] = job id } (a job a unit
---          keeps, given before the search: it was sent there before, ADR "sticky keep") }
+--          M.CHAIN), budget (default M.BUDGET) }
 function M.assign(units, jobs, value, opts)
     opts = opts or {}
     local chain, budget = opts.chain or M.CHAIN, opts.budget or M.BUDGET
+    local asked = {}
+    local raw = value
+    value = function(u, j, from)
+        local k = u.id .. "|" .. tostring(j.id) .. "|"
+            .. (from and (tostring(from.x) .. "," .. tostring(from.y) .. "," .. from.late) or "-")
+        local r = asked[k]
+        if not r then
+            r = table.pack(raw(u, j, from))
+            asked[k] = r
+        end
+        return r[1], r[2], r[3]
+    end
     local order = {}
     for _, j in ipairs(jobs) do order[#order + 1] = j end
     table.sort(order, urgency)
+    -- each job's takers, the best first job first (its value from where it stands, then slot):
+    -- a search the budget cuts short keeps its first dive, and that dive is then the greedy
+    -- pairing's, never a worse one by slot order
     local takers = {}
     for i, j in ipairs(order) do
-        takers[i] = opts.takers and opts.takers(j) or units
+        local list = {}
+        for _, u in ipairs(opts.takers and opts.takers(j) or units) do list[#list + 1] = u end
+        local first = {}
+        for _, u in ipairs(list) do first[u.id] = value(u, j, nil) or -math.huge end
+        table.sort(list, function(a, b)
+            if first[a.id] ~= first[b.id] then return first[a.id] > first[b.id] end
+            return (a.slot or 0) < (b.slot or 0)
+        end)
+        takers[i] = list
     end
     -- what the jobs from i on could add at most: each its own worth
     local rest = { [#order + 1] = 0 }
@@ -107,23 +130,6 @@ function M.assign(units, jobs, value, opts)
         cur, curTurns, curN = cur - v, curTurns - (cost or t), curN - 1
     end
 
-    -- the fixed jobs first: each kept by its unit, off the search
-    local fixedJob = {}
-    if opts.fixed then
-        local byId = {}
-        for _, j in ipairs(order) do byId[j.id] = j end
-        for _, u in ipairs(units) do
-            local j = byId[opts.fixed[u.id]]
-            if j and not fixedJob[j.id] then
-                local v, t, cost = value(u, j, nil)
-                if v then
-                    give(u, j, v, t, cost)
-                    fixedJob[j.id] = true
-                end
-            end
-        end
-    end
-
     local function search(i)
         nodes = nodes + 1
         if i > #order then
@@ -133,21 +139,20 @@ function M.assign(units, jobs, value, opts)
         -- no way to beat the best from here: every job left at its full worth falls short
         if cur + rest[i] < best - EPS then return end
         local j = order[i]
-        if not fixedJob[j.id] then
-            for _, u in ipairs(takers[i]) do
-                if nodes > budget then break end
-                local c = chains[u.id]
-                if not c or #c < chain then
-                    local v, t, cost = value(u, j, ends[u.id])
-                    if v then
-                        local was = give(u, j, v, t, cost)
-                        search(i + 1)
-                        take(u, was, v, t, cost)
-                    end
+        for _, u in ipairs(takers[i]) do
+            if nodes > budget then break end
+            local c = chains[u.id]
+            if not c or #c < chain then
+                local v, t, cost = value(u, j, ends[u.id])
+                if v then
+                    local was = give(u, j, v, t, cost)
+                    search(i + 1)
+                    take(u, was, v, t, cost)
                 end
             end
         end
-        -- the job left to no one (a fixed job is already had)
+
+        -- the job left to no one
         if nodes <= budget or best < 0 then search(i + 1) end
     end
     search(1)
