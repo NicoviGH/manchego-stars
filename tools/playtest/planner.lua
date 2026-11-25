@@ -1502,7 +1502,54 @@ function M.plan(Bot, board, sight, style, opts)
         return true
     end
 
-    local function extend(st, a, uid)
+    -- An act on an ally's tile (its `vacate`) brings that ally's move off it, as a player moves
+    -- the ally first: its best act by its own score (a.own) that ends on neither tile the act
+    -- needs. Without it the act waited for some other part of the plan to move the ally first,
+    -- and nothing did: vanilla Ch14 s4003 (#766, `r766f`), Colm and Innes were offered the
+    -- (17,2) door from (18,1) and (17,1) for nine turns, the allies who stood there held, no
+    -- plan judged held the door, and the board repeated until the run was cut. One step deep:
+    -- the ally's own move is not given an ally's in turn.
+    local candById
+    -- each unit's candidates by its id (stepAside's ally, the heal swap's unit), built once
+    local function candOf(id)
+        if not candById then
+            candById = {}
+            for _, c in ipairs(cands) do candById[c.unit.id] = c end
+        end
+        return candById[id]
+    end
+    local function stepAside(st, a, extendFn)
+        local c = candOf(a.vacate)
+        if not c then return nil end
+        local need, at = a.move.x .. "," .. a.move.y, endTile(a)
+        local order = {}
+        for _, b in ipairs(c.acts) do
+            local e = endTile(b)
+            local tile = e.x .. "," .. e.y
+            if tile ~= need and tile ~= at.x .. "," .. at.y
+                    and b.move.x .. "," .. b.move.y ~= need then
+                order[#order + 1] = b
+            end
+        end
+        table.sort(order, function(x, y)
+            if (x.own or 0) ~= (y.own or 0) then return (x.own or 0) > (y.own or 0) end
+            return key(x) < key(y)
+        end)
+        for _, b in ipairs(order) do
+            local n = extendFn(st, b, a.vacate, true)   -- one step deep
+            if n then return n end
+        end
+        return nil
+    end
+
+    -- `exact`: the act alone, never the ally's step aside: a replay of acts a plan already
+    -- holds (complete, rebuild, the mends, the kept rest, the fog reorder) puts back the moves it
+    -- had, and an aside there would silently swap an ally's own act for another
+    local extend
+    extend = function(st, a, uid, exact)
+        if a.vacate and not st.used[a.vacate] and not exact and not st.used[uid] then
+            st = stepAside(st, a, extend) or st
+        end
         -- the tile it ends on (a Canto move's), which the plan then holds; the act's own tile
         -- must be free too, when it moves on from it
         local at = endTile(a)
@@ -1592,7 +1639,18 @@ function M.plan(Bot, board, sight, style, opts)
     for _ = 1, #menus do
         local nxt, seenSig = {}, {}
         for _, st in ipairs(beam) do
-            for _, m in ipairs(menusFor(st)) do
+            local menusNow, placed = menusFor(st), true
+            for _, m in ipairs(menusNow) do placed = placed and st.used[m.unit.id] == true end
+            -- a plan whose every unit is placed already (an ally's step aside placed two in one
+            -- depth, ADR 0469) goes on as it is: it would extend to nothing at the last depth
+            -- and lose its place to plans one act behind it
+            if placed then
+                local sig = {}
+                for _, x in ipairs(st.acts) do sig[#sig + 1] = key(x) end
+                sig = table.concat(sig, "|")
+                if not seenSig[sig] then seenSig[sig] = true; nxt[#nxt + 1] = st end
+            end
+            for _, m in ipairs(placed and {} or menusNow) do
                 for _, a in ipairs(m.acts) do
                     local n = extend(st, a, m.unit.id)
                     if n then
@@ -1636,7 +1694,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, c in ipairs(cands) do
             if not st.used[c.unit.id] then
                 for _, a in ipairs(c.acts) do
-                    local n = a.why == "hold" and extend(st, a, c.unit.id)
+                    local n = a.why == "hold" and extend(st, a, c.unit.id, true)
                     if n then st = n break end
                 end
             end
@@ -1651,7 +1709,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, x in ipairs(acts) do
             local y = choose and choose(x, st)
             if y ~= false then
-                st = (y and extend(st, y, y.unitId)) or extend(st, x, x.unitId) or st
+                st = (y and extend(st, y, y.unitId, true)) or extend(st, x, x.unitId, true) or st
             end
         end
         return st
@@ -2363,15 +2421,17 @@ function M.plan(Bot, board, sight, style, opts)
                 st.wearFor[p.unit.id] = carries(p.unit.id)
             end
         end
-        -- what the plan's strikes spend of their weapons, at the gold's points (#642, Bot's
-        -- useCharge): the uses each spends at the HP the plan leaves its target (st.wear, the
-        -- game's played ways), charged here, on the judged plan, and never on an act's own
-        -- score, so the beam builds the plan a dear weapon's kill makes safe and the cap reads
-        -- it first
+        -- what the plan's strikes spend of their weapons, and its hires, at the gold's points
+        -- (#642, Bot's useCharge): the uses each spends at the HP the plan leaves its target
+        -- (st.wear, the game's played ways), charged here, on the judged plan, and never on an
+        -- act's own score, so the beam builds the plan a dear weapon's kill makes safe and the
+        -- cap reads it first
         st.priced = 0
         for _, a in ipairs(st.acts) do
             local w = st.wear[a.unitId]
             st.priced = st.priced + W.gold * (a.useCharge or 0) * (w and w.uses or 0)
+            -- a paid Talk's hire (#766, Bot's hirePrice): the gold the paid-recruit script takes
+            st.priced = st.priced + W.gold * (a.hirePrice or 0)
         end
         judged = judged - st.priced
         st.judged = judged
@@ -2491,7 +2551,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, k in ipairs(rest) do
             local o = byKey[k]
             if o then readied(o.a) end   -- a spare is read only once a plan takes it
-            local n = o and extend(st, o.a, o.uid)
+            local n = o and extend(st, o.a, o.uid, true)
             if n then st, kept = n, kept + 1 end
         end
         if kept > 0 then offer(st, "rest") end
@@ -2811,13 +2871,13 @@ function M.plan(Bot, board, sight, style, opts)
                         for _, x in ipairs(base.acts) do
                             cur = rebuild(cur, { x }, leave(t.uid))
                             if not put and holds(cur, t.a.needs) then
-                                local n = extend(cur, t.a, t.uid)
+                                local n = extend(cur, t.a, t.uid, true)
                                 if n then cur, put = n, true end
                             end
                         end
-                        st = put and cur or extend(cur, t.a, t.uid)
+                        st = put and cur or extend(cur, t.a, t.uid, true)
                     else
-                        st = extend(start, t.a, t.uid)
+                        st = extend(start, t.a, t.uid, true)
                         st = st and rebuild(st, base.acts, leave(t.uid))
                     end
                 end
@@ -2842,10 +2902,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- away) and the deficit it closes (W.taken for each HP restored, the judge's `short`). The
     -- rank decides between the plans.
     if best and Bot.mendAt then
-        local unitOf = {}
-        for _, c in ipairs(cands) do unitOf[c.unit.id] = c.unit end
         local st = rebuild(start, best.acts, function(x, now)
-            local u = x.act == "wait" and unitOf[x.unitId] or nil
+            local u = x.act == "wait" and candOf(x.unitId) and candOf(x.unitId).unit or nil
             local h = u and Bot.mendAt(ctx, u, x.move) or nil
             if not h then return nil end
             h.why = "mend"
@@ -3135,7 +3193,7 @@ function M.plan(Bot, board, sight, style, opts)
         end)
         local st = start
         for _, o in ipairs(order) do
-            st = st and extend(st, o.a, o.a.unitId)
+            st = st and extend(st, o.a, o.a.unitId, true)
         end
         local was, same = {}, st ~= nil
         for i, a in ipairs(best.acts) do was[key(a)] = best.expect[i] end

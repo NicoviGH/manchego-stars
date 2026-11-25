@@ -500,6 +500,10 @@ local function sightOf(o)
         end
     end
     if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
+    -- a paid Talk's price (sight.talkPrice: o.price[u.id][t.id], 0 when unset) and the party's
+    -- gold (sight.gold)
+    if o.price then s.talkPrice = function(u, t) return (o.price[u.id] or {})[t.id] or 0 end end
+    if o.gold then s.gold = function() return o.gold end end
     -- the map as the phase changes it (sight.mapKey), read live so a test can open a door
     s.mapKey = function() return o.mapKey or "-" end
     -- fn() on the board a plan leaves (sight.changed, #661, #670): o.change(change) gives the
@@ -3708,6 +3712,41 @@ do
     check(where[0x01], "1,0", "vacate: with the ally ahead staying, A takes the free tile")
 end
 
+-- test_an_act_on_an_allys_tile_brings_the_allys_move_off_it (#766, vanilla Ch14 s4003 `r766f`):
+-- the board of the aside test below, with the beam cut to one partial plan of one act a unit.
+-- K's Door from (1,0) asks J, who stands there, to move first. The narrowed beam pins the
+-- mechanism: at the default beam this small board's beam happens to place J's aside first
+-- itself (#770's review), as Ch14's twelve units' did not (Colm and Innes offered the (17,2)
+-- door for nine turns while Tana and Artur held (17,1) and (18,1), no plan judged held it, and
+-- the board repeated until cut; with the step aside, `r766g`'s attempt 2 opened it on turn 8).
+-- The act now brings J's best move off the tile with it.
+do
+    local K = blue(0x01, 0, 0, 1)
+    local J = blue(0x02, 1, 1, 0)
+    local C = blue(0x03, 2, 0, 0)
+    local D = blue(0x04, 3, 1, 1)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 1 }, { 1, 0 }),
+                  [0x02] = tiles({ 1, 0 }, { 0, 0 }, { 1, 1 }, { 0, 2 }),
+                  [0x03] = tiles({ 0, 0 }, { 1, 0 }), [0x04] = tiles({ 1, 1 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE,
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["4,0"] = 2, ["0,1"] = 3, ["1,1"] = 2, ["0,2"] = 4 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+    }
+    local beam, per = Planner.BEAM, Planner.PER_UNIT
+    Planner.BEAM, Planner.PER_UNIT = 1, 1
+    local ok, _, plan = pcall(Planner.plan, B, boardOf(K, J, C, D, E), sightOf(o), style("careful"))
+    Planner.BEAM, Planner.PER_UNIT = beam, per
+    local opened = false
+    for _, a in ipairs(ok and plan and plan.acts or {}) do
+        opened = opened or (a.unitId == 0x01 and a.act == "door")
+    end
+    check(opened, true, "step aside: K's Door is played, J moved off its tile first")
+end
+
 -- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
 -- (0,1) and (0,2) are safe, (0,1) the safest by board order. C marches onto (0,1). A must
 -- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (Manchego Stars ch03:
@@ -5683,6 +5722,29 @@ do
         check(ctx.exploreGoal[0x01] and ctx.exploreGoal[0x01].x, 8,
               "exploring: the unit that gets there in time is sent")
         check(ctx.exploreGoal[0x02], nil, "exploring: the one too slow for the race is not")
+    end
+
+    -- test_exploring_times_both_villages (#766, #764's Ch10 witness): a flier A (MOV 8) makes
+    -- either village in time, a knight B (MOV 4) only the near one, (6,0), shut after enemy
+    -- phase 3; the far one, (14,0), shuts after phase 2. The greedy pairing gave A the near
+    -- village (its best pair) and the far one was lost. The assignment sends A far, B near.
+    do
+        local A3 = blue(0x01, 0, 0, 0, { minRange = false, mov = 8 })
+        local B3 = blue(0x02, 1, 0, 1, { minRange = false, mov = 4 })
+        local two = {}
+        for k, v in pairs(o) do two[k] = v end
+        two.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) }
+        two.explorable = { { x = 6, y = 0, kind = "visit" }, { x = 14, y = 0, kind = "visit" } }
+        two.canExplore = { [0x01] = { ["6,0"] = "visit", ["14,0"] = "visit" },
+                           [0x02] = { ["6,0"] = "visit", ["14,0"] = "visit" } }
+        two.closings = { ["6,0"] = 3, ["14,0"] = 2 }
+        local _, ctx = B.candidates(boardOf(A3, B3, X), sightOf(two), gifted("careful", 500))
+        local function goalOf(id)
+            local g = ctx.exploreGoal[id]
+            return g and (g.x .. "," .. g.y) or "-"
+        end
+        check(goalOf(0x01), "14,0", "exploring: the flier takes the village only it makes in time")
+        check(goalOf(0x02), "6,0", "exploring: the knight takes the near one")
     end
 
     -- test_threats_are_the_seen_and_the_remembered (ADR 0399): enemiesOf's first list is the
@@ -8729,6 +8791,45 @@ do
                  [0x02] = { [0x30] = true, [0x31] = true } } })
     check(g[0x01], "3,0", "talker: the nearest pair is sent first")
     check(g[0x02], "4,4", "talker: the second recruit gets the free talker")
+end
+
+-- test_a_paid_talker_is_priced_and_never_sent_past_the_purse (#766, vanilla Ch14's Rennac): A
+-- and C may both Talk T over, A the nearer. A's Talk is the paid hire (9,980 gold, Eirika's), C's
+-- free (L'Arachel's). With 9,420 gold the paid script refuses A's hire, so C is sent; A beside T
+-- is offered no Talk. With the gold to pay, the free talker still outranks the paid one, and with
+-- C out of it A is sent only where the style rates a unit above the price (careful: 1,000 points
+-- against 9,980 x 0.04; even: 300 against 9,980 x 0.08). An affordable Talk carries its price for
+-- the planner to charge.
+do
+    local A = blue(0x01, 0, 4, 0, { minRange = false })
+    local C = blue(0x19, 1, 9, 0, { minRange = false })
+    local T = blue(0x1C, 5, 0, 0, { faction = "green" })
+    local function o(gold, cTalks)
+        return { reach = { [0x01] = tiles({ 4, 0 }), [0x19] = tiles({ 9, 0 }) },
+                 talk = { [0x01] = { [0x1C] = true }, [0x19] = { [0x1C] = cTalks ~= false } },
+                 price = { [0x01] = { [0x1C] = 9980 } }, gold = gold }
+    end
+    check(talkGoals(boardOf(A, C, T), o(9420))[0x19], "0,0", "paid: the free talker is sent when the purse is short")
+    check(talkGoals(boardOf(A, C, T), o(9420))[0x01] ~= "0,0", true, "paid: the unpayable talker is not")
+    check(talkGoals(boardOf(A, C, T), o(20000))[0x19], "0,0", "paid: the free talker outranks the paid one")
+    check(talkGoals(boardOf(A, C, T), o(20000, false))[0x01], "0,0",
+          "paid: careful sends the paid talker when it is the only one")
+    check(talkGoals(boardOf(A, C, T), o(20000, false), style("even"))[0x01] ~= "0,0", true,
+          "paid: even rates the hire below its price")
+    local near = blue(0x01, 0, 1, 0, { minRange = false })
+    local reach = { [0x01] = tiles({ 1, 0 }) }
+    local short = o(9420, false); short.reach = reach
+    check(B.decide(boardOf(near, T), sightOf(short), style("careful")).act ~= "talk", true,
+          "paid: no Talk offered past the purse")
+    local rich = o(20000, false); rich.reach = reach
+    local a = B.decide(boardOf(near, T), sightOf(rich), style("careful"))
+    check(a.act == "talk" and a.hirePrice, 9980, "paid: an affordable Talk carries its price")
+    -- and the planner charges it, as it charges a weapon's uses (st.priced, W.gold points)
+    local _, plan = Planner.plan(B, boardOf(near, T), sightOf(rich), style("careful"))
+    local talked = false
+    for _, x in ipairs(plan and plan.acts or {}) do talked = talked or x.act == "talk" end
+    check(talked and plan.priced, 9980 * Planner.WEIGHTS.careful.gold,
+          "paid: the planner charges the hire")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is

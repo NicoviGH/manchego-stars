@@ -40,7 +40,9 @@
 -- death for it, and each unit is pulled forward as the old flat ground term pulled it (careful:
 -- ~111 a unit of nine, a turn closer ~9 against the old 8). The win itself is the planner's W.win.
 --
--- Goals.chance(goal, pos, gamma, turnsTo) -> 0..1: pos[unit id] = { x, y, acted, alive (0..1) },
+-- Goals.chance(goal, pos, gamma, turnsTo) -> 0..1, and the turn the likeliest taker arrives on
+-- (nil: none can): pos[unit id] = { x, y, acted, alive (0..1), late (turns a chain of jobs spends
+-- first, jobs.lua) },
 -- the board a plan leaves. t = turnsTo(u, tile, pos, beside), its turns there (sight's: cost /
 -- MOV, not rounded; `beside` = M.beside(goal.kind), the tile's lock left out); one that has
 -- acted takes it a turn later. The chance is gamma ^ (max(t, 1) - 1 +
@@ -428,7 +430,9 @@ function M.chance(goal, pos, gamma, turnsTo)
         -- opener), where p.alive x (1 - robbed) would count a way that kills the holder twice
         local alive = p and (goal.kind == "chest" and p.opens or p.alive or 1)
         if p and alive > 0 then
-            local late = p.acted and 1 or 0
+            -- p.late: the turns a chain of jobs already spends before this one (jobs.lua), so
+            -- its deadline and GAMMA count from now, not from the chain's last tile
+            local late = (p.late or 0) + (p.acted and 1 or 0)
             local beside = M.beside(goal.kind)
             local t
             if goal.path and #goal.path > 0 then
@@ -442,7 +446,7 @@ function M.chance(goal, pos, gamma, turnsTo)
             end
             if t then
                 options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
-                                          alive = alive }
+                                          alive = alive, turns = math.max(math.ceil(t), 1) + late }
             end
         end
     end
@@ -452,7 +456,9 @@ function M.chance(goal, pos, gamma, turnsTo)
         out = out + none * o.alive * o.c
         none = none * (1 - o.alive)
     end
-    return out
+    -- and the turns the likeliest taker arrives on, counted from now (a chain's next job,
+    -- jobs.lua, starts from there)
+    return out, options[1] and options[1].turns
 end
 
 return M

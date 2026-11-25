@@ -3205,6 +3205,13 @@ INSPECT.loadSight = function()
     return INSPECT.Sight
 end
 
+-- What the party may spend (Sight.spendableGold), for the campaign's api.gold: the shop and
+-- botrun's unpaid Talks. The Sight's own s.gold runs the same read on its sandbox.
+INSPECT.spendableGold = function()
+    local Sight = INSPECT.loadSight()
+    return INSPECT.gameCalls(function(call) return Sight.spendableGold(call, SYM) end)
+end
+
 INSPECT.sightApi = function()
     local raw = PROCS.raw
     INSPECT.loadSight()
@@ -4284,11 +4291,7 @@ INSPECT.campaignApi = function(game)
         -- the draws restart at each chapter start from (seed, chapter), so a resumed or pooled
         -- attempt draws what the whole campaign would have drawn there
         seed = function(ch) math.randomseed(seed, ch) end,
-        -- What the party may spend is the game's answer, not the PlaySt field: GetPartyGoldAmount
-        -- is 0 in Ch5x (bmgold.c), where the shop refuses every purchase.
-        gold = function()
-            return INSPECT.gameCalls(function(call) return call(SYM.GetPartyGoldAmount, {}) end)
-        end,
+        gold = INSPECT.spendableGold,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }

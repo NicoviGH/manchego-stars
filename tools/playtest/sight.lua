@@ -1411,7 +1411,7 @@ function M.demandsOf(units, commands, fog, freeTalks, needed)
     return out
 end
 
--- The walk of an event script's bytes (callsScript, scriptEffects): `visit(at, cmd, sub)` is
+-- The walk of an event script's bytes (talkPrice, scriptEffects): `visit(at, cmd, sub)` is
 -- called for each command, in order, and the walk stops early when it returns true (walkScript
 -- then returns true). A CALL or ENQUEUE_CALL (the script pointer at +4 either way) is visited
 -- and then walked into, so a called script's commands come in place and a visitor's own state
@@ -1421,12 +1421,11 @@ end
 -- The bytecode is linear and a GOTO or branch can jump over an END to a CALL behind a later
 -- LABEL, so an END stops the walk only when every label a GOTO/branch named is already behind it.
 -- Bounded: EV_SCRIPT_LIMIT commands a script, and a pointer is followed only inside the ROM
--- (a script in RAM, or garbage, is not read). `opts`: { memo = true } walks each script once
--- (a visitor with no state between CALLs, callsScript: a diamond of CALLs is then linear, not
--- exponential), { budget = n } stops the walk after n commands in all (a visitor with state, as
--- scriptEffects' slot 2, walks a script CALLed twice twice, so its total is bounded instead).
--- walkScript returns (stopped, truncated): `truncated` is true when the budget ended a walk.
--- Without memo the scripts being walked are a stack that guards a loop. Branches are not
+-- (a script in RAM, or garbage, is not read). `opts`: { budget = n } stops the walk after n
+-- commands in all (a visitor's state holds through CALLs, as scriptEffects' slot 2 and
+-- talkPrice's slot 4 do, so a script CALLed twice is walked twice and the total is bounded
+-- instead). walkScript returns (stopped, truncated): `truncated` is true when the budget ended a
+-- walk. The scripts being walked are a stack that guards a loop. Branches are not
 -- evaluated: every command the bytes reach linearly is visited. Pure over mem.
 -- Every ENQUEUE_CALL is followed, whatever its subcommand: an enqueued paid script reads as paid,
 -- which only withholds a free-talker demand, never adds a wrong one.
@@ -1439,11 +1438,9 @@ local ROM_REGION, ROM_SHIFT = 4, 25
 function M.walkScript(mem, script, visit, opts)
     opts = opts or {}
     local stack, left, truncated = {}, opts.budget or math.huge, false
-    local done = opts.memo and {} or nil
     local function walk(from)
-        if from >> ROM_SHIFT ~= ROM_REGION or stack[from] or (done and done[from]) then return false end
+        if from >> ROM_SHIFT ~= ROM_REGION or stack[from] then return false end
         stack[from] = true
-        if done then done[from] = true end
         local at, reached, wanted, stopped = from, {}, {}, false
         for _ = 1, M.EV_SCRIPT_LIMIT do
             local head = mem.u16(at)
@@ -1474,15 +1471,6 @@ function M.walkScript(mem, script, visit, opts)
     return stopped, truncated
 end
 
--- Whether the event script at `script` CALLs `target` (EV_CMD_CALL or EV_CMD_ENQUEUE_CALL),
--- through the CALLs of its own (M.walkScript's walk, each script once).
-function M.callsScript(mem, script, target)
-    if script == target then return true end
-    return M.walkScript(mem, script, function(at, cmd)
-        return (cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL) and mem.u32(at + 4) == target
-    end, { memo = true })
-end
-
 -- What an event script does to the field's units, read from its bytes (#724): the units it loads
 -- and the ones it removes. -> { loads = { { charId, x, y } }, removals = { charId }, truncated }.
 -- Encodings (include/eventscript.h, src/eventscr.c): a command's head halfword is cmd << 8 | len
@@ -1506,7 +1494,7 @@ end
 -- `truncated = true` and is an estimate of less than the script does. Pure over mem.
 local EV_CMD_SVAL, EV_CMD_LOADUNIT, EV_CMD_LOADSINGLEUNIT, EV_CMD_CHANGESTATE =
     0x05, 0x2C, 0x32, 0x34
-local EVSUB_KILL, EVSUB_DISA, EVENT_SLOT_2 = 0xD, 0xF, 2
+local EVSUB_KILL, EVSUB_DISA, EVENT_SLOT_2, EVENT_SLOT_4 = 0xD, 0xF, 2, 4
 local UDEF_SIZE, UDEF_LIMIT = 0x14, 64
 local MAP_COORD_LIMIT = 64   -- x and y are 6-bit fields in a UnitDefinition; a byte's 7th bit is a sign
 -- A UnitDefinition's allegiance (bmunit.h:202: the 2 bits above autolevel in +3): 0 blue, 1
@@ -1617,15 +1605,74 @@ function M.foldScripted(events)
     return out
 end
 
+-- The gold the talk script at `script` asks for a hire: nil when it never reaches the
+-- paid-recruit script `paid` (a free talk), else the price it set before the CALL. The game
+-- marks no talk free or paid, so the script is read (#766: the march sent Eirika, whose Talk
+-- costs 9,980 gold, to hire Ch14's Rennac with 9,420 in the purse).
+-- common-events.h EventScr_9EEB00 is CHECK_MONEY then BLT(0, EVT_SLOT_C, EVT_SLOT_4): it hires
+-- only when the party's gold is at least slot 4, and charges slot 4 (SADD slot 3 from slot 4,
+-- GIVETOSLOT3). Slot 4 is set by an SVAL (EvtSetSlot: slot at +2, a u32 at +4) earlier in the
+-- walk, the state held through CALLs (M.walkScript): E_14's EventScr_089F61C4 sets it to 0x26fc
+-- and CALLs EventScr_9EEAAC, which CALLs the paid script. Of vanilla's six slot-4 SVALs only
+-- E_14a's and E_14b's reach it (E_9a/b's are text ids before EventScr_089F3C34, E_19a/b's a
+-- UnitDefinition before EventScr_089F82FC, and neither CALLs it), so a paid CALL reached with
+-- slot 4 never set, or set to a ROM address, is a script this read does not know: it raises,
+-- as does a walk the budget cut short (it could hide the paid CALL and read as free). Pure.
+function M.talkPrice(mem, script, paid)
+    local slot4, price = nil, nil
+    local function visit(at, cmd)
+        if cmd == EV_CMD_SVAL and mem.u16(at + 2) == EVENT_SLOT_4 then
+            slot4 = mem.u32(at + 4)
+        elseif (cmd == EV_CMD_CALL or cmd == EV_CMD_ENQUEUE_CALL) and mem.u32(at + 4) == paid then
+            if slot4 == nil or slot4 >> ROM_SHIFT == ROM_REGION then
+                error(string.format("sight.talkPrice: script 0x%08X reaches the paid-recruit "
+                    .. "script with slot 4 %s, not a price", script,
+                    slot4 and string.format("= 0x%08X", slot4) or "never set"), 0)
+            end
+            price = slot4
+            return true
+        end
+        return false
+    end
+    -- a talk whose script IS the paid one sets no price of its own before it
+    if script == paid then
+        error(string.format("sight.talkPrice: script 0x%08X is the paid-recruit script itself, "
+            .. "with slot 4 never set", script), 0)
+    end
+    local _, truncated = M.walkScript(mem, script, visit, { budget = M.EV_WALK_BUDGET })
+    if truncated and price == nil then
+        error(string.format("sight.talkPrice: the walk of script 0x%08X was cut short", script), 0)
+    end
+    return price
+end
+
+-- What the party may spend, the game's answer on the machine `call` runs (the shop's, and the
+-- paid-recruit script's CHECK_MONEY), not the PlaySt field: GetPartyGoldAmount is 0 in Ch5x
+-- (bmgold.c), where the shop refuses every purchase. The one owner: s.gold and harness.lua's
+-- api.gold (INSPECT.spendableGold) each run it on their own machine.
+function M.spendableGold(call, S) return call(S.GetPartyGoldAmount, {}) end
+
+-- The gold talker `a`'s Talk to `b` hires `b` for: of `talks` (M.talks' entries, available or
+-- not), those naming the pair (a = 0 is anyone), priced by M.talkPrice; the dearest when more
+-- than one names it, 0 for free or none. An entry's flag only says whether it runs now; its
+-- script is what it charges, so a script this read does not know raises whatever its flag. Pure.
+function M.pairPrice(mem, talks, paid, a, b)
+    local p = 0
+    for _, e in ipairs(talks) do
+        if (e.a == a or e.a == 0) and e.b == b then
+            p = math.max(p, M.talkPrice(mem, e.script, paid) or 0)
+        end
+    end
+    return p
+end
+
 -- The recruits a unit brings over for FREE: of `talks` (M.recruitTalks), the talks to a unit not
--- yet in the party (`joined`, a set of charIds) whose script never reaches the paid-recruit
--- script `paid` (common-events.h EventScr_9EEB00: it asks the price; E_14's Eirika and Rennac).
--- The game marks no talk free or paid, so the script is read. a = 0 is anyone: no demand.
--- -> { [recruit] = { [talker] = true } }
+-- yet in the party (`joined`, a set of charIds) whose script asks no price (M.talkPrice).
+-- a = 0 is anyone: no demand. -> { [recruit] = { [talker] = true } }
 function M.freeTalks(mem, talks, paid, joined)
     local out = {}
     for _, t in ipairs(talks) do
-        if t.a ~= 0 and not (joined or {})[t.b] and not M.callsScript(mem, t.script, paid) then
+        if t.a ~= 0 and not (joined or {})[t.b] and M.talkPrice(mem, t.script, paid) == nil then
             out[t.b] = out[t.b] or {}
             out[t.b][t.a] = true
         end
@@ -4843,6 +4890,27 @@ function M.new(outer)
         end)
     end
 
+    -- The gold `u`'s Talk to `t` hires `t` for (M.talkPrice of its script), 0 for a free one or
+    -- none: the game's Talk check knows no gold, its paid script refuses a hire the party cannot
+    -- pay (#766). Every entry of the chapter's table is read, available now or not (a talk's
+    -- script is its own whatever its flag), once per Sight; a pair named by more than one entry
+    -- is priced at the dearest.
+    local allTalks, prices = nil, {}
+    function s.talkPrice(u, t)
+        local k = u.charId .. ">" .. t.charId
+        if prices[k] == nil then
+            allTalks = allTalks or M.talks(api, sandbox, true)
+            prices[k] = M.pairPrice(mem, allTalks, S.EventScr_9EEB00, u.charId, t.charId)
+        end
+        return prices[k]
+    end
+    -- the party's gold as the paid-recruit script's CHECK_MONEY reads it (M.spendableGold), on
+    -- this Sight's own sandbox: the bot asks it inside a sight.batch, where a call on another
+    -- machine (harness.lua's INSPECT.gameCalls) did not return (#770's review fix, `r766h`)
+    function s.gold()
+        return sandbox(function(call) return M.spendableGold(call, S) end)
+    end
+
     local function asActive(u, x, y) M.asActive(api, u, x, y) end
 
     -- A razed village keeps its Visit command (GetAvailableTileEventCommand), but the Visit
@@ -5434,8 +5502,9 @@ end
 -- recruits): SearchAvailableEvent walks the chapter's characterBasedEvents asking for a pair no
 -- entry names, a breakpoint on each talk check (EvCheck03_CHAR, EvCheck04_CHARASM) reads the
 -- entry it is handed, and CheckForCharacterEvents(a, b) keeps the ones available (flag unset,
--- condition met). -> { { a = pidA, b = pidB, script } }, a = 0 being anyone.
-function M.talks(api, sandbox)
+-- condition met; `all`: every entry, available or not). -> { { a = pidA, b = pidB, script } },
+-- a = 0 being anyone.
+function M.talks(api, sandbox, all)
     local mem, S = api.mem, api.SYM
     return (sandbox or M.machine(api.cpu))(function(call, info)
         eventSearch(api, call, info, CHAPTER_TALKS)
@@ -5449,6 +5518,7 @@ function M.talks(api, sandbox)
         end
         M.withBreaks(api.cpu, { { S.EvCheck03_CHAR, entry }, { S.EvCheck04_CHARASM, entry } },
             function() call(S.SearchAvailableEvent, { info }) end)
+        if all then return seen end
         local out = {}
         for _, t in ipairs(seen) do
             if call(S.CheckForCharacterEvents, { t.a, t.b }) ~= 0 then out[#out + 1] = t end

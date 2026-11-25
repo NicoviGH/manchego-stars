@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0468 (#766): a talk's script is read for its price (sight.talkPrice), not
+    # only whether it reaches the paid script; the event walk has no memo (every visitor keeps
+    # state through CALLs)
+    r'\bcallsScript\b', r'\{ memo = true \}',
     # retired by ADR 0467 (#765): a retry's memory is the failed attempts' timelines
     # (timeline.lua), not four hand-picked lists; the hold reads Timeline.holdTurns
     r'\bstyle\.arrivals\b', r'\bmemory\.(?:enemies|arrivals|closings|fates)\b',
