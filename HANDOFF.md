@@ -13,41 +13,38 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-24; main is 12c9c716 + this HANDOFF)
+## Next session starts here (2026-11-24; main is 64060b87 + this HANDOFF)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the
 plan, first. In short: one-case fixes kept trading one loss for another. The bot will:
-- **R1 #765: done.** PR #769 (ADR 0467): a retry's memory is each failed attempt's visible
-  timeline (`tools/playtest/timeline.lua`).
-- **R2 #766: part 1 merged** (PR #770, ADR 0468 and 0469):
-  - `jobs.lua` assigns the march's jobs over deadlines.
-  - A paid Talk is priced from its script: a talker the party cannot pay is no talker, and a
-    hire is charged.
-  - An act on an ally's tile brings the ally's move off it.
-  - **First, PR #770's loose ends**, in #766's latest comment: a default-settings test from Ch14's
-    real board, and the turn-11 plan over the death cap played while admitted plans were offered.
+- **R1 #765: done.** PR #769 (ADR 0467).
+- **R2 #766: part 1 merged** (PR #770, ADR 0468 and 0469), **and PR #770's two loose ends are
+  closed** (#766's comments of 2026-11-24 have the detail):
+  - PR #771: a step-aside test built from Ch14's real corridor (`r766f` turn 13) fails without
+    the step aside at the default beam. The beam's "carry a fully placed plan" rule stays held by
+    reading: four boards and beam widths 1 to 16 never showed it doing anything (ADR 0469).
+  - PR #772, ADR 0470 (Nicolas chose option A): the death cap reads the next enemy phase and the
+    wear, never the lookahead's second phase, which only breaks ties now. Deaths are graded
+    against the same number (botrun `deathRead`, montecarlo `death_read`). Replay `a470a` of Ch14
+    s4003 is move-for-move identical to `r766i`. **Not measured:** how often A changes play
+    (when a lookahead finalist read as dying two turns out now wins on progress). Measure it on
+    the next lap of games over the R2/R3 batch, not alone (ADR 0430).
   - **Left for R2:** the stage, clear and escort jobs, and replacing `recruitFirst` and
-    `marchGoal`'s per-goal choice (#766's first progress comment). Cut a new branch from main
-    for them; `feat/766-job-layer` is deleted.
+    `marchGoal`'s per-goal choice (#766's first progress comment). Cut a new branch from main.
 - **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it). The
   Ch14 replays show why: L'Arachel holds Rennac's job but spends turns on her staff.
 - **R4 #768:** then measure the walls.
 
 The one call still open for Nicolas is whether R3 touches the rank's order (before R3).
 
-**What PR #770's replays showed** (vanilla Ch14 s4003, two attempts each):
-- **`r766g`, before the review fixes:** attempt 2 **won clean** in 19 turns with 0 deaths.
-  Rennac was talked over on turn 5 and the (17,2) door opened on turn 8.
-- **`r766i`, after the review fixes:**
-  - Attempt 1 won in 22 turns with 0 deaths.
-  - Attempt 2 won in 21 turns: Rennac was talked over on turn 5, then died on turn 13 in a plan
-    read at 0.59 to die, over the cap.
-  - On turn 11 both runs played a non-admitted `spare` plan (0.835) over admitted ones. That is
-    noted on #743; it is not #770's.
-- **`r766e`/`r766f`:** the stall the step-aside fixed (keyless allies on both of the door's
-  tiles; `r766f` was instrumented).
-- `r766h` crashed on turn 2: a gold read nested two machines. It was fixed before the merge; ignore
-  the run.
+**Ch14 s4003 as it stands** (`a470a`, two attempts): both won (22 and 21 turns). In attempt 2
+Rennac dies on turn 13 where no plan was under the cap even on the next phase (0.536 at best):
+#743's ground, the wounded unit with no safe tile.
+
+**Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s4003/`.
+Ch14 s4003's start is a scout lap: replay it with
+`montecarlo.py resume --game vanilla --tag <tag> --campaigns b640e-cs-s4003 --chapter 14 --last 14
+--attempts 2 --scout --jobs 1`.
 
 **Holds to revisit:** #569 waited on R1 (read its hold comment: does it reopen?). #727 waits on
 R2/R3, #639 on R4. #742 lands before R4. #745 (the recorder misses a thief's drop) stays open.
