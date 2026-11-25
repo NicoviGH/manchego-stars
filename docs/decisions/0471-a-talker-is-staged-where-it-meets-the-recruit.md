@@ -1,0 +1,65 @@
+---
+id: 471
+title: "A talker is staged where it meets the recruit, on the route an earlier attempt saw him walk"
+date: "2026-11-24"
+section: "Combat System"
+issues: [766, 764, 510]
+---
+
+# A talker is staged where it meets the recruit, on the route an earlier attempt saw him walk
+
+**Decided (2026-11-24, #766, the stage job of R2 in #764's plan).** It builds on ADR 0467 (the
+timeline) and ADR 0468 (the Talk job's worth).
+
+**Why.** A recruit the game's AI moves is priced where the talker meets him on his way
+(`Goals.chance` reads `goal.path`, #699). But the march aimed at the tile he stood on, so a
+talker behind him chased. Two gaps stood behind that:
+- **The march's goal was his current tile.** `exploring` gave the Talk job the recruit's own tile,
+  and the job had no deadline: a talker that could never reach him before he left was still sent.
+- **The path stopped at the forecast's horizon** (8 enemy phases, `sight.lua` `CLOSE_HORIZON`).
+  Vanilla Ch14's Rennac leaves 9 turns after he appears, so the last meeting turns were never
+  read. R1's remembered routes (`Timeline.routes`) were written for this, and nothing read them.
+
+## What changed
+
+- **`Timeline.routeOf(memory, charId, classId)`**: a character's walk from the latest attempt
+  that showed it, and the turn it arrived on. A slot id changes between attempts; the character
+  does not.
+- **`goals.lua` `runOn`**: a recruit's path is the forecast's phases, then the remembered route
+  up to his removal (or the route's end when no removal is known). Phase k is read `turn + k -
+  appearance` turns after he came, where the appearance is this attempt's (`ctx.appeared`), or
+  turn 0 for a unit there at the start. **The forecast's phases stand**: the board as it is now
+  outranks a memory of another play. A unit that has not appeared yet this attempt, or that no
+  attempt saw walk, keeps the forecast alone.
+- **`Goals.meeting`**: where and in which phase a taker meets a goal. It shares one read
+  (`arrive`) with `Goals.chance`, so the march aims where the chance is priced.
+- **`exploring`'s Talk jobs** read the recruit goals (`Goals.recruits`, the same goals
+  `Goals.list` prices). A talker's job is worth the recruit's worth less the hire (ADR 0468)
+  times its chance of meeting him. Its tile is the meeting tile. **A talker with no chance of
+  meeting him before he is removed has no job**: per #764, a job no one can make in time is
+  dropped, not chased. The Talk itself is still offered whenever the game offers it
+  (ADR 0396).
+
+## Effect on the old pairing test
+
+`test_each_recruit_gets_its_own_talker` changed answer. Counting the chance, A takes T2 and C
+takes T1, so both recruits are reached this turn. The old answer (the nearest pair first) left C
+two turns from T2.
+
+## Proof
+
+- Unit tests that fail without the change: `test_timeline` (routeOf), `test_goals`
+  (`test_a_recruit_path_runs_on_where_the_last_attempt_saw_him_walk`), `test_bot`
+  (`test_a_talker_is_staged_where_it_meets_the_recruit`: both checks fail on main).
+- Lua test time is unchanged: 0.72 to 0.73 s CPU against 0.71 to 0.72 s on main, run back to back.
+- **Replay `s766a`, vanilla Ch14 s4003, two attempts, against `a470a` (main):**
+  - Attempt 2 plays move for move as on main. L'Arachel talks Rennac over on turn 5, so the
+    remembered route is never needed, and Rennac's turn-13 death (#743) stands.
+  - Attempt 1 first diverges on turn 5. From then L'Arachel's job is the meeting tile (1,8),
+    on Rennac's forecast walk west to his exit; on main it was his current tile, one turn
+    behind him. **She does not play it:** her ends are (20,13), (14,13), (20,13), and from
+    turn 9 no meeting is left. Rennac is missed, as on main. The job is right, but the
+    per-turn planner does not play it. That is R3 (#767).
+  - Attempt 1 won in 24 turns with 1 death (Colm, charId 9, turn 16), against 22 turns and
+    0 deaths on main. That death is 11 turns after the divergence, in a different game; one
+    run does not show its cause.

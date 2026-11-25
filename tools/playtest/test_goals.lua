@@ -249,6 +249,37 @@ do
         "recruit path: without a path, the current tile is the price")
 end
 
+-- test_a_recruit_path_runs_on_where_the_last_attempt_saw_him_walk (#766's stage job, vanilla
+-- Ch14's Rennac): the forecast plays one enemy phase of his walk, and he leaves after phase 4.
+-- The last attempt saw him walk east from his appearance; this attempt he appeared on turn 3,
+-- and it is turn 5, so phases 2 and 3 are where he stood 4 and 5 turns after he appeared. A
+-- talker ahead of him meets him only in phase 3: on the forecast alone he is past its end, and
+-- the goal reads no chance.
+do
+    local rennac = { id = 0x90, charId = 0x20, classId = 4, x = 8, y = 0, faction = "red",
+                     onField = true, items = {} }
+    local board = { units = { blue(1, 24, 0), rennac }, turn = 5 }
+    local sight = fakeSight()
+    function sight.closings() return { ["unit:144"] = 4 }, { [0x90] = { { x = 12, y = 0 } } } end
+    local track = { { turn = 3, phase = "player", x = 6, y = 0 }, { turn = 4, phase = "enemy", x = 8, y = 0 },
+                    { turn = 5, phase = "enemy", x = 12, y = 0 }, { turn = 6, phase = "enemy", x = 16, y = 0 },
+                    { turn = 7, phase = "enemy", x = 20, y = 0 } }
+    local memory = { attempts = { { units = { { key = "r", charId = 0x20, classId = 4, faction = "red",
+                                                  arrival = 3, track = track } } } } }
+    local ctx = { recruitTalkers = { [0x90] = { 1 } }, turn = 5,
+                  appeared = function(c, k) return c == 0x20 and k == 4 and 3 or nil end }
+    local g = find(Goals.list(board, sight, { memory = memory }, ctx), "recruit:144")
+    local p = g.path or {}
+    check(#p .. " " .. p[1].x .. " " .. (p[2] or {}).x .. " " .. (p[3] or {}).x, "3 12 16 20",
+          "remembered route: the forecast's phase, then where he walked, up to his removal")
+    local pos = { [1] = { x = 24, y = 0, acted = false, alive = 1 } }
+    check(Goals.chance(g, pos, G, sight.turnsTo) > 0, true, "remembered route: met in phase 3")
+    local tile, f = Goals.meeting(g, board.units[1], pos[1], sight.turnsTo)
+    check(tile and tile.x .. "," .. tile.y .. " " .. f, "16,0 3", "remembered route: the meeting tile and phase")
+    g = find(Goals.list(board, sight, {}, ctx), "recruit:144")
+    check(Goals.chance(g, pos, G, sight.turnsTo), 0, "no memory: past the forecast he is never met")
+end
+
 -- TestRecruitOnALockedTileIsMet (#710, vanilla Ch14's Rennac): his path runs over a chest the
 -- taker holds no key for. A Talk is beside the recruit, so his tile's lock is no way's cost: the
 -- goal asks turnsTo to leave it out (`beside`), for the path and for the stationary price. A

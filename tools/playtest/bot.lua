@@ -2984,7 +2984,9 @@ local function exploring(ctx, sent, barred, triedIn)
         for _, u in ipairs(units) do
             local c = out[u.id]
             if c then
-                ctx.exploreGoal[u.id] = { x = c[1].t.x, y = c[1].t.y, kind = kind }
+                -- where the first job is had: a recruit's meeting tile (`at`), else the goal's
+                local at = pair[u.id .. ">" .. c[1].id].at or c[1].t
+                ctx.exploreGoal[u.id] = { x = at.x, y = at.y, kind = kind }
                 ctx.jobs[u.id] = c
                 for _, j in ipairs(c) do taken[j.id] = true end
             end
@@ -2995,6 +2997,8 @@ local function exploring(ctx, sent, barred, triedIn)
     -- Ross, killed on turn 2 while Eirika marched on the brigands). A recruit the style claims
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
+    -- each recruit's goal (Goals.recruits): when he is removed, and where he walks till then
+    local recruitGoal = Goals.recruits(ctx.board, ctx.sight, ctx.style, ctx)
     for _, t in ipairs(recruitTargets(ctx)) do
         -- unclaimed: any talker; claimed: the first claim with a talker that can go, as
         -- recruitFirst falls through its claims in order
@@ -3011,7 +3015,22 @@ local function exploring(ctx, sent, barred, triedIn)
             -- the planner may still play it, the hire charged (st.priced)
             local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, p.u, t) },
                                   weightsFor(ctx.style.aggression))
-            if v > 0 then talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = v } end
+            -- the stage job (#766): the talker is sent where it meets him on his way
+            -- (Goals.meeting), not to the tile he is leaving, and the job is worth its chance
+            -- of that (Goals.chance); a talker that cannot meet him before he is removed has no
+            -- job, which is dropped, not chased (#764)
+            local g, at, c, turns = recruitGoal[t.id], nil, 1, nil
+            if g then
+                local goal = { kind = g.kind, tile = g.tile, closes = g.closes, path = g.path,
+                               takerUnits = { p.u } }
+                local pos = { x = p.u.x, y = p.u.y, acted = p.u.acted, alive = 1 }
+                c, turns = Goals.chance(goal, { [p.u.id] = pos }, Goals.GAMMA, ctx.turnsTo)
+                at = Goals.meeting(goal, p.u, pos, ctx.turnsTo)
+            end
+            if v > 0 and c > 0 then
+                talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = v * c, turns = turns,
+                                              at = at }
+            end
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
@@ -3622,6 +3641,7 @@ end
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    ctx.board = board   -- exploring's Talk jobs read the recruits' goals off it (Goals.recruits)
     -- the board's Talk memo (#671): a re-list's read asks the same pairs again (recruitsOf, 224
     -- CheckForCharacterEvents per change key), and a pair's answer is keyed by its two units (ids
     -- are stable within the chapter) and depends on charIds and the event flags, which no door or

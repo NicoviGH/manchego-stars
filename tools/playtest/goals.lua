@@ -255,6 +255,74 @@ function M.openTiles(sight, style, ctx, closings)
     return out
 end
 
+-- A recruit's path (sight.closings' second answer: where he stands after each enemy phase, as
+-- far as the forecast plays) run on with where an earlier attempt saw him walk (Timeline.routeOf,
+-- #766's stage job: Ch14's Rennac leaves 9 turns after he appears, past the forecast's 8
+-- phases). Phase k is player turn ctx.turn + k, so it reads the route `ctx.turn + k - from`
+-- turns after he came: `from` is his appearance in this attempt (ctx.appeared) for a unit that
+-- arrived, turn 0 for one there at the start. Up to his removal (closes - 1, the path's own
+-- contract), or with none known to the route's end. The forecast's phases stand: the board as
+-- it is outranks another play's memory. A turn before the route's first step reads the tile
+-- before it (a phase the fog hid). A unit that came in the earlier attempt but not yet in this
+-- one, or that no attempt saw walk, keeps the forecast.
+local function runOn(path, closes, t, memory, ctx)
+    local route, arrival = nil, nil
+    if memory and t.charId then route, arrival = Timeline.routeOf(memory, t.charId, t.classId) end
+    local from = route and (arrival == nil and 0 or ctx.appeared and ctx.appeared(t.charId, t.classId))
+    if not (from and ctx.turn) then return path end
+    path = path or {}
+    local last = closes and closes - 1 or route[#route].after - (ctx.turn - from)
+    if last <= #path then return path end
+    local out = {}
+    for k, v in ipairs(path) do out[k] = v end
+    for k = #path + 1, last do
+        local at = out[k - 1] or { x = t.x, y = t.y }
+        for _, st in ipairs(route) do
+            if st.after <= ctx.turn + k - from then at = { x = st.x, y = st.y } end
+        end
+        out[k] = at
+    end
+    return out
+end
+
+-- Each recruit a unit may Talk over (ctx.recruitTalkers, a pending one ctx.pendingRecruits'),
+-- as a goal: worth the gold he carries, taken by his talkers, closing when he is removed, met on
+-- his path (runOn). `byId` holds the board's units by id.
+local function recruitGoals(byId, closings, paths, cost, style, ctx)
+    local out = {}
+    for id, talkers in pairs(ctx.recruitTalkers or {}) do
+        local t = byId[id] or (ctx.pendingRecruits or {})[id]
+        if t then
+            local gold = 0
+            for _, it in ipairs(t.items or {}) do gold = gold + cost(it.id) end
+            local us = {}
+            for _, uid in ipairs(talkers) do
+                if byId[uid] then us[#us + 1] = byId[uid] end
+            end
+            out[#out + 1] = { id = "recruit:" .. id, kind = "recruit", unitId = id,
+                              tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us,
+                              closes = closings["unit:" .. id],
+                              path = runOn(paths[id], closings["unit:" .. id], t, style.memory, ctx) }
+        end
+    end
+    return out
+end
+
+-- The recruit goals alone (recruitGoals), by the recruit's unit id: the Talk jobs' read
+-- (bot.lua's exploring, #766), the same goals M.list prices.
+function M.recruits(board, sight, style, ctx)
+    local byId = {}
+    for _, u in ipairs(board.units) do byId[u.id] = u end
+    local open, walks = M.closings(sight, style, ctx)
+    local closings, paths = M.scriptedCloses(sight, ctx, board, open, walks, style.memory)
+    local out = {}
+    for _, g in ipairs(recruitGoals(byId, closings, paths, sight.itemCost or function() return 0 end,
+                                    style, ctx)) do
+        out[g.unitId] = g
+    end
+    return out
+end
+
 function M.list(board, sight, style, ctx)
     local goals, blues, byId = {}, {}, {}
     -- a sight without a read (test_bot's fakes) has no goal that needs it
@@ -284,20 +352,7 @@ function M.list(board, sight, style, ctx)
         end)
         goals[#goals + 1] = g
     end
-    for id, talkers in pairs(ctx.recruitTalkers or {}) do
-        local t = byId[id] or (ctx.pendingRecruits or {})[id]
-        if t then
-            local gold = 0
-            for _, it in ipairs(t.items or {}) do gold = gold + cost(it.id) end
-            local us = {}
-            for _, uid in ipairs(talkers) do
-                if byId[uid] then us[#us + 1] = byId[uid] end
-            end
-            goals[#goals + 1] = { id = "recruit:" .. id, kind = "recruit", unitId = id,
-                                  tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us,
-                                  closes = closings["unit:" .. id], path = paths[id] }
-        end
-    end
+    for _, g in ipairs(recruitGoals(byId, closings, paths, cost, style, ctx)) do goals[#goals + 1] = g end
     for _, u in ipairs(ctx.objectiveTile and blues or {}) do
         local t = ctx.objectiveTile(u)
         if t then
@@ -409,6 +464,7 @@ end
 -- recruit's own tile. Past the path's last phase, with no removal, it stays where it ended.
 -- `beside` (M.beside) asks turnsTo to leave the lock on his tile out: priced through the chests
 -- Rennac walks over, every partial plan read his chance as 0 (#710).
+-- Second and third answers: the tile he is met on and its phase.
 local function meet(goal, u, p, late, turnsTo, beside)
     local path = goal.path
     for f = 1, goal.closes or math.huge do
@@ -416,9 +472,30 @@ local function meet(goal, u, p, late, turnsTo, beside)
         if beyond and goal.closes then return nil end
         local tile = f == 1 and goal.tile or path[math.min(f - 1, #path)] or goal.tile
         local t = turnsTo(u, tile, p, beside)
-        if t and (beyond or math.max(math.ceil(t), 1) + late <= f) then return t end
+        if t and (beyond or math.max(math.ceil(t), 1) + late <= f) then return t, tile, f end
         if beyond then return nil end
     end
+end
+
+-- When taker `u` (at `p`, M.chance's position, `late` turns spent first) gets to `goal`: its
+-- turns (turnsTo's), the tile it gets the goal on and the player phase from now (1: this one),
+-- or nil when it cannot before the goal closes. A recruit the game moves is met on his way
+-- (meet); any other goal stands where it is. The one read M.chance prices and M.meeting aims.
+local function arrive(goal, u, p, late, turnsTo)
+    local beside = M.beside(goal.kind)
+    -- the deadline is in the meeting's phase (meet), so no closes test after it
+    if goal.path and #goal.path > 0 then return meet(goal, u, p, late, turnsTo, beside) end
+    local t = turnsTo(u, goal.tile, p, beside)
+    local f = t and math.max(math.ceil(t), 1) + late
+    if not f or goal.closes and goal.closes < f then return nil end
+    return t, goal.tile, f
+end
+
+-- Where taker `u` meets the goal, and in which player phase from now: the stage job's tile
+-- (#766), a talker marching where it meets the recruit, not at the tile he is leaving.
+function M.meeting(goal, u, p, turnsTo)
+    local _, tile, f = arrive(goal, u, p, (p.late or 0) + (p.acted and 1 or 0), turnsTo)
+    return tile, f
 end
 
 function M.chance(goal, pos, gamma, turnsTo)
@@ -433,17 +510,7 @@ function M.chance(goal, pos, gamma, turnsTo)
             -- p.late: the turns a chain of jobs already spends before this one (jobs.lua), so
             -- its deadline and GAMMA count from now, not from the chain's last tile
             local late = (p.late or 0) + (p.acted and 1 or 0)
-            local beside = M.beside(goal.kind)
-            local t
-            if goal.path and #goal.path > 0 then
-                -- the deadline is in the meeting's phase (meet), so no closes test after it
-                t = meet(goal, u, p, late, turnsTo, beside)
-            else
-                t = turnsTo(u, goal.tile, p, beside)
-                if t and goal.closes and goal.closes < math.max(math.ceil(t), 1) + late then
-                    t = nil
-                end
-            end
+            local t = arrive(goal, u, p, late, turnsTo)
             if t then
                 options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
                                           alive = alive, turns = math.max(math.ceil(t), 1) + late }

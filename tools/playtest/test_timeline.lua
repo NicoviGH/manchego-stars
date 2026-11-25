@@ -219,5 +219,20 @@ do
     check(#t .. " " .. t[1].killerKey .. " a" .. t[1].attempt, "1 a:128:5:3 a1", "threats: the death and its attempt")
 end
 
+-- routeOf: a character's walk by its charId and class, the latest attempt that showed it (#766's
+-- stage job reads where a recruit walks, not which slot he had)
+do
+    local a1 = Fakeline.attempt({ arrivals = { { charId = 0x80, classId = 5, turn = 3 } } })
+    a1.units[1].track = { { turn = 3, phase = "player", x = 1, y = 1, hp = 20 } }
+    local a2 = Fakeline.attempt({ arrivals = { { charId = 0x80, classId = 5, turn = 4 } } })
+    a2.units[1].track = { { turn = 4, phase = "player", x = 2, y = 2, hp = 20 },
+                          { turn = 5, phase = "enemy", x = 3, y = 2, hp = 20 } }
+    local mem = { attempts = { a1, a2 } }
+    local r = Timeline.routeOf(mem, 0x80, 5)
+    check(r and #r .. " " .. r[2].after .. " " .. r[2].x, "2 2 3", "routeOf: the latest attempt's walk")
+    check(Timeline.routeOf(mem, 0x80, 6), nil, "routeOf: another class is another unit")
+    check(Timeline.routeOf(nil, 0x80, 5), nil, "routeOf: no memory, no route")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

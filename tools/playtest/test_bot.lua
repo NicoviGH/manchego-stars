@@ -575,7 +575,10 @@ local function sightOf(o)
     end
     -- when a looter takes each open tile (sight.closings: "x,y" -> the enemy phase); the game
     -- always has the read where it has villages and chests (none: no looter)
-    if o.closings or o.explorable then s.closings = function() return o.closings or {} end end
+    -- and o.paths, where each watched recruit stands after each enemy phase (its second answer)
+    if o.closings or o.explorable then
+        s.closings = function() return o.closings or {}, o.paths end
+    end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then
         s.explorable = function() return o.explorable end
@@ -8794,6 +8797,25 @@ end
 -- turn a hold costs against the death a march risks. A menu cut to the march alone left no safe
 -- plan to judge (vanilla Ch5: Natasha sent into a 0.56 chance to die on turn 3, Joshua lost).
 -- So claimed and unclaimed menus are alike here; which talker a claim sends is
+-- test_a_talker_is_staged_where_it_meets_the_recruit (#766's stage job): T walks east, (5,0)
+-- after the first enemy phase and (10,0) after the second, and leaves after the third. A, 15
+-- tiles from where T stands, cannot be beside him this turn, but meets him on his way at (5,0)
+-- next turn: A marches there, not at the tile T is leaving. Where T leaves before any talker
+-- can meet him, the Talk is no job (a job no one can make in time is dropped, not chased, #764).
+do
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local function o(closes, path)
+        return { reach = { [0x01] = tiles({ 12, 3 }) }, talk = { [0x01] = { [0x30] = true } },
+                 closings = { ["unit:48"] = closes }, paths = { [0x30] = path } }
+    end
+    local A = blue(0x01, 0, 12, 3, { minRange = false })
+    check(talkGoals(boardOf(A, T), o(3, { { x = 5, y = 0 }, { x = 10, y = 0 } }))[0x01], "5,0",
+          "stage: the talker marches where it meets the recruit")
+    local far = blue(0x01, 0, 14, 9, { minRange = false })
+    local g = talkGoals(boardOf(far, T), o(2, { { x = 5, y = 0 } }))[0x01]
+    check(g ~= "0,0" and g ~= "5,0", true, "stage: no Talk job a talker cannot make before he leaves")
+end
+
 -- test_a_claimed_recruit_is_sent_its_claimed_talker's, and no way at all
 -- test_no_talker_is_sent_where_it_has_no_way's.
 do
@@ -8856,8 +8878,9 @@ do
 end
 
 -- test_each_recruit_gets_its_own_talker: A and C may each Talk to T1 and T2, and A is the
--- nearer to both. Each recruit gets one talker and each talker one recruit, nearest pair first:
--- A takes T1 (distance 1), C is left T2.
+-- nearer to both. Each recruit gets one talker and each talker one recruit, so that both are
+-- met soonest (#766: the assignment, not the nearest pair first): A reaches T2 (4 tiles) and C
+-- reaches T1 (5 tiles) this turn at MOV 5, where A on T1 left C 8 tiles, two turns, from T2.
 do
     local A = blue(0x01, 0, 4, 0, { minRange = false })
     local C = blue(0x02, 1, 8, 0, { minRange = false })
@@ -8867,8 +8890,8 @@ do
         reach = { [0x01] = tiles({ 4, 0 }), [0x02] = tiles({ 8, 0 }) },
         talk = { [0x01] = { [0x30] = true, [0x31] = true },
                  [0x02] = { [0x30] = true, [0x31] = true } } })
-    check(g[0x01], "3,0", "talker: the nearest pair is sent first")
-    check(g[0x02], "4,4", "talker: the second recruit gets the free talker")
+    check(g[0x01], "4,4", "talker: each recruit is met this turn, A on T2")
+    check(g[0x02], "3,0", "talker: and C on T1")
 end
 
 -- test_a_paid_talker_is_priced_and_never_sent_past_the_purse (#766, vanilla Ch14's Rennac): A

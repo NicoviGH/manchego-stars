@@ -29,7 +29,8 @@
 --   items     what the screen showed change hands: { kind = "theft"|"drop", turn, ... }
 --
 -- A retry's memory is the failed attempts' timelines, oldest first: style.memory = { attempts }.
--- Its readers are below (M.enemies, M.arrivals, M.holdTurns, M.deadlines, M.routes, M.threats);
+-- Its readers are below (M.enemies, M.arrivals, M.holdTurns, M.deadlines, M.routes, M.routeOf,
+-- M.threats);
 -- nothing else keeps a copy of what an earlier attempt saw.
 
 local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
@@ -408,6 +409,22 @@ function compute.routes(memory)
         end
     end
     return out
+end
+
+-- A character's walk (M.routes' steps) by its charId and class, from the latest attempt that
+-- showed it walk, or nil: a unit's slot id is not the same over attempts, its character is
+-- (#766's stage job: where a recruit walks after he appears). Second answer: the first board
+-- turn it arrived on that attempt, the one its steps count from; nil for a unit there at the
+-- start (its steps count from turn 0).
+function M.routeOf(memory, charId, classId)
+    local out, arrival
+    for _, tl in ipairs(attempts(memory)) do
+        for _, u in ipairs(tl.units or {}) do
+            local r = u.charId == charId and u.classId == classId and M.routes(memory)[u.key]
+            if r and #r.steps > 0 then out, arrival = r.steps, u.arrival end
+        end
+    end
+    return out, arrival
 end
 
 -- Who killed whom, from where, on which turn, over every earlier attempt, oldest first: each
