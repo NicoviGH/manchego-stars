@@ -9734,18 +9734,21 @@ do
           "joined: the mend swaps the deadly Talk for the talker's other act")
 end
 
--- PR #773 review: a recruit paid as a player unit meets the fog as one (the fog's strike on her,
--- read where the Talk leaves her, is in the Talk plan's fog), and a recruit the phase found no
--- blue slot for is counted in the call's cost, never dropped silently.
+-- PR #773 review: a joined recruit gets no fog read (her blue unit lives only in the judged
+-- phase; the real strike stands the unit by its address, which she has none of there), so a
+-- Talk beside the fog never asks for one; and a recruit the phase found no blue slot for is
+-- counted in the call's cost, never dropped silently.
 do
+    local askedHer = false
     local _, talk = talkedRecruitPlay(false, {
         unseen = { { x = 2, y = 1 } },
         fogStrike = function(u)
-            if u.id == 0x05 then return { takenDist = { [0] = 0.5, [99] = 0.5 } } end
+            if u.id == 0x05 then askedHer = true end
             return { takenDist = { [0] = 1 } }
         end,
     })
-    check(talk and talk.rank and talk.rank.fog, 0.5, "joined: the fog's strike on her is read")
+    check(talk ~= nil and not askedHer, true,
+          "joined: a Talk beside the fog is judged, the fog never read for her blue unit")
     local _, _, _, cost = talkedRecruitPlay(false, {
         enemyPhase = function(plan)
             if plan.joined and plan.joined[0x81] then return { unjoined = 1 } end

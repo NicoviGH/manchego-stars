@@ -108,9 +108,12 @@ Both now skip the plan's Talk targets (`talkedIn`, which the judged phase's `joi
 
 **PR #773 review (2026-11-25).** The plan's HP on her (`plan.reds`) and the wear its counters
 left on her weapon (`plan.redWear`) are staged after the join, so they follow her to her blue id
-(`M.stageRedHp`, `M.stageWear`'s `joined`); before, she stood at board HP with no wear. She is
-paid the fog as a player unit, where the Talk leaves her. The mend's tries for her drop the
-talker's acts that Talk her again. A Talk whose recruit finds no free blue slot is counted
-(`.unjoined`, the plan cost's and the run record's `plans.unjoined`), never silently left unread.
-The mend filter has no test of its own: the fakes' menus offer one Talk per target, which the
-dropped try rebuilds as the plan in hand, and the rebuild is deduplicated before it is judged.
+(`M.stageRedHp`, `M.stageWear`'s `joined`); before, she stood at board HP with no wear. A Talk
+whose recruit finds no free blue slot is counted (`.unjoined`, the most per decision in the plan
+cost, summed over decisions in the run record's `plans.unjoined`), never silently left unread.
+Two of the review's changes were taken back on evidence. The fog read for her crashed: the fog's
+strike is read on the real board, where she is still red and has no blue unit, so she gets none
+(the fog is a tie-breaker; her death in the phase is read in full). And the mend keeps the
+talker's other Talks over her: on vanilla Ch10 s4005 a2, turn 10, the plan that Talked her under
+the cap was the mend's swap to a Talk with Canto to (4,21); with those tries dropped the Talk was
+never made and the start missed its clean clear.

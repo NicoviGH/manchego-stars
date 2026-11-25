@@ -828,9 +828,9 @@ function M.run(api)
                   deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
                   -- unsplit: the counter kills the judged phases left unsplit (sight's
                   -- M.phaseWays); floored: the ways of a plan's uncertain kills left unsplit
-                  -- (the planner's, ADR 0415); unjoined: the Talked recruits no blue slot was
-                  -- free for in the judged phases (sight's M.joinTalked, ADR 0471);
-                  -- area_positional, area_truncated: the Misc
+                  -- (the planner's, ADR 0415); unjoined: per decision, the most Talked
+                  -- recruits a judged phase found no blue slot for (sight's M.joinTalked, ADR
+                  -- 0471), summed over decisions; area_positional, area_truncated: the Misc
                   -- scripts' CHAI_AT (#727) and budget-cut walks the judged phases left unread
                   -- (M.areaWake); slowest: the decision that ran the most frames, and its
                   -- turn (what M.DECISION_FRAMES is sized from)

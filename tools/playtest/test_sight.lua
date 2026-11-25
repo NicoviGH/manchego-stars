@@ -4032,8 +4032,14 @@ end
 -- the plan's reds HP is written, and nextPhase's second after the army's reply, before it plays.
 do
     local stage = sightSrc:match("local function stagePhase%(call, scratch, plan%).-\n    end\n")
-    check(stage ~= nil and stage:find("M%.stageRedHp%(api, byId, joined, plan%.reds%).-healFaction%(call, byId, \"red\"%)") ~= nil, true,
+    local hpThenHeal = "M%.stageRedHp%(api, byId, joined, plan%.reds%)"
+        .. ".-healFaction%(call, byId, \"red\"%)"
+    check(stage ~= nil and stage:find(hpThenHeal) ~= nil, true,
           "healFaction: the staged phase heals the reds after the plan's HP is written")
+    -- a joined recruit's wear is staged under her blue id too (#766 review): the call is given
+    -- the joined map
+    check(stage ~= nil and stage:find("M%.stageWear%(api, call, S, plan, byId, joined%)") ~= nil,
+          true, "stageWear: the staged phase passes the joined map")
     local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
     check(nextPhase ~= nil and nextPhase:find("healFaction%(call, byId, \"green\"%)%s+healFaction%(call, byId, \"blue\"%)%s+local played = reply and armyReply") ~= nil
           and nextPhase:find("armyReply%(call.-healFaction%(call, byId, \"red\"%).-playPhase%(call, proc, byId, berserkFirst, 1,") ~= nil,
