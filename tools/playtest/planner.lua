@@ -107,7 +107,9 @@
 -- { id, charId, die, counter (the part of `die` that is the counters to the plan's own acts),
 -- branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both, but for a unit the
--- wear read, whose `die` is the wear's reading of the later phases alone), wear (what the
+-- wear read, whose `die` is the wear's reading of the later phases alone), capDie (when
+-- extended: `die` as it stood before the second phase, the next phase and the wear, which
+-- admission and the idle rule read: ADR 0470), wear (what the
 -- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
 -- read: ADR 0421, M.WEAR; `die` counts it) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep, wear (the wear's
@@ -1965,8 +1967,9 @@ function M.plan(Bot, board, sight, style, opts)
             if firstCall then pr.first = pr.die end
             local over = M.admits(pr.die, cap) and 0 or pr.die - cap
             local capDie = pr.capDie or pr.die
-            capExceed = math.max(capExceed, M.admits(capDie, cap) and 0 or capDie - cap)
-            rank.admitted = rank.admitted and M.admits(capDie, cap)
+            local capOver = M.admits(capDie, cap) and 0 or capDie - cap
+            capExceed = math.max(capExceed, capOver)
+            rank.admitted = rank.admitted and capOver == 0
             rank.max_exceed = math.max(rank.max_exceed, over)
             rank.sum_exceed = rank.sum_exceed + over
             rank.max_die = math.max(rank.max_die, pr.die)

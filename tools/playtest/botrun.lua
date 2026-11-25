@@ -694,13 +694,15 @@ function M.givenCounter(die, counter)
 end
 
 -- The death chance plan `plan` read for unit slot `id` once its own acts were played: its
--- `protected` entry's weighted `die` (what Planner.admit tests against the cap: every way of the
--- judged phase, the lookahead's second phase and the wear), given the unit lived through the
+-- `protected` entry's weighted `capDie`, else `die` (what Planner.admit tests against the cap:
+-- every way of the judged phase and the wear, never the lookahead's second phase, ADR 0470),
+-- given the unit lived through the
 -- plan's own counters (M.givenCounter), else its predict's for a unit it does not protect; nil
 -- when the plan read neither. montecarlo.py's death_read is its Python twin, for the traces.
 function M.deathRead(plan, id)
     for _, pr in ipairs(plan and plan.protected or {}) do
-        if pr.id == id then return M.givenCounter(pr.die, pr.counter) end
+        -- the chance admission read (ADR 0470): before the lookahead's second phase, if any
+        if pr.id == id then return M.givenCounter(pr.capDie or pr.die, pr.counter) end
     end
     local p = M.predictOf(plan, id)
     return p and p.die

@@ -295,3 +295,6 @@ CPU is still reported beside it.
 - **Where it is checked.** `montecarlo.py`'s `SC003_BASELINE_CALLS` and `SC003_MARGIN` hold
   the numbers. `suite --baseline` prints each start's calls beside its CPU, then the total
   against the budget, within or OVER.
+
+**Amended 2026-11-24 (Nicolas, #766, ADR 0470):** admission reads each protected unit's death
+chance on the next enemy phase and the wear (ADR 0421), never the lookahead's second phase.

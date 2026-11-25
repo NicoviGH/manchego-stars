@@ -41,6 +41,9 @@ ranks the next phase first among plans over the cap. Admission was the one place
   plus the wear's three phases for a unit no heal reaches (ADR 0421, unchanged).
 - The idle rule's two cap checks (ADR 0439, 0441: an under-cap march is not idle; a wound-only
   advance counts only under the cap) read the same excess (`st.capExceed`).
+- A death is graded against what admission read: `botrun.lua` `M.deathRead` and its Python
+  twin `montecarlo.py` `death_read` take `capDie` where the record has one. A death the second
+  phase foresaw but the cap admitted grades as within the cap, not `over_cap`.
 - The lookahead still runs, and its reading still counts in the rank: `max_die`, `sum_die`,
   `max_exceed`, `sum_exceed`, `hp_left`, `game_over` and `value` all take it. It only breaks ties,
   after progress among admitted plans.
@@ -49,7 +52,8 @@ ranks the next phase first among plans over the cap. Admission was the one place
 
 ## Proof
 
-- `test_bot.lua`: eight lookahead assertions rewritten to the new rule; each fails on the old
+- `test_bot.lua`: eight lookahead assertions rewritten to the new rule, and one idle-rule case
+  (`advances G: a march the second phase kills is still no idle plan`); each fails on the old
   admission. The wear tests (`wear: ... A stays out`) pass unchanged; they fail if the wear is
   dropped from the cap with the second phase.
 - Replay `a470a`, vanilla Ch14 s4003, two attempts: move-for-move identical to `r766i`.
