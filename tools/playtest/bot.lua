@@ -717,7 +717,7 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, map = board.map, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, exposures = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
+                  worsts = {}, exposures = {}, routeLosses = {}, options = {}, priced = {}, breaches = {}, keyed = {}, talks = {},
                   talkTiles = {}, openers = {}, scopes = {}, floods = {}, rescueTiles = {}, carried = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
@@ -2875,12 +2875,67 @@ local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) 
 -- its own turns, none once a looter closes it first), that chance, and the turn it gets there on.
 -- A unit cut off from it goes through the breach (turnsFor). `from` (jobs.lua's chain: { x, y,
 -- late }) starts the trip where an earlier job ends, `late` turns from now; nil: where u stands.
+-- The chance `u` dies on its march to `tile` (#766: a job is worth its goal for the least
+-- expected loss, #764): the tiles its march stops on, a turn of MOV each down its own field to
+-- the tile (sight.march), from `from` (a chain's last tile) or where it stands. Each stop is
+-- read as worstCase reads a tile: every enemy that reaches it strikes u there (exposure: the
+-- game's own forecast), u at its HP now; the stops together. An estimate: the enemies stand
+-- where they stand now, and our army does not cover u. Vanilla Ch14 (`s766a`): a talker sent
+-- west for Rennac and a thief sent to a chest behind a door both walked into the corridor the
+-- enemy held, and the death cap turned the one back and wore the other down to its death.
+-- A goal it has no field to is no loss here (a way through a door: breachFor's).
+local function routeLoss(ctx, u, tile, from)
+    local field = fieldFor(ctx, tile, u)
+    local x, y = from and from.x or u.x, from and from.y or u.y
+    if not (field and field[y] and field[y][x]) then return 0 end
+    local key = u.id .. ">" .. tileKey(tile.x, tile.y) .. "@" .. tileKey(x, y)
+    if ctx.routeLosses[key] then return ctx.routeLosses[key] end
+    local odds, mov, live = oddsOf(ctx.sight), ctx.sight.mov(u), 1
+    while field[y][x] > 0 do
+        -- one turn: down the field while each step's cost fits in what is left of MOV
+        local left, moved = mov, false
+        while true do
+            local cur, bx, by, bn = field[y][x], nil, nil, nil
+            for _, side in ipairs(SIDES) do
+                local nx, ny = x + side[1], y + side[2]
+                local n = field[ny] and field[ny][nx]
+                if n and n < cur and cur - n <= left and (not bn or n < bn) then bx, by, bn = nx, ny, n end
+            end
+            if not bn then break end
+            left, x, y, moved = left - (cur - bn), bx, by, true
+        end
+        if not moved then break end
+        local dists = {}
+        for _, e in ipairs(exposure(ctx, u, x, y)) do
+            if e.f and e.f.takenDist then dists[#dists + 1] = e.f.takenDist end
+        end
+        if #dists > 0 then live = live * (1 - odds(dists, u.hp)) end
+    end
+    ctx.routeLosses[key] = 1 - live
+    return 1 - live
+end
+
+-- A job's expected loss in the style's points: the death on its way (routeLoss) x W.death, the
+-- weight a death already carries (#764: no new weight).
+local function lossOf(ctx, u, tile, from)
+    return routeLoss(ctx, u, tile, from) * weightsFor(ctx.style.aggression).death
+end
+
 local function sendWorth(ctx, u, t, from)
     local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
     local p = from and { x = from.x, y = from.y, late = from.late, alive = 1 }
         or { x = u.x, y = u.y, acted = u.acted, alive = 1 }
     local c, turns = Goals.chance(goal, { [u.id] = p }, Goals.GAMMA, ctx.turnsTo)
-    return t.gold * c, c, turns
+    -- its gold x the chance, less the loss on the way in gold (the style's points / W.gold)
+    local loss = c > 0 and lossOf(ctx, u, t, from) / weightsFor(ctx.style.aggression).gold or 0
+    return t.gold * c - loss, c, turns
+end
+
+-- Whether sending `u` to open tile `t` is a job: it gets there in time, and the trip is worth
+-- the death on its way (sendWorth's net of routeLoss). `from` as sendWorth's.
+local function worthSending(ctx, u, t, from)
+    local v, c = sendWorth(ctx, u, t, from)
+    return c > 0 and v >= 0
 end
 
 -- Whether the goal tile `t` is barred for unit `id` (the goals units are blocked from).
@@ -2972,8 +3027,8 @@ local function exploring(ctx, sent, barred, triedIn)
             local p = pair[u.id .. ">" .. j.id]
             if not p then return nil end
             if not from then return p.v or 1, p.turns or 1, p.d end
-            local v, c, turns = sendWorth(ctx, u, j.t, from)
-            if c <= 0 then return nil end
+            if not worthSending(ctx, u, j.t, from) then return nil end
+            local v, _, turns = sendWorth(ctx, u, j.t, from)
             -- the tie's cost in the first job's measure: the march from the chain's last tile
             -- (a way through an obstacle has no field walk: its turns at the unit's MOV)
             return v, turns, walkFrom(ctx, j.t, from.x, from.y, u)
@@ -2984,7 +3039,9 @@ local function exploring(ctx, sent, barred, triedIn)
         for _, u in ipairs(units) do
             local c = out[u.id]
             if c then
-                ctx.exploreGoal[u.id] = { x = c[1].t.x, y = c[1].t.y, kind = kind }
+                -- where the first job is had: a recruit's meeting tile (`at`), else the goal's
+                local at = pair[u.id .. ">" .. c[1].id].at or c[1].t
+                ctx.exploreGoal[u.id] = { x = at.x, y = at.y, kind = kind }
                 ctx.jobs[u.id] = c
                 for _, j in ipairs(c) do taken[j.id] = true end
             end
@@ -2995,7 +3052,10 @@ local function exploring(ctx, sent, barred, triedIn)
     -- Ross, killed on turn 2 while Eirika marched on the brigands). A recruit the style claims
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
-    for _, t in ipairs(recruitTargets(ctx)) do
+    -- each recruit's goal (Goals.recruits): when he is removed, and where he walks till then
+    local targets = recruitTargets(ctx)
+    local recruitGoal = #targets > 0 and Goals.recruits(ctx.board, ctx.sight, ctx.style, ctx) or {}
+    for _, t in ipairs(targets) do
         -- unclaimed: any talker; claimed: the first claim with a talker that can go, as
         -- recruitFirst falls through its claims in order
         local claims, talkers = claimsOn(ctx, "recruits", t), nil
@@ -3011,7 +3071,24 @@ local function exploring(ctx, sent, barred, triedIn)
             -- the planner may still play it, the hire charged (st.priced)
             local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, p.u, t) },
                                   weightsFor(ctx.style.aggression))
-            if v > 0 then talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = v } end
+            -- the stage job (#766): the talker is sent where it meets him on his way
+            -- (Goals.meeting), not to the tile he is leaving, and the job is worth its chance
+            -- of that (Goals.chance); a talker that cannot meet him before he is removed has no
+            -- job, which is dropped, not chased (#764)
+            local g, at, c, turns = recruitGoal[t.id], nil, 1, nil
+            if g then
+                local goal = g   -- Goals.recruits' own table, this pair's taker set on it
+                goal.takerUnits = { p.u }
+                local pos = { x = p.u.x, y = p.u.y, acted = p.u.acted, alive = 1 }
+                c, turns = Goals.chance(goal, { [p.u.id] = pos }, Goals.GAMMA, ctx.turnsTo)
+                at = Goals.meeting(goal, p.u, pos, ctx.turnsTo)
+            end
+            -- less the death on its way there (lossOf): a job not worth its way is none
+            local net = c > 0 and v * c - lossOf(ctx, p.u, at or t) or 0
+            if v > 0 and net > 0 then
+                talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = net, turns = turns,
+                                              at = at }
+            end
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
@@ -3030,7 +3107,7 @@ local function exploring(ctx, sent, barred, triedIn)
         for _, w in ipairs(ctx.actors) do
             if w ~= but and not spent[w.id] and not ctx.exploreGoal[w.id]
                 and not isBarred(barred, w.id, t) and ownOpener(w, t) and reaches(w, t)
-                and select(2, sendWorth(ctx, w, t)) > 0 then
+                and worthSending(ctx, w, t) then
                 spent[w.id] = true
                 return true
             end
@@ -3066,7 +3143,7 @@ local function exploring(ctx, sent, barred, triedIn)
                 and ownOpener(u, t) ~= keyless and not isBarred(barred, u.id, t) then
                 if not u.acted and quiet[t.id] and not triedOn(t.id)[u.id] then
                     triedOn(t.id)[u.id] = true
-                elseif reaches(u, t) and select(2, sendWorth(ctx, u, t)) > 0
+                elseif reaches(u, t) and worthSending(ctx, u, t)
                     and not (keyless and openerFree(t, u)) then
                     taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
                 end
@@ -3085,7 +3162,7 @@ local function exploring(ctx, sent, barred, triedIn)
             local d = reaches(u, t)
             if d then
                 local v, c, turns = sendWorth(ctx, u, t)
-                if c > 0 then
+                if worthSending(ctx, u, t) then
                     local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
                         or byOpen[ownOpener(u, t) and 1 or 2]
                     list[#list + 1] = { t = t, u = u, d = d, v = v, turns = turns }
@@ -3622,6 +3699,7 @@ end
 function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
+    ctx.board = board   -- exploring's Talk jobs read the recruits' goals off it (Goals.recruits)
     -- the board's Talk memo (#671): a re-list's read asks the same pairs again (recruitsOf, 224
     -- CheckForCharacterEvents per change key), and a pair's answer is keyed by its two units (ids
     -- are stable within the chapter) and depends on charIds and the event flags, which no door or

@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-468 decisions. Read this index, then open the two or three you need — the whole
+469 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -311,6 +311,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0468` | [A paid Talk is priced from its script; a talker past the purse is no talker](decisions/0468-a-paid-talk-is-priced-from-its-script.md) | 2026-11-24 | #766 #764 #510 |
 | `0469` | [An act on an ally's tile brings the ally's move off it](decisions/0469-an-act-on-an-allys-tile-brings-the-allys-move-off-it.md) | 2026-11-24 | #766 #764 #754 #510 |
 | `0470` | [The death cap reads the next enemy phase and the wear, never the lookahead's second phase](decisions/0470-the-cap-reads-the-next-enemy-phase-not-the-lookahead.md) | 2026-11-24 | #766 #743 #510 |
+| `0471` | [A talker is staged where it meets the recruit, on the route an earlier attempt saw him walk](decisions/0471-a-talker-is-staged-where-it-meets-the-recruit.md) | 2026-11-24 | #766 #764 #510 |
 
 ---
 

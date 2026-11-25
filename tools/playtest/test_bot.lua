@@ -575,7 +575,10 @@ local function sightOf(o)
     end
     -- when a looter takes each open tile (sight.closings: "x,y" -> the enemy phase); the game
     -- always has the read where it has villages and chests (none: no looter)
-    if o.closings or o.explorable then s.closings = function() return o.closings or {} end end
+    -- and o.paths, where each watched recruit stands after each enemy phase (its second answer)
+    if o.closings or o.explorable then
+        s.closings = function() return o.closings or {}, o.paths end
+    end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then
         s.explorable = function() return o.explorable end
@@ -8856,8 +8859,9 @@ do
 end
 
 -- test_each_recruit_gets_its_own_talker: A and C may each Talk to T1 and T2, and A is the
--- nearer to both. Each recruit gets one talker and each talker one recruit, nearest pair first:
--- A takes T1 (distance 1), C is left T2.
+-- nearer to both. Each recruit gets one talker and each talker one recruit, so that both are
+-- met soonest (#766: the assignment, not the nearest pair first): A reaches T2 (4 tiles) and C
+-- reaches T1 (5 tiles) this turn at MOV 5, where A on T1 left C 8 tiles, two turns, from T2.
 do
     local A = blue(0x01, 0, 4, 0, { minRange = false })
     local C = blue(0x02, 1, 8, 0, { minRange = false })
@@ -8867,8 +8871,8 @@ do
         reach = { [0x01] = tiles({ 4, 0 }), [0x02] = tiles({ 8, 0 }) },
         talk = { [0x01] = { [0x30] = true, [0x31] = true },
                  [0x02] = { [0x30] = true, [0x31] = true } } })
-    check(g[0x01], "3,0", "talker: the nearest pair is sent first")
-    check(g[0x02], "4,4", "talker: the second recruit gets the free talker")
+    check(g[0x01], "4,4", "talker: each recruit is met this turn, A on T2")
+    check(g[0x02], "3,0", "talker: and C on T1")
 end
 
 -- test_a_paid_talker_is_priced_and_never_sent_past_the_purse (#766, vanilla Ch14's Rennac): A
@@ -8908,6 +8912,47 @@ do
     for _, x in ipairs(plan and plan.acts or {}) do talked = talked or x.act == "talk" end
     check(talked and plan.priced, 9980 * Planner.WEIGHTS.careful.gold,
           "paid: the planner charges the hire")
+end
+
+-- test_a_talker_is_staged_where_it_meets_the_recruit (#766's stage job): T walks east, (5,0)
+-- after the first enemy phase and (10,0) after the second, and leaves after the third. A, 15
+-- tiles from where T stands, cannot be beside him this turn, but meets him on his way at (5,0)
+-- next turn: A marches there, not at the tile T is leaving. Where T leaves before any talker
+-- can meet him, the Talk is no job (a job no one can make in time is dropped, not chased, #764).
+do
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local function o(closes, path)
+        return { reach = { [0x01] = tiles({ 12, 3 }) }, talk = { [0x01] = { [0x30] = true } },
+                 closings = { ["unit:48"] = closes }, paths = { [0x30] = path } }
+    end
+    local A = blue(0x01, 0, 12, 3, { minRange = false })
+    check(talkGoals(boardOf(A, T), o(3, { { x = 5, y = 0 }, { x = 10, y = 0 } }))[0x01], "5,0",
+          "stage: the talker marches where it meets the recruit")
+    local far = blue(0x01, 0, 14, 9, { minRange = false })
+    check(talkGoals(boardOf(far, T), o(2, { { x = 5, y = 0 } }))[0x01], nil,
+          "stage: no Talk job a talker cannot make before he leaves")
+end
+
+-- test_a_job_is_priced_by_the_danger_on_its_way (#766: the most worth for the least expected
+-- loss, #764). A and C may Talk T over. A is the nearer (8 tiles, 1.6 turns at MOV 5) and C
+-- the farther (9 tiles). A's march stops on (3,0) after its first turn, where E (2 tiles off)
+-- kills it for sure; C's stops, (0,4) and then T's side, are out of E's reach. So C is sent.
+-- With A the only talker, the Talk is no job: its way costs the death it is worth.
+do
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local E = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local C = blue(0x02, 1, 0, 9, { minRange = false })
+    local function o(talk)
+        return { reach = { [0x01] = tiles({ 8, 0 }), [0x02] = tiles({ 0, 9 }), [0x81] = tiles({ 3, 1 }) },
+                 talk = talk, danger = { ["3,0"] = 1 },
+                 fc = { [0x01] = { [0x81] = { ["3,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } } } }
+    end
+    local g = talkGoals(boardOf(A, C, T, E), o({ [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } }))
+    check(g[0x02], "0,0", "loss: the talker with the safe way is sent")
+    check(g[0x01] ~= "0,0", true, "loss: the nearer one, killed on its way, is not")
+    check(talkGoals(boardOf(A, T, E), o({ [0x01] = { [0x30] = true } }))[0x01], nil,
+          "loss: a way that costs the death it is worth is no job")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
@@ -9631,6 +9676,137 @@ do
     _, plan = Planner.plan(B, boardOf(A, H), sightOf(x), style("careful"))
     win = goalAfter(plan, "win")
     check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
+end
+
+-- test_a_talked_recruit_is_judged_as_a_player_unit_where_it_stands (#766, ADR 0471): R (red,
+-- charId 0x12, vanilla Ch10's Amelia) is a recruit A may Talk over from (1,0). The game turns
+-- her blue on her tile (UnitChangeFaction): the judged phase is told she joins (plan.joined)
+-- and gives her new blue id (.joined); Z kills her there. The Talk plan carries her death,
+-- protected under the cap, so careful does not Talk; where Z cannot reach her it does. Before
+-- the fix the Talk took her off the map, no death was read, and careful Talked her into Z's
+-- reach.
+local function talkedRecruitPlay(deadly, extra)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local R = red(0x81, 2, 0, { hp = 10, charId = 0x12, minRange = false })
+    local Z = red(0x82, 4, 0, { minRange = false })
+    local asked
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        enemyPhase = function(plan)
+            if not (plan.joined and plan.joined[0x81]) then return {} end
+            asked = true
+            local out = { joined = { [0x81] = 0x05 } }
+            if deadly then
+                out[1] = { enemy = 0x82, target = 0x05, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 10 }
+            end
+            return out
+        end,
+    }
+    for k, v in pairs(extra or {}) do o[k] = v end
+    local a, plan, cost = Planner.plan(B, boardOf(A, R, Z), sightOf(o), style("careful"))
+    local talk
+    for _, c in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(c.acts) do
+            if k:find(">talk@1,0>129", 1, true) then talk = talk or c end
+        end
+    end
+    return a, talk, asked, cost
+end
+do
+    local a, talk, asked = talkedRecruitPlay(true)
+    check(asked, true, "joined: the judged phase is told the Talk's recruit joins")
+    check(talk and talk.rank and talk.rank.max_die, 1, "joined: the Talk plan carries her death")
+    check(a and a.act ~= "talk", true, "joined: careful does not Talk her into the reds' reach")
+    a = talkedRecruitPlay(false)
+    check(a and a.act, "talk", "joined: where no red reaches her, careful Talks")
+    -- the talker's menu and the beam cut to one (vanilla Ch10 s4005: three Talk variants
+    -- filled the menu, and every plan the beam kept Talked): the beam builds only Talk plans,
+    -- and the mend tries the talker's other acts for her, as she has none of her own this turn
+    local saved, savedBeam = Planner.PER_UNIT, Planner.BEAM
+    Planner.PER_UNIT, Planner.BEAM = 1, 1
+    a, talk = talkedRecruitPlay(true)
+    Planner.PER_UNIT, Planner.BEAM = saved, savedBeam
+    check(talk ~= nil, true, "joined: with the menu cut, a Talk plan is still judged")
+    check(a and a.act ~= "talk", true,
+          "joined: the mend swaps the deadly Talk for the talker's other act")
+end
+
+-- PR #773 review: a joined recruit gets no fog read (her blue unit lives only in the judged
+-- phase; the real strike stands the unit by its address, which she has none of there), so a
+-- Talk beside the fog never asks for one; and a recruit the phase found no blue slot for is
+-- counted in the call's cost, never dropped silently.
+do
+    local askedHer = false
+    local _, talk = talkedRecruitPlay(false, {
+        unseen = { { x = 2, y = 1 } },
+        fogStrike = function(u)
+            if u.id == 0x05 then askedHer = true end
+            return { takenDist = { [0] = 1 } }
+        end,
+    })
+    check(talk ~= nil and not askedHer, true,
+          "joined: a Talk beside the fog is judged, the fog never read for her blue unit")
+    local _, _, _, cost = talkedRecruitPlay(false, {
+        enemyPhase = function(plan)
+            if plan.joined and plan.joined[0x81] then return { unjoined = 1 } end
+            return {}
+        end,
+    })
+    check(cost and cost.unjoined and cost.unjoined > 0, true,
+          "joined: a recruit with no free blue slot is counted in the plan's cost")
+end
+
+-- test_a_talked_recruit_is_never_relisted_as_dead (#766): a Talk takes R off the enemy side, but
+-- she stands on (2,0) as a player unit, so the plan's re-listing (sight.changed) never reads her
+-- tile as freed by a kill. Before the fix the Talk's fx.gone made her a dead red there.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local R = red(0x81, 2, 0, { hp = 10, charId = 0x12, minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        change = function() return {} end,
+        enemyPhase = function() return {} end,
+    }
+    local sight = sightOf(o)
+    local a = Planner.plan(B, boardOf(A, R), sight, style("careful"))
+    check(a and a.act, "talk", "relist joined: the Talk is played")
+    local dead = false
+    for _, c in ipairs(sight.changes or {}) do
+        if (c.gone or {})[0x81] then dead = true end
+    end
+    check(dead, false, "relist joined: her tile is never re-listed as a dead red's")
+end
+
+-- test_a_talked_green_is_read_once_as_ours (#766): G, a green recruit, joins on her tile when A
+-- Talks her over; the phase reads her under her blue id alone. Before the fix her old green
+-- entry stayed in the plan's record too, reading 0 (no unit holds that id any more).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x41, 2, 0, 0, { faction = "green", hp = 10, charId = 0x12, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x41] = true } },
+        enemyPhase = function(plan)
+            if plan.joined and plan.joined[0x41] then return { joined = { [0x41] = 0x05 } } end
+            return {}
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    check(a and a.act, "talk", "green joined: the Talk is played")
+    local asGreen, asOurs = 0, 0
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x41 and p.green then asGreen = asGreen + 1 end
+        if p.id == 0x05 and p.joined == 0x41 then asOurs = asOurs + 1 end
+    end
+    check(asGreen .. "," .. asOurs, "0,1",
+          "green joined: read once, as ours, never as the green she was")
 end
 
 -- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────
@@ -10489,8 +10665,8 @@ end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
 -- alone -- our units, the enemies gone, the enemies' HP and the weapon uses their counters
--- spent (#644), the doors and walls it opens, the units it carries (Rescue) -- and
--- nothing about a turn to come:
+-- spent (#644), the doors and walls it opens, the units it carries (Rescue), the recruits it
+-- Talks over (#766: they join on their tiles) -- and nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.
 do
     local board, sight, st = looksAhead(true)
@@ -10498,7 +10674,8 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds,waits", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,joined,opened,redWear,reds,waits",
+          "lookahead: the staged board, nothing more")
 end
 
 -- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers

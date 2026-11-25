@@ -333,6 +333,7 @@ WANTED = [
     'CanUnitUseStaff',          # whether a unit can use a staff it holds (bmitem.c)
     'GetOffensiveStaffAccuracy',  # a status staff's hit chance, rolled once (bmbattle.c; #674)
     'UnitGetDeathDropLocation',  # where a dying carrier sets down whom it carries (bmunit.c; #739)
+    'UnitChangeFaction',        # a Talk's recruit turned blue on its tile, the judged phase's (bmunit.c; #766)
     # The bot's heals (#510 step 9 PR E): what a staff or a Vulnerary would do, by the game.
     'CanUnitUseItem',           # usable now; for a staff it builds the targets (bmitemuse.c)
     'GetUnitItemHealAmount',    # the HP an item restores for this unit (bmitem.c)

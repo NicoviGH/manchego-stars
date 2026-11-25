@@ -702,6 +702,7 @@ function Board.bind(mem, SYM)
         distance = Board.distance, weaponFor = Board.weaponFor, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside, memoryKey = Board.memoryKey, playsAsSeen = Board.playsAsSeen,
         terrainHealSkips = Board.terrainHealSkips, addHp = Board.addHp,
+        sortedKeys = Board.sortedKeys,
         unit = Board.unit, at = Board.at, statusHeld = Board.statusHeld,
         statusOf = Board.statusOf, STATUS_BERSERK = Board.STATUS_BERSERK,
         statusAfter = Board.statusAfter, STATUS_STAVES = Board.STATUS_STAVES,
