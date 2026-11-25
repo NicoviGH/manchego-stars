@@ -95,3 +95,13 @@ phase reads her where she stands, which can be worse than her best move.
 fails 3 checks on the code without the fix (the phase is never told she joins; the Talk plan's
 `max_die` is 0; careful Talks her into the reds' reach). `test_sight`'s `joinUs` block checks
 the game call, the kept memory and her map cell.
+
+**The way out, and the same cause elsewhere (2026-11-25).** Judging her death was not enough on
+its own. On the replay, vanilla Ch10 s4005 a2 still Talked her at 0.94: every Talk variant
+filled the talker's menu (Talk from (2,20), then Canto to (2,19), to (1,20), or none), every plan
+the beam kept Talked, and the mend tries a unit's own other acts, which a recruit who just joined
+has none of. The mend now tries the talker's other acts for her (`tries`, `p.joined`). Two more
+places took a Talk's `fx.gone` for a death. The re-listing (`deadReds`, the change key) read her
+tile as freed by a kill; a talked green kept a stale green entry beside her player-unit read.
+Both now skip the plan's Talk targets (`talkedIn`, which the judged phase's `joined` uses too).
+`test_bot`'s mend, re-listing and talked-green checks each fail without their fix.

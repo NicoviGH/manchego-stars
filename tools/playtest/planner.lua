@@ -1376,17 +1376,26 @@ function M.plan(Bot, board, sight, style, opts)
     -- The enemies a plan's changes count dead: the reds of its `gone` (a Talk's recruit is one
     -- too, red until it joins); the board's units are looked up here for both menusFor and
     -- extend's key.
-    local function deadReds(gone)
+    -- the recruits a plan's acts Talk over, as a set: each joins the player on its tile
+    -- (#766), off the enemy side (fx.gone) but never dead, and its tile never freed
+    local function talkedIn(acts)
         local out = {}
+        for _, a in ipairs(acts) do
+            if a.act == "talk" then out[a.targetId] = true end
+        end
+        return out
+    end
+    local function deadReds(gone, acts)
+        local out, talked = {}, talkedIn(acts)
         for id in pairs(gone) do
-            if byId[id] and byId[id].faction == "red" then out[id] = true end
+            if byId[id] and byId[id].faction == "red" and not talked[id] then out[id] = true end
         end
         return out
     end
     -- A plan's change set as one key: its doors and walls, then its dead reds; nil for none.
     -- extend keeps it (`changeKey`) as it adds either, so menusFor never rebuilds it per state.
-    local function changeKeyOf(opened, gone)
-        local dead = deadReds(gone)
+    local function changeKeyOf(opened, gone, acts)
+        local dead = deadReds(gone, acts)
         if next(opened) == nil and next(dead) == nil then return nil end
         return table.concat(sortedKeys(opened), ";") .. "|" .. table.concat(sortedKeys(dead), ";")
     end
@@ -1394,7 +1403,7 @@ function M.plan(Bot, board, sight, style, opts)
         if offer or not sight.changed or not st.changeKey then return menus end
         local mk = st.changeKey
         if relisted[mk] then return relisted[mk] end
-        local gone = deadReds(st.gone)
+        local gone = deadReds(st.gone, st.acts)
         -- the changed tiles: each door's or wall's whole change where the sight says
         -- (sight.mapChange: a gate two tiles deep), else its own tile; each dead enemy's
         local changed = {}
@@ -1622,7 +1631,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         if fx.opened then n.opened[fx.opened] = true end
         -- the change set's key, kept as either grows (menusFor's memo reads it)
-        if fx.opened or fx.gone then n.changeKey = changeKeyOf(n.opened, n.gone) end
+        if fx.opened or fx.gone then n.changeKey = changeKeyOf(n.opened, n.gone, n.acts) end
         if fx.carry then n.carry[fx.carry.id] = { by = fx.carry.by } end
         if fx.drop then
             n.carry[fx.drop.id] = { x = fx.drop.x, y = fx.drop.y }
@@ -2159,10 +2168,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- the recruits the plan Talks over join the player on their tiles (#766): the judged
         -- phase stands each as a blue unit (sight's plan.joined), where the reds may strike it,
         -- so its death is read as a player unit's (`ours` below), never left out with the gone
-        local joined = {}
-        for _, a in ipairs(st.acts) do
-            if a.act == "talk" then joined[a.targetId] = true end
-        end
+        local joined = talkedIn(st.acts)
         st.phase = { blues = blues0, waits = M.waitsIn(planned, {}, blues0), gone = gone, reds = reds,
                      redWear = st.redWear, joined = joined,
                      opened = st.opened, carry = st.carry }
@@ -2275,6 +2281,16 @@ function M.plan(Bot, board, sight, style, opts)
         local overAll = 0
         -- per unit, player and green, the enemies that strike it in any outcome
         local strikers = {}
+        -- a green the plan Talks over is a player unit in this phase (`recruited` below), its
+        -- green id gone from the board: it is read once, as a player unit
+        local greens = greens
+        if next(ours) then
+            local kept = {}
+            for _, g in ipairs(greens) do
+                if not ours[g.id] then kept[#kept + 1] = g end
+            end
+            greens = kept
+        end
         for _, g in ipairs(greens) do strikers[g.id] = {} end
         for _, p in ipairs(planned) do strikers[p.unit.id] = {} end
         -- the recruits the plan Talks over, each as the phase stands it: a player unit, under
@@ -2870,6 +2886,18 @@ function M.plan(Bot, board, sight, style, opts)
                 local out = {}
                 for _, id in ipairs(p.struck) do
                     for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
+                end
+                return out
+            end
+            if p.joined then
+                -- a recruit the plan Talks over has no act of its own in it: the talker's
+                -- other acts are its way out, the Talk not made this turn (vanilla Ch10 s4005:
+                -- every plan judged Talked Amelia into the reds' reach at 0.94, and she died)
+                local out = {}
+                for _, a in ipairs(base.acts) do
+                    if a.act == "talk" and a.targetId == p.joined then
+                        for _, t in ipairs(menuOf[a.unitId] or {}) do out[#out + 1] = t end
+                    end
                 end
                 return out
             end

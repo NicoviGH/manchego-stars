@@ -9720,6 +9720,64 @@ do
     check(a and a.act ~= "talk", true, "joined: careful does not Talk her into the reds' reach")
     a = talkedRecruitPlay(false)
     check(a and a.act, "talk", "joined: where no red reaches her, careful Talks")
+    -- the talker's menu and the beam cut to one (vanilla Ch10 s4005: three Talk variants
+    -- filled the menu, and every plan the beam kept Talked): the beam builds only Talk plans, and the mend tries the talker's other acts
+    -- for her, as she has none of her own this turn
+    local saved, savedBeam = Planner.PER_UNIT, Planner.BEAM
+    Planner.PER_UNIT, Planner.BEAM = 1, 1
+    a, talk = talkedRecruitPlay(true)
+    Planner.PER_UNIT, Planner.BEAM = saved, savedBeam
+    check(talk ~= nil, true, "joined: with the menu cut, a Talk plan is still judged")
+    check(a and a.act ~= "talk", true, "joined: the mend swaps the deadly Talk for the talker's other act")
+end
+
+-- test_a_talked_recruit_is_never_relisted_as_dead (#766): a Talk takes R off the enemy side, but
+-- she stands on (2,0) as a player unit, so the plan's re-listing (sight.changed) never reads her
+-- tile as freed by a kill. Before the fix the Talk's fx.gone made her a dead red there.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local R = red(0x81, 2, 0, { hp = 10, charId = 0x12, minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        change = function() return {} end,
+        enemyPhase = function() return {} end,
+    }
+    local sight = sightOf(o)
+    local a = Planner.plan(B, boardOf(A, R), sight, style("careful"))
+    check(a and a.act, "talk", "relist joined: the Talk is played")
+    local dead = false
+    for _, c in ipairs(sight.changes or {}) do
+        if (c.gone or {})[0x81] then dead = true end
+    end
+    check(dead, false, "relist joined: her tile is never re-listed as a dead red's")
+end
+
+-- test_a_talked_green_is_read_once_as_ours (#766): G, a green recruit, joins on her tile when A
+-- Talks her over; the phase reads her under her blue id alone. Before the fix her old green
+-- entry stayed in the plan's record too, reading 0 (no unit holds that id any more).
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local G = blue(0x41, 2, 0, 0, { faction = "green", hp = 10, charId = 0x12, minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x41] = true } },
+        enemyPhase = function(plan)
+            if plan.joined and plan.joined[0x41] then return { joined = { [0x41] = 0x05 } } end
+            return {}
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    check(a and a.act, "talk", "green joined: the Talk is played")
+    local asGreen, asOurs = 0, 0
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x41 and p.green then asGreen = asGreen + 1 end
+        if p.id == 0x05 and p.joined == 0x41 then asOurs = asOurs + 1 end
+    end
+    check(asGreen .. "," .. asOurs, "0,1", "green joined: read once, as ours, never as the green she was")
 end
 
 -- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────
