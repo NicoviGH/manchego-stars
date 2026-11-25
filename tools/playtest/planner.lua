@@ -1086,7 +1086,9 @@ function M.plan(Bot, board, sight, style, opts)
         local beside = tile and ctx.beside and ctx.beside(tile) or false
         local t = tile and turnsTo(u, tile, nil, beside)
         if t then
-            -- a clear job's enemy (#767, exploreGoal.target): its death in the plan is the job done
+            -- a clear job's enemy (#767, exploreGoal.target): its death in the plan is the job
+            -- done, whoever kills it -- the job is the way it opens, and the next decision gives
+            -- the clearer a new job; a plan that kills it is credited the clearer's whole way
             assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside,
                                         target = tile.target }
             goalOf[u.id] = assigned[#assigned]

@@ -246,7 +246,8 @@ local Jobs = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/jobs.lua")
 
 -- planner.lua's style weights (Planner.WEIGHTS) for `aggression`: a Talk's job is the recruit's
 -- worth less its hire in the same points (#766). planner.lua loads no Bot, so there is no cycle;
--- it is loaded on the first ask, not with this file (most decisions price no Talk)
+-- it is loaded on the first ask, not with this file (a decision with no Talk, village or chest
+-- in reach prices no job, and asks nothing of it)
 local PLANNER_PATH = PLAYTEST_DIR and (PLAYTEST_DIR .. "/planner.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "planner.lua")
 local plannerModule
@@ -2896,9 +2897,9 @@ local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) 
 -- enemy held, and the death cap turned the one back and wore the other down to its death.
 -- A goal it has no field to is no loss here (a way through a door: breachFor's).
 -- -> the chance, and the way's read (#767): `worst`, the death chance at its deadliest stop, and
--- `by`, the enemies that strike u at a stop it may die on (a stop of no death chance blocks
--- nothing), in id order: what a clear job kills to open the way.
-local NO_WAY = { worst = 0, by = {} }
+-- `stops`, each stop's death chance `p` and the enemies that strike u there (`by`): what a
+-- clear job kills to open the way (blockersOn).
+local NO_WAY = { worst = 0, stops = {} }
 local function routeLoss(ctx, u, tile, from)
     local field = fieldFor(ctx, tile, u)
     local x, y = from and from.x or u.x, from and from.y or u.y
@@ -2907,7 +2908,7 @@ local function routeLoss(ctx, u, tile, from)
     local kept = ctx.routeLosses[key]
     if kept then return kept.loss, kept end
     local odds, mov, live = oddsOf(ctx.sight), ctx.sight.mov(u), 1
-    local worst, by = 0, {}
+    local worst, stops = 0, {}
     while field[y][x] > 0 do
         -- one turn: down the field while each step's cost fits in what is left of MOV
         local left, moved = mov, false
@@ -2933,14 +2934,10 @@ local function routeLoss(ctx, u, tile, from)
             local p = odds(dists, u.hp)
             live = live * (1 - p)
             if p > worst then worst = p end
-            if p > 0 then
-                for _, e in ipairs(strikers) do by[e.id] = e end
-            end
+            if p > 0 then stops[#stops + 1] = { p = p, by = strikers } end
         end
     end
-    local list = {}
-    for _, id in ipairs(Board.sortedKeys(by)) do list[#list + 1] = by[id] end
-    kept = { loss = 1 - live, worst = worst, by = list }
+    kept = { loss = 1 - live, worst = worst, stops = stops }
     ctx.routeLosses[key] = kept
     return kept.loss, kept
 end
@@ -2951,11 +2948,36 @@ local function lossOf(ctx, u, tile, from)
     return routeLoss(ctx, u, tile, from) * weightsFor(ctx.style.aggression).death
 end
 
-local function sendWorth(ctx, u, t, from)
-    local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
+-- The enemies that block a way (#767), in id order: those striking at a stop over the cap when
+-- one is (the cap alone turns the unit back there); else, when the loss alone outweighs the
+-- job, those at every stop it may die on (each adds to that loss). An enemy that reaches only
+-- a stop of no death chance blocks nothing.
+local function blockersOn(way, cap)
+    local over, by = way.worst > cap, {}
+    for _, s in ipairs(way.stops) do
+        if s.p > (over and cap or 0) then
+            for _, e in ipairs(s.by) do by[e.id] = e end
+        end
+    end
+    local out = {}
+    for _, id in ipairs(Board.sortedKeys(by)) do out[#out + 1] = by[id] end
+    return out
+end
+
+-- The chance `u` alone takes `goal` (Goals.chance) and the turn it gets there on, from `from` ({
+-- x, y, late }: a later start, `late` turns from now) or from where u stands (its `acted`
+-- counted); and the start read. `goal` is read through, never written: one table may be every
+-- taker's goal (a recruit's, Goals.recruits). -> c, turns, the start, the goal as u takes it.
+local function takerChance(ctx, goal, u, from)
+    local own = setmetatable({ takerUnits = { u } }, { __index = goal })
     local p = from and { x = from.x, y = from.y, late = from.late, alive = 1 }
         or { x = u.x, y = u.y, acted = u.acted, alive = 1 }
-    local c, turns = Goals.chance(goal, { [u.id] = p }, Goals.GAMMA, ctx.turnsTo)
+    local c, turns = Goals.chance(own, { [u.id] = p }, Goals.GAMMA, ctx.turnsTo)
+    return c, turns, p, own
+end
+
+local function sendWorth(ctx, u, t, from)
+    local c, turns = takerChance(ctx, { tile = { x = t.x, y = t.y }, closes = t.closes }, u, from)
     -- its gold x the chance, less the loss on the way in gold (the style's points / W.gold)
     local loss = c > 0 and lossOf(ctx, u, t, from) / weightsFor(ctx.style.aggression).gold or 0
     return t.gold * c - loss, c, turns
@@ -3002,13 +3024,19 @@ local function sendOpeners(ctx, barred)
     end
 end
 
--- Whether `w` can kill `e` under the style's cap: from the tile nearest w (by its field to e)
--- each weapon strikes e from, the game's forecast (sight.attack) kills e as a kill is counted
--- (Planner.GONE: likelier than not) and w's death by the counter is within the cap. The read a
--- clear job's taker passes (#767); the enemies around that tile are the per-turn planner's.
+-- Where `w` can kill `e` under the style's cap (#767), or nil: the tile w strikes e from, the
+-- nearest w first by its own march (sight.march from where it stands, as meetingTile reads a
+-- talker's), no other unit on it, whose forecast (sight.attack) with one of w's weapons kills e
+-- as a kill is counted (Planner.GONE: likelier than not), w's death by the counter within the
+-- cap. The read a clear job's taker passes; the other enemies around that tile are its way's
+-- (clearJobs prices it) and the per-turn planner's.
 local function canClear(ctx, w, e)
-    local field = fieldFor(ctx, e, w)
-    if not field then return false end
+    local field = fieldFor(ctx, { x = w.x, y = w.y }, w)
+    if not field then return nil end
+    local held = {}
+    for _, o in ipairs(ctx.board and ctx.board.units or {}) do
+        if o.onField and not o.dead and o.id ~= w.id then held[tileKey(o.x, o.y)] = true end
+    end
     local weapons = ctx.sight.weapons(w)
     local reach = 0
     for _, wp in ipairs(weapons) do reach = math.max(reach, wp.max or 1) end
@@ -3016,8 +3044,9 @@ local function canClear(ctx, w, e)
     for ty = e.y - reach, e.y + reach do
         for tx = e.x - reach, e.x + reach do
             local d = manhattan(tx, ty, e.x, e.y)
-            if d >= 1 and d <= reach and field[ty] and field[ty][tx] then
-                tiles[#tiles + 1] = { x = tx, y = ty, d = manhattan(tx, ty, w.x, w.y) }
+            if d >= 1 and d <= reach and field[ty] and field[ty][tx]
+                and not held[tileKey(tx, ty)] then
+                tiles[#tiles + 1] = { x = tx, y = ty, d = field[ty][tx] }
             end
         end
     end
@@ -3027,28 +3056,30 @@ local function canClear(ctx, w, e)
         return a.x < b.x
     end)
     local cap, gone = capFor(ctx.style.aggression), planner().GONE
-    for _, wp in ipairs(weapons) do
-        local t = attackTileFor(tiles, e, { wp })
-        local f = t and attack(ctx, w, e, t.x, t.y, wp.slot)
-        if f and f.kill >= gone and f.die <= cap then return true end
+    for _, t in ipairs(tiles) do
+        for _, wp in ipairs(weapons) do
+            local f = Board.weaponFor({ wp }, t.x, t.y, e.x, e.y) and attack(ctx, w, e, t.x, t.y, wp.slot)
+            if f and f.kill >= gone and f.die <= cap then return { x = t.x, y = t.y } end
+        end
     end
-    return false
+    return nil
 end
 
 -- The clear jobs (#767): a job no unit can take, because every taker's way to it costs more
 -- than it is worth (routeLoss) or stops where the cap forbids (its `worst` stop), makes the
--- enemies on that way targets. A clear is worth what the blocked job is still worth once the
--- clear is done: its holder's chance of making it starting the turn the clearer gets to the
--- enemy (`after(late)`, Goals.chance with the job's own deadline: a job no one can make in time
--- is dropped, not chased, #764), shared over the enemies blocking it (no new weight), less the
--- death on the clearer's own way (lossOf). Its taker is a unit free of other jobs that can kill
--- the enemy under the cap (canClear). `blocked`: job key -> { by (the enemies), after };
--- `ok`: the job keys some unit can take.
-local function clearJobs(ctx, blocked, ok, barred, assign)
+-- enemies blocking those ways (blockersOn) targets. A clear is worth what the blocked job is
+-- still worth once the clear is done: the best of its takers' chances of making it starting the
+-- turn the clearer reaches its strike tile (`after(late)`, the job's own deadline: a job no one
+-- can make in time is dropped, not chased, #764), shared over the enemies blocking it (no new
+-- weight), less the death on the clearer's own way there. Its taker is a unit free of other
+-- jobs that can kill the enemy under the cap (canClear), on a way with no stop over the cap.
+-- `blocked`: job key -> { by (the enemies), after }; `open(k)`: whether job k went to a taker
+-- whose way is open (such a job needs no clear).
+local function clearJobs(ctx, blocked, open, barred, assign)
     local share, order = {}, {}
     for _, k in ipairs(Board.sortedKeys(blocked)) do
         local b = blocked[k]
-        if not ok[k] and #b.by > 0 then
+        if not open(k) and #b.by > 0 then
             for _, e in ipairs(b.by) do
                 if not share[e.id] then
                     share[e.id] = { e = e, jobs = {} }
@@ -3059,22 +3090,23 @@ local function clearJobs(ctx, blocked, ok, barred, assign)
         end
     end
     table.sort(order)
+    local cap = #order > 0 and capFor(ctx.style.aggression)
     local pairs_ = {}
     for _, id in ipairs(order) do
         local e, jobs = share[id].e, share[id].jobs
         local t = { id = "clear>" .. id, x = e.x, y = e.y, target = id }
         for _, w in ipairs(ctx.actors) do
-            if not ctx.exploreGoal[w.id] and not isBarred(barred, w.id, t) and canClear(ctx, w, e) then
-                local goal = { tile = { x = e.x, y = e.y }, takerUnits = { w } }
-                local c, turns = Goals.chance(goal, { [w.id] = { x = w.x, y = w.y, acted = w.acted,
-                                                                  alive = 1 } },
-                                              Goals.GAMMA, ctx.turnsTo)
+            local at = not ctx.exploreGoal[w.id] and not isBarred(barred, w.id, t)
+                and canClear(ctx, w, e)
+            local way = at and select(2, routeLoss(ctx, w, at))
+            if way and way.worst <= cap then
+                local c, turns = takerChance(ctx, { tile = at }, w)
                 local worth = 0
                 for _, b in ipairs(c > 0 and jobs or {}) do worth = worth + b.after(turns) / #b.by end
-                local v = worth > 0 and worth - lossOf(ctx, w, e) or 0
+                local v = worth > 0 and worth - lossOf(ctx, w, at) or 0
                 if v > 0 then
                     pairs_[#pairs_ + 1] = { t = t, u = w, v = v, turns = turns,
-                                            d = marchLength(ctx, w, e) }
+                                            d = marchLength(ctx, w, at) }
                 end
             end
         end
@@ -3089,7 +3121,7 @@ local function exploring(ctx, sent, barred, triedIn)
     ctx.jobs = {}
     ctx.tried = {}
     barred = barred or {}
-    local taken = {}
+    local taken = {}   -- job key -> the id of the unit that took it
     -- Whether `u` uses `t` on its own: the game's menu check, never asked of a unit that has acted
     -- (an acted unit keeps its tile on the path alone). Not Goals.list's takerUnits (any unit
     -- that opens it, or that an enemy's key would let), nor botrun's reading of a goal's takers:
@@ -3154,7 +3186,7 @@ local function exploring(ctx, sent, barred, triedIn)
                 ctx.exploreGoal[u.id] = { x = at.x, y = at.y, kind = kind,
                                           target = c[1].t.target }
                 ctx.jobs[u.id] = c
-                for _, j in ipairs(c) do taken[j.id] = true end
+                for _, j in ipairs(c) do taken[j.id] = u.id end
             end
         end
     end
@@ -3163,30 +3195,44 @@ local function exploring(ctx, sent, barred, triedIn)
     -- Ross, killed on turn 2 while Eirika marched on the brigands). A recruit the style claims
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
-    -- the jobs no unit's way lets it take (#767: clearJobs), and those some unit can; keyed as
-    -- each assign keys its goals
-    local blocked, ok = {}, {}
-    local W, cap = weightsFor(ctx.style.aggression), capFor(ctx.style.aggression)
-    -- one taker's way to job `k`, worth `gross` (the style's points) at chance: open, or blocked
-    -- by the enemies on it (routeLoss's `by`) when its loss outweighs the job (`net` <= 0) or a
-    -- stop is over the cap. A blocked job keeps the way of its richest taker, and `after(late)`:
-    -- the job's worth to that taker starting `late` turns from now (clearJobs)
-    local function weigh(k, u, tile, gross, net, worth, goal)
+    -- the jobs some taker's way blocks (#767: clearJobs), and the takers whose way is open, by
+    -- job; keyed as each assign keys its goals
+    local blocked, openTo = {}, {}
+    -- one taker's way to job `k` (worth `gross`, the style's points, at u's chance): open when
+    -- the caller's own test sends u (`takes`) and no stop is over the cap; else blocked by the
+    -- enemies on it (blockersOn). A blocked job gathers every blocked taker's blockers, and
+    -- `after(late)`: its worth (`worth` x chance) to the best of them starting `late` turns from
+    -- now (clearJobs)
+    local function weigh(k, u, tile, gross, takes, worth, goal)
         if gross <= 0 then return end
+        local cap = capFor(ctx.style.aggression)
         local _, way = routeLoss(ctx, u, tile)
-        if net > 0 and way.worst <= cap then
-            ok[k] = true
-        elseif not blocked[k] or gross > blocked[k].worth then
-            -- the goal as the holder alone takes it (a recruit's goal table is shared: a copy
-            -- that reads through to it)
-            local own = setmetatable({ takerUnits = { u } }, { __index = goal })
-            blocked[k] = { worth = gross, by = way.by, after = function(late)
-                return worth * (Goals.chance(own, { [u.id] = { x = u.x, y = u.y, acted = u.acted,
-                                                               alive = 1, late = late } },
-                                             Goals.GAMMA, ctx.turnsTo))
-            end }
+        if takes and way.worst <= cap then
+            openTo[k] = openTo[k] or {}
+            openTo[k][u.id] = true
+            return
+        end
+        local b = blocked[k]
+        if not b then
+            b = { by = {}, afters = {} }
+            b.after = function(late)
+                local best = 0
+                for _, f in ipairs(b.afters) do best = math.max(best, f(late)) end
+                return best
+            end
+            blocked[k] = b
+        end
+        local seen = {}
+        for _, e in ipairs(b.by) do seen[e.id] = true end
+        for _, e in ipairs(blockersOn(way, cap)) do
+            if not seen[e.id] then b.by[#b.by + 1] = e end
+        end
+        table.sort(b.by, function(x, y) return x.id < y.id end)
+        b.afters[#b.afters + 1] = function(late)
+            return worth * (takerChance(ctx, goal, u, { x = u.x, y = u.y, late = late }))
         end
     end
+    local function openTaken(k) return taken[k] ~= nil and (openTo[k] or {})[taken[k]] == true end
     -- each recruit's goal (Goals.recruits): when he is removed, and where he walks till then
     local targets = recruitTargets(ctx)
     local recruitGoal = #targets > 0 and Goals.recruits(ctx.board, ctx.sight, ctx.style, ctx) or {}
@@ -3212,15 +3258,13 @@ local function exploring(ctx, sent, barred, triedIn)
             -- job, which is dropped, not chased (#764)
             local g, at, c, turns = recruitGoal[t.id], nil, 1, nil
             if g then
-                local goal = g   -- Goals.recruits' own table, this pair's taker set on it
-                goal.takerUnits = { p.u }
-                local pos = { x = p.u.x, y = p.u.y, acted = p.u.acted, alive = 1 }
-                c, turns = Goals.chance(goal, { [p.u.id] = pos }, Goals.GAMMA, ctx.turnsTo)
-                at = Goals.meeting(goal, p.u, pos, ctx.turnsTo)
+                local pos, own
+                c, turns, pos, own = takerChance(ctx, g, p.u)
+                at = Goals.meeting(own, p.u, pos, ctx.turnsTo)
             end
             -- less the death on its way there (lossOf): a job not worth its way is none
             local net = c > 0 and v * c - lossOf(ctx, p.u, at or t) or 0
-            weigh("talk>" .. t.id, p.u, at or t, v * c, net, v,
+            weigh("talk>" .. t.id, p.u, at or t, v * c, v > 0 and net > 0, v,
                   g or { tile = { x = t.x, y = t.y }, kind = RECRUIT })
             if v > 0 and net > 0 then
                 talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = net, turns = turns,
@@ -3230,7 +3274,7 @@ local function exploring(ctx, sent, barred, triedIn)
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
     if not ctx.sight.explorable then
-        clearJobs(ctx, blocked, ok, barred, assign)
+        clearJobs(ctx, blocked, openTaken, barred, assign)
         return
     end
     local open, blues = {}, {}
@@ -3302,8 +3346,11 @@ local function exploring(ctx, sent, barred, triedIn)
             local d = reaches(u, t)
             if d then
                 local v, c, turns = sendWorth(ctx, u, t)
-                weigh(tileKey(t.x, t.y), u, t, t.gold * c * W.gold, c > 0 and v or 0,
-                      t.gold * W.gold, { tile = { x = t.x, y = t.y }, closes = t.closes })
+                if c > 0 then
+                    local gold = weightsFor(ctx.style.aggression).gold
+                    weigh(tileKey(t.x, t.y), u, t, t.gold * c * gold, worthSending(ctx, u, t),
+                          t.gold * gold, { tile = { x = t.x, y = t.y }, closes = t.closes })
+                end
                 if worthSending(ctx, u, t) then
                     local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
                         or byOpen[ownOpener(u, t) and 1 or 2]
@@ -3320,7 +3367,7 @@ local function exploring(ctx, sent, barred, triedIn)
         local t = open[tileKey(g.x, g.y)]
         if t and not g.door and quiet[t.id] then triedOn(t.id)[uid] = true end
     end
-    clearJobs(ctx, blocked, ok, barred, assign)
+    clearJobs(ctx, blocked, openTaken, barred, assign)
     sendOpeners(ctx, barred)
 end
 

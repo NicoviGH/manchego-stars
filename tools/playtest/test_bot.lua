@@ -8773,13 +8773,18 @@ end
 
 -- The goals a careful plan sends units to, "x,y" by unit id. `o.field` defaults to open ground
 -- (the manhattan distance from the goal); `blocked[id]` cuts that unit off from every goal.
+-- A march field over the open 15x10 board: each tile's Manhattan distance to `goal`.
+local function openField(goal)
+    local f = {}
+    for y = 0, 9 do
+        f[y] = {}
+        for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+    end
+    return f
+end
 local function talkGoals(board, o, st, blocked)
     o.field = o.field or function(goal)
-        local f = {}
-        for y = 0, 9 do
-            f[y] = {}
-            for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
-        end
+        local f = openField(goal)
         for _, u in ipairs(board.units) do
             if blocked and blocked[u.id] then f[u.y][u.x] = nil end
         end
@@ -8963,6 +8968,14 @@ end
 -- whose forecast does not kill E is not sent. Nor is S sent where T leaves after the second
 -- enemy phase (`closes` 2): A alone still meets him in time, but not once it waits the turn S's
 -- clear takes (a job no one can make in time is dropped, #764); with a turn more it is sent.
+-- each unit's goal in a plan's record, by unit id (its `clears`: the enemy a clear job kills)
+local function clearsOf(plan)
+    local out = {}
+    for _, g in ipairs(plan and plan.goals or {}) do out[g.id] = g end
+    return out
+end
+local KILLS = fc { hit = 100, dmg = 99, hits = 1, killsTarget = true }
+local DIES = fc { takenHit = 100, takenDmg = 99, takenHits = 1 }
 local function clearPlan(kills, closes)
     local T = blue(0x30, 5, 0, 0, { faction = "green" })
     local E = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
@@ -8972,24 +8985,13 @@ local function clearPlan(kills, closes)
         reach = { [0x01] = tiles({ 8, 0 }), [0x02] = tiles({ 3, 6 }, { 3, 4 }, { 3, 3 }),
                   [0x81] = tiles({ 3, 1 }) },
         talk = { [0x01] = { [0x30] = true } }, danger = { ["3,0"] = 1 },
-        closings = closes and { ["unit:48"] = closes } or nil,
+        closings = closes and { ["unit:48"] = closes } or nil, field = openField,
         fc = { [0x01] = { [0x81] = { ["3,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } },
                [0x02] = { [0x81] = { ["3,3"] = kills
                    and fc { hit = 100, dmg = 99, hits = 1, killsTarget = true } or nil } } },
-        field = function(goal)
-            local f = {}
-            for y = 0, 9 do
-                f[y] = {}
-                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
-            end
-            return f
-        end,
     }
     local _, plan = Planner.plan(B, boardOf(A, S, T, E), sightOf(o), style("careful"))
-    local goal
-    for _, g in ipairs(plan and plan.goals or {}) do
-        if g.id == 0x02 then goal = g end
-    end
+    local goal = clearsOf(plan)[0x02]
     local killed
     for _, c in ipairs(plan and plan.considered or {}) do
         for _, k in ipairs(c.acts) do
@@ -9010,6 +9012,51 @@ do
     check(goal, nil, "clear: no clear that lands after the blocked job closes")
     goal = clearPlan(true, 3)
     check(goal and goal.clears, 0x81, "clear: a clear that lands in time is sent")
+end
+
+-- test_a_blocked_village_sends_a_unit_to_kill_its_blocker (#767, PR #774 review): a village's
+-- job is blocked as a Talk's is. A alone may visit (0,0), and its march stops on (3,0), where E
+-- kills it for sure; S, which kills E from (3,3), is sent to E.
+do
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local S = blue(0x02, 1, 3, 6)
+    local E = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 8, 0 }), [0x02] = tiles({ 3, 6 }), [0x81] = tiles({ 3, 1 }) },
+        explorable = { { x = 0, y = 0, kind = "visit" } }, closings = {},
+        canExplore = { [0x01] = { ["0,0"] = "visit" } },
+        danger = { ["3,0"] = 1 }, field = openField,
+        fc = { [0x01] = { [0x81] = { ["3,0"] = DIES } }, [0x02] = { [0x81] = { ["3,3"] = KILLS } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, S, E), sightOf(o), gifted("careful", 3000))
+    local g = clearsOf(plan)[0x02]
+    check(g and g.clears, 0x81, "clear village: the blocked village's blocker is cleared")
+end
+
+-- test_a_jobs_blockers_are_every_blocked_takers (#767, PR #774 review): A and C may each Talk T
+-- over, and each way is deadly: A's stops on (3,0), where E1 kills it, C's on (0,4), where E2
+-- does. Clearing only the richer taker's blocker would leave the other way shut; both E1 (by
+-- S1) and E2 (by S2) are cleared.
+do
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local C = blue(0x03, 2, 0, 9, { minRange = false })
+    local S1 = blue(0x02, 1, 3, 6)
+    local S2 = blue(0x04, 3, 2, 8)
+    local E1 = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local E2 = red(0x82, 2, 4, { minRange = 1, maxRange = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 8, 0 }), [0x03] = tiles({ 0, 9 }), [0x02] = tiles({ 3, 6 }),
+                  [0x04] = tiles({ 2, 8 }), [0x81] = tiles({ 3, 1 }), [0x82] = tiles({ 1, 4 }) },
+        talk = { [0x01] = { [0x30] = true }, [0x03] = { [0x30] = true } },
+        danger = { ["3,0"] = 1, ["0,4"] = 1 }, field = openField,
+        fc = { [0x01] = { [0x81] = { ["3,0"] = DIES } }, [0x03] = { [0x82] = { ["0,4"] = DIES } },
+               [0x02] = { [0x81] = { ["3,3"] = KILLS } }, [0x04] = { [0x82] = { ["2,5"] = KILLS } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, S1, S2, T, E1, E2), sightOf(o), style("careful"))
+    local g = clearsOf(plan)
+    check(tostring(g[0x02] and g[0x02].clears) .. "," .. tostring(g[0x04] and g[0x04].clears),
+          "129,130", "clear union: each blocked taker's blocker is cleared")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
