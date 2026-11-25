@@ -3712,6 +3712,14 @@ do
     check(where[0x01], "1,0", "vacate: with the ally ahead staying, A takes the free tile")
 end
 
+-- Whether `plan` plays a Door act (by unit `id`, when given): the step-aside tests' outcome.
+local function opensDoor(plan, id)
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.act == "door" and (id == nil or a.unitId == id) then return true end
+    end
+    return false
+end
+
 -- test_an_act_on_an_allys_tile_brings_the_allys_move_off_it (#766, vanilla Ch14 s4003 `r766f`):
 -- the board of the aside test below, with the beam cut to one partial plan of one act a unit.
 -- K's Door from (1,0) asks J, who stands there, to move first. The narrowed beam pins the
@@ -3740,11 +3748,8 @@ do
     Planner.BEAM, Planner.PER_UNIT = 1, 1
     local ok, _, plan = pcall(Planner.plan, B, boardOf(K, J, C, D, E), sightOf(o), style("careful"))
     Planner.BEAM, Planner.PER_UNIT = beam, per
-    local opened = false
-    for _, a in ipairs(ok and plan and plan.acts or {}) do
-        opened = opened or (a.unitId == 0x01 and a.act == "door")
-    end
-    check(opened, true, "step aside: K's Door is played, J moved off its tile first")
+    check(opensDoor(ok and plan, 0x01), true,
+          "step aside: K's Door is played, J moved off its tile first")
 end
 
 -- test_the_door_is_opened_from_a_crowded_corridor_at_the_default_beam (#766, PR #770's loose
@@ -3764,15 +3769,14 @@ do
     for id, x in pairs(row) do
         units[#units + 1] = blue(id, id - 1, x, 1)
         local r, o = {}, {}
-        for tx = math.max(6, x - 5), math.min(23, x + 5) do
-            r[#r + 1] = { x = tx, y = 1 }; o[#o + 1] = { x = tx, y = 1 }
-        end
+        for tx = math.max(6, x - 5), math.min(23, x + 5) do r[#r + 1] = { tx, 1 } end
+        for _, t in ipairs(r) do o[#o + 1] = t end
         for _, cx in ipairs({ 17, 18 }) do
             for y = 2, 6 do
-                if math.abs(x - cx) + y - 1 <= 5 then o[#o + 1] = { x = cx, y = y } end
+                if math.abs(x - cx) + y - 1 <= 5 then o[#o + 1] = { cx, y } end
             end
         end
-        shut[id], open[id] = r, o
+        shut[id], open[id] = tiles(table.unpack(r)), tiles(table.unpack(o))
     end
     table.sort(units, function(a, b) return a.id < b.id end)
     local locked = {}
@@ -3801,9 +3805,8 @@ do
     board.map = { w = 30, h = 30 }
     local ok, _, plan = pcall(Planner.plan, B, board, sightOf(o), style("careful"))
     check(ok, true, "Ch14 corridor: the plan is made")
-    local opened = false
-    for _, a in ipairs(ok and plan and plan.acts or {}) do opened = opened or a.act == "door" end
-    check(opened, true, "Ch14 corridor: the door is opened, an ally moved off its tile first")
+    check(opensDoor(ok and plan, 0x0A), true,
+          "Ch14 corridor: id 10 opens the door, an ally moved off its tile first")
 end
 
 -- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;

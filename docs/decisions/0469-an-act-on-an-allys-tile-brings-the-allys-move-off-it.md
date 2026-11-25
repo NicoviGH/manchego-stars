@@ -37,13 +37,14 @@ replay (`r766f`) settled it:
   Seize and goal offers, and `unstall`. A replay of acts a plan already holds passes `exact`:
   `complete`, `rebuild`, the mends, the kept `rest` and the fog reorder. An aside there would
   silently swap an ally's own act for another (#770's review).
-- **Amended 2026-11-24 (#766): the beam no longer carries a plan whose every unit is placed.**
-  #770's review added that rule by reading: a step aside places two units in one depth, so such
-  a plan might extend to nothing at the last depth and lose its place. No board showed it doing
-  anything. With the rule removed, the result was the same on all three door boards in
-  `test_bot.lua`, at beam widths 1 to 16 and per-unit widths 1 to 4. Either every plan in the
-  last depth's beam was fully placed (the beam then stops as it stands), or the beam built the
-  same plan in another order. Code that no test can show working is removed.
+- **The beam carries a plan whose every unit is already placed** to the next depth as it is. A
+  step aside places two units in one depth, and such a plan would otherwise extend to nothing at
+  the last depth and lose its place (#770's review). The loss needs a last-depth beam that mixes
+  such a plan with plans one act short that can still extend. No board built so far shows it
+  (2026-11-24, #771): on three door boards, at beam widths 1 to 16 and per-unit widths 1 to 4,
+  and on a fourth built for the mixed case, the result was the same without the rule. Either
+  every plan in the beam was fully placed, or the beam or the advance built the same door plan
+  in another order. So this is held by reading, not by a test.
 
 ## Proof
 
