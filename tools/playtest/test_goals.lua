@@ -274,8 +274,8 @@ do
           "remembered route: the forecast's phase, then where he walked, up to his removal")
     local pos = { [1] = { x = 24, y = 0, acted = false, alive = 1 } }
     check(Goals.chance(g, pos, G, sight.turnsTo) > 0, true, "remembered route: met in phase 3")
-    local tile, f = Goals.meeting(g, board.units[1], pos[1], sight.turnsTo)
-    check(tile and tile.x .. "," .. tile.y .. " " .. f, "16,0 3", "remembered route: the meeting tile and phase")
+    local m = Goals.meetings(g, board.units[1], pos[1], G, sight.turnsTo)[1]
+    check(m and m.tile.x .. "," .. m.tile.y .. " " .. m.f, "16,0 3", "remembered route: the meeting tile and phase")
     g = find(Goals.list(board, sight, {}, ctx), "recruit:144")
     check(Goals.chance(g, pos, G, sight.turnsTo), 0, "no memory: past the forecast he is never met")
 end

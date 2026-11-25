@@ -2921,6 +2921,32 @@ local function lossOf(ctx, u, tile, from)
     return routeLoss(ctx, u, tile, from) * weightsFor(ctx.style.aggression).death
 end
 
+-- The Talk job's worth for talker `u` on recruit `t` (#766): the recruit's (Goals.worth) less
+-- what the hire spends, so a free talker outranks a paid one, and a hire dearer than a unit is
+-- worth to the style is not marched on. A ranking, not a ban (ADR 0396): the Talk stays offered,
+-- and the planner may still play it, the hire charged (st.priced). The stage job: the talker is
+-- sent where it meets him on his way (Goals.meetings, on `g`, his goal from Goals.recruits), not to
+-- the tile he is leaving. The job is "get him": it is worth its best meeting, its chance there
+-- less the death on its way there (lossOf), not its first (`h766c`: Rennac's first meeting was in
+-- the corridor the enemy held, the job died on it, and nobody went for the safe one at the map's
+-- edge). A talker that cannot meet him before he is removed has no job, which is dropped, not
+-- chased (#764).
+-- -> its net worth (0: no job), the turn it meets him on, and the meeting tile.
+local function talkWorth(ctx, u, t, g)
+    local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, u, t) },
+                          weightsFor(ctx.style.aggression))
+    if v <= 0 then return 0 end
+    if not g then return math.max(v - lossOf(ctx, u, t), 0) end
+    local pos = { x = u.x, y = u.y, acted = u.acted, alive = 1 }
+    local best
+    for _, m in ipairs(Goals.meetings(g, u, pos, Goals.GAMMA, ctx.turnsTo)) do
+        local net = v * m.c - lossOf(ctx, u, m.tile)
+        if not best or net > best.net then best = { net = net, turns = m.turns, at = m.tile } end
+    end
+    if not best then return 0 end
+    return math.max(best.net, 0), best.turns, best.at
+end
+
 local function sendWorth(ctx, u, t, from)
     local goal = { tile = { x = t.x, y = t.y }, closes = t.closes, takerUnits = { u } }
     local p = from and { x = from.x, y = from.y, late = from.late, alive = 1 }
@@ -3069,23 +3095,8 @@ local function exploring(ctx, sent, barred, triedIn)
             -- talker outranks a paid one, and a hire dearer than a unit is worth to the style is
             -- not marched on (#766). A ranking, not a ban (ADR 0396): the Talk stays offered, and
             -- the planner may still play it, the hire charged (st.priced)
-            local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, p.u, t) },
-                                  weightsFor(ctx.style.aggression))
-            -- the stage job (#766): the talker is sent where it meets him on his way
-            -- (Goals.meeting), not to the tile he is leaving, and the job is worth its chance
-            -- of that (Goals.chance); a talker that cannot meet him before he is removed has no
-            -- job, which is dropped, not chased (#764)
-            local g, at, c, turns = recruitGoal[t.id], nil, 1, nil
-            if g then
-                local goal = g   -- Goals.recruits' own table, this pair's taker set on it
-                goal.takerUnits = { p.u }
-                local pos = { x = p.u.x, y = p.u.y, acted = p.u.acted, alive = 1 }
-                c, turns = Goals.chance(goal, { [p.u.id] = pos }, Goals.GAMMA, ctx.turnsTo)
-                at = Goals.meeting(goal, p.u, pos, ctx.turnsTo)
-            end
-            -- less the death on its way there (lossOf): a job not worth its way is none
-            local net = c > 0 and v * c - lossOf(ctx, p.u, at or t) or 0
-            if v > 0 and net > 0 then
+            local net, turns, at = talkWorth(ctx, p.u, t, recruitGoal[t.id])
+            if net > 0 then
                 talkPairs[#talkPairs + 1] = { t = t, u = p.u, d = p.d, v = net, turns = turns,
                                               at = at }
             end

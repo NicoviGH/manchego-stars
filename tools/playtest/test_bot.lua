@@ -8955,6 +8955,24 @@ do
           "loss: a way that costs the death it is worth is no job")
 end
 
+-- test_a_talk_job_is_worth_its_best_meeting (#766, vanilla Ch14 s4002 `h766c`): T walks to (7,0),
+-- then to (0,9), and leaves after the third enemy phase. A (MOV 5, at (0,0)) meets him first at
+-- (7,0), but its march stops on (5,0) on the way, where E kills it for sure; it meets him later
+-- at (0,9) by a way E never reaches. The job is "get T": it is worth its best meeting, so A is
+-- sent to (0,9). Priced at its first meeting alone, the job cost the death it is worth and was
+-- dropped, and no talker went for him (Rennac, met first in the corridor the enemy held).
+do
+    local T = blue(0x30, 5, 6, 0, { faction = "green" })
+    local E = red(0x81, 5, 2, { minRange = 1, maxRange = 1 })
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 5, 1 }) },
+                talk = { [0x01] = { [0x30] = true } }, danger = { ["5,0"] = 1 },
+                fc = { [0x01] = { [0x81] = { ["5,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } } },
+                closings = { ["unit:48"] = 4 }, paths = { [0x30] = { { x = 7, y = 0 }, { x = 0, y = 9 } } } }
+    check(talkGoals(boardOf(A, T, E), o)[0x01], "0,9",
+          "best meeting: the talker is sent to the safe later meeting, not dropped")
+end
+
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
 -- the nearer unit able to Talk to it. Only C is sent; A is left to its own goal.
 do
