@@ -27,15 +27,29 @@ plan, first.
     Ch10 deaths after early Talks (5 of 10 games on the branch before, 0 after).
   - 10 starts (Ch10 and Ch14, s4002/3/5/7/9, two attempts each): 4 cleared clean against main's
     2, and 6 deaths against 12.
-  - **Next, approved by Nicolas (2026-11-25): the rest of R2** — the clear and escort jobs, and
-    replacing `recruitFirst` and `marchGoal`'s per-goal choice. Cut a new branch from main.
+- **Next, approved by Nicolas (2026-11-25): the clear job for a blocked job** (#767 comment
+  7170318277). Two sizings from records, no runs, turned the plan:
+  - Clear and escort as R2 jobs reach none of PR #773's 6 deaths (#766 comment 7169799151).
+  - The rank order stays as it is (Nicolas, 2026-11-25). Progress choosing a deadlier admitted
+    plan costs about 3.5% of deaths, and research 0024 measured the swap worse (#767 comment
+    7170091271).
+  - R3's progress term reaches none of the 7 rewards missed in #773's final games. The cap decided 4
+    (the Talk tile beside Amelia; Ch14's corridor to Rennac), no job was set in 2, and 1 was a
+    lost race.
+  - **Build:** when a job's tile or way is too deadly for its holder (over the cap, or its route loss
+    outweighs it), the enemies that make it so become clear targets for units that can kill them
+    under the cap, worth the blocked job's worth (no new weight). The planner credits progress
+    toward those kills.
+  - **First check:** why Ch14 s4002 a2 (`j766c`) gave L'Arachel no job on turns 3-4, 5 tiles from
+    Rennac (likely route loss; untested).
+  - Branch `feat/766-clear-escort-jobs` is cut from main with no changes. Reuse it or cut a new one.
 - **Ch10 s4009 a1's loss is no bug** (#766 comment 7169573218): the 0%-for-Eirika plans each
   forfeited Amelia's recruit, and bold's cap took an 11.8% game over (read right) over a certain
   forfeit. No rank change (Nicolas went on to R2); the R3 rank-order question stays open on
   its own. Lesson: read a plan record's rank keys in order (`forfeits` first among admitted)
   before naming which key decided; the earlier comment had named `progress` without looking.
 - **Also open:** Ch10 s4003/s4007 never recruit Amelia (main too), so they never clear clean.
-- **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it).
+- **R3 #767:** the progress term waits until a run shows a job lost on `progress`.
 - **R4 #768:** then measure the walls.
 
 **Ch14 s4003 as it stands** (`j766c`, two attempts): won in 18 turns, then cleared clean in 17.
