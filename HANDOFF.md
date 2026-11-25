@@ -13,40 +13,42 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-24; main is 522736d1 + this HANDOFF)
+## Next session starts here (2026-11-24; main is 12c9c716 + this HANDOFF)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the
 plan, first. In short: one-case fixes kept trading one loss for another. The bot will:
 - **R1 #765: done.** PR #769 (ADR 0467): a retry's memory is each failed attempt's visible
-  timeline, read off its trace by `tools/playtest/timeline.lua`.
-- **R2 #766: in progress** on branch `feat/766-job-layer` (pushed, no PR). Nicolas settled the
-  horizon and loss-weight calls (#764's body). Built: `jobs.lua`, the assignment `exploring`
-  now uses. Left: #766's progress comment (issuecomment-7145144548). Next: the Ch14 root cause, confirmed in #766's latest comment.
-  The Rennac Talk went to Eirika, whose Talk costs 9,980 gold against the party's 9,420, while
-  L'Arachel (free) marched on the boss. Fix: price each talker's job (the comment says how).
-- **R3 #767:** have the per-turn planner play those jobs;
+  timeline (`tools/playtest/timeline.lua`).
+- **R2 #766: part 1 merged** (PR #770, ADR 0468 and 0469):
+  - `jobs.lua` assigns the march's jobs over deadlines.
+  - A paid Talk is priced from its script: a talker the party cannot pay is no talker, and a
+    hire is charged.
+  - An act on an ally's tile brings the ally's move off it.
+  - **Left for R2:** the stage, clear and escort jobs, and replacing `recruitFirst` and
+    `marchGoal`'s per-goal choice (#766's first progress comment). Cut a new branch from main
+    for them; `feat/766-job-layer` is deleted.
+- **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it). The
+  Ch14 replays show why: L'Arachel holds Rennac's job but spends turns on her staff.
 - **R4 #768:** then measure the walls.
 
 The one call still open for Nicolas is whether R3 touches the rank's order (before R3).
 
-**Merged today:** PR #762 (ADR 0465, fliers' march reads their own costs; #730 stays open, it
-was only referenced), PR #763 (ADR 0466, a talker marches on a recruit our act will load), PR
-#769 (R1).
+**What PR #770's replays showed** (vanilla Ch14 s4003, two attempts each):
+- **`r766g`, before the review fixes:** attempt 2 **won clean** in 19 turns with 0 deaths.
+  Rennac was talked over on turn 5 and the (17,2) door opened on turn 8.
+- **`r766i`, after the review fixes:**
+  - Attempt 1 won in 22 turns with 0 deaths.
+  - Attempt 2 won in 21 turns: Rennac was talked over on turn 5, then died on turn 13 in a plan
+    read at 0.59 to die, over the cap.
+  - On turn 11 both runs played a non-admitted `spare` plan (0.835) over admitted ones. That is
+    noted on #743; it is not #770's.
+- **`r766e`/`r766f`:** the stall the step-aside fixed (keyless allies on both of the door's
+  tiles; `r766f` was instrumented).
+- `r766h` crashed on turn 2: a gold read nested two machines. It was fixed before the merge; ignore
+  the run.
 
-**What R1's replays showed** (on PR #769):
-- **Ch14 s4003 (`r765c`):** attempt 2 won, 21 turns, 0 deaths. Rennac came on turn 4; the
-  planner dated his departure to turn 13 and he left on turn 13; both chests were dated to the
-  phases they were lost in. Nobody could reach him or the chests in time: R2's staging.
-- **Ch10 s4002 (`r765a`):** attempt 1 now visits both villages (with #762/#763). Attempt 2 lost
-  two units on turn 7: the killers are in the timeline's `threats`, for R2.
-
-**Holds to revisit now that R1 is in:** #569 waited on R1 (read its hold comment: does it
-reopen?). #727 waits on R2/R3, #639 on R4. #742 lands before R4. #745 (the recorder misses a
-thief's drop) is not fixed by R1 and stays open under it.
-
-**Run tags this session** (vanilla store `references/sim/vanilla/c25b145e3745`):
-- `r765a`: Ch10 s4002, two attempts; `r765c`: Ch14 s4003, two attempts (R1's replays);
-- `r765b`: stopped early (ran before the review's `appeared` fix), ignore it.
+**Holds to revisit:** #569 waited on R1 (read its hold comment: does it reopen?). #727 waits on
+R2/R3, #639 on R4. #742 lands before R4. #745 (the recorder misses a thief's drop) stays open.
 
 **Worktrees:**
 - `../manchego-stars-wt4` still holds Trade step 1 (#688), uncommitted.
