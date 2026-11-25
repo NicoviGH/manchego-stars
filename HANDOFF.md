@@ -13,47 +13,46 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-25, evening; main is 698657f3 + HANDOFF commits)
+## Next session starts here (2026-11-25, night; main is 698657f3 + HANDOFF commits)
 
-**The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the
-plan, first.
-- **R1 #765: done.** PR #769 (ADR 0467).
-- **R2 #766: the stage job, route loss and the Talk-recruit fix are merged** (PR #773, ADR 0471;
-  #766's comments of 2026-11-25 have the measurements):
-  - A talker is sent to the tile where it meets the recruit, on the route an earlier attempt
-    saw; a job is priced by the death on its road (`routeLoss` × `W.death`, no new weight).
-  - A Talk's recruit is judged as a player unit on her tile (the game's `UnitChangeFaction` in
-    the judged phase), and the mend tries the talker's other acts for her. This stopped Amelia's
-    Ch10 deaths after early Talks (5 of 10 games on the branch before, 0 after).
-  - 10 starts (Ch10 and Ch14, s4002/3/5/7/9, two attempts each): 4 cleared clean against main's
-    2, and 6 deaths against 12.
-- **The clear job is built, reviewed, and NOT merged: PR #774** (branch
-  `feat/767-clear-blocked-job`, ADR 0472 on the branch only). A job whose takers' ways are
-  deadly makes the enemies on them kill targets for free units, timed to the job's deadline.
-  Review and re-review findings all fixed; every test fails without its fix. CI not checked.
-  - **It gains nothing on the replayed games** (#767 comment 7172408562): Ch14 s4002 plays as main
-    (Rennac still missed: six enemies hold his corridor and fall after he leaves). In Ch10 s4007,
-    both attempts lost Amelia: clear jobs sent Franz and Seth near her, she attacked them on
-    turn 7, and their counters killed her (turn 6's one-phase plan could not see it).
-  - **Open call for Nicolas:** leave PR #774 unmerged and run R4 on main (recommended), or merge
-    it and then run R4. Asked 2026-11-25, unanswered.
-- **Rennac is recruited on 2 of 5 Ch14 starts** (s4003, s4009, attempt 2 only; `j766c`), not
-  "solved": s4002, s4005 and s4007 miss him. The likelier fix than clearing his corridor:
-  stage a talker before opening the door that brings him (#764's own witness). Not built,
-  not checked whether the bot can hold back that door.
-- **Ch10's clean clears hold on PR #774** (s4002 a1, s4005 a2; `c767d`).
-- **R3 #767:** the progress term was sized out (#767 comment 7170318277).
-- **R4 #768, next:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
-  --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
-  b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
-  comment 7093112364). Run in the background.
+**The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
+R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773).
 
-**Ch14 s4003 as it stands** (`j766c`, two attempts): won in 18 turns, then cleared clean in 17.
+**Order Nicolas set (2026-11-25): #775, then #776, then the R4 runs (#768).**
 
-**Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s4003/`.
-Each start is a scout lap: replay it with
-`montecarlo.py resume --game vanilla --tag <tag> --campaigns b640e-cs-s4003 --chapter 14 --last 14
---attempts 2 --scout --jobs 1`.
+1. **#775: a unit's remembered walk outranks a forecast that holds it still** (sub-issue of #766).
+   Once Rennac is on the board the forecast (`sight.closings`' path) keeps him on his tile, and
+   `goals.lua` `runOn` lets it outrank his remembered walk, so every Talk meeting is priced in
+   the enemy-held corridor and dropped. First step is a code read (does the forecast play his
+   Lockpick door and chests?), then fix the forecast or let the memory win. Proof: a failing
+   test and one Ch14 s4005 replay. Its body has the plan.
+2. **#776: a step safe now that leaves no safe tile next turn** (sub-issue of #743; Tana in Ch14
+   s4002, Amelia in Ch10 s4007). **Answer its question before building:** #743's probe found
+   the second-phase read no guide, so first check on the recorded boards whether a "safe tile
+   next turn" check would flag those deaths at t-1 and not the units that lived.
+3. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
+   --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
+   b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
+   comment 7093112364). Run in the background.
+
+**Branch `feat/766-hold-trigger` (local only, one WIP commit 39568f35, not pushed, not
+reviewed)**, cut from main:
+- **The Talk job is worth its best meeting, not its first** (`Goals.meetings`, `talkWorth`):
+  Rennac recruited on 3 of 5 Ch14 starts (main 2), clean clears 2 of 5 (main 2); s4002 won him
+  by the safe intercept at his exit (#766 comment 7175090575). Keep it; #775 builds on it.
+- **The door hold (`heldTrigger`) never fired** in any run (`h766b`, `h766d`): remove it before
+  the PR unless #775 makes it matter. History: a hold on distance won s4002 and lost s4003 and
+  s4009 (`h766a`); the decomp shows Rennac sits on (22,12) until our (22,17) door opens
+  (#766 comments 7172746109, 7173054263, 7174641267).
+- Do #775 on this branch, then one PR for both, `/code-review`, ADR (0473: 0472 is PR #774's).
+
+**PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
+Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
+
+**Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
+Today's tags: `h774a` (door-hold probe), `h766a`-`h766e` (Ch14 five starts and two logged
+replays). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
+b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
 **Holds to revisit:** #569 waited on R1 (read its hold comment: does it reopen?). #727 waits on
 R2/R3, #639 on R4. #742 lands before R4. #745 (the recorder misses a thief's drop) stays open.
