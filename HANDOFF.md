@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-25; main is 698657f3 + this HANDOFF)
+## Next session starts here (2026-11-25; main is 698657f3 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the
 plan, first.
@@ -27,11 +27,13 @@ plan, first.
     Ch10 deaths after early Talks (5 of 10 games on the branch before, 0 after).
   - 10 starts (Ch10 and Ch14, s4002/3/5/7/9, two attempts each): 4 cleared clean against main's
     2, and 6 deaths against 12.
-  - **Left for R2:** the clear and escort jobs, and replacing `recruitFirst` and `marchGoal`'s
-    per-goal choice. Cut a new branch from main.
+  - **Next, approved by Nicolas (2026-11-25): the rest of R2** — the clear and escort jobs, and
+    replacing `recruitFirst` and `marchGoal`'s per-goal choice. Cut a new branch from main.
 - **Ch10 s4009 a1's loss is no bug** (#766 comment 7169573218): the 0%-for-Eirika plans each
   forfeited Amelia's recruit, and bold's cap took an 11.8% game over (read right) over a certain
-  forfeit. Recommended: no rank change; the R3 rank-order question stays open on its own.
+  forfeit. No rank change (Nicolas went on to R2); the R3 rank-order question stays open on
+  its own. Lesson: read a plan record's rank keys in order (`forfeits` first among admitted)
+  before naming which key decided; the earlier comment had named `progress` without looking.
 - **Also open:** Ch10 s4003/s4007 never recruit Amelia (main too), so they never clear clean.
 - **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it).
 - **R4 #768:** then measure the walls.
