@@ -3712,6 +3712,14 @@ do
     check(where[0x01], "1,0", "vacate: with the ally ahead staying, A takes the free tile")
 end
 
+-- Whether `plan` plays a Door act (by unit `id`, when given): the step-aside tests' outcome.
+local function opensDoor(plan, id)
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.act == "door" and (id == nil or a.unitId == id) then return true end
+    end
+    return false
+end
+
 -- test_an_act_on_an_allys_tile_brings_the_allys_move_off_it (#766, vanilla Ch14 s4003 `r766f`):
 -- the board of the aside test below, with the beam cut to one partial plan of one act a unit.
 -- K's Door from (1,0) asks J, who stands there, to move first. The narrowed beam pins the
@@ -3740,11 +3748,65 @@ do
     Planner.BEAM, Planner.PER_UNIT = 1, 1
     local ok, _, plan = pcall(Planner.plan, B, boardOf(K, J, C, D, E), sightOf(o), style("careful"))
     Planner.BEAM, Planner.PER_UNIT = beam, per
-    local opened = false
-    for _, a in ipairs(ok and plan and plan.acts or {}) do
-        opened = opened or (a.unitId == 0x01 and a.act == "door")
+    check(opensDoor(ok and plan, 0x01), true,
+          "step aside: K's Door is played, J moved off its tile first")
+end
+
+-- test_the_door_is_opened_from_a_crowded_corridor_at_the_default_beam (#766, PR #770's loose
+-- end): vanilla Ch14 s4003 attempt 2, turn 13 of `r766f`, the blues on row 1 where the record
+-- has them, the five on the door's stretch (16 to 20). The (17,2)/(18,2) door opens only from
+-- (17,1) or (18,1), held by board ids 3 and 11, who hold no key; id 10 holds a Lockpick. Each
+-- unit reaches five tiles along the row through its allies, and once the door opens, down
+-- columns 17 and 18 toward the boss. In the run no plan judged held the door for nine turns,
+-- and the board repeated until the run was cut. At the default beam, with the step aside the
+-- door is opened; without it, it is not.
+do
+    local row = { [0x01] = 16, [0x03] = 17, [0x0B] = 18, [0x0A] = 19, [0x07] = 20 }
+    local units, shut, open, toDoor = {}, {}, {}, {}
+    local toBoss = { ["9,5"] = 0 }
+    for x = 6, 23 do toDoor[x .. ",1"] = math.min(math.abs(x - 17), math.abs(x - 18)) + 1 end
+    for y = 2, 6 do toBoss["17," .. y] = 12 - y; toBoss["18," .. y] = 13 - y end
+    for id, x in pairs(row) do
+        units[#units + 1] = blue(id, id - 1, x, 1)
+        local r, o = {}, {}
+        for tx = math.max(6, x - 5), math.min(23, x + 5) do r[#r + 1] = { tx, 1 } end
+        for _, t in ipairs(r) do o[#o + 1] = t end
+        for _, cx in ipairs({ 17, 18 }) do
+            for y = 2, 6 do
+                if math.abs(x - cx) + y - 1 <= 5 then o[#o + 1] = { cx, y } end
+            end
+        end
+        shut[id], open[id] = tiles(table.unpack(r)), tiles(table.unpack(o))
     end
-    check(opened, true, "step aside: K's Door is played, J moved off its tile first")
+    table.sort(units, function(a, b) return a.id < b.id end)
+    local locked = {}
+    for id in pairs(row) do
+        if id ~= 0x0A then
+            locked[id] = { ["17,2"] = "door", ["18,2"] = "door" }
+        end
+    end
+    units[#units + 1] = red(0x81, 9, 5, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" },
+        reach = shut,
+        field = fieldsOf { ["9,5"] = toBoss, ["17,2"] = toDoor, ["18,2"] = toDoor },
+        obstacles = {}, doors = { { x = 17, y = 2 }, { x = 18, y = 2 } },
+        openers = { [0x0A] = true },
+        -- the door is locked to every unit with no key (sight.locked), and no enemy drops one
+        locked = locked,
+        change = function(c)
+            if c.opened["17,2"] or c.opened["18,2"] then
+                return { reach = open, doors = {}, locked = {}, mapKey = "open" }
+            end
+            return {}
+        end,
+    }
+    local board = boardOf(table.unpack(units))
+    board.map = { w = 30, h = 30 }
+    local ok, _, plan = pcall(Planner.plan, B, board, sightOf(o), style("careful"))
+    check(ok, true, "Ch14 corridor: the plan is made")
+    check(opensDoor(ok and plan, 0x0A), true,
+          "Ch14 corridor: id 10 opens the door, an ally moved off its tile first")
 end
 
 -- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
