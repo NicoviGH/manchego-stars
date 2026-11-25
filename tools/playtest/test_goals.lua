@@ -284,9 +284,9 @@ end
 -- per turn until the Talk, the trip's and the wait's. His walk is (4,0), then (8,0), and he stays
 -- there (no removal). A (at (0,0), 4 tiles a turn) meets him on (4,0) in phase 2 after one turn
 -- there and a wait of one, on (8,0) in phase 3 on arrival; past the walk's end it meets him
--- whenever it arrives, waiting from that phase. B, 8 turns from his last tile, meets him only past the walk's end, on its
--- arrival: never at a phase before it gets there (the wait was -4 and the chance above 1). A
--- goal with no path is met where it stands.
+-- whenever it arrives, waiting from that phase. B, 8 turns from his last tile, meets him only
+-- past the walk's end, on its arrival: never at a phase before it gets there (the wait was -4
+-- and the chance above 1). A goal with no path is met where it stands.
 do
     local goal = { tile = { x = 0, y = 4 }, path = { { x = 4, y = 0 }, { x = 8, y = 0 } } }
     local A, B = { id = 1 }, { id = 2 }

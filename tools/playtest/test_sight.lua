@@ -4019,6 +4019,14 @@ do
     sight.remember({ { id = 1 } })
     check(dangerReads({ gone = { [1] = true } }) > 0, true,
           "changed: a remembered enemy's death rebuilds the danger grid")
+    -- chestItem (#775, PR #777 review): the forecast's replay reads a chest's item from the memo
+    -- alone (`known`), so an unread chest is nil and runs no game call (no sandbox nested in the
+    -- replay, borrowing the AI's scratch); a plain read asks the game
+    local before = calls
+    check(sight.chestItem(5, 5, true), nil, "chestItem: known only, an unread chest has no item")
+    check(calls - before, 0, "chestItem: known only, no game call")
+    sight.chestItem(5, 5)
+    check(calls - before > 0, true, "chestItem: a plain read asks the game")
     -- ADR 0449: knows() reads the arrival botrun stamped; a refresh only when one changes
     do
         local refreshes, plain = 0, sight.refresh
