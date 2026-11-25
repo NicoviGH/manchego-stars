@@ -24,6 +24,8 @@ plan, first. In short: one-case fixes kept trading one loss for another. The bot
   - A paid Talk is priced from its script: a talker the party cannot pay is no talker, and a
     hire is charged.
   - An act on an ally's tile brings the ally's move off it.
+  - **First, PR #770's loose ends**, in #766's latest comment: a default-settings test from Ch14's
+    real board, and the turn-11 plan over the death cap played while admitted plans were offered.
   - **Left for R2:** the stage, clear and escort jobs, and replacing `recruitFirst` and
     `marchGoal`'s per-goal choice (#766's first progress comment). Cut a new branch from main
     for them; `feat/766-job-layer` is deleted.
