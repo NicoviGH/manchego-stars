@@ -9678,6 +9678,50 @@ do
     check(win, 0.85, "rout: the fallback count keeps a red off the field standing")
 end
 
+-- test_a_talked_recruit_is_judged_as_a_player_unit_where_it_stands (#766, ADR 0471): R (red,
+-- charId 0x12, vanilla Ch10's Amelia) is a recruit A may Talk over from (1,0). The game turns her blue on her
+-- tile (UnitChangeFaction): the judged phase is told she joins (plan.joined) and gives her new
+-- blue id (.joined); Z kills her there. The Talk plan carries her death, protected under the
+-- cap, so careful does not Talk; where Z cannot reach her it does. Before the fix the Talk took
+-- her off the map, no death was read, and careful Talked her into Z's reach.
+local function talkedRecruitPlay(deadly)
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local R = red(0x81, 2, 0, { hp = 10, charId = 0x12, minRange = false })
+    local Z = red(0x82, 4, 0, { minRange = false })
+    local asked
+    local o = {
+        objective = { kind = "rout" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        talk = { [0x01] = { [0x81] = true } },
+        enemyPhase = function(plan)
+            if not (plan.joined and plan.joined[0x81]) then return {} end
+            asked = true
+            local out = { joined = { [0x81] = 0x05 } }
+            if deadly then
+                out[1] = { enemy = 0x82, target = 0x05, takenHit = 100, takenDmg = 99,
+                           takenHits = 1, takenCrit = 0, targetHp = 10 }
+            end
+            return out
+        end,
+    }
+    local a, plan = Planner.plan(B, boardOf(A, R, Z), sightOf(o), style("careful"))
+    local talk
+    for _, c in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(c.acts) do
+            if k:find(">talk@1,0>129", 1, true) then talk = talk or c end
+        end
+    end
+    return a, talk, asked
+end
+do
+    local a, talk, asked = talkedRecruitPlay(true)
+    check(asked, true, "joined: the judged phase is told the Talk's recruit joins")
+    check(talk and talk.rank and talk.rank.max_die, 1, "joined: the Talk plan carries her death")
+    check(a and a.act ~= "talk", true, "joined: careful does not Talk her into the reds' reach")
+    a = talkedRecruitPlay(false)
+    check(a and a.act, "talk", "joined: where no red reaches her, careful Talks")
+end
+
 -- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────
 
 -- test_caps_are_fixed_per_style (FR-010): careful 1%, even 5%, bold 15%, and a style with no
@@ -10534,8 +10578,8 @@ end
 
 -- test_lookahead_sees_only_the_board (T059): the second phase is asked on the staged board
 -- alone -- our units, the enemies gone, the enemies' HP and the weapon uses their counters
--- spent (#644), the doors and walls it opens, the units it carries (Rescue) -- and
--- nothing about a turn to come:
+-- spent (#644), the doors and walls it opens, the units it carries (Rescue), the recruits it
+-- Talks over (#766: they join on their tiles) -- and nothing about a turn to come:
 -- an arrival is a trigger, never a unit placed on it.
 do
     local board, sight, st = looksAhead(true)
@@ -10543,7 +10587,8 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,opened,redWear,reds,waits", "lookahead: the staged board, nothing more")
+    check(table.concat(keys, ","), "blues,carry,gone,joined,opened,redWear,reds,waits",
+          "lookahead: the staged board, nothing more")
 end
 
 -- test_a_remembered_enemy_is_planned_against (ADR 0399): a fogged red the retry remembers

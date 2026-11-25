@@ -2038,6 +2038,58 @@ do
     check(#calls, 0, "deathDropAt: and asks the game nothing")
 end
 
+-- joinUs (#766, ADR 0471): a Talk's recruit is turned blue as the game turns it: the game's own
+-- UnitChangeFaction, into the first blue slot GetFreeUnit would give (here 0x03: 0x01 and 0x02
+-- are loaded), both structs and gActiveUnit kept first (the call's writes are not journaled),
+-- and her map cell holds her new id. With no blue slot free nothing is called.
+do
+    local m = fakeMem()
+    local S = { gBmMapUnit = 0x100, gActiveUnit = 0x110, gUnitLookup = 0x2000,
+                UnitChangeFaction = 0x0800BBBB }
+    m.w32(0x100, 0x200)
+    for y = 0, 15 do m.w32(0x200 + y * 4, 0x1000 + y * 0x20) end
+    local function at(x, y) return 0x1000 + y * 0x20 + x end
+    local SIZE = 0x48
+    local function slotOf(id) return 0x5000 + id * SIZE end
+    for id = 0x01, 0x3F do
+        m.w32(S.gUnitLookup + id * 4, slotOf(id)); m.w8(slotOf(id) + 0x0B, id)
+    end
+    m.w32(slotOf(0x01), 0x08AA0000); m.w32(slotOf(0x02), 0x08AA0040)
+    local red = 0x7000
+    m.w32(S.gUnitLookup + 0x81 * 4, red)
+    m.w32(red, 0x08AA0080); m.w8(red + 0x0B, 0x81); m.w8(red + 0x10, 2); m.w8(red + 0x11, 3)
+    m.w8(red + 0x13, 17)   -- her HP
+    m.w8(at(2, 3), 0x81)
+    local kept, calls = {}, {}
+    local api = { mem = m, SYM = S, Board = { UNIT_SIZE = SIZE, UNIT_RESCUE = 0x1B },
+                  write8 = m.w8, write32 = m.w32,
+                  keep16 = function(a, n) kept[#kept + 1] = string.format("%X:%d", a, n) end }
+    -- as bmunit.c: CopyUnit into GetFreeUnit(faction)'s slot (its index kept), ClearUnit
+    local call = function(fn, args)
+        calls[#calls + 1] = string.format("%X(%X,%d)", fn, args[1], args[2])
+        local to = Sight.freeSlots(m, S, args[2] + 1, args[2] + 0x3F)[1].addr
+        for k = 0, SIZE - 1 do
+            if k ~= 0x0B then m.w8(to + k, m.u8(args[1] + k)) end
+        end
+        for k = 0, SIZE - 1 do
+            if k ~= 0x0B then m.w8(args[1] + k, 0) end
+        end
+    end
+    local e = { id = 0x81, addr = red, faction = "red", charId = 0x12, x = 2, y = 3 }
+    local u = Sight.joinUs(api, call, S, e)
+    check(u and string.format("%X|%s|%X|%X", u.id, u.faction, u.addr, u.charId), "3|blue|50D8|12",
+          "joinUs: ours under the game's free blue slot, her charId kept")
+    check(calls[1], "800BBBB(7000,0)", "joinUs: the game's UnitChangeFaction to FACTION_BLUE")
+    check(table.concat(kept, ","), "7000:36,50D8:36,110:2",
+          "joinUs: both structs and gActiveUnit kept before the call")
+    check(m.u8(slotOf(0x03) + 0x13) .. "|" .. m.u8(at(2, 3)) .. "|" .. m.u32(red),
+          "17|3|0", "joinUs: her HP on her tile, the map cell hers by the new id, the red slot empty")
+    for id = 0x03, 0x3F do m.w32(slotOf(id), 0x08AA0000 + id) end
+    calls = {}
+    check(Sight.joinUs(api, call, S, e), nil, "joinUs: no blue slot free, no join")
+    check(#calls, 0, "joinUs: and no call")
+end
+
 -- the closings key reads our units as the AI's targets only for the second look, which runs only
 -- for a watched unit: with one, same tiles and another HP or carrier is another read; with none
 -- (a looters-only chapter), the tiles are all that count.

@@ -70,3 +70,28 @@ two turns from T2.
     reached Colm by turn 16. The test is one instrumented replay that logs every unit's job on
     turns 5 to 16. It waits for R3 (#767): until the planner plays the jobs, the stage job
     only moves the game around.
+
+## A Talk's recruit is judged as a player unit on its tile (2026-11-25)
+
+**Why.** The game's Talk turns a red recruit blue where she stands (`bmunit.c`
+`UnitChangeFaction`), and the reds may strike her on the enemy phase after. The planner took her
+off the map instead (`fx.gone`), so a Talk plan read no death for her. Vanilla Ch10's Amelia
+(charId 0x12), comparing the played Talk plan's highest death read with her own death read in
+the replan just after she joined: s4002 a2, 0.017 against 0.687, and she died that phase; s4005
+a1, 0 against 0.653; s4005 a2, 0 against 0.95, dead the next turn; s4009 a2, 0 against 0.914,
+dead that phase. On main s4002, where she lived, both read 0.
+
+**What changed.** The judged phase (`sight.lua` `stagePhase`, which `enemyPhase` and the
+lookahead's `nextPhase` both use) is told the plan's Talk targets (`plan.joined`). It turns each
+one blue with the game's own `UnitChangeFaction` (`M.joinUs`) and reports her new blue id
+(`.joined`). Her red id stays gone, so she never acts as an enemy. The planner reads her death
+under that id as it reads a blue's: she is in `hit`, in `predict`, and in `protected` under the
+style's cap. Her death costs a unit's loss in the judged score.
+
+**Known limit.** The game lets her act on the turn she joins, and the bot replans her move. The
+phase reads her where she stands, which can be worse than her best move.
+
+**Proof.** `test_bot`'s `test_a_talked_recruit_is_judged_as_a_player_unit_where_it_stands`
+fails 3 checks on the code without the fix (the phase is never told she joins; the Talk plan's
+`max_die` is 0; careful Talks her into the reds' reach). `test_sight`'s `joinUs` block checks
+the game call, the kept memory and her map cell.
