@@ -8933,6 +8933,28 @@ do
           "stage: no Talk job a talker cannot make before he leaves")
 end
 
+-- test_a_job_is_priced_by_the_danger_on_its_way (#766: the most worth for the least expected
+-- loss, #764). A and C may Talk T over. A is the nearer (8 tiles, 1.6 turns at MOV 5) and C
+-- the farther (9 tiles). A's march stops on (3,0) after its first turn, where E (2 tiles off)
+-- kills it for sure; C's stops, (0,4) and then T's side, are out of E's reach. So C is sent.
+-- With A the only talker, the Talk is no job: its way costs the death it is worth.
+do
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local E = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local C = blue(0x02, 1, 0, 9, { minRange = false })
+    local function o(talk)
+        return { reach = { [0x01] = tiles({ 8, 0 }), [0x02] = tiles({ 0, 9 }), [0x81] = tiles({ 3, 1 }) },
+                 talk = talk, danger = { ["3,0"] = 1 },
+                 fc = { [0x01] = { [0x81] = { ["3,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } } } }
+    end
+    local g = talkGoals(boardOf(A, C, T, E), o({ [0x01] = { [0x30] = true }, [0x02] = { [0x30] = true } }))
+    check(g[0x02], "0,0", "loss: the talker with the safe way is sent")
+    check(g[0x01] ~= "0,0", true, "loss: the nearer one, killed on its way, is not")
+    check(talkGoals(boardOf(A, T, E), o({ [0x01] = { [0x30] = true } }))[0x01], nil,
+          "loss: a way that costs the death it is worth is no job")
+end
+
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
 -- the nearer unit able to Talk to it. Only C is sent; A is left to its own goal.
 do
