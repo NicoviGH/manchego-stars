@@ -308,27 +308,40 @@ local function recruitGoals(byId, closings, paths, cost, style, ctx)
     return out
 end
 
--- The recruit goals alone (recruitGoals), by the recruit's unit id: the Talk jobs' read
--- (bot.lua's exploring, #766), the same goals M.list prices.
-function M.recruits(board, sight, style, ctx)
+-- This board's closings and recruit paths (M.closings, then M.scriptedCloses), and its units by
+-- id: the one read M.list and M.recruits share, kept on ctx for the board it was read on (the
+-- Talk jobs read it once per exploring pass, and the planner's M.list again on the same board).
+local function boardRead(board, sight, style, ctx)
+    local r = ctx.goalRead
+    if r and r.board == board then return r end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local open, walks = M.closings(sight, style, ctx)
     local closings, paths = M.scriptedCloses(sight, ctx, board, open, walks, style.memory)
+    r = { board = board, byId = byId, closings = closings, paths = paths }
+    ctx.goalRead = r
+    return r
+end
+
+-- a sight without a read (test_bot's fakes) has no goal that needs it
+local function costOf(sight) return sight.itemCost or function() return 0 end end
+
+-- The recruit goals alone (recruitGoals), by the recruit's unit id: the Talk jobs' read
+-- (bot.lua's exploring, #766), the same goals M.list prices. New tables each call: a caller may
+-- set its own takers on one.
+function M.recruits(board, sight, style, ctx)
+    local r = boardRead(board, sight, style, ctx)
     local out = {}
-    for _, g in ipairs(recruitGoals(byId, closings, paths, sight.itemCost or function() return 0 end,
-                                    style, ctx)) do
+    for _, g in ipairs(recruitGoals(r.byId, r.closings, r.paths, costOf(sight), style, ctx)) do
         out[g.unitId] = g
     end
     return out
 end
 
 function M.list(board, sight, style, ctx)
-    local goals, blues, byId = {}, {}, {}
-    -- a sight without a read (test_bot's fakes) has no goal that needs it
-    local cost = sight.itemCost or function() return 0 end
+    local goals, blues = {}, {}
+    local r = boardRead(board, sight, style, ctx)
     for _, u in ipairs(board.units) do
-        byId[u.id] = u
         if u.faction == "blue" and u.onField and not u.dead then blues[#blues + 1] = u end
     end
     local function takers(ok)
@@ -338,9 +351,7 @@ function M.list(board, sight, style, ctx)
         end
         return out
     end
-    local open, walks = M.closings(sight, style, ctx)
-    local closings, paths = M.scriptedCloses(sight, ctx, board, open, walks, style.memory)
-    for _, g in ipairs(M.openTiles(sight, style, ctx, closings)) do
+    for _, g in ipairs(M.openTiles(sight, style, ctx, r.closings)) do
         g.takerUnits = takers(function(u)
             if sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind) then
                 return true
@@ -352,7 +363,9 @@ function M.list(board, sight, style, ctx)
         end)
         goals[#goals + 1] = g
     end
-    for _, g in ipairs(recruitGoals(byId, closings, paths, cost, style, ctx)) do goals[#goals + 1] = g end
+    for _, g in ipairs(recruitGoals(r.byId, r.closings, r.paths, costOf(sight), style, ctx)) do
+        goals[#goals + 1] = g
+    end
     for _, u in ipairs(ctx.objectiveTile and blues or {}) do
         local t = ctx.objectiveTile(u)
         if t then

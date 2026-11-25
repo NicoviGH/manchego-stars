@@ -2998,8 +2998,9 @@ local function exploring(ctx, sent, barred, triedIn)
     -- goes to the claim's talker only, as recruitFirst marches it.
     local talkPairs = {}
     -- each recruit's goal (Goals.recruits): when he is removed, and where he walks till then
-    local recruitGoal = Goals.recruits(ctx.board, ctx.sight, ctx.style, ctx)
-    for _, t in ipairs(recruitTargets(ctx)) do
+    local targets = recruitTargets(ctx)
+    local recruitGoal = #targets > 0 and Goals.recruits(ctx.board, ctx.sight, ctx.style, ctx) or {}
+    for _, t in ipairs(targets) do
         -- unclaimed: any talker; claimed: the first claim with a talker that can go, as
         -- recruitFirst falls through its claims in order
         local claims, talkers = claimsOn(ctx, "recruits", t), nil
@@ -3021,8 +3022,8 @@ local function exploring(ctx, sent, barred, triedIn)
             -- job, which is dropped, not chased (#764)
             local g, at, c, turns = recruitGoal[t.id], nil, 1, nil
             if g then
-                local goal = { kind = g.kind, tile = g.tile, closes = g.closes, path = g.path,
-                               takerUnits = { p.u } }
+                local goal = g   -- Goals.recruits' own table, this pair's taker set on it
+                goal.takerUnits = { p.u }
                 local pos = { x = p.u.x, y = p.u.y, acted = p.u.acted, alive = 1 }
                 c, turns = Goals.chance(goal, { [p.u.id] = pos }, Goals.GAMMA, ctx.turnsTo)
                 at = Goals.meeting(goal, p.u, pos, ctx.turnsTo)

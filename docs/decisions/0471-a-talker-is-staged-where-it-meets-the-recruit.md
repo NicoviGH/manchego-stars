@@ -51,6 +51,9 @@ two turns from T2.
 - Unit tests that fail without the change: `test_timeline` (routeOf), `test_goals`
   (`test_a_recruit_path_runs_on_where_the_last_attempt_saw_him_walk`), `test_bot`
   (`test_a_talker_is_staged_where_it_meets_the_recruit`: both checks fail on main).
+- **Planning cost.** `exploring` reads the recruit goals only when there is a recruit to Talk
+  over. The closings read is shared, on `ctx`, with the planner's `Goals.list` for the same
+  board, so a turn reads the forecast once, as before.
 - Lua test time is unchanged: 0.72 to 0.73 s CPU against 0.71 to 0.72 s on main, run back to back.
 - **Replay `s766a`, vanilla Ch14 s4003, two attempts, against `a470a` (main):**
   - Attempt 2 plays move for move as on main. L'Arachel talks Rennac over on turn 5, so the
@@ -61,5 +64,9 @@ two turns from T2.
     turn 9 no meeting is left. Rennac is missed, as on main. The job is right, but the
     per-turn planner does not play it. That is R3 (#767).
   - Attempt 1 won in 24 turns with 1 death (Colm, charId 9, turn 16), against 22 turns and
-    0 deaths on main. That death is 11 turns after the divergence, in a different game; one
-    run does not show its cause.
+    0 deaths on main. **Its cause is untested.** The two games first differ on turn 5, where
+    Eirika opens the (17,20) door in place of another unit's item use. The hypothesis to test
+    is that the changed Talk jobs freed Eirika for the door, and that the door changed what
+    reached Colm by turn 16. The test is one instrumented replay that logs every unit's job on
+    turns 5 to 16. It waits for R3 (#767): until the planner plays the jobs, the stage job
+    only moves the game around.

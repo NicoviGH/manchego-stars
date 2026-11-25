@@ -8797,25 +8797,6 @@ end
 -- turn a hold costs against the death a march risks. A menu cut to the march alone left no safe
 -- plan to judge (vanilla Ch5: Natasha sent into a 0.56 chance to die on turn 3, Joshua lost).
 -- So claimed and unclaimed menus are alike here; which talker a claim sends is
--- test_a_talker_is_staged_where_it_meets_the_recruit (#766's stage job): T walks east, (5,0)
--- after the first enemy phase and (10,0) after the second, and leaves after the third. A, 15
--- tiles from where T stands, cannot be beside him this turn, but meets him on his way at (5,0)
--- next turn: A marches there, not at the tile T is leaving. Where T leaves before any talker
--- can meet him, the Talk is no job (a job no one can make in time is dropped, not chased, #764).
-do
-    local T = blue(0x30, 5, 0, 0, { faction = "green" })
-    local function o(closes, path)
-        return { reach = { [0x01] = tiles({ 12, 3 }) }, talk = { [0x01] = { [0x30] = true } },
-                 closings = { ["unit:48"] = closes }, paths = { [0x30] = path } }
-    end
-    local A = blue(0x01, 0, 12, 3, { minRange = false })
-    check(talkGoals(boardOf(A, T), o(3, { { x = 5, y = 0 }, { x = 10, y = 0 } }))[0x01], "5,0",
-          "stage: the talker marches where it meets the recruit")
-    local far = blue(0x01, 0, 14, 9, { minRange = false })
-    local g = talkGoals(boardOf(far, T), o(2, { { x = 5, y = 0 } }))[0x01]
-    check(g ~= "0,0" and g ~= "5,0", true, "stage: no Talk job a talker cannot make before he leaves")
-end
-
 -- test_a_claimed_recruit_is_sent_its_claimed_talker's, and no way at all
 -- test_no_talker_is_sent_where_it_has_no_way's.
 do
@@ -8931,6 +8912,24 @@ do
     for _, x in ipairs(plan and plan.acts or {}) do talked = talked or x.act == "talk" end
     check(talked and plan.priced, 9980 * Planner.WEIGHTS.careful.gold,
           "paid: the planner charges the hire")
+end
+
+-- test_a_talker_is_staged_where_it_meets_the_recruit (#766's stage job): T walks east, (5,0)
+-- after the first enemy phase and (10,0) after the second, and leaves after the third. A, 15
+-- tiles from where T stands, cannot be beside him this turn, but meets him on his way at (5,0)
+-- next turn: A marches there, not at the tile T is leaving. Where T leaves before any talker
+-- can meet him, the Talk is no job (a job no one can make in time is dropped, not chased, #764).
+do
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local function o(closes, path)
+        return { reach = { [0x01] = tiles({ 12, 3 }) }, talk = { [0x01] = { [0x30] = true } },
+                 closings = { ["unit:48"] = closes }, paths = { [0x30] = path } }
+    end
+    local A = blue(0x01, 0, 12, 3, { minRange = false })
+    check(talkGoals(boardOf(A, T), o(3, { { x = 5, y = 0 }, { x = 10, y = 0 } }))[0x01], "5,0",
+          "stage: the talker marches where it meets the recruit")
+    local far = blue(0x01, 0, 14, 9, { minRange = false })
+    check(talkGoals(boardOf(far, T), o(2, { { x = 5, y = 0 } }))[0x01], nil, "stage: no Talk job a talker cannot make before he leaves")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
