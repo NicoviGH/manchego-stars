@@ -2061,7 +2061,8 @@ do
     m.w8(red + 0x13, 17)   -- her HP
     m.w8(at(2, 3), 0x81)
     local kept, calls = {}, {}
-    local api = { mem = m, SYM = S, Board = { UNIT_SIZE = SIZE, UNIT_RESCUE = 0x1B },
+    local api = { mem = m, SYM = S,
+                  Board = { UNIT_SIZE = SIZE, UNIT_RESCUE = 0x1B, sortedKeys = Board.sortedKeys },
                   write8 = m.w8, write32 = m.w32,
                   keep16 = function(a, n) kept[#kept + 1] = string.format("%X:%d", a, n) end }
     -- as bmunit.c: CopyUnit into GetFreeUnit(faction)'s slot (its index kept), ClearUnit
@@ -2084,10 +2085,41 @@ do
           "joinUs: both structs and gActiveUnit kept before the call")
     check(m.u8(slotOf(0x03) + 0x13) .. "|" .. m.u8(at(2, 3)) .. "|" .. m.u32(red),
           "17|3|0", "joinUs: her HP on her tile, the map cell hers by the new id, the red slot empty")
+    -- a recruit who carries a partner (rescue byte = its id): the call rewrites the partner's
+    -- rescue byte, so that halfword (the byte rounded down to its halfword) is kept too
+    local function recruit(addr, id, x, y)
+        m.w32(S.gUnitLookup + id * 4, addr)
+        m.w32(addr, 0x08AA0090); m.w8(addr + 0x0B, id); m.w8(addr + 0x10, x); m.w8(addr + 0x11, y)
+        m.w8(addr + 0x13, 17)
+        m.w8(at(x, y), id)
+        return { id = id, addr = addr, faction = "red", charId = 0x13, x = x, y = y }
+    end
+    local carrier = recruit(0x7100, 0x82, 4, 5)
+    m.w8(carrier.addr + 0x1B, 0x02)   -- carries unit 0x02
+    kept = {}
+    local carried = Sight.joinUs(api, call, S, carrier)
+    check(carried and carried.id, 0x04, "joinUs: a carrier takes the next free blue slot")
+    check(table.concat(kept, ","), "7100:36,5120:36,110:2,50AA:1",
+          "joinUs: and its partner's rescue halfword is kept (slot 0x02's +0x1A, one halfword)")
+    -- joinTalked: each recruit the plan names, in id order, swapped in the phase's byId
+    local third = recruit(0x7200, 0x83, 6, 7)
+    local byId = { [0x83] = third }
+    local joined, unjoined = Sight.joinTalked(api, call, S, byId, { joined = { [0x83] = true } })
+    check(joined[0x83] .. "|" .. unjoined .. "|" .. tostring(byId[0x83]) .. "|" .. byId[0x05].id,
+          "5|0|nil|5", "joinTalked: her red id is gone from byId, her blue record under the new id")
+    -- the plan's blows left her at 9 HP: the HP is written under her blue id (stageRedHp)
+    Sight.stageRedHp(api, byId, joined, { [0x83] = 9, [0x99] = 4 })
+    check(m.u8(slotOf(0x05) + 0x13), 9,
+          "stageRedHp: a joined recruit stands at the HP the plan left her")
     for id = 0x03, 0x3F do m.w32(slotOf(id), 0x08AA0000 + id) end
     calls = {}
     check(Sight.joinUs(api, call, S, e), nil, "joinUs: no blue slot free, no join")
     check(#calls, 0, "joinUs: and no call")
+    -- no blue slot: she is not joined, and the phase counts her so the planner can say so
+    byId = { [0x81] = e }
+    joined, unjoined = Sight.joinTalked(api, call, S, byId, { joined = { [0x81] = true } })
+    check(next(joined) == nil and unjoined == 1 and byId[0x81] == e, true,
+          "joinTalked: no slot, she stays as she was and is counted unjoined")
 end
 
 -- the closings key reads our units as the AI's targets only for the second look, which runs only
@@ -3266,6 +3298,17 @@ do
         end)
     end)
     check(seen, "1401,0,0,0,0", "stageWear: the enemy's counter spent its javelin's last use")
+    -- a recruit the plan Talked over stands under her blue id (0x05) when the wear is staged: the
+    -- counter's wear is still hers (plan.redWear is keyed by her red id)
+    fill(red.addr, { SWORD, 0x1C | (1 << 8) })
+    sandbox(function()
+        sandbox(function()
+            Sight.stageWear(api, call, S, { blues = {}, redWear = { [0x81] = { [1] = 1 } } },
+                            { [0x05] = red }, { [0x81] = 0x05 })
+            seen = bag(red.addr)
+        end)
+    end)
+    check(seen, "1401,0,0,0,0", "stageWear: a joined recruit's weapon wears under her blue id")
 
     -- PR #645 re-review (3, 4): the army reply's killer, armed from slot 2 (a javelin, 2 uses)
     -- for a kill that spends 1, the first phase's counter having already counted 0.45 on its
@@ -3989,7 +4032,7 @@ end
 -- the plan's reds HP is written, and nextPhase's second after the army's reply, before it plays.
 do
     local stage = sightSrc:match("local function stagePhase%(call, scratch, plan%).-\n    end\n")
-    check(stage ~= nil and stage:find("plan%.reds or {}%) do.-end\n%s+healFaction%(call, byId, \"red\"%)") ~= nil, true,
+    check(stage ~= nil and stage:find("M%.stageRedHp%(api, byId, joined, plan%.reds%).-healFaction%(call, byId, \"red\"%)") ~= nil, true,
           "healFaction: the staged phase heals the reds after the plan's HP is written")
     local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
     check(nextPhase ~= nil and nextPhase:find("healFaction%(call, byId, \"green\"%)%s+healFaction%(call, byId, \"blue\"%)%s+local played = reply and armyReply") ~= nil

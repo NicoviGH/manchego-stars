@@ -9679,12 +9679,13 @@ do
 end
 
 -- test_a_talked_recruit_is_judged_as_a_player_unit_where_it_stands (#766, ADR 0471): R (red,
--- charId 0x12, vanilla Ch10's Amelia) is a recruit A may Talk over from (1,0). The game turns her blue on her
--- tile (UnitChangeFaction): the judged phase is told she joins (plan.joined) and gives her new
--- blue id (.joined); Z kills her there. The Talk plan carries her death, protected under the
--- cap, so careful does not Talk; where Z cannot reach her it does. Before the fix the Talk took
--- her off the map, no death was read, and careful Talked her into Z's reach.
-local function talkedRecruitPlay(deadly)
+-- charId 0x12, vanilla Ch10's Amelia) is a recruit A may Talk over from (1,0). The game turns
+-- her blue on her tile (UnitChangeFaction): the judged phase is told she joins (plan.joined)
+-- and gives her new blue id (.joined); Z kills her there. The Talk plan carries her death,
+-- protected under the cap, so careful does not Talk; where Z cannot reach her it does. Before
+-- the fix the Talk took her off the map, no death was read, and careful Talked her into Z's
+-- reach.
+local function talkedRecruitPlay(deadly, extra)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local R = red(0x81, 2, 0, { hp = 10, charId = 0x12, minRange = false })
     local Z = red(0x82, 4, 0, { minRange = false })
@@ -9704,14 +9705,15 @@ local function talkedRecruitPlay(deadly)
             return out
         end,
     }
-    local a, plan = Planner.plan(B, boardOf(A, R, Z), sightOf(o), style("careful"))
+    for k, v in pairs(extra or {}) do o[k] = v end
+    local a, plan, cost = Planner.plan(B, boardOf(A, R, Z), sightOf(o), style("careful"))
     local talk
     for _, c in ipairs(plan and plan.considered or {}) do
         for _, k in ipairs(c.acts) do
             if k:find(">talk@1,0>129", 1, true) then talk = talk or c end
         end
     end
-    return a, talk, asked
+    return a, talk, asked, cost
 end
 do
     local a, talk, asked = talkedRecruitPlay(true)
@@ -9721,14 +9723,37 @@ do
     a = talkedRecruitPlay(false)
     check(a and a.act, "talk", "joined: where no red reaches her, careful Talks")
     -- the talker's menu and the beam cut to one (vanilla Ch10 s4005: three Talk variants
-    -- filled the menu, and every plan the beam kept Talked): the beam builds only Talk plans, and the mend tries the talker's other acts
-    -- for her, as she has none of her own this turn
+    -- filled the menu, and every plan the beam kept Talked): the beam builds only Talk plans,
+    -- and the mend tries the talker's other acts for her, as she has none of her own this turn
     local saved, savedBeam = Planner.PER_UNIT, Planner.BEAM
     Planner.PER_UNIT, Planner.BEAM = 1, 1
     a, talk = talkedRecruitPlay(true)
     Planner.PER_UNIT, Planner.BEAM = saved, savedBeam
     check(talk ~= nil, true, "joined: with the menu cut, a Talk plan is still judged")
-    check(a and a.act ~= "talk", true, "joined: the mend swaps the deadly Talk for the talker's other act")
+    check(a and a.act ~= "talk", true,
+          "joined: the mend swaps the deadly Talk for the talker's other act")
+end
+
+-- PR #773 review: a recruit paid as a player unit meets the fog as one (the fog's strike on her,
+-- read where the Talk leaves her, is in the Talk plan's fog), and a recruit the phase found no
+-- blue slot for is counted in the call's cost, never dropped silently.
+do
+    local _, talk = talkedRecruitPlay(false, {
+        unseen = { { x = 2, y = 1 } },
+        fogStrike = function(u)
+            if u.id == 0x05 then return { takenDist = { [0] = 0.5, [99] = 0.5 } } end
+            return { takenDist = { [0] = 1 } }
+        end,
+    })
+    check(talk and talk.rank and talk.rank.fog, 0.5, "joined: the fog's strike on her is read")
+    local _, _, _, cost = talkedRecruitPlay(false, {
+        enemyPhase = function(plan)
+            if plan.joined and plan.joined[0x81] then return { unjoined = 1 } end
+            return {}
+        end,
+    })
+    check(cost and cost.unjoined and cost.unjoined > 0, true,
+          "joined: a recruit with no free blue slot is counted in the plan's cost")
 end
 
 -- test_a_talked_recruit_is_never_relisted_as_dead (#766): a Talk takes R off the enemy side, but
@@ -9777,7 +9802,8 @@ do
         if p.id == 0x41 and p.green then asGreen = asGreen + 1 end
         if p.id == 0x05 and p.joined == 0x41 then asOurs = asOurs + 1 end
     end
-    check(asGreen .. "," .. asOurs, "0,1", "green joined: read once, as ours, never as the green she was")
+    check(asGreen .. "," .. asOurs, "0,1",
+          "green joined: read once, as ours, never as the green she was")
 end
 
 -- ── Risk admission and ranking (#510 step 9 PR-C: FR-009 to FR-013, ADR 0384) ──────

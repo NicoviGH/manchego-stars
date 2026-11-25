@@ -140,7 +140,9 @@
 -- seizes = whether this plan takes it }, and what the call cost, over every plan it judged (a
 -- call that finds no plan judged some too): { phases (the enemy phases judged), averaged (the
 -- uncertain kills left to the likeliest way past BRANCH), unsplit (the counter kills those phases
--- left unsplit below sight's SPLIT_FLOOR, summed over them), area_positional and area_truncated
+-- left unsplit below sight's SPLIT_FLOOR, summed over them), unjoined (the Talked recruits no
+-- blue slot was free for in the phases judged: taken off, no death read, ADR 0471),
+-- area_positional and area_truncated
 -- (the CHAI_AT commands, #727, and the walks the budget cut short in the Misc scripts the plans'
 -- waits ran, which the judged phase did not play: M.areaWake), floored (the ways of the plan's
 -- uncertain kills left unsplit below that floor of the plan, ADR 0415), look = { decisions, triggered,
@@ -912,7 +914,7 @@ function M.plan(Bot, board, sight, style, opts)
         cands, ctx = Bot.candidates(board, sight, style, opts)
     end
     if #cands == 0 then return nil, nil, { phases = 0, averaged = 0, unsplit = 0, floored = 0,
-                                      area_positional = 0, area_truncated = 0 } end
+                                      unjoined = 0, area_positional = 0, area_truncated = 0 } end
     if now then now.stage = "search" end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
@@ -1895,7 +1897,7 @@ function M.plan(Bot, board, sight, style, opts)
     local fogDie = (offer and Bot.fogRead(board, sight, opts and opts.seen) or ctx.fogRead()).die
     -- what this call costs, over every plan it judges: the enemy phases judged, and the
     -- uncertain kills left to the likeliest way past BRANCH (never silent)
-    local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0,
+    local cost = { phases = 0, averaged = 0, unsplit = 0, floored = 0, unjoined = 0,
                    area_positional = 0, area_truncated = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
@@ -2069,7 +2071,7 @@ function M.plan(Bot, board, sight, style, opts)
                 only[x.exchange.target] = uid
             end
         end
-        local joined = {}
+        local jointDone = {}   -- the units whose own exchange's joint a dim above plays
         for id, blows in pairs(st.kill) do
             -- the plan's blows on it together, at its own HP: each blow alone was scored at the
             -- HP the earlier ones leave on average, which can call a sure kill short. Gone or
@@ -2085,7 +2087,7 @@ function M.plan(Bot, board, sight, style, opts)
                 local list = sight.jointAt(st.fought[uid].exchange.joint, hp)
                 for _, w in ipairs(list) do w.uid = uid end
                 dims[#dims + 1] = { id = id, key = "k" .. id, ways = list }
-                joined[uid] = true
+                jointDone[uid] = true
             elseif p > 0 and p < 1 then
                 dims[#dims + 1] = { id = id, key = "k" .. id, ways = {
                     { p = p, dead = true },
@@ -2093,7 +2095,7 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         for uid, x in pairs(st.fought) do
-            if not joined[uid] then
+            if not jointDone[uid] then
                 local list = {}
                 for b, p in pairs(x.back[1]) do
                     if p > 0 then list[#list + 1] = { p = p, back = b, uid = uid } end
@@ -2237,6 +2239,7 @@ function M.plan(Bot, board, sight, style, opts)
         -- apart from `averaged`, which stays the plan's own uncertain kills past BRANCH
         local unsplit = 0
         local ours = {}   -- [recruit id] = its blue id in the phase (sight's .joined)
+        local unjoined = 0   -- the recruits no blue slot was free for (sight's .unjoined)
         for i, w in ipairs(ways) do
             if phase then cost.phases = cost.phases + 1 end
             if now then now.phases = cost.phases end
@@ -2246,6 +2249,7 @@ function M.plan(Bot, board, sight, style, opts)
                                         redWear = st.redWear, mass = w.p,
                                         opened = st.opened, carry = st.carry }) or {}
             unsplit = unsplit + (s.unsplit or 0)
+            unjoined = unjoined + (s.unjoined or 0)
             cost.area_positional = cost.area_positional + (s.areaPositional or 0)
             cost.area_truncated = cost.area_truncated + (s.areaTruncated or 0)
             for _, o in ipairs(s.outcomes or { { p = 1, strikes = s } }) do
@@ -2259,6 +2263,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         cost.averaged = cost.averaged + st.averaged
         cost.unsplit = cost.unsplit + unsplit
+        cost.unjoined = cost.unjoined + unjoined
         cost.floored = cost.floored + st.floored
         -- mutually exclusive branches, their chances normalized to sum to 1 (FR-009)
         local wayP = {}
@@ -2425,6 +2430,9 @@ function M.plan(Bot, board, sight, style, opts)
                 addFog(g, gx, gy, g.hp - (taken[g.id] or 0))
             end
         end
+        -- a joined recruit is paid as a player unit, so she meets the fog as one, where the plan
+        -- Talks her (she stands on her tile)
+        for _, r in ipairs(recruited) do addFog(r, r.x, r.y, r.hp - (taken[r.id] or 0)) end
         st.predict = {}
         for _, g in ipairs(greens) do
             judged = judged - loss(W, st, g.charId) * die[g.id]
@@ -2780,6 +2788,7 @@ function M.plan(Bot, board, sight, style, opts)
         wearCalls = wearCalls + 1
         cost.area_positional = cost.area_positional + (r.areaPositional or 0)
         cost.area_truncated = cost.area_truncated + (r.areaTruncated or 0)
+        cost.unjoined = cost.unjoined + (r.unjoined or 0)
         -- the lookahead's second phase for this plan is this same call: kept for it
         st.wearNext = r
         local worn = {}
@@ -2878,28 +2887,38 @@ function M.plan(Bot, board, sight, style, opts)
             for _, a in ipairs(m.acts) do mine[#mine + 1] = { uid = m.unit.id, a = a } end
             menuOf[m.unit.id] = mine
         end
+        -- the menu entries of the units `ids`, less those `skip` drops
+        local function menusOf(ids, skip)
+            local out = {}
+            for _, id in ipairs(ids) do
+                for _, t in ipairs(menuOf[id] or {}) do
+                    if not (skip and skip(t.a)) then out[#out + 1] = t end
+                end
+            end
+            return out
+        end
         local function tries(p)
             if p.recruit then
                 -- a recruit has no player menu: the units it strikes try theirs (out of its
                 -- reach, or waiting or striking holding a weapon whose counter spares it:
                 -- the "gentle" acts, #730)
-                local out = {}
-                for _, id in ipairs(p.struck) do
-                    for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
-                end
-                return out
+                return menusOf(p.struck)
             end
             if p.joined then
                 -- a recruit the plan Talks over has no act of its own in it: the talker's
                 -- other acts are its way out, the Talk not made this turn (vanilla Ch10 s4005:
-                -- every plan judged Talked Amelia into the reds' reach at 0.94, and she died)
-                local out = {}
+                -- every plan judged Talked Amelia into the reds' reach at 0.94, and she died).
+                -- Its acts that Talk her again are left out: they cannot save her, and each
+                -- costs a whole enemy phase to judge
+                local talkers = {}
                 for _, a in ipairs(base.acts) do
                     if a.act == "talk" and a.targetId == p.joined then
-                        for _, t in ipairs(menuOf[a.unitId] or {}) do out[#out + 1] = t end
+                        talkers[#talkers + 1] = a.unitId
                     end
                 end
-                return out
+                return menusOf(talkers, function(a)
+                    return a.act == "talk" and a.targetId == p.joined
+                end)
             end
             if not p.green then return menuOf[p.id] or {} end
             local striker, out = {}, {}
@@ -3076,6 +3095,7 @@ function M.plan(Bot, board, sight, style, opts)
                         look.calls = look.calls + 1
                         cost.area_positional = cost.area_positional + (r.areaPositional or 0)
                         cost.area_truncated = cost.area_truncated + (r.areaTruncated or 0)
+                        cost.unjoined = cost.unjoined + (r.unjoined or 0)
                     end
                     -- the units the wear read (ADR 0421): their later phases are its reading,
                     -- the same second phase on each way's HP and the third, already in their

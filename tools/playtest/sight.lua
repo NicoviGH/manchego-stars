@@ -152,7 +152,8 @@
 --                            plan.joined = { [recruit id] = true } (optional, a subset of
 --                            gone): the recruits the plan Talks over, blue on their tiles
 --                            (M.joinUs); .joined = { [recruit id] = its blue id }, the id
---                            the strikes on it carry.
+--                            the strikes on it carry; .unjoined = the recruits no blue slot was
+--                            free for (taken off, no death read).
 --   nextPhase(plan, reply)   the enemy phase AFTER the next (the planner's lookahead, FR-017),
 --                            our units holding between, or with `reply` playing armyReply's
 --                            turn: plan as enemyPhase's; the next phase
@@ -1940,8 +1941,8 @@ end
 local UNIT_INDEX = 0x0B
 -- gUnitArrayRed's 50 slots by unit id (bmunit.h:376; Board.FACTIONS' red)
 local RED_FIRST, RED_LAST = 0x81, 0xB2
--- the blue ids GetFreeUnit(FACTION_BLUE) searches, in its order (bmunit.c: faction + 1 up to
--- faction + 0x40, exclusive)
+-- the blue ids GetFreeUnit(FACTION_BLUE) searches, in its order, both ends inclusive (bmunit.c
+-- scans faction + 1 up to faction + 0x40, exclusive: 0x01..0x3F)
 local BLUE_FIRST, BLUE_LAST = 0x01, 0x3F
 -- The slots from id `first` to `last` no unit is loaded in (pCharacterData 0), by id, as memory
 -- stands: GetFreeUnit's test (bmunit.c). Pure over mem.
@@ -1981,6 +1982,32 @@ function M.joinUs(api, call, S, e)
     u.id, u.addr, u.faction = slot.id, slot.addr, "blue"
     M.standOn(api, u, x, y)
     return u
+end
+-- Inside a sandbox: every recruit `plan.joined` names turned blue (M.joinUs), in id order so two
+-- recruits take the free slots alike every run. `byId` (a phase's units by id) is changed in
+-- place: her red id gone, her blue record under the new id. -> { [red id] = blue id } and the
+-- number of recruits no blue slot was free for (they are taken off as the plan's gone are, and
+-- no death of theirs is read: the planner counts it, never silently).
+function M.joinTalked(api, call, S, byId, plan)
+    local joined, unjoined = {}, 0
+    for _, id in ipairs(api.Board.sortedKeys(plan.joined or {})) do
+        local u = byId[id] and M.joinUs(api, call, S, byId[id])
+        if u then
+            byId[id], byId[u.id], joined[id] = nil, u, u.id
+        elseif byId[id] then
+            unjoined = unjoined + 1
+        end
+    end
+    return joined, unjoined
+end
+-- Inside a sandbox: the HP a plan leaves its enemies (`reds` = plan.reds, { [id] = hp }) written
+-- on each. A recruit that joined (`joined` = M.joinTalked's) stands under her blue id now, and
+-- the HP the plan's blows left her is hers there: the planner reads her death off it.
+function M.stageRedHp(api, byId, joined, reds)
+    for id, hp in pairs(reds or {}) do
+        local e = byId[id] or byId[joined[id]]
+        if e then api.write8(e.addr + UNIT_HP, hp) end
+    end
 end
 function M.standOn(api, u, x, y, keepOccupant)
     -- where it stands now, not u.x/u.y: a sandbox may have moved it already
@@ -3053,14 +3080,15 @@ end
 -- wear), and each enemy's weapon worn by its counters to the plan's attacks (#644 review: one
 -- whose counter spent its last javelin struck with it in the phase): `redWear` = { [id] =
 -- { [slot] = uses } }, each slot as the board's bag has it, so the highest slot first (a
--- packed bag moves only the slots after the one emptied). `byId` = the board's units by id.
-function M.stageWear(api, call, S, plan, byId)
+-- packed bag moves only the slots after the one emptied). `byId` = the board's units by id;
+-- `joined` (M.joinTalked's, optional): a recruit that joined wears under her blue id.
+function M.stageWear(api, call, S, plan, byId, joined)
     local ledger = {}
     for _, b in ipairs(plan.blues) do
         ledger = M.armAsPlanned(api, call, S, ledger, b.unit, b.slot, b.wearSlot, b.wear)
     end
     for id, slots in pairs(plan.redWear or {}) do
-        local e = byId[id]
+        local e = byId[id] or byId[(joined or {})[id]]
         local order = {}
         for slot in pairs(slots) do order[#order + 1] = slot end
         table.sort(order, function(a, b) return a > b end)
@@ -4284,23 +4312,16 @@ function M.new(outer)
         -- enemy. In id order, so two recruits take the free slots alike every run. Known limit:
         -- the game lets a recruit act on the turn it joins (the bot replans its move); the phase
         -- reads it where it stands, which can be worse than its best move.
-        local joined = {}
-        local talked = {}
-        for id in pairs(plan.joined or {}) do talked[#talked + 1] = id end
-        table.sort(talked)
-        for _, id in ipairs(talked) do
-            local u = byId[id] and M.joinUs(api, call, S, byId[id])
-            if u then byId[id], byId[u.id], joined[id] = nil, u, u.id end
-        end
+        local joined, unjoined = M.joinTalked(api, call, S, byId, plan)
         -- the waits the plan makes run the chapter's Misc events before the enemy phase: an AREA
         -- event that wakes an enemy (vanilla Ch16's Sage, #712) has done so by then
         seen.area = seen.area or { tiles = {}, scripts = {} }
         local _, area = M.areaWake(api, call, scratch, byId, plan.waits or {}, seen.area)
-        for id, hp in pairs(plan.reds or {}) do
-            if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
-        end
+        -- after the join, which keeps her HP as it copies the struct: the plan's blows left her
+        -- this HP (stageRedHp finds her under her blue id), and she is blue for the heal below
+        M.stageRedHp(api, byId, joined, plan.reds)
         healFaction(call, byId, "red")   -- the reds' phase begins: a heal tile heals before any acts
-        local wearing = { base = M.stageWear(api, call, S, plan, byId) }
+        local wearing = { base = M.stageWear(api, call, S, plan, byId, joined) }
         stageCarry(byId, plan.carry)
         -- a unit dies in the phase (a blow's kill, our counter's, a berserk strike's): a
         -- carrier first sets down whom it carries (M.dieOff)
@@ -4408,7 +4429,7 @@ function M.new(outer)
             return M.pilfer(api, call, S, Board, standOn, e, act)
         end
         return byId, order, decides, strike, remove, gone, wearing, berserkFirst, cast, pilfer, area,
-               joined
+               joined, unjoined
     end
 
     -- The phase over `list`, each enemy deciding in turn (M.phaseWays splits it where a counter
@@ -4467,13 +4488,13 @@ function M.new(outer)
     function s.enemyPhase(plan)
         return learningAs(true, function() return sandbox(ghostly(function(call, proc)
             local byId, order, decides, strike, remove, _, _, berserkFirst, cast, pilfer, area,
-                  joined = stagePhase(call, proc, plan)
+                  joined, unjoined = stagePhase(call, proc, plan)
             local out = playPhase(call, proc, byId, berserkFirst, 0, order, decides, strike, remove,
                                   plan.mass, cast, pilfer)
             -- what the plan's waits' events left unread (M.areaWake's stats), for the cost line
             out.areaPositional, out.areaTruncated = area.positional, area.truncated
             -- each Talked recruit's new blue id ({ [red id] = blue id }): its strikes' target
-            out.joined = joined
+            out.joined, out.unjoined = joined, unjoined
             return out
         end)) end)
     end
@@ -4610,7 +4631,7 @@ function M.new(outer)
     function s.nextPhase(plan, reply)
         return learningAs(false, function() return sandbox(ghostly(function(call, proc)
             local byId, order, decides, strike, remove, _, wearing, berserkFirst, cast, pilfer, area,
-                  joined = stagePhase(call, proc, plan)
+                  joined, unjoined = stagePhase(call, proc, plan)
             local moved, fell = {}, {}
             -- the first phase's strikes in order, our berserked units' first (playPhase): each
             -- wears on what the last left (M.tally)
@@ -4692,7 +4713,8 @@ function M.new(outer)
             local out = playPhase(call, proc, byId, berserkFirst, 1, order, decides, strike,
                                   remove, nil, cast, pilfer)
             out.hp, out.moved, out.reply, out.fell = hp, moved, played, fell
-            out.joined = joined   -- as enemyPhase's: a joined recruit's .hp is under its blue id
+            -- as enemyPhase's: a joined recruit's .hp is under its blue id
+            out.joined, out.unjoined = joined, unjoined
             out.areaPositional, out.areaTruncated = area.positional, area.truncated
             return out
         end)) end)

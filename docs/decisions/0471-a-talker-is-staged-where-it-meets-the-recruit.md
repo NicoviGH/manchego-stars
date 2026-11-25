@@ -105,3 +105,12 @@ places took a Talk's `fx.gone` for a death. The re-listing (`deadReds`, the chan
 tile as freed by a kill; a talked green kept a stale green entry beside her player-unit read.
 Both now skip the plan's Talk targets (`talkedIn`, which the judged phase's `joined` uses too).
 `test_bot`'s mend, re-listing and talked-green checks each fail without their fix.
+
+**PR #773 review (2026-11-25).** The plan's HP on her (`plan.reds`) and the wear its counters
+left on her weapon (`plan.redWear`) are staged after the join, so they follow her to her blue id
+(`M.stageRedHp`, `M.stageWear`'s `joined`); before, she stood at board HP with no wear. She is
+paid the fog as a player unit, where the Talk leaves her. The mend's tries for her drop the
+talker's acts that Talk her again. A Talk whose recruit finds no free blue slot is counted
+(`.unjoined`, the plan cost's and the run record's `plans.unjoined`), never silently left unread.
+The mend filter has no test of its own: the fakes' menus offer one Talk per target, which the
+dropped try rebuilds as the plan in hand, and the rebuild is deduplicated before it is judged.
