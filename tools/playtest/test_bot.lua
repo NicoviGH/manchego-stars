@@ -8929,7 +8929,8 @@ do
     check(talkGoals(boardOf(A, T), o(3, { { x = 5, y = 0 }, { x = 10, y = 0 } }))[0x01], "5,0",
           "stage: the talker marches where it meets the recruit")
     local far = blue(0x01, 0, 14, 9, { minRange = false })
-    check(talkGoals(boardOf(far, T), o(2, { { x = 5, y = 0 } }))[0x01], nil, "stage: no Talk job a talker cannot make before he leaves")
+    check(talkGoals(boardOf(far, T), o(2, { { x = 5, y = 0 } }))[0x01], nil,
+          "stage: no Talk job a talker cannot make before he leaves")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is

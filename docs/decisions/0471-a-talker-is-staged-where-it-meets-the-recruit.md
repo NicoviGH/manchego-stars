@@ -54,7 +54,7 @@ two turns from T2.
 - **Planning cost.** `exploring` reads the recruit goals only when there is a recruit to Talk
   over. The closings read is shared, on `ctx`, with the planner's `Goals.list` for the same
   board, so a turn reads the forecast once, as before.
-- Lua test time is unchanged: 0.72 to 0.73 s CPU against 0.71 to 0.72 s on main, run back to back.
+- Lua test time is unchanged: 0.72 to 0.73 s CPU against 0.72 s on main, run back to back after the review fixes.
 - **Replay `s766a`, vanilla Ch14 s4003, two attempts, against `a470a` (main):**
   - Attempt 2 plays move for move as on main. L'Arachel talks Rennac over on turn 5, so the
     remembered route is never needed, and Rennac's turn-13 death (#743) stands.
