@@ -52,4 +52,7 @@ ranks the next phase first among plans over the cap. Admission was the one place
 - `test_bot.lua`: eight lookahead assertions rewritten to the new rule; each fails on the old
   admission. The wear tests (`wear: ... A stays out`) pass unchanged; they fail if the wear is
   dropped from the cap with the second phase.
-- Replay `a470a`, vanilla Ch14 s4003, two attempts: see #766.
+- Replay `a470a`, vanilla Ch14 s4003, two attempts: move-for-move identical to `r766i`.
+  Attempt 1 won in 22 turns with 0 deaths, attempt 2 in 21 turns. Turns 11 and 12 play the same
+  plans, now admitted. Rennac still dies on turn 13, where no plan judged was under the cap even
+  on the next phase (0.536 at best): #743's ground, not this record's.
