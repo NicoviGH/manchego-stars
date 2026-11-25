@@ -81,13 +81,18 @@ the forecast's phases outrank the memory. Fix 2, memory over forecast, was not n
   L'Arachel (not committed).** From every tile he stood on, the forecast's path now matched his
   real walk tile for tile: (22,9) → (22,5) → (22,3) → (18,1) → (12,1) → (6,1) → (1,2) → (1,8).
   L'Arachel's meetings were priced along row 1. On `h766e` they were priced only on his current
-  tile. One read is still unexplained: in attempt 2, on the turn he stood at
-  (22,3), 20 reads sent him south. It is on #766 (comment 7176696969) with the test that would
-  settle it.
+  tile. The other reads, 20 of them in attempt 2 on the turn he stood at
+  (22,3), send him south along row 13. They are the forecast on judged plans that break the
+  (20,13) wall in two strikes (forecast blows of 21 to 29 on its 50 HP). With the wall open,
+  the row-13 exit is nearer. The played plan struck the wall once, so it stood and he went
+  west (#766 comment 7176696969, replays `h775d`-`h775f`).
 - **Outcome on that replay:** both attempts won with 0 deaths (`h766e`: a1 lost Innes, charId
-  11). Rennac was still not recruited, and his two chests closed (taken by him). Pricing the
-  meetings on his real walk did not make L'Arachel get there. That is the per-turn play's gap
-  (R3, #767), not the forecast's.
+  11). Rennac was still not recruited, and his two chests closed (taken by him). Why, from the
+  logged replay: from turn 4, each meeting's death cost on the way outweighs the recruit. On
+  turn 4, meeting him at (18,1) is worth 60 × 0.631 = 37.9 against a loss of 59.98, because
+  her only way north is the corridor the enemy holds, read as it stands. Once our units clear
+  it (turn 8), no meeting is left before he leaves. The Talk job dies on the way's danger, and
+  the clearing comes too late: the clear job's question (#767, PR #774).
 - **PR #777 review.** A meeting past the end of his walk (no removal) is met when the talker
   arrives, never in an earlier phase. Before, a talker 8 turns away read a negative wait and a
   chance near 1 (`test_goals` `test_meetings_price_each_meeting_on_its_wait` fails without the
