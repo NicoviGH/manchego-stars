@@ -3529,6 +3529,8 @@ class Calibration(unittest.TestCase):
         self.assertEqual(mc.death_read(plan, 1), 0.0, 'all its risk was the resolved counter')
         plan = {'protected': [{'id': 1, 'die': 0.6, 'counter': 0.2}]}
         self.assertAlmostEqual(mc.death_read(plan, 1), 0.5, msg='(0.6 - 0.2) / (1 - 0.2)')
+        plan = {'protected': [{'id': 1, 'die': 0.9, 'capDie': 0.02}]}
+        self.assertEqual(mc.death_read(plan, 1), 0.02, "an extended plan: the cap's own reading (ADR 0470)")
 
     @unittest.skipUnless(shutil.which('lua'), 'no lua on PATH')
     def test_death_read_agrees_with_botrun(self):

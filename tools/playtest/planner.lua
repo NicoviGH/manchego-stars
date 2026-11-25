@@ -107,7 +107,9 @@
 -- { id, charId, die, counter (the part of `die` that is the counters to the plan's own acts),
 -- branches = { { p, die } } per way the judged phase went, cap, second (the
 -- lookahead's second phase's chance, when extended; `die` then counts both, but for a unit the
--- wear read, whose `die` is the wear's reading of the later phases alone), wear (what the
+-- wear read, whose `die` is the wear's reading of the later phases alone), capDie (when
+-- extended: `die` as it stood before the second phase, the next phase and the wear, which
+-- admission and the idle rule read: ADR 0470), wear (what the
 -- phases after the next add for a unit no heal of the army's reaches, and `phases` how many were
 -- read: ADR 0421, M.WEAR; `die` counts it) }, lookahead =
 -- { trigger = the kinds M.triggers found | nil, extended, skipped, calls, deep, wear (the wear's
@@ -266,7 +268,8 @@ end
 function M.admits(d, cap) return d <= cap + M.DUST end
 
 -- Whether complete plan rank `a` ranks before `b` (ADR 0384, FR-011 to FR-013). Admission
--- first. Over the cap, the smaller chance of a game over first: a lord's death is no risk
+-- first, which reads the next enemy phase and the wear, never the lookahead's second phase
+-- (ADR 0470). Over the cap, the smaller chance of a game over first: a lord's death is no risk
 -- among others, it ends the chapter (Nicolas, 2026-11-01); then, once the bot's own stall
 -- reading has fired (opts.idle, ADR 0439), a plan that advances the level before an idle one
 -- (`idle`: a hold, or a march over the cap; an under-cap march is not idle, ADR 0458); then
@@ -1900,9 +1903,10 @@ function M.plan(Bot, board, sight, style, opts)
         end
     end
     -- the rank's admission (FR-009 to FR-011) from each protected unit's death chance against
-    -- the cap: set once the phase is judged, and again when the lookahead adds a second phase
-    -- The first call is the next phase's alone, and its numbers are kept (`first_*`, a
-    -- protected unit's `first`): over the cap they rank ahead of the two-phase ones
+    -- the cap: set once the phase is judged, again after the wear and the idle rule, and when
+    -- the lookahead adds a second phase, which changes the rank's numbers but not admission
+    -- (ADR 0470). The first call is the next phase's alone, and its numbers are kept (`first_*`,
+    -- a protected unit's `first`): over the cap they rank ahead of the two-phase ones
     -- (M.outranks), which the lookahead's call overwrites.
     -- Whether healer `q` (a plan's entry: unit, x, y), from where the plan leaves it, can stand
     -- within one of its staves' reach of `p`'s tile next turn: a tile 1 to that reach away
@@ -1942,33 +1946,44 @@ function M.plan(Bot, board, sight, style, opts)
     -- Whether a plan advances the level for the idle rule: under the death-risk cap any
     -- advance counts; over it, a wound that only outlasts the heal does not (#709, ADR 0441: a
     -- seven-unit assault netting 1 HP on a fort boss, max_die 0.999, outranked every hold). Read
-    -- off the rank's `max_exceed`, which admit() sets before this is asked.
+    -- off the cap's own excess (`st.capExceed`), which admit() sets before this is asked.
     local function advancing(st)
-        return st.advances and (not st.woundOnly or st.rank.max_exceed == 0)
+        return st.advances and (not st.woundOnly or st.capExceed == 0)
     end
+    -- The cap reads the next enemy phase and the wear (ADR 0421), never the lookahead's second
+    -- phase (ADR 0470): `pr.capDie`, each protected unit's death chance as it stood before the
+    -- lookahead raised `pr.die` (pr.die itself before then). The both-phase excesses below only
+    -- break ties (M.outranks): over 300 stored runs the second phase's readings of 0.05 or more
+    -- summed to 345 deaths where 54 units died, and admitting by them marked plans safe on the
+    -- next phase as over the cap.
     local function admit(st)
         local rank = st.rank
         local firstCall = rank.first_game_over == nil
         if firstCall then rank.first_game_over = rank.game_over end
         rank.admitted, rank.max_exceed, rank.sum_exceed, rank.max_die, rank.sum_die =
             true, 0, 0, 0, 0
+        local capExceed = 0
         for _, pr in ipairs(st.protected) do
             if firstCall then pr.first = pr.die end
             local over = M.admits(pr.die, cap) and 0 or pr.die - cap
-            rank.admitted = rank.admitted and over == 0
+            local capDie = pr.capDie or pr.die
+            local capOver = M.admits(capDie, cap) and 0 or capDie - cap
+            capExceed = math.max(capExceed, capOver)
+            rank.admitted = rank.admitted and capOver == 0
             rank.max_exceed = math.max(rank.max_exceed, over)
             rank.sum_exceed = rank.sum_exceed + over
             rank.max_die = math.max(rank.max_die, pr.die)
             rank.sum_die = rank.sum_die + pr.die
         end
+        if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
+        st.capExceed = capExceed
         -- a plan that does not advance is no plan once the stall reading fired (ADR 0439); one
         -- under the cap that brings a unit nearer its goal is not idle (#744): the cap already
         -- keeps it safe, and idling it handed the turn to a 0.93-death bait. `idleOn` still turns
         -- on only for a real advance (pick()), so a march never switches the rule on.
-        local marches = rank.max_exceed == 0 and rank.progress > M.DUST
+        local marches = capExceed == 0 and rank.progress > M.DUST
         rank.idle = (idleOn and not advancing(st) and not marches) and 1 or 0
         rank.admitted = rank.admitted and rank.idle ~= 1
-        if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
     end
     -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, fought?,
     -- heal? }): per id { d (its chance to die), t (HP taken), sh (HP short at the end, when
@@ -3020,6 +3035,8 @@ function M.plan(Bot, board, sight, style, opts)
                     for _, pr in ipairs(st.protected) do
                         protected[pr.id] = true
                         pr.second = second[pr.id] or 0
+                        -- the cap's reading stays the one before this phase (ADR 0470)
+                        pr.capDie = pr.capDie or pr.die
                         if not wornRead[pr.id] then pr.die = M.either(pr.die, pr.second) end
                         rank.hp_left = rank.hp_left - (lost[pr.id] or 0)
                     end

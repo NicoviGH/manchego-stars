@@ -3541,14 +3541,17 @@ CALIBRATION_BINS = ((0.0, '0'), (0.01, 'up to 1%'), (0.05, '1 to 5%'), (0.15, '5
 
 def death_read(plan, uid, field='die'):
     """The death chance trace plan event `plan` read for unit slot `uid` once its own acts were
-    played: its `protected` entry's `field` (`die`, every phase it read, as botrun grades a death;
-    `first`, the next enemy phase alone) given the unit lived through the plan's own counters
+    played: its `protected` entry's `field` (`die`: what admission read, its `capDie` where the
+    lookahead's second phase raised `die` (ADR 0470), as botrun grades a death; `first`, the next
+    enemy phase alone) given the unit lived through the plan's own counters
     (`counter`), else its predict's `die` for a unit it does not protect, or whose entry lacks
     `field` (a trace from before ADR 0389 kept no `first`); None when it read neither. The twin of botrun.lua's M.deathRead and M.givenCounter: botrun grades the run in
     Lua, this reads the kept traces, and the two must agree (ADR 0454)."""
     for pr in (plan or {}).get('protected') or []:
         if pr.get('id') == uid and pr.get(field) is not None:
             die, counter = pr[field], pr.get('counter') or 0
+            if field == 'die' and pr.get('capDie') is not None:
+                die = pr['capDie']
             if counter <= 0 or counter >= 1:
                 return die
             return max(0.0, min(1.0, (die - counter) / (1 - counter)))

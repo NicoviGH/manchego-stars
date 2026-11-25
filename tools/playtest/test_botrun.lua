@@ -2369,6 +2369,10 @@ do
     check(d.mover_ref, d.plan_ref, "and the same ref")
     -- no plan: no read, never zero
     check(Botrun.deathRead(nil, 0x01), nil, "no plan: nil")
+    -- a plan the lookahead extended: the cap read the next phase and the wear (`capDie`), and
+    -- the death is graded against that, not the second phase's two-phase `die` (ADR 0470)
+    check(Botrun.deathRead({ protected = { { id = 0x01, die = 0.9, capDie = 0.02 } } }, 0x01), 0.02,
+          "extended plan: the cap's own reading")
 end
 
 -- test_only_a_protected_death_has_a_cap (FR-009): the cap is on blue units and on units whose

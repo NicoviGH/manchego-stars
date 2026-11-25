@@ -195,3 +195,9 @@ turn the 2026-11-08 amendment set aside (the planner's own plan, 4.6x).
 - **Control:** `PT_REPLY=hold` reads every second phase with our units holding, as before.
 
 **Amended 2026-11-23 (ADR 0459, #743): the sandbox strike equips its weapon.** The game equips the weapon an enemy strikes with, which moves it to slot 0 of the bag; the sandbox's strike did not, so the second phase started from the bag in its old order and read the wrong weapon for a striker with two (a Steel Lance where the Killer Lance had struck). The equip now carries the bag order into the second phase, and into each phase the wear reads after it, with the ledger's rows following their items. Our own berserked unit's strike does not equip (its reply slots are read off the board's list).
+
+**Amended 2026-11-24 (Nicolas, #766, ADR 0470): the second phase no longer decides admission.**
+The lookahead still runs at the same transitions and its reading still counts in the rank (the
+two-phase numbers and `value`), but a plan is admitted on the next enemy phase and the wear
+alone. Over 300 stored traces its readings of 0.05 or more summed to 345 deaths where 54 units
+died.

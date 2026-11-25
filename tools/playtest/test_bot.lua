@@ -7575,7 +7575,8 @@ do
     -- A and B each wound E (30 of 40, fort heal 9) for 5, the counters kill each: over the cap.
     do
         local played
-        local function assault(hp, heal, counter)
+        -- `second`: a lookahead second phase that kills whoever stands beside E (ADR 0470)
+        local function assault(hp, heal, counter, second)
             local A = blue(0x01, 0, 0, 0)
             local Bu = blue(0x02, 1, 0, 1)
             local E = red(0x81, 2, 0, { minRange = 1, hp = hp, maxhp = 40, isBoss = true })
@@ -7587,6 +7588,16 @@ do
                 fc = { [0x01] = { [0x81] = { ["1,0"] = blow(lethal) } },
                        [0x02] = { [0x81] = { ["2,1"] = blow(lethal) } } },
                 enemyPhase = function() return {} end,
+                nextPhase = second and function(plan)
+                    local out = {}
+                    for _, b in ipairs(plan.blues) do
+                        if Board.distance(b.x, b.y, 2, 0) == 1 then
+                            out[#out + 1] = { enemy = 0x81, target = b.unit.id, takenHit = 100,
+                                              takenDmg = 99, takenHits = 1, takenCrit = 0 }
+                        end
+                    end
+                    return out
+                end or nil,
             }
             local _, plan = Planner.plan(B, boardOf(A, Bu, E), sightOf(o), style("careful"), { idle = true })
             local n, assaultIdle = 0, nil
@@ -7606,6 +7617,11 @@ do
         -- under-cap march toward the boss (progress 0.6) is no idle plan either (#744)
         check(select(2, assault(10, 9, true)), 0, "advances G: the same assault with a kill chance still advances")
         check(played, "1>wait@1,0>nil 2>wait@2,1>nil", "advances G: and the under-cap march toward the boss is played over it (#744)")
+        -- the same march with a second phase that kills both marchers: still under the cap on
+        -- the next phase, so still no idle plan, and still played (ADR 0470: the idle rule reads
+        -- the cap's own excess, not the lookahead's)
+        assault(10, 9, true, true)
+        check(played, "1>wait@1,0>nil 2>wait@2,1>nil", "advances G: a march the second phase kills is still no idle plan (ADR 0470)")
         check(assault(30, 9, false) > 0, true, "advances G: an under-cap chip that outlasts the heal still advances")
     end
     -- the heal model (Planner.healed): 6 HP back on 30 max; a wound of 4 is healed whole, one of
@@ -10227,7 +10243,7 @@ do
     end
     local board, sight, st = fogged(true)
     local a, plan = Planner.plan(B, board, sight, st)
-    check(at(a), "0,0", "remembered boss: the second phase's sure death keeps A back")
+    check(at(a), "1,0", "remembered boss: the next phase is safe, so the march goes (ADR 0470)")
     check(plan.lookahead.extended, true, "remembered boss: the step into its reach triggers the lookahead")
     board, sight, st = fogged(false)
     check(at(Planner.plan(B, board, sight, st)), "1,0", "unseen boss: no trigger, the march goes")
@@ -10243,7 +10259,7 @@ do
 
     board, sight, st = looksAhead(true)
     local a, plan, cost = Planner.plan(B, board, sight, st)
-    check(at(a), "0,0", "lookahead: the second phase's sure death keeps A back")
+    check(at(a), "1,0", "lookahead: the cap reads the next phase alone, so the march goes (ADR 0470)")
     local fin = 0
     for _, c in ipairs(plan.considered) do
         if c.extended then fin = fin + 1 end
@@ -10254,22 +10270,24 @@ do
     check(plan.lookahead.extended, true, "lookahead: and says it extended")
     check(cost.look.calls, fin, "lookahead: the call's cost counts them too")
     check(cost.look.triggered + cost.look.extended, 2, "lookahead: triggered and extended")
-    local over = false
-    for _, c in ipairs(plan.considered) do
-        if c.extended and not c.rank.admitted then over = true end
-    end
-    check(over, true, "lookahead: the finalist at (1,0) dies in the second phase, over the cap")
-    -- the HP it loses there leaves the rank too, and the judged score pays the death; the
-    -- trace's `judged` stays the next phase's alone
+    -- the finalist at (1,0) dies in the second phase: the rank's both-phase reading says so,
+    -- and the cap, which reads the next phase alone, still admits it (ADR 0470)
     local hold, march
     for _, c in ipairs(plan.considered) do
-        if c.extended and c.rank.admitted then hold = hold or c end
-        if c.extended and not c.rank.admitted then march = march or c end
+        if c.extended and c.rank.max_die < 0.5 then hold = hold or c end
+        if c.extended and c.rank.max_die > 0.5 then march = march or c end
     end
+    check(hold ~= nil and march ~= nil, true, "lookahead: the hold and the march both met the second phase")
+    check(march.rank.admitted and march.rank.first_max_exceed == 0, true,
+          "lookahead: the finalist at (1,0) dies in the second phase, and is still admitted")
+    -- the HP it loses there leaves the rank too, and the judged score pays the death; the
+    -- trace's `judged` stays the next phase's alone
     check(march.rank.hp_left < hold.rank.hp_left, true, "lookahead: the second phase's HP lost")
     check(march.rank.value < march.judged, true, "lookahead: the value pays the second death")
     check(hold.rank.value, hold.judged, "lookahead: a safe hold pays nothing more")
-    check(plan.protected[1].second, 0, "lookahead: holding at (0,0) is safe in the second phase")
+    check(hold.rank.max_die, 0, "lookahead: holding at (0,0) is safe in the second phase")
+    check(plan.protected[1].second == 1 and plan.protected[1].capDie == 0, true,
+          "lookahead: the played march's record keeps the second phase's death and the cap's 0")
 
     board, sight, st = looksAhead(true)
     a, plan, cost = Planner.plan(B, board, sight, st, { budget = { attempt = 1 } })
@@ -10294,7 +10312,7 @@ end
 -- test_the_second_phase_reads_the_army_s_reply (ADR 0389's amendment of 2026-11-17): every
 -- second phase is asked with the army's reply (sight.nextPhase's `reply`); opts.reply = "hold"
 -- (PT_REPLY=hold) asks the hold instead. Here the hold's second phase kills A at (1,0) and the
--- reply's spares it: the march goes, and the hold keeps A back.
+-- reply's spares it: the record of the played march reads each (the cap reads neither, ADR 0470).
 do
     local played = { kills = {}, steps = { { unit = 0x01, x = 0, y = 0 } } }
     local board, sight, st = looksAhead(true, function() return { reply = played } end)
@@ -10303,9 +10321,11 @@ do
     check(plan.lookahead.reply, played, "reply: what it played is in the played plan's trace")
     check(sight.replied, #sight.asked, "reply: every second phase is the reply's")
     check(plan.lookahead.calls, #sight.asked, "reply: one call a finalist, as the hold's")
+    check(plan.protected[1].second, 0, "reply: the reply's second phase spares A at (1,0)")
     board, sight, st = looksAhead(true, function() return {} end)
-    a = Planner.plan(B, board, sight, st, { reply = "hold" })
-    check(at(a), "0,0", "reply: PT_REPLY=hold reads the hold, which keeps A back")
+    a, plan = Planner.plan(B, board, sight, st, { reply = "hold" })
+    check(at(a) .. " " .. tostring(plan.protected[1].second == 1), "1,0 true",
+          "reply: PT_REPLY=hold reads the hold, whose second phase kills A at (1,0)")
     check(sight.replied, nil, "reply: and never asks the reply")
 end
 
@@ -10413,7 +10433,9 @@ do
         if c.extended and c.acts[1]:match("@1,0>") then march = march or c end
     end
     check(hold ~= nil and march ~= nil, true, "over the cap: both the hold and the march judged")
-    check(hold.rank.admitted or march.rank.admitted, false, "over the cap: neither is admitted")
+    -- the cap reads the next phase alone (ADR 0470): the hold, safe there, is admitted
+    check(hold.rank.admitted and not march.rank.admitted, true,
+          "over the cap: the hold is admitted, the march is not")
     -- the gap the order turns on, both ways: the two-phase numbers favour the march, the next
     -- phase's favour the hold
     check(march.rank.max_die < hold.rank.max_die - 0.1, true,
@@ -10584,7 +10606,10 @@ do
         check(#c.weights >= 1 and math.abs(c.weights[1] - 1) < 1e-9, true,
               "audit: one way, all the weight")
     end
-    check(why.over_cap, true, "audit: the march the second phase kills is over_cap")
+    -- the march the second phase kills is still admitted (ADR 0470): the hold it outranks is
+    -- `outranked`, and no plan is over the cap
+    check(why.outranked and not why.over_cap, true,
+          "audit: the hold is outranked, and nothing is over_cap")
     -- no transition, no second phase: both plans within the cap, the hold ranked below
     board, sight, st = looksAhead(nil)
     _, plan = Planner.plan(B, board, sight, st)
@@ -10606,7 +10631,8 @@ do
           "deep: every finalist meets a second phase")
     check(plan.lookahead.deep and plan.lookahead.extended, true, "deep: tagged and extended")
     check(plan.lookahead.trigger, nil, "deep: no transition was found, none is claimed")
-    check(at(a), "0,0", "deep: the second phase's death keeps A back")
+    check(at(a) .. " " .. tostring(plan.protected[1].second == 1), "1,0 true",
+          "deep: the second phase reads A's death; the cap reads the next phase (ADR 0470)")
     board, sight, st = looksAhead(nil)
     _, plan = Planner.plan(B, board, sight, st)
     check(sight.asked == nil and plan.lookahead.deep == nil, true, "deep: off by default")
@@ -10671,7 +10697,7 @@ end
 -- test_offer_judges_every_enemy_seen (re-review A): the offer brings the fogged board's acts
 -- only; the enemies the judging knows are the fog-off board's. A boss the fog hides when the
 -- acts are read still makes the step into its reach a lookahead trigger, and the second
--- phase's death keeps A back, as it does with the boss seen all along.
+-- phase reads A's death, as it does with the boss seen all along.
 do
     local board, sight, st = looksAhead(true)
     local fogged = { turn = board.turn, phase = board.phase, map = board.map, units = {} }
@@ -10685,7 +10711,7 @@ do
     local a, plan = Planner.plan(B, board, sight, st, { offer = { cands = cands, ctx = ctx } })
     check(plan.lookahead.trigger and plan.lookahead.trigger[1], "boss",
           "offer: the boss the fog hid is seen by the trigger")
-    check(at(a), "0,0", "offer: and its second phase keeps A back")
+    check(plan.protected[1].second, 1, "offer: and its second phase reads A's death")
     check(plan.enemies[0x82], true, "offer: the plan's enemies hold the boss")
 end
 
