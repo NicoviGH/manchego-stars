@@ -13,45 +13,36 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-25, night; main is 698657f3 + HANDOFF commits)
+## Next session starts here (2026-11-25, late night; main is 698657f3 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773).
 
-**Order Nicolas set (2026-11-25): #775, then #776, then the R4 runs (#768).**
+**PR #777 waits for Nicolas's "merge"** (branch `feat/775-talk-best-meeting`, ADR 0473, closes
+#775). It holds the best-meeting Talk job and the forecast's Rogue fix: `sight.closings`' replay
+now plays `AI_ACTION_PICK` (door opens, chest empties, its item fills the bag). Replay `h775c`
+(Ch14 s4005): Rennac's forecast walk matches his real one tile for tile, but he is still not
+recruited (the per-turn play's gap, #767). `/code-review medium` done, every finding fixed, one
+scoped re-review done; CI was running at handoff. The door hold was dropped (never fired). One
+open question is on #766 (comment 7176696969: 20 reads sent him south on a2 turn 6).
 
-1. **#775: a unit's remembered walk outranks a forecast that holds it still** (sub-issue of #766).
-   Once Rennac is on the board the forecast (`sight.closings`' path) keeps him on his tile, and
-   `goals.lua` `runOn` lets it outrank his remembered walk, so every Talk meeting is priced in
-   the enemy-held corridor and dropped. First step is a code read (does the forecast play his
-   Lockpick door and chests?), then fix the forecast or let the memory win. Proof: a failing
-   test and one Ch14 s4005 replay. Its body has the plan.
-2. **#776: a step safe now that leaves no safe tile next turn** (sub-issue of #743; Tana in Ch14
+**Order Nicolas set (2026-11-25): #775 (done in PR #777), then #776, then the R4 runs (#768).**
+
+1. **#776: a step safe now that leaves no safe tile next turn** (sub-issue of #743; Tana in Ch14
    s4002, Amelia in Ch10 s4007). **Answer its question before building:** #743's probe found
    the second-phase read no guide, so first check on the recorded boards whether a "safe tile
    next turn" check would flag those deaths at t-1 and not the units that lived.
-3. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
+2. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
    --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
    b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
-   comment 7093112364). Run in the background.
-
-**Branch `feat/766-hold-trigger` (local only, one WIP commit 39568f35, not pushed, not
-reviewed)**, cut from main:
-- **The Talk job is worth its best meeting, not its first** (`Goals.meetings`, `talkWorth`):
-  Rennac recruited on 3 of 5 Ch14 starts (main 2), clean clears 2 of 5 (main 2); s4002 won him
-  by the safe intercept at his exit (#766 comment 7175090575). Keep it; #775 builds on it.
-- **The door hold (`heldTrigger`) never fired** in any run (`h766b`, `h766d`): remove it before
-  the PR unless #775 makes it matter. History: a hold on distance won s4002 and lost s4003 and
-  s4009 (`h766a`); the decomp shows Rennac sits on (22,12) until our (22,17) door opens
-  (#766 comments 7172746109, 7173054263, 7174641267).
-- Do #775 on this branch, then one PR for both, `/code-review`, ADR (0473: 0472 is PR #774's).
+   comment 7093112364). Run in the background, after PR #777 lands.
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
 Today's tags: `h774a` (door-hold probe), `h766a`-`h766e` (Ch14 five starts and two logged
-replays). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
+replays), `h775a`-`h775c` (Ch14 s4005 replays of the forecast fix). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
 b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
 **Holds to revisit:** #569 waited on R1 (read its hold comment: does it reopen?). #727 waits on
