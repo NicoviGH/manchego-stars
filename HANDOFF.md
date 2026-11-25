@@ -13,22 +13,18 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-25, late night; main is 698657f3 + HANDOFF commits)
+## Next session starts here (2026-11-25, late night; main is d0e6f8e7 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773).
 
-**PR #777 waits for Nicolas's "merge"** (branch `feat/775-talk-best-meeting`, ADR 0473, closes
-#775). It holds the best-meeting Talk job and the forecast's Rogue fix: `sight.closings`' replay
-now plays `AI_ACTION_PICK` (door opens, chest empties, its item fills the bag). Replay `h775c`
-(Ch14 s4005): Rennac's forecast walk matches his real one tile for tile, but he is still not
-recruited (the per-turn play's gap, #767). `/code-review medium` done, every finding fixed, one
-scoped re-review done. The door hold was dropped (never fired). Both whys settled on #766
-(comment 7176696969): the south-bound reads are plans that break the (20,13) wall (correct),
-and L'Arachel's job dies on the corridor's danger until it is cleared, too late: #767's
-question (PR #774).
+**PR #777 merged (2026-11-25, ADR 0473, closed #775):** the best-meeting Talk job, and the
+forecast now plays a Rogue's door and chests. Rennac's forecast walk matches his real one, but
+he is still missed on s4005: his Talk job dies on the corridor's danger, read as it stands,
+until our units clear it, too late (#766 comment 7176696969). R4 is to size that for PR #774's
+merge call (#767 comment).
 
-**Order Nicolas set (2026-11-25): #775 (done in PR #777), then #776, then the R4 runs (#768).**
+**Order Nicolas set (2026-11-25): #775 (done, PR #777), then #776, then the R4 runs (#768).**
 
 1. **#776: a step safe now that leaves no safe tile next turn** (sub-issue of #743; Tana in Ch14
    s4002, Amelia in Ch10 s4007). **Answer its question before building:** #743's probe found
@@ -37,7 +33,7 @@ question (PR #774).
 2. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
    --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
    b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
-   comment 7093112364). Run in the background, after PR #777 lands.
+   comment 7093112364). Run in the background. Also count the misses #767's comment asks for.
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
