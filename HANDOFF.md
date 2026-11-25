@@ -23,8 +23,10 @@ R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix mer
 now plays `AI_ACTION_PICK` (door opens, chest empties, its item fills the bag). Replay `h775c`
 (Ch14 s4005): Rennac's forecast walk matches his real one tile for tile, but he is still not
 recruited (the per-turn play's gap, #767). `/code-review medium` done, every finding fixed, one
-scoped re-review done; CI was running at handoff. The door hold was dropped (never fired). One
-open question is on #766 (comment 7176696969: 20 reads sent him south on a2 turn 6).
+scoped re-review done. The door hold was dropped (never fired). Both whys settled on #766
+(comment 7176696969): the south-bound reads are plans that break the (20,13) wall (correct),
+and L'Arachel's job dies on the corridor's danger until it is cleared, too late: #767's
+question (PR #774).
 
 **Order Nicolas set (2026-11-25): #775 (done in PR #777), then #776, then the R4 runs (#768).**
 
