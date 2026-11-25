@@ -13,36 +13,34 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-24; main is 64060b87 + this HANDOFF)
+## Next session starts here (2026-11-25; main is 698657f3 + this HANDOFF)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the
-plan, first. In short: one-case fixes kept trading one loss for another. The bot will:
+plan, first.
 - **R1 #765: done.** PR #769 (ADR 0467).
-- **R2 #766: part 1 merged** (PR #770, ADR 0468 and 0469), **and PR #770's two loose ends are
-  closed** (#766's comments of 2026-11-24 have the detail):
-  - PR #771: a step-aside test built from Ch14's real corridor (`r766f` turn 13) fails without
-    the step aside at the default beam. The beam's "carry a fully placed plan" rule stays held by
-    reading: four boards and beam widths 1 to 16 never showed it doing anything (ADR 0469).
-  - PR #772, ADR 0470 (Nicolas chose option A): the death cap reads the next enemy phase and the
-    wear, never the lookahead's second phase, which only breaks ties now. Deaths are graded
-    against the same number (botrun `deathRead`, montecarlo `death_read`). Replay `a470a` of Ch14
-    s4003 is move-for-move identical to `r766i`. **Not measured:** how often A changes play
-    (when a lookahead finalist read as dying two turns out now wins on progress). Measure it on
-    the next lap of games over the R2/R3 batch, not alone (ADR 0430).
-  - **Left for R2:** the stage, clear and escort jobs, and replacing `recruitFirst` and
-    `marchGoal`'s per-goal choice (#766's first progress comment). Cut a new branch from main.
-- **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it). The
-  Ch14 replays show why: L'Arachel holds Rennac's job but spends turns on her staff.
+- **R2 #766: the stage job, route loss and the Talk-recruit fix are merged** (PR #773, ADR 0471;
+  #766's comments of 2026-11-25 have the measurements):
+  - A talker is sent to the tile where it meets the recruit, on the route an earlier attempt
+    saw; a job is priced by the death on its road (`routeLoss` × `W.death`, no new weight).
+  - A Talk's recruit is judged as a player unit on her tile (the game's `UnitChangeFaction` in
+    the judged phase), and the mend tries the talker's other acts for her. This stopped Amelia's
+    Ch10 deaths after early Talks (5 of 10 games on the branch before, 0 after).
+  - 10 starts (Ch10 and Ch14, s4002/3/5/7/9, two attempts each): 4 cleared clean against main's
+    2, and 6 deaths against 12.
+  - **Left for R2:** the clear and escort jobs, and replacing `recruitFirst` and `marchGoal`'s
+    per-goal choice. Cut a new branch from main.
+- **Decision owed to Nicolas (on #766):** Ch10 s4009 a1 is lost. On turn 7 the bot had admitted
+  plans with Eirika at 0%, but it played one with her at 0.118, because within the cap the
+  admitted order ranks progress ahead of death. It is main's order; this ties into the open R3
+  question of whether R3 touches the rank's order.
+- **Also open:** Ch10 s4003/s4007 never recruit Amelia (main too), so they never clear clean.
+- **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it).
 - **R4 #768:** then measure the walls.
 
-The one call still open for Nicolas is whether R3 touches the rank's order (before R3).
-
-**Ch14 s4003 as it stands** (`a470a`, two attempts): both won (22 and 21 turns). In attempt 2
-Rennac dies on turn 13 where no plan was under the cap even on the next phase (0.536 at best):
-#743's ground, the wounded unit with no safe tile.
+**Ch14 s4003 as it stands** (`j766c`, two attempts): won in 18 turns, then cleared clean in 17.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s4003/`.
-Ch14 s4003's start is a scout lap: replay it with
+Each start is a scout lap: replay it with
 `montecarlo.py resume --game vanilla --tag <tag> --campaigns b640e-cs-s4003 --chapter 14 --last 14
 --attempts 2 --scout --jobs 1`.
 
