@@ -8955,6 +8955,63 @@ do
           "loss: a way that costs the death it is worth is no job")
 end
 
+-- test_a_job_blocked_by_an_enemy_sends_a_unit_to_kill_it (#767: the clear job). A alone may
+-- Talk T over, and its way stops on (3,0), where E kills it for sure: the Talk is no job
+-- (test_a_job_is_priced_by_the_danger_on_its_way). S can kill E from (3,3) with no counter, so
+-- S is sent to E (a clear job, worth the Talk's), and the plan that kills E is credited the
+-- whole of S's way (0.8 turns at MOV 5), not what is left of it from where S ends (0.6). An S
+-- whose forecast does not kill E is not sent. Nor is S sent where T leaves after the second
+-- enemy phase (`closes` 2): A alone still meets him in time, but not once it waits the turn S's
+-- clear takes (a job no one can make in time is dropped, #764); with a turn more it is sent.
+local function clearPlan(kills, closes)
+    local T = blue(0x30, 5, 0, 0, { faction = "green" })
+    local E = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
+    local A = blue(0x01, 0, 8, 0, { minRange = false })
+    local S = blue(0x02, 1, 3, 6)
+    local o = {
+        reach = { [0x01] = tiles({ 8, 0 }), [0x02] = tiles({ 3, 6 }, { 3, 4 }, { 3, 3 }),
+                  [0x81] = tiles({ 3, 1 }) },
+        talk = { [0x01] = { [0x30] = true } }, danger = { ["3,0"] = 1 },
+        closings = closes and { ["unit:48"] = closes } or nil,
+        fc = { [0x01] = { [0x81] = { ["3,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } },
+               [0x02] = { [0x81] = { ["3,3"] = kills
+                   and fc { hit = 100, dmg = 99, hits = 1, killsTarget = true } or nil } } },
+        field = function(goal)
+            local f = {}
+            for y = 0, 9 do
+                f[y] = {}
+                for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+            end
+            return f
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, S, T, E), sightOf(o), style("careful"))
+    local goal
+    for _, g in ipairs(plan and plan.goals or {}) do
+        if g.id == 0x02 then goal = g end
+    end
+    local killed
+    for _, c in ipairs(plan and plan.considered or {}) do
+        for _, k in ipairs(c.acts) do
+            if k:find(">attack@3,3>129", 1, true) then killed = killed or c end
+        end
+    end
+    return goal, killed
+end
+do
+    local goal, killed = clearPlan(true)
+    check(goal and (goal.x .. "," .. goal.y .. ">" .. tostring(goal.clears)), "3,2>129",
+          "clear: the unit that can kill the blocker is sent to it")
+    check(killed and killed.rank and killed.rank.progress, 0.8,
+          "clear: the kill is credited the whole way to the blocker")
+    goal = clearPlan(false)
+    check(goal, nil, "clear: a unit that cannot kill the blocker is not sent")
+    goal = clearPlan(true, 2)
+    check(goal, nil, "clear: no clear that lands after the blocked job closes")
+    goal = clearPlan(true, 3)
+    check(goal and goal.clears, 0x81, "clear: a clear that lands in time is sent")
+end
+
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
 -- the nearer unit able to Talk to it. Only C is sent; A is left to its own goal.
 do

@@ -1086,7 +1086,9 @@ function M.plan(Bot, board, sight, style, opts)
         local beside = tile and ctx.beside and ctx.beside(tile) or false
         local t = tile and turnsTo(u, tile, nil, beside)
         if t then
-            assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside }
+            -- a clear job's enemy (#767, exploreGoal.target): its death in the plan is the job done
+            assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside,
+                                        target = tile.target }
             goalOf[u.id] = assigned[#assigned]
         end
     end
@@ -1094,8 +1096,12 @@ function M.plan(Bot, board, sight, style, opts)
         local pos, out = positions(st), 0
         local read = turnsOn(st, pos)
         for _, a in ipairs(assigned) do
-            local t = read(a.u, a.tile, pos[a.u.id], a.beside)
-            if t then out = out + (a.turns - t) end
+            if a.target and st.gone[a.target] then
+                out = out + a.turns
+            else
+                local t = read(a.u, a.tile, pos[a.u.id], a.beside)
+                if t then out = out + (a.turns - t) end
+            end
         end
         return out
     end
@@ -3239,7 +3245,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- the recruit, village or chest each unit was sent to (Bot.candidates' exploring), by unit id
     best.goals = {}
     for id, t in pairs(ctx.exploreGoal or {}) do
-        best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
+        best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y, clears = t.target }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
     -- the enemies the plan was made against: in sight, and those a retry remembers (ctx.threats,
