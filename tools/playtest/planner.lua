@@ -1639,18 +1639,7 @@ function M.plan(Bot, board, sight, style, opts)
     for _ = 1, #menus do
         local nxt, seenSig = {}, {}
         for _, st in ipairs(beam) do
-            local menusNow, placed = menusFor(st), true
-            for _, m in ipairs(menusNow) do placed = placed and st.used[m.unit.id] == true end
-            -- a plan whose every unit is placed already (an ally's step aside placed two in one
-            -- depth, ADR 0469) goes on as it is: it would extend to nothing at the last depth
-            -- and lose its place to plans one act behind it
-            if placed then
-                local sig = {}
-                for _, x in ipairs(st.acts) do sig[#sig + 1] = key(x) end
-                sig = table.concat(sig, "|")
-                if not seenSig[sig] then seenSig[sig] = true; nxt[#nxt + 1] = st end
-            end
-            for _, m in ipairs(placed and {} or menusNow) do
+            for _, m in ipairs(menusFor(st)) do
                 for _, a in ipairs(m.acts) do
                     local n = extend(st, a, m.unit.id)
                     if n then

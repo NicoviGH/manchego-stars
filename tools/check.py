@@ -92,6 +92,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0469's amendment (#766): the beam does not carry a fully placed plan; no
+    # board showed the rule doing anything
+    r'\bwhose every unit is placed already\b', r'\bplaced two in one depth\b',
     # retired by ADR 0468 (#766): a talk's script is read for its price (sight.talkPrice), not
     # only whether it reaches the paid script; the event walk has no memo (every visitor keeps
     # state through CALLs)

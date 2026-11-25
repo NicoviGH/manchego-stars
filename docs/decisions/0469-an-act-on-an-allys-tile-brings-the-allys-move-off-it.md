@@ -37,16 +37,23 @@ replay (`r766f`) settled it:
   Seize and goal offers, and `unstall`. A replay of acts a plan already holds passes `exact`:
   `complete`, `rebuild`, the mends, the kept `rest` and the fog reorder. An aside there would
   silently swap an ally's own act for another (#770's review).
-- **The beam carries a plan whose every unit is already placed** to the next depth as it is. A
-  step aside places two units in one depth, and such a plan would otherwise extend to nothing at
-  the last depth and lose its place (#770's review). No board tried shows the loss: on two test
-  boards the beam built the same plan at the last depth in another order. So this is held by
-  reading, not by a test.
+- **Amended 2026-11-24 (#766): the beam no longer carries a plan whose every unit is placed.**
+  #770's review added that rule by reading: a step aside places two units in one depth, so such
+  a plan might extend to nothing at the last depth and lose its place. No board showed it doing
+  anything. With the rule removed, the result was the same on all three door boards in
+  `test_bot.lua`, at beam widths 1 to 16 and per-unit widths 1 to 4. Either every plan in the
+  last depth's beam was fully placed (the beam then stops as it stands), or the beam built the
+  same plan in another order. Code that no test can show working is removed.
 
 ## Proof
 
 - `test_bot.lua` `test_an_act_on_an_allys_tile_brings_the_allys_move_off_it`: the Ch8 aside
   board with the beam cut to one plan of one act per unit. It fails before this change.
+- `test_bot.lua` `test_the_door_is_opened_from_a_crowded_corridor_at_the_default_beam` (added
+  2026-11-24): the Ch14 stall at the default beam. It uses the real row-1 positions of `r766f`
+  attempt 2, turn 13, with the door locked to the keyless units and reach along the row only.
+  Without the step aside it fails, and so does the test above. With it, board id 3 steps aside
+  and id 10 opens the door from (17,1). The door plan wins on progress, 7.6 against 1.6.
 - Replay `r766g`, Ch14 s4003, two attempts:
   - Attempt 1 won in 20 turns with 0 deaths; Rennac was missed.
   - Attempt 2 **won clean** in 19 turns with 0 deaths. L'Arachel talked Rennac over on turn 5
