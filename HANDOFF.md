@@ -29,10 +29,9 @@ plan, first.
     2, and 6 deaths against 12.
   - **Left for R2:** the clear and escort jobs, and replacing `recruitFirst` and `marchGoal`'s
     per-goal choice. Cut a new branch from main.
-- **Decision owed to Nicolas (on #766):** Ch10 s4009 a1 is lost. On turn 7 the bot had admitted
-  plans with Eirika at 0%, but it played one with her at 0.118, because within the cap the
-  admitted order ranks progress ahead of death. It is main's order; this ties into the open R3
-  question of whether R3 touches the rank's order.
+- **Ch10 s4009 a1's loss is no bug** (#766 comment 7169573218): the 0%-for-Eirika plans each
+  forfeited Amelia's recruit, and bold's cap took an 11.8% game over (read right) over a certain
+  forfeit. Recommended: no rank change; the R3 rank-order question stays open on its own.
 - **Also open:** Ch10 s4003/s4007 never recruit Amelia (main too), so they never clear clean.
 - **R3 #767:** have the per-turn planner play those jobs (`ctx.jobs` is written for it).
 - **R4 #768:** then measure the walls.
