@@ -564,12 +564,15 @@ Board.ACTIONS = { [0x01] = "wait", [0x02] = "attack", [0x03] = "staff", [0x04] =
 -- xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the ballista, AiAttemptBallistaCombat's -1),
 -- +0A actionPerformed (AiSetDecision sets it: the unit decided to move or act at all).
 Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, SLOT = 0x07,
-                 PERFORMED = 0x0A }
+                 X_TARGET = 0x08, Y_TARGET = 0x09, PERFORMED = 0x0A }
 -- AI_ACTION_*: what the AI chose. A theft (AiStartStealAction) and a village pillage
 -- (AiPillageAction) set no action type of their own.
 Board.AI_ACTION_COMBAT, Board.AI_ACTION_ESCAPE, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE =
     1, 2, 3, 4
 Board.AI_ACTION_STAFF = 5
+-- A Rogue's door or chest (cpextra_80407F0.c sub_8040C5C: xTarget/yTarget name the lock it
+-- opens from its move tile; cp_perform.c AiPickAction, then bmusemind.c ActionPick)
+Board.AI_ACTION_PICK = 13
 
 -- What became of a unit the death watch saw on the field (`was` = { charId, faction }), read off
 -- what the game wrote to its slot at `addr` this frame; nil = it is still there.
@@ -726,7 +729,7 @@ function Board.bind(mem, SYM)
         AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
         -- sight.closings reads it off api.Board: without it the compare was nil == action, never
         -- true, and no recruit's escape was ever seen (#699)
-        AI_ACTION_ESCAPE = Board.AI_ACTION_ESCAPE,
+        AI_ACTION_ESCAPE = Board.AI_ACTION_ESCAPE, AI_ACTION_PICK = Board.AI_ACTION_PICK,
     }
 end
 

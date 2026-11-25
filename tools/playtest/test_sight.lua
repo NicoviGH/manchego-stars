@@ -34,6 +34,14 @@ local function zeroMem()
     return { u8 = zero, u16 = zero, u32 = zero, s8 = zero }
 end
 
+-- Memory over a sparse `bytes` table ({ [address] = value }, 0 elsewhere) at every width: the
+-- one stub for a test that lays out the few addresses a game read walks. A test that also reads
+-- signed bytes or writes keeps its own.
+local function bytesMem(bytes)
+    local read = function(a) return bytes[a] or 0 end
+    return { u8 = read, u16 = read, u32 = read }
+end
+
 -- The game's own map layout (bmmap.c BmMapInit) over `m` for the three maps a refresh rebuilds
 -- (gBmMapUnit, gBmMapHidden, gBmMapFog), W x H tiles (3 x 2 unless given): gBmMapSize, then per
 -- pool the h + 4 row pointers and the (w + 2)-wide rows, the handle on the third pointer. -> the
@@ -246,9 +254,7 @@ end
 do
     local cpu, seen = fakeCpu(1)
     local bytes = { [0x100] = 7 }
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
+    local outer = { cpu = cpu, mem = bytesMem(bytes),
                     write8 = function(a, v) bytes[a] = v end,
                     write16 = function(a, v) bytes[a] = v end,
                     write32 = function(a, v) bytes[a] = v end }
@@ -298,9 +304,7 @@ end
 do
     local cpu = fakeCpu(1)
     local bytes = {}
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
+    local outer = { cpu = cpu, mem = bytesMem(bytes),
                     write8 = function(a, v) bytes[a] = v end,
                     write16 = function(a, v) bytes[a] = v end,
                     write32 = function(a, v) bytes[a] = v end }
@@ -339,14 +343,79 @@ do
     check(seen[3], 30, "openMap: a tile with no change changes nothing")
 end
 
+-- test_play_pick_opens_what_the_rogue_picked (#775): a Rogue's AI_ACTION_PICK names its door or
+-- chest in the decision's xTarget/yTarget, and ActionPick (bmusemind.c) runs that tile's door
+-- or chest event. The forecast's replay played no pick, so Ch14's Rennac picked the same shut
+-- door every phase and read as standing beside it for his whole stay. A door opens as its map
+-- change draws it (openMap), a chest with no change is emptied, and a decision that is no pick
+-- changes nothing.
+do
+    local bytes = {}
+    local mem = bytesMem(bytes)
+    local kept
+    local api = { mem = mem, write8 = function(a, v) bytes[a] = v end,
+                  write16 = function(a, v) bytes[a] = v end,
+                  keep16 = function(a, n) kept = a .. "x" .. n end }
+    local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10,
+                gBmMapBaseTiles = 0x20, gBmMapTerrain = 0x30, gAiDecision = 0x700,
+                MakeNewItem = 3, UnitAddItem = 4 }
+    local B = { AI_DEC = Board.AI_DEC, AI_ACTION_PICK = Board.AI_ACTION_PICK,
+                UNIT_ITEMS = Board.UNIT_ITEMS, ITEM_COUNT = Board.ITEM_COUNT }
+    local rogue, added = { addr = 0x900 }, {}
+    local function itemAt(x, y) return (x == 4 and y == 1) and 0x1D or nil end
+    bytes[0x20], bytes[0x30], bytes[0x10] = 0x100, 0x200, 0x400
+    bytes[0x104], bytes[0x204] = 0x140, 0x240
+    bytes[0x240 + 2], bytes[0x240 + 4] = Sight.TERRAIN_DOOR, Sight.TERRAIN_CHEST_FULL
+    bytes[0x400 + (0x88 >> 2)] = 0x01
+    local mc = 0x500
+    bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 1, 1, 0x600
+    bytes[0x600] = 0x88
+    local function call(fn, args)
+        if fn == S.GetMapChangeIdAt then
+            return (args[1] == 2 and args[2] == 1) and 3 or 0xFFFFFFFF
+        elseif fn == S.MakeNewItem then
+            return args[1] | 0x1E00
+        elseif fn == S.UnitAddItem then
+            added[#added + 1] = args[1] .. ":" .. args[2]
+            return 0
+        end
+        return mc
+    end
+    local function decide(action, x, y)
+        bytes[0x700 + Board.AI_DEC.ACTION] = action
+        bytes[0x700 + Board.AI_DEC.X_TARGET], bytes[0x700 + Board.AI_DEC.Y_TARGET] = x, y
+    end
+    check(Board.AI_ACTION_PICK, 13, "playPick: AI_ACTION_PICK is cp_common.h's 13")
+    decide(Board.AI_ACTION_PICK, 2, 1)
+    local x, y, chest = Sight.playPick(api, call, S, B, rogue, itemAt)
+    check(x .. "," .. y .. "|" .. tostring(chest) .. "|" .. bytes[0x242], "2,1|false|1",
+          "playPick: the picked door opens as its map change draws it")
+    decide(Board.AI_ACTION_PICK, 4, 1)
+    x, y, chest = Sight.playPick(api, call, S, B, rogue, itemAt)
+    check(x .. "," .. y .. "|" .. tostring(chest) .. "|" .. bytes[0x244],
+          "4,1|true|" .. Sight.TERRAIN_CHEST_EMPTY, "playPick: a picked chest with no change is emptied")
+    check(table.concat(added, ",") .. "|" .. tostring(kept),
+          (0x900) .. ":" .. (0x1D | 0x1E00) .. "|" .. (0x900 + Board.UNIT_ITEMS) .. "x" .. Board.ITEM_COUNT,
+          "playPick: the chest's item goes into the Rogue's bag, the bag kept first")
+    bytes[0x244] = Sight.TERRAIN_CHEST_FULL
+    decide(Board.AI_ACTION_PILLAGE, 4, 1)
+    check(Sight.playPick(api, call, S, B, rogue, itemAt), nil, "playPick: a decision that is no pick plays nothing")
+    check(bytes[0x244], Sight.TERRAIN_CHEST_FULL, "playPick: no pick, the chest stays full")
+    check(#added, 1, "playPick: a door, and no pick, put nothing in the bag")
+    -- the forecast's replay plays it after every move, and the board API carries the constant
+    -- (without it the compare was nil == action, as AI_ACTION_ESCAPE's once was, #699)
+    local at = sightSrc:find("local function replay(who, at, into, gone, onPillage, tileOnly)", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("M.carryPaths(", at, true)) or ""
+    check(body:find("M.playPick(", 1, true) ~= nil, true, "playPick: the forecast's replay plays a pick")
+    check(Board.bind(mem, {}).AI_ACTION_PICK, 13, "playPick: the board API carries AI_ACTION_PICK")
+end
+
 -- test_map_change_tiles_are_the_rectangles_drawn_tiles: the change at (2,1) is 2x2 at (2,1);
 -- the game writes only its non-zero tiles (ApplyMapChangesById), so (3,2), a 0, is not one.
 -- A tile with no change has none (nil).
 do
     local bytes = {}
-    local mem = { u8 = function(a) return bytes[a] or 0 end,
-                  u16 = function(a) return bytes[a] or 0 end,
-                  u32 = function(a) return bytes[a] or 0 end }
+    local mem = bytesMem(bytes)
     local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10 }
     local mc = 0x500
     bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 2, 2, 0x600
@@ -401,9 +470,7 @@ end
 do
     local cpu = fakeCpu(1)
     local bytes = {}
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
+    local outer = { cpu = cpu, mem = bytesMem(bytes),
                     write8 = function(a, v) bytes[a] = v end,
                     write16 = function(a, v) bytes[a] = v end,
                     write32 = function(a, v) bytes[a] = v end, Board = Board }
@@ -2152,9 +2219,7 @@ do
     local function run(nested)
         local cpu = fakeCpu(1)
         local bytes = { [0x100] = 7 }
-        local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                           u16 = function(a) return bytes[a] or 0 end,
-                                           u32 = function(a) return bytes[a] or 0 end },
+        local outer = { cpu = cpu, mem = bytesMem(bytes),
                         write8 = function(a, v) bytes[a] = v end,
                         write16 = function(a, v) bytes[a] = v end,
                         write32 = function(a, v) bytes[a] = v end }
@@ -3954,6 +4019,14 @@ do
     sight.remember({ { id = 1 } })
     check(dangerReads({ gone = { [1] = true } }) > 0, true,
           "changed: a remembered enemy's death rebuilds the danger grid")
+    -- chestItem (#775, PR #777 review): the forecast's replay reads a chest's item from the memo
+    -- alone (`known`), so an unread chest is nil and runs no game call (no sandbox nested in the
+    -- replay, borrowing the AI's scratch); a plain read asks the game
+    local before = calls
+    check(sight.chestItem(5, 5, true), nil, "chestItem: known only, an unread chest has no item")
+    check(calls - before, 0, "chestItem: known only, no game call")
+    sight.chestItem(5, 5)
+    check(calls - before > 0, true, "chestItem: a plain read asks the game")
     -- ADR 0449: knows() reads the arrival botrun stamped; a refresh only when one changes
     do
         local refreshes, plain = 0, sight.refresh

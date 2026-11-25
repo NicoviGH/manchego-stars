@@ -326,6 +326,7 @@ function M.riding(state) return ((state or 0) & M.US_IN_BALLISTA) ~= 0 end
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL, CA_BALLISTAE
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL, M.CA_BALLISTAE = 0x69, 0x6B, 0x04, 1 << 7
+M.ITEM_GOLD = 0x77   -- include/constants/items.h: a chest of gold puts nothing in the bag
 -- The staves the game heals one ally with: bmitemuse.c DoItemUse sends Heal, Mend and Recover
 -- (0x4B-0x4D) and Physic (0x4E) to DoUseHealStaff, gSelectInfo_Heal's target selection, the one
 -- the harness plays. GetUnitItemHealAmount (bmitem.c) is no test of it: it adds its holder's
@@ -406,8 +407,9 @@ local ACTION_X_OTHER, ACTION_Y_OTHER, ACTION_TRAP_TYPE = 0x13, 0x14, 0x15
 -- 0x1C bytes. A talk entry (EvtListTalk, struct EvCheck03/04) holds script +04, pidA +08,
 -- pidB +09.
 local EVENT_INFO_SIZE, EVENT_SCRIPT, EVENT_PID_A, EVENT_PID_B = 0x1C, 0x04, 0x1A, 0x1B
--- struct EventInfo +08 flag, +18/+19 xPos/yPos; struct ChapterEventGroup +08 locationBasedEvents
-local EVENT_FLAG, EVENT_X, EVENT_Y = 0x08, 0x18, 0x19
+-- struct EventInfo +08 flag, +14 givenItem, +18/+19 xPos/yPos; struct ChapterEventGroup +08
+-- locationBasedEvents
+local EVENT_FLAG, EVENT_ITEM, EVENT_X, EVENT_Y = 0x08, 0x14, 0x18, 0x19
 local CHAPTER_TURNS, CHAPTER_LOCATIONS, CHAPTER_MISC = 0x00, 0x08, 0x0C
 local TALK_SCRIPT, TALK_PID_A, TALK_PID_B, NO_PID = 0x04, 0x08, 0x09, 0xFF
 -- struct ChapterEventGroup (include/chapterdata.h): +04 characterBasedEvents, the talks.
@@ -3213,6 +3215,32 @@ function M.idleMove(api, mem, S, Board, follow, e)
     return x, y, escaped
 end
 
+-- Inside a sandbox: Rogue `e`'s pick (AI_ACTION_PICK, #775) played as ActionPick plays it
+-- (bmusemind.c): the door or chest event at the decision's xTarget/yTarget. A door opens as its
+-- map change draws it (openMap); a chest is emptied (its change when it has one, else the
+-- empty chest's terrain), off the AI's lock lists, and its item (`itemAt(x, y)`: sight's
+-- chestItem, nil for gold) goes into his bag through the game's MakeNewItem and UnitAddItem,
+-- the bag kept first as moveItem keeps a theft's. A full bag is what turns the Ch14 Rogue
+-- from locks to his exit (cpextra_80407F0.c sub_8040C5C: 5 items, aiFlags 8). Unplayed, Rennac
+-- picked the same shut door every phase of the forecast and read as standing beside it for his
+-- whole stay; with an empty bag he went back south for the doors instead of west to his exit.
+-- -> the lock's tile and whether it was a chest, or nil when the decision is no pick
+function M.playPick(api, call, S, Board, e, itemAt)
+    local mem, D = api.mem, S.gAiDecision
+    if mem.u8(D + Board.AI_DEC.ACTION) ~= Board.AI_ACTION_PICK then return nil end
+    local x, y = mem.u8(D + Board.AI_DEC.X_TARGET), mem.u8(D + Board.AI_DEC.Y_TARGET)
+    local at = cell(mem, S.gBmMapTerrain, x, y)
+    local chest = mem.u8(at) == M.TERRAIN_CHEST_FULL
+    M.openMap(api, call, S, x, y)
+    if chest and mem.u8(at) == M.TERRAIN_CHEST_FULL then api.write8(at, M.TERRAIN_CHEST_EMPTY) end
+    local item = chest and itemAt(x, y)
+    if item then
+        api.keep16(e.addr + Board.UNIT_ITEMS, Board.ITEM_COUNT)
+        call(S.UnitAddItem, { e.addr, call(S.MakeNewItem, { item }) })
+    end
+    return x, y, chest
+end
+
 -- Where a dying carrier `o` sets down whom it carries, inside a sandbox: the game's own
 -- search, bmunit.c UnitGetDeathDropLocation, as bmmind.c DropRescueOnDeath calls it when a unit
 -- at 0 HP is US_RESCUING (#739). Left carried, the unit stayed hidden and the enemies after the
@@ -4772,6 +4800,11 @@ function M.new(outer)
         end
         local ck = M.closingsKey(turn0, k, waves, looters, open, blockers, s.mapKey(), watch)
         if closingsAt[ck] then return closingsAt[ck].out, closingsAt[ck].paths end
+        -- a Rogue's chest fills his bag (M.playPick): each chest's item read now, in its own
+        -- sandbox, so the replay's reads are the memo's and never borrow the AI's scratch
+        for _, c in ipairs(commands) do
+            if c.cmd == M.TILE_COMMAND_CHEST then s.chestItem(c.x, c.y) end
+        end
         local out, paths = {}, {}
         local function close(x, y, phase)
             local key = x .. "," .. y
@@ -4802,6 +4835,15 @@ function M.new(outer)
                                     who[id], gone[id] = nil, true
                                 elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE and onPillage then
                                     onPillage(x, y, phase)
+                                else
+                                    -- a Rogue's door or chest opens (both looks: a shut door
+                                    -- held Rennac still); a chest it takes closes in the first
+                                    -- (playPick has emptied it: no sackedTerrain over it)
+                                    -- the items closings read before its sandbox (a chest it
+                                    -- did not list is no full chest, so puts nothing in)
+                                    local px, py, chest = M.playPick(api, call, S, Board, e,
+                                        function(cx, cy) return s.chestItem(cx, cy, true) end)
+                                    if chest and onPillage then close(px, py, phase) end
                                 end
                             end
                         end
@@ -5007,15 +5049,42 @@ function M.new(outer)
         return false
     end
 
-    -- Whether the Visit at (x, y) is a House: its location entry (SearchAvailableEvent over the
-    -- chapter's locationBasedEvents, as GetAvailableTileEventCommand finds it) has flag 0, so
-    -- its Visit never closes and it marks nothing taken (eventinfo House(0, ...)); a village's
-    -- entry sets a flag. `info` is a sandbox's scratch.
-    local function isHouse(call, info, x, y)
+    -- The location entry at (x, y) (SearchAvailableEvent over the chapter's locationBasedEvents,
+    -- as GetAvailableTileEventCommand finds it) filled into `info`, a sandbox's scratch; ->
+    -- whether one is there
+    local function locationAt(call, info, x, y)
         eventSearch(api, call, info, CHAPTER_LOCATIONS)
         api.write8(info + EVENT_X, x)
         api.write8(info + EVENT_Y, y)
-        return call(S.SearchAvailableEvent, { info }) ~= 0 and mem.u32(info + EVENT_FLAG) == 0
+        return call(S.SearchAvailableEvent, { info }) ~= 0
+    end
+    -- Whether the Visit at (x, y) is a House: its location entry has flag 0, so its Visit never
+    -- closes and it marks nothing taken (eventinfo House(0, ...)); a village's entry sets a flag.
+    local function isHouse(call, info, x, y)
+        return locationAt(call, info, x, y) and mem.u32(info + EVENT_FLAG) == 0
+    end
+    -- The item the chest at (x, y) puts in its opener's bag, or false for gold or none
+    -- (eventinfo.c StartAvailableTileEvent's TILE_COMMAND_CHEST: the entry's givenItem, ITEM_GOLD
+    -- pays the party instead; a givenItem of 0 rolls one from the table at its script, whose
+    -- first entry stands for the roll: what the AI reads of it is a bag one item fuller). The
+    -- forecast's Rogue fills his bag with them (M.playPick). Read once: a chest's entry never
+    -- changes. `known` reads the memo alone (nil when it was never read), for a caller inside a
+    -- sandbox whose scratch a nested one must not borrow (closings' replay: the AI's proc).
+    local chestItems = {}
+    function s.chestItem(x, y, known)
+        local k = x .. "," .. y
+        if chestItems[k] == nil and not known then
+            chestItems[k] = sandbox(function(call, info)
+                if not locationAt(call, info, x, y) then return false end
+                local item = mem.u32(info + EVENT_ITEM) & 0xFFFF
+                if item == 0 then
+                    local table = mem.u32(info + EVENT_SCRIPT)
+                    item = table ~= 0 and mem.u8(table) or 0
+                end
+                return item ~= 0 and item ~= M.ITEM_GOLD and item or false
+            end)
+        end
+        return chestItems[k] or nil
     end
 
     function s.explorable()

@@ -478,37 +478,77 @@ end
 -- `beside` (M.beside) asks turnsTo to leave the lock on his tile out: priced through the chests
 -- Rennac walks over, every partial plan read his chance as 0 (#710).
 -- Second and third answers: the tile he is met on and its phase.
-local function meet(goal, u, p, late, turnsTo, beside)
+-- `each(t, tile, f)` for each phase in turn whose meeting the taker makes, until it answers
+-- true: meet's first, M.meetings' every one.
+-- A trip of `t` turns (turnsTo's) begun `late` turns from now: the player phase it arrives in
+-- (1: this one) and its chance, a gamma per turn on the way. The one clock every Talk and goal
+-- price reads (meetEach, arrive, M.meetings, M.chance).
+local function trip(t, late, gamma)
+    return math.max(math.ceil(t), 1) + late, gamma and gamma ^ (math.max(t, 1) - 1 + late)
+end
+
+local function meetEach(goal, u, p, late, turnsTo, beside, each)
     local path = goal.path
     for f = 1, goal.closes or math.huge do
         local beyond = f - 1 > #path
-        if beyond and goal.closes then return nil end
+        if beyond and goal.closes then return end
         local tile = f == 1 and goal.tile or path[math.min(f - 1, #path)] or goal.tile
         local t = turnsTo(u, tile, p, beside)
-        if t and (beyond or math.max(math.ceil(t), 1) + late <= f) then return t, tile, f end
-        if beyond then return nil end
+        if t and (beyond or trip(t, late) <= f) and each(t, tile, f) then return end
+        if beyond then return end
     end
+end
+
+local function meet(goal, u, p, late, turnsTo, beside)
+    local mt, mtile, mf
+    meetEach(goal, u, p, late, turnsTo, beside, function(t, tile, f)
+        mt, mtile, mf = t, tile, f
+        return true
+    end)
+    return mt, mtile, mf
 end
 
 -- When taker `u` (at `p`, M.chance's position, `late` turns spent first) gets to `goal`: its
 -- turns (turnsTo's), the tile it gets the goal on and the player phase from now (1: this one),
 -- or nil when it cannot before the goal closes. A recruit the game moves is met on his way
--- (meet); any other goal stands where it is. The one read M.chance prices and M.meeting aims.
+-- (meet); any other goal stands where it is. The one read M.chance and M.meetings share.
 local function arrive(goal, u, p, late, turnsTo)
     local beside = M.beside(goal.kind)
     -- the deadline is in the meeting's phase (meet), so no closes test after it
     if goal.path and #goal.path > 0 then return meet(goal, u, p, late, turnsTo, beside) end
     local t = turnsTo(u, goal.tile, p, beside)
-    local f = t and math.max(math.ceil(t), 1) + late
+    local f = t and trip(t, late)
     if not f or goal.closes and goal.closes < f then return nil end
     return t, goal.tile, f
 end
 
--- Where taker `u` meets the goal, and in which player phase from now: the stage job's tile
--- (#766), a talker marching where it meets the recruit, not at the tile he is leaving.
-function M.meeting(goal, u, p, turnsTo)
-    local _, tile, f = arrive(goal, u, p, (p.late or 0) + (p.acted and 1 or 0), turnsTo)
-    return tile, f
+-- Every meeting taker `u` (at `p`, M.chance's position) can make with a recruit on his way
+-- (#766: the job is "get him", worth its best meeting, not its first: vanilla Ch14's Rennac is
+-- met first in the corridor the enemy holds, and later, safely, at the map's edge):
+-- { { tile, f (its player phase from now), c (its chance: M.chance's for a lone taker, one gamma
+-- more for each turn it waits there for him), turns (the turn it gets there on) } }, soonest first.
+-- A goal with no path is met where it is.
+function M.meetings(goal, u, p, gamma, turnsTo)
+    local late = (p.late or 0) + (p.acted and 1 or 0)
+    local out = {}
+    -- every turn until the Talk costs a gamma: the trip's (as M.chance), then the wait there
+    -- for him, so a later meeting is never worth more for being nearer
+    -- A meeting past the walk's end (meetEach's `beyond`, no removal) is made whenever the taker
+    -- arrives, later than that phase too: it is met on its arrival, and no wait is negative (PR
+    -- #777 review: a talker 8 turns off read a meeting at phase 4 at gamma^-4, above every
+    -- nearer one)
+    local function add(t, tile, f)
+        local turns, c = trip(t, late, gamma)
+        f = math.max(f, turns)
+        out[#out + 1] = { tile = tile, f = f, turns = turns, c = c * gamma ^ (f - turns) }
+    end
+    if goal.path and #goal.path > 0 then
+        meetEach(goal, u, p, late, turnsTo, M.beside(goal.kind), function(t, tile, f) add(t, tile, f) end)
+    else
+        local t, tile, f = arrive(goal, u, p, late, turnsTo)
+        if t then add(t, tile, f) end
+    end
+    return out
 end
 
 function M.chance(goal, pos, gamma, turnsTo)
@@ -525,8 +565,8 @@ function M.chance(goal, pos, gamma, turnsTo)
             local late = (p.late or 0) + (p.acted and 1 or 0)
             local t = arrive(goal, u, p, late, turnsTo)
             if t then
-                options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
-                                          alive = alive, turns = math.max(math.ceil(t), 1) + late }
+                local turns, c = trip(t, late, gamma)
+                options[#options + 1] = { c = c, alive = alive, turns = turns }
             end
         end
     end
